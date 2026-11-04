@@ -30,11 +30,11 @@ source is now out of date and who owns it.
 
 | # | Source | Decides |
 | --- | --- | --- |
-| 1 | Alex's latest explicit decision, once it is in `decisions.md` | Anything it names |
+| 1 | Alex's latest explicit decision, once it is in `decisions/` (or the frozen `decisions.md`) | Anything it names |
 | 2 | `glossary.md` | Words and the bot / chat / thread model |
 | 3 | `rules.md` | Product and visual rules |
-| 4 | Accepted Figma frame newer than the code | Layout: what goes where, sizes, order, grouping |
-| 5 | Merged implementation (from PR #165 on) | Layout where the frame is older than the code |
+| 4 | A Figma draft Alex is reviewing now | Layout: what goes where, sizes, order, grouping |
+| 5 | The running app on `main` ([decision 2026-11-01-0015](decisions/2026-11-01-0015-main-is-the-design.md)) | Layout everywhere else; it wins over any other Figma frame |
 | 6 | Comma (app.comma.surf) | Look and feel: shell structure, density, type, radii, shadows |
 | 7 | reUI / shadcn defaults | Only what nothing above covers |
 

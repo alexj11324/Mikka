@@ -10,16 +10,18 @@ const TEMPLATES = { desktop: 'tpl1', claude: 'tpl2', codex: 'tpl3' }
 const CATALOGUE = JSON.stringify({ version: 1, workerSha: SHA, templates: Object.fromEntries(Object.keys(TEMPLATES).map(kind => [kind, { templateId: TEMPLATES[kind], models: MODELS[kind] }])) })
 const STORED = { MIKKA_CLOUD_TEMPLATE_MODELS: CATALOGUE, E2B_BYO_COMPUTER_TEMPLATE: 'tpl1', E2B_CLAUDE_TEMPLATE: 'tpl2', E2B_CODEX_TEMPLATE: 'tpl3', MIKKA_CLOUD_WORKER_SHA: SHA }
 
-function fakeVercel({ inFlight = 0, stored = STORED, redeploy = 'READY', commit, newerCommit } = {}) {
+function fakeVercel({ inFlight = 0, stored = STORED, before, redeploy = 'READY', commit, newerCommit } = {}) {
   const calls = []
   let listings = 0
+  let wrote = false
   const fetchImpl = async (url, init) => {
     const path = url.pathname, method = init.method
     calls.push({ method, path, search: url.search, body: init.body && JSON.parse(init.body) })
     const json = (body) => ({ ok: true, status: 200, json: async () => body })
-    if (method === 'POST' && path.endsWith('/env')) return json({ created: [] })
-    if (path.endsWith('/env')) return json({ envs: Object.keys(stored).map((key) => ({ id: `id-${key}`, key, target: ['production'] })) })
-    if (path.includes('/env/id-')) return json({ value: stored[path.split('/env/id-')[1]] })
+    const source = wrote || !before ? stored : before
+    if (method === 'POST' && path.endsWith('/env')) { wrote = true; return json({ created: [] }) }
+    if (path.endsWith('/env')) return json({ envs: Object.keys({ ...stored, ...source }).map((key) => ({ id: `id-${key}`, key, target: ['production'] })) })
+    if (path.includes('/env/id-')) return json({ value: source[path.split('/env/id-')[1]] })
     if (path === '/v6/deployments') return json({ deployments: [
       ...(listings++ < inFlight ? [{ uid: 'dpl_new', name: 'mikka', state: 'BUILDING' }] : []),
       ...(newerCommit ? [{ uid: 'dpl_newer', name: 'mikka', state: 'READY', meta: { githubCommitSha: newerCommit } }] : []),
@@ -34,7 +36,7 @@ function fakeVercel({ inFlight = 0, stored = STORED, redeploy = 'READY', commit,
 const run = (fake, extra = {}) => publish({ token: 't', templates: TEMPLATES, sourceSha: SHA, models: MODELS, fetchImpl: fake.fetchImpl, wait: async () => {}, log: () => {}, ...extra })
 
 test('every template and the worker hash go to production in one upsert, then production is redeployed', async () => {
-  const fake = fakeVercel()
+  const fake = fakeVercel({ before: { ...STORED, MIKKA_CLOUD_WORKER_SHA: 'b'.repeat(40) } })
   assert.deepEqual(await run(fake), { deploymentId: 'dpl_redeploy' })
   const writes = fake.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/env'))
   assert.equal(writes.length, 1)
@@ -47,7 +49,7 @@ test('every template and the worker hash go to production in one upsert, then pr
 })
 
 test('waits for a production build already running before redeploying', async () => {
-  const fake = fakeVercel({ inFlight: 2 })
+  const fake = fakeVercel({ inFlight: 2, before: { ...STORED, MIKKA_CLOUD_WORKER_SHA: 'b'.repeat(40) } })
   await run(fake)
   assert.equal(fake.calls.filter((c) => c.path === '/v6/deployments').length, 3)
 })
@@ -59,7 +61,13 @@ test('stops before redeploying when the env did not take', async () => {
 })
 
 test('a failed redeploy fails the run', async () => {
-  await assert.rejects(run(fakeVercel({ redeploy: 'ERROR' })), /redeploy_error/)
+  await assert.rejects(run(fakeVercel({ redeploy: 'ERROR', before: { ...STORED, MIKKA_CLOUD_WORKER_SHA: 'b'.repeat(40) } })), /redeploy_error/)
+})
+
+test('an unchanged production env skips the write and the redeploy', async () => {
+  const fake = fakeVercel()
+  assert.deepEqual(await run(fake), { skipped: true })
+  assert.equal(fake.calls.filter((call) => call.method === 'POST').length, 0)
 })
 
 test('refuses a short SHA, an odd or a missing template id before any write', () => {
@@ -83,18 +91,27 @@ test('official runtime publishes source, worker and measured capabilities togeth
   const officialEnv = pairEnv({ templates, sourceSha: SHA, models: MODELS })
   const stored = Object.fromEntries(officialEnv.map(row => [row.key, row.value]))
   stored.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = sourceCommit
-  const fake = fakeVercel({ stored, commit: sourceCommit })
+  const fake = fakeVercel({ stored, before: { ...stored, MIKKA_CLOUD_WORKER_SHA: 'c'.repeat(40) }, commit: sourceCommit })
   await run(fake, { templates, sourceCommit })
   const writes = fake.calls.filter(row => row.method === 'POST' && row.path.endsWith('/env'))
   assert.equal(writes.length, 1)
   assert.ok(writes[0].body.some(row => row.key === 'MIKKA_CLOUD_WORKER_SOURCE_COMMIT' && row.value === sourceCommit))
 })
 
+test('unchanged official runtime does not redeploy over a newer READY application', async () => {
+  const sourceCommit = 'b'.repeat(40), templates = { desktop: 'desktop', claude: 'claude', codex: 'codex' }
+  const stored = Object.fromEntries(pairEnv({ templates, sourceSha: SHA, models: MODELS }).map(row => [row.key, row.value]))
+  stored.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = sourceCommit
+  const fake = fakeVercel({ stored, commit: sourceCommit, newerCommit: 'c'.repeat(40) })
+  assert.deepEqual(await run(fake, { templates, sourceCommit }), { skipped: true })
+  assert.equal(fake.calls.filter(row => row.method === 'POST').length, 0)
+})
+
 test('official runtime cannot redeploy a READY application from a different commit', async () => {
   const sourceCommit = 'b'.repeat(40), templates = { desktop: 'desktop', claude: 'claude', codex: 'codex' }
   const stored = Object.fromEntries(pairEnv({ templates, sourceSha: SHA, models: MODELS }).map(row => [row.key, row.value]))
   stored.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = sourceCommit
-  const fake = fakeVercel({ stored, commit: 'c'.repeat(40) })
+  const fake = fakeVercel({ stored, before: { ...stored, MIKKA_CLOUD_WORKER_SHA: 'd'.repeat(40) }, commit: 'c'.repeat(40) })
   await assert.rejects(run(fake, { templates, sourceCommit }), /production_source_changed/)
   assert.ok(!fake.calls.some(row => row.method === 'POST' && row.path.endsWith('/env')))
   assert.ok(!fake.calls.some(row => row.method === 'POST' && row.path === '/v13/deployments'))
@@ -104,7 +121,7 @@ test('a newer READY main application cannot be replaced by an older matching sou
   const sourceCommit = 'b'.repeat(40), templates = { desktop: 'desktop', claude: 'claude', codex: 'codex' }
   const stored = Object.fromEntries(pairEnv({ templates, sourceSha: SHA, models: MODELS }).map(row => [row.key, row.value]))
   stored.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = sourceCommit
-  const fake = fakeVercel({ stored, commit: sourceCommit, newerCommit: 'c'.repeat(40) })
+  const fake = fakeVercel({ stored, before: { ...stored, MIKKA_CLOUD_WORKER_SHA: 'd'.repeat(40) }, commit: sourceCommit, newerCommit: 'c'.repeat(40) })
   await assert.rejects(run(fake, { templates, sourceCommit }), /production_source_changed/)
   assert.equal(fake.calls.filter(row => row.method === 'POST').length, 0, 'keep the newer application and all configuration intact')
 })

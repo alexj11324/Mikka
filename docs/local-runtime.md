@@ -154,7 +154,7 @@ never Mikka 默认 and never the AI Gateway:
   only; never write it to a file, a commit, a log or a report.
 - `pnpm dev:local` adds it to every local account and picks DS 4.1 Flash for
   the Coordinator and the Bots (`scripts/dev-local/seed-model-keys.ts`). Outside
-  dev:local, add it as a DeepSeek key in Settings › API 与订阅 and pick DS 4.1
+  dev:local, add it as a DeepSeek key in Settings › 模型与订阅 and pick DS 4.1
   Flash by hand.
 - Mikka 默认 (hosted, billed through the AI Gateway) is not used for local
   work, so a local run needs neither `AI_GATEWAY_API_KEY` nor a card
@@ -195,7 +195,8 @@ Not substituted:
 `pnpm test:dev-local` covers the guard, the routing, the cron schedule and the
 real AI SDK gateway provider against the substitutes.
 
-`pnpm test:local-loop` runs the five MVP acceptance items through HTTP and the
+`pnpm test:local-loop` runs acceptance items 1–7 by default (the five MVP
+items plus the two mailbox items below) through HTTP and the
 real daemon CLI, using Node 24 in cloud Linux. Supply the same loopback
 `E2E_DATABASE_URL`, `MIKKA_DATABASE_URL` and `DATABASE_URL`, with
 `MIKKA_LOCAL_TEST_ACCOUNTS=1`. The harness creates its own uniquely named
@@ -222,13 +223,13 @@ device credentials, releases its account lease and removes its daemon's
 temporary credential files. Disposable databases and repository evidence are
 retained for diagnosis.
 
-The default also runs item 6: real Agent mailbox tools, automatic idle-Bot
+Item 6: real Agent mailbox tools, automatic idle-Bot
 notification, a reply, explicit inbox/ACK, exact-send retry and owner isolation.
 Item 7 verifies notifications reaching a running daemon worker, separately
 from the native-Bot exchange.
 
 For a focused probe, use `LOCAL_LOOP_ITEMS=1` or `LOCAL_LOOP_ITEMS=4,5`; the
-selected scope is recorded and does not establish a full five-item pass.
+selected scope is recorded and does not establish a full default pass.
 `--existing` attaches to a running local service using that run's
 `MIKKA_TEST_ENVIRONMENT_FILE` and matching database targets. It acquires its
 own account lease and, when needed, its own daemon credential. Items 4 and 5
@@ -243,3 +244,74 @@ worker hash come from `E2B_ACCEPTANCE_TEMPLATE` / `E2B_WORKER_SHA` or the
 operator's non-secret `LOCAL_LOOP_CLOUD_TEMPLATE_FILE` metadata. Its independent
 normal account lease, restricted HTTPS relay, sandbox cleanup and timing
 evidence are owned by `scripts/e2b/cloud-local-acceptance.mjs`.
+
+Item 9 is an opt-in offline Factory handoff between two real local daemons.
+Run `LOCAL_LOOP_ITEMS=9 LOCAL_LOOP_EXPECTED_SOURCE_SHA=<reviewed-40-character-commit>
+pnpm test:local-loop` on the fixed Linux checkout, with the same normal local
+account-pool/database/Flash environment described above. The source pin must
+match HEAD. This item cannot attach with `--existing`: it must own both daemon
+processes and its fresh disposable database. It adds a 15-minute item budget;
+allow that time in addition to any other selected items and initial setup.
+
+The runner approves two distinct device IDs through the normal owner APIs.
+The dedicated ordinary owner must have no E2B key, so existing cloud-first
+recovery cannot legitimately replace the intended B target. Once A has run
+the real Flash workload and saved a repository checkpoint, the runner checks
+Linux process ancestry and suspends A's isolated process groups, including
+detached native children. Next and the existing local minute cron continue.
+The normal 90-second lease expires without edits to server state or thresholds;
+B must really claim the server-created retry of the same Task and request epoch.
+The test reads the structured Handoff and frozen payer/owner identity, resumes
+A to exercise lease fencing, checks exact artifact bytes/hash and one PR, and
+accepts the independently reviewed/verified candidate through the human API.
+It observes one further minute schedule for duplicate retries or publications.
+
+`item9-handoff.json` retains phase, Task/run/epoch/device identifiers, checkpoint,
+Handoff digest, artifact hash, publication count and failure status. SQL reads
+only evidence in that disposable database; dispatch and acceptance remain
+authenticated API operations. Timeout/interruption restores paused processes
+before ordinary cleanup. This case proves offline local-device handoff only:
+it does not establish the separate 45-minute online-stall watchdog, official
+subscription behavior, or production-provider acceptance. The process and
+receipt guard tests are included in `pnpm test:dev-local` and make no model calls.
+
+Item 10 isolates the server's real online-stall watchdog. Select
+`LOCAL_LOOP_ITEMS=10` or `LOCAL_LOOP_ITEMS=9,10` with the same immutable
+`LOCAL_LOOP_EXPECTED_SOURCE_SHA`; it also requires the owned fresh Linux stack.
+The selected item configures these dedicated local daemons using the existing
+formal CLI option `--stall-minutes 60`. The normal daemon default is 10 minutes,
+which would stop a silent executor before the server's unchanged 45-minute
+execute window. Evidence states this isolation explicitly. When 9 and 10 run
+together, they share the already approved second daemon; item 10 starts only
+after item 9 passes. The 60-minute daemon setting is recorded for both cases.
+
+After the real Flash run creates a file and uploads a checkpoint, item 10 binds
+its observed native session to the unique direct child of the real daemon RPC
+PID whose cwd matches that worktree's inode. It verifies ancestry and PID start
+time, then pauses that native tree by individual PID. Claude's SDK transport
+shares its parent's process group, so the fault injector never signals that
+group or relies on the different legacy `spawnCli` PID-file path. A's daemon, real heartbeat/lease and
+the independent minute cron keep running. Once per minute, evidence records
+that no tool result or new checkpoint has reset persisted progress. It does not
+alter database times, production defaults or the server sweep schedule. At the
+real watchdog stop request, it waits for pending TERM/INT on the original PID
+(local cancellation has reached the CLI), or actual native exit plus host
+acknowledgement, before resuming any native processes. The normal revoked-lease
+stop/ack must report failure with `device_lost`, never a resumed success. It
+then observes one automatic admission on authorized B.
+
+This case deliberately preserves the original checkpoint. After 45 minutes it
+is outside the existing 30-minute recovery window, so the expected result is
+`bounded_checkpoint_block`: B refuses it before native/model execution. The
+test requires the same Task/epoch, the current Handoff, the stale-checkpoint
+summary through the ordinary owner Thread API, one blocked-run notification
+event/inbox delivery, and no publication or repeated admission across two
+further minute schedules. It does not call that outcome successful recovery.
+`item10-watchdog.json` retains timing, heartbeat/lease samples, Handoff identity,
+retry and notification counts, the public blocker and failure status. Timeout
+or interruption separately requests the owner's normal stop before restoration;
+if cancellation cannot be confirmed, it terminates only the captured native PIDs
+whose start times still match. Cleanup is never counted as watchdog evidence.
+The item budget is 60 minutes; allow setup and selected item 9 in addition.
+This is not a default-daemon latency measurement, a before/after benchmark or
+cloud-device acceptance. Its offline guards make no model calls.

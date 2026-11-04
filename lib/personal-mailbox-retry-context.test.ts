@@ -24,7 +24,7 @@ const database = {
       from() { return selection }, where() { return selection }, innerJoin() { return selection },
       limit: async () => !fields ? [lost] : 'remoteUrl' in fields ? [{ remoteUrl: 'https://github.com/synthetic/fixture.git', repoPath: remoteKey('https://github.com/synthetic/fixture.git') }] : 'harness' in fields ? [{ harness: 'codex' }] : [],
       // A run only retries where a machine can take it: one online server with Codex (允许自动调度 on by default).
-      orderBy: async () => [{ deviceId: 'other-device', harnesses: [{ harness: 'codex', installed: true }], deviceType: 'server', autoSchedule: null }],
+      orderBy: async () => [{ deviceId: 'other-device', lastSeenAt: new Date(), harnesses: [{ harness: 'codex', installed: true }], deviceType: 'server', autoSchedule: null }],
     }
     return selection
   },
@@ -37,11 +37,22 @@ mock.module(new URL('./coordinator-event-store.ts', import.meta.url).href, { nam
 mock.module(new URL('./coordinator/wake.ts', import.meta.url).href, { namedExports: { wakeCoordinator: () => { throw Error('Unexpected wake') } } })
 mock.module(new URL('./mcp/worker.ts', import.meta.url).href, { namedExports: { revokeRunTokens: async (id: string) => { revoked.push(id) } } })
 mock.module(new URL('./device-repositories.ts', import.meta.url).href, { namedExports: { ensureDeviceRepository: async () => ({ id: 'other-repository' }) } })
+// This fixture covers the legacy private-mailbox writer. Admitted repository
+// recovery has real database coverage and must never run for this legacy row.
+const readmit = mock.fn(async () => { throw Error('Unexpected repository admission for legacy mailbox retry') })
+mock.module(new URL('./run-repository-retry.ts', import.meta.url).href, { namedExports: { readmitLostLocalRun: readmit } })
+const recoveryHandoff = mock.fn(async (_pool: unknown, identity: unknown, prompt: string) => {
+  assert.equal(identity, lost)
+  return { prompt, briefing: '' }
+})
+mock.module(new URL('./factory/handoff.ts', import.meta.url).href, { namedExports: { factoryRecoveryHandoff: recoveryHandoff } })
 
 test('actual reclaim writer carries the trusted private Bot into a new attempt instead of falling back to default namespace', async () => {
   const { reclaimLostRuns } = await import('./run-leases')
   await reclaimLostRuns(lost.userId)
   assert.ok(inserted)
+  assert.equal(recoveryHandoff.mock.callCount(), 1)
+  assert.equal(readmit.mock.callCount(), 0)
   assert.equal(inserted.botId, botId)
   assert.equal(inserted.userId, lost.userId)
   assert.equal(inserted.retryOf, lost.id)

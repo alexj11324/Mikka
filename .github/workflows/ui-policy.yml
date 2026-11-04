@@ -392,14 +392,42 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+      # The .deb files apt downloads for the packages below, keyed on the package
+      # list and the runner image (a new image can carry newer dependencies).
+      # Read-only except on pushes to main, like the pnpm store.
+      - name: Name the native dependency package cache
+        id: native-debs-key
+        run: echo "key=native-debs-v1-$ImageOS-$ImageVersion-${{ runner.arch }}-bubblewrap-socat-ripgrep" >> "$GITHUB_OUTPUT"
+      - name: Restore native dependency packages
+        id: native-debs
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/native-debs
+          key: ${{ steps.native-debs-key.outputs.key }}
       - name: Install native dependencies for the CLI approval database roundtrip
         # A stalled Ubuntu mirror once held apt for the rest of the job
         # (2026-11-01, run 41257416436). Fail this step instead of the job.
         timeout-minutes: 5
         run: |
+          packages=(bubblewrap socat ripgrep)
+          if compgen -G "$HOME/native-debs/*.deb" > /dev/null && sudo dpkg -i "$HOME"/native-debs/*.deb && command -v bwrap socat rg > /dev/null; then
+            echo "Installed ${packages[*]} from the cached packages"
+            exit 0
+          fi
+          echo "No usable cached packages; installing ${packages[*]} from the Ubuntu mirror"
           apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
           sudo apt-get "${apt_options[@]}" update
-          sudo apt-get "${apt_options[@]}" install -y bubblewrap socat ripgrep
+          sudo apt-get clean
+          sudo apt-get "${apt_options[@]}" install -y -f "${packages[@]}"
+          command -v bwrap socat rg > /dev/null
+          rm -rf "$HOME/native-debs" && mkdir -p "$HOME/native-debs"
+          if compgen -G "/var/cache/apt/archives/*.deb" > /dev/null; then cp /var/cache/apt/archives/*.deb "$HOME/native-debs/"; fi
+      - name: Save native dependency packages (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.native-debs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/native-debs
+          key: ${{ steps.native-debs-key.outputs.key }}
       - name: Generate ephemeral test-only auth secret
         run: |
           node --input-type=commonjs - <<'NODE'

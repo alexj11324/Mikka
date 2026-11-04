@@ -1,8 +1,8 @@
 name: Analytics SSR
+# Runs on pull requests only. After a merge, Vercel's production build of main
+# is the build check; repeating this one on main added nothing.
 on:
   pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -91,6 +91,11 @@ jobs:
             assert.ok(files.includes(resolve(path)), 'Task runtime file missing from deployment trace: ' + path)
             console.log('Traced task runtime file: ' + path)
           }
+          const factoryTrace = '.next/server/app/api/factory/tasks/[taskId]/route.js.nft.json'
+          const factoryFiles = JSON.parse(readFileSync(factoryTrace, 'utf8')).files.map(file => resolve(dirname(factoryTrace), file))
+          const probe = 'scripts/e2b/inspect-retained-deliverable.mjs'
+          assert.ok(factoryFiles.includes(resolve(probe)), 'Retained delivery probe missing from deployment trace')
+          console.log('Traced retained delivery probe: ' + probe)
           JS
       - name: Render real Next HTTP pages with analytics enabled
         run: node scripts/check-analytics-ssr.mjs

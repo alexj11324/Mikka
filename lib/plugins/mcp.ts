@@ -25,8 +25,10 @@ export async function runMcpCommand(target: () => Promise<McpTarget>, command: M
   let dispatched = false
   let stage: McpStage = 'target'
   let host: string | undefined
+  let secrets: string[] = []
   try {
     const connection = await target()
+    secrets = connection.secrets
     host = new URL(connection.url).host
     stage = 'connect'
     transport = (dependencies.transport ?? publicMcpFetch)(new URL(connection.url).origin, signal)
@@ -50,7 +52,7 @@ export async function runMcpCommand(target: () => Promise<McpTarget>, command: M
     if (dispatched) return { error: 'mcpOutcomeUnknown' }
     const code = hooks.code?.(error)
     if (code) return { error: code }
-    console.warn(JSON.stringify({ event: 'mcp_unavailable', ...mcpFailure(error, stage, host) }))
+    console.warn(redact(JSON.stringify({ event: 'mcp_unavailable', ...mcpFailure(error, stage, host) }), secrets))
     return { error: 'mcpUnavailable' }
   } finally {
     // Cleanup cannot replace a confirmed result with a retryable failure.
@@ -110,17 +112,20 @@ export function mcpFailure(error: unknown, stage: McpStage, host?: string) {
 }
 
 export function createPersonalMcpRuntime(store: Pick<PersonalPluginStore, 'mcpConnection'>, dependencies: McpDependencies = {}) {
-  return async (userId: string, snapshot: PersonalPluginSnapshot | undefined, command: PersonalMcpCommand) => {
+  return async (userId: string, snapshot: PersonalPluginSnapshot | undefined, command: PersonalMcpCommand, guard?: () => Promise<unknown>) => {
     let revision: number | undefined
     const result = await runMcpCommand(async () => {
+      await guard?.()
       const entry = snapshot?.servers.find(server => server.id === command.serverId)
       if (snapshot && !entry) throw new PluginError('mcpNotEnabledForExecution', 403)
-      const connection = await store.mcpConnection(userId, command.serverId, entry?.revision)
+      const connection = await store.mcpConnection(userId, command.serverId, entry?.revision, snapshot?.mcpAuthority)
       revision = connection.revision
-      return { url: connection.url, transport: connection.transport, headers: connection.headers, secrets: Object.values(connection.headers) }
+      // The connection may belong to a teammate. Mask its own secret values,
+      // not only the requester's secret registry; the endpoint also stays private.
+      return { url: connection.url, transport: connection.transport, headers: connection.headers, secrets: [...Object.values(connection.headers), connection.url] }
     }, command, dependencies, {
       // A setting changed while the server initialized: do not dispatch with an old credential.
-      ready: () => store.mcpConnection(userId, command.serverId, revision),
+      ready: async () => { await guard?.(); await store.mcpConnection(userId, command.serverId, revision, snapshot?.mcpAuthority) },
       code: error => error instanceof PluginError ? error.code : undefined,
     })
     return 'name' in command || 'error' in result ? result : { serverId: command.serverId, ...result }
@@ -129,7 +134,8 @@ export function createPersonalMcpRuntime(store: Pick<PersonalPluginStore, 'mcpCo
 
 function redact<T>(result: T, secrets: string[]): T {
   // A server can echo headers in its result. Never persist those literal values.
-  const needles = secrets.flatMap(secret => [secret, secret.replace(/^Bearer\s+/i, ''), Buffer.from(secret).toString('base64')]).filter(Boolean).sort((a,b) => b.length-a.length)
+  const needles = secrets.flatMap(secret => [secret, secret.replace(/^Bearer\s+/i, '')])
+    .flatMap(secret => [secret, Buffer.from(secret).toString('base64'), encodeURIComponent(secret)]).filter(Boolean).sort((a,b) => b.length-a.length)
   const mask = (value: unknown): unknown => {
     if (typeof value === 'string') return needles.reduce((text, needle) => text.split(needle).join('[redacted]'), value)
     if (Array.isArray(value)) return value.map(mask)

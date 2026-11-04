@@ -49,6 +49,7 @@ export const ACTION_ERROR_CODES = [
   'runNotActive',
   'threadReplaced',
   'threadCannotContinue',
+  'threadRecoveryUnavailable',
   'runChainEnded',
   'threadStopping',
   'apiKeyNotFound',

@@ -24,10 +24,20 @@ its existing protected status names and real acceptance coverage.
 
 ## Main pushes: postmerge checks
 
-- A push to `main` triggers `ui-policy.yml` again. No browser run follows a
-  main push or runs nightly; expensive desktop/release workflows stay
-  independent.
-- Both workflow concurrency keys include `github.run_id` only on `main`.
+- A push to `main` triggers `ui-policy.yml` again. It is the only test
+  workflow that reruns on `main`: the daemon and desktop releases wait for it
+  on the exact commit (`scripts/release/ci-gate.mjs`).
+- The special suites (`analytics-ssr`, `cloud-computer`, `desktop`,
+  `e2b-byos`, `site-search`, `ssh-device-backend`, `unattended-sandbox`) run on
+  pull requests only, and only when their paths change; each can still be run
+  by hand (`workflow_dispatch`). Vercel's production build is the build check
+  for `main`.
+- `publish-daemon.yml` and `desktop-release.yml` run only when a path that goes
+  into their package changes. Every daemon release makes installed daemons
+  upgrade and restart, so a web-only change publishes neither.
+- The run-dispatch and Controlled Skill improvement suites run in the CI
+  database shards (`pnpm test:db`); they no longer have workflows of their own.
+- The `ui-policy.yml` concurrency key includes `github.run_id` only on `main`.
   This prevents GitHub from evicting an older *pending* main verification,
   in addition to not cancelling a running main job. Superseded PR checks may
   still be cancelled.
@@ -41,6 +51,9 @@ the actual CLI model catalogue. Only reviewed `main` runs receive the existing
 E2B validation key and Vercel release token in separate jobs. Publication pairs
 the official template names, worker digest, source commit and model catalogue in
 one request, and redeploys only a READY application of that exact Git commit.
+The worker digest ignores package.json scripts and lockfile entries outside
+the daemon install. When that digest and the published variables already match
+production, the workflow does not rebuild or redeploy.
 If the latest READY application has moved to another source, publication stops
 before changing configuration; retry against the latest reviewed main rather
 than replacing a newer application with the older release.

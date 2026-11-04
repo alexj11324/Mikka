@@ -5,12 +5,12 @@ name: Site search read contract
 # browser is installed or launched.
 # Runs only when search changes: on every pull request (this repository's and
 # forks') and on pushes to main that touch these paths.
+# Pull requests only: the same suite already passed on the PR, and main's
+# CI workflow (ui-policy.yml) still verifies every merged commit.
 on:
-  push:
-    branches: [main]
-    paths: ['lib/search/**', 'lib/federated-search/**', 'app/api/search/**', 'tests/e2e/site-search.spec.ts', '.github/workflows/site-search.yml']
   pull_request:
     paths: ['lib/search/**', 'lib/federated-search/**', 'app/api/search/**', 'tests/e2e/site-search.spec.ts', '.github/workflows/site-search.yml']
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:

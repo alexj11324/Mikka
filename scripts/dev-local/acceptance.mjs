@@ -13,19 +13,23 @@ import { acquireTestAccounts, recordAuthenticationSecrets } from '../test-accoun
 import { TestAccountPool } from '../test-accounts/pool.mjs'
 import { verifyMailbox } from './mailbox-acceptance.mjs'
 import { verifyWorkerMailbox } from './worker-mailbox-acceptance.mjs'
+import { assertHandoffConfiguration, verifyFactoryHandoff } from './factory-handoff-acceptance.mjs'
+import { verifyFactoryWatchdog } from './factory-watchdog-acceptance.mjs'
 import { assertFlashTestModel, assertTestModelRequest } from '../test-model-policy.mjs'
+import { prepareCloudAcceptance } from '../e2b/cloud-acceptance-release.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const selectedItems = process.env.LOCAL_LOOP_ITEMS?.split(',') ?? ['1', '2', '3', '4', '5', '6', '7']
-assert.ok(selectedItems.length && selectedItems.every(item => /^[1-8]$/.test(item)) && new Set(selectedItems).size === selectedItems.length, 'LOCAL_LOOP_ITEMS must be unique item numbers 1–8')
-const needsDaemon = selectedItems.some(item => ['1', '2', '3', '7'].includes(item))
+assert.ok(selectedItems.length && selectedItems.every(item => /^(?:[1-9]|10)$/.test(item)) && new Set(selectedItems).size === selectedItems.length, 'LOCAL_LOOP_ITEMS must be unique item numbers 1–10')
+const needsDaemon = selectedItems.some(item => ['1', '2', '3', '7', '9', '10'].includes(item))
 // Keep the daemon Unix socket below Linux's 108-byte pathname limit even in
 // the separate fixed acceptance checkout. Evidence retains the full runId.
 const runId = randomUUID(), directory = resolve(root, '.cache/dev-local', `acceptance-${runId.replaceAll('-', '').slice(0, 16)}`)
 const progressFile = resolve(root, '.cache/dev-local/progress.jsonl')
-const started = Date.now(), children = [], secrets = new Set()
+const started = Date.now(), children = [], secrets = new Set(), expectedChildExits = new WeakSet()
 const completedItems = []
-let pool, accounts, environment, runtime, activeStep, cleanupPromise, sourceFingerprint, serviceFailure, releaseHold, output = '', daemonCode, interrupted = false
+const cleanupHooks = [], daemonDirectories = [join(directory, 'daemon')]
+let cloudRelease, cloudApiKey, pool, accounts, environment, runtime, localStackChild, secondDaemonPromise, activeStep, cleanupPromise, sourceFingerprint, serviceFailure, releaseHold, output = '', daemonCode, interrupted = false
 async function fingerprint() {
   const paths = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'app', 'lib', 'packages', 'scripts', 'agents', 'drizzle', 'package.json', 'pnpm-lock.yaml', 'next.config.mjs'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean).sort()
   const hash = createHash('sha256')
@@ -83,7 +87,7 @@ function child(command, args, env = process.env, persistent = false) {
   children.push(processChild)
   processChild.on('error', () => { if (persistent && !cleanupPromise) serviceFailure = new Error('An owned acceptance service could not start') })
   processChild.once('exit', (code, signal) => {
-    if (persistent && !cleanupPromise) serviceFailure = new Error(`An owned acceptance service exited (${signal ?? code}); inspect the redacted service log`)
+    if (persistent && !cleanupPromise && !expectedChildExits.has(processChild)) serviceFailure = new Error(`An owned acceptance service exited (${signal ?? code}); inspect the redacted service log`)
   })
   const capture = data => {
     const chunk = data.toString()
@@ -109,7 +113,14 @@ async function json(account, path, body, method = body ? 'POST' : 'GET') {
     assertFlashTestModel((await modelResponse.json()).current?.modelId)
   }
   const response = await account.request(path, { method, ...(body ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}) })
-  assert.ok(response.ok, `${method} ${path}: HTTP ${response.status}`)
+  if (!response.ok) {
+    const value = await response.json().catch(() => null)
+    // Keep stable public refusal codes in failure evidence, never response
+    // bodies (which may contain account data or provider diagnostics).
+    const code = typeof value?.error === 'string' && /^(?:factory|github)[A-Z][A-Za-z0-9]{1,70}$/.test(value.error)
+      ? value.error : 'acceptanceHttpFailure'
+    throw Object.assign(new Error(`${method} ${path}: HTTP ${response.status} (${code})`), { code, status: response.status })
+  }
   return response.json()
 }
 const query = async (sql, values = []) => (await pool.query(sql, values)).rows
@@ -150,6 +161,15 @@ async function setup() {
   const origin = process.env.LOCAL_LOOP_ORIGIN ?? `http://localhost:${process.env.MIKKA_DEV_PORT ?? '3110'}`
   assert.ok(['localhost', '127.0.0.1'].includes(new URL(origin).hostname), 'Only loopback app targets are allowed')
   const driverRevision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
+  const cloud = prepareCloudAcceptance({ root, items: selectedItems })
+  if (cloud) {
+    cloudRelease = cloud.release
+    cloudApiKey = cloud.apiKey
+    if (cloudApiKey) secrets.add(cloudApiKey)
+  }
+  if (selectedItems.includes('9') || selectedItems.includes('10')) {
+    assertHandoffConfiguration({ existing, platform: process.platform, revision: driverRevision, expectedSource: process.env.LOCAL_LOOP_EXPECTED_SOURCE_SHA })
+  }
   // An attached runner can contain reviewed harness changes. Bind auth/DB
   // attestation to the existing server's descriptor, recording driver code
   // separately; bootstrap and account acquisition still verify that binding.
@@ -194,7 +214,9 @@ async function setup() {
     await recordAuthenticationSecrets([decodeURIComponent(new URL(process.env.E2E_DATABASE_URL).password)], { environment })
   }
   await new TestAccountPool(pool, environment).prepare({ pairs: 4 })
-  if (!existing) child(process.execPath, ['scripts/dev-local.mjs'], { ...process.env, NEXT_TELEMETRY_DISABLED: '1', MIKKA_DEV_SKIP_ENV_FILES: '1', ...(!needsDaemon ? { MIKKA_DEV_SKIP_DAEMON: '1' } : {}) }, true)
+  if (!existing) localStackChild = child(process.execPath, ['scripts/dev-local.mjs'], { ...process.env, NEXT_TELEMETRY_DISABLED: '1', MIKKA_DEV_SKIP_ENV_FILES: '1',
+    ...(selectedItems.some(item => ['9', '10'].includes(item)) ? { MIKKA_DEV_ACCEPTANCE_HANDOFF: '1' } : {}),
+    ...(selectedItems.includes('10') ? { MIKKA_DEV_ACCEPTANCE_ONLINE_WATCHDOG: '1' } : {}), ...(!needsDaemon ? { MIKKA_DEV_SKIP_DAEMON: '1' } : {}) }, true)
   await step('server-ready', 180_000, signal => until(signal, async () => {
     try { return (await fetch(`${origin}/mikka/sign-in`, { signal: AbortSignal.timeout(5_000) })).ok } catch { return false }
   }))
@@ -268,6 +290,57 @@ async function factoryApproval(runId, signal) {
   assert.deepEqual(stages.slice(-3).map(row=>row.stage),['execute','review','verify'])
   assert.equal(new Set(stages.slice(-3).map(row=>row.sessionId)).size,3,'independent CLI sessions for all three stages')
   return task
+}
+
+async function secondDaemon(signal) {
+  return secondDaemonPromise ??= startSecondDaemon(signal)
+}
+
+async function stopSecondDaemon() {
+  if (!secondDaemonPromise) return
+  const { processChild } = await secondDaemonPromise
+  secondDaemonPromise = undefined
+  if (processChild.exitCode !== null || processChild.signalCode !== null) return
+  expectedChildExits.add(processChild)
+  const exited = new Promise(resolve => processChild.once('exit', resolve))
+  process.kill(-processChild.pid, 'SIGTERM')
+  if (!await Promise.race([exited.then(() => true), delay(5_000).then(() => false)])) {
+    process.kill(-processChild.pid, 'SIGKILL')
+    assert.ok(await Promise.race([exited.then(() => true), delay(5_000).then(() => false)]), 'The owned B daemon did not stop')
+  }
+}
+
+async function startSecondDaemon(signal) {
+  const dataDir = join(directory, 'daemon-b')
+  if (!daemonDirectories.includes(dataDir)) daemonDirectories.push(dataDir)
+  await mkdir(dataDir, { recursive: true, mode: 0o700 })
+  const daemonUser = process.getuid?.() === 0 && process.env.MIKKA_DEV_DAEMON_USER
+  if (daemonUser) execFileSync('chown', ['-R', daemonUser, dataDir])
+  const tsx = join(root, 'packages/daemon/node_modules/.bin/tsx')
+  const env = { ...process.env, NODE_USE_ENV_PROXY: '1',
+    NO_PROXY: [process.env.NO_PROXY, process.env.no_proxy, 'localhost', '127.0.0.1', '::1'].filter(Boolean).join(','),
+    PATH: `${join(root, '.cache/dev-local/bin')}:${process.env.PATH ?? ''}`,
+    ...(daemonUser ? { HOME: `/home/${daemonUser}` } : {}),
+    MIKKA_TEST_MODE: '1', MIKKA_DEV_GIT_ORIGIN: runtime.scenario.barePath,
+    GIT_CONFIG_GLOBAL: join(directory, 'dev-local.gitconfig'), GIT_TERMINAL_PROMPT: '0' }
+  delete env.DEEPSEEK_API_KEY // The authorized account model is delivered by the host.
+  const launch = (args, persistent = false) => {
+    const argv = [join(root, 'packages/daemon/bin/mikka.ts'), ...args, '--data-dir', dataDir]
+    return child(daemonUser ? 'setpriv' : tsx, daemonUser ? ['--reuid', daemonUser, '--regid', daemonUser, '--init-groups', tsx, ...argv] : argv, env, persistent)
+  }
+  // The next scenario reuses only this runner's already approved B identity.
+  // It stays stopped until A has actually begun its automatic execution.
+  if (!await access(join(dataDir, 'device.json')).then(() => true, () => false)) {
+    daemonCode = undefined
+    launch(['daemon', 'login', '--server', runtime.server])
+    const code = await until(signal, () => daemonCode)
+    await json(accounts.owner, `/api/auth/device?user_code=${encodeURIComponent(code)}`)
+    await json(accounts.owner, '/api/auth/device/approve', { userCode: code })
+    await until(signal, () => access(join(dataDir, 'device.json')).then(() => true, () => false))
+  }
+  const processChild = launch(['daemon', '--no-auto-update', '--server', runtime.server,
+    ...(selectedItems.includes('10') ? ['--stall-minutes', '60'] : [])], true)
+  return { dataDir, pid: processChild.pid, processChild }
 }
 
 async function accept(device) {
@@ -372,6 +445,20 @@ async function accept(device) {
   })
   if (only.includes('6')) await check('item6-agent-mailbox', 600_000, signal => verifyMailbox({ accounts, pool, progress, signal }))
   if (only.includes('7')) await check('item7-worker-mailbox', 600_000, signal => verifyWorkerMailbox({ accounts, pool, progress, signal, device }))
+  if (only.includes('9')) await check('item9-factory-handoff', 900_000, async signal => { try { return await verifyFactoryHandoff({
+    root, directory, runtime, ownerId: accounts.owner.userId, device, signal, progress,
+    query, json: (path, body) => json(accounts.owner, path, body), until: predicate => until(signal, predicate),
+    run, dispatch: (name, text) => dispatch(name, text, signal), terminal: id => terminal(id, signal),
+    factoryApproval: id => factoryApproval(id, signal), observations, startSecondDaemon: () => secondDaemon(signal),
+    stackPid: localStackChild.pid, registerCleanup: hook => cleanupHooks.push(hook), daemonStallMinutes: selectedItems.includes('10') ? 60 : 10,
+  }) } finally { await stopSecondDaemon() } })
+  if (only.includes('10')) await check('item10-online-watchdog', 3_600_000, signal => {
+    assert.ok(!only.includes('9') || completedItems.includes(9), 'Complete the selected offline handoff case before reusing its devices for the hour-long watchdog case')
+    return verifyFactoryWatchdog({ root, directory, runtime, ownerId: accounts.owner.userId, device, signal, progress,
+      query, json: (path, body) => json(accounts.owner, path, body), until: predicate => until(signal, predicate), run,
+      dispatch: (name, text) => dispatch(name, text, signal), observations, startSecondDaemon: () => secondDaemon(signal),
+      stackPid: localStackChild.pid, registerCleanup: hook => cleanupHooks.push(hook) })
+  })
   if (only.includes('8')) await check('item8-cloud-loop', 900_000, async signal => {
     const reviewed = process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE
       ? await (await import('./reviewed-local-evidence.mjs')).verifyReviewedLocalEvidence(process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE, { environment, runtime }) : null
@@ -382,19 +469,17 @@ async function accept(device) {
     }
     const passed = new Set([...completedItems, ...(previous?.passedItems ?? []), ...(reviewed?.passedItems ?? [])])
     assert.ok([1, 2, 3, 4, 5, 6, 7].every(item => passed.has(item)), 'Run and pass the local five items and native/worker mailbox before the paid cloud leg')
-    const metadata = await readFile(process.env.LOCAL_LOOP_CLOUD_TEMPLATE_FILE ?? '/tmp/mikka-e2b-services-build-result.json', 'utf8').then(JSON.parse, () => ({}))
-    const templateId = process.env.E2B_ACCEPTANCE_TEMPLATE ?? metadata.templateId
-    const workerHash = process.env.E2B_WORKER_SHA ?? metadata.workerHash
-    assert.match(templateId ?? '', /^[A-Za-z0-9_-]+$/, 'A private acceptance E2B template is required')
-    assert.match(workerHash ?? '', /^[a-f0-9]{40}$/, 'The acceptance template worker source hash is required')
     const { verifyCloud } = await import('../e2b/cloud-local-acceptance.mjs')
-    await verifyCloud({ environment, progress, signal, templateId, workerHash, runtime, accounts, pool })
+    await verifyCloud({ environment, progress, signal, ...cloudRelease, apiKey: cloudApiKey, runtime, accounts, pool })
   })
   if (failures.length) throw new AggregateError(failures, `${failures.length} acceptance item(s) failed`)
 }
 
 async function cleanup() {
   return cleanupPromise ??= (async () => {
+    for (const hook of cleanupHooks.reverse()) {
+      try { await hook() } catch { await progress('cleanup', 'warning', 'Owned handoff fault cleanup needs inspection; evidence retained') }
+    }
     try {
       if (accounts) {
         const tokens = await json(accounts.owner, '/api/device-tokens')
@@ -412,7 +497,7 @@ async function cleanup() {
     await pool?.end()
     // Only the daemon credential files created by this invocation are removed;
     // repository worktrees and non-secret evidence remain inspectable.
-    for (const name of ['device.json', 'daemon.secret']) await rm(join(directory, 'daemon', name), { force: true }).catch(() => {})
+    for (const dataDir of daemonDirectories) for (const name of ['device.json', 'daemon.secret']) await rm(join(dataDir, name), { force: true }).catch(() => {})
   })()
 }
 

@@ -4,4 +4,5 @@ export async function handoffStage(actor: { userId: string; workspaceId: string 
   console.info(JSON.stringify({ event: 'factory_cloud_handoff', runId, previousRunId }))
   const started = await handoffFactoryCloudStage(pool, actor, previousRunId, runId)
   console.info(JSON.stringify({ event: 'factory_cloud_handoff_finished', runId, started }))
+  return started
 }

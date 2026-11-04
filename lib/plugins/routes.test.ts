@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
 import { randomUUID } from 'node:crypto'
+import { sessionMustBeFresh } from '@/lib/fresh-session'
 
 const calls: unknown[][] = []
 let owner: string | null = 'owner'
@@ -16,6 +17,9 @@ stub('./runtime.ts', { personalPlugins: {
   installSkill: async (...args: unknown[]) => { calls.push(['installSkill', ...args]); return {} },
   updateSkill: async (...args: unknown[]) => { calls.push(['updateSkill', ...args]); return {} },
   deleteSkill: async (...args: unknown[]) => { calls.push(['deleteSkill', ...args]) },
+}, workspaceMcp: {
+  list: async (userId: string, workspaceId: string) => { calls.push(['workspaceMcpList', userId, workspaceId]); return { workspaceId, servers: [], count: 0 } },
+  share: async (userId: string, input: unknown) => { assert.ok(sessionMustBeFresh(), 'sharing reads the normal session from the database'); calls.push(['workspaceMcpShare', userId, input]); return { servers: [], count: 0 } },
 } })
 stub('./skill-source.ts', { fetchSkillSource: async (input: unknown) => ({ ...input as object, body: '# Fixture' }) })
 stub('../composio.ts', { getComposio: () => ({}) })
@@ -45,6 +49,8 @@ before(async () => { credentials = await import('../../app/api/integrations/comp
 let appDetail: typeof import('../../app/api/integrations/composio/catalog/[toolkit]/route')
 before(async () => { appDetail = await import('../../app/api/integrations/composio/catalog/[toolkit]/route') })
 let mcp: typeof import('../../app/api/integrations/mcp/route'), skills: typeof import('../../app/api/skills/route'), catalog: typeof import('../../app/api/integrations/composio/catalog/route')
+let mcpShares: typeof import('../../app/api/integrations/mcp/shares/route')
+before(async () => { mcpShares = await import('../../app/api/integrations/mcp/shares/route') })
 before(async () => { mcp = await import('../../app/api/integrations/mcp/route'); skills = await import('../../app/api/skills/route'); catalog = await import('../../app/api/integrations/composio/catalog/route') })
 function request(path: string, method = 'GET', data?: unknown, origin = 'https://mikka.acme.dev') {
   return new Request(`https://mikka.acme.dev${path}`, { method, headers: { origin, 'Content-Type': 'application/json' }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) })
@@ -82,6 +88,23 @@ test('an app page needs a signed-in person, not a connected account', async () =
   const response = await appDetail.GET(request('/api/integrations/composio/catalog/supabase'), params)
   assert.equal(response.status, 200)
   assert.equal((await response.json() as { tools: { read: unknown[] } }).tools.read.length, 1)
+})
+
+test('custom MCP sharing is a fresh owner HTTP action; workspace reads and mutations reject injected authority', async () => {
+  const workspaceId = randomUUID(), serverId = randomUUID(), path = '/api/integrations/mcp/shares'
+  const input = { workspaceId, serverId, shared: true }
+  owner = null; calls.length = 0
+  assert.equal((await mcpShares.PATCH(request(path, 'PATCH', input))).status, 401)
+  owner = 'owner'
+  assert.equal((await mcpShares.PATCH(request(path, 'PATCH', input, 'https://foreign.acme.dev'))).status, 403)
+  for (const injected of [{ ownerId: 'peer' }, { requester: 'peer' }, { grantId: randomUUID() }, { revision: 1 }])
+    assert.equal((await mcpShares.PATCH(request(path, 'PATCH', { ...input, ...injected }))).status, 400)
+  assert.deepEqual(calls, [])
+  assert.equal((await mcpShares.PATCH(request(path, 'PATCH', input))).status, 200)
+  assert.deepEqual(calls.at(-1), ['workspaceMcpShare', 'owner', input])
+  assert.equal((await mcp.GET(request(`/api/integrations/mcp?workspaceId=${workspaceId}`))).status, 200)
+  assert.deepEqual(calls.at(-1), ['workspaceMcpList', 'owner', workspaceId])
+  assert.equal((await mcp.GET(request('/api/integrations/mcp?workspaceId=invalid'))).status, 400)
 })
 
 test('a key goes from the signed-in person to Composio and never back out, in a response or a log', async () => {

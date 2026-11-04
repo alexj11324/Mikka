@@ -1,5 +1,5 @@
 import type { PoolClient } from "pg";
-import { DEVICE_ONLINE_WINDOW_MS } from "@mikka/protocol/device";
+import { deviceIsOnline } from "../device-presence";
 import {applyApprovalMode,defaultRunPolicy} from "@mikka/protocol/agent-policy";
 import { FactoryError } from "./contract";
 import type { FactoryTask } from "./store";
@@ -82,8 +82,7 @@ async function monitorRun(
     fail("factoryMonitorRunUnavailable");
   if (
     !row.enabled ||
-    !row.lastSeenAt ||
-    Date.now() - row.lastSeenAt.getTime() > DEVICE_ONLINE_WINDOW_MS ||
+    !await deviceIsOnline({ id: row.deviceId, lastSeenAt: row.lastSeenAt }) ||
     !row.harnesses?.some(
       (h: { harness: string; installed: boolean }) =>
         h.harness === row.harness && h.installed,

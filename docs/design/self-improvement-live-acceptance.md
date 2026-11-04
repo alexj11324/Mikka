@@ -1,5 +1,10 @@
 # Controlled Skill improvement: live completion plan
 
+> Note (2026-11-03): the fixed trigger of 25 distinct failures or a seven-day-old
+> failure named below was later replaced by the Decision API's `propose` answer
+> (`lib/self-improvement/proposal-judgment.ts`,
+> [decision 2026-11-01-1500](decisions/2026-11-01-1500-self-improvement-and-profile-decided-by-decision-api.md)).
+
 Status: implementation in progress. User direction, 2026-10-26: repair the failed
 acceptance requirements until the complete feature passes. This extends the
 earlier synthetic rehearsal; it does not relabel that rehearsal as acceptance.

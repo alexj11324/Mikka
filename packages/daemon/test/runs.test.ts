@@ -818,6 +818,47 @@ describe("follow-up runs", () => {
     expect(mockSession(dataDir, sessionId).messages).toHaveLength(3)
   })
 
+  it('retains a continued delivery at its actual content commit while preserving the original diff baseline', async () => {
+    const { server, dataDir } = await setup()
+    const fixturesDir = tempDir()
+    const content = 'factory-1146-codex-d8f3d3f2 resume-1146-recheck-6a265954\n7 - 4 = 3\nverified artifact\n'
+    writeFileSync(join(fixturesDir, 'delivery-question.jsonl'), [
+      { t: 0, write: { path: 'DELIVERY.txt', content: 'Awaiting the owner answer.\n' }, chunk: { type: 'text-delta', id: 'question', delta: 'Need the owner answer.' } },
+      { t: 1, exit: { outcome: 'failed', stopReason: 'blocked', report: { summary: 'Waiting for the owner.', blockedOn: 'fixture_answer' } } },
+    ].map(line => JSON.stringify(line)).join('\n') + '\n')
+    writeFileSync(join(fixturesDir, 'delivery-answer.jsonl'), [
+      { t: 0, write: { path: 'DELIVERY.txt', content }, chunk: { type: 'text-delta', id: 'answer', delta: 'Applied the answer.' } },
+      { t: 1, submit: { summary: 'The answered delivery is ready.', deliverableCommit: 'f'.repeat(40) } },
+    ].map(line => JSON.stringify(line)).join('\n') + '\n')
+    const daemon = await boot(server, dataDir, Number.POSITIVE_INFINITY, undefined, fixturesDir)
+    const first = server.queueRun(DEVICE, { issueId: 'continued-delivery', repoId: 'repo-1', baseBranch: 'main', harness: 'mock',
+      prompt: 'Produce the delivery.', fixture: 'delivery-question', factoryExecuteKind: 'deliverable', preserveQuestionWorktree: true })
+    const earlier = await runToEnd(daemon, server, first)
+    expect(earlier.stopReason).toBe('blocked')
+    const firstCompletion = structuredClone(server.runs.get(first)!.completion!)
+    const baseline = firstCompletion.report!.sourceCommit!
+    const second = server.queueRun(DEVICE, { issueId: 'continued-delivery', repoId: 'repo-1', baseBranch: 'main', harness: 'mock',
+      prompt: 'Continue the answered delivery.', followUp: 'Apply the owner answer.', fixture: 'delivery-answer',
+      continuesRunId: first, resumeSessionId: earlier.sessionId!, factoryExecuteKind: 'deliverable', preserveQuestionWorktree: true })
+    const run = await runToEnd(daemon, server, second)
+    expect(run).toMatchObject({ state: 'succeeded', sessionId: earlier.sessionId, worktree: earlier.worktree })
+    expect(server.runs.get(first)!.completion).toEqual(firstCompletion)
+    const report = server.runs.get(second)!.completion!.report!
+    expect(report.sourceCommit).toBe(baseline)
+    const snapshot = report.deliverableCommit!
+    expect(snapshot).toMatch(/^[a-f0-9]{40}$/)
+    expect(snapshot).not.toBe(baseline)
+    expect(snapshot).not.toBe('f'.repeat(40))
+    expect(git(run.worktree!, 'rev-parse', 'HEAD')).toBe(snapshot)
+    expect(git(run.worktree!, 'status', '--porcelain')).toBe('')
+    const common = resolve(run.worktree!, git(run.worktree!, 'rev-parse', '--git-common-dir'))
+    expect(git(dirname(common), 'ls-tree', '--name-only', baseline, '--', 'DELIVERY.txt')).toBe('')
+    const check = await new WorktreeManager(tempDir()).create('independent-continued-delivery', dirname(common), snapshot)
+    expect(check).not.toBe(run.worktree)
+    expect(readFileSync(join(check, 'DELIVERY.txt'))).toEqual(Buffer.from(content, 'utf8'))
+    expect(readFileSync(join(check, 'DELIVERY.txt')).length).toBe(85)
+  })
+
   it("Factory external blockers retain their empty worktree for a later exact-session answer", async () => {
     const {server,dataDir}=await setup()
     const daemon=await boot(server,dataDir)

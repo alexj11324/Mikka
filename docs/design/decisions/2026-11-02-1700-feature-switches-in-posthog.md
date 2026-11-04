@@ -23,3 +23,26 @@ it, and without that its default.
 
 Per-person flags (`mikka-proactive-profile`, the gated and kill switches in
 `lib/feature-flags.ts`) are unchanged.
+
+## Group contribution policy rollback
+
+`mikka-group-contribution-off` follows this owner as a Boolean kill flag.
+False (including an inactive flag) selects `group-contribution-v1`; true
+selects the reviewed forced-reply baseline, `group-route-v0`. Both policies
+use the same sequential Decision protocol and authorization boundaries.
+There is no automatic policy promotion or user-facing policy override.
+
+While PostHog gives no explicit answer, `MIKKA_GROUP_DECISION_POLICY` can
+select either recognized version; otherwise the candidate remains enabled.
+The existing deployment cache refreshes at most once per 60 seconds, so a
+manual flag change affects subsequent routing attempts after refresh. Each
+attempt freezes one version before its first provider request, records it
+on every retained routing step, and preserves earlier attempt versions on
+retry. A change cannot mix policies within an in-flight routing chain.
+
+The authenticated fixed-dataset replay endpoint passes its host-selected
+baseline or candidate explicitly and does not consume the live flag. Its
+collector reports completion of all logical cases separately from quality
+acceptance; an uncertain or invalid receipted result remains a failure and
+retains its known or unknown cost. Rollback and restoration are manual,
+reviewed operations; a full collection is not an automatic rollout gate.

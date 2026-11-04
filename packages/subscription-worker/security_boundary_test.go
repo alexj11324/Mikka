@@ -54,6 +54,81 @@ type boundedAccessStore struct {
 	reads   int
 }
 
+type requestBoundaryExecutor struct {
+	core.ProviderExecutor
+	calls  int
+	result *ex.StreamResult
+}
+
+func (e *requestBoundaryExecutor) ExecuteStream(context.Context, *core.Auth, ex.Request, ex.Options) (*ex.StreamResult, error) {
+	e.calls++
+	return e.result, nil
+}
+
+func TestStreamRequestByteBoundaryPrecedesCredentialReadAndInference(t *testing.T) {
+	w, _, _ := fixtureWorker(t, "claude")
+	initial := mustAcquire(t, w)
+	closed := make(chan ex.StreamChunk)
+	close(closed)
+	executor := &requestBoundaryExecutor{ProviderExecutor: w.Executor, result: &ex.StreamResult{Chunks: closed}}
+	w.Executor = executor
+	record, err := w.Repo.Lookup(context.Background(), w.Scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	access := &boundedAccessStore{SecretStore: w.AccessSecrets, allowed: record.AccessName}
+	w.ExecutionOnly = true
+	w.Secrets = nil
+	w.AccessSecrets = access
+	payloadFor := func(text string) []byte {
+		payload, err := json.Marshal(map[string]any{"messages": []any{map[string]any{"role": "user", "content": text}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return payload
+	}
+	capacity := 1048576 - len(payloadFor(""))
+	multibyte := strings.Repeat("汉", capacity/3) + strings.Repeat("x", capacity%3)
+	for _, test := range []struct {
+		name string
+		text string
+		fail bool
+	}{
+		{"ASCII boundary", strings.Repeat("x", capacity), false},
+		{"UTF8 boundary", multibyte, false},
+		{"ASCII overflow", strings.Repeat("x", capacity+1), true},
+		{"UTF8 overflow", multibyte + "x", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			executor.calls = 0
+			beforeReads := access.reads
+			payload := payloadFor(test.text)
+			logged := captureStderr(t, func() { err = w.Stream(context.Background(), initial.Revision, "fixture-model", payload, func([]byte) error { t.Fatal("unexpected output"); return nil }) })
+			if test.fail {
+				if err != ErrProvider || executor.calls != 0 || access.reads != beforeReads {
+					t.Fatal("oversized stream reached credentials or inference")
+				}
+				if logged != "subscription_request_failure claude input payload_too_large 1048577 1048576\n" {
+					t.Fatalf("unexpected boundary diagnostic: %q", logged)
+				}
+			} else if err != nil || executor.calls != 1 || logged != "" {
+				t.Fatalf("valid byte boundary failed: err=%v calls=%d diagnostic=%q", err, executor.calls, logged)
+			}
+		})
+	}
+	// Authorization stays ahead of diagnostics and credential access.
+	w.Use = nil
+	beforeReads := access.reads
+	logged := captureStderr(t, func() { err = w.Stream(context.Background(), initial.Revision, "fixture-model", payloadFor(multibyte+"x"), func([]byte) error { return nil }) })
+	if err != ErrUnavailable || access.reads != beforeReads || logged != "" {
+		t.Fatal("unauthorized request crossed the live authority check")
+	}
+	after, err := w.Repo.Lookup(context.Background(), w.Scope)
+	if err != nil || after.Version != record.Version || after.OperationID != record.OperationID {
+		t.Fatal("request boundary changed the credential record")
+	}
+}
+
 func (s *boundedAccessStore) Create(context.Context, string, []byte) error { return ErrUnsupported }
 func (s *boundedAccessStore) Delete(context.Context, string) error         { return ErrUnsupported }
 func (s *boundedAccessStore) Read(ctx context.Context, name string) ([]byte, error) {

@@ -2,7 +2,8 @@ import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { after } from 'next/server'
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { executionIdentityForRun } from '@/lib/execution-identity'
 import { agentRuns, agents, artifactShares, artifactVersions, artifacts, bots, issueMembers, issues, type ArtifactKind } from '@/lib/db/schema'
 import { runAgentName, runBotName } from '@/lib/run-bot-name'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
@@ -46,6 +47,9 @@ export async function submitArtifact(submitter: ArtifactSubmitter, input: { titl
   if (!content.trim() || !title) return { error: 'empty', message: 'Title and content must not be empty.' }
   const size = utf8Bytes(content)
   if (size > ARTIFACT_MAX_BYTES[input.kind]) return { error: 'too_large', message: `At most ${ARTIFACT_MAX_BYTES[input.kind]} bytes for ${input.kind}.` }
+  // Revalidate even if a caller obtained its submitter before a share was withdrawn.
+  const identity = submitter.runId ? await executionIdentityForRun(pool, submitter.runId, submitter.userId) : null
+  if (identity && identity.outputOwner !== submitter.userId) throw new Error('executionIdentityUnavailable')
   const storage = artifactStorage()
   const hash = sha256(content)
 
@@ -69,12 +73,15 @@ export async function submitArtifact(submitter: ArtifactSubmitter, input: { titl
     if (storage === 'r2') await putArtifactObject(storageKey, content, ARTIFACT_CONTENT_TYPES[input.kind])
     await tx.insert(artifactVersions).values({
       id: crypto.randomUUID(), artifactId, version, storageKey, inlineContent: storage === 'inline' ? content : null,
-      sha256: hash, size, authorName: submitter.authorName,
+      sha256: hash, size, authorName: submitter.authorName, executionIdentity: identity,
     })
-    return { artifactId, version, title, kind: input.kind }
+    const submitted = { artifactId, version, title, kind: input.kind }
+    // Version provenance must commit with its bytes and latest pointer. A
+    // response interruption must not leave a visible version without its run.
+    await recordCoordinatorEvent(tx, artifactSubmittedEvent(submitter, submitted))
+    return submitted
   })
   if ('error' in result) return result
-  await recordCoordinatorEvent(db, artifactSubmittedEvent(submitter, result))
   after(() => wakeCoordinator(submitter.userId))
   return result
 }

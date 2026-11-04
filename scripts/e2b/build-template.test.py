@@ -218,6 +218,66 @@ class WorkerHash(unittest.TestCase):
             finally:
                 bt.ROOT = root
 
+    def test_script_and_unrelated_lock_entries_do_not_change_the_hash(self):
+        import subprocess, tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            git = lambda *args: subprocess.run(['git', '-c', 'user.email=t@t', '-c', 'user.name=t', *args], cwd=temp, check=True, capture_output=True)
+            write = lambda path, text: (Path(temp, path).parent.mkdir(parents=True, exist_ok=True), Path(temp, path).write_text(text))
+            git('init', '-q')
+            write('package.json', '{"packageManager":"pnpm@10.34.3","scripts":{"test":"one"},"dependencies":{"next":"1.0.0"}}')
+            write('packages/daemon/package.json', '{"name":"@mikka/daemon","dependencies":{"zod":"1.0.0"}}')
+            write('pnpm-lock.yaml', '''lockfileVersion: '9.0'
+
+importers:
+
+  .:
+    dependencies:
+      next:
+        specifier: 1.0.0
+        version: 1.0.0
+
+  packages/daemon:
+    dependencies:
+      zod:
+        specifier: 1.0.0
+        version: 1.0.0
+
+packages:
+
+  next@1.0.0:
+    resolution: {integrity: web}
+
+  zod@1.0.0:
+    resolution: {integrity: daemon}
+
+snapshots:
+
+  next@1.0.0: {}
+
+  zod@1.0.0: {}
+''')
+            write('packages/daemon/a.ts', 'one')
+            git('add', '-A'); git('commit', '-qm', 'base')
+            root, bt.ROOT = bt.ROOT, Path(temp)
+            try:
+                first = bt.worker_hash('HEAD')
+                write('package.json', '{"packageManager":"pnpm@10.34.3","scripts":{"test":"two"},"dependencies":{"next":"1.0.0"}}')
+                git('commit', '-qam', 'script only')
+                self.assertEqual(bt.worker_hash('HEAD'), first)
+                write('pnpm-lock.yaml', Path(temp, 'pnpm-lock.yaml').read_text().replace('integrity: web', 'integrity: web2'))
+                git('commit', '-qam', 'web package only')
+                self.assertEqual(bt.worker_hash('HEAD'), first, 'a web-only lockfile entry stays out of the worker hash')
+                text = Path(temp, 'pnpm-lock.yaml').read_text().replace('integrity: daemon', 'integrity: daemon2')
+                write('pnpm-lock.yaml', text)
+                git('commit', '-qam', 'daemon package')
+                self.assertNotEqual(bt.worker_hash('HEAD'), first)
+            finally:
+                bt.ROOT = root
+
+    def test_real_lockfile_projects(self):
+        digest = bt.worker_hash('HEAD')
+        self.assertRegex(digest, r'^[0-9a-f]{40}$')
+
 class WorkerImports(unittest.TestCase):
     def test_packaged_code_only_imports_what_the_template_ships(self):
         # The template holds WORKER_PATHS only: a relative import that leaves them works in the

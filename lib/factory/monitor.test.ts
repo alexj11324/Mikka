@@ -1120,7 +1120,7 @@ test(
           )!;
           assert.equal(fresh.runId, null);
           assert.equal(fresh.sessionId, null);
-          assert.deepEqual(fresh.output, {});
+          assert.deepEqual(fresh.output, { requestEpoch: cycle.task.sourceEventId });
           assert.deepEqual(fresh.evidence, []);
           assert.deepEqual(
             JSON.parse(

@@ -1,3 +1,4 @@
+import type { ExecutionIdentity } from '../execution-identity'
 import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
 import type { SendKey } from '../send-key'
 import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
@@ -102,6 +103,8 @@ export const bots = pgTable('bots', {
   ownerId: text('ownerId').references(() => users.id, { onDelete: 'set null' }),
   workspaceId: uuid('workspaceId').notNull(),
   name: text('name').notNull(),
+  /** Public duties visible to group participants; never populated from private instructions. */
+  publicRole: text('publicRole').notNull().default(''),
   /** A bloub colour id, see components/nav/bot-avatar.tsx. */
   color: text('color').notNull().default('encre'),
   shape: text('shape').notNull().default('cercle'),
@@ -880,6 +883,9 @@ export const groupTurns = pgTable('group_turns', {
   status: text('status').$type<'queued' | 'running' | 'complete' | 'failed'>().notNull().default('queued'),
   agentId: uuid('agentId'), activeRunId: uuid('activeRunId'), route: jsonb('route'), error: text('error'),
   botId: uuid('botId'), modelSelections: jsonb('modelSelections').notNull().default({}),
+  decisionAttempts: integer('decisionAttempts').notNull().default(0),
+  nextDecisionAt: timestamp('nextDecisionAt', { withTimezone: true }),
+  trace: jsonb('trace').notNull().default({}),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [index('group_turns_queue_idx').on(t.conversationId, t.status, t.createdAt)])
@@ -889,6 +895,14 @@ export const groupRoutingCorrections = pgTable('group_routing_corrections', {
   message: text('message').notNull(), wrongId: uuid('wrongId').notNull(), rightId: uuid('rightId'), decisionExecution: jsonb('decisionExecution'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [index('group_routing_corrections_recent_idx').on(t.conversationId, t.createdAt.desc())])
+export const groupDecisionFeedback = pgTable('group_decision_feedback', {
+  id: uuid('id').primaryKey(),
+  conversationId: uuid('conversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  messageId: uuid('messageId').notNull().references(() => groupTurns.messageId, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(), source: text('source').notNull(), kind: text('kind').notNull(), targetId: uuid('targetId'),
+  sourceMessageId: uuid('sourceMessageId').references(() => conversationMessages.id, { onDelete: 'set null' }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [index('group_decision_feedback_conversation_idx').on(t.conversationId, t.createdAt.desc()), uniqueIndex('group_decision_feedback_receipt_idx').on(t.messageId, t.userId, t.source, t.kind)])
 // --- Artifacts ---------------------------------------------------------------
 //
 // A document (Markdown) or web page (HTML) an agent hands over through the MCP
@@ -911,6 +925,8 @@ export const artifacts = pgTable('artifacts', {
 }, table => [index('artifacts_user_idx').on(table.userId, table.updatedAt), index('artifacts_run_idx').on(table.runId)])
 
 export const artifactVersions = pgTable('artifact_versions', {
+  /** Immutable author/resource/payer provenance; null means historical or external OAuth. */
+  executionIdentity: jsonb('executionIdentity').$type<ExecutionIdentity | null>(),
   id: uuid('id').primaryKey(),
   artifactId: uuid('artifactId').notNull().references(() => artifacts.id, { onDelete: 'cascade' }),
   version: integer('version').notNull(),

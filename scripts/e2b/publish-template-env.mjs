@@ -64,6 +64,18 @@ export async function publish({ token, templates, sourceSha, sourceCommit, model
   const env = pairEnv({ templates, sourceSha, models })
   if (sourceCommit) env.push({ key: 'MIKKA_CLOUD_WORKER_SOURCE_COMMIT', value: sourceCommit, type: 'plain', target: ['production'] })
   const call = (path, options = {}) => api(path, { token, fetchImpl, ...options })
+  const listedNow = await call(`/v10/projects/${PROJECT}/env`)
+  const unchanged = []
+  for (const want of env) {
+    const row = (listedNow.envs ?? []).find((item) => item.key === want.key && item.target?.includes('production') && !item.gitBranch)
+    const value = row ? (await call(`/v1/projects/${PROJECT}/env/${encodeURIComponent(row.id)}`)).value : undefined
+    unchanged.push(value === want.value)
+  }
+  // Same templates, worker hash and catalogue: the git deploy is the only production build.
+  if (unchanged.every(Boolean)) {
+    log('production env unchanged; skip redeploy')
+    return { skipped: true }
+  }
 
   // A production build already running (e.g. the git deploy of this same push) started with the old
   // pair. Let it finish and identify the exact source before changing configuration.

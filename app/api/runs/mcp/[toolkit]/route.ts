@@ -5,6 +5,7 @@ import { withBasePath } from '@/lib/base-path'
 import { verifyRunToken } from '@/lib/mcp/worker'
 import { authorizeRunApp } from '@/lib/run-app-mcp'
 import { runAppEntry, runAppToolkits } from '@/lib/app-tools-server'
+import { CUSTOM_MCP_TOOLKIT } from '@/lib/plugins/run-mcp'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -21,6 +22,11 @@ function result(value: unknown) {
 }
 
 async function serve(request: Request, toolkit: string) {
+  if (toolkit === CUSTOM_MCP_TOOLKIT) {
+    const auth = (request as Request & { auth?: AuthInfo }).auth
+    if (!auth) return Response.json({ error: 'runAppUnavailable' }, { status: 403 })
+    return (await import('@/lib/plugins/run-mcp-handler')).customRunMcpHandler(request, auth)
+  }
   const scope = await authorizeRunApp((request as Request & { auth?: AuthInfo }).auth, toolkit, runAppToolkits)
   const entry = scope && runAppEntry(scope)
   if (!entry) return Response.json({ error: 'runAppUnavailable' }, { status: 403, headers: { 'cache-control': 'no-store' } })

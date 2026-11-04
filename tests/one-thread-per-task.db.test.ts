@@ -162,8 +162,22 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     const first = await dispatch(a)
     // The model asks for a new thread, but the person only added information: the thread is kept.
     judged = 0.1
-    const kept = await dispatch(a, { note: 'More detail', newThread: true, sourceEventId: await said(a, '再补充一点：还要支持空输入') })
+    const moreDetail = await said(a, '再补充一点：还要支持空输入')
+    const kept = await dispatch(a, { note: 'More detail', newThread: true, sourceEventId: moreDetail })
     assert.deepEqual([kept.thread, kept.runId], ['message', first.runId])
+    const continued = await runs(a.id)
+    assert.equal(continued.length, 2, 'the fenced unclaimed run ends and the current epoch gets one executor')
+    assert.equal(continued[0].status, 'stopped', 'an unclaimed run needs no daemon stop acknowledgement')
+    assert.equal(continued[1].continuesRunId, first.runId, 'the new request keeps the same thread')
+    assert.equal(continued[1].status, 'queued')
+    const { continueActiveFactoryRequest } = await import('../lib/factory/request-epoch')
+    await Promise.all([
+      continueActiveFactoryRequest(appPool, a.id, first.runId, 'More detail', moreDetail),
+      continueActiveFactoryRequest(appPool, a.id, first.runId, 'More detail', moreDetail),
+    ])
+    assert.deepEqual(await runs(a.id), continued, 'late/repeated cleanup of an old epoch never stops its new child')
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM factory_tasks WHERE "userId"=$1', [a.id])).rows[0].n, 1)
+    assert.equal((await pool.query(`SELECT count(*)::int AS n FROM factory_events e JOIN factory_tasks t ON t.id=e."taskId" WHERE t."userId"=$1 AND e.request->>'kind'='request_epoch'`, [a.id])).rows[0].n, 1, 'source replay never creates another epoch')
     // No message of the person's to judge: kept as well, without asking the Decision API.
     const before = judgments.length
     assert.equal((await dispatch(a, { newThread: true })).thread, 'message')
@@ -175,12 +189,61 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     assert.notEqual(fresh.runId, first.runId)
     assert.equal(fresh.replacedThreadId, first.runId)
     const all = await runs(a.id)
-    assert.equal(all.length, 2)
+    assert.equal(all.length, 3)
     assert.equal(all[0].threadReplacedBy, fresh.runId)
-    assert.equal(all[1].continuesRunId, null, 'a new thread is its own chain')
+    assert.equal(all[1].continuesRunId, first.runId, 'the owner follow-up was a continuation of the original thread')
+    assert.equal(all[2].continuesRunId, null, 'only the explicit new thread is its own chain')
     assert.ok((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [first.runId])).rows[0].stopRequestedAt || all[0].status === 'stopped', 'the replaced thread is stopped')
     assert.ok(judgments.every(entry => entry === 'thread-switch:quoted'))
     judged = null
+  })
+
+  await t.test('an old run ending before the epoch lock still admits the new target with an empty fenced set', async () => {
+    const a = await person()
+    const first = await dispatch(a)
+    // The HTTP caller already observed this active run. Its ordinary completion
+    // and the completion hook both finish before the owner message gets the lock.
+    await pool.query(`UPDATE agent_runs SET status='stopped',"finishedAt"=now() WHERE id=$1`, [first.runId])
+    const { afterRunEnded } = await import('../lib/run-completion-effects')
+    await afterRunEnded(a.id, first.runId)
+    assert.equal((await pool.query('SELECT status FROM factory_tasks WHERE "userId"=$1', [a.id])).rows[0].status, 'blocked')
+    const source = await said(a, 'Continue with the new target after the old executor ended')
+    const { continueActiveFactoryRequest } = await import('../lib/factory/request-epoch')
+    await continueActiveFactoryRequest(appPool, a.id, first.runId, 'Continue with the new target', source)
+    const current = await runs(a.id)
+    assert.deepEqual(current.map(run => run.status), ['stopped', 'queued'])
+    assert.equal(current[1].continuesRunId, first.runId)
+    const events = (await pool.query(`SELECT e.request FROM factory_events e JOIN factory_tasks t ON t.id=e."taskId"
+      WHERE t."userId"=$1 AND e.request->>'kind'='request_epoch'`, [a.id])).rows
+    assert.equal(events.length, 1)
+    assert.deepEqual(events[0].request.supersededRunIds, [], 'there was no active executor left to acknowledge a stop')
+    await continueActiveFactoryRequest(appPool, a.id, first.runId, 'Continue with the new target', source)
+    assert.deepEqual(await runs(a.id), current, 'replaying the empty-set hook never admits another executor')
+  })
+
+  await t.test('an owner turn captured before a concurrent continuation fences that queued child and replays safely', async () => {
+    const a = await person()
+    const first = await dispatch(a)
+    const capturedRunId = first.runId
+    await dispatch(a, { note: 'Target A', sourceEventId: await said(a, 'Target A') })
+    const afterA = await runs(a.id)
+    assert.equal(afterA.length, 2)
+    assert.equal(afterA[1].status, 'queued')
+    // Another request had already read the original thread run before A's
+    // post-commit completion hook queued its child. B must fence that child too.
+    const sourceB = await said(a, 'Target B')
+    const { continueActiveFactoryRequest } = await import('../lib/factory/request-epoch')
+    await continueActiveFactoryRequest(appPool, a.id, capturedRunId, 'Target B', sourceB)
+    const afterB = await runs(a.id)
+    assert.deepEqual(afterB.map(run => run.status), ['stopped', 'stopped', 'queued'])
+    assert.equal(afterB[2].continuesRunId, afterA[1].id, 'B continues the same thread after A is fenced')
+    await continueActiveFactoryRequest(appPool, a.id, capturedRunId, 'Target B', sourceB)
+    assert.deepEqual(await runs(a.id), afterB, 'late B cleanup cannot stop its own new executor')
+    const tasks = (await pool.query(`SELECT t.id,t."sourceEventId",a.output,e.payload FROM factory_tasks t
+      JOIN factory_attempts a ON a.id=t."attemptId" JOIN coordinator_events e ON e.id=t."sourceEventId" WHERE t."userId"=$1`, [a.id])).rows
+    assert.equal(tasks.length, 1, 'all owner epochs belong to the same Factory Task')
+    assert.equal(tasks[0].payload.text, 'Target B')
+    assert.equal(tasks[0].output.requestEpoch, tasks[0].sourceEventId)
   })
 
   await t.test('a named computer: the run is pinned there and the result says so; offline, not theirs or removed is refused', async () => {
@@ -260,10 +323,11 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     assert.equal(moved.thread, 'new', JSON.stringify(moved))
     assert.equal(moved.replacedThreadId, first.runId)
     const rows = (await pool.query('SELECT r.id,r."stopRequestedAt",r."threadReplacedBy",d."remoteUrl" FROM agent_runs r JOIN device_repos d ON d.id=r."deviceRepoId" WHERE r."userId"=$1 ORDER BY r."createdAt"', [a.id])).rows
-    assert.equal(rows.length, 2)
+    assert.equal(rows.length, 3, 'one request-epoch continuation plus one explicitly requested new thread')
     assert.ok(rows[0].stopRequestedAt, 'the old thread is asked to stop')
     assert.equal(rows[0].threadReplacedBy, moved.runId)
-    assert.match(rows[1].remoteUrl, /octo\/web/, 'the new thread works in the named repository')
+    assert.match(rows[1].remoteUrl, /octo\/repo/, 'the earlier owner follow-up kept its original repository')
+    assert.match(rows[2].remoteUrl, /octo\/web/, 'the new thread works in the named repository')
     judged = null
   })
   await t.test('newThread with a repository the person named: a new thread there even when the Decision API cannot judge', async () => {

@@ -1,0 +1,49 @@
+import { z } from 'zod'
+import { withBasePath } from './base-path'
+
+const reference = z.string().min(1).max(200)
+const resource = z.object({
+  kind: z.enum(['device', 'api_key', 'subscription', 'e2b', 'mcp']),
+  id: reference, ownerId: reference, access: z.enum(['owner', 'workspace_share']),
+  revision: z.string().max(200).optional(),
+})
+const account = z.object({
+  kind: z.enum(['api_key', 'subscription', 'native_login', 'local_device', 'e2b']),
+  ownerId: reference, resourceId: reference,
+  amount: z.enum(['provider_unknown', 'metered', 'not_applicable']),
+})
+const identity = z.object({
+  version: z.literal(1), requester: reference, botId: z.uuid().nullable(), botOwner: reference.nullable(),
+  executionPrincipal: reference, workspaceId: z.uuid().nullable(), outputOwner: reference,
+  resourceBindings: z.array(resource), billingAccount: z.object({ model: account, runtime: account }),
+  personalResourcePolicy: z.literal('requester_only'),
+})
+const evidence = z.object({ run: z.object({
+  id: z.uuid(), harness: z.string().max(200).nullable(), model: z.string().max(200).nullable(),
+  credentialType: z.enum(['subscription', 'api_key', 'unknown']),
+  subscriptionRoute: z.enum(['claude_code_cli', 'codex_cli']).nullable().catch(null),
+  executionIdentity: identity.nullable(),
+}) })
+
+/** Presentation-only allowlist over the existing owner evidence API. Never
+ * infer a frozen account from a Bot's current model settings. */
+export type ThreadExecutionEvidence = z.infer<typeof evidence>['run']
+export function threadExecutionEvidence(input: unknown, runId: string): ThreadExecutionEvidence {
+  const parsed = evidence.safeParse(input)
+  if (!parsed.success || parsed.data.run.id !== runId) throw Error('thread_execution_evidence_unavailable')
+  return parsed.data.run
+}
+
+/** Also guard the rendered value during a run-key change or late response. */
+export function currentThreadExecutionEvidence(data: ThreadExecutionEvidence | undefined, runId: string) {
+  return data?.id === runId ? data : null
+}
+
+export async function readThreadExecutionEvidence(runId: string, fetchImpl: typeof fetch = fetch): Promise<ThreadExecutionEvidence> {
+  if (!z.uuid().safeParse(runId).success) throw Error('thread_execution_evidence_unavailable')
+  const response = await fetchImpl(withBasePath(`/api/runs/${runId}/evidence`), {
+    method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(15000),
+  })
+  if (!response.ok) throw Error('thread_execution_evidence_unavailable')
+  return threadExecutionEvidence(await response.json(), runId)
+}

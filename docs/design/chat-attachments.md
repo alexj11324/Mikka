@@ -1,7 +1,7 @@
 # Files in every chat
 
 - **Status:** accepted by Alex after the long-filename correction; implementation
-  completed with local acceptance; see the [evidence report](../acceptance/2026-11-03-chat-attachments.md).
+  completed with local acceptance; see the evidence report.
 - **Figma:** [all-chat attachments, page `917:456`](https://www.figma.com/design/zPe5LKycb2XuT1ivCLRw07?node-id=917-456).
   A1–A10 are accepted frames.
 - **Source:** [Alex's requested scope](decisions/2026-11-03-1242-all-chat-attachments.md).

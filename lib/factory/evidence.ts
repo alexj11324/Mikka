@@ -8,6 +8,7 @@ import {
 } from "./approval-contract";
 import type { FactoryCandidate, FactoryTask } from "./approval-dependencies";
 import { maskCredentials } from "../secrets/mask";
+import { completedRecoveryEvidence, readDeliverableSnapshotReceipt } from './deliverable-snapshot';
 
 /** What a screenshot or recording entry shown to the reviewer carries. */
 export interface FactoryCaptureEvidence {
@@ -200,10 +201,32 @@ export async function runCaptureEvidence(
   }));
 }
 
+/** An owner-consumed completion has its own immutable receipt. The old blocked
+ * attempt stays blocked; only its canonical completed-run evidence is projected. */
+async function recoveredExecutionEvidence(tx: PoolClient, task: FactoryTask, candidate: FactoryCandidate & { runId: string }) {
+  const completed = await completedRecoveryEvidence(tx, task, candidate);
+  if (completed || candidate.kind !== 'deliverable') return completed;
+  const retained = await readDeliverableSnapshotReceipt(tx, task, candidate.id);
+  if (!retained) return null;
+  const original = retained.completion;
+  const evidence = original.evidence.map((value: unknown) => {
+    const parsed = evidenceSchema.safeParse(value);
+    if (!parsed.success || parsed.data.candidateId !== retained.previous.id || parsed.data.sha !== null ||
+      parsed.data.environment !== retained.previous.environment || parsed.data.runId !== original.runId ||
+      parsed.data.sessionId !== original.sessionId) throw new FactoryError('factoryEvidenceMismatch');
+    // This is an explicit projection in the current manifest. The persisted
+    // source receipt and original report remain byte-for-byte unchanged.
+    return { ...parsed.data, candidateId: candidate.id };
+  });
+  return { ...original, evidence, deliverableSnapshotRecoveryEventId: retained.eventId,
+    deliverableSnapshotReceiptDigest: retained.receiptDigest, originalEvidenceCandidateId: retained.previous.id,
+    deliverableSnapshotSha: retained.snapshot.head, deliverableSnapshotTree: retained.snapshot.tree };
+}
+
 export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
   const {
     rows: [candidate],
-  } = await tx.query<FactoryCandidate>(
+  } = await tx.query<FactoryCandidate & { runId: string }>(
     'SELECT * FROM factory_candidates WHERE id=$1 AND "taskId"=$2',
     [task.candidateId, task.id],
   );
@@ -215,9 +238,11 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
   const latest = ["execute", "review", "verify"].map((stage) =>
     rows.filter((a) => a.stage === stage).at(-1),
   );
+  const recovered = latest[0] ? null : await recoveredExecutionEvidence(tx, task, candidate);
+  if (recovered) latest[0] = recovered;
   if (
     latest.some(
-      (a) => !a || a.status !== "passed" || !a.runId || !a.sessionId,
+      (a) => !a || (a.status !== "passed" && a !== recovered) || !a.runId || !a.sessionId,
     ) ||
     new Set(latest.map((a) => a?.runId)).size !== 3 ||
     new Set(latest.map((a) => a?.sessionId)).size !== 3
@@ -269,6 +294,10 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
       const entry = {
         stage: attempt.stage,
         attemptId: attempt.id,
+        ...(attempt === recovered ? { completionRecoveryEventId: recovered.completionRecoveryEventId, completionEventId: recovered.completionEventId,
+          ...(recovered.deliverableSnapshotRecoveryEventId ? { deliverableSnapshotRecoveryEventId: recovered.deliverableSnapshotRecoveryEventId,
+            deliverableSnapshotReceiptDigest: recovered.deliverableSnapshotReceiptDigest, originalEvidenceCandidateId: recovered.originalEvidenceCandidateId,
+            deliverableSnapshotSha: recovered.deliverableSnapshotSha, deliverableSnapshotTree: recovered.deliverableSnapshotTree } : {}) } : {}),
         ...ref,
         ...timestamps,
         sha256: digest(raw),

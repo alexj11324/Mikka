@@ -3,7 +3,8 @@ import { createHash, randomBytes } from 'node:crypto'
 import { after } from 'next/server'
 import { and, eq, gt, inArray, isNull, notInArray, or } from 'drizzle-orm'
 import type { AuthInfo } from '@modelcontextprotocol/server'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { revalidateExecutionIdentity, ExecutionIdentityError } from '@/lib/execution-identity'
 import { agentRuns, runTokens } from '@/lib/db/schema'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runBlockedEvent, runQuestionEvent, runReportEvent, type CoordinatorEventInput } from '@/lib/coordinator-events'
@@ -46,7 +47,7 @@ export async function revokeRunTokens(runId: string): Promise<void> {
 
 async function currentRunToken(bearerToken: string) {
   const [row] = await db
-    .select({ runId: runTokens.runId, userId: runTokens.userId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId, agentId: agentRuns.agentId, botId: agentRuns.botId })
+    .select({ runId: runTokens.runId, userId: runTokens.userId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId, agentId: agentRuns.agentId, botId: agentRuns.botId, deviceId: agentRuns.deviceId, agentDefinition: agentRuns.agentDefinition })
     .from(runTokens)
     .innerJoin(agentRuns, eq(agentRuns.id, runTokens.runId))
     .where(and(
@@ -66,7 +67,10 @@ export async function verifyRunToken(_request: Request, bearerToken?: string): P
   if (!bearerToken?.startsWith(RUN_TOKEN_PREFIX)) return undefined
   const row = await currentRunToken(bearerToken)
   if (!row || (row.issueId && !await issueForUser(row.userId, row.issueId))) return undefined
-  if (row.botId) {
+  let identity
+  try { identity = await revalidateExecutionIdentity(pool, row) }
+  catch (error) { if (error instanceof ExecutionIdentityError) return undefined; throw error }
+  if (row.botId && !identity) {
     try { await agentScope(row.userId, row.botId) }
     catch (error) { if (error instanceof AgentKitError) return undefined; throw error }
   }
@@ -76,7 +80,7 @@ export async function verifyRunToken(_request: Request, bearerToken?: string): P
   return {
     token: bearerToken, clientId: `run:${row.runId}`, scopes: [],
     expiresAt: Math.floor(row.expiresAt.getTime() / 1000),
-    extra: { userId: row.userId, runId: row.runId, issueId: row.issueId, agentId: row.agentId, botId: row.botId },
+    extra: { userId: row.userId, runId: row.runId, issueId: row.issueId, agentId: row.agentId, botId: row.botId, executionIdentity: identity },
   }
 }
 

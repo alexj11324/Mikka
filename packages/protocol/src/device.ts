@@ -103,6 +103,7 @@ export const devicePaths = {
       : ""),
   commandsAck: (deviceId: string) =>
     `/v1/devices/${seg(deviceId)}/commands/ack`,
+  gateway: (deviceId: string) => `/v1/devices/${seg(deviceId)}/gateway`,
   runEvents: (runId: string) => `/v1/runs/${seg(runId)}/events`,
   runPatch: (runId: string) => `/v1/runs/${seg(runId)}`,
   runCheckpoint: (runId: string) => `/v1/runs/${seg(runId)}/checkpoint`,
@@ -221,6 +222,13 @@ export const heartbeatResultSchema = z.object({
   daemonVersions: daemonVersionsSchema.optional().catch(undefined),
 })
 export type HeartbeatResult = z.input<typeof heartbeatResultSchema>
+
+/** `GET /v1/devices/:deviceId/gateway`. Null when this server has no gateway. */
+export const deviceGatewaySchema = z.object({
+  url: z.string().url().nullable(),
+  protocol: z.string().regex(/^mikka-ticket-[0-9]+-[a-f0-9]{64}$/).nullable(),
+})
+export type DeviceGatewayTicket = z.infer<typeof deviceGatewaySchema>
 
 // --- Checkpoints ------------------------------------------------------------
 

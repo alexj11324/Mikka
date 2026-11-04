@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { bareUrl, criterionGroups, pullNumber, resultRows, type AcceptanceCheck } from './acceptance-view'
+import { bareUrl, candidateCheckRetry, candidateCheckRetryConfirmed, candidateCheckState, criterionGroups, pullNumber, resultRows, visibleAcceptance, type AcceptanceCheck, type AcceptanceTaskView } from './acceptance-view'
 import type { EvidenceEntry } from './evidence-view'
 
 const shot = (id: string, title: string): EvidenceEntry => ({ artifact: `run-capture:${id}`, captureId: id, title, kind: 'screenshot', stage: 'verify', runId: 'verify-run' })
@@ -87,4 +87,83 @@ test('steps that share a second show tenths; the others show whole seconds', asy
   const { stepTime } = await import('./evidence-view')
   const steps = [{ atMs: 0 }, { atMs: 1200 }, { atMs: 1700 }, { atMs: 65_000 }]
   assert.deepEqual(steps.map((_, position) => stepTime(steps, position)), ['0:00', '0:01.2', '0:01.7', '1:05'])
+})
+
+const failedTask = (patch: Partial<AcceptanceTaskView> = {}): AcceptanceTaskView => ({
+  id: 't1', issueId: 'issue-1', attemptId: 'a1', revision: 24, candidateId: 'c1', stage: 'review', status: 'failed', ...patch,
+})
+const retryFixture = (stage: 'review' | 'verify' = 'review') => {
+  const task = failedTask({ stage })
+  const detail = { task: { ...task }, checks: [check({ stage, attemptId: 'a1', status: 'failed' })] }
+  const ledger = { taskId: 't1', issueId: 'issue-1', attemptId: 'a1', revision: 24, candidateId: 'c1' }
+  return { task, detail, ledger }
+}
+
+test('fixed candidates stay visible for failed, pending and running checks, without widening other stages', () => {
+  for (const stage of ['review', 'verify'] as const) for (const status of ['failed', 'pending', 'running'] as const) {
+    assert.equal(visibleAcceptance(failedTask({ stage, status })), true)
+    assert.deepEqual(candidateCheckState(failedTask({ stage, status })), { stage, status })
+  }
+  for (const patch of [
+    { candidateId: null }, { stage: 'execute' }, { status: 'waiting' }, { status: 'passed' },
+    { status: 'cancelled' }, { status: 'revoked' },
+  ]) assert.equal(visibleAcceptance(failedTask(patch)), false)
+  const recovery = failedTask({ completionRecovery: { binding: { taskId: 't1', revision: 24 } } })
+  assert.equal(visibleAcceptance(recovery), true)
+  assert.equal(candidateCheckState(recovery), null, 'host completion recovery keeps its existing presentation')
+  for (const patch of [{ stage: 'approval', status: 'pending' }, { stage: 'approval', status: 'passed' }, { stage: 'publish' }]) {
+    assert.equal(visibleAcceptance(failedTask(patch)), true)
+    assert.equal(candidateCheckState(failedTask(patch)), null)
+  }
+})
+
+test('candidate retry returns only the existing revision binding for one exact failed attempt', () => {
+  for (const stage of ['review', 'verify'] as const) {
+    const { task, detail, ledger } = retryFixture(stage)
+    const retry = candidateCheckRetry(task, detail, ledger)
+    assert.equal(retry?.stage, stage)
+    assert.deepEqual(retry?.binding, { taskId: 't1', revision: 24 })
+    assert.equal(retry?.key, JSON.stringify(['t1', 'issue-1', 'a1', 'c1', 24]))
+  }
+})
+
+test('stale or incomplete list, detail, ledger and latest-check identities cannot expose retry', () => {
+  const { task, detail, ledger } = retryFixture()
+  for (const patch of [
+    { id: 'other' }, { issueId: 'other' }, { attemptId: 'other' }, { candidateId: 'other' },
+    { revision: 23 }, { revision: 25 }, { status: 'pending' }, { stage: 'verify' },
+  ]) assert.equal(candidateCheckRetry(task, { ...detail, task: { ...detail.task, ...patch } }, ledger), null)
+  for (const patch of [
+    { taskId: 'other' }, { issueId: 'other' }, { attemptId: 'other' }, { candidateId: 'other' },
+    { revision: 23 }, { revision: 25 },
+  ]) assert.equal(candidateCheckRetry(task, detail, { ...ledger, ...patch }), null)
+  for (const patch of [
+    { id: undefined }, { issueId: undefined }, { attemptId: undefined }, { revision: undefined },
+    { revision: Number.NaN }, { revision: -1 }, { candidateId: null }, { status: 'running' },
+  ]) assert.equal(candidateCheckRetry({ ...task, ...patch }, detail, ledger), null)
+  assert.equal(candidateCheckRetry(task, undefined, ledger), null)
+  assert.equal(candidateCheckRetry(task, detail, undefined), null)
+  assert.equal(candidateCheckRetry(task, { ...detail, checks: [] }, ledger), null)
+  assert.equal(candidateCheckRetry(task, { ...detail, completionRecovery: { binding: { taskId: 't1', revision: 24 } } }, ledger), null)
+  const pending = check({ stage: 'review', attemptId: 'a2', status: 'pending', runId: null })
+  assert.equal(candidateCheckRetry(task, { ...detail, checks: [...detail.checks, pending] }, ledger), null,
+    'a newer undispatched attempt must not fall back to the old failed run')
+  assert.equal(candidateCheckRetry(task, { ...detail, checks: [check({ stage: 'review', attemptId: 'a1', status: 'failed', candidateId: 'other' })] }, ledger), null)
+})
+
+test('retry confirmation requires the canonical same-candidate pending transition', () => {
+  for (const stage of ['review', 'verify']) {
+    const task = { id: 't1', issueId: 'issue-1', attemptId: 'check-24', candidateId: 'c1', revision: 24, stage, status: 'failed' }
+    const next = { ...task, attemptId: 'check-25', revision: 25, status: 'pending' }
+    const attempt = { id: next.attemptId, taskId: task.id, candidateId: task.candidateId, stage, status: 'pending' }
+    const receipt = { contractVersion: 1, task: next, attempts: [attempt], candidates: [{ id: task.candidateId, taskId: task.id }] }
+    assert.equal(candidateCheckRetryConfirmed(task, receipt), true)
+    for (const value of [null, [], 'html', {}, { ...receipt, contractVersion: 2 }, { ...receipt, attempts: undefined },
+      { ...receipt, candidates: undefined }, { ...receipt, attempts: [] }, { ...receipt, task },
+      { ...receipt, attempts: [{ ...attempt, taskId: 'other' }] }])
+      assert.equal(candidateCheckRetryConfirmed(task, value), false)
+    for (const patch of [{ id: 'other' }, { issueId: 'other' }, { candidateId: 'other' }, { stage: 'execute' },
+      { status: 'running' }, { revision: 26 }, { revision: 24 }, { attemptId: task.attemptId }, { attemptId: '' }])
+      assert.equal(candidateCheckRetryConfirmed(task, { ...receipt, task: { ...next, ...patch } }), false)
+  }
 })

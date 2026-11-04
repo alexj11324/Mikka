@@ -86,6 +86,7 @@ import {
   RunSupervisor,
   type SupervisorDeps,
 } from "./runs/supervisor"
+import { DeviceGatewayClosedError, openDeviceGateway, runDeviceGateway } from "./device-gateway"
 import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
@@ -248,6 +249,14 @@ export class Daemon {
   private quota: QuotaPoller | null = null
   /** Ends the commands long-poll when the daemon stops. */
   private commandsAbort = new AbortController()
+  /** The push socket is open. An idle device does not heartbeat the database. */
+  private gatewayLive = false
+  /** The server said it has no gateway. Do not ask again on every long-poll. */
+  private gatewayUnavailable = false
+  private gatewayFailures = 0
+  private gatewayRetryAt = 0
+  private deviceReceiptsVersion = 0
+  private deviceReceiptsAcknowledged = 0
   private commandsLoop: Promise<void> = Promise.resolve()
   private fsLoop: Promise<void> = Promise.resolve()
   private reviewAbort: AbortController | null = null
@@ -640,6 +649,17 @@ export class Daemon {
           await link.ackCommands(deviceId, ids)
           for (const id of ids) this.unacked.delete(id)
         }
+        // The push socket is the idle path. A missing gateway, or one that
+        // refuses the connection, falls through to the long-poll below.
+        if (await this.holdGateway(deviceId, signal)) {
+          backoff = 1_000
+          continue
+        }
+        if (this.stopped || signal.aborted) return
+        // An uninstall heartbeat queues stop on the next event-loop turn.
+        // Do not send another unauthorized command request in that gap and
+        // erase the grace credential before the service receives its receipt.
+        if (this.draining && this.supervisor.heartbeatRuns().length === 0) return
         // Runs being stopped or already ended would come back on every
         // answer; leaving them out lets the poll wait for new commands.
         // So are queued runs this daemon refused or failed to claim: the
@@ -699,6 +719,101 @@ export class Daemon {
         backoff = Math.min(backoff * 2, 30_000)
       }
     }
+  }
+
+  /** One read after a push, or right after the socket opens. Wait is zero: the signal already arrived. */
+  private async pullSignaledWork(deviceId: string, signal: AbortSignal) {
+    const failedClaims = [...this.queuedClaims].flatMap(([id, state]) => state === "failed" ? [id] : [])
+    const skipRuns = [...failedClaims, ...this.refusedRuns, ...this.stopping, ...this.ended].slice(0, COMMANDS_MAX_SKIP)
+    let queued: string[] = []
+    const commands = await this.options.link.fetchCommands(deviceId, 0, {
+      signal,
+      skipRuns,
+      onQueuedRuns: (runIds) => { queued = runIds },
+      updates: { daemonLatest: this.knownLatest ?? DAEMON_VERSION, skipDeviceCommands: this.polledDeviceCommands },
+      onUpdates: ({ daemonVersions, deviceCommands }) => {
+        this.learnRelease(daemonVersions?.latest)
+        this.checkAutoUpdate()
+        const fresh = deviceCommands.filter(command => !this.polledDeviceCommands.includes(command.id))
+        if (fresh.length === 0) return
+        this.polledDeviceCommands = [...this.polledDeviceCommands, ...fresh.map(command => command.id)].slice(-COMMANDS_MAX_SKIP_DEVICE_COMMANDS)
+        void this.syncWithServer().catch(() => undefined)
+      },
+    })
+    if (this.stopped || signal.aborted) return
+    await this.applyCommands(commands)
+    if (queued.length > 0) this.claimQueued(queued)
+    // A held socket never returns to pollCommands' ACK step. Confirm delivery
+    // here, retaining IDs on failure so the fallback retries without redelivery.
+    while (this.unacked.size > 0 && !signal.aborted) {
+      const ids = [...this.unacked].slice(0, 500)
+      await this.options.link.ackCommands(deviceId, ids)
+      for (const id of ids) this.unacked.delete(id)
+    }
+  }
+
+  /**
+   * Stay on the device's push socket until it drops. Failed and short-lived
+   * sessions cool down independently of the responsive long-poll fallback.
+   */
+  private async holdGateway(deviceId: string, signal: AbortSignal) {
+    const mint = this.options.link.deviceGateway
+    if (!mint || this.gatewayUnavailable || performance.now() < this.gatewayRetryAt) return false
+    let openedAt: number | undefined
+    let failure: unknown
+    const connection = new AbortController()
+    const abort = () => connection.abort()
+    signal.addEventListener("abort", abort, { once: true })
+    if (signal.aborted) connection.abort()
+    try {
+      const ticket = await mint.call(this.options.link, deviceId, connection.signal)
+      if (!ticket.url || !ticket.protocol) { this.gatewayUnavailable = true; return false }
+      if (signal.aborted) return false
+      const socket = openDeviceGateway(ticket.url, ticket.protocol)
+      await runDeviceGateway(socket, {
+        signal: connection.signal,
+        onOpen: () => {
+          openedAt = performance.now()
+          this.gatewayLive = true
+        },
+        onWork: async () => {
+          await this.pullSignaledWork(deviceId, connection.signal)
+          if (connection.signal.aborted || this.stopped) return
+          await this.syncWithServer()
+          // Idle push mode removed the timer. Work can create a run, so it
+          // must restore recurring lease renewals, not only heartbeat once.
+          if (!connection.signal.aborted && !this.stopped)
+            this.schedule(this.gatewayIdle() ? null : (this.options.heartbeatMs ?? 15_000))
+        },
+      })
+    } catch (error) {
+      failure = error
+      if (!this.stopped && !signal.aborted) {
+        this.log.warn({ err: error }, "device gateway disconnected; using long-poll fallback")
+        // Removed devices may still heartbeat once to receive uninstall.
+        // Let that path handle auth before a command 401 clears credentials.
+        if (error instanceof SessionRejectedError) await this.syncWithServer().catch(() => undefined)
+      }
+    } finally {
+      connection.abort()
+      signal.removeEventListener("abort", abort)
+      this.gatewayLive = false
+      if (!this.stopped && !signal.aborted && !this.gatewayUnavailable) {
+        // Merely opening is not recovery: a flapping server must not reset
+        // backoff. Stable sessions start again at the shortest retry delay.
+        if (openedAt !== undefined && performance.now() - openedAt >= 60_000) this.gatewayFailures = 0
+        this.gatewayFailures = Math.min(this.gatewayFailures + 1, 5)
+        const ceiling = Math.min(60_000, 5_000 * 2 ** (this.gatewayFailures - 1))
+        const delay = failure instanceof DeviceGatewayClosedError && failure.code === 4000
+          ? 60_000 : ceiling * (0.8 + Math.random() * 0.2)
+        this.gatewayRetryAt = performance.now() + delay
+        // Idle push mode clears the timer. Resume it once after disconnect,
+        // preserving a pending or in-flight heartbeat during fallback/active
+        // work: repeated gateway failures must not postpone lease renewals.
+        if (this.timer === null) this.schedule(this.options.heartbeatMs ?? 15_000)
+      }
+    }
+    return false
   }
 
   /**
@@ -1084,17 +1199,27 @@ export class Daemon {
   }
 
   private saveDevice(patch: Partial<DeviceFile>) {
+    if (patch.completedDeviceCommands || patch.failedDeviceCommands) this.deviceReceiptsVersion++
     this.device = { ...this.device, ...patch }
     writeJsonAtomic(this.paths.device, this.device)
   }
 
-  private schedule(delay: number) {
+  /** Idle on the push socket: no runs, nothing waiting to upload. The database can sleep. */
+  private gatewayIdle() {
+    return this.gatewayLive && this.server === "online" && this.supervisor.heartbeatRuns().length === 0
+      && this.queuedClaims.size === 0 && this.unacked.size === 0 && this.outbox.pending() === 0 && !this.draining && !this.updating
+      && this.deviceReceiptsVersion === this.deviceReceiptsAcknowledged
+  }
+
+  private schedule(delay: number | null) {
     if (this.stopped) return
+    if (this.timer) clearTimeout(this.timer)
+    if (delay === null) { this.timer = null; return }
     this.timer = setTimeout(() => {
       // Runs past their lease or watchdog limit stop even while offline.
       this.supervisor.check()
       this.tick = this.syncWithServer().finally(() =>
-        this.schedule(this.options.heartbeatMs ?? 15_000)
+        this.schedule(this.gatewayIdle() ? null : (this.options.heartbeatMs ?? 15_000))
       )
     }, delay)
     this.timer.unref()
@@ -1168,6 +1293,7 @@ export class Daemon {
       const deviceId = this.device.deviceId as string
       // Heartbeat first: lease renewal must not wait on anything else.
       const quotas = this.quota?.snapshot().quotas
+      const receiptsVersion = this.deviceReceiptsVersion
       const heartbeat = {
         completedDeviceCommands: this.device.completedDeviceCommands,
         failedDeviceCommands: this.device.failedDeviceCommands,
@@ -1180,6 +1306,7 @@ export class Daemon {
         ...(this.options.autoUpdate ? { updateFailure: reportedUpdateFailure(this.updateStateFile, DAEMON_VERSION) } : {}),
       }
       const { leases, revoked, cloudCredential, deviceCommands, daemonVersions } = await link.heartbeat(deviceId, heartbeat)
+      this.deviceReceiptsAcknowledged = receiptsVersion
       this.learnRelease(daemonVersions?.latest)
       this.supervisor.renewLeases(leases)
       if (revoked) this.supervisor.revokeLeases(revoked)

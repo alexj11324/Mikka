@@ -4,6 +4,8 @@ import { PgDialect } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
 import { ActionFailureError } from './action-error'
 import { agentRuns, issueMembers, runChunks, runMessages } from './db/schema'
+import { factoryEventId } from './factory/event-id'
+import { FactoryError } from './factory/contract'
 
 const runId = '31300000-0000-4000-8000-000000000001'
 const issueId = '31300000-0000-4000-8000-000000000002'
@@ -14,8 +16,8 @@ let requestHeaders = new Headers({cookie: 'synthetic-session'})
 let sessionUser: string | null = null
 let freshSession = true
 function fixture() {
-  const run = { id: runId, issueId, userId: 'owner', botId, status: 'running', stopRequestedAt: null as Date | null, prompt: 'Private thread', report: null, error: null, createdAt: new Date(), finishedAt: null, agentName: 'Owned Bot', harness: 'codex', ownerName: 'Owner' }
-  return { questions: new Map<string, string>(), questionOwners: new Map<string, string>(), questionReads: [] as unknown[][], run, members: new Set(['owner', 'member', botId]), messages: [] as Array<{ id: string; runId: string; userId: string; text: string }>, updates: 0, transactions: 0, beforeLock: undefined as (() => void) | undefined, fault: undefined as Error | undefined }
+  const run = { id: runId, issueId, deviceRepoId:undefined as string|undefined, userId: 'owner', botId, status: 'running', stopRequestedAt: null as Date | null, prompt: 'Private thread', report: null, error: null as string | null, questionContinuation: null as (typeof agentRuns.$inferSelect)['questionContinuation'], createdAt: new Date(), finishedAt: null, agentName: 'Owned Bot', harness: 'codex', ownerName: 'Owner' }
+  return { questions: new Map<string, string>(), questionOwners: new Map<string, string>(), questionReads: [] as unknown[][], epochReads: [] as unknown[][], run, continuation: null as typeof run | null, members: new Set(['owner', 'member', botId]), messages: [] as Array<{ id: string; runId: string; userId: string; text: string }>, updates: 0, transactions: 0, ordinaryDispatches: 0, beforeLock: undefined as (() => void) | undefined, fault: undefined as Error | undefined, recovery: null as Record<string,unknown> | null, recoveryReads: 0, recoveryCalls: [] as Array<{actor:unknown;input:unknown}> }
 }
 let current = fixture()
 class Selection {
@@ -34,7 +36,11 @@ class Selection {
       if (query.sql.includes('"agent_runs"."issueId"')) {
         assert.ok(query.params.includes(issueId), 'readable thread must bind the requested issue')
       } else {
-        assert.ok(query.sql.includes('"agent_runs"."userId"') && query.params.includes('owner') && query.params.includes(runId), 'message snapshot must bind owner and run')
+        assert.ok(query.sql.includes('"agent_runs"."userId"') && query.params.includes('owner') && [current.run, current.continuation].some(run => run && query.params.includes(run.id)), 'message snapshot must bind owner and run')
+      }
+      if (current.continuation && query.params.includes(current.continuation.id)) {
+        assert.ok(query.sql.includes('"agent_runs"."userId"') && query.params.includes('owner'), 'latest failure stays scoped to its owner')
+        return [{ ...current.continuation }]
       }
       if (/"agent_runs"\."id"/.test(query.sql) && !query.params.includes(runId)) return []
       return [{ ...current.run }]
@@ -46,6 +52,7 @@ class Selection {
   async limit(count: number) { return this.materialize().slice(0, count) }
 }
 const database = {
+  insert(table:unknown) {assert.equal(table,runMessages);return {values:async(value:typeof current.messages[number])=>{current.messages.push(value)}}},
   select() { return new Selection() },
   async transaction(callback: (tx: unknown) => Promise<void>) {
     current.transactions++
@@ -76,20 +83,19 @@ const database = {
     })
   },
 }
-// The run-chain reads (lib/run-chain.ts) are the only raw SQL these actions may issue. The fixture has a
-// one-run chain; it answers only for the owner and the bound issue, like the real owner/issue filters.
-// Any other pool query still fails loudly.
-const chainRow = () => ({ rootRunId: current.run.id, runId: current.run.id, status: current.run.status, stopRequestedAt: current.run.stopRequestedAt, createdAt: current.run.createdAt, finishedAt: current.run.finishedAt, rootCreatedAt: current.run.createdAt })
+// The fixture resolves only the owner's same-issue chain. A continuation stays
+// below its root, as in the real recursive query; unrelated pool reads fail.
+const chainRow = (run = current.run) => ({ rootRunId: current.run.id, runId: run.id, status: run.status, stopRequestedAt: run.stopRequestedAt, createdAt: run.createdAt, finishedAt: run.finishedAt, rootCreatedAt: current.run.createdAt })
 const chainReads: string[] = []
 async function runChainQuery(sql: string, params: unknown[]) {
   if (!/^\s*WITH RECURSIVE/.test(sql)) throw new Error('Unexpected SQL pool access outside thread control')
   if (/WHERE id = \$1::uuid AND "userId" = \$2/.test(sql)) { // readRunChain(runId, userId)
     chainReads.push('chain')
-    return { rows: params[0] === current.run.id && params[1] === current.run.userId ? [chainRow()] : [] }
+    return { rows: [current.run, current.continuation].some(run => run?.id === params[0]) && params[1] === current.run.userId ? [chainRow(), ...(current.continuation ? [chainRow(current.continuation)] : [])] : [] }
   }
   if (/r\."issueId" = \$1 AND r\."userId" = ANY\(\$2::text\[\]\)/.test(sql)) { // listIssueRunChains(issueId, userIds)
     chainReads.push('issue')
-    return { rows: params[0] === current.run.issueId && (params[1] as string[]).includes(current.run.userId) ? [chainRow()] : [] }
+    return { rows: params[0] === current.run.issueId && (params[1] as string[]).includes(current.run.userId) ? [chainRow(), ...(current.continuation ? [chainRow(current.continuation)] : [])] : [] }
   }
   throw new Error('Unexpected run-chain SQL shape')
 }
@@ -101,14 +107,31 @@ before(async () => {
   } } } } })
   mock.module('next/headers', { namedExports: { headers: async () => requestHeaders } })
   mock.module('@/lib/db', { namedExports: { db: database, withDatabaseClient: () => { throw Error('Factory dispatch is outside thread-control fixture') }, pool: { async query(sql: string, params: unknown[]) {
+    // Running owner messages first check for a Factory target to advance.
+    // These ordinary-thread fixtures have no Factory binding; keep the actual
+    // epoch function in the call path and verify its owner/run constraints.
+    if (sql.startsWith('SELECT t.id,t."botId",t."issueId" FROM factory_attempts a')) {
+      assert.match(sql,/JOIN factory_tasks t ON t\.id=a\."taskId" WHERE a\."runId"=\$1 AND t\."userId"=\$2/)
+      assert.deepEqual(params,[current.continuation?.id ?? current.run.id,current.run.userId])
+      current.epochReads.push(params)
+      return {rows:[]}
+    }
     // Run chains (BE-18) fold a resumed-question continuation into its thread; covered against real PG in
     // tests/run-chain.db.test.ts and lib/factory/questions/postgres.test.ts.
+    if (/SELECT q.id AS "questionId"/.test(sql)) {
+      current.recoveryReads++;
+      assert.deepEqual(params.slice(0,3),['owner',runId,issueId]);
+      assert.equal(params[3],factoryEventId('question-recover',factoryEventId('question-owner-retry',runId)));
+      assert.match(sql,/r\."userId"=\$1/);assert.match(sql,/q\."userId"=\$1/);assert.match(sql,/t\."userId"=\$1/);
+      return {rows:current.recovery?[current.recovery]:[]};
+    }
     if (!/FROM factory_questions/.test(sql)) return runChainQuery(sql, params)
     // Factory questions are the other pool read on the thread path (lib/issue-thread-questions.ts).
     current.questionReads.push(params)
     const [runIds, viewerId] = params as [string[], string]
     // Apply the owner predicates the query states: the question row's owner and its task's (the run owner's).
     const questionOwner = /q\."userId"=\$2/.test(sql), taskOwner = /t\."userId"=\$2/.test(sql)
+    if(!Array.isArray(runIds))return {rows:[]}; // The ended ordinary thread has no Factory question.
     return { rows: runIds.filter(id => current.questions.has(id)
       && (!questionOwner || (current.questionOwners.get(id) ?? current.run.userId) === viewerId)
       && (!taskOwner || current.run.userId === viewerId)).map(id => ({ runId: id, status: current.questions.get(id) })) }
@@ -128,6 +151,12 @@ before(async () => {
   mock.module('@/lib/coordinator/store', { namedExports: { citationSources: () => { throw new Error('citations outside test') } } })
   // The thread's quota view (lib/run-quota-view.ts) is covered against real Postgres in tests/run-quota.db.test.ts.
   mock.module('@/lib/run-quota-view', { namedExports: { threadQuotaView: async () => ({ switched: [], paused: null }) } })
+  mock.module('@/lib/thread-dispatch',{namedExports:{explicitNewThread:async()=>false,latestTaskRun:async()=>({id:current.continuation?.id ?? current.run.id}),dispatchToTask:async()=>{current.ordinaryDispatches++;return {thread:'continued',runId:'ordinary-next-run'}}}});
+  mock.module('@/lib/factory/runtime',{namedExports:{factoryLifecycleEnabled:()=>true,guardFactoryClaim:async()=>({}),factoryAuthorize:async()=>true,factoryRuntimeForBot:(selectedBot:string|null)=>({questions:{recover:async(actor:unknown,input:unknown)=>{
+    assert.equal(selectedBot,botId);current.recoveryCalls.push({actor,input});
+    if (current.fault) throw current.fault;
+    return {continuationRunId:'owner-recovery-run'};
+  }}})}});
   actions = await import('../app/actions/agents')
 })
 const rejected = (code: string) => (error: unknown) => error instanceof ActionFailureError && error.code === code
@@ -139,6 +168,7 @@ test('actual thread actions preserve owner detail/Bot display and attribute an a
   await actions.sendIssueThreadMessage({ issueId, runId, text: '  continue  ' })
   assert.deepEqual(current.messages.map(({ runId: run, userId, text }) => ({ run, userId, text })), [{ run: runId, userId: 'owner', text: 'continue' }])
   assert.equal(current.transactions, 1)
+  assert.deepEqual(current.epochReads,[[runId,'owner']])
 })
 
 test('actual actions deny member/Bot-ID authority for content, messages and stop while retaining metadata', async () => {
@@ -150,6 +180,7 @@ test('actual actions deny member/Bot-ID authority for content, messages and stop
     await assert.rejects(actions.sendIssueThreadMessage({ issueId, runId, text: 'forged' }), rejected('runNotFound'))
     await assert.rejects(actions.stopRun(runId), rejected('runNotFound'))
     assert.equal(current.messages.length + current.updates, 0)
+    assert.equal(current.epochReads.length,0,'a collaborator cannot reach the owner target probe')
   }
 })
 
@@ -268,11 +299,112 @@ test('a question reaches only its owner, only on an ended run, and only behind t
 
 test('the composer send returns a refusal as its code and still throws unknown failures', async () => {
   current = fixture(); viewer = 'owner'
-  assert.deepEqual(await actions.sendIssueThreadReply({ issueId, runId, text: 'go on' }), { sent: true })
+  assert.deepEqual(await actions.sendIssueThreadReply({ issueId, runId, text: 'go on' }), { sent: true,runId,continued:false })
   current = fixture(); viewer = 'member'
   assert.equal((await actions.sendIssueThreadReply({ issueId, runId, text: 'forged' })).error, 'runNotFound')
   current = fixture(); viewer = 'owner'
   assert.equal((await actions.sendIssueThreadReply({ issueId, runId, text: ' ' })).error, 'messageRequired')
   const fault = new Error('synthetic lock failure'); current.fault = fault
   await assert.rejects(actions.sendIssueThreadReply({ issueId, runId, text: 'retry' }), error => error === fault)
+})
+
+const recoveryRow=()=>({questionId:'31300000-0000-4000-8000-000000000010',botId,continuationRunId:runId,questionStatus:'blocked',taskStatus:'blocked',runStatus:'failed',questionRevision:13,originRunId:'31300000-0000-4000-8000-000000000011',originSessionId:'original-sdk-session',binding:{taskId:'31300000-0000-4000-8000-000000000012',issueId,attemptId:'31300000-0000-4000-8000-000000000013',revision:13,candidateId:null},recoveryRequest:null});
+test('only the explicit owner Retry intent recovers a blocked original-session question with a stable request',async()=>{
+  current=fixture();viewer='owner';current.run.status='failed';current.recovery=recoveryRow();
+  const result=await actions.sendIssueThreadReply({issueId,runId,text:'Arbitrary translated button label',retryOriginalSession:true});
+  assert.deepEqual(result,{sent:true,runId:'owner-recovery-run',continued:true});
+  assert.equal(current.recoveryCalls.length,1);assert.equal(current.messages.length,0);
+  assert.equal(current.epochReads.length,0,'explicit native-question recovery must not create a new owner target')
+  const first=current.recoveryCalls[0];
+  assert.deepEqual(first.actor,{source:'human',userId:'owner',sessionId:'synthetic-session'});
+  const expected={requestId:factoryEventId('question-owner-retry',runId),expectedFailedRunId:runId,reference:{questionId:current.recovery.questionId,questionRevision:13,binding:current.recovery.binding,originRunId:current.recovery.originRunId,originSessionId:current.recovery.originSessionId}};
+  assert.deepEqual(first.input,expected);
+  current.recovery={...recoveryRow(),questionStatus:'resuming',taskStatus:'running',questionRevision:14,recoveryRequest:{kind:'question_recover',userId:'owner',input:expected}};
+  assert.deepEqual(await actions.sendIssueThreadReply({issueId,runId,text:'Another label',retryOriginalSession:true}),result);
+  assert.deepEqual(current.recoveryCalls[1].input,expected,'transport/click replay must retain the old reference');
+});
+test('owner Retry reports original-session recovery failure without claiming its task is missing', async () => {
+  current=fixture();viewer='owner';current.run.status='failed';current.recovery=recoveryRow();
+  current.fault=new FactoryError('factoryQuestionContinuationUnavailable');
+  assert.deepEqual(await actions.sendIssueThreadReply({issueId,runId,text:'Retry',retryOriginalSession:true}),{error:'threadRecoveryUnavailable',params:undefined});
+  assert.equal(current.recoveryCalls.length,1);
+  assert.equal(current.ordinaryDispatches,0);assert.equal(current.messages.length,0);
+  current.fault=new FactoryError('factoryNotFound');
+  assert.equal((await actions.sendIssueThreadReply({issueId,runId,text:'Retry',retryOriginalSession:true})).error,'runNotFound');
+  const unexpected=new Error('unexpected synthetic failure');current.fault=unexpected;
+  await assert.rejects(actions.sendIssueThreadReply({issueId,runId,text:'Retry',retryOriginalSession:true}),error=>error===unexpected);
+});
+test('typed Retry text is ordinary messaging, and explicit retry never grants a collaborator or API actor authority',async()=>{
+  current=fixture();viewer='owner';current.recovery=recoveryRow();
+  await actions.sendIssueThreadReply({issueId,runId,text:'Retry'});
+  assert.equal(current.recoveryReads,0);assert.equal(current.recoveryCalls.length,0);assert.equal(current.messages.length,1);
+  assert.deepEqual(current.epochReads,[[runId,'owner']])
+  for(const mode of ['member','api','expired']) {
+    current=fixture();current.run.status='failed';current.recovery=recoveryRow();viewer=mode==='member'?'member':'owner';
+    if(mode==='api')requestHeaders=new Headers({cookie:'synthetic-session',authorization:'Bearer synthetic'});
+    if(mode==='expired')freshSession=false;
+    try { const result=await actions.sendIssueThreadReply({issueId,runId,text:'Retry',retryOriginalSession:true});assert.ok(result.error);assert.equal(current.recoveryReads,0);assert.equal(current.recoveryCalls.length,0); }
+    finally {requestHeaders=new Headers({cookie:'synthetic-session'});freshSession=true;viewer='owner';}
+  }
+});
+test('an explicit retry with a stale strict question never falls back to ordinary messaging',async()=>{
+  current=fixture();viewer='owner';current.run.status='failed';current.recovery={...recoveryRow(),questionStatus:'resuming',taskStatus:'running'};
+  assert.equal((await actions.sendIssueThreadReply({issueId,runId,text:'Retry',retryOriginalSession:true})).error,'threadCannotContinue');
+  assert.equal(current.recoveryCalls.length,0);assert.equal(current.messages.length,0);
+  current.recovery={...recoveryRow(),continuationRunId:'another-failed-run'};
+  assert.equal((await actions.sendIssueThreadReply({issueId,runId,text:'Retry',retryOriginalSession:true})).error,'threadCannotContinue');
+  assert.equal(current.recoveryCalls.length,0);assert.equal(current.messages.length,0);
+});
+
+test('the existing Retry on an ordinary failed run retains the ordinary continuation path',async()=>{
+  current=fixture();viewer='owner';current.run.status='failed';current.run.deviceRepoId='31300000-0000-4000-8000-000000000020';
+  assert.deepEqual(await actions.sendIssueThreadReply({issueId,runId,text:'Retry',retryOriginalSession:true}),{sent:true,runId:'ordinary-next-run',continued:true});
+  assert.equal(current.recoveryReads,1);assert.equal(current.recoveryCalls.length,0);
+  assert.deepEqual(current.messages.map(message=>({runId:message.runId,text:message.text})),[{runId:'ordinary-next-run',text:'Retry'}]);
+});
+
+const failedRunId = '31300000-0000-4000-8000-000000000030'
+function strictContinuation(status = 'failed') {
+  current.run.status = 'stopped'
+  current.continuation = { ...current.run, id: failedRunId, status, deviceRepoId: '31300000-0000-4000-8000-000000000020',
+    error: 'Codex subscription execution failed', createdAt: new Date(current.run.createdAt.getTime() + 1),
+    questionContinuation: { questionId: recoveryRow().questionId as string, originRunId: runId, originSessionId: 'original-sdk-session', followUp: 'Existing answer', requireSessionResume: true } }
+}
+
+test('ordinary text on a failed strict continuation cannot start another task or discard its original session', async () => {
+  current = fixture(); viewer = 'owner'; strictContinuation()
+  // The owner opened the original thread, while the failure belongs to its latest attempt.
+  for (const text of ['Retry', '重试', 'Continue the task.']) {
+    assert.equal((await actions.sendIssueThreadReply({ issueId, runId, text })).error, 'threadCannotContinue')
+  }
+  assert.equal(current.ordinaryDispatches, 0)
+  assert.equal(current.recoveryCalls.length, 0)
+  assert.equal(current.messages.length, 0)
+})
+
+test('successful strict continuations still accept new owner work through ordinary continuation', async () => {
+  current = fixture(); viewer = 'owner'; strictContinuation('succeeded')
+  assert.deepEqual(await actions.sendIssueThreadReply({ issueId, runId, text: 'Add the next requirement.' }), { sent: true, runId: 'ordinary-next-run', continued: true })
+  assert.equal(current.ordinaryDispatches, 1)
+  assert.equal(current.recoveryCalls.length, 0)
+})
+
+test('opening the root thread exposes its latest failed attempt error without changing root identity', async () => {
+  current = fixture(); viewer = 'owner'; strictContinuation()
+  const detail = await actions.getIssueThread(issueId, runId)
+  assert.equal(detail.thread.id, runId)
+  assert.equal(detail.thread.rootRunId, runId)
+  assert.equal(detail.thread.latestRunId, failedRunId)
+  assert.equal(detail.thread.status, 'stopped', 'root status remains historical metadata')
+  assert.equal(detail.thread.continuation?.status, 'failed')
+  assert.equal(detail.thread.error, 'Codex subscription execution failed')
+  assert.equal(detail.thread.prompt, 'Private thread')
+})
+
+test('an earlier attempt failure does not remain the current error after a continuation starts or succeeds', async () => {
+  for (const status of ['running', 'succeeded']) {
+    current = fixture(); viewer = 'owner'; strictContinuation(status)
+    current.run.status = 'failed'; current.run.error = 'Historical failure'
+    assert.equal((await actions.getIssueThread(issueId, runId)).thread.error, null)
+  }
 })

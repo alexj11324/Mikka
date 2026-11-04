@@ -53,6 +53,9 @@ type UnitFence = { client: PoolClient | null; acquiring: Promise<void> | null; i
 const authority = new AsyncLocalStorage<{ caller: DeviceAuthority; pools: WeakMap<Pool, Pool>; fence?: UnitFence }>()
 export const FENCE_IDLE_MS = 1_000
 export const FENCE_IDLE_IN_TRANSACTION = '10s'
+/** The timeout new fences take. Production never changes it; the hung-unit
+ * test in lib/device-unit-fence.db.test.ts shortens it instead of waiting 10 s. */
+export const fenceIdleInTransaction = { seconds: 10 }
 const FENCE_POOL_MAX = 3
 const FENCE_CONNECT_TIMEOUT_MS = 2_000
 const fencePools = new WeakMap<Pool, Pool>()
@@ -89,7 +92,7 @@ async function acquireFence(fence: UnitFence, caller: DeviceAuthority, base: Poo
     client.on('error', fence.onError)
     const drop = (destroy: boolean) => { client.off('error', fence.onError); client.release(destroy) }
     try {
-      await client.query(`BEGIN; SET LOCAL lock_timeout='5s'; SET LOCAL idle_in_transaction_session_timeout='${FENCE_IDLE_IN_TRANSACTION}'`)
+      await client.query(`BEGIN; SET LOCAL lock_timeout='5s'; SET LOCAL idle_in_transaction_session_timeout='${fenceIdleInTransaction.seconds}s'`)
       const result = await client.query('SELECT id FROM device_tokens WHERE id=$1 AND "userId"=$2 AND "revokedAt" IS NULL AND ("expiresAt" IS NULL OR "expiresAt">clock_timestamp()) FOR SHARE', [caller.tokenId, caller.userId])
       if (!result.rowCount) {
         await client.query('ROLLBACK').catch(() => undefined)

@@ -29,6 +29,15 @@ const publicationAssignment={pushBranch:'mikka/mik-42',policy:publicationPolicy}
 const prepared=mock.fn(async(..._args:Parameters<typeof import('../run-publications').prepareRunPublication>)=>structuredClone(publicationAssignment))
 const completed=mock.fn(async()=>{throw Error('Claim unexpectedly completed a run')})
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
+// Snapshot composition uses SQL fixtures; current resource/membership enforcement is also covered by execution-identity.db.test.ts.
+function identityFixtureQuery(sql: string) {
+ if(sql.startsWith('SELECT "ownerId","workspaceId" FROM bots')) return { rows: [{ ownerId: owner, workspaceId: workspace }] }
+ if(sql.startsWith('SELECT "ownerId",kind,enabled FROM devices')) return { rows: [{ ownerId: owner, kind: 'cloud', enabled: true }] }
+ if(sql.startsWith('SELECT b."ownerId",b."workspaceId"')) return { rows: [{ ownerId: owner, workspaceId: workspace, revision: String(binding.connectionRevision), modelId: binding.modelId, route: binding.route, shared: false }] }
+ if(sql.startsWith('SELECT 1 FROM user_e2b_keys')) return { rows: [{}] }
+ return null
+}
+
 // This suite substitutes device authentication and DB IO to test only claim
 // snapshot composition. Real credential admission is covered by revocation DB tests.
 stub('../device-route.ts',{withDeviceRoute:<T>(handler:T)=>handler})
@@ -79,7 +88,7 @@ stub('../self-improvement/server.ts',{
 stub('../subscription-runtime.ts',{subscriptionRuntime:()=>({repository:{binding:bindingById,nativeBinding:latestBinding}})})
 let claim: typeof import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route').POST
 let queue: typeof import('../computer/queue-run').queueCloudRun
-before(async()=>{claim=(await import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route')).POST;queue=(await import('../computer/queue-run')).queueCloudRun})
+before(async()=>{const workspaceModule = await import('../workspace-db');stub('../workspace-db.ts', { ...workspaceModule, workspacePool: { query: async () => ({ rows: [{ userId: owner }] }) } });claim=(await import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route')).POST;queue=(await import('../computer/queue-run')).queueCloudRun})
 beforeEach(()=>{definition=frozen();subscription={...binding};missing=false;cloud=false;localCapable=false;cliReadOnly=false;cliPolicy.permissions.git_push='deny';publicationPolicy.permissions.git_push='allow';computerPermission='ask';mismatch=undefined;protocolVersion=3;selectIndex=0;stopDuringToken=false;lockOrder.length=0;process.env.MIKKA_BYOS_ENABLED='1';process.env.MIKKA_AGENT_KIT='1';process.env.MIKKA_CLOUD_COMPUTER_TASKS='1';for(const fn of [modelAdmissionCheck,bindingById,latestBinding,scopedBinding,claimed,cloudClaimed,prepared,completed])fn.mock.resetCalls()})
 const request=()=>claim(new Request('https://example.test/v1/devices/'+deviceId+'/runs/'+randomUUID()+'/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1'}}),{params:Promise.resolve({deviceId,runId:randomUUID()})})
 const assertCliPolicy=(body:{policy:ReturnType<typeof defaultRunPolicy>;policyRevision:string})=>{assert.equal(body.policy.permissions.network,'deny');assert.equal(body.policy.permissions.install_dependency,'deny');assert.deepEqual(body.policy.networkAllow,['cli-policy.invalid']);assert.equal(body.policyRevision,'a'.repeat(64))}
@@ -142,7 +151,7 @@ test('subscription provenance is copied across retries and participates in the d
 })
 test('cloud queue captures exact worker and parent snapshot in the same transaction as binding',async()=>{
  const calls:{sql:string,args:unknown[]}[]=[]
- const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Cloud review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
+ const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});const identity=identityFixtureQuery(sql);if(identity)return identity;if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Cloud review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
  const parent={id:randomUUID(),status:'running' as const,snapshot:makeSnapshot(randomUUID(),2,DEFAULT_AGENT_DEFINITION,'HOST',{harness:'codex',model:null})}
  await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'synthetic',model:binding.modelId,execution:parent})
  const insert=calls.find(c=>c.sql.startsWith('INSERT INTO agent_runs'))!;const snapshot=JSON.parse(insert.args[9] as string);assert.equal(snapshot.harness,'codex');assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(snapshot.parent.executionId,parent.id);assert.equal(calls.at(-1)!.sql,'COMMIT');assert.ok(calls.some(c=>c.sql.startsWith('INSERT INTO computer_run_bindings')))
@@ -153,7 +162,7 @@ test('with versioned definitions off, a cloud run still freezes its Agent and cr
  // Every cloud run freezes its definition when it is queued (orchestration.md § 5), with the model its caller chose.
  process.env.MIKKA_AGENT_KIT='0'
  const calls:{sql:string,args:unknown[]}[]=[]
- const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
+ const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});const identity=identityFixtureQuery(sql);if(identity)return identity;if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
  await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:binding.modelId})
  const insert=calls.find(c=>c.sql.startsWith('INSERT INTO agent_runs'))!;const snapshot=JSON.parse(insert.args[9] as string)
  assert.equal(snapshot.harness,'codex');assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(calls.at(-1)!.sql,'COMMIT')
@@ -163,7 +172,7 @@ test('with versioned definitions off, a cloud run still freezes its Agent and cr
 test('a cloud subscription run must name its model explicitly with versioned definitions disabled',async()=>{
  process.env.MIKKA_AGENT_KIT='0'
  const calls:{sql:string,args:unknown[]}[]=[]
- const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
+ const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});const identity=identityFixtureQuery(sql);if(identity)return identity;if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
  const pool={connect:async()=>client} as unknown as Parameters<typeof queue>[0]
  for(const model of ['auto','',undefined]){
   await assert.rejects(queue(pool,{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:model as string,threadRunId:'previous-run'}),/Run model missing \(run .+, thread previous-run\)/)

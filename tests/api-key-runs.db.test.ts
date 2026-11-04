@@ -13,8 +13,10 @@ import { mock, test } from 'node:test'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { MODEL_CREDENTIAL_HEADER, REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
 import { normalizeRepository } from '@mikka/protocol/repository'
+import { apiKeyHarnesses } from '../lib/model-api-key-providers'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { recordPushGrant } from './support/github-app-stub'
+import { sealSecret, userE2bKeyAad } from '../lib/secrets/crypto'
 import { fakeThreadMachines } from './support/thread-machine-fake'
 
 test('API-key runs: frozen by id at dispatch, opened only at claim, subscription first, withdrawn key refused', { skip: !dbUrl }, async t => {
@@ -45,6 +47,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM bot_model_choices WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM model_api_keys WHERE "ownerId" = ANY($1)', [users])
+    await pool.query('DELETE FROM user_e2b_keys WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM byos_bindings WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM byos_connections WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM workspace_subscription_shares WHERE "ownerId" = ANY($1)', [users])
@@ -59,7 +62,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
   })
 
   const models = (ids: string[]) => (async () => Response.json({ data: ids.map(id => ({ id })) })) as unknown as typeof fetch
-  const addKey = (ownerId: string, provider: 'anthropic' | 'openai', apiKey: string, listed: string[]) =>
+  const addKey = (ownerId: string, provider: 'anthropic' | 'openai' | 'deepseek', apiKey: string, listed: string[]) =>
     keys.addApiKey(pool, ownerId, { provider, apiKey }, { env: process.env, fetch: models(listed) })
   /** One task per run: a person has one unfinished run per task. */
   const task = async (ownerId: string) => {
@@ -107,6 +110,8 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
   /** The Bot's own computer, which dispatch queues against; each cloud thread then runs on its own thread machine. */
   const botComputer = async (p: Awaited<ReturnType<typeof person>>) => {
     const cloudDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID()
+    const sealed = sealSecret('synthetic-e2b-fixture', userE2bKeyAad(p.id))
+    await pool.query('INSERT INTO user_e2b_keys("userId",ciphertext,iv,"keyVersion",last4) VALUES($1,$2,$3,$4,\'test\') ON CONFLICT DO NOTHING', [p.id, sealed.ciphertext, sealed.iv, sealed.keyVersion])
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses) VALUES ($1,$2,'Cloud computer','cloud',true,$3)`, [cloudDevice, p.id, JSON.stringify(desktopMachine)])
     await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,'running',true)`, [p.workspaceId, p.id, randomUUID(), `sbx-${randomUUID()}`, cloudDevice])
     await pool.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)`, [p.botId, p.workspaceId, p.id])
@@ -328,6 +333,37 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const stranger = await person('foreign-binding')
     const foreign = await subscribe(stranger)
     await assert.rejects(queue(foreign.binding, `foreign:${randomUUID()}`, await task(p.id)), cloud ? { status: 409 } : { code: 'executionAccountUnavailable' }, 'an id never grants access to another Agent or owner’s subscription')
+  })
+
+  await t.test('cloud queue refuses a key withdrawn after preflight even when another key serves the same model', async () => {
+    const p = await person('key-withdrawn-before-cloud-queue')
+    const selected = await addKey(p.id, 'anthropic', `sk-ant-${randomBytes(16).toString('hex')}`, ['key-model-a'])
+    // A preset replaces the owner's existing key. Use another preset that
+    // also serves Claude Code; the model list remains this test's fake fetch.
+    const other = await addKey(p.id, 'deepseek', `sk-${randomBytes(16).toString('hex')}`, ['key-model-a'])
+    assert.notEqual(selected.id, other.id)
+    for (const key of [selected, other]) {
+      assert.ok(apiKeyHarnesses(key).includes('claude_code'))
+      assert.ok(key.models.includes('key-model-a'))
+    }
+    const { agentId, repoId } = await botComputer(p)
+    const { runCredentialSource } = await import('../lib/run-credential-source')
+    const selection = { ownerId: p.id, botId: p.botId, harness: 'claude_code', model: 'key-model-a', keyId: selected.id, botWorkspaceId: p.workspaceId, choiceWorkspaceId: p.workspaceId, subscription: null }
+    assert.deepEqual((await runCredentialSource(pool, selection)).apiKey, { keyId: selected.id, model: 'key-model-a' })
+    // Deterministic interleaving: preflight chooses A, the owner withdraws A
+    // during wake, then the real queue reauthorizes with usable key B present.
+    await keys.removeApiKey(pool, p.id, selected.id)
+    assert.deepEqual((await runCredentialSource(pool, selection)).apiKey, { keyId: other.id, model: 'key-model-a' })
+    const snapshot = async () => (await pool.query(`SELECT
+      (SELECT count(*) FROM agent_runs WHERE "userId"=$1) AS runs,
+      (SELECT count(*) FROM computer_run_bindings WHERE "ownerId"=$1) AS bindings,
+      (SELECT count(*) FROM thread_machines WHERE "ownerId"=$1) AS machines,
+      (SELECT count(*) FROM run_publications WHERE "userId"=$1) AS publications`, [p.id])).rows[0]
+    const before = await snapshot()
+    await assert.rejects(queueCloudRun(pool, { userId: p.id, workspaceId: p.workspaceId }, {
+      botId: p.botId, issueId: p.issueId, agentId, deviceRepoId: repoId, title: 'Keep selected key', body: '', model: 'key-model-a', apiKeyId: selected.id, readOnly: true,
+    }), { status: 409 })
+    assert.deepEqual(await snapshot(), before, 'a refused credential creates no run, binding, task machine or publication')
   })
 
   await t.test('cloud computer: queued with no subscription, the claim returns the key', async () => {

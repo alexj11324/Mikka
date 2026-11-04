@@ -83,7 +83,13 @@ export type FactoryReconcileFor = (botId: string | null) => (userId: string, run
 
 const defaultReconcileFor: FactoryReconcileFor = botId => async (userId, runId) => {
   const { factoryRuntimeForBot } = await import('./factory/runtime')
-  return factoryRuntimeForBot(botId).reconcile.run(userId, runId)
+  const result = await factoryRuntimeForBot(botId).reconcile.run(userId, runId)
+  // A host-stopped stalled worker can now hand over immediately. The watchdog
+  // rechecks the current epoch/receipt and uses the same bounded admission as
+  // its independent cron fallback; an old completion cannot start extra work.
+  const { pool } = await import('./db')
+  await (await import('./factory/watchdog')).sweepFactoryWatchdog(pool, undefined, new Date(), Date.now() + 15_000, { userId, runId })
+  return result
 }
 
 /** BE-9: like a GitHub check_suite "completed" event, a committed run

@@ -1199,6 +1199,7 @@
     "runNotActive": "This run has ended and has no answerable question.",
     "threadReplaced": "A newer thread took this task over. Send it there.",
     "threadCannotContinue": "This thread works on no task, so it can’t run again.",
+    "threadRecoveryUnavailable": "The original session cannot be resumed right now.",
     "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response.",
     "savedLoginNotFound": "This login does not exist or was already deleted.",
     "savedLoginSiteInvalid": "Enter an https site address.",
@@ -2487,7 +2488,23 @@
       "hours": "{count} h",
       "balance": "Balance",
       "points": "{points} points",
-      "awaitingTakeover": "Awaiting takeover"
+      "awaitingTakeover": "Awaiting takeover",
+      "executionAccounts": "Accounts used for your tasks",
+      "accountKind": "Resource",
+      "accountPayer": "Account holder",
+      "accountBilling": "Billing",
+      "accountKinds": {
+        "api_key": "Model API key",
+        "subscription": "Model subscription",
+        "native_login": "Device model account",
+        "local_device": "Personal device",
+        "e2b": "Personal E2B account"
+      },
+      "accountAmounts": {
+        "provider_unknown": "Billed by provider / amount unknown",
+        "metered": "Billed by actual usage",
+        "not_applicable": "No platform compute charge"
+      }
     },
     "billing": {
       "loading": "Loading billing",
@@ -2519,6 +2536,25 @@
       }
     },
     "searchEmpty": "No matching settings",
+    "mcpConnections": {
+      "title": "Custom MCP",
+      "loading": "Loading custom MCP connections",
+      "share": "Share with workspace members",
+      "shareLabel": "Share {name} with workspace members",
+      "sharedBy": "Shared by {name}",
+      "member": "Workspace member",
+      "paused": "Disabled",
+      "onlyYou": "Only you",
+      "sharedReadOnly": "Shared with workspace members",
+      "unconfirmed": "State unconfirmed",
+      "loadFailed": "Custom MCP connection state unavailable",
+      "shareUnconfirmed": "Sharing change unconfirmed; current sharing state unknown",
+      "checkAgain": "Check again",
+      "confirmTitle": "Share {name} with members of {workspace}?",
+      "currentWorkspace": "this workspace",
+      "confirmAuthority": "Members can use the tools authorized for this connection. External services may charge the connected account.",
+      "confirmShare": "Share connection"
+    },
     "apiKeys": {
       "add": "Add API key",
       "addConfirm": "Add",
@@ -3498,7 +3534,7 @@
     "started": "started {time}",
     "steps": "Handed to {harness} · {count, plural, one {# step} other {# steps}}",
     "composer": "Tell {agent} what to do next…",
-    "sendFailed": "Not sent. Draft kept",
+    "sendFailed": "Send outcome unconfirmed. Draft kept",
     "stop": "Stop",
     "stopping": "Stopping…",
     "stopFailed": "Stop not confirmed",
@@ -3529,7 +3565,66 @@
       "paidBy": "{owner}'s {plan}",
       "movedTo": "Moved to {machine} to continue"
     },
-    "back": "Back"
+    "back": "Back",
+    "executionIdentity": {
+      "title": "Execution identity and billing",
+      "loading": "Loading execution record",
+      "unavailable": "Execution record unavailable",
+      "unknown": "Unknown",
+      "notRecorded": "Not recorded",
+      "runId": "Run ID",
+      "copyRunId": "Copy run ID",
+      "copied": "Run ID copied",
+      "copyFailed": "Run ID could not be copied",
+      "harness": "Agent",
+      "model": "Model",
+      "credential": "Credential type",
+      "subscriptionRoute": "Subscription route",
+      "snapshotMissing": "No recorded identity snapshot",
+      "participants": "Execution identity",
+      "workspace": "Workspace",
+      "requester": "Requester",
+      "botOwner": "Bot owner",
+      "executionPrincipal": "Execution principal",
+      "outputOwner": "Output owner",
+      "resources": "Authorized resources",
+      "resourceOwner": "Resource holder",
+      "resourceReference": "Resource reference",
+      "resourceRevision": "Resource revision",
+      "billing": "Billing responsibility",
+      "modelBilling": "Model account",
+      "runtimeBilling": "Runtime account",
+      "payer": "Payer",
+      "amount": "Billing",
+      "credentialKinds": {
+        "subscription": "Official subscription",
+        "api_key": "API Key",
+        "unknown": "Unknown"
+      },
+      "resourceKinds": {
+        "device": "Device",
+        "api_key": "API Key",
+        "subscription": "Subscription",
+        "e2b": "E2B",
+        "mcp": "MCP"
+      },
+      "access": {
+        "owner": "Own resource",
+        "workspace_share": "Workspace share"
+      },
+      "accountKinds": {
+        "api_key": "API Key",
+        "subscription": "Subscription",
+        "native_login": "Native login",
+        "local_device": "Local device",
+        "e2b": "E2B"
+      },
+      "amounts": {
+        "provider_unknown": "External cost unknown",
+        "metered": "Mikka metered usage",
+        "not_applicable": "Not applicable"
+      }
+    }
   },
   "Computer": {
     "status": {
@@ -3684,6 +3779,16 @@
       "allThreadsWaiting": "All threads, {count} waiting on you",
       "tabs": "Right panel content",
       "details": "Details",
+      "publicRole": {
+        "label": "Public role",
+        "hint": "Group chats use this role to choose the bot. Tools still require authorization.",
+        "placeholder": "Responsibilities in group chats; leave empty to clear",
+        "count": "{count} / {max}",
+        "tooLong": "Public role can be at most {max} characters",
+        "loadError": "Public role failed to load",
+        "saveError": "Save not confirmed. Your draft is kept.",
+        "saved": "Saved"
+      },
       "threads": "Threads",
       "prs": "PRs",
       "computer": "Computer",
@@ -4158,6 +4263,22 @@
     },
     "listError": "Couldn't load acceptance",
     "retry": "Retry",
+    "checkState": {
+      "review": {
+        "failed": "Review not passed",
+        "pending": "Review queued",
+        "running": "Reviewing"
+      },
+      "verify": {
+        "failed": "Verification not passed",
+        "pending": "Verification queued",
+        "running": "Verifying"
+      }
+    },
+    "retryReview": "Retry review",
+    "retryVerify": "Retry verification",
+    "checkRetryUnknown": "Retry unconfirmed",
+    "checkRetryFailed": "Retry did not complete",
     "reject": "Request changes",
     "rejectNote": "Note for changes",
     "rejectSubmit": "Send back",
@@ -4462,5 +4583,48 @@
       "copyFailed": "Couldn't copy",
       "quote": "Quote"
     }
+  },
+  "GroupTask": {
+    "stage": {
+      "clarify": "Needs more information",
+      "spec": "Planning",
+      "execute": "Execution",
+      "review": "Independent review",
+      "verify": "Verification",
+      "approval": "Awaiting human acceptance",
+      "publish": "Publishing",
+      "monitor": "Monitoring results"
+    },
+    "status": {
+      "pending": "Pending",
+      "running": "Running",
+      "waiting": "Waiting for input",
+      "passed": "Stage passed",
+      "failed": "Stage failed",
+      "blocked": "Blocked",
+      "cancelled": "Cancelled",
+      "revoked": "Authorization revoked"
+    },
+    "awaitingDispatch": "Awaiting dispatch",
+    "state": "Task status: {stage} · {status}.",
+    "accepted": "Task completed: the deliverable passed independent review and verification, and the requester accepted it.",
+    "merged": "Task completed: the current code candidate has been merged.",
+    "task": "Task",
+    "thread": "Thread",
+    "evidence": "Results and verification evidence",
+    "artifact": "Artifact {number}",
+    "approvalRequired": "Independent review and verification are recorded in Factory. Complete the required human acceptance in the task.",
+    "repositoryRemedy": "Select a repository you have authorized in Bot settings, then try again.",
+    "runtimeRemedy": "Connect your local Agent and keep it online, or configure an authorized cloud computer in runtime settings.",
+    "toolRemedy": "Ask the Bot owner to enable task delegation in the existing Agent settings.",
+    "authorizationRemedy": "Check your model, subscription or API key authorization and runtime settings, then try again. Other members’ personal credentials cannot be used.",
+    "chooseBot": "Choose a Bot in this group with Factory task capabilities. This member can only answer questions.",
+    "notStarted": "Execution has not started. {remedy}",
+    "newRunNotStarted": "A new execution has not started. {remedy}",
+    "stopRequested": "Cancellation recorded; stopping the running Agent.",
+    "nothingToStop": "The task has not started.",
+    "continued": "The new request was sent to the same task. Factory will execute, independently review and verify the latest requirements.",
+    "created": "The task was sent to Factory. I will report its execution, independent review and verification results.",
+    "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   }
 }

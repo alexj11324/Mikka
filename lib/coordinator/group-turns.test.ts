@@ -11,11 +11,24 @@ import { DECISION_MODEL, type DecisionAnswer } from './decision'
 import type { DecisionExecution } from './decide'
 import { UnknownMentionError, routingInput } from './group-routing'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
+import { groupTurnSessionOptions, openGroupTurnSession } from './group-turn-session'
 
 const a = randomUUID(), b = randomUUID(), outsider = randomUUID()
 const members: GroupAgent[] = [a,b].map((id,i) => ({ id, name: `Agent ${i}`, description: `role ${i}` }))
 const message = { text: 'everyone', mentions: [] }
-const receipt: DecisionExecution = {executionId:'synthetic-execution',modelId:DECISION_MODEL,providerGenerationId:'synthetic-generation',startedAt:'2026-01-01T00:00:00.000Z',completedAt:'2026-01-01T00:00:01.000Z',requestDigest:'synthetic',imageDigests:[],vision:'no-image-input'}
+const receipt: DecisionExecution = {executionId:'synthetic-execution',modelId:DECISION_MODEL,providerGenerationId:'synthetic-generation',startedAt:'2026-01-01T00:00:00.000Z',completedAt:'2026-01-01T00:00:01.000Z',requestDigest:'a'.repeat(64),imageDigests:[],vision:'no-image-input'}
+test('group session uses the same database/role/TLS and only bypasses the documented Neon transaction pooler',()=>{
+  const source=new URL('postgresql://ep-group-pooler.c-7.us-east-2.aws.neon.tech/app?sslmode=require')
+  source.username=randomUUID();source.password=randomUUID()
+  const options=groupTurnSessionOptions({connectionString:source.href,options:'-c search_path=group_fixture',max:5})
+  const target=new URL(options.connectionString!)
+  assert.equal(target.hostname,'ep-group.c-7.us-east-2.aws.neon.tech')
+  assert.equal(target.username,source.username);assert.equal(target.password,source.password)
+  assert.equal(target.pathname,source.pathname);assert.equal(target.search,source.search)
+  assert.equal(options.options,'-c search_path=group_fixture');assert.equal(options.max,1)
+  assert.equal(groupTurnSessionOptions({host:'localhost-pooler.example.test'}).host,'localhost-pooler.example.test')
+  assert.throws(()=>groupTurnSessionOptions({connectionString:source.href+'&host=foreign.invalid'}),/NEON_CONNECTION_OVERRIDE_REFUSED/)
+})
 test('group failure diagnostics preserve finite underlying causes and never private provider text', () => {
   const wrapped = (cause:unknown) => Object.assign(new Error('private prompt and credential'), { name:'AI_NoOutputGeneratedError',cause })
   assert.equal(groupGenerationFailure(wrapped(new DOMException('private upstream URL','TimeoutError'))),'generation_timeout')
@@ -51,6 +64,22 @@ test('nothing-to-add is not posted; removed members never generate; unknown peer
   assert.equal(posted, 0); assert.equal(called, 1)
   await assert.rejects(runGroupRounds({ by: 'mention', responders: [a] }, message, { ...io, async generate() { return { text: 'bad', mentions: [outsider] } } }), UnknownMentionError)
   assert.equal(posted, 0)
+})
+test('root explicit mentions all receive direct delivery; autonomous followups still need contribution and revoked targets cannot run',async()=>{
+  const generated:string[]=[],judged:string[]=[]
+  await runGroupRounds({by:'mention',action:'reply',responders:[a,b]}, {...message,mentions:[a,b]}, {
+    eligible:async()=>members,status:async()=>{},
+    contribution:async(_message,member)=>{judged.push(member.id);return{contribute:false}},
+    generate:async member=>{generated.push(member.id);return{text:member.id===b?'[nothing to add]':'first answer',mentions:member.id===a?[b]:[]}},
+    publish:async()=>true,
+  })
+  assert.deepEqual(generated,[a,b]);assert.deepEqual(judged,[b],'only the followup is subject to autonomous screening')
+  const revokedGenerated:string[]=[]
+  await runGroupRounds({by:'mention',responders:[a,b]}, {...message,mentions:[a,b]}, {
+    eligible:async()=>revokedGenerated.length?[members[0]]:members,status:async()=>{},
+    generate:async member=>{revokedGenerated.push(member.id);return{text:'answer',mentions:[]}},publish:async()=>true,
+  })
+  assert.deepEqual(revokedGenerated,[a],'membership removal still takes effect before direct generation')
 })
 test('failure clears generating status and does not synthesize a response', async () => {
   const statuses: (string|null)[] = [], outcomes: (string|undefined)[] = []
@@ -104,6 +133,35 @@ test('private routing rejects foreign/self/third peers and an unavailable writer
 // Only a disposable loopback *_e2e database, even if REQUIRE_DB is set.
 const dbURL = disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined
 if (process.env.REQUIRE_DB === '1' && !dbURL) throw new Error('REQUIRE_DB=1 requires a loopback *_e2e database')
+test('PG17: group sessions own different backends and close releases reentrant locks even after a socket loss',{skip:!dbURL},async t=>{
+  const database=new Pool({connectionString:dbURL})
+  t.after(()=>database.end())
+  const first=await openGroupTurnSession(database),second=await openGroupTurnSession(database)
+  const key=`group-session-fixture:${randomUUID()}`
+  const lock=(session:typeof first)=>session.client.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired',[key])
+  const firstPid=(await first.client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+  try {
+    assert.notEqual((await second.client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid,firstPid)
+    assert.equal((await lock(first)).rows[0].acquired,true)
+    assert.equal((await lock(first)).rows[0].acquired,true,'PostgreSQL re-enters a lock on the same backend')
+    assert.equal((await lock(second)).rows[0].acquired,false,'the other worker cannot re-enter that backend')
+    await first.close()
+    assert.equal((await lock(second)).rows[0].acquired,true,'physical close releases all nested acquisitions')
+  } finally {await first.close();await second.close()}
+  assert.equal((await database.query("SELECT count(*)::int n FROM pg_locks WHERE locktype='advisory' AND pid=$1",[firstPid])).rows[0].n,0)
+  const lost=await openGroupTurnSession(database)
+  try {
+    await lock(lost)
+    const pid=(await lost.client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+    const ended=new Promise<void>(resolve=>lost.client.once('end',()=>resolve()))
+    assert.equal((await database.query('SELECT pg_terminate_backend($1) AS terminated',[pid])).rows[0].terminated,true)
+    await ended
+    assert.throws(()=>lost.assertHeld(),/group_turn_session_lost/)
+    await assert.rejects(lost.client.query('SELECT 1'))
+  } finally {await lost.close()}
+  const recovered=await openGroupTurnSession(database)
+  try {assert.equal((await lock(recovered)).rows[0].acquired,true)} finally {await recovered.close()}
+})
 test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, rounds, correction persistence and privacy', { skip: !dbURL }, async () => {
   const pool = new Pool({ connectionString: dbURL })
   const schema = `turns_${randomUUID().replaceAll('-','')}`
@@ -116,6 +174,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const migration = await readFile(new URL('../../drizzle/20261029043634_group_turns.sql', import.meta.url),'utf8')
     await Promise.all([scoped.query(migration),scoped.query(migration)]); await scoped.query(migration)
     await scoped.query(await readFile(new URL('../../drizzle/20261031153511_group_bot_members.sql', import.meta.url), 'utf8'))
+    await scoped.query(await readFile(new URL('../../drizzle/20261103220300_group_decision_quality.sql', import.meta.url), 'utf8'))
     // Minimal real agent_runs columns used by the bridge; full tracked schema
     // bootstrap is an independent gate in the same ephemeral-PG17 CI job.
     await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now(), "createdAt" timestamptz DEFAULT now(), "issueId" uuid, "deviceId" uuid, "botId" uuid)`)
@@ -125,6 +184,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     await scoped.query(`CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text NOT NULL,"workspaceId" uuid,name text NOT NULL,color text,shape text);
       CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY,"botId" uuid NOT NULL,"ownerId" text NOT NULL);
       CREATE TABLE bot_cloud_runtimes ("agentId" uuid,"botId" uuid,"ownerId" text)`)
+    await scoped.query(await readFile(new URL('../../drizzle/20261103220201_group_factory.sql', import.meta.url), 'utf8'))
     for (const member of members) await scoped.query('INSERT INTO agents (id,"userId",name) VALUES ($1,$2,$3)', [member.id, 'owner', member.name])
     const workspaceId = randomUUID()
     const base: GroupRequest = { userId: 'owner', method: 'POST', resource: 'conversations', origin: 'http://localhost:3100', host: 'localhost:3100' }
@@ -326,13 +386,14 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     let aborted = false
     assert.equal(await processGroupTurn(scoped,id,{...runtime,async generate(_agent,input) {
       const stop = await handleGroup(scoped,directory,{...base,userId:'member',resource:'stop',id},true)
-      assert.equal(stop.status,200); assert.deepEqual(stop.body,{stopped:1})
+      assert.equal(stop.status,200); assert.ok((stop.body as {stopped:number}).stopped>=1,'stop also cancels recoverable pending judgments')
       await new Promise<void>(resolve => input.signal?.addEventListener('abort',() => { aborted = true; resolve() },{once:true}))
       throw input.signal?.reason
     }}),true)
     assert.ok(aborted,'the reply in flight is aborted')
     assert.deepEqual((await scoped.query('SELECT status,error,"agentId" FROM group_turns WHERE "messageId"=$1',[stoppedRoot])).rows[0],{status:'failed',error:'stopped',agentId:null})
     assert.equal((await scoped.query('SELECT count(*)::int n FROM conversation_messages WHERE "replyToId"=$1',[stoppedRoot])).rows[0].n,0)
+    assert.deepEqual((await scoped.query('SELECT source,kind FROM group_decision_feedback WHERE "messageId"=$1', [stoppedRoot])).rows, [{ source: 'human_cancellation', kind: 'cancelled_turn' }])
     assert.equal((await scoped.query(`SELECT status FROM agent_runs WHERE kind='group_chat' ORDER BY "createdAt" DESC LIMIT 1`)).rows[0].status,'stopped')
     const page = await handleGroup(scoped,directory,{...base,method:'GET',resource:'messages',id},true)
     assert.equal((page.body as {stopped:boolean;agentStatus:unknown}).stopped,true); assert.equal((page.body as {agentStatus:unknown}).agentStatus,null)
@@ -347,6 +408,165 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[afterStop])).rows[0].status,'complete')
     // Only members stop: someone outside the group gets the same 404 as an unknown group.
     assert.equal((await handleGroup(scoped,directory,{...base,userId:'stranger',resource:'stop',id},true)).status,404)
+    // Quiet routes are successful durable turns with no chat run and no public message.
+    let newGenerations=0
+    for (const action of ['ignore','observe'] as const) {
+      const quiet=await send(id,action==='ignore'?'随便聊聊':'已经有人给了完整答案')
+      const runsBefore=(await scoped.query('SELECT count(*)::int AS n FROM agent_runs')).rows[0].n
+      await processGroupTurn(scoped,id,{...runtime,async route(){return{by:'model',action,reason:'already_answered',responders:[]}},async generate(){newGenerations++;throw Error('quiet turn generated')}})
+      assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[quiet])).rows[0].status,'complete')
+      assert.equal((await scoped.query('SELECT count(*)::int AS n FROM conversation_messages WHERE "replyToId"=$1',[quiet])).rows[0].n,0)
+      assert.equal((await scoped.query('SELECT count(*)::int AS n FROM agent_runs')).rows[0].n,runsBefore)
+      const quietTrace=(await scoped.query('SELECT trace FROM group_turns WHERE "messageId"=$1',[quiet])).rows[0].trace
+      assert.equal(quietTrace.action,action);assert.equal(quietTrace.status,'complete');assert.deepEqual(quietTrace.events,[])
+    }
+    const useful=await send(id,'请分别给出实现与设计意见')
+    await processGroupTurn(scoped,id,{...runtime,async route(){return{by:'model',action:'reply',responders:[a,b]}},async contribution(){return{contribute:false}},async generate(){newGenerations++;return{text:'两部分均已完整说明',mentions:[]}}})
+    assert.equal(newGenerations,1)
+    assert.equal((await scoped.query('SELECT count(*)::int AS n FROM conversation_messages WHERE "replyToId"=$1',[useful])).rows[0].n,1)
+    const usefulEvents=(await scoped.query('SELECT trace FROM group_turns WHERE "messageId"=$1',[useful])).rows[0].trace.events as {type:string}[]
+    for(const type of ['wake','generate','publish']) assert.equal(usefulEvents.filter(event=>event.type===type).length,1)
+    // Only an unstarted judgment may retry; it stays visibly pending until then.
+    const pending=await send(id,'需要暂时不可用的决策')
+    await assert.rejects(processGroupTurn(scoped,id,{...runtime,async correction(){return{kind:'not_correction'}},async route(){throw new GroupJudgmentPendingError()}}),GroupJudgmentPendingError)
+    const pendingState=(await scoped.query('SELECT status,error,"nextDecisionAt" FROM group_turns WHERE "messageId"=$1',[pending])).rows[0]
+    assert.equal(pendingState.error,'group_judgment_pending');assert.ok(pendingState.nextDecisionAt)
+    await scoped.query('UPDATE group_turns SET "nextDecisionAt"=now()-interval \'1 second\' WHERE "messageId"=$1',[pending])
+    assert.ok((await groupsWithPendingTurns(scoped)).includes(id))
+    await processGroupTurn(scoped,id,{...runtime,async correction(){return{kind:'not_correction'}},async route(){return{by:'model',action:'observe',responders:[]}}})
+    assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[pending])).rows[0].status,'complete')
+    // Real route consumer + real durable turn: a paid later-phase failure is
+    // pending, and a successful retry keeps both attempts without waking a Bot.
+    const sequential=await send(id,'sequential pending fixture')
+    let decisionCalls=0,retrying=false
+    const sequentialJudge=createGroupJudgment(async(_purpose,_input,questions)=>{
+      decisionCalls++;assert.equal(questions.length,1)
+      const name=questions[0].name,value=retrying?'observe_already_answered':name==='intent'?'reply_useful_answer':'uncertain'
+      return {answers:new Map([[name,{type:'choice' as const,name,choice:value}]]),execution:{...receipt,executionId:`durable-${decisionCalls}`,providerGenerationId:`durable-generation-${decisionCalls}`}}
+    })
+    const sequentialRuntime:GroupRuntime={...runtime,route:sequentialJudge.route,correction:async()=>({kind:'not_correction'}),generate:async()=>assert.fail('invalid/quiet chain cannot generate')}
+    await assert.rejects(processGroupTurn(scoped,id,sequentialRuntime),GroupJudgmentPendingError)
+    const failedChain=(await scoped.query('SELECT trace,error FROM group_turns WHERE "messageId"=$1',[sequential])).rows[0]
+    assert.equal(failedChain.error,'group_judgment_pending');assert.equal(failedChain.trace.decisionFailure,'uncertain')
+    assert.equal(failedChain.trace.decisions.length,2);assert.equal(failedChain.trace.decisions[1].status,'invalid_decision')
+    retrying=true
+    await scoped.query('UPDATE group_turns SET "nextDecisionAt"=now()-interval \'1 second\' WHERE "messageId"=$1',[sequential])
+    await processGroupTurn(scoped,id,sequentialRuntime)
+    const recovered=(await scoped.query('SELECT status,trace FROM group_turns WHERE "messageId"=$1',[sequential])).rows[0]
+    assert.equal(recovered.status,'complete');assert.equal(recovered.trace.action,'observe');assert.equal(decisionCalls,3)
+    assert.equal(recovered.trace.decisions.length,3);assert.equal(recovered.trace.execution.providerGenerationId,'durable-generation-3')
+    assert.equal(recovered.trace.decisions[1].status,'invalid_decision');assert.deepEqual(recovered.trace.events,[])
+    const stoppedDecision=await send(id,'stop between routing phases')
+    let stoppedDecisionCalls=0
+    const stopJudge=createGroupJudgment(async(_purpose,_input,questions)=>{
+      stoppedDecisionCalls++
+      assert.equal(questions[0].name,'intent')
+      assert.equal((await handleGroup(scoped,directory,{...base,resource:'stop',id},true)).status,200)
+      return {answers:new Map([['intent',{type:'choice' as const,name:'intent',choice:'reply_useful_answer'}]]),execution:{...receipt,executionId:'stop-phase',providerGenerationId:'stop-phase-generation'}}
+    })
+    await processGroupTurn(scoped,id,{...sequentialRuntime,route:stopJudge.route})
+    const stoppedChain=(await scoped.query('SELECT error,trace FROM group_turns WHERE "messageId"=$1',[stoppedDecision])).rows[0]
+    assert.equal(stoppedDecisionCalls,1);assert.equal(stoppedChain.error,'stopped');assert.equal(stoppedChain.trace.decisions.length,1)
+
+    // A transaction pooler can lend one physical backend to two logical
+    // clients between statements. PostgreSQL's session lock then re-enters;
+    // a history poll must not classify a still-live Decision as interrupted.
+    const pooledGroup=await create(), pooledMessage=await send(pooledGroup,'quiet pooled fixture')
+    const backend=await scoped.connect()
+    const pooledClient=new Proxy(backend,{get(target,property){
+      if(property==='release') return ()=>{}
+      const value=Reflect.get(target,property,target)
+      return typeof value==='function'?value.bind(target):value
+    }})
+    const transactionPool=new Proxy(scoped,{get(target,property){
+      if(property==='connect') return async()=>pooledClient
+      const value=Reflect.get(target,property,target)
+      return typeof value==='function'?value.bind(target):value
+    }})
+    let completeDecision!:()=>void, decisionEntered!:()=>void, pooledCalls=0
+    const decisionReady=new Promise<void>(resolve=>{decisionEntered=resolve})
+    const decisionRelease=new Promise<void>(resolve=>{completeDecision=resolve})
+    const pooledJudge=createGroupJudgment(async()=>{
+      pooledCalls++;decisionEntered();await decisionRelease
+      return {answers:new Map([['intent',{type:'choice' as const,name:'intent',choice:'observe_context'}]]),execution:{...receipt,executionId:'pooled-decision',providerGenerationId:'pooled-generation'}}
+    })
+    const pooledRuntime={...runtime,route:pooledJudge.route}
+    const liveDecision=processGroupTurn(transactionPool,pooledGroup,pooledRuntime)
+    try {
+      await decisionReady
+      assert.equal(await processGroupTurn(transactionPool,pooledGroup,pooledRuntime),false)
+      const live=(await scoped.query('SELECT status,error,trace FROM group_turns WHERE "messageId"=$1',[pooledMessage])).rows[0]
+      assert.equal(live.status,'running','a concurrent history poll must not interrupt the live worker')
+      assert.equal(live.error,null);assert.equal(live.trace.status,'pending');assert.equal(pooledCalls,1)
+    } finally {completeDecision();await liveDecision;backend.release()}
+    const pooledFinished=(await scoped.query('SELECT status,error,trace FROM group_turns WHERE "messageId"=$1',[pooledMessage])).rows[0]
+    assert.equal(pooledFinished.status,'complete');assert.equal(pooledFinished.error,null)
+    assert.equal(pooledFinished.trace.decisions[0].receipt.providerGenerationId,'pooled-generation')
+    assert.deepEqual(pooledFinished.trace.events,[],'quiet routing does not wake or generate')
+
+    // Terminate only this fixture worker's owned backend while its Decision
+    // is in flight. It cannot start the dependent responder request or post.
+    const lostDecisionGroup=await create(),lostDecisionMessage=await send(lostDecisionGroup,'lost Decision fixture')
+    let decisionPid=0, releaseLostDecision!:()=>void, enterLostDecision!:()=>void, lostCalls=0
+    let decisionEnded:Promise<void>=Promise.resolve()
+    const lostDecisionReady=new Promise<void>(resolve=>{enterLostDecision=resolve})
+    const lostDecisionRelease=new Promise<void>(resolve=>{releaseLostDecision=resolve})
+    const lostJudge=createGroupJudgment(async()=>{
+      lostCalls++;enterLostDecision();await lostDecisionRelease
+      return {answers:new Map([['intent',{type:'choice' as const,name:'intent',choice:'reply_useful_answer'}]]),execution:{...receipt,executionId:'lost-decision',providerGenerationId:'lost-generation'}}
+    })
+    const lostDecisionWork=processGroupTurn(scoped,lostDecisionGroup,{...runtime,route:lostJudge.route,
+      async agents(owner,ids,client){
+        decisionPid=(await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+        decisionEnded=new Promise<void>(resolve=>client.once('end',()=>resolve()))
+        return runtime.agents(owner,ids,client)
+      },async generate(){assert.fail('a lost Decision worker cannot generate')},
+    })
+    const lostDecisionRejected=assert.rejects(lostDecisionWork)
+    try {
+      await lostDecisionReady
+      assert.equal((await scoped.query('SELECT pg_terminate_backend($1) AS terminated',[decisionPid])).rows[0].terminated,true)
+      await decisionEnded
+    } finally {releaseLostDecision();await lostDecisionRejected}
+    assert.equal(lostCalls,1,'a lost session never starts the dependent paid phase')
+    assert.equal(await processGroupTurn(scoped,lostDecisionGroup,runtime),false)
+    const lostDecisionState=(await scoped.query('SELECT error,trace FROM group_turns WHERE "messageId"=$1',[lostDecisionMessage])).rows[0]
+    assert.equal(lostDecisionState.error,'interrupted_generation_not_replayed')
+    assert.deepEqual(lostDecisionState.trace.events,[])
+
+    // A running generator receives cancellation after its physical session
+    // disappears. This is worker loss, not a fabricated user stop/feedback.
+    const lostGenerationGroup=await create(),lostGenerationMessage=await send(lostGenerationGroup,'lost generation fixture',[a])
+    let generationPid=0, enterLostGeneration!:()=>void, releaseLostGeneration!:()=>void, generationAborted=false
+    let generationEnded:Promise<void>=Promise.resolve()
+    const lostGenerationReady=new Promise<void>(resolve=>{enterLostGeneration=resolve})
+    const lostGenerationWork=processGroupTurn(scoped,lostGenerationGroup,{...runtime,
+      async agents(owner,ids,client){
+        generationPid=(await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+        generationEnded=new Promise<void>(resolve=>client.once('end',()=>resolve()))
+        return runtime.agents(owner,ids,client)
+      },async generate(_agent,input){
+        enterLostGeneration()
+        return new Promise((resolve,reject)=>{
+          releaseLostGeneration=()=>resolve({text:'must not publish after session loss',mentions:[]})
+          input.signal!.addEventListener('abort',()=>{generationAborted=true;reject(input.signal!.reason)},{once:true})
+        })
+      },
+    })
+    const lostGenerationRejected=assert.rejects(lostGenerationWork)
+    try {
+      await lostGenerationReady
+      assert.equal((await scoped.query('SELECT pg_terminate_backend($1) AS terminated',[generationPid])).rows[0].terminated,true)
+      await generationEnded
+      const until=Date.now()+2500
+      while(!generationAborted && Date.now()<until) await new Promise(resolve=>setTimeout(resolve,20))
+      assert.equal(generationAborted,true,'physical session loss must abort the active generator')
+    } finally {releaseLostGeneration();await lostGenerationRejected}
+    assert.equal(await processGroupTurn(scoped,lostGenerationGroup,runtime),false)
+    const lostGenerationState=(await scoped.query('SELECT error,trace FROM group_turns WHERE "messageId"=$1',[lostGenerationMessage])).rows[0]
+    assert.equal(lostGenerationState.error,'interrupted_generation_not_replayed')
+    assert.equal(lostGenerationState.trace.events.filter((event:{type:string})=>event.type==='publish').length,0)
+    assert.equal((await scoped.query('SELECT count(*)::int n FROM conversation_messages WHERE "replyToId"=$1',[lostGenerationMessage])).rows[0].n,0)
     assert.ok(generated.includes('first')); assert.ok(laterRoot)
   } finally { releasePending(); await scoped.end(); await pool.end() }
 })
@@ -397,28 +617,29 @@ test('model route preserves its choice and rejects uncertain or non-member outpu
 })
 
 
-test('decision adapter retains host receipt and refuses missing, inconsistent or invalid answers', async () => {
+test('decision adapter retains each sequential host receipt and refuses missing, inconsistent or invalid answers', async () => {
   const seen: { purpose: string; text: string; names: string[] }[] = []
-  const judge = createGroupJudgment(async (purpose, input, questions) => {
+  let calls=0
+  const invoke=async (purpose:string,input:import('./decision').DecisionInput,questions:import('./decision').DecisionQuestion[]) => {
     seen.push({purpose,text:typeof input === 'string' ? input : input.text,names:questions.map(q=>q.name)})
-    const entries: [string, Exclude<DecisionAnswer,{type:'refusal'}>][] = purpose === 'group-routing'
-      ? [['responder_0',{type:'choice',name:'responder_0',choice:b}],['responder_1',{type:'choice',name:'responder_1',choice:'end'}]]
-      : [['correction',{type:'choice',name:'correction',choice:'yes'}],['target',{type:'choice',name:'target',choice:b}]]
-    return {answers:new Map(entries),execution:receipt}
-  })
-  assert.deepEqual(await judge.route(message,members,a,[]), {by:'model',responders:[b],execution:receipt})
+    const values:Record<string,string>={responder_0:b,responder_1:'end',correction:'yes',target:b}
+    const entries=questions.map(q=>[q.name,{type:'choice' as const,name:q.name,choice:values[q.name]}] as const)
+    return {answers:new Map(entries),execution:{...receipt,executionId:`adapter-${++calls}`,providerGenerationId:`adapter-generation-${calls}`}}
+  }
+  const judge = createGroupJudgment(invoke,'group-route-v0')
+  const route=await judge.route(message,members,a,[])
+  assert.equal(route.action,'reply');assert.equal(route.policyVersion,'group-route-v0');assert.deepEqual(route.responders,[b])
+  assert.equal(route.decisions?.length,2);assert.equal(route.execution?.executionId,'adapter-1')
+  assert.deepEqual(seen.slice(0,2).map(call=>call.names),[['responder_0'],['responder_1']])
   const input = {previous:{message:'earlier',responderId:a},current:message,members}
-  assert.deepEqual(await judge.correction(input), {kind:'correction',rightId:b,execution:receipt})
-  assert.match(seen[1].text, /untrusted data/); assert.deepEqual(seen[1].names,['correction','target'])
-  const invalid = createGroupJudgment(async () => ({answers:new Map([['responder_0',{type:'choice',name:'responder_0',choice:outsider}]]),execution:receipt}))
+  const correction=await judge.correction(input)
+  assert.equal(correction.kind,'correction');if(correction.kind==='correction')assert.equal(correction.rightId,b)
+  assert.match(seen[2].text, /untrusted data/); assert.deepEqual(seen[2].names,['correction','target'])
+  const invalid = createGroupJudgment(async () => ({answers:new Map([['responder_0',{type:'choice',name:'responder_0',choice:outsider}]]),execution:receipt}),'group-route-v0')
   await assert.rejects(invalid.route(message,members,a,[]),GroupJudgmentPendingError)
   assert.deepEqual(await invalid.correction(input), {kind:'uncertain'})
-  // An uncertain later slot cannot silently become a completed partial route.
-  const uncertain = createGroupJudgment(async () => ({answers:new Map<string, Exclude<DecisionAnswer,{type:'refusal'}>>([
-    ['responder_0',{type:'choice',name:'responder_0',choice:b}],
-    ['responder_1',{type:'choice',name:'responder_1',choice:'uncertain'}],
-  ]),execution:receipt}))
-  await assert.rejects(uncertain.route(message,members,a,[]),GroupJudgmentPendingError)
+  const uncertain = createGroupJudgment(async (_purpose,_input,questions) => ({answers:new Map(questions.map(q=>[q.name,{type:'choice' as const,name:q.name,choice:q.name==='responder_0'?b:'uncertain'}])),execution:{...receipt,executionId:`uncertain-${++calls}`,providerGenerationId:`uncertain-generation-${calls}`}}),'group-route-v0')
+  await assert.rejects(uncertain.route(message,members,a,[]),(error:unknown)=>error instanceof GroupJudgmentPendingError && error.decisionFailure==='uncertain' && error.decisions.length===2)
   const unavailable = createGroupJudgment(async () => null)
   await assert.rejects(unavailable.route(message,members,a,[]),GroupJudgmentPendingError)
   assert.deepEqual(await unavailable.correction(input), {kind:'uncertain'})

@@ -1199,6 +1199,7 @@
     "runNotActive": "此运行已结束，且没有可回答的问题。",
     "threadReplaced": "这个任务已经换到新的线程，请在那里发送。",
     "threadCannotContinue": "这个线程没有关联任务，无法再次运行。",
+    "threadRecoveryUnavailable": "暂时无法恢复原会话。",
     "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。",
     "savedLoginNotFound": "此登录信息不存在或已删除。",
     "savedLoginSiteInvalid": "网站地址无效，只支持 https。",
@@ -2487,7 +2488,23 @@
       "hours": "{count} 小时",
       "balance": "余额",
       "points": "{points} 点",
-      "awaitingTakeover": "待接管"
+      "awaitingTakeover": "待接管",
+      "executionAccounts": "我的任务使用的账户",
+      "accountKind": "资源",
+      "accountPayer": "账户持有人",
+      "accountBilling": "费用",
+      "accountKinds": {
+        "api_key": "模型 API Key",
+        "subscription": "模型订阅",
+        "native_login": "设备上的模型账户",
+        "local_device": "个人设备",
+        "e2b": "个人 E2B 账户"
+      },
+      "accountAmounts": {
+        "provider_unknown": "由供应商计费/金额未知",
+        "metered": "按实际用量计费",
+        "not_applicable": "无平台计算费用"
+      }
     },
     "billing": {
       "loading": "正在加载计费",
@@ -2519,6 +2536,25 @@
       }
     },
     "searchEmpty": "没有匹配的设置",
+    "mcpConnections": {
+      "title": "自定义 MCP",
+      "loading": "正在读取自定义 MCP 连接",
+      "share": "分享给工作区成员",
+      "shareLabel": "将「{name}」分享给工作区成员",
+      "sharedBy": "分享者：{name}",
+      "member": "工作区成员",
+      "paused": "已停用",
+      "onlyYou": "仅自己",
+      "sharedReadOnly": "已分享给工作区成员",
+      "unconfirmed": "状态未确认",
+      "loadFailed": "自定义 MCP 连接状态无法读取",
+      "shareUnconfirmed": "分享变更未确认，当前分享状态未知",
+      "checkAgain": "重新检查",
+      "confirmTitle": "向「{workspace}」成员分享「{name}」？",
+      "currentWorkspace": "当前工作区",
+      "confirmAuthority": "成员可使用此连接已授权的工具。外部服务可能向连接账户收费。",
+      "confirmShare": "分享连接"
+    },
     "apiKeys": {
       "add": "添加 API Key",
       "addConfirm": "添加",
@@ -3498,7 +3534,7 @@
     "started": "开始于 {time}",
     "steps": "交给 {harness} · 执行了 {count} 步",
     "composer": "告诉 {agent} 下一步做什么…",
-    "sendFailed": "发送失败，草稿已保留",
+    "sendFailed": "发送结果未确认，草稿已保留",
     "stop": "停止",
     "stopping": "正在停止…",
     "stopFailed": "停止未确认",
@@ -3529,7 +3565,66 @@
       "paidBy": "{owner} 的 {plan}",
       "movedTo": "已换到 {machine} 继续"
     },
-    "back": "返回"
+    "back": "返回",
+    "executionIdentity": {
+      "title": "执行身份与费用归属",
+      "loading": "正在读取执行记录",
+      "unavailable": "执行记录不可读取",
+      "unknown": "未知",
+      "notRecorded": "未记录",
+      "runId": "执行 ID",
+      "copyRunId": "复制执行 ID",
+      "copied": "执行 ID 已复制",
+      "copyFailed": "执行 ID 复制失败",
+      "harness": "Agent",
+      "model": "模型",
+      "credential": "凭证类型",
+      "subscriptionRoute": "订阅执行路由",
+      "snapshotMissing": "未记录身份快照",
+      "participants": "执行身份",
+      "workspace": "工作区",
+      "requester": "任务发起者",
+      "botOwner": "Bot 所有者",
+      "executionPrincipal": "执行主体",
+      "outputOwner": "产物归属",
+      "resources": "已授权资源",
+      "resourceOwner": "资源持有人",
+      "resourceReference": "资源引用",
+      "resourceRevision": "资源版本",
+      "billing": "费用归属",
+      "modelBilling": "模型账户",
+      "runtimeBilling": "运行资源账户",
+      "payer": "付款主体",
+      "amount": "计费口径",
+      "credentialKinds": {
+        "subscription": "官方订阅",
+        "api_key": "API Key",
+        "unknown": "未知"
+      },
+      "resourceKinds": {
+        "device": "电脑",
+        "api_key": "API Key",
+        "subscription": "订阅",
+        "e2b": "E2B",
+        "mcp": "MCP"
+      },
+      "access": {
+        "owner": "本人资源",
+        "workspace_share": "工作区分享"
+      },
+      "accountKinds": {
+        "api_key": "API Key",
+        "subscription": "订阅",
+        "native_login": "本机登录",
+        "local_device": "本地电脑",
+        "e2b": "E2B"
+      },
+      "amounts": {
+        "provider_unknown": "外部费用未知",
+        "metered": "Mikka 按量计费",
+        "not_applicable": "不适用"
+      }
+    }
   },
   "Computer": {
     "status": {
@@ -3684,6 +3779,16 @@
       "allThreadsWaiting": "全部线程，{count} 条等你",
       "tabs": "右栏内容",
       "details": "详情",
+      "publicRole": {
+        "label": "公开职责",
+        "hint": "群聊按此公开职责选择 Bot；工具仍需授权。",
+        "placeholder": "在群聊中负责的工作；留空可清除",
+        "count": "{count} / {max}",
+        "tooLong": "公开职责最多 {max} 个字",
+        "loadError": "公开职责加载失败",
+        "saveError": "保存未确认，修改已保留。",
+        "saved": "已保存"
+      },
       "threads": "线程",
       "prs": "PR",
       "computer": "电脑",
@@ -4158,6 +4263,22 @@
     },
     "listError": "无法加载验收",
     "retry": "重试",
+    "checkState": {
+      "review": {
+        "failed": "审阅未通过",
+        "pending": "等待审阅",
+        "running": "审阅中"
+      },
+      "verify": {
+        "failed": "验证未通过",
+        "pending": "等待验证",
+        "running": "验证中"
+      }
+    },
+    "retryReview": "重新审阅",
+    "retryVerify": "重新验证",
+    "checkRetryUnknown": "重试未确认",
+    "checkRetryFailed": "重试未完成",
     "reject": "退回修改",
     "rejectNote": "退回备注",
     "rejectSubmit": "退回",
@@ -4462,5 +4583,48 @@
       "copyFailed": "复制失败",
       "quote": "引用"
     }
+  },
+  "GroupTask": {
+    "stage": {
+      "clarify": "等待补充信息",
+      "spec": "制定方案",
+      "execute": "执行",
+      "review": "独立审查",
+      "verify": "验证",
+      "approval": "等待人工验收",
+      "publish": "发布",
+      "monitor": "观察结果"
+    },
+    "status": {
+      "pending": "待处理",
+      "running": "进行中",
+      "waiting": "等待输入",
+      "passed": "本阶段通过",
+      "failed": "本阶段未通过",
+      "blocked": "被阻塞",
+      "cancelled": "已取消",
+      "revoked": "授权已撤回"
+    },
+    "awaitingDispatch": "等待调度",
+    "state": "任务状态：{stage} · {status}。",
+    "accepted": "任务已完成：交付物已通过独立审查、验证，并获发起人验收。",
+    "merged": "任务已完成：当前候选代码已合并。",
+    "task": "Task",
+    "thread": "Thread",
+    "evidence": "成果与验证证据",
+    "artifact": "Artifact {number}",
+    "approvalRequired": "独立审查和验证已交回 Factory；仍需在任务中完成所要求的人工验收。",
+    "repositoryRemedy": "请在 Bot 设置中选择你已授权的仓库后重试。",
+    "runtimeRemedy": "请连接你的本地 Agent 并保持在线，或在运行设置中配置你有权使用的云端电脑。",
+    "toolRemedy": "请由 Bot 所有者在现有 Agent 设置中启用任务委派能力。",
+    "authorizationRemedy": "请检查你自己的模型、订阅或 API Key 授权与运行位置设置后重试；其他成员的个人凭据不会被代用。",
+    "chooseBot": "请指定本群中具备 Factory 任务能力的 Bot 来执行；此成员只提供回答。",
+    "notStarted": "尚未开始执行。{remedy}",
+    "newRunNotStarted": "尚未开始新的执行。{remedy}",
+    "stopRequested": "已取消任务，正在停止运行中的 Agent。",
+    "nothingToStop": "任务尚未开始执行。",
+    "continued": "新的要求已交给同一任务；Factory 将按最新要求执行、独立审查并验证。",
+    "created": "任务已交给 Factory，后续由我统一汇报执行、独立审查和验证结果。",
+    "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   }
 }

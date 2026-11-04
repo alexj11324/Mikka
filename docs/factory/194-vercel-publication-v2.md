@@ -1,5 +1,13 @@
 # Vercel publication receipt V2
 
+> Update: since #528 the Vercel publication adapter is not registered.
+> `configuredVercelPublicationAdapters` in `lib/factory/vercel-publication.ts`
+> has no production caller; preview deployments come from the repository's own
+> Vercel integration and are evidence only (`warp-aligned-factory.md`). The
+> switches are now `mikka-factory-vercel-publication` and
+> `mikka-factory-vercel-production` in `lib/deployment-switches.ts`; the
+> `FACTORY_VERCEL_*` variables are read only as a legacy override.
+
 This adds a publisher implementation to the frozen Factory stage contract. It
 does not change stages, create another orchestrator, rename migrations or change
 review/verify/monitor validators. Existing publication JSON stores the checkpoint.

@@ -28,7 +28,27 @@ const artifactRoot = artifactIndex > 0 ? realpathSync(process.argv[artifactIndex
 const metadataGitEnv = { PATH: process.env.PATH, LANG: 'C.UTF-8', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' }
 const repositoryIndex = process.argv.indexOf('--repository-selection')
 const repositoryRoot = repositoryIndex > 0 ? realpathSync(process.argv[repositoryIndex + 1]) : null
-const REPOSITORY_TOOL = { name: 'switch_repository', description: 'When this checkout does not match the task, choose the correct owner/repo after inspecting the task, Git origin and repository files. The host rechecks your owner’s live GitHub authorization, preserves this checkout, clones the selected repository into a new bound execution, and continues with the same model and credential. End your turn after calling this tool. Do not change origin or clone a nested delivery in the wrong worktree. Independent checks cannot switch their fixed candidate.', inputSchema: { type: 'object', properties: { repository: { type: 'string', description: 'Exact GitHub owner/repo or GitHub clone URL.' }, reason: { type: 'string', description: 'Task and repository evidence explaining the mismatch and chosen target.' } }, required: ['repository', 'reason'], additionalProperties: false } }
+const REPOSITORY_TOOL = { name: 'switch_repository', description: 'When this checkout does not match the task, choose the correct owner/repo after inspecting the task, Git origin and repository files. The host rechecks your owner’s live GitHub authorization, preserves this checkout, clones the selected repository into a new bound execution, and continues with the same model and credential. End your turn only if the response confirms a repository selection was recorded. If it reports already_active, continue the task in this checkout. Do not change origin or clone a nested delivery in the wrong worktree. Independent checks cannot switch their fixed candidate.', inputSchema: { type: 'object', properties: { repository: { type: 'string', description: 'Exact GitHub owner/repo or GitHub clone URL.' }, reason: { type: 'string', description: 'Task and repository evidence explaining the mismatch and chosen target.' } }, required: ['repository', 'reason'], additionalProperties: false } }
+
+// This standalone script has no package imports. Match only the standard
+// GitHub identity forms accepted by protocol/repository; this is not authority.
+function githubRepository(input) {
+  if (typeof input !== 'string') return null
+  let raw = input.trim()
+  if (!raw || raw.length > 4000 || /[\s\\%]/.test(raw) ||
+      [...raw].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127) || /(^|[/:])\.{1,2}(?:\/|$)/.test(raw)) return null
+  if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(raw)) raw = `https://github.com/${raw.replace(/\.git$/, '')}.git`
+  const scp = /^git@github\.com:([^/].*)$/i.exec(raw)
+  if (scp && raw.startsWith('git@')) raw = `ssh://git@github.com/${scp[1]}`
+  let url
+  try { url = new URL(raw) } catch { return null }
+  if (url.hostname.toLowerCase() !== 'github.com' || url.search || url.hash || url.password) return null
+  if (!(url.protocol === 'https:' && !url.username && (!url.port || url.port === '443')) &&
+      !(url.protocol === 'ssh:' && url.username === 'git' && (!url.port || url.port === '22'))) return null
+  const parts = url.pathname.replace(/^\//, '').replace(/\/+$/, '').replace(/\.git$/, '').split('/')
+  if (parts.length !== 2 || parts.some(part => !/^[A-Za-z0-9_.-]+$/.test(part) || part === '.' || part === '..' || part.startsWith('-'))) return null
+  return parts.join('/').toLowerCase()
+}
 
 function selectRepository(args) {
   if (typeof args.repository !== 'string' || !args.repository.trim() || args.repository.length > 4000 || typeof args.reason !== 'string' || !args.reason.trim() || args.reason.length > 2000) throw new Error('repository_selection')
@@ -36,8 +56,14 @@ function selectRepository(args) {
   const head = git(['rev-parse', '--verify', 'HEAD'])
   const remote = git(['remote', 'get-url', 'origin'])
   if (head.status !== 0 || !/^[a-f0-9]{40}$/.test(head.stdout.trim())) throw new Error('repository_head')
+  const observedRemote = remote.status === 0 ? remote.stdout.trim() : null
+  const currentRepository = githubRepository(observedRemote)
+  if (currentRepository && currentRepository === githubRepository(args.repository)) {
+    return { content: [{ type: 'text', text: JSON.stringify({ status: 'already_active', selectionRecorded: false,
+      action: 'continue_current_checkout', currentRepository, observedRemote, observedHead: head.stdout.trim() }) }] }
+  }
   record('blocked', { blockedOn: 'repository_selection', summary: args.reason,
-    repositorySelection: { repository: args.repository.trim(), reason: args.reason.trim(), observedRemote: remote.status === 0 ? remote.stdout.trim() : null, observedHead: head.stdout.trim() } }, 'switch_repository')
+    repositorySelection: { repository: args.repository.trim(), reason: args.reason.trim(), observedRemote, observedHead: head.stdout.trim() } }, 'switch_repository')
   return { content: [{ type: 'text', text: 'Repository selection recorded for host authorization and a new checkout. End your turn now. This checkout is preserved; no delivery has been submitted.' }] }
 }
 const ARTIFACT_TEXT_LIMIT = 64 * 1024

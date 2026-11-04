@@ -126,6 +126,97 @@ func TestUpstreamErrorTypeKeepsOnlyTheEnum(t *testing.T) {
 	}
 }
 
+func TestRequestDiagnosticsAcceptOnlyLocalEnumsAndByteCounts(t *testing.T) {
+	logged := captureStderr(t, func() {
+		requestFailure("fixture-private-provider", "input", "json_invalid", 12, 262144)
+		requestFailure("claude", "conversion", "fixture_private_reason", 12, 524288)
+		requestFailure("claude", "fixture_private_phase", "json_invalid", 12, 262144)
+		requestFailure("claude", "stream", "json_invalid", 12, 262144)
+		requestFailure("claude", "input", "json_invalid", -1, 262144)
+		requestFailure("claude", "input", "json_invalid", 12, 12345)
+		requestFailure("claude", "input", "payload_too_large", 1048577, 1048576)
+		requestFailure("codex", "conversion", "payload_too_large", 2097153, 2097152)
+		requestFailure("claude", "input", "json_invalid", 12, 2097152)
+		requestFailure("codex", "conversion", "json_invalid", 12, 1048576)
+		requestFailure("claude", "stream", "chunk_too_large", 1048577, 1048576)
+	})
+	if logged != "subscription_request_failure unknown input json_invalid 12 262144\n"+
+		"subscription_request_failure claude input payload_too_large 1048577 1048576\n"+
+		"subscription_request_failure codex conversion payload_too_large 2097153 2097152\n" {
+		t.Fatalf("unexpected local diagnostic: %q", logged)
+	}
+}
+
+func TestPlainModelRequestBoundariesDoNotReachProviderOrExposeInput(t *testing.T) {
+	for _, provider := range []string{"claude", "codex"} {
+		t.Run(provider, func(t *testing.T) {
+			calls, sentBytes, inputBytes := 0, 0, 0
+			model := CPAPlainModel{Provider: provider, Client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				calls++
+				raw, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				sentBytes = len(raw)
+				body := "data: {\"type\":\"message_stop\"}\n\n"
+				if provider == "codex" {
+					body = "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"fixture\",\"model\":\"fixture-model\",\"output\":[],\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}}\n\n"
+				}
+				return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(body))}, nil
+			})}}
+			auth := &core.Auth{Metadata: map[string]any{"access_token": "fixture-private-access", "account_id": "fixture-account"}}
+			execute := func(text string) error {
+				var input bytes.Buffer
+				encoder := json.NewEncoder(&input)
+				// Match JSON.stringify: HTML characters arrive unescaped. Real
+				// conversion can expand them while the input stays under 1 MiB.
+				encoder.SetEscapeHTML(false)
+				if err := encoder.Encode(map[string]any{"model": "fixture-model", "stream": true, "messages": []any{map[string]any{"role": "user", "content": text}}}); err != nil {
+					t.Fatal(err)
+				}
+				payload := bytes.TrimSuffix(input.Bytes(), []byte("\n"))
+				inputBytes = len(payload)
+				result, err := model.ExecuteStream(context.Background(), auth, ex.Request{Model: "fixture-model", Payload: payload}, ex.Options{})
+				if err != nil {
+					return err
+				}
+				for chunk := range result.Chunks {
+					if chunk.Err != nil {
+						return chunk.Err
+					}
+				}
+				return nil
+			}
+			if err := execute("seed"); err != nil {
+				t.Fatal(err)
+			}
+			// Calibrate the real CPA conversion, rather than copying its format.
+			capacity := 2097152 - sentBytes + len("seed")
+			boundary := strings.Repeat("<", capacity/6) + strings.Repeat("x", capacity%6)
+			calls = 0
+			if err := execute(boundary); err != nil || calls != 1 || sentBytes != 2097152 || inputBytes > 1048576 {
+				t.Fatalf("exact converted boundary failed: err=%v calls=%d input=%d output=%d", err, calls, inputBytes, sentBytes)
+			}
+			calls = 0
+			var err error
+			logged := captureStderr(t, func() { err = execute(boundary + "x") })
+			if err != ErrProvider || calls != 0 || inputBytes > 1048576 || logged != fmt.Sprintf("subscription_request_failure %s conversion payload_too_large 2097153 2097152\n", provider) {
+				t.Fatalf("converted overflow crossed boundary: err=%v calls=%d diagnostic=%q", err, calls, logged)
+			}
+			invalid := []byte(`{"fixture-private-body":`)
+			logged = captureStderr(t, func() {
+				_, err = model.ExecuteStream(context.Background(), auth, ex.Request{Model: "fixture-model", Payload: invalid}, ex.Options{})
+			})
+			if err != ErrProvider || calls != 0 || logged != fmt.Sprintf("subscription_request_failure %s input json_invalid %d 1048576\n", provider, len(invalid)) {
+				t.Fatalf("invalid input crossed boundary: err=%v calls=%d diagnostic=%q", err, calls, logged)
+			}
+			if strings.Contains(logged, "fixture-private") {
+				t.Fatal("request diagnostic exposed input or credential")
+			}
+		})
+	}
+}
+
 func TestClaudeSubscriptionSystemPreservesHostBlocks(t *testing.T) {
 	prefix := map[string]any{"type": "text", "text": "You are Claude Code, Anthropic's official CLI for Claude."}
 	host := map[string]any{"type": "text", "text": "Mikka host instructions", "cache_control": map[string]any{"type": "ephemeral"}}

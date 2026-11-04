@@ -2,9 +2,12 @@ import 'server-only'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { FactoryError } from './contract'
+import { checkFactoryRepairBudget } from './check-recovery-evidence'
 import { factoryBinding, createFactoryDispatch, type FactoryQueue } from './dispatch'
 import { factoryEventId } from './event-id'
 import { factoryLifecycleEnabled, factoryRuntimeForBot } from './runtime'
+import { notifyQueuedLocalRun } from '../device-gateway-notify'
+import { advanceFactoryRequest, factoryContinuationSource } from './request-epoch'
 
 /** Placement is already decided. Route, attempt, queue and receipt share one commit. */
 export async function queueFactoryTask(pool: Pool, userId: string, input: {
@@ -22,6 +25,7 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
   try {
     await tx.query('BEGIN')
     await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['factory-host-dispatch', userId, input.issueId])])
+    await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify([userId, input.issueId])])
     const { rows: [receipt] } = await tx.query(`SELECT e.result,e.request->>'digest'=$5 AS same,t.status,t.id AS "taskId" FROM factory_events e JOIN factory_tasks t ON t.id=e."taskId" WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid AND e."eventId"=$4`, [userId, input.issueId, input.botId, receiptId, digest])
     if (receipt) {
       if (!receipt.same) throw new FactoryError('factoryReplayMismatch')
@@ -39,16 +43,16 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
     // A direct owner follow-up is a new request epoch. Automatic repairs
     // reuse the task/source and must never replace their acceptance target.
     if (input.previousRunId && input.sourceEventId && task?.sourceEventId !== input.sourceEventId) {
+      sourceEventId = await factoryContinuationSource(tx, { userId, issueId: input.issueId, botId: input.botId }, input.sourceEventId, input.previousRunId)
       const { rows: [source] } = await tx.query(`SELECT e."userId",e."botId",e."issueId",e.kind,e.payload,
         EXISTS(SELECT 1 FROM agent_runs r WHERE r.id::text=$2 AND r."userId"=$3 AND r."issueId"=$4) AS "parentOwned"
-        FROM coordinator_events e WHERE e.id=$1`, [input.sourceEventId, input.previousRunId, userId, input.issueId])
+        FROM coordinator_events e WHERE e.id=$1`, [sourceEventId, input.previousRunId, userId, input.issueId])
       if (source?.payload?.source === 'thread_continuation') {
         if (source.userId !== userId || source.botId !== input.botId || source.issueId !== input.issueId || source.kind !== 'user_message' ||
           source.payload.previousRunId !== input.previousRunId || !source.parentOwned) throw new FactoryError('factorySourceMismatch')
-        if (task && task.sourceEventId !== input.sourceEventId) {
-          if (!['passed','cancelled','revoked'].includes(task.status))
-            await runtime.store.apply(userId, factoryBinding(task), factoryEventId('owner-followup', key), { action: 'cancel', reason: 'The owner continued this thread with a new request.' }, tx)
-          task = undefined
+        if (task && task.sourceEventId !== sourceEventId) {
+          task = await runtime.store.lockTask(tx, userId, task.id)
+          task = await advanceFactoryRequest(tx, task, sourceEventId)
         }
       }
     }
@@ -65,9 +69,13 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
       }
       if (task.stage === 'execute' && ['failed','blocked','waiting'].includes(task.status))
         task = (await runtime.store.apply(userId, factoryBinding(task), factoryEventId('continue-retry', key), { action: 'retry', reason: input.note?.slice(0, 4000) || 'Continue the task.' }, tx)).task
-      else if (['review','verify','monitor','approval'].includes(task.stage) && ['failed','blocked','waiting','pending'].includes(task.status))
+      else if (['review','verify','monitor','approval'].includes(task.stage) && ['failed','blocked','waiting','pending'].includes(task.status)) {
+        // Generic thread dispatch shares the host lifecycle's repair budget.
+        // An authenticated new owner epoch already advanced to execute above.
+        task = await runtime.store.lockTask(tx, userId, task.id)
+        await checkFactoryRepairBudget(tx, task)
         task = (await runtime.store.apply(userId, factoryBinding(task), factoryEventId('continue-repair', key), { action: 'repair', reason: input.note?.slice(0, 4000) || 'Revise the candidate.' }, tx)).task
-      else if (task.status === 'passed') task = undefined
+      } else if (task.status === 'passed') task = undefined
       if (task && (task.stage !== 'execute' || task.status !== 'pending')) throw new FactoryError('factoryRunStillActive')
     } else task = undefined
     if (!task) task = (await runtime.store.route(userId, { issueId: input.issueId, eventId: factoryEventId('host-route', key), sourceEventId, rationale: 'Authenticated task dispatch; placement and model selected by the host.' }, tx)).task
@@ -76,6 +84,7 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
     if (input.previousRunId) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1 AND "userId"=$3', [result.runId, input.previousRunId, userId])
     await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)', [task.id, receiptId, JSON.stringify({ key, digest }), JSON.stringify({ runId: result.runId })])
     await tx.query('COMMIT')
+    await notifyQueuedLocalRun(tx, userId, result.runId)
     return { runId: result.runId }
   } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
 }

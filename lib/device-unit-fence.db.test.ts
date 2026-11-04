@@ -93,8 +93,17 @@ test('between bursts (a wait, network IO) the fence is not held: a revocation go
   assert.equal(second, 0)
 })
 
-test('a hung unit loses its fence after 10 s; the revocation then completes and the unit fails closed', { skip: !url, timeout: 30_000 }, async () => {
+test('a hung unit loses its fence after 10 s; the revocation then completes and the unit fails closed', { skip: !url, timeout: 30_000 }, async t => {
   const { withDeviceRoute, pool } = await modules()
+  // Production fences time out after 10 s of idle transaction. The same
+  // PostgreSQL timeout is shortened here to 2 s and the bounds scale with it
+  // (at least 80% of it, at most it plus 1.5 s), so the test does not wait 12 s.
+  const { FENCE_IDLE_IN_TRANSACTION, fenceIdleInTransaction } = await import('./db/device-scope')
+  assert.equal(FENCE_IDLE_IN_TRANSACTION, '10s')
+  assert.equal(fenceIdleInTransaction.seconds, 10)
+  fenceIdleInTransaction.seconds = 2
+  t.after(() => { fenceIdleInTransaction.seconds = 10 })
+  const timeoutMs = fenceIdleInTransaction.seconds * 1000
   const f = await fixture()
   let inBurst!: () => void
   const started = new Promise<void>(resolve => { inBurst = resolve })
@@ -103,7 +112,7 @@ test('a hung unit loses its fence after 10 s; the revocation then completes and 
     const client: PoolClient = await pool.connect()   // held, idle: a stuck handler
     try {
       await client.query('SELECT 1'); inBurst()
-      await delay(12_000)
+      await delay(timeoutMs + 2_000)
       try { await pool.query('SELECT 1') } catch (error) { after = error; throw error }
     } finally { client.release() }
     return Response.json({ ok: true })
@@ -113,7 +122,7 @@ test('a hung unit loses its fence after 10 s; the revocation then completes and 
   const began = Date.now()
   await revoke(f)                                     // no lock timeout: it waits for the fence to go
   const waited = Date.now() - began
-  assert.ok(waited >= 8_000 && waited < 11_500, `the revocation completed after ${waited} ms`)
+  assert.ok(waited >= timeoutMs * 0.8 && waited < timeoutMs + 1_500, `the revocation completed after ${waited} ms`)
   assert.equal((await answer).status, 503, 'the rest of the unit fails closed')
   assert.ok(after)
 })

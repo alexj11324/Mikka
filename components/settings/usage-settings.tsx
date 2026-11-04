@@ -116,6 +116,14 @@ export function UsageSettings({ workspaceId, personal = false }: { workspaceId: 
           </TableBody>
         </Table>
       </div>
+      {Boolean(data.executionAccounts?.length) && <section data-settings-card className="overflow-hidden rounded-2xl border bg-card">
+        <h2 className="px-5 pt-4 text-sm font-medium">{t('executionAccounts')}</h2>
+        <Table className="table-fixed"><TableHeader><TableRow><TableHead className="w-1/3 whitespace-normal pl-5">{t('accountKind')}</TableHead><TableHead className="w-1/4 whitespace-normal">{t('accountPayer')}</TableHead><TableHead className="pr-5">{t('accountBilling')}</TableHead></TableRow></TableHeader>
+          <TableBody>{data.executionAccounts!.map(account => <TableRow key={account.id}>
+            <TableCell className="wrap-break-word whitespace-normal pl-5">{t(`accountKinds.${account.kind}`)}</TableCell><TableCell className="wrap-break-word whitespace-normal">{account.ownerName}</TableCell>
+            <TableCell className="wrap-break-word whitespace-normal pr-5 text-muted-foreground">{t(`accountAmounts.${account.amount}`)}</TableCell>
+          </TableRow>)}</TableBody></Table>
+      </section>}
     </>}
   </div>
 }

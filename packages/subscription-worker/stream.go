@@ -16,7 +16,12 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 	if w.Executor == nil || w.Executor.Identifier() != w.Scope.Provider {
 		return ErrUnsupported
 	}
-	if !modelPattern.MatchString(model) || len(payload) > 262144 {
+	if !modelPattern.MatchString(model) {
+		requestFailure(w.Scope.Provider, "input", "model_invalid", len(payload), modelRequestMaxBytes)
+		return ErrProvider
+	}
+	if len(payload) > modelRequestMaxBytes {
+		requestFailure(w.Scope.Provider, "input", "payload_too_large", len(payload), modelRequestMaxBytes)
 		return ErrProvider
 	}
 	r, a, err := w.readyAuth(ctx, epoch)
@@ -30,6 +35,7 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 		return executionFailure(err)
 	}
 	if result == nil || result.Chunks == nil {
+		requestFailure(w.Scope.Provider, "stream", "stream_unavailable", 0, 0)
 		return ErrProvider
 	}
 	ticker := time.NewTicker(time.Second)
@@ -50,6 +56,7 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 				return executionFailure(chunk.Err)
 			}
 			if len(chunk.Payload) > 65536 {
+				requestFailure(w.Scope.Provider, "stream", "chunk_too_large", len(chunk.Payload), 65536)
 				return ErrProvider
 			}
 			if err = w.activeRuntime(ctx, r.Epoch, model); err != nil {

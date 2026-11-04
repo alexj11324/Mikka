@@ -122,25 +122,32 @@ the same contract: a clean environment for the thread, Agents that Mikka
 installed, and credentials injected at the start of each run and wiped at its
 end.
 
-| | Mikka Cloud (E2B) | Device with Docker | Device without Docker (most Macs) |
-| --- | --- | --- | --- |
-| Environment | A sandbox from the Mikka template | A container from the same image | A worktree plus a temporary Agent config dir (`CLAUDE_CONFIG_DIR` / `CODEX_HOME` style) |
-| Agents | Preinstalled in the image | Preinstalled in the image | The daemon's own copies in a private dir (e.g. `~/.mikka/harness`) |
-| Isolation | The sandbox | The container | The Agent's own sandbox plus Mikka's approval policy |
+| | Mikka Cloud (E2B) | The person's computer or server |
+| --- | --- | --- |
+| Environment | A machine of its own per task, started from E2B's official `claude` or `codex` template (a Bot's computer: `desktop`), with Mikka's worker added | A worktree plus a temporary Agent config dir (`CLAUDE_CONFIG_DIR` / `CODEX_HOME` style) |
+| Agents | The template's own CLI | The daemon's own copies in a private dir (e.g. `~/.mikka/harness`) |
+| Isolation | The machine itself: one task, one machine | None beyond the worktree and the run's own config dir; the CLI runs directly as the daemon's user |
 
-- **One image.** One multi-arch Dockerfile builds both the E2B template and
-  the device image.
+- **No Mikka image and no sandbox.** Cloud machines start from E2B's official
+  templates with Mikka's worker added. No run uses Docker, `sandbox-runtime`
+  or the CLI's own sandbox, on E2B or on a device
+  ([2335](decisions/2026-11-01-2335-e2b-official-templates.md)).
+  [1430](decisions/2026-11-03-1430-official-e2b-templates-unchanged.md) asks
+  that the official template files stay untouched; until #1131 lands,
+  `scripts/e2b/bootstrap.sh` still replaces the template's Node.
 - **Daemon-managed Agents.** The daemon installs and updates its own copies
   of Claude Code and Codex on first use. It never uses, touches or detects
   the person's own Claude Code or Codex installs, logins or config.
 - **Device capability check.** This replaces Agent detection. A device
   reports its OS, architecture, free disk, whether Docker is available, and
-  its 参与调度 switch (§4). A sandbox runs only a boot self-check; a
+  its 参与调度 switch (§4). A cloud machine runs only a boot self-check; a
   failed check marks the runner unhealthy, and its runs are placed again.
 - **Model slots** come from the daemon's own Agent copies, never from the
   person's CLI settings.
-- **Tools.** Tool permissions follow the run's allow / ask / deny policy
-  (`packages/daemon/src/agents/tool-approval-policy.ts`). Connected apps reach
+- **Tools.** Agents ask nothing per tool or destination: Claude Code runs in
+  `bypassPermissions`, Codex with approvals `never` (2335). The daemon's live
+  gate (`packages/daemon/src/agents/tool-approval.ts`) only stops a run whose
+  lease, owner or policy is no longer live. Connected apps reach
   the run as one MCP entry per toolkit, through Mikka, using the run token
   ([apps in device runs](decisions/2026-10-31-1937-apps-in-device-runs.md)).
 
@@ -219,7 +226,7 @@ sequenceDiagram
 ```
 
 - **One environment per thread**, reused across the thread's runs. A sandbox
-  pauses between runs, and a container or worktree stays. Credentials are
+  pauses between runs, and a worktree stays. Credentials are
   injected at the start of every run and are absent while the environment is
   paused or idle. The environment ends when the thread ends.
 - **Concurrency.** Threads run in parallel. The runs of one thread run one at
@@ -247,10 +254,10 @@ token or key.
    - Saved logins live in the credential vault.
    - The E2B key belongs to the account. Only the server uses it; it is never
      handed to a sandbox or a model.
-2. **At run start:** the server resolves the run's credential owner: the bot
-   owner, or the share's owner when §2 step 2 applied. It injects only that
+2. **At run start:** the server resolves the run requester's selected credential,
+   or the credential owner's explicit share when §2 step 2 applied. It injects only that
    credential, plus a run token for Mikka's MCP and apps. The credential lands
-   only inside the run's environment: the sandbox, the container, or the
+   only inside the run's environment: the E2B machine or the
    temporary Agent config dir. It never comes from, or goes to, the person's
    own CLI config.
    On a device, a subscription run gets only that run's short-lived access
@@ -272,9 +279,34 @@ shares leave that workspace at once, and their bots there are paused (暂停).
 An admin may take a bot over. It then runs on the admin's resources or the
 workspace's.
 
+### Execution identity and provenance (#1163)
+
+The host freezes the requester, executing Bot owner, execution principal,
+selected model and device resource references, billing accounts and output owner
+with each new run. A group reporter Bot is separately recorded by the group's
+host binding; choosing a reporter never transfers that Bot owner's accounts or
+computer. Personal app connections remain the execution requester's connections.
+
+Claim, credential disclosure, run-token authentication, app-tool execution and
+lease renewal recheck current authority. A shared subscription or API key needs
+both members to remain active, the explicit share and the current workspace
+policy. The selected resource and payer cannot change implicitly on retry.
+A host-authorized device handoff rechecks the new device's owner and preserves
+the requester's identity; a consented quota fallback records the newly selected
+API key and its actual owner. Cloud continuation freezes its parent placement
+before rebinding to the new thread machine.
+
+Artifact versions retain this provenance without changing the artifact's owner
+or sharing rules. Owner-only run details and account usage show the frozen
+attribution. Historical rows without a snapshot remain unattributed; current Bot
+ownership is never used to reconstruct who paid for a historical run.
+
 ## 7. Billing
 
-The workspace where the work happens pays.
+Mikka-hosted calls use the applicable workspace's credits. Personal subscriptions,
+API keys and E2B use the account shown below. External provider amounts remain
+unknown unless the provider supplies a receipt; 0 Mikka credits is not a zero
+external bill.
 
 | Work | Who pays |
 | --- | --- |
@@ -305,7 +337,7 @@ The workspace where the work happens pays.
 | Model order of §2; Mikka 默认 when there is nothing else; no mid-run switch; 「订阅额度用完后，自动改用 API Key」; a popup when nothing is left | — |
 | Model → Agent mapping with a per-model override | — |
 | Mikka Cloud on each person's own E2B key, with no Mikka caps | — |
-| Personal computers and daemon servers as runners with the same contract: daemon-managed Agents, a container where Docker exists, otherwise a worktree plus a temporary config dir, one multi-arch image | — |
+| Personal computers and daemon servers as runners with the same contract: daemon-managed Agents, a worktree plus a temporary config dir, no sandbox; cloud machines on E2B's official templates | — |
 | A device capability check and 参与调度 instead of Agent detection and 「设备离线时」; 优先使用的模型 in order instead of label rules and 任务默认 | — |
 | 立即警告 (the action card) when there is no machine; the offline flow of §4 | — |
 | One environment per thread; leases and heartbeats; credentials injected each run and absent while paused | — |

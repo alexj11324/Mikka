@@ -2,6 +2,7 @@ import { factoryRunBotMatches } from './run-scope'
 import type { Pool, PoolClient } from 'pg';
 import { freezeWorkerDefinition, retryWorkerDefinition } from '../agent-kit/worker';
 import { configureFactoryCheck, factoryRepairBrief } from './checks';
+import { factoryHandoffPrompt, persistFactoryHandoff } from './handoff';
 import type { DispatchInput, DispatchResult } from '../run-dispatch';
 import { FactoryError, type FactoryBinding, type FactoryStage } from './contract';
 import { factoryEventId } from './event-id';
@@ -12,11 +13,11 @@ export { factoryDispatchSchema, type FactoryDispatchInput };
 export type QueueFactoryRun = (tx: PoolClient, userId: string, input: DispatchInput, sourceRunId?: string) => Promise<DispatchResult>;
 export type FactoryQueue = (tx: PoolClient, userId: string, input: {
   issueId: string; agentId: string; deviceRepoId: string; note?: string;
-}, botId: string | null, context: { sourceEventId: string; attemptId: string; questionOriginRunId?: string }) => Promise<{ runId: string }>;
+}, botId: string | null, context: { sourceEventId: string; attemptId: string; questionOriginRunId?: string; questionHistoryRunId?: string }) => Promise<{ runId: string }>;
 /** Installed by the owning consumer; no model may select a callback or gate. */
 export interface FactoryDispatchAdapters {
   lockAdmission?: (tx: PoolClient, userId: string, input: FactoryDispatchInput) => Promise<void>;
-  configure: Partial<Record<FactoryStage, (tx: PoolClient, task: FactoryTask, runId: string) => Promise<void>>>;
+  configure: Partial<Record<FactoryStage, (tx: PoolClient, task: FactoryTask, runId: string) => Promise<void | { preservePrompt: true }>>>;
   replay?: Partial<Record<FactoryStage, (tx: PoolClient, task: FactoryTask, runId: string) => Promise<void>>>;
   freeze: (tx: PoolClient, task: FactoryTask, runId: string) => Promise<void>;
 }
@@ -47,7 +48,7 @@ function fail(code: string): never { throw new FactoryError(code); }
 /** Task -> issue/access -> run. The existing queue writes through this transaction.
  * Ledger, queue, server configuration, frozen definition and binding commit together. */
 export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof createFactoryStore>, queue: FactoryQueue, adapters: FactoryDispatchAdapters = defaultFactoryDispatchAdapters) {
-  return async (userId: string, raw: FactoryDispatchInput, existing?: PoolClient, questionOriginRunId?: string): Promise<FactoryDispatchResult> => {
+  return async (userId: string, raw: FactoryDispatchInput, existing?: PoolClient, questionOriginRunId?: string, questionHistoryRunId?: string): Promise<FactoryDispatchResult> => {
     const parsed = factoryDispatchSchema.safeParse(raw);
     if (!parsed.success) fail('factoryInvalid');
     // The note is human text that reaches factory_events.request (the idempotency
@@ -80,15 +81,33 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
       if (task.status !== 'pending' || !['spec','execute','review','verify','monitor'].includes(task.stage)) fail('factoryTransition');
       const configure = adapters.configure[task.stage];
       if (!configure) fail('factoryDispatchAdapterRequired');
-      const queued = await queue(tx,userId,{issueId:task.issueId,agentId:input.agentId,deviceRepoId:input.deviceRepoId,note:input.note},task.botId,{sourceEventId:task.sourceEventId,attemptId:task.attemptId,...(questionOriginRunId ? {questionOriginRunId} : {})});
-      await configure(tx,task,queued.runId);
+      const queued = await queue(tx,userId,{issueId:task.issueId,agentId:input.agentId,deviceRepoId:input.deviceRepoId,note:input.note},task.botId,{sourceEventId:task.sourceEventId,attemptId:task.attemptId,...(questionOriginRunId ? {questionOriginRunId} : {}),...(questionHistoryRunId ? {questionHistoryRunId} : {})});
+      await tx.query('UPDATE factory_attempts SET output=output || $2::jsonb WHERE id=$1', [task.attemptId, JSON.stringify({ requestEpoch: task.sourceEventId })]);
+      const configured = await configure(tx,task,queued.runId);
+      const handoff = await persistFactoryHandoff(tx, task);
+      const handoffText = factoryHandoffPrompt(handoff);
+      if (configured?.preservePrompt) {
+        // Automatic repair keeps the entire admitted request. A later handoff
+        // must not silently remove its final criteria before the definition freezes.
+        const { rows: [configuredRun] } = await tx.query('SELECT prompt FROM agent_runs WHERE id=$1', [queued.runId]);
+        if (!configuredRun || configuredRun.prompt.length + handoffText.length > 100000) fail('factoryCheckBindingMismatch');
+        await tx.query('UPDATE agent_runs SET prompt=prompt || $2 WHERE id=$1', [queued.runId, handoffText]);
+      } else {
+        await tx.query('UPDATE agent_runs SET prompt=left(prompt,$2) || $3 WHERE id=$1', [queued.runId, 100000 - handoffText.length, handoffText]);
+      }
+      await tx.query('UPDATE factory_attempts SET output=output || $2::jsonb WHERE id=$1', [task.attemptId, JSON.stringify({ handoff: { eventId: handoff.eventId, digest: handoff.digest, requestEpoch: task.sourceEventId } })]);
       await adapters.freeze(tx,task,queued.runId);
       const { rows: [run] } = await tx.query('SELECT * FROM agent_runs WHERE id=$1 FOR UPDATE',[queued.runId]);
       if (!run || run.userId !== userId || run.issueId !== task.issueId || !(await factoryRunBotMatches(tx, task, run)) || run.agentId !== input.agentId || run.deviceRepoId !== input.deviceRepoId || run.status !== 'queued' || run.stopRequestedAt || !run.agentDefinition) fail('factoryRunMismatch');
       const state = await store.apply(userId,binding,binding.attemptId,{action:'bind_run',runId:run.id},tx);
       const result = {...state,runId:run.id as string,replayed:false,binding:factoryBinding(state.task)};
       await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)',[task.id,eventId,JSON.stringify(input),JSON.stringify(result)]);
-      if (!existing) await tx.query('COMMIT');
+      if (!existing) {
+        await tx.query('COMMIT');
+        // Workflow schemas import factoryBinding from this module. Load the
+        // Node lifecycle helper only inside the committed dispatch operation.
+        await (await import('../device-gateway-notify')).notifyQueuedLocalRun(tx, userId, run.id);
+      }
       return result;
     } catch (error) { if (!existing) await tx.query('ROLLBACK'); throw error; }
     finally { if (!existing) tx.release(); }

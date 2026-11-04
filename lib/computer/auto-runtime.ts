@@ -1,6 +1,7 @@
 import 'server-only'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
+import { deviceIsOnline } from '../device-presence'
 
 type Actor = { userId: string; workspaceId: string }
 export type BotCloudRuntime = { botId: string; harness: 'codex' | 'claude_code'; agentId: string }
@@ -44,12 +45,17 @@ export async function ensureCoordinatorBot(pool: Pool, actor: Actor) {
 }
 
 async function findRuntime(pool: Pool, actor: Actor, botId: string, harness: string) {
-  return (await pool.query<BotCloudRuntime>(`SELECT r."botId",r.harness,r."agentId" FROM bot_cloud_runtimes r
+  const rows = (await pool.query<BotCloudRuntime & { deviceId: string; lastSeenAt: Date | null }>(`SELECT r."botId",r.harness,r."agentId",d.id AS "deviceId",d."lastSeenAt" FROM bot_cloud_runtimes r
     JOIN agents a ON a.id=r."agentId" AND a."userId"=r."ownerId"
     JOIN cloud_machines m ON m."deviceId"=a."deviceId" AND m."ownerId"=r."ownerId" AND m."workspaceId"=r."workspaceId" AND m.state='running'
-    JOIN devices d ON d.id=m."deviceId" AND d."ownerId"=r."ownerId" AND d.kind='cloud' AND d.enabled=true AND d."lastSeenAt">now()-interval '60 seconds'
-    WHERE r."botId"=$1 AND r."ownerId"=$2 AND r."workspaceId"=$3 AND ($4='auto' OR r.harness=$4) ORDER BY r.harness LIMIT 1`,
-  [botId, actor.userId, actor.workspaceId, harness])).rows[0] ?? null
+    JOIN devices d ON d.id=m."deviceId" AND d."ownerId"=r."ownerId" AND d.kind='cloud' AND d.enabled=true
+    WHERE r."botId"=$1 AND r."ownerId"=$2 AND r."workspaceId"=$3 AND ($4='auto' OR r.harness=$4) ORDER BY r.harness`,
+  [botId, actor.userId, actor.workspaceId, harness])).rows
+  for (const row of rows) {
+    if (await deviceIsOnline({ id: row.deviceId, lastSeenAt: row.lastSeenAt }))
+      return { botId: row.botId, harness: row.harness, agentId: row.agentId }
+  }
+  return null
 }
 
 /** The runtime's Agent uses the owner's own connected subscription for its

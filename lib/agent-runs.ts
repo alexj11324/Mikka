@@ -1,4 +1,5 @@
 import 'server-only'
+import type { ExecutionIdentity } from './execution-identity'
 import { personalMailboxEnabled } from './personal-mailbox-config'
 import { byosEnabled } from './cloud-computer-flag'
 import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
@@ -13,6 +14,7 @@ import { agents, agentRuns, bots, deviceRepos, devices, issues, runChunks, runMe
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runWaitingDeviceId } from '@/lib/run-waiting-for'
+import { deviceOnlineStates } from '@/lib/device-presence'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { workspaceRunView } from '@/lib/run-visibility'
@@ -30,6 +32,8 @@ import { runBotName } from '@/lib/run-bot-name'
 // with the session's user; the Coordinator calls them with its owner's.
 
 export interface RunView {
+  /** Owner-only trusted provenance; omitted from workspace summaries and null on historical runs. */
+  executionIdentity?: ExecutionIdentity | null
   id: string
   pauseReason?: 'human_control' | 'quota_exhausted' | null
   waitFor?: string
@@ -57,6 +61,7 @@ export interface RunDetail {
 }
 
 export const runViewColumns = {
+  executionIdentity: sql<ExecutionIdentity | null>`${agentRuns.agentDefinition}->'executionIdentity'`,
   id: agentRuns.id, issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: runBotName,
   harness: sql<SupportedHarness>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`, status: agentRuns.status, outcome: agentRuns.outcome, pauseReason: agentRuns.pauseReason, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
   error: agentRuns.error, report: agentRuns.report, createdAt: agentRuns.createdAt,
@@ -222,8 +227,10 @@ export async function visibleRuns(userId: string, input: { issueId?: string; run
       input.runIds ? inArray(agentRuns.id, input.runIds) : undefined,
       input.activeOnly ? inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]) : undefined,
     )).orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(Math.max(1, Math.min(input.limit ?? 20, 100)))
+  const presence = await deviceOnlineStates(rows.flatMap(row => row.ownerId === userId && row.status === 'queued' && row.waitDeviceId
+    ? [{ id: row.waitDeviceId, lastSeenAt: row.lastSeenAt }] : []))
   return rows.map(({ ownerId, waitDeviceId, lastSeenAt, deviceEnabled, ...run }) => {
-    const waitFor = runWaitingDeviceId(userId, { ownerId, status: run.status, deviceId: waitDeviceId, lastSeenAt, deviceEnabled })
+    const waitFor = runWaitingDeviceId(userId, { ownerId, status: run.status, deviceId: waitDeviceId, lastSeenAt, deviceEnabled, deviceOnline: waitDeviceId ? presence.get(waitDeviceId) : undefined })
     return ownerId === userId ? { ...run, ...(waitFor ? { waitFor } : {}) } : workspaceRunView(run)
   })
 }
@@ -245,6 +252,7 @@ export async function addRunMessage(
   userId: string,
   input: { runId: string; text: string },
   source:'user'|'peer'|{source:'human';sessionId:string}|{source:'orchestrator'}='user',
+  messageId?: string,
 ): Promise<void> {
   const parsed = z
     .object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000) })
@@ -253,7 +261,7 @@ export async function addRunMessage(
   // Ordinary user/peer traffic keeps main's single locked owner/state check.
   // Only a host-attested browser session may enter ended Factory questions.
   if (typeof source === 'string' || source.source === 'orchestrator')
-    return sendOwnedRunMessage(db,userId,parsed.data,typeof source === 'string' ? source : 'peer')
+    return sendOwnedRunMessage(db,userId,{...parsed.data,...(messageId ? {messageId} : {})},typeof source === 'string' ? source : 'peer')
   const [run] = await db
     .select({ id: agentRuns.id, status: agentRuns.status })
     .from(agentRuns)
@@ -286,6 +294,7 @@ export async function addRunMessage(
           userId,
           { runId: q.continuationRunId, text: parsed.data.text },
           source,
+          messageId,
         )
     }
     if (typeof source==='string' || source.source !== 'human')
@@ -314,7 +323,7 @@ export async function addRunMessage(
     )
     return
   }
-  await sendOwnedRunMessage(db,userId,parsed.data,typeof source==='string'?source:source.source==='human'?'user':'peer')
+  await sendOwnedRunMessage(db,userId,{...parsed.data,...(messageId ? {messageId} : {})},typeof source==='string'?source:source.source==='human'?'user':'peer')
 }
 /** Asks the daemon to stop the run; it repeats until the run has ended. */
 export async function requestRunStop(userId: string, runId: string): Promise<{ stoppedRunIds: string[] }> {

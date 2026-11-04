@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { WorkflowAgent } from '@ai-sdk/workflow'
+import { APICallError } from 'ai'
 import type { ModelCallStreamPart } from '@ai-sdk/workflow'
 import { runHostedWorkflowTurn } from './subscription-workflow-turn'
 const id=(n:number)=>`10000000-0000-4000-8000-${String(n).padStart(12,'0')}`
@@ -23,6 +24,38 @@ test('stream refusal does not invoke generate or retry',async t=>{
   t.mock.method(WorkflowAgent.prototype,'stream',async ()=>{calls++;throw new Error('synthetic refusal')})
   await assert.rejects(runHostedWorkflowTurn(runtime,{}, {prompt:'synthetic'}),/synthetic refusal/)
   assert.equal(calls,1)
+})
+test('a Workflow stream error logs bounded diagnostics and keeps one attempt and a generic refusal', async t => {
+  const logs: string[] = []
+  let calls = 0
+  t.mock.method(console, 'warn', (line: string) => logs.push(line))
+  t.mock.method(WorkflowAgent.prototype, 'generate', () => { throw new Error('paid fallback') })
+  const error = new APICallError({ message: 'fixture-private-message', url: 'https://fixture.invalid/private', requestBodyValues: { secret: 'fixture-private-input' }, responseBody: 'fixture-private-response', statusCode: 429, cause: Object.assign(new Error('fixture-private-cause'), { code: 'ETIMEDOUT' }) })
+  t.mock.method(WorkflowAgent.prototype, 'stream', async (options: { maxRetries: number }) => {
+    calls++; assert.equal(options.maxRetries, 0)
+    return { error }
+  })
+  await assert.rejects(runHostedWorkflowTurn(runtime, {}, { prompt: 'synthetic', maxRetries: 9 }), { message: 'subscription_generation_failed' })
+  assert.equal(calls, 1)
+  assert.equal(logs.length, 1)
+  const diagnostic = JSON.parse(logs[0])
+  assert.equal(diagnostic.stage, 'workflow_result')
+  assert.equal(diagnostic.errorClass, 'AI_APICallError')
+  assert.equal(diagnostic.statusCode, 429)
+  assert.deepEqual(diagnostic.causes, [{ errorClass: 'Error', errorCode: 'ETIMEDOUT', statusCode: null }])
+  assert.ok(!logs.join('\n').includes('fixture-private'))
+})
+test('an undefined stream error or failed logger cannot turn a refusal into success or retry', async t => {
+  let calls = 0, logAttempts = 0
+  t.mock.method(console, 'warn', () => { logAttempts++; throw new Error('logger unavailable') })
+  t.mock.method(WorkflowAgent.prototype, 'generate', () => { throw new Error('paid fallback') })
+  t.mock.method(WorkflowAgent.prototype, 'stream', async (options: { maxRetries: number }) => {
+    calls++; assert.equal(options.maxRetries, 0)
+    return { error: undefined }
+  })
+  await assert.rejects(runHostedWorkflowTurn(runtime, {}, { prompt: 'synthetic' }), { message: 'subscription_generation_failed' })
+  assert.equal(calls, 1)
+  assert.equal(logAttempts, 1)
 })
 test('default snapshot streams with zero retry and malformed subscription never falls back',async t=>{
   let streamed=0

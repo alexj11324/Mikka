@@ -1,6 +1,6 @@
 import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { mock, test } from 'node:test'
 import { Pool } from 'pg'
@@ -14,8 +14,8 @@ if (target) {
 }
 if (!target && process.env.REQUIRE_DB === '1') throw Error('An isolated group read database is required')
 let caller: string | null = null, tokenWorkspaceId: string | undefined
-// Only session lookup is a fixture. The exported routes, group/workspace
-// membership, timeline, read-position storage and unread SQL are real.
+// Session lookup and each turn subtest's model transport are fixtures. The
+// exported routes, membership, timeline, read positions and unread SQL are real.
 mock.module(new URL('./auth.ts', import.meta.url).href, { namedExports: { auth: { api: {
   getSession: async () => caller ? { user: { id: caller }, session: { id: 'group-read-fixture' }, tokenWorkspaceId } : null,
 } } } })
@@ -248,6 +248,8 @@ test('group read routes advance actual group history without opening private DMs
   await t.test('real Bot identities keep owner/workspace, avatars, activity and frozen group execution distinct from coding agents', async () => {
     const { processGroupTurn } = await import('./coordinator/group-turns')
     const { groupRuntime } = await import('./coordinator/group-runtime')
+    const { createGroupJudgment } = await import('./coordinator/group-judgment')
+    const { DECISION_MODEL, validatedAnswers } = await import('./coordinator/decision')
     const { handleGroup } = await import('./group-conversations-store')
     const { groupDirectory } = await import('./group-conversations-directory')
     const roster = await import('../app/api/conversations/[id]/members/route')
@@ -278,17 +280,36 @@ test('group read routes advance actual group history without opening private DMs
     const membersView = await (await roster.GET(request('GET', `/api/conversations/${source}/members`), context)).json()
     assert.deepEqual(membersView.members.filter((p: { memberType: string }) => p.memberType === 'bot').map((p: { id: string }) => p.id).sort(), [a,b,c].sort())
     assert.ok(membersView.members.every((p: { memberType: string; color: string; shape: string }) => p.memberType !== 'bot' || p.color === 'bleu' && p.shape === 'cercle'))
-    const send = async (text: string, selected: string[]) => {
-      const response = await handleGroup(pool, directory, { userId: member, method: 'POST', resource: 'messages', id: source, origin: null, host: '127.0.0.1',
+    const send = async (text: string, selected: string[], userId = owner) => {
+      const response = await handleGroup(pool, directory, { userId, method: 'POST', resource: 'messages', id: source, origin: null, host: '127.0.0.1',
         body: JSON.stringify({ body: text, mentions: selected.map(memberId => ({ memberType: 'bot', memberId })) }) }, true)
       assert.equal(response.status, 201)
       return (response.body as { id: string }).id
     }
     const prepared = new Map<string, number>(), initialModels = new Map<string, string>()
+    const mentionedRoutes: string[][] = []
+    // Replace only the paid Decision transport. Explicit mentions still use
+    // the real question/answer validator and host-selected member allowlist.
+    const mentionJudgment = createGroupJudgment(async (purpose, input, questions) => {
+      assert.equal(purpose, 'group-routing')
+      const text = typeof input === 'string' ? input : input.text
+      const context = JSON.parse(text) as { message: { mentions: string[] }; members: { id: string }[] }
+      const selected = context.message.mentions
+      assert.ok(selected.length)
+      assert.deepEqual(context.members.map(actor => actor.id).sort(), [...selected].sort())
+      mentionedRoutes.push(selected)
+      const choices: Record<string, string> = { intent: 'reply_useful_answer' }
+      for (let index = 0; index < selected.length; index++) choices[`responder_${index}`] = selected[index]
+      const answers = validatedAnswers({ answers: questions.map(question => ({ type: 'choice', name: question.name, choice: choices[question.name] })) }, questions)
+      assert.ok(answers)
+      const time = new Date().toISOString()
+      return { answers, execution: { executionId: randomUUID(), modelId: DECISION_MODEL, providerGenerationId: `synthetic-group-read-${randomUUID()}`, startedAt: time, completedAt: time, requestDigest: createHash('sha256').update(text).digest('hex'), imageDigests: [], vision: 'no-image-input' } }
+    })
     let version = 1, entered!: () => void, release!: () => void
     const waiting = new Promise<void>(resolve => { entered = resolve }), blocked = new Promise<void>(resolve => { release = resolve })
     const runtime: import('./coordinator/group-turns').GroupRuntime = {
       ...groupRuntime,
+      routeMention: mentionJudgment.route,
       async correction() { return { kind: 'not_correction' } },
       async prepareBot(actor, scope, client) {
         assert.deepEqual(scope, { ownerId: owner, workspaceId: w })
@@ -308,6 +329,9 @@ test('group read routes advance actual group history without opening private DMs
       },
     }
     const rootId = await send('consult a peer', [a,c])
+    // The owner supplies its own Bot model resources; the other member reads
+    // the real group timeline and independently marks the initiating message.
+    assert.equal((await call('POST', source, rootId)).status, 200)
     const working = processGroupTurn(pool, source, runtime)
     try {
       await Promise.race([waiting, working.then(() => { throw Error('Expected a pending Bot generation') })])
@@ -379,5 +403,15 @@ test('group read routes advance actual group history without opening private DMs
       return result
     } })
     assert.equal((await pool.query(`SELECT count(*)::int n FROM conversation_messages WHERE "conversationId"=$1`, [exchange.linkedConversationId])).rows[0].n, 2, 'deleting the Bot peer while inference is in flight prevents the new private effect')
+    const foreignRoot = await send('another member cannot borrow owner chat credentials', [c], member)
+    await processGroupTurn(pool, source, { ...runtime,
+      async prepareBot() { assert.fail('another member cannot resolve the owner Bot model') },
+      async generate() { assert.fail('another member cannot spend the owner Bot credentials') },
+    })
+    const foreignTurn = (await pool.query(`SELECT status,"modelSelections",trace FROM group_turns WHERE "messageId"=$1`, [foreignRoot])).rows[0]
+    assert.equal(foreignTurn.status, 'complete')
+    assert.deepEqual(foreignTurn.modelSelections, {})
+    assert.equal(foreignTurn.trace.events.filter((event: { type: string }) => event.type === 'generate').length, 0)
+    assert.deepEqual(mentionedRoutes, [[a,c], [c], [a], [c]], 'each explicit mention goes through Decision routing, including denied cross-owner chat')
   })
 })

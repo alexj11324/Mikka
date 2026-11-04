@@ -43,7 +43,7 @@ before(async () => {
     namedExports: { daemonVersions, cachedDaemonVersions, newerDaemonRelease, daemonRequestTooOld },
   })
   mock.module(new URL('../../../../../lib/device-link.ts', import.meta.url).href, {
-    namedExports: { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, ownsDevice, sleep, waitSeconds: actual.waitSeconds },
+    namedExports: { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, longPollIdleCheck: actual.longPollIdleCheck, ownsDevice, sleep, waitSeconds: actual.waitSeconds },
   })
   GET = (await import('./route')).GET
 })
@@ -92,7 +92,7 @@ test('disconnect during the idle wait cancels the timer and prevents the next da
   assert.equal((await GET(request(controller.signal), params)).status, 204)
   assert.equal(deviceWork.mock.callCount(), 1)
   assert.equal(sleep.mock.callCount(), 1)
-  assert.equal(sleep.mock.calls[0].arguments[0], 2_000, 'an idle device is checked every 2 s')
+  assert.equal(sleep.mock.calls[0].arguments[0], 5_000, 'an idle device is checked every 5 s')
   assert.equal(sleep.mock.calls[0].arguments[1]?.aborted, true)
   assert.equal(logs[0].outcome, 'ignored')
 })
@@ -203,7 +203,7 @@ test('a release the daemon already knows (it is busy or backing off) does not en
   try {
     assert.deepEqual(await (await GET(request(undefined, 25, '', false, '&daemonLatest=0.0.401'), params)).json(), { commands: [], daemonVersions: releases })
   } finally { clock.mock.restore() }
-  assert.equal(sleep.mock.callCount(), 13, 'waited the whole 25 s, checking every 2 s')
+  assert.equal(sleep.mock.callCount(), 5, 'waited the whole 25 s, checking every 5 s')
   assert.equal(logs[0].outcome, 'empty')
 })
 

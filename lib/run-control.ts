@@ -7,17 +7,27 @@ import { matchesRepositoryAdmission } from './repository-admission'
 import { remoteKey } from '@mikka/protocol/repository'
 import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 import type { db } from './db'
+import { notifyDeviceWork } from './device-gateway-notify'
 
 export type RunControlDatabase = Pick<typeof db, 'transaction'>
 
 /** Lock the owned run before checking its state so completion and messages serialize. */
-export async function sendOwnedRunMessage(database: RunControlDatabase, userId: string, input: { runId: string; text: string }, origin: 'user' | 'peer' = 'user') {
-  await database.transaction(async tx => {
+export async function sendOwnedRunMessage(database: RunControlDatabase, userId: string, input: { runId: string; text: string; messageId?: string }, origin: 'user' | 'peer' = 'user') {
+  const deviceId = await database.transaction(async tx => {
     const [run] = await tx.select({ id: agentRuns.id, status: agentRuns.status, stopRequestedAt: agentRuns.stopRequestedAt,
       agentDefinition: agentRuns.agentDefinition, deviceRepoId: agentRuns.deviceRepoId, deviceId: agentRuns.deviceId,
       issueId: agentRuns.issueId, agentId: agentRuns.agentId, botId: agentRuns.botId })
       .from(agentRuns).where(and(eq(agentRuns.id, input.runId), eq(agentRuns.userId, userId))).limit(1).for('update')
-    if (!run || run.stopRequestedAt || !UNFINISHED_RUN_STATUSES.some(status => status === run.status)) throw new ActionFailureError('runNotFound')
+    if (!run) throw new ActionFailureError('runNotFound')
+    if (input.messageId) {
+      const [prior] = await tx.select().from(runMessages).where(eq(runMessages.id, input.messageId)).limit(1)
+      if (prior) {
+        if (prior.runId !== run.id || prior.userId !== userId || prior.origin !== (origin === 'user' ? 'owner' : 'peer')
+          || prior.text !== personalRunMessageText(input.messageId, input.text, origin)) throw new ActionFailureError('submissionConflict')
+        return null
+      }
+    }
+    if (run.stopRequestedAt || !UNFINISHED_RUN_STATUSES.some(status => status === run.status)) throw new ActionFailureError('runNotFound')
     if (run.deviceRepoId) {
       const [repo] = await tx.select().from(deviceRepos).where(and(eq(deviceRepos.id, run.deviceRepoId), eq(deviceRepos.userId, userId))).limit(1)
       if (!repo || !repo.remoteUrl) throw new ActionFailureError('runInvalid')
@@ -32,10 +42,12 @@ export async function sendOwnedRunMessage(database: RunControlDatabase, userId: 
           || !await (await import('./run-admission-store')).acceptedEventStillMatches(receipt, run.botId, tx)) throw new ActionFailureError('runInvalid')
       }
     }
-    const id = crypto.randomUUID()
+    const id = input.messageId ?? crypto.randomUUID()
     await tx.insert(runMessages).values({ id, runId: run.id, userId, text: personalRunMessageText(id, input.text, origin),
       origin: origin === 'user' ? 'owner' : 'peer', mailboxWakeDepth: origin === 'user' ? -1 : MAILBOX_NOTIFICATION_LIMIT })
+    return run.deviceId
   })
+  notifyDeviceWork(deviceId)
 }
 
 /**
@@ -46,8 +58,10 @@ export async function sendOwnedRunMessage(database: RunControlDatabase, userId: 
  * the caller then runs afterRunEnded after commit.
  */
 export async function stopOwnedRun(database: RunControlDatabase, userId: string, runId: string): Promise<boolean> {
-  return database.transaction(async tx => {
-    const [run] = await tx.select({ id: agentRuns.id, status: agentRuns.status, pauseReason: agentRuns.pauseReason, stopRequestedAt: agentRuns.stopRequestedAt })
+  let ended = false
+  let wake: string | null = null
+  await database.transaction(async tx => {
+    const [run] = await tx.select({ id: agentRuns.id, status: agentRuns.status, pauseReason: agentRuns.pauseReason, stopRequestedAt: agentRuns.stopRequestedAt, deviceId: agentRuns.deviceId })
       .from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1).for('update')
     if (!run || !UNFINISHED_RUN_STATUSES.some(status => status === run.status)) throw new ActionFailureError('runNotFound')
     const now = new Date()
@@ -61,11 +75,15 @@ export async function stopOwnedRun(database: RunControlDatabase, userId: string,
     if ((run.status === 'queued' && !machineBound) || quotaPaused) {
       await tx.update(agentRuns).set({ status: 'stopped', pauseReason: null, stopRequestedAt: run.stopRequestedAt ?? now, finishedAt: now, updatedAt: now })
         .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId)))
+      ended = true
       return true
     }
     if (run.stopRequestedAt) return false
     await tx.update(agentRuns).set({ stopRequestedAt: now, updatedAt: now })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId)))
+    wake = run.deviceId
     return false
   })
+  notifyDeviceWork(wake)
+  return ended
 }

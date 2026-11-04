@@ -24,8 +24,8 @@ const isActionErrorCode = (code: string): code is ActionErrorCode => (ACTION_ERR
  * any dispatch (the device or cloud computer, the credential and its quota).
  * Only the thread's owner may send, as for a working thread.
  */
-export async function sendThreadMessage(userId: string, runId: string, text: string, source: Source = 'user'): Promise<{ runId: string; continued: boolean }> {
-  const parsed = z.object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000) }).safeParse({ runId, text })
+export async function sendThreadMessage(userId: string, runId: string, text: string, source: Source = 'user', requestId?: string): Promise<{ runId: string; continued: boolean }> {
+  const parsed = z.object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000), requestId: z.uuid().optional() }).safeParse({ runId, text, requestId })
   if (!parsed.success) throw new ActionFailureError('messageRequired')
   // The owner's chain only: a teammate who can see a shared thread cannot run it.
   const chain = await readRunChain(pool, userId, parsed.data.runId)
@@ -34,19 +34,45 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
     const { validateChatFiles } = await import('@/lib/chat-attachments/store')
     try { await validateChatFiles(userId, { kind: 'thread', id: parsed.data.runId }, parsed.data.text) } catch { throw new ActionFailureError('messageRequired') }
   }
+  if (parsed.data.requestId) {
+    // The client anchors its first attempt, even when a lost response has
+    // already moved this chain. Resolve that receipt before choosing work.
+    const { rows: [scope] } = await pool.query(`SELECT r."issueId",CASE WHEN f.id IS NOT NULL THEN f."botId" ELSE r."botId" END AS "botId"
+      FROM agent_runs r LEFT JOIN LATERAL (SELECT t.id,t."botId" FROM factory_attempts a
+        JOIN factory_tasks t ON t.id=a."taskId" WHERE a."runId"=r.id AND t."userId"=r."userId" LIMIT 1) f ON true
+      WHERE r.id=$1 AND r."userId"=$2`, [parsed.data.runId, userId])
+    if (!scope) throw new ActionFailureError('runNotFound')
+    const { submitThreadOnce } = await import('@/lib/thread-submission')
+    return submitThreadOnce(pool, { userId, requestId: parsed.data.requestId, rootRunId: chain.rootRunId,
+      requestedRunId: parsed.data.runId, previousRunId: chain.latestRunId, issueId: scope.issueId, botId: scope.botId, text: parsed.data.text,
+      mode: UNFINISHED_RUN_STATUSES.some(status => status === chain.attempts.find(attempt => attempt.runId === chain.latestRunId)?.status) ? 'message' : 'continuation' },
+    sourceEventId => continueThread(userId, parsed.data.text, source, chain, sourceEventId))
+  }
+  return continueThread(userId, parsed.data.text, source, chain)
+}
+
+async function continueThread(userId: string, text: string, source: Source,
+  chain: NonNullable<Awaited<ReturnType<typeof readRunChain>>>, sourceEventId?: string): Promise<{ runId: string; continued: boolean }> {
   const latest = chain.attempts.find(attempt => attempt.runId === chain.latestRunId)!
   if (UNFINISHED_RUN_STATUSES.some(status => status === latest.status)) {
-    await addRunMessage(userId, { runId: latest.runId, text: parsed.data.text }, source)
+    if (source === 'user' || (typeof source === 'object' && source.source === 'human'))
+      if (await (await import('@/lib/factory/request-epoch')).continueActiveFactoryRequest(pool, userId, latest.runId, text, sourceEventId, sourceEventId ? { recordOwnerMessage: true } : undefined))
+        return { runId: latest.runId, continued: false }
+    await addRunMessage(userId, { runId: latest.runId, text }, source, sourceEventId)
     return { runId: latest.runId, continued: false }
   }
   // An ended run that asked a Factory question is answered there, as before.
   const { rows: [question] } = await pool.query('SELECT 1 FROM factory_questions WHERE "originRunId"=$1 AND "userId"=$2 LIMIT 1', [latest.runId, userId])
   if (question) {
-    await addRunMessage(userId, { runId: latest.runId, text: parsed.data.text }, source)
+    await addRunMessage(userId, { runId: latest.runId, text }, source, sourceEventId)
     return { runId: latest.runId, continued: false }
   }
   const [run] = await db.select().from(agentRuns).where(and(eq(agentRuns.id, latest.runId), eq(agentRuns.userId, userId))).limit(1)
   if (!run) throw new ActionFailureError('runNotFound')
+  // A failed required-SID continuation belongs to its original Factory task.
+  // Ordinary text must not cancel that task and create a fresh request epoch;
+  // only the explicit owner recovery path can resume its retained session.
+  if (run.status === 'failed' && run.questionContinuation?.requireSessionResume === true) throw new ActionFailureError('threadCannotContinue')
   // The next run is the task's (one task, one thread); a thread with no task has nothing to run again.
   if (!run.issueId || !run.deviceRepoId) throw new ActionFailureError('threadCannotContinue')
   const issueId = run.issueId
@@ -54,7 +80,8 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
   // Another thread took the task over (a new thread was asked for): this one is history now.
   if ((await latestTaskRun(pool, userId, issueId))?.id !== run.id) throw new ActionFailureError('threadReplaced')
   const result = await dispatchToTask(userId, issueId, {
-    note: parsed.data.text,
+    note: text,
+    ...(sourceEventId ? { expectedRunId: run.id } : {}),
     start: async (previous, note) => {
       if (previous?.id !== run.id) throw new ActionFailureError('threadReplaced')
       // This is provenance for this already authorized thread action, not a
@@ -64,10 +91,10 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
       if (source === 'user' || (typeof source === 'object' && source.source === 'human')) {
         const { rows: [factory] } = await pool.query(`SELECT t."botId" FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" WHERE a."runId"=$1 AND t."userId"=$2 AND t."issueId"=$3 ORDER BY a.position DESC LIMIT 1`, [run.id, userId, issueId])
         const botId = factory ? factory.botId : run.botId
-        const sourceEventId = crypto.randomUUID()
-        await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload,tier,"deliveredAt") VALUES ($1,$2,$3,$4,'user_message',$5,$6,'background',now())`,
-          [sourceEventId, userId, botId, issueId, `thread-continuation:${sourceEventId}`, JSON.stringify({ text: parsed.data.text, source: 'thread_continuation', previousRunId: run.id, postedToChat: true })])
-        request = { sourceEventId, botId }
+        const eventId = sourceEventId ?? crypto.randomUUID()
+        await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload,tier,"deliveredAt") VALUES ($1,$2,$3,$4,'user_message',$5,$6,'background',now()) ON CONFLICT DO NOTHING`,
+          [eventId, userId, botId, issueId, `thread-continuation:${eventId}`, JSON.stringify({ text, source: 'thread_continuation', previousRunId: run.id, postedToChat: true })])
+        request = { sourceEventId: eventId, botId }
       }
       return queueNextRun(userId, run, previous, note, request)
     },
@@ -76,7 +103,9 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
   if ('error' in result) throw new ActionFailureError(isActionErrorCode(result.error) ? result.error : 'runInvalid')
   if (result.thread === 'message') return { runId: result.runId, continued: false }
   // The words are already in the new run's note; this row shows them in the thread and is never delivered again.
-  await db.insert(runMessages).values({ id: crypto.randomUUID(), runId: result.runId, userId, text: parsed.data.text, origin: 'owner', mailboxWakeDepth: -1, deliveredAt: new Date() })
+  const display = db.insert(runMessages).values({ id: sourceEventId ?? crypto.randomUUID(), runId: result.runId, userId, text, origin: 'owner', mailboxWakeDepth: -1, deliveredAt: new Date() })
+  if (sourceEventId) await display.onConflictDoNothing()
+  else await display
   return { runId: result.runId, continued: true }
 }
 

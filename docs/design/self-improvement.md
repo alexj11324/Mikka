@@ -27,14 +27,14 @@ fact. #232 remains the Skill registry owner.
 - `GET /api/self-improvement?runId=...`: authorized scores/proposals for that
   run's owner, issue and agent/repository bucket. No caller workspace or policy.
 - `lib/self-improvement/{contract,scorer,regression,store,http,server}.ts`:
-  immutable server-owned scorer, fixed trigger, transactions, allowlist and
+  immutable server-owned scorer, Decision API proposal judgment (`proposal-judgment.ts`), transactions, allowlist and
   synthetic comparison. No shell, network, model or publication adapter.
-- `drizzle/20261025070600_self_improvement.sql`: separate append-only ledgers;
+- `drizzle/20261029044007_self_improvement.sql`: separate append-only ledgers;
   no changes to shared Factory, protocol, registry or permission contracts.
 - `lib/issue-access.ts`: the identical optional transaction executor already
   present in #192's candidate; no permission-rule change. Parent must dedupe it.
-- Tests and `.github/workflows/self-improvement.yml`: source tests and actual
-  isolated PG17/HTTP checks. Full build/typecheck remain existing remote CI.
+- Tests: source tests run in CI's core unit job, and the isolated PG17 checks
+  in its database shards (`test:self-improvement-db`, `test:skill-semantic-db`).
 
 ## Rules and controls
 

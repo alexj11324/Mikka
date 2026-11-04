@@ -25,6 +25,17 @@ const DOCS_ONLY = [
   /^LICENSE$/,
   /^AGENTS\.md$/,
   /^\.github\/pull_request_template\.md$/,
+  /^(?:CONTRIBUTING|REVIEW)\.md$/,
+  /^\.github\/workflows\/README\.md$/,
+  // Package and app READMEs. Nothing imports them; the daemon build copies its
+  // README into the package as text.
+  /^(?:packages|apps)\/[^/]+\/README\.md$/,
+  // Vendored agent skills: instructions and their metadata only (the skills
+  // README forbids scripts there, so any other extension still runs CI).
+  /^\.claude\/skills\/.+\.(?:md|yaml)$/,
+  // Screenshots and recordings that documents embed. docs/assets/ keeps its
+  // narrower rule above because the README diagrams live there.
+  /^docs\/(?!assets\/).+\.(?:png|jpe?g|gif|webp|mp4|mov)$/,
   // README diagrams and the scripts that draw them; nothing in the app imports either.
   /^docs\/assets\/[^/]+\.svg$/,
   /^scripts\/(?:generate-diagrams|diagram-svg)\.mjs$/,
@@ -86,7 +97,7 @@ function eventPayload() {
   return JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
 }
 
-function changedFiles(base, head) {
+export function changedFiles(base, head) {
   const options = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
   const files = execFileSync('git', ['diff', '--no-renames', '-z', '--name-only', `${base}...${head}`], options)
     .split('\0').filter(Boolean)

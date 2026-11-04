@@ -380,8 +380,70 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(run.kind, 'cloud')
     assert.ok(run.remoteUrl, 'the queued run is a repository task')
   })
-  await t.test('a no-repository desktop deliverable gets independent checks and human acceptance without GitHub', async () => {
-    const personState = await person('factory-desktop')
+  await t.test('sleeping parent staging requires the current owned Factory stage and a prepared idle parent', async () => {
+    const personState = await person('factory-stage-admission')
+    const unrelated = await dispatch(personState.id, personState.issueId, personState.botId) as { runId: string }
+    const issueId = await seedIssue(pool, personState.id)
+    const producer = await steps.dispatchComputerThread(personState.id, { botId: personState.botId, issueId, harness: 'codex' }, `admission:${randomUUID()}`) as { runId: string }
+    const [{ factoryRuntimeForBot }, { factoryBinding }, { queueCloudRun }, { configureFactoryCheck }] = await Promise.all([
+      import('../lib/factory/runtime'), import('../lib/factory/dispatch'), import('../lib/computer/queue-run'), import('../lib/factory/checks'),
+    ])
+    const runtime = factoryRuntimeForBot(personState.botId)
+    const source = (await pool.query(`SELECT r.*,repo."repoPath" FROM agent_runs r JOIN device_repos repo ON repo.id=r."deviceRepoId" WHERE r.id=$1`, [producer.runId])).rows[0]
+    const parent = (await pool.query('SELECT * FROM bot_cloud_runtimes WHERE "botId"=$1 AND harness=\'codex\'', [personState.botId])).rows[0]
+    const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" WHERE a."runId"=$1', [producer.runId])).rows[0]
+    const actor = { userId: personState.id, workspaceId: personState.workspaceId }
+    const beforeProviderCalls = provisioned, beforeHandoffs = stageHandoffs.length
+    const client = await appPool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='producer-session',report=$2,"finishedAt"=clock_timestamp() WHERE id=$1`, [producer.runId, JSON.stringify({ sourceCommit:'a'.repeat(40), deliverableCommit:'b'.repeat(40), verify:{status:'not_run'} })])
+      const candidate = await runtime.store.apply(personState.id, factoryBinding(task), randomUUID(), { action:'candidate',runId:producer.runId,
+        candidate:{kind:'deliverable',sha:null,repository:source.repoPath,environment:`device:${source.deviceId}`,scope:`issue:${issueId}`} }, client)
+      const finished = await runtime.store.apply(personState.id, factoryBinding(candidate.task), randomUUID(), { action:'finish',status:'passed',reason:'Synthetic completed delivery',output:{runId:producer.runId},
+        evidence:[{artifact:`run-report:${producer.runId}`,kind:'report',runId:producer.runId,sessionId:'producer-session',candidateId:candidate.task.candidateId,sha:null,environment:`device:${source.deviceId}`,recordedAt:new Date().toISOString()}] }, client)
+      const pending = await runtime.store.apply(personState.id, factoryBinding(finished.task), randomUUID(), {action:'advance',stage:'review',reason:'Independent inspection'}, client)
+      const admission = { binding:factoryBinding(pending.task),sourceEventId:pending.task.sourceEventId,sourceRunId:producer.runId }
+      const input = { botId:personState.botId,issueId,agentId:parent.agentId,deviceRepoId:parent.repoId,title:'Inspect delivery',body:'Read the existing result.',
+        model:source.agentDefinition.model,subscriptionBindingId:source.agentDefinition.subscription.bindingId,readOnly:true,idempotencyKey:`factory:${pending.task.attemptId}` }
+      await client.query(`UPDATE cloud_machines SET state='sleeping' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
+      const before = (await client.query(`SELECT (SELECT count(*) FROM agent_runs WHERE "userId"=$1)::int AS runs,(SELECT count(*) FROM thread_machines WHERE "ownerId"=$1)::int AS machines`, [actor.userId])).rows[0]
+      await assert.rejects(queueCloudRun(appPool, actor, input, client), { status:409 }, 'ordinary queue admission remains running-only')
+      await assert.rejects(queueCloudRun(appPool, {...actor,userId:'foreign-owner'}, input, client, admission), {status:409})
+      await assert.rejects(queueCloudRun(appPool, {...actor,workspaceId:randomUUID()}, input, client, admission), {status:409})
+      await assert.rejects(queueCloudRun(appPool, actor, input, client, {...admission,sourceEventId:randomUUID()}), {status:409})
+      await assert.rejects(queueCloudRun(appPool, actor, input, client, {...admission,sourceRunId:unrelated.runId}), {status:409}, 'another task cannot lend its source')
+      await assert.rejects(queueCloudRun(appPool, actor, input, client, {...admission,binding:{...admission.binding,revision:admission.binding.revision+1}}), {status:409})
+      for (const [label, update] of [
+        ['not prepared', '"runtimeReady"=false'],
+        ['being provisioned', '"provisionLeaseId"=gen_random_uuid(),"provisionLeaseUntil"=now()+interval \'1 minute\''],
+        ['worker being provisioned', '"workerLeaseId"=gen_random_uuid(),"workerLeaseUntil"=now()+interval \'1 minute\''],
+        ['missing parent sandbox', '"sandboxId"=NULL'],
+      ]) {
+        await client.query('SAVEPOINT unavailable_parent')
+        await client.query(`UPDATE cloud_machines SET ${update} WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
+        await assert.rejects(queueCloudRun(appPool, actor, input, client, admission), {status:409}, label)
+        await client.query('ROLLBACK TO SAVEPOINT unavailable_parent')
+      }
+      assert.deepEqual((await client.query(`SELECT (SELECT count(*) FROM agent_runs WHERE "userId"=$1)::int AS runs,(SELECT count(*) FROM thread_machines WHERE "ownerId"=$1)::int AS machines`, [actor.userId])).rows[0], before)
+      const parentBefore = (await client.query('SELECT row_to_json(m) AS value FROM cloud_machines m WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId,actor.userId])).rows[0].value
+      const queued = await queueCloudRun(appPool, actor, input, client, admission)
+      await configureFactoryCheck(client, pending.task, queued.runId, undefined, admission)
+      const check = (await client.query('SELECT kind,"agentDefinition","sessionId" FROM agent_runs WHERE id=$1',[queued.runId])).rows[0]
+      assert.equal(check.kind,'acceptance')
+      assert.equal(check.sessionId,null,'the checker receives an independent native session')
+      assert.deepEqual(check.agentDefinition.subscription,source.agentDefinition.subscription)
+      assert.equal(check.agentDefinition.apiKey,undefined)
+      assert.equal(check.agentDefinition.model,source.agentDefinition.model)
+      assert.equal(check.agentDefinition.executionIdentity.requester,actor.userId)
+      assert.deepEqual((await client.query('SELECT row_to_json(m) AS value FROM cloud_machines m WHERE "workspaceId"=$1 AND "ownerId"=$2',[actor.workspaceId,actor.userId])).rows[0].value,parentBefore)
+      assert.equal(provisioned,beforeProviderCalls,'metadata staging cannot wake or replace the parent')
+      assert.equal(stageHandoffs.length,beforeHandoffs,'only the existing after-commit callback may start the separate thread')
+    } finally { await client.query('ROLLBACK'); client.release() }
+  })
+
+  for (const parentState of ['running', 'sleeping'] as const) await t.test(`a no-repository desktop deliverable gets independent checks and human acceptance with its parent ${parentState}`, async () => {
+    const personState = await person(`factory-desktop-${parentState}`)
     await dispatch(personState.id, personState.issueId, personState.botId)
     const issueId = await seedIssue(pool, personState.id)
     const result = await steps.dispatchComputerThread(personState.id, { botId: personState.botId, issueId, harness: 'codex' }, `desktop:${randomUUID()}`) as { runId?: string; error?: string }
@@ -411,7 +473,10 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const { withDeviceDatabaseAuthority, withDeviceUnitFence } = await import('../lib/db/device-scope')
     const { factoryAutomaticRuntime } = await import('../lib/factory/automatic-dispatch')
     const { handoffFactoryCloudStage } = await import('../lib/factory/cloud-stage-handoff')
+    const parentProviderCalls = provisioned
     const completeFromDevice = async (sourceRunId: string, check: boolean, unit: boolean) => {
+      if (parentState === 'sleeping') await pool.query(`UPDATE cloud_machines SET state='sleeping' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [personState.workspaceId, personState.id])
+      const parentBefore = (await pool.query('SELECT row_to_json(m) AS value FROM cloud_machines m WHERE "workspaceId"=$1 AND "ownerId"=$2', [personState.workspaceId,personState.id])).rows[0].value
       const sourceToken = (await pool.query(`SELECT token.id FROM device_tokens token JOIN agent_runs r ON r."deviceId"=token."boundDeviceId" WHERE r.id=$1 AND token."revokedAt" IS NULL`, [sourceRunId])).rows[0]
       assert.ok(sourceToken)
       const realEnqueue = factoryAutomaticRuntime.enqueue, beforeHandoffs = stageHandoffs.length
@@ -427,6 +492,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       assert.equal(await handoffFactoryCloudStage(appPool,actor,randomUUID(),runId),false,'a mismatched completed source cannot authorize the handoff')
       assert.equal(await handoffFactoryCloudStage(appPool,actor,previous,runId),true,'the separate host step starts the independent checker after revoking the source worker')
       assert.ok((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1',[sourceToken.id])).rows[0].revokedAt)
+      assert.deepEqual((await pool.query('SELECT row_to_json(m) AS value FROM cloud_machines m WHERE "workspaceId"=$1 AND "ownerId"=$2',[personState.workspaceId,personState.id])).rows[0].value,parentBefore,'the separate stage preserves the original parent machine')
+      assert.equal(provisioned,parentProviderCalls)
     }
     await completeFromDevice(result.runId!, false, false)
     const review = await current()

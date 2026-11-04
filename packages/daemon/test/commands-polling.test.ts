@@ -115,6 +115,8 @@ it('stops an in-flight poll without scheduling an idle pause or another request'
   const fetch = vi.fn<ServerLink['fetchCommands']>((_device, _wait, { signal } = {}) =>
     new Promise(resolve => signal?.addEventListener('abort', () => resolve([]), { once: true })))
   const { daemon } = pollCommands(fetch)
+  await vi.advanceTimersByTimeAsync(0)
+  expect(fetch).toHaveBeenCalledTimes(1)
   await daemon.stop()
   expect(vi.getTimerCount()).toBe(0)
   await vi.advanceTimersByTimeAsync(60_000)

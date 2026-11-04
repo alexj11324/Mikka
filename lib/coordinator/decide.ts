@@ -2,11 +2,11 @@ import { gatewayCost,gatewayGenerationId } from '@/lib/abuse/policy'
 import 'server-only'
 import { gatewayAuth } from '@/lib/ai-gateway-auth'
 import { createHash, randomUUID } from 'node:crypto'
-import { validatedAnswers, decisionRequestInput, DECISION_MODEL, DECISIONS_URL, type DecisionInput, type DecisionQuestion } from './decision'
+import { validatedAnswers, decisionRequestInput, DECISION_MODEL, DECISIONS_URL, type DecisionInput, type DecisionQuestion, type DecisionAnswer } from './decision'
 
 const DECISION_TIMEOUT_MS = 5000
 const hash = (value: string) => createHash('sha256').update(value).digest('hex')
-/** Issued by this host after a successful, validated provider response. Never
+/** Issued by this host after a successful, validated provider envelope. Never
  * construct one from model prose, a screenshot label, peer data or a tool arg.
  * Submitted pixels and a provider receipt do not prove visual understanding. */
 export interface DecisionExecution {
@@ -20,7 +20,7 @@ export interface DecisionExecution {
   vision: 'image-input-submitted' | 'no-image-input'
 }
 /** Existing gateway/budget only. No alternate provider, program judgment or human-approval fallback. */
-export async function invokeDecision(purpose: string, input: DecisionInput, questions: DecisionQuestion[], signal?: AbortSignal) {
+export async function invokeDecision(purpose: string, input: DecisionInput, questions: DecisionQuestion[], signal?: AbortSignal, diagnostics?: {retainInvalidReceipt:true}) {
   'use step'
   if (signal?.aborted) return null
   // The app's one gateway credential (lib/ai-gateway-auth.ts), the same the Coordinator's model uses.
@@ -69,13 +69,17 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
     // These fields come from the response envelope, not an answer or input.
     const metadata = payload as { model?: unknown; provider_metadata?: { gateway?: { generationId?: unknown } } }
     const generation = metadata?.provider_metadata?.gateway?.generationId
-    if (!answers || signal?.aborted || metadata.model !== DECISION_MODEL || typeof generation !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(generation)) return null
+    if (signal?.aborted || metadata.model !== DECISION_MODEL || typeof generation !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(generation)) return null
+    if (!answers && !diagnostics?.retainInvalidReceipt) return null
     const execution: DecisionExecution = {
       executionId, modelId: DECISION_MODEL, providerGenerationId: generation,
       startedAt, completedAt: new Date().toISOString(), requestDigest: hash(body),
       imageDigests, vision: imageDigests.length ? 'image-input-submitted' : 'no-image-input',
     }
-    return { answers, execution }
+    // Host-only group diagnostics opt in to retaining a paid invalid response.
+    // No usable answer is exposed; the default contract of all other callers
+    // (including decide/callDecisionRequest) remains null for invalid answers.
+    return { answers: answers ?? new Map<string,Exclude<DecisionAnswer,{type:'refusal'}>>(), execution, ...(answers ? {} : {validationFailure:'invalid_response' as const}) }
   } catch {
     await usage.hostedUsage.settle(callId,requestStarted ? null : 0)
     // No upstream text, credentials, image bytes or untrusted purpose in logs.

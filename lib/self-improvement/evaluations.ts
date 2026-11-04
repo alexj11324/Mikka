@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { notifyQueuedLocalRun } from '../device-gateway-notify'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { runExecution } from '@mikka/protocol/run'
@@ -198,7 +199,8 @@ export function createSkillEvaluations(pool: Pool, dependencies: EvaluationDepen
     assertBenchmarkExecution({...actual,observedModel:expected.model},expected)
   }
   async function dispatchNext(userId: string,id: string,training = false) {
-    return transaction(async tx => {
+    let wakeRun: string | undefined
+    const dispatched = await transaction(async tx => {
       const {rows:[hint]}=await tx.query<Pick<Instance,'sourceRunId'|'issueId'>>(training
         ? 'SELECT "sourceRunId","issueId" FROM improvement_benchmark_instances WHERE id=$1 AND "userId"=$2'
         : `SELECT i."sourceRunId",i."issueId" FROM improvement_skill_evaluations e JOIN improvement_benchmark_instances i ON i.id=e."instanceId" AND i."userId"=e."userId" WHERE e.id=$1 AND e."userId"=$2`,[id,userId])
@@ -229,8 +231,11 @@ export function createSkillEvaluations(pool: Pool, dependencies: EvaluationDepen
       await tx.query(`INSERT INTO improvement_benchmark_runs("runId","instanceId","evaluationId","caseId",arm,"versionId","userId") VALUES($1,$2,$3,$4,$5,$6,$7)`,
       [result.runId,instance.id,evaluation?.id ?? null,slot.caseId,slot.arm,slot.versionId,userId])
       if (slot.arm === 'candidate') await dependencies.selectVersion(userId,result.runId,slot.versionId,{purpose:'evaluation',evaluationId:evaluation!.id},tx)
+      wakeRun = result.runId
       return {...result,complete:false}
     })
+    if (wakeRun) await notifyQueuedLocalRun(pool, userId, wakeRun)
+    return dispatched
   }
   async function comparisonState(tx:PoolClient,userId:string,evaluationId:string):Promise<ComparisonState> {
       await lockEvaluationTask(tx,userId,evaluationId)

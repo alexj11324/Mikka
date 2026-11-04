@@ -3,13 +3,20 @@ import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { COMMANDS_DAEMON_LATEST_PARAM, COMMANDS_MAX_SKIP, COMMANDS_MAX_SKIP_DEVICE_COMMANDS, COMMANDS_MAX_WAIT_SECONDS, COMMANDS_SKIP_DEVICE_COMMANDS_PARAM, COMMANDS_SKIP_PARAM, MAILBOX_NOTICE_HEADER } from '@mikka/protocol/device'
 import { cachedDaemonVersions, daemonVersions, newerDaemonRelease, daemonRequestTooOld } from '@/lib/daemon-release'
-import { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, ownsDevice, sleep, waitSeconds } from '@/lib/device-link'
+import { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, longPollIdleCheck, ownsDevice, sleep, waitSeconds } from '@/lib/device-link'
 import { noteLogOutcome, withRequestLog } from '@/lib/request-log'
 
 export const dynamic = 'force-dynamic'
 
-/** How often a waiting long-poll looks for new work. */
-const IDLE_CHECK_MS = 2_000
+/**
+ * How often a waiting long-poll looks for new work (longPollIdleCheck.ms, 5 s).
+ * This is only the fallback for an old daemon or a gateway that is down: a
+ * daemon on the push socket does not call this route while it is idle. Each
+ * check is a Neon query, so the fallback is throttled to one every 5s (it was
+ * 2s, about 30 queries a minute per idle device). New work reaches a fallback
+ * daemon within 5s, and a revoked credential fails the next check inside the
+ * bound in lib/device-revocation.db.test.ts.
+ */
 
 /**
  * `GET /v1/devices/:deviceId/commands?wait=<seconds>`: messages people sent
@@ -56,7 +63,7 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
       })
     }
     // One unlocked read per wait. It does not take the credential lock; a revoked credential fails that read before any message text is loaded (lib/device-revocation.db.test.ts).
-    await sleep(Math.min(IDLE_CHECK_MS, Math.max(50, deadline - Date.now())), request.signal)
+    await sleep(Math.min(longPollIdleCheck.ms, Math.max(50, deadline - Date.now())), request.signal)
   }
   noteLogOutcome('ignored')
   return new NextResponse(null, { status: 204 })

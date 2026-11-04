@@ -29,16 +29,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
     const runtime = (await pool.query('SELECT r."agentId",r."repoId",a."deviceId" FROM bot_cloud_runtimes r JOIN agents a ON a.id=r."agentId" WHERE r."botId"=$1 AND r."ownerId"=$2 AND r."workspaceId"=$3 AND r.harness=$4', [botId, session.user.id, context.workspace.id, parsed.data.harness])).rows[0]
     if (!runtime) return Response.json({ error: 'Bot computer task is unavailable' }, { status: 409, headers })
     // One task, one thread (lib/thread-dispatch.ts): a task with a thread gets this as that thread's work.
-    const { dispatchToTask } = await import('@/lib/thread-dispatch')
+    const { dispatchToTask, latestTaskRun } = await import('@/lib/thread-dispatch')
+    const previousThread = await latestTaskRun(pool, session.user.id, parsed.data.issueId)
+    const sourceEventId = previousThread && parsed.data.note ? await (await import('@/lib/factory/request-epoch')).recordOwnerFactoryContinuation(pool, session.user.id, previousThread.id, parsed.data.note) : undefined
     const result = await dispatchToTask(session.user.id, parsed.data.issueId, {
-      note: parsed.data.note,
+      note: parsed.data.note, sourceEventId,
       // A new thread takes 优先使用的模型's first cloud entry for this harness; the thread's next run keeps its own model.
       start: async (previous, note) => {
         const deviceRepoId = previous?.remoteUrl ? (await (await import('@/lib/device-repositories')).ensureDeviceRepository(session.user.id,runtime.deviceId,previous.remoteUrl)).id : runtime.repoId
         const runModel = previous ? await latestThreadRunModel(pool, session.user.id, parsed.data.issueId, previous.agentId) : await chooseCloudRunModel(pool, { ownerId: session.user.id, workspaceId: context.workspace.id, botId }, runtime.agentId, parsed.data.harness)
         if (!runModel) throw new ComputerError(409, 'threadModelUnavailable')
         if ('error' in runModel) throw new ComputerError(409, 'Bot subscription unavailable')
-        return queueFactoryCloudRun(pool, { userId: session.user.id, workspaceId: context.workspace.id }, { issueId: parsed.data.issueId, note, botId, agentId: runtime.agentId, deviceRepoId, ...(previous?.botId === null ? {withoutBot:true} : {}), title: issue.title, body: tiptapToText(issue.content), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous ? { idempotencyKey: `thread:${previous.id}:${crypto.randomUUID()}` } : {}), ...runModel, ...(previous ? { threadRunId: previous.id } : {}) })
+        return queueFactoryCloudRun(pool, { userId: session.user.id, workspaceId: context.workspace.id }, { issueId: parsed.data.issueId, note, botId, sourceEventId, agentId: runtime.agentId, deviceRepoId, ...(previous?.botId === null ? {withoutBot:true} : {}), title: issue.title, body: tiptapToText(issue.content), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous ? { idempotencyKey: `thread:${previous.id}:${sourceEventId ?? crypto.randomUUID()}` } : {}), ...runModel, ...(previous ? { threadRunId: previous.id } : {}) })
       },
     })
     if ('runId' in result && result.thread !== 'message') await (await import('@/lib/run-leases')).startThreadMachine({ userId: session.user.id, workspaceId: context.workspace.id }, result.runId)

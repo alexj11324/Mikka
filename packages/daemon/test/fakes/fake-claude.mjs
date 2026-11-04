@@ -23,6 +23,7 @@ import { createInterface } from "node:readline"
 
 import { callMcpTool } from "./mcp-call.mjs"
 
+
 const argv = process.argv.slice(2)
 const flag = (name) => {
   const inline = argv.find((arg) => arg.startsWith(`${name}=`))
@@ -152,6 +153,12 @@ lines.on("line", async (line) => {
     done()
   }
   if (message.includes("HANG")) {
+    const exitMarker = message.match(/SIGTERM_EXIT_143:(\S+)/)?.[1]
+    if (exitMarker) process.on('SIGTERM', () => {
+      writeFileSync(exitMarker, '143\n')
+      process.exit(143)
+    })
+    if (exitMarker) writeFileSync(`${exitMarker}.ready`, 'ready\n')
     text("working forever")
     return
   }

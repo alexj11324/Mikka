@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from "pg";
-import { FactoryError, type FactoryBinding, type FactoryEvidence } from "./contract";
-import { runCaptureEvidence } from "./evidence";
+import { FactoryError, type FactoryBinding } from "./contract";
+import { completeFactoryExecution } from "./completed-execution";
 import { factoryEventId } from "./event-id";
 import type { FactoryTask, createFactoryStore } from "./store";
 import { MAX_RUN_ATTEMPTS } from "../run-retry";
@@ -63,8 +63,10 @@ export function createFactoryReconciler(
   botId: string | null = null,
   dispatchNext?: (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, task: FactoryTask, run: Record<string, any>) => Promise<(() => Promise<void>) | undefined>,
 ) {
-  const PENDING = `t.stage IN ('spec','execute','review','verify','monitor') AND (t.status='running' OR (t.status='failed' AND EXISTS (SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r."retryOf"=a."runId" WHERE a.id=t."attemptId")))`;
-  const reconcileTasks = async (userId: string, pending: { id: string; attemptId?: string }[]) => {
+  const PENDING = `t.stage IN ('spec','execute','review','verify','monitor') AND (t.status='running' OR
+    (t.status='pending' AND EXISTS(SELECT 1 FROM factory_events f WHERE f."taskId"=t.id AND f.request->>'kind'='request_epoch' AND f.request->>'sourceEventId'=t."sourceEventId"::text)) OR
+    (t.status='failed' AND EXISTS (SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r."retryOf"=a."runId" WHERE a.id=t."attemptId")))`;
+  const reconcileTasks = async (userId: string, pending: { id: string; attemptId?: string; completedRunId?: string }[]) => {
     let recovered = 0;
     for (const item of pending) {
       const tx = await pool.connect();
@@ -78,7 +80,16 @@ export function createFactoryReconciler(
         // A run completion is bound to the attempt that was current when it was
         // selected; if a reject/retry/repair replaced it meanwhile, that old
         // run must not move the task (QA #449-5).
-        if (!["running", "failed"].includes(task.status) || (item.attemptId && task.attemptId !== item.attemptId)) { await tx.query("COMMIT"); continue; }
+        if (!["pending", "running", "failed"].includes(task.status) || (item.attemptId && task.attemptId !== item.attemptId)) { await tx.query("COMMIT"); continue; }
+        if (task.status === 'pending') {
+          const { rows: active } = await tx.query(`SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId"
+            WHERE a."taskId"=$1 AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing') LIMIT 1`, [task.id]);
+          const start = active.length ? undefined : await dispatchNext?.(tx, store, task, { id: item.completedRunId });
+          await tx.query('COMMIT');
+          await start?.();
+          if (!active.length && dispatchNext) recovered++;
+          continue;
+        }
         let {
           rows: [run],
         } = await tx.query(
@@ -262,95 +273,14 @@ export function createFactoryReconciler(
           const { rows: retrying } = await tx.query('SELECT 1 FROM agent_runs WHERE "retryOf"=$1 LIMIT 1', [run.id]);
           if (retrying.length)
             await store.apply(userId, binding(task), eventId, { action: "finish", status: "failed", reason: String(run.error ?? run.stopReason ?? "Run failed").slice(0, 4000), evidence: [], output: { runId: run.id, reasonCode: "run_failed" } }, tx);
+          else if (run.stopReason === "device_lost")
+            // The lease host already exhausted/denied safe takeover. A generic
+            // repair would silently dispatch back to that same offline device.
+            await store.apply(userId, binding(task), eventId, { action: "finish", status: "blocked", reason: String(run.error ?? "No authorized online device can continue this task").slice(0, 4000), evidence: [], output: { runId: run.id, reasonCode: "device_recovery_unavailable" } }, tx);
           else
             await failIntoRepairLoop(tx, store, userId, task, `run-completion:${run.id}`, `Run failed: ${String(run.error ?? run.stopReason ?? "unknown")}`, "run_failed", { runId: run.id });
         } else {
-          const sha = run.report?.publish?.commit ?? ((run.agentDefinition?.readOnly || !run.remoteUrl) ? run.report?.sourceCommit : undefined);
-          const repository = run.remoteUrl ?? run.repoPath;
-          const deliverable = !run.remoteUrl && typeof run.repoPath === 'string' && run.repoPath.startsWith('/home/user/.mikka/bot-workspaces/');
-          if (
-            !run.sessionId ||
-            !run.report ||
-            !run.deviceId ||
-            (task.stage === "execute" &&
-              (!repository ||
-                (!deliverable && (typeof sha !== 'string' || !/^[a-f0-9]{40}$/.test(sha)))))
-          ) {
-            await store.apply(
-              userId,
-              binding(task),
-              eventId,
-              {
-                action: "finish",
-                status: "blocked",
-                reason:
-                  "Run ended without a traceable session, report or exact repository candidate; trusted recovery required",
-                evidence: [],
-                output: { runId: run.id },
-              },
-              tx,
-            );
-          } else {
-            let current = task;
-            if (task.stage === "execute") {
-              const next = await store.apply(
-                userId,
-                binding(current),
-                factoryEventId("run-candidate", run.id),
-                {
-                  action: "candidate",
-                  runId: run.id,
-                  candidate: {
-                    sha: deliverable ? null : sha,
-                    ...(deliverable ? { kind: 'deliverable' as const } : run.agentDefinition?.readOnly || !run.remoteUrl ? { kind: 'report' as const } : {}),
-                    repository,
-                    environment: `device:${run.deviceId}`,
-                    scope: `issue:${task.issueId}`,
-                  },
-                },
-                tx,
-              );
-              current = next.task;
-            }
-            const report: FactoryEvidence = {
-              artifact: `run-report:${run.id}`,
-              kind: "report",
-              runId: run.id,
-              sessionId: run.sessionId,
-              candidateId: current.candidateId,
-              sha: task.stage === "execute" && !deliverable ? sha : null,
-              environment: `device:${run.deviceId}`,
-              recordedAt: (run.finishedAt ?? new Date()).toISOString(),
-            };
-            const next = await store.apply(
-              userId,
-              binding(current),
-              eventId,
-              {
-                action: "finish",
-                status: "passed",
-                reason: "Persisted completed Harness run and artifact matched",
-                // The report, then the screenshots and recordings the run took.
-                evidence: [report, ...(await runCaptureEvidence(tx, { id: run.id, userId }, report))],
-                output: { runId: run.id },
-              },
-              tx,
-            );
-            await store.apply(
-              userId,
-              binding(next.task),
-              factoryEventId("run-advance", run.id),
-              {
-                action: "advance",
-                stage: task.stage === "spec" ? "execute" : "review",
-                reason:
-                  task.stage === "spec"
-                    ? "Spec run complete; execution pending"
-                    : "Exact candidate awaits independent review",
-              },
-              tx,
-            );
-          }
+          await completeFactoryExecution(tx, store, task, run);
         }
         const start = await dispatchNext?.(tx, store, task, run);
         await tx.query("COMMIT");
@@ -397,10 +327,15 @@ export function createFactoryReconciler(
    * run it retried), so a completion never advances an unrelated task. */
   reconcile.run = async (userId: string, runId: string) => {
     const { rows: pending } = await pool.query(
-      `SELECT t.id, a.id AS "attemptId" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id
+      `SELECT t.id, a.id AS "attemptId",$3::uuid AS "completedRunId" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id
         WHERE t."userId"=$1 AND t."botId" IS NOT DISTINCT FROM $2::uuid AND ${PENDING}
           AND (a."runId"=$3::uuid OR EXISTS (SELECT 1 FROM agent_runs c WHERE c.id=$3::uuid AND c."retryOf"=a."runId")
-            OR EXISTS (SELECT 1 FROM factory_questions q WHERE q."taskId"=t.id AND (q."originRunId"=$3::uuid OR q."continuationRunId"=$3::uuid)))
+            OR EXISTS (SELECT 1 FROM factory_questions q WHERE q."taskId"=t.id AND (q."originRunId"=$3::uuid OR q."continuationRunId"=$3::uuid))
+            OR (t.status='pending' AND EXISTS(SELECT 1 FROM factory_events f WHERE f."taskId"=t.id
+              AND f.request->>'kind'='request_epoch' AND f.request->>'sourceEventId'=t."sourceEventId"::text
+              AND f.request->'supersededRunIds' ? $3::text))
+            OR (t.status='pending' AND EXISTS(SELECT 1 FROM coordinator_events e WHERE e.id=t."sourceEventId" AND e."userId"=$1
+              AND e.payload->>'source'='thread_continuation' AND e.payload->>'previousRunId'=$3::text)))
         ORDER BY t.id`,
       [userId, botId, runId],
     );

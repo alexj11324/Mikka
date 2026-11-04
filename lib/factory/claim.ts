@@ -31,12 +31,17 @@ export function createFactoryClaim(store: ReturnType<typeof createFactoryStore>,
       JOIN devices d ON d.id=$3 AND d."ownerId"=$4 AND d.enabled=true
       WHERE a.id=$1 AND a."userId"=$4 FOR SHARE OF a,repo,d`,[run.agentId,run.deviceRepoId,deviceId,userId]);
     if (!authorized.rowCount) throw new FactoryError('factoryRunMismatch');
-    if(run.questionContinuation) return {...await questions.claimContinuation(userId,deviceId,runId,leaseExpiresAt,tx),preserveQuestionWorktree:true};
+    // A question resumes its original session and still needs the host's
+    // execution purpose, including retention of a no-repository delivery.
+    const { rows: [repo] } = task.stage === 'execute'
+      ? await tx.query('SELECT "remoteUrl","repoPath" FROM device_repos WHERE id=$1 AND "userId"=$2', [run.deviceRepoId, userId])
+      : { rows: [] };
+    const execution = task.stage === 'execute' ? { factoryExecuteKind: factoryExecutionKind(repo, run.agentDefinition?.readOnly) } : {};
+    if(run.questionContinuation) return {...await questions.claimContinuation(userId,deviceId,runId,leaseExpiresAt,tx),...execution,preserveQuestionWorktree:true};
     if(['review','verify','monitor'].includes(task.stage)) {
       if(!validateCheck) throw new FactoryError('factoryDispatchAdapterRequired');
       return {...await validateCheck(tx,task,runId),preserveQuestionWorktree:true};
     }
-    const { rows: [repo] } = await tx.query('SELECT "remoteUrl","repoPath" FROM device_repos WHERE id=$1 AND "userId"=$2', [run.deviceRepoId, userId]);
-    return {preserveQuestionWorktree:true, ...(task.stage === 'execute' ? { factoryExecuteKind: factoryExecutionKind(repo, run.agentDefinition?.readOnly) } : {})};
+    return {preserveQuestionWorktree:true,...execution};
   };
 }

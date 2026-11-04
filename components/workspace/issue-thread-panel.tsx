@@ -8,8 +8,11 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowLeft, Square, SquareKanban, X } from 'lucide-react'
 import { getIssueThread, getThreadChanges, sendIssueThreadReply, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
+import { checkPageBuildBeforeAction } from '@/lib/app-build'
+import { prepareThreadReply, type ThreadReplySubmission } from '@/lib/thread-submission-input'
 import { mergeThreadChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
+import { ThreadExecutionIdentity } from './thread-execution-identity'
 import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { QuoteChip, QuoteLine } from '@/components/artifacts/artifact-quote'
@@ -97,12 +100,14 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const viewingChanges = hasChanges && tab === 'changes'
   const transcript = useViewScroll<HTMLDivElement>(`thread:${runId}:chat`, !!data && !viewingChanges && !accepting)
   const [draft, setDraft] = useViewState(`thread:${runId}:draft`, '')
+  const [submission, setSubmission] = useViewState<ThreadReplySubmission | null>(`thread:${runId}:submission`, null)
   // Words picked from the agent's reply with 引用: they head the next message as quote lines.
   const [replyQuote, setReplyQuote] = useViewState<string | null>(`thread:${runId}:quote`, null)
   const rootRef = useRef<HTMLElement>(null)
   const [sending, setSending] = useState(false)
   // false, or what to say: the refusal's reason when the server gave one (threadReplaced…), else 发送失败.
   const [sendFailed, setSendFailed] = useState<string | false>(false)
+  useEffect(() => { if (submission && !sending) setSendFailed(t('sendFailed')) }, [submission, sending, t])
   const actionError = useActionError()
   const [stopAttempt, setStopAttempt] = useState<number | null>(null)
   const [stopFailed, setStopFailed] = useState(false)
@@ -126,13 +131,13 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const stopPending = stopRequested && !stopFailed
   const items = data ? threadItems(data.chunks, data.messages, runId) : []
   // A failed run says why under the stage that stopped, else at the end of the conversation.
-  const failure = data ? runFailureText(data.thread.status, data.thread.error) : null
+  const failure = data && view ? runFailureText(view.status, data.thread.error) : null
   const failedStagesId = failure ? [...items].reverse().find(item => item.kind === 'stages' && item.stages.some(stage => !stage.ok))?.id : undefined
   // A message to an ended thread runs it again in the same thread (R-81): 重试 is that message, one tap (N2).
   const canRetry = !!failure && !!data?.thread.detail && data.thread.ownedByCurrentUser && !runIsActive(view?.status ?? '')
   const failureLine = failure && <div className="flex items-start gap-2" data-slot="thread-failure">
     <p className="line-clamp-2 min-w-0 flex-1 text-xs break-words text-destructive/80" title={failure}>{failure}</p>
-    {canRetry && <Button variant="outline" size="xs" className="shrink-0 pointer-coarse:h-11" disabled={sending} onClick={() => { void send(t('retry')) }}>{t('retry')}</Button>}
+    {canRetry && <Button variant="outline" size="xs" className="shrink-0 pointer-coarse:h-11" disabled={sending} onClick={() => { void send(t('retry'), true) }}>{t('retry')}</Button>}
   </div>
   useEffect(() => {
     if (!active || requestedAt === null) return
@@ -145,13 +150,18 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     // Acknowledgement updates the task's thread list as soon as this panel sees it.
     void mutateCache(['issue-threads', issueId])
   }, [issueId, view?.status, view?.stopping, question, mutateCache])
-  async function send(retry?: string) {
+  async function send(retry?: string, retryOriginalSession?: true) {
     const text = retry ?? draft.trim()
     if (!text || sending || stopRequested || question === 'resuming') return
     setSending(true); setSendFailed(false)
     try {
-      const result = await sendIssueThreadReply({ issueId, runId: liveRunId, text: retry === undefined ? withReplyQuote(text, replyQuote) : text })
-      if (result.error) { setSendFailed(actionError(result.error)); return }
+      if (!await checkPageBuildBeforeAction()) return
+      const words = retry === undefined ? withReplyQuote(text, replyQuote) : text
+      const request = retryOriginalSession ? { runId: liveRunId, text: words, retryOriginalSession } : prepareThreadReply(submission, liveRunId, words)
+      if ('requestId' in request) setSubmission(request)
+      const result = await sendIssueThreadReply({ issueId, ...request })
+      if (result.error) { setSendFailed(actionError(result.error)); if ('requestId' in request) setSubmission(null); return }
+      if ('requestId' in request) setSubmission(null)
       if (retry === undefined) { setDraft(current => current.trim() === text ? '' : current); setReplyQuote(null) }
       void mutate(); void mutateCache(['issue-threads', issueId])
     }
@@ -183,6 +193,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       <h2 ref={headingRef} tabIndex={-1} className={cn('min-w-0 truncate text-sm font-semibold outline-none', !acceptance && 'flex-1')}>{title}</h2>
       {acceptance && <><AcceptanceStateBadge task={acceptance} /><span className="flex-1" /></>}
       <ThreadArtifacts runId={runId} status={data?.thread.status ?? ''} />
+      {data?.thread.ownedByCurrentUser && <ThreadExecutionIdentity runId={liveRunId} />}
       {/* Stop lives here for every live run, also one waiting for an answer, whose composer button sends. */}
       {canStop && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('stop')} data-slot="thread-stop" onClick={() => { void stop() }} />}><Square data-icon="inline-start" className="fill-current" /></TooltipTrigger><TooltipContent side="bottom">{t('stop')}</TooltipContent></Tooltip>}
       {onOpenTask && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('openTask')} onClick={onOpenTask} />}><SquareKanban data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('openTask')}</TooltipContent></Tooltip>}

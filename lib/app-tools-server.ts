@@ -5,7 +5,8 @@ import { serverWriteJudge } from '@/lib/operations/write-judgment'
 import { resolveComposioAccount } from '@/lib/composio-actions'
 import { chosenComposioDefault } from '@/lib/composio-account-store'
 import { getComposio } from '@/lib/composio'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { activeExecutionIdentity } from '@/lib/execution-identity'
 import { readWriteSettingLayers } from '@/lib/operations/write-setting-layers'
 import { pendingActions } from '@/lib/db/schema'
 import { proposeAppToolCall } from '@/lib/pending-action-store'
@@ -68,6 +69,17 @@ export function runAppEntry(scope: RunAppScope) {
   const client = getComposio()
   if (!client) return null
   const deps = appToolDeps(scope.userId, scope.botId, client)
+  const execute = deps.execute
+  deps.execute = async (call, accountId) => {
+    // Tool discovery / the write decision may wait on external services. Recheck at use, after those waits.
+    await activeExecutionIdentity(pool, scope.runId, scope.userId)
+    if (!await deps.appAllowed(call.toolkit)) throw new Error('integrationActionDenied')
+    if (accountId) {
+      const current = await deps.resolveAccount(call.toolkit, accountId)
+      if (current.accountId !== accountId) throw new Error('integrationAccountUnavailable')
+    }
+    return execute(call, accountId)
+  }
   return {
     list: async () => (await client.tools.getRawComposioTools({ toolkits: [scope.toolkit], limit: MAX_RUN_APP_TOOLS }) as AppTool[])
       .flatMap(tool => runAppTool(tool, scope.toolkit) ?? []),

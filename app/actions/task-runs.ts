@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
 import { headers } from 'next/headers'
 import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
+import { deviceOnlineStates } from '@/lib/device-presence'
 import { ActionFailureError } from '@/lib/action-error'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -91,11 +92,23 @@ async function readThreads(known?: string) {
   return withDatabaseOperation('/actions/threads/poll', async () => {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
+    // Only queued local work can show "waiting for device". Ask the gateway
+    // on this user read, so an idle socket affects both the view and its hash.
+    const queuedDevices = process.env.DEVICE_GATEWAY_URL && process.env.DEVICE_GATEWAY_PUSH_SECRET
+      ? await db.selectDistinct({ id: devices.id, lastSeenAt: devices.lastSeenAt }).from(devices)
+        .innerJoin(agentRuns, eq(agentRuns.deviceId, devices.id))
+        .where(and(eq(agentRuns.userId, session.user.id), eq(devices.ownerId, session.user.id),
+          eq(devices.kind, 'local'), eq(devices.enabled, true), eq(agentRuns.status, 'queued'),
+          sql`${agentRuns.createdAt} > now() - interval '30 days'`))
+      : []
+    const presence = await deviceOnlineStates(queuedDevices)
+    const onlineIds = [...presence].filter(([, online]) => online).map(([id]) => id)
+    const gatewayOffline = onlineIds.length ? sql`not (${inArray(devices.id, onlineIds)})` : sql`true`
     // Hash the visible waiting state, not a raw heartbeat clock: an ordinary
     // heartbeat must not invalidate every historic thread on that machine.
     const waitingForDevice = sql<boolean>`${devices.kind}='local' and ${agentRuns.status}='queued' and
-      (${devices.enabled} is false or ${devices.lastSeenAt} is null or
-       ${devices.lastSeenAt}<statement_timestamp()-(${DEVICE_ONLINE_WINDOW_MS} * interval '1 millisecond'))`.as('waitingForDevice')
+      (${devices.enabled} is false or (${gatewayOffline} and (${devices.lastSeenAt} is null or
+       ${devices.lastSeenAt}<statement_timestamp()-(${DEVICE_ONLINE_WINDOW_MS} * interval '1 millisecond'))))`.as('waitingForDevice')
     const snapshot = db.select({
       id: agentRuns.id, botId: agentRuns.botId, agentName: runBotName.as('agentName'), issueId: agentRuns.issueId, prompt: sql<string>`left(${agentRuns.prompt}, 200)`.as('prompt'),
       status: agentRuns.status, error: agentRuns.error, createdAt: agentRuns.createdAt, updatedAt: agentRuns.updatedAt,
