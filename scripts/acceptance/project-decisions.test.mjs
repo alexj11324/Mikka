@@ -204,6 +204,50 @@ test('missing actions are reported as fixed names and counts before any case mut
     assert.ok(!serialized.includes(forbidden))
 })
 
+
+for (const tableFirst of [true, false]) test('public Turbopack loader graph stays within the scan budget when the table arrives '
+  + (tableFirst ? 'before' : 'after') + ' the page importer', async () => {
+  // Production 577ed56: a 2,019-path loader table, numeric .A(id) imports,
+  // and ProjectWorkspace's nested ProjectForm/ProjectDetail loader factories.
+  const paths = [], diagnostics = {}
+  const prefix = '/mikka/_next/static/chunks/'
+  const reference = name => 'createServerReference("' + refs[name] + '",callServer,void 0,findSourceMapURL,"' + name + '")'
+  const loader = (id, chunks) => id + ',s=>{s.v(t=>Promise.all(' + JSON.stringify(chunks)
+    + '.map(t=>s.l(t))).then(()=>t(' + (id + 1) + ')))}'
+  const unrelated = Array.from({ length: 2017 }, (_, index) => index)
+  const table = '(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["script",'
+    + unrelated.map(index => loader(10000 + index, ['static/chunks/unrelated-' + index + '.js'])).join(',')
+    + ',' + loader(49166, ['static/chunks/workspace.js', 'static/chunks/shared.js']) + ']);'
+  const shell = names.filter(name => !['saveProject', 'setProjectIssues'].includes(name)).map(reference).join(';')
+    + ';e.A(49166).then(e=>e.ProjectWorkspace)'
+  const seeds = [tableFirst ? 'table' : 'shell', 'catalog',
+    ...Array.from({ length: 21 }, (_, index) => 'seed-' + index), tableFirst ? 'shell' : 'table']
+  const chunks = new Map([
+    [prefix + 'table.js', table],
+    [prefix + 'shell.js', shell],
+    // A whole-app importer must not outrank the small page/component branch.
+    [prefix + 'catalog.js', unrelated.map(index => 'e.A(' + (10000 + index) + ')').join(';')],
+    [prefix + 'workspace.js', 'e.A(512069).then(e=>e.ProjectForm);e.A(640782).then(e=>e.ProjectDetail);'
+      + '(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["script",'
+      + loader(640782, ['static/chunks/detail.js', 'static/chunks/shared.js']) + ','
+      + loader(512069, ['static/chunks/form.js', 'static/chunks/shared.js']) + ']);'],
+    [prefix + 'form.js', reference('saveProject')],
+    [prefix + 'detail.js', reference('setProjectIssues')],
+  ])
+  const result = await discoverActions(async path => {
+    paths.push(path)
+    return new Response(path.includes('/_next/') ? chunks.get(path) ?? ''
+      : seeds.map(name => '<script src="' + prefix + name + '.js"></script>').join(''))
+  }, diagnostics)
+  assert.deepEqual(result, refs)
+  assert.deepEqual(diagnostics.missing, [])
+  assert.ok(diagnostics.chunksRead < 200)
+  assert.ok(diagnostics.chunksRemaining > 1500)
+  assert.ok(paths.includes(prefix + 'form.js') && paths.includes(prefix + 'detail.js'))
+  assert.ok(!paths.includes(prefix + 'unrelated-500.js'))
+  assert.equal(new Set(paths.filter(path => path.includes('/_next/'))).size, diagnostics.chunksRead)
+})
+
 test('discovery reports its remaining public chunks when the scan bound is reached', async () => {
   const diagnostics = {}
   const result = await discoverActions(async path => {
