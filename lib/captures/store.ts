@@ -285,7 +285,11 @@ export async function failRecording(id: string, error: string) {
  * person's own.
  */
 export async function runEvidence(userId: string, runId: string) {
-  const [run] = await db.select({ id: agentRuns.id, status: agentRuns.status, issueId: agentRuns.issueId, botId: agentRuns.botId })
+  const [run] = await db.select({ id: agentRuns.id, status: agentRuns.status, issueId: agentRuns.issueId, botId: agentRuns.botId,
+    harness: sql<string | null>`${agentRuns.agentDefinition}->>'harness'`,
+    model: sql<string | null>`${agentRuns.agentDefinition}->>'model'`,
+    credentialType: sql<'subscription' | 'api_key' | 'unknown'>`CASE WHEN ${agentRuns.agentDefinition}->'apiKey' IS NOT NULL AND ${agentRuns.agentDefinition}->'apiKey'<>'null'::jsonb THEN 'api_key' WHEN ${agentRuns.agentDefinition}->'subscription' IS NOT NULL AND ${agentRuns.agentDefinition}->'subscription'<>'null'::jsonb THEN 'subscription' ELSE 'unknown' END`,
+    subscriptionRoute: sql<string | null>`${agentRuns.agentDefinition}->'subscription'->>'route'` })
     .from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1)
   if (!run) return null
   const captures = await db.select().from(runCaptures)

@@ -36,6 +36,9 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
   }
   const latest = chain.attempts.find(attempt => attempt.runId === chain.latestRunId)!
   if (UNFINISHED_RUN_STATUSES.some(status => status === latest.status)) {
+    if (source === 'user' || (typeof source === 'object' && source.source === 'human'))
+      if (await (await import('@/lib/factory/request-epoch')).continueActiveFactoryRequest(pool, userId, latest.runId, parsed.data.text))
+        return { runId: latest.runId, continued: false }
     await addRunMessage(userId, { runId: latest.runId, text: parsed.data.text }, source)
     return { runId: latest.runId, continued: false }
   }
@@ -69,7 +72,7 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
         const { rows: [factory] } = await pool.query(`SELECT t."botId" FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" WHERE a."runId"=$1 AND t."userId"=$2 AND t."issueId"=$3 ORDER BY a.position DESC LIMIT 1`, [run.id, userId, issueId])
         const botId = factory ? factory.botId : run.botId
         const sourceEventId = crypto.randomUUID()
-        await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload,tier,"deliveredAt") VALUES ($1,$2,$3,$4,'user_message',$5,$6,'background',now())`,
+        await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload,tier,"deliveredAt") VALUES ($1,$2,$3,$4,'user_message',$5,$6,'background',now()) ON CONFLICT DO NOTHING`,
           [sourceEventId, userId, botId, issueId, `thread-continuation:${sourceEventId}`, JSON.stringify({ text: parsed.data.text, source: 'thread_continuation', previousRunId: run.id, postedToChat: true })])
         request = { sourceEventId, botId }
       }

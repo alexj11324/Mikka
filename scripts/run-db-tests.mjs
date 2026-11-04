@@ -44,6 +44,8 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/self-improvement/store.ts', file: 'lib/self-improvement/postgres.test.ts', script: 'test:self-improvement-db' },
   { marker: 'lib/self-improvement/team-skills.ts', file: 'lib/self-improvement/team-skills.db.test.ts', script: 'test:self-improvement-db' },
   { marker: 'lib/factory/checks.ts', file: 'lib/factory/checks.db.test.ts', script: 'test:factory-checks-db' },
+  { marker: 'lib/factory/request-epoch.ts', file: 'lib/factory/continuity.db.test.ts', script: 'test:factory-checks-db' },
+  { marker: 'lib/factory/watchdog.ts', file: 'lib/factory/continuity.db.test.ts', script: 'test:factory-checks-db' },
   { marker: 'lib/factory/monitor-v2-binding.ts', file: 'lib/factory/monitor-v2-binding.db.test.ts', script: 'test:factory-monitor-db' },
   { marker: 'lib/factory/check-independence.ts', file: 'lib/factory/check-independence.db.test.ts', script: 'test:factory-check-independence-db' },
   { marker: 'lib/operations/approved-writes.ts', file: 'lib/operations/write-legacy-schema.db.test.ts', script: 'test:approved-writes-db' },

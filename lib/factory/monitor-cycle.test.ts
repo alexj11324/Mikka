@@ -169,7 +169,7 @@ test(
           assert.equal(current.runId, null);
           assert.equal(current.sessionId, null);
           assert.equal(current.finishedAt, null);
-          assert.deepEqual(current.output, {});
+          assert.deepEqual(current.output, { requestEpoch: next.task.sourceEventId });
           assert.deepEqual(current.evidence, []);
           assert.deepEqual(await attemptRow(task.attemptId), old);
           assert.equal(

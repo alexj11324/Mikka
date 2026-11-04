@@ -729,7 +729,7 @@ dbTest('Factory completion delivery keeps historical handoffs and reads current 
           { id: nextAttemptId, taskId, stage: 'execute', ordinal: 2, position: 2, status: 'running', runId: nextRunId, reason: 'Continue authorized task' },
         ])
       })
-      return { issueId, taskId, oldRunId, nextRunId, nextAttemptId, agentId, targetRepo, deviceId, target }
+      return { issueId, taskId, sourceEventId, oldRunId, nextRunId, nextAttemptId, agentId, targetRepo, deviceId, target }
     }
     const own = await fixture(owner, botId, 'own'), foreign = await fixture(peer, peerBotId, 'peer-private'), other = await fixture(owner, otherBotId, 'other-bot-private')
     const enqueue = async (runId: string, payload: Record<string, unknown>) => {
@@ -808,6 +808,46 @@ dbTest('Factory completion delivery keeps historical handoffs and reads current 
     assert.equal((await readLinked()).size, 0, 'a valid runtime binding cannot admit a Factory Bot from another workspace')
     await db.update(schema.factoryTasks).set({ botId: peerBotId }).where(eq(schema.factoryTasks.id, linked.taskId))
     assert.equal((await readLinked()).size, 0, 'the same binding cannot admit another owner’s Factory Bot')
+
+    const epochs = await fixture(owner, botId, 'continued-request')
+    const oldPublication = { url: 'https://github.com/example/continued-request-wrong/pull/8', state: 'open' as const }
+    await db.insert(schema.runPublications).values({ runId: epochs.oldRunId, userId: owner, issueId: epochs.issueId,
+      remoteUrl: 'https://github.com/example/continued-request-wrong.git', remoteKey: 'v2/github.com/example/continued-request-wrong',
+      branch: 'mikka/previous-request', status: 'published', pullRequest: oldPublication })
+    const readEpoch = async () => (await runCompletionObservations(db, { userId: owner, botId }, [eventFor(epochs)])).get(epochs.oldRunId)!
+    const legacy = await readEpoch()
+    assert.equal(legacy.publication?.pullRequest?.url, oldPublication.url, 'legacy attempts without an epoch still expose their own publication before continuation')
+    assert.equal(legacy.factory.requestEpoch, epochs.sourceEventId)
+    assert.equal(legacy.factory.runAttempt.requestEpoch, null, 'legacy history is not relabelled as a recorded epoch')
+    await pool.query('UPDATE factory_attempts SET output=output || $2::jsonb WHERE "taskId"=$1', [epochs.taskId, JSON.stringify({ requestEpoch: epochs.sourceEventId })])
+    assert.equal((await readEpoch()).publication?.pullRequest?.url, oldPublication.url, 'an explicitly bound same-epoch publication remains available')
+    const delayedId = randomUUID(), nextEpoch = randomUUID()
+    const delayedPayload = { ...historical, summary: 'The previous request published its result.', publication: { pullRequest: oldPublication } }
+    await db.insert(schema.coordinatorEvents).values({ id: delayedId, userId: owner, botId, issueId: epochs.issueId,
+      runId: epochs.oldRunId, kind: 'run_finished', tier: 'result', dedupeKey: delayedId, payload: delayedPayload })
+    await db.insert(schema.coordinatorEvents).values({ id: nextEpoch, userId: owner, botId, issueId: epochs.issueId,
+      kind: 'user_message', dedupeKey: nextEpoch, deliveredAt: new Date(),
+      payload: { text: 'Replace the previous result with the current owner request.', source: 'thread_continuation', previousRunId: epochs.nextRunId, postedToChat: true } })
+    const epochClient = await pool.connect()
+    try {
+      await epochClient.query('BEGIN')
+      const { rows: [currentTask] } = await epochClient.query<import('../factory/store').FactoryTask>('SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE', [epochs.taskId, owner])
+      await (await import('../factory/request-epoch')).advanceFactoryRequest(epochClient, currentTask, nextEpoch)
+      await epochClient.query('COMMIT')
+    } catch (error) { await epochClient.query('ROLLBACK'); throw error } finally { epochClient.release() }
+    const continued = await readEpoch()
+    assert.equal(continued.publication, null, 'the delayed previous-epoch run must not supply the current request publication when its candidate is empty')
+    assert.deepEqual([continued.factory.requestEpoch, continued.factory.runAttempt.requestEpoch], [nextEpoch, epochs.sourceEventId])
+    assert.equal(continued.factory.candidate, null)
+    assert.deepEqual(continued.checks, [])
+    assert.deepEqual([continued.factory.stage, continued.factory.status], ['execute', 'pending'])
+    await store.takeInbox(owner, 'notice-new-request', botId)
+    await store.releaseLease(owner, 'notice-new-request', botId)
+    const continuedPrompt = String((await store.loadConversation(owner, botId)).messages.at(-1)!.message.content)
+    assert.ok(continuedPrompt.startsWith(`[Event] Run ${epochs.oldRunId}`), 'the original ended run remains visible as history')
+    assert.ok(!continuedPrompt.includes(oldPublication.url), 'neither event publication fallback nor the current observation claims the old PR for the new request')
+    assert.deepEqual((await db.select().from(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.id, delayedId)))[0].payload, delayedPayload)
+    assert.equal((await pool.query('SELECT "pullRequest" FROM run_publications WHERE "runId"=$1', [epochs.oldRunId])).rows[0].pullRequest.url, oldPublication.url, 'the original publication ledger remains unchanged')
 
     const plainId = randomUUID()
     await db.insert(schema.agentRuns).values({ id: plainId, userId: owner, botId, issueId: own.issueId, agentId: own.agentId, status: 'succeeded', stopReason: 'submitted', finishedAt: new Date() })

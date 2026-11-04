@@ -5,6 +5,16 @@ import { chatItems, jsonbText, compactionCut, COMPACT_AT_TOKENS, estimateTokens,
 import { modelMessage, pointsSwitchMessage, quotaSwitchMessage, sourcedEventMessage } from './message-safety'
 import { runCompletionObservations } from './run-completion-observation'
 
+test('watchdog blocker exposes the actual host facts and never invents a successful handoff', () => {
+  const prompt = eventPrompt({ kind: 'run_report', issueId: 'issue', runId: null, payload: {
+    source: 'task_watchdog', taskId: 'task', requestEpoch: 'epoch', reason: 'Credential revoked on the remaining device', handoffEventId: 'handoff', handoffDigest: 'digest',
+  } })
+  assert.match(prompt, /Credential revoked/)
+  assert.match(prompt, /epoch/)
+  assert.match(prompt, /Do not replay uncertain/)
+  assert.doesNotMatch(prompt, /undefined/)
+})
+
 function stored(messages: ModelMessage[]): StoredMessage[] {
   return messages.map((message, index) => ({ position: index + 1, message }))
 }
@@ -235,8 +245,8 @@ test('a blocked predecessor notification carries the accepted repository handoff
   } }
   const prompt = eventPrompt(event, {
     observedAt: '2026-11-03T23:07:28Z', runId: 'old', postRunVerify: { status: 'not_run' },
-    factory: { taskId: 'task', stage: 'execute', status: 'running', revision: 5, attemptId: 'attempt-next',
-      runAttempt: { id: 'attempt-old', stage: 'execute', status: 'blocked' }, candidate: null },
+    factory: { taskId: 'task', stage: 'execute', status: 'running', revision: 5, attemptId: 'attempt-next', requestEpoch: 'request-1',
+      runAttempt: { id: 'attempt-old', stage: 'execute', status: 'blocked', requestEpoch: 'request-1' }, candidate: null },
     checks: [], publication: null,
     repositoryHandoffs: [{ previousRunId: 'old', nextRunId: 'next', nextStatus: 'running',
       from: 'https://github.com/example/wrong.git', to: 'https://github.com/example/correct.git', previousHead: 'a'.repeat(40) }],
@@ -256,8 +266,8 @@ test('a stale review notification reports the current fixed-candidate verificati
   } }
   const prompt = eventPrompt(event, {
     observedAt: '2026-11-03T23:15:12Z', runId: 'review', postRunVerify: { status: 'not_run' },
-    factory: { taskId: 'task', stage: 'approval', status: 'pending', revision: 14, attemptId: 'approval-attempt',
-      runAttempt: { id: 'review-attempt', stage: 'review', status: 'passed' }, candidate: { id: 'candidate', sha: 'c'.repeat(40) } },
+    factory: { taskId: 'task', stage: 'approval', status: 'pending', revision: 14, attemptId: 'approval-attempt', requestEpoch: 'request-1',
+      runAttempt: { id: 'review-attempt', stage: 'review', status: 'passed', requestEpoch: 'request-1' }, candidate: { id: 'candidate', sha: 'c'.repeat(40) } },
     checks: [
       { stage: 'review', status: 'passed', runId: 'review', sessionId: 'review-sid', reportOnly: true, postRunVerify: { status: 'not_run' } },
       { stage: 'verify', status: 'passed', runId: 'verify', sessionId: 'verify-sid', reportOnly: false, postRunVerify: { status: 'passed', command: 'npm test', exitCode: 0, timedOut: false, signal: null } },
@@ -272,6 +282,24 @@ test('a stale review notification reports the current fixed-candidate verificati
   assert.match(prompt, /These facts do not replace owner approval/)
   assert.equal(event.payload.publication.errorCode, null, 'the original event snapshot is not rewritten')
   assert.doesNotMatch(eventPrompt({ ...event, payload: { ...event.payload, factory: { stage: 'publish', status: 'passed' } } }), /Current host observation/, 'event prose cannot supply host observations')
+})
+
+test('a delayed completion from an earlier request cannot reuse its event publication as current', () => {
+  const oldUrl = 'https://github.com/example/previous-request/pull/8'
+  const prompt = eventPrompt({ kind: 'run_finished', issueId: 'issue', runId: 'old-run', payload: {
+    status: 'succeeded', stopReason: 'submitted', summary: 'The previous request finished.',
+    publication: { pullRequest: { url: oldUrl, state: 'open' } },
+  } }, {
+    observedAt: '2026-11-04T00:10:00Z', runId: 'old-run', postRunVerify: { status: 'passed' },
+    factory: { taskId: 'task', stage: 'execute', status: 'pending', revision: 15, attemptId: 'new-attempt', requestEpoch: 'request-2',
+      runAttempt: { id: 'old-attempt', stage: 'execute', status: 'passed', requestEpoch: 'request-1' }, candidate: null },
+    checks: [], publication: null, repositoryHandoffs: [],
+  })
+  assert.doesNotMatch(prompt, /Verified GitHub pull request/)
+  assert.ok(!prompt.includes(oldUrl))
+  assert.match(prompt, /"requestEpoch":"request-2"/)
+  assert.match(prompt, /"requestEpoch":"request-1"/)
+  assert.match(prompt, /different request epoch cannot prove the current request's result/)
 })
 
 test('finished run publication names the verified PR or missing setup in the existing chat', () => {

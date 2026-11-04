@@ -2,7 +2,9 @@ import 'server-only'
 import type { Pool, PoolClient } from 'pg'
 import { queueFactoryRun } from '@/lib/agent-runs'
 import { queueCloudRun } from '@/lib/computer/queue-run'
-import { chooseCloudRunModel, threadRunModel } from '@/lib/computer/run-model'
+import { chooseCloudRunModel, chooseLocalRunModel, threadRunModel } from '@/lib/computer/run-model'
+import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
+import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { withDatabaseClient } from '@/lib/db'
 import { tiptapToText } from '@/lib/tiptap-text'
@@ -46,11 +48,36 @@ export function automaticFactoryDispatch(pool: Pool) {
       WHERE f."taskId"=$1 AND f.stage='execute' ORDER BY f.position DESC LIMIT 1`, [task.id])
     if (!source) throw new FactoryError('factoryRunMismatch')
     const check = task.stage !== 'execute'
-    const selection = check ? {} : threadRunModel(source.agentDefinition) ?? {}
+    let selection = check ? {} : threadRunModel(source.agentDefinition) ?? {}
+    const { rows: [pending] } = await tx.query('SELECT output FROM factory_attempts WHERE id=$1 AND "taskId"=$2', [task.attemptId, task.id])
+    const recovery = pending?.output?.watchdogRecovery
+    let agentId = source.agentId, deviceRepoId = source.deviceRepoId
+    if (recovery && !check && source.deviceKind !== 'cloud') {
+      if (recovery.requestEpoch !== task.sourceEventId || recovery.previousRunId !== source.id || !source.remoteUrl)
+        throw new FactoryError('factoryRecoveryExecutorUnavailable')
+      const { rows: targets } = await tx.query(`SELECT a.id,d.id AS "deviceId",a.harness FROM agents a JOIN devices d ON d.id=a."deviceId" AND d."ownerId"=a."userId"
+        WHERE a."userId"=$1 AND d.enabled=true AND d.kind='local' AND d.id<>$2 AND a.harness=$3
+          AND d."lastSeenAt">$4 AND d."protocolVersion">=$5
+        ORDER BY (d."deviceType"='server') DESC,d."lastSeenAt" DESC,a.id LIMIT 5`,
+      [task.userId, source.deviceId, source.harness, new Date(Date.now() - DEVICE_ONLINE_WINDOW_MS), DAEMON_PROTOCOL_VERSION])
+      const workspaceId = await (await import('@/lib/execution-settings')).executionWorkspace(task.userId, task.botId)
+      let selected = false
+      for (const target of targets) {
+        const model = await chooseLocalRunModel(pool, { ownerId: task.userId, workspaceId, botId: task.botId }, target, source.agentDefinition?.model)
+        if ('error' in model) continue
+        agentId = target.id
+        deviceRepoId = (await withDatabaseClient(tx, () => ensureDeviceRepository(task.userId, target.deviceId, source.remoteUrl))).id
+        selection = model
+        selected = true
+        break
+      }
+      if (!selected) throw new FactoryError('factoryRecoveryExecutorUnavailable')
+    }
     if (source.deviceKind !== 'cloud') {
       const dispatch = createFactoryDispatch(pool, store, (client, userId, input, botId, context) => queueFactoryRun(client, userId, input, botId, context, undefined, { ...selection, readOnly: check || source.agentDefinition?.readOnly }))
-      const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId: source.agentId, deviceRepoId: source.deviceRepoId }, tx)
+      const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId, deviceRepoId }, tx)
       if (!check) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
+      if (recovery && !check) await tx.query('UPDATE agent_runs SET "retryOf"=$2,attempt=$3 WHERE id=$1', [result.runId, source.id, source.attempt + 1])
       return
     }
     const { rows: [runtime] } = await tx.query(`SELECT r."agentId",a."deviceId",r."repoId" FROM bot_cloud_runtimes r JOIN agents a ON a.id=r."agentId" WHERE r."botId"=$1 AND r."ownerId"=$2 AND r.harness=$3`, [source.runtimeBotId, task.userId, source.harness])

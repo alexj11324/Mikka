@@ -10,6 +10,7 @@ import { FactoryError } from "../contract";
 import { ActionFailureError } from "../../action-error";
 import { createFactoryStore } from "../store";
 import { createFactoryDispatch } from "../dispatch";
+import { advanceFactoryRequest } from "../request-epoch";
 import { factoryDispatchDatabase } from "../transaction";
 import { insertRunOnce } from "../../run-dispatch";
 import { createFactoryQuestions, questionReference } from "./store";
@@ -313,13 +314,26 @@ test(
           assert.equal((await recoverySnapshot(f)).runs,3);
           assert.deepEqual((await recoverySnapshot(f)).question.answer,before.question.answer);
         });
-        for(const drift of ['subscription','question','custody']) await t.test('recovery revalidates '+drift+' after runtime maintenance before any dispatch',async()=>{
+        for(const drift of ['subscription','question','custody','epoch']) await t.test('recovery revalidates '+drift+' after runtime maintenance before any dispatch',async()=>{
           let f: Awaited<ReturnType<typeof failedContinuation>>,afterMaintenance: unknown,calls=0;
           f=await failedContinuation(async()=>{
             calls++;
             if(drift==='subscription')await pool.query('UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1',[f.connectionId]);
             if(drift==='question')await pool.query('UPDATE factory_questions SET revision=revision+1 WHERE id=$1',[f.q.id]);
             if(drift==='custody')await pool.query('UPDATE thread_machines SET "sandboxId"=$2 WHERE "runId"=$1',[f.first.continuationRunId,'different-vm']);
+            if(drift==='epoch') {
+              const tx=await pool.connect();
+              try {
+                await tx.query('BEGIN');
+                const current=await store.lockTask(tx,userId,f.task.id),sourceEventId=randomUUID();
+                await tx.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
+                  VALUES($1,$2,$3,$4,'user_message',$6,$5)`,[sourceEventId,userId,current.botId,f.issueId,
+                  {text:'The owner changed the target during runtime maintenance',source:'thread_continuation',previousRunId:f.first.continuationRunId},`epoch:${sourceEventId}`]);
+                await advanceFactoryRequest(tx,current,sourceEventId);
+                await tx.query('COMMIT');
+              } catch(error) { await tx.query('ROLLBACK'); throw error; }
+              finally { tx.release(); }
+            }
             afterMaintenance=await recoverySnapshot(f);
           });
           await assert.rejects(f.service.recover(human,f.recovery),e=>e instanceof FactoryError);

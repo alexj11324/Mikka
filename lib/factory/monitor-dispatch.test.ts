@@ -631,7 +631,7 @@ test(
           assert.equal(state.task.revision, f.task.revision);
           assert.deepEqual(
             state.attempts.find((a) => a.id === f.task.attemptId)!.output,
-            {},
+            { requestEpoch: f.task.sourceEventId },
           );
           await pool.query(
             "DROP TRIGGER reject_monitor_dispatch ON factory_events",
