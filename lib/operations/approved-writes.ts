@@ -10,6 +10,7 @@ import type { WriteProvider } from './write-contract'
 import { writeBindingSchema as bindingSchema, prepareWriteBinding } from './write-binding'
 import { lockWritePolicy } from './write-policy-store'
 import { withWritePolicy } from './policy-authorization'
+import { approvedWriteChanged } from '../live/approved-writes'
 
 function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical)
@@ -20,6 +21,9 @@ const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(ca
 export interface StoredWriteProposal { id: string; userId: string; action: string; input: Record<string, unknown>; status: string; operationBinding: z.infer<typeof bindingSchema>; intentKey: string; context: Record<string, unknown> | null; createdAt: Date }
 type Proposal = StoredWriteProposal
 export interface ApprovedWriteView {
+  /** Server read time plus the browser's monotonic request-start time. */
+  observedAt?: string
+  requestedAt?: number
   id: string
   action: WriteActionName
   input: Record<string, unknown>
@@ -170,6 +174,7 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
         if (Number(count.rows[0].count) >= 20) throw new OperationError('tooManyPendingActions')
         const id = randomUUID()
         await tx.query('INSERT INTO pending_actions (id,"userId",action,input,"intentKey","operationBinding",context) VALUES ($1,$2,$6,$3,$4,$5,$7)', [id, owner, input, canonicalIntentKey, binding, action, selected.context ?? null])
+        await approvedWriteChanged(tx, id, owner)
         return { status: 'awaiting_approval', actionId: id }
       })
     },
@@ -215,6 +220,7 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
           const binding = bindingSchema.parse({ ...prepareWriteBinding(provider.name, selected, input), run: { runId:run.runId, botId:run.botId, workspaceId:run.workspaceId, policyVersion:policy.version, decision:policy.decision, approvalDefault } })
           const id = randomUUID(), status = policy.decision === 'allow' ? 'running' : 'pending'
           const inserted = await tx.query<Proposal>('INSERT INTO pending_actions (id,"userId",action,input,"intentKey","operationBinding",context,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *', [id, run.ownerId, action, input, key, binding, selected.context ?? null, status])
+          await approvedWriteChanged(tx, id, run.ownerId)
           return inserted.rows[0]
         })
       }
@@ -237,6 +243,7 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
           // Allow old bindings without contextDigest to be safely declined.
           const closed = await tx.query<Proposal>("UPDATE pending_actions SET status='declined',\"decidedAt\"=clock_timestamp() WHERE id=$1 AND \"userId\"=$2 AND action=$3 AND status IN ('pending','running') RETURNING *", [id, actor.userId, action])
           if (!closed.rows.length) throw new OperationError('pendingActionUnavailable')
+          await approvedWriteChanged(tx, id, actor.userId)
           await requireOperationSession(tx, actor, actor.userId)
           return { proposal: closed.rows[0], readbackOnly: false, declined: true }
         }
@@ -254,7 +261,10 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
         const valid = await tx.query(`SELECT id FROM pending_actions WHERE id=$1 AND (status IN ('running','done') OR "createdAt">clock_timestamp()-interval '7 days')`, [id])
         if (!valid.rows.length) throw new OperationError('pendingActionUnavailable')
         if (!['pending', 'running', 'done'].includes(row.status)) throw new OperationError('pendingActionUnavailable')
-        if (row.status === 'pending') await tx.query("UPDATE pending_actions SET status='running',\"decidedAt\"=clock_timestamp() WHERE id=$1", [id])
+        if (row.status === 'pending') {
+          await tx.query("UPDATE pending_actions SET status='running',\"decidedAt\"=clock_timestamp() WHERE id=$1", [id])
+          await approvedWriteChanged(tx, id, actor.userId)
+        }
         return { proposal: row, readbackOnly, declined: false }
       }, actor)
       const result = decision.declined ? { status: 'declined' as const, error: null } : await execute(decision.proposal, actor, decision.readbackOnly)

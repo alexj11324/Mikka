@@ -1,9 +1,9 @@
 'use client'
 
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useSWRConfig } from 'swr'
 import { withBasePath } from '@/lib/base-path'
-import { type LiveRuntime, type LiveTicket } from '@/lib/live/channel'
+import { type LiveRuntime, type LiveTicket, type LiveSubscriptionOptions } from '@/lib/live/channel'
 import { LiveChannels } from '@/lib/live/channels'
 import type { LiveKind } from '@/lib/live/events'
 
@@ -29,6 +29,7 @@ function browserRuntime(workspaceId: string | null): LiveRuntime {
       return () => { document.removeEventListener('visibilitychange', changed); window.removeEventListener('online', changed) }
     },
     now: Date.now,
+    monotonicNow: () => performance.now(),
     later: (callback, milliseconds) => setTimeout(callback, milliseconds),
     cancel: timer => clearTimeout(timer as ReturnType<typeof setTimeout>),
   }
@@ -42,14 +43,28 @@ export function LiveProvider({ ownerId, workspaceId, children }: { ownerId: stri
 }
 
 /** Register the SWR keys invalidated by a committed entity change. */
-export function useLiveKey(kind: LiveKind, id: string | null | undefined, keys: readonly string[], workspaceId?: string | null) {
+export function useLiveKey(kind: LiveKind, id: string | null | undefined, keys: readonly string[], workspaceId?: string | null, options?: LiveSubscriptionOptions) {
+  useLiveKeys(id ? [{ kind, id }] : [], keys, workspaceId, options)
+}
+
+/** A thread's attempts share one read and one owner/workspace connection. */
+export function useLiveKeys(entities: readonly { kind: LiveKind; id: string; workspaceId?: string | null }[], keys: readonly string[], workspaceId?: string | null, options?: LiveSubscriptionOptions) {
   const context = useContext(LiveContext)
   const channels = context?.channels
   const scope = workspaceId === undefined ? context?.workspaceId ?? null : workspaceId
   const { mutate } = useSWRConfig()
   const serialized = JSON.stringify(keys)
+  const references = JSON.stringify(entities)
+  const minIntervalMs = options?.minIntervalMs ?? 0
+  const deadline = useRef(options?.deadline)
+  deadline.current = options?.deadline
+  // Anchor the server's remaining duration once per expiry, not once per render
+  // or stream refresh. A scope/key change still uses the latest authorized read.
+  const deadlineKey = options?.deadline?.at ?? null
   useEffect(() => {
-    if (!channels || !id) return
-    return channels.subscribe(scope, kind, id, JSON.parse(serialized) as string[], key => mutate(key))
-  }, [channels, scope, kind, id, serialized, mutate])
+    if (!channels) return
+    const unsubscribe = (JSON.parse(references) as { kind: LiveKind; id: string; workspaceId?: string | null }[]).map(({ kind, id, workspaceId: entityScope }) =>
+      channels.subscribe(entityScope === undefined ? scope : entityScope, kind, id, JSON.parse(serialized) as string[], key => mutate(key), { minIntervalMs, deadline: deadline.current }))
+    return () => { for (const stop of unsubscribe) stop() }
+  }, [channels, scope, references, serialized, mutate, minIntervalMs, deadlineKey])
 }
