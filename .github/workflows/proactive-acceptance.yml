@@ -1,4 +1,7 @@
-name: Temporary group policy preflight
+# One complete recheck for run 41789934538's missing baseline phase receipt.
+# Keep the original FAIL and unknown cost. No case retry, data reuse, policy,
+# label, budget, source, deployment or acceptance-gate change. No further recheck.
+name: Temporary group policy receipt recheck
 on:
   push:
     branches: [acceptance/proactive-1157-1163]
