@@ -55,9 +55,18 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
   }
   const counts = { scanned: 0, recovered: 0, blocked: 0, deferred: 0, failed: 0 }
   const { rows: candidates } = await pool.query(`SELECT t.id,t."userId",t."botId",a."runId",
-    (t.status='running' AND live.status='failed' AND live."stopReason"='provider_failure' AND live."stopRequestedAt" IS NULL AND live.report->'modelFallback'->>'state'='pending') AS "providerPending"
+    (t.status='running' AND live."stopRequestedAt" IS NULL AND (
+      (live.status='failed' AND live."stopReason"='provider_failure' AND live.report->'modelFallback'->>'state'='pending')
+      OR (live.status='queued' AND previous.status='failed' AND previous."stopReason"='provider_failure' AND previous."stopRequestedAt" IS NULL
+        AND previous.report->'modelFallback'->>'state'='switched' AND previous.report->'modelFallback'->>'retryRunId'=live.id::text
+        AND previous.report->'modelFallback'->>'nextDefinitionDigest'=live."agentDefinition"->>'definitionDigest'))) AS "providerPending",
+    CASE WHEN live.status='queued' THEN previous.id ELSE live.id END AS "providerRunId"
     FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId"
     LEFT JOIN agent_runs live ON live.id=a."runId"
+    LEFT JOIN LATERAL (SELECT source.id FROM factory_events e JOIN agent_runs source ON source.id::text=e.request->>'priorRunId'
+      WHERE e."taskId"=t.id AND e.result->>'runId'=live.id::text AND t.stage IN ('review','verify','monitor')
+        AND source.report->'modelFallback'->>'retryRunId'=live.id::text LIMIT 1) provider_check ON live."retryOf" IS NULL
+    LEFT JOIN agent_runs previous ON previous.id=COALESCE(live."retryOf",provider_check.id) AND previous."userId"=t."userId" AND previous."issueId"=t."issueId"
     WHERE (t.status IN ('pending','running') OR (t.status='blocked' AND a.output->'watchdog'->>'reasonCode'='task_stalled'))
       AND t.stage IN ('spec','execute','review','verify','monitor')
       AND (live.status IS NULL OR live.status NOT IN ('paused','waiting_input'))
@@ -76,13 +85,13 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
       // current task itself; this pass holds no DB connection or task lock.
       try {
         let launch: (() => Promise<void>) | undefined
-        if (dependencies.recoverProvider) launch = await dependencies.recoverProvider(candidate.userId, candidate.runId)
+        if (dependencies.recoverProvider) launch = await dependencies.recoverProvider(candidate.userId, candidate.providerRunId)
         else {
           const { recoverProviderFailure, launchProviderContinuation } = await import('../run-provider-fallback')
-          const continuation = await recoverProviderFailure(pool, candidate.userId, candidate.runId)
+          const continuation = await recoverProviderFailure(pool, candidate.userId, candidate.providerRunId)
           launch = () => launchProviderContinuation(candidate.userId, continuation)
         }
-        await runtime.reconcile.run(candidate.userId, candidate.runId)
+        await runtime.reconcile.run(candidate.userId, candidate.providerRunId)
         await launch?.()
         counts.recovered++
       } catch { counts.failed++ }
@@ -97,7 +106,11 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
       const task = await runtime.store.lockTask(tx, candidate.userId, candidate.id)
       if (!['pending', 'running', 'blocked'].includes(task.status)) { await tx.query('COMMIT'); continue }
       const { rows: [state] } = await tx.query(`SELECT a."runId",r.status AS "runStatus",a.output->'watchdog' AS watchdog,
-        (r.status='failed' AND r."stopReason"='provider_failure' AND r."stopRequestedAt" IS NULL AND r.report->'modelFallback'->>'state'='pending') AS "providerPending",
+        (r."stopRequestedAt" IS NULL AND (
+          (r.status='failed' AND r."stopReason"='provider_failure' AND r.report->'modelFallback'->>'state'='pending')
+          OR (r.status='queued' AND previous.status='failed' AND previous."stopReason"='provider_failure' AND previous."stopRequestedAt" IS NULL
+            AND previous.report->'modelFallback'->>'state'='switched' AND previous.report->'modelFallback'->>'retryRunId'=r.id::text
+            AND previous.report->'modelFallback'->>'nextDefinitionDigest'=r."agentDefinition"->>'definitionDigest'))) AS "providerPending",
         r."questionContinuation" IS NOT NULL AS "originalSessionOnly",
         GREATEST(t."updatedAt",a."createdAt",a."finishedAt",c."createdAt",cp."updatedAt",
           (SELECT max(ch."createdAt") FROM run_chunks ch WHERE ch."runId"=r.id AND ch.chunk->>'type'='tool_output')) AS "progressAt",
@@ -111,6 +124,10 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
             WHERE op."taskId"=t.id AND p."userId"=t."userId" AND p.status='processing')) AS "uncertainEffect"
         FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId"
         LEFT JOIN agent_runs r ON r.id=a."runId" AND r."userId"=t."userId" AND r."issueId"=t."issueId"
+        LEFT JOIN LATERAL (SELECT source.id FROM factory_events e JOIN agent_runs source ON source.id::text=e.request->>'priorRunId'
+          WHERE e."taskId"=t.id AND e.result->>'runId'=r.id::text AND t.stage IN ('review','verify','monitor')
+            AND source.report->'modelFallback'->>'retryRunId'=r.id::text LIMIT 1) provider_check ON r."retryOf" IS NULL
+        LEFT JOIN agent_runs previous ON previous.id=COALESCE(r."retryOf",provider_check.id) AND previous."userId"=t."userId" AND previous."issueId"=t."issueId"
         LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id
         LEFT JOIN run_checkpoints cp ON cp."runId"=r.id AND cp."userId"=t."userId" WHERE t.id=$1`, [task.id])
       if (!state) { await tx.query('COMMIT'); continue }

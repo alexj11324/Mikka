@@ -41,7 +41,15 @@ export async function modelNotAllowed(pool: Pool, scope: OrderScope, asked?: { h
   return { error: 'modelNotAllowed', asked, allowed: entries.map(entry => ({ harness: entry.harness, model: entry.model })) }
 }
 
-export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, asked?: { harness: OrderEntry['harness']; model?: string } | null, location?: RunLocation, deviceId?: string, dependencies: { cloudPurpose?: 'task' | 'desktop'; refreshQuota?: RefreshOrderQuota; /** Host-only continuation fence: a task never cycles through failed entries again. */ excludeEntryKeys?: readonly string[]; /** The cloud already failed to start this run: a server or a computer only. */ withoutCloud?: boolean } = {}): Promise<ModelDispatch> {
+export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, asked?: { harness: OrderEntry['harness']; model?: string } | null, location?: RunLocation, deviceId?: string, dependencies: {
+  cloudPurpose?: 'task' | 'desktop'; refreshQuota?: RefreshOrderQuota
+  /** Host-only placement constraint: the Agent is already chosen, but its model still follows preferences. */
+  harness?: OrderEntry['harness']
+  /** Host-only continuation fence: a task never cycles through failed entries again. */
+  excludeEntryKeys?: readonly string[]
+  /** The cloud already failed to start this run: a server or a computer only. */
+  withoutCloud?: boolean
+} = {}): Promise<ModelDispatch> {
   // A subscription never asked for its models offers none yet: ask it first (once per revision).
   await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
   const candidates = await orderCandidates(pool, scope)
@@ -53,10 +61,11 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   // A named computer, or a run the person put in the cloud, goes only there.
   const places = deviceId || dependencies.withoutCloud ? 'local' as const : location === 'cloud' ? 'cloudOnly' as const : location ?? stored.location
   const excluded = new Set(dependencies.excludeEntryKeys)
-  const order = { ...stored, entries: stored.entries.filter(entry => !excluded.has(entryKey(entry))), location: places }
+  const allowedAgent = (entry: Pick<OrderEntry, 'harness'>) => !dependencies.harness || entry.harness === dependencies.harness
+  const order = { ...stored, entries: stored.entries.filter(entry => allowedAgent(entry) && !excluded.has(entryKey(entry))), location: places }
   // A model the thread named: the first credential that offers it on that Agent (its own entry if it is listed).
   const picked = explicit ? order.entries.find(entry => entry.harness === explicit.harness && entry.model === explicit.model)
-    ?? candidates.filter(candidate => candidate.harness === explicit.harness && candidate.model === explicit.model)
+    ?? candidates.filter(candidate => allowedAgent(candidate) && candidate.harness === explicit.harness && candidate.model === explicit.model)
       .map(candidate => ({ id: `thread:${candidate.harness}:${candidate.model}`, harness: candidate.harness, model: candidate.model, source: candidate.source }))[0] : undefined
   const named = explicit && { agent: HARNESS_NAMES[explicit.harness], model: explicit.model }
   // The thread's model is the only one tried: no subscription or key offers it on that Agent, so nothing runs and the card says so.

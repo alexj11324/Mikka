@@ -358,6 +358,11 @@ export async function startThreadMachine(actor: { userId: string; workspaceId: s
   } catch (error) {
     const { RetainedTaskMachineUnavailable } = await import('@/lib/cloud-computer/thread-machines')
     if (error instanceof RetainedTaskMachineUnavailable) return { state: 'unavailable' as const, reason: 'retained_runtime' as const }
+    // A concurrent durable handoff owns this run's provisioning lease. Its
+    // first VM is not a failed attempt, and only that lease may finish/clean it.
+    const { ComputerError } = await import('@/lib/computer/store')
+    if (error instanceof ComputerError && error.status === 409 && error.message === 'Thread provisioning in progress')
+      return { state: 'unavailable' as const, reason: 'provisioning' as const }
     // A question continuation cannot replace its original native session VM.
     // Keep the committed answer/run and placement for the same answer's retry.
     const [continuation] = await db.select({ question: agentRuns.questionContinuation }).from(agentRuns)
