@@ -11,6 +11,7 @@ import { initializeGroupDecisionTrace, recordGroupDecisionRoute, recordGroupDeci
 import { GROUP_MAX_RESPONDERS } from './group-decision-chain'
 import { recordGroupFeedback } from './group-decision-feedback'
 import { groupCopy, readGroupLocale } from './group-copy'
+import { openGroupTurnSession } from './group-turn-session'
 
 export const GROUP_MAX_ROUNDS = GROUP_MAX_RESPONDERS
 export type GroupAgent = RoutingMember
@@ -85,12 +86,13 @@ export async function enqueueGroupTurn(client: PoolClient, conversationId: strin
  * A crashed generation is marked failed on next wake, NEVER automatically replayed.
  */
 export async function processGroupTurn(pool: Pool, conversationId: string, runtime: GroupRuntime, deadline = Date.now() + 220000): Promise<boolean> {
-  const client = await pool.connect()
+  const session = await openGroupTurnSession(pool)
+  const { client } = session
   let locked = false
-  let discard = false
   let messageId: string | undefined
   try {
     const acquired = await client.query(`SELECT pg_try_advisory_lock(hashtextextended(current_database() || '.' || current_schema() || '.group-turn.' || $1,0)) AS acquired`, [conversationId])
+    session.assertHeld()
     if (!acquired.rows[0].acquired) return false
     locked = true
     // An unavailable routing decision has not woken a responder. Retry only
@@ -105,8 +107,20 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     const root = rows[0]
     if (!root) return false
     // 停止 (stopGroupTurns) moves the turn off 'running'; the worker checks before each step and while a reply generates.
-    const stopped = async () => (await client.query(`SELECT status FROM group_turns WHERE "messageId"=$1`, [root.messageId])).rows[0]?.status !== 'running'
-    const modelScope = <T>(work: () => Promise<T>) => hostedBillingScope.run({ workspaceId: root.workspaceId, ownerId: root.userId }, work)
+    const stopped = async () => {
+      if (session.isLost()) return true
+      try { return (await client.query(`SELECT status FROM group_turns WHERE "messageId"=$1`, [root.messageId])).rows[0]?.status !== 'running' }
+      catch (error) {
+        // A known socket loss releases this worker's lock. Other SQL errors
+        // are not evidence that the person pressed stop.
+        if (session.isLost()) return true
+        throw error
+      }
+    }
+    const modelScope = <T>(work: () => Promise<T>) => {
+      session.assertHeld()
+      return hostedBillingScope.run({ workspaceId: root.workspaceId, ownerId: root.userId }, work)
+    }
     messageId = root.messageId
     await client.query(`UPDATE group_turns SET status='running',"updatedAt"=now() WHERE "messageId"=$1`, [messageId])
     const authorized = async () => {
@@ -172,8 +186,12 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
         stopped,
         chatUnavailableText:async()=>groupCopy(await readGroupLocale(client,root.userId)).chatUnavailable,
         contribution: runtime.contribution ? (message, member, earlier) => modelScope(()=>runtime.contribution!(message, member, earlier)) : undefined,
-        delegate: runtime.delegate ? (reporter, delegation) => runtime.delegate!({ userId:root.userId, workspaceId:root.workspaceId, conversationId, messageId:messageId!, reporter, text:input.text, delegation },client) : undefined,
+        delegate: runtime.delegate ? (reporter, delegation) => {
+          session.assertHeld()
+          return runtime.delegate!({ userId:root.userId, workspaceId:root.workspaceId, conversationId, messageId:messageId!, reporter, text:input.text, delegation },client)
+        } : undefined,
         generate: (agent, input) => untilStopped(stopped, async signal => {
+          session.assertHeld()
           input = { ...input, signal, attachmentContext: { userId: root.userId, conversationId } }
           const generate = async (value: typeof input) => {
             const eventId = `generate:${++generationCount}`
@@ -278,8 +296,8 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     throw error
   } finally {
     try { if (locked) await client.query(`SELECT pg_advisory_unlock(hashtextextended(current_database() || '.' || current_schema() || '.group-turn.' || $1,0))`, [conversationId]) }
-    catch { discard = true }
-    finally { client.release(discard) }
+    catch { /* A lost physical session has already released its locks. */ }
+    finally { await session.close() }
   }
 }
 
