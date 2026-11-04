@@ -2536,6 +2536,25 @@
       }
     },
     "searchEmpty": "No matching settings",
+    "mcpConnections": {
+      "title": "Custom MCP",
+      "loading": "Loading custom MCP connections",
+      "share": "Share with workspace members",
+      "shareLabel": "Share {name} with workspace members",
+      "sharedBy": "Shared by {name}",
+      "member": "Workspace member",
+      "paused": "Disabled",
+      "onlyYou": "Only you",
+      "sharedReadOnly": "Shared with workspace members",
+      "unconfirmed": "State unconfirmed",
+      "loadFailed": "Custom MCP connection state unavailable",
+      "shareUnconfirmed": "Sharing change unconfirmed; current sharing state unknown",
+      "checkAgain": "Check again",
+      "confirmTitle": "Share {name} with members of {workspace}?",
+      "currentWorkspace": "this workspace",
+      "confirmAuthority": "Members can use the tools authorized for this connection. External services may charge the connected account.",
+      "confirmShare": "Share connection"
+    },
     "apiKeys": {
       "add": "Add API key",
       "addConfirm": "Add",

@@ -5,8 +5,9 @@ import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
 
 /** Authority is host data, never a Decision/model argument. References only: no credentials. */
 const resource = z.object({
-  kind: z.enum(['device', 'api_key', 'subscription', 'e2b']), id: z.string().min(1), ownerId: z.string().min(1),
+  kind: z.enum(['device', 'api_key', 'subscription', 'e2b', 'mcp']), id: z.string().min(1), ownerId: z.string().min(1),
   access: z.enum(['owner', 'workspace_share']), revision: z.string().optional(),
+  grantId: z.uuid().optional(), workspaceId: z.uuid().optional(),
 })
 const account = z.object({
   kind: z.enum(['api_key', 'subscription', 'native_login', 'local_device', 'e2b']),
@@ -54,6 +55,14 @@ export async function freezeExecutionIdentity(query: Query, run: RunAuthority, m
   const { rows: [device] } = await query.query<{ ownerId: string; kind: string; enabled: boolean }>('SELECT "ownerId",kind,enabled FROM devices WHERE id=$1', [run.deviceId])
   if (!device?.enabled || device.ownerId !== run.userId) return denied()
   const resourceBindings: ExecutionIdentity['resourceBindings'] = [{ kind: 'device', id: run.deviceId, ownerId: device.ownerId, access: 'owner' }]
+  if (definition.customMcp) {
+    if (definition.customMcp.workspaceId !== workspaceId) return denied()
+    const authority = await (await import('./plugins/workspace-mcp')).validateMcpAuthority(query, run.userId, definition.customMcp, membership).catch(() => denied())
+    for (const grant of authority.servers) resourceBindings.push({ kind: 'mcp', id: grant.id, ownerId: grant.ownerId,
+      access: grant.grantId ? 'workspace_share' : 'owner', revision: String(grant.revision),
+      ...(grant.grantId ? { grantId: grant.grantId } : {}), ...(authority.workspaceId ? { workspaceId: authority.workspaceId } : {}),
+    })
+  }
   let model: ExecutionIdentity['billingAccount']['model'] = { kind: 'native_login', ownerId: run.userId, resourceId: run.deviceId, amount: 'provider_unknown' }
   if (definition.apiKey && definition.subscription) return denied()
   if (definition.apiKey) {

@@ -3,6 +3,8 @@ import type { Pool, PoolClient } from 'pg'
 import { openSecret, sealSecret, type Sealed } from '@/lib/secrets/crypto'
 import { PluginError, type InstalledSkill, type McpServerView, type PersonalPluginSnapshot, type SkillContent, type createMcpSchema, type updateMcpSchema } from './contracts'
 import type { z } from 'zod'
+import type { McpAuthority } from './contracts'
+import { singleMcpAuthority, WorkspaceMcpStore } from './workspace-mcp'
 
 type McpRow = Omit<McpServerView, 'authKind' | 'createdAt'> & {
   auth_header: string | null; ciphertext: string | null; iv: string | null; key_version: number | null; created_at: Date;
@@ -13,7 +15,7 @@ const mcpView = (row: McpRow): McpServerView => ({ id: row.id, name: row.name, u
 const aad = (userId: string, id: string, url: string, header: string) => JSON.stringify(['personal-mcp', userId, id, url, header.toLowerCase()])
 
 export class PersonalPluginStore {
-  constructor(readonly pool: Pool, readonly env: Record<string, string | undefined> = process.env) {}
+  constructor(readonly pool: Pool, readonly env: Record<string, string | undefined> = process.env, readonly membership?: Pick<Pool | PoolClient, 'query'>) {}
   private async write<T>(userId: string, work: (client: PoolClient) => Promise<T>) {
     const client = await this.pool.connect()
     try {
@@ -51,10 +53,13 @@ export class PersonalPluginStore {
     if (!(await this.pool.query('DELETE FROM personal_mcp_servers WHERE id=$1 AND user_id=$2', [id, userId])).rowCount) throw new PluginError('mcpNotFound', 404)
   }
   /** Called immediately before remote discovery/call. Never returned by an API. */
-  async mcpConnection(userId: string, id: string, revision?: number) {
-    const row = (await this.pool.query<McpRow>(`SELECT ${mcpColumns} FROM personal_mcp_servers WHERE id=$1 AND user_id=$2 AND enabled=true`, [id, userId])).rows[0]
+  async mcpConnection(userId: string, id: string, revision?: number, authority?: McpAuthority) {
+    const grant = authority ? (await new WorkspaceMcpStore(this.pool, this.membership).validate(userId, singleMcpAuthority(authority, id))).servers[0] : null
+    const ownerId = grant?.ownerId ?? userId
+    const row = (await this.pool.query<McpRow>(`SELECT ${mcpColumns} FROM personal_mcp_servers WHERE id=$1 AND user_id=$2 AND enabled=true`, [id, ownerId])).rows[0]
     if (!row || revision !== undefined && row.revision !== revision) throw new PluginError('mcpUnavailable', 404)
-    const headers = row.auth_header ? { [row.auth_header]: openSecret({ ciphertext: row.ciphertext!, iv: row.iv!, keyVersion: row.key_version! }, aad(userId, row.id, row.url, row.auth_header), this.env) } : {}
+    if (grant && row.revision !== grant.revision) throw new PluginError('mcpUnavailable', 404)
+    const headers = row.auth_header ? { [row.auth_header]: openSecret({ ciphertext: row.ciphertext!, iv: row.iv!, keyVersion: row.key_version! }, aad(ownerId, row.id, row.url, row.auth_header), this.env) } : {}
     return { ...mcpView(row), headers }
   }
   async listSkills(userId: string): Promise<InstalledSkill[]> {
@@ -78,10 +83,12 @@ export class PersonalPluginStore {
   async deleteSkill(userId: string, id: string) {
     if (!(await this.pool.query('DELETE FROM personal_skills WHERE id=$1 AND user_id=$2', [id, userId])).rowCount) throw new PluginError('skillNotFound', 404)
   }
-  async snapshot(userId: string, client: Pick<PoolClient, 'query'> = this.pool): Promise<PersonalPluginSnapshot> {
-    const servers = (await client.query<PersonalPluginSnapshot['servers'][number]>('SELECT id,name,revision FROM personal_mcp_servers WHERE user_id=$1 AND enabled=true ORDER BY created_at,id', [userId])).rows
+  async snapshot(userId: string, client: Pick<PoolClient, 'query'> = this.pool, workspaceId?: string | null): Promise<PersonalPluginSnapshot> {
+    const mcpAuthority = workspaceId ? await new WorkspaceMcpStore(this.pool, this.membership).freeze(userId, workspaceId, client) : undefined
+    const servers = mcpAuthority ? mcpAuthority.servers.map(({ id, name, revision }) => ({ id, name, revision }))
+      : (await client.query<PersonalPluginSnapshot['servers'][number]>('SELECT id,name,revision FROM personal_mcp_servers WHERE user_id=$1 AND enabled=true ORDER BY created_at,id', [userId])).rows
     const skills = (await client.query<PersonalPluginSnapshot['skills'][number]>(`SELECT id,name,source,slug,source_kind AS "sourceKind",source_revision AS "sourceRevision",source_path AS "sourcePath",sha256,body FROM personal_skills WHERE user_id=$1 AND enabled=true ORDER BY created_at,id`, [userId])).rows
     const accounts = (await client.query<{ toolkit: string }>('SELECT DISTINCT toolkit FROM composio_accounts WHERE "userId"=$1 AND toolkit=\'googledrive\'', [userId])).rows
-    return { servers, skills, toolkits: accounts.map(row => row.toolkit) }
+    return { servers, skills, toolkits: accounts.map(row => row.toolkit), ...(mcpAuthority ? { mcpAuthority } : {}) }
   }
 }

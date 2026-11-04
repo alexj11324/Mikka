@@ -22,6 +22,7 @@ export const updateMcpSchema = z.object({
   auth: mcpAuthSchema.nullable().optional(),
 }).strict().refine(value => value.name !== undefined || value.enabled !== undefined || value.auth !== undefined)
 export const deletePluginSchema = z.object({ id: z.uuid() }).strict()
+export const shareMcpSchema = z.object({ serverId: z.uuid(), workspaceId: z.uuid(), shared: z.boolean() }).strict()
 export const installSkillSchema = z.object({
   source: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}\/[A-Za-z0-9_.-]{1,100}$/),
   slug: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/),
@@ -31,6 +32,24 @@ export type McpServerView = {
   id: string; name: string; url: string; transport: 'http' | 'sse'; enabled: boolean;
   revision: number; authKind: 'header' | 'none'; createdAt: string;
 }
+export type McpWorkspaceServerView = Omit<McpServerView, 'url'> & {
+  /** A teammate receives public metadata, never the owner's private endpoint. */
+  url: string | null; ownerId: string; ownerName: string | null; mine: boolean; shared: boolean;
+}
+export type McpWorkspacePage = {
+  workspaceId: string; workspaceKind: 'personal' | 'team'; canShare: boolean;
+  servers: McpWorkspaceServerView[]; count: number;
+}
+/** Host-owned references only. A recreated share never revives an old grant. */
+export const mcpServerGrantSchema = z.object({
+  id: z.uuid(), name: z.string().max(80), revision: z.number().int().positive(), ownerId: z.string().min(1),
+  grantId: z.uuid().nullable(),
+}).strict()
+export const mcpAuthoritySchema = z.object({
+  requester: z.string().min(1), workspaceId: z.uuid().nullable(), servers: z.array(mcpServerGrantSchema).max(64),
+}).strict()
+export type McpServerGrant = z.infer<typeof mcpServerGrantSchema>
+export type McpAuthority = z.infer<typeof mcpAuthoritySchema>
 export type InstalledSkill = {
   id: string; name: string; source: string; slug: string; sourceKind: 'skills.sh' | 'built-in' | 'self-improvement';
   sourceRevision: string; sourcePath: string; sha256: string; enabled: boolean; createdAt: string;
@@ -38,6 +57,8 @@ export type InstalledSkill = {
 export type SkillContent = Pick<InstalledSkill, 'name' | 'source' | 'slug' | 'sourceKind' | 'sourceRevision' | 'sourcePath' | 'sha256'> & { body: string }
 export type PersonalPluginSnapshot = {
   servers: Pick<McpServerView, 'id' | 'name' | 'revision'>[];
+  /** Absent on legacy executions, whose MCP authority remains personal only. */
+  mcpAuthority?: McpAuthority;
   skills: (SkillContent & { id: string })[];
   toolkits?: string[];
 }
