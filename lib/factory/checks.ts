@@ -1,5 +1,5 @@
 import { factoryRunBotMatches } from './run-scope'
-import { sleepingFactoryCloudTarget, type FactoryCloudStageAdmission } from './cloud-stage-admission'
+import type { FactoryCloudStageAdmission } from './cloud-stage-admission'
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { deviceIsOnline } from "../device-presence";
@@ -108,7 +108,7 @@ export async function configureFactoryCheck(
   )
     throw new FactoryError("factoryEvidenceMismatch");
   const staged = !row.cloudOnline && row.deviceKind === 'cloud' && factoryStage && row.runtimeBotId && row.runtimeWorkspaceId
-    ? await sleepingFactoryCloudTarget(tx, { userId: task.userId, workspaceId: row.runtimeWorkspaceId },
+    ? await (await import('./cloud-stage-admission')).sleepingFactoryCloudTarget(tx, { userId: task.userId, workspaceId: row.runtimeWorkspaceId },
       { botId: row.runtimeBotId, issueId: task.issueId, agentId: row.agentId, deviceRepoId: row.deviceRepoId, withoutBot: task.botId === null }, factoryStage, runId)
     : null
   if (
