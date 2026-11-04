@@ -1,0 +1,100 @@
+name: Web deploy
+# Builds the production web app on GitHub's free runners (this repository is
+# public) and uploads the prebuilt output to Vercel, instead of paying for
+# Vercel build minutes. Vercel's own Git deployment of main is off in
+# vercel.json. See docs/operations/web-deploy.md.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  # One production upload at a time; a newer push waits and replaces any older queued run.
+  group: web-deploy-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      VERCEL_ORG_ID: team_C7lwxVVvnUicFli6112mvxpv
+      VERCEL_PROJECT_ID: prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH
+      VERCEL_CLI: vercel@65.4.0
+      NEXT_TELEMETRY_DISABLED: '1'
+      # Same as vercel.json build.env.
+      NEXT_ENABLE_ADAPTER: '0'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Read the Vercel deploy token
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_DEPLOY_TOKEN
+          include-imports: false
+      - name: Skip documentation-only changes
+        id: skip
+        run: node scripts/release/web-deploy.mjs skip
+        env:
+          VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
+      # `vercel pull` returns Vercel's sensitive values empty. prod:/vercel is the
+      # Infisical source Vercel production is synced from; the next step fills only
+      # keys production defines and Vercel withheld. Runtime still reads Vercel's copy.
+      - name: Read the production values Vercel withholds from `vercel pull`
+        if: steps.skip.outputs.skip != 'true'
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          recursive: false
+          include-imports: false
+      - name: Pull the production project settings and environment
+        if: steps.skip.outputs.skip != 'true'
+        run: npx --yes "$VERCEL_CLI" pull --yes --environment=production --token "$VERCEL_TOKEN" > /dev/null
+        env:
+          VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
+      - name: Fill build-time values
+        if: steps.skip.outputs.skip != 'true'
+        run: node scripts/release/web-deploy.mjs env .vercel/.env.production.local
+      - name: Build (runs migrations last, as the Vercel build did)
+        if: steps.skip.outputs.skip != 'true'
+        run: npx --yes "$VERCEL_CLI" build --prod --token "$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
+          VERCEL_GIT_COMMIT_REF: main
+          VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
+      - name: Upload the prebuilt output to production
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          message="$(git log -1 --format=%s "$GITHUB_SHA")"
+          url="$(npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --archive=tgz --token "$VERCEL_TOKEN" \
+            --meta githubDeployment=1 --meta githubOrg=alexj11324 --meta githubRepo=Mikka \
+            --meta githubCommitRef=main --meta githubCommitSha="$GITHUB_SHA" \
+            --meta githubCommitMessage="$message")"
+          echo "Deployed $url"
+          echo "### Production deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "$url (commit $GITHUB_SHA)" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
