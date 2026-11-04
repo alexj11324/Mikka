@@ -342,10 +342,29 @@ export async function configureFactoryCheck(
 }
 
 /** Frozen assignment for a bound check. Called before claiming; fails closed after a stop/repair. */
-export async function factoryCheckAssignment(
+export function factoryCheckAssignment(
   tx: Pick<PoolClient, "query">,
   userId: string,
   runId: string,
+) {
+  return readFactoryCheckAssignment(tx, userId, runId, "running");
+}
+
+/** An Owner answer may resume a waiting artifact check, but cannot grant it a
+ * repository command. This entry never admits a normal claim or repository check. */
+export function factoryReportQuestionAssignment(
+  tx: Pick<PoolClient, "query">,
+  userId: string,
+  runId: string,
+) {
+  return readFactoryCheckAssignment(tx, userId, runId, "waiting");
+}
+
+async function readFactoryCheckAssignment(
+  tx: Pick<PoolClient, "query">,
+  userId: string,
+  runId: string,
+  status: "running" | "waiting",
 ) {
   const {
     rows: [row],
@@ -364,12 +383,12 @@ export async function factoryCheckAssignment(
   if (
     !row ||
     !["review", "verify"].includes(row.stage) ||
-    row.status !== "running" ||
+    row.status !== status ||
     row.kind !== "acceptance" ||
     row.retryOf ||
     row.stopRequestedAt ||
     !(await factoryRunBotMatches(tx, { userId, botId: row.taskBotId }, { id: runId, botId: row.botId })) ||
-    row.attemptStatus !== "running" ||
+    row.attemptStatus !== status ||
     row.attemptCandidateId !== row.candidateId ||
     check?.stage !== row.stage ||
     (check?.requestEpoch != null && check.requestEpoch !== row.sourceEventId) ||
@@ -384,7 +403,9 @@ export async function factoryCheckAssignment(
     (check?.candidateEnvironment ?? check?.environment) !== row.environment ||
     !policy.success ||
     policy.data.readOnly !== true ||
-    (!check?.command && check?.inferCommand !== true && check?.reportOnly !== true)
+    (!check?.command && check?.inferCommand !== true && check?.reportOnly !== true) ||
+    (status === "waiting" && (!["deliverable", "report"].includes(row.candidateKind) ||
+      check?.reportOnly !== true || check?.inferCommand !== false || check?.command !== null))
   )
     throw new FactoryError("factoryCheckBindingMismatch");
   return {
