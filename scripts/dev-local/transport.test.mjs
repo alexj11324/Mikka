@@ -50,7 +50,7 @@ test('live acceptance blocks V4 Pro before any provider or model-selection reque
       ['https://api.deepseek.com/anthropic/v1/messages', 'POST', { model: 'deepseek-v4-pro' }],
       ['https://ai-gateway.vercel.sh/v1/responses', 'POST', { model: 'deepseek/deepseek-v4-pro' }],
       ['http://127.0.0.1:3000/mikka/api/mobile/model', 'PUT', { bot: null, id: 'apikey:fixture:deepseek-v4-pro' }],
-    ]) await assert.rejects(() => fetch(url, { method, body: JSON.stringify(body), headers: { 'content-type': 'application/json' } }), /Flash-only test policy/)
+    ]) await assert.rejects(() => fetch(url, { method, body: JSON.stringify(body), headers: { 'content-type': 'application/json' } }), /Test model policy/)
     assert.deepEqual(seen, [], 'A rejected Pro request must never reach upstream fetch')
     await fetch('https://api.deepseek.com/v1/chat/completions', { method: 'POST', body: JSON.stringify({ model: 'deepseek-flash' }) })
     assert.equal(seen.length, 1)
