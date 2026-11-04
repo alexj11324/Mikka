@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue-1166-production-readback",
+  "scope": "SELECT-only observations; no new production test was dispatched during these observations",
+  "applicationOrigin": "https://app.aspectlylabs.com/mikka",
+  "accountEmail": "alexjiang20232024@gmail.com",
+  "cc7d2c91": {
+    "observedAt": "2026-11-04T06:52:55.122Z",
+    "taskId": "08e3df90-1878-4d31-bb02-b32cb7c7d258",
+    "stage": "approval",
+    "status": "passed",
+    "revision": 12,
+    "candidateId": "74d6465d-fa44-432e-8187-d8544f30858f",
+    "producerRunId": "4c19d00c-c214-4bf3-8658-caa8af4a3c1d",
+    "acceptanceId": "eb64639a-3984-4a54-b77b-fcbb1ded11e3",
+    "acceptedAt": "2026-11-04T05:43:36.730Z",
+    "ownerEventId": "ea8121a0-82d2-4719-8988-5f5d32bf8355",
+    "authenticatedSessionPresent": true,
+    "acceptanceCount": 1,
+    "liveTestRepeated": false,
+    "businessOutcome": "needs_input",
+    "sourceOfFullEvidence": "../cases/cc-7d2c91-owner-accepted.json"
+  },
+  "apiA9e472": {
+    "status": "not_started",
+    "promptSent": false,
+    "testModelPolicyAssertExecuted": false,
+    "observedAt": "2026-11-04T06:52:52.120Z",
+    "expectedModel": "deepseek-flash",
+    "expectedHarness": "claude_code",
+    "keyMetadata": {
+      "id": "782ed1f2-c34a-4be1-971b-fadf6f15238c",
+      "ownerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "protocol": "anthropic",
+      "provider": "deepseek",
+      "createdAt": "2026-11-02T10:39:46.291947+00:00",
+      "updatedAt": "2026-11-02T17:41:36.876569+00:00",
+      "responsesApi": true,
+      "expectedModelListed": true,
+      "servesExpectedHarness": true
+    },
+    "exactCaseCounts": {
+      "exactTitleRuns": 0,
+      "exactTitleTasks": 0,
+      "exactTitleIssues": 0,
+      "exactTitleApiClaims": 0,
+      "exactTitleActiveRuns": 0,
+      "exactTitleSubscriptionClaims": 0,
+      "exactTitleExecutingOrUncertainOperations": 0
+    },
+    "parallelActivityCounts": {
+      "otherActiveRunsOnBot": 0,
+      "otherTerminalRunsOnBot": 27,
+      "activeThreadMachineLeases": 0
+    },
+    "currentOrderSettings": {
+      "location": "cloud",
+      "updatedAt": "2026-11-03T23:52:52.766951+00:00",
+      "customized": true,
+      "preferredHarness": "claude_code"
+    },
+    "storedPriorityEntries": [
+      {
+        "id": "c2e064c7-0f7d-4455-9f66-5a16f1943d06",
+        "model": "gpt-5.6-luna",
+        "harness": "codex",
+        "position": 0,
+        "sourceId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5",
+        "createdAt": "2026-11-03T23:52:52.766951+00:00",
+        "sourceKind": "subscription"
+      },
+      {
+        "id": "335682ec-0e5a-4a37-93d8-27f68a6c70c4",
+        "model": "claude-opus-5-5",
+        "harness": "claude_code",
+        "position": 1,
+        "sourceId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce",
+        "createdAt": "2026-11-03T23:52:52.766951+00:00",
+        "sourceKind": "subscription"
+      },
+      {
+        "id": "2e9f1653-bf1f-48a8-885e-7ba5c78ce82f",
+        "model": "deepseek-v4-pro",
+        "harness": "claude_code",
+        "position": 2,
+        "sourceId": "782ed1f2-c34a-4be1-971b-fadf6f15238c",
+        "createdAt": "2026-11-03T23:52:52.766951+00:00",
+        "sourceKind": "api_key"
+      },
+      {
+        "id": "9eaab335-3116-406b-9668-23c70be92778",
+        "model": "gpt-6.1-sol",
+        "harness": "codex",
+        "position": 3,
+        "sourceId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5",
+        "createdAt": "2026-11-03T23:52:52.766951+00:00",
+        "sourceKind": "subscription"
+      }
+    ],
+    "storedOrderTargetsExpectedApiForAutomaticChecks": false,
+    "orderedRowsSha256": "868bb49fb8550f02cddee11d8252b29469f9ebfce5bb132b8629d7f87df7d04b",
+    "settingsSha256": "b710bab2cd0e114acf6d768350521d91e204026938ad2c16679e9eff79e99b95",
+    "settingsChangedByThisObservation": false,
+    "modelAliasVersionIndependentlyVerified": false
+  },
+  "originalCodex390": {
+    "observed_at": "2026-11-04T06:52:53.799Z",
+    "task_id": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+    "stage": "review",
+    "status": "failed",
+    "revision": 24,
+    "request_epoch": "531dbd62-042c-4177-9e8a-16d25a46a452",
+    "candidate_id": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+    "current_attempt_id": "53415a39-a7bc-4ad9-8378-4bd8f6d050aa",
+    "producer_run_id": "390deeb4-5e5b-487a-acb9-c2e53dc3f8e9",
+    "producer_session_id": "01a1a2a5-76f1-7881-b182-311eba17fa98",
+    "execute_count_using_existing_budget_rule": "4",
+    "active_factory_runs": "0",
+    "owner_acceptances": "0",
+    "reason_code": "repair_budget_exhausted",
+    "interpretation": "Still failed and unaccepted. No replacement producer; the next Owner retry and independent checks remain pending.",
+    "budgetCountInterpretation": "The count follows the existing legacy repair-budget rule, not a substitute for the explicit recovery receipt used by inherited-observation provenance."
+  },
+  "executionEnvironment": {
+    "observedAt": "2026-11-04 06:31:27 UTC",
+    "operation": "exec_command pwd in existing execution environment",
+    "result": "No usable execution environment is available. Wait for an environment to become available before using this tool.",
+    "localTestsRun": false,
+    "browserActionsPerformed": false
+  },
+  "oldStrictPhysicalAfter": {
+    "workflowRunId": 41748854643,
+    "artifactId": 13285320595,
+    "status": "FAILED",
+    "reason": "historical_database_row_changed / compare_after; hourly judge outcomeAt changed",
+    "collectorOrBaselineChanged": false,
+    "rerunAsReplacement": false
+  },
+  "otherUnfinishedWork": {
+    "issue1116": "offline WIP remains unresolved; not claimed complete"
+  },
+  "boundaries": {
+    "productionSqlWrites": 0,
+    "browserAcceptanceActionsDuringThisReadback": 0,
+    "providerOrVmActionsDuringThisReadback": 0,
+    "overallIssue1166Accepted": false
+  },
+  "previousReadbackTimes": {
+    "api": "2026-11-04T06:35:12.164Z",
+    "cc": "2026-11-04T06:35:13.680Z",
+    "original": "2026-11-04T06:39:32.180Z"
+  },
+  "productionSourceObservedBeforeReadback": {
+    "observedAt": "2026-11-04 06:47:32 UTC",
+    "id": "dpl_3w4SnCqaoFhayN8QCU6UGc4vuARw",
+    "url": "mikka-6iemhhedq-mikka-dev.vercel.app",
+    "readyState": "READY",
+    "source": "aa50444a0b5012d2d35ca730c3ca722c0057d596",
+    "ready": 1793774513569,
+    "alias": "app.aspectlylabs.com",
+    "aliasDeploymentId": "dpl_3w4SnCqaoFhayN8QCU6UGc4vuARw"
+  }
+}

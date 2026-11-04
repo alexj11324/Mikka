@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "kind": "factory_continuation_budget_release",
+  "observedAt": "2026-11-04T06:34:39Z",
+  "repository": "alexj11324/Mikka",
+  "pr": 1205,
+  "mergedAt": "2026-11-04T06:29:37Z",
+  "sourceCommit": "185a91bd0dafb5717ef69fb6589ec0251b3115f6",
+  "sourceTree": "7273b4f2ae714ff24c736d5c32e35a3c5e2e71a1",
+  "testedHead": "a72c32fa3622d2b71202ada09bccc7835d47826c",
+  "testedBase": "aee3b8d23fc1431b4c0f6c98d9852d1402bc723e",
+  "testedSynthetic": "7df3d839b3a9849d42a27e4613a32b28aaab1835",
+  "testedTreeEqualsMergeTree": true,
+  "premergeCi": {
+    "runId": 41785141538,
+    "checks": 17,
+    "success": 16,
+    "expectedOidcSkip": 1,
+    "dbSuites": 66,
+    "targetPassed": 178,
+    "targetFailed": 0,
+    "targetSkipped": 0,
+    "ssrRunId": 41785141486,
+    "ssrCompiled": true,
+    "staticPages": 67,
+    "retainedProbeNft": true
+  },
+  "mainCi": {
+    "runId": 41785877824,
+    "status": "completed",
+    "conclusion": "success",
+    "jobs": 12,
+    "allJobsSuccess": true,
+    "dbShardsSuccess": 4,
+    "targetDbJobId": 126427849295,
+    "targetPassed": 178,
+    "targetFailed": 0,
+    "targetSkipped": 0
+  },
+  "production": {
+    "deploymentId": "dpl_5gAEU6sLyW8BRKS4Uq4VEGapotnz",
+    "sourceCommit": "185a91bd0dafb5717ef69fb6589ec0251b3115f6",
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "readyState": "READY",
+    "readyAt": "2026-11-04T06:33:28.132Z",
+    "alias": "app.aspectlylabs.com",
+    "aliasDeploymentId": "dpl_5gAEU6sLyW8BRKS4Uq4VEGapotnz",
+    "aliasUpdatedAt": "2026-11-04T06:33:28.314Z"
+  },
+  "privateRuntime": {
+    "changedByThisPatch": false,
+    "officialRuntimeWorkflowForThisSha": false,
+    "officialTemplateAndCliModified": false
+  },
+  "boundaries": {
+    "observationOnly": true,
+    "manualDeployments": 0,
+    "productionVmActions": 0,
+    "productionSqlWrites": 0,
+    "originalTaskRetries": 0,
+    "modelCalls": 0,
+    "productionOwnerAcceptanceClaimed": false,
+    "localValidationPerformed": false,
+    "scope": "Only PR #1205 implementation/release observation; root's authorized expected-head squash merge is recorded above. Earlier #1166 production retries and model calls remain in the prior case evidence."
+  },
+  "failureHistory": {
+    "redHead": "b82294b2567066b7a1fb1b47a9b333c4a55a7a25",
+    "redCiRunId": 41782386697,
+    "redDb3JobId": 126416779370,
+    "pendingBudgetBypassReproduced": true,
+    "failedAncestryGuardAlreadyRejected": true,
+    "historyPreserved": true
+  },
+  "rootIndependentReadyReadback": {
+    "id": "dpl_5gAEU6sLyW8BRKS4Uq4VEGapotnz",
+    "url": "mikka-gd5hpbep8-mikka-dev.vercel.app",
+    "readyState": "READY",
+    "source": "185a91bd0dafb5717ef69fb6589ec0251b3115f6",
+    "ready": 1793774008132
+  },
+  "rootIndependentAliasReadback": {
+    "alias": "app.aspectlylabs.com",
+    "deploymentId": "dpl_5gAEU6sLyW8BRKS4Uq4VEGapotnz",
+    "deploymentUrl": "mikka-gd5hpbep8-mikka-dev.vercel.app"
+  }
+}

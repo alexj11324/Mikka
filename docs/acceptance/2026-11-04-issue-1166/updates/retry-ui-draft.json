@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "kind": "same-candidate-owner-retry-ui-draft",
+  "repository": "alexj11324/Mikka",
+  "pr": 1207,
+  "head": "6273413b921f0747a40e9fc8f98033b325ff32f0",
+  "tree": "60e918ae50c36ab11c112b841032946bb5d5e73f",
+  "mergeParents": [
+    "122c7eb9f7fda068ee21ad2c8899526a91459c7e",
+    "aa50444a0b5012d2d35ca730c3ca722c0057d596"
+  ],
+  "testedBase": "aa50444a0b5012d2d35ca730c3ca722c0057d596",
+  "testedSynthetic": "fc3f3ededdb9e993f1e93979e2d135a789a09c90",
+  "syntheticTreeEqualsHead": true,
+  "workflowRuns": {
+    "ci": 41787567146,
+    "analyticsSSR": 41787566998,
+    "browserCompatibilityGate": 41787567071
+  },
+  "jobs": {
+    "source": 126433204662,
+    "core": 126433204691,
+    "analyticsFull": 126433179603,
+    "uiPolicy": 126434781218
+  },
+  "checks": {
+    "total": 17,
+    "success": 16,
+    "skip": 1,
+    "failure": 0
+  },
+  "skip": {
+    "jobId": 126433206121,
+    "name": "Cloud credential access (OIDC)",
+    "reason": "condition requires push; actual event is pull_request"
+  },
+  "actualAcceptanceUiTests": {
+    "tests": 72,
+    "pass": 72,
+    "fail": 0,
+    "skip": 0,
+    "entry": "test:factory-routing -> test:factory-acceptance-ui",
+    "actualCheckout": "fc3f3ededdb9e993f1e93979e2d135a789a09c90",
+    "runtime": "node:test/happy-dom unit regression with mocked SWR/fetch",
+    "realBrowserOrProductionAcceptance": false
+  },
+  "frozenBlobs": {
+    "components/workspace/factory-acceptance-pane.tsx": "9f3e22e3e7d45b63cb93d74781441dfd6a5b2e5c",
+    "components/workspace/factory-acceptance.test.tsx": "a9d2f81a1f88a7b6d658d8fbdec394df50cef062",
+    "components/workspace/factory-acceptance.tsx": "83d6b3e19513e5df08b77bf6fd817eed0e745cef",
+    "lib/factory/acceptance-view.test.ts": "8f48b34ccf9643623aec027a9caf7ae4003a763c",
+    "lib/factory/acceptance-view.ts": "1844f6fed0d62bfe8699db56e4441fe60c76ad65",
+    "messages/en.json": "6ec115f3252c0993f0ada0e85814dfe2980dcd08",
+    "messages/zh-CN.json": "545a6a02f24839713dced17c3c70d798ab2d50e7",
+    "scripts/factory-acceptance-ui.test.tsx": "86e4b084721216afe4d86a9d0fd2cfb1cec28988"
+  },
+  "scope": {
+    "uiFiles": 8,
+    "allEightFrozenBlobsUnchanged": true,
+    "integratedMainFiles": 6,
+    "bothCompareScopesExact": true
+  },
+  "rootReview": {
+    "candidateAndAttemptBinding": "list, detail, ledger and latest failed check must agree",
+    "threeViewRefresh": "success, conflict and unknown refresh issue list, detail and ledger",
+    "malformed200UnknownReceipt": "canonical same-candidate fresh-pending FactorySnapshot required; malformed HTTP200 stays unknown",
+    "stableReplay": "same eventId and complete body retained in scoped view state; no automatic re-POST on refresh or later revision",
+    "statusAndControls": "failed/pending/running check states visible; old completion recovery and approval/publication contracts preserved",
+    "newCodeBlockerReported": false
+  },
+  "localProductionBuildScreenshots": {
+    "status": "BLOCKED",
+    "reason": "No usable execution environment",
+    "requiredBeforeMerge": true,
+    "policy": "AGENTS.md line10 and referenced design decisions 1520/2225",
+    "ciDoesNotReplaceScreenshots": true
+  },
+  "draft": true,
+  "merged": false,
+  "deployed": false,
+  "localTestsExecuted": false,
+  "productionModelOrVmCallsForThisUiPatch": 0,
+  "originalTaskOwnerRetryPerformed": false,
+  "earlierValidatedVersion": {
+    "head": "122c7eb9f7fda068ee21ad2c8899526a91459c7e",
+    "base": "aee3b8d23fc1431b4c0f6c98d9852d1402bc723e",
+    "ci": 41785733947,
+    "sameUiBlobs": true
+  },
+  "boundary": "These are code and isolated CI results; original 390 and API a9e472 are not accepted by this document."
+}

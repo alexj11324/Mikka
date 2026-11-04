@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue-1166-recovery-followup-manifest",
+  "baseArchiveCommit": "cac122deb9707fd756fbbbf8097b2d07984246be",
+  "baseArchiveTree": "8f88814d207d436b1ffef98eb8ad71f543227955",
+  "preservation": "Append-only: the 20 pre-existing evidence files remain byte-for-byte at the listed Git blob SHA; no old report or screenshot is replaced.",
+  "preservedFiles": [
+    {
+      "path": "docs/acceptance/2026-11-03-official-subscriptions/README.md",
+      "blobSha": "36ba4f2d880782e3bddd7ae7b190719897ad5c79"
+    },
+    {
+      "path": "docs/acceptance/2026-11-03-official-subscriptions/cases/claude-continuation-82.json",
+      "blobSha": "1f57fb58098db70f0b22fff11e59286985467197"
+    },
+    {
+      "path": "docs/acceptance/2026-11-03-official-subscriptions/cases/claude-initial.json",
+      "blobSha": "e8f8e7a0ae14b5bed72397f0251655cb3f81208c"
+    },
+    {
+      "path": "docs/acceptance/2026-11-03-official-subscriptions/cases/codex-initial.json",
+      "blobSha": "0f3a78f8cd53d4887009ea9e004660916c3fb2d8"
+    },
+    {
+      "path": "docs/acceptance/2026-11-03-official-subscriptions/cases/historical-incomplete-rounds.json",
+      "blobSha": "f04ee259e96a201b00d3727424942cb2c4e00e3e"
+    },
+    {
+      "path": "docs/acceptance/2026-11-03-official-subscriptions/manifest.json",
+      "blobSha": "425883e13d22ab82a8f819e577660d8bda14abfa"
+    },
+    {
+      "path": "docs/acceptance/2026-11-03-official-subscriptions/screenshots/claude-continuation-accepted.png",
+      "blobSha": "474b96c325953a34ef8235f7188b5da9111bbbd0"
+    },
+    {
+      "path": "docs/acceptance/2026-11-03-official-subscriptions/screenshots/claude-continuation-pending.png",
+      "blobSha": "f8c23eb8d283827323a6032f477f2733120b0b80"
+    },
+    {
+      "path": "docs/acceptance/2026-11-03-official-subscriptions/screenshots/claude-initial-accepted.png",
+      "blobSha": "8aa1d78e22a316183e74c94c6dd0207e96463bb8"
+    },
+    {
+      "path": "docs/acceptance/2026-11-03-official-subscriptions/screenshots/codex-initial-accepted.png",
+      "blobSha": "c0a1441b7b0ece6321c61a562861352d228ca48f"
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/README.md",
+      "blobSha": "8e1cd31f297e0b762d42727a1a9de9796f428d2e"
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/api-a9e472-prompt-v3.txt",
+      "blobSha": "ed7a973fe321b6c6b0772953b9297eed69542e73"
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/cases/api-a9e472-not-started.json",
+      "blobSha": "ec5bafd52feb15d98cfbcdab712d052d79770aee"
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/cases/cc-7d2c91-owner-accepted.json",
+      "blobSha": "24803b8b6f696603498f9f27f9a903178a30e119"
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/cases/codex-390-recovery-incomplete.json",
+      "blobSha": "811a791dd9455b5515f3daca4a8bb4aaa207d92d"
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/cases/codex-direct-predecessor-observations.json",
+      "blobSha": "be706a028b8ec54647fd375eeb64fb757251ed11"
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/cases/repair-budget-boundary.json",
+      "blobSha": "6d66f6d34437a9de45255b650ece7f97b680f142"
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/manifest.json",
+      "blobSha": "04f3486a4052e90956d040a95514512615c6172f"
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/next-steps.md",
+      "blobSha": "7af31ce35cf2220d1b6559cca55868fcee38924f"
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/production-releases.json",
+      "blobSha": "003ca2a564598b7dcde3362df9802a4df22c287e"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/updates/factory-continuation-budget-release.json",
+      "gitBlobSha": "8908a88445fd7f41b4c1af83174ab115099dde4e",
+      "utf8Bytes": 2903
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/updates/inherited-observations-production-shape.json",
+      "gitBlobSha": "5808f9447aeffd5df0430eddfcaedf28eb0e7657",
+      "utf8Bytes": 1578
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/updates/resume-plan.md",
+      "gitBlobSha": "c40007fd3502d4c13e672299c6efe10fb0a57d63",
+      "utf8Bytes": 11036
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/updates/latest-production-readback.json",
+      "gitBlobSha": "0911de4d5faf76ab56633bfd9cb291a37111d0f2",
+      "utf8Bytes": 6336
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/updates/inherited-observations-release.json",
+      "gitBlobSha": "024d0a4051f9f67dd843822798d78a1baf739507",
+      "utf8Bytes": 3509
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/updates/retry-ui-draft.json",
+      "gitBlobSha": "315af2b382f40579818d00318776bfca7425c3d6",
+      "utf8Bytes": 3652
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/updates/README.md",
+      "gitBlobSha": "37be7922a5e3ed31d7d9537b341439e829193349",
+      "utf8Bytes": 7630
+    }
+  ],
+  "manifestExcludedFromOwnList": true,
+  "overallAcceptanceStatus": "incomplete",
+  "limitations": [
+    "New local production-build screenshots and original390/APIa9e472 live acceptance remain blocked by unavailable execution environment",
+    "The UI tests are isolated component regressions, not real browser or production acceptance",
+    "The old strict physical AFTER remains FAILED"
+  ]
+}

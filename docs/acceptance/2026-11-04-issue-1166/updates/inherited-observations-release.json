@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "kind": "inherited-question-observations-release",
+  "repository": "alexj11324/Mikka",
+  "pr": 1206,
+  "observedAt": "2026-11-04T06:47:47Z",
+  "mergedAt": "2026-11-04T06:37:53Z",
+  "source": "aa50444a0b5012d2d35ca730c3ca722c0057d596",
+  "tree": "f41533ed01a9433cfbec09275824994625e41050",
+  "mergeTreeMatchesTestedTree": true,
+  "testedHead": "af76522dcbf3fc61daff8d26ab9e65f85b94f277",
+  "testedBase": "185a91bd0dafb5717ef69fb6589ec0251b3115f6",
+  "testedSynthetic": "8cd57ed2289ddb27a5d88659ba42aa580be233c6",
+  "premergeCi": {
+    "runId": 41785992016,
+    "checks": 22,
+    "success": 18,
+    "conditionalPrSkips": [
+      "official runtime check",
+      "official runtime validate",
+      "official runtime publish",
+      "Cloud credential access (OIDC)"
+    ],
+    "pending": 0,
+    "failure": 0,
+    "targetDbJobId": 126428199881,
+    "newSubtestsPassed": 37,
+    "targetPassed": 110,
+    "targetFailed": 0,
+    "targetSkipped": 0
+  },
+  "mainCi": {
+    "runId": 41786808055,
+    "conclusion": "success"
+  },
+  "application": {
+    "deploymentId": "dpl_3w4SnCqaoFhayN8QCU6UGc4vuARw",
+    "url": "mikka-6iemhhedq-mikka-dev.vercel.app",
+    "sourceMatches": true,
+    "state": "READY",
+    "readyAt": "2026-11-04T06:41:53.569Z",
+    "alias": "app.aspectlylabs.com",
+    "aliasDeploymentId": "dpl_3w4SnCqaoFhayN8QCU6UGc4vuARw",
+    "aliasMatches": true
+  },
+  "privateRuntime": {
+    "runId": 41786808108,
+    "checkJobId": 126430789705,
+    "checkObservedAt": "2026-11-04T06:38:23.653955Z",
+    "wantedDigest": "0920b72f9f15513c6f1735d8a1ea5c73d215218c",
+    "liveDigest": "0920b72f9f15513c6f1735d8a1ea5c73d215218c",
+    "digestMatches": true,
+    "check": "success",
+    "validate": "skipped",
+    "publish": "skipped"
+  },
+  "daemon": {
+    "runId": 41786808218,
+    "jobId": 126430712973,
+    "conclusion": "success",
+    "version": "0.0.427",
+    "registryVerifiedSameCommitAt": "2026-11-04T06:44:19.954394Z"
+  },
+  "desktop": {
+    "runId": 41786808376,
+    "jobId": 126430748972,
+    "status": "in_progress",
+    "currentStep": "Package signed macOS app",
+    "completed": false
+  },
+  "boundaries": {
+    "scope": "This PR's release observer actions; root's authorized expected-head merge is recorded separately above.",
+    "ownerRetryPerformedByReleaseObserver": false,
+    "taskOrVmAccessByReleaseObserver": false,
+    "productionBusinessWrites": false,
+    "manualDeployTriggerCancel": false,
+    "includesProductionReviewOrAcceptanceEvidence": false,
+    "localValidationPerformed": false,
+    "officialTemplateOrCliFilesModified": false
+  },
+  "failureHistory": {
+    "fixtureOnlyFailureHead": "11227f6d64bac1d6628e253709e1b3ad6d715b2d",
+    "fixtureErrors": [
+      "unused import",
+      "byos_connections_check3 synthetic connected-row constraint"
+    ],
+    "fixtureErrorsCountAsBusinessRed": false,
+    "businessRedHead": "d069a72bc76d6ef30518768fc1a05affca0a21ff",
+    "businessRedCi": 41784021222,
+    "businessRedDbJob": 126421932314,
+    "businessRed": "fixture created, assertion at line203 missing inheritedRecords",
+    "historyPreserved": true
+  },
+  "rootIndependentProductionObservation": {
+    "observedAt": "2026-11-04 06:47:32 UTC",
+    "id": "dpl_3w4SnCqaoFhayN8QCU6UGc4vuARw",
+    "url": "mikka-6iemhhedq-mikka-dev.vercel.app",
+    "readyState": "READY",
+    "source": "aa50444a0b5012d2d35ca730c3ca722c0057d596",
+    "ready": 1793774513569,
+    "alias": "app.aspectlylabs.com",
+    "aliasDeploymentId": "dpl_3w4SnCqaoFhayN8QCU6UGc4vuARw"
+  }
+}

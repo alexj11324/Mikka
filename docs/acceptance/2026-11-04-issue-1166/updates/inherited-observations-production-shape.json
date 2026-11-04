@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "kind": "inherited-question-observations-production-shape",
+  "repository": "alexj11324/Mikka",
+  "source": {
+    "head": "ae5cedac8ae9bc48ce1056580a05de18c45894d7",
+    "tree": "746809aa52b907871ff52c0f751adaf8686b381f",
+    "helperBlob": "c647bcde9d421ac04a0bbed98da3cdc3127def03"
+  },
+  "scope": {
+    "ownerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+    "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+    "sourceEventId": "531dbd62-042c-4177-9e8a-16d25a46a452",
+    "producerRunId": "390deeb4-5e5b-487a-acb9-c2e53dc3f8e9",
+    "directSourceRunId": "e57a6d03-510e-496f-bd88-97375318cd9e",
+    "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1"
+  },
+  "result": {
+    "observedAt": "2026-11-04T06:23:40.931Z",
+    "exactHelperSqlRows": 1,
+    "receiptIdentity": true,
+    "continuationLinks": true,
+    "directRecoveryLinks": true,
+    "originalExecuteEpochBinding": true,
+    "requestSourceBinding": true,
+    "frozenActualClaimIdentity": true,
+    "canonicalAnswerIdentityUnchanged": true,
+    "timingOrder": true,
+    "eligibleDirectPairs": 1,
+    "anyPairTruncated": false,
+    "recordedSnapshotMatchesParameters": true
+  },
+  "boundaries": [
+    "SELECT-only shape verification; the new TypeScript helper was not executed in production",
+    "Canonical answer fingerprint compared to the previously audited value; the TypeScript canonical hash was not recomputed by SQL",
+    "No provider, VM, model, task mutation or acceptance/review action; this is not a passed production review"
+  ],
+  "mutations": 0,
+  "localRuntimeTestsRun": false
+}
