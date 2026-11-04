@@ -509,6 +509,7 @@ export class ClaudeAdapter implements AgentAdapter {
     const ctx = new RunContext({
       harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
+      mcp: options.mcp,
       apps: options.apps,
       githubRuntime: options.githubRuntime,
       childPath: options.env.PATH,

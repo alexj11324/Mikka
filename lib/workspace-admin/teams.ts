@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, eq, inArray, ne } from 'drizzle-orm'
+import { sql, and, eq, inArray, ne } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { issues, teamIssueCreateRequests, teamIssuePromotions } from '@/lib/db/schema'
@@ -62,6 +62,7 @@ export async function deleteTeamData(actorId: string, teamId: string, confirmNam
     await lockTeamRelations(tx)
     const { issueIds, projectIds } = await teamContents(tx, team.id)
     const tasks = await db.transaction(async main => {
+      if (projectIds.length) await main.execute(sql`delete from project_decisions where "projectId" in ${projectIds}`)
       await main.delete(teamIssueCreateRequests).where(eq(teamIssueCreateRequests.teamId, team.id))
       await main.delete(teamIssuePromotions).where(eq(teamIssuePromotions.teamId, team.id))
       if (!issueIds.length) return 0

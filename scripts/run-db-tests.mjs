@@ -11,6 +11,7 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/project-map/decisions.ts', file: 'lib/project-map/decisions.db.test.ts', script: 'test:project-decisions-db' },
   { marker: 'lib/chat-attachments/store.ts', file: 'lib/chat-attachments/store.db.test.ts', script: 'test:chat-attachments-db' },
   { marker: 'lib/plugins/store.ts', file: 'lib/plugins/store.db.test.ts', script: 'test:plugins-db' },
   { marker: 'lib/schedules/store.ts', file: 'lib/schedules/store.db.test.ts', script: 'test:schedules-db' },
@@ -27,6 +28,7 @@ export const REQUIRED_SUITES = [
   { marker:'lib/execution-settings.ts',file:'lib/execution-settings.db.test.ts',script:'test:execution-settings-db' },
   { marker: 'lib/rule-dispatch.ts', file: 'tests/run-machine-fallback.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/thread-dispatch.ts', file: 'tests/one-thread-per-task.db.test.ts', script: 'test:bot-threads-db' },
+  { marker: 'lib/factory/questions/queue-local-continuation.ts', file: 'tests/factory-local-question.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/coordinator/coordinator-bot.ts', file: 'tests/coordinator-bot.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/run-credential-source.ts', file: 'tests/api-key-runs.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/model-order.ts', file: 'tests/model-order.db.test.ts', script: 'test:bot-threads-db' },

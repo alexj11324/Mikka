@@ -43,12 +43,13 @@ test('single-result invalidation cannot alias another session, action or proposa
 test('server read time keeps an expiry fixed across renders and a slow client clock', () => {
   const observedAt = '2026-11-04T20:00:00.000Z', expiresAt = '2026-11-04T20:00:10.000Z'
   const read = { observedAt, requestedAt: 1_000 }, serverNow = Date.parse(observedAt)
-  assert.deepEqual(approvalDeadline(expiresAt, read, 1_000, 0), { at: expiresAt, afterMs: 10_000 })
-  assert.deepEqual(approvalDeadline(expiresAt, read, 7_000, 0), { at: expiresAt, afterMs: 4_000 })
-  assert.deepEqual(approvalDeadline(expiresAt, { observedAt, requestedAt: 0 }, 6_000, 0), { at: expiresAt, afterMs: 4_000 }, 'time spent fetching is included, never added to the approval lifetime')
+  assert.deepEqual(approvalDeadline(expiresAt, read, 1_000, 0), { at: expiresAt, afterMs: 10_000, observation: 1_000 })
+  assert.deepEqual(approvalDeadline(expiresAt, read, 7_000, 0), { at: expiresAt, afterMs: 4_000, observation: 1_000 })
+  assert.deepEqual(approvalDeadline(expiresAt, { observedAt, requestedAt: 0 }, 6_000, 0), { at: expiresAt, afterMs: 4_000, observation: 0 }, 'time spent fetching is included, never added to the approval lifetime')
   assert.equal(approvalNow(read, 11_000, 0), serverNow + 10_000)
   assert.equal(approvalExpired(expiresAt, read, 11_000, 0), true)
-  assert.equal(approvalDeadline(expiresAt, read, 11_000, 0), null, 'an expired read cannot start another timer')
+  assert.deepEqual(approvalDeadline(expiresAt, read, 11_000, 0), { at: expiresAt, afterMs: 0, observation: 1_000 }, 'a server-future response delayed past its conservative time may still require one check')
+  assert.equal(approvalDeadline(expiresAt, { observedAt: expiresAt, requestedAt: 11_000 }, 11_000, 0), null, 'an actually expired server response cannot start another timer')
   assert.equal(approvalExpired(expiresAt, read, 1_000, serverNow + 20_000), true, 'a fast local clock cannot extend the original UI deadline')
   assert.equal(approvalDeadline('invalid', read, 1_000, 0), null)
 })

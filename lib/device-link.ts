@@ -1,3 +1,4 @@
+import { runMessagePrompt } from './run-message-prompt'
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -230,13 +231,13 @@ export async function deviceWork(deviceId: string, skip: readonly string[], opti
   const queuedRuns = options.queued ? live.filter(run => run.status === 'queued').map(run => run.id).slice(0, 100) : []
   if (live.length === 0) return { commands: [], queuedRuns }
   const messages = await db
-    .select({ id: runMessages.id, runId: runMessages.runId, text: runMessages.text })
+    .select({ id: runMessages.id, runId: runMessages.runId, text: runMessages.text, origin: runMessages.origin })
     .from(runMessages)
     .where(and(isNull(runMessages.deliveredAt), inArray(runMessages.runId, live.map(run => run.id))))
     .orderBy(asc(runMessages.createdAt))
     .limit(500)
   // The runId filter above excludes mailbox messages, whose runId is null.
-  const inputs: RunCommand[] = messages.flatMap(({ id, runId, text }) => runId ? [{ kind: 'input' as const, runId, messageId: id, text }] : [])
+  const inputs: RunCommand[] = messages.flatMap(({ id, runId, text, origin }) => runId ? [{ kind: 'input' as const, runId, messageId: id, text: runMessagePrompt({ id, runId, origin, text }) }] : [])
   const stops: RunCommand[] = live.filter(run => run.stopRequestedAt).map(run => ({ kind: 'stop', runId: run.id }))
   const notices = options.mailboxNotices ? await pendingMailboxNotices(deviceId, live.filter(run => !run.stopRequestedAt).map(run => run.id)) : []
   return { commands: [...stops, ...notices, ...inputs].slice(0, 500), queuedRuns }

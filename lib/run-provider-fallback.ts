@@ -28,7 +28,7 @@ import { ComputerError } from './computer/store'
 type Run = typeof agentRuns.$inferSelect
 type Query = Pick<Pool | PoolClient, 'query'>
 type Scope = { ownerId: string; workspaceId: string; botId: string | null }
-type Continuation = { runId: string; deviceId: string; cloud: boolean; workspaceId: string }
+type Continuation = { runId: string; previousRunId: string; deviceId: string; cloud: boolean; workspaceId: string }
 // JSONB cannot store NUL separators used by the in-memory dispatch key.
 const attemptKey = (entry: OrderEntry) => encodeURIComponent(entryKey(entry))
 const choice = (entry: OrderEntry): ModelFallbackChoice => ({ harness: entry.harness, model: entry.model, source: entry.source.kind })
@@ -95,6 +95,31 @@ export function providerContinuationMatches(prior: Run, next: Run): boolean {
   if (!first.success || !second.success || !isDeepStrictEqual(standingIdentity(first.data), standingIdentity(second.data))) return false
   const { executionIdentity: _identity, ...actual } = after
   return isDeepStrictEqual(actual, providerContinuationDefinition(before, after, next.prompt, after.policyCeiling))
+}
+
+/** Independent Factory checks intentionally discard the failed native session
+ * and continuation prompt. Only their exact current host adoption event can
+ * authorize that transformation; the worker cannot supply this receipt. */
+export async function providerContinuationLaunchMatches(query: Query, prior: Run, next: Run): Promise<boolean> {
+  if (providerContinuationMatches(prior, next)) return true
+  const definition = next.agentDefinition
+  if (next.retryOf !== null || !definition || next.prompt !== prior.prompt || definition.promptDigest !== digest(prior.prompt) ||
+    (next.status === 'queued' && next.sessionId !== null) || (next.sessionId && next.sessionId === prior.sessionId)) return false
+  const prompt = providerContinuationPrompt(prior.prompt)
+  if (!providerContinuationMatches(prior, { ...next, retryOf: prior.id, prompt,
+    agentDefinition: { ...definition, promptDigest: digest(prompt) } })) return false
+  const { factoryEventId } = await import('./factory/event-id')
+  const { rowCount } = await query.query(`SELECT 1 FROM factory_tasks t
+    JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id AND a.stage=t.stage
+    JOIN factory_attempts previous ON previous."taskId"=t.id AND previous."runId"=$1 AND previous.stage=a.stage AND previous.status='failed'
+    JOIN factory_events e ON e."taskId"=t.id AND e."eventId"=$4
+    WHERE t."userId"=$3 AND t."issueId"=$5 AND t.status='running' AND t.stage IN ('review','verify','monitor')
+      AND a."runId"=$2 AND a.output->>'requestEpoch'=t."sourceEventId"::text
+      AND previous.output->>'requestEpoch'=t."sourceEventId"::text
+      AND a."candidateId" IS NOT DISTINCT FROM t."candidateId" AND previous."candidateId" IS NOT DISTINCT FROM t."candidateId"
+      AND e.request->>'priorRunId'=$1::text AND e.result->>'runId'=$2::text`,
+    [prior.id, next.id, prior.userId, factoryEventId('provider-check-continuation', prior.id), prior.issueId])
+  return Boolean(rowCount)
 }
 
 async function readSource(query: Query, userId: string, runId: string) {
@@ -183,7 +208,8 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
     if (prior?.state !== 'pending') {
       const next = prior?.retryRunId ? await readSource(client, source.userId, prior.retryRunId) : null
       await client.query('COMMIT')
-      return next?.deviceId ? { runId: next.id, deviceId: next.deviceId, cloud: next.agentDefinition?.executionIdentity?.billingAccount.runtime.kind === 'e2b', workspaceId: next.agentDefinition?.executionIdentity?.workspaceId ?? '' } : null
+      return next?.deviceId && next.status === 'queued' && !next.stopRequestedAt && await providerContinuationLaunchMatches(client, source, next)
+        ? { runId: next.id, previousRunId: source.id, deviceId: next.deviceId, cloud: next.agentDefinition?.executionIdentity?.billingAccount.runtime.kind === 'e2b', workspaceId: next.agentDefinition?.executionIdentity?.workspaceId ?? '' } : null
     }
     const stopped = async () => {
       // Retirement, cancellation and a replaced Factory request are terminal
@@ -233,7 +259,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
         await client.query(`UPDATE agent_runs SET "retryOf"=$2,attempt=$3,kind=$4,"baseBranch"=$5,prompt=$6,"agentDefinition"=$7,"source"=$8,"updatedAt"=now() WHERE id=$1`,
           [runId, source.id, source.attempt, source.kind, source.baseBranch, prompt, JSON.stringify(definition), source.source])
         receipt = { ...receipt, state: 'switched', to: choice(target.entry), retryRunId: runId, nextDefinitionDigest: definition.definitionDigest }
-        continuation = { runId, deviceId: target.deviceId, cloud: target.cloud, workspaceId: target.workspaceId }
+        continuation = { runId, previousRunId: source.id, deviceId: target.deviceId, cloud: target.cloud, workspaceId: target.workspaceId }
       }
       await client.query(`UPDATE agent_runs SET report=COALESCE(report,'{}'::jsonb)||jsonb_build_object('modelFallback',$3::jsonb),"updatedAt"=now() WHERE id=$1 AND "userId"=$2`, [source.id, source.userId, JSON.stringify(receipt)])
       if (receipt.state === 'switched' && receipt.retryRunId)
@@ -264,7 +290,8 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
   if (source.stopRequestedAt) return initial.state === 'pending' ? settle(pool, source, initial) : null
   if (initial.state === 'switched' && initial.retryRunId) {
     const next = await readSource(pool, userId, initial.retryRunId)
-    return next?.deviceId && !next.stopRequestedAt && next.status === 'queued' ? { runId: next.id, deviceId: next.deviceId, cloud: next.agentDefinition?.executionIdentity?.billingAccount.runtime.kind === 'e2b', workspaceId: next.agentDefinition?.executionIdentity?.workspaceId ?? '' } : null
+    return next?.deviceId && !next.stopRequestedAt && next.status === 'queued' && await providerContinuationLaunchMatches(pool, source, next)
+      ? { runId: next.id, previousRunId: source.id, deviceId: next.deviceId, cloud: next.agentDefinition?.executionIdentity?.billingAccount.runtime.kind === 'e2b', workspaceId: next.agentDefinition?.executionIdentity?.workspaceId ?? '' } : null
   }
   if (initial.state !== 'pending') return null
   const scope = await fallbackScope(pool, source), { entries } = await readOrder(pool, scope)
@@ -339,10 +366,14 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
   return settle(pool, source, await unavailableRecord(pool, scope, source, attempted, skipped))
 }
 
-/** Launch only after Factory has adopted the committed continuation. The
- * existing queue/claim authority and idempotent cloud launcher remain in charge. */
+/** Commit the handoff before acknowledging the completed worker. Parking the
+ * previous VM revokes its device token, so only the durable host workflow may
+ * do the next run's database work and retry a retained-machine wake. */
 export async function launchProviderContinuation(userId: string, continuation: Continuation | null) {
   if (!continuation) return
-  if (continuation.cloud) await (await import('./run-leases')).startThreadMachine({ userId, workspaceId: continuation.workspaceId }, continuation.runId)
+  if (continuation.cloud) {
+    const [{ start }, { factoryCloudStageHandoff }] = await Promise.all([import('workflow/api'), import('@/workflows/factory-stage/workflow')])
+    await start(factoryCloudStageHandoff, [{ userId, workspaceId: continuation.workspaceId }, continuation.previousRunId, continuation.runId, true])
+  }
   else (await import('./device-gateway-notify')).notifyDeviceWork(continuation.deviceId)
 }

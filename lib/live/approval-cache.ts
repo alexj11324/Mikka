@@ -34,7 +34,15 @@ export function approvalNow(read: ApprovalReadTime, monotonicNow = performance.n
 
 export function approvalDeadline(expiresAt: string, read: ApprovalReadTime, monotonicNow = performance.now(), wallNow = Date.now()) {
   const expires = Date.parse(expiresAt), remaining = expires - approvalNow(read, monotonicNow, wallNow)
-  return Number.isFinite(expires) && remaining > 0 ? { at: expiresAt, afterMs: remaining } : null
+  if (!Number.isFinite(expires)) return null
+  const observed = Date.parse(read.observedAt ?? '')
+  if (Number.isFinite(observed) && Number.isFinite(read.requestedAt)) {
+    // Network time may make the conservative timer fire early. Only a genuine
+    // newer read with positive server remaining time may arrange another check;
+    // an already-expired server response must never create an immediate loop.
+    return expires > observed ? { at: expiresAt, afterMs: Math.max(0, remaining), observation: read.requestedAt! } : null
+  }
+  return remaining > 0 ? { at: expiresAt, afterMs: remaining } : null
 }
 
 export function approvalExpired(expiresAt: string, read: ApprovalReadTime, monotonicNow = performance.now(), wallNow = Date.now()) {

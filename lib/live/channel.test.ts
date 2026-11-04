@@ -449,3 +449,42 @@ test('updating read pacing retains the connection and applies the new spacing to
   assert.equal(f.ticketCalls(), 1); assert.equal(f.sockets.length, 1)
   stop()
 })
+
+test('only a newer real observation can rearm the same fired deadline, and an active deadline is never postponed', async () => {
+  const f = fixture()
+  const stop = f.channel.subscribe('approved_writes', task, ['approvals'], key => { f.reads.push(key) },
+    { deadline: { at: 'fixed-expiry', afterMs: 1_000, observation: 10 } })
+  await f.open(); f.reads.length = 0
+  await f.advance(300)
+  stop.update({ deadline: { at: 'fixed-expiry', afterMs: 10_000, observation: 20 } })
+  await f.advance(700)
+  assert.deepEqual(f.reads, ['approvals'], 'a fresh read cannot postpone an active conservative deadline')
+  for (const observation of [20, 10, undefined]) stop.update({ deadline: { at: 'fixed-expiry', afterMs: 100, observation } })
+  await f.advance(500)
+  assert.deepEqual(f.reads, ['approvals'], 'a consumed observation, older response and plain render cannot rearm it')
+  stop.update({ deadline: { at: 'fixed-expiry', afterMs: 500, observation: 30 } })
+  await f.advance(600)
+  assert.deepEqual(f.reads, ['approvals', 'approvals'], 'a new authoritative read still before the same expiry gets its final check')
+  stop.update({ deadline: { at: 'fixed-expiry', afterMs: 500, observation: 30 } })
+  await f.advance(1_000)
+  assert.equal(f.reads.length, 2)
+  assert.equal(f.ticketCalls(), 1); assert.equal(f.sockets.length, 1)
+  stop()
+})
+
+test('a fresh server-future observation whose conservative remaining time is zero gets only one immediate recheck', async () => {
+  const f = fixture()
+  const stop = f.channel.subscribe('approved_writes', task, ['approvals'], key => { f.reads.push(key) },
+    { deadline: { at: 'fixed-expiry', afterMs: 500, observation: 10 } })
+  await f.open(); f.reads.length = 0
+  await f.advance(500); assert.deepEqual(f.reads, ['approvals'])
+  stop.update({ deadline: { at: 'fixed-expiry', afterMs: 0, observation: 20 } })
+  await f.advance(100); assert.deepEqual(f.reads, ['approvals', 'approvals'])
+  stop.update({ deadline: { at: 'fixed-expiry', afterMs: 0, observation: 20 } })
+  stop.update({ deadline: { at: 'fixed-expiry', afterMs: 0 } })
+  await f.advance(1_000); assert.equal(f.reads.length, 2)
+  stop.update({ deadline: null })
+  await f.advance(1_000); assert.equal(f.reads.length, 2)
+  assert.equal(f.ticketCalls(), 1); assert.equal(f.sockets.length, 1)
+  stop()
+})

@@ -18,10 +18,11 @@ export interface LiveRuntime {
 }
 export type LiveSubscriptionOptions = {
   /** Minimum spacing for changes, never for reconnect/visibility catch-up. */ minIntervalMs?: number
-  /** One read at a server-derived deadline, independent of the browser's clock. */ deadline?: { at: string; afterMs: number } | null
+  /** One read at a server-derived deadline. A real HTTP read may identify its
+   * observation only while the server still reports a future deadline. */ deadline?: { at: string; afterMs: number; observation?: number } | null
 }
 export type LiveSubscription = (() => void) & { update(options: LiveSubscriptionOptions): void }
-type Subscription = { kind: LiveKind; id: string; keys: readonly string[]; refresh: (key: string) => unknown; minIntervalMs: number; deadlineAt: number | null; deadlineKey: string | null; timer: string }
+type Subscription = { kind: LiveKind; id: string; keys: readonly string[]; refresh: (key: string) => unknown; minIntervalMs: number; deadlineAt: number | null; deadlineKey: string | null; deadlineObservation: number | null; timer: string }
 type PendingRead = { refresh: Subscription['refresh']; at: number }
 
 /** One connection per mounted owner/workspace; repeated badges share each SWR read. */
@@ -48,7 +49,9 @@ export class LiveChannel {
     if (!LIVE_ID.test(id)) return Object.assign(() => {}, { update() {} })
     const subscription: Subscription = { kind, id, keys, refresh, minIntervalMs: Math.max(0, options.minIntervalMs ?? 0),
       deadlineAt: options.deadline && Number.isFinite(options.deadline.afterMs) ? this.localNow() + Math.max(0, options.deadline.afterMs) : null,
-      deadlineKey: options.deadline?.at ?? null, timer: `deadline:${++this.nextDeadline}` }
+      deadlineKey: options.deadline?.at ?? null,
+      deadlineObservation: Number.isFinite(options.deadline?.observation) ? options.deadline!.observation! : null,
+      timer: `deadline:${++this.nextDeadline}` }
     this.subscriptions.add(subscription)
     if (this.subscriptions.size === 1) {
       this.unwatch = this.runtime.watchVisibility(() => this.visibilityChanged())
@@ -71,7 +74,14 @@ export class LiveChannel {
       if (!this.subscriptions.has(subscription)) return
       subscription.minIntervalMs = Math.max(0, next.minIntervalMs ?? 0)
       const key = next.deadline?.at ?? null
-      if (key === subscription.deadlineKey) return // A render/read cannot restart the same expiry.
+      const observation = Number.isFinite(next.deadline?.observation) ? next.deadline!.observation! : null
+      if (key === subscription.deadlineKey) {
+        const fresh = observation !== null && (subscription.deadlineObservation === null || observation > subscription.deadlineObservation)
+        if (fresh) subscription.deadlineObservation = observation
+        // Never postpone an active conservative timer. After it has fired, only
+        // a newer actual server-future read can arrange the still-needed check.
+        if (subscription.deadlineAt !== null || !fresh) return
+      } else subscription.deadlineObservation = observation
       subscription.deadlineKey = key
       subscription.deadlineAt = next.deadline && Number.isFinite(next.deadline.afterMs)
         ? this.localNow() + Math.max(0, next.deadline.afterMs) : null

@@ -56,12 +56,12 @@ export async function latestThreadRunModel(pool: Pick<Pool, 'query'>, userId: st
 }
 
 /**
- * A new cloud run's model by 优先使用的模型 (decision 2026-11-02-1400): the first cloud entry for
+ * A new cloud run's model by 优先使用的模型 (decision 2026-11-02-1400): the first usable cloud entry for
  * this harness. A subscription entry is bound to the Agent so the run uses that account.
  */
 export async function chooseCloudRunModel(pool: Pool, scope: { ownerId: string; workspaceId: string; botId: string | null }, agentId: string, harness: 'claude_code' | 'codex', asked?: string, purpose: 'task' | 'desktop' = 'desktop'): Promise<RunModel | { error: 'machineUnavailable'; reason?: string }> {
   const { resolveModelDispatch, bindAgentToConnection } = await import('@/lib/model-dispatch')
-  const target = await resolveModelDispatch(pool, scope, { harness, ...(asked ? { model: asked } : {}) }, 'cloud', undefined, { cloudPurpose: purpose })
+  const target = await resolveModelDispatch(pool, scope, asked ? { harness, model: asked } : null, 'cloud', undefined, { cloudPurpose: purpose, harness })
   if (target.kind !== 'cloud') return { error: 'machineUnavailable', ...(target.kind === 'none' ? { reason: target.reason } : {}) }
   const source = target.entry.source
   const modelDispatch: WorkerModelDispatch = { mode: asked ? 'picked' : 'preference', location: 'cloud', entry: target.entry }
@@ -75,7 +75,7 @@ export async function chooseCloudRunModel(pool: Pool, scope: { ownerId: string; 
  */
 export async function chooseLocalRunModel(pool: Pool, scope: { ownerId: string; workspaceId: string; botId: string | null }, agent: { id: string; deviceId: string; harness: 'claude_code' | 'codex' }, asked?: string): Promise<RunModel | { error: 'machineUnavailable'; reason?: string }> {
   const { resolveModelDispatch } = await import('@/lib/model-dispatch')
-  const target = await resolveModelDispatch(pool, scope, { harness: agent.harness, ...(asked ? { model: asked } : {}) }, 'local', agent.deviceId)
+  const target = await resolveModelDispatch(pool, scope, asked ? { harness: agent.harness, model: asked } : null, 'local', agent.deviceId, { harness: agent.harness })
   if (target.kind !== 'device' || target.agentId !== agent.id) return { error: 'machineUnavailable', ...(target.kind === 'none' ? { reason: target.reason } : {}) }
   return { model: target.model, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}), ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}), modelDispatch: { mode: asked ? 'picked' : 'preference', location: 'local', entry: target.entry } }
 }

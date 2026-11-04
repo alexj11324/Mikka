@@ -207,6 +207,7 @@ async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: 
   const deletedBots = botIds.length ? (await tx.delete(bots).where(eq(bots.workspaceId, workspaceId)).returning({ id: bots.id })).length : 0
   await tx.delete(conversations).where(eq(conversations.workspaceId, workspaceId))
   for (const statement of [
+    sql`delete from project_decisions where "workspaceId" = ${workspaceId}`,
     sql`delete from subagent_events where "workspaceId" = ${workspaceId}`,
     sql`delete from cloud_machines where "workspaceId" = ${workspaceId}`,
     sql`delete from workspace_snapshots where "workspaceId" = ${workspaceId}`,

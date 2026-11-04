@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg";
+import { factoryDecisionWarnings, type ProjectDecisionWarning } from "../project-decision-warnings";
 import { VERIFY_STATUSES, type VerifyStatus } from "@mikka/protocol/run";
 import { redactFactoryCheckText } from "./checks";
 import { FACTORY_STATUSES, type FactoryStatus } from "./contract";
@@ -54,7 +55,7 @@ export interface FactoryDelivery {
    */
   deploymentEnvironment: "preview" | "production" | null;
 }
-export interface FactoryTaskDetail { checks: FactoryCheckResult[]; delivery: FactoryDelivery }
+export interface FactoryTaskDetail { checks: FactoryCheckResult[]; delivery: FactoryDelivery; decisionWarnings: ProjectDecisionWarning[] }
 type Task = { id: string; issueId: string; candidateId: string | null; userId: string };
 
 const text = (v: unknown) => (typeof v === "string" && v.trim() ? redactFactoryCheckText(v) : null);
@@ -132,6 +133,7 @@ export async function factoryTaskDetail(
   const url = d?.previewUrl && d.previewUrl.startsWith("https://") ? d.previewUrl : null;
   return {
     checks,
+    decisionWarnings: await factoryDecisionWarnings(tx, task),
     delivery: {
       candidateSha: d?.sha ?? null,
       previewDatabaseBranch: text(d?.previewDatabaseBranch),

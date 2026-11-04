@@ -26,6 +26,7 @@ let ApprovedWriteActions: typeof import('../components/coordinator/approved-writ
 let LiveProvider: typeof import('../hooks/use-live-key')['LiveProvider']
 let items: ApprovedWriteItem[], records: Map<string, ApprovedWriteItem>, calls: { op: string; cursor?: string; id?: string }[]
 let ticketReads = 0
+let listReply: (() => Promise<Response>) | undefined
 let availability: number, paginated: boolean, loseDecision: boolean, serverNow: string | null
 const sockets: FakeSocket[] = []
 
@@ -56,7 +57,7 @@ before(async () => {
   ;({ LiveProvider } = await import('../hooks/use-live-key'))
 })
 beforeEach(() => {
-  items = []; records = new Map(); calls = []; availability = 0; paginated = false; loseDecision = false; serverNow = null; sockets.length = 0; flag = undefined; ticketReads = 0
+  items = []; records = new Map(); calls = []; availability = 0; paginated = false; loseDecision = false; serverNow = null; sockets.length = 0; flag = undefined; ticketReads = 0; listReply = undefined
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
   globalThis.fetch = async (url, options) => {
     const path = String(url)
@@ -70,6 +71,7 @@ beforeEach(() => {
     if (options?.method === 'GET') { availability++; return Response.json({ enabled: true }) }
     const body = JSON.parse(String(options?.body)); calls.push(body)
     const observedAt = serverNow ?? new Date().toISOString()
+    if (body.op === 'list' && listReply) return listReply()
     if (body.op === 'list') return Response.json({ viewerId: 'owner', items: paginated && !body.cursor ? [] : items, nextCursor: paginated && !body.cursor ? 'older-page' : null, asOf: observedAt, observedAt })
     if (body.op === 'view') return Response.json({ ...(records.get(body.id) ?? items.find(item => item.id === body.id)), observedAt })
     assert.equal(body.op, 'decide')
@@ -159,5 +161,30 @@ test('a server-derived expiry performs one authoritative read and disables appro
   assert.equal(sockets.length, socketCount); assert.equal(ticketReads, tickets)
   const settled = calls.length; await wait(300)
   assert.equal(calls.length, settled, 'expiry does not become a recurring read')
+  assert.equal(calls.filter(call => call.op === 'decide').length, 0)
+})
+
+
+test('a slow initial approval read followed by a fast same-expiry read still observes the real server expiry', { timeout: 6_000 }, async () => {
+  const started = performance.now(), epoch = Date.parse('2099-01-01T00:00:00.000Z'), expiresAfter = 2_000
+  const expiring = proposal(); expiring.approvalExpiresAt = new Date(epoch + expiresAfter).toISOString()
+  const observations: number[] = []
+  listReply = async () => {
+    if (performance.now() - started < 600) await new Promise(resolve => setTimeout(resolve, 450))
+    const elapsed = performance.now() - started; observations.push(elapsed)
+    const observedAt = new Date(epoch + elapsed).toISOString()
+    return Response.json({ viewerId: 'owner', items: [expiring], nextCursor: null, asOf: observedAt, observedAt })
+  }
+  await render()
+  while (performance.now() - started < 800) await wait(50)
+  const approve = () => [...container.querySelectorAll('button')].find(node => node.textContent === 'approveSend')
+  assert.equal(approve()?.disabled, false)
+  const socketCount = sockets.length, tickets = ticketReads
+  while (performance.now() - started < 2_450) await wait(50)
+  assert.ok(observations.some(elapsed => elapsed > 1_000 && elapsed < expiresAfter), 'the conservative first deadline really read before server expiry')
+  assert.equal(observations.filter(elapsed => elapsed >= expiresAfter).length, 1, 'the newer same-at response must arrange the actual expiry read')
+  assert.equal(approve()?.disabled, true)
+  assert.equal(sockets.length, socketCount); assert.equal(ticketReads, tickets)
+  const settled = calls.length; await wait(300); assert.equal(calls.length, settled)
   assert.equal(calls.filter(call => call.op === 'decide').length, 0)
 })

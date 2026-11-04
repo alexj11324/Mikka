@@ -58,9 +58,10 @@ export function useLiveKeys(entities: readonly { kind: LiveKind; id: string; wor
   const minIntervalMs = options?.minIntervalMs ?? 0
   const timing = useRef({ minIntervalMs, deadline: options?.deadline })
   timing.current = { minIntervalMs, deadline: options?.deadline }
-  // Anchor the server's remaining duration once per expiry, not once per render
-  // or stream refresh. A scope/key change still uses the latest authorized read.
+  // Renders do not reanchor an expiry. A newer HTTP observation can arrange a
+  // final check if the conservative timer fired before the server's deadline.
   const deadlineKey = options?.deadline?.at ?? null
+  const deadlineObservation = options?.deadline?.observation
   const active = useRef<LiveSubscription[]>([])
   useEffect(() => {
     if (!channels) return
@@ -76,5 +77,5 @@ export function useLiveKeys(entities: readonly { kind: LiveKind; id: string; wor
   }, [channels, scope, references, serialized, mutate])
   useEffect(() => {
     for (const subscription of active.current) subscription.update(timing.current)
-  }, [minIntervalMs, deadlineKey])
+  }, [minIntervalMs, deadlineKey, deadlineObservation])
 }
