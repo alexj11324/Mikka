@@ -2488,7 +2488,23 @@
       "hours": "{count} h",
       "balance": "Balance",
       "points": "{points} points",
-      "awaitingTakeover": "Awaiting takeover"
+      "awaitingTakeover": "Awaiting takeover",
+      "executionAccounts": "Accounts used for your tasks",
+      "accountKind": "Resource",
+      "accountPayer": "Account holder",
+      "accountBilling": "Billing",
+      "accountKinds": {
+        "api_key": "Model API key",
+        "subscription": "Model subscription",
+        "native_login": "Device model account",
+        "local_device": "Personal device",
+        "e2b": "Personal E2B account"
+      },
+      "accountAmounts": {
+        "provider_unknown": "Billed by provider / amount unknown",
+        "metered": "Billed by actual usage",
+        "not_applicable": "No platform compute charge"
+      }
     },
     "billing": {
       "loading": "Loading billing",

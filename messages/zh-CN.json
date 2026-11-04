@@ -2488,7 +2488,23 @@
       "hours": "{count} 小时",
       "balance": "余额",
       "points": "{points} 点",
-      "awaitingTakeover": "待接管"
+      "awaitingTakeover": "待接管",
+      "executionAccounts": "我的任务使用的账户",
+      "accountKind": "资源",
+      "accountPayer": "账户持有人",
+      "accountBilling": "费用",
+      "accountKinds": {
+        "api_key": "模型 API Key",
+        "subscription": "模型订阅",
+        "native_login": "设备上的模型账户",
+        "local_device": "个人设备",
+        "e2b": "个人 E2B 账户"
+      },
+      "accountAmounts": {
+        "provider_unknown": "由供应商计费/金额未知",
+        "metered": "按实际用量计费",
+        "not_applicable": "无平台计算费用"
+      }
     },
     "billing": {
       "loading": "正在加载计费",

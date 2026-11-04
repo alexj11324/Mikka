@@ -1,4 +1,5 @@
 import 'server-only'
+import { rebindExecutionDevice, revalidateExecutionIdentity } from '../execution-identity'
 import { botWorkspacePath, initializeBotWorkspace } from '@/lib/computer/bot-workspace'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
@@ -249,6 +250,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       LEFT JOIN device_repos source_repo ON source_repo.id=runtime."repoId" AND source_repo."userId"=r."userId"
       WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
     if (!run || !run.botSandboxId || !(refreshRuntime ? ['succeeded','failed','stopped','cancelled'] : ['queued', 'preparing', 'running', 'waiting_input']).includes(run.status)) throw new ComputerError(404, 'Thread unavailable')
+    if (!refreshRuntime) await revalidateExecutionIdentity(client, run)
     exactQuestionMachine = run.questionContinuation?.requireSessionResume === true
     const repositoryTask = Boolean(run.remoteUrl)
     // Stop check 1, before any provider call, under the run lock stopOwnedRun also takes.
@@ -478,7 +480,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       await client.query('UPDATE thread_machines SET "workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND "workerLeaseId"=$2',[runId,leaseId])
       await client.query('COMMIT'); return { runId, state: 'running' }
     }
-    const definition = current.agentDefinition
+    let definition = current.agentDefinition
     const admission = definition?.repositoryAdmission
     if (current.status === 'queued' && admission) {
       if (!matchesRepositoryAdmission(admission, {
@@ -496,7 +498,8 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     await client.query('UPDATE thread_machines SET "deviceId"=$2,"repoId"=$3 WHERE "runId"=$1', [runId, deviceId, repoId])
     await client.query('UPDATE device_tokens SET "revokedAt"=now() WHERE "boundDeviceId"=$1', [deviceId])
     await client.query('INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES ($1,$2,$3,$4,$5,$6,now()+interval \'24 hours\')', [randomUUID(), actor.userId, 'Thread worker', createHash('sha256').update(credential).digest('hex'), deviceId, actor.workspaceId])
-    await client.query('UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"agentDefinition"=COALESCE($5::jsonb,"agentDefinition") WHERE id=$1 AND "userId"=$4 AND status=\'queued\'', [runId, deviceId, repoId, actor.userId, admission ? JSON.stringify(definition) : null])
+    definition = await rebindExecutionDevice(client, { ...current, agentDefinition: definition }, deviceId)
+    await client.query('UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"agentDefinition"=COALESCE($5::jsonb,"agentDefinition") WHERE id=$1 AND "userId"=$4 AND status=\'queued\'', [runId, deviceId, repoId, actor.userId, definition ? JSON.stringify(definition) : null])
     // The host relocates a check to its dedicated machine before claim. Its
     // candidate remains fixed; only execution placement changes.
     await client.query(`UPDATE factory_attempts SET output=jsonb_set(jsonb_set(output,'{check,deviceRepoId}',to_jsonb($2::text)),'{check,environment}',to_jsonb($3::text))

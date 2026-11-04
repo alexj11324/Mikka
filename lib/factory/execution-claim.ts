@@ -1,3 +1,4 @@
+import { executionIdentityForRun } from '../execution-identity';
 import type { Pool, PoolClient } from "pg";
 import { FactoryError } from "./contract";
 import type { FactoryAuthorize } from "./store";
@@ -36,6 +37,7 @@ export function createExecutionClaim(pool: Pool, authorize: FactoryAuthorize) {
 /** Same existing Factory lineage fence, with caller-owned transaction/CAS. */
 export function createExecutionClaimGuard(authorize:FactoryAuthorize){
   return async(tx:PoolClient,userId:string,runId:string)=>{
+      await executionIdentityForRun(tx, runId, userId);
       const { rows: tasks } = await tx.query(
         `WITH RECURSIVE lineage AS (
           SELECT id,"retryOf" FROM agent_runs WHERE id=$1

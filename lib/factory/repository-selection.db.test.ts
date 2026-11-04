@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { Pool, type PoolClient } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
@@ -11,6 +11,7 @@ import { createFactoryReconciler } from './reconcile'
 import { freezeWorkerDefinition } from '../agent-kit/worker'
 import { repositorySelectionRuntime } from './repository-selection'
 import { factoryCheckIndependent } from './check-independence'
+import { sealSecret, userE2bKeyAad } from '../secrets/crypto'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) {
@@ -25,6 +26,9 @@ test('Agent repository selection creates an authorized new execution, retaining 
   await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 5 })
+  const { workspacePool } = await import('../workspace-db')
+  const previousWorkspaceURL = workspacePool.options.connectionString
+  workspacePool.options.connectionString = target.toString()
   const previous = { ...repositorySelectionRuntime }
   try {
     const dir = new URL('../../drizzle/', import.meta.url)
@@ -127,6 +131,10 @@ test('Agent repository selection creates an authorized new execution, retaining 
     })
     await t.test('the real cloud queue reauthorizes the same subscription and defers machine handoff until commit', async () => {
       const workspaceId = randomUUID(), botId = randomUUID(), connectionId = randomUUID()
+      await pool.query(`INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,'owner','Repository selection fixture')`, [workspaceId])
+      await pool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,'owner','Fixture','repository-selection@example.invalid','admin','active')`, [workspaceId])
+      const key = sealSecret('synthetic-e2b-fixture', userE2bKeyAad('owner'), { WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex') })
+      await pool.query(`INSERT INTO user_e2b_keys("userId",ciphertext,iv,"keyVersion",last4) VALUES('owner',$1,$2,$3,'test')`, [key.ciphertext, key.iv, key.keyVersion])
       await pool.query(`UPDATE devices SET kind='cloud' WHERE id=$1`, [deviceId])
       await pool.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES ($1,$2,'owner','Repository test runtime')`, [botId, workspaceId])
       await pool.query(`INSERT INTO cloud_machines("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES ($1,'owner',$2,'synthetic-no-provider',$3,'running',true)`, [workspaceId, randomUUID(), deviceId])
@@ -160,6 +168,8 @@ test('Agent repository selection creates an authorized new execution, retaining 
     })
   } finally {
     Object.assign(repositorySelectionRuntime, previous)
+    workspacePool.options.connectionString = previousWorkspaceURL
+    await workspacePool.end()
     await dropTestDatabase(admin, database, pool)
     await admin.end()
   }

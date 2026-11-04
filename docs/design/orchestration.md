@@ -254,8 +254,8 @@ token or key.
    - Saved logins live in the credential vault.
    - The E2B key belongs to the account. Only the server uses it; it is never
      handed to a sandbox or a model.
-2. **At run start:** the server resolves the run's credential owner: the bot
-   owner, or the share's owner when §2 step 2 applied. It injects only that
+2. **At run start:** the server resolves the run requester's selected credential,
+   or the credential owner's explicit share when §2 step 2 applied. It injects only that
    credential, plus a run token for Mikka's MCP and apps. The credential lands
    only inside the run's environment: the E2B machine or the
    temporary Agent config dir. It never comes from, or goes to, the person's
@@ -279,9 +279,34 @@ shares leave that workspace at once, and their bots there are paused (暂停).
 An admin may take a bot over. It then runs on the admin's resources or the
 workspace's.
 
+### Execution identity and provenance (#1163)
+
+The host freezes the requester, executing Bot owner, execution principal,
+selected model and device resource references, billing accounts and output owner
+with each new run. A group reporter Bot is separately recorded by the group's
+host binding; choosing a reporter never transfers that Bot owner's accounts or
+computer. Personal app connections remain the execution requester's connections.
+
+Claim, credential disclosure, run-token authentication, app-tool execution and
+lease renewal recheck current authority. A shared subscription or API key needs
+both members to remain active, the explicit share and the current workspace
+policy. The selected resource and payer cannot change implicitly on retry.
+A host-authorized device handoff rechecks the new device's owner and preserves
+the requester's identity; a consented quota fallback records the newly selected
+API key and its actual owner. Cloud continuation freezes its parent placement
+before rebinding to the new thread machine.
+
+Artifact versions retain this provenance without changing the artifact's owner
+or sharing rules. Owner-only run details and account usage show the frozen
+attribution. Historical rows without a snapshot remain unattributed; current Bot
+ownership is never used to reconstruct who paid for a historical run.
+
 ## 7. Billing
 
-The workspace where the work happens pays.
+Mikka-hosted calls use the applicable workspace's credits. Personal subscriptions,
+API keys and E2B use the account shown below. External provider amounts remain
+unknown unless the provider supplies a receipt; 0 Mikka credits is not a zero
+external bill.
 
 | Work | Who pays |
 | --- | --- |

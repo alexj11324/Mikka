@@ -12,6 +12,7 @@ for (const mode of ['ordinary', 'current', 'stopped', 'retry-unadopted', 'foreig
     const tx = {
       async query(sql: string) {
         commands.push(sql)
+        if (sql.startsWith('SELECT "userId","botId","deviceId","agentDefinition"')) return { rows: [{ userId: 'owner', botId: null, deviceId: 'device', agentDefinition: null }] }
         if (sql.includes('WITH RECURSIVE')) return { rows: mode==='ordinary'?[]:mode==='multiple-tasks'?[task,task]:[task] }
         if (sql.includes('FROM factory_attempts WHERE')) return { rows: [{ runId:mode==='retry-unadopted'?'parent':'run', stage:'execute', status:'running' }] }
         if (sql.includes('SELECT "issueId"')) return { rows:[{ issueId:mode==='wrong-issue'?'other':'issue' }] }

@@ -20,6 +20,13 @@ mock.module(new URL('./model-api-keys.ts', import.meta.url).href, { namedExports
 mock.module(new URL('./computer/native-run-binding.ts', import.meta.url).href, { namedExports: {
   nativeRunBinding: async () => ({ ...subscription, workspaceId: id(2), consumerId: id(21), route: 'claude_code_cli' }),
 } })
+mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: {
+  workspacePool: { query: async (sql: string, args: unknown[]) => {
+    assert.match(sql, /FROM mikka_workspace_members/)
+    assert.deepEqual(args, [id(2), ['alice']])
+    return { rows: [{ userId: 'alice' }], rowCount: 1 }
+  } },
+} })
 let runCredentialSource: typeof import('./run-credential-source')['runCredentialSource']
 let quotaFallbackApiKey: typeof import('./run-credential-source')['quotaFallbackApiKey']
 let queueCloudRun: typeof import('./computer/queue-run')['queueCloudRun']
@@ -98,6 +105,25 @@ function cloudQueueFixture() {
       calls.push({ sql, args })
       if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql) || sql.startsWith('SELECT pg_advisory_xact_lock') || sql.startsWith('INSERT INTO ')) return { rows: [], rowCount: 0 }
       if (sql.startsWith('SELECT m.')) return { rows: [{ deviceId: id(23), instructions: '', harness: 'claude_code', baseBranch: 'main' }], rowCount: 1 }
+      // Keep real identity freezing in these queue tests: all resources belong
+      // to the active requester, and only keys still in the fixture exist.
+      if (sql.startsWith('SELECT "ownerId","workspaceId" FROM bots')) {
+        assert.equal(args[0], scope.botId)
+        return { rows: [{ ownerId: scope.ownerId, workspaceId: id(2) }], rowCount: 1 }
+      }
+      if (sql.startsWith('SELECT "ownerId",kind,enabled FROM devices')) {
+        assert.equal(args[0], id(23))
+        return { rows: [{ ownerId: scope.ownerId, kind: 'cloud', enabled: true }], rowCount: 1 }
+      }
+      if (sql.startsWith('SELECT k."ownerId"')) {
+        assert.equal(args[1], id(2))
+        const selected = keys.find(key => key.id === args[0])
+        return { rows: selected ? [{ ownerId: selected.ownerId, shared: false }] : [], rowCount: Number(Boolean(selected)) }
+      }
+      if (sql.startsWith('SELECT 1 FROM user_e2b_keys')) {
+        assert.equal(args[0], scope.ownerId)
+        return { rows: [{ present: true }], rowCount: 1 }
+      }
       return query.query(sql, args)
     },
   }
@@ -135,6 +161,7 @@ test('cloud queue freezes the explicitly selected key when another key also offe
   const inserted = fixture.calls.find(call => call.sql.startsWith('INSERT INTO agent_runs'))!
   const frozen = JSON.parse(inserted.args[9] as string)
   assert.deepEqual(frozen.apiKey, { keyId: selected.id, model: subscription.modelId })
+  assert.equal(frozen.executionIdentity.billingAccount.model.resourceId, selected.id)
   assert.equal(frozen.subscription, undefined)
   assert.equal(fixture.calls.at(-1)?.sql, 'COMMIT')
 })
@@ -146,6 +173,7 @@ test('cloud queue still permits an explicitly selected subscription to use its a
   const inserted = fixture.calls.find(call => call.sql.startsWith('INSERT INTO agent_runs'))!
   const frozen = JSON.parse(inserted.args[9] as string)
   assert.deepEqual(frozen.apiKey, { keyId: id(4), model: subscription.modelId })
+  assert.equal(frozen.executionIdentity.billingAccount.model.resourceId, id(4))
   assert.equal(frozen.subscription, undefined)
   assert.equal(fixture.calls.at(-1)?.sql, 'COMMIT')
 })

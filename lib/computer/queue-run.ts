@@ -1,5 +1,6 @@
 import { personalMailboxEnabled } from '../personal-mailbox-config'
 import 'server-only'
+import { freezeExecutionIdentity, revalidateExecutionIdentity, ExecutionIdentityError } from '../execution-identity'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
@@ -68,6 +69,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
         if (priorRun.userId !== actor.userId || priorRun.issueId !== input.issueId || priorRun.agentId !== input.agentId || priorRun.deviceId !== target.deviceId || priorRun.deviceRepoId !== input.deviceRepoId || priorRun.runBotId !== (input.withoutBot ? null : input.botId) || priorRun.botId !== input.botId || priorRun.workspaceId !== actor.workspaceId || priorRun.prompt !== prompt) throw new ComputerError(409, 'Task request changed')
         if ((!priorRun.agentDefinition || priorRun.agentDefinition.harness !== target.harness || (priorRun.agentDefinition.parent?.executionId ?? null) !== (input.execution?.id ?? null))) throw new ComputerError(409,'Task request changed')
         if (priorRun.dispatchFingerprint ? priorRun.dispatchFingerprint !== selectionFingerprint : input.subscriptionBindingId && priorRun.agentDefinition.subscription?.bindingId !== input.subscriptionBindingId) throw new ComputerError(409, 'Task request changed')
+        await revalidateExecutionIdentity(client, { ...priorRun, botId: priorRun.runBotId })
         if (!existing) await client.query('COMMIT')
         return { runId }
       }
@@ -85,6 +87,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     // The hosted runner starts a subscription run only on that subscription's own model: a different one is refused here, not at startup.
     if (subscription && subscription.modelId !== model) throw new ComputerError(409, 'Bot subscription unavailable')
     const frozen = freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
+    frozen.executionIdentity = await freezeExecutionIdentity(client, { userId: actor.userId, botId: runBotId, deviceId: target.deviceId, agentDefinition: frozen }, undefined, actor.workspaceId)
     // A writable github.com run gets its task branch here, like a local run's (decision 2026-11-02-1600).
     const github = input.readOnly ? false : (await client.query('SELECT 1 FROM device_repos WHERE id=$1 AND "userId"=$2 AND "repoPath" LIKE \'v2/github.com/%\'', [input.deviceRepoId, actor.userId])).rowCount === 1
     const push = !github ? null : await (await import('./cloud-push')).admitCloudPush(client, { userId: actor.userId, issueId: input.issueId, agentId: input.agentId, deviceId: target.deviceId, deviceRepoId: input.deviceRepoId, ...(runBotId ? { workspaceId: actor.workspaceId } : {}), now: new Date() })
@@ -97,5 +100,5 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'pending',$5,'starting') ON CONFLICT DO NOTHING`, [runId, actor.workspaceId, actor.userId, input.botId, randomUUID()])
     if (!existing) await client.query('COMMIT')
     return { runId }
-  } catch (error) { if (!existing) await client.query('ROLLBACK'); throw error } finally { if (!existing) client.release() }
+  } catch (error) { if (!existing) await client.query('ROLLBACK'); if (error instanceof ExecutionIdentityError) throw new ComputerError(409, 'Execution identity or resource unavailable'); throw error } finally { if (!existing) client.release() }
 }
