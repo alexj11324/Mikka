@@ -16,6 +16,7 @@ import { GET as queuedRuns } from '../app/v1/devices/[deviceId]/runs/route'
 import { Socket } from 'node:net'
 import { withDeviceRoute } from './device-route'
 import { pool as appPool } from './db'
+import { longPollIdleCheck } from './device-link'
 
 // Every byte the database sends to this process.
 const sockets = new Set<Socket>()
@@ -171,7 +172,14 @@ test('terminating an admitted write connection rolls back both the write and aut
   assert.equal((await raw.query('SELECT name FROM devices WHERE id=$1', [f.device])).rows[0].name, 'Revocation test device')
 })
 
-test('a long poll loses token authority within its five-second database polling interval', async () => {
+test('a long poll loses token authority within its five-second database polling interval', async t => {
+  // The window is the route's idle check; production checks every 5 s
+  // (app/v1/devices/[deviceId]/commands/route.test.ts). It is shortened here so
+  // the same bound, one check plus 1.5 s, is asserted without the full wait.
+  // It stays above the 1 s unit-fence idle time (lib/db/device-scope.ts), as 5 s is.
+  assert.equal(longPollIdleCheck.ms, 5_000)
+  longPollIdleCheck.ms = 2_000
+  t.after(() => { longPollIdleCheck.ms = 5_000 })
   const f = await fixture()
   const started = Date.now()
   const poll = scope.run(() => commands(new Request(`http://127.0.0.1/mikka/v1/devices/${f.device}/commands?wait=20`, {
@@ -180,7 +188,7 @@ test('a long poll loses token authority within its five-second database polling 
   await delay(150)
   await revokeDeviceCredential(raw, f.owner, f.tokenId)
   assert.equal((await poll).status, 401)
-  assert.ok(Date.now() - started < 6500)
+  assert.ok(Date.now() - started < longPollIdleCheck.ms + 1500)
 })
 
 test('existing device removal still refuses live work, then records revocation without deleting history', async () => {

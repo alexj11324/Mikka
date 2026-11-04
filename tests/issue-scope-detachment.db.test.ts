@@ -68,6 +68,14 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const setIssueScope = (input: Parameters<typeof issueScopeActions.setIssueScope>[0]) => collectIssueEffects([], () => issueScopeActions.setIssueScope(input))
   const confirmIssuePersonalScope = (input: Parameters<typeof issueScopeActions.confirmIssuePersonalScope>[0]) => collectIssueEffects([], () => issueScopeActions.confirmIssuePersonalScope(input))
   const { retryLinearIssue } = await import('../app/actions/linear-sync')
+  const { linearRequestTimeout } = await import('../lib/linear-sync/graphql')
+  // The two tests below hold an old provider request until it times out. The
+  // timeout is real (AbortSignal), only shorter than production's 12 s.
+  assert.equal(linearRequestTimeout.ms, 12_000)
+  const withShortLinearTimeout = async (callback: () => Promise<void>) => {
+    linearRequestTimeout.ms = 2_000
+    try { await callback() } finally { linearRequestTimeout.ms = 12_000 }
+  }
   const { AfterContext } = await import('next/dist/server/after/after-context')
   const { workAsyncStorage } = await import('next/dist/server/app-render/work-async-storage.external')
   const { workUnitAsyncStorage } = await import('next/dist/server/app-render/work-unit-async-storage.external')
@@ -945,7 +953,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal([...provider.comments.values()].some(comment=>comment.issue.id===id),false)
     } finally {hold.release();await request}
   })
-  await scopeSubtest(t, 'old in-flight update cannot attach, publish edits or upload comments after explicit Mikka promotion',async()=>{
+  await scopeSubtest(t, 'old in-flight update cannot attach, publish edits or upload comments after explicit Mikka promotion',()=>withShortLinearTimeout(async()=>{
     const id=randomUUID();await seed(id);provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
     await setDiscussion(id,'old-publication-comment')
     const hold=provider.hold('MikkaLinearUpdateIssue'),old=processLinearIssueOutbox(id)
@@ -975,8 +983,8 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal(JSON.stringify(provider.requests).includes('post-promotion-edit'),false)
       assert.equal([...provider.comments.values()].some(comment=>comment.issue.id===id),false)
     } finally {hold.release();await old}
-  })
-  await scopeSubtest(t, 'late retired provider failure cannot attach a link or change later diagnostics',async()=>{
+  }))
+  await scopeSubtest(t, 'late retired provider failure cannot attach a link or change later diagnostics',()=>withShortLinearTimeout(async()=>{
     const id=randomUUID();await seed(id);provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
     const hold=provider.hold('MikkaLinearUpdateIssue','after',true),old=processLinearIssueOutbox(id)
     try {
@@ -987,7 +995,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[id])).rows[0].n,0)
       assert.equal((await pool.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[id])).rows[0].n,1)
     } finally {hold.release();await old}
-  })
+  }))
   await scopeSubtest(t, 'webhook paused in HTTP cannot mutate promoted task or later diagnostics',async()=>{
     const id=randomUUID();await seed(id);provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
     const deliveryId=`held-webhook-${randomUUID()}`

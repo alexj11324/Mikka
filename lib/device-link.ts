@@ -152,6 +152,14 @@ export async function linkDeviceToken(caller: Pick<DeviceCaller, 'userId' | 'tok
   return rows.length > 0
 }
 
+/**
+ * How often a waiting long-poll (app/v1/devices/[deviceId]/commands) checks
+ * for new work and for a revoked credential. Production never changes it;
+ * lib/device-revocation.db.test.ts shortens it so the revocation bound is
+ * asserted without waiting the full 5 s.
+ */
+export const longPollIdleCheck = { ms: 5_000 }
+
 export async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   try { await delay(ms, undefined, { signal }) }
   catch (error) {

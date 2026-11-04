@@ -43,7 +43,7 @@ before(async () => {
     namedExports: { daemonVersions, cachedDaemonVersions, newerDaemonRelease, daemonRequestTooOld },
   })
   mock.module(new URL('../../../../../lib/device-link.ts', import.meta.url).href, {
-    namedExports: { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, ownsDevice, sleep, waitSeconds: actual.waitSeconds },
+    namedExports: { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, longPollIdleCheck: actual.longPollIdleCheck, ownsDevice, sleep, waitSeconds: actual.waitSeconds },
   })
   GET = (await import('./route')).GET
 })

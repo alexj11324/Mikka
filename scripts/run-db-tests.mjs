@@ -3,7 +3,8 @@
 // Inventory is tree-aware, never "missing script => skip". A feature marker requires
 // its suite even if the test or package script was accidentally removed. All other
 // present pg/DB test files must map to a package script or inventory fails closed.
-import { spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
+import { availableParallelism } from 'node:os'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { posix, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -245,26 +246,154 @@ export function shardScripts(scripts, shard) {
   return selected
 }
 
-export function main({ root = '.', env = process.env, run = spawnSync } = {}) {
+// Suites that must run on the bootstrapped database itself rather than on a
+// clone of it. They run one at a time, after every clone has been taken (a
+// database can be a template only while nobody is connected to it).
+export const TEMPLATE_BOUND = [
+  { script: 'test:personal-mailbox-default-off-db', reason: 'loads MIKKA_TEST_ENVIRONMENT_FILE, whose descriptor and identity marker name the bootstrapped database' },
+  { script: 'test:test-accounts-db', reason: 'loads MIKKA_TEST_ENVIRONMENT_FILE, whose descriptor and identity marker name the bootstrapped database' },
+  { script: 'test:execution-settings-db', reason: 'asserts its connection is the database /mikka_e2e' },
+  { script: 'test:approved-writes-db', reason: 'asserts every connection is 127.0.0.1:5432/mikka_e2e' },
+  { script: 'test:factory-checks-db', reason: 'asserts its database is /mikka_e2e' },
+  { script: 'test:ops-db', reason: 'asserts its database is /mikka_e2e or /mikka_transport_e2e' },
+  { script: 'test:run-dispatch', reason: 'asserts its database is /mikka_e2e' },
+]
+
+/** The per-suite clone of `template` (a loopback *_e2e URL); <= 63 bytes and *_e2e itself. */
+export function cloneDatabaseName(template, index, script) {
+  const base = decodeURIComponent(new URL(template).pathname.slice(1)).replace(/_e2e$/, '')
+  const prefix = `${base}_s${String(index).padStart(2, '0')}_`
+  const slug = script.replace(/^test:/, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/_db$/, '')
+  return `${prefix}${slug.slice(0, Math.max(0, 63 - prefix.length - 4))}_e2e`
+}
+
+export function databaseUrl(template, name) {
+  const url = new URL(template)
+  url.pathname = `/${name}`
+  const value = url.toString()
+  if (!isE2eTarget(value)) throw new Error(`Clone ${name}: ${E2E_DB_RULE}`)
+  return value
+}
+
+/** Every variable that names the bootstrapped database (E2E_/MIKKA_/DATABASE_URL,
+ * FACTORY_MONITOR_TEST_URL, ...) names the suite's own clone instead. */
+export function suiteEnv(env, database) {
+  const template = env.E2E_DATABASE_URL
+  const next = { ...env }
+  if (database) {
+    const clone = databaseUrl(template, database)
+    for (const [name, value] of Object.entries(env)) if (value === template) next[name] = clone
+  }
+  return { ...next, REQUIRE_DB: '1', CONVERSATION_READS_REQUIRE_DB: '1', MIKKA_TEST_DB_PORT: new URL(template).port || '5432' }
+}
+
+/** CREATE DATABASE <clone> TEMPLATE <bootstrapped>, from a separate *_e2e
+ * control database so that nothing is connected to the template. `ready` is
+ * called as each clone exists, so its suite can start while the rest are made. */
+export async function createClones(template, names, ready = () => {}) {
+  if (!names.length) return
+  const { default: pg } = await import('pg')
+  const source = decodeURIComponent(new URL(template).pathname.slice(1))
+  const control = databaseUrl(template, `${source.replace(/_e2e$/, '')}_runner_e2e`)
+  const quote = name => `"${name.replaceAll('"', '""')}"`
+  const once = async (url, statements) => {
+    const client = new pg.Client({ connectionString: url })
+    await client.connect()
+    try { for (const statement of statements) await client.query(statement) } finally { await client.end() }
+  }
+  const controlName = decodeURIComponent(new URL(control).pathname.slice(1))
+  await once(template, [`DROP DATABASE IF EXISTS ${quote(controlName)} WITH (FORCE)`, `CREATE DATABASE ${quote(controlName)} TEMPLATE template0`])
+  const client = new pg.Client({ connectionString: control })
+  await client.connect()
+  try {
+    for (const name of names) {
+      await client.query(`DROP DATABASE IF EXISTS ${quote(name)} WITH (FORCE)`)
+      await client.query(`CREATE DATABASE ${quote(name)} TEMPLATE ${quote(source)}`)
+      ready(name)
+    }
+  } finally { await client.end() }
+}
+
+/** Runs one package script; its output is buffered and returned, not streamed. */
+export function runScript(command, args, options) {
+  return new Promise(resolvePromise => {
+    const stdout = [], stderr = []
+    let settled = false
+    const done = result => { if (!settled) { settled = true; resolvePromise(result) } }
+    const child = spawn(command, args, { cwd: options.cwd, env: options.env, stdio: ['ignore', 'pipe', 'pipe'] })
+    child.stdout.on('data', chunk => stdout.push(chunk))
+    child.stderr.on('data', chunk => stderr.push(chunk))
+    child.on('error', error => done({ status: null, stdout: Buffer.concat(stdout).toString('utf8'), stderr: `${Buffer.concat(stderr).toString('utf8')}\n${error.message}` }))
+    child.on('close', status => done({ status, stdout: Buffer.concat(stdout).toString('utf8'), stderr: Buffer.concat(stderr).toString('utf8') }))
+  })
+}
+
+export function concurrency(value, fallback = DEFAULT_CONCURRENCY) {
+  if (value === undefined || value === '') return fallback
+  if (!/^[1-9]\d?$/.test(value)) throw new Error('DB_TEST_CONCURRENCY must be an integer from 1 to 99')
+  return Number(value)
+}
+// Measured on the 4-vCPU GitHub runner; see the pull request that set it.
+export const DEFAULT_CONCURRENCY = 4
+
+/** Test files a package script runs: a rough size, to start the largest suites first. */
+export const suiteWeight = command => (command ?? '').split(/\s+/).filter(token => /\.(test|spec|db)\.(ts|mts|mjs|tsx|js)$|\.test\.|\.db\.ts$/.test(token)).length
+
+export async function main({ root = '.', env = process.env, run = runScript, clone = createClones, now = () => Date.now() } = {}) {
   try {
     validateTarget(env)
+    const limit = concurrency(env.DB_TEST_CONCURRENCY)
     const scripts = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).scripts ?? {}
     const plan = inventory(readTree(root), scripts, (env.DB_TEST_EXPECTED ?? '').split(',').filter(Boolean))
     console.log(`Required DB inventory: ${JSON.stringify(plan)}`)
     const selected = shardScripts(plan.scripts, env.DB_TEST_SHARD)
     console.log(`Required DB selection: ${JSON.stringify({ shard: env.DB_TEST_SHARD ?? 'all', total: plan.scripts.length, scripts: selected })}`)
+    // Suites share destructive fixtures, so each runs on its own copy of the
+    // bootstrapped database; the few bound to that database by name run on it,
+    // one at a time, once every copy has been taken.
+    const bound = new Set(TEMPLATE_BOUND.map(entry => entry.script))
+    const onTemplate = selected.filter(script => bound.has(script))
+    const byWeight = (a, b) => b.weight - a.weight || (a.script < b.script ? -1 : 1)
+    const isolated = selected.filter(script => !bound.has(script)).map(script => {
+      let ready, failed
+      const cloned = new Promise((resolvePromise, rejectPromise) => { ready = resolvePromise; failed = rejectPromise })
+      cloned.catch(() => {})
+      return { script, weight: suiteWeight(scripts[script]), database: cloneDatabaseName(env.E2E_DATABASE_URL, plan.scripts.indexOf(script), script), cloned, ready, failed }
+    }).sort(byWeight)
+    const cloning = now()
+    const clones = Promise.resolve().then(() => clone(env.E2E_DATABASE_URL, isolated.map(suite => suite.database), name => isolated.find(suite => suite.database === name)?.ready()))
+      .then(() => {
+        for (const suite of isolated) suite.failed(new Error(`clone ${suite.database} was not created`))
+        console.log(`Required DB clones: ${JSON.stringify({ template: new URL(env.E2E_DATABASE_URL).pathname.slice(1), clones: isolated.length, onTemplate, seconds: Math.round((now() - cloning) / 100) / 10 })}`)
+      }, error => { for (const suite of isolated) suite.failed(error); throw error })
+    clones.catch(() => {})
     let failed = false
-    // Suites share destructive fixtures, so only isolated CI jobs run in parallel.
-    for (const script of selected) {
-      console.log(`::group::pnpm ${script}`)
-      const result = run('pnpm', ['-s', script], { cwd: root, encoding: 'utf8', env: { ...env, REQUIRE_DB: '1', CONVERSATION_READS_REQUIRE_DB: '1', MIKKA_TEST_DB_PORT: new URL(env.E2E_DATABASE_URL).port || '5432' }, maxBuffer: 64 << 20 })
+    const timings = []
+    const execute = async ({ script, database }) => {
+      const started = now()
+      const result = await run('pnpm', ['-s', script], { cwd: root, encoding: 'utf8', env: suiteEnv(env, database), maxBuffer: 64 << 20 })
+      const seconds = Math.round((now() - started) / 100) / 10
+      timings.push({ script, seconds })
+      console.log(`::group::pnpm ${script} (${database ?? 'template database'}, ${seconds}s)`)
       process.stdout.write(result.stdout ?? ''); process.stderr.write(result.stderr ?? '')
       console.log('::endgroup::')
       const error = checkSummary(script, result.status, parseSummary(`${result.stdout}\n${result.stderr}`))
       if (error) { console.error(`::error::${error}`); failed = true }
       else console.log(`${script}: OK`)
     }
+    const guarded = async (script, wait, body) => {
+      try { await wait() } catch (error) { console.error(`::error::${script}: ${error.message}`); failed = true; return }
+      await body()
+    }
+    // One serial lane for the template-bound suites, beside the clones, largest work first.
+    const lanes = [
+      ...(onTemplate.length ? [{ weight: onTemplate.reduce((sum, script) => sum + suiteWeight(scripts[script]), 0), script: '', start: () => guarded(onTemplate.join(','), () => clones, async () => { for (const script of onTemplate) await execute({ script }) }) }] : []),
+      ...isolated.map(suite => ({ weight: suite.weight, script: suite.script, start: () => guarded(suite.script, () => suite.cloned, () => execute(suite)) })),
+    ].sort(byWeight)
+    const workers = Array.from({ length: Math.min(limit, lanes.length) }, async () => { while (lanes.length) await lanes.shift().start() })
+    await Promise.all(workers)
+    console.log(`Required DB timings: ${JSON.stringify({ shard: env.DB_TEST_SHARD ?? 'all', concurrency: limit, cpus: availableParallelism(), suites: timings.sort((a, b) => b.seconds - a.seconds) })}`)
     return failed ? 1 : 0
   } catch (error) { console.error(`::error::${error.message}`); return 1 }
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) process.exit(main())
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main().then(code => process.exit(code))
