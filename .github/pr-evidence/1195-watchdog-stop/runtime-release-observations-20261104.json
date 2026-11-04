@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "scope": "Read-only official daemon and cloud worker release observations",
+  "observations": [
+    {
+      "appSource": "06d89a4c29fb882379039a4ba5f1236af3f390d2",
+      "npmVersion": "0.0.420",
+      "npmGitHead": "06d89a4c29fb882379039a4ba5f1236af3f390d2",
+      "registryObservedAt": "2026-11-04T04:00:25.339Z",
+      "workerSha": "81308d4b25e6b587bbaed9503599fb6fa145b7ea",
+      "sourcePin": "06d89a4c29fb882379039a4ba5f1236af3f390d2",
+      "releaseRunId": 41769833557,
+      "runtimeRunId": 41769833573,
+      "runtimePublishJob": 126377935718,
+      "pairDeployment": "dpl_9XKkpUZQm4We6jfv2X8g2sbGZo6J",
+      "readyLogAt": "2026-11-04T04:02:47.8089428Z",
+      "limitation": "Release observation for 06d; subsequent main 7f63 has advanced. Does not prove any previously running instance or customer daemon upgraded.",
+      "sourcePinReadTool": "vercel_get_project_env exact plain env BQXoIXIMnsuR0UQR; observed in this monitor turn",
+      "canonicalObservation": {
+        "observedAt": "2026-11-04T04:10:11.497Z",
+        "url": "https://app.aspectlylabs.com/mikka/sign-in",
+        "status": 200,
+        "buildIdExtracted": false
+      }
+    },
+    {
+      "source": "7f63de8822cabe07fc70be072644555096e2a809",
+      "npmVersion": "0.0.421",
+      "npmGitHead": "7f63de8822cabe07fc70be072644555096e2a809",
+      "registryObservedAt": "2026-11-04T04:28:15.140Z",
+      "workerSha": "8f0937688f309d0d18a108b0b3d063e2ce4b922a",
+      "sourcePin": "7f63de8822cabe07fc70be072644555096e2a809",
+      "daemonRunId": 41771097665,
+      "runtimeRunId": 41771097684,
+      "publishJob": 126382220777,
+      "deploymentId": "dpl_Dj623Tb9hmLzfxSuoBGYPpjsnqSZ",
+      "readyLogAt": "2026-11-04T04:14:35.9639769Z",
+      "limitation": "Subsequent 1194 release observation; does not upgrade the isolated immutable 020 acceptance nor prove any old live instance upgraded."
+    },
+    {
+      "source": "d06583b9277b3c413e8b13c643ab21ab5b726402",
+      "npmVersion": "0.0.422",
+      "npmGitHead": "d06583b9277b3c413e8b13c643ab21ab5b726402",
+      "registryObservedAt": "2026-11-04T05:12:13.017Z",
+      "npmIntegrity": "sha512-VSXxMXvNKCzzUemvlHrH1CieX+7Dp4et4Sv9tpRfQQzch4IRPxbbwW0Epz0ry8HDGKl31hq9npUzeoo38vM4YQ==",
+      "workerSha": "1b63d0609ba0f1e16cb3150243d03df9bcc075ea",
+      "sourcePin": "d06583b9277b3c413e8b13c643ab21ab5b726402",
+      "daemonRunId": 41774520045,
+      "runtimeRunId": 41774520113,
+      "publishJob": 126392713473,
+      "deploymentId": "dpl_6bdrJPPDxg9PUWRgwudCoPTm1Mh9",
+      "readyLogAt": "2026-11-04T04:48:44.8176397Z",
+      "deploymentRead": {
+        "id": "dpl_6bdrJPPDxg9PUWRgwudCoPTm1Mh9",
+        "readyState": "READY",
+        "url": "mikka-p8klkbprt-mikka-dev.vercel.app",
+        "metaSha": "d06583b9277b3c413e8b13c643ab21ab5b726402",
+        "alias": [
+          "app.aspectlylabs.com",
+          "mikka.aspectlylabs.com",
+          "new-base-nova-project-ten.vercel.app",
+          "mikka-mikka-dev.vercel.app",
+          "mikka-git-main-mikka-dev.vercel.app"
+        ]
+      },
+      "limitation": "Source pin is current configuration at read time, not the version of every live or retained machine."
+    }
+  ],
+  "criticalProductSourceEquivalence": {
+    "refs": [
+      "020b3957e8fc9609528c69499609adef08150cdf",
+      "62bb445860642cb110b37e00794daf06ab454f88"
+    ],
+    "method": "Exact immutable GitHub file contents compared, not merge-base diff",
+    "files": [
+      {
+        "path": "lib/agent-tool-approval/store.ts",
+        "identical": true,
+        "bytes": [
+          5990,
+          5990
+        ]
+      },
+      {
+        "path": "app/v1/runs/[runId]/tool-approval/route.ts",
+        "identical": true,
+        "bytes": [
+          5110,
+          5110
+        ]
+      },
+      {
+        "path": "packages/daemon/src/agents/tool-approval.ts",
+        "identical": true,
+        "bytes": [
+          2260,
+          2260
+        ]
+      },
+      {
+        "path": "packages/daemon/src/server-link-http.ts",
+        "identical": true,
+        "bytes": [
+          27381,
+          27381
+        ]
+      },
+      {
+        "path": "packages/daemon/src/runs/supervisor.ts",
+        "identical": true,
+        "bytes": [
+          76621,
+          76621
+        ]
+      }
+    ]
+  },
+  "isolatedRuntime": {
+    "source": "55840a4f186c86b5c776629a8d075d654dd5c16f",
+    "base": "59ecb8cde452b2688a4b22a8c01b6baa40710fce",
+    "runId": "a673713c-4421-48ee-8713-8530bbc73a4a",
+    "statusAtRecord": "in_progress",
+    "note": "Development daemon and application are fixed to the source checkout, not npm latest; no upgrade was performed."
+  },
+  "limits": [
+    "Subsequent main commits may advance the canonical web deployment; each observation belongs to its named immutable release.",
+    "A successful package publish, provider configuration update and READY pair deployment do not prove that previously running machines upgraded.",
+    "No deployment, token, model, runtime signal, or package update was invoked while collecting these read-only observations."
+  ]
+}
