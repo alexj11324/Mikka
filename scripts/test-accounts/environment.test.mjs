@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdtemp, chmod, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -9,6 +10,7 @@ import { readBoundedBody } from './http-body.mjs'
 import { MVP_DECISION_KEY, installMvpTransport, verifyMvpTransport, hasBoundMvpTransport } from '../../tests/mvp/transport.mjs'
 import { hasBoundDevLocalTransport, installDevLocalTransport, verifyDevLocalTransport } from '../dev-local/transport.mjs'
 import { LOCAL_RESEND_KEY } from '../dev-local/services.mjs'
+import { prepareCloudAcceptance } from '../e2b/cloud-acceptance-release.mjs'
 
 function withSyntheticCredentials(value) {
   const target = new URL(value)
@@ -37,6 +39,48 @@ test('environment binds all explicit database aliases, origin, SHA and capabilit
     { ANTHROPIC_API_KEY: 'synthetic-model-canary' }, { COMPOSIO_API_KEY: 'synthetic-service-canary' }, { E2B_API_KEY: 'synthetic-service-canary' }, { EXPO_ACCESS_TOKEN: 'synthetic-service-canary' },
     { POSTHOG_SECRET_KEY: 'synthetic-service-canary' }, { AI_GATEWAY_API_KEY: MVP_DECISION_KEY },
   ]) assert.throws(() => validateEnvironment(descriptor, { ...env, ...change }))
+})
+
+
+test('only an isolated fixed-source cloud leg receives the platform key; normal children and evidence do not', () => {
+  const key = 'synthetic-e2b-cloud-only-canary'
+  const local = { ...env, MIKKA_LOCAL_TEST_ACCOUNTS: '1', E2B_API_KEY: key }
+  const cloud = prepareCloudAcceptance({ items: ['1', '2', '3', '4', '5', '6', '7', '8'], env: local,
+    revision: () => descriptor.deploymentSha, status: () => '', hash: () => 'b'.repeat(40) })
+  assert.equal(cloud.apiKey, key)
+  assert.equal(Object.hasOwn(local, 'E2B_API_KEY'), false)
+  assert.deepEqual(validateEnvironment(descriptor, local), descriptor)
+  for (const role of ['app', 'daemon']) {
+    const presence = execFileSync(process.execPath, ['--input-type=module', '--eval',
+      "console.log(JSON.stringify({role:process.argv[1],hasPlatformKey:Object.hasOwn(process.env,'E2B_API_KEY')}))", role],
+    { env: local, encoding: 'utf8' }).trim()
+    assert.deepEqual(JSON.parse(presence), { role, hasPlatformKey: false })
+    assert.equal(presence.includes(key), false)
+  }
+  const evidence = JSON.stringify({ release: cloud.release, environment: validateEnvironment(descriptor, local) })
+  assert.equal(evidence.includes(key), false)
+  assert.equal(evidence.includes('E2B_API_KEY'), false)
+})
+
+test('non-cloud runs retain the original external-credential rejection and failed cloud preparation consumes nothing', () => {
+  const key = 'synthetic-e2b-cloud-only-canary'
+  const local = { ...env, MIKKA_LOCAL_TEST_ACCOUNTS: '1', E2B_API_KEY: key }
+  assert.equal(prepareCloudAcceptance({ items: ['1', '2', '3', '4', '5', '6', '7'], env: local,
+    revision: () => assert.fail('Non-cloud preparation must not claim the credential') }), null)
+  assert.equal(local.E2B_API_KEY, key)
+  assert.throws(() => validateEnvironment(descriptor, local), error => error.code === 'EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN')
+  for (const state of [
+    { env: { ...local, MIKKA_LOCAL_TEST_ACCOUNTS: undefined } },
+    { env: { ...local, DATABASE_URL: 'postgresql://user:synthetic@production.invalid/app' } },
+    { sourceCommit: 'c'.repeat(40) },
+    { status: () => '?? lib/unreviewed.ts\n' },
+  ]) {
+    const supplied = state.env ?? { ...local }
+    assert.throws(() => prepareCloudAcceptance({ items: ['8'], env: supplied, revision: () => descriptor.deploymentSha,
+      status: () => '', hash: () => assert.fail('Rejected setup must not prepare a worker'), ...state }))
+    assert.equal(supplied.E2B_API_KEY, key)
+    assert.throws(() => validateEnvironment(descriptor, supplied))
+  }
 })
 
 test('production, unspecified preview, wildcard origins and deceptive database labels fail before any connection', () => {
