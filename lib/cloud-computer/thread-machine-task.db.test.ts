@@ -39,7 +39,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
     process.env.E2B_CODEX_TEMPLATE = 'codex'; // The fixture agent runs Codex (decision 2026-11-01-2335).
     const db = await import("../db");
     appPool = db.pool;
-    const { ensureThreadMachine, parkThreadMachine, endClosedTaskMachines, keepTailBeforeKill, threadMachineAction, threadMachineProvider } = await import("./thread-machines");
+    const { ensureThreadMachine, parkThreadMachine, endClosedTaskMachines, keepTailBeforeKill, threadMachineAction, threadMachineProvider, RetainedTaskMachineUnavailable } = await import("./thread-machines");
 
     const owner = "owner", workspaceId = randomUUID(), botId = randomUUID(), otherBot = randomUUID(), botDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), otherRepo = randomUUID();
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Fixture','thr-task@example.invalid',true,now(),now())`, [owner]);
@@ -226,6 +226,23 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       } finally {factoryAutomaticRuntime.start=start;}
     });
 
+    await t.test('a replayed Factory handoff only resumes lifecycle for its current live owned worker', async () => {
+      const f = await questionMachine('running');
+      await pool.query(`UPDATE agent_runs SET status='running',"leaseExpiresAt"=now()+interval '1 minute' WHERE id=$1`, [f.next]);
+      const { factoryAutomaticRuntime } = await import('../factory/automatic-dispatch');
+      const { handoffFactoryCloudStage } = await import('../factory/cloud-stage-handoff');
+      const park = mock.method(factoryAutomaticRuntime, 'park', async () => { throw new Error('active worker must not be parked'); });
+      const start = mock.method(factoryAutomaticRuntime, 'start', async () => { throw new Error('active worker must not be bootstrapped'); });
+      try {
+        assert.equal(await handoffFactoryCloudStage(pool, actor, f.prior.runId, f.next), true);
+        assert.equal(await handoffFactoryCloudStage(pool, { ...actor, userId: 'foreign' }, f.prior.runId, f.next), false);
+        await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()-interval '1 minute' WHERE id=$1`, [f.next]);
+        assert.equal(await handoffFactoryCloudStage(pool, actor, f.prior.runId, f.next), false);
+        assert.equal(park.mock.callCount(), 0);
+        assert.equal(start.mock.callCount(), 0);
+      } finally { park.mock.restore(); start.mock.restore(); }
+    });
+
     await t.test('required question wake refuses a machine without authoritative question provenance', async () => {
       const prior = await parked(await task());
       await pool.query(`UPDATE agent_runs r SET status='queued',"deviceId"=m."deviceId","deviceRepoId"=m."repoId" FROM thread_machines m WHERE r.id=$1 AND m."runId"=r.id`, [prior.runId]);
@@ -305,7 +322,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         for (const name of names) if (saved[name] === undefined) delete process.env[name]; else process.env[name] = saved[name];
       }
     };
-    const refreshFake = (f: Awaited<ReturnType<typeof failedQuestionMachine>>, state: string) => {
+    const refreshFake = (f: { prior: { device: string } }, state: string) => {
       const fixture = exactFake(state), steps: string[] = [];
       let sha = 'a'.repeat(40), bootstrap: { deviceId: string; credential: string } | undefined;
       fixture.provider.connect = async id => {
@@ -340,6 +357,155 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       };
       return { ...fixture, steps };
     };
+
+    await t.test('a queued stage upgrades its adopted official VM before bootstrap and preserves its completed producer', () => withRefreshWorker(async () => {
+      const issueId = await task(), prior = await parked(issueId), next = await run(issueId);
+      await pool.query(`UPDATE agent_runs SET "sessionId"='retained-original-session',report='{"summary":"original immutable result"}' WHERE id=$1`, [prior.runId]);
+      const before = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [prior.runId])).rows[0];
+      const fixture = refreshFake({ prior }, 'paused'), connect = fixture.provider.connect;
+      fixture.provider.connect = async (...args) => {
+        const sandbox = await connect(...args), execute = sandbox.commands.run.bind(sandbox.commands);
+        sandbox.commands.run = (async (...commandArgs: Parameters<typeof sandbox.commands.run>) => {
+          if (String(commandArgs[0]).includes('MIKKA_OFFICIAL_WORKER_STAGE')) {
+            const tx = await pool.connect();
+            try {
+              await tx.query('BEGIN'); await tx.query(`SET LOCAL lock_timeout='250ms'`);
+              await tx.query('SELECT id FROM agent_runs WHERE id=$1 FOR UPDATE', [next]);
+              await tx.query('SELECT "runId" FROM thread_machines WHERE "runId"=$1 FOR UPDATE', [next]);
+              await tx.query('ROLLBACK');
+            } finally { tx.release(); }
+          }
+          return execute(...commandArgs);
+        }) as typeof sandbox.commands.run;
+        return sandbox;
+      };
+      assert.deepEqual(await ensureThreadMachine(pool, actor, next, fixture.provider), { runId: next, state: 'running' });
+      assert.deepEqual(fixture.calls, [`connect:${prior.sandboxId}`], 'no new sandbox, snapshot or kill');
+      assert.deepEqual(fixture.steps, ['stage', 'switch', 'registered', 'verify', 'rpc']);
+      assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE id=$1', [prior.runId])).rows[0], before);
+      assert.equal((await machine(prior.runId)).sandboxId, null);
+      assert.deepEqual(await machine(next), { state: 'running', sandboxId: prior.sandboxId, deviceId: prior.device, issueId });
+      const current = (await pool.query('SELECT status,"deviceId","sessionId" FROM agent_runs WHERE id=$1', [next])).rows[0];
+      assert.deepEqual(current, { status: 'queued', deviceId: prior.device, sessionId: null }, 'the independent checker has not borrowed the producer session');
+    }));
+
+    await t.test('adopted VM wake failures and durable replays preserve custody and never take the generic end path', () => withRefreshWorker(async () => {
+      const issueId = await task(), prior = await parked(issueId), next = await run(issueId);
+      const before = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [prior.runId])).rows[0];
+      const calls: string[] = [];
+      let failWith404 = false;
+      const connect = mock.method(threadMachineProvider, 'connect', async (id: string) => {
+        calls.push(`connect:${id}`);
+        if (failWith404) throw { status: 404 };
+        throw new Error('fixture transient connect');
+      });
+      const kill = mock.method(threadMachineProvider, 'kill', async (id: string) => { calls.push(`kill:${id}`); });
+      const create = mock.method(threadMachineProvider, 'create', async () => { throw new Error('replacement is forbidden'); });
+      try {
+        const { startThreadMachine } = await import('../run-leases');
+        for (const missing of [false, true]) {
+          failWith404 = missing;
+          assert.deepEqual(await startThreadMachine(actor, next), { state: 'unavailable', reason: 'retained_runtime' });
+          assert.deepEqual(await machine(next), { state: 'error', sandboxId: prior.sandboxId, deviceId: prior.device, issueId });
+          const row = (await pool.query('SELECT "workerLeaseId","workerLeaseUntil" FROM thread_machines WHERE "runId"=$1', [next])).rows[0];
+          assert.deepEqual(row, { workerLeaseId: null, workerLeaseUntil: null });
+        }
+        assert.deepEqual(calls, [`connect:${prior.sandboxId}`, `connect:${prior.sandboxId}`]);
+        assert.equal(create.mock.callCount(), 0);
+        assert.equal(kill.mock.callCount(), 0);
+        assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [next])).rows[0].status, 'queued');
+        assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE id=$1', [prior.runId])).rows[0], before);
+      } finally { connect.mock.restore(); kill.mock.restore(); create.mock.restore(); }
+      const retry = refreshFake({ prior }, 'paused');
+      assert.deepEqual(await ensureThreadMachine(pool, actor, next, retry.provider), { runId: next, state: 'running' });
+      assert.equal((await machine(next)).sandboxId, prior.sandboxId, 'successful retry continues with the same retained VM');
+    }));
+
+    await t.test('Factory starts the retained worker without spawning a second lifecycle workflow', () => withRefreshWorker(async () => {
+      const issueId = await task(), prior = await parked(issueId), next = await run(issueId);
+      const fixture = refreshFake({ prior }, 'paused');
+      let childStarts = 0;
+      const workflow = mock.module('workflow/api', { namedExports: { start: async () => {
+        childStarts++; throw new Error('the current Factory workflow already owns the lifecycle');
+      } } });
+      const connect = mock.method(threadMachineProvider, 'connect', fixture.provider.connect);
+      const { factoryAutomaticRuntime } = await import('../factory/automatic-dispatch');
+      try {
+        assert.deepEqual(await factoryAutomaticRuntime.start(actor, next), { state: 'running' });
+        assert.equal(childStarts, 0);
+        assert.equal((await machine(next)).sandboxId, prior.sandboxId);
+        assert.deepEqual(fixture.steps, ['stage', 'switch', 'registered', 'verify', 'rpc']);
+      } finally { connect.mock.restore(); workflow.restore(); }
+    }));
+
+    await t.test('retained stage maintenance rejects another active run before touching its VM', async () => {
+      const issueId = await task(), prior = await parked(issueId), next = await run(issueId), active = await run(await task());
+      await pool.query('UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [active, prior.device]);
+      const fixture = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider), RetainedTaskMachineUnavailable);
+      assert.deepEqual(fixture.calls, []);
+      assert.equal((await machine(prior.runId)).sandboxId, prior.sandboxId, 'failed admission rolls back adoption');
+      assert.equal(await machine(next), undefined);
+    });
+
+    await t.test('a queued running retained VM can upgrade without replacing its existing machine', () => withRefreshWorker(async () => {
+      const issueId = await task(), prior = await parked(issueId), next = await run(issueId);
+      const first = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, next, first.provider), RetainedTaskMachineUnavailable);
+      await pool.query(`UPDATE thread_machines SET state='running' WHERE "runId"=$1`, [next]);
+      const fixture = refreshFake({ prior }, 'running'), connect = fixture.provider.connect;
+      fixture.provider.connect = async (...args) => {
+        assert.equal((await machine(next)).state, 'error', 'maintenance fences claims before provider I/O without pretending the provider paused');
+        return connect(...args);
+      };
+      assert.deepEqual(await ensureThreadMachine(pool, actor, next, fixture.provider), { runId: next, state: 'running' });
+      assert.deepEqual(fixture.calls, [`connect:${prior.sandboxId}`]);
+      assert.deepEqual(fixture.steps, ['stage', 'switch', 'registered', 'verify', 'rpc']);
+      assert.equal((await machine(next)).sandboxId, prior.sandboxId);
+    }));
+
+    await t.test('a changed maintenance lease prevents switch and cleanup from affecting its new owner', () => withRefreshWorker(async () => {
+      const issueId = await task(), prior = await parked(issueId), next = await run(issueId), newerLease = randomUUID();
+      const fixture = refreshFake({ prior }, 'paused'), connect = fixture.provider.connect;
+      fixture.provider.connect = async (...args) => {
+        const sandbox = await connect(...args), execute = sandbox.commands.run.bind(sandbox.commands);
+        sandbox.commands.run = (async (...commandArgs: Parameters<typeof sandbox.commands.run>) => {
+          const result = await execute(...commandArgs);
+          if (String(commandArgs[0]).includes('MIKKA_OFFICIAL_WORKER_STAGE'))
+            await pool.query(`UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval '10 minutes' WHERE "runId"=$1`, [next, newerLease]);
+          return result;
+        }) as typeof sandbox.commands.run;
+        return sandbox;
+      };
+      const warning = mock.method(console, 'warn', () => undefined);
+      try { await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider), RetainedTaskMachineUnavailable); }
+      finally { warning.mock.restore(); }
+      assert.deepEqual(fixture.steps, ['stage'], 'no switch, bootstrap or rollback under a changed lease');
+      const row = (await pool.query('SELECT state,"sandboxId","workerLeaseId" FROM thread_machines WHERE "runId"=$1', [next])).rows[0];
+      assert.deepEqual(row, { state: 'paused', sandboxId: prior.sandboxId, workerLeaseId: newerLease });
+    }));
+
+    await t.test('a queued adopted stage cannot switch or bootstrap after its run starts elsewhere', () => withRefreshWorker(async () => {
+      const issueId = await task(), prior = await parked(issueId), next = await run(issueId);
+      const fixture = refreshFake({ prior }, 'paused'), connect = fixture.provider.connect;
+      fixture.provider.connect = async (...args) => {
+        const sandbox = await connect(...args), execute = sandbox.commands.run.bind(sandbox.commands);
+        sandbox.commands.run = (async (...commandArgs: Parameters<typeof sandbox.commands.run>) => {
+          const result = await execute(...commandArgs);
+          if (String(commandArgs[0]).includes('MIKKA_OFFICIAL_WORKER_STAGE'))
+            await pool.query(`UPDATE agent_runs SET status='running',"leaseExpiresAt"=now()+interval '1 minute' WHERE id=$1`, [next]);
+          return result;
+        }) as typeof sandbox.commands.run;
+        return sandbox;
+      };
+      const warning = mock.method(console, 'warn', () => undefined);
+      try { await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider), RetainedTaskMachineUnavailable); }
+      finally { warning.mock.restore(); }
+      assert.deepEqual(fixture.steps, ['stage']);
+      assert.equal((await machine(next)).sandboxId, prior.sandboxId);
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM device_tokens WHERE "boundDeviceId"=$1', [prior.device])).rows[0].n, 0);
+      assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [next])).rows[0].status, 'running', 'no run status is rewritten on failure');
+    }));
 
     for (const [state, recovered] of [['paused', false], ['running', true]] as const) {
       await t.test(`explicit runtime refresh updates the ${state} failed original VM without changing answer or recovery history`, () => withRefreshWorker(async () => {
