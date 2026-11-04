@@ -1,0 +1,15 @@
+请通过正常 Factory 流程，只创建并派发一个新的、无 GitHub 仓库关联的文件任务，交给 Factory CC 1122（botId=d6bf6e81-2ff8-4f2d-ad94-003d94b934bb），不要复用其他任务。
+标题：Factory 1166 最终回归 API a9e472
+把以下任务契约完整写入 issue 描述，保留精确正文、字节数和摘要。创建 issue 后，对该 issue 只调用一次 dispatch_bot_computer，botId=d6bf6e81-2ff8-4f2d-ad94-003d94b934bb，harness="claude_code"，model="deepseek-flash"；使用既有 API key（keyId=782ed1f2-c34a-4be1-971b-fadf6f15238c），不传 repo，不新建或修改 Bot、工作区、凭据或权限。
+执行、独立 review、独立 verify 三阶段都必须使用 claude_code harness、DeepSeek Flash（实际别名 deepseek-flash）和现有 DeepSeek API key；不得使用 CC/Codex 订阅、Pro、其他模型或其他 API key。当前聊天模型只负责调度，不算执行来源。若该 API key 或别名不可用，明确停下并报告，不能换来源。不能宣称已独立观察到该别名背后的提供方版本。
+
+在本任务工作目录只创建 factory-1166-final-api-a9e472.txt。正文为以下精确三行，UTF-8、无 BOM、LF 换行，第三行后恰好一个 LF；代码围栏不写入文件：
+```text
+factory-1166-final-api-a9e472
+9 * 7 = 63
+DeepSeek API artifact
+```
+验收标准：文件恰好 63 字节；SHA-256 必须为 7b1343eee28f3f545acbf34101d1974630fb710153251a06c218da3154c93fed；实际第二行算式 9 * 7 = 63 正确。
+
+执行阶段实际创建并读取文件，实际测量字节数和 SHA-256，并核算算式。随后让正常 Factory 流程各产生独立 review 和 verify：各阶段必须亲自调用 inspect_artifact 读取同一个固定候选的该文件，传入完整 expectedUtf8，核对实际正文、bytes、sha256、committedSha256、matchesExpectedUtf8 和 contentMatchesGit，并独立核算算式。review/verify 只读，不根据上一阶段的报告代替读文件，不重写文件或改变标准。
+不连接或切换 GitHub 仓库，不 push、不创建 PR、不调用外部浏览器、不委派子代理，不修改其他任务。宿主对候选做本地快照属于正常流程。三个阶段通过后停在等待 Owner 验收，汇报任务/候选与实测结果，不自动执行 Owner 验收。来源由宿主冻结和领取记录核实，不能用模型自述替代。

@@ -1,0 +1,416 @@
+{
+  "schemaVersion": 1,
+  "caseId": "cc-7d2c91",
+  "status": "production_owner_accepted",
+  "applicationOrigin": "https://app.aspectlylabs.com/mikka",
+  "applicationCommit": "7b6c1ee1b4a53563b2d6d9885ad992858514cd7a",
+  "deploymentId": "dpl_EJC6ev9gDootduhzSggG6YLd2Udi",
+  "workerCommit": "0920b72f9f15513c6f1735d8a1ea5c73d215218c",
+  "manualUi": {
+    "producerThreadUrl": "https://app.aspectlylabs.com/mikka?thread=4c19d00c-c214-4bf3-8658-caa8af4a3c1d",
+    "ownerClickAt": "2026-11-04T05:43:36.435Z",
+    "observedStatus": "已验收",
+    "screenshotAttachment": "unavailable_after_execution_environment_disconnected",
+    "clickCount": 1
+  },
+  "artifact": {
+    "path": "factory-1166-final-cc-7d2c91.txt",
+    "expectedUtf8": "factory-1166-final-cc-7d2c91\n7 * 8 = 56\nCC subscription artifact\n",
+    "bytes": 65,
+    "sha256": "3ac41740fdfcf500ab16088d022cc1472820b0386d33fc8e7f40dfe543ac77dd",
+    "arithmetic": "7 * 8 = 56"
+  },
+  "nativeProvenance": [
+    {
+      "observed_at": "2026-11-04T05:43:23.891Z",
+      "run_id": "4c19d00c-c214-4bf3-8658-caa8af4a3c1d",
+      "native_sid": "b99fbb76-aece-4752-a69e-acd2e0015d96",
+      "status": "succeeded",
+      "stopReason": "submitted",
+      "model_source": "subscription",
+      "harness": "claude_code",
+      "model": "claude-opus-5-5",
+      "native_binding": "dabd9bd4-2a79-40a8-85dc-1b3db772db19",
+      "native_connection": "93b6ab23-900b-4e18-9ea0-baccf2d104ce",
+      "connection_revision": "2",
+      "api_key_claim_count": "0",
+      "computer_scope_matches": true,
+      "criteria": [
+        {
+          "text": "File is exactly 65 bytes",
+          "passed": true,
+          "command": "wc -c < factory-1166-final-cc-7d2c91.txt",
+          "evidence": "65",
+          "exitCode": 0
+        },
+        {
+          "text": "SHA-256 equals 3ac41740fdfcf500ab16088d022cc1472820b0386d33fc8e7f40dfe543ac77dd",
+          "passed": true,
+          "command": "sha256sum factory-1166-final-cc-7d2c91.txt",
+          "evidence": "3ac41740fdfcf500ab16088d022cc1472820b0386d33fc8e7f40dfe543ac77dd  factory-1166-final-cc-7d2c91.txt",
+          "exitCode": 0
+        },
+        {
+          "text": "Second line arithmetic 7 * 8 = 56 is correct",
+          "passed": true,
+          "command": "cat -A factory-1166-final-cc-7d2c91.txt; echo $((7*8))",
+          "evidence": "Line 2 reads '7 * 8 = 56$'; shell computes 56",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "observed_at": "2026-11-04T05:43:23.891Z",
+      "run_id": "08c4d08b-7930-4ded-8b4f-adb6fc32058d",
+      "native_sid": "75cf0bac-312f-4ce1-82a6-721e1b68b3cc",
+      "status": "succeeded",
+      "stopReason": "submitted",
+      "model_source": "subscription",
+      "harness": "claude_code",
+      "model": "claude-opus-5-5",
+      "native_binding": "dabd9bd4-2a79-40a8-85dc-1b3db772db19",
+      "native_connection": "93b6ab23-900b-4e18-9ea0-baccf2d104ce",
+      "connection_revision": "2",
+      "api_key_claim_count": "0",
+      "computer_scope_matches": true,
+      "criteria": [
+        {
+          "text": "File is exactly 65 bytes",
+          "passed": true,
+          "evidence": "inspect_artifact(path=factory-1166-final-cc-7d2c91.txt) at HEAD 4a796fa888fbd0ef521762c29cbd25fe93578936 returned bytes=65; matchesExpectedUtf8=true against the exact 3-line LF text (28+1 + 10+1 + 24+1 = 65)."
+        },
+        {
+          "text": "SHA-256 equals 3ac41740fdfcf500ab16088d022cc1472820b0386d33fc8e7f40dfe543ac77dd",
+          "passed": true,
+          "evidence": "inspect_artifact returned sha256=3ac41740fdfcf500ab16088d022cc1472820b0386d33fc8e7f40dfe543ac77dd, committedSha256 has the same value, contentMatchesGit=true."
+        },
+        {
+          "text": "Second line arithmetic 7 * 8 = 56 is correct",
+          "passed": true,
+          "evidence": "In contentUtf8, line 2 is '7 * 8 = 56'. Checked independently: 7 × 8 = 56."
+        }
+      ]
+    },
+    {
+      "observed_at": "2026-11-04T05:43:23.891Z",
+      "run_id": "207c69c0-658b-46c5-8b5a-4086ccbe65b5",
+      "native_sid": "b2efbdb0-c9ef-403c-999c-e1b760eb4eec",
+      "status": "succeeded",
+      "stopReason": "submitted",
+      "model_source": "subscription",
+      "harness": "claude_code",
+      "model": "claude-opus-5-5",
+      "native_binding": "dabd9bd4-2a79-40a8-85dc-1b3db772db19",
+      "native_connection": "93b6ab23-900b-4e18-9ea0-baccf2d104ce",
+      "connection_revision": "2",
+      "api_key_claim_count": "0",
+      "computer_scope_matches": true,
+      "criteria": [
+        {
+          "text": "File is exactly 65 bytes",
+          "passed": true,
+          "command": "mcp__mikka__inspect_artifact path=factory-1166-final-cc-7d2c91.txt",
+          "evidence": "inspect_artifact bytes=65. My own count of the content: 28+1 + 10+1 + 24+1 = 65. matchesExpectedUtf8=true, so the file matches the expected text exactly: no BOM, LF line endings and one final LF."
+        },
+        {
+          "text": "SHA-256 equals 3ac41740fdfcf500ab16088d022cc1472820b0386d33fc8e7f40dfe543ac77dd",
+          "passed": true,
+          "command": "mcp__mikka__inspect_artifact path=factory-1166-final-cc-7d2c91.txt",
+          "evidence": "sha256=3ac41740fdfcf500ab16088d022cc1472820b0386d33fc8e7f40dfe543ac77dd; committedSha256 is identical; contentMatchesGit=true at head 4a796fa888fbd0ef521762c29cbd25fe93578936"
+        },
+        {
+          "text": "Second line arithmetic 7 * 8 = 56 is correct",
+          "passed": true,
+          "command": "mcp__mikka__inspect_artifact path=factory-1166-final-cc-7d2c91.txt",
+          "evidence": "In contentUtf8, line 2 is '7 * 8 = 56'. I checked it myself: 7 × 8 = 56, so it is correct."
+        }
+      ]
+    }
+  ],
+  "independentStages": [
+    {
+      "observed_at": "2026-11-04T05:42:42.953Z",
+      "task_id": "08e3df90-1878-4d31-bb02-b32cb7c7d258",
+      "task_stage": "approval",
+      "task_status": "pending",
+      "candidate_id": "74d6465d-fa44-432e-8187-d8544f30858f",
+      "candidate_kind": "deliverable",
+      "candidate_sha": null,
+      "producer_run_id": "4c19d00c-c214-4bf3-8658-caa8af4a3c1d",
+      "expected_execution_commit": "4a796fa888fbd0ef521762c29cbd25fe93578936",
+      "fresh_deliverable_snapshot_present": true,
+      "latest_stage_rows": [
+        {
+          "id": "a26f0a5d-def0-4e4a-a410-aabaf1535bad",
+          "runId": "4c19d00c-c214-4bf3-8658-caa8af4a3c1d",
+          "stage": "execute",
+          "status": "passed",
+          "position": 1,
+          "sessionId": "b99fbb76-aece-4752-a69e-acd2e0015d96",
+          "finishedAt": "2026-11-04T05:38:08.647245+00:00",
+          "run_status": "succeeded",
+          "stopReason": "submitted",
+          "frozen_check_sha": null,
+          "actual_session_id": "b99fbb76-aece-4752-a69e-acd2e0015d96",
+          "actual_base_branch": "main",
+          "observed_check_sha": null,
+          "observed_read_only": null,
+          "frozen_check_read_only": null,
+          "producer_deliverable_commit": "4a796fa888fbd0ef521762c29cbd25fe93578936"
+        },
+        {
+          "id": "cc94e31c-18c7-455a-aeb8-81dfbc76d8b0",
+          "runId": "08c4d08b-7930-4ded-8b4f-adb6fc32058d",
+          "stage": "review",
+          "status": "passed",
+          "position": 2,
+          "sessionId": "75cf0bac-312f-4ce1-82a6-721e1b68b3cc",
+          "finishedAt": "2026-11-04T05:39:47.567473+00:00",
+          "run_status": "succeeded",
+          "stopReason": "submitted",
+          "frozen_check_sha": "4a796fa888fbd0ef521762c29cbd25fe93578936",
+          "actual_session_id": "75cf0bac-312f-4ce1-82a6-721e1b68b3cc",
+          "actual_base_branch": "4a796fa888fbd0ef521762c29cbd25fe93578936",
+          "observed_check_sha": "4a796fa888fbd0ef521762c29cbd25fe93578936",
+          "observed_read_only": "true",
+          "frozen_check_read_only": "true",
+          "producer_deliverable_commit": null
+        },
+        {
+          "id": "6bdf84cf-3bc0-495c-ae57-cdec8f4a230b",
+          "runId": "207c69c0-658b-46c5-8b5a-4086ccbe65b5",
+          "stage": "verify",
+          "status": "passed",
+          "position": 3,
+          "sessionId": "b2efbdb0-c9ef-403c-999c-e1b760eb4eec",
+          "finishedAt": "2026-11-04T05:41:28.584718+00:00",
+          "run_status": "succeeded",
+          "stopReason": "submitted",
+          "frozen_check_sha": "4a796fa888fbd0ef521762c29cbd25fe93578936",
+          "actual_session_id": "b2efbdb0-c9ef-403c-999c-e1b760eb4eec",
+          "actual_base_branch": "4a796fa888fbd0ef521762c29cbd25fe93578936",
+          "observed_check_sha": "4a796fa888fbd0ef521762c29cbd25fe93578936",
+          "observed_read_only": "true",
+          "frozen_check_read_only": "true",
+          "producer_deliverable_commit": null
+        }
+      ],
+      "stage_count": "3",
+      "distinct_run_count": "3",
+      "distinct_native_sid_count": "3",
+      "passed_completed_stage_count": "3",
+      "fixed_candidate_check_count": "2",
+      "producer_snapshot_matches_candidate": true
+    }
+  ],
+  "actualInspectCalls": [
+    {
+      "observed_at": "2026-11-04T05:42:41.207Z",
+      "case_id": "cc-7d2c91",
+      "task_id": "08e3df90-1878-4d31-bb02-b32cb7c7d258",
+      "request_epoch": "6c3ca579-438b-440f-bd32-9b4c5e4e5767",
+      "attempt_id": "cc94e31c-18c7-455a-aeb8-81dfbc76d8b0",
+      "attempt_stage": "review",
+      "attempt_status": "passed",
+      "position": 2,
+      "candidate_id": "74d6465d-fa44-432e-8187-d8544f30858f",
+      "run_id": "08c4d08b-7930-4ded-8b4f-adb6fc32058d",
+      "session_id": "75cf0bac-312f-4ce1-82a6-721e1b68b3cc",
+      "input_seq": 9,
+      "input_created_at": "2026-11-04T05:39:13.077Z",
+      "tool_name": "mcp__mikka__inspect_artifact",
+      "tool_call_id": "toolu_012vk7TjfTztztwy3Pfbka8D",
+      "input_whitelist": {
+        "path": "factory-1166-final-cc-7d2c91.txt",
+        "expectedUtf8": "factory-1166-final-cc-7d2c91\n7 * 8 = 56\nCC subscription artifact\n"
+      },
+      "output_seq": 10,
+      "output_created_at": "2026-11-04T05:39:13.491Z",
+      "output_type": "tool-output-available",
+      "output_json_characters": 458,
+      "output_chunk_sha256": "ae66289318830500c4b826a2403ec03460a40d46e9310e41572e927e1bb9ce04",
+      "actual_tool_error": false,
+      "output_exceeds_limit": false,
+      "actualArtifact": {
+        "path": "factory-1166-final-cc-7d2c91.txt",
+        "bytes": 65,
+        "sha256": "3ac41740fdfcf500ab16088d022cc1472820b0386d33fc8e7f40dfe543ac77dd",
+        "head": "4a796fa888fbd0ef521762c29cbd25fe93578936",
+        "committedSha256": "3ac41740fdfcf500ab16088d022cc1472820b0386d33fc8e7f40dfe543ac77dd",
+        "contentMatchesGit": true,
+        "contentUtf8": "factory-1166-final-cc-7d2c91\n7 * 8 = 56\nCC subscription artifact\n",
+        "textUnavailable": null,
+        "matchesExpectedUtf8": true
+      }
+    },
+    {
+      "observed_at": "2026-11-04T05:42:41.207Z",
+      "case_id": "cc-7d2c91",
+      "task_id": "08e3df90-1878-4d31-bb02-b32cb7c7d258",
+      "request_epoch": "6c3ca579-438b-440f-bd32-9b4c5e4e5767",
+      "attempt_id": "6bdf84cf-3bc0-495c-ae57-cdec8f4a230b",
+      "attempt_stage": "verify",
+      "attempt_status": "passed",
+      "position": 3,
+      "candidate_id": "74d6465d-fa44-432e-8187-d8544f30858f",
+      "run_id": "207c69c0-658b-46c5-8b5a-4086ccbe65b5",
+      "session_id": "b2efbdb0-c9ef-403c-999c-e1b760eb4eec",
+      "input_seq": 9,
+      "input_created_at": "2026-11-04T05:40:48.735Z",
+      "tool_name": "mcp__mikka__inspect_artifact",
+      "tool_call_id": "toolu_01CMTMcrJtViVcdkHaXcnFHS",
+      "input_whitelist": {
+        "path": "factory-1166-final-cc-7d2c91.txt",
+        "expectedUtf8": "factory-1166-final-cc-7d2c91\n7 * 8 = 56\nCC subscription artifact\n"
+      },
+      "output_seq": 10,
+      "output_created_at": "2026-11-04T05:40:49.519Z",
+      "output_type": "tool-output-available",
+      "output_json_characters": 458,
+      "output_chunk_sha256": "6c6ad9bfe89080f20740119564c72707afbcfdb9f5c27c0083f8d57489fec0c0",
+      "actual_tool_error": false,
+      "output_exceeds_limit": false,
+      "actualArtifact": {
+        "path": "factory-1166-final-cc-7d2c91.txt",
+        "bytes": 65,
+        "sha256": "3ac41740fdfcf500ab16088d022cc1472820b0386d33fc8e7f40dfe543ac77dd",
+        "head": "4a796fa888fbd0ef521762c29cbd25fe93578936",
+        "committedSha256": "3ac41740fdfcf500ab16088d022cc1472820b0386d33fc8e7f40dfe543ac77dd",
+        "contentMatchesGit": true,
+        "contentUtf8": "factory-1166-final-cc-7d2c91\n7 * 8 = 56\nCC subscription artifact\n",
+        "textUnavailable": null,
+        "matchesExpectedUtf8": true
+      }
+    }
+  ],
+  "ownerReceipt": {
+    "observed_at": "2026-11-04T05:43:44.624Z",
+    "case_id": "cc-7d2c91",
+    "task_id": "08e3df90-1878-4d31-bb02-b32cb7c7d258",
+    "issue_id": "e598dc4c-848f-4240-bf90-9d1112f3b113",
+    "stage": "approval",
+    "status": "passed",
+    "revision": 12,
+    "request_epoch": "6c3ca579-438b-440f-bd32-9b4c5e4e5767",
+    "current_candidate_id": "74d6465d-fa44-432e-8187-d8544f30858f",
+    "candidate_id": "74d6465d-fa44-432e-8187-d8544f30858f",
+    "candidate_kind": "deliverable",
+    "candidate_sha": null,
+    "producer_run_id": "4c19d00c-c214-4bf3-8658-caa8af4a3c1d",
+    "producer_session_id": "b99fbb76-aece-4752-a69e-acd2e0015d96",
+    "candidate_execution_commit": "4a796fa888fbd0ef521762c29cbd25fe93578936",
+    "acceptance_id": "eb64639a-3984-4a54-b77b-fcbb1ded11e3",
+    "accepted_candidate_id": "74d6465d-fa44-432e-8187-d8544f30858f",
+    "accepted_by": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+    "authenticated_session_present": true,
+    "owner_event_id": "ea8121a0-82d2-4719-8988-5f5d32bf8355",
+    "accepted_at": "2026-11-04T05:43:36.730Z",
+    "event_action": "finish",
+    "event_status": "passed",
+    "event_acceptance_id": "eb64639a-3984-4a54-b77b-fcbb1ded11e3",
+    "result_stage": "approval",
+    "result_status": "passed",
+    "result_candidate_id": "74d6465d-fa44-432e-8187-d8544f30858f",
+    "acceptance_count_for_current_candidate": 1
+  },
+  "limitations": {
+    "providerResolvedAliasIndependentlyObserved": false,
+    "sourceConclusion": "Frozen harness/model/source and actual native subscription claims; no API fallback.",
+    "reportsAreNotSubstitutedForActualToolCalls": true
+  },
+  "history": {
+    "firstPost1201RetryAt": "2026-11-04T05:32:33.923Z",
+    "coordinatorExecution": "6901569e-3344-4da2-8cb3-72a38b5cc596",
+    "coordinatorResult": "completed",
+    "coordinatorActualSource": "claude_cpa / claude-haiku-5-5 / subscription",
+    "incorrectDispatch": "dispatch_run returned repositoryRequired after creating exactly one issue; no native run was created by that call.",
+    "correction": "Same issue dispatched once through dispatch_bot_computer with Claude Code / claude-opus-5-5.",
+    "correctionSentAt": "2026-11-04T05:34:56.897Z",
+    "correctionExecution": "38b807f8-8225-4e8a-8a31-7c18e46fb0e4",
+    "olderFailuresRemainHistoricalFailures": true
+  },
+  "independentObserver": {
+    "observedThrough": "2026-11-04T05:48:01.484Z",
+    "providerObservedModel": null,
+    "producerActualCommandPair": {
+      "runId": "4c19d00c-c214-4bf3-8658-caa8af4a3c1d",
+      "toolCallId": "toolu_01TVYYYLXAoz62Kps8vsEJno",
+      "inputSeq": 8,
+      "outputSeq": 9,
+      "toolName": "Bash",
+      "actualCommandChecks": [
+        "printf write",
+        "cat read",
+        "wc -c",
+        "sha256sum",
+        "shell arithmetic 7*8"
+      ],
+      "outputCharacters": 450,
+      "actualBytes65": true,
+      "actualHashMatches": true,
+      "actualThreeLines": true,
+      "actualMath56": true,
+      "outputType": "tool-output-available",
+      "separatelyObservedExitCode": null,
+      "inputJsonSha256": "0c68f0a649b3f40635aebaa331714e4620220fbd7a66fe12b3a3cbd33f6316c2",
+      "outputJsonSha256": "7d5a467a7148b13da701a8577d340975e4cd433046f749bfbfe13d72bdce7f32"
+    },
+    "bothIndependentChecks": {
+      "readOnly": true,
+      "filesChanged": 0,
+      "criteriaPassed": 3,
+      "criteriaTotal": 3,
+      "mathEquationPresent": true,
+      "independentMathJudgmentPresent": true
+    },
+    "ownerReceiptReadbackAt": "2026-11-04T05:45:29.025Z",
+    "sessionValidAtAcceptance": true,
+    "finalState": {
+      "observedAt": "2026-11-04T05:47:58.039Z",
+      "sameTitleIssues": 1,
+      "tasks": 1,
+      "runs": 3,
+      "nativeClaims": 3,
+      "apiClaims": 0,
+      "issueMutationReceipts": 1,
+      "ownerReceipts": 1,
+      "caseOperations": 0,
+      "nonterminalRuns": 0,
+      "futureRunLeases": 0,
+      "activeThreadMachines": 0,
+      "pendingActions": 0,
+      "runningCoordinators": 0,
+      "caseUndeliveredEvents": 0,
+      "executingOrUncertainOperations": 0,
+      "coordinatorLease": false,
+      "coordinatorHasError": false
+    },
+    "observerActions": {
+      "readOnly": true,
+      "modelCalls": 0,
+      "vmCalls": 0,
+      "businessWrites": 0,
+      "extraRetries": 0
+    },
+    "nativeRunOutcomes": [
+      {
+        "runId": "4c19d00c-c214-4bf3-8658-caa8af4a3c1d",
+        "outcome": "needs_input",
+        "factoryStageStatus": "passed",
+        "runStatus": "succeeded"
+      },
+      {
+        "runId": "08c4d08b-7930-4ded-8b4f-adb6fc32058d",
+        "outcome": "needs_input",
+        "factoryStageStatus": "passed",
+        "runStatus": "succeeded"
+      },
+      {
+        "runId": "207c69c0-658b-46c5-8b5a-4086ccbe65b5",
+        "outcome": "needs_input",
+        "factoryStageStatus": "passed",
+        "runStatus": "succeeded"
+      }
+    ]
+  }
+}

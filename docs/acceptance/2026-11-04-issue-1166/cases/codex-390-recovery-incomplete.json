@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "caseId": "original-codex-390",
+  "status": "incomplete_review_failed",
+  "lastReadOnlyState": {
+    "observed_at": "2026-11-04T05:47:24.685Z",
+    "task_id": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+    "issue_id": "65e92e1e-4d75-4531-b1bd-a2a68d7689c7",
+    "request_epoch": "531dbd62-042c-4177-9e8a-16d25a46a452",
+    "stage": "review",
+    "status": "failed",
+    "revision": 24,
+    "attemptId": "53415a39-a7bc-4ad9-8378-4bd8f6d050aa",
+    "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+    "producer_run_id": "390deeb4-5e5b-487a-acb9-c2e53dc3f8e9",
+    "producer_session_id": "01a1a2a5-76f1-7881-b182-311eba17fa98",
+    "current_check_run_id": "d646fc7d-3154-491a-86e0-d27be6b77549",
+    "reason_code": "repair_budget_exhausted",
+    "trusted_failure_provenance": "true",
+    "same_epoch_execute_attempts": "4",
+    "current_candidate_owner_acceptances": "0",
+    "active_factory_runs": "0",
+    "latest_review_criteria": [
+      {
+        "text": "目标文件正文按本次 expectedUtf8 逐字节匹配。",
+        "passed": true,
+        "command": "mikka.inspect_artifact({\"path\":\"factory-1146-codex-d8f3d3f2.txt\",\"expectedUtf8\":\"factory-1146-codex-d8f3d3f2 resume-1146-recheck-6a265954\\n7 - 4 = 3\\nverified artifact\\n\"})",
+        "evidence": "真实 inspect 返回 contentUtf8=\"factory-1146-codex-d8f3d3f2 resume-1146-recheck-6a265954\\n7 - 4 = 3\\nverified artifact\\n\" 且 matchesExpectedUtf8=true。",
+        "exitCode": 0
+      },
+      {
+        "text": "实际 UTF-8 字节数与 SHA256 匹配本次契约。",
+        "passed": true,
+        "command": "mikka.inspect_artifact(...)",
+        "evidence": "真实返回 bytes=85，sha256=4e80716f5de244c05cab6f9fdf3d93c90f35fc2cabcf4a07ae79772c48d35032。",
+        "exitCode": 0
+      },
+      {
+        "text": "实际第二行算式语义正确。",
+        "passed": true,
+        "command": "mikka.inspect_artifact(...)",
+        "evidence": "真实返回的完整 contentUtf8 第二行为“7 - 4 = 3”；7 减 4 等于 3。",
+        "exitCode": 0
+      },
+      {
+        "text": "Git HEAD 快照与当前目标内容一致。",
+        "passed": true,
+        "command": "mikka.inspect_artifact(...)",
+        "evidence": "真实返回 head=8f418086fff9bcd42d17e32de7b7f4a968fdfc0a、committedSha256=4e80716f5de244c05cab6f9fdf3d93c90f35fc2cabcf4a07ae79772c48d35032、contentMatchesGit=true。",
+        "exitCode": 0
+      },
+      {
+        "text": "独立命令执行证据（如冻结 criterion 要求）可由本次 review 提供。",
+        "passed": false,
+        "evidence": "本次 review brief 明确未授予 verify_command；inspect_artifact 不是命令执行。持久化 producer command records=[]，因此没有真实独立命令执行证据。"
+      }
+    ]
+  },
+  "retainedSnapshotRecovery": {
+    "ownerClickAt": "2026-11-04T05:19:25.461Z",
+    "applicationCommit": "62bb445860642cb110b37e00794daf06ab454f88",
+    "snapshotReceiptId": "2ea317bc-ded1-4523-85c6-4199f384dbf5",
+    "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+    "producerUnchanged": "390deeb4-5e5b-487a-acb9-c2e53dc3f8e9",
+    "sessionUnchanged": "01a1a2a5-76f1-7881-b182-311eba17fa98",
+    "actualHead": "8f418086fff9bcd42d17e32de7b7f4a968fdfc0a",
+    "actualTree": "308db7079ee7bf6a9810d95f799b6a660e6caf8e",
+    "clean": true,
+    "diffBytes": 279,
+    "diffSha256": "21cf7d857692742a00fd91bb63df63405e8bae87f3cbb33df6afcc6e4a644928",
+    "newProducerCreated": false,
+    "historicalRowComparison": "11 of 11 protected rows unchanged between the near-click and first post-click observations; this is a separate later observation, not a replacement for the old strict AFTER."
+  },
+  "currentFailureInterpretation": {
+    "artifactChecksPassed": 4,
+    "extraConditionalCommandCriterionFailed": true,
+    "ownerUnconditionallyRequiresIndependentShell": false,
+    "ownerProducerActualChecksStillRequired": true,
+    "currentProducerPersistedCommandRecords": 0,
+    "currentProducerNativeJsonlRead": false,
+    "noClaimThatSdkExecutedNoOtherCommands": true,
+    "nextCandidateMustRemainFixed": true
+  },
+  "historicalStrictAfter": {
+    "status": "FAILED",
+    "reason": "historical_database_row_changed/compare_after",
+    "workflowRun": 41748854643,
+    "artifactId": 13285320595,
+    "changedColumn": "outcomeAt",
+    "changedColumns": 1,
+    "comparedColumns": 44,
+    "baselineOrCollectorOrThresholdModified": false
+  },
+  "acceptance": {
+    "independentReviewPassed": false,
+    "independentVerifyCompleted": false,
+    "ownerAccepted": false
+  },
+  "protectedVm": "ihuee6xcl4vvkox0lmpsz",
+  "protectedVmAccessedByThisWork": false
+}

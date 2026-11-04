@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "mainObservedSha": "7b6c1ee1b4a53563b2d6d9885ad992858514cd7a",
+  "release1200": {
+    "pr": 1200,
+    "mergeCommit": "62bb445860642cb110b37e00794daf06ab454f88",
+    "finalDeployment": {
+      "id": "dpl_419jqfp1pAwM8QJY2Bt1if7sbH2t",
+      "url": "mikka-fougzx0qr-mikka-dev.vercel.app",
+      "readyState": "READY",
+      "ready": 1793769428715,
+      "sourceCommit": "62bb445860642cb110b37e00794daf06ab454f88"
+    },
+    "officialWorkerCommit": "d504b28f1269cc6eeb4a283dd78e323e0d058b35",
+    "mainCiRun": 41777016903,
+    "officialRuntimeRun": 41777016988,
+    "status": "ready_before_original_owner_retry"
+  },
+  "release1201": {
+    "pr": 1201,
+    "mergeCommit": "7b6c1ee1b4a53563b2d6d9885ad992858514cd7a",
+    "finalDeployment": {
+      "id": "dpl_EJC6ev9gDootduhzSggG6YLd2Udi",
+      "url": "mikka-hbmfhn2ma-mikka-dev.vercel.app",
+      "readyState": "READY",
+      "ready": 1793770177030,
+      "sourceCommit": "7b6c1ee1b4a53563b2d6d9885ad992858514cd7a"
+    },
+    "officialWorkerCommit": "0920b72f9f15513c6f1735d8a1ea5c73d215218c",
+    "mainCiRun": 41778673782,
+    "officialRuntimeRun": 41778673763,
+    "status": "ready_before_successful_cc_retry"
+  },
+  "latestProductionAlias": {
+    "observedAt": "2026-11-04T05:47Z",
+    "alias": "app.aspectlylabs.com",
+    "deploymentId": "dpl_EJC6ev9gDootduhzSggG6YLd2Udi"
+  },
+  "protectedTemplates": {
+    "officialDesktopClaudeCodexTemplatesModified": false,
+    "customTemplateWorkflowEnabled": false
+  },
+  "testingLimits": "Passing CI and READY deploys do not establish the remaining original Codex or fresh API acceptance."
+}

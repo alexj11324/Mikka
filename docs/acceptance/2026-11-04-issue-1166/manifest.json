@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "checkpointStatus": "in_progress_not_final_acceptance",
+  "scope": "Only the 2026-11-04-issue-1166 directory; all prior files and prior manifest remain unchanged.",
+  "applicationCommit": "7b6c1ee1b4a53563b2d6d9885ad992858514cd7a",
+  "lastProductionObservationsThrough": "2026-11-04T06:00:38.427Z",
+  "evidenceBranchParent": "b7852d08682c9b64eeb987332d960adce1ed4e81",
+  "files": [
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/cases/codex-390-recovery-incomplete.json",
+      "gitBlobSha": "811a791dd9455b5515f3daca4a8bb4aaa207d92d",
+      "utf8Bytes": 4663
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/cases/codex-direct-predecessor-observations.json",
+      "gitBlobSha": "be706a028b8ec54647fd375eeb64fb757251ed11",
+      "utf8Bytes": 7263
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/production-releases.json",
+      "gitBlobSha": "003ca2a564598b7dcde3362df9802a4df22c287e",
+      "utf8Bytes": 1610
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/cases/repair-budget-boundary.json",
+      "gitBlobSha": "6d66f6d34437a9de45255b650ece7f97b680f142",
+      "utf8Bytes": 4459
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/cases/cc-7d2c91-owner-accepted.json",
+      "gitBlobSha": "24803b8b6f696603498f9f27f9a903178a30e119",
+      "utf8Bytes": 17379
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/cases/api-a9e472-not-started.json",
+      "gitBlobSha": "ec5bafd52feb15d98cfbcdab712d052d79770aee",
+      "utf8Bytes": 5838
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/README.md",
+      "gitBlobSha": "8e1cd31f297e0b762d42727a1a9de9796f428d2e",
+      "utf8Bytes": 7829
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/next-steps.md",
+      "gitBlobSha": "7af31ce35cf2220d1b6559cca55868fcee38924f",
+      "utf8Bytes": 6401
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1166/api-a9e472-prompt-v3.txt",
+      "gitBlobSha": "ed7a973fe321b6c6b0772953b9297eed69542e73",
+      "utf8Bytes": 2403
+    }
+  ],
+  "manifestSelfHashExcluded": true,
+  "noNewScreenshotAttached": true
+}

@@ -1,0 +1,88 @@
+{
+  "schema": "issue1166-repair-budget-boundary-v1",
+  "sourceCommit": "62bb445860642cb110b37e00794daf06ab454f88",
+  "sameCriticalSourceAtMain": "7b6c1ee1b4a53563b2d6d9885ad992858514cd7a",
+  "observedAt": "2026-11-04T05:43:42.194773Z",
+  "task": {
+    "id": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+    "stage": "review",
+    "status": "failed",
+    "revision": 24,
+    "attemptId": "53415a39-a7bc-4ad9-8378-4bd8f6d050aa",
+    "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+    "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452"
+  },
+  "producerRunId": "390deeb4-5e5b-487a-acb9-c2e53dc3f8e9",
+  "review": {
+    "runId": "d646fc7d-3154-491a-86e0-d27be6b77549",
+    "runStatus": "succeeded",
+    "stopReason": "submitted",
+    "attemptStatus": "failed",
+    "trustedFailureProvenance": true,
+    "reasonCode": "repair_budget_exhausted",
+    "reportOnly": true,
+    "command": null,
+    "executionSha": "8f418086fff9bcd42d17e32de7b7f4a968fdfc0a",
+    "filesChangedCount": 0
+  },
+  "completionReceipt": {
+    "eventId": "afd8b51d-e84c-566b-9aba-18e3b559e3e5",
+    "action": "finish",
+    "status": "failed",
+    "revision": 24,
+    "sha256": "b7ae688fecbfd4b44d4862b53d765b50ce71584b4d60f82b10686c933d480fad",
+    "scopeMatches": true
+  },
+  "receiptDifference": {
+    "observedAt": "2026-11-04T05:44:26.781968Z",
+    "savedReasonCode": null,
+    "currentReasonCode": "repair_budget_exhausted",
+    "otherOutputFieldsExactlyEqual": true,
+    "savedOutputSha256": "d0f25d538e5cc068db2815b6ba8d5eea0ddc1b4e0ba9dd46cb6084c8cc7ffefa",
+    "currentOutputWithoutReasonSha256": "d0f25d538e5cc068db2815b6ba8d5eea0ddc1b4e0ba9dd46cb6084c8cc7ffefa"
+  },
+  "budget": {
+    "executeCount": 4,
+    "maxFixAttempts": 3,
+    "rejectPredicate": "executeCount > maxFixAttempts",
+    "maximumTotalExecuteAttempts": 4,
+    "remainingAutomaticFixes": 0,
+    "legacyNullRequestEpochCountsAsCurrent": true,
+    "checkRecoveryEventsForCandidate": 0,
+    "automaticCurrentCheckRepairEventExists": false
+  },
+  "controls": {
+    "activeTaskRuns": 0,
+    "unresolvedCurrentAttemptQuestions": 0,
+    "executingOrUncertainOperations": 0
+  },
+  "paths": {
+    "ownerRetry": "existing retry creates fresh review attempt; preserves candidate, producer and request epoch; no Decisions model",
+    "automaticFactory": "completion/reconcile/watchdog/approval reject and repair_code use the existing budget gate; cannot add execute at count4",
+    "genericCoordinator": "queueFactoryTask continue-repair lacks the budget gate; pending review after Owner retry is a concrete window that can clear candidate and create execute",
+    "failedTrustedCheckCaveat": "current d646 direct generic repair also encounters downstream repairAnswerCandidate receipt ancestry rejection; pending retry does not satisfy that failedCheck predicate",
+    "decisionRecovery": "current reportOnly/null candidate.sha and later reasonCode append do not match readFactoryCheckFailure; do not loosen that contract"
+  },
+  "requiredGuard": {
+    "status": "authorized_for_separate_draft_pr_not_yet_implemented",
+    "file": "lib/factory/task-dispatch.ts",
+    "change": "checkFactoryRepairBudget(tx,task) inside existing locked continue-repair branch before store.apply(repair), including pending states",
+    "ownerEpoch": "normal authenticated advanceFactoryRequest occurs first; a new Owner request keeps its existing new-epoch behavior",
+    "unchanged": "direct Owner repair semantics, store, caps, old records, templates, UI",
+    "remainingBoundary": "queue guard prevents new attempts/runs; earlier prepareBotCloudTaskRuntime may already have performed provider preparation; no zero-provider-call claim"
+  },
+  "risk": {
+    "occurrenceEstimate": 6,
+    "impactEstimate": 9,
+    "score": 54,
+    "productionBypassExecuted": false
+  },
+  "requiredDbCases": [
+    "four execute attempts: failed review generic continuation rejects with budget code and preserves rows",
+    "four execute attempts: same-candidate pending retry cannot be replaced by generic continuation",
+    "three execute attempts: same-epoch continuation admits exactly one fourth execute and replays idempotently",
+    "four old executes: explicit authenticated Owner continuation opens new epoch and first execute without counting old attempts"
+  ],
+  "implementationGate": "same-candidate UI retry must wait for guard regression verification",
+  "observations": "SELECT only; no VM/UI/model/write or issue comments in this diagnosis"
+}
