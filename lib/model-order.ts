@@ -117,7 +117,9 @@ export async function readOrder(query: Query, scope: OrderScope, candidates?: (O
   const settings = await settingsRow(query, scope)
   if (!settings.customized) {
     const list = defaultOrder(candidates ?? await orderCandidates(query, scope), settings.preferredHarness)
-    return { ...settings, entries: list.map(item => ({ id: `default:${entryKey(item)}`, harness: item.harness, model: item.model, source: item.source })) }
+    // The entry is also frozen in a run's JSONB definition. Keep the NUL-separated
+    // identity key in memory, but give its opaque row id a stable JSONB-safe form.
+    return { ...settings, entries: list.map(item => ({ id: `default:${encodeURIComponent(entryKey(item))}`, harness: item.harness, model: item.model, source: item.source })) }
   }
   const { rows } = await query.query<EntryRow>(
     'SELECT id,harness,model,"sourceKind","sourceId"::text AS "sourceId" FROM model_order_entries WHERE "ownerId"=$1 AND "workspaceId"=$2 ORDER BY position,id',

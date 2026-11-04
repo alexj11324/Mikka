@@ -12,6 +12,7 @@ import { normalizeRepository } from '@mikka/protocol/repository'
 import { emptyRunReport } from '@mikka/protocol/run'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { recordPushGrant } from './support/github-app-stub'
+import { ALLOWED_MODEL, codexWithModel, seedAllowedModel } from './support/allowed-model'
 
 test('provider failure continues the same task through its authorized preferred models', { skip: !dbUrl }, async t => {
   const names = ['WORKSPACE_SECRETS_KEY', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED'] as const
@@ -150,6 +151,38 @@ test('provider failure continues the same task through its authorized preferred 
     await preferences(p, entries)
     return { p, first, second, entries }
   }
+
+  await t.test('an untouched default order persists its source and subscription continuation with the same entry identities', async () => {
+    const p = await person('provider-default-order')
+    await addKey(p.id, 'anthropic', ['fixture-opus'])
+    const { connectionId } = await seedAllowedModel(pool, p.id, { workspaceId: p.workspaceId })
+    await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [p.deviceId, JSON.stringify([
+      { harness: 'claude_code', installed: true, toolApproval: true }, ...codexWithModel,
+    ])])
+    // A location change leaves the real default preference list untouched.
+    await order.changeOrder(pool, scope(p), { kind: 'location', location: 'local' })
+    const preferred = await order.readOrder(pool, scope(p))
+    assert.equal(preferred.customized, false)
+    assert.deepEqual(preferred.entries.map(item => [item.harness, item.model]), [['claude_code', 'fixture-opus'], ['codex', ALLOWED_MODEL]])
+    assert.deepEqual(preferred.entries[1].source, { kind: 'subscription', connectionId })
+    assert.ok(preferred.entries.every(item => item.id.startsWith('default:') && !item.id.includes('\u0000')))
+
+    const runId = await running(p)
+    assert.deepEqual((await row(runId)).agentDefinition.modelDispatch.entry, preferred.entries[0])
+    await end(p, runId, balance)
+    const original = await row(runId)
+    const [continuation, ...extra] = await children(runId)
+    assert.ok(continuation, 'the default subscription must be admitted after the first provider fails')
+    assert.equal(extra.length, 0)
+    assert.equal(original.report.modelFallback.state, 'switched')
+    assert.deepEqual(continuation.agentDefinition.modelDispatch.entry, preferred.entries[1])
+    assert.equal(continuation.agentDefinition.subscription.modelId, ALLOWED_MODEL)
+    assert.equal(continuation.agentDefinition.apiKey, undefined)
+    assert.equal(providerContinuationMatches(original, continuation), true)
+    await recoverProviderFailure(pool, p.id, runId)
+    assert.equal((await children(runId)).length, 1)
+    assert.deepEqual(await order.readOrder(pool, scope(p)), preferred, 'freezing and replay neither encode an id twice nor customize the list')
+  })
 
   await t.test('402 switches A to B, keeps the worktree across harnesses, and replay creates exactly one child', async () => {
     const { p, first, second } = await twoModels('provider-balance')
