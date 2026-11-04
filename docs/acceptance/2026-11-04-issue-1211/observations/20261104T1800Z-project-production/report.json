@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "observedAt": "2026-11-04T19:20:03.972Z",
+  "status": "insufficient",
+  "productionAcceptance": false,
+  "reasons": [
+    "metric_groups_missing_or_truncated"
+  ],
+  "scope": {
+    "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+    "vercelProjectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "neonProjectId": "autumn-fire-21908520",
+    "neonOrgId": "org-sweet-lab-80289846"
+  },
+  "provenance": {
+    "checkerSha": "ca7958c34c566642893576479dfd21660b849c34",
+    "workflowRunId": "41895894978"
+  },
+  "limitations": [
+    "This is a project-wide production observation, never a fixed-task before, after or idle acceptance window.",
+    "The completed hour can include multiple deployments, concurrent work and interrupted tasks; alias/build reads are collection context only.",
+    "Vercel values are function-invocation observability aggregates, not an independent complete billing receipt.",
+    "Neon project bytes include all branches; PostHog bucket alignment requires its own matching provider-hour evidence."
+  ],
+  "window": {
+    "role": "observation",
+    "scope": "project-production",
+    "start": 1793815200000,
+    "end": 1793818800000,
+    "from": "2026-11-04T18:00:00.000Z",
+    "to": "2026-11-04T19:00:00.000Z"
+  },
+  "neon": {
+    "projectId": "autumn-fire-21908520",
+    "orgId": "org-sweet-lab-80289846",
+    "metric": "public_network_transfer_bytes",
+    "granularity": "hourly",
+    "requestedFrom": "2026-11-04T18:00:00.000Z",
+    "requestedTo": "2026-11-04T19:00:00.000Z",
+    "reportedThrough": "2026-11-04T19:00:00.000Z",
+    "coverage": "requested_hour_returned",
+    "bytes": 60516203,
+    "buckets": [
+      {
+        "from": "2026-11-04T18:00:00.000Z",
+        "to": "2026-11-04T19:00:00.000Z",
+        "bytes": 60516203,
+        "periodStart": "2026-11-03T10:56:54.000Z"
+      }
+    ],
+    "scope": "project_all_branches",
+    "finality": "returned_provider_bucket_not_an_independent_billing_finality_receipt"
+  }
+}

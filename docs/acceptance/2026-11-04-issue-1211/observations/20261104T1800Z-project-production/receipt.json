@@ -1,0 +1,30 @@
+{
+  "kind": "project-production-observation",
+  "productionAcceptance": false,
+  "implementationCommit": "cbf3fdb99729301cb929c23f5b2e36c44488363f",
+  "checkerCommit": "ca7958c34c566642893576479dfd21660b849c34",
+  "workflowRunId": 41895894978,
+  "artifactId": 13355716068,
+  "artifactArchiveSha256": "2fed7b79fa44fd31591d0d1f129b2f0e156667e7f201a1c3d0ca226b35884957",
+  "status": "insufficient",
+  "reasons": [
+    "metric_groups_missing_or_truncated"
+  ],
+  "neonHour": {
+    "from": "2026-11-04T18:00:00.000Z",
+    "to": "2026-11-04T19:00:00.000Z",
+    "bytes": 60516203,
+    "scope": "project_all_branches"
+  },
+  "posthogAlignment": "not_established_by_capture_timestamp_or_matching_bytes",
+  "historicalImplementationRun": {
+    "id": 41895747540,
+    "checkerCommit": "cbf3fdb99729301cb929c23f5b2e36c44488363f",
+    "role": "connectivity-smoke",
+    "from": "2026-11-04T11:00:00.000Z",
+    "to": "2026-11-04T12:00:00.000Z",
+    "artifactId": 13355616141,
+    "artifactArchiveSha256": "1d60c475cb93871a0a7d3cccbc96459d254d639f55ae7c1b2a7289b2baf80281",
+    "productionAcceptance": false
+  }
+}
