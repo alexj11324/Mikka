@@ -52,13 +52,12 @@ origin. Reuse existing authorized provider/browser sessions. If the provider
 requires MFA or reauthentication, hand over that specific provider step once;
 never request passwords or verification codes in chat.
 
-An existing authorized dedicated account is stored in Infisical project
-`Mikka Test Account Vault`, environment `dev`, path `/test-account`, under
-`MIKKA_TEST_ACCOUNT_EMAIL` and `MIKKA_TEST_ACCOUNT_PASSWORD`. Use this existing
-source when the specific check needs that identity; it is not a routine account
-retrieval requirement. Retrieve needed values only in memory and keep them out
-of source, logs, screenshots and model-visible output. This project is separate
-from cloud-computer execution credentials. Preserve provider verification checks.
+There is no separate Infisical vault for an OAuth test account; the Aspectly Labs
+organization has no such project. Use the existing authorized provider/browser
+sessions above. Live model-path acceptance (API key, Claude Code subscription,
+Codex subscription) runs through the normal Owner UI of the existing Owner
+account, which already has those sources bound. Preserve provider verification
+checks.
 
 For `account_not_linked`, diagnose the provider identity, existing account and
 verification state without weakening ownership checks. Record the affected
