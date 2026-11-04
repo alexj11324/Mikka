@@ -21,6 +21,7 @@ import { getTelegramIntegrationStatus } from '@/app/actions/telegram'
 import { Link } from '@/i18n/navigation'
 import { AppTile, ConnectedAppDetail, ConnectedAppRow, ConnectedAppsStatus, OWN_APPS, PluginBreadcrumb, PluginRow, isOwnApp, useAppInfo, useConnectedApps, useStoreCatalog, type ConnectedApps, type OwnAppId } from '@/components/plugins/connected-apps'
 import { CredentialDialog, type CredentialTarget } from '@/components/plugins/credential-dialog'
+import { McpConnections, useMcpConnections } from '@/components/plugins/mcp-connections'
 import { GitHubSettings } from '@/components/plugins/github-settings'
 import { LinearSettings } from '@/components/settings/linear-settings'
 import { TelegramSettings } from '@/components/settings/telegram-settings'
@@ -110,7 +111,7 @@ type StoreEntry = { id: string; name: string; description: string; iconUrl: stri
  * every app a person can connect, as Codex's 插件. 设置 › 连接 lists only
  * what the person has connected. An app's own page (`&app=`) is shared.
  */
-export function PluginsView({ section, rootLabel, linearNotice = null }: { section: 'plugins' | 'connections'; rootLabel: string; linearNotice?: 'connected' | 'error' | null }) {
+export function PluginsView({ section, rootLabel, linearNotice = null, workspaceId, workspaceName }: { section: 'plugins' | 'connections'; rootLabel: string; linearNotice?: 'connected' | 'error' | null; workspaceId?: string; workspaceName?: string }) {
   const apps = useConnectedApps()
   const info = useAppInfo()
   const [app, setApp] = useState<string | null>(linearNotice ? 'linear' : null)
@@ -160,20 +161,22 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
         </div>}
     </div>
   }
-  if (section === 'connections') return <ConnectedList apps={apps} ownRead={ownRead} href={id => href({ app: id })} onOpen={openApp} />
+  if (section === 'connections') return <ConnectedList key={workspaceId} apps={apps} ownRead={ownRead} href={id => href({ app: id })} onOpen={openApp} workspaceId={workspaceId} workspaceName={workspaceName} />
   return <Store apps={apps} ownRead={ownRead} category={category} rootLabel={rootLabel} href={href} go={go} tab={tab} setTab={setTab} query={query} setQuery={setQuery} />
 }
 
 /** 设置 › 连接: only what the person has connected, one uniform row each. */
-function ConnectedList({ apps, ownRead, href, onOpen }: { apps: ConnectedApps; ownRead: OwnAppsRead; href: (id: string) => string; onOpen: (id: string) => void }) {
+function ConnectedList({ apps, ownRead, href, onOpen, workspaceId, workspaceName }: { apps: ConnectedApps; ownRead: OwnAppsRead; href: (id: string) => string; onOpen: (id: string) => void; workspaceId?: string; workspaceName?: string }) {
   const t = useTranslations('Plugins')
   const info = useAppInfo()
+  const mcp = useMcpConnections(workspaceId)
+  const mcpEmpty = !workspaceId || (mcp.data && !mcp.error && mcp.data.servers.length === 0)
   const composio = apps.connectedToolkits()
   const ownStates = ownRead.data?.states
   const ownKnown = ownRead.data && !ownRead.data.failed.length && !ownRead.error
   const loading = apps.loading || (!ownRead.data && !ownRead.error)
   const own = OWN_APPS.filter(id => ownStates?.[id] === 'connected' || ownStates?.[id] === 'paused')
-  if (!apps.loading && !apps.error && ownKnown && !composio.length && !own.length) return <div className="flex flex-col gap-4">
+  if (!apps.loading && !apps.error && ownKnown && !composio.length && !own.length && mcpEmpty) return <div className="flex flex-col gap-4">
     <ConnectedAppsStatus apps={apps} />
     <Empty className="min-h-48">
       <EmptyHeader>
@@ -192,6 +195,7 @@ function ConnectedList({ apps, ownRead, href, onOpen }: { apps: ConnectedApps; o
         <span className="text-xs text-muted-foreground">{t(`state.${ownStates![id]!}`)}</span>
       </PluginRow>)}
     </SettingsSection> : null}
+    {workspaceId && <McpConnections workspaceId={workspaceId} workspaceName={workspaceName} read={mcp} />}
   </div>
 }
 

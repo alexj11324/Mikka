@@ -19,6 +19,22 @@ test('MCP input rejects credential URLs, private targets, forwarded headers and 
   assert.equal(updateMcpSchema.safeParse({ id: randomUUID(), url: 'https://another.dev' }).success, false)
 })
 
+test('connection-owned credentials are masked from pre-call diagnostics as well as tool results', async () => {
+  const secret = 'SYNTHETICSHAREDOWNERSECRET', endpoint = 'https://mcp.acme.dev/private-endpoint'
+  const printed: string[] = [], warn = console.warn
+  console.warn = line => { printed.push(String(line)) }
+  try {
+    const result = await runMcpCommand(async () => ({ url: endpoint, transport: 'http', headers: { authorization: `Bearer ${secret}` }, secrets: [secret, endpoint] }), { cursor: undefined }, {
+      connect: async () => { throw Object.assign(new Error(endpoint), { name: secret, code: secret }) },
+      transport: () => ({ fetch: async () => { throw Error('no provider I/O') }, close: async () => {} }),
+    })
+    assert.deepEqual(result, { error: 'mcpUnavailable' })
+    assert.equal(printed.length, 1)
+    assert.ok(!printed[0].includes(secret)); assert.ok(!printed[0].includes(endpoint))
+    assert.ok(printed[0].includes('[redacted]'))
+  } finally { console.warn = warn }
+})
+
 test('transport rejects private DNS and origin changes before sending, pins DNS on the wire', async () => {
   let sent = 0
   const transport = publicMcpFetch('https://mcp.acme.dev', AbortSignal.timeout(5000), {
