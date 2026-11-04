@@ -13,7 +13,7 @@ import { loadAgentDirectory } from './loader'
 import { instrumentTools, toolOutcome } from './instrument'
 import { CORE_EVAL_CASES, compareReports, evaluateTrace, runEvalSuite, type EvalTrace } from './evals'
 import { assertSafeImprovement, caseFromFailure, proposeImprovement } from './improvement'
-import { freezeWorkerDefinition, retryWorkerDefinition } from './worker'
+import { apiKeyWorkerDefinition, freezeWorkerDefinition, retryWorkerDefinition } from './worker'
 
 const base = () => structuredClone(DEFAULT_AGENT_DEFINITION)
 const context = { toolCallId:'call-1',messages:[] }
@@ -150,4 +150,15 @@ test('worker definition and parent provenance survive retries without inventing 
   assert.equal(retry.harness,'codex')
   assert.equal(retryWorkerDefinition(null,'old task'),null)
   assert.throws(() => freezeWorkerDefinition({ harness:'codex',instructions:'',prompt:'',parent,executionId:null }),/ParentIncomplete/)
+})
+
+test('automatic local recovery is an explicit standing grant, preserved by retries but never inferred for legacy definitions', () => {
+  const input = { harness: 'codex' as const, instructions: 'Continue the current task', prompt: 'Task', parent: null, executionId: null }
+  const legacy = freezeWorkerDefinition(input)
+  const automatic = freezeWorkerDefinition({ ...input, allowLocalRecovery: true })
+  assert.equal(legacy.allowLocalRecovery, undefined)
+  assert.notEqual(automatic.definitionDigest, legacy.definitionDigest)
+  assert.equal(retryWorkerDefinition(automatic, 'Retry')?.allowLocalRecovery, true)
+  assert.equal(retryWorkerDefinition(legacy, 'Retry')?.allowLocalRecovery, undefined)
+  assert.equal(apiKeyWorkerDefinition(automatic, 'Continue', { keyId: randomUUID(), model: 'fixture-model' }).allowLocalRecovery, true)
 })
