@@ -1,0 +1,80 @@
+name: Temporary stop of one failed group fixture
+on:
+  push:
+    branches: [acceptance/proactive-1157-1163]
+    paths:
+      - '.github/workflows/proactive-acceptance.yml'
+      - 'scripts/ops/failed-group-stop-diagnostic.mjs'
+permissions:
+  contents: read
+concurrency:
+  group: proactive-failed-group-stop-61da4558
+  cancel-in-progress: false
+jobs:
+  stop:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/proactive-1157-1163'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: source
+    env:
+      GROUP_STOP_ORIGIN: https://app.aspectlylabs.com
+      GROUP_STOP_DEPLOYMENT: dpl_6ECwt2WNzdho8NLMJMZvLCb2eZVw
+      GROUP_STOP_REVISION: 7b212367026f090907f724b618743ae63f7fa68a
+      GROUP_STOP_OUTPUT: ${{ github.workspace }}/group-stop-sanitized/results.json
+    steps:
+      # This temporary branch supplies only the driver. Application code is
+      # checked out separately at the exact deployed revision.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: driver
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.GROUP_STOP_REVISION }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Verify the exact current production checkout before credentials
+        run: >-
+          node --input-type=module -e 'import {execFileSync} from "node:child_process"; if(process.env.GROUP_STOP_REVISION!=="7b212367026f090907f724b618743ae63f7fa68a"||process.env.GROUP_STOP_DEPLOYMENT!=="dpl_6ECwt2WNzdho8NLMJMZvLCb2eZVw"||execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim()!==process.env.GROUP_STOP_REVISION)process.exit(1)'
+      - name: Read the existing Smoke email only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read the existing Smoke password only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Record safe diagnostics and stop only the known failed group once
+        run: node ../driver/scripts/ops/failed-group-stop-diagnostic.mjs
+      - name: Upload sanitized before and after state
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: failed-group-stop-${{ github.run_id }}
+          path: group-stop-sanitized/results.json
+          if-no-files-found: error
+          retention-days: 7
