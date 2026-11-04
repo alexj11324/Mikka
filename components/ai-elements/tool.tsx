@@ -44,6 +44,8 @@ export type ToolHeaderProps = {
   type: ToolUIPart["type"];
   state: ToolUIPart["state"];
   className?: string;
+  /** Nothing to open: no chevron, and the line does not toggle. */
+  disabled?: boolean;
 };
 
 const getStatus = (status: ToolUIPart["state"], t: ReturnType<typeof useTranslations<"AiElements.tool">>) => {
