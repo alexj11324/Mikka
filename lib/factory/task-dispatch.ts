@@ -2,6 +2,7 @@ import 'server-only'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { FactoryError } from './contract'
+import { checkFactoryRepairBudget } from './check-recovery-evidence'
 import { factoryBinding, createFactoryDispatch, type FactoryQueue } from './dispatch'
 import { factoryEventId } from './event-id'
 import { factoryLifecycleEnabled, factoryRuntimeForBot } from './runtime'
@@ -68,9 +69,13 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
       }
       if (task.stage === 'execute' && ['failed','blocked','waiting'].includes(task.status))
         task = (await runtime.store.apply(userId, factoryBinding(task), factoryEventId('continue-retry', key), { action: 'retry', reason: input.note?.slice(0, 4000) || 'Continue the task.' }, tx)).task
-      else if (['review','verify','monitor','approval'].includes(task.stage) && ['failed','blocked','waiting','pending'].includes(task.status))
+      else if (['review','verify','monitor','approval'].includes(task.stage) && ['failed','blocked','waiting','pending'].includes(task.status)) {
+        // Generic thread dispatch shares the host lifecycle's repair budget.
+        // An authenticated new owner epoch already advanced to execute above.
+        task = await runtime.store.lockTask(tx, userId, task.id)
+        await checkFactoryRepairBudget(tx, task)
         task = (await runtime.store.apply(userId, factoryBinding(task), factoryEventId('continue-repair', key), { action: 'repair', reason: input.note?.slice(0, 4000) || 'Revise the candidate.' }, tx)).task
-      else if (task.status === 'passed') task = undefined
+      } else if (task.status === 'passed') task = undefined
       if (task && (task.stage !== 'execute' || task.status !== 'pending')) throw new FactoryError('factoryRunStillActive')
     } else task = undefined
     if (!task) task = (await runtime.store.route(userId, { issueId: input.issueId, eventId: factoryEventId('host-route', key), sourceEventId, rationale: 'Authenticated task dispatch; placement and model selected by the host.' }, tx)).task
