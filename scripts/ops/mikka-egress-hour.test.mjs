@@ -33,7 +33,7 @@ const goodSamples = path => Array.from({ length: 13 }, (_, index) => {
   const expected = expectedPaths[path]
   return {
     observedAt: new Date(start + index * 300_000).toISOString(), runId, issueId, status: 'running',
-    startedAt: new Date(start - 60_000).toISOString(), finishedAt: null,
+    startedAt: new Date(start - 60_000).toISOString(), finishedAt: null, readOnly: true,
     ...expected, modelSource: expected.credentialType, cliModelSelection: 'explicit',
     apiKeyModel: expected.credentialType === 'api_key' ? expected.model : null,
     subscriptionModel: expected.credentialType === 'subscription' ? expected.model : null,
@@ -59,21 +59,41 @@ try {
       assert.deepEqual(plan.expected, expectedPaths[path])
       assert.equal(plan.executionPath, path)
       assert.equal(plan.workload.files.length, 100)
+      assert.equal(plan.workload.version, 3)
+      assert.equal(plan.workload.readOnly, true)
+      assert.equal(plan.workload.delivery, 'native_markdown_reply')
+      assert.deepEqual(plan.dispatchRequirement, { tool: 'dispatch_run', repo: 'alexj11324/Mikka', target: 'cloud', readOnly: true,
+        model: { harness: expectedPaths[path].harness, model: expectedPaths[path].model } })
+      assert.match(plan.prompt, /完整 Markdown 审计报告/)
+      assert.doesNotMatch(plan.prompt, /mikka-egress-audit\.json|正常任务产物入口/)
+      assert.match(plan.workload.instructions, /\{workloadDigest\}/)
+      assert.equal(plan.prompt, plan.workload.instructions.replaceAll('{workloadDigest}', plan.workloadDigest)
+        .replaceAll('{windowStart}', plan.windowStart).replaceAll('{windowEnd}', plan.windowEnd))
       return plan
     })
     assert.equal(new Set(plans.map(plan => plan.workloadDigest)).size, 1)
     assert.equal(new Set(plans.map(plan => plan.prompt)).size, 1)
+    const later = JSON.parse(execute('plan', 'codex_subscription', { EGRESS_WINDOW_START: new Date(start + 3_600_000).toISOString() }).stdout)
+    assert.equal(later.workloadDigest, plans[2].workloadDigest)
+    assert.notEqual(later.prompt, plans[2].prompt)
     assert.notEqual(execute('plan', '').status, 0)
     assert.notEqual(execute('plan', 'unknown-model').status, 0)
   })
-  await test('each full, exclusive hour retains pending artifact/provider review status', () => {
+  await test('each full, exclusive hour retains pending report/provider review status', () => {
     for (const path of Object.keys(expectedPaths)) {
       const result = validate(path, goodSamples(path))
       assert.equal(result.status, 0, result.stderr)
       const report = JSON.parse(result.stdout)
-      assert.equal(report.status, 'samples_observed_pending_provider_and_artifact_review')
+      assert.equal(report.status, 'samples_observed_pending_provider_and_report_review')
       assert.equal(report.progressBuckets, 12)
       assert.deepEqual(report.review, [])
+    }
+  })
+  await test('missing, false or string read-only claims cannot satisfy the frozen task', () => {
+    for (const readOnly of [undefined, null, false, 'true']) {
+      const samples = goodSamples('codex_subscription')
+      samples[6].readOnly = readOnly
+      assert.match(validate('codex_subscription', samples).stderr, /egress_read_only_required/)
     }
   })
   await test('a subscription-to-key transition or a model change invalidates the hour', () => {
@@ -102,12 +122,12 @@ try {
     stopped[7].finishedAt = stopped[7].observedAt
     assert.match(validate('api_key_flash', stopped).stderr, /egress_task_stopped_before_hour/)
   })
-  await test('unchanged chunk sequence requires artifact/test review rather than asserting activity', () => {
+  await test('unchanged chunk sequence requires report/test review rather than asserting activity', () => {
     const samples = goodSamples('claude_subscription')
     samples[6].lastSeq = samples[5].lastSeq
     const result = validate('claude_subscription', samples)
     assert.equal(result.status, 0, result.stderr)
-    assert.deepEqual(JSON.parse(result.stdout).review, [{ minute: 30, reason: 'no_new_events_requires_artifact_and_test_review' }])
+    assert.deepEqual(JSON.parse(result.stdout).review, [{ minute: 30, reason: 'no_new_events_requires_report_and_test_review' }])
   })
   await test('historical unadmitted rows retain raw counts and cannot hide real activity or omit scope evidence', () => {
     const samples = goodSamples('codex_subscription')
@@ -135,6 +155,7 @@ try {
     assert.equal(query.database_name, 'orvilo_mvp')
     assert.match(query.sql, /^WITH other_runs AS MATERIALIZED \(SELECT /)
     assert.match(query.sql, /SELECT now\(\)/)
+    assert.match(query.sql, /"agentDefinition"->'readOnly' AS "readOnly"/)
     assert.match(query.sql, new RegExp(runId))
     assert.match(query.sql, new RegExp(issueId))
     assert.doesNotMatch(query.sql, /\b(?:INSERT|UPDATE|DELETE|ALTER|DROP|TRUNCATE)\b/i)

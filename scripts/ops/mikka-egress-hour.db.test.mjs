@@ -38,7 +38,7 @@ try {
   await client.query('CREATE TEMP TABLE run_chunks("runId" uuid,seq integer,"createdAt" timestamptz) ON COMMIT DROP')
   await client.query(`INSERT INTO agent_runs(id,"userId","issueId",status,"startedAt","updatedAt","leaseExpiresAt","agentDefinition")
     VALUES($1,'fixture-owner',$2,'running',$3,$3,$4,$5)`, [runId, issueId, at(-60_000), at(7_200_000), {
-      model: 'gpt-6-luna', harness: 'codex', modelSource: 'subscription', cliModelSelection: 'explicit',
+      model: 'gpt-6-luna', harness: 'codex', modelSource: 'subscription', cliModelSelection: 'explicit', readOnly: true,
       subscription: { modelId: 'gpt-6-luna', route: 'codex_cli' },
     }])
   await client.query('INSERT INTO run_chunks VALUES($1,1,$2)', [runId, at(0)])
@@ -49,6 +49,15 @@ try {
       VALUES($1,'fixture-owner',$2,'running',$3,$3)`, [otherId, issueId, at(-172_800_000)])
     await client.query('INSERT INTO run_chunks VALUES($1,1,$2)', [otherId, at(-172_800_000)])
   }
+
+  await test('the frozen read-only flag remains a JSON boolean, with missing authority visible as null', async () => {
+    assert.equal((await sample()).readOnly, true)
+    await client.query('UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",\'{readOnly}\',\'false\') WHERE id=$1', [runId])
+    assert.equal((await sample()).readOnly, false)
+    await client.query('UPDATE agent_runs SET "agentDefinition"="agentDefinition"-\'readOnly\' WHERE id=$1', [runId])
+    assert.equal((await sample()).readOnly, null)
+    await client.query('UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",\'{readOnly}\',\'true\') WHERE id=$1', [runId])
+  })
 
   await test('inert unadmitted historical rows remain in raw counts but are not actual model concurrency', async () => {
     await historical()
