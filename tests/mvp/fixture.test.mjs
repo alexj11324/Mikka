@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
+import { writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { createGateway, generateText, stepCountIs, tool } from 'ai'
 import { z } from 'zod'
@@ -12,6 +15,64 @@ import { createPatchedFetcher } from 'next/dist/server/lib/patch-fetch.js'
 
 const database = 'postgresql://ci:fixture@127.0.0.1:5432/mikka_e2e'
 const isolated = { CI: 'true', GITHUB_ACTIONS: 'true', MIKKA_MVP_E2E: '1', MIKKA_TEST_MODE: '1', E2E_DATABASE_URL: database, MIKKA_DATABASE_URL: database, DATABASE_URL: database }
+
+test('GitHub fixture human merge preserves exact Git bytes and rejects unauthorized or stale heads', async () => {
+  const services = await startMvpServices(0)
+  const userToken = 'mikka-local-synthetic-user-token'
+  const call = async (path, body, token = userToken, method = body ? 'POST' : 'GET') => {
+    const response = await fetch(`${services.origin}${path}`, { method,
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      ...(body ? { body: JSON.stringify(body) } : {}) })
+    return { status: response.status, body: await response.json() }
+  }
+  const git = (cwd, ...args) => execFileSync('git', ['-c', `safe.directory=${cwd}`, ...args], {
+    cwd, encoding: 'utf8', env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim()
+  try {
+    const setup = await call('/scenario', { marker: `mvp-${randomUUID()}`, title: 'Real merge fixture', harness: 'any' })
+    assert.equal(setup.status, 200)
+    const bare = setup.body.barePath, checkout = join(dirname(bare), 'merge-checkout')
+    git(dirname(bare), 'clone', bare, checkout)
+    git(checkout, 'config', 'user.name', 'Fixture owner')
+    git(checkout, 'config', 'user.email', 'fixture-owner@example.test')
+    const repo = '/github/repos/mikka-e2e/core-loop'
+    const base = git(bare, 'rev-parse', 'refs/heads/trunk')
+    const branch = 'mikka/fixture-merge-1', content = 'exact handoff artifact\n'
+    git(checkout, 'checkout', '-b', branch)
+    await writeFile(join(checkout, 'handoff.txt'), content)
+    git(checkout, 'add', 'handoff.txt')
+    git(checkout, 'commit', '-m', 'Create exact handoff artifact')
+    git(checkout, 'push', 'origin', branch)
+    const sha = git(checkout, 'rev-parse', 'HEAD')
+    const created = await call(`${repo}/pulls`, { title: 'Handoff artifact', head: branch, base: 'trunk', draft: false,
+      body: `Fixture candidate\n<!-- mikka-issue:${randomUUID()} -->` })
+    assert.equal(created.status, 201)
+    const path = `${repo}/pulls/${created.body.number}`, input = { sha, merge_method: 'merge' }
+    for (const token of ['mvp-synthetic-installation-run', 'mvp-synthetic-installation-write', 'mvp-synthetic-installation-read']) {
+      assert.equal((await call(`${path}/merge`, input, token, 'PUT')).status, 403)
+    }
+    assert.equal((await call(`${path}/merge`, { ...input, sha: '0'.repeat(40) }, userToken, 'PUT')).status, 409)
+    assert.equal(git(bare, 'rev-parse', 'refs/heads/trunk'), base, 'Rejected requests must not change the default branch')
+    const merged = await call(`${path}/merge`, input, userToken, 'PUT')
+    assert.equal(merged.status, 200, JSON.stringify(merged.body))
+    assert.equal(merged.body.merged, true)
+    assert.equal(git(bare, 'rev-parse', 'refs/heads/trunk'), merged.body.sha)
+    assert.deepEqual(git(bare, 'show', '-s', '--format=%P', merged.body.sha).split(' '), [base, sha])
+    assert.equal(execFileSync('git', ['--git-dir', bare, 'show', `${merged.body.sha}:handoff.txt`], { encoding: 'utf8' }), content)
+    const view = await call(path)
+    assert.equal(view.body.merged, true)
+    assert.equal(view.body.state, 'closed')
+    assert.equal(view.body.head.sha, sha)
+    assert.equal(view.body.merge_commit_sha, merged.body.sha)
+    assert.deepEqual(await call(`${path}/merge`, input, userToken, 'PUT'), merged, 'Repeating the same merge must not create a second commit')
+    assert.equal(git(bare, 'rev-parse', 'refs/heads/trunk'), merged.body.sha)
+    const observed = await call('/observations')
+    assert.equal(observed.body.observations.filter(value => value.kind === 'pull-request-merged').length, 1)
+    assert.deepEqual(observed.body.errors, [])
+  } finally { await services.close() }
+})
+
 test('fixture refuses remote targets, split databases, native runtime and every deployment', () => {
   assert.doesNotThrow(() => assertMvpEnvironment(isolated))
   for (const patch of [{ GITHUB_ACTIONS: '' }, { MIKKA_TEST_MODE: '' }, { VERCEL_ENV: 'preview' }, { VERCEL_ENV: 'production' }, { VERCEL: '1' }, { E2E_BASE_URL: 'https://example.com' }, { DATABASE_URL: 'postgresql://127.0.0.1/business' }, { MIKKA_DATABASE_URL: `${database}?options=-csearch_path=business` }]) {

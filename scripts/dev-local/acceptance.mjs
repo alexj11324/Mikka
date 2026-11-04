@@ -112,7 +112,14 @@ async function json(account, path, body, method = body ? 'POST' : 'GET') {
     assertFlashTestModel((await modelResponse.json()).current?.modelId)
   }
   const response = await account.request(path, { method, ...(body ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}) })
-  assert.ok(response.ok, `${method} ${path}: HTTP ${response.status}`)
+  if (!response.ok) {
+    const value = await response.json().catch(() => null)
+    // Keep stable public refusal codes in failure evidence, never response
+    // bodies (which may contain account data or provider diagnostics).
+    const code = typeof value?.error === 'string' && /^(?:factory|github)[A-Z][A-Za-z0-9]{1,70}$/.test(value.error)
+      ? value.error : 'acceptanceHttpFailure'
+    throw Object.assign(new Error(`${method} ${path}: HTTP ${response.status} (${code})`), { code, status: response.status })
+  }
   return response.json()
 }
 const query = async (sql, values = []) => (await pool.query(sql, values)).rows
