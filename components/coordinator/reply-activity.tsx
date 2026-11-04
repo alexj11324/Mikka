@@ -25,6 +25,8 @@ function previewValue(text: string): unknown {
  * else the seconds it took, and what it thought when the model returned readable reasoning. A stored reply knows that
  * it thought (`thought`) and which stored rows hold readable reasoning (`reasoningAt`), loaded when the person opens it.
  * Without readable reasoning, Reasoning has no content and does not open. A tool's previews are short and masked.
+ * Thinking and tools are muted lines, not cards; an opened preview is as wide as the reply's text bubble may be (82%),
+ * full width on a phone, so it lines up with the reply under it instead of sitting in a narrower fixed box.
  */
 export const ReplyActivity = memo(function ReplyActivity({ tools, thinking, thought = false, reasoningAt, botId = null }: {
   tools: readonly ChatTool[]
@@ -45,7 +47,7 @@ export const ReplyActivity = memo(function ReplyActivity({ tools, thinking, thou
   const message = (active: boolean) => active ? <Shimmer as="span" duration={1}>{t('thinking')}</Shimmer>
     : <span>{thinking ? t('thought', { seconds: thinking.seconds }) : t('thoughtStored')}</span>
   const label = (name: string) => t.has(`tools.${name}` as never) ? t(`tools.${name}` as never) : t('tool')
-  return <div data-reply-activity="" className="flex w-full min-w-0 max-w-md flex-col gap-1.5">
+  return <div data-reply-activity="" className="flex w-full min-w-0 flex-col gap-1.5 sm:max-w-[82%]">
     {(thinking || thought) && <Reasoning className="mb-0" isStreaming={thinking?.active ?? false} duration={thinking && !thinking.active ? thinking.seconds : undefined}
       defaultOpen={false} open={readable && open} onOpenChange={setOpen}
       data-activity-thinking={thinking ? thinking.active ? 'active' : 'done' : 'stored'} data-reasoning={readable ? 'readable' : 'none'}>
@@ -56,11 +58,11 @@ export const ReplyActivity = memo(function ReplyActivity({ tools, thinking, thou
         : <ReasoningTrigger disabled className="w-fit text-xs"><BrainIcon className="size-3.5" />{message(thinking?.active ?? false)}</ReasoningTrigger>}
       {readable && <ReasoningContent className="mt-2 max-h-80 overflow-y-auto border-l border-border pl-3 text-xs whitespace-pre-wrap">{text ?? ''}</ReasoningContent>}
     </Reasoning>}
-    {tools.map(tool => <Tool key={tool.call} className="mb-0" data-activity-tool={tool.state}>
-      <ToolHeader className="gap-3 px-3 py-2" title={label(tool.name)} type={`tool-${tool.name}`} state={STATES[tool.state]} />
+    {tools.map(tool => <Tool key={tool.call} data-activity-tool={tool.state}>
+      <ToolHeader disabled={!tool.input && !tool.output} title={label(tool.name)} type={`tool-${tool.name}`} state={STATES[tool.state]} />
       {(tool.input || tool.output) && <ToolContent>
-        {tool.input && <ToolInput className="p-3 pt-0" input={previewValue(tool.input)} />}
-        {tool.output && <ToolOutput className="p-3 pt-0" output={tool.state === 'error' ? undefined : previewValue(tool.output)} errorText={tool.state === 'error' ? tool.output : undefined} />}
+        {tool.input && <ToolInput input={previewValue(tool.input)} />}
+        {tool.output && <ToolOutput output={tool.state === 'error' ? undefined : previewValue(tool.output)} errorText={tool.state === 'error' ? tool.output : undefined} />}
       </ToolContent>}
     </Tool>)}
   </div>
