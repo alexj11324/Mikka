@@ -1,0 +1,107 @@
+{
+  "sourceCommit": "3f42627321479e9d9071143dc7ca133c2034c56d",
+  "sourceTree": "1517b1ac176e126b78045f18f72ac4f6fcb065dd",
+  "verifiedAt": "2026-11-04T19:01:18.872016+00:00",
+  "allImageHashesMatch": true,
+  "allDimensionsMatch": true,
+  "allImagesVisuallyReviewed": true,
+  "consoleErrors": 0,
+  "httpFailures": 0,
+  "captureManifestSha256": "7ae17d3e4420b3120459d3e5d6d05a9c4205747ebb7a37ad31e835d3e46f78e3",
+  "images": [
+    {
+      "name": "zh-task-1440-light.png",
+      "bytes": 107677,
+      "sha256": "4d82b60f9542cea66b2b24e7c812551ba4a3c5f6080158e7d7291e464bbac112",
+      "gitBlob": "cdbae6577910f198b346731ab7374cf484e7ba5b",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "zh-task-1440-dark.png",
+      "bytes": 110507,
+      "sha256": "22883d6e21cfc08e8e27ce8c5d3578372b7abbff7d9bdf15ee81dd1251adcde8",
+      "gitBlob": "000ce032c0cd759ebd97dc922f25c328f7deac50",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "zh-task-390-light.png",
+      "bytes": 47878,
+      "sha256": "5ee2a62c577e71fe3f4d056f98443cede975a114c5f265c8c902949b5a2ae343",
+      "gitBlob": "e5688f26a98f657d597620cf44c4584a352c2d65",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "zh-thread-390-light.png",
+      "bytes": 36195,
+      "sha256": "a7dc8e06a17e6f4f7b4ef6236b59834711a62e54321d1b79ea10a029b7e67492",
+      "gitBlob": "09a2312fe1d40fa093b1cba0b7ce5241442e43e1",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "zh-task-390-dark.png",
+      "bytes": 48879,
+      "sha256": "7f62622fa0ebd89302d72efa3bd854855b752c142ae6b5f8bf2300a9c94e9540",
+      "gitBlob": "657b77a7b84b1ed0bafbf1540838105747b5e721",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "zh-thread-390-dark.png",
+      "bytes": 37393,
+      "sha256": "8abbe06e49e9d32d862713745ec09b9b38c992bd3c59888fdfde70dd0094361a",
+      "gitBlob": "07cf567d8fe97f88a680322d36d823b214a31656",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "en-task-1440-light.png",
+      "bytes": 103790,
+      "sha256": "a6224ff6ab75d3093eb4e70693e47d3a5bc5aec2154117ef8c66a18a737e370f",
+      "gitBlob": "f62845012685970776115787c5fb6c16635734a5",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "en-task-1440-dark.png",
+      "bytes": 106078,
+      "sha256": "8c1535b0f114a201c4991ec8091e13429f7881f5e58050dddfb8761e55bd6e97",
+      "gitBlob": "e256e42214f400459e1c0c9f31ab71a1f1fac308",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "en-task-390-light.png",
+      "bytes": 44253,
+      "sha256": "375084ef5c3e35ec93ac5b1524c3213f1f75f7131697e9c3803fd4bbb55943d5",
+      "gitBlob": "519f1dc0202c07f58b2213fa5d72d4e934205c11",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "en-thread-390-light.png",
+      "bytes": 34580,
+      "sha256": "bcaae756d3c02c50f04f0d8e57420c7b00226bdb4266a466c8b72f8a68b8a201",
+      "gitBlob": "e69582ffae46981e2f66f1a46f9dda8db0c47bbc",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "en-task-390-dark.png",
+      "bytes": 45081,
+      "sha256": "1c2afc9b81891f6ed8e5f3dc74bfaafec6bc53a6895546d35f81333a376f1830",
+      "gitBlob": "d4a3bf44a6076be2058bfa84aee7d125a1541232",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "en-thread-390-dark.png",
+      "bytes": 35602,
+      "sha256": "24c4750c2ca4003b91d92ab84c2543cab33d73ce502db298676e65e012da242d",
+      "gitBlob": "7b33a3221c5ec3a6a54ff16eb3db92bfaa902350",
+      "visuallyReviewed": true
+    }
+  ],
+  "limits": [
+    "Local screenshot evidence with synthetic display records, actual production build/HTTP/PostgreSQL, and normal TestPool sign-up/sign-in. No model execution, no browser test runner, no route interception, no healthy-WebSocket or production-traffic acceptance."
+  ],
+  "build": {
+    "finalExitCode": 0,
+    "previousFailureRetained": {
+      "exitCode": 137,
+      "cause": "Kernel global OOM during page data collection with worktree/cache on tmpfs; same code rebuilt successfully on disk in the same sandbox."
+    }
+  }
+}

@@ -1,0 +1,153 @@
+{
+  "commit": "3f42627321479e9d9071143dc7ca133c2034c56d",
+  "environmentId": "local-535309e0-da37-418c-8b7e-bc1e16eed5ce",
+  "origin": "http://localhost:3321",
+  "startedAt": "2026-11-04T18:53:12.742Z",
+  "captures": [
+    {
+      "name": "zh-task-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "task-and-thread",
+      "at": "2026-11-04T18:53:37.777Z",
+      "sha256": "4d82b60f9542cea66b2b24e7c812551ba4a3c5f6080158e7d7291e464bbac112"
+    },
+    {
+      "name": "zh-task-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "task-and-thread",
+      "at": "2026-11-04T18:53:38.736Z",
+      "sha256": "22883d6e21cfc08e8e27ce8c5d3578372b7abbff7d9bdf15ee81dd1251adcde8"
+    },
+    {
+      "name": "zh-task-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "task",
+      "at": "2026-11-04T18:53:39.510Z",
+      "sha256": "5ee2a62c577e71fe3f4d056f98443cede975a114c5f265c8c902949b5a2ae343"
+    },
+    {
+      "name": "zh-thread-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "thread",
+      "at": "2026-11-04T18:53:40.177Z",
+      "sha256": "a7dc8e06a17e6f4f7b4ef6236b59834711a62e54321d1b79ea10a029b7e67492"
+    },
+    {
+      "name": "zh-task-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "task",
+      "at": "2026-11-04T18:53:40.894Z",
+      "sha256": "7f62622fa0ebd89302d72efa3bd854855b752c142ae6b5f8bf2300a9c94e9540"
+    },
+    {
+      "name": "zh-thread-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "thread",
+      "at": "2026-11-04T18:53:41.564Z",
+      "sha256": "8abbe06e49e9d32d862713745ec09b9b38c992bd3c59888fdfde70dd0094361a"
+    },
+    {
+      "name": "en-task-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "task-and-thread",
+      "at": "2026-11-04T18:53:42.475Z",
+      "sha256": "a6224ff6ab75d3093eb4e70693e47d3a5bc5aec2154117ef8c66a18a737e370f"
+    },
+    {
+      "name": "en-task-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "task-and-thread",
+      "at": "2026-11-04T18:53:43.235Z",
+      "sha256": "8c1535b0f114a201c4991ec8091e13429f7881f5e58050dddfb8761e55bd6e97"
+    },
+    {
+      "name": "en-task-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "task",
+      "at": "2026-11-04T18:53:43.974Z",
+      "sha256": "375084ef5c3e35ec93ac5b1524c3213f1f75f7131697e9c3803fd4bbb55943d5"
+    },
+    {
+      "name": "en-thread-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "thread",
+      "at": "2026-11-04T18:53:44.577Z",
+      "sha256": "bcaae756d3c02c50f04f0d8e57420c7b00226bdb4266a466c8b72f8a68b8a201"
+    },
+    {
+      "name": "en-task-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "task",
+      "at": "2026-11-04T18:53:45.242Z",
+      "sha256": "1c2afc9b81891f6ed8e5f3dc74bfaafec6bc53a6895546d35f81333a376f1830"
+    },
+    {
+      "name": "en-thread-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "thread",
+      "at": "2026-11-04T18:53:45.847Z",
+      "sha256": "24c4750c2ca4003b91d92ab84c2543cab33d73ce502db298676e65e012da242d"
+    }
+  ],
+  "fixture": {
+    "issueId": "7e400592-dee3-4f6d-8a51-f8c553275e57",
+    "runId": "fe389204-dd0f-49a8-9164-daa1d6e97afe",
+    "agentId": "069c0db1-f9e0-4bb9-9d29-29f7b47d7f4a"
+  },
+  "limits": [
+    "Local screenshot evidence with synthetic display records, actual production build/HTTP/PostgreSQL, and normal TestPool sign-up/sign-in. No model execution, no browser test runner, no route interception, no healthy-WebSocket or production-traffic acceptance."
+  ],
+  "consoleErrors": [],
+  "httpFailures": [],
+  "finishedAt": "2026-11-04T18:53:45.848Z",
+  "audit": {
+    "files": 13,
+    "archives": 0,
+    "archiveEntries": 0,
+    "decodedBytes": 0,
+    "result": "passed",
+    "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+  },
+  "cleanup": {
+    "fixtureResourcesRemoved": true,
+    "leaseState": "quarantined",
+    "reason": "UI account pair quarantined; synthetic task/run resources removed",
+    "at": "2026-11-04T18:53:45.957Z"
+  }
+}
