@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { LiveChannel, LIVE_FALLBACK_MS, type LiveRuntime, type LiveSocket, type LiveTicket } from './channel'
+import { DEVICE_GATEWAY_TICKET_SECONDS } from '../device-gateway-ticket'
 
 const task = '19df8afd-0f8c-4c6b-bc9c-20df0b046a72'
 const other = 'e4ec7f73-0a59-4ad4-8b3c-41f8cd510c6d'
@@ -163,4 +164,52 @@ test('a half-open socket becomes offline when pongs stop', async () => {
   await f.advance(1_000)
   assert.equal(f.ticketCalls(), 2)
   f.channel.dispose()
+})
+
+test('a healthy socket catches a lost invalidation at the full ticket lifetime', async () => {
+  const f = fixture(), lifetime = DEVICE_GATEWAY_TICKET_SECONDS * 1_000
+  let committedVersion = 0
+  const observed: number[] = []
+  f.lifetime(lifetime)
+  f.channel.subscribe('factory_task', task, ['detail'], () => { observed.push(committedVersion) })
+  await f.open()
+  assert.deepEqual(observed, [0])
+  // The database commits, but every delivery attempt fails before reaching the
+  // healthy socket. Pongs continue; no invalidation message is received.
+  committedVersion = 1
+  await f.advance(lifetime - 101)
+  assert.deepEqual(observed, [0])
+  assert.equal(f.sockets[0].readyState, 1)
+  await f.advance(1)
+  assert.equal(f.sockets[0].readyState, 3)
+  assert.equal(f.ticketCalls(), 2)
+  await f.open()
+  assert.deepEqual(observed, [0, 1])
+  f.channel.dispose()
+})
+
+test('a hung renewal still reconciles a lost invalidation after one offline fallback interval', async () => {
+  const f = fixture(), lifetime = DEVICE_GATEWAY_TICKET_SECONDS * 1_000
+  const mint = f.runtime.ticket
+  let first = true, finishRenew!: (ticket: LiveTicket | null) => void
+  let renewalSignal: AbortSignal | null = null
+  f.runtime.ticket = signal => {
+    if (first) { first = false; return mint(signal) }
+    renewalSignal = signal
+    return new Promise<LiveTicket | null>(resolve => { finishRenew = resolve })
+  }
+  f.lifetime(lifetime); f.subscribe(); await f.open(); f.reads.length = 0
+  await f.advance(lifetime - 100)
+  assert.equal(f.sockets[0].readyState, 3)
+  assert.equal(f.sockets.length, 1)
+  assert.ok(renewalSignal)
+  await f.advance(LIVE_FALLBACK_MS - 1)
+  assert.deepEqual(f.reads, [])
+  await f.advance(101)
+  assert.deepEqual(f.reads, ['detail', 'ledger'])
+  // Teardown also aborts the pending renewal; a late response cannot reopen it.
+  f.channel.dispose()
+  assert.equal((renewalSignal as AbortSignal).aborted, true)
+  finishRenew(null); await settle()
+  assert.equal(f.sockets.length, 1)
 })
