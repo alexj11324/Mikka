@@ -147,7 +147,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // A poll names the version it shows; an unchanged chat comes back as its live state only (lib/coordinator/chat-poll.ts).
   const shown = useRef<{ chat?: Chat; fullReadAt: number }>({ fullReadAt: 0 })
   // SWR re-reads a function interval only when its running timer fires, so a send would wait out the quiet 30 s
-  // before the turn's stream connects. A number from each read restarts the timer as soon as the turn starts.
+  // before the turn's stream connects. A number from the latest chat restarts the timer as soon as the turn starts,
+  // whichever hook read it: the bot list and the workspace read this same key with their own fetchers, and a
+  // revalidation they win never calls this hook's onSuccess.
   const [pollEvery, setPollEvery] = useState(() => chatPollInterval(undefined))
   const { data, mutate, error: loadError } = useSWR<Chat>(coordinatorChatKey(botId), async () => {
     const known = knownVersion(shown.current.chat, shown.current.fullReadAt, Date.now())
@@ -158,9 +160,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     return mergeChat(shown.current.chat, next)
   }, {
     refreshInterval: pollEvery,
-    onSuccess: chat => { setPollEvery(chatPollInterval(chat)); reconnectStream.current() },
+    onSuccess: () => reconnectStream.current(),
   })
-  useEffect(() => { shown.current.chat = data }, [data])
+  useEffect(() => { shown.current.chat = data; setPollEvery(chatPollInterval(data)) }, [data])
   const [loadingHistory, setLoadingHistory] = useState(false)
   async function loadHistory() {
     if (!data?.historyBefore || loadingHistory) return
