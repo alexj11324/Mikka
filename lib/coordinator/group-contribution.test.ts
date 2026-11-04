@@ -6,6 +6,7 @@ import { mentionRoute, UnknownMentionError, type GroupMessage } from './group-ro
 import { groupBotCatalog } from './group-member-catalog'
 import type { DecisionExecution, invokeDecision } from './decide'
 import { DECISION_MODEL, type DecisionAnswer } from './decision'
+import { GROUP_LIVE_POLICY_VERSION } from './group-decision-policy'
 
 const a='00000000-0000-4000-8000-000000000001', b='00000000-0000-4000-8000-000000000002', c='00000000-0000-4000-8000-000000000003'
 const members=[{id:a,name:'Code',description:'Implement software',memberType:'bot' as const,executionAvailable:true},{id:b,name:'Design',description:'Design interfaces'},{id:c,name:'Review',description:'Review correctness'}]
@@ -26,7 +27,7 @@ test('Decision ignore/observe are completed zero-wake actions, distinct from una
     const message={text,mentions:[]}
     const route=await judge.route(message,members,null,[])
     assert.equal(route.action,action);assert.equal(route.reason,action==='ignore'?'ordinary_conversation':'already_answered')
-    assert.equal(route.policyVersion,'group-contribution-v2');assert.deepEqual(route.responders,[])
+    assert.equal(route.policyVersion,GROUP_LIVE_POLICY_VERSION);assert.deepEqual(route.responders,[])
     await runGroupRounds(route,message,{eligible:async()=>members,status:async()=>assert.fail('zero wake'),generate:async()=>assert.fail('zero generation'),publish:async()=>assert.fail('zero publish')})
   }
   for (const invoke of [async()=>null,async()=>{throw new DOMException('upstream private detail','TimeoutError')},async()=>answers({intent:'uncertain'}),async()=>answers({intent:'foreign'}),routeAnswers('reply',[])]) {

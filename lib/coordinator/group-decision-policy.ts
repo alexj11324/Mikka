@@ -6,6 +6,8 @@ import { deploymentSwitch } from '../deployment-switches'
 export const GROUP_POLICY_VERSION = 'group-contribution-v2' as const
 /** Historical candidate receipts and explicitly selected offline replays stay interpretable. */
 export const GROUP_PREVIOUS_POLICY_VERSION = 'group-contribution-v1' as const
+/** Stage candidate inference first; live promotion requires its reviewed fixed-case comparison. */
+export const GROUP_LIVE_POLICY_VERSION = GROUP_PREVIOUS_POLICY_VERSION
 export const GROUP_BASELINE_VERSION = 'group-route-v0' as const
 export const GROUP_POLICY_VERSIONS = [GROUP_BASELINE_VERSION,GROUP_PREVIOUS_POLICY_VERSION,GROUP_POLICY_VERSION] as const
 export type GroupPolicyVersion = typeof GROUP_POLICY_VERSIONS[number]
@@ -13,7 +15,7 @@ export type GroupPolicyVersion = typeof GROUP_POLICY_VERSIONS[number]
 export function getGroupDecisionPolicy(value?: string) {
   if (value && !GROUP_POLICY_VERSIONS.includes(value as GroupPolicyVersion)) throw new Error('unknown_group_decision_policy')
   const version: GroupPolicyVersion = value ? value as GroupPolicyVersion
-    : deploymentSwitch('groupContribution') ? GROUP_POLICY_VERSION : GROUP_BASELINE_VERSION
+    : deploymentSwitch('groupContribution') ? GROUP_LIVE_POLICY_VERSION : GROUP_BASELINE_VERSION
   return {
     version,
     instructions: version === GROUP_BASELINE_VERSION

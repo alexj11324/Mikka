@@ -10,7 +10,7 @@ import { DECISION_MODEL } from './decision'
 import type { DecisionExecution, invokeDecision } from './decide'
 import { handleGroupDecisionReplay } from './group-decision-replay-api'
 import { hostedBillingScope } from '@/lib/abuse/context'
-import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, GROUP_PREVIOUS_POLICY_VERSION, type GroupPolicyVersion } from './group-decision-policy'
+import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, GROUP_LIVE_POLICY_VERSION, GROUP_PREVIOUS_POLICY_VERSION, type GroupPolicyVersion } from './group-decision-policy'
 import { createGroupJudgment } from './group-judgment'
 import { GroupJudgmentPendingError } from './group-correction'
 import { overrideDeploymentSwitch } from '../deployment-switches'
@@ -127,7 +127,7 @@ test('PG: scoped decision traces, exact event counting, human feedback, revoked 
     const fakeProvider:typeof invokeDecision=async(_purpose,input,questions)=>{
       calls++
       assert.ok(typeof input!=='string');assert.equal(questions.length,1)
-      const expected=calls<=2?GROUP_POLICY_VERSION:GROUP_BASELINE_VERSION
+      const expected=calls<=2?GROUP_LIVE_POLICY_VERSION:GROUP_BASELINE_VERSION
       assert.equal(JSON.parse(input.text).policyVersion,expected)
       assert.equal((await readTrace()).policyVersion,expected,'the chosen version is persisted before the provider boundary')
       if(calls===1)overrideDeploymentSwitch('groupContribution',false)
@@ -155,15 +155,15 @@ test('PG: scoped decision traces, exact event counting, human feedback, revoked 
       assert.ok(failedJudgment)
       await recordGroupDecisionSteps(pool,policyMessage,failedJudgment.decisions,failedJudgment.decisionFailure)
       const failed=await readTrace()
-      assert.equal(failed.policyVersion,GROUP_POLICY_VERSION)
-      assert.deepEqual(failed.decisions.map((step:any)=>step.policyVersion),[GROUP_POLICY_VERSION,GROUP_POLICY_VERSION])
+      assert.equal(failed.policyVersion,GROUP_LIVE_POLICY_VERSION)
+      assert.deepEqual(failed.decisions.map((step:any)=>step.policyVersion),[GROUP_LIVE_POLICY_VERSION,GROUP_LIVE_POLICY_VERSION])
       assert.equal(failed.decisions[1].status,'invalid_decision')
       await initializeGroupDecisionTrace(pool,policyMessage,policyMembers,[])
       const baseline=await judgment.route({text:'private retry fixture',mentions:[]},policyMembers,null,[],retain)
       await recordGroupDecisionRoute(pool,policyMessage,baseline)
       const recovered=await readTrace()
       assert.equal(calls,3);assert.equal(recovered.policyVersion,GROUP_BASELINE_VERSION)
-      assert.deepEqual(recovered.decisions.map((step:any)=>step.policyVersion),[GROUP_POLICY_VERSION,GROUP_POLICY_VERSION,GROUP_BASELINE_VERSION])
+      assert.deepEqual(recovered.decisions.map((step:any)=>step.policyVersion),[GROUP_LIVE_POLICY_VERSION,GROUP_LIVE_POLICY_VERSION,GROUP_BASELINE_VERSION])
       assert.equal(new Set(recovered.decisions.map((step:any)=>step.receipt.providerGenerationId)).size,3)
       assert.equal(recovered.execution.providerGenerationId,'policy-fixture-3')
       assert.ok(!JSON.stringify(recovered).includes('private policy fixture'))

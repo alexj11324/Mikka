@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { createGroupDecisionTrace, groupDecisionReceipt, groupDecisionSteps } from './group-decision-trace'
 import { compareGroupPolicies, evaluateGroupDecisions, groupTraceObservation, type GroupEvalCase, type GroupEvalObservation } from './group-decision-eval'
-import { getGroupDecisionPolicy, GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, GROUP_PREVIOUS_POLICY_VERSION } from './group-decision-policy'
+import { getGroupDecisionPolicy, GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, GROUP_LIVE_POLICY_VERSION, GROUP_PREVIOUS_POLICY_VERSION } from './group-decision-policy'
 import { groupFeedbackInput } from './group-decision-feedback'
 import { groupDecisionReplayInput } from './group-decision-replay-api'
 import type { GroupDecisionStep } from './group-decision-chain'
@@ -23,14 +23,16 @@ test('deployment rollback changes live policy while host-selected replay version
   assert.equal(getGroupDecisionPolicy().version,GROUP_BASELINE_VERSION)
   assert.equal(getGroupDecisionPolicy(GROUP_POLICY_VERSION).version,GROUP_POLICY_VERSION)
   overrideDeploymentSwitch('groupContribution',true)
-  assert.equal(getGroupDecisionPolicy().version,GROUP_POLICY_VERSION)
+  assert.equal(GROUP_LIVE_POLICY_VERSION,GROUP_PREVIOUS_POLICY_VERSION,'candidate inference must pass before live promotion')
+  assert.notEqual(GROUP_LIVE_POLICY_VERSION,GROUP_POLICY_VERSION)
+  assert.equal(getGroupDecisionPolicy().version,GROUP_LIVE_POLICY_VERSION)
   assert.equal(getGroupDecisionPolicy(GROUP_BASELINE_VERSION).version,GROUP_BASELINE_VERSION)
 })
 
 test('trace snapshots detect duty/authorization changes without copying role instructions or extra fields', () => {
   const member = { id: 'member', name: 'Coding', description: 'private-shaped fixture text', capabilities: ['factory'], executionAvailable: true, token: 'never-copy-this' }
   const first = createGroupDecisionTrace([member], ['context'])
-  assert.equal(first.policyVersion, GROUP_POLICY_VERSION)
+  assert.equal(first.policyVersion, GROUP_LIVE_POLICY_VERSION)
   assert.equal(first.members[0].executionAvailable, true)
   assert.ok(!JSON.stringify(first).includes(member.description))
   assert.ok(!JSON.stringify(first).includes(member.token))
