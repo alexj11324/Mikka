@@ -136,7 +136,7 @@ test('the streaming reply keeps its earlier chips mounted as new tokens arrive',
   } finally { await view.unmount() }
 })
 
-test('a reply shows its thinking and each tool by name and state with AI Elements; previews open on demand', async () => {
+test('a reply shows its thinking once it ends and each tool by name and state with AI Elements; previews open on demand', async () => {
   const { ReplyActivity } = await import('../components/coordinator/reply-activity')
   const view = await mount()
   try {
@@ -147,8 +147,9 @@ test('a reply shows its thinking and each tool by name and state with AI Element
     ]
     await view.render(<ReplyActivity tools={tools} thinking={{ active: true, seconds: 1 }} />)
     const text = () => view.container.textContent ?? ''
-    assert.equal(view.container.querySelector('[data-activity-thinking]')?.getAttribute('data-activity-thinking'), 'active')
-    assert.match(view.container.querySelector('[data-activity-thinking]')?.textContent ?? '', /^Thinking$/)
+    // Live thinking is the Thinking Loader's under the chat (tests/reply-wait.test.tsx): no second 「Thinking」 line here.
+    assert.equal(view.container.querySelector('[data-activity-thinking]'), null)
+    assert.doesNotMatch(text(), /Thinking/)
     // AI Elements Tool: our label as its title, the AI SDK state as its badge; internal names never show.
     assert.deepEqual([...view.container.querySelectorAll('[data-activity-tool]')].map(row => [row.getAttribute('data-activity-tool'), row.querySelector('[data-slot="collapsible-trigger"], button')?.textContent]),
       [['done', 'Create taskDone'], ['running', 'Start threadRunning'], ['error', 'Use a toolFailed']])
@@ -156,11 +157,14 @@ test('a reply shows its thinking and each tool by name and state with AI Element
     await act(async () => { (view.container.querySelector('[data-activity-tool="done"] button') as HTMLButtonElement).click() })
     for (let tries = 0; tries < 100 && !/i1/.test(text()); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20)))
     assert.match(text(), /Input[\s\S]*Fix login[\s\S]*Result[\s\S]*i1/)
-    const thinkingTrigger = view.container.querySelector('[data-activity-thinking] button') as HTMLButtonElement
-    assert.ok(thinkingTrigger.disabled, 'reasoning text is never shown, so thinking does not open')
 
     await view.render(<ReplyActivity tools={[]} thinking={{ active: false, seconds: 3 }} />)
+    assert.equal(view.container.querySelector('[data-activity-thinking]')?.getAttribute('data-activity-thinking'), 'done')
     assert.equal(text(), 'Thought for 3 seconds')
+    const thinkingTrigger = view.container.querySelector('[data-activity-thinking] button') as HTMLButtonElement
+    assert.ok(thinkingTrigger.disabled, 'reasoning text is never shown, so thinking does not open')
+    await view.render(<ReplyActivity tools={[]} thinking={{ active: true, seconds: 1 }} />)
+    assert.equal(view.container.innerHTML, '', 'thinking with nothing else waits for the loader')
     await view.render(<ReplyActivity tools={[]} thought />)
     assert.equal(text(), 'Thought', 'a stored reply knows only that it thought')
     await view.render(<ReplyActivity tools={[]} />)

@@ -37,7 +37,7 @@ import { useLiveCitations } from './use-live-citations'
 import type { CoordinatorLiveReply } from '@/lib/coordinator-stream-client'
 import { ThreadCard } from './thread-card'
 import { ReplyActivity } from './reply-activity'
-import { Shimmer } from '@/components/ai-elements/shimmer'
+import { ReplyWaitLine, replyWait } from './reply-wait'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { PendingActions } from './pending-actions'
 import { SubagentLoginNeeds } from './subagent-login-needs'
@@ -436,9 +436,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 </span>
               </MessageContent></Message>
             </MessageScrollerItem>}
-            {/* The working line fades in (R-37: opacity on a duration). It leaves at once: an exit would keep its height
-                after the reply lands and pull the scroll position back (coordinator-scroll.spec). */}
-            {data?.working && items.length > 0 && <p role="status" className={cn('flex items-center gap-2 text-sm text-muted-foreground', workingEnter && ENTER)}><Shimmer as="span">{t('working')}</Shimmer></p>}
+            {/* While a reply has no words yet: affectUI's Thinking Loader, its label following the stream's events. It fades
+                in (R-37: opacity on a duration) and leaves at once: an exit would keep its height after the reply lands and
+                pull the scroll position back (coordinator-scroll.spec). */}
+            {items.length > 0 && <ReplyWaitLine wait={replyWait(Boolean(data?.working), stream.replies, lastSaid?.from === 'coordinator' && Boolean(lastSaid.text))} enter={workingEnter} />}
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <AnimatePresence initial={false}>

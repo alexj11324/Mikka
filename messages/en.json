@@ -3067,7 +3067,6 @@
       "arguments": "Details",
       "approveRun": "Run"
     },
-    "working": "Coordinator is working…",
     "loadError": "Could not load the conversation. Retrying.",
     "failedTitle": "Reply failed",
     "subscriptionRefusal": {
@@ -3200,6 +3199,7 @@
     },
     "activity": {
       "thinking": "Thinking",
+      "reading": "Reading results",
       "thought": "Thought for {seconds, plural, one {# second} other {# seconds}}",
       "thoughtStored": "Thought",
       "tool": "Use a tool",
