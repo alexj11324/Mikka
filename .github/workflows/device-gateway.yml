@@ -6,6 +6,10 @@ on:
       - 'cloudflare/device-gateway/**'
       - 'lib/device-gateway*.ts'
       - 'lib/device-presence*.ts'
+      - 'lib/live/**'
+      - 'lib/db/commit-effects*.ts'
+      - 'hooks/use-live-key.tsx'
+      - 'app/api/live/**'
       - 'scripts/device-gateway/**'
       - '.github/workflows/device-gateway.yml'
   pull_request:
@@ -33,6 +37,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node --test scripts/device-gateway/deploy.test.mjs
       - run: node --test cloudflare/device-gateway/test/runtime.test.mjs
+      - run: node --import tsx --test lib/live/scope.test.ts lib/live/channel.test.ts lib/db/commit-effects.test.ts cloudflare/device-gateway/src/live-route.test.ts
+      - run: node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/live/ticket.test.ts
   deploy:
     needs: test
     if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'

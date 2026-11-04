@@ -7,6 +7,7 @@ import { snapshotMatchesScope } from './deliverable-snapshot'
 import { apiKeyWorkerDefinition } from "../agent-kit/worker";
 import { factoryRunBotMatches } from './run-scope'
 import { randomUUID } from "node:crypto";
+import { factoryChanged } from '../live/factory';
 import { factoryCheckIndependent } from "./check-independence";
 import { maskFactoryNote } from "./note-mask";
 import { factoryTaskDetail, type FactoryTaskDetail } from "./task-detail";
@@ -248,6 +249,7 @@ export function createFactoryStore(
       'INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)',
       [task.id, eventId, JSON.stringify(request), JSON.stringify(result)],
     );
+    await factoryChanged(tx, task);
     return result;
   }
   async function runFor(tx: PoolClient, task: FactoryTask, runId: string) {
@@ -494,6 +496,7 @@ export function createFactoryStore(
           // Both versions are inside this uncommitted transaction. The one
           // immutable receipt exposed to replays includes the queued review.
           await tx.query('UPDATE factory_events SET result=$3 WHERE "taskId"=$1 AND "eventId"=$2', [task.id, eventId, JSON.stringify(result)]);
+          await factoryChanged(tx, final);
           return { result, start };
         });
       } finally {
