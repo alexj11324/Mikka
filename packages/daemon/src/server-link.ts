@@ -73,6 +73,8 @@ export interface ServerLink {
   /** Authenticated policy validation before repository/setup effects, including resume. */
   verifyRunPolicy?(assignment: RunAssignment, signal: AbortSignal): Promise<unknown>
   prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
+  /** A gateway hint only; every live run rechecks its current authority. */
+  invalidateRunControls?(): void
   /** The server's Decisions API on behalf of one run (server-decision.ts). */
   decide?: ServerDecide
   /** Optional host-only adapter for the claimed run; never model-supplied. */

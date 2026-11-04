@@ -776,6 +776,7 @@ export class Daemon {
           openedAt = performance.now()
           this.gatewayLive = true
         },
+        onWorkAvailable: () => this.options.link.invalidateRunControls?.(),
         onWork: async () => {
           await this.pullSignaledWork(deviceId, connection.signal)
           if (connection.signal.aborted || this.stopped) return
@@ -798,6 +799,7 @@ export class Daemon {
       connection.abort()
       signal.removeEventListener("abort", abort)
       this.gatewayLive = false
+      this.options.link.invalidateRunControls?.()
       if (!this.stopped && !signal.aborted && !this.gatewayUnavailable) {
         // Merely opening is not recovery: a flapping server must not reset
         // backoff. Stable sessions start again at the shortest retry delay.
