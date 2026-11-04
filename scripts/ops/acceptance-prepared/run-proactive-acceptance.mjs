@@ -62,22 +62,23 @@ const sameCost = (left, right) => ['knownCalls', 'unknownCalls', 'omittedCalls']
  * makes the fixed 12 x 2 logical suite pass. */
 export function measureReplayEvidence(value, expected) {
   const allSteps = [], generations = new Set(), executions = new Set(), logical = new Set(), stepIds = new Set()
-  let logicalReplays = 0, receiptedLogicalReplays = 0, completedLogicalReplays = 0, unobservedLogicalReplays = 0, valid = true
+  let logicalReplays = 0, receiptedLogicalReplays = 0, completedLogicalReplays = 0, unobservedLogicalReplays = 0, evidenceValid = true
   const configured = Array.isArray(expected.caseIds) && expected.caseIds.length === 12 && new Set(expected.caseIds).size === 12
     && digest(expected.datasetDigest) && token(expected.baselinePolicy) && token(expected.candidatePolicy)
   for (const [label, policy] of [['baseline', expected.baselinePolicy], ['candidate', expected.candidatePolicy]]) {
     const rows = Array.isArray(value?.[label]) ? value[label] : []
-    if (rows.length !== 12) valid = false
+    if (rows.length !== 12) evidenceValid = false
     for (const row of rows) {
       logicalReplays++
       if (validReceipt(row.receipt)) receiptedLogicalReplays++
       const key = policy + ':' + row.caseId, steps = Array.isArray(row.decisions) ? row.decisions : []
       if (!steps.length) unobservedLogicalReplays++
       const totals = measureDecisions(steps)
-      let rowValid = configured && !logical.has(key) && expected.caseIds.includes(row.caseId)
+      let rowBound = configured && !logical.has(key) && expected.caseIds.includes(row.caseId)
         && row.policyVersion === policy && row.datasetDigest === expected.datasetDigest && row.schemaVersion === 1
         && row.evidenceKind === 'actual-decision-inference' && row.executionPerformed === false && row.policyChanged === false
-        && row.decisionProtocol === 'group-sequential-v1' && row.status === 'complete' && row.failureReason === null
+        && row.decisionProtocol === 'group-sequential-v1' && ['complete', 'invalid_decision'].includes(row.status)
+        && (row.status === 'complete' ? row.failureReason === null : decisionFailure(row.failureReason) !== null)
         && row.costScope === 'routing-decision-chain' && steps.length > 0 && steps.length <= 4
         && validReceipt(row.receipt) && steps[0]?.receipt?.executionId === row.receipt?.executionId
         && steps[0]?.receipt?.providerGenerationId === row.receipt?.providerGenerationId
@@ -90,22 +91,31 @@ export function measureReplayEvidence(value, expected) {
         const step = item && typeof item === 'object' ? item : {}
         allSteps.push(step)
         const evidence = validReceipt(step.receipt)
+        const failedLast = row.status === 'invalid_decision' && index === steps.length - 1
+        const stepBound = failedLast
+          ? step.failure === row.failureReason && (evidence ? step.status === 'invalid_decision' : step.status === 'unavailable' && step.receipt === null)
+          : step.status === 'complete' && step.failure === null && evidence
         if (!uuid(step.id) || stepIds.has(step.id) || !['intent', 'responder', 'delegation', 'report_timing'].includes(step.phase) || step.index !== index
-          || step.status !== 'complete' || step.failure !== null || !evidence) rowValid = false
+          || !stepBound) rowBound = false
         stepIds.add(step.id)
         if (evidence) {
-          if (generations.has(step.receipt.providerGenerationId) || executions.has(step.receipt.executionId)) rowValid = false
+          if (generations.has(step.receipt.providerGenerationId) || executions.has(step.receipt.executionId)) rowBound = false
           generations.add(step.receipt.providerGenerationId); executions.add(step.receipt.executionId)
         }
       }
-      if (rowValid) completedLogicalReplays++
-      else valid = false
+      if (rowBound && row.status === 'complete') completedLogicalReplays++
+      if (!rowBound) evidenceValid = false
     }
   }
   const totals = measureDecisions(allSteps)
   if (unobservedLogicalReplays) totals.decisionCostUsd = null
+  evidenceValid = Boolean(evidenceValid && configured && logicalReplays === 24 && totals.decisionCalls.attempted <= 96)
+  const collectionComplete = evidenceValid && value?.collectionComplete === true
+  const valid = evidenceValid && completedLogicalReplays === 24
+  const qualityAccepted = collectionComplete && valid && value?.status === 'complete' && value?.qualityAccepted === true
+    && value?.comparison?.decisionReviewReady === true
   return { scope: 'routing-decision-chain', logicalReplays, receiptedLogicalReplays, completedLogicalReplays, unobservedLogicalReplays,
-    valid: Boolean(valid && configured && logicalReplays === 24 && completedLogicalReplays === 24 && totals.decisionCalls.attempted <= 96),
+    evidenceValid, collectionComplete, qualityAccepted, valid,
     ...totals, maximumProviderCalls: 96 }
 }
 const cleanupTurn = row => shape(row, { messageId: uuid, status: token, error: token, traceStatus: token })
@@ -177,7 +187,7 @@ export function sanitizeReplayReport(value) {
       knownCalls: integer, unknownCalls: integer, omittedCalls: integer, completeTotalUsd: finite,
       knownObservations: integer, unknownObservations: integer }),
     decisionLatency: row => shape(row, { scope: oneOf(['provider-request']), samples: finite, p50Ms: finite, p95Ms: finite }), runtimeCasesExcluded: list(token) }) : null
-  return { ...shape(value, { status: token, error: token, dataset: token, datasetDigest: digest, deploymentId: token, revision: token,
+  return { ...shape(value, { status: token, error: token, collectionComplete: bool, qualityAccepted: bool, dataset: token, datasetDigest: digest, deploymentId: token, revision: token,
     conversationId: uuid, startedAt: date, finishedAt: date, baseline: rows, candidate: rows }),
     comparison: { baseline: summary(value.comparison?.baseline), candidate: summary(value.comparison?.candidate),
       decisionReviewReady: value.comparison?.decisionReviewReady === true, requiresHumanReview: true, executionAcceptanceRequired: true },
@@ -508,7 +518,7 @@ export async function runAcceptanceBundle({ env = process.env, fetchImpl = fetch
   const machinesCleaned = !groupRaw?.cases?.some(row => uuid(row.taskId)) || report.machineCleanup?.status === 'ended'
   report.status = !report.error && cleaned && machinesCleaned && sessionsEnded && report.replaySessionEnded && report.group?.sessionEnded
     && report.ownerMcp?.status === 'passed' && report.group?.status === 'pass' && report.replay?.status === 'complete'
-    && report.replayAccounting?.valid && report.replay?.comparison?.decisionReviewReady === true ? 'pass' : 'fail'
+    && report.replayAccounting?.qualityAccepted && report.replay?.comparison?.decisionReviewReady === true ? 'pass' : 'fail'
   return report
 }
 
@@ -532,11 +542,13 @@ async function main() {
   writeSanitizedReport(report, output)
   const summary = { status: report.status, ownerMcp: report.ownerMcp?.status ?? 'not-run', group: report.group?.status ?? 'not-run', replay: report.replay?.status ?? 'not-run',
     actualReceiptedDecisionReplays: report.actualReceiptedDecisionReplays, completedLogicalDecisionReplays: report.completedLogicalDecisionReplays ?? 0,
+    collectedLogicalDecisionReplays: report.replayAccounting?.logicalReplays ?? 0,
+    replayCollectionComplete: report.replayAccounting?.collectionComplete === true, replayQualityAccepted: report.replayAccounting?.qualityAccepted === true,
     expectedDecisionReplays: 24, replayDecisionCalls: report.replayAccounting?.decisionCalls ?? null,
     error: report.error ?? null, fixtureConversationId: report.fixtureConversationId ?? null, report: output }
   console.log(JSON.stringify(summary))
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY,
-    `## Proactive production acceptance\n\nStatus: **${summary.status}**\n\nOwner MCP management: ${summary.ownerMcp}; group runtime: ${summary.group}; complete logical Decision replays: ${summary.completedLogicalDecisionReplays}/24 (${summary.replay}).\n\nReplay provider calls: attempted ${summary.replayDecisionCalls?.attempted ?? 'unknown'}, receipted ${summary.replayDecisionCalls?.receipted ?? 'unknown'}, unreceipted ${summary.replayDecisionCalls?.unreceipted ?? 'unknown'}. Routing cost remains unknown unless every call is priced.\n\nOnly the sanitized JSON report is uploaded. Owner MCP does not call a provider; replay does not execute its projected actions.\n`)
+    `## Proactive production acceptance\n\nStatus: **${summary.status}**\n\nOwner MCP management: ${summary.ownerMcp}; group runtime: ${summary.group}; collected logical Decision replays: ${summary.collectedLogicalDecisionReplays}/24; complete judgments: ${summary.completedLogicalDecisionReplays}/24 (${summary.replay}). Collection complete: ${summary.replayCollectionComplete}; quality accepted: ${summary.replayQualityAccepted}.\n\nReplay provider calls: attempted ${summary.replayDecisionCalls?.attempted ?? 'unknown'}, receipted ${summary.replayDecisionCalls?.receipted ?? 'unknown'}, unreceipted ${summary.replayDecisionCalls?.unreceipted ?? 'unknown'}. Routing cost remains unknown unless every call is priced.\n\nOnly the sanitized JSON report is uploaded. Owner MCP does not call a provider; replay does not execute its projected actions.\n`)
   if (report.status !== 'pass') process.exitCode = 1
 }
 

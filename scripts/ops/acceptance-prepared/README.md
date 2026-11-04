@@ -2,6 +2,14 @@
 
 This directory contains inert preparation files for Mikka issues #1157–1163. Saving this directory does not activate an acceptance job, change the production deployment, or invoke a model. The workflow template is deliberately outside `.github/workflows`.
 
+## Fixed-case collection and quality
+
+The collector revision keeps the exact 12 baseline and 12 candidate logical cases. A normally authenticated, source-bound HTTP 200 `invalid_decision` observation, including `uncertain`, is retained and the next fixed case is requested once. It does not retry the failed case, change the provider, or perform the projected action. Every chain remains bounded to four requests; all step IDs, execution IDs and provider generation IDs must be unique across the suite. A missing primary receipt, service/auth failure, deployment change, malformed chain, inconsistent accounting, or repeated receipt stops further work.
+
+`collectionComplete` means all 24 structurally bound cases were collected. `qualityAccepted` additionally requires every judgment to be complete and the existing comparison gate to pass. An invalid result keeps `status: failed`, its failure code, its real receipts and its paid/unknown costs even when collection completes. The outer bundle independently validates these facts and never treats collection completion as production acceptance. Full bundle success still requires the group runtime, owner MCP management and all original credential/session/resource cleanup gates.
+
+The inert `collector-source/` copies are overlays for the two named source paths on application base `5b81321dfd3bbc3413d71af258433e5e9ba73dfb`; they are not executed directly from this directory. The publisher must integrate and review the source collector before using this prepared runner. `COLLECTION-VERIFICATION.json` records the actual offline checks for this revision. No production or provider request was made by those tests; prior failed production evidence is unchanged.
+
 ## Recovery and evidence
 
 The original scratch files became unreadable during this session. The five executable/template files are being recovered from complete, untruncated tool output. `RECOVERY.json` records their original expected SHA-256 values, recovered values, and the actual post-recovery verification result. A match is required before describing a file as an exact recovery. This README is newly authored; it is not a byte-for-byte restoration of the former README. No production result is implied by restoring or testing these files.

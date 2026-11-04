@@ -27,7 +27,7 @@ const replay = () => {
       decisionCost: { knownUsd: 0, knownCalls: 0, unknownCalls: count, omittedCalls: 0 }, decisionCostUsd: null,
       costScope: 'routing-decision-chain', executionPerformed: false, policyChanged: false }
   })
-  return { status: 'complete', baseline: rows(replayContract.baselinePolicy, 1), candidate: rows(replayContract.candidatePolicy, 2),
+  return { status: 'complete', collectionComplete: true, qualityAccepted: true, baseline: rows(replayContract.baselinePolicy, 1), candidate: rows(replayContract.candidatePolicy, 2),
     comparison: { decisionReviewReady: true } }
 }
 
@@ -214,8 +214,52 @@ test('duplicate provider evidence, duplicate cases and reordered chains cannot p
   ]) {
     const report = await fixture({ groupFails: false, mutateReplay }).run()
     assert.equal(report.status, 'fail'); assert.equal(report.replayAccounting.valid, false)
+    assert.equal(report.replayAccounting.collectionComplete, false)
     assert.equal(report.credentialCleanup.credentialSessionLogoutAcknowledged, true)
   }
+})
+
+test('24 collected observations including a priced uncertain result remain a quality and overall failure', async () => {
+  const f = fixture({ groupFails: false, mutateReplay: value => {
+    value.status = 'failed'; value.error = 'replay_decision_unavailable'; value.qualityAccepted = false
+    value.comparison.decisionReviewReady = false
+    const row = value.baseline[0]
+    row.status = 'invalid_decision'; row.failureReason = 'uncertain'
+    row.decisions[0].status = 'invalid_decision'; row.decisions[0].failure = 'uncertain'
+    row.decisions[0].decisionCostUsd = 0.000061
+    row.decisionCost = { knownUsd: 0.000061, knownCalls: 1, unknownCalls: 0, omittedCalls: 0 }; row.decisionCostUsd = 0.000061
+    return value
+  } })
+  const report = await f.run()
+  assert.equal(report.status, 'fail'); assert.equal(f.counters.replay, 1)
+  assert.equal(report.replay.collectionComplete, true); assert.equal(report.replay.qualityAccepted, false)
+  assert.equal(report.replayAccounting.evidenceValid, true); assert.equal(report.replayAccounting.collectionComplete, true)
+  assert.equal(report.replayAccounting.qualityAccepted, false); assert.equal(report.replayAccounting.valid, false)
+  assert.equal(report.replayAccounting.logicalReplays, 24); assert.equal(report.actualReceiptedDecisionReplays, 24)
+  assert.equal(report.completedLogicalDecisionReplays, 23); assert.equal(report.replayAccounting.decisionCalls.receipted, 36)
+  assert.equal(report.replayAccounting.decisionCost.knownUsd, 0.000061); assert.equal(report.replayAccounting.decisionCostUsd, null)
+  assert.equal(report.replay.baseline[0].failureReason, 'uncertain')
+  assert.equal(report.credentialCleanup.removed, true); assert.equal(report.credentialCleanup.cloudRemoved, true)
+  for (const session of Object.values(report.sessionCleanup)) assert.equal(session.logoutAcknowledged, true)
+})
+
+test('a bounded partial invalid chain preserves its unreceipted cost without claiming quality or a retry', async () => {
+  const f = fixture({ groupFails: false, mutateReplay: value => {
+    value.status = 'failed'; value.error = 'replay_decision_unavailable'; value.qualityAccepted = false
+    value.comparison.decisionReviewReady = false
+    const row = value.candidate[0]
+    row.status = 'invalid_decision'; row.failureReason = 'unavailable'
+    row.decisions[1].status = 'unavailable'; row.decisions[1].failure = 'unavailable'; row.decisions[1].receipt = null
+    row.decisionCalls = { attempted: 2, receipted: 1, unreceipted: 1 }
+    return value
+  } })
+  const report = await f.run()
+  assert.equal(report.status, 'fail'); assert.equal(f.counters.replay, 1)
+  assert.equal(report.replayAccounting.evidenceValid, true); assert.equal(report.replayAccounting.collectionComplete, true)
+  assert.equal(report.replayAccounting.qualityAccepted, false); assert.equal(report.completedLogicalDecisionReplays, 23)
+  assert.deepEqual(report.replayAccounting.decisionCalls, { attempted: 36, receipted: 35, unreceipted: 1 })
+  assert.equal(report.replayAccounting.decisionCost.unknownCalls, 36); assert.equal(report.replayAccounting.decisionCostUsd, null)
+  assert.equal(report.replay.candidate[0].decisions[1].receipt, null)
 })
 
 test('a complete four-phase delegation chain includes its actual report-timing receipt', async () => {
