@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "status": "observed",
+  "observedAt": "2026-11-04T04:02:04.196Z",
+  "runId": "41770686098",
+  "source": {
+    "application": "5b81321dfd3bbc3413d71af258433e5e9ba73dfb",
+    "cloudWorkerObserved": "3def948dd00ec5aac59a04f6bc043a1d291d7683",
+    "cloudWorkerProvenance": "existing-Vercel-plain-setting-reported-by-coordinator"
+  },
+  "configurationSource": {
+    "service": "Infisical",
+    "projectId": "89850d6a-f020-4936-863e-df77380dfe40",
+    "environment": "prod",
+    "path": "/vercel",
+    "name": "MIKKA_DATABASE_URL",
+    "namedReadConfirmed": true,
+    "directlyObservedDeployedValue": false
+  },
+  "connection": {
+    "recognized": true,
+    "neon": true,
+    "isPooler": true,
+    "classification": "neon-pooled"
+  },
+  "databaseConnectionAttempted": false,
+  "sqlExecuted": false,
+  "applicationSessionOpened": false,
+  "providerInvoked": false,
+  "configurationChanged": false,
+  "privateConnectionDataEmitted": false,
+  "missingDoesNotProveProductionAbsence": true
+}

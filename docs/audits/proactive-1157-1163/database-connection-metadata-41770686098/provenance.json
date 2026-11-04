@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "workflowRunId": 41770686098,
+  "jobId": 126379411560,
+  "workflowHead": "5477e2fd42b9dd11ff2c54d0570b4550887f1e0c",
+  "artifactId": 13293644386,
+  "artifactZipSha256": "a2743b53b51422532bc69450e6e85f970ee042e8c78fed133a15f8c6eb515cc3",
+  "rawJsonSha256": "faeaa45e3f61c5f472dd39faa0519c20256e3a543e3e102501630ffa3d1cd4e7",
+  "rawJsonBytes": 1007,
+  "scope": "One existing named production configuration value; classification only; no DB connection, SQL, application login, provider call, or configuration mutation.",
+  "limitation": "Infisical prod:/vercel value was observed, not the deployed process environment."
+}
