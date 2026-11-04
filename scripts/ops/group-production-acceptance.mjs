@@ -186,13 +186,13 @@ export async function runGroupProductionAcceptance({ env = process.env, fetchImp
     const trace = turn.trace, count = type => trace.events.filter(event => event.type === type).length
     const observed = observeDecisions(turn, quality)
     const replies = page.messages.filter(item => item.replyToId === message.id && item.authorType !== 'user')
-    Object.assign(evidence, { action: trace.action, responders: trace.responders, generations: count('generate'), publications: count('publish'), decision: trace.execution,
+    Object.assign(evidence, { action: trace.action, responders: trace.responders, wakes: count('wake'), generations: count('generate'), publications: count('publish'), decision: trace.execution,
       decisionCostUsd: observed.decisionCostUsd, decisionLatencyMs: observed.decisionLatencyMs,
       decisionProtocol: observed.decisionProtocol, decisions: observed.decisions, decisionsOmitted: observed.decisionsOmitted,
       decisionCalls: observed.decisionCalls, decisionCost: observed.decisionCost, costScope: observed.costScope })
     check(expected.actions.includes(trace.action), 'acceptance_action_mismatch')
     assert.deepEqual(trace.responders, expected.responders, 'acceptance_responder_mismatch')
-    check(count('generate') === expected.generations && count('publish') === expected.publications && replies.length === expected.publications, 'acceptance_side_effect_mismatch')
+    check(count('wake') === expected.wakes && count('generate') === expected.generations && count('publish') === expected.publications && replies.length === expected.publications, 'acceptance_side_effect_mismatch')
     if (!mentions.length) check(Boolean(trace.execution?.executionId && trace.execution?.providerGenerationId && trace.execution?.requestDigest), 'acceptance_decision_receipt_missing')
     check(observed.decisionProtocol === GROUP_DECISION_PROTOCOL && observed.costScope === 'routing-decision-chain'
       && observed.decisions.length > 0 && observed.primaryReceipt
@@ -248,9 +248,9 @@ export async function runGroupProductionAcceptance({ env = process.env, fetchImp
     createdGroup = { id: group.id, title }
     report.conversationId = group.id
     const [ui, , testing] = report.bots
-    await scenario(group.id, 'useful-silence', '今天午饭不错。这只是闲聊，不需要回复，也不需要执行任何任务。', [], { actions: ['ignore','observe'], responders: [], generations: 0, publications: 0 })
-    const help = await scenario(group.id, 'duty-matched-primary', '请负责UI设计的同事回答：保存按钮在请求进行中应该有什么反馈？只需一句交互建议，不要执行任务。', [], { actions: ['reply'], responders: [ui.id], generations: 1, publications: 1 })
-    await scenario(group.id, 'explicit-mention', '请用一句话建议如何测试空值输入。只回答建议，不执行任务。', [{ memberType: 'bot', memberId: testing.id }], { actions: ['reply'], responders: [testing.id], generations: 1, publications: 1 })
+    await scenario(group.id, 'useful-silence', '今天午饭不错。这只是闲聊，不需要回复，也不需要执行任何任务。', [], { actions: ['ignore','observe'], responders: [], wakes: 0, generations: 0, publications: 0 })
+    const help = await scenario(group.id, 'duty-matched-primary', '请负责UI设计的同事回答：保存按钮在请求进行中应该有什么反馈？只需一句交互建议，不要执行任务。', [], { actions: ['reply'], responders: [ui.id], wakes: 1, generations: 1, publications: 1 })
+    await scenario(group.id, 'explicit-mention', '请用一句话建议如何测试空值输入。只回答建议，不执行任务。', [{ memberType: 'bot', memberId: testing.id }], { actions: ['reply'], responders: [testing.id], wakes: 1, generations: 1, publications: 1 })
     const feedback = await json(`/api/conversations/${group.id}/decisions`, { messageId: help, kind: 'helpful', targetId: ui.id })
     check(feedback.recorded === true && feedback.source === 'human_explicit' && feedback.policyChanged === false, 'acceptance_feedback_not_persisted')
     const forgery = await request(`/api/conversations/${group.id}/decisions`, { messageId: help, kind: 'helpful', source: 'agent_evaluation' })

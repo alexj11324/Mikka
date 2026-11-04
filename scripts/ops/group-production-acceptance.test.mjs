@@ -132,6 +132,7 @@ function pendingFixture({ recoverFirst = false, wrongCleanupOwner = false, unkno
 test('pending judgment can finish within the original budget but never passes as silence while pending', async () => {
   const f = pendingFixture({ recoverFirst: true }), report = await f.run()
   assert.equal(report.cases[0].status, 'pass')
+  assert.equal(report.cases[0].wakes, 0)
   assert.equal(report.cases[0].decision.providerGenerationId, 'generation-synthetic')
   assert.equal(report.cases[0].decisions.length, 1)
   assert.deepEqual(report.cases[0].decisionCalls, { attempted: 1, receipted: 1, unreceipted: 0 })
