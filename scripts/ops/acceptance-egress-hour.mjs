@@ -142,7 +142,28 @@ function observationRows(raw, metric, dimensions) {
   return rows
 }
 
-async function projectObservation(read, window) {
+
+/** Diagnostic metadata only. Values, raw errors and arbitrary object keys
+ * never enter the artifact, even when validation fails. */
+function metricResponseShape(raw) {
+  const describe = (value, allowed = []) => {
+    if (value === null) return { type: 'null' }
+    if (Array.isArray(value)) return { type: 'array', length: value.length }
+    if (typeof value === 'object') {
+      const actual = Object.keys(value), keys = actual.filter(key => allowed.includes(key))
+      return { type: 'object', keyCount: actual.length, unknownKeyCount: actual.length - keys.length, keys }
+    }
+    return { type: typeof value }
+  }
+  const first = Array.isArray(raw?.summary) ? raw.summary[0] : undefined
+  return { response: describe(raw, ['summary', 'series', 'queryId', 'meta', 'data']), summary: describe(raw?.summary),
+    series: describe(raw?.series), data: describe(raw?.data, ['summary', 'series']),
+    firstSummary: describe(first, ['dimensions', 'values', 'timestamp']),
+    dimensions: describe(first?.dimensions, ['route', 'httpStatus', 'http_status', 'deploymentId', 'deployment_id', 'environment']),
+    values: describe(first?.values, ['value']) }
+}
+
+async function projectObservation(read, window, recordShape) {
   const context = async () => {
     const alias = activeAlias(await read('/v4/aliases/' + PRODUCTION_ALIAS))
     const deployment = selectedDeployment(await read('/v13/deployments/' + alias.deploymentId),
@@ -157,6 +178,7 @@ async function projectObservation(read, window) {
     read('/metrics/v1', projectMetricQuery(COUNT, countContract.aggregation, window, dimensions)),
     read('/metrics/v1', projectMetricQuery(CPU, cpuContract.aggregation, window, dimensions)),
   ])
+  recordShape({ count: metricResponseShape(countsRaw), cpu: metricResponseShape(cpuRaw), queryGroupLimit: OBSERVATION_GROUP_LIMIT })
   const after = await context()
   const counts = observationRows(countsRaw, COUNT, dimensions), cpu = observationRows(cpuRaw, CPU, dimensions)
   const totals = aggregate(cpu, counts)
@@ -200,7 +222,7 @@ export async function collectHour({ input, vercelToken, neonToken, now = Date.no
   const values = await Promise.allSettled([
     (async () => {
       if (!vercelToken) fail('vercel_token_unavailable')
-      if (window.role === 'observation') return projectObservation(read, window)
+      if (window.role === 'observation') return projectObservation(read, window, shape => { report.vercelResponseShape = shape })
       const [before, selected] = await Promise.all([
         read('/v4/aliases/' + PRODUCTION_ALIAS).then(activeAlias),
         read('/v13/deployments/' + window.deploymentId).then(raw => selectedDeployment(raw, window)),

@@ -63,7 +63,7 @@ test('Neon retains exact returned bucket boundaries and never invents zero for d
 })
 
 function provider({ changeAlias = false, excluded = false, error = false, incomplete = false, countOnly = false, legacy = false,
-  observation = false, truncated = false, duplicate = false, missingDeployment = false, empty = false, cpuMismatch = false } = {}) {
+  observation = false, missingSummary = false, unknownKey = false, truncated = false, duplicate = false, missingDeployment = false, empty = false, cpuMismatch = false } = {}) {
   const calls = []
   let aliases = 0
   const fetchImpl = async (url, init = {}) => {
@@ -118,7 +118,8 @@ function provider({ changeAlias = false, excluded = false, error = false, incomp
       if (empty) summary = []
     }
     if (legacy) for (const row of summary) { row.dimensions.http_status = row.dimensions.httpStatus; delete row.dimensions.httpStatus }
-    return Response.json({ summary,
+    const unknown = unknownKey ? { ['synthetic-secret-key-' + 'x'.repeat(10000)]: 'synthetic-secret-value' } : {}
+    return Response.json({ ...unknown, ...(missingSummary ? { data: { summary, ...unknown } } : { summary }),
       ...(excluded ? { meta: { excludedIntervals: [{ start: input.from, end: input.to }] } } : {}),
       private_unknown: 'synthetic-secret-never-exported' })
   }
@@ -244,4 +245,29 @@ test('project observations preserve insufficient coverage, truncation, duplicate
   const { report } = await observe({ incomplete: true })
   assert.equal(report.status, 'insufficient'); assert.ok(report.reasons.includes('neon_requested_hour_not_reported'))
   assert.equal(report.vercel.requests, 95); assert.equal(report.neon.bytes, null)
+})
+
+test('failed project observation records actual response shape without claiming truncation or exporting values', async () => {
+  const missing = (await observe({ missingSummary: true })).report
+  const truncated = (await observe({ truncated: true })).report
+  assert.deepEqual(missing.reasons, ['metric_groups_missing_or_truncated'])
+  assert.deepEqual(truncated.reasons, ['metric_groups_missing_or_truncated'])
+  assert.deepEqual(missing.vercelResponseShape.count.summary, { type: 'undefined' })
+  assert.deepEqual(missing.vercelResponseShape.count.data, { type: 'object', keyCount: 1, unknownKeyCount: 0, keys: ['summary'] })
+  assert.deepEqual(truncated.vercelResponseShape.count.summary, { type: 'array', length: 100 })
+  assert.deepEqual(truncated.vercelResponseShape.cpu.summary, { type: 'array', length: 100 })
+  assert.equal(truncated.vercelResponseShape.queryGroupLimit, 100)
+  assert.deepEqual(truncated.vercelResponseShape.count.dimensions.keys, ['route', 'httpStatus', 'deploymentId'])
+  const unknown = (await observe({ missingSummary: true, unknownKey: true })).report
+  assert.deepEqual(unknown.vercelResponseShape.count.data, { type: 'object', keyCount: 2, unknownKeyCount: 1, keys: ['summary'] })
+  assert.equal(unknown.vercelResponseShape.count.response.unknownKeyCount, 2)
+  for (const report of [missing, truncated, unknown]) {
+    assert.equal(report.status, 'insufficient')
+    assert.equal(report.productionAcceptance, false)
+    assert.equal(report.vercel, undefined)
+    const serialized = JSON.stringify(report.vercelResponseShape)
+    assert.ok(!serialized.includes('synthetic-secret'))
+    assert.ok(!serialized.includes('/[locale]'))
+    assert.ok(!serialized.includes('dpl_'))
+  }
 })
