@@ -1,0 +1,14 @@
+{
+  "observedAt": "2026-11-04T18:17:40.083Z",
+  "reply": {
+    "id": "aa9584db-12d7-47be-bb86-9808d47d5a08",
+    "body": "任务已交给 Factory，后续由我统一汇报执行、独立审查和验证结果。\n[Task](/mikka?issue=036b1450-662a-435b-befa-f8f1d579bb3a)\n[Thread](/mikka?issue=036b1450-662a-435b-befa-f8f1d579bb3a&thread=4d87420b-d376-4690-8410-fd89314f903b) · [成果与验证证据](/mikka?issue=036b1450-662a-435b-befa-f8f1d579bb3a&thread=4d87420b-d376-4690-8410-fd89314f903b)",
+    "authorId": "279c373e-2a6b-415d-a430-ac64f4c33b16",
+    "position": 7,
+    "createdAt": "2026-11-04T18:14:04.228228+00:00",
+    "replyToId": "c1ec51d8-10d1-4aee-b23f-738493f6be33",
+    "authorType": "bot"
+  },
+  "productionBuild": "f2db127431737cd6d5ca3c338c76ec7021be433f",
+  "uiObservation": "CUA renders full body as plain text; no link nodes for Task/Thread."
+}

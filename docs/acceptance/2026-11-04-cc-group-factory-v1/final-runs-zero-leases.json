@@ -1,0 +1,104 @@
+[
+  {
+    "observedAt": "2026-11-04T18:26:23.384Z",
+    "taskId": "98c9ef53-e6bd-44a3-8f33-2cc8909550f2",
+    "status": "cancelled",
+    "stage": "review",
+    "revision": 17,
+    "activeRuns": "0",
+    "unexpiredLeases": "0",
+    "runs": [
+      {
+        "runId": "4d87420b-d376-4690-8410-fd89314f903b",
+        "stage": "execute",
+        "attemptStatus": "passed",
+        "runStatus": "succeeded",
+        "finishedAt": "2026-11-04T18:15:14.170029+00:00",
+        "sessionId": "b0b39c80-eb00-443d-8789-e0da9d231fdc",
+        "leaseExpiresAt": "2026-11-04T18:16:40.361+00:00",
+        "model": "claude-haiku-5-5",
+        "harness": "claude_code",
+        "modelSource": "subscription",
+        "subscription": {
+          "route": "claude_code_cli",
+          "modelId": "claude-haiku-5-5",
+          "bindingId": "0e5edf2d-2653-475e-8693-b53ceafa7c11"
+        },
+        "nativeClaims": 1
+      },
+      {
+        "runId": "836c475a-8498-4200-814b-4726eb825f21",
+        "stage": "review",
+        "attemptStatus": "passed",
+        "runStatus": "succeeded",
+        "finishedAt": "2026-11-04T18:16:53.705179+00:00",
+        "sessionId": "79ac42c8-51a2-49c7-a559-4041e2bd89fb",
+        "leaseExpiresAt": "2026-11-04T18:18:16.059+00:00",
+        "model": "claude-haiku-5-5",
+        "harness": "claude_code",
+        "modelSource": "subscription",
+        "subscription": {
+          "route": "claude_code_cli",
+          "modelId": "claude-haiku-5-5",
+          "bindingId": "0e5edf2d-2653-475e-8693-b53ceafa7c11"
+        },
+        "nativeClaims": 1
+      },
+      {
+        "runId": "e5afc195-793c-4c18-83c0-9b6bd8bbaa1b",
+        "stage": "verify",
+        "attemptStatus": "failed",
+        "runStatus": "succeeded",
+        "finishedAt": "2026-11-04T18:18:22.583319+00:00",
+        "sessionId": "a6101619-7ebd-4066-aee1-23059cb9a39c",
+        "leaseExpiresAt": "2026-11-04T18:19:45.387+00:00",
+        "model": "claude-haiku-5-5",
+        "harness": "claude_code",
+        "modelSource": "subscription",
+        "subscription": {
+          "route": "claude_code_cli",
+          "modelId": "claude-haiku-5-5",
+          "bindingId": "0e5edf2d-2653-475e-8693-b53ceafa7c11"
+        },
+        "nativeClaims": 1
+      },
+      {
+        "runId": "88ed7cca-ad0e-420f-8103-3a13cfa6a6c7",
+        "stage": "execute",
+        "attemptStatus": "passed",
+        "runStatus": "succeeded",
+        "finishedAt": "2026-11-04T18:20:04.311736+00:00",
+        "sessionId": "b8cf55ac-5e9d-460a-90a2-57a0be1b45f5",
+        "leaseExpiresAt": "2026-11-04T18:21:23.759+00:00",
+        "model": "claude-haiku-5-5",
+        "harness": "claude_code",
+        "modelSource": "subscription",
+        "subscription": {
+          "route": "claude_code_cli",
+          "modelId": "claude-haiku-5-5",
+          "bindingId": "0e5edf2d-2653-475e-8693-b53ceafa7c11"
+        },
+        "nativeClaims": 1
+      },
+      {
+        "runId": "25b60832-a063-46e1-860c-15c7bd84a977",
+        "stage": "review",
+        "attemptStatus": "cancelled",
+        "runStatus": "failed",
+        "finishedAt": "2026-11-04T18:20:40.730327+00:00",
+        "sessionId": null,
+        "leaseExpiresAt": "2026-11-04T18:22:06.17+00:00",
+        "model": "claude-haiku-5-5",
+        "harness": "claude_code",
+        "modelSource": "subscription",
+        "subscription": {
+          "route": "claude_code_cli",
+          "modelId": "claude-haiku-5-5",
+          "bindingId": "0e5edf2d-2653-475e-8693-b53ceafa7c11"
+        },
+        "nativeClaims": 1
+      }
+    ]
+  }
+]
+

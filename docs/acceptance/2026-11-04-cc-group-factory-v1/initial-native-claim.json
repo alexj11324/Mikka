@@ -1,0 +1,108 @@
+[
+  {
+    "observedAt": "2026-11-04T18:15:09.698Z",
+    "id": "4d87420b-d376-4690-8410-fd89314f903b",
+    "status": "running",
+    "sessionId": "b0b39c80-eb00-443d-8789-e0da9d231fdc",
+    "startedAt": "2026-11-04T18:14:05.251Z",
+    "finishedAt": null,
+    "stopReason": null,
+    "model": "claude-haiku-5-5",
+    "harness": "claude_code",
+    "source": "subscription",
+    "cliModelSelection": "explicit",
+    "bindingId": "0e5edf2d-2653-475e-8693-b53ceafa7c11",
+    "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce",
+    "connectionRevision": "2",
+    "route": "claude_code_cli",
+    "modelId": "claude-haiku-5-5",
+    "nativeClaimCount": "1",
+    "initialChunks": [
+      {
+        "seq": 1,
+        "chunk": {
+          "type": "start",
+          "messageId": "93b23309-08b4-4ac5-bda1-f603d04bd733"
+        }
+      },
+      {
+        "seq": 2,
+        "chunk": {
+          "data": {
+            "task": "@PolicyV3 CC Coding 1104-1638 请由你负责这一项新的 Factory 小任务，并由你在群聊单独汇报；UI 和 Testing 无需回复或派发。任务名：PolicyV3 CC Factory 20261104-1812。",
+            "botId": "279c373e-2a6b-415d-a430-ac64f4c33b16",
+            "runId": "4d87420b-d376-4690-8410-fd89314f903b",
+            "state": "working"
+          },
+          "type": "data-computer"
+        }
+      },
+      {
+        "seq": 3,
+        "chunk": {
+          "data": {
+            "state": "preparing"
+          },
+          "type": "data-run-state",
+          "transient": true
+        }
+      },
+      {
+        "seq": 4,
+        "chunk": {
+          "data": {
+            "ms": 0,
+            "ok": true,
+            "stage": "repository"
+          },
+          "type": "data-run-stage"
+        }
+      },
+      {
+        "seq": 5,
+        "chunk": {
+          "data": {
+            "ms": 20,
+            "ok": true,
+            "stage": "worktree"
+          },
+          "type": "data-run-stage"
+        }
+      },
+      {
+        "seq": 6,
+        "chunk": {
+          "data": {
+            "ms": 17705,
+            "ok": true,
+            "stage": "agent_start"
+          },
+          "type": "data-run-stage"
+        }
+      },
+      {
+        "seq": 7,
+        "chunk": {
+          "data": {
+            "state": "running"
+          },
+          "type": "data-run-state",
+          "transient": true
+        }
+      },
+      {
+        "seq": 8,
+        "chunk": {
+          "type": "tool-input-available",
+          "input": {
+            "command": "pwd && git remote -v && git rev-parse --abbrev-ref HEAD && git rev-parse HEAD && git status --short",
+            "description": "Check worktree remote, branch, HEAD and status"
+          },
+          "toolName": "Bash",
+          "toolCallId": "toolu_019zqKG3Uc2oXrwgTDM5apti"
+        }
+      }
+    ]
+  }
+]
+

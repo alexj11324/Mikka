@@ -1,0 +1,111 @@
+[
+  {
+    "stage": "review",
+    "runId": "836c475a-8498-4200-814b-4726eb825f21",
+    "check": {
+      "sha": "c112b45298756761823109c41651b4778def36f2",
+      "stage": "review",
+      "policy": {
+        "readOnly": true,
+        "permissions": {
+          "network": "allow",
+          "git_push": "deny",
+          "computer_use": "deny",
+          "install_dependency": "deny",
+          "write_outside_repo": "deny"
+        },
+        "networkAllow": [
+          "github.com",
+          "*.github.com",
+          "*.githubusercontent.com"
+        ]
+      },
+      "command": null,
+      "reportOnly": true,
+      "repository": "/home/user/.mikka/bot-workspaces/279c373e-2a6b-415d-a430-ac64f4c33b16",
+      "candidateId": "45eabaf4-c11e-420d-83c5-17d5e3dc2839",
+      "environment": "device:a0e919bf-0d27-491a-a0e1-8d6518c331ff",
+      "deviceRepoId": "02169380-c3e5-4f7d-a65a-9d5976691a11",
+      "inferCommand": false,
+      "requestEpoch": "b2b9229c-143d-5715-8f25-7c2da1a544be",
+      "candidateEnvironment": "device:a0e919bf-0d27-491a-a0e1-8d6518c331ff"
+    },
+    "candidateId": "45eabaf4-c11e-420d-83c5-17d5e3dc2839",
+    "kind": "deliverable",
+    "sha": null,
+    "producerRunId": "4d87420b-d376-4690-8410-fd89314f903b"
+  },
+  {
+    "stage": "verify",
+    "runId": "e5afc195-793c-4c18-83c0-9b6bd8bbaa1b",
+    "check": {
+      "sha": "c112b45298756761823109c41651b4778def36f2",
+      "stage": "verify",
+      "policy": {
+        "readOnly": true,
+        "permissions": {
+          "network": "allow",
+          "git_push": "deny",
+          "computer_use": "deny",
+          "install_dependency": "deny",
+          "write_outside_repo": "deny"
+        },
+        "networkAllow": [
+          "github.com",
+          "*.github.com",
+          "*.githubusercontent.com"
+        ]
+      },
+      "command": null,
+      "reportOnly": true,
+      "repository": "/home/user/.mikka/bot-workspaces/279c373e-2a6b-415d-a430-ac64f4c33b16",
+      "candidateId": "45eabaf4-c11e-420d-83c5-17d5e3dc2839",
+      "environment": "device:a0e919bf-0d27-491a-a0e1-8d6518c331ff",
+      "deviceRepoId": "02169380-c3e5-4f7d-a65a-9d5976691a11",
+      "inferCommand": false,
+      "requestEpoch": "b2b9229c-143d-5715-8f25-7c2da1a544be",
+      "candidateEnvironment": "device:a0e919bf-0d27-491a-a0e1-8d6518c331ff"
+    },
+    "candidateId": "45eabaf4-c11e-420d-83c5-17d5e3dc2839",
+    "kind": "deliverable",
+    "sha": null,
+    "producerRunId": "4d87420b-d376-4690-8410-fd89314f903b"
+  },
+  {
+    "stage": "review",
+    "runId": "25b60832-a063-46e1-860c-15c7bd84a977",
+    "check": {
+      "sha": "c112b45298756761823109c41651b4778def36f2",
+      "stage": "review",
+      "policy": {
+        "readOnly": true,
+        "permissions": {
+          "network": "allow",
+          "git_push": "deny",
+          "computer_use": "deny",
+          "install_dependency": "deny",
+          "write_outside_repo": "deny"
+        },
+        "networkAllow": [
+          "github.com",
+          "*.github.com",
+          "*.githubusercontent.com"
+        ]
+      },
+      "command": null,
+      "reportOnly": true,
+      "repository": "/home/user/.mikka/bot-workspaces/279c373e-2a6b-415d-a430-ac64f4c33b16",
+      "candidateId": "b634b501-1267-46fb-8d96-60b312f78982",
+      "environment": "device:a0e919bf-0d27-491a-a0e1-8d6518c331ff",
+      "deviceRepoId": "02169380-c3e5-4f7d-a65a-9d5976691a11",
+      "inferCommand": false,
+      "requestEpoch": "b2b9229c-143d-5715-8f25-7c2da1a544be",
+      "candidateEnvironment": "device:a0e919bf-0d27-491a-a0e1-8d6518c331ff"
+    },
+    "candidateId": "b634b501-1267-46fb-8d96-60b312f78982",
+    "kind": "deliverable",
+    "sha": null,
+    "producerRunId": "88ed7cca-ad0e-420f-8103-3a13cfa6a6c7"
+  }
+]
+

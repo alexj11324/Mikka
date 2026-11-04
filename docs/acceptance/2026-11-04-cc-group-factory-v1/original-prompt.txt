@@ -1,0 +1,15 @@
+@PolicyV3 CC Coding 1104-1638 请由你负责这一项新的 Factory 小任务，并由你在群聊单独汇报；UI 和 Testing 无需回复或派发。任务名：PolicyV3 CC Factory 20261104-1812。
+
+请通过正常 Factory 流程创建并执行一次，随后独立 review、独立 verify，最终等待我手工 Owner 验收。执行端固定云端 Claude Code、官方原订阅 claude-haiku-5-5；工作区目前只保留此原订阅模型优先项。禁止改用 API key、其它订阅或其它模型；如果不可用，就记录阻塞，不要切换或重试换模型。不要复用旧任务、旧候选或旧 SID。
+
+本任务没有外部 Git 仓库。请在本任务独立工作目录创建 mikka-group-policy-v3-cc-20261104-1812.txt，精确 UTF-8、无 BOM、三行，每行以 LF 结束：
+mikka-group-policy-v3
+path=claude-code
+status=ready
+
+验收标准：只交付这个文件；内容精确如上，共 52 字节，SHA-256 必须为 05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6。允许在本任务目录写这个文件并运行实际检查；不连接生产数据库，不改生产设置，不操作其它任务，不 push、不建 PR、不发送第三方消息。
+
+执行阶段必须真实运行创建文件及检查命令，保存本 run 的实际命令输入、输出和退出状态，不用口述替代执行。冻结检查命令如下，review / verify 请通过正常可用的只读检查工具实际检查当前候选，并运行这条命令，记录新鲜结果；使用 inspect_artifact 实际读取该文件，不把 producer 的文字说明当作独立检查：
+python3 -c "from pathlib import Path; import hashlib; p=Path('mikka-group-policy-v3-cc-20261104-1812.txt'); b=p.read_bytes(); print('bytes=', len(b)); print('sha256=', hashlib.sha256(b).hexdigest()); print(b.decode('utf-8'), end=''); assert b==b'mikka-group-policy-v3\npath=claude-code\nstatus=ready\n'"
+
+通过既有 submit 结束执行，让 Factory 保存本轮 deliverable snapshot 并启动独立审阅、独立验证。不要求不存在的 submit_artifact 上传功能。检查不通过时保留真实失败原因；不要修改验收标准或伪造 passed。三个阶段全部通过以后只汇报这一个任务的候选和状态，等待我的 Owner 验收。
