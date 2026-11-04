@@ -1,6 +1,6 @@
 import { pgTable, uuid, text, varchar, jsonb, timestamp, index, uniqueIndex, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
-import { users, issues, agentRuns, factoryTasks } from './schema'
+import { users, issues, agentRuns, factoryTasks } from './schema.ts'
 
 /** Immutable project decisions; AI conversation bodies remain in their original Mikka tables. */
 export const projectDecisions = pgTable('project_decisions', {

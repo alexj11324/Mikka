@@ -1215,4 +1215,4 @@ export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
   processedAt: timestamp('processedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
-export { projectDecisions, projectDecisionSources } from './project-map-schema'
+export { projectDecisions, projectDecisionSources } from './project-map-schema.ts'

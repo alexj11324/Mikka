@@ -382,3 +382,19 @@ test('question and answer retain their frozen origin session after a run session
     await missing(resolve({ ...locator, sessionId: 'resumed-session' }))
   }
 })
+
+test('an exact artifact version uses its submitter for authority, attribution and masking', async () => {
+  records.currentRun = { ...records.run, id: id.otherRun }
+  // The version query returned B's receipt; A is only the artifact creator.
+  records.artifact = { ...records.artifact, version: 2, runId: id.otherRun, title: 'B version' }
+  const source = { type: 'artifact_version' as const, id: id.artifact, versionId: id.version }
+  const [resolved] = await resolve(source, { ...scope, runId: id.otherRun })
+  assert.equal(resolved.locator.runId, id.otherRun)
+  assert.equal(resolved.locator.revision, 2)
+  assert.equal(resolved.authorId, id.otherRun)
+  await missing(resolve(source, { ...scope, runId: id.run }))
+  await missing(resolve({ ...source, runId: id.run }))
+  await readDecisionSource(scope, resolved.locator)
+  assert.equal(masks[0].type, 'run')
+  assert.equal(masks[0].target, id.otherRun)
+})

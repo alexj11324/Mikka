@@ -252,8 +252,20 @@ async function loadSource(ctx: Context, raw: DecisionSourceLocator): Promise<Loa
       return { locator: constrain(input, { type: input.type, id: row.id, taskId: task.id, ...runCoordinates(run), sessionId: row.originSessionId, revision: row.originRevision, ...(input.type === 'answer' && row.answerId ? { answerId: row.answerId } : {}) }), relation: 'host_verified', occurredAt: input.type === 'answer' ? row.answeredAt! : row.createdAt, ...(human ? { authorKind: 'human' as const, authorId: row.userId } : input.type === 'question' ? { authorKind: 'agent' as const, authorId: run.id } : {}), maskRunId: run.id, content: input.type === 'answer' ? row.answer : { question: row.question, context: row.context, options: row.options } }
     }
     case 'artifact_version': {
-      const { rows: [row] } = await pool.query<{ artifactId: string; versionId: string; version: number; userId: string; issueId: string | null; runId: string | null; title: string; kind: string; size: number; storageKey: string | null; inlineContent: string | null; createdAt: Date }>(`SELECT a.id AS "artifactId",v.id AS "versionId",v.version,a."userId",a."issueId",a."runId",a.title,a.kind,v.size,v."storageKey",v."inlineContent",v."createdAt"
-        FROM artifacts a JOIN artifact_versions v ON v."artifactId"=a.id WHERE a.id=$1 AND v.id=$2 AND a."userId"=$3`, [input.id, input.versionId ? uuid(input.versionId) : unavailable(), scope.userId])
+      // artifacts.runId is only the initial creator. Each later version belongs
+      // to its exact host submission receipt, including its own issue and title.
+      // Before receipts existed, only v1 can safely fall back to the creator.
+      // Joining every matching dedupe key makes a conflicting receipt fail closed.
+      const { rows: [row] } = await pool.query<{ artifactId: string; versionId: string; version: number; userId: string; issueId: string | null; runId: string | null; title: string; kind: string; size: number; storageKey: string | null; inlineContent: string | null; createdAt: Date }>(`SELECT a.id AS "artifactId",v.id AS "versionId",v.version,a."userId",
+          CASE WHEN e.id IS NULL THEN a."issueId" ELSE e."issueId" END AS "issueId",
+          CASE WHEN e.id IS NULL THEN a."runId" ELSE e."runId" END AS "runId",
+          COALESCE(NULLIF(e.payload->>'title',''),a.title) AS title,a.kind,v.size,v."storageKey",v."inlineContent",v."createdAt"
+        FROM artifacts a JOIN artifact_versions v ON v."artifactId"=a.id
+        LEFT JOIN coordinator_events e ON e."dedupeKey"='artifact_submitted:' || a.id::text || ':' || v.version::text
+        WHERE a.id=$1 AND v.id=$2 AND a."userId"=$3
+          AND ((e.id IS NULL AND v.version=1) OR
+            (e.kind='artifact_submitted' AND e."userId"=a."userId" AND e.payload->>'artifactId'=a.id::text
+             AND jsonb_typeof(e.payload->'version')='number' AND e.payload->>'version'=v.version::text))`, [input.id, input.versionId ? uuid(input.versionId) : unavailable(), scope.userId])
       if (!row) unavailable()
       await requireIssue(ctx, row.issueId)
       const run = row.runId ? await requireRun(ctx, row.runId) : undefined

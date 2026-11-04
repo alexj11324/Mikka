@@ -18,7 +18,6 @@ import * as artifacts from '@/lib/mcp/artifacts'
 import { ARTIFACT_KINDS } from '@/lib/db/schema'
 import { ARTIFACT_TITLE_MAX } from '@/lib/artifacts/limits'
 import { recordDecisionSchema, ProjectMapError } from '@/lib/project-map/contracts'
-import { recordProjectDecision } from '@/lib/project-map/decisions'
 
 export const dynamic = 'force-dynamic'
 // Leaves room for read_coordinator_messages to wait for a reply.
@@ -293,6 +292,7 @@ function createWorkerHandler(mailbox: readonly MailboxToolName[]) { return creat
     const auth = ctx.http?.authInfo
     const run = worker.workerRun(auth)
     try {
+      const { recordProjectDecision } = await import('@/lib/project-map/decisions')
       return json(await recordProjectDecision({ kind: 'run', userId: run.userId, runId: run.id, token: auth!.token }, input))
     } catch (error) {
       if (error instanceof ProjectMapError) return outcome({ error: error.code })
