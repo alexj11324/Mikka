@@ -3549,7 +3549,6 @@
     "changesLongLines": "长行",
     "changesWrap": "换行",
     "changesScroll": "横向滚动",
-    "changesUnchanged": "{count} 行未修改",
     "changesOpenFile": "在新标签打开",
     "changesBinary": "二进制文件",
     "changesTooLarge": "改动太大，无法显示",

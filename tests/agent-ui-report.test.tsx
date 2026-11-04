@@ -79,8 +79,10 @@ test('a saved reply\'s file diff shows ✓; only a streaming one spins', () => {
   assert.match(saved, /aria-label="Changes applied"/)
   assert.doesNotMatch(saved, /aria-label="Applying changes"/)
   assert.match(saved, /data-state="complete"/)
-  // The header is beUI's plain button: no ghost Button fill when open.
-  assert.doesNotMatch(saved, /aria-expanded:bg-muted/)
+  // The header is the diff library's own: no fold toggle of ours, so nothing tinted when open.
+  assert.doesNotMatch(saved, /aria-expanded="/)
+  // Copy sits in the library header's metadata slot.
+  assert.match(saved, /<div slot="header-metadata">[\s\S]*aria-label="Copy code"/)
   assert.match(render(samples.BeFileDiff, 'en', true), /aria-label="Applying changes"/)
 })
 
