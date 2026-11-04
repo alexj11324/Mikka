@@ -66,7 +66,11 @@ export async function acceptLocalRun(input: {
     const [bot] = input.botId ? await tx.select().from(bots).where(and(eq(bots.id, input.botId), eq(bots.ownerId, input.userId))).for('share') : []
     if (input.botId && !bot) throw invalid('botUnavailable')
     // Server-selected references, never the Bot owner's personal credentials.
-    const executionIdentity = await freezeExecutionIdentity(client, { userId: input.userId, botId: input.botId, deviceId: input.deviceId, agentDefinition: input.definition }).catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
+    const authority = { userId: input.userId, botId: input.botId, deviceId: input.deviceId, agentDefinition: input.definition }
+    const executionIdentity = await (input.definition.executionIdentity
+      ? revalidateExecutionIdentity(client, authority)
+      : freezeExecutionIdentity(client, authority)).catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
+    if (!executionIdentity) throw new ActionFailureError('executionAccountUnavailable')
     const definition = { ...input.definition, executionIdentity }
     const context = { ...(bot ? { workspaceId: bot.workspaceId } : {}), ...(input.requestEventId ? { requestEventId: input.requestEventId } : {}) }
     const replayMatches = async (prior: typeof agentRuns.$inferSelect) => {
@@ -141,3 +145,29 @@ export async function acceptedEventStillMatches(admission: import('./repository-
   return Boolean(event?.deliveredAt && destination.success && destination.data.kind === 'device' && destination.data.deviceId === admission.deviceId)
 }
 
+
+/** The host re-admitted a retry on another local Agent. Both immutable
+ * publication receipts must keep the original owner, scope, remote and branch.
+ * An Agent-id change alone, or a copied A receipt, is never a takeover grant. */
+export async function admittedRepositoryRetryMatches(client: PoolClient, prior: typeof agentRuns.$inferSelect, retry: typeof agentRuns.$inferSelect): Promise<boolean> {
+  const original = prior.agentDefinition?.repositoryAdmission
+  const accepted = retry.agentDefinition?.repositoryAdmission
+  if (!original || !accepted || accepted.authority !== 'owner_credential' ||
+    prior.userId !== retry.userId || prior.botId !== retry.botId || prior.issueId !== retry.issueId ||
+    retry.retryOf !== prior.id || !prior.issueId || !prior.deviceId || !retry.deviceId ||
+    accepted.workspaceId !== original.workspaceId || accepted.workspaceLinked !== original.workspaceLinked ||
+    accepted.requestEventId !== original.requestEventId) return false
+  const { rows } = await client.query(`SELECT p.*,repo."repoPath",repo."remoteUrl" AS "repositoryUrl",repo."deviceId" AS "repositoryDeviceId",repo."userId" AS "repositoryOwnerId"
+    FROM run_publications p JOIN agent_runs r ON r.id=p."runId" JOIN device_repos repo ON repo.id=r."deviceRepoId"
+    WHERE p."runId"=ANY($1::uuid[])`, [[prior.id, retry.id]])
+  const before = rows.find(p => p.runId === prior.id), after = rows.find(p => p.runId === retry.id)
+  if (!before || !after || before.scopeVersion !== after.scopeVersion || before.branch !== after.branch || before.remoteKey !== after.remoteKey) return false
+  for (const [run, admission, publication] of [[prior, original, before], [retry, accepted, after]] as const) {
+    if (publication.userId !== run.userId || publication.issueId !== run.issueId || publication.repositoryOwnerId !== run.userId ||
+      publication.repositoryDeviceId !== run.deviceId || publication.remoteKey !== publication.repoPath ||
+      !matchesRepositoryAdmission(admission, { userId: run.userId, issueId: run.issueId!, deviceId: run.deviceId!, agentId: run.agentId,
+        remoteKey: publication.remoteKey, remoteUrl: publication.repositoryUrl, targetBranch: publication.branch,
+        workspaceId: original.workspaceId, workspaceLinked: original.workspaceLinked, requestEventId: original.requestEventId })) return false
+  }
+  return true
+}

@@ -585,7 +585,7 @@ export function createFactoryStore(
             : prior.agentDefinition;
           if (
             (!quotaRetry && (prior.stopReason !== "device_lost" || prior.status !== "failed")) ||
-            retry.retryOf !== prior.id || retry.agentId !== prior.agentId ||
+            retry.retryOf !== prior.id || (retry.agentId !== prior.agentId && !(await (await import('../run-admission-store')).admittedRepositoryRetryMatches(tx, prior, retry))) ||
             retry.kind !== prior.kind || retry.baseBranch !== prior.baseBranch ||
             retry.agentDefinition?.definitionDigest !== expected?.definitionDigest
           )

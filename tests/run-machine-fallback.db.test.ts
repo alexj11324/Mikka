@@ -4,6 +4,7 @@
 // the other, and nothing that can run gives the bot the 没有能跑这个任务的模型 card with the reason.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { gzipSync } from 'node:zlib'
 import test from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
@@ -98,6 +99,84 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     return issueId
   }
   const runOf = async (runId: string) => (await pool.query('SELECT "deviceId",status FROM agent_runs WHERE id=$1', [runId])).rows[0]
+
+  for (const named of [false, true]) await t.test(`${named ? 'an explicitly selected' : 'an automatically placed'} device keeps its placement authority through normal Factory admission and recovery`, async () => {
+    const who = await person(named ? 'named-handoff' : 'automatic-handoff')
+    await runAt(who, 'local')
+    const deviceA = await onlineMac(who.id, true, 'server')
+    const botId = await chatBotId(who.id, null, who.workspaceId)
+    const sourceEventId = randomUUID()
+    await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,"deliveredAt")
+      VALUES($1,$2,$3,'user_message',$4,$5,now())`, [sourceEventId, who.id, botId, `placement:${sourceEventId}`,
+      JSON.stringify({ text: named ? `Use device ${deviceA} for this task.` : 'Choose an available computer automatically for this task.' })])
+    const dispatched = await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', sourceEventId,
+      requestKey: `placement:${randomUUID()}`, ...(named ? { target: { deviceId: deviceA } } : {}) }, undefined, botId) as unknown as { runId?: string; error?: string }
+    assert.ok(dispatched.runId, JSON.stringify(dispatched))
+    const original = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [dispatched.runId])).rows[0]
+    assert.equal(original.deviceId, deviceA)
+    assert.equal(original.agentDefinition.pinnedDeviceId, named ? deviceA : undefined,
+      'an automatic host choice must not acquire the authority of an explicit device selection')
+    assert.equal(original.agentDefinition.repositoryAdmission.deviceId, deviceA)
+    const before = (await pool.query(`SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId"
+      WHERE a."runId"=$1 AND t."userId"=$2`, [original.id, who.id])).rows[0]
+    assert.equal(before.sourceEventId, sourceEventId)
+
+    // B is available only after ordinary dispatch picked A. No admission or
+    // frozen identity is removed to make the recovery test pass.
+    const deviceB = await onlineMac(who.id, true, 'server')
+    const now = new Date()
+    const { DAEMON_PROTOCOL_VERSION } = await import('@mikka/protocol/daemon')
+    await pool.query('UPDATE devices SET "protocolVersion"=$2 WHERE id=ANY($1::uuid[])', [[deviceA, deviceB], DAEMON_PROTOCOL_VERSION])
+    await pool.query('UPDATE devices SET "lastSeenAt"=$2 WHERE id=$1', [deviceA, new Date(now.getTime() - 120_000)])
+    await pool.query(`UPDATE agent_runs SET status='running',"sessionId"='placement-A',"startedAt"=$2,"leaseExpiresAt"=$3 WHERE id=$1`,
+      [original.id, new Date(now.getTime() - 180_000), new Date(now.getTime() - 1_000)])
+    await pool.query(`INSERT INTO run_checkpoints("runId","baseCommit",patch,files,"updatedAt","userId","takenAt")
+      VALUES($1,$2,$3,1,$4,$5,$4)`, [original.id, 'a'.repeat(40), gzipSync('diff --git a/target.txt b/target.txt\n'), now, who.id])
+    const reclaim = async () => {
+      try { await reclaimLostRuns(who.id, now) }
+      catch (error) {
+        // The real completion/reconciler already ran. This Node test has no
+        // Next response on which to schedule its optional Coordinator wake.
+        if (!(error instanceof Error) || !error.message.includes('`after` was called outside a request scope')) throw error
+      }
+    }
+    await reclaim()
+    const { rows: children } = await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [original.id])
+    const current = (await pool.query(`SELECT t.id,t."sourceEventId",t.status,a."runId",a.output FROM factory_tasks t
+      JOIN factory_attempts a ON a.id=t."attemptId" WHERE t.id=$1`, [before.id])).rows[0]
+    assert.equal(current.id, before.id)
+    assert.equal(current.sourceEventId, sourceEventId)
+    if (named) {
+      assert.equal(children.length, 0, 'an explicitly selected A must never silently become B')
+      assert.equal(current.status, 'blocked')
+      const ended = (await pool.query('SELECT status,error,"agentDefinition" FROM agent_runs WHERE id=$1', [original.id])).rows[0]
+      assert.equal(ended.status, 'failed')
+      assert.match(ended.error, /taskDestinationMismatch/)
+      assert.equal(ended.agentDefinition.pinnedDeviceId, deviceA)
+      return
+    }
+    assert.equal(children.length, 1, 'ordinary automatic dispatch must produce one actual re-admitted B run')
+    const child = children[0]
+    assert.equal(child.deviceId, deviceB)
+    assert.equal(child.botId, botId)
+    assert.equal(child.agentDefinition.pinnedDeviceId, undefined)
+    assert.equal(child.agentDefinition.model, original.agentDefinition.model)
+    assert.deepEqual(child.agentDefinition.subscription, original.agentDefinition.subscription)
+    const identity = child.agentDefinition.executionIdentity, priorIdentity = original.agentDefinition.executionIdentity
+    for (const field of ['requester', 'executionPrincipal', 'outputOwner', 'botId', 'botOwner', 'workspaceId']) assert.equal(identity[field], priorIdentity[field])
+    assert.deepEqual(identity.billingAccount.model, priorIdentity.billingAccount.model)
+    assert.deepEqual(identity.resourceBindings.filter((entry: { kind: string }) => entry.kind !== 'device'),
+      priorIdentity.resourceBindings.filter((entry: { kind: string }) => entry.kind !== 'device'))
+    assert.equal(identity.billingAccount.runtime.resourceId, deviceB)
+    assert.equal(child.agentDefinition.repositoryAdmission.deviceId, deviceB)
+    assert.equal(child.agentDefinition.repositoryAdmission.targetBranch, original.agentDefinition.repositoryAdmission.targetBranch)
+    assert.equal(current.runId, child.id)
+    assert.equal(current.output.requestEpoch, sourceEventId)
+    const { claimExecutionRun } = await import('../lib/factory/server')
+    assert.equal((await claimExecutionRun(who.id, deviceB, child.id, new Date(now.getTime() + 90_000).toISOString())).length, 1)
+    await reclaim()
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "retryOf"=$1', [original.id])).rows[0].n, 1)
+  })
 
   await t.test('(a) no computer: the card says so, then a computer is picked once it takes part', async () => {
     const a = await person('fresh')

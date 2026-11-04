@@ -34,7 +34,7 @@ export interface AcceptanceDelivery {
   environment?: string | null
 }
 export interface CandidateMachine { name: string; kind: 'device' | 'cloud' }
-export interface AcceptanceDetail { task?: { stage: string; status: string; candidateId: string | null }; checks?: AcceptanceCheck[]; delivery?: AcceptanceDelivery; completionRecovery?: { binding: { taskId: string; revision: number } } }
+export interface AcceptanceDetail { task?: { stage: string; status: string; candidateId: string | null; revision?: number }; checks?: AcceptanceCheck[]; delivery?: AcceptanceDelivery; completionRecovery?: { binding: { taskId: string; revision: number } } }
 
 /** One piece of evidence plus, for text from a verify run, the command it ran. */
 export interface AcceptanceItem { entry: EvidenceEntry; command: { text: string; exitCode: number | null } | null }

@@ -75,14 +75,14 @@ export function factoryHandoffPrompt(handoff: Awaited<ReturnType<typeof persistF
 
 /** The existing lease-retry path bypasses ordinary dispatch. Refresh its handoff
  * before it creates the child; claim still rechecks the current task/attempt. */
-export async function factoryRecoveryHandoff(pool: Pool, run: { id: string; userId: string }, prompt: string): Promise<{ prompt: string; briefing: string; blocked?: string }> {
+export async function factoryRecoveryHandoff(pool: Pool, run: { id: string; userId: string }, prompt: string, existing?: PoolClient): Promise<{ prompt: string; briefing: string; blocked?: string }> {
   if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return { prompt, briefing: '' }
-  const tx = await pool.connect()
+  const tx = existing ?? await pool.connect()
   try {
-    await tx.query('BEGIN')
+    if (!existing) await tx.query('BEGIN')
     const { factoryClaimTask } = await import('./claim')
     const identity = await factoryClaimTask(tx, run.id)
-    if (!identity) { await tx.query('COMMIT'); return { prompt, briefing: '' } }
+    if (!identity) { if (!existing) await tx.query('COMMIT'); return { prompt, briefing: '' } }
     const { factoryRuntimeForBot } = await import('./runtime')
     const task = await factoryRuntimeForBot(identity.botId).store.lockTask(tx, run.userId, identity.id)
     const handoff = await persistFactoryHandoff(tx, task)
@@ -92,8 +92,8 @@ export async function factoryRecoveryHandoff(pool: Pool, run: { id: string; user
       || effects.publications.some(p => p.status === 'processing')
     const currentRequest = await (await import('./checks')).currentFactoryRequest(tx, task)
     const suffix = factoryHandoffPrompt(handoff)
-    await tx.query('COMMIT')
+    if (!existing) await tx.query('COMMIT')
     return { prompt: currentRequest + prompt.slice(0, 100000 - currentRequest.length - suffix.length) + suffix, briefing: currentRequest + suffix,
       ...(uncertain ? { blocked: 'An external action may already have happened. Reconcile its existing receipt before resuming on another machine.' } : {}) }
-  } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+  } catch (error) { if (!existing) await tx.query('ROLLBACK'); throw error } finally { if (!existing) tx.release() }
 }
