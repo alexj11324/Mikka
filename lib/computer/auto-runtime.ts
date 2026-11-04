@@ -5,13 +5,11 @@ import type { Pool } from 'pg'
 type Actor = { userId: string; workspaceId: string }
 export type BotCloudRuntime = { botId: string; harness: 'codex' | 'claude_code'; agentId: string }
 
-/** Wakes the bot's cloud computer and its worker, which records the bot's
- * runtime rows (`ensureBotRuntime`). Tests replace it; production uses E2B. */
+/** Task admission needs declared execution identities, not a live parent.
+ * Tests can replace registration; production makes no provider calls here. */
 export const botRuntimeProvisioner = {
   provision: async (pool: Pool, actor: Actor, botId: string) => {
-    const { ComputerStore } = await import('./store')
-    await new ComputerStore(pool).operate(actor, botId, 'wake')
-    await (await import('./wake-worker')).ensureCloudBotWorker(pool, actor, botId)
+    await (await import('./task-runtime')).ensureBotTaskRuntime(pool, actor, botId)
   },
 }
 
@@ -71,20 +69,13 @@ async function bindOwnSubscription(pool: Pool, actor: Actor, runtime: BotCloudRu
   [id, actor.userId, actor.workspaceId, runtime.agentId, route, model, provider])
 }
 
-/**
- * The bot's own cloud runtime for a run, created on first use with no manual
- * step: its cloud computer is woken and its runtime recorded. Idempotent; a
- * second dispatch reuses its metadata without waking a sleeping parent or
- * requiring a live parent heartbeat. Returns null when the cloud refuses, so
- * the run takes the next machine (decision 2026-10-31-2200-run-machine-fallback).
- */
+/** The bot's own task runtime is registered on first use. A fresh official
+ * task container initializes its workspace and receives runtime credentials.
+ * Registration never starts, connects to or changes the parent's VM. */
 export async function ensureBotCloudRuntime(pool: Pool, actor: Actor, botId: string, target: { harness: string; model?: string }, provisioner = botRuntimeProvisioner) {
+  if (!['auto', 'codex', 'claude_code'].includes(target.harness)) return null
   let runtime = await findRuntime(pool, actor, botId, target.harness)
   if (!runtime) {
-    // An invalid or missing runtime must not wake an existing sleeping parent.
-    // First-use provisioning remains available when there is no sleeping parent.
-    if ((await pool.query(`SELECT 1 FROM cloud_machines WHERE "ownerId"=$1 AND "workspaceId"=$2 AND state='sleeping'`,
-      [actor.userId, actor.workspaceId])).rowCount) return null
     try { await provisioner.provision(pool, actor, botId) } catch { return null }
     runtime = await findRuntime(pool, actor, botId, target.harness)
     if (!runtime) return null
