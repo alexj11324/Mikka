@@ -13,7 +13,7 @@
 | 文件 | 目标库 | 内容 |
 |---|---|---|
 | `drizzle/20261029213938_workspace_admin_identity.sql` | `DATABASE_URL` | `mikka_workspaces.icon`；新表 `mikka_workspace_slug_redirects(slug PK, workspaceId)` |
-| `drizzle/20261029213939_workspace_admin_settings.sql` | `MIKKA_DATABASE_URL` | 新表 `workspace_settings`；`bots` 新增 `model`、`repository`、`monthlyCreditLimit` 列；`bot_subagents` 指向 bots 的外键改成 `ON UPDATE CASCADE`；计费表 `workspace_billing`、`workspace_credit_grants`、`stripe_webhook_events`（已建表，读写逻辑没有交付） |
+| `drizzle/20261029213939_workspace_admin_settings.sql` | `MIKKA_DATABASE_URL` | 新表 `workspace_settings`；`bots` 新增 `model`、`repository`、`monthlyCreditLimit` 列；`bot_subagents` 指向 bots 的外键改成 `ON UPDATE CASCADE`；计费表 `workspace_billing`、`workspace_credit_grants`、`stripe_webhook_events`（现在由 `lib/billing/` 读写） |
 
 ## 常规
 
@@ -149,14 +149,13 @@ listWorkspaceBots(): Promise<ActionResult<{ bots: Array<{
 
 ## 新增错误码（`lib/action-result.ts`，`messages/*.json` 的 `Errors` 下）
 
-`workspaceSlugTaken`、`workspaceIconInvalid`、`workspaceDeleteNameMismatch`、`workspaceHasActiveSubscription`、`workspaceCannotRemoveSelf`、`workspaceTransferTargetInvalid`、`botTransferBusy`、`botTransferNameConflict`、`teamNotFound`、`teamDeleteNameMismatch`、`botDefaultRepositoryUnavailable`。以下几个已经加好错误码和文案，但对应功能没有交付：`usageLimitReached`、`usageCreditsExhausted`、`billingNotConfigured`、`billingNoSubscription`、`billingPlanInvalid`、`billingProviderFailed`。
+`workspaceSlugTaken`、`workspaceIconInvalid`、`workspaceDeleteNameMismatch`、`workspaceHasActiveSubscription`、`workspaceCannotRemoveSelf`、`workspaceTransferTargetInvalid`、`botTransferBusy`、`botTransferNameConflict`、`teamNotFound`、`teamDeleteNameMismatch`、`botDefaultRepositoryUnavailable`。计费用到 `billingNotConfigured`、`billingNoSubscription`、`billingPlanInvalid`、`billingProviderFailed`（`lib/billing/service.ts`）。`usageLimitReached`、`usageCreditsExhausted` 有错误码和文案，但现在没有代码返回它们。
 
 ## 测试
 
 - `test:workspace-settings`：`tests/workspace-settings-actions.test.ts`（action 包装：调用身份、当前工作区、错误码映射、cookie 切换、createBot 默认值），`lib/workspace-admin/icon.test.ts`。
 - `test:workspace-admin-db`：`tests/workspace-admin.db.test.ts`，在真实 PostgreSQL 上跑。每个破坏性用例都会额外建一个工作区，并断言它的数据没有被动到。这个 suite 已经登记到 `scripts/run-db-tests.mjs` 的 REQUIRED_SUITES 和 CI 的 `DB_TEST_EXPECTED`。
 
-## 未完成
+## 用量和计费
 
-- 5 用量：调研和代码草稿已经写了一部分，没有测试，所以没有提交。可以计量的真实数据有这些：Bot 线程的时长（agent_runs.startedAt / finishedAt，按 botId 归到工作区）、云电脑运行（computer_run_bindings）、后台任务次数（bot_subagents）。模型 token 用量方面，只有 `proactive_usage` 按个人和天记录了 token，没有工作区维度，单次运行也没有 token 数，所以点数口径只能按时长和次数定。派发入口有四处需要加检查：`lib/run-dispatch.ts`（insertRunOnce）、`lib/run-admission-store.ts`、`lib/computer/queue-run.ts`、`lib/cloud-computer/subagents.ts`（create）。
-- 6 计费（Stripe）：只建了表，没有实现。
+这两部分不在本文范围，后来另外交付了：用量是 `getUsage(month?, workspaceId?)`（`app/actions/usage.ts`，`lib/usage/read.ts`），计费是 `app/actions/billing.ts` 和 `lib/billing/`（Stripe 结账、门户、点数购买、银行卡验证）。

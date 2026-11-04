@@ -16,7 +16,7 @@ import { bootstrapOfficialInstance, isOfficialE2BTemplate, stageOfficialWorkerRe
 import type { Actor } from './subagents'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { secretMaskerFor } from '@/lib/secrets/runtime'
-import { readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder } from './thread-worker-logs'
+import { readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder, logRuntimeRefreshFailure, type RuntimeRefreshPhase } from './thread-worker-logs'
 import { credentialProbeCommand, credentialScrubCommand } from '../../packages/daemon/src/credential-globs'
 /** A thread machine runs on its owner's own E2B key (orchestration § 2); this module only acts for that owner. */
 async function options(ownerId: string) {
@@ -229,6 +229,8 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
   const refreshBudget = refreshDeadline ? budgetUntil(refreshDeadline) : undefined
   const client = await pool.connect()
   const leaseId = randomUUID()
+  let refreshPhase: RuntimeRefreshPhase = 'admission'
+  let parallelFailurePhase: RuntimeRefreshPhase | undefined
   let exactQuestionMachine = false
   let runtimeRollback: (() => Promise<void>) | undefined
   let verifyRefreshedRuntime: (() => Promise<unknown>) | undefined
@@ -303,11 +305,13 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (refreshRuntime && machine.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now()) throw new ComputerError(409, 'Thread provisioning in progress')
     if (machine?.state === 'ended') throw new ComputerError(409, 'Thread ended')
     if (!exactQuestionMachine && machine?.state === 'running' && machine.sandboxId) {
+      refreshPhase = 'provider_state'
       const base = await options(actor.userId)
       const state = await withE2BErrors(actor.userId, false, () => Sandbox.getInfo(machine.sandboxId, { ...base, ...runtimeRequestOptions(refreshBudget), ...(refreshBudget ? { retries: 0 } : {}) })).catch((error: unknown) => {
         if (sandboxGone(error)) return null
         throw error
       })
+      refreshPhase = 'admission'
       if (!state) machine = await replaceGoneSandbox(client, runId)
       else if (state.state !== 'paused' && !refreshRuntime) {
         const current = await provider.connect(machine.sandboxId, actor.workspaceId)
@@ -345,6 +349,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (exactQuestionMachine) {
       // Provider I/O happens after the lease transaction. A running original VM
       // already has its worker; only a paused VM needs bootstrap after connect.
+      refreshPhase = 'provider_state'
       const state = provider.state ? await provider.state(machine.sandboxId, actor.userId, refreshBudget) :
         (await withE2BErrors(actor.userId, false, async () => Sandbox.getInfo(machine.sandboxId, { ...await options(actor.userId), ...runtimeRequestOptions(refreshBudget), ...(refreshBudget ? { retries: 0 } : {}) }))).state
       if (state !== 'running' && state !== 'paused') throw new ComputerError(409,'Original question machine unavailable')
@@ -353,6 +358,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
         return { runId, state: 'running' }
       }
     }
+    refreshPhase = 'connect'
     let connected = machine.sandboxId ? await provider.connect(machine.sandboxId, actor.workspaceId, refreshBudget).catch((error: unknown) => {
       if (sandboxGone(error)) return null
       throw error
@@ -366,6 +372,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     }
     const sandbox = connected ?? await provider.create(machine.snapshotId, machine.operationId, { application: 'mikka-thread', workspaceId: actor.workspaceId, runId }, actor.userId)
     connected = null
+    refreshPhase = 'record_sandbox'
     const recorded = await recordThreadSandbox(pool, runId, sandbox.sandboxId, leaseId)
     if (!recorded) {
       // An end can win while Sandbox.create is in flight. The just-created
@@ -377,6 +384,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       }
       throw new ComputerError(409, 'Thread provisioning cancelled')
     }
+    refreshPhase = 'post_connect_admission'
     // Stop check 2: a stop may have landed while the first transaction was committed and the
     // sandbox was being created. Re-take the run lock and check again before the worker starts.
     await client.query('BEGIN')
@@ -401,6 +409,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       // A snapshot never holds a credential; scrub the same list again in case an older snapshot did.
       await sandbox.commands.run(`rm -rf /home/user/.mikka/worker /home/user/.mikka/bootstrap.json /run/mikka-viewer /run/mikka-subagents; ${credentialScrubCommand()}; install -d -m 700 /run/mikka-viewer`, { user: 'root', timeoutMs: 10_000 })
     }
+    refreshPhase = 'runtime_configuration'
     const deviceId = machine.deviceId ?? randomUUID()
     const repoId = machine.repoId ?? randomUUID()
     const credential = `orv_${randomBytes(32).toString('base64url')}`
@@ -410,9 +419,10 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     // Version verification and viewer startup are independent. Hosted runs no
     // longer use Docker; never pull its obsolete image on the critical path.
     // A repository task's machine (claude or codex template) has no desktop.
+    refreshPhase = 'read_worker'
     const [sourceSha] = await Promise.all([
-      sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root', ...runtimeRequestOptions(refreshBudget) }).then(value => value.trim()),
-      repositoryTask ? undefined : installComputerRuntime(sandbox, refreshBudget),
+      sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root', ...runtimeRequestOptions(refreshBudget) }).then(value => value.trim()).catch(error => { parallelFailurePhase ??= 'read_worker'; throw error }),
+      repositoryTask ? undefined : installComputerRuntime(sandbox, refreshBudget).catch(error => { parallelFailurePhase ??= 'install_computer'; throw error }),
     ])
     if (refreshRuntime) {
       const maintenance = async (action: 'switch' | 'rollback', release: Awaited<ReturnType<typeof stageOfficialWorkerRelease>>, budget = refreshBudget) => {
@@ -434,19 +444,25 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
           await client.query('COMMIT')
         } catch(error) { await client.query('ROLLBACK'); throw error }
       }
+      refreshPhase = 'stage_admission'
       // Refuse busy/foreign machines before fetching or building any release.
       const idle = await pool.query(`SELECT 1 FROM thread_machines m WHERE m."runId"=$1 AND m."ownerId"=$2 AND m."workspaceId"=$3 AND m."sandboxId"=$4 AND m."workerLeaseId"=$5
         AND NOT EXISTS(SELECT 1 FROM agent_runs r WHERE r."deviceId"=m."deviceId" AND r."userId"=m."ownerId" AND r.status NOT IN ('succeeded','failed','stopped','cancelled'))`, [runId,actor.userId,actor.workspaceId,sandbox.sandboxId,leaseId])
       if (!idle.rowCount) throw new ComputerError(409, 'Task runtime is busy')
+      refreshPhase = 'stage_release'
       const release = await stageOfficialWorkerRelease(sandbox,machine.snapshotId,sourceSha,process.env,undefined,refreshBudget)
       runtimeRollback = () => maintenance('rollback',release,budgetUntil(Date.now()+30_000))
+      refreshPhase = 'switch_release'
       await maintenance('switch',release)
       verifyRefreshedRuntime = () => switchOfficialWorkerRelease(sandbox,release,{deviceId:machine.deviceId,workspaceId:actor.workspaceId,operationId:leaseId},'verify',undefined,refreshBudget)
     } else if (!expectedSha || sourceSha !== expectedSha) throw new Error('Worker version mismatch')
+    refreshPhase = 'read_refreshed_worker'
     if (!expectedSha || (await sandbox.files.read('/opt/mikka/worker-source-sha',{user:'root',...runtimeRequestOptions(refreshBudget)})).trim()!==expectedSha) throw new Error('Worker version mismatch')
     // Every computer action runs through lease-driver.py, which needs display :1 and its lease.
     // A snapshot boots with neither, and a resumed one may hold a lease from an older policy.
+    refreshPhase = 'start_desktop'
     if (!repositoryTask) await startThreadDesktop(pool, actor, runId, leaseId, sandbox, desktop, refreshBudget)
+    refreshPhase = 'credential_bootstrap'
     await client.query('BEGIN')
     if (refreshBudget) await client.query("SELECT set_config('lock_timeout',$1,true),set_config('statement_timeout',$1,true)", [`${refreshBudget(5_000)}ms`])
     // Provision and end both lock the parent run before its machine.
@@ -491,14 +507,17 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     await client.query('COMMIT')
     // Publishing bootstrap wakes an existing preloader before the explicit start
     // command. Count only this credential's use since its handoff began.
+    refreshPhase = 'publish_bootstrap'
     const handoffStartedAt = (await pool.query('SELECT clock_timestamp() AS now')).rows[0].now as Date
     const handoff = `/run/mikka-viewer/thread-${leaseId}.json`
     await sandbox.files.write(handoff, JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(), ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) }), { user: 'root', ...runtimeRequestOptions(refreshBudget) })
     await sandbox.commands.run(`install -d -o user -g user -m 700 /home/user/.mikka; install -o user -g user -m 600 ${handoff} /home/user/.mikka/bootstrap.next; mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json; unlink ${handoff}`, { user: 'root', ...runtimeCommandOptions(10_000, refreshBudget) })
     // The worker's output streams into the server logs only while this invocation lives;
     // the tee'd file in the sandbox keeps it for later reads (park, failure, end).
+    refreshPhase = 'start_worker'
     const mask = await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })
     await sandbox.commands.run(workerCommand(CLOUD_WORKER_COMMAND), { user: 'user', background: true, timeoutMs: 0, ...runtimeRequestOptions(refreshBudget), ...workerOutputForwarder(runId, mask) })
+    refreshPhase = 'worker_register'
     const deadline = Math.min(Date.now() + 30_000, refreshDeadline ?? Infinity)
     let ready = false
     do {
@@ -513,15 +532,21 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       await saveWorkerTail(pool, runId, await readWorkerTail(async () => sandbox), mask, refreshRuntime ? undefined : 'Thread worker did not register').catch(() => undefined)
       throw new Error('Thread worker did not register')
     }
+    refreshPhase = 'verify_runtime'
     if (verifyRefreshedRuntime) await verifyRefreshedRuntime()
+    refreshPhase = 'finish'
     refreshBudget?.(1)
     const finished = await pool.query('UPDATE thread_machines SET state=\'running\',"lastActiveAt"=now(),"runningSince"=now(),"workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND "workerLeaseId"=$2 AND state<>\'ended\' RETURNING "runId"', [runId, leaseId])
     if (!finished.rowCount) throw new ComputerError(409, 'Thread provisioning cancelled')
     return { runId, state: 'running' }
   } catch (error) {
+    // Capture the rejecting branch before cleanup awaits: the parallel guard
+    // install and worker read can fail independently. No historical run error
+    // or report is changed by this maintenance diagnostic.
+    if (refreshRuntime) logRuntimeRefreshFailure(runId, parallelFailurePhase ?? refreshPhase, error)
     await client.query('ROLLBACK')
     if (runtimeRollback) {
-      try { await runtimeRollback() } catch { console.warn('Idle task runtime rollback unconfirmed', {runId}) }
+      try { await runtimeRollback() } catch (rollbackError) { logRuntimeRefreshFailure(runId, 'rollback', rollbackError) }
     }
     if (refreshRuntime) await pool.query(`UPDATE thread_machines SET state='error',"workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND "ownerId"=$2 AND "workerLeaseId"=$3 AND state<>'ended'`,[runId,actor.userId,leaseId]).catch(()=>undefined)
     else if (exactQuestionMachine) await pool.query('UPDATE thread_machines SET "workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND "workerLeaseId"=$2',[runId,leaseId]).catch(()=>undefined)

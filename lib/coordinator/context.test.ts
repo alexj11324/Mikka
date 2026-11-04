@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import type { ModelMessage } from 'ai'
 import { chatItems, jsonbText, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
 import { modelMessage, pointsSwitchMessage, quotaSwitchMessage, sourcedEventMessage } from './message-safety'
+import { runCompletionObservations } from './run-completion-observation'
 
 test('watchdog blocker exposes the actual host facts and never invents a successful handoff', () => {
   const prompt = eventPrompt({ kind: 'run_report', issueId: 'issue', runId: null, payload: {
@@ -218,15 +219,98 @@ test('chatItems marks inbox (pending) user messages so they are never reported a
   assert.equal(items[1].pending, true)
 })
 
+test('a report-only run does not claim that separate Factory verification was absent', () => {
+  const prompt = eventPrompt({ kind: 'run_finished', issueId: 'i1', runId: 'review-1', payload: {
+    status: 'succeeded', stopReason: 'submitted', runKind: 'acceptance', verification: 'not_run',
+    summary: 'Read-only review executed npm test and a byte-equality check.',
+  } })
+  assert.match(prompt, /This run's host post-run verifier was not run/)
+  assert.match(prompt, /does not describe commands called by the Agent or separate Factory checks/)
+  assert.doesNotMatch(prompt, /Verification was not run: no verification command is configured/)
+})
+
+test('unrelated and differently scoped inbox events cause no observation read', async () => {
+  const executor = { execute: async () => { throw new Error('Unexpected database read') } } as never
+  const scope = { userId: 'owner', botId: 'bot' }
+  const event = { ...scope, runId: 'run', issueId: 'issue', kind: 'run_finished' }
+  assert.equal((await runCompletionObservations(executor, scope, [
+    { ...event, kind: 'user_message' }, { ...event, userId: 'peer' },
+    { ...event, botId: 'other-bot' }, { ...event, runId: null },
+  ])).size, 0)
+})
+
+test('a blocked predecessor notification carries the accepted repository handoff and current task', () => {
+  const event = { kind: 'run_finished' as const, issueId: 'issue', runId: 'old', payload: {
+    status: 'stopped', stopReason: 'blocked', summary: 'Selected another repository.', verification: 'not_run',
+  } }
+  const prompt = eventPrompt(event, {
+    observedAt: '2026-11-03T23:07:28Z', runId: 'old', postRunVerify: { status: 'not_run' },
+    factory: { taskId: 'task', stage: 'execute', status: 'running', revision: 5, attemptId: 'attempt-next', requestEpoch: 'request-1',
+      runAttempt: { id: 'attempt-old', stage: 'execute', status: 'blocked', requestEpoch: 'request-1' }, candidate: null },
+    checks: [], publication: null,
+    repositoryHandoffs: [{ previousRunId: 'old', nextRunId: 'next', nextStatus: 'running',
+      from: 'https://github.com/example/wrong.git', to: 'https://github.com/example/correct.git', previousHead: 'a'.repeat(40) }],
+  })
+  assert.match(prompt, /Run old ended with status stopped \(blocked\)/, 'original terminal history remains visible')
+  assert.match(prompt, /Current host observation/)
+  assert.match(prompt, /"nextRunId":"next","nextStatus":"running"/)
+  assert.match(prompt, /"stage":"execute","status":"running"/)
+  assert.match(prompt, /Do not redispatch while a successor or Factory stage is queued or running/)
+  assert.doesNotMatch(JSON.stringify(event.payload), /Current host observation/)
+})
+
+test('a stale review notification reports the current fixed-candidate verification and publication', () => {
+  const event = { kind: 'run_finished' as const, issueId: 'issue', runId: 'review', payload: {
+    status: 'succeeded', stopReason: 'submitted', verification: 'not_run',
+    summary: 'Publication pending when this review finished.', publication: { branch: 'mikka/task', errorCode: null },
+  } }
+  const prompt = eventPrompt(event, {
+    observedAt: '2026-11-03T23:15:12Z', runId: 'review', postRunVerify: { status: 'not_run' },
+    factory: { taskId: 'task', stage: 'approval', status: 'pending', revision: 14, attemptId: 'approval-attempt', requestEpoch: 'request-1',
+      runAttempt: { id: 'review-attempt', stage: 'review', status: 'passed', requestEpoch: 'request-1' }, candidate: { id: 'candidate', sha: 'c'.repeat(40) } },
+    checks: [
+      { stage: 'review', status: 'passed', runId: 'review', sessionId: 'review-sid', reportOnly: true, postRunVerify: { status: 'not_run' } },
+      { stage: 'verify', status: 'passed', runId: 'verify', sessionId: 'verify-sid', reportOnly: false, postRunVerify: { status: 'passed', command: 'npm test', exitCode: 0, timedOut: false, signal: null } },
+    ],
+    publication: { runId: 'execute', status: 'published', branch: 'mikka/task', errorCode: null,
+      pullRequest: { url: 'https://github.com/example/correct/pull/6', state: 'open' } }, repositoryHandoffs: [],
+  })
+  assert.match(prompt, /Verified GitHub pull request: https:\/\/github.com\/example\/correct\/pull\/6 \(open\)/)
+  assert.match(prompt, /"stage":"verify","status":"passed"/)
+  assert.match(prompt, /"command":"npm test","exitCode":0/)
+  assert.match(prompt, /"reportOnly":true,"postRunVerify":\{"status":"not_run"\}/)
+  assert.match(prompt, /These facts do not replace owner approval/)
+  assert.equal(event.payload.publication.errorCode, null, 'the original event snapshot is not rewritten')
+  assert.doesNotMatch(eventPrompt({ ...event, payload: { ...event.payload, factory: { stage: 'publish', status: 'passed' } } }), /Current host observation/, 'event prose cannot supply host observations')
+})
+
+test('a delayed completion from an earlier request cannot reuse its event publication as current', () => {
+  const oldUrl = 'https://github.com/example/previous-request/pull/8'
+  const prompt = eventPrompt({ kind: 'run_finished', issueId: 'issue', runId: 'old-run', payload: {
+    status: 'succeeded', stopReason: 'submitted', summary: 'The previous request finished.',
+    publication: { pullRequest: { url: oldUrl, state: 'open' } },
+  } }, {
+    observedAt: '2026-11-04T00:10:00Z', runId: 'old-run', postRunVerify: { status: 'passed' },
+    factory: { taskId: 'task', stage: 'execute', status: 'pending', revision: 15, attemptId: 'new-attempt', requestEpoch: 'request-2',
+      runAttempt: { id: 'old-attempt', stage: 'execute', status: 'passed', requestEpoch: 'request-1' }, candidate: null },
+    checks: [], publication: null, repositoryHandoffs: [],
+  })
+  assert.doesNotMatch(prompt, /Verified GitHub pull request/)
+  assert.ok(!prompt.includes(oldUrl))
+  assert.match(prompt, /"requestEpoch":"request-2"/)
+  assert.match(prompt, /"requestEpoch":"request-1"/)
+  assert.match(prompt, /different request epoch cannot prove the current request's result/)
+})
+
 test('finished run publication names the verified PR or missing setup in the existing chat', () => {
   const event = { kind: 'run_finished' as const, issueId: 'i1', runId: 'r1', payload: { status: 'succeeded', stopReason: 'submitted', verification: 'not_run', publication: { pullRequest: { url: 'https://github.com/owner/repo/pull/7', state: 'draft' } } } }
   const prompt = eventPrompt(event)
   assert.match(prompt, /Verified GitHub pull request: https:\/\/github.com\/owner\/repo\/pull\/7 \(draft\)/)
   assert.match(prompt, /existing thread card updates in place/)
-  assert.match(prompt, /Verification was not run/)
+  assert.match(prompt, /This run's host post-run verifier was not run/)
   // The fact goes to the Coordinator; whether it needs the person's review is the model's judgment, not a fixed instruction.
   assert.doesNotMatch(prompt, /needs human review/)
-  assert.match(prompt, /Never say the changes passed verification/)
+  assert.match(prompt, /Do not claim verification passed from this field alone/)
   const blocked = eventPrompt({ ...event, payload: { ...event.payload, publication: { errorCode: 'github_permission_required' } } })
   assert.match(blocked, /pull_requests: write/)
   assert.doesNotMatch(blocked, /Verified GitHub/)

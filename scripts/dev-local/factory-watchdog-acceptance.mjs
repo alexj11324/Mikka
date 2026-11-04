@@ -9,7 +9,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { assertFlashTestModel } from '../test-model-policy.mjs'
-import { assertOnlineDaemonStatus, daemonStatus } from './factory-handoff-acceptance.mjs'
+import { assertOnlineDaemonStatus, daemonStatus, waitForOnlineDaemonStatus } from './factory-handoff-acceptance.mjs'
 import { nativeRunIdentity, nativeTerminationState, ownedDaemonGroups, processTable, suspendNativeRun } from './daemon-fault.mjs'
 
 const EXECUTE_WINDOW_MS = 45 * 60_000
@@ -39,6 +39,8 @@ export function assertServerWatchdogStop(current, baseline, epoch) {
 export async function verifyFactoryWatchdog(context) {
   const { root, directory, runtime, ownerId, device, signal, progress, query, json, until, run, dispatch,
     observations, startSecondDaemon, stackPid, registerCleanup } = context
+  const online = (dataDir, deviceId) => waitForOnlineDaemonStatus({ root, dataDir, deviceId, until,
+    devices: async () => (await json('/api/mobile/threads')).devices ?? [] })
   const marker = `watchdog-${randomUUID()}`, filename = `${marker}.txt`, expected = Buffer.from(`${marker}\n`)
   const evidence = { version: 1, marker, status: 'running', startedAt: new Date().toISOString(),
     scenario: 'online-server-watchdog-with-stale-checkpoint-block', daemonDefaultStallMinutes: 10, daemonStallMinutes: 60,
@@ -81,20 +83,13 @@ export async function verifyFactoryWatchdog(context) {
     assert.equal(owned.server, runtime.server)
     assert.equal(resolve(owned.dataDir), resolve(runtime.daemonDataDir))
     assert.equal(owned.stallMinutes, 60, 'Only the explicitly configured acceptance daemon may isolate the server watchdog')
-    const aStatus = daemonStatus(root, runtime.daemonDataDir)
-    assertOnlineDaemonStatus(aStatus, { dataDir: runtime.daemonDataDir, deviceId: device.id })
+    const aStatus = await online(runtime.daemonDataDir, device.id)
     ownedDaemonGroups(await processTable(), { ...owned, daemonPid: aStatus.pid, forbiddenPids: [process.pid, stackPid] })
     const [cloud] = await query(`SELECT EXISTS(SELECT 1 FROM user_e2b_keys WHERE "userId"=$1)
       OR EXISTS(SELECT 1 FROM workspace_e2b_keys WHERE "createdBy"=$1) AS present`, [ownerId])
     assert.equal(cloud.present, false, 'Use a dedicated ordinary owner without a cloud-first recovery source')
     const b = await startSecondDaemon()
-    const bStatus = await until(async () => {
-      try {
-        const value = daemonStatus(root, b.dataDir)
-        const devices = (await json('/api/mobile/threads')).devices ?? []
-        return value.signedIn && value.server === 'online' && devices.some(entry => entry.id === value.deviceId && entry.online) ? value : null
-      } catch (error) { if (error.code === 'ETIMEDOUT') throw error; return null }
-    })
+    const bStatus = await online(b.dataDir)
     assertOnlineDaemonStatus(bStatus, { dataDir: b.dataDir })
     assert.notEqual(bStatus.deviceId, device.id)
     const priorPrs = new Set((await observations()).pullRequests.map(pr => pr.number))

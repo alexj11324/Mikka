@@ -4,7 +4,7 @@
 - Source: Alex, relayed by the coordinator: 「一个人也是一个工作区」,
   「不管你在哪个工作区，你都可以用自己账号」, and on the proposal
   「可以按你的建议来」. Research and audit:
-  [personal vs workspace](../research/2026-10-31-personal-vs-workspace.md)
+  personal vs workspace
 - Rule: —
 - Superseded in part by: [2026-11-01-2310-personal-and-team-workspaces-apart](2026-11-01-2310-personal-and-team-workspaces-apart.md) (the three levels: profile memory and 「API 与订阅」 belong to the account, while bot and team memory stay in their workspace; a personal workspace hides every team setting, keeps personal billing and handles only personal events; nothing moves between personal and team)
 - Superseded in part by: [2026-11-01-2240-own-credentials-always-usable](2026-11-01-2240-own-credentials-always-usable.md) (an admin can no longer switch off personal subscriptions or API keys)

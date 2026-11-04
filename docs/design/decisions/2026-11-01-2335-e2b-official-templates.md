@@ -5,6 +5,7 @@
   for a person's own computer or server: 「自己的服务器和电脑直接走自己的Claude/codex，也不做沙箱了」;
   for permissions: 「那就不要decision api 了，直接走bypass」
 - Rule: —
+- Superseded in part by: [2026-11-03-1430-official-e2b-templates-unchanged](2026-11-03-1430-official-e2b-templates-unchanged.md) (official template files stay untouched; not yet in code, #1131)
 - Replaces: [2026-11-01-1201 template public, released by CI](2026-11-01-1201-e2b-template-public-auto-release.md)
   (Mikka's own worker template), the sandbox-runtime part and the device
   paragraph of [2026-11-01-1312 cloud runs without Docker](2026-11-01-1312-cloud-runs-without-docker.md),

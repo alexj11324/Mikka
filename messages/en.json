@@ -1199,6 +1199,7 @@
     "runNotActive": "This run has ended and has no answerable question.",
     "threadReplaced": "A newer thread took this task over. Send it there.",
     "threadCannotContinue": "This thread works on no task, so it can’t run again.",
+    "threadRecoveryUnavailable": "The original session cannot be resumed right now.",
     "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response.",
     "savedLoginNotFound": "This login does not exist or was already deleted.",
     "savedLoginSiteInvalid": "Enter an https site address.",

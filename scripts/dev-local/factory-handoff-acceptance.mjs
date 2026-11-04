@@ -35,6 +35,33 @@ export function assertOnlineDaemonStatus(status, { dataDir, deviceId }) {
   if (deviceId !== undefined) assert.equal(status.deviceId, deviceId)
 }
 
+// A heartbeat registers the owner-visible device before syncPass finishes
+// loading repos and marks RPC server=online. Both observations are required.
+export async function waitForOnlineDaemonStatus({ root, dataDir, deviceId, until, devices,
+  readStatus = () => daemonStatus(root, dataDir), timeoutMs = 60_000, now = Date.now }) {
+  const deadline = now() + timeoutMs
+  let observed = 'RPC not listening'
+  return until(async () => {
+    assert.ok(now() < deadline, `Daemon readiness timed out after ${timeoutMs}ms (${observed})`)
+    let value
+    try { value = await readStatus() } catch (error) {
+      // This is the CLI's explicit socket-not-created response. Authentication,
+      // malformed protocol, RPC timeout and owner API failures must surface.
+      if (error.status === 1 && String(error.stderr).trim() === `No daemon running for ${dataDir}`) return null
+      throw error
+    }
+    assert.equal(resolve(value.dataDir), resolve(dataDir), 'Daemon RPC returned another data directory')
+    if (deviceId !== undefined && value.deviceId != null) assert.equal(value.deviceId, deviceId)
+    assert.ok(['unregistered', 'offline', 'online'].includes(value.server), 'Unexpected daemon server state')
+    observed = `server=${value.server}, signedIn=${value.signedIn}`
+    if (value.server !== 'online' || !value.signedIn || !value.deviceId) return null
+    assertOnlineDaemonStatus(value, { dataDir, deviceId })
+    const ownerOnline = (await devices()).some(entry => entry.id === value.deviceId && entry.online)
+    observed += `, ownerDeviceOnline=${ownerOnline}`
+    return ownerOnline ? value : null
+  })
+}
+
 export function assertHandoffEvidence({ original, retry, task, receipt, ownerId, deviceB, marker }) {
   assert.equal(retry.retryOf, original.id, 'B must claim the server-created retry of A')
   assert.equal(retry.userId, ownerId)
@@ -86,6 +113,8 @@ export async function verifyFactoryHandoff(context) {
     await progress('item9-factory-handoff', phase)
   }
   const status = dataDir => daemonStatus(root, dataDir)
+  const online = (dataDir, deviceId) => waitForOnlineDaemonStatus({ root, dataDir, deviceId, until,
+    devices: async () => (await json('/api/mobile/threads')).devices ?? [] })
   let fault
   registerCleanup(() => fault?.resume())
   try {
@@ -93,8 +122,7 @@ export async function verifyFactoryHandoff(context) {
     assert.equal(owned.parentPid, stackPid, 'A must belong to this runner\'s stack')
     assert.equal(owned.server, runtime.server)
     assert.equal(resolve(owned.dataDir), resolve(runtime.daemonDataDir))
-    const aStatus = status(runtime.daemonDataDir)
-    assertOnlineDaemonStatus(aStatus, { dataDir: runtime.daemonDataDir, deviceId: device.id })
+    const aStatus = await online(runtime.daemonDataDir, device.id)
     ownedDaemonGroups(await processTable(), { ...owned, daemonPid: aStatus.pid, forbiddenPids: [process.pid, stackPid] })
     // A cloud source would legitimately take precedence over local B. Do not
     // disable or edit one merely to force this acceptance outcome.
@@ -102,13 +130,7 @@ export async function verifyFactoryHandoff(context) {
       OR EXISTS(SELECT 1 FROM workspace_e2b_keys WHERE "createdBy"=$1) AS present`, [ownerId])
     assert.equal(cloud.present, false, 'Use a dedicated ordinary owner without an E2B source for the dual-local-device case')
     const b = await startSecondDaemon()
-    const bStatus = await until(async () => {
-      try {
-        const value = status(b.dataDir)
-        const devices = (await json('/api/mobile/threads')).devices ?? []
-        return value.signedIn && value.server === 'online' && devices.some(entry => entry.id === value.deviceId && entry.online) ? value : null
-      } catch (error) { if (error.code === 'ETIMEDOUT') throw error; return null }
-    })
+    const bStatus = await online(b.dataDir)
     assert.notEqual(bStatus.deviceId, aStatus.deviceId, 'A and B need independent approved device IDs')
     assertOnlineDaemonStatus(bStatus, { dataDir: b.dataDir })
     await record('two-authorized-devices', { deviceA: device.id, deviceB: bStatus.deviceId })

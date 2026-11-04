@@ -5,6 +5,7 @@ import type { SQL } from 'drizzle-orm'
 import { ActionFailureError } from './action-error'
 import { agentRuns, issueMembers, runChunks, runMessages } from './db/schema'
 import { factoryEventId } from './factory/event-id'
+import { FactoryError } from './factory/contract'
 
 const runId = '31300000-0000-4000-8000-000000000001'
 const issueId = '31300000-0000-4000-8000-000000000002'
@@ -153,6 +154,7 @@ before(async () => {
   mock.module('@/lib/thread-dispatch',{namedExports:{explicitNewThread:async()=>false,latestTaskRun:async()=>({id:current.continuation?.id ?? current.run.id}),dispatchToTask:async()=>{current.ordinaryDispatches++;return {thread:'continued',runId:'ordinary-next-run'}}}});
   mock.module('@/lib/factory/runtime',{namedExports:{factoryLifecycleEnabled:()=>true,guardFactoryClaim:async()=>({}),factoryAuthorize:async()=>true,factoryRuntimeForBot:(selectedBot:string|null)=>({questions:{recover:async(actor:unknown,input:unknown)=>{
     assert.equal(selectedBot,botId);current.recoveryCalls.push({actor,input});
+    if (current.fault) throw current.fault;
     return {continuationRunId:'owner-recovery-run'};
   }}})}});
   actions = await import('../app/actions/agents')
@@ -320,6 +322,17 @@ test('only the explicit owner Retry intent recovers a blocked original-session q
   current.recovery={...recoveryRow(),questionStatus:'resuming',taskStatus:'running',questionRevision:14,recoveryRequest:{kind:'question_recover',userId:'owner',input:expected}};
   assert.deepEqual(await actions.sendIssueThreadReply({issueId,runId,text:'Another label',retryOriginalSession:true}),result);
   assert.deepEqual(current.recoveryCalls[1].input,expected,'transport/click replay must retain the old reference');
+});
+test('owner Retry reports original-session recovery failure without claiming its task is missing', async () => {
+  current=fixture();viewer='owner';current.run.status='failed';current.recovery=recoveryRow();
+  current.fault=new FactoryError('factoryQuestionContinuationUnavailable');
+  assert.deepEqual(await actions.sendIssueThreadReply({issueId,runId,text:'Retry',retryOriginalSession:true}),{error:'threadRecoveryUnavailable',params:undefined});
+  assert.equal(current.recoveryCalls.length,1);
+  assert.equal(current.ordinaryDispatches,0);assert.equal(current.messages.length,0);
+  current.fault=new FactoryError('factoryNotFound');
+  assert.equal((await actions.sendIssueThreadReply({issueId,runId,text:'Retry',retryOriginalSession:true})).error,'runNotFound');
+  const unexpected=new Error('unexpected synthetic failure');current.fault=unexpected;
+  await assert.rejects(actions.sendIssueThreadReply({issueId,runId,text:'Retry',retryOriginalSession:true}),error=>error===unexpected);
 });
 test('typed Retry text is ordinary messaging, and explicit retry never grants a collaborator or API actor authority',async()=>{
   current=fixture();viewer='owner';current.recovery=recoveryRow();

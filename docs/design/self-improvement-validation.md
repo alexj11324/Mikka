@@ -1,5 +1,10 @@
 # Controlled improvement: validation and handoff
 
+> Note (2026-11-03): the fixed trigger of 25 distinct failures or a seven-day-old
+> failure named below was later replaced by the Decision API's `propose` answer
+> (`lib/self-improvement/proposal-judgment.ts`,
+> [decision 2026-11-01-1500](decisions/2026-11-01-1500-self-improvement-and-profile-decided-by-decision-api.md)).
+
 This is an additive backend candidate based on main `c0f702f7e9f474e42d6217b7e2b0904ee02ca00d`.
 It does not replace #192–#195, #208, #230 or #232. See [the spec](self-improvement.md).
 Tracking: [GitHub #237](https://github.com/alexj11324/Mikka/issues/237),

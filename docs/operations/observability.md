@@ -33,11 +33,13 @@ The existing minute worker can call `GET /api/cron/ops-monitor` using its
 existing `CRON_SECRET` bearer. It uses the existing main pool
 (`MIKKA_DATABASE_URL`), persists aggregate observations and firing/resolved
 transitions in `ops_monitor_observations`, and returns `notificationStatus`.
-No extra variable is needed to collect database signals. The optional
+No extra variable is needed to collect database signals. The same route also
+runs the provider-only database transfer collector described in
+[database-egress.md](database-egress.md). The optional
 `OPS_INTERNAL_ALERT_SINK` enables the explicitly restricted loopback sink;
 unconfigured forwarding returns `not_configured` while DB collection keeps
 running. The route never sends external notifications. It returns 503 when
-the database/persistence or a configured sink fails, so the existing worker's
+the database/persistence, a configured sink or the transfer collector fails, so the existing worker's
 health logs can observe collector failure. Only a trusted database operator
 or authenticated cron caller can read these global aggregate records. No
 public user-facing monitoring API or tenant data is added.

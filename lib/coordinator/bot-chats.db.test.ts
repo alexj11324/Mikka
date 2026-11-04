@@ -692,3 +692,170 @@ dbTest('own task completion returns to the original Bot with an exhausted team t
     assert.equal(await deliverRunCompletion(pool, { ...delivered, observedRun: null }, { userId: owner, botId }, pool), false, 'a missing visibility observation cannot release a result')
   })
 })
+
+dbTest('Factory completion delivery keeps historical handoffs and reads current checks only within the owner Bot', async t => {
+  const [{ createRequestDatabaseScope, db, pool }, schema, store, { runCompletionObservations }, { eq, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('./store'), import('./run-completion-observation'), import('drizzle-orm'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!), owner = `test-factory-notice-${randomUUID()}`, peer = `test-factory-peer-${randomUUID()}`
+  t.after(async () => { t.diagnostic(`Retained Factory notice fixtures ${owner}, ${peer}`); await scope.close() })
+  await scope.run(async () => {
+    for (const id of [owner, peer]) await db.execute(sql`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES(${id},'Notice fixture',${`${id}@example.invalid`},false,now(),now())`)
+    const { botId, workspaceId } = await seedCoordinator(owner), peerBotId = (await seedCoordinator(peer)).botId, otherBotId = randomUUID()
+    await db.insert(schema.bots).values({ id: otherBotId, ownerId: owner, workspaceId, name: 'Other notice Bot' })
+    const fixture = async (userId: string, runBotId: string, name: string, factoryBotId = runBotId) => {
+      const issueId = randomUUID(), taskId = randomUUID(), sourceEventId = randomUUID(), deviceId = randomUUID(), agentId = randomUUID()
+      const oldRunId = randomUUID(), nextRunId = randomUUID(), oldAttemptId = randomUUID(), nextAttemptId = randomUUID(), wrongRepo = randomUUID(), targetRepo = randomUUID()
+      const original = `https://github.com/example/${name}-wrong.git`, target = `https://github.com/example/${name}-correct.git`
+      await db.insert(schema.devices).values({ id: deviceId, ownerId: userId, name: 'Notice device' })
+      await db.insert(schema.agents).values({ id: agentId, userId, deviceId, harness: 'claude_code', name: `Notice ${agentId}` })
+      await db.insert(schema.issues).values({ id: issueId, userId, title: name, content: { type: 'doc', content: [] }, status: 'review', priority: 'normal' })
+      await db.insert(schema.deviceRepos).values([
+        { id: wrongRepo, userId, deviceId, repoPath: `${name}-wrong`, remoteUrl: original },
+        { id: targetRepo, userId, deviceId, repoPath: `${name}-correct`, remoteUrl: target },
+      ])
+      await db.insert(schema.coordinatorEvents).values({ id: sourceEventId, userId, botId: factoryBotId, kind: 'user_message', dedupeKey: sourceEventId, payload: { text: 'Use the authorized repository' }, deliveredAt: new Date() })
+      await db.insert(schema.agentRuns).values([
+        { id: oldRunId, userId, botId: runBotId, issueId, agentId, deviceId, deviceRepoId: wrongRepo, status: 'stopped', stopReason: 'blocked', sessionId: `old-${oldRunId}`, finishedAt: new Date(), report: { summary: 'Repository handoff requested', verify: { status: 'not_run' } } },
+        { id: nextRunId, userId, botId: runBotId, issueId, agentId, deviceId, deviceRepoId: targetRepo, status: 'running', sessionId: `next-${nextRunId}`, continuesRunId: oldRunId },
+      ])
+      await db.transaction(async tx => {
+        await tx.insert(schema.factoryTasks).values({ id: taskId, userId, botId: factoryBotId, issueId, sourceEventId,
+          route: { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Fixture', missingInformation: [], missingPermissions: [], needsSpec: false },
+          stage: 'execute', status: 'running', revision: 5, attemptId: nextAttemptId, reason: 'Authorized repository handoff' })
+        await tx.insert(schema.factoryAttempts).values([
+          { id: oldAttemptId, taskId, stage: 'execute', ordinal: 1, position: 1, status: 'blocked', runId: oldRunId, reason: 'Selected repository',
+            output: { repositorySelection: { previousRunId: oldRunId, observedRemote: original, observedHead: 'a'.repeat(40), target: `v2/github.com/example/${name}-correct` } } },
+          { id: nextAttemptId, taskId, stage: 'execute', ordinal: 2, position: 2, status: 'running', runId: nextRunId, reason: 'Continue authorized task' },
+        ])
+      })
+      return { issueId, taskId, sourceEventId, oldRunId, nextRunId, nextAttemptId, agentId, targetRepo, deviceId, target }
+    }
+    const own = await fixture(owner, botId, 'own'), foreign = await fixture(peer, peerBotId, 'peer-private'), other = await fixture(owner, otherBotId, 'other-bot-private')
+    const enqueue = async (runId: string, payload: Record<string, unknown>) => {
+      const id = randomUUID()
+      await db.insert(schema.coordinatorEvents).values({ id, userId: owner, botId, issueId: own.issueId, runId, kind: 'run_finished', tier: 'result', dedupeKey: id, payload })
+      return id
+    }
+    const historical = { status: 'stopped', stopReason: 'blocked', summary: 'Selected another repository', verification: 'not_run' }
+    const oldEventId = await enqueue(own.oldRunId, historical)
+    await store.takeInbox(owner, 'notice-handoff', botId)
+    await store.releaseLease(owner, 'notice-handoff', botId)
+    const first = String((await store.loadConversation(owner, botId)).messages.at(-1)!.message.content)
+    const observation = (text: string) => JSON.parse(text.split('Current host observation: ')[1].split('\n')[0]) as import('./run-completion-observation').RunCompletionObservation
+    const handoff = observation(first)
+    assert.ok(first.includes(`Run ${own.oldRunId} ended with status stopped (blocked)`))
+    assert.deepEqual([handoff.factory.stage, handoff.factory.status, handoff.factory.attemptId, handoff.factory.runAttempt.status], ['execute', 'running', own.nextAttemptId, 'blocked'])
+    assert.equal(handoff.repositoryHandoffs.length, 1)
+    assert.deepEqual(handoff.repositoryHandoffs[0], { previousRunId: own.oldRunId, nextRunId: own.nextRunId, nextStatus: 'running',
+      from: 'https://github.com/example/own-wrong.git', to: 'https://github.com/example/own-correct.git', previousHead: 'a'.repeat(40) })
+
+    const candidateId = randomUUID(), reviewId = randomUUID(), verifyId = randomUUID(), approvalId = randomUUID(), sha = 'c'.repeat(40)
+    const reviewReport = { summary: 'Read-only review ran npm test', check: { sha, readOnly: true }, filesChanged: [], verify: { status: 'not_run' as const } }
+    const verifyReport = { summary: 'Independent verification', check: { sha, readOnly: true }, filesChanged: [], verify: { status: 'passed' as const, command: 'npm test', exitCode: 0, timedOut: false, signal: null, output: 'Passed' } }
+    await db.update(schema.agentRuns).set({ status: 'succeeded', stopReason: 'submitted', finishedAt: new Date(), report: { summary: 'Candidate submitted', verify: { status: 'not_run' } } }).where(eq(schema.agentRuns.id, own.nextRunId))
+    await db.insert(schema.agentRuns).values([
+      { id: reviewId, userId: owner, botId, issueId: own.issueId, agentId: own.agentId, kind: 'acceptance', status: 'succeeded', stopReason: 'submitted', sessionId: 'review-sid', baseBranch: sha, finishedAt: new Date(), report: reviewReport },
+      { id: verifyId, userId: owner, botId, issueId: own.issueId, agentId: own.agentId, kind: 'acceptance', status: 'succeeded', stopReason: 'submitted', sessionId: 'verify-sid', baseBranch: sha, finishedAt: new Date(), report: verifyReport },
+    ])
+    await db.transaction(async tx => {
+      await tx.insert(schema.factoryCandidates).values({ id: candidateId, taskId: own.taskId, sha, repository: own.target, environment: 'fixture', scope: 'acceptance.txt', runId: own.nextRunId })
+      await tx.update(schema.factoryAttempts).set({ status: 'passed', candidateId }).where(eq(schema.factoryAttempts.id, own.nextAttemptId))
+      await tx.insert(schema.factoryAttempts).values([
+        { id: randomUUID(), taskId: own.taskId, stage: 'review', ordinal: 1, position: 3, status: 'passed', runId: reviewId, candidateId, reason: 'Review passed', output: { check: { reportOnly: true } } },
+        { id: randomUUID(), taskId: own.taskId, stage: 'verify', ordinal: 1, position: 4, status: 'passed', runId: verifyId, candidateId, reason: 'Verification passed', output: { check: { reportOnly: false } } },
+        { id: approvalId, taskId: own.taskId, stage: 'approval', ordinal: 1, position: 5, status: 'pending', candidateId, reason: 'Owner approval pending' },
+      ])
+      await tx.update(schema.factoryTasks).set({ stage: 'approval', status: 'pending', revision: 14, candidateId, attemptId: approvalId }).where(eq(schema.factoryTasks.id, own.taskId))
+    })
+    await db.insert(schema.runPublications).values({ runId: own.nextRunId, userId: owner, issueId: own.issueId, remoteUrl: own.target, remoteKey: 'v2/github.com/example/own-correct', branch: 'mikka/task', status: 'published', pullRequest: { url: 'https://github.com/example/own-correct/pull/6', state: 'open' } })
+    const reviewEventId = await enqueue(reviewId, { status: 'succeeded', stopReason: 'submitted', verification: 'not_run', summary: 'Publication pending in the earlier report', publication: { branch: 'mikka/task', errorCode: null } })
+    await enqueue(verifyId, { status: 'succeeded', stopReason: 'submitted', summary: 'Check complete' })
+    const before = (await pool.query('SELECT id,status,"sessionId",report,"continuesRunId" FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [own.issueId])).rows
+    await store.takeInbox(owner, 'notice-checks', botId)
+    await store.releaseLease(owner, 'notice-checks', botId)
+    const messages = (await store.loadConversation(owner, botId)).messages.map(row => String(row.message.content))
+    const reviewed = messages.find(text => text.startsWith(`[Event] Run ${reviewId}`))!
+    const current = observation(reviewed)
+    assert.ok(reviewed.includes('Verified GitHub pull request: https://github.com/example/own-correct/pull/6 (open)'))
+    assert.deepEqual([current.factory.stage, current.factory.status, current.factory.attemptId], ['approval', 'pending', approvalId])
+    assert.deepEqual(current.factory.candidate, { id: candidateId, sha })
+    assert.deepEqual(current.checks.find(check => check.stage === 'review'), { stage: 'review', status: 'passed', runId: reviewId, sessionId: 'review-sid', reportOnly: true,
+      postRunVerify: { status: 'not_run', command: null, exitCode: null, timedOut: null, signal: null } })
+    assert.deepEqual(current.checks.find(check => check.stage === 'verify'), { stage: 'verify', status: 'passed', runId: verifyId, sessionId: 'verify-sid', reportOnly: false,
+      postRunVerify: { status: 'passed', command: 'npm test', exitCode: 0, timedOut: false, signal: null } })
+    assert.ok(!reviewed.includes('Verification was not run: no verification command is configured'))
+    assert.deepEqual((await pool.query('SELECT id,status,"sessionId",report,"continuesRunId" FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [own.issueId])).rows, before)
+    assert.deepEqual((await db.select().from(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.id, oldEventId)))[0].payload, historical)
+    assert.equal((await db.select().from(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.id, reviewEventId)))[0].payload.verification, 'not_run')
+
+    const eventFor = (f: typeof own, userId = owner, chatBotId = botId) => ({ kind: 'run_finished', userId, botId: chatBotId, runId: f.oldRunId, issueId: f.issueId })
+    assert.equal((await runCompletionObservations(db, { userId: owner, botId }, [eventFor(foreign), eventFor(other)])).size, 0, 'even owned inbox references cannot expose another owner or Bot')
+    assert.equal((await runCompletionObservations(db, { userId: peer, botId: peerBotId }, [eventFor(foreign, peer, peerBotId)])).size, 1, 'the foreign fixture is readable in its own scope')
+    assert.equal((await runCompletionObservations(db, { userId: owner, botId: otherBotId }, [eventFor(other, owner, otherBotId)])).size, 1)
+
+    const linked = await fixture(owner, botId, 'linked-runtime', otherBotId)
+    const readLinked = () => runCompletionObservations(db, { userId: owner, botId }, [eventFor(linked)])
+    assert.equal((await readLinked()).size, 0, 'another owned Bot alone does not grant access to its Factory task')
+    await pool.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [linked.oldRunId, botId, workspaceId, owner])
+    const linkedObservation = (await readLinked()).get(linked.oldRunId)!
+    assert.equal(linkedObservation.factory.taskId, linked.taskId, 'the existing cloud binding admits its separate chat Bot in the same workspace')
+    assert.equal(linkedObservation.repositoryHandoffs[0].nextRunId, linked.nextRunId)
+    const distantWorkspace = randomUUID(), distantBot = randomUUID()
+    await pool.query(`INSERT INTO mikka_workspaces(id,"userId",name,slug,kind) VALUES ($1,$2,'Other workspace',$3,'team')`, [distantWorkspace, owner, `notice-${distantWorkspace}`])
+    await db.insert(schema.bots).values({ id: distantBot, ownerId: owner, workspaceId: distantWorkspace, name: 'Distant notice Bot' })
+    await db.update(schema.factoryTasks).set({ botId: distantBot }).where(eq(schema.factoryTasks.id, linked.taskId))
+    assert.equal((await readLinked()).size, 0, 'a valid runtime binding cannot admit a Factory Bot from another workspace')
+    await db.update(schema.factoryTasks).set({ botId: peerBotId }).where(eq(schema.factoryTasks.id, linked.taskId))
+    assert.equal((await readLinked()).size, 0, 'the same binding cannot admit another owner’s Factory Bot')
+
+    const epochs = await fixture(owner, botId, 'continued-request')
+    const oldPublication = { url: 'https://github.com/example/continued-request-wrong/pull/8', state: 'open' as const }
+    await db.insert(schema.runPublications).values({ runId: epochs.oldRunId, userId: owner, issueId: epochs.issueId,
+      remoteUrl: 'https://github.com/example/continued-request-wrong.git', remoteKey: 'v2/github.com/example/continued-request-wrong',
+      branch: 'mikka/previous-request', status: 'published', pullRequest: oldPublication })
+    const readEpoch = async () => (await runCompletionObservations(db, { userId: owner, botId }, [eventFor(epochs)])).get(epochs.oldRunId)!
+    const legacy = await readEpoch()
+    assert.equal(legacy.publication?.pullRequest?.url, oldPublication.url, 'legacy attempts without an epoch still expose their own publication before continuation')
+    assert.equal(legacy.factory.requestEpoch, epochs.sourceEventId)
+    assert.equal(legacy.factory.runAttempt.requestEpoch, null, 'legacy history is not relabelled as a recorded epoch')
+    await pool.query('UPDATE factory_attempts SET output=output || $2::jsonb WHERE "taskId"=$1', [epochs.taskId, JSON.stringify({ requestEpoch: epochs.sourceEventId })])
+    assert.equal((await readEpoch()).publication?.pullRequest?.url, oldPublication.url, 'an explicitly bound same-epoch publication remains available')
+    const delayedId = randomUUID(), nextEpoch = randomUUID()
+    const delayedPayload = { ...historical, summary: 'The previous request published its result.', publication: { pullRequest: oldPublication } }
+    await db.insert(schema.coordinatorEvents).values({ id: delayedId, userId: owner, botId, issueId: epochs.issueId,
+      runId: epochs.oldRunId, kind: 'run_finished', tier: 'result', dedupeKey: delayedId, payload: delayedPayload })
+    await db.insert(schema.coordinatorEvents).values({ id: nextEpoch, userId: owner, botId, issueId: epochs.issueId,
+      kind: 'user_message', dedupeKey: nextEpoch, deliveredAt: new Date(),
+      payload: { text: 'Replace the previous result with the current owner request.', source: 'thread_continuation', previousRunId: epochs.nextRunId, postedToChat: true } })
+    const epochClient = await pool.connect()
+    try {
+      await epochClient.query('BEGIN')
+      const { rows: [currentTask] } = await epochClient.query<import('../factory/store').FactoryTask>('SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE', [epochs.taskId, owner])
+      await (await import('../factory/request-epoch')).advanceFactoryRequest(epochClient, currentTask, nextEpoch)
+      await epochClient.query('COMMIT')
+    } catch (error) { await epochClient.query('ROLLBACK'); throw error } finally { epochClient.release() }
+    const continued = await readEpoch()
+    assert.equal(continued.publication, null, 'the delayed previous-epoch run must not supply the current request publication when its candidate is empty')
+    assert.deepEqual([continued.factory.requestEpoch, continued.factory.runAttempt.requestEpoch], [nextEpoch, epochs.sourceEventId])
+    assert.equal(continued.factory.candidate, null)
+    assert.deepEqual(continued.checks, [])
+    assert.deepEqual([continued.factory.stage, continued.factory.status], ['execute', 'pending'])
+    await store.takeInbox(owner, 'notice-new-request', botId)
+    await store.releaseLease(owner, 'notice-new-request', botId)
+    const continuedPrompt = String((await store.loadConversation(owner, botId)).messages.at(-1)!.message.content)
+    assert.ok(continuedPrompt.startsWith(`[Event] Run ${epochs.oldRunId}`), 'the original ended run remains visible as history')
+    assert.ok(!continuedPrompt.includes(oldPublication.url), 'neither event publication fallback nor the current observation claims the old PR for the new request')
+    assert.deepEqual((await db.select().from(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.id, delayedId)))[0].payload, delayedPayload)
+    assert.equal((await pool.query('SELECT "pullRequest" FROM run_publications WHERE "runId"=$1', [epochs.oldRunId])).rows[0].pullRequest.url, oldPublication.url, 'the original publication ledger remains unchanged')
+
+    const plainId = randomUUID()
+    await db.insert(schema.agentRuns).values({ id: plainId, userId: owner, botId, issueId: own.issueId, agentId: own.agentId, status: 'succeeded', stopReason: 'submitted', finishedAt: new Date() })
+    await enqueue(plainId, { status: 'succeeded', stopReason: 'submitted', summary: 'Plain task complete', publication: { pullRequest: { url: 'https://github.com/example/plain/pull/1', state: 'open' } } })
+    await store.takeInbox(owner, 'notice-plain', botId)
+    await store.releaseLease(owner, 'notice-plain', botId)
+    const plain = String((await store.loadConversation(owner, botId)).messages.at(-1)!.message.content)
+    assert.ok(plain.includes('Plain task complete') && plain.includes('Verified GitHub pull request: https://github.com/example/plain/pull/1 (open)'))
+    assert.ok(!plain.includes('Current host observation'), 'ordinary non-Factory notifications retain their own publication and result')
+  })
+})

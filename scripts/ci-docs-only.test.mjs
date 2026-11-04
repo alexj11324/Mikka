@@ -24,6 +24,17 @@ test('approved documentation paths are documentation-only', () => {
     'docs/assets/architecture-light.svg',
     'scripts/generate-diagrams.mjs',
     'scripts/diagram-svg.mjs',
+    'CONTRIBUTING.md',
+    'REVIEW.md',
+    '.github/workflows/README.md',
+    'packages/subscription-worker/README.md',
+    'apps/mobile/README.md',
+    '.claude/skills/README.md',
+    '.claude/skills/tdd/SKILL.md',
+    '.claude/skills/tdd/agents/openai.yaml',
+    'docs/acceptance/evidence/run/screen.png',
+    'docs/design/research/assets/secrets/01.png',
+    'docs/screenshots/flow.mp4',
   ]
   assert.equal(isDocsOnly(files), true)
   assert.equal(isDocsOnly(['AGENTS.md']), true)
@@ -51,6 +62,16 @@ test('code, workflows, configuration, messages and public assets are not documen
     'docs/AGENTS.md',
     'tasks/AGENTS.md',
     'scripts/release/workspace-sbom.mjs',
+    'packages/daemon/src/README.md',
+    'packages/daemon/package.json',
+    '.claude/skills/tdd/run.sh',
+    '.claude/skills/AGENTS.md',
+    '.claude/settings.json',
+    '.github/workflows/README.yml',
+    'docs/integration/migration-manifest-20261029.json',
+    'docs/factory/schema-proposals/195-incidents.sql',
+    'docs/design/research/assets/secrets/screens.html',
+    'docs/assets/photo.png',
   ]) {
     assert.equal(isDocsOnly([file]), false, file)
   }
