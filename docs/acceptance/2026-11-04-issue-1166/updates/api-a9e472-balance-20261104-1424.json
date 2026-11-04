@@ -1,0 +1,368 @@
+{
+  "schemaVersion": 1,
+  "case": "Factory 1166 最终回归 API a9e472",
+  "recordedAt": "2026-11-04T14:32:06Z",
+  "production": {
+    "build": "39aca4f1807609cffe59f3a88d2b9907d777b807",
+    "webDeployRunId": 41843117536,
+    "window": "2026-11-04T14:21:17.718Z/2026-11-04T14:24:55.844Z"
+  },
+  "preflight": {
+    "model": "deepseek-flash",
+    "assertCommand": "node scripts/assert-test-model.mjs deepseek-flash",
+    "assertExitCode": 0,
+    "assertAt": "2026-11-04T13:57:41Z",
+    "assertExecutor": "root Vercel sandbox",
+    "exactTitleIssueCount": 0,
+    "targetAndCoordinatorActiveRunCount": 0,
+    "checkedAt": "2026-11-04T14:20:24.976Z"
+  },
+  "contract": {
+    "promptBlob": "ed7a973fe321b6c6b0772953b9297eed69542e73",
+    "resumePlanBlob": "c40007fd3502d4c13e672299c6efe10fb0a57d63",
+    "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+    "computerBotId": "d6bf6e81-2ff8-4f2d-ad94-003d94b934bb",
+    "coordinatorBotId": "b56e7f61-59dd-4d7e-a114-b9dddf821a84",
+    "issueId": "9809bb6a-fdb8-4a00-926f-768c303a084f",
+    "taskId": "6e413ef7-7179-442d-ad0e-b9492cf76145",
+    "requestEpoch": "3d8d1c10-b87e-4035-bf06-fa96aae7c1ca",
+    "artifactPath": "factory-1166-final-api-a9e472.txt",
+    "expectedBytes": 63,
+    "expectedSha256": "7b1343eee28f3f545acbf34101d1974630fb710153251a06c218da3154c93fed"
+  },
+  "uiActions": {
+    "ownerPromptSubmissions": 1,
+    "dispatchBotComputerCalls": 1,
+    "manualRetryCalls": 0,
+    "ownerAcceptCalls": 0,
+    "stopAttempt": {
+      "result": "No UI stop delivered: the referenced stop node disappeared as the run finished; subsequent SQL shows all stopRequestedAt values null.",
+      "toolError": "Protocol error (DOM.getContentQuads): No node found for given backend id"
+    }
+  },
+  "result": {
+    "status": "blocked_by_provider_balance",
+    "factoryStage": "execute",
+    "factoryStatus": "failed",
+    "factoryRevision": 12,
+    "attemptCount": 4,
+    "automaticRepairCount": 3,
+    "terminalReasonCode": "repair_budget_exhausted",
+    "candidateId": null,
+    "reviewRuns": 0,
+    "verifyRuns": 0,
+    "ownerAccepted": false,
+    "actualToolCalls": 0,
+    "totalApiClaims": 4,
+    "totalNativeClaims": 0,
+    "activeRuns": 0
+  },
+  "attempts": [
+    {
+      "taskId": "6e413ef7-7179-442d-ad0e-b9492cf76145",
+      "stage": "execute",
+      "status": "failed",
+      "revision": 12,
+      "candidateId": null,
+      "attemptId": "4582f9c9-785e-487d-9d0e-99e0b29bccd5",
+      "ordinal": 1,
+      "attemptStage": "execute",
+      "attemptStatus": "failed",
+      "runId": "d19adfcb-6fd3-4301-8fc9-8ac59900d82d",
+      "reason": "Run failed: Claude Code: API Error: 402 Insufficient Balance (request_id: f1bce30f-79ca-493c-a5bd-938d0592dd03)",
+      "runStatus": "failed",
+      "model": "deepseek-flash",
+      "harness": "claude_code",
+      "modelSource": "api_key",
+      "keyId": "782ed1f2-c34a-4be1-971b-fadf6f15238c",
+      "error": "Claude Code: API Error: 402 Insufficient Balance (request_id: f1bce30f-79ca-493c-a5bd-938d0592dd03)",
+      "sessionId": "10ac7a48-32ba-4b60-8c1f-3e87477b2cf5",
+      "startedAt": "2026-11-04T14:22:31.358Z",
+      "finishedAt": "2026-11-04T14:22:51.336Z",
+      "stopRequestedAt": null,
+      "apiClaims": [
+        {
+          "keyId": "782ed1f2-c34a-4be1-971b-fadf6f15238c",
+          "createdAt": "2026-11-04T14:21:52.185987+00:00",
+          "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9"
+        }
+      ],
+      "nativeClaims": "0",
+      "toolCalls": "0",
+      "machine": [
+        {
+          "runId": "d19adfcb-6fd3-4301-8fc9-8ac59900d82d",
+          "state": "ended",
+          "endedAt": "2026-11-04T14:23:03.860338+00:00",
+          "sandboxId": null,
+          "workerLeaseHeld": false,
+          "workerLeaseUntil": null
+        }
+      ]
+    },
+    {
+      "taskId": "6e413ef7-7179-442d-ad0e-b9492cf76145",
+      "stage": "execute",
+      "status": "failed",
+      "revision": 12,
+      "candidateId": null,
+      "attemptId": "8758bb7c-9af2-4c2c-8150-36b41a690f68",
+      "ordinal": 2,
+      "attemptStage": "execute",
+      "attemptStatus": "failed",
+      "runId": "a5e393bc-30e7-4dcf-8b65-a660673275ae",
+      "reason": "Run failed: Claude Code: API Error: 402 Insufficient Balance (request_id: 730a61d0-caee-49bd-bd4a-9f5e975772b3)",
+      "runStatus": "failed",
+      "model": "deepseek-flash",
+      "harness": "claude_code",
+      "modelSource": "api_key",
+      "keyId": "782ed1f2-c34a-4be1-971b-fadf6f15238c",
+      "error": "Claude Code: API Error: 402 Insufficient Balance (request_id: 730a61d0-caee-49bd-bd4a-9f5e975772b3)",
+      "sessionId": "82d41f77-7abc-4a8a-bfa2-4e213844e770",
+      "startedAt": "2026-11-04T14:23:11.858Z",
+      "finishedAt": "2026-11-04T14:23:28.331Z",
+      "stopRequestedAt": null,
+      "apiClaims": [
+        {
+          "keyId": "782ed1f2-c34a-4be1-971b-fadf6f15238c",
+          "createdAt": "2026-11-04T14:22:58.865157+00:00",
+          "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9"
+        }
+      ],
+      "nativeClaims": "0",
+      "toolCalls": "0",
+      "machine": [
+        {
+          "runId": "a5e393bc-30e7-4dcf-8b65-a660673275ae",
+          "state": "ended",
+          "endedAt": "2026-11-04T14:23:40.667738+00:00",
+          "sandboxId": null,
+          "workerLeaseHeld": false,
+          "workerLeaseUntil": null
+        }
+      ]
+    },
+    {
+      "taskId": "6e413ef7-7179-442d-ad0e-b9492cf76145",
+      "stage": "execute",
+      "status": "failed",
+      "revision": 12,
+      "candidateId": null,
+      "attemptId": "41b02a7d-a7d0-45e4-8066-afc819b3c22f",
+      "ordinal": 3,
+      "attemptStage": "execute",
+      "attemptStatus": "failed",
+      "runId": "1c4e59fe-fe78-4df6-8b6b-f434c3bd053c",
+      "reason": "Run failed: Claude Code: API Error: 402 Insufficient Balance (request_id: 0aa77396-6619-42aa-97d8-9b814c8fa051)",
+      "runStatus": "failed",
+      "model": "deepseek-flash",
+      "harness": "claude_code",
+      "modelSource": "api_key",
+      "keyId": "782ed1f2-c34a-4be1-971b-fadf6f15238c",
+      "error": "Claude Code: API Error: 402 Insufficient Balance (request_id: 0aa77396-6619-42aa-97d8-9b814c8fa051)",
+      "sessionId": "5d0f0aee-45fe-4371-9bda-42e6d3f3199e",
+      "startedAt": "2026-11-04T14:23:57.962Z",
+      "finishedAt": "2026-11-04T14:24:16.111Z",
+      "stopRequestedAt": null,
+      "apiClaims": [
+        {
+          "keyId": "782ed1f2-c34a-4be1-971b-fadf6f15238c",
+          "createdAt": "2026-11-04T14:23:32.461081+00:00",
+          "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9"
+        }
+      ],
+      "nativeClaims": "0",
+      "toolCalls": "0",
+      "machine": [
+        {
+          "runId": "1c4e59fe-fe78-4df6-8b6b-f434c3bd053c",
+          "state": "ended",
+          "endedAt": "2026-11-04T14:24:28.497792+00:00",
+          "sandboxId": null,
+          "workerLeaseHeld": false,
+          "workerLeaseUntil": null
+        }
+      ]
+    },
+    {
+      "taskId": "6e413ef7-7179-442d-ad0e-b9492cf76145",
+      "stage": "execute",
+      "status": "failed",
+      "revision": 12,
+      "candidateId": null,
+      "attemptId": "9e053ef0-570c-4af2-82fa-3a28167d8f40",
+      "ordinal": 4,
+      "attemptStage": "execute",
+      "attemptStatus": "failed",
+      "runId": "910f04bf-ce7a-4a79-8d13-0f74f9d62722",
+      "reason": "Repair budget exhausted. Run failed: Claude Code: API Error: 402 Insufficient Balance (request_id: b403c247-5950-47c7-8e73-d5aa4af0aaed)",
+      "runStatus": "failed",
+      "model": "deepseek-flash",
+      "harness": "claude_code",
+      "modelSource": "api_key",
+      "keyId": "782ed1f2-c34a-4be1-971b-fadf6f15238c",
+      "error": "Claude Code: API Error: 402 Insufficient Balance (request_id: b403c247-5950-47c7-8e73-d5aa4af0aaed)",
+      "sessionId": "c668f2fd-9706-467f-8321-951fd659c160",
+      "startedAt": "2026-11-04T14:24:37.382Z",
+      "finishedAt": "2026-11-04T14:24:55.666Z",
+      "stopRequestedAt": null,
+      "apiClaims": [
+        {
+          "keyId": "782ed1f2-c34a-4be1-971b-fadf6f15238c",
+          "createdAt": "2026-11-04T14:24:21.961701+00:00",
+          "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9"
+        }
+      ],
+      "nativeClaims": "0",
+      "toolCalls": "0",
+      "machine": [
+        {
+          "runId": "910f04bf-ce7a-4a79-8d13-0f74f9d62722",
+          "state": "paused",
+          "endedAt": null,
+          "sandboxId": "iuuy25g6jxed4ub31vr3e",
+          "workerLeaseHeld": false,
+          "workerLeaseUntil": null
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "eventId": "4582f9c9-785e-487d-9d0e-99e0b29bccd5",
+      "createdAt": "2026-11-04T14:21:46.500Z",
+      "change": {
+        "runId": "d19adfcb-6fd3-4301-8fc9-8ac59900d82d",
+        "action": "bind_run"
+      }
+    },
+    {
+      "eventId": "8758bb7c-9af2-4c2c-8150-36b41a690f68",
+      "createdAt": "2026-11-04T14:22:51.541Z",
+      "change": {
+        "runId": "a5e393bc-30e7-4dcf-8b65-a660673275ae",
+        "action": "bind_run"
+      }
+    },
+    {
+      "eventId": "8837aefb-acba-5684-b2b6-2c92ebb1695e",
+      "createdAt": "2026-11-04T14:22:51.541Z",
+      "change": {
+        "action": "retry",
+        "reason": "Repair after run_failed"
+      }
+    },
+    {
+      "eventId": "91649c90-a735-5ce3-b0af-7871022aa644",
+      "createdAt": "2026-11-04T14:22:51.541Z",
+      "change": {
+        "action": "finish",
+        "output": {
+          "runId": "d19adfcb-6fd3-4301-8fc9-8ac59900d82d",
+          "reasonCode": "run_failed"
+        },
+        "reason": "Run failed: Claude Code: API Error: 402 Insufficient Balance (request_id: f1bce30f-79ca-493c-a5bd-938d0592dd03)",
+        "status": "failed",
+        "evidence": []
+      }
+    },
+    {
+      "eventId": "41b02a7d-a7d0-45e4-8066-afc819b3c22f",
+      "createdAt": "2026-11-04T14:23:28.514Z",
+      "change": {
+        "runId": "1c4e59fe-fe78-4df6-8b6b-f434c3bd053c",
+        "action": "bind_run"
+      }
+    },
+    {
+      "eventId": "5a657910-7a78-5ab9-8234-0b237c618ccb",
+      "createdAt": "2026-11-04T14:23:28.514Z",
+      "change": {
+        "action": "finish",
+        "output": {
+          "runId": "a5e393bc-30e7-4dcf-8b65-a660673275ae",
+          "reasonCode": "run_failed"
+        },
+        "reason": "Run failed: Claude Code: API Error: 402 Insufficient Balance (request_id: 730a61d0-caee-49bd-bd4a-9f5e975772b3)",
+        "status": "failed",
+        "evidence": []
+      }
+    },
+    {
+      "eventId": "6147498e-dff4-5fdf-b5db-288a6803d864",
+      "createdAt": "2026-11-04T14:23:28.514Z",
+      "change": {
+        "action": "retry",
+        "reason": "Repair after run_failed"
+      }
+    },
+    {
+      "eventId": "640dfc45-ef66-56f0-9d1f-62aa0148a0ad",
+      "createdAt": "2026-11-04T14:24:16.312Z",
+      "change": {
+        "action": "finish",
+        "output": {
+          "runId": "1c4e59fe-fe78-4df6-8b6b-f434c3bd053c",
+          "reasonCode": "run_failed"
+        },
+        "reason": "Run failed: Claude Code: API Error: 402 Insufficient Balance (request_id: 0aa77396-6619-42aa-97d8-9b814c8fa051)",
+        "status": "failed",
+        "evidence": []
+      }
+    },
+    {
+      "eventId": "6da1043a-9b12-5694-8d61-d12c6d766f22",
+      "createdAt": "2026-11-04T14:24:16.312Z",
+      "change": {
+        "action": "retry",
+        "reason": "Repair after run_failed"
+      }
+    },
+    {
+      "eventId": "9e053ef0-570c-4af2-82fa-3a28167d8f40",
+      "createdAt": "2026-11-04T14:24:16.312Z",
+      "change": {
+        "runId": "910f04bf-ce7a-4a79-8d13-0f74f9d62722",
+        "action": "bind_run"
+      }
+    },
+    {
+      "eventId": "ac086462-9202-598a-a7a3-985d9f5143d3",
+      "createdAt": "2026-11-04T14:24:55.844Z",
+      "change": {
+        "action": "finish",
+        "output": {
+          "runId": "910f04bf-ce7a-4a79-8d13-0f74f9d62722",
+          "reasonCode": "repair_budget_exhausted"
+        },
+        "reason": "Repair budget exhausted. Run failed: Claude Code: API Error: 402 Insufficient Balance (request_id: b403c247-5950-47c7-8e73-d5aa4af0aaed)",
+        "status": "failed",
+        "evidence": []
+      }
+    }
+  ],
+  "settings": {
+    "guard": "Fresh settings/entries/choices exactly equalled the saved post-change snapshot before normal UI restoration.",
+    "normalUiChange": "Added one deepseek-flash/claude_code/api_key entry and moved it first; retained all four existing entries and all chat choices.",
+    "temporaryEntryId": "2e405582-176b-48eb-a263-370dfeca1d64",
+    "beforeSha256": "62b7a4fab2998d91a6d0b537174a6ebcd32b23380c0d97d2d7d7a7e075424a13",
+    "postChangeSha256": "fa88ec1f3241f660b47296a0b000dd536a40c11182542ca0755055c57f4c99c3",
+    "preRestoreEqualsPostChange": true,
+    "restoredSha256": "2d3040200fc9f8ea3ae40f042137f6a3182d0fc5ba510b263b76fb8c8e7e4d37",
+    "restoredAt": "2026-11-04T14:28:10.919174+00:00",
+    "restoreSemanticEquality": true,
+    "restoredEntryIds": [
+      "c2e064c7-0f7d-4455-9f66-5a16f1943d06",
+      "335682ec-0e5a-4a37-93d8-27f68a6c70c4",
+      "2e9f1653-bf1f-48a8-885e-7ba5c78ce82f",
+      "9eaab335-3116-406b-9668-23c70be92778"
+    ],
+    "timestampCaveat": "Normal UI saves rewrite settings.updatedAt and entries.createdAt; exact original timestamps are not restored. IDs, order, model/source/harness, remaining settings and chat choices match the pre-change snapshot."
+  },
+  "limits": [
+    "402 occurred before artifact creation or inspection; no file, digest, arithmetic or independent-stage success is claimed.",
+    "The preserved provider alias is deepseek-flash; this does not identify an underlying provider model version.",
+    "Thread-machine paused/ended and cleared lease states are database observations; provider state is not independently asserted here.",
+    "No model/key fallback, repeated user dispatch, production SQL mutation, deployment deletion, shared-token change or Acme VM operation was performed."
+  ]
+}
