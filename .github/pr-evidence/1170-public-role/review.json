@@ -1,0 +1,56 @@
+{
+  "revision": "e95e90d391d81ef57037a0f3710569fba0ea7031",
+  "normalAuth": true,
+  "modelCalls": 0,
+  "api": {
+    "ownerPatchReadback": "passed",
+    "emptyClear": "passed",
+    "accepts2000": "passed",
+    "rejects2001WithoutChange": "passed",
+    "foreignRead": 404,
+    "foreignPatch": 404,
+    "privateInstructionsExposed": false
+  },
+  "layouts": [
+    {
+      "locale": "en",
+      "width": 1440,
+      "viewport": 1440,
+      "pageWidth": 1430,
+      "fieldWidth": 328,
+      "fieldRight": 1407,
+      "fieldValue": "Research technical sources, compare solutions, and summarize evidence for group discussions.",
+      "maxLength": 2000
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "viewport": 390,
+      "pageWidth": 390,
+      "fieldWidth": 357,
+      "fieldRight": 374,
+      "fieldValue": "Research technical sources, compare solutions, and summarize evidence for group discussions.",
+      "maxLength": 2000
+    },
+    {
+      "locale": "zh-CN",
+      "width": 1440,
+      "viewport": 1440,
+      "pageWidth": 1430,
+      "fieldWidth": 328,
+      "fieldRight": 1407,
+      "fieldValue": "检索技术资料、比较解决方案，并为群聊讨论整理证据和结论。",
+      "maxLength": 2000
+    },
+    {
+      "locale": "zh-CN",
+      "width": 390,
+      "viewport": 390,
+      "pageWidth": 390,
+      "fieldWidth": 357,
+      "fieldRight": 374,
+      "fieldValue": "检索技术资料、比较解决方案，并为群聊讨论整理证据和结论。",
+      "maxLength": 2000
+    }
+  ]
+}

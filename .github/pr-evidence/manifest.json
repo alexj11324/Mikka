@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "archivedAt": "2026-11-04",
+  "purpose": "Reviewed PR screenshot evidence; existing captures only",
+  "images": [
+    {
+      "path": "1168-identity/en-390.webp",
+      "bytes": 16892,
+      "sha256": "09acc8abc2d8716227afdfaace6ff8075b676f277f34245fd71f1715cf196a00",
+      "gitBlob": "54544ae3cbe6cca4edba154235f4d42801d36785",
+      "width": 390,
+      "height": 844,
+      "metadataKeys": [],
+      "captureRevision": "70b210ed4060334546283dc20951ac8b22501ce3"
+    },
+    {
+      "path": "1168-identity/en-1440.webp",
+      "bytes": 33328,
+      "sha256": "5d5e2e798fed112e0ddecd5ec5ccab3b9a3308edda66fa8f3c803428c8462b0e",
+      "gitBlob": "529ee930c823306c2a3d66f900265e348730011a",
+      "width": 1440,
+      "height": 1000,
+      "metadataKeys": [],
+      "captureRevision": "70b210ed4060334546283dc20951ac8b22501ce3"
+    },
+    {
+      "path": "1168-identity/zh-CN-390.webp",
+      "bytes": 10936,
+      "sha256": "0347b50bb70c3918eeeb51414e1413e8ed9ee557cc75e7ce1445d83d45c70b9e",
+      "gitBlob": "f159a90221e2c52ffddfaef430f18bddea6c1754",
+      "width": 390,
+      "height": 844,
+      "metadataKeys": [],
+      "captureRevision": "70b210ed4060334546283dc20951ac8b22501ce3"
+    },
+    {
+      "path": "1168-identity/zh-CN-1440.webp",
+      "bytes": 35986,
+      "sha256": "70f68771fb86c9b23425453c5f1364020072537df694a0c01a709a99d23a6b3a",
+      "gitBlob": "a7f531e665c2995524576fccf007e9d46db25490",
+      "width": 1440,
+      "height": 1000,
+      "metadataKeys": [],
+      "captureRevision": "70b210ed4060334546283dc20951ac8b22501ce3"
+    },
+    {
+      "path": "1170-public-role/en-390.webp",
+      "bytes": 13860,
+      "sha256": "61804d3be3caadb88aa6622faae8cbde1c08596438d7db7ea1c180e3024f67fe",
+      "gitBlob": "5819e21145cc636de734e4f79b44df57c1140f53",
+      "width": 390,
+      "height": 844,
+      "metadataKeys": [],
+      "captureRevision": "e95e90d391d81ef57037a0f3710569fba0ea7031"
+    },
+    {
+      "path": "1170-public-role/en-1440.webp",
+      "bytes": 27946,
+      "sha256": "19f77f2d591b899d9be0f093fb038da697dc57445b4e684ef48802d0cb8dadb0",
+      "gitBlob": "b57c81ae8ffd9d8893b98c067b0efecf5005d061",
+      "width": 1440,
+      "height": 1000,
+      "metadataKeys": [],
+      "captureRevision": "e95e90d391d81ef57037a0f3710569fba0ea7031"
+    },
+    {
+      "path": "1170-public-role/zh-CN-390.webp",
+      "bytes": 12176,
+      "sha256": "ccf929ae7485bafab5daa1b0272f1405607015779a64fbe998097a9f1dd33d9f",
+      "gitBlob": "c592d68bbc227c50cadac91c86215079ef4125e4",
+      "width": 390,
+      "height": 844,
+      "metadataKeys": [],
+      "captureRevision": "e95e90d391d81ef57037a0f3710569fba0ea7031"
+    },
+    {
+      "path": "1170-public-role/zh-CN-1440.webp",
+      "bytes": 25296,
+      "sha256": "f48193ec69de02d0e7994182b9ee14cb95ea77cbcdba22f921b333a92641ce2d",
+      "gitBlob": "a1c4cdbf7c127a36d75df27f2bb0cb5e30ee1e1e",
+      "width": 1440,
+      "height": 1000,
+      "metadataKeys": [],
+      "captureRevision": "e95e90d391d81ef57037a0f3710569fba0ea7031"
+    }
+  ]
+}
