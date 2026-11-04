@@ -218,7 +218,7 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
       }
       if (path === `/user/${githubUser.id}` && method === 'GET') { readAccess(); return reply(githubUser) }
       if (path === `${REPO_PATH}/collaborators/${githubUser.login}/permission` && method === 'GET') { readAccess(); return reply({ permission: 'write', user: githubUser }) }
-      if (path === REPO_PATH && method === 'GET') { readAccess(); return reply({ id: REPOSITORY_ID, full_name: 'mikka-e2e/core-loop', default_branch: 'trunk' }) }
+      if (path === REPO_PATH && method === 'GET') { readAccess(); return reply({ id: REPOSITORY_ID, full_name: 'mikka-e2e/core-loop', default_branch: 'trunk', allow_merge_commit: true, allow_squash_merge: false, allow_rebase_merge: false }) }
       const currentCommit = branch => git(scenario.barePath, ['rev-parse', '--verify', `refs/heads/${branch}`])
       const checkCommit = async commit => {
         assert.match(commit, /^[a-f0-9]{40}$/)
@@ -258,6 +258,35 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         if (!pr) return reply({ message: 'Fixture pull request not found' }, 404)
         return reply({ ...pr, head: { ...pr.head, sha: await currentCommit(pr.head.ref) } })
       }
+      if (new RegExp(`^${REPO_PATH}/pulls/[0-9]+/merge$`).test(path) && method === 'PUT') {
+        // Factory acceptance acts as the person; installation/run tokens may
+        // publish a PR but cannot stand in for the person's merge decision.
+        if (bearer !== 'Bearer mikka-local-synthetic-user-token') return reply({ message: 'The fixture owner must accept the pull request' }, 403)
+        const pr = pullRequests.find(value => value.number === Number(path.split('/').at(-2)))
+        if (!pr) return reply({ message: 'Fixture pull request not found' }, 404)
+        const input = await readBody(request), head = await currentCommit(pr.head.ref)
+        if (input.sha !== head) return reply({ message: 'Head branch was modified' }, 409)
+        if (input.merge_method !== 'merge') return reply({ message: 'This fixture supports merge commits only' }, 422)
+        const result = sha => ({ sha, merged: true, message: 'Pull request successfully merged' })
+        if (pr.merged) return reply(result(pr.merge_commit_sha))
+        if (pr.state !== 'open' || pr.draft) return reply({ message: 'Pull request is not mergeable' }, 405)
+        const base = await currentCommit(pr.base.ref)
+        let tree
+        try { tree = await git(scenario.barePath, ['merge-tree', '--write-tree', base, head]) }
+        catch (error) {
+          if (error.code === 1) return reply({ message: 'Merge conflict' }, 405)
+          throw error
+        }
+        const commit = await git(scenario.barePath, ['-c', 'user.name=Mikka fixture owner', '-c', 'user.email=fixture-owner@example.test',
+          'commit-tree', tree, '-p', base, '-p', head, '-m', `Merge pull request #${pr.number}`])
+        // Compare-and-swap the real default branch; a concurrent update cannot
+        // be reported as a successful merge of this reviewed candidate.
+        try { await git(scenario.barePath, ['update-ref', `refs/heads/${pr.base.ref}`, commit, base]) }
+        catch { return reply({ message: 'Base branch was modified' }, 409) }
+        Object.assign(pr, { state: 'closed', merged: true, merged_at: new Date().toISOString(), merge_commit_sha: commit })
+        observe({ kind: 'pull-request-merged', requestId, number: pr.number, headSha: head, mergeCommitSha: commit })
+        return reply(result(commit))
+      }
       if (new RegExp(`^${REPO_PATH}/commits/[a-f0-9]{40}/check-runs$`).test(path) && method === 'GET') {
         readAccess()
         const commit = path.split('/').at(-2)
@@ -295,7 +324,7 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         if (issueId) assert.equal(bodyIssueId, issueId)
         assert.equal(pullRequests.some(pr => pr.head.ref === input.head), false, 'A replay must find the existing PR')
         const number = 41 + pullRequests.length
-        const pr = { number, node_id: `MVP_PR_${number}`, title: input.title, html_url: `https://github.com/mikka-e2e/core-loop/pull/${number}`, state: 'open', draft: input.draft === true, merged_at: null, body: input.body, head: { ref: input.head, repo: { id: REPOSITORY_ID } }, base: { ref: 'trunk', repo: { id: REPOSITORY_ID } } }
+        const pr = { number, node_id: `MVP_PR_${number}`, title: input.title, html_url: `https://github.com/mikka-e2e/core-loop/pull/${number}`, state: 'open', draft: input.draft === true, merged: false, merged_at: null, merge_commit_sha: null, body: input.body, head: { ref: input.head, repo: { id: REPOSITORY_ID } }, base: { ref: 'trunk', repo: { id: REPOSITORY_ID } } }
         pullRequests.push(pr)
         observe({ kind: 'pull-request-created', requestId, ...(runId ? { runId } : {}), issueId: bodyIssueId, commit, branch: input.head, url: pr.html_url })
         return reply(pr, 201)
