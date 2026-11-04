@@ -48,7 +48,7 @@ beforeEach(() => {
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
   globalThis.fetch = async (url, options) => {
     if (String(url).endsWith('/api/workspace/switcher')) return Response.json({ accounts: [{ id: viewerId, choices: [] }] })
-    if (String(url).endsWith('/api/pending-actions')) return Response.json(legacy)
+    if (String(url).endsWith('/api/pending-actions')) return Response.json(legacy, { headers: { 'x-mikka-viewer': encodeURIComponent(responseViewer), 'x-mikka-observed-at': new Date().toISOString() } })
     assert.ok(String(url).endsWith('/api/approved-writes'))
     if (options?.method === 'GET') { availabilityReads++; return Response.json({ enabled: !disabled }, { status: availabilityFailure ? 503 : 200 }) }
     const body = JSON.parse(String(options?.body)); calls.push(body)
@@ -70,7 +70,7 @@ const click = async (node: Element) => { await act(async () => { (node as HTMLBu
 
 test('all new ask proposals display their frozen content/account; new and legacy buttons retain separate deciders', async () => {
   items = [proposal('new-slack'), proposal('new-notion', 'append_notion_paragraph'), proposal('new-calendar', 'cancel_calendar_event')]
-  legacy = [{ id: 'legacy-email', action: 'send_email', input: { to: ['fixture@example.invalid'], subject: 'Old route', body: 'Old body' }, context: null, status: 'pending', createdAt: '2026-10-29T10:00:00Z' }]
+  legacy = [{ id: 'legacy-email', action: 'send_email', input: { to: ['fixture@example.invalid'], subject: 'Old route', body: 'Old body' }, context: null, status: 'pending', createdAt: new Date().toISOString() }]
   await render()
   for (const value of ['Frozen paragraph', 'Frozen message', 'Frozen event', 'frozen-account', 'frozen-channel', 'notifyExternal', 'Old body']) assert.ok(container.textContent?.includes(value), value)
   assert.deepEqual(calls[0], { op: 'list', unresolvedOnly: true, limit: 50 })
@@ -83,7 +83,7 @@ test('all new ask proposals display their frozen content/account; new and legacy
 
 test('disabled new service preserves legacy approvals without an error or new action', async () => {
   disabled = true
-  legacy = [{ id: 'old', action: 'send_email', input: { subject: 'Legacy approval' }, context: null, status: 'pending', createdAt: '2026-10-29T10:00:00Z' }]
+  legacy = [{ id: 'old', action: 'send_email', input: { subject: 'Legacy approval' }, context: null, status: 'pending', createdAt: new Date().toISOString() }]
   await render()
   assert.ok(container.textContent?.includes('Legacy approval'))
   assert.ok(!container.querySelector('[role="alert"]'))
@@ -93,7 +93,7 @@ test('disabled new service preserves legacy approvals without an error or new ac
 
 test('failed availability leaves legacy approvals usable and never starts new service POSTs', async () => {
   availabilityFailure = true
-  legacy = [{ id: 'old', action: 'send_email', input: { subject: 'Legacy approval' }, context: null, status: 'pending', createdAt: '2026-10-29T10:00:00Z' }]
+  legacy = [{ id: 'old', action: 'send_email', input: { subject: 'Legacy approval' }, context: null, status: 'pending', createdAt: new Date().toISOString() }]
   await render()
   assert.ok(container.textContent?.includes('Legacy approval'))
   assert.ok(container.querySelector('[role="alert"]')?.textContent?.includes('approvalLoadFailed'))

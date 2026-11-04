@@ -1,4 +1,4 @@
-export const LIVE_KINDS = ['approved_writes', 'approved_write', 'factory_task', 'factory_issue', 'thread', 'run'] as const
+export const LIVE_KINDS = ['approved_writes', 'approved_write', 'pending_actions', 'factory_task', 'factory_issue', 'thread', 'run'] as const
 export type LiveKind = typeof LIVE_KINDS[number]
 export type LiveInvalidation = { kind: LiveKind; id: string }
 export const LIVE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
