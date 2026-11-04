@@ -41,7 +41,7 @@ export async function runGroupProductionAcceptance({ env = process.env, fetchImp
   }
   async function version() {
     const data = await json('/api/version')
-    check(data?.build === report.deploymentId, 'acceptance_deployment_changed')
+    check(data?.build === report.revision, 'acceptance_deployment_changed')
   }
   function observeDecisions(turn, quality) {
     const token = value => typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,180}$/.test(value) ? value : null
