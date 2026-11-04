@@ -33,7 +33,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - run: node --test scripts/e2b/publish-template-env.test.mjs
+      - run: node --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs
       - run: python3 -m py_compile scripts/e2b/validate-official-instances.py
       - run: bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh
   # Same comparison as the historical template workflow. A commit that leaves the

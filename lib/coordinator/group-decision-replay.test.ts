@@ -102,7 +102,7 @@ test('real replay runner fails before calls without normal auth/fixed deployment
   const result=await runGroupDecisionReplay({env,fetchImpl:async(url,options)=>{
     calls++
     assert.equal(options?.redirect,'error')
-    if(String(url).endsWith('/api/version'))return Response.json({build:'dpl_fixture'})
+    if(String(url).endsWith('/api/version'))return Response.json({build:env.GROUP_REPLAY_REVISION})
     const body=JSON.parse(options?.body as string)
     assert.deepEqual(body,{caseId:'small-talk',policyVersion:GROUP_BASELINE_VERSION})
     return Response.json(await replayGroupDecision(body.caseId,body.policyVersion,async()=>null),{status:503})
@@ -116,7 +116,7 @@ test('fixed replay collection continues after real uncertain and partial invalid
   const env={GROUP_REPLAY_CONVERSATION:ui,GROUP_REPLAY_DEPLOYMENT:'dpl_fixture',GROUP_REPLAY_REVISION:'b'.repeat(40),GROUP_REPLAY_COOKIE:'fixture-session'}
   const requested:string[]=[]
   const result=await runGroupDecisionReplay({env,fetchImpl:async(url,options)=>{
-    if(String(url).endsWith('/api/version'))return Response.json({build:'dpl_fixture'})
+    if(String(url).endsWith('/api/version'))return Response.json({build:env.GROUP_REPLAY_REVISION})
     const body=JSON.parse(options?.body as string)
     requested.push(`${body.policyVersion}:${body.caseId}`)
     const uncertain=body.policyVersion===GROUP_BASELINE_VERSION && body.caseId==='small-talk'
@@ -129,6 +129,7 @@ test('fixed replay collection continues after real uncertain and partial invalid
     return Response.json(row)
   }})
   assert.equal(requested.length,24);assert.equal(new Set(requested).size,24)
+  assert.deepEqual(result.modelScope,{expectedDecisionModel:DECISION_MODEL,observedDecisionModels:[DECISION_MODEL],workerModel:null,workerExecutionPerformed:false})
   assert.deepEqual(requested,[GROUP_BASELINE_VERSION,GROUP_POLICY_VERSION].flatMap(policy=>GROUP_REPLAY_CASE_IDS.map(id=>`${policy}:${id}`)))
   assert.equal(result.collectionComplete,true);assert.equal(result.qualityAccepted,false)
   assert.equal(result.status,'failed');assert.equal(result.error,'replay_decision_unavailable');assert.equal(result.comparison.decisionReviewReady,false)
@@ -144,7 +145,7 @@ test('collector rejects a repeated provider receipt across different logical cas
   const env={GROUP_REPLAY_CONVERSATION:ui,GROUP_REPLAY_DEPLOYMENT:'dpl_fixture',GROUP_REPLAY_REVISION:'b'.repeat(40),GROUP_REPLAY_COOKIE:'fixture-session'}
   let posts=0
   const result=await runGroupDecisionReplay({env,fetchImpl:async(url,options)=>{
-    if(String(url).endsWith('/api/version'))return Response.json({build:'dpl_fixture'})
+    if(String(url).endsWith('/api/version'))return Response.json({build:env.GROUP_REPLAY_REVISION})
     posts++
     const body=JSON.parse(options?.body as string)
     return Response.json(await replayGroupDecision(body.caseId,body.policyVersion,async(_purpose,_input,questions)=>answer({[questions[0].name]:'uncertain'},receipt)))
@@ -159,7 +160,7 @@ test('a changed deployment after an invalid observation prevents the next fixed 
   const env={GROUP_REPLAY_CONVERSATION:ui,GROUP_REPLAY_DEPLOYMENT:'dpl_fixture',GROUP_REPLAY_REVISION:'b'.repeat(40),GROUP_REPLAY_COOKIE:'fixture-session'}
   let posts=0
   const result=await runGroupDecisionReplay({env,fetchImpl:async(url,options)=>{
-    if(String(url).endsWith('/api/version'))return Response.json({build:posts?'dpl_changed':'dpl_fixture'})
+    if(String(url).endsWith('/api/version'))return Response.json({build:posts?'c'.repeat(40):env.GROUP_REPLAY_REVISION})
     posts++
     const body=JSON.parse(options?.body as string)
     return Response.json(await replayGroupDecision(body.caseId,body.policyVersion,async(_purpose,_input,questions)=>answer({[questions[0].name]:'uncertain'})))
@@ -192,7 +193,7 @@ async function comparisonFixture({baselineFailure='uncertain',candidateFailure=f
   const env={GROUP_REPLAY_CONVERSATION:ui,GROUP_REPLAY_DEPLOYMENT:'dpl_fixture',GROUP_REPLAY_REVISION:'b'.repeat(40),GROUP_REPLAY_COOKIE:'fixture-session'}
   const requested:string[]=[]
   const report=await runGroupDecisionReplay({env,fetchImpl:async(url,options)=>{
-    if(String(url).endsWith('/api/version'))return Response.json({build:'dpl_fixture'})
+    if(String(url).endsWith('/api/version'))return Response.json({build:env.GROUP_REPLAY_REVISION})
     const body=JSON.parse(options?.body as string)
     requested.push([body.policyVersion,body.caseId].join(':'))
     const item=dataset.cases.find(item=>item.id===body.caseId)!
@@ -262,4 +263,16 @@ test('a complete baseline requires an intact typed route and matching projection
     assert.equal(new Set(requested).size,requested.length)
     assert.ok(report.baseline.at(-1)?.receipt,'malformed observation retains its real receipt')
   }
+})
+
+test('commit build is required; a deployment ID in the public version cannot stand in for it',async()=>{
+  let posts=0
+  const env={GROUP_REPLAY_CONVERSATION:ui,GROUP_REPLAY_DEPLOYMENT:'dpl_fixture',GROUP_REPLAY_REVISION:'b'.repeat(40),GROUP_REPLAY_COOKIE:'fixture-session'}
+  const result=await runGroupDecisionReplay({env,fetchImpl:async(url)=>{
+    if(String(url).endsWith('/api/version'))return Response.json({build:env.GROUP_REPLAY_DEPLOYMENT})
+    posts++;throw Error('must fail before paid replay')
+  }})
+  assert.equal(posts,0);assert.equal(result.error,'replay_deployment_changed')
+  assert.equal(result.deploymentId,env.GROUP_REPLAY_DEPLOYMENT);assert.equal(result.revision,env.GROUP_REPLAY_REVISION)
+  assert.deepEqual(result.modelScope,{expectedDecisionModel:DECISION_MODEL,observedDecisionModels:[],workerModel:null,workerExecutionPerformed:false})
 })
