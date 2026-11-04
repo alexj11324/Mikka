@@ -19,8 +19,9 @@ const fixtureRun = () => ({ id: selectedRun, issueId: ISSUE, userId: OWNER,
   deviceRepoId: null, report: null, error: null, createdAt: new Date(0), finishedAt: null,
   agentName: 'Fixture Bot', harness: 'codex', ownerName: null, stopRequestedAt: null, outcome: null })
 function selection(rows: unknown[]) {
-  const query = { from: () => query, innerJoin: () => query, leftJoin: () => query, where: () => query,
-    orderBy: () => query, limit: () => query, then: (resolve: (value: unknown[]) => unknown, reject?: (reason: unknown) => unknown) => Promise.resolve(rows).then(resolve, reject) }
+  const query = Promise.resolve(rows)
+  Object.assign(query, { from: () => query, innerJoin: () => query, leftJoin: () => query, where: () => query,
+    orderBy: () => query, limit: () => query })
   return query
 }
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
