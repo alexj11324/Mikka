@@ -4,6 +4,7 @@ import { readFileSync, mkdirSync, openSync, closeSync, constants } from 'node:fs
 import { resolve } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import { measureReplayEvidence, sanitizeReplayReport, writeSanitizedReport } from './run-proactive-acceptance.mjs'
+import { verifyProductionRelease } from './production-release-pin.mjs'
 
 const ORIGIN='https://app.aspectlylabs.com'
 const OWNER='cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3'
@@ -16,8 +17,20 @@ const check=(condition,reason)=>{if(!condition)throw Error(reason)}
 
 async function sourceDependencies(repo){
   const module=path=>import(pathToFileURL(resolve(repo,path)).href)
-  const [replay,cases,policy]=await Promise.all([module('scripts/group-decision-replay.ts'),module('lib/coordinator/group-decision-replay.ts'),module('lib/coordinator/group-decision-policy.ts')])
-  return {runReplay:replay.runGroupDecisionReplay,livePolicy:policy.GROUP_LIVE_POLICY_VERSION,
+  const driver=resolve(fileURLToPath(new URL('../..',import.meta.url)))
+  // Only the transport driver differs from the fixed production checkout.
+  // Every shared dataset/policy/receipt/scoring module must remain byte-identical.
+  const contractPaths=['tests/fixtures/group-decision-cases.json','lib/coordinator/group-decision-replay.ts',
+    'lib/coordinator/group-decision-policy.ts','lib/coordinator/group-decision-chain.ts','lib/coordinator/group-decision-trace.ts','lib/coordinator/decision.ts',
+    'lib/coordinator/group-judgment.ts','lib/coordinator/group-correction.ts','lib/coordinator/group-routing.ts','lib/deployment-switches.ts']
+  const contractDigests=Object.fromEntries(contractPaths.map(path=>{
+    const source=readFileSync(resolve(repo,path)),local=readFileSync(resolve(driver,path))
+    check(source.equals(local),'preflight_driver_contract_mismatch')
+    return[path,createHash('sha256').update(source).digest('hex')]
+  }))
+  const [replay,cases,policy]=await Promise.all([import(new URL('../group-decision-replay.ts',import.meta.url)),module('lib/coordinator/group-decision-replay.ts'),module('lib/coordinator/group-decision-policy.ts')])
+  return {runReplay:replay.runGroupDecisionReplay,livePolicy:policy.GROUP_LIVE_POLICY_VERSION,contractDigests,
+    replayDriverDigest:createHash('sha256').update(readFileSync(resolve(driver,'scripts/group-decision-replay.ts'))).digest('hex'),
     contract:{caseIds:cases.GROUP_REPLAY_CASE_IDS,datasetDigest:cases.GROUP_REPLAY_DATASET_DIGEST,
       comparisonVersion:cases.GROUP_REPLAY_COMPARISON_VERSION,baselinePolicy:policy.GROUP_BASELINE_VERSION,candidatePolicy:policy.GROUP_POLICY_VERSION}}
 }
@@ -37,10 +50,10 @@ export async function runPolicyPreflight({env=process.env,repo=process.cwd(),fet
   const email=env.SMOKE_OWNER_EMAIL,password=env.SMOKE_OWNER_PASSWORD
   check(email?.toLowerCase()===EMAIL && typeof password==='string' && password.length>=8,'preflight_normal_account_required')
   const start=now(),deadline=start+8*60_000,report={schemaVersion:1,kind:'candidate-replay-before-live-promotion',status:'failed',
-    sourceRevision:revision,deploymentId:deployment,livePolicy:'group-contribution-v1',candidatePolicy:contract.candidatePolicy,
+    sourceRevision:revision,deploymentId:deployment,replayDriverDigest:api.replayDriverDigest??null,contractDigests:api.contractDigests??null,releasePins:{before:null,after:null},livePolicy:'group-contribution-v1',candidatePolicy:contract.candidatePolicy,
     ownerId:OWNER,workspaceId:WORKSPACE,conversationId:GROUP,startedAt:new Date().toISOString(),finishedAt:null,
     session:{loginAttempted:false,loginStatus:null,identityConfirmed:false,logoutAttempted:false,logoutStatus:null,logoutAcknowledged:false},
-    scopeConfirmed:false,replay:null,accounting:null,error:null,policyChanged:false,executionPerformed:false,productionAccepted:false}
+    scopeConfirmed:false,replay:null,accounting:null,modelScope:{expectedDecisionModel:'openai/gpt-6-luna-decisions',observedDecisionModels:[],workerModel:null,workerExecutionPerformed:false},error:null,policyChanged:false,executionPerformed:false,productionAccepted:false}
   let cookie=''
   const allowed=new Set(['/mikka/api/version','/mikka/api/auth/sign-in/email','/mikka/api/auth/get-session','/mikka/api/auth/sign-out',
     '/mikka/api/conversations', '/mikka/api/conversations/'+GROUP+'/members','/mikka/api/conversations/'+GROUP+'/decisions/replay'])
@@ -60,8 +73,9 @@ export async function runPolicyPreflight({env=process.env,repo=process.cwd(),fet
       ...(body===undefined?{}:{body:JSON.stringify(body)})},cleanup)
     return {response,data:await response.json().catch(()=>null)}
   }
-  const version=async()=>{const {response,data}=await request('/api/version');check(response.status===200 && data?.build===deployment,'preflight_deployment_changed')}
+  const version=async()=>{const {response,data}=await request('/api/version');check(response.status===200 && data?.build===revision,'preflight_deployment_changed')}
   try{
+    report.releasePins.before=await verifyProductionRelease({revision,deploymentId:deployment,env,fetchImpl,now})
     await version()
     report.session.loginAttempted=true
     const login=await request('/api/auth/sign-in/email',{email,password})
@@ -84,10 +98,15 @@ export async function runPolicyPreflight({env=process.env,repo=process.cwd(),fet
       GROUP_REPLAY_REVISION:revision,GROUP_REPLAY_COOKIE:cookie},fetchImpl:transport})
     report.replay=sanitizeReplayReport(replay)
     report.accounting=measureReplayEvidence(replay,contract)
+    report.modelScope.observedDecisionModels=[...new Set([...report.replay.baseline,...report.replay.candidate].flatMap(row=>(row.decisions??[]).flatMap(step=>step.receipt?[step.receipt.modelId]:[])))]
     await version()
     check(report.accounting.qualityAccepted===true && report.replay.status==='comparison_ready','preflight_candidate_rejected')
   }catch(error){report.error=safeError(error)}
   finally{
+    if(report.releasePins.before){
+      try{report.releasePins.after=await verifyProductionRelease({revision,deploymentId:deployment,env,fetchImpl,now})}
+      catch(error){report.error??=safeError(error)}
+    }
     if(cookie){
       report.session.logoutAttempted=true
       try{const logout=await request('/api/auth/sign-out',{},true);report.session.logoutStatus=logout.response.status;report.session.logoutAcknowledged=logout.response.status===200}catch{report.session.logoutAcknowledged=false}
@@ -95,7 +114,7 @@ export async function runPolicyPreflight({env=process.env,repo=process.cwd(),fet
     cookie=''
     report.finishedAt=new Date().toISOString()
   }
-  report.status=!report.error && report.scopeConfirmed && report.accounting?.qualityAccepted===true
+  report.status=!report.error && report.scopeConfirmed && report.releasePins.before && report.releasePins.after && report.accounting?.qualityAccepted===true
     && report.session.logoutAcknowledged?'passed':'failed'
   return report
 }

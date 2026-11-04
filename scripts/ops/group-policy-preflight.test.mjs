@@ -53,13 +53,19 @@ function abstain(row, reason = 'uncertain') {
 
 const OWNER='cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3',WORKSPACE='0f877068-66a0-4893-8801-9a14eb3116b3',GROUP='f197747b-64af-42c3-9ac4-8ff335610324'
 const email='alexjiang20232024+mikka-smoke-owner@gmail.com'
-const env={GROUP_REPLAY_REVISION:'a'.repeat(40),GROUP_REPLAY_DEPLOYMENT:'dpl_fixture',SMOKE_OWNER_EMAIL:email,SMOKE_OWNER_PASSWORD:'synthetic-password-only'}
+const env={GROUP_REPLAY_REVISION:'a'.repeat(40),GROUP_REPLAY_DEPLOYMENT:'dpl_fixture',SMOKE_OWNER_EMAIL:email,SMOKE_OWNER_PASSWORD:'synthetic-password-only',VERCEL_DEPLOY_TOKEN:'synthetic-vercel-only'}
 function scenario({wrongOwner=false,foreignGroup=false,memberLeft=false,logoutUnknown=false,drift=false,expire=false,mutate=value=>value,unexpectedPath=false}={}){
   const calls=[],counts={replay:0,logout:0,version:0};let elapsed=0
   const fetchImpl=async(url,options={})=>{
     const path=new URL(url).pathname;calls.push(path)
     assert.equal(options.redirect,'error')
-    if(path.endsWith('/api/version')){counts.version++;return Response.json({build:drift&&counts.version>=3?'dpl_changed':'dpl_fixture'})}
+    if(new URL(url).origin==='https://api.vercel.com') {
+      assert.equal(options.method,'GET');assert.equal(options.headers.authorization,'Bearer synthetic-vercel-only');assert.equal(options.headers.cookie,undefined)
+      if(path.startsWith('/v4/aliases/'))return Response.json({alias:'app.aspectlylabs.com',projectId:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH',deploymentId:'dpl_fixture'})
+      if(path.startsWith('/v13/deployments/'))return Response.json({id:'dpl_fixture',projectId:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH',target:'production',readyState:'READY',meta:{githubCommitSha:env.GROUP_REPLAY_REVISION}})
+      throw Error('unexpected_vercel_path')
+    }
+    if(path.endsWith('/api/version')){counts.version++;return Response.json({build:drift&&counts.version>=3?'b'.repeat(40):env.GROUP_REPLAY_REVISION})}
     if(path.endsWith('/sign-in/email')){assert.deepEqual(JSON.parse(options.body),{email,password:env.SMOKE_OWNER_PASSWORD});return Response.json({}, {headers:{'set-cookie':'synthetic-session=value; HttpOnly'}})}
     assert.equal(options.headers.cookie,'synthetic-session=value')
     if(path.endsWith('/get-session'))return Response.json({user:{id:wrongOwner?'foreign-owner':OWNER,email},session:{userId:wrongOwner?'foreign-owner':OWNER,token:'PRIVATE_SESSION'}})
@@ -95,9 +101,11 @@ test('normal owner proof precedes the fixed synthetic replay and one acknowledge
   assert.equal(result.livePolicy,'group-contribution-v1');assert.equal(result.candidatePolicy,'group-contribution-v3')
   assert.equal(result.accounting.logicalReplays,24);assert.equal(result.accounting.candidateCompleted,12)
   assert.equal(result.policyChanged,false);assert.equal(result.executionPerformed,false);assert.equal(result.productionAccepted,false)
+  assert.equal(result.releasePins.before.deploymentId,env.GROUP_REPLAY_DEPLOYMENT);assert.equal(result.releasePins.after.revision,env.GROUP_REPLAY_REVISION)
+  assert.deepEqual(result.modelScope,{expectedDecisionModel:'openai/gpt-6-luna-decisions',observedDecisionModels:['openai/gpt-6-luna-decisions'],workerModel:null,workerExecutionPerformed:false})
   assert.equal(f.counts.replay,1);assert.equal(f.counts.logout,1)
   assert.ok(f.calls.indexOf('/mikka/api/conversations/'+GROUP+'/members')>=0)
-  assert.doesNotMatch(JSON.stringify(result),/PRIVATE|synthetic-session|synthetic-password-only/)
+  assert.doesNotMatch(JSON.stringify(result),/PRIVATE|synthetic-session|synthetic-password-only|synthetic-vercel-only/)
 })
 test('a different owner, foreign fixture or departed member prevents all paid replay',async()=>{
   for(const option of [{wrongOwner:true},{foreignGroup:true},{memberLeft:true}]){

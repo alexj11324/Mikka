@@ -1,58 +1,101 @@
-# TEMPORARY WORKFLOW: replace .github/workflows/proactive-acceptance.yml
-# on acceptance/proactive-1157-1163 only. Do not add it to mainline.
-# Frozen runtime source in /vercel/mikka-local-loop; independent of this temporary branch.
-name: Temporary sandbox Flash and official cloud acceptance
+# One new comparison authorized by issue #1210 (2026-11-04).
+# Fixture replay invokes the built-in Decision judge only; no coding worker.
+# Preserve all historical outcomes, fixed cases/labels/comparison-v2 and <=96 calls.
+name: Temporary fixed group policy comparison
 on:
   push:
     branches: [acceptance/proactive-1157-1163]
+    paths:
+      - '.github/workflows/proactive-acceptance.yml'
+      - 'scripts/ops/group-policy-preflight.mjs'
+      - 'scripts/ops/group-policy-preflight.test.mjs'
+      - 'scripts/ops/run-proactive-acceptance.mjs'
+      - 'scripts/ops/owner-mcp-boundaries.mjs'
+      - 'scripts/ops/production-release-pin.mjs'
+      - 'scripts/ops/production-release-pin.test.mjs'
+      - 'scripts/group-decision-replay.ts'
 permissions:
   contents: read
 concurrency:
-  group: mikka-acceptance-existing-sandbox-612
+  group: proactive-production-acceptance-once
   cancel-in-progress: false
 jobs:
- sandbox-local-loop:
-  if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/proactive-1157-1163'
-  runs-on: ubuntu-latest
-  timeout-minutes: 100
-  permissions:
-    contents: read
-    id-token: write
-  steps:
-    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      with:
-        persist-credentials: false
-    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-      with:
-        node-version: 24
-    - name: Check dispatcher contract without network access
-      run: node --test scripts/ops/proactive-sandbox-local-loop.test.mjs
-    - name: Read existing sandbox team token
-      uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-      with:
-        method: oidc
-        identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-        oidc-audience: mikka-infisical
-        project-id: 89850d6a-f020-4936-863e-df77380dfe40
-        env-slug: prod
-        secret-path: /platform
-        recursive: false
-        include-imports: false
-        secret-name: VERCEL_TEAM_TOKEN
-    - name: Read the existing E2B cloud acceptance credential
-      uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-      with:
-        method: oidc
-        identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-        oidc-audience: mikka-infisical
-        project-id: 89850d6a-f020-4936-863e-df77380dfe40
-        env-slug: prod
-        secret-path: /vercel
-        recursive: false
-        include-imports: false
-        secret-name: E2B_API_KEY
-    - name: Dispatch bounded real Flash local loop in the existing sandbox
-      run: node scripts/ops/proactive-sandbox-local-loop.mjs
-      env:
-        # Root replaces this with the final reviewed source commit before push.
-        MIKKA_ACCEPTANCE_SOURCE_SHA: 1df22f1aa249111dd412c956aad0ca0a850495e7
+  candidate-preflight:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/proactive-1157-1163'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: source
+    env:
+      GROUP_REPLAY_ORIGIN: https://app.aspectlylabs.com
+      GROUP_REPLAY_DEPLOYMENT: dpl_4kZ7pUMoULur1GKEUhcBqVqmhH2J
+      GROUP_REPLAY_REVISION: bff53413d9d64a48618010dfe4611024251e5293
+      GROUP_POLICY_PREFLIGHT_OUTPUT: ${{ github.workspace }}/group-policy-preflight-sanitized/results.json
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: driver
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.GROUP_REPLAY_REVISION }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify the reviewed runner without credentials
+        working-directory: driver/scripts/ops
+        run: node --test group-policy-preflight.test.mjs production-release-pin.test.mjs
+      - name: Install fixed source dependencies before receiving credentials
+        run: npm exec --yes --package pnpm@10.34.3 -- pnpm install --frozen-lockfile --filter '!@mikka/mobile' --ignore-scripts
+      - name: Read the existing Vercel token for read-only deployment pinning
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_DEPLOY_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Read the existing Smoke email only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read the existing Smoke password only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Compare fixed baseline and candidate through the normal owner API once
+        run: node --import tsx ../driver/scripts/ops/group-policy-preflight.mjs
+      - name: Upload sanitized evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: group-policy-preflight-${{ github.run_id }}
+          path: group-policy-preflight-sanitized/results.json
+          if-no-files-found: error
+          retention-days: 7
