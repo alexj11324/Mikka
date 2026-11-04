@@ -39,6 +39,32 @@ func upstreamFailure(provider, stage string, status int, kind string) {
 	fmt.Fprintf(os.Stderr, "subscription_upstream_failure %s %s %d %s\n", provider, stage, status, kind)
 }
 
+// Local request boundaries have no upstream response. Only fixed enums and
+// byte counts cross stderr; zero means no byte buffer/limit exists at that
+// boundary. Never accept error text, model names, payloads or credentials.
+func requestFailure(provider, phase, reason string, size, limit int) {
+	if provider != "claude" && provider != "codex" {
+		provider = "unknown"
+	}
+	switch phase + ":" + reason {
+	case "input:model_invalid", "input:payload_too_large", "input:json_invalid",
+		"conversion:conversion_failed", "conversion:json_invalid", "conversion:encode_failed",
+		"conversion:payload_too_large", "conversion:request_invalid",
+		"stream:stream_unavailable", "stream:chunk_too_large":
+	default:
+		return
+	}
+	if size < 0 || limit < 0 {
+		return
+	}
+	switch limit {
+	case 0, 65536, 262144, 524288:
+	default:
+		return
+	}
+	fmt.Fprintf(os.Stderr, "subscription_request_failure %s %s %s %d %d\n", provider, phase, reason, size, limit)
+}
+
 func knownUpstreamType(kind string) bool {
 	if providerEventFailure(kind) != ErrProvider {
 		return true
@@ -84,6 +110,7 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 	}
 	var original map[string]any
 	if json.Unmarshal(request.Payload, &original) != nil {
+		requestFailure(e.Provider, "input", "json_invalid", len(request.Payload), 262144)
 		return nil, ErrProvider
 	}
 	var converted []byte
@@ -104,11 +131,12 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 		return nil, ErrUnsupported
 	}
 	if err != nil {
-		upstreamFailure(e.Provider, "convert", 0, "request_conversion")
+		requestFailure(e.Provider, "conversion", "conversion_failed", 0, 0)
 		return nil, ErrProvider
 	}
 	var body map[string]any
 	if json.Unmarshal(converted, &body) != nil {
+		requestFailure(e.Provider, "conversion", "json_invalid", len(converted), 524288)
 		return nil, ErrProvider
 	}
 	allowed := " model messages system max_tokens stream tools tool_choice temperature top_p stop_sequences thinking output_config service_tier "
@@ -128,11 +156,17 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 		body["store"] = false
 	}
 	converted, err = json.Marshal(body)
-	if err != nil || len(converted) > 524288 {
+	if err != nil {
+		requestFailure(e.Provider, "conversion", "encode_failed", 0, 0)
+		return nil, ErrProvider
+	}
+	if len(converted) > 524288 {
+		requestFailure(e.Provider, "conversion", "payload_too_large", len(converted), 524288)
 		return nil, ErrProvider
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(converted))
 	if err != nil {
+		requestFailure(e.Provider, "conversion", "request_invalid", len(converted), 524288)
 		return nil, ErrProvider
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
