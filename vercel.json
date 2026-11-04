@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "pnpm install --filter '!@mikka/mobile'",
+  "installCommand": "pnpm install --filter '!@mikka/mobile' --filter '!@mikka/desktop'",
   "build": {
     "env": {
       "NEXT_ENABLE_ADAPTER": "0"
