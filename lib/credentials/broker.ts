@@ -1,4 +1,4 @@
-import { lockSubagentEvents, notifySubagentEvents } from '@/lib/computer/event-log'
+import { lockSubagentEvents } from '@/lib/computer/event-lock'
 import type { Pool } from 'pg'
 import { CredentialError } from './contracts'
 import { awsKms, open, type Kms } from './kms'
@@ -119,14 +119,13 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
       // Keep the shared event lock last: business row first, then sequence allocation.
       await client.query('SELECT id FROM bot_subagents WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4 FOR UPDATE', [caller.subagentId, caller.userId, caller.workspaceId, caller.botId])
       await lockSubagentEvents(client, { ownerId: caller.userId, workspaceId: caller.workspaceId })
-      const appended = await client.query(`WITH changed AS (
+      await client.query(`WITH changed AS (
         UPDATE bot_subagents SET status=$5,needs=$6,step=$7
         WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4 AND status IN ('running','needs_you') RETURNING *
       ) INSERT INTO subagent_events("ownerId","workspaceId","botId","subagentId",event)
       SELECT "ownerId","workspaceId","botId",id,jsonb_build_object('type','data-subagent','data',jsonb_build_object('botId',"botId",'subagentId',id,'task',task,'state',status,'step',step,'needs',needs)) FROM changed`,
       [caller.subagentId, caller.userId, caller.workspaceId, caller.botId, 'running', null, 'running'])
       await client.query('COMMIT'); completed = true
-      if (appended.rowCount) notifySubagentEvents({ ownerId: caller.userId, workspaceId: caller.workspaceId })
     }
     return { status: sessionApplied ? 'session_applied' as const : 'submitted' as const, origin: context.origin }
   } catch (error) {

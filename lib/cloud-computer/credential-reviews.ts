@@ -97,7 +97,7 @@ export async function executeCredentialOperation(pool: Pool, userId: string, raw
         return { data: { status: 'needs_login' } }
       }
       // Broker itself holds policy+credential locks and rechecks exact version.
-      const result = await executeCredentialLease(lease.lease, plan.origin)
+      const result = await executeCredentialLease(lease.lease, plan.origin, { ownerId: caller.userId, workspaceId: caller.workspaceId })
       if (result.status !== 'guarded') {
         await store.update(actor,plan.botId,plan.subagentId,'running','Observe login outcome')
         if(plan.operation==='login') await pool.query(`UPDATE pending_actions SET status='done',result=$2 WHERE id=$1`,[plan.actionId,{status:result.status}])

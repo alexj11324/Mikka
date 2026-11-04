@@ -6,6 +6,7 @@ import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { CredentialStore, hashNonce, type BrowserTarget } from '../credentials/store'
 import { CredentialError, type EncryptionContext } from '../credentials/contracts'
+import { credentialFailure } from '../credentials/http'
 import { sealSession, type Kms } from '../credentials/kms'
 import type { Cdp, BrowserGuard } from '../credentials/browser'
 import type { LiveScope } from '../live/scope'
@@ -42,6 +43,8 @@ test('credential broker publishes only the committed session-resume event and ca
   const pool = new Pool({ connectionString: url, options: `-c search_path=${schema}`, max: 4 })
   const reader = new Pool({ connectionString: url, options: `-c search_path=${schema}`, max: 2 })
   const previousSecret = process.env.BETTER_AUTH_SECRET
+  const previousBroker = process.env.CREDENTIAL_BROKER_URL
+  process.env.CREDENTIAL_BROKER_URL = 'https://fixture-broker.vercel.app'
   process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex')
   const keys = new Map<string, { key: Buffer; context: EncryptionContext }>()
   let decrypts = 0
@@ -63,8 +66,31 @@ test('credential broker publishes only the committed session-resume event and ca
   const boundary = mock.module(new URL('../live/notify.ts', import.meta.url).href, {
     namedExports: { notifyLive: (scope: LiveScope, events: LiveInvalidation[]) => onNotify(scope, events) },
   })
+  const runtimeBoundaries = [
+    mock.module('@vercel/oidc', { namedExports: { getVercelOidcToken: async () => 'synthetic-oidc' } }),
+    mock.module(new URL('../api-auth.ts', import.meta.url).href, { namedExports: { auth: {} } }),
+    mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool } }),
+    mock.module(new URL('../workspace-access.ts', import.meta.url).href, { namedExports: { loadWorkspaceContext: () => { throw Error('unexpected actor lookup') } } }),
+    mock.module(new URL('../cloud-computer/subagent-browser.ts', import.meta.url).href, {
+      namedExports: {
+        resolveSubagentBrowserTarget: () => { throw Error('unexpected target lookup') },
+        resolveThreadBrowserTarget: () => { throw Error('unexpected target lookup') },
+      },
+    }),
+  ]
+  let brokerReply: (lease: string) => Promise<Response> = async () => { throw Error('unexpected broker request') }
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    assert.equal(String(input), 'https://fixture-broker.vercel.app/api/fill')
+    assert.equal(init?.method, 'POST')
+    assert.equal(init?.redirect, 'error')
+    assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer synthetic-oidc')
+    const payload = JSON.parse(String(init?.body))
+    assert.deepEqual(Object.keys(payload), ['lease'])
+    return brokerReply(payload.lease)
+  })
   try {
     const { fillCredential } = await import('../credentials/broker')
+    const { executeCredentialLease } = await import('../credentials/runtime')
     await pool.query(`
       CREATE TABLE "user"(id text PRIMARY KEY);
       CREATE TABLE bots(id uuid PRIMARY KEY,"ownerId" text NOT NULL,"workspaceId" uuid NOT NULL);
@@ -153,7 +179,8 @@ test('credential broker publishes only the committed session-resume event and ca
         assert.deepEqual(events, [{ kind: 'subagent_events', id: item.actor.workspaceId }])
         observations.push(item.snapshot())
       }
-      assert.deepEqual(await fillCredential(observeTransactions(pool, item.completed), item.lease, item.options), { status: 'session_applied', origin: item.origin })
+      brokerReply = async lease => Response.json(await fillCredential(observeTransactions(pool, item.completed), lease, item.options))
+      assert.deepEqual(await executeCredentialLease(item.lease, item.origin, { ownerId: item.actor.userId, workspaceId: item.actor.workspaceId }), { status: 'session_applied', origin: item.origin })
       assert.equal(observations.length, 1)
       const expected = { botId: item.actor.botId, subagentId: item.actor.subagentId, task: 'Read fixture source', state: 'running', step: 'running', needs: null }
       assert.deepEqual(await observations[0], { row: { status: 'running', needs: null, step: 'running' }, events: [{ type: 'data-subagent', data: expected }] })
@@ -173,7 +200,11 @@ test('credential broker publishes only the committed session-resume event and ca
       await pool.query(`CREATE FUNCTION reject_broker_event() RETURNS trigger LANGUAGE plpgsql AS $$
         BEGIN RAISE EXCEPTION 'fixture rejects event'; END; $$;
         CREATE TRIGGER reject_broker_event BEFORE INSERT ON subagent_events FOR EACH ROW EXECUTE FUNCTION reject_broker_event();`)
-      await assert.rejects(fillCredential(observeTransactions(pool, item.completed), item.lease, item.options),
+      brokerReply = async lease => {
+        try { return Response.json(await fillCredential(observeTransactions(pool, item.completed), lease, item.options)) }
+        catch (error) { return credentialFailure(error) }
+      }
+      await assert.rejects(executeCredentialLease(item.lease, item.origin, { ownerId: item.actor.userId, workspaceId: item.actor.workspaceId }),
         (error: unknown) => error instanceof CredentialError && error.code === 'credential_outcome_unknown' && error.status === 409)
       assert.deepEqual(item.completed, ['BEGIN', 'COMMIT', 'BEGIN', 'ROLLBACK'])
       assert.deepEqual(await item.snapshot(), { row: { status: 'needs_you', needs: item.needs, step: 'Waiting for fixture' }, events: [] })
@@ -191,8 +222,44 @@ test('credential broker publishes only the committed session-resume event and ca
       assert.deepEqual({ calls: item.calls.length, decrypts }, beforeReplay)
       assert.equal(notifications, 0)
     })
+    for (const failure of ['wrong-origin', 'lost-response'] as const) {
+      await t.test(`a committed event with ${failure} keeps its durable state without an unvalidated app notification`, async () => {
+        // The earlier rollback fixture's trigger is deliberately removed only in this disposable schema.
+        await pool.query('DROP TRIGGER IF EXISTS reject_broker_event ON subagent_events')
+        const item = await fixture()
+        let notifications = 0
+        onNotify = () => { notifications++ }
+        brokerReply = async lease => {
+          const result = await fillCredential(observeTransactions(pool, item.completed), lease, item.options)
+          if (failure === 'lost-response') throw Error('synthetic response loss')
+          return Response.json({ ...result, origin: 'https://different.example' })
+        }
+        await assert.rejects(executeCredentialLease(item.lease, item.origin, { ownerId: item.actor.userId, workspaceId: item.actor.workspaceId }),
+          (error: unknown) => error instanceof CredentialError && error.code === 'credential_outcome_unknown' && error.status === 409)
+        assert.deepEqual(item.completed, ['BEGIN', 'COMMIT', 'BEGIN', 'COMMIT'])
+        const persisted = await item.snapshot()
+        assert.equal(persisted.row.status, 'running')
+        assert.equal(persisted.events.length, 1, 'reconnect can still read the committed event')
+        assert.equal(notifications, 0, 'an app invalidation requires the validated broker acknowledgement')
+        const beforeReplay = { calls: item.calls.length, decrypts }
+        await assert.rejects(fillCredential(pool, item.lease, item.options), (error: unknown) => error instanceof CredentialError && error.code === 'credential_denied')
+        assert.deepEqual({ calls: item.calls.length, decrypts }, beforeReplay)
+      })
+    }
+    await t.test('guarded broker responses do not announce resumed subagents', async () => {
+      const item = await fixture()
+      let notifications = 0
+      onNotify = () => { notifications++ }
+      brokerReply = async () => Response.json({ status: 'guarded', origin: item.origin })
+      assert.deepEqual(await executeCredentialLease(item.lease, item.origin, { ownerId: item.actor.userId, workspaceId: item.actor.workspaceId }),
+        { status: 'guarded', origin: item.origin })
+      assert.equal(notifications, 0)
+      assert.equal((await item.snapshot()).events.length, 0)
+    })
   } finally {
+    for (const mocked of runtimeBoundaries.reverse()) mocked.restore()
     boundary.restore()
+    if (previousBroker === undefined) delete process.env.CREDENTIAL_BROKER_URL; else process.env.CREDENTIAL_BROKER_URL = previousBroker
     if (previousSecret === undefined) delete process.env.BETTER_AUTH_SECRET; else process.env.BETTER_AUTH_SECRET = previousSecret
     for (const { key } of keys.values()) key.fill(0)
     await reader.end(); await pool.end()
