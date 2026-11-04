@@ -8,7 +8,7 @@ export async function queueFactoryCloudRun(pool: Parameters<typeof queueCloudRun
   return queueFactoryTask(pool, actor.userId, {
     issueId: input.issueId, botId: previous && !['cancelled','revoked'].includes(previous.status) ? previous.botId : input.factoryBotId !== undefined ? input.factoryBotId : input.withoutBot ? null : input.botId, agentId: input.agentId, deviceRepoId: input.deviceRepoId,
     note: input.note, key: input.idempotencyKey, previousRunId: input.threadRunId, sourceEventId: input.sourceEventId,
-    selection: [input.model, input.apiKeyId, input.subscriptionBindingId, input.apiKey, Boolean(input.readOnly), input.execution?.id],
-    queue: (tx, _owner, _request, _bot, context) => queueCloudRun(pool, actor, { ...input, idempotencyKey: `factory:${context.attemptId}` }, tx),
+    selection: [input.model, input.apiKeyId, input.subscriptionBindingId, input.apiKey, Boolean(input.readOnly), input.execution?.id, ...(input.allowLocalRecovery === true ? [{ allowLocalRecovery: true }] : [])],
+    queue: (tx, _owner, _request, _bot, context) => queueCloudRun(pool, actor, { ...input, sourceEventId: context.sourceEventId, idempotencyKey: `factory:${context.attemptId}` }, tx),
   })
 }

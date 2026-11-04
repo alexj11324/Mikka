@@ -21,7 +21,7 @@ import { afterRunEnded } from '@/lib/run-completion-effects'
 import { notifyDeviceWork } from '@/lib/device-gateway-notify'
 import { deviceOnlineStates } from '@/lib/device-presence'
 import { ownE2BKeySql } from './secrets/e2b-owner-sql'
-import { readmitLostLocalRun, type AdmittedTakeover } from './run-repository-retry'
+import { readmitLostLocalRun, type AdmittedTakeover, type CloudRecoverySource } from './run-repository-retry'
 
 const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -137,7 +137,14 @@ async function takeoverTarget(run: { id: string; userId: string; agentId: string
   const [agent] = await db.select({ harness: agents.harness }).from(agents).where(eq(agents.id, run.agentId)).limit(1)
   if (!repo?.remoteUrl || !agent || !repositoryBindingMatches(repo.repoPath, repo.remoteUrl, { allowFile: daemonTestMode(process.env) })) return null
   const bound = await db.execute(sql`select 1 from computer_run_bindings where "runId"=${run.id} and "ownerId"=${run.userId}`)
-  if (bound.rows.length) return null
+  // A repository-only cloud task can use normal local admission after its
+  // exact old sandbox is parked. Desktop work still needs a cloud runtime.
+  if (bound.rows.length) {
+    if (!run.agentDefinition?.repositoryAdmission || run.agentDefinition.allowLocalRecovery !== true) return null
+    const factory = await db.execute(sql`select 1 from factory_attempts a join factory_tasks t on t.id=a."taskId"
+      where a."runId"=${run.id} and t."userId"=${run.userId} limit 1`)
+    if (!factory.rows.length) return null
+  }
   const available = await db.select({ deviceId: devices.id, harnesses: devices.harnesses, deviceType: devices.deviceType, lastSeenAt: devices.lastSeenAt })
     .from(devices)
     .where(and(eq(devices.ownerId, run.userId), eq(devices.enabled, true), eq(devices.kind, 'local'), isNull(devices.removedAt), sql`${devices.protocolVersion} >= ${DAEMON_PROTOCOL_VERSION}`))
@@ -181,7 +188,8 @@ type Run = typeof agentRuns.$inferSelect
 /**
  * A run whose machine is gone continues elsewhere (decision
  * 2026-10-31-2200-run-machine-fallback, orchestration.md § 4): a cloud thread
- * on a new sandbox; any other run on the person's own E2B cloud, else another
+ * on an authorized local device after confirmed parking when it has a
+ * repository receipt, otherwise on a new sandbox; any other run on the person's own E2B cloud, else another
  * of their devices with 允许自动调度 on, else it ends with the card of what
  * the person can do. The move is the `run_retried` event's `movedTo`.
  */
@@ -193,16 +201,18 @@ async function reclaimLostRun(run: Run, now: Date) {
     if (ended) await announceEnd({ ...run, status })
     return
   }
-  const bound = (await db.execute(sql`select "workspaceId" from computer_run_bindings where "runId"=${run.id} and "ownerId"=${run.userId}`)).rows[0] as { workspaceId: string } | undefined
+  const bound = (await db.execute(sql`select b."workspaceId",m."sandboxId",m."operationId",m."deviceId",m."repoId" from computer_run_bindings b
+    left join thread_machines m on m."runId"=b."runId" and m."ownerId"=b."ownerId" and m."workspaceId"=b."workspaceId"
+    where b."runId"=${run.id} and b."ownerId"=${run.userId}`)).rows[0] as CloudRecoverySource | undefined
   const cloud = bound ? null : await cloudTarget(run)
-  const target = bound || cloud ? null : await takeoverTarget(run, now)
+  const target = cloud ? null : await takeoverTarget(run, now)
   if (!bound && !cloud && !target) {
     const ended = await endRun(run.id, LEASED_RUN_STATUSES, { status: 'failed', error: DEVICE_STAYED_OFFLINE }, now, true, await noMachineCard())
     if (ended) await announceEnd({ ...run, status: 'failed' })
     return
   }
   if (target && run.agentDefinition?.repositoryAdmission) {
-    await recoverAdmittedRun(run, target, now)
+    await recoverAdmittedRun(run, target, now, false, bound)
     return
   }
   const retryId = crypto.randomUUID()
@@ -247,8 +257,8 @@ async function reclaimLostRun(run: Run, now: Date) {
 
 /** Both an expired execution and a queued retry that lost B need a new
  * device-bound receipt. Never mutate an admitted queued run's placement. */
-async function recoverAdmittedRun(run: Run, target: AdmittedTakeover, now: Date, queued = false) {
-  const result = await readmitLostLocalRun(run, target, now, queued)
+async function recoverAdmittedRun(run: Run, target: AdmittedTakeover, now: Date, queued = false, cloudSource?: CloudRecoverySource) {
+  const result = await readmitLostLocalRun(run, target, now, queued, cloudSource)
   if (result.retried) {
     stopRecordingsAfter([run.id])
     await afterRunEnded(run.userId, run.id)
