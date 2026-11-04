@@ -45,9 +45,10 @@ test('a stopped run is never live', async () => {
 })
 
 async function watchdogFixture(receipt = true) {
-  const stoppedRun = randomUUID(), taskId = randomUUID(), attemptId = randomUUID(), epoch = randomUUID()
+  const stoppedRun = randomUUID(), taskId = randomUUID(), attemptId = randomUUID(), epoch = randomUUID(), workerId = randomUUID()
+  await pool.query(`INSERT INTO agents (id,"userId",harness,"deviceId") VALUES ($1,$2,'codex',$3)`, [workerId,actor.userId,deviceId])
   await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId",status,"stopRequestedAt","leaseExpiresAt","agentId")
-    SELECT $1,"userId","deviceId",'running',now(),now()+interval '5 minutes',"agentId" FROM agent_runs WHERE id=$2`, [stoppedRun,runId])
+    SELECT $1,"userId","deviceId",'running',now(),now()+interval '5 minutes',$3 FROM agent_runs WHERE id=$2`, [stoppedRun,runId,workerId])
   const revision = (await readCliRunPolicy(pool,stoppedRun,actor.userId)).revision
   await pool.query(`INSERT INTO factory_tasks VALUES($1,$2,$3,'blocked')`, [taskId,actor.userId,epoch])
   await pool.query('INSERT INTO factory_attempts VALUES($1,$2,$3,$4)', [attemptId,taskId,stoppedRun,{
@@ -84,6 +85,18 @@ test('an actually expired lease carries its cause, while a manual stop and termi
   await assert.rejects(current.check(), error => error instanceof ApprovalUnavailable && error.revokeReason === undefined)
   await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=NULL,status='failed' WHERE id=$1`, [current.runId])
   await assert.rejects(current.check(), error => error instanceof ApprovalUnavailable && error.revokeReason === undefined)
+})
+
+test('a changed policy revision cannot be hidden by an expired lease or watchdog stop', async () => {
+  for (const expired of [false,true]) {
+    const current = await watchdogFixture()
+    if (expired) await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=NULL,"leaseExpiresAt"=now()-interval '1 second' WHERE id=$1`, [current.runId])
+    await setCliPolicy(pool,actor.userId,current.runId,'worker',current.revision,{permissions:{install_dependency:'deny'}})
+    await assert.rejects(current.check(), error => error instanceof ApprovalUnavailable && error.revokeReason === undefined)
+    const updated = await readCliRunPolicy(pool,current.runId,actor.userId)
+    assert.notEqual(updated.revision,current.revision)
+    await assert.rejects(store.checkState(actor,current.runId,updated.revision), error => error instanceof ApprovalUnavailable && error.revokeReason === 'device_lost')
+  }
 })
 
 test('a changed worker policy ends the live check for the old revision', async () => {

@@ -9,12 +9,12 @@ export class ApprovalUnavailable extends Error { constructor(readonly revokeReas
 export class AgentToolApprovalStore {
   constructor(private readonly pool: Pick<Pool, 'connect' | 'query'>, private readonly membership: CliMembershipGuard = realCliMembershipGuard) {}
   /** Locks the run before every state mutation so stop, lease and ownership are checked. */
-  private async transaction<T>(runId: string, userId: string, work: (client: PoolClient) => Promise<T>, allowPaused = false, deviceId?: string): Promise<T> {
+  private async transaction<T>(runId: string, userId: string, work: (client: PoolClient) => Promise<T>, allowPaused = false, liveness?: { deviceId: string; revision: string }): Promise<T> {
     const result = await writeTransaction<{ unavailable: ApprovalUnavailable } | { value: T }>(this.pool, async client => {
       const run = await client.query(`SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 AND status=ANY($3::text[]) AND "stopRequestedAt" IS NULL AND "leaseExpiresAt">now() FOR UPDATE`, [runId, userId, ['preparing','running','waiting_input', ...(allowPaused ? ['paused'] : [])]])
       if (!run.rowCount) {
-        const reason = deviceId ? await this.revocationReason(client, runId, userId, deviceId) : undefined
-        if (!reason) throw new ApprovalUnavailable()
+        const reason = liveness ? await this.revocationReason(client, runId, userId, liveness.deviceId) : undefined
+        if (!reason || !liveness || (await lockCliRunPolicy(client,runId,userId)).revision !== liveness.revision) throw new ApprovalUnavailable()
         // A typed refusal still passes the existing policy/member guard before
         // it leaves the transaction. Throwing here would skip that guard.
         return { unavailable: new ApprovalUnavailable(reason) }
@@ -77,6 +77,6 @@ export class AgentToolApprovalStore {
         : current
       if (!row.rowCount) throw new ApprovalUnavailable()
       return { live: (await lockCliRunPolicy(client, runId, actor.userId)).revision === revision, paused: row.rows[0].status === 'paused' }
-    }, true, actor.deviceId)
+    }, true, {deviceId:actor.deviceId,revision})
   }
 }
