@@ -1,0 +1,3130 @@
+{
+  "version": 1,
+  "observedAt": "2026-11-04T20:18:24.610Z",
+  "status": "collected",
+  "productionAcceptance": false,
+  "reasons": [],
+  "scope": {
+    "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+    "vercelProjectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "neonProjectId": "autumn-fire-21908520",
+    "neonOrgId": "org-sweet-lab-80289846"
+  },
+  "provenance": {
+    "checkerSha": "0feefc5c1b0e81eea1082b8e3152761be4975ea2",
+    "workflowRunId": "41905292130"
+  },
+  "limitations": [
+    "This is a project-wide production observation, never a fixed-task before, after or idle acceptance window.",
+    "The completed hour can include multiple deployments, concurrent work and interrupted tasks; alias/build reads are collection context only.",
+    "Vercel values are function-invocation observability aggregates, not an independent complete billing receipt.",
+    "Neon project bytes include all branches; PostHog bucket alignment requires its own matching provider-hour evidence."
+  ],
+  "window": {
+    "role": "observation",
+    "scope": "project-production",
+    "start": 1793815200000,
+    "end": 1793818800000,
+    "from": "2026-11-04T18:00:00.000Z",
+    "to": "2026-11-04T19:00:00.000Z"
+  },
+  "vercelResponseShape": {
+    "count": {
+      "response": {
+        "type": "object",
+        "keyCount": 4,
+        "unknownKeyCount": 0,
+        "keys": [
+          "series",
+          "summary",
+          "queryId",
+          "meta"
+        ]
+      },
+      "summary": {
+        "type": "array",
+        "length": 100
+      },
+      "series": {
+        "type": "array",
+        "length": 1200
+      },
+      "data": {
+        "type": "undefined"
+      },
+      "firstSummary": {
+        "type": "object",
+        "keyCount": 2,
+        "unknownKeyCount": 0,
+        "keys": [
+          "dimensions",
+          "values"
+        ]
+      },
+      "dimensions": {
+        "type": "object",
+        "keyCount": 3,
+        "unknownKeyCount": 0,
+        "keys": [
+          "route",
+          "httpStatus",
+          "deploymentId"
+        ]
+      },
+      "values": {
+        "type": "object",
+        "keyCount": 1,
+        "unknownKeyCount": 0,
+        "keys": [
+          "value"
+        ]
+      }
+    },
+    "cpu": {
+      "response": {
+        "type": "object",
+        "keyCount": 4,
+        "unknownKeyCount": 0,
+        "keys": [
+          "series",
+          "summary",
+          "queryId",
+          "meta"
+        ]
+      },
+      "summary": {
+        "type": "array",
+        "length": 100
+      },
+      "series": {
+        "type": "array",
+        "length": 1200
+      },
+      "data": {
+        "type": "undefined"
+      },
+      "firstSummary": {
+        "type": "object",
+        "keyCount": 2,
+        "unknownKeyCount": 0,
+        "keys": [
+          "dimensions",
+          "values"
+        ]
+      },
+      "dimensions": {
+        "type": "object",
+        "keyCount": 3,
+        "unknownKeyCount": 0,
+        "keys": [
+          "route",
+          "httpStatus",
+          "deploymentId"
+        ]
+      },
+      "values": {
+        "type": "object",
+        "keyCount": 1,
+        "unknownKeyCount": 0,
+        "keys": [
+          "value"
+        ]
+      }
+    },
+    "queryGroupLimit": 100,
+    "partitioning": {
+      "kind": "disjoint_deployments",
+      "maximumDeployments": 16,
+      "totals": {
+        "count": {
+          "response": {
+            "type": "object",
+            "keyCount": 4,
+            "unknownKeyCount": 0,
+            "keys": [
+              "series",
+              "summary",
+              "queryId",
+              "meta"
+            ]
+          },
+          "summary": {
+            "type": "array",
+            "length": 1
+          },
+          "series": {
+            "type": "array",
+            "length": 12
+          },
+          "data": {
+            "type": "undefined"
+          },
+          "firstSummary": {
+            "type": "object",
+            "keyCount": 2,
+            "unknownKeyCount": 0,
+            "keys": [
+              "dimensions",
+              "values"
+            ]
+          },
+          "dimensions": {
+            "type": "object",
+            "keyCount": 0,
+            "unknownKeyCount": 0,
+            "keys": []
+          },
+          "values": {
+            "type": "object",
+            "keyCount": 1,
+            "unknownKeyCount": 0,
+            "keys": [
+              "value"
+            ]
+          }
+        },
+        "cpu": {
+          "response": {
+            "type": "object",
+            "keyCount": 4,
+            "unknownKeyCount": 0,
+            "keys": [
+              "series",
+              "summary",
+              "queryId",
+              "meta"
+            ]
+          },
+          "summary": {
+            "type": "array",
+            "length": 1
+          },
+          "series": {
+            "type": "array",
+            "length": 12
+          },
+          "data": {
+            "type": "undefined"
+          },
+          "firstSummary": {
+            "type": "object",
+            "keyCount": 2,
+            "unknownKeyCount": 0,
+            "keys": [
+              "dimensions",
+              "values"
+            ]
+          },
+          "dimensions": {
+            "type": "object",
+            "keyCount": 0,
+            "unknownKeyCount": 0,
+            "keys": []
+          },
+          "values": {
+            "type": "object",
+            "keyCount": 1,
+            "unknownKeyCount": 0,
+            "keys": [
+              "value"
+            ]
+          }
+        }
+      },
+      "deployments": {
+        "count": {
+          "response": {
+            "type": "object",
+            "keyCount": 4,
+            "unknownKeyCount": 0,
+            "keys": [
+              "series",
+              "summary",
+              "queryId",
+              "meta"
+            ]
+          },
+          "summary": {
+            "type": "array",
+            "length": 6
+          },
+          "series": {
+            "type": "array",
+            "length": 72
+          },
+          "data": {
+            "type": "undefined"
+          },
+          "firstSummary": {
+            "type": "object",
+            "keyCount": 2,
+            "unknownKeyCount": 0,
+            "keys": [
+              "dimensions",
+              "values"
+            ]
+          },
+          "dimensions": {
+            "type": "object",
+            "keyCount": 1,
+            "unknownKeyCount": 0,
+            "keys": [
+              "deploymentId"
+            ]
+          },
+          "values": {
+            "type": "object",
+            "keyCount": 1,
+            "unknownKeyCount": 0,
+            "keys": [
+              "value"
+            ]
+          }
+        },
+        "cpu": {
+          "response": {
+            "type": "object",
+            "keyCount": 4,
+            "unknownKeyCount": 0,
+            "keys": [
+              "series",
+              "summary",
+              "queryId",
+              "meta"
+            ]
+          },
+          "summary": {
+            "type": "array",
+            "length": 6
+          },
+          "series": {
+            "type": "array",
+            "length": 72
+          },
+          "data": {
+            "type": "undefined"
+          },
+          "firstSummary": {
+            "type": "object",
+            "keyCount": 2,
+            "unknownKeyCount": 0,
+            "keys": [
+              "dimensions",
+              "values"
+            ]
+          },
+          "dimensions": {
+            "type": "object",
+            "keyCount": 1,
+            "unknownKeyCount": 0,
+            "keys": [
+              "deploymentId"
+            ]
+          },
+          "values": {
+            "type": "object",
+            "keyCount": 1,
+            "unknownKeyCount": 0,
+            "keys": [
+              "value"
+            ]
+          }
+        }
+      },
+      "partitions": [
+        {
+          "count": {
+            "response": {
+              "type": "object",
+              "keyCount": 4,
+              "unknownKeyCount": 0,
+              "keys": [
+                "series",
+                "summary",
+                "queryId",
+                "meta"
+              ]
+            },
+            "summary": {
+              "type": "array",
+              "length": 23
+            },
+            "series": {
+              "type": "array",
+              "length": 276
+            },
+            "data": {
+              "type": "undefined"
+            },
+            "firstSummary": {
+              "type": "object",
+              "keyCount": 2,
+              "unknownKeyCount": 0,
+              "keys": [
+                "dimensions",
+                "values"
+              ]
+            },
+            "dimensions": {
+              "type": "object",
+              "keyCount": 3,
+              "unknownKeyCount": 0,
+              "keys": [
+                "route",
+                "httpStatus",
+                "deploymentId"
+              ]
+            },
+            "values": {
+              "type": "object",
+              "keyCount": 1,
+              "unknownKeyCount": 0,
+              "keys": [
+                "value"
+              ]
+            }
+          },
+          "cpu": {
+            "response": {
+              "type": "object",
+              "keyCount": 4,
+              "unknownKeyCount": 0,
+              "keys": [
+                "series",
+                "summary",
+                "queryId",
+                "meta"
+              ]
+            },
+            "summary": {
+              "type": "array",
+              "length": 23
+            },
+            "series": {
+              "type": "array",
+              "length": 276
+            },
+            "data": {
+              "type": "undefined"
+            },
+            "firstSummary": {
+              "type": "object",
+              "keyCount": 2,
+              "unknownKeyCount": 0,
+              "keys": [
+                "dimensions",
+                "values"
+              ]
+            },
+            "dimensions": {
+              "type": "object",
+              "keyCount": 3,
+              "unknownKeyCount": 0,
+              "keys": [
+                "route",
+                "httpStatus",
+                "deploymentId"
+              ]
+            },
+            "values": {
+              "type": "object",
+              "keyCount": 1,
+              "unknownKeyCount": 0,
+              "keys": [
+                "value"
+              ]
+            }
+          }
+        },
+        {
+          "count": {
+            "response": {
+              "type": "object",
+              "keyCount": 4,
+              "unknownKeyCount": 0,
+              "keys": [
+                "series",
+                "summary",
+                "queryId",
+                "meta"
+              ]
+            },
+            "summary": {
+              "type": "array",
+              "length": 25
+            },
+            "series": {
+              "type": "array",
+              "length": 300
+            },
+            "data": {
+              "type": "undefined"
+            },
+            "firstSummary": {
+              "type": "object",
+              "keyCount": 2,
+              "unknownKeyCount": 0,
+              "keys": [
+                "dimensions",
+                "values"
+              ]
+            },
+            "dimensions": {
+              "type": "object",
+              "keyCount": 3,
+              "unknownKeyCount": 0,
+              "keys": [
+                "route",
+                "httpStatus",
+                "deploymentId"
+              ]
+            },
+            "values": {
+              "type": "object",
+              "keyCount": 1,
+              "unknownKeyCount": 0,
+              "keys": [
+                "value"
+              ]
+            }
+          },
+          "cpu": {
+            "response": {
+              "type": "object",
+              "keyCount": 4,
+              "unknownKeyCount": 0,
+              "keys": [
+                "series",
+                "summary",
+                "queryId",
+                "meta"
+              ]
+            },
+            "summary": {
+              "type": "array",
+              "length": 25
+            },
+            "series": {
+              "type": "array",
+              "length": 300
+            },
+            "data": {
+              "type": "undefined"
+            },
+            "firstSummary": {
+              "type": "object",
+              "keyCount": 2,
+              "unknownKeyCount": 0,
+              "keys": [
+                "dimensions",
+                "values"
+              ]
+            },
+            "dimensions": {
+              "type": "object",
+              "keyCount": 3,
+              "unknownKeyCount": 0,
+              "keys": [
+                "route",
+                "httpStatus",
+                "deploymentId"
+              ]
+            },
+            "values": {
+              "type": "object",
+              "keyCount": 1,
+              "unknownKeyCount": 0,
+              "keys": [
+                "value"
+              ]
+            }
+          }
+        },
+        {
+          "count": {
+            "response": {
+              "type": "object",
+              "keyCount": 4,
+              "unknownKeyCount": 0,
+              "keys": [
+                "series",
+                "summary",
+                "queryId",
+                "meta"
+              ]
+            },
+            "summary": {
+              "type": "array",
+              "length": 37
+            },
+            "series": {
+              "type": "array",
+              "length": 444
+            },
+            "data": {
+              "type": "undefined"
+            },
+            "firstSummary": {
+              "type": "object",
+              "keyCount": 2,
+              "unknownKeyCount": 0,
+              "keys": [
+                "dimensions",
+                "values"
+              ]
+            },
+            "dimensions": {
+              "type": "object",
+              "keyCount": 3,
+              "unknownKeyCount": 0,
+              "keys": [
+                "route",
+                "httpStatus",
+                "deploymentId"
+              ]
+            },
+            "values": {
+              "type": "object",
+              "keyCount": 1,
+              "unknownKeyCount": 0,
+              "keys": [
+                "value"
+              ]
+            }
+          },
+          "cpu": {
+            "response": {
+              "type": "object",
+              "keyCount": 4,
+              "unknownKeyCount": 0,
+              "keys": [
+                "series",
+                "summary",
+                "queryId",
+                "meta"
+              ]
+            },
+            "summary": {
+              "type": "array",
+              "length": 37
+            },
+            "series": {
+              "type": "array",
+              "length": 444
+            },
+            "data": {
+              "type": "undefined"
+            },
+            "firstSummary": {
+              "type": "object",
+              "keyCount": 2,
+              "unknownKeyCount": 0,
+              "keys": [
+                "dimensions",
+                "values"
+              ]
+            },
+            "dimensions": {
+              "type": "object",
+              "keyCount": 3,
+              "unknownKeyCount": 0,
+              "keys": [
+                "route",
+                "httpStatus",
+                "deploymentId"
+              ]
+            },
+            "values": {
+              "type": "object",
+              "keyCount": 1,
+              "unknownKeyCount": 0,
+              "keys": [
+                "value"
+              ]
+            }
+          }
+        },
+        {
+          "count": {
+            "response": {
+              "type": "object",
+              "keyCount": 4,
+              "unknownKeyCount": 0,
+              "keys": [
+                "series",
+                "summary",
+                "queryId",
+                "meta"
+              ]
+            },
+            "summary": {
+              "type": "array",
+              "length": 63
+            },
+            "series": {
+              "type": "array",
+              "length": 756
+            },
+            "data": {
+              "type": "undefined"
+            },
+            "firstSummary": {
+              "type": "object",
+              "keyCount": 2,
+              "unknownKeyCount": 0,
+              "keys": [
+                "dimensions",
+                "values"
+              ]
+            },
+            "dimensions": {
+              "type": "object",
+              "keyCount": 3,
+              "unknownKeyCount": 0,
+              "keys": [
+                "route",
+                "httpStatus",
+                "deploymentId"
+              ]
+            },
+            "values": {
+              "type": "object",
+              "keyCount": 1,
+              "unknownKeyCount": 0,
+              "keys": [
+                "value"
+              ]
+            }
+          },
+          "cpu": {
+            "response": {
+              "type": "object",
+              "keyCount": 4,
+              "unknownKeyCount": 0,
+              "keys": [
+                "series",
+                "summary",
+                "queryId",
+                "meta"
+              ]
+            },
+            "summary": {
+              "type": "array",
+              "length": 63
+            },
+            "series": {
+              "type": "array",
+              "length": 756
+            },
+            "data": {
+              "type": "undefined"
+            },
+            "firstSummary": {
+              "type": "object",
+              "keyCount": 2,
+              "unknownKeyCount": 0,
+              "keys": [
+                "dimensions",
+                "values"
+              ]
+            },
+            "dimensions": {
+              "type": "object",
+              "keyCount": 3,
+              "unknownKeyCount": 0,
+              "keys": [
+                "route",
+                "httpStatus",
+                "deploymentId"
+              ]
+            },
+            "values": {
+              "type": "object",
+              "keyCount": 1,
+              "unknownKeyCount": 0,
+              "keys": [
+                "value"
+              ]
+            }
+          }
+        },
+        {
+          "count": {
+            "response": {
+              "type": "object",
+              "keyCount": 4,
+              "unknownKeyCount": 0,
+              "keys": [
+                "series",
+                "summary",
+                "queryId",
+                "meta"
+              ]
+            },
+            "summary": {
+              "type": "array",
+              "length": 22
+            },
+            "series": {
+              "type": "array",
+              "length": 264
+            },
+            "data": {
+              "type": "undefined"
+            },
+            "firstSummary": {
+              "type": "object",
+              "keyCount": 2,
+              "unknownKeyCount": 0,
+              "keys": [
+                "dimensions",
+                "values"
+              ]
+            },
+            "dimensions": {
+              "type": "object",
+              "keyCount": 3,
+              "unknownKeyCount": 0,
+              "keys": [
+                "route",
+                "httpStatus",
+                "deploymentId"
+              ]
+            },
+            "values": {
+              "type": "object",
+              "keyCount": 1,
+              "unknownKeyCount": 0,
+              "keys": [
+                "value"
+              ]
+            }
+          },
+          "cpu": {
+            "response": {
+              "type": "object",
+              "keyCount": 4,
+              "unknownKeyCount": 0,
+              "keys": [
+                "series",
+                "summary",
+                "queryId",
+                "meta"
+              ]
+            },
+            "summary": {
+              "type": "array",
+              "length": 22
+            },
+            "series": {
+              "type": "array",
+              "length": 264
+            },
+            "data": {
+              "type": "undefined"
+            },
+            "firstSummary": {
+              "type": "object",
+              "keyCount": 2,
+              "unknownKeyCount": 0,
+              "keys": [
+                "dimensions",
+                "values"
+              ]
+            },
+            "dimensions": {
+              "type": "object",
+              "keyCount": 3,
+              "unknownKeyCount": 0,
+              "keys": [
+                "route",
+                "httpStatus",
+                "deploymentId"
+              ]
+            },
+            "values": {
+              "type": "object",
+              "keyCount": 1,
+              "unknownKeyCount": 0,
+              "keys": [
+                "value"
+              ]
+            }
+          }
+        },
+        {
+          "count": {
+            "response": {
+              "type": "object",
+              "keyCount": 4,
+              "unknownKeyCount": 0,
+              "keys": [
+                "series",
+                "summary",
+                "queryId",
+                "meta"
+              ]
+            },
+            "summary": {
+              "type": "array",
+              "length": 20
+            },
+            "series": {
+              "type": "array",
+              "length": 240
+            },
+            "data": {
+              "type": "undefined"
+            },
+            "firstSummary": {
+              "type": "object",
+              "keyCount": 2,
+              "unknownKeyCount": 0,
+              "keys": [
+                "dimensions",
+                "values"
+              ]
+            },
+            "dimensions": {
+              "type": "object",
+              "keyCount": 3,
+              "unknownKeyCount": 0,
+              "keys": [
+                "route",
+                "httpStatus",
+                "deploymentId"
+              ]
+            },
+            "values": {
+              "type": "object",
+              "keyCount": 1,
+              "unknownKeyCount": 0,
+              "keys": [
+                "value"
+              ]
+            }
+          },
+          "cpu": {
+            "response": {
+              "type": "object",
+              "keyCount": 4,
+              "unknownKeyCount": 0,
+              "keys": [
+                "series",
+                "summary",
+                "queryId",
+                "meta"
+              ]
+            },
+            "summary": {
+              "type": "array",
+              "length": 20
+            },
+            "series": {
+              "type": "array",
+              "length": 240
+            },
+            "data": {
+              "type": "undefined"
+            },
+            "firstSummary": {
+              "type": "object",
+              "keyCount": 2,
+              "unknownKeyCount": 0,
+              "keys": [
+                "dimensions",
+                "values"
+              ]
+            },
+            "dimensions": {
+              "type": "object",
+              "keyCount": 3,
+              "unknownKeyCount": 0,
+              "keys": [
+                "route",
+                "httpStatus",
+                "deploymentId"
+              ]
+            },
+            "values": {
+              "type": "object",
+              "keyCount": 1,
+              "unknownKeyCount": 0,
+              "keys": [
+                "value"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "vercel": {
+    "scope": "project-production",
+    "measurement": "function_invocation_observability_aggregates",
+    "coverage": "disjoint_deployments_reconciled_to_project_totals",
+    "groupLimit": 100,
+    "reconciliation": {
+      "method": "disjoint_deployments",
+      "maximumDeployments": 16,
+      "from": "2026-11-04T18:00:00.000Z",
+      "to": "2026-11-04T19:00:00.000Z",
+      "totalRequests": 4077,
+      "totalCpuMs": 471641.01096711925,
+      "countComparison": "exact",
+      "cpuAbsoluteToleranceMs": 1e-7,
+      "cpuRelativeTolerance": 1e-9,
+      "partitions": [
+        {
+          "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+          "groups": 23,
+          "requests": 295,
+          "cpuMs": 50679.5
+        },
+        {
+          "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+          "groups": 25,
+          "requests": 142,
+          "cpuMs": 52861.642857142855
+        },
+        {
+          "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+          "groups": 37,
+          "requests": 1333,
+          "cpuMs": 119025.49385255267
+        },
+        {
+          "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+          "groups": 63,
+          "requests": 1954,
+          "cpuMs": 183011.11159308554
+        },
+        {
+          "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+          "groups": 22,
+          "requests": 181,
+          "cpuMs": 47079.46382428941
+        },
+        {
+          "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+          "groups": 20,
+          "requests": 172,
+          "cpuMs": 18983.79884004884
+        }
+      ]
+    },
+    "contextAtCollection": {
+      "before": {
+        "alias": {
+          "hostname": "app.aspectlylabs.com",
+          "deploymentId": "dpl_5oCM9ABtbz3A8PHFy7w45ScHJSRG",
+          "updatedAt": 1793822812133
+        },
+        "deployment": {
+          "id": "dpl_5oCM9ABtbz3A8PHFy7w45ScHJSRG",
+          "sha": "8a490000457b133a8b1434c5515d39277b7b586c",
+          "readyAt": "2026-11-04T20:06:51.956Z"
+        }
+      },
+      "after": {
+        "alias": {
+          "hostname": "app.aspectlylabs.com",
+          "deploymentId": "dpl_5oCM9ABtbz3A8PHFy7w45ScHJSRG",
+          "updatedAt": 1793822812133
+        },
+        "deployment": {
+          "id": "dpl_5oCM9ABtbz3A8PHFy7w45ScHJSRG",
+          "sha": "8a490000457b133a8b1434c5515d39277b7b586c",
+          "readyAt": "2026-11-04T20:06:51.956Z"
+        }
+      },
+      "aliasChanged": false
+    },
+    "metricContract": {
+      "count": {
+        "metric": "vercel.function_invocation.count",
+        "unit": "count",
+        "aggregation": "count",
+        "supportedAggregations": [
+          "count"
+        ],
+        "dimensions": [
+          "route",
+          "environment",
+          "httpStatus",
+          "deploymentId"
+        ]
+      },
+      "cpu": {
+        "metric": "vercel.function_invocation.function_cpu_time_ms",
+        "unit": "milliseconds",
+        "aggregation": "sum",
+        "supportedAggregations": [
+          "sum",
+          "count"
+        ],
+        "dimensions": [
+          "route",
+          "environment",
+          "httpStatus",
+          "deploymentId"
+        ]
+      },
+      "dimensions": {
+        "route": "route",
+        "httpStatus": "httpStatus",
+        "deploymentId": "deploymentId",
+        "environment": "environment"
+      },
+      "selectionBasis": "current_vercel_cli_catalog_default_for_count_unit"
+    },
+    "requests": 4077,
+    "errors": 10,
+    "cpuMs": 471641.01096711936,
+    "cpuPerRequestMs": 115.68334828725027,
+    "errorRate": 0.0024527839097375523,
+    "groups": [
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/[locale]",
+        "httpStatus": "200",
+        "requests": 131,
+        "cpuMs": 14270,
+        "cpuPerRequestMs": 108.93129770992367
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/version",
+        "httpStatus": "200",
+        "requests": 22,
+        "cpuMs": 520,
+        "cpuPerRequestMs": 23.636363636363637
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/approved-writes",
+        "httpStatus": "200",
+        "requests": 19,
+        "cpuMs": 800,
+        "cpuPerRequestMs": 42.10526315789474
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/conversations/[id]/read",
+        "httpStatus": "200",
+        "requests": 18,
+        "cpuMs": 585,
+        "cpuPerRequestMs": 32.5
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/auth/[...all]",
+        "httpStatus": "200",
+        "requests": 13,
+        "cpuMs": 1498.0000000000002,
+        "cpuPerRequestMs": 115.23076923076925
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/factory/tasks",
+        "httpStatus": "200",
+        "requests": 11,
+        "cpuMs": 746.6666666666666,
+        "cpuPerRequestMs": 67.87878787878788
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/pending-actions",
+        "httpStatus": "200",
+        "requests": 10,
+        "cpuMs": 10,
+        "cpuPerRequestMs": 1
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/agent/sessions",
+        "httpStatus": "200",
+        "requests": 9,
+        "cpuMs": 810,
+        "cpuPerRequestMs": 90
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/conversations",
+        "httpStatus": "200",
+        "requests": 9,
+        "cpuMs": 543.1666666666666,
+        "cpuPerRequestMs": 60.35185185185185
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/mobile/reactions",
+        "httpStatus": "200",
+        "requests": 9,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/workspace",
+        "httpStatus": "200",
+        "requests": 9,
+        "cpuMs": 747.5,
+        "cpuPerRequestMs": 83.05555555555556
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/workspace/switcher",
+        "httpStatus": "200",
+        "requests": 9,
+        "cpuMs": 182.5,
+        "cpuPerRequestMs": 20.27777777777778
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/live/ticket",
+        "httpStatus": "200",
+        "requests": 6,
+        "cpuMs": 150,
+        "cpuPerRequestMs": 25
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/bots/[botId]/computer",
+        "httpStatus": "503",
+        "requests": 3,
+        "cpuMs": 2366.6666666666665,
+        "cpuPerRequestMs": 788.8888888888888
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/[locale]/sign-in",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 4550,
+        "cpuPerRequestMs": 2275
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/cron/account-deletions",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 4230,
+        "cpuPerRequestMs": 2115
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/cron/audit-retention",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 3080,
+        "cpuPerRequestMs": 1540
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/cron/coordinator-wakes",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 4970,
+        "cpuPerRequestMs": 2485
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/cron/ops-monitor",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 2310,
+        "cpuPerRequestMs": 1155
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/cron/run-recovery",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 3240,
+        "cpuPerRequestMs": 1620
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/cron/schedules",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 4580,
+        "cpuPerRequestMs": 2290
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/webhooks/github",
+        "httpStatus": "202",
+        "requests": 2,
+        "cpuMs": 440,
+        "cpuPerRequestMs": 220
+      },
+      {
+        "deploymentId": "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+        "route": "/api/self-improvement",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 50,
+        "cpuPerRequestMs": 50
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/version",
+        "httpStatus": "200",
+        "requests": 58,
+        "cpuMs": 1300,
+        "cpuPerRequestMs": 22.413793103448278
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/[locale]",
+        "httpStatus": "200",
+        "requests": 16,
+        "cpuMs": 5385,
+        "cpuPerRequestMs": 336.5625
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/auth/[...all]",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 960,
+        "cpuPerRequestMs": 192
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/cron/account-deletions",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 6660,
+        "cpuPerRequestMs": 1332
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/cron/audit-retention",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 2890,
+        "cpuPerRequestMs": 578
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/cron/coordinator-wakes",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 5630,
+        "cpuPerRequestMs": 1126
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/cron/ops-monitor",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 5150,
+        "cpuPerRequestMs": 1030
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/cron/run-recovery",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 7710,
+        "cpuPerRequestMs": 1542
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/cron/schedules",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 8190,
+        "cpuPerRequestMs": 1638
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/webhooks/github",
+        "httpStatus": "202",
+        "requests": 5,
+        "cpuMs": 1209.642857142857,
+        "cpuPerRequestMs": 241.92857142857142
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/v1/devices/[deviceId]/heartbeat",
+        "httpStatus": "200",
+        "requests": 4,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/v1/devices/[deviceId]/repos",
+        "httpStatus": "200",
+        "requests": 4,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/v1/devices/[deviceId]/commands",
+        "httpStatus": "200",
+        "requests": 3,
+        "cpuMs": 169.5,
+        "cpuPerRequestMs": 56.5
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/v1/devices/[deviceId]/runs",
+        "httpStatus": "200",
+        "requests": 3,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/[locale]/sign-in",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 4180,
+        "cpuPerRequestMs": 2090
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/conversations",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 102.5,
+        "cpuPerRequestMs": 51.25
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/webhooks/github",
+        "httpStatus": "204",
+        "requests": 2,
+        "cpuMs": 90,
+        "cpuPerRequestMs": 45
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/agent/sessions",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 1130,
+        "cpuPerRequestMs": 1130
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/conversations/[id]/members",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 1840,
+        "cpuPerRequestMs": 1840
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/conversations/[id]/messages",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/mobile/reactions",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/workspace",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 265,
+        "cpuPerRequestMs": 265
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/api/workspace/switcher",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/v1/devices/[deviceId]/gateway",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+        "route": "/v1/devices/register",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/[locale]",
+        "httpStatus": "200",
+        "requests": 732,
+        "cpuMs": 28632.888888888887,
+        "cpuPerRequestMs": 39.11596842744383
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/version",
+        "httpStatus": "200",
+        "requests": 115,
+        "cpuMs": 760,
+        "cpuPerRequestMs": 6.608695652173913
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/approved-writes",
+        "httpStatus": "200",
+        "requests": 46,
+        "cpuMs": 815.7727272727273,
+        "cpuPerRequestMs": 17.734189723320156
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/conversations/[id]/read",
+        "httpStatus": "200",
+        "requests": 38,
+        "cpuMs": 1886.025641025641,
+        "cpuPerRequestMs": 49.63225371120108
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/conversations",
+        "httpStatus": "200",
+        "requests": 36,
+        "cpuMs": 1517.1428571428573,
+        "cpuPerRequestMs": 42.142857142857146
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/auth/[...all]",
+        "httpStatus": "200",
+        "requests": 35,
+        "cpuMs": 1146.8333333333335,
+        "cpuPerRequestMs": 32.76666666666667
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/factory/tasks",
+        "httpStatus": "200",
+        "requests": 25,
+        "cpuMs": 3519.1666666666665,
+        "cpuPerRequestMs": 140.76666666666665
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/pending-actions",
+        "httpStatus": "200",
+        "requests": 23,
+        "cpuMs": 1290.8823529411766,
+        "cpuPerRequestMs": 56.12531969309463
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/agent/sessions",
+        "httpStatus": "200",
+        "requests": 20,
+        "cpuMs": 1027.7813852813852,
+        "cpuPerRequestMs": 51.389069264069256
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/workspace",
+        "httpStatus": "200",
+        "requests": 20,
+        "cpuMs": 571.5,
+        "cpuPerRequestMs": 28.575
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/workspace/switcher",
+        "httpStatus": "200",
+        "requests": 20,
+        "cpuMs": 105,
+        "cpuPerRequestMs": 5.25
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/mobile/reactions",
+        "httpStatus": "200",
+        "requests": 19,
+        "cpuMs": 30,
+        "cpuPerRequestMs": 1.5789473684210527
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/cron/account-deletions",
+        "httpStatus": "200",
+        "requests": 18,
+        "cpuMs": 9350,
+        "cpuPerRequestMs": 519.4444444444445
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/cron/audit-retention",
+        "httpStatus": "200",
+        "requests": 18,
+        "cpuMs": 6565,
+        "cpuPerRequestMs": 364.72222222222223
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/cron/coordinator-wakes",
+        "httpStatus": "200",
+        "requests": 18,
+        "cpuMs": 15090,
+        "cpuPerRequestMs": 838.3333333333334
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/cron/ops-monitor",
+        "httpStatus": "200",
+        "requests": 18,
+        "cpuMs": 8810,
+        "cpuPerRequestMs": 489.44444444444446
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/cron/run-recovery",
+        "httpStatus": "200",
+        "requests": 18,
+        "cpuMs": 9780,
+        "cpuPerRequestMs": 543.3333333333334
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/cron/schedules",
+        "httpStatus": "200",
+        "requests": 18,
+        "cpuMs": 8670,
+        "cpuPerRequestMs": 481.6666666666667
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/live/ticket",
+        "httpStatus": "200",
+        "requests": 14,
+        "cpuMs": 210,
+        "cpuPerRequestMs": 15
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/webhooks/github",
+        "httpStatus": "202",
+        "requests": 14,
+        "cpuMs": 2206.3333333333335,
+        "cpuPerRequestMs": 157.5952380952381
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/factory/tasks/[taskId]",
+        "httpStatus": "200",
+        "requests": 9,
+        "cpuMs": 8980,
+        "cpuPerRequestMs": 997.7777777777778
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/factory/tasks/[taskId]/approval",
+        "httpStatus": "200",
+        "requests": 9,
+        "cpuMs": 1654.1666666666665,
+        "cpuPerRequestMs": 183.79629629629628
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/bots/[botId]/computer",
+        "httpStatus": "503",
+        "requests": 7,
+        "cpuMs": 272,
+        "cpuPerRequestMs": 38.857142857142854
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/v1/devices/[deviceId]/heartbeat",
+        "httpStatus": "200",
+        "requests": 7,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/v1/devices/[deviceId]/repos",
+        "httpStatus": "200",
+        "requests": 7,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/v1/devices/[deviceId]/commands",
+        "httpStatus": "200",
+        "requests": 6,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/v1/devices/[deviceId]/runs",
+        "httpStatus": "200",
+        "requests": 6,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/v1/devices/[deviceId]/gateway",
+        "httpStatus": "200",
+        "requests": 3,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/[locale]/sign-in",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 4890,
+        "cpuPerRequestMs": 2445
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/bots/[botId]/computer",
+        "httpStatus": "404",
+        "requests": 2,
+        "cpuMs": 315,
+        "cpuPerRequestMs": 157.5
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/self-improvement",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 25,
+        "cpuPerRequestMs": 12.5
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/settings/[read]",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 740,
+        "cpuPerRequestMs": 370
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/v1/devices/register",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/bots",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/cron/briefings",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/subscriptions",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 165,
+        "cpuPerRequestMs": 165
+      },
+      {
+        "deploymentId": "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+        "route": "/api/webhooks/github",
+        "httpStatus": "204",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/runs/[runId]/tool-approval",
+        "httpStatus": "200",
+        "requests": 290,
+        "cpuMs": 440.2541849230423,
+        "cpuPerRequestMs": 1.5181178790449734
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/[locale]",
+        "httpStatus": "200",
+        "requests": 196,
+        "cpuMs": 19214.666666666664,
+        "cpuPerRequestMs": 98.03401360544217
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/version",
+        "httpStatus": "200",
+        "requests": 132,
+        "cpuMs": 830,
+        "cpuPerRequestMs": 6.287878787878788
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/devices/[deviceId]/heartbeat",
+        "httpStatus": "200",
+        "requests": 124,
+        "cpuMs": 464.3659842707996,
+        "cpuPerRequestMs": 3.744886969925803
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/devices/[deviceId]/repos",
+        "httpStatus": "200",
+        "requests": 124,
+        "cpuMs": 646,
+        "cpuPerRequestMs": 5.209677419354839
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/devices/[deviceId]/runs",
+        "httpStatus": "200",
+        "requests": 124,
+        "cpuMs": 226.09756097560975,
+        "cpuPerRequestMs": 1.8233674272226592
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/approved-writes",
+        "httpStatus": "200",
+        "requests": 117,
+        "cpuMs": 461.42857142857144,
+        "cpuPerRequestMs": 3.943833943833944
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/devices/[deviceId]/runs/[runId]/subscription",
+        "httpStatus": "200",
+        "requests": 107,
+        "cpuMs": 2532.9925114445236,
+        "cpuPerRequestMs": 23.672827209761902
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/devices/[deviceId]/commands",
+        "httpStatus": "200",
+        "requests": 75,
+        "cpuMs": 748.0539451948121,
+        "cpuPerRequestMs": 9.974052602597494
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/runs/[runId]/events",
+        "httpStatus": "200",
+        "requests": 63,
+        "cpuMs": 43.75,
+        "cpuPerRequestMs": 0.6944444444444444
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/pending-actions",
+        "httpStatus": "200",
+        "requests": 59,
+        "cpuMs": 150,
+        "cpuPerRequestMs": 2.542372881355932
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/conversations/[id]/messages",
+        "httpStatus": "200",
+        "requests": 38,
+        "cpuMs": 2175,
+        "cpuPerRequestMs": 57.23684210526316
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/runs/mcp/[toolkit]",
+        "httpStatus": "200",
+        "requests": 36,
+        "cpuMs": 7173.333333333334,
+        "cpuPerRequestMs": 199.25925925925927
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/devices/[deviceId]/gateway",
+        "httpStatus": "401",
+        "requests": 25,
+        "cpuMs": 90,
+        "cpuPerRequestMs": 3.6
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/cron/account-deletions",
+        "httpStatus": "200",
+        "requests": 23,
+        "cpuMs": 14955,
+        "cpuPerRequestMs": 650.2173913043479
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/cron/audit-retention",
+        "httpStatus": "200",
+        "requests": 23,
+        "cpuMs": 9115,
+        "cpuPerRequestMs": 396.30434782608694
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/cron/coordinator-wakes",
+        "httpStatus": "200",
+        "requests": 23,
+        "cpuMs": 13136.42857142857,
+        "cpuPerRequestMs": 571.1490683229813
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/cron/ops-monitor",
+        "httpStatus": "200",
+        "requests": 23,
+        "cpuMs": 8337,
+        "cpuPerRequestMs": 362.4782608695652
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/cron/run-recovery",
+        "httpStatus": "200",
+        "requests": 23,
+        "cpuMs": 4374,
+        "cpuPerRequestMs": 190.17391304347825
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/cron/schedules",
+        "httpStatus": "200",
+        "requests": 23,
+        "cpuMs": 15946.666666666666,
+        "cpuPerRequestMs": 693.3333333333333
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/factory/tasks/[taskId]/approval",
+        "httpStatus": "200",
+        "requests": 22,
+        "cpuMs": 43.166666666666664,
+        "cpuPerRequestMs": 1.962121212121212
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/settings/[read]",
+        "httpStatus": "200",
+        "requests": 22,
+        "cpuMs": 35464.58333333333,
+        "cpuPerRequestMs": 1612.026515151515
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/mikka/.well-known/workflow/v1/flow",
+        "httpStatus": "200",
+        "requests": 22,
+        "cpuMs": 13979.5,
+        "cpuPerRequestMs": 635.4318181818181
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/bots/[botId]/computer",
+        "httpStatus": "200",
+        "requests": 21,
+        "cpuMs": 190,
+        "cpuPerRequestMs": 9.047619047619047
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/factory/tasks",
+        "httpStatus": "200",
+        "requests": 20,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/webhooks/github",
+        "httpStatus": "202",
+        "requests": 20,
+        "cpuMs": 97.77777777777777,
+        "cpuPerRequestMs": 4.888888888888888
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/conversations",
+        "httpStatus": "200",
+        "requests": 19,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/runs/[runId]",
+        "httpStatus": "204",
+        "requests": 18,
+        "cpuMs": 36.83098591549296,
+        "cpuPerRequestMs": 2.0461658841940533
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/devices/[deviceId]/runs/[runId]/claim",
+        "httpStatus": "409",
+        "requests": 13,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/[locale]/settings",
+        "httpStatus": "200",
+        "requests": 11,
+        "cpuMs": 2808.3333333333335,
+        "cpuPerRequestMs": 255.3030303030303
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/mobile/reactions",
+        "httpStatus": "200",
+        "requests": 10,
+        "cpuMs": 127.61904761904762,
+        "cpuPerRequestMs": 12.761904761904763
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/runs/[runId]/policy-snapshot",
+        "httpStatus": "200",
+        "requests": 10,
+        "cpuMs": 31.379310344827587,
+        "cpuPerRequestMs": 3.137931034482759
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/workspace",
+        "httpStatus": "200",
+        "requests": 8,
+        "cpuMs": 2423.8888888888887,
+        "cpuPerRequestMs": 302.9861111111111
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/auth/[...all]",
+        "httpStatus": "200",
+        "requests": 7,
+        "cpuMs": 1844.9999999999998,
+        "cpuPerRequestMs": 263.57142857142856
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/conversations/[id]/read",
+        "httpStatus": "200",
+        "requests": 7,
+        "cpuMs": 116.66666666666667,
+        "cpuPerRequestMs": 16.666666666666668
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/devices/[deviceId]/computer",
+        "httpStatus": "200",
+        "requests": 6,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/devices/[deviceId]/gateway",
+        "httpStatus": "200",
+        "requests": 6,
+        "cpuMs": 50,
+        "cpuPerRequestMs": 8.333333333333334
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/devices/register",
+        "httpStatus": "200",
+        "requests": 6,
+        "cpuMs": 40.827586206896555,
+        "cpuPerRequestMs": 6.804597701149426
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/workspace/switcher",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 1120,
+        "cpuPerRequestMs": 224
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/devices/[deviceId]/runs/[runId]/claim",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/runs/[runId]/complete",
+        "httpStatus": "204",
+        "requests": 5,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/runs/[runId]/checkpoint",
+        "httpStatus": "204",
+        "requests": 4,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/agent/sessions",
+        "httpStatus": "200",
+        "requests": 3,
+        "cpuMs": 180,
+        "cpuPerRequestMs": 60
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/computer/events",
+        "httpStatus": "200",
+        "requests": 3,
+        "cpuMs": 2694.5,
+        "cpuPerRequestMs": 898.1666666666666
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/conversations/[id]/members",
+        "httpStatus": "200",
+        "requests": 3,
+        "cpuMs": 100,
+        "cpuPerRequestMs": 33.333333333333336
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/teams/directory",
+        "httpStatus": "200",
+        "requests": 3,
+        "cpuMs": 92.66666666666666,
+        "cpuPerRequestMs": 30.888888888888886
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/devices/[deviceId]/commands",
+        "httpStatus": "401",
+        "requests": 3,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/devices/[deviceId]/runs/[runId]/subscription",
+        "httpStatus": "409",
+        "requests": 3,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/[locale]/sign-in",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 4560,
+        "cpuPerRequestMs": 2280
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/coordinator/stream",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 6190,
+        "cpuPerRequestMs": 3095
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/factory/tasks/[taskId]",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 2330,
+        "cpuPerRequestMs": 1165
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/subscriptions",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 120,
+        "cpuPerRequestMs": 60
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/subscriptions/usage",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 3670,
+        "cpuPerRequestMs": 1835
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/devices/[deviceId]/heartbeat",
+        "httpStatus": "401",
+        "requests": 2,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/bots/[botId]",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 98.33333333333333,
+        "cpuPerRequestMs": 98.33333333333333
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/bots/[botId]/computer/viewer",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 70,
+        "cpuPerRequestMs": 70
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/conversations/[id]/messages",
+        "httpStatus": "201",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/cron/briefings",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/integrations/composio",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 1400,
+        "cpuPerRequestMs": 1400
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/mobile/bots/[id]",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/self-improvement",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/api/workspaces/[workspaceId]/computer-policy",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 2070,
+        "cpuPerRequestMs": 2070
+      },
+      {
+        "deploymentId": "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+        "route": "/v1/runs/[runId]/tool-approval",
+        "httpStatus": "409",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/api/version",
+        "httpStatus": "200",
+        "requests": 42,
+        "cpuMs": 350,
+        "cpuPerRequestMs": 8.333333333333334
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/v1/devices/[deviceId]/heartbeat",
+        "httpStatus": "200",
+        "requests": 19,
+        "cpuMs": 916.1304909560722,
+        "cpuPerRequestMs": 48.21739426084591
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/v1/devices/[deviceId]/repos",
+        "httpStatus": "200",
+        "requests": 19,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/v1/devices/[deviceId]/runs",
+        "httpStatus": "200",
+        "requests": 19,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/api/webhooks/github",
+        "httpStatus": "202",
+        "requests": 15,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/v1/devices/[deviceId]/commands",
+        "httpStatus": "200",
+        "requests": 10,
+        "cpuMs": 280.6666666666667,
+        "cpuPerRequestMs": 28.06666666666667
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/api/auth/[...all]",
+        "httpStatus": "200",
+        "requests": 6,
+        "cpuMs": 1146,
+        "cpuPerRequestMs": 191
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/api/cron/account-deletions",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 4670,
+        "cpuPerRequestMs": 934
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/api/cron/audit-retention",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 2080,
+        "cpuPerRequestMs": 416
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/api/cron/coordinator-wakes",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 4580,
+        "cpuPerRequestMs": 916
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/api/cron/ops-monitor",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 2655,
+        "cpuPerRequestMs": 531
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/api/cron/run-recovery",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 6280,
+        "cpuPerRequestMs": 1256
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/api/cron/schedules",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 3290,
+        "cpuPerRequestMs": 658
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/[locale]",
+        "httpStatus": "200",
+        "requests": 4,
+        "cpuMs": 6045,
+        "cpuPerRequestMs": 1511.25
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/api/settings/[read]",
+        "httpStatus": "200",
+        "requests": 4,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/v1/devices/[deviceId]/gateway",
+        "httpStatus": "401",
+        "requests": 4,
+        "cpuMs": 76.66666666666666,
+        "cpuPerRequestMs": 19.166666666666664
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/api/subscriptions",
+        "httpStatus": "200",
+        "requests": 3,
+        "cpuMs": 1100,
+        "cpuPerRequestMs": 366.6666666666667
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/[locale]/sign-in",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 3940,
+        "cpuPerRequestMs": 1970
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/api/bots",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/api/cron/briefings",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 2810,
+        "cpuPerRequestMs": 2810
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/api/cron/user-facts",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 850,
+        "cpuPerRequestMs": 850
+      },
+      {
+        "deploymentId": "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+        "route": "/mikka/.well-known/workflow/v1/flow",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 6010,
+        "cpuPerRequestMs": 6010
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/api/version",
+        "httpStatus": "200",
+        "requests": 29,
+        "cpuMs": 140,
+        "cpuPerRequestMs": 4.827586206896552
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/[locale]",
+        "httpStatus": "200",
+        "requests": 18,
+        "cpuMs": 1063.3333333333333,
+        "cpuPerRequestMs": 59.07407407407407
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/v1/devices/[deviceId]/heartbeat",
+        "httpStatus": "200",
+        "requests": 15,
+        "cpuMs": 63.333333333333336,
+        "cpuPerRequestMs": 4.222222222222222
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/v1/devices/[deviceId]/repos",
+        "httpStatus": "200",
+        "requests": 15,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/v1/devices/[deviceId]/runs",
+        "httpStatus": "200",
+        "requests": 14,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/v1/devices/[deviceId]/commands",
+        "httpStatus": "200",
+        "requests": 13,
+        "cpuMs": 172.52747252747253,
+        "cpuPerRequestMs": 13.27134404057481
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/api/cron/account-deletions",
+        "httpStatus": "200",
+        "requests": 7,
+        "cpuMs": 2186.666666666667,
+        "cpuPerRequestMs": 312.3809523809524
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/api/cron/audit-retention",
+        "httpStatus": "200",
+        "requests": 7,
+        "cpuMs": 1435,
+        "cpuPerRequestMs": 205
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/api/cron/coordinator-wakes",
+        "httpStatus": "200",
+        "requests": 7,
+        "cpuMs": 2880,
+        "cpuPerRequestMs": 411.42857142857144
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/api/cron/ops-monitor",
+        "httpStatus": "200",
+        "requests": 7,
+        "cpuMs": 1365,
+        "cpuPerRequestMs": 195
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/api/cron/run-recovery",
+        "httpStatus": "200",
+        "requests": 7,
+        "cpuMs": 1610,
+        "cpuPerRequestMs": 230
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/api/cron/schedules",
+        "httpStatus": "200",
+        "requests": 7,
+        "cpuMs": 1270,
+        "cpuPerRequestMs": 181.42857142857142
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/api/conversations",
+        "httpStatus": "200",
+        "requests": 6,
+        "cpuMs": 323.0769230769231,
+        "cpuPerRequestMs": 53.84615384615385
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/api/conversations/[id]/messages",
+        "httpStatus": "200",
+        "requests": 6,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/v1/devices/[deviceId]/gateway",
+        "httpStatus": "200",
+        "requests": 6,
+        "cpuMs": 41.111111111111114,
+        "cpuPerRequestMs": 6.851851851851852
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/v1/devices/register",
+        "httpStatus": "200",
+        "requests": 3,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/api/mobile/reactions",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/api/conversations/[id]/messages",
+        "httpStatus": "201",
+        "requests": 1,
+        "cpuMs": 463.75,
+        "cpuPerRequestMs": 463.75
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/api/cron/briefings",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 2720,
+        "cpuPerRequestMs": 2720
+      },
+      {
+        "deploymentId": "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM",
+        "route": "/api/cron/suggestions-reconcile",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 3250,
+        "cpuPerRequestMs": 3250
+      }
+    ],
+    "routes": [
+      {
+        "route": "/[locale]",
+        "httpStatus": "200",
+        "requests": 1097,
+        "cpuMs": 74610.88888888889,
+        "cpuPerRequestMs": 68.01357236908741
+      },
+      {
+        "route": "/api/version",
+        "httpStatus": "200",
+        "requests": 398,
+        "cpuMs": 3900,
+        "cpuPerRequestMs": 9.798994974874372
+      },
+      {
+        "route": "/v1/runs/[runId]/tool-approval",
+        "httpStatus": "200",
+        "requests": 290,
+        "cpuMs": 440.2541849230423,
+        "cpuPerRequestMs": 1.5181178790449734
+      },
+      {
+        "route": "/api/approved-writes",
+        "httpStatus": "200",
+        "requests": 182,
+        "cpuMs": 2077.2012987012986,
+        "cpuPerRequestMs": 11.413193948908233
+      },
+      {
+        "route": "/v1/devices/[deviceId]/heartbeat",
+        "httpStatus": "200",
+        "requests": 169,
+        "cpuMs": 1443.829808560205,
+        "cpuPerRequestMs": 8.543371648285238
+      },
+      {
+        "route": "/v1/devices/[deviceId]/repos",
+        "httpStatus": "200",
+        "requests": 169,
+        "cpuMs": 646,
+        "cpuPerRequestMs": 3.8224852071005917
+      },
+      {
+        "route": "/v1/devices/[deviceId]/runs",
+        "httpStatus": "200",
+        "requests": 166,
+        "cpuMs": 226.09756097560975,
+        "cpuPerRequestMs": 1.3620334998530708
+      },
+      {
+        "route": "/v1/devices/[deviceId]/commands",
+        "httpStatus": "200",
+        "requests": 107,
+        "cpuMs": 1370.7480843889514,
+        "cpuPerRequestMs": 12.810729760644405
+      },
+      {
+        "route": "/v1/devices/[deviceId]/runs/[runId]/subscription",
+        "httpStatus": "200",
+        "requests": 107,
+        "cpuMs": 2532.9925114445236,
+        "cpuPerRequestMs": 23.672827209761902
+      },
+      {
+        "route": "/api/pending-actions",
+        "httpStatus": "200",
+        "requests": 92,
+        "cpuMs": 1450.8823529411766,
+        "cpuPerRequestMs": 15.770460358056267
+      },
+      {
+        "route": "/api/conversations",
+        "httpStatus": "200",
+        "requests": 72,
+        "cpuMs": 2485.8864468864467,
+        "cpuPerRequestMs": 34.52620065120065
+      },
+      {
+        "route": "/api/auth/[...all]",
+        "httpStatus": "200",
+        "requests": 66,
+        "cpuMs": 6595.833333333333,
+        "cpuPerRequestMs": 99.93686868686868
+      },
+      {
+        "route": "/api/conversations/[id]/read",
+        "httpStatus": "200",
+        "requests": 63,
+        "cpuMs": 2587.6923076923076,
+        "cpuPerRequestMs": 41.07448107448107
+      },
+      {
+        "route": "/v1/runs/[runId]/events",
+        "httpStatus": "200",
+        "requests": 63,
+        "cpuMs": 43.75,
+        "cpuPerRequestMs": 0.6944444444444444
+      },
+      {
+        "route": "/api/cron/account-deletions",
+        "httpStatus": "200",
+        "requests": 60,
+        "cpuMs": 42051.666666666664,
+        "cpuPerRequestMs": 700.8611111111111
+      },
+      {
+        "route": "/api/cron/audit-retention",
+        "httpStatus": "200",
+        "requests": 60,
+        "cpuMs": 25165,
+        "cpuPerRequestMs": 419.4166666666667
+      },
+      {
+        "route": "/api/cron/coordinator-wakes",
+        "httpStatus": "200",
+        "requests": 60,
+        "cpuMs": 46286.42857142857,
+        "cpuPerRequestMs": 771.4404761904763
+      },
+      {
+        "route": "/api/cron/ops-monitor",
+        "httpStatus": "200",
+        "requests": 60,
+        "cpuMs": 28627,
+        "cpuPerRequestMs": 477.1166666666667
+      },
+      {
+        "route": "/api/cron/run-recovery",
+        "httpStatus": "200",
+        "requests": 60,
+        "cpuMs": 32994,
+        "cpuPerRequestMs": 549.9
+      },
+      {
+        "route": "/api/cron/schedules",
+        "httpStatus": "200",
+        "requests": 60,
+        "cpuMs": 41946.666666666664,
+        "cpuPerRequestMs": 699.1111111111111
+      },
+      {
+        "route": "/api/factory/tasks",
+        "httpStatus": "200",
+        "requests": 56,
+        "cpuMs": 4265.833333333333,
+        "cpuPerRequestMs": 76.17559523809523
+      },
+      {
+        "route": "/api/webhooks/github",
+        "httpStatus": "202",
+        "requests": 56,
+        "cpuMs": 3953.7539682539687,
+        "cpuPerRequestMs": 70.60274943310658
+      },
+      {
+        "route": "/api/conversations/[id]/messages",
+        "httpStatus": "200",
+        "requests": 45,
+        "cpuMs": 2175,
+        "cpuPerRequestMs": 48.333333333333336
+      },
+      {
+        "route": "/api/mobile/reactions",
+        "httpStatus": "200",
+        "requests": 41,
+        "cpuMs": 157.61904761904762,
+        "cpuPerRequestMs": 3.8443670150987224
+      },
+      {
+        "route": "/api/workspace",
+        "httpStatus": "200",
+        "requests": 38,
+        "cpuMs": 4007.8888888888887,
+        "cpuPerRequestMs": 105.47076023391813
+      },
+      {
+        "route": "/api/runs/mcp/[toolkit]",
+        "httpStatus": "200",
+        "requests": 36,
+        "cpuMs": 7173.333333333334,
+        "cpuPerRequestMs": 199.25925925925927
+      },
+      {
+        "route": "/api/workspace/switcher",
+        "httpStatus": "200",
+        "requests": 35,
+        "cpuMs": 1407.5,
+        "cpuPerRequestMs": 40.214285714285715
+      },
+      {
+        "route": "/api/agent/sessions",
+        "httpStatus": "200",
+        "requests": 33,
+        "cpuMs": 3147.781385281385,
+        "cpuPerRequestMs": 95.38731470549652
+      },
+      {
+        "route": "/api/factory/tasks/[taskId]/approval",
+        "httpStatus": "200",
+        "requests": 31,
+        "cpuMs": 1697.3333333333333,
+        "cpuPerRequestMs": 54.75268817204301
+      },
+      {
+        "route": "/v1/devices/[deviceId]/gateway",
+        "httpStatus": "401",
+        "requests": 29,
+        "cpuMs": 166.66666666666666,
+        "cpuPerRequestMs": 5.747126436781609
+      },
+      {
+        "route": "/api/settings/[read]",
+        "httpStatus": "200",
+        "requests": 28,
+        "cpuMs": 36204.58333333333,
+        "cpuPerRequestMs": 1293.0208333333333
+      },
+      {
+        "route": "/mikka/.well-known/workflow/v1/flow",
+        "httpStatus": "200",
+        "requests": 23,
+        "cpuMs": 19989.5,
+        "cpuPerRequestMs": 869.1086956521739
+      },
+      {
+        "route": "/api/bots/[botId]/computer",
+        "httpStatus": "200",
+        "requests": 21,
+        "cpuMs": 190,
+        "cpuPerRequestMs": 9.047619047619047
+      },
+      {
+        "route": "/api/live/ticket",
+        "httpStatus": "200",
+        "requests": 20,
+        "cpuMs": 360,
+        "cpuPerRequestMs": 18
+      },
+      {
+        "route": "/v1/runs/[runId]",
+        "httpStatus": "204",
+        "requests": 18,
+        "cpuMs": 36.83098591549296,
+        "cpuPerRequestMs": 2.0461658841940533
+      },
+      {
+        "route": "/v1/devices/[deviceId]/gateway",
+        "httpStatus": "200",
+        "requests": 16,
+        "cpuMs": 91.11111111111111,
+        "cpuPerRequestMs": 5.694444444444445
+      },
+      {
+        "route": "/v1/devices/[deviceId]/runs/[runId]/claim",
+        "httpStatus": "409",
+        "requests": 13,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "route": "/v1/devices/register",
+        "httpStatus": "200",
+        "requests": 12,
+        "cpuMs": 40.827586206896555,
+        "cpuPerRequestMs": 3.402298850574713
+      },
+      {
+        "route": "/api/factory/tasks/[taskId]",
+        "httpStatus": "200",
+        "requests": 11,
+        "cpuMs": 11310,
+        "cpuPerRequestMs": 1028.1818181818182
+      },
+      {
+        "route": "/[locale]/settings",
+        "httpStatus": "200",
+        "requests": 11,
+        "cpuMs": 2808.3333333333335,
+        "cpuPerRequestMs": 255.3030303030303
+      },
+      {
+        "route": "/api/bots/[botId]/computer",
+        "httpStatus": "503",
+        "requests": 10,
+        "cpuMs": 2638.6666666666665,
+        "cpuPerRequestMs": 263.8666666666667
+      },
+      {
+        "route": "/[locale]/sign-in",
+        "httpStatus": "200",
+        "requests": 10,
+        "cpuMs": 22120,
+        "cpuPerRequestMs": 2212
+      },
+      {
+        "route": "/v1/runs/[runId]/policy-snapshot",
+        "httpStatus": "200",
+        "requests": 10,
+        "cpuMs": 31.379310344827587,
+        "cpuPerRequestMs": 3.137931034482759
+      },
+      {
+        "route": "/api/subscriptions",
+        "httpStatus": "200",
+        "requests": 6,
+        "cpuMs": 1385,
+        "cpuPerRequestMs": 230.83333333333334
+      },
+      {
+        "route": "/v1/devices/[deviceId]/computer",
+        "httpStatus": "200",
+        "requests": 6,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "route": "/v1/devices/[deviceId]/runs/[runId]/claim",
+        "httpStatus": "200",
+        "requests": 5,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "route": "/v1/runs/[runId]/complete",
+        "httpStatus": "204",
+        "requests": 5,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "route": "/api/self-improvement",
+        "httpStatus": "200",
+        "requests": 4,
+        "cpuMs": 75,
+        "cpuPerRequestMs": 18.75
+      },
+      {
+        "route": "/api/conversations/[id]/members",
+        "httpStatus": "200",
+        "requests": 4,
+        "cpuMs": 1940,
+        "cpuPerRequestMs": 485
+      },
+      {
+        "route": "/api/cron/briefings",
+        "httpStatus": "200",
+        "requests": 4,
+        "cpuMs": 5530,
+        "cpuPerRequestMs": 1382.5
+      },
+      {
+        "route": "/v1/runs/[runId]/checkpoint",
+        "httpStatus": "204",
+        "requests": 4,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "route": "/api/webhooks/github",
+        "httpStatus": "204",
+        "requests": 3,
+        "cpuMs": 90,
+        "cpuPerRequestMs": 30
+      },
+      {
+        "route": "/api/computer/events",
+        "httpStatus": "200",
+        "requests": 3,
+        "cpuMs": 2694.5,
+        "cpuPerRequestMs": 898.1666666666666
+      },
+      {
+        "route": "/api/teams/directory",
+        "httpStatus": "200",
+        "requests": 3,
+        "cpuMs": 92.66666666666666,
+        "cpuPerRequestMs": 30.888888888888886
+      },
+      {
+        "route": "/v1/devices/[deviceId]/commands",
+        "httpStatus": "401",
+        "requests": 3,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "route": "/v1/devices/[deviceId]/runs/[runId]/subscription",
+        "httpStatus": "409",
+        "requests": 3,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "route": "/api/bots/[botId]/computer",
+        "httpStatus": "404",
+        "requests": 2,
+        "cpuMs": 315,
+        "cpuPerRequestMs": 157.5
+      },
+      {
+        "route": "/api/bots",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "route": "/api/coordinator/stream",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 6190,
+        "cpuPerRequestMs": 3095
+      },
+      {
+        "route": "/api/subscriptions/usage",
+        "httpStatus": "200",
+        "requests": 2,
+        "cpuMs": 3670,
+        "cpuPerRequestMs": 1835
+      },
+      {
+        "route": "/v1/devices/[deviceId]/heartbeat",
+        "httpStatus": "401",
+        "requests": 2,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "route": "/api/conversations/[id]/messages",
+        "httpStatus": "201",
+        "requests": 2,
+        "cpuMs": 463.75,
+        "cpuPerRequestMs": 231.875
+      },
+      {
+        "route": "/api/bots/[botId]",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 98.33333333333333,
+        "cpuPerRequestMs": 98.33333333333333
+      },
+      {
+        "route": "/api/bots/[botId]/computer/viewer",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 70,
+        "cpuPerRequestMs": 70
+      },
+      {
+        "route": "/api/integrations/composio",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 1400,
+        "cpuPerRequestMs": 1400
+      },
+      {
+        "route": "/api/mobile/bots/[id]",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "route": "/api/workspaces/[workspaceId]/computer-policy",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 2070,
+        "cpuPerRequestMs": 2070
+      },
+      {
+        "route": "/v1/runs/[runId]/tool-approval",
+        "httpStatus": "409",
+        "requests": 1,
+        "cpuMs": 0,
+        "cpuPerRequestMs": 0
+      },
+      {
+        "route": "/api/cron/user-facts",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 850,
+        "cpuPerRequestMs": 850
+      },
+      {
+        "route": "/api/cron/suggestions-reconcile",
+        "httpStatus": "200",
+        "requests": 1,
+        "cpuMs": 3250,
+        "cpuPerRequestMs": 3250
+      }
+    ],
+    "deploymentIds": [
+      "dpl_4RqUZM5Yb3Nk5Sx3Kqeb8KdHJ4Gb",
+      "dpl_7xMAeC9jxMmtF4aajmSW5rYYaNjT",
+      "dpl_B4XZsPZ5VBR5tg1gayN6jNN6dJwP",
+      "dpl_BKKMKTJtGFEPk4bDpE4QTGLnTCaZ",
+      "dpl_G64SurRdbYwX6H42AQBoxjUeRMrA",
+      "dpl_H7j3AfQRKPosNGitoCVSTG6K5FAM"
+    ]
+  },
+  "neon": {
+    "projectId": "autumn-fire-21908520",
+    "orgId": "org-sweet-lab-80289846",
+    "metric": "public_network_transfer_bytes",
+    "granularity": "hourly",
+    "requestedFrom": "2026-11-04T18:00:00.000Z",
+    "requestedTo": "2026-11-04T19:00:00.000Z",
+    "reportedThrough": "2026-11-04T19:00:00.000Z",
+    "coverage": "requested_hour_returned",
+    "bytes": 60516203,
+    "buckets": [
+      {
+        "from": "2026-11-04T18:00:00.000Z",
+        "to": "2026-11-04T19:00:00.000Z",
+        "bytes": 60516203,
+        "periodStart": "2026-11-03T10:56:54.000Z"
+      }
+    ],
+    "scope": "project_all_branches",
+    "finality": "returned_provider_bucket_not_an_independent_billing_finality_receipt"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "workflowRunId": 41905292130,
+  "artifactId": 13359359707,
+  "artifactZipBytes": 10918,
+  "artifactZipSha256": "eefca640b7c20351f3eedd86a7786f95a41d6116c29f655ca1564ccb34fb860f",
+  "checkerSha": "0feefc5c1b0e81eea1082b8e3152761be4975ea2",
+  "files": {
+    "README.md": {
+      "bytes": 5009,
+      "sha256": "ee2300f00be02fb836c2a2acf8df72f71e59edc43a38ca2cd944e29d282be787"
+    },
+    "report.json": {
+      "bytes": 85773,
+      "sha256": "21c5314744bc7696f195deb7801ceaa4e1266faee03fbdea0a7dad4fb24ba910"
+    },
+    "summary.md": {
+      "bytes": 17116,
+      "sha256": "afa4dd10d2869918502c1d0a5df04ce7f6964baacf995aeeeed97e64568d2dd5"
+    },
+    "posthog-hour-query.sql": {
+      "bytes": 689,
+      "sha256": "4394d525e45069734363038e4509a9a3a9a835cc2faafd656b41444d2320f220"
+    },
+    "posthog-hour-result.psv": {
+      "bytes": 2187,
+      "sha256": "25efa12a3f340754dc10dd2a70bf2d4dd20e980bde7448109ac7d6c1f78181d0"
+    },
+    "posthog-hour-alignment.json": {
+      "bytes": 3220,
+      "sha256": "865bce330aeb42728051dd383f0263c87b2ce9e85d9be8b4010e0a63266b1dac"
+    }
+  }
+}
