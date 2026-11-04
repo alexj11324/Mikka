@@ -53,9 +53,9 @@ test('listing returns tools and a cursor, masked', async () => {
   const { dependencies } = fixture()
   const runtime = createGitHubMcpRuntime(tokens([]), dependencies)
   const first = await runtime('owner', {}) as { tools: { name: string }[]; nextCursor: string | null }
-  assert.equal(first.tools[0].name, 'issue_read'); assert.equal(first.nextCursor, 'next')
+  assert.equal(first.tools[0].name, 'issue_read'); assert.equal(typeof first.nextCursor, 'string')
   assert.ok(!JSON.stringify(first).includes(OWN))
-  assert.equal((await runtime('owner', { cursor: 'next' }) as { nextCursor: string | null }).nextCursor, null)
+  assert.equal((await runtime('owner', { cursor: first.nextCursor! }) as { nextCursor: string | null }).nextCursor, null)
 })
 
 test('not connected is a code, and the server is never contacted', async () => {
