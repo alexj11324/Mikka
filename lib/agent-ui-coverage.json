@@ -42,7 +42,7 @@
     { "element": "Question", "beui": ["approval-card"], "match": "functional", "usage": "active", "note": "单选、多选、自由回答、多步骤及原位提交重试。" },
     { "element": "Queue", "beui": ["todo-list"], "match": "partial", "usage": "available", "note": "可展示任务列表，不提供消息队列调度。" },
     { "element": "Reasoning", "beui": ["agent-activity"], "match": "partial", "usage": "available", "note": "可折叠活动，仅供真实允许披露的宿主数据。" },
-    { "element": "Shimmer", "beui": ["loader"], "match": "functional", "usage": "active", "note": "回复前的等待状态使用 affectUI Thinking Loader（components/ui/thinking-loader-clean.tsx，MIT），阶段由宿主根据流事件控制。" },
+    { "element": "Shimmer", "beui": ["loader"], "match": "functional", "usage": "active", "note": "回复前的等待状态和思考、工具轨迹使用 shadcn Trace（components/ui/trace.tsx）的进行中状态，由宿主根据流事件控制。" },
     { "element": "Sources", "beui": ["citations", "streaming-response"], "match": "functional", "usage": "available", "note": "引用列表与来源摘要，不编造来源。" },
     { "element": "Suggestion", "beui": ["button"], "match": "partial", "usage": "active", "note": "使用 beUI Button 组合建议按钮，没有独立 Suggestion 组件。" },
     { "element": "Task", "beui": ["todo-list"], "match": "functional", "usage": "active", "note": "任务状态、进度和完成计数。" },

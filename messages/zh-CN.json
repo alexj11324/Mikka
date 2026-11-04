@@ -3199,7 +3199,8 @@
     },
     "activity": {
       "thinking": "思考中",
-      "reading": "阅读结果",
+      "running": "正在{tool}",
+      "failed": "{tool}失败",
       "thought": "思考了 {seconds} 秒",
       "thoughtStored": "已思考",
       "tool": "使用工具",

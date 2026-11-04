@@ -3,7 +3,7 @@ import type { Page, TestInfo } from '@playwright/test'
 import { Pool } from 'pg'
 import { test, expect, register } from './fixtures'
 
-// The Thinking Loader (「思考中」) is for work the person is waiting on. After the turn
+// The Thinking row (「思考中」) is for work the person is waiting on. After the turn
 // stores its reply, the workflow still finishes up (execution record, phone
 // push decision, next inbox read, lease release) for a few seconds; the line
 // must not stay under the finished reply. A message sent meanwhile is still

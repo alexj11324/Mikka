@@ -1,6 +1,6 @@
 import { assertNoSecret, type SecretFingerprint } from '@/lib/credentials/fingerprint'
 import { QUIET_REPLY } from '@/lib/attention/handoff'
-import { credentialMasker, maskDeep } from '@/lib/secrets/mask'
+import { credentialMasker, identityMasker, maskDeep, maskStreamStep, withCredentialMasking } from '@/lib/secrets/mask'
 import type { CoordinatorStreamEvent, CoordinatorWorkflowStreamPart } from './stream'
 import { TOOL_PREVIEW_CHARS } from './chat-projection'
 import { HIDDEN_TOOLS, jsonbText } from './context'
@@ -19,7 +19,7 @@ function preview(userId: string, value: unknown, fingerprints: SecretFingerprint
   return text
 }
 
-/** A finished thinking block as the chat may show it: masked like stored messages; nothing if it holds a saved secret. */
+/** A stored thinking block as the chat may show it: masked like stored messages; nothing if it holds a saved secret. */
 export function reasoningText(userId: string, text: string, fingerprints: SecretFingerprint[]): string | undefined {
   const masked = credentialMasker(text.trim())
   if (!masked) return undefined
@@ -27,10 +27,16 @@ export function reasoningText(userId: string, text: string, fingerprints: Secret
   return masked
 }
 
+/** Credential patterns as a stream masks them: a token still growing at the end is held back until it ends. */
+const reasoningMasker = withCredentialMasking(identityMasker)
+
+/** One thinking block as it streams: masked text released so far (`buf`), what was sent of it, the raw tail held back. */
+type ReasoningBlock = { pending: string; buf: string; sent: number; blocked: boolean }
+
 /**
  * What leaves the durable model stream: assistant text, each tool's name, state and short masked previews,
- * when the model starts and stops thinking, and each finished thinking block's text, masked. Whole tool inputs and
- * outputs stay server-side.
+ * when the model starts and stops thinking, and its reasoning as it streams, masked like the text. Whole tool
+ * inputs and outputs stay server-side.
  */
 export function coordinatorTextStream(userId: string, fingerprints: SecretFingerprint[]) {
   const holdback = Math.max(0, ...fingerprints.map(entry => entry.length - 1))
@@ -40,8 +46,32 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
   let sent = 0
   let stepStart = 0
   let stepText = ''
-  /** Reasoning text so far, by reasoning block. */
-  const reasoning = new Map<string, string>()
+  /** Thinking blocks streaming now, by reasoning block id. */
+  const reasoning = new Map<string, ReasoningBlock>()
+  /** The turn's reasoning sent so far, and where this model step's part of it starts (a retried step drops it). */
+  let thought = ''
+  let stepThought = 0
+
+  /**
+   * Sends what is safe of a thinking block: credential patterns are masked by `maskStreamStep`; the last `holdback`
+   * characters wait for the next delta so a saved secret is always checked whole before any of it leaves, as the
+   * text does. A saved secret stops the block: nothing more of it is sent.
+   */
+  function think(controller: TransformStreamDefaultController<CoordinatorStreamEvent>, block: ReasoningBlock, delta: string, final = false) {
+    if (!id || block.blocked) return
+    const step = maskStreamStep(reasoningMasker, block.pending, delta, final)
+    block.pending = step.pending
+    block.buf += step.release
+    // The first words of a block start at its first non-space character.
+    if (!block.sent) block.buf = block.buf.trimStart()
+    try { assertNoSecret(userId, block.buf.slice(Math.max(0, block.sent - holdback)), fingerprints) } catch { block.blocked = true; return }
+    const through = final ? block.buf.trimEnd().length : Math.max(0, block.buf.length - holdback)
+    if (through <= block.sent) return
+    const piece = (!block.sent && thought ? '\n\n' : '') + block.buf.slice(block.sent, through)
+    block.sent = through
+    thought += piece
+    controller.enqueue({ type: 'thinking', id, state: 'delta', text: piece })
+  }
 
   function publish(controller: TransformStreamDefaultController<CoordinatorStreamEvent>, complete = false) {
     if (!id) return
@@ -58,7 +88,7 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
       if (part.type === 'coordinator-turn-start') {
         id = part.id
         quietEligible = part.quietEligible
-        text = ''; sent = 0; stepStart = 0; stepText = ''; reasoning.clear()
+        text = ''; sent = 0; stepStart = 0; stepText = ''; reasoning.clear(); thought = ''; stepThought = 0
         controller.enqueue({ type: 'start', id })
       } else if (part.type === 'coordinator-turn-committed') {
         if (part.id !== id) throw new Error('coordinator_stream_turn_mismatch')
@@ -68,9 +98,14 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
       } else if (id && type === 'start-step') {
         stepStart = text.length
         stepText = ''
+        stepThought = thought.length
       } else if (id && part.type === 'reset-step') {
         // A retried durable model step replaces its partial attempt, keeping earlier completed steps.
         reasoning.clear()
+        if (thought.length > stepThought) {
+          thought = thought.slice(0, stepThought)
+          if (!quietEligible) controller.enqueue({ type: 'thinking', id, state: 'reset', text: thought })
+        }
         text = text.slice(0, stepStart)
         stepText = ''
         const through = Math.min(sent, Math.max(0, text.length - holdback))
@@ -90,15 +125,16 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
         const output = part.type === 'tool-result' ? preview(userId, part.output, fingerprints) : undefined
         controller.enqueue({ type: 'tool', id, call: part.toolCallId, name: part.toolName, state, ...(input ? { input } : {}), ...(output ? { output } : {}) })
       } else if (id && part.type === 'reasoning-start') {
-        reasoning.set(part.id, '')
+        reasoning.set(part.id, { pending: '', buf: '', sent: 0, blocked: false })
         if (!quietEligible) controller.enqueue({ type: 'thinking', id, state: 'start' })
       } else if (id && part.type === 'reasoning-delta') {
-        reasoning.set(part.id, (reasoning.get(part.id) ?? '') + part.text)
+        const block = reasoning.get(part.id)
+        if (block && !quietEligible) think(controller, block, part.text)
       } else if (id && part.type === 'reasoning-end') {
-        // Whole blocks only: a credential split over deltas is masked as one string, never streamed in halves.
-        const thought = reasoningText(userId, reasoning.get(part.id) ?? '', fingerprints)
+        const block = reasoning.get(part.id)
+        if (block && !quietEligible) think(controller, block, '', true)
         reasoning.delete(part.id)
-        if (!quietEligible) controller.enqueue({ type: 'thinking', id, state: 'end', ...(thought ? { text: thought } : {}) })
+        if (!quietEligible) controller.enqueue({ type: 'thinking', id, state: 'end' })
       } else if (id && part.type === 'error') {
         controller.enqueue({ type: 'error' })
       }

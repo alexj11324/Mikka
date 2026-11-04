@@ -3199,7 +3199,8 @@
     },
     "activity": {
       "thinking": "Thinking",
-      "reading": "Reading results",
+      "running": "{tool}",
+      "failed": "{tool} failed",
       "thought": "Thought for {seconds, plural, one {# second} other {# seconds}}",
       "thoughtStored": "Thought",
       "tool": "Use a tool",
