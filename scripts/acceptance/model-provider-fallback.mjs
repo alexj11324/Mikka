@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Issue #1225 / PR #1232 only. Ordinary owner HTTP sessions and real tasks.
+/** Issue #1225 / PRs #1232 and #1249 only. Ordinary owner HTTP sessions and real tasks.
  * Credentials, cookies, upstream bodies and chat text never enter the report.
  * Unit fixtures prove this driver's guards, not production model acceptance. */
 import { createHash } from 'node:crypto'
@@ -12,6 +12,8 @@ import { assertFlashTestModel } from '../test-model-policy.mjs'
 
 export const ORIGIN = 'https://app.aspectlylabs.com'
 export const REPOSITORY = 'alexj11324/Mikka'
+export const FEATURE_PULL_REQUEST = 1232
+export const ACCEPTANCE_PULL_REQUEST = 1249
 export const CASES = [
   { id: 'deepseek_402_fallback', model: 'deepseek-flash', provider: 'deepseek', harness: 'claude_code', kind: 'api_key' },
   { id: 'official_claude', model: 'claude-haiku-5-5', provider: 'claude', harness: 'claude_code', kind: 'subscription' },
@@ -26,6 +28,7 @@ const actionsAllowed = new Set(['getIssueThread', 'changeModelOrder', 'getIssue'
 const serverCodes = new Set(['authRequired', 'workspaceAccessDenied', 'executionModelUnknown', 'executionAccountUnavailable', 'executionRuleOrderInvalid', 'modelUnavailable', 'botNotFound', 'factoryStale', 'factoryStopped', 'factoryNotFound', 'factoryLifecycleUnavailable', 'factoryUnavailable', 'issueOutdated', 'runChainEnded', 'runNotFound', 'subscription_unavailable', 'backend_unavailable', 'validationGeneric'])
 const codes = new Set([
   'configuration_required', 'origin_rejected', 'merge_scope_rejected', 'build_mismatch', 'build_mapping_required',
+  'deployment_proof', 'application_ancestry', 'web_deploy', 'merge_read_failed', 'merge_changed',
   'account_required', 'sign_in_failed', 'session_missing', 'session_identity', 'workspace_missing',
   'request_failed', 'http_refused', 'response_invalid', 'action_missing', 'action_not_allowed', 'action_refused',
   'source_missing', 'source_ambiguous', 'source_blocked', 'cloud_unavailable', 'worker_release',
@@ -57,21 +60,75 @@ export function publicFailure(error) {
   }
 }
 
-export function mergeGuard({ repository, ref, eventName, event, pr }) {
-  const expected = pr?.merge_commit_sha
-  check(repository === REPOSITORY && ref === 'refs/heads/main' && pr?.number === 1232 && pr.merged === true
-    && pr.base?.ref === 'main' && pr.base?.repo?.full_name === REPOSITORY && sha(expected)
-    && /(?:refs?|fix(?:es)?|clos(?:e[sd]?|ing)|resolv(?:e[sd]?|ing))\s+(?:https:\/\/github\.com\/alexj11324\/Mikka\/issues\/)?#?1225\b/i.test(pr.body ?? ''), 'merge_scope_rejected')
+export function mergeGuard({ repository, ref, eventName, event, pr, acceptancePr }) {
+  const valid = (value, number) => value?.number === number && value.merged === true
+    && value.base?.ref === 'main' && value.base?.repo?.full_name === REPOSITORY && sha(value.merge_commit_sha)
+    && /(?:refs?|fix(?:es)?|clos(?:e[sd]?|ing)|resolv(?:e[sd]?|ing))\s+(?:https:\/\/github\.com\/alexj11324\/Mikka\/issues\/)?#?1225\b/i.test(value.body ?? '')
+  check(repository === REPOSITORY && ref === 'refs/heads/main' && valid(pr, FEATURE_PULL_REQUEST)
+    && valid(acceptancePr, ACCEPTANCE_PULL_REQUEST), 'merge_scope_rejected')
+  let guardPr, mode
   if (eventName === 'workflow_run') {
     const run = event?.workflow_run
-    check(run?.name === 'Web deploy' && run.conclusion === 'success' && run.status === 'completed'
-      && run.head_branch === 'main' && run.head_sha === expected && run.head_repository?.full_name === REPOSITORY
-      && (run.head_commit?.message?.includes('(#1232)') || run.pull_requests?.some(item => item.number === 1232)),
-    'merge_scope_rejected')
-    return { sha: expected, mode: 'active' }
+    guardPr = [pr, acceptancePr].find(value => value.merge_commit_sha === run?.head_sha
+      && (run.head_commit?.message?.includes(`(#${value.number})`) || run.pull_requests?.some(item => item.number === value.number)))
+    check(guardPr && run.name === 'Web deploy' && run.event === 'push' && run.conclusion === 'success' && run.status === 'completed'
+      && run.head_branch === 'main' && run.head_repository?.full_name === REPOSITORY, 'merge_scope_rejected')
+    mode = 'active'
+  } else {
+    mode = event?.inputs?.mode ?? 'preflight'
+    const number = Number(event?.inputs?.guard_pr ?? ACCEPTANCE_PULL_REQUEST)
+    guardPr = [pr, acceptancePr].find(value => value.number === number)
+    check(eventName === 'workflow_dispatch' && guardPr && ['preflight', 'active'].includes(mode), 'merge_scope_rejected')
   }
-  check(eventName === 'workflow_dispatch' && ['preflight', 'active'].includes(event?.inputs?.mode ?? 'preflight'), 'merge_scope_rejected')
-  return { sha: expected, mode: event?.inputs?.mode ?? 'preflight' }
+  return Object.freeze({ featureMergeSha: pr.merge_commit_sha, guardPullRequest: guardPr.number,
+    guardMergeSha: guardPr.merge_commit_sha, driverRevision: acceptancePr.merge_commit_sha, mode })
+}
+
+function successfulRun(runs, revision, name, path) {
+  return Array.isArray(runs) ? runs.find(run => run && Number.isSafeInteger(run.id) && run.id > 0 && run.name === name && run.path === path
+    && run.event === 'push' && run.head_branch === 'main' && run.head_sha === revision
+    && run.head_repository?.full_name === REPOSITORY && run.status === 'completed' && run.conclusion === 'success') : undefined
+}
+
+/** Read the live application before any smoke credential is loaded. A newer
+ * main release is eligible only when it contains the authorized issue merge. */
+export async function resolveAcceptanceDeployment({ guard, githubToken, fetchImpl = fetch }) {
+  check(guard && [FEATURE_PULL_REQUEST, ACCEPTANCE_PULL_REQUEST].includes(guard.guardPullRequest)
+    && [guard.featureMergeSha, guard.guardMergeSha, guard.driverRevision].every(sha)
+    && ['preflight', 'active'].includes(guard.mode), 'merge_scope_rejected')
+  async function read(url, github = false) {
+    let response
+    try {
+      response = await fetchImpl(url, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(30_000),
+        headers: { accept: 'application/json', 'cache-control': 'no-store',
+          ...(github && githubToken ? { authorization: `Bearer ${githubToken}` } : {}) } })
+    } catch { throw new AcceptanceError('deployment_proof') }
+    check(response.ok, 'deployment_proof')
+    const value = await response.json().catch(() => null)
+    check(value !== null, 'deployment_proof')
+    return value
+  }
+  const versionUrl = `${ORIGIN}/mikka/api/version`
+  const revision = (await read(versionUrl)).build
+  check(sha(revision), typeof revision === 'string' && revision.startsWith('dpl_') ? 'build_mapping_required' : 'build_mismatch')
+  for (const base of new Set([guard.featureMergeSha, guard.guardMergeSha, guard.driverRevision])) {
+    const compared = await read(`https://api.github.com/repos/${REPOSITORY}/compare/${base}...${revision}`, true)
+    check(['ahead', 'identical'].includes(compared.status) && compared.base_commit?.sha === base
+      && compared.merge_base_commit?.sha === base, 'application_ancestry')
+  }
+  const runs = await read(`https://api.github.com/repos/${REPOSITORY}/actions/workflows/web-deploy.yml/runs?event=push&head_sha=${revision}&per_page=100`, true)
+  const deployed = successfulRun(runs.workflow_runs, revision, 'Web deploy', '.github/workflows/web-deploy.yml')
+  check(deployed, 'web_deploy')
+  assertVersion((await read(versionUrl)).build, revision)
+  return Object.freeze({ ...guard, revision, webDeployRunId: deployed.id })
+}
+
+/** A same-SHA successful official workflow is the runtime proof. Project-wide
+ * env values, another commit's release, and pending jobs cannot replace it. */
+export function officialRuntimeProof(revision, runs) {
+  check(sha(revision), 'configuration_required')
+  const run = successfulRun(runs, revision, 'E2B official instance runtime', '.github/workflows/e2b-official-runtime.yml')
+  return run ? Object.freeze({ kind: 'same_sha_official_runtime', sha: revision, runId: run.id }) : null
 }
 
 export function assertVersion(build, expectedSha) {
@@ -253,17 +310,26 @@ export async function assertWorkspaceIdle(read) {
 
 export async function runModelProviderAcceptance({ env = process.env, fetchImpl = fetch, wait = delay, now = Date.now } = {}) {
   const expectedSha = env.MIKKA_EXPECTED_DEPLOYMENT_SHA, mode = env.MIKKA_PROVIDER_ACCEPTANCE_MODE ?? 'preflight'
+  const featureMergeSha = env.MIKKA_FEATURE_MERGE_SHA, guardMergeSha = env.MIKKA_ACCEPTANCE_GUARD_MERGE_SHA
+  const guardPullRequest = Number(env.MIKKA_ACCEPTANCE_GUARD_PR), driverRevision = env.MIKKA_ACCEPTANCE_DRIVER_SHA
+  const webDeployRunId = Number(env.MIKKA_WEB_DEPLOY_RUN_ID)
   check(sha(expectedSha) && ['preflight', 'active'].includes(mode), 'configuration_required')
+  check([featureMergeSha, guardMergeSha, driverRevision].every(sha)
+    && [FEATURE_PULL_REQUEST, ACCEPTANCE_PULL_REQUEST].includes(guardPullRequest)
+    && Number.isSafeInteger(webDeployRunId) && webDeployRunId > 0, 'configuration_required')
   check(!env.MIKKA_ACCEPTANCE_BASE_URL || env.MIKKA_ACCEPTANCE_BASE_URL === ORIGIN + '/mikka', 'origin_rejected')
+  const workerRunId = Number(env.MIKKA_WORKER_RELEASE_RUN_ID)
+  const workerReady = env.MIKKA_WORKER_RELEASE_PROOF === 'same_sha_official_runtime'
+    && env.MIKKA_WORKER_RELEASE_SHA === expectedSha && Number.isSafeInteger(workerRunId) && workerRunId > 0
+  check(workerReady, 'worker_release')
   const email = env.SMOKE_OWNER_EMAIL, password = env.SMOKE_OWNER_PASSWORD
   check(isSmokeAccountEmail(email) && typeof password === 'string' && password.length > 0, 'account_required')
-  const workerRunId = Number(env.MIKKA_WORKER_RELEASE_RUN_ID)
-  const workerReady = env.MIKKA_WORKER_RELEASE_SHA === expectedSha && Number.isSafeInteger(workerRunId) && workerRunId > 0
   const timeoutMs = Number(env.MIKKA_PROVIDER_ACCEPTANCE_TIMEOUT_MS ?? 600_000)
   check(Number.isSafeInteger(timeoutMs) && timeoutMs >= 1000 && timeoutMs <= 1_200_000, 'configuration_required')
-  const report = { issue: 1225, pullRequest: 1232, revision: expectedSha, origin: ORIGIN, mode,
+  const report = { issue: 1225, pullRequest: FEATURE_PULL_REQUEST, featureMergeSha, guardPullRequest, guardMergeSha,
+    driverRevision, revision: expectedSha, webDeploy: { sha: expectedSha, runId: webDeployRunId }, origin: ORIGIN, mode,
     startedAt: new Date(now()).toISOString(), workerRelease: { ready: workerReady,
-      ...(workerReady ? { sha: expectedSha, runId: workerRunId } : {}) }, cases: [], status: 'running' }
+      kind: 'same_sha_official_runtime', sha: expectedSha, runId: workerRunId }, cases: [], status: 'running' }
   let cookie = '', ownerId, workspaceId, actionRefs = {}
   async function request(path, body, method = body === undefined ? 'GET' : 'POST', headers = {}) {
     const url = new URL(path.startsWith('/mikka/') ? path : '/mikka' + path, ORIGIN)
@@ -685,7 +751,12 @@ async function writeReport(report) {
   const directory = resolve('model-provider-fallback-report')
   await mkdir(directory, { recursive: true })
   await writeFile(`${directory}/results.json`, JSON.stringify(report, null, 2) + '\n', { mode: 0o600 })
-  const summary = ['## Issue #1225 provider acceptance', '', `Revision: ${report.revision ?? 'unavailable'}`, '',
+  const summary = ['## Issue #1225 provider acceptance', '', `Feature merge: ${report.featureMergeSha ?? 'unavailable'}`,
+    `Application revision: ${report.revision ?? 'unavailable'}`,
+    `Guard PR: ${report.guardPullRequest ? '#' + report.guardPullRequest : 'unavailable'} (${report.guardMergeSha ?? 'unavailable'})`,
+    `Acceptance driver: ${report.driverRevision ?? 'unavailable'}`,
+    `Web deploy: ${report.webDeploy?.runId ?? 'unavailable'}`,
+    `Runtime proof: ${report.workerRelease?.kind ?? 'unavailable'}; run ${report.workerRelease?.runId ?? 'unavailable'}`, '',
     `Mode: ${report.mode ?? 'preflight'}; result: ${report.status}`, '', '| Path | Result | Code |', '| --- | --- | --- |',
     ...(report.cases ?? []).map(item => `| ${item.case} | ${item.status} | ${item.code ?? ''} |`), '',
     'Reports contain only allowlisted evidence. A blocked path does not count as passed.', ''].join('\n')
