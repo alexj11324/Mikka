@@ -21,6 +21,7 @@ import { afterRunEnded } from '@/lib/run-completion-effects'
 import { notifyDeviceWork } from '@/lib/device-gateway-notify'
 import { deviceOnlineStates } from '@/lib/device-presence'
 import { ownE2BKeySql } from './secrets/e2b-owner-sql'
+import { readmitLostLocalRun, type AdmittedTakeover } from './run-repository-retry'
 
 const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -110,6 +111,10 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
     if (run.deviceId && presence.get(run.deviceId)) continue
     // Nothing waits on an offline device (设备离线时 is gone): another device takes it, else the person gets the card.
     const target = await takeoverTarget(run, now)
+    if (target && run.agentDefinition?.repositoryAdmission) {
+      await recoverAdmittedRun(run, target, now, true)
+      continue
+    }
     if (target) {
       await db.update(agentRuns).set({ deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, agentDefinition: await rebindExecutionDevice(pool, run, target.deviceId), updatedAt: now })
         .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
@@ -123,11 +128,10 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
 
 /**
  * Another online machine of the owner with the execution harness and
- * 参与调度 on. The target clones the same remote; the original agentId
- * stays as provenance.
+ * 参与调度 on. The target clones the same remote. Admitted local tasks
+ * use the target Agent and retain original provenance through retryOf.
  */
-async function takeoverTarget(run: { id: string; userId: string; agentId: string; deviceId: string | null; deviceRepoId: string | null; agentDefinition?: Run['agentDefinition'] }, now: Date): Promise<(TakeoverCandidate & { deviceRepoId: string }) | null> {
-  if (run.agentDefinition?.repositoryAdmission) return null
+async function takeoverTarget(run: { id: string; userId: string; agentId: string; deviceId: string | null; deviceRepoId: string | null; agentDefinition?: Run['agentDefinition'] }, now: Date): Promise<(TakeoverCandidate & { deviceRepoId: string; agentId: string }) | null> {
   if (!run.deviceRepoId) return null
   const [repo] = await db.select({ remoteUrl: deviceRepos.remoteUrl, repoPath: deviceRepos.repoPath }).from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
   const [agent] = await db.select({ harness: agents.harness }).from(agents).where(eq(agents.id, run.agentId)).limit(1)
@@ -140,11 +144,18 @@ async function takeoverTarget(run: { id: string; userId: string; agentId: string
     .orderBy(desc(devices.lastSeenAt))
   // Only devices with 参与调度 on (enabled, decision 2026-11-02-1400); servers first.
   const presence = await deviceOnlineStates(available.map(device => ({ id: device.deviceId, lastSeenAt: device.lastSeenAt })), now.getTime())
-  const candidates = available.filter(device => presence.get(device.deviceId)).sort((a, b) => Number(b.deviceType === 'server') - Number(a.deviceType === 'server'))
-  const target = pickTakeover(run.agentDefinition?.subscription ? candidates.filter(candidate => candidate.harnesses.some(info => info.harness === run.agentDefinition?.harness && info.subscriptionBroker)) : candidates, { remoteUrl: repo.remoteUrl, harness: run.agentDefinition?.harness ?? agent.harness, lostDeviceId: run.deviceId })
+  let candidates = available.filter(device => presence.get(device.deviceId)).sort((a, b) => Number(b.deviceType === 'server') - Number(a.deviceType === 'server'))
+  const harness = run.agentDefinition?.harness ?? agent.harness
+  // A fresh local admission needs B's real registered Agent; the old Agent
+  // remains provenance through retryOf, not a forged Agent/device pairing.
+  const registered = run.agentDefinition?.repositoryAdmission && candidates.length
+    ? await db.select({ id: agents.id, deviceId: agents.deviceId }).from(agents).where(and(eq(agents.userId, run.userId), eq(agents.harness, agent.harness), inArray(agents.deviceId, candidates.map(candidate => candidate.deviceId)))).orderBy(agents.id)
+    : []
+  if (run.agentDefinition?.repositoryAdmission) candidates = candidates.filter(candidate => registered.some(agent => agent.deviceId === candidate.deviceId))
+  const target = pickTakeover(run.agentDefinition?.subscription ? candidates.filter(candidate => candidate.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) : candidates, { remoteUrl: repo.remoteUrl, harness, lostDeviceId: run.deviceId })
   if (!target) return null
   const targetRepo = await ensureDeviceRepository(run.userId, target.deviceId, repo.remoteUrl)
-  return { ...target, deviceRepoId: targetRepo.id }
+  return { ...target, deviceRepoId: targetRepo.id, agentId: registered.find(agent => agent.deviceId === target.deviceId)?.id ?? run.agentId }
 }
 
 /**
@@ -190,6 +201,10 @@ async function reclaimLostRun(run: Run, now: Date) {
     if (ended) await announceEnd({ ...run, status: 'failed' })
     return
   }
+  if (target && run.agentDefinition?.repositoryAdmission) {
+    await recoverAdmittedRun(run, target, now)
+    return
+  }
   const retryId = crypto.randomUUID()
   const where = bound || cloud ? 'moved to the cloud' : 'handed to another device'
   const recovery = await (await import('@/lib/factory/handoff')).factoryRecoveryHandoff(pool, run, retryPrompt(run.prompt, outcome.attempt))
@@ -227,6 +242,20 @@ async function reclaimLostRun(run: Run, now: Date) {
     if (bound) await startThreadMachine({ userId: run.userId, workspaceId: bound.workspaceId }, retryId)
     if (cloud) await moveToCloud(run, cloud, outcome.attempt, now, recovery.briefing)
     else notifyDeviceWork(target?.deviceId ?? run.deviceId)
+  }
+}
+
+/** Both an expired execution and a queued retry that lost B need a new
+ * device-bound receipt. Never mutate an admitted queued run's placement. */
+async function recoverAdmittedRun(run: Run, target: AdmittedTakeover, now: Date, queued = false) {
+  const result = await readmitLostLocalRun(run, target, now, queued)
+  if (result.retried) {
+    stopRecordingsAfter([run.id])
+    await afterRunEnded(run.userId, run.id)
+    notifyDeviceWork(target.deviceId)
+  } else if (result.blocked) {
+    const ended = await endRun(run.id, queued ? ['queued'] : LEASED_RUN_STATUSES, { status: 'failed', error: result.blocked }, now, !queued, await noMachineCard())
+    if (ended) await announceEnd({ ...run, status: 'failed' })
   }
 }
 

@@ -273,6 +273,10 @@ export function createFactoryReconciler(
           const { rows: retrying } = await tx.query('SELECT 1 FROM agent_runs WHERE "retryOf"=$1 LIMIT 1', [run.id]);
           if (retrying.length)
             await store.apply(userId, binding(task), eventId, { action: "finish", status: "failed", reason: String(run.error ?? run.stopReason ?? "Run failed").slice(0, 4000), evidence: [], output: { runId: run.id, reasonCode: "run_failed" } }, tx);
+          else if (run.stopReason === "device_lost")
+            // The lease host already exhausted/denied safe takeover. A generic
+            // repair would silently dispatch back to that same offline device.
+            await store.apply(userId, binding(task), eventId, { action: "finish", status: "blocked", reason: String(run.error ?? "No authorized online device can continue this task").slice(0, 4000), evidence: [], output: { runId: run.id, reasonCode: "device_recovery_unavailable" } }, tx);
           else
             await failIntoRepairLoop(tx, store, userId, task, `run-completion:${run.id}`, `Run failed: ${String(run.error ?? run.stopReason ?? "unknown")}`, "run_failed", { runId: run.id });
         } else {
