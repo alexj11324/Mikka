@@ -1,0 +1,16 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for getByRole('button', { name: '打开右栏', exact: true })
+
+    at <anonymous> (/vercel/acceptance/computer-visual-capture-v7.mjs:70:104) {
+  log: [
+    "  - waiting for getByRole('button', { name: '打开右栏', exact: true })"
+  ],
+  name: 'TimeoutError'
+}
+
+Node.js v24.22.1

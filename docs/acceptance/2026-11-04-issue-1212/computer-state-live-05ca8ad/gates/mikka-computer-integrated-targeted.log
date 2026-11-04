@@ -1,0 +1,49 @@
+(node:7730) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:7730) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+(node:7730) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+✔ real computer uses its serialized SWR key, server deadline, and no periodic polling (22.609719ms)
+✔ a hidden panel with no selected Bot registers neither a key nor a live entity (3.247311ms)
+✔ only an authenticated state response selects the channel and a changed response changes the scope (4.097026ms)
+✔ mock pushes keep their existing patches and release the previous Bot listener (3.365408ms)
+✔ short-lived viewer grants keep their original renewal deadline and disabled behavior (2.327105ms)
+✔ a slow actual state fetch caches its request-start clock for expiry and remount calculations (32.091329ms)
+✔ computer deadlines choose the earliest observed expiry with a server-relative delay (1.779018ms)
+✔ wire parsing preserves deadline metadata and remains compatible with mock or older responses (4.458502ms)
+✔ slow transport, cached remounts and a changed wall clock cannot restart an observed deadline (0.364677ms)
+✔ only a fresh response that still observes a future expiry can rearm the same deadline (0.223976ms)
+(node:7736) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:7736) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ real PG: computer changes publish committed owner state without heartbeat polling
+  ✔ cold wake and takeover notify only the owned machine after real commits (551.391934ms)
+  ✔ outer rollback and rolled-back savepoints publish nothing (2.283329ms)
+  ✔ a policy provider failure rolls back the write and produces no invalidation (3.928542ms)
+  ✔ new and reappearing cloud approvals notify; unchanged seenAt heartbeats do not (21.204624ms)
+  ✔ a later invalid snapshot rolls back the earlier pending approval and its effect (4.036326ms)
+  ✔ decisions and withdrawal refresh the matching Bot; replay and foreign owners do not (29.227459ms)
+  ✔ the earliest actual approval expiry and run lease bound the server projection (15.876135ms)
+  ✔ handback and server-observed provider expiry refresh without guessing a local state (12.701019ms)
+  ✔ actual reconciliation and provider failure publish durable machine changes (138.865964ms)
+  ✔ active membership and persisted owner/workspace partition notifications (3.430373ms)
+✔ real PG: computer changes publish committed owner state without heartbeat polling (1079.818505ms)
+(node:7739) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:7739) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+(node:7739) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ rapid wake clicks send one request and show progress while a sleeping poll is stale (206.783042ms)
+✔ a real wake failure is visible and releases the button for an explicit retry (13.389062ms)
+✔ a required refresh disconnects the active viewer once and removes its listener on unmount (10.343493ms)
+✔ a page already requiring refresh never creates the viewer connection (7.600127ms)
+✔ refresh while the viewer module loads prevents its eventual connection (8.567793ms)
+✔ normal viewer unmount removes the update listener and does not stop the device (4.163251ms)
+✔ a remote viewer disconnect requests one authoritative state read; normal disposal does not (3.860833ms)
+✔ remote disconnect while hidden waits for the shared visibility catch-up (3.650994ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1486.727091

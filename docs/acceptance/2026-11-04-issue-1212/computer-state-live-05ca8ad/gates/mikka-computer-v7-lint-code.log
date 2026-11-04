@@ -1,0 +1,87 @@
+
+> next-app@0.0.1 lint:code /vercel/sandbox/mikka-computer-state-live-final
+> oxlint --deny-warnings && pnpm check:migrations && pnpm test:migrations && pnpm check:factory
+
+Found 0 warnings and 0 errors.
+Finished in 92ms on 2977 files with 96 rules using 8 threads.
+
+> next-app@0.0.1 check:migrations /vercel/sandbox/mikka-computer-state-live-final
+> node scripts/check-migrations.mjs
+
+migrations: 228 个迁移文件检查通过
+
+> next-app@0.0.1 test:migrations /vercel/sandbox/mikka-computer-state-live-final
+> node --test scripts/activity-actor-validation.test.mjs scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs scripts/migration-guard.test.mjs scripts/migration-steps.test.mjs scripts/migration-targets.test.mjs scripts/scope-migration-history.test.mjs scripts/integration-migration-history.test.mjs
+
+✔ actor checks are validated independently in replay-safe standalone files (2.358077ms)
+✔ 历史重号在白名单内通过 (2.525386ms)
+✔ 新的 NNNN_ 文件被拒绝 (0.356621ms)
+✔ 修改旧迁移被拒绝 (1.65745ms)
+✔ 删除旧迁移被拒绝 (0.252656ms)
+✔ 非法时间戳被拒绝 (0.30972ms)
+✔ 不晚于 main 最新迁移被拒绝 (0.22986ms)
+✔ 晚于 main 最新迁移通过 (0.217492ms)
+✔ 时间戳重复被拒绝 (0.203626ms)
+✔ 拿不到 main 时只跳过顺序检查 (0.256359ms)
+✔ consolidated migration aliases preserve immutable SQL and refuse ambiguous old receipts (6.474113ms)
+Retained test fixture: /tmp/migration-mode-LmHBae
+Retained test fixture: /tmp/migration-preview-target-cs3uli
+Retained test fixture: /tmp/code-only-build-A3qMP6
+Retained test fixture: /tmp/migration-preflight-lQop2x
+✔ explicit MIGRATE=0 exits before filesystem or database work in production (193.692488ms)
+✔ explicit Preview migration never connects to the global application target (56.649369ms)
+✔ the build runs migrations only after compilation and type checking succeed (14.962425ms)
+✔ all files preflight before a database connection, even if an earlier file is valid (45.865482ms)
+✔ Vercel production migrates only from main (1.881858ms)
+✔ outside Vercel MIGRATE=1 reaches only loopback databases unless --allow-remote (0.620003ms)
+✔ Vercel preview keeps its own preview database target (0.842535ms)
+✔ loopback detection (0.483051ms)
+✔ migrates unasked only in Vercel production or when every target is loopback off Vercel (0.246929ms)
+✔ only the explicit baseline precedes legacy migrations, without changing their IDs (3.146146ms)
+✔ missing baseline fails before connecting to any database (0.458781ms)
+✔ known legacy artifact compatibility runs before mainline artifact creation (0.192905ms)
+✔ BYOS migration aliases recognize both recorded branch histories without replay (5.337595ms)
+✔ Agent Kit migration alias requires its original exact SQL (0.442708ms)
+✔ local repository defaults only accepts the exact SQL under its historical name (0.282228ms)
+✔ device authorization recognizes its historical name only for identical SQL (0.249198ms)
+✔ publication migration keeps the exact historical SQL receipt (0.255433ms)
+✔ credential vault migration recognizes the exact previously applied Preview SQL (0.288526ms)
+✔ a normal file is sent whole, in one transaction (2.521182ms)
+✔ directives count only in the header (leading comment / blank lines) (0.515431ms)
+✔ no-transaction: exactly one statement, trailing semicolon optional, comments ignored (1.013301ms)
+✔ no-transaction rejects a second statement (QA: files used to be split on ;) (2.02757ms)
+✔ no-transaction rejects any $ quoting (0.242544ms)
+✔ no-transaction rejects BEGIN / COMMIT / END / ROLLBACK (0.256182ms)
+✔ empty files and misplaced CONCURRENTLY are rejected (0.189252ms)
+✔ assertIndexValid passes a valid index and fails a missing or INVALID one (0.533053ms)
+✔ index names are looked up the way Postgres stores them (0.202548ms)
+✔ QA string forms: the raw file is executed, never the stripped text (0.292577ms)
+✔ no-transaction: the ; count must survive comment stripping (0.225493ms)
+✔ all tracked SQL preflights without altering historical migration bytes (8.605244ms)
+✔ concurrent index plans carry their table and schema (4.02465ms)
+✔ dropInvalidIndex drops only an INVALID index on the expected table, concurrently and schema-qualified (0.568341ms)
+✔ Preview migration routes both targets to its configured branch, never the global application URL (1.987258ms)
+✔ production and local migration targets retain their separate configured URLs (0.183018ms)
+✔ scope aliases pin identical SQL and keep the two-body historical name ambiguous (4.299199ms)
+✔ all partial and mixed ledger models either preserve ordered progress or fail closed (156.451931ms)
+✔ a later recorded gate cannot prove which older verified-target body ran (0.597501ms)
+✔ actual runner model skips old DDL, applies only missing suffixes, and replays nothing on retry (7.876848ms)
+✔ renamed scope sources preserve the complete previous ledger without DDL or replacement entries (2.122763ms)
+✔ mixed previous and oldest unambiguous prefixes execute only the missing suffix (5.155458ms)
+✔ actual runner model refuses ambiguous, gapped or changed history before pending DDL (7.80259ms)
+✔ actual runner model rolls back DDL when the ledger write fails (1.614697ms)
+✔ an unrelated AgentKit ledger addition from 79 to 80 neither authorizes nor aliases scope DDL (3.797382ms)
+✔ actual runner model retains both DDL and ledger after lost COMMIT response; retry does not repeat it (4.202369ms)
+ℹ tests 55
+ℹ suites 0
+ℹ pass 55
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 394.138984
+
+> next-app@0.0.1 check:factory /vercel/sandbox/mikka-computer-state-live-final
+> node scripts/check-factory.mjs
+
+factory: mikka (1 repositories, 1 runners, digest 5d6471b07f847683d43313aa54bc48d3ee9ac02fdf9cc2a10142cac7f962743f)

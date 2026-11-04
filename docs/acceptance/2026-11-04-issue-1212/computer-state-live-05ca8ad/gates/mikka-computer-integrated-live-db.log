@@ -1,0 +1,61 @@
+
+> next-app@0.0.1 test:live-db /vercel/sandbox/mikka-computer-state-live-final
+> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/live/factory.db.test.ts lib/live/store.db.test.ts lib/live/ticket-session.db.test.ts lib/db/request-scope-live.db.test.ts lib/live/notification-context.db.test.ts lib/live/computer-state.db.test.ts
+
+▶ deferred post-commit reads retain their database and device authority after releasing the writer
+  ✔ live (17.614199ms)
+  ✔ revoked (11.425215ms)
+  ✔ closed (9.523926ms)
+✔ deferred post-commit reads retain their database and device authority after releasing the writer (657.117714ms)
+(node:8056) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:8056) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ real PG: computer changes publish committed owner state without heartbeat polling
+  ✔ cold wake and takeover notify only the owned machine after real commits (624.324611ms)
+  ✔ outer rollback and rolled-back savepoints publish nothing (2.151447ms)
+  ✔ a policy provider failure rolls back the write and produces no invalidation (3.83928ms)
+  ✔ new and reappearing cloud approvals notify; unchanged seenAt heartbeats do not (22.142315ms)
+  ✔ a later invalid snapshot rolls back the earlier pending approval and its effect (5.100178ms)
+  ✔ decisions and withdrawal refresh the matching Bot; replay and foreign owners do not (33.708753ms)
+  ✔ the earliest actual approval expiry and run lease bound the server projection (14.31022ms)
+  ✔ handback and server-observed provider expiry refresh without guessing a local state (11.625771ms)
+  ✔ actual reconciliation and provider failure publish durable machine changes (66.708364ms)
+  ✔ active membership and persisted owner/workspace partition notifications (3.071975ms)
+✔ real PG: computer changes publish committed owner state without heartbeat polling (1143.186596ms)
+▶ real PG: committed invalidations, savepoint rollback, and canonical owner/workspace targets
+  ✔ same-owner different-workspace and same-workspace different-owner targets stay separate (9.422923ms)
+  ✔ removed membership and a mismatched Bot owner cannot produce a target (5.46604ms)
+  ✔ personal issue lists and Bot task details keep their distinct canonical scopes when viewed from another workspace (9.454606ms)
+  ✔ outer COMMIT is visible to a separate connection before a queued effect runs (9.433372ms)
+  ✔ savepoint and failed-transaction rollback do not publish reverted state (3.331777ms)
+✔ real PG: committed invalidations, savepoint rollback, and canonical owner/workspace targets (135.882782ms)
+(node:8063) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:8063) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ real Factory notifications retain their database across COMMIT and delayed Next after callbacks
+  ✔ a real store COMMIT in the request and later scheduler invocation outside it retain the originating database (71.642594ms)
+  ✔ registration in the request survives COMMIT and scheduling in a different context, after visibility to another connection (15.277592ms)
+  ✔ an already committed Factory update uses the same public scheduling boundary (16.180683ms)
+  ✔ permission is read after scheduling, so suspended membership suppresses delivery even while the other database is still active (12.723159ms)
+  ✔ actual outer and savepoint rollbacks schedule no notification (19.439199ms)
+✔ real Factory notifications retain their database across COMMIT and delayed Next after callbacks (2212.729992ms)
+(node:8067) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:8067) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ the real Factory store schedules one invalidation only after its outer transaction commits
+  ✔ route waits for the caller COMMIT; reads and idempotent replay send nothing (46.632892ms)
+  ✔ a route rolled back by its caller never schedules work (4.833696ms)
+  ✔ a non-merge PR webhook refreshes the current Factory delivery after its update commits (460.548756ms)
+✔ the real Factory store schedules one invalidation only after its outer transaction commits (2178.095407ms)
+(node:8075) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:8075) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a real revoked Better Auth session cannot renew a live ticket through its still-valid cache cookie (954.538358ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7466.943133

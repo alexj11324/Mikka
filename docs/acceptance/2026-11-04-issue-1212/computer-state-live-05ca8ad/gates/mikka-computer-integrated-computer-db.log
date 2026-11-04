@@ -1,0 +1,27 @@
+
+> next-app@0.0.1 test:computer-db /vercel/sandbox/mikka-computer-state-live-final
+> node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts lib/computer/bot-runtime.db.test.ts lib/computer/provision.db.test.ts lib/computer/local-reviews.db.test.ts lib/computer/reconcile.db.test.ts tests/device-computer-migration.test.mjs tests/computer-policy-default-allow-migration.test.mjs
+
+✔ a bot runtime follows its computer to a new device and survives an unbound agent (807.730049ms)
+Retained local review test schema: local_review_a888514958d747abad2e1f5ae0d8c167
+✔ local decisions bind owner, device, live run and exact digest, and cannot be replayed (80.332098ms)
+✔ real PostgreSQL: a gone or out-of-date machine is replaced, unless a run lives on it (49.24533ms)
+✔ reconcileCloudMachines: a sandbox E2B no longer has stops claiming to run (852.944968ms)
+Desktop GitHub credential helper not installed { sandboxId: 'sandbox-test' }
+Desktop GitHub credential helper not installed { sandboxId: 'sandbox-test' }
+{"msg":"cloud_run_model_missing","runId":"c27ec567-687c-432b-81dd-9b5ecf303f9d","threadRunId":"thread-fixture","issueId":"01678101-21dc-48f6-822e-48c36640a42b","agentId":"29858689-09eb-4293-bd39-4bc1e8060d45"}
+{"msg":"cloud_run_model_missing","runId":"bc460cc0-1807-4085-9bf9-88761bde0bdd","threadRunId":"thread-fixture","issueId":"01678101-21dc-48f6-822e-48c36640a42b","agentId":"29858689-09eb-4293-bd39-4bc1e8060d45"}
+{"msg":"cloud_run_model_missing","runId":"556c6e0a-ab97-43d1-89b7-3ce801554345","threadRunId":"thread-fixture","issueId":"01678101-21dc-48f6-822e-48c36640a42b","agentId":"29858689-09eb-4293-bd39-4bc1e8060d45"}
+{"msg":"cloud_run_model_missing","runId":"3bb21166-fe37-4b47-85d3-6551ba30d348","threadRunId":"thread-fixture","issueId":"01678101-21dc-48f6-822e-48c36640a42b","agentId":"29858689-09eb-4293-bd39-4bc1e8060d45"}
+Retained computer test schema: computer_bdd0454ca2904f3ca195dafcf5a784e8
+✔ real PostgreSQL: allocation, owner boundary, control generations and recovery (834.417649ms)
+✔ computer policy migration retires ask: rows become allow, deny stays, new rows default to allow (36.70729ms)
+✔ local computer metadata migration preserves devices and reruns safely (32.773912ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5922.64522

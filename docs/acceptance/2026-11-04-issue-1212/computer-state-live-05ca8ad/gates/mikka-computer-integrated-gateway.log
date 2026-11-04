@@ -1,0 +1,100 @@
+
+> next-app@0.0.1 test:device-gateway /vercel/sandbox/mikka-computer-state-live-final
+> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/device-presence.test.ts lib/device-gateway-notify.test.ts lib/live/ticket.test.ts && node --import tsx --test lib/device-gateway-ticket.test.ts lib/live/scope.test.ts lib/live/channel.test.ts lib/db/commit-effects.test.ts cloudflare/device-gateway/src/route.test.ts cloudflare/device-gateway/src/live-route.test.ts && node --test cloudflare/device-gateway/test/runtime.test.mjs
+
+(node:8248) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:8248) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ committed work survives the response boundary, with bounded transient retries and no work body (314.263667ms)
+✔ an idle device stays available after its HTTP heartbeat expires, without writing the heartbeat (38.922017ms)
+✔ fresh legacy heartbeats do not call the gateway; page duplicates only read once (8.316812ms)
+✔ offline, expired, malformed and unavailable gateway responses never invent online state (9.997284ms)
+✔ presence does not follow redirects with its server credential (2.932553ms)
+✔ a gateway-online owned device can receive a dispatch after one hour idle; foreign and disabled devices cannot (3.754029ms)
+(node:8250) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:8250) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ the real ticket route requires a browser session before reading membership (83.288444ms)
+✔ unauthorized, suspended and malformed workspace selections cannot mint a ticket (2.492693ms)
+✔ the route signs the session owner and exact authorized workspace, ignoring a caller-supplied owner (1.910441ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 538.820009
+✔ a browser upgrade can reach only its signed owner/workspace object (28.296285ms)
+✔ only the authenticated publisher can deliver bounded invalidation keys (4.835558ms)
+✔ a push with the gateway secret wakes that device and carries no body (20.670233ms)
+✔ a push without the secret does not wake the device (0.457274ms)
+✔ the socket is refused until the ticket matches the device (1.472319ms)
+✔ the edge forwards only the authenticated protocol from an offered list (0.593921ms)
+✔ status is uncached and available only to the authenticated server (4.441466ms)
+✔ a refused status request does not create or wake a Durable Object (0.37307ms)
+✔ a composed writer waits for the outer commit and coalesces repeated entity changes (2.153064ms)
+✔ rollback and PostgreSQL COMMIT-as-ROLLBACK never publish (0.552352ms)
+✔ savepoint rollback removes only the reverted changes, including replacements of an earlier key (0.609141ms)
+✔ a failed commit cannot leave effects for a later transaction (0.672171ms)
+✔ callback query semantics and query-config objects remain supported (0.340245ms)
+✔ a ticket opens only its own device and only before it expires (1.446456ms)
+✔ push authorization compares the whole bearer header (0.187122ms)
+✔ duplicate badges share a connection and one revalidation per SWR key (3.564736ms)
+✔ online idle channels send pings and perform no polling reads (0.922573ms)
+✔ offline fallback waits at least 60 seconds; hidden tabs make no requests (0.922603ms)
+✔ a reconnect reconciles missed changes immediately and resets the offline fallback (0.787569ms)
+✔ unknown ids, kinds and payload fields cannot trigger revalidation (0.520836ms)
+✔ workspace teardown aborts a pending ticket and discards late events (0.389172ms)
+✔ ticket renewal reauthenticates and catches up without keeping an expired subscription (0.621898ms)
+✔ a late ticket cannot open a socket after the tab becomes hidden (0.301568ms)
+✔ a half-open socket becomes offline when pongs stop (0.436779ms)
+✔ a healthy socket catches a lost invalidation at the full ticket lifetime (0.73182ms)
+✔ a hung renewal still reconciles a lost invalidation after one offline fallback interval (0.80797ms)
+✔ stream bursts retain the last change without reading more often than the old two-second cadence (0.786523ms)
+✔ semantic changes bypass a pending stream delay and deduplicate the same SWR key (1.867336ms)
+✔ a change during an in-flight read gets one trailing read after it settles (0.484661ms)
+✔ hidden documents discard delayed reads and reconcile the current document on visibility return (0.370838ms)
+✔ teardown during a read cannot schedule an old owner or workspace trailing read (0.274066ms)
+✔ a server question deadline performs one catch-up read and never becomes a poll (0.37311ms)
+✔ hidden question deadlines make no reads; visibility and teardown reconcile or discard them (0.360674ms)
+✔ a subscriber joining an already healthy channel reconciles a read that started before its subscription (0.342738ms)
+✔ a new client on an old Worker keeps the sixty-second fallback despite healthy auto-pongs (0.430342ms)
+✔ capabilities are per-kind, including subscriptions added after the channel is ready (0.404628ms)
+✔ malformed readiness cannot suppress fallback, and a verified readiness stops only supported-key fallback (0.416443ms)
+✔ approval expiry still triggers one authoritative read when the old Worker has no capability announcement (0.308574ms)
+✔ moving the browser wall clock backwards cannot postpone a server-derived approval expiry (0.435268ms)
+✔ a backward wall-clock correction cannot postpone a pushed key beyond its existing pacing interval (0.392701ms)
+✔ updating or clearing a deadline retains the same subscription and cannot restart the same expiry (0.766429ms)
+✔ timing updates while hidden do not read, and updates after teardown cannot revive a subscription (0.613934ms)
+✔ updating read pacing retains the connection and applies the new spacing to subsequent pushes (0.458991ms)
+✔ only a newer real observation can rearm the same fired deadline, and an active deadline is never postponed (0.820825ms)
+✔ a fresh server-future observation whose conservative remaining time is zero gets only one immediate recheck (0.685966ms)
+✔ owner and workspace are both part of the signed channel; device tickets are another domain (1.852281ms)
+✔ the wire format refuses data, credentials and arbitrary entity kinds (1.00969ms)
+✔ gateway configuration uses the existing origin and refuses credential-bearing URLs (0.199715ms)
+ℹ tests 48
+ℹ suites 0
+ℹ pass 48
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 237.574223
+✔ Node built-in WebSocket opens against the Worker with its exact ticket protocol (184.443976ms)
+✔ real auto-pongs refresh presence and authenticated pushes reach the same socket (33.170807ms)
+✔ a real upgrade selects the validated ticket from multiple offered protocols (6.168041ms)
+✔ a client close without a status code completes without an invalid-code exception (5.405991ms)
+✔ status rejects a device ticket and wrong server secret, while an absent device is offline (7.305086ms)
+✔ a real socket upgrade refuses a ticket for another device (3.992681ms)
+✔ real browser tabs multicast within one owner/workspace and isolate peers and other workspaces (22.893718ms)
+✔ an expired browser ticket cannot receive later invalidations on an existing socket (1747.6623ms)
+✔ daemon reconnects retain their one-socket replacement and work signal (6.223887ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2367.139588

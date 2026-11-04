@@ -1,0 +1,13 @@
+file:///vercel/sandbox/mikka-computer-state-live-final/scripts/test-accounts/environment.mjs:19
+const fail = code => { throw new EnvironmentError(code) }
+                             ^
+
+EnvironmentError: DEPLOYMENT_ATTESTATION_REJECTED
+    at fail (file:///vercel/sandbox/mikka-computer-state-live-final/scripts/test-accounts/environment.mjs:19:30)
+    at assertDeploymentIdentity (file:///vercel/sandbox/mikka-computer-state-live-final/scripts/test-accounts/environment.mjs:120:61)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async <anonymous> (/vercel/acceptance/computer-visual-capture-v7.mjs:16:1) {
+  code: 'DEPLOYMENT_ATTESTATION_REJECTED'
+}
+
+Node.js v24.22.1

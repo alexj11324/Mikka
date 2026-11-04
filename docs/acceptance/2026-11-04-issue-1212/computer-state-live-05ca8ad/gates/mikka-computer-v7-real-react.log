@@ -1,0 +1,13 @@
+✔ real SWR stays quiet beyond the former two-second interval after computer capability is ready (2840.547635ms)
+✔ a real computer key event refreshes only its Bot through the shared SWR cache (1021.471075ms)
+✔ an unresolved state never guesses the Provider workspace; its authorized response chooses the actual channel (551.373746ms)
+✔ an observed computer expiry reads once without reopening the shared channel or restarting the expired deadline (3672.705153ms)
+✔ a new authorized observation re-arms an early deadline read for the same future expiry (4221.565829ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12882.225693

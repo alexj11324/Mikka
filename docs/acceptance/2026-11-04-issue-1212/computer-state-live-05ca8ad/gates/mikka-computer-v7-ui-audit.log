@@ -1,0 +1,8 @@
+
+> next-app@0.0.1 lint:ui /vercel/sandbox/mikka-computer-state-live-final
+> node scripts/lint-ui.mjs
+
+
+UI policy: 2440 business files, 0 errors; 286 component-library files excluded (no source verification).
+Interaction policy: 460 files, including downloaded business blocks; only UI/ReUI primitives excluded.
+{}

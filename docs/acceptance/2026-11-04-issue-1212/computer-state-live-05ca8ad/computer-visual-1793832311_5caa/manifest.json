@@ -1,0 +1,142 @@
+{
+  "commit": "05ca8adad57a2687fa5f376ccb7551977a19af68",
+  "environmentId": "local-706f09c5-5bd8-41e2-8b53-1996a57bcf6e",
+  "origin": "http://localhost:3362",
+  "startedAt": "2026-11-04T22:46:00.591Z",
+  "captures": [
+    {
+      "name": "zh-sleeping-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "at": "2026-11-04T22:46:07.264Z",
+      "sha256": "aefa501855e4b86336b85905fe02b7e78710814b09f0e046d44c680d1351df6f"
+    },
+    {
+      "name": "zh-sleeping-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "at": "2026-11-04T22:46:08.029Z",
+      "sha256": "7fbf429d0047875b690e2e3c91660b1aa1a7f8d2da01cf88d5739b82b1f75bef"
+    },
+    {
+      "name": "zh-sleeping-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "at": "2026-11-04T22:46:08.887Z",
+      "sha256": "3b0c60cf47d6515f489d8244e8e3b785d547b9650d9e226e5ff7a820419f8b68"
+    },
+    {
+      "name": "zh-sleeping-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "at": "2026-11-04T22:46:09.458Z",
+      "sha256": "7e2076a7a41824db7c4bfa576e208510d8ca49215e9d3d638c10c5e839e9010d"
+    },
+    {
+      "name": "en-sleeping-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "at": "2026-11-04T22:46:10.230Z",
+      "sha256": "746307c90943e4bb47da0c8fe8229f4ddcbe947648ebcc2c0dac148f2734ef7f"
+    },
+    {
+      "name": "en-sleeping-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "at": "2026-11-04T22:46:10.912Z",
+      "sha256": "87e52b2a681e6d7064378cbc3b2bc123a82c8c86dcf4f8bdd93dec6997653943"
+    },
+    {
+      "name": "en-sleeping-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "at": "2026-11-04T22:46:11.593Z",
+      "sha256": "44cd59ccb8793195de090195dc1bc8675385681f907f3692f169b9f840fc6e89"
+    },
+    {
+      "name": "en-sleeping-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "at": "2026-11-04T22:46:12.318Z",
+      "sha256": "4c6d617c478f369c508db62315b6234a8d64274c0394bb748bf02db34bdd2b3f"
+    }
+  ],
+  "stateReads": [
+    {
+      "at": "2026-11-04T22:46:07.070Z",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T22:46:07.810Z",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T22:46:08.673Z",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T22:46:09.300Z",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T22:46:10.009Z",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T22:46:10.699Z",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T22:46:11.444Z",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T22:46:12.098Z",
+      "status": 200
+    }
+  ],
+  "consoleErrors": [],
+  "httpFailures": [],
+  "limits": [
+    "Actual isolated production build, normal TestPool sign-up/sign-in, real HTTP and PostgreSQL; screenshot capture only, no browser test runner or intercepted routes.",
+    "Synthetic E2B key metadata is only a local display fixture with an explicit in-process verifier; no real key, provider, machine, model, or paid request.",
+    "The real authorized Computer API displays a sleeping computer with no allocated machine. These images do not prove healthy WebSocket or production traffic behavior."
+  ],
+  "fixture": {
+    "botId": "ab3d0b55-baa2-4eaf-959f-1a317d0b7051",
+    "workspaceId": "29033e40-5b00-41e5-834a-e6eabd4b9ea0",
+    "machineAllocated": false,
+    "state": "sleeping"
+  },
+  "finishedAt": "2026-11-04T22:46:12.319Z",
+  "audit": {
+    "files": 9,
+    "archives": 0,
+    "archiveEntries": 0,
+    "decodedBytes": 0,
+    "result": "passed",
+    "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+  },
+  "cleanup": {
+    "displayKeyRemoved": true,
+    "leaseState": "quarantined",
+    "accountPairQuarantined": true,
+    "at": "2026-11-04T22:46:12.373Z"
+  }
+}
