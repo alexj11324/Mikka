@@ -232,7 +232,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
     const { factoryBinding } = await import('../lib/factory/dispatch')
     const { latestThreadRunModel } = await import('../lib/computer/run-model')
-    const fixture = async (executeCount: number) => {
+    const fixture = async (executeCount: number, atExecution = false) => {
       const b = await person()
       const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `budget:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
       assert.ok(initial.runId, JSON.stringify(initial))
@@ -251,10 +251,14 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       const candidateId = randomUUID(), reviewId = randomUUID(), reviewAttemptId = randomUUID()
       const producer = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [producerRunId])).rows[0]
       const repo = (await pool.query('SELECT * FROM device_repos WHERE id=$1', [producer.deviceRepoId])).rows[0]
+      if (atExecution) {
+        await pool.query(`UPDATE factory_tasks SET stage='execute',status='failed',"attemptId"=(SELECT id FROM factory_attempts WHERE "taskId"=$1 AND stage='execute' ORDER BY position DESC LIMIT 1),"candidateId"=NULL,revision=revision+1 WHERE id=$1`, [task.id])
+      } else {
       await pool.query(`INSERT INTO factory_candidates (id,"taskId",kind,sha,repository,environment,scope,"runId") VALUES ($1,$2,'deliverable',NULL,$3,$4,'fixture',$5)`, [candidateId, task.id, repo.remoteUrl, `device:${producer.deviceId}`, producerRunId])
       await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",kind,status,prompt,"botId","agentDefinition","sessionId","stopReason","finishedAt") SELECT $1,"userId","issueId","agentId","deviceId","deviceRepoId",'acceptance','succeeded',prompt,"botId","agentDefinition",$2,'submitted',now() FROM agent_runs WHERE id=$3`, [reviewId, `review:${reviewId}`, producerRunId])
       await pool.query(`INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,"runId","sessionId","candidateId",reason,output) VALUES ($1,$2,'review',1,$3,'failed',$4,$5,$6,'Synthetic failed independent review',$7)`, [reviewAttemptId, task.id, executeCount + 1, reviewId, `review:${reviewId}`, candidateId, JSON.stringify({ requestEpoch: task.sourceEventId, completion: { runId: reviewId, trustedFailureProvenance: true } })])
       await pool.query(`UPDATE factory_tasks SET stage='review',status='failed',"attemptId"=$2,"candidateId"=$3,revision=revision+1 WHERE id=$1`, [task.id, reviewAttemptId, candidateId])
+      }
       const model = (await latestThreadRunModel(pool, b.id, b.issueId, producer.agentId))!
       const request = { issueId: b.issueId, agentId: producer.agentId, repo: repo.remoteUrl, ...model, threadRunId: producerRunId, note: 'Continue the same request.', requestKey: `budget:${randomUUID()}` }
       const snapshot = async () => (await pool.query(`SELECT jsonb_build_object(
@@ -283,6 +287,41 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       const before = await f.snapshot()
       await assert.rejects(queueTaskRun(f.b.id, f.request, f.b.botId, undefined, status === 'pending' ? f.task.sourceEventId : undefined), { code: 'factoryRecoveryBudgetExceeded' })
       assert.deepEqual(await f.snapshot(), before, 'no dispatch source, task revision, candidate, attempt, receipt or run changes')
+    })
+
+    for (const status of ['failed', 'blocked', 'waiting'] as const) await t.test(`exhausted ${status} execution cannot be retried by generic thread dispatch`, async () => {
+      const f = await fixture(4, true)
+      const { rows: [attempt] } = await pool.query('SELECT id FROM factory_attempts WHERE "taskId"=$1 AND stage=\'execute\' ORDER BY position DESC LIMIT 1', [f.task.id])
+      await pool.query('UPDATE factory_attempts SET status=$2 WHERE id=$1', [attempt.id, status])
+      await pool.query(`UPDATE factory_tasks SET stage='execute',status=$2,"attemptId"=$3,"candidateId"=NULL,revision=revision+1 WHERE id=$1`, [f.task.id, status, attempt.id])
+      const before = await f.snapshot()
+      await assert.rejects(queueTaskRun(f.b.id, f.request, f.b.botId), { code: 'factoryRecoveryBudgetExceeded' })
+      assert.deepEqual(await f.snapshot(), before, 'a retry cannot add a fifth execute attempt, source, receipt or run')
+    })
+
+    await t.test('direct Owner repair cannot replace a pending review after the same-epoch cap', async () => {
+      const f = await fixture(4)
+      const current = await f.retryReview()
+      const before = await f.snapshot()
+      const { handleFactory } = await import('../lib/factory/http')
+      const response = await handleFactory(factoryRuntimeForBot(f.b.botId).store, {
+        userId: f.b.id, method: 'POST', taskId: f.task.id, origin: 'http://127.0.0.1', url: 'http://127.0.0.1/mikka/api/factory',
+        body: { binding: { taskId: current.id, revision: current.revision }, eventId: randomUUID(), action: 'repair', reason: 'Repair the same candidate.' },
+      })
+      assert.deepEqual(response, { status: 409, body: { error: 'factoryRecoveryBudgetExceeded' } })
+      assert.deepEqual(await f.snapshot(), before, 'the normal Owner API cannot create a fifth execution to dispatch later')
+    })
+
+    await t.test('direct Owner retry cannot create a fifth same-epoch execution', async () => {
+      const f = await fixture(4, true)
+      const before = await f.snapshot(), current = before.task
+      const { handleFactory } = await import('../lib/factory/http')
+      const response = await handleFactory(factoryRuntimeForBot(f.b.botId).store, {
+        userId: f.b.id, method: 'POST', taskId: f.task.id, origin: 'http://127.0.0.1', url: 'http://127.0.0.1/mikka/api/factory',
+        body: { binding: { taskId: current.id, revision: current.revision }, eventId: randomUUID(), action: 'retry', reason: 'Retry the same execution.' },
+      })
+      assert.deepEqual(response, { status: 409, body: { error: 'factoryRecoveryBudgetExceeded' } })
+      assert.deepEqual(await f.snapshot(), before)
     })
 
     await t.test('same-epoch continuation within budget queues the fourth execution once', async () => {

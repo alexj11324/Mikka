@@ -6,6 +6,7 @@ import { Pool } from 'pg';
 import { orderMigrations } from '../../scripts/migration-order.mjs';
 import { createFactoryStore } from './store';
 import { factoryCriteria } from './task-detail';
+import { citedQuestionCommandSources } from './question-command-sources';
 import { refreshPublishedPullRequest } from '../github/publication-webhook';
 import { dropTestDatabase } from '../../tests/support/drop-test-database';
 
@@ -75,6 +76,20 @@ test('task detail GET exposes criteria and delivery without unused fields or wri
     assert.equal(review.criteria[1].criterionId, null);
     assert.deepEqual(review.verify, { status: 'passed', command: 'pnpm test', exitCode: 0 });
     assert.deepEqual(detail.delivery, { candidateSha: sha, previewDatabaseBranch: 'preview/ac-7', machineName: 'Build server', repository: 'o/r', environment: 'device:x', pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' }, previewUrl: null, deploymentEnvironment: null }, 'no receipt: deploymentEnvironment null');
+
+    const source = { runId: randomUUID(), sessionId: 'prior-question-session', status: 'stopped',
+      recoveryEventId: randomUUID(), candidateSha: sha, outputChunkId: randomUUID(), observedAt: '2026-11-04T12:03:04.000Z' };
+    await pool.query('UPDATE factory_attempts SET output=$2 WHERE id=$1', [reviewAttempt,
+      JSON.stringify({ check: { candidateId, sha, questionCommandSources: [source] } })]);
+    await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1', [reviewRun,
+      JSON.stringify({ ...report, criteria: [{ text: 'Producer command', passed: true, evidence: 'Checked run-chunk:' + source.outputChunkId }] })]);
+    const attributed = await store.read('owner', taskId);
+    assert.deepEqual(attributed.checks?.[0].commandSources, [{ runId: source.runId, sessionId: source.sessionId, status: source.status,
+      recoveryEventId: source.recoveryEventId, observedAt: source.observedAt }], 'GET joins the actual citation to host-frozen candidate provenance');
+    assert.equal(attributed.checks?.[0].status, 'passed', 'attribution never changes a verdict');
+    await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1', [reviewRun, JSON.stringify(report)]);
+    assert.equal((await store.read('owner', taskId)).checks?.[0].commandSources, undefined, 'an uncited source is not represented as used');
+    await pool.query("UPDATE factory_attempts SET output='{}' WHERE id=$1", [reviewAttempt]);
 
     await refreshPublishedPullRequest('pull_request', { repository: { full_name: 'o/r' }, pull_request: { number: 7, html_url: 'https://github.com/o/r/pull/7', title: 'Updated PR title', state: 'open', draft: false, merged_at: null } }, pool);
     assert.equal((await store.read('owner', taskId)).delivery?.pullRequest?.title, 'Updated PR title');
@@ -154,4 +169,23 @@ test('criterion command and exit code stay paired; legacy entries use the run fa
     { passed: true },
   ] });
   assert.deepEqual(out.map(c => [c.command, c.exitCode]), [['pnpm test:one', 3], ['pnpm test:two', null], ['pnpm test:all', 0]]);
+});
+
+test('question command attribution accepts only cited host records for the same fixed candidate', () => {
+  const candidateId = randomUUID(), sha = 'c'.repeat(40), outputChunkId = randomUUID();
+  const source = { runId: randomUUID(), sessionId: 'native-before-question', status: 'failed',
+    recoveryEventId: randomUUID(), candidateSha: sha, outputChunkId, observedAt: '2026-11-04T12:03:04.000Z' };
+  const check = { candidateId, sha, questionCommandSources: [source] };
+  const criteria = [{ evidence: 'Observed run-chunk:' + outputChunkId + ' after checking the fixed file.' }];
+  assert.deepEqual(citedQuestionCommandSources(check, criteria, candidateId, sha),
+    [{ runId: source.runId, sessionId: source.sessionId, status: 'failed', recoveryEventId: source.recoveryEventId, observedAt: source.observedAt }]);
+  assert.deepEqual(citedQuestionCommandSources(check, [{ evidence: 'The producer said it passed.' }], candidateId, sha), []);
+  assert.deepEqual(citedQuestionCommandSources(check, criteria, randomUUID(), sha), []);
+  assert.deepEqual(citedQuestionCommandSources(check, criteria, candidateId, 'd'.repeat(40)), []);
+  for (const malformed of [
+    { ...source, outputChunkId: randomUUID() }, { ...source, candidateSha: 'e'.repeat(40) },
+    { ...source, observedAt: 'not-a-date' }, { ...source, runId: 'not-a-run-id' },
+    { ...source, status: 'passed' }, { ...source, sessionId: '' },
+  ]) assert.deepEqual(citedQuestionCommandSources({ ...check, questionCommandSources: [malformed] }, criteria, candidateId, sha), []);
+  assert.deepEqual(citedQuestionCommandSources({ ...check, questionCommandSources: Array.from({ length: 33 }, () => source) }, criteria, candidateId, sha), []);
 });

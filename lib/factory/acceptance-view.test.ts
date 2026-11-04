@@ -65,6 +65,20 @@ test('独立结果 lists the latest review then verify with their counts', () =>
   assert.deepEqual(rows.map(row => [row.stage, row.status, row.runId, row.passed, row.total]), [['review', 'failed', 'review-run', 0, 1], ['verify', 'passed', 'verify-run', 2, 2]])
 })
 
+test('command origins belong only to the latest check of the current candidate and never change its verdict', () => {
+  const origin = { runId: 'pre-question-run', sessionId: 'original-native-session', status: 'stopped' as const,
+    recoveryEventId: 'immutable-answer-receipt', observedAt: '2026-11-04T09:12:34.000Z' }
+  const rows = resultRows([
+    check({ stage: 'review', candidateId: 'old-candidate', commandSources: [origin] }),
+    check({ stage: 'review', commandSources: [origin] }),
+    check({ stage: 'review', status: 'failed', criteria: [{ criterionId: 'k', text: 'Current file', passed: false, evidence: null }] }),
+    check({ stage: 'verify', status: 'failed', commandSources: [origin] }),
+  ], 'c1')
+  assert.equal(rows[0].commandSources, undefined, 'an earlier check cannot label a new result')
+  assert.deepEqual(rows[1].commandSources, [origin], 'preserve the host-provided run, SID, status, receipt and time')
+  assert.deepEqual(rows.map(row => [row.stage, row.status, row.passed, row.total]), [['review', 'failed', 0, 1], ['verify', 'failed', 0, 0]])
+})
+
 test('PR numbers and bare preview hosts', () => {
   assert.equal(pullNumber('https://github.com/alexj11324/Mikka/pull/418'), '418')
   assert.equal(pullNumber('https://github.com/alexj11324/Mikka/pull/418/files'), '418')
