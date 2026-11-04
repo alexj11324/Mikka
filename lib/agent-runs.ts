@@ -1,4 +1,5 @@
 import 'server-only'
+import { runDecisionWarnings, type ProjectDecisionWarning } from './project-decision-warnings'
 import type { ExecutionIdentity } from './execution-identity'
 import { personalMailboxEnabled } from './personal-mailbox-config'
 import { byosEnabled } from './cloud-computer-flag'
@@ -56,6 +57,7 @@ export interface RunView {
 }
 
 export interface RunDetail {
+  decisionWarnings?: ProjectDecisionWarning[]
   run: RunView
   chunks: Record<string, unknown>[]
   messages: { id: string; text: string; createdAt: Date }[]
@@ -309,7 +311,8 @@ export async function readRun(userId: string, runId: string): Promise<RunDetail 
     .where(eq(runChunks.runId, run.id)).orderBy(asc(runChunks.seq))
   const messages = await db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt })
     .from(runMessages).where(eq(runMessages.runId, run.id)).orderBy(asc(runMessages.createdAt))
-  return { run, chunks: chunks.map(row => row.chunk), messages }
+  const decisionWarnings = await runDecisionWarnings(pool, userId, run.id)
+  return { run, chunks: chunks.map(row => row.chunk), messages, decisionWarnings }
 }
 
 /** A message to the running agent; the daemon delivers it. */

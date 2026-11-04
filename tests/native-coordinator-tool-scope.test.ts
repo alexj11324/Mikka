@@ -61,6 +61,14 @@ stub('../lib/self-improvement/server.ts',{improvementStore:{},skillAssignments:{
     return effect()
   },
 }})
+const projectDecisionWrite = mock.fn(async (..._args: unknown[]) => ({ decisionId: 'recorded-decision', duplicate: false }))
+let projectExecutionActive = true
+let projectExecutionMissing = false
+stub('../lib/agent-kit/service.ts', {
+  agentScope: async (ownerId: string, botId: string) => ({ ownerId, botId, workspaceId: 'host-workspace' }),
+  agentKitStore: { readExecution: async () => projectExecutionMissing ? null : ({ status: projectExecutionActive ? 'running' : 'completed', snapshot: { effectiveTools: ['record_decision'], runtime: { harness: 'codex', model: 'host-model' } } }) },
+})
+stub('../lib/project-map/decisions.ts', { recordProjectDecision: projectDecisionWrite })
 let steps: typeof import('../workflows/coordinator/steps')
 before(async()=>{steps=await import('../workflows/coordinator/steps')})
 const scope={holder:'holder',turnId:'turn',callId:'call'}
@@ -70,6 +78,7 @@ const user='host-owned-user'
 
 beforeEach(()=>{
   appAllowed=true;policyChecks.mock.resetCalls()
+  projectExecutionActive=true;projectExecutionMissing=false;projectDecisionWrite.mock.resetCalls()
   revoked=false;uncertain=false;runDetail=null;questionReadError=null;revokeDuringQuestionRead=false;revokeDuringEventRead=false
   hostQuestionReference.binding.candidateId=null
   for (const fn of [checks,effect,readRunResult,readQuestion,escalateQuestion,readUserEvent]) fn.mock.resetCalls()
@@ -103,6 +112,7 @@ const calls = {
   answerFactoryQuestionFromUser:()=>steps.answerFactoryQuestionFromUser(user,{reference,answerId:'answer',sourceEventId:'event'},scope),
   resolveFactoryTask:()=>steps.resolveFactoryTask(user,{binding,sourceEventId:'event',rationale:'resolution',missingInformation:[],missingPermissions:[],needsSpec:false},scope),
   stopFactoryTask:()=>steps.stopFactoryTask(user,{binding,reason:'cancel',action:'cancel'},scope),
+  recordProjectDecision:()=>steps.recordProjectDecisionStep(user,COORDINATOR_BOT,'host-execution',{kind:'confirm',title:'Keep route',summary:'Use the existing route',reason:'Meets the constraints',idempotencyKey:'decision-1'},scope),
   remember:()=>steps.remember(user,{note:'preference'},scope,COORDINATOR_BOT),
   forget:()=>steps.forget(user,{text:'preference'},scope,COORDINATOR_BOT),
   composioAction:()=>steps.composioAction(user,'fetch_recent_gmail',{query:'is:unread'},scope),
@@ -315,4 +325,20 @@ test('work with no bot of its own stays outside workspace app policy and revoked
   await assert.rejects(steps.composioAction(user,'fetch_recent_gmail',{},scope,undefined,'owned-bot'),/coordinatorExpiredOrLeaseLost/)
   assert.equal(policyChecks.mock.callCount(),0)
   assert.equal(effect.mock.callCount(),1)
+})
+
+
+test('project decisions derive Bot, workspace and model from the host and refuse a closed execution', async () => {
+  const input = { kind: 'confirm' as const, title: 'Keep route', summary: 'Use the existing route', reason: 'Meets the constraints', idempotencyKey: 'decision-1' }
+  await steps.recordProjectDecisionStep(user, COORDINATOR_BOT, 'host-execution', input, scope)
+  assert.deepEqual(projectDecisionWrite.mock.calls[0].arguments, [
+    { kind: 'bot', userId: user, workspaceId: 'host-workspace', botId: COORDINATOR_BOT, sessionId: 'host-execution', modelId: 'host-model', harness: 'codex' }, input,
+  ])
+  assert.equal(checks.mock.callCount(), 2, 'native scope is checked again immediately before the write')
+  projectExecutionActive = false
+  assert.deepEqual(await steps.recordProjectDecisionStep(user, COORDINATOR_BOT, 'host-execution', input, scope), { error: 'agentExecutionClosed' })
+  projectExecutionActive = true
+  projectExecutionMissing = true
+  assert.deepEqual(await steps.recordProjectDecisionStep(user, COORDINATOR_BOT, 'missing-execution', input, scope), { error: 'agentExecutionClosed' })
+  assert.equal(projectDecisionWrite.mock.callCount(), 1)
 })

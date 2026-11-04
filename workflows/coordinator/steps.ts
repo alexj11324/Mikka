@@ -330,6 +330,27 @@ export async function personalMailbox(userId: string, botId: string, request: Ma
   return result.body
 }
 
+/** Records only under the host's current Bot and frozen execution authority. */
+export async function recordProjectDecisionStep(userId: string, botId: string, executionId: string | undefined, input: import('@/lib/project-map/contracts').RecordDecisionInput, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (scope?.scheduledRead) return { error: 'scheduleToolNotAllowed' }
+  const { agentScope, agentKitStore } = await import('@/lib/agent-kit/service')
+  const { ProjectMapError } = await import('@/lib/project-map/contracts')
+  const { recordProjectDecision } = await import('@/lib/project-map/decisions')
+  const ownerScope = await agentScope(userId, botId)
+  if (!ownerScope.workspaceId) return { error: 'WORKSPACE_REQUIRED' }
+  const execution = executionId ? await agentKitStore.readExecution(ownerScope, executionId) : null
+  if ((executionId && !execution) || execution && (execution.status !== 'running' || !execution.snapshot.effectiveTools.includes('record_decision'))) return { error: 'agentExecutionClosed' }
+  await assertNativeToolScope(userId, scope)
+  try {
+    return await recordProjectDecision({ kind: 'bot', userId, workspaceId: ownerScope.workspaceId, botId: ownerScope.botId, sessionId: executionId ?? null, modelId: execution?.snapshot.runtime.model ?? null, harness: execution?.snapshot.runtime.harness ?? null }, input)
+  } catch (error) {
+    if (error instanceof ProjectMapError) return { error: error.code }
+    throw error
+  }
+}
+
 export async function remember(userId: string, input: { note: string }, scope: NativeToolScope | undefined, botId: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
@@ -844,6 +865,7 @@ export async function getRun(userId: string, input: { runId: string }, scope?: N
     startedAt: run.startedAt?.toISOString() ?? null, finishedAt: run.finishedAt?.toISOString() ?? null,
     // The tail of the event stream, enough to see what the agent is doing.
     recentEvents: detail.chunks.slice(-5).map(chunk => JSON.stringify(chunk).slice(0, 1000)),
+    ...(detail.decisionWarnings?.length ? { decisionWarnings: detail.decisionWarnings } : {}),
   }
 }
 

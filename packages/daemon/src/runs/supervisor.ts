@@ -29,7 +29,7 @@
 // agent. An explicitly approved, pushed submission can finish unverified;
 // its report keeps `not_run`, and the server may open only a draft PR.
 import { quotaStopApplies } from "./quota-exhausted"
-import { runApps } from '../agents/run-apps'
+import { runApps, runMcp } from '../agents/run-apps'
 import { materializeChatFiles } from '../agents/chat-files'
 import { splitChatFiles, type ChatFileDownload } from '@mikka/protocol/chat-attachments'
 import { fixedCheckSnapshot } from "./check"
@@ -1390,6 +1390,7 @@ export class RunSupervisor {
       github: assignment.github && assignment.mcp
         ? { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId } : undefined,
       apps: runApps(assignment.mcp),
+      mcp: runMcp(assignment.mcp),
       toolApproval,
       runId,
       requireSessionResume: assignment.requireSessionResume,

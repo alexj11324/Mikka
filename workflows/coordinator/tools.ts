@@ -23,6 +23,7 @@ import { writeSchemas } from '@/lib/operations/write-schema'
 import { supportsWritePlanning } from '@/lib/operations/write-planning-model'
 import { scheduledReadTools } from '@/lib/coordinator/scheduled-read-tools'
 import { scheduleTools } from '@/lib/schedules/tools'
+import { recordDecisionSchema } from '@/lib/project-map/contracts'
 
 /** `coordinator`: this chat's bot is the person's Coordinator, which may act on any of their bots and hold the factory tools. */
 /** Deployment switches the tools depend on (lib/deployment-switches.ts), read in a step: a workflow body never reads one itself. */
@@ -227,6 +228,11 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
         personAsked: z.boolean().optional().describe('For snooze: the person asked for this reminder, so telling them then spends no budget.'),
       }),
       execute: input => steps.recordAttention(userId, input, scope),
+    }),
+    record_decision: tool({
+      description: 'Record a meaningful project choice, change of direction, stopped route, merge or human confirmation from this Mikka conversation. Include alternatives, reasons and actual Mikka evidence. Use a stable idempotencyKey for exact retries. This writes only to Mikka, never to a code repository.',
+      inputSchema: recordDecisionSchema,
+      execute: input => steps.recordProjectDecisionStep(userId, botId, execution?.id, input, scope),
     }),
     remember: tool({
       description: 'Save one short note to the person\'s memory, which you see in every conversation. Use it when the person asks you to remember something, or for a lasting preference or decision. Not for run status or anything that will soon change.',

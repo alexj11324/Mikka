@@ -1,3 +1,4 @@
+import { runMessagePrompt } from './run-message-prompt'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -49,7 +50,7 @@ dbTest('one read of a device\'s runs finds its stops, messages and queued runs',
     assert.deepEqual(work.queuedRuns, [ids.queued], 'queued runs of this device, without skipped ones')
     assert.deepEqual(work.commands, [
       { kind: 'stop', runId: ids.stopping },
-      { kind: 'input', runId: ids.running, messageId: message, text: 'please also add a test' },
+      { kind: 'input', runId: ids.running, messageId: message, text: runMessagePrompt({ id: message, runId: ids.running, origin: 'owner', text: 'please also add a test' }) },
     ])
     assert.deepEqual((await deviceWork(device, [], { queued: false })).queuedRuns, [], 'a device with scheduling off is offered no runs')
     assert.deepEqual(await deviceWork(other, [ids.elsewhere], { queued: true }), { commands: [], queuedRuns: [] })
