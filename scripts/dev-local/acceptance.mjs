@@ -25,7 +25,7 @@ const needsDaemon = selectedItems.some(item => ['1', '2', '3', '7', '9', '10'].i
 // the separate fixed acceptance checkout. Evidence retains the full runId.
 const runId = randomUUID(), directory = resolve(root, '.cache/dev-local', `acceptance-${runId.replaceAll('-', '').slice(0, 16)}`)
 const progressFile = resolve(root, '.cache/dev-local/progress.jsonl')
-const started = Date.now(), children = [], secrets = new Set()
+const started = Date.now(), children = [], secrets = new Set(), expectedChildExits = new WeakSet()
 const completedItems = []
 const cleanupHooks = [], daemonDirectories = [join(directory, 'daemon')]
 let pool, accounts, environment, runtime, localStackChild, secondDaemonPromise, activeStep, cleanupPromise, sourceFingerprint, serviceFailure, releaseHold, output = '', daemonCode, interrupted = false
@@ -86,7 +86,7 @@ function child(command, args, env = process.env, persistent = false) {
   children.push(processChild)
   processChild.on('error', () => { if (persistent && !cleanupPromise) serviceFailure = new Error('An owned acceptance service could not start') })
   processChild.once('exit', (code, signal) => {
-    if (persistent && !cleanupPromise) serviceFailure = new Error(`An owned acceptance service exited (${signal ?? code}); inspect the redacted service log`)
+    if (persistent && !cleanupPromise && !expectedChildExits.has(processChild)) serviceFailure = new Error(`An owned acceptance service exited (${signal ?? code}); inspect the redacted service log`)
   })
   const capture = data => {
     const chunk = data.toString()
@@ -282,10 +282,24 @@ async function secondDaemon(signal) {
   return secondDaemonPromise ??= startSecondDaemon(signal)
 }
 
+async function stopSecondDaemon() {
+  if (!secondDaemonPromise) return
+  const { processChild } = await secondDaemonPromise
+  secondDaemonPromise = undefined
+  if (processChild.exitCode !== null || processChild.signalCode !== null) return
+  expectedChildExits.add(processChild)
+  const exited = new Promise(resolve => processChild.once('exit', resolve))
+  process.kill(-processChild.pid, 'SIGTERM')
+  if (!await Promise.race([exited.then(() => true), delay(5_000).then(() => false)])) {
+    process.kill(-processChild.pid, 'SIGKILL')
+    assert.ok(await Promise.race([exited.then(() => true), delay(5_000).then(() => false)]), 'The owned B daemon did not stop')
+  }
+}
+
 async function startSecondDaemon(signal) {
   const dataDir = join(directory, 'daemon-b')
-  daemonDirectories.push(dataDir)
-  await mkdir(dataDir, { mode: 0o700 })
+  if (!daemonDirectories.includes(dataDir)) daemonDirectories.push(dataDir)
+  await mkdir(dataDir, { recursive: true, mode: 0o700 })
   const daemonUser = process.getuid?.() === 0 && process.env.MIKKA_DEV_DAEMON_USER
   if (daemonUser) execFileSync('chown', ['-R', daemonUser, dataDir])
   const tsx = join(root, 'packages/daemon/node_modules/.bin/tsx')
@@ -300,15 +314,19 @@ async function startSecondDaemon(signal) {
     const argv = [join(root, 'packages/daemon/bin/mikka.ts'), ...args, '--data-dir', dataDir]
     return child(daemonUser ? 'setpriv' : tsx, daemonUser ? ['--reuid', daemonUser, '--regid', daemonUser, '--init-groups', tsx, ...argv] : argv, env, persistent)
   }
-  daemonCode = undefined
-  launch(['daemon', 'login', '--server', runtime.server])
-  const code = await until(signal, () => daemonCode)
-  await json(accounts.owner, `/api/auth/device?user_code=${encodeURIComponent(code)}`)
-  await json(accounts.owner, '/api/auth/device/approve', { userCode: code })
-  await until(signal, () => access(join(dataDir, 'device.json')).then(() => true, () => false))
+  // The next scenario reuses only this runner's already approved B identity.
+  // It stays stopped until A has actually begun its automatic execution.
+  if (!await access(join(dataDir, 'device.json')).then(() => true, () => false)) {
+    daemonCode = undefined
+    launch(['daemon', 'login', '--server', runtime.server])
+    const code = await until(signal, () => daemonCode)
+    await json(accounts.owner, `/api/auth/device?user_code=${encodeURIComponent(code)}`)
+    await json(accounts.owner, '/api/auth/device/approve', { userCode: code })
+    await until(signal, () => access(join(dataDir, 'device.json')).then(() => true, () => false))
+  }
   const processChild = launch(['daemon', '--no-auto-update', '--server', runtime.server,
     ...(selectedItems.includes('10') ? ['--stall-minutes', '60'] : [])], true)
-  return { dataDir, pid: processChild.pid }
+  return { dataDir, pid: processChild.pid, processChild }
 }
 
 async function accept(device) {
@@ -413,13 +431,13 @@ async function accept(device) {
   })
   if (only.includes('6')) await check('item6-agent-mailbox', 600_000, signal => verifyMailbox({ accounts, pool, progress, signal }))
   if (only.includes('7')) await check('item7-worker-mailbox', 600_000, signal => verifyWorkerMailbox({ accounts, pool, progress, signal, device }))
-  if (only.includes('9')) await check('item9-factory-handoff', 900_000, signal => verifyFactoryHandoff({
+  if (only.includes('9')) await check('item9-factory-handoff', 900_000, async signal => { try { return await verifyFactoryHandoff({
     root, directory, runtime, ownerId: accounts.owner.userId, device, signal, progress,
     query, json: (path, body) => json(accounts.owner, path, body), until: predicate => until(signal, predicate),
     run, dispatch: (name, text) => dispatch(name, text, signal), terminal: id => terminal(id, signal),
     factoryApproval: id => factoryApproval(id, signal), observations, startSecondDaemon: () => secondDaemon(signal),
     stackPid: localStackChild.pid, registerCleanup: hook => cleanupHooks.push(hook), daemonStallMinutes: selectedItems.includes('10') ? 60 : 10,
-  }))
+  }) } finally { await stopSecondDaemon() } })
   if (only.includes('10')) await check('item10-online-watchdog', 3_600_000, signal => {
     assert.ok(!only.includes('9') || completedItems.includes(9), 'Complete the selected offline handoff case before reusing its devices for the hour-long watchdog case')
     return verifyFactoryWatchdog({ root, directory, runtime, ownerId: accounts.owner.userId, device, signal, progress,

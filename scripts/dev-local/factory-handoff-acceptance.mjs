@@ -62,7 +62,43 @@ export async function waitForOnlineDaemonStatus({ root, dataDir, deviceId, until
   })
 }
 
+export function assertAutomaticRecoverySource(original, deviceId) {
+  assert.equal(original.deviceId, deviceId, 'Initial automatic execution must run on A')
+  assert.ok(original.agentDefinition?.pinnedDeviceId == null, 'An explicit device selection is not an automatic handoff scenario')
+  const admission = original.agentDefinition?.repositoryAdmission
+  assert.equal(admission?.authority, 'owner_credential', 'The original execution needs a normal repository admission')
+  assert.equal(admission.deviceId, deviceId)
+  assert.ok(admission.requestEventId == null, 'A host-bound destination cannot be used to prove automatic handoff')
+  assert.equal(original.agentDefinition.harness, 'claude_code')
+  assertFlashTestModel(original.agentDefinition.model)
+}
+
+/** Both fault scenarios begin with only A available. B is approved/started
+ * after the actual automatic run exists, never selected through the brief. */
+export async function beginAutomaticHandoff({ name, brief, deviceId, devices, dispatch, run, until, startSecondDaemon, online, now = Date.now }) {
+  const deadline = now() + 120_000
+  await until(async () => {
+    assert.ok(now() < deadline, 'Only the initial owned device may be online before automatic dispatch')
+    const available = (await devices()).filter(device => device.online)
+    return available.length === 1 && available[0].id === deviceId
+  })
+  const id = await dispatch(name, `Create one new task using automatic device placement, harness Claude Code, repository https://github.com/mikka-e2e/core-loop.git, newThread:true, readOnly:false. Let the host choose an available computer; omit an explicit target. Preserve this entire brief in the worker prompt and dispatch now.\n${brief}`)
+  assertAutomaticRecoverySource(await run(id), deviceId)
+  const original = await until(async () => {
+    const value = await run(id)
+    assert.ok(!ended.has(value?.status), `A ended before the automatic handoff workload (${value?.status})`)
+    return value?.sessionId && value.status === 'running' ? value : null
+  })
+  assertAutomaticRecoverySource(original, deviceId)
+  const b = await startSecondDaemon()
+  const bStatus = await online(b.dataDir)
+  assertOnlineDaemonStatus(bStatus, { dataDir: b.dataDir })
+  assert.notEqual(bStatus.deviceId, deviceId, 'A and B need independent approved device IDs')
+  return { original, b, bStatus }
+}
+
 export function assertHandoffEvidence({ original, retry, task, receipt, ownerId, deviceB, marker }) {
+  assertAutomaticRecoverySource(original, original.deviceId)
   assert.equal(retry.retryOf, original.id, 'B must claim the server-created retry of A')
   assert.equal(retry.userId, ownerId)
   assert.equal(retry.issueId, original.issueId)
@@ -129,24 +165,14 @@ export async function verifyFactoryHandoff(context) {
     const [cloud] = await query(`SELECT EXISTS(SELECT 1 FROM user_e2b_keys WHERE "userId"=$1)
       OR EXISTS(SELECT 1 FROM workspace_e2b_keys WHERE "createdBy"=$1) AS present`, [ownerId])
     assert.equal(cloud.present, false, 'Use a dedicated ordinary owner without an E2B source for the dual-local-device case')
-    const b = await startSecondDaemon()
-    const bStatus = await online(b.dataDir)
-    assert.notEqual(bStatus.deviceId, aStatus.deviceId, 'A and B need independent approved device IDs')
-    assertOnlineDaemonStatus(bStatus, { dataDir: b.dataDir })
-    await record('two-authorized-devices', { deviceA: device.id, deviceB: bStatus.deviceId })
     const priorPrs = new Set((await observations()).pullRequests.map(pr => pr.number))
-    const brief = `Create a new task on device ${device.name} (deviceId ${device.id}), harness Claude Code, repository https://github.com/mikka-e2e/core-loop.git, newThread:true, readOnly:false. Preserve the entire brief in the worker prompt and dispatch now.
-Owner acceptance marker ${marker}. Create ${filename} with exactly one UTF-8 line: ${marker} followed by a newline. This is the sole repository change.
+    const brief = `Owner acceptance marker ${marker}. Create ${filename} with exactly one UTF-8 line: ${marker} followed by a newline. This is the sole repository change.
 On the ORIGINAL execution only, create that file and then run one finite sleep 300 before committing, pushing or creating a PR. This pause allows the host's normal checkpoint capture. Do not finish before the finite wait.
 If the host provides a retry/Host task handoff, do NOT repeat the sleep: inspect the restored checkpoint and existing publication receipts, keep the same exact file bytes, then complete the task. Never append a duplicate line or repeat an already completed push/PR. Use normal review/verification and existing permissions; do not ask to change authorization. Publish one PR for this task.`
-    const originalId = await dispatch('item9', brief)
-    const original = await until(async () => {
-      const value = await run(originalId)
-      assert.ok(!ended.has(value?.status), `A ended before the real fault checkpoint (${value?.status})`)
-      return value?.sessionId && value.status === 'running' ? value : null
-    })
-    assert.equal(original.deviceId, device.id, 'Initial execution must run on A')
-    assertFlashTestModel(original.agentDefinition?.model)
+    const { original, b, bStatus } = await beginAutomaticHandoff({ name: 'item9', brief, deviceId: device.id,
+      devices: async () => (await json('/api/mobile/threads')).devices ?? [], dispatch, run, until, startSecondDaemon, online })
+    await record('two-authorized-devices', { deviceA: device.id, deviceB: bStatus.deviceId, placement: 'automatic',
+      originalStartedAt: original.startedAt, recoveryDeviceReadyAt: new Date().toISOString(), originalUnpinned: true })
     const [linked] = await query(`SELECT t.id FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1 AND t."userId"=$2`, [original.id, ownerId])
     assert.ok(linked, 'The normal dispatch must have a real Factory Task')
     const task = (await json(`/api/factory/tasks/${linked.id}`)).task
