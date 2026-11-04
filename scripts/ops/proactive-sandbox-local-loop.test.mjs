@@ -107,13 +107,13 @@ test('the existing sandbox must have the full 90-minute budget plus cleanup grac
   assert.equal(target.sessionId, 'sbx_i0JVU4ryiQnowZ6IWX9zrkOdWbHR')
 })
 
-test('the fixed 9/10 plan retains bounded shutdown, fresh setup and exclusive local ownership', async () => {
-  assert.equal(target.cwd, '/vercel/Mikka-watchdog-acceptance')
-  assert.ok(sandboxProgram.includes("const root = '/vercel/Mikka-watchdog-acceptance'"))
+test('the fixed item10 plan retains bounded shutdown, fresh setup and exclusive local ownership', async () => {
+  assert.equal(target.cwd, '/vercel/Mikka-watchdog-observer')
+  assert.ok(sandboxProgram.includes("const root = '/vercel/Mikka-watchdog-observer'"))
   assert.ok(sandboxProgram.includes("LOCAL_LOOP_ORIGIN: 'http://localhost:3114'"))
   assert.ok(sandboxProgram.includes("MIKKA_DEV_PORT: '3114'"))
   assert.deepEqual(acceptancePlan, {
-    items: [9, 10], softTimeout: 85 * 60_000, killTimeout: 88 * 60_000,
+    items: [10], softTimeout: 85 * 60_000, killTimeout: 88 * 60_000,
     hardTimeout: 90 * 60_000, cleanupGrace: 60_000,
   })
   assert.ok(Object.isFrozen(acceptancePlan) && Object.isFrozen(acceptancePlan.items))
@@ -144,7 +144,7 @@ test('the workflow budgets 100 minutes and requires an explicit source pin befor
   assert.match(workflow, /^  cancel-in-progress: false$/m)
   assert.match(workflow, /^    branches: \[acceptance\/watchdog-stop-1195\]$/m)
   const sourcePin = workflow.match(/^        MIKKA_ACCEPTANCE_SOURCE_SHA: (\S+)$/m)?.[1]
-  assert.equal(sourcePin, '020b3957e8fc9609528c69499609adef08150cdf')
+  assert.equal(sourcePin, '55840a4f186c86b5c776629a8d075d654dd5c16f')
   const f = fixture({ env: { MIKKA_ACCEPTANCE_SOURCE_SHA: 'REPLACE_WITH_FINAL_REVIEWED_40_CHARACTER_SOURCE_SHA' } })
   assert.equal((await f.execute()).status, 'source_sha_required')
   assert.equal(f.calls.length, 0)

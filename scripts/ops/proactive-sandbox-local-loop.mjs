@@ -3,10 +3,10 @@ import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 
-// This rerun covers only the two unfinished recovery scenarios. The plan is
+// This rerun covers only the online watchdog scenario; item 9 already passed. The plan is
 // host-selected and is embedded in the remote program, never read from input.
 export const acceptancePlan = Object.freeze({
-  items: Object.freeze([9, 10]),
+  items: Object.freeze([10]),
   softTimeout: 85 * 60_000,
   killTimeout: 88 * 60_000,
   hardTimeout: 90 * 60_000,
@@ -19,7 +19,7 @@ export const target = Object.freeze({
   projectId: 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH',
   projectName: 'mikka',
   sessionId: 'sbx_i0JVU4ryiQnowZ6IWX9zrkOdWbHR',
-  cwd: '/vercel/Mikka-watchdog-acceptance',
+  cwd: '/vercel/Mikka-watchdog-observer',
   hardTimeout: acceptancePlan.hardTimeout,
 })
 
@@ -42,7 +42,7 @@ import { mkdir, open, readFile, realpath, writeFile } from 'node:fs/promises'
 import net from 'node:net'
 import { resolve } from 'node:path'
 
-const root = '/vercel/Mikka-watchdog-acceptance'
+const root = '/vercel/Mikka-watchdog-observer'
 const sha = process.argv[1]
 const acceptancePlan = ${JSON.stringify(acceptancePlan)}
 let child
