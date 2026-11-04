@@ -57,7 +57,7 @@ test('a live reply keeps each tool in call order with its latest state, and adds
   const timed: [CoordinatorStreamEvent, number][] = [
     [{ type: 'start', id }, 0],
     [{ type: 'thinking', id, state: 'start' }, 1_000], [{ type: 'thinking', id, state: 'start' }, 1_500], [{ type: 'thinking', id, state: 'end' }, 3_400],
-    [{ type: 'tool', id, call: 'c1', name: 'create_issue', state: 'running', input: '{"title":"Fix"}' }, 3_500],
+    [{ type: 'tool', id, call: 'c1', name: 'create_issue', state: 'running', input: '{"title":"Fix"}', at: 12 }, 3_500],
     [{ type: 'tool', id, call: 'c2', name: 'web_search', state: 'running' }, 3_600],
     [{ type: 'tool', id, call: 'c1', name: 'create_issue', state: 'done', output: '{"id":"i1"}' }, 4_000],
     [{ type: 'thinking', id, state: 'start' }, 5_000], [{ type: 'thinking', id, state: 'end' }, 6_000],
@@ -66,7 +66,7 @@ test('a live reply keeps each tool in call order with its latest state, and adds
   let replies: CoordinatorLiveReply[] = []
   for (const [event, at] of timed) replies = coordinatorStreamReply(replies, event, at)
   assert.deepEqual(replies[0].tools, [
-    { call: 'c1', name: 'create_issue', state: 'done', input: '{"title":"Fix"}', output: '{"id":"i1"}' },
+    { call: 'c1', name: 'create_issue', state: 'done', input: '{"title":"Fix"}', output: '{"id":"i1"}', at: 12 },
     { call: 'c2', name: 'web_search', state: 'error' },
   ])
   assert.deepEqual(replies[0].thinking, { ms: 3_400 }, 'a repeated start does not restart the clock')

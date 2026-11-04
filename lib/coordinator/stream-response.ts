@@ -123,7 +123,7 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
         const state = part.type === 'tool-call' ? 'running' : part.type === 'tool-result' ? 'done' : 'error'
         const input = part.type === 'tool-call' ? preview(userId, part.input, fingerprints) : undefined
         const output = part.type === 'tool-result' ? preview(userId, part.output, fingerprints) : undefined
-        controller.enqueue({ type: 'tool', id, call: part.toolCallId, name: part.toolName, state, ...(input ? { input } : {}), ...(output ? { output } : {}) })
+        controller.enqueue({ type: 'tool', id, call: part.toolCallId, name: part.toolName, state, ...(input ? { input } : {}), ...(output ? { output } : {}), ...(part.type === 'tool-call' ? { at: text.length } : {}) })
       } else if (id && part.type === 'reasoning-start') {
         reasoning.set(part.id, { pending: '', buf: '', sent: 0, blocked: false })
         if (!quietEligible) controller.enqueue({ type: 'thinking', id, state: 'start' })
