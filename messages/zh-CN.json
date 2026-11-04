@@ -4359,7 +4359,9 @@
       "githubMergeClosed": "PR 已关闭",
       "githubUnavailable": "GitHub 暂不可用"
     },
-    "steps": "操作 {count}"
+    "steps": "操作 {count}",
+    "questionCommandSource": "来自提问前的执行",
+    "sourceExecution": "查看执行"
   },
   "AccountEmail": {
     "exportSubject": "你的 Mikka 数据导出",

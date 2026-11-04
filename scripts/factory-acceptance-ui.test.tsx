@@ -31,7 +31,9 @@ mock.module('swr', { defaultExport: (key: string | null) => {
   if (refreshFails) throw new Error('list unavailable')
   return list?.data
 } }) } })
-mock.module('next-intl', { namedExports: { useTranslations: () => lookup, useFormatter: () => ({ dateTime: () => '' }) } })
+mock.module('next-intl', { namedExports: { useTranslations: () => lookup, useFormatter: () => ({
+  dateTime: (value: Date, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', ...options }).format(value),
+}) } })
 mock.module(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 const Pass = ({ children }: { children?: ReactNode }) => <div>{children}</div>
 mock.module(new URL('../components/ui/dialog.tsx', import.meta.url).href, { namedExports: { Dialog: Pass, DialogContent: Pass, DialogHeader: Pass, DialogTitle: Pass, DialogFooter: Pass } })
@@ -482,4 +484,33 @@ test('host completion recovery keeps its existing control ahead of same-candidat
   assert.ok(button('重试'))
   assert.equal(button('重新审阅'), undefined)
   assert.equal(button('重新验证'), undefined)
+})
+
+test('a cited pre-question command source shows its localized time and opens that source thread without changing the result', async () => {
+  const current = failedCandidate()
+  const source = { runId: 'pre-question-run', sessionId: 'native-session-kept-in-data', status: 'stopped',
+    recoveryEventId: 'answer-receipt', observedAt: '2026-11-04T09:12:34.000Z' }
+  const sourceCheck = { stage: 'review', status: 'failed', attemptId: current.attemptId, candidateId: current.candidateId,
+    candidateSha: 'a'.repeat(40), runId: 'review-run', criteria: [], verify: null, commandSources: [source] }
+  detail = { task: current, checks: [sourceCheck] }
+  const opened: string[] = []
+  await act(async () => root.render(<FactoryAcceptancePane task={current} onOpenThread={runId => opened.push(runId)} />))
+  assert.match(container.textContent ?? '', /来自提问前的执行/)
+  assert.match(container.textContent ?? '', /需要修改/)
+  const time = container.querySelector('time')
+  assert.equal(time?.getAttribute('datetime'), source.observedAt)
+  assert.equal(time?.textContent, new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(source.observedAt)))
+  assert.doesNotMatch(container.textContent ?? '', /native-session-kept-in-data|answer-receipt/)
+  await act(async () => { button('查看执行')!.click() })
+  await act(async () => { button('独立审阅')!.click() })
+  assert.deepEqual(opened, ['pre-question-run', 'review-run'])
+  assert.ok(button('重新审阅'), 'source provenance does not turn a failed check into a pass')
+
+  for (const commandSources of [undefined, []]) {
+    detail = { task: current, checks: [{ ...sourceCheck, commandSources }] }
+    await pane(current)
+    assert.doesNotMatch(container.textContent ?? '', /来自提问前的执行|查看执行/)
+    assert.equal(container.querySelector('time'), null)
+    assert.match(container.textContent ?? '', /需要修改/)
+  }
 })
