@@ -35,8 +35,8 @@
       "skipped": 0
     },
     "green": {
-      "tests": 27,
-      "passed": 27,
+      "tests": 28,
+      "passed": 28,
       "failed": 0,
       "skipped": 0
     },
@@ -44,11 +44,12 @@
       "node --test run-proactive-acceptance.test.mjs owner-mcp-boundaries.test.mjs",
       "node --check run-proactive-acceptance.mjs"
     ],
-    "syntaxExitCode": 0
+    "syntaxExitCode": 0,
+    "policyProvenance": "Optional per-step policyVersion is projected only for group-route-v0 or group-contribution-v1; missing/unknown remains null."
   },
   "sha256": {
-    "run-proactive-acceptance.mjs": "6e744ee198233991ee658a64949e81c125b0338993a2d236f5a88e0c4f0bdda0",
-    "run-proactive-acceptance.test.mjs": "77a8416cb17508aa430943d521ac99e9c348b7802e5de0606b51c15c56ee836d",
+    "run-proactive-acceptance.mjs": "66d5fbe0b9807d782ecac7f6caa2c3faf5b2d556fcadd397729fac0757310d45",
+    "run-proactive-acceptance.test.mjs": "a19cc2573c7b4feb9e8caebaf075c85f26497d88208d1c6fc4c48fe517125cf5",
     "README.md": "b140b1262b0071235390e7e5d8a250b08810bb86361a3934a8a42bba165b2072",
     "collector-source/scripts/group-decision-replay.ts": "abe51c79b8f7f4e0e2c1e26142a69e405011c5372adecbb9643962a69680d125",
     "collector-source/lib/coordinator/group-decision-replay.test.ts": "e9e08bdd63ef0fb58f55deaf335845a501c29d3e40c5b8695ecd034f1c7bf461"

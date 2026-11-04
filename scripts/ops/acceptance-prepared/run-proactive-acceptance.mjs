@@ -27,7 +27,7 @@ const decisionFailure = oneOf(['unavailable', 'missing_or_refused', 'wrong_answe
   'receipt_missing', 'duplicate_receipt', 'mention_requires_intervention', 'reporter_unavailable', 'call_budget_exhausted', 'invalid_response', 'members_unavailable'])
 const decisionCalls = value => shape(value, { attempted: integer, receipted: integer, unreceipted: integer })
 const decisionCost = value => shape(value, { knownUsd: finite, knownCalls: integer, unknownCalls: integer, omittedCalls: integer })
-const decisionStep = value => shape(value, { id: token, phase, index: integer,
+const decisionStep = value => shape(value, { id: token, phase, index: integer, policyVersion: oneOf(['group-route-v0', 'group-contribution-v1']),
   status: oneOf(['complete', 'invalid_decision', 'unavailable']), failure: decisionFailure, receipt, decisionCostUsd: finite })
 const decisionFields = { decisionProtocol: protocol, decisions: list(decisionStep), decisionsOmitted: integer,
   failureReason: decisionFailure, decisionCalls, decisionCost, decisionCostUsd: finite, decisionLatencyMs: finite,

@@ -432,3 +432,16 @@ test('reports retain only allowlisted metadata and refuse credential-bearing out
   assert.throws(() => writeSanitizedReport({ unexpected: env.DEEPSEEK_API_KEY }, join(directory, 'rejected.json'), env), /secret_detected/)
   assert.throws(() => writeSanitizedReport({ cookie: 'short' }, join(directory, 'rejected-field.json'), env), /private_field_detected/)
 })
+
+test('step policy provenance retains only the two host policies and never upgrades a legacy receipt', () => {
+  const source = replay()
+  source.baseline[0].decisions[0].policyVersion = 'group-route-v0'
+  source.candidate[0].decisions[0].policyVersion = 'group-contribution-v1'
+  source.candidate[1].decisions[0].policyVersion = 'PRIVATE_ARBITRARY_POLICY'
+  const projected = sanitizeReplayReport(source)
+  assert.equal(projected.baseline[0].decisions[0].policyVersion, 'group-route-v0')
+  assert.equal(projected.candidate[0].decisions[0].policyVersion, 'group-contribution-v1')
+  assert.equal(projected.candidate[1].decisions[0].policyVersion, null)
+  assert.equal(projected.baseline[1].decisions[0].policyVersion, null)
+  assert.doesNotMatch(JSON.stringify(projected), /PRIVATE_ARBITRARY_POLICY/)
+})
