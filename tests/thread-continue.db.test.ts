@@ -492,19 +492,26 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
     const { factoryBinding } = await import('../lib/factory/dispatch')
     const { latestThreadRunModel } = await import('../lib/computer/run-model')
+    const { latestTaskRun } = await import('../lib/thread-dispatch')
     const fixture = async (executeCount: number, atExecution = false) => {
       const b = await person()
       const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `budget:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
       assert.ok(initial.runId, JSON.stringify(initial))
       const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [initial.runId])).rows[0]
-      await end(initial.runId, 'succeeded')
+      // These completed executions are synthetic history, not real model
+      // turns. Give them a past chronology so a fast local DB cannot put
+      // several executions in one JS millisecond and let random UUIDs choose
+      // the latest run in this repair-budget test.
+      await pool.query(`UPDATE agent_runs SET status='succeeded',"updatedAt"=now(),
+        "createdAt"=now()-$2::int*interval '1 second',
+        "finishedAt"=now()-$2::int*interval '1 second'+interval '500 milliseconds' WHERE id=$1`, [initial.runId, executeCount])
       await pool.query(`UPDATE factory_attempts SET status='passed',output='{}' WHERE id=$1`, [task.attemptId])
       let producerRunId = initial.runId
       // Synthetic legacy history: every execution counts even without requestEpoch
       // and regardless of its old attempt status. No executor runs in this fixture.
       for (let ordinal = 2; ordinal <= executeCount; ordinal++) {
         const runId = randomUUID()
-        await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,"botId","agentDefinition","continuesRunId","finishedAt") SELECT $1,"userId","issueId","agentId","deviceId","deviceRepoId",'succeeded',prompt,"botId","agentDefinition",id,now() FROM agent_runs WHERE id=$2`, [runId, producerRunId])
+        await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,"botId","agentDefinition","continuesRunId","createdAt","finishedAt") SELECT $1,"userId","issueId","agentId","deviceId","deviceRepoId",'succeeded',prompt,"botId","agentDefinition",id,"createdAt"+interval '1 second',"createdAt"+interval '1500 milliseconds' FROM agent_runs WHERE id=$2`, [runId, producerRunId])
         await pool.query(`INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,"runId",reason,output) VALUES ($1,$2,'execute',$3,$3,$4,$5,'Synthetic legacy execution','{}')`, [randomUUID(), task.id, ordinal, ordinal === 2 ? 'waiting' : 'blocked', runId])
         producerRunId = runId
       }
@@ -519,6 +526,8 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       await pool.query(`INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,"runId","sessionId","candidateId",reason,output) VALUES ($1,$2,'review',1,$3,'failed',$4,$5,$6,'Synthetic failed independent review',$7)`, [reviewAttemptId, task.id, executeCount + 1, reviewId, `review:${reviewId}`, candidateId, JSON.stringify({ requestEpoch: task.sourceEventId, completion: { runId: reviewId, trustedFailureProvenance: true } })])
       await pool.query(`UPDATE factory_tasks SET stage='review',status='failed',"attemptId"=$2,"candidateId"=$3,revision=revision+1 WHERE id=$1`, [task.id, reviewAttemptId, candidateId])
       }
+      assert.equal((await readRunChain(pool, b.id, producerRunId))?.latestRunId, producerRunId, 'synthetic history ends at its last producer')
+      assert.equal((await latestTaskRun(pool, b.id, b.issueId))?.id, producerRunId, 'task dispatch sees the same last producer')
       const model = (await latestThreadRunModel(pool, b.id, b.issueId, producer.agentId))!
       const request = { issueId: b.issueId, agentId: producer.agentId, repo: repo.remoteUrl, ...model, threadRunId: producerRunId, note: 'Continue the same request.', requestKey: `budget:${randomUUID()}` }
       const snapshot = async () => (await pool.query(`SELECT jsonb_build_object(
