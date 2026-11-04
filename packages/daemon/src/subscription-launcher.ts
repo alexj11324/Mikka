@@ -61,12 +61,8 @@ export async function launchHostedSubscription(use: SubscriptionUse, options: St
         subscriptionAuth: { accountId, verify: async () => { await check() }, token: async () => { const value = await next(); return { accountId: value.accountId ?? '', accessToken: value.accessToken, expiresAt: value.expiresAt ?? '' } } } })
   })
   let ended = false
-  let checking = false
-  const timer = setInterval(() => {
-    if (ended || checking) return
-    checking = true
-    void (async () => {
-      if (!await gate.checkLive()) { gate.revoke(); throw new Error('Run tool approval unavailable') }
+  const offMonitor = gate.monitor(async () => {
+      if (ended || gate.revoked) return
       const access = await host.access()
       if (gate.revoked) throw new Error('Run tool approval unavailable')
       // A host refresh callback waits for durable publication. Do not cancel
@@ -76,11 +72,9 @@ export async function launchHostedSubscription(use: SubscriptionUse, options: St
       if (credentialCalls > 0 && access.credentialTransition && access.connection?.revision === revision) {
         authorizeSubscriptionUse({ ...use, execution: 'native' }, { ...access, connection: { ...access.connection, state: 'connected' } })
       } else authorizeSubscriptionUse({ ...use, execution: 'native' }, access)
-    })().catch(async () => { await session.cancel(); cleanup() }).finally(() => { checking = false })
   }, host.revocationPollMs ?? 1000)
-  timer.unref()
   const off = gate.onRevoke(() => { void session.cancel().catch(() => undefined).finally(cleanup) })
-  function cleanup() { ended = true; clearInterval(timer); off(); gate.revoke() }
+  function cleanup() { ended = true; offMonitor(); off(); gate.revoke() }
   return {
     sessionId: session.sessionId,
     async *events() { try { yield* session.events() } finally { cleanup() } },

@@ -3560,7 +3560,6 @@
     "changesLongLines": "Long lines",
     "changesWrap": "Wrap",
     "changesScroll": "Scroll",
-    "changesUnchanged": "{count, plural, one {# unchanged line} other {# unchanged lines}}",
     "changesOpenFile": "Open in new tab",
     "changesBinary": "Binary file",
     "changesTooLarge": "Too many changes to show",

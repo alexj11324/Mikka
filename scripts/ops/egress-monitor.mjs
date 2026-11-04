@@ -35,6 +35,7 @@ export function neonUsage(raw, now = Date.now()) {
     periodBytes: all.reduce((n, b) => n + b.value, 0),
     todayBytes: all.filter(b => b.start >= dayStart).reduce((n, b) => n + b.value, 0),
     latestBucketBytes: latestHour.value, reportedThrough: iso(latest),
+    latestBucketStart: iso(latestHour.start), latestBucketEnd: iso(latestHour.end),
     stale: now - latest > 3 * 3_600_000,
     dailyBudgetBytes: DAILY_BUDGET_BYTES, monthlyBudgetBytes: MONTHLY_BUDGET_BYTES }
 }
@@ -137,6 +138,8 @@ export async function publish(report, token, fetchImpl = fetch) {
       sampled_bytes: report.runtime?.sampledBytes ?? 0, request_count: report.runtime?.requests.reduce((n,r)=>n+r.count,0) ?? 0 }),
     ...(report.neon ? { period_bytes: report.neon.periodBytes, today_bytes: report.neon.todayBytes,
       latest_hour_bytes: report.neon.latestHourBytes,
+      // Capture time can lag the provider's hour; preserve the actual bucket.
+      latest_hour_start: report.neon.latestBucketStart, latest_hour_end: report.neon.latestBucketEnd,
       daily_budget_ratio: report.neon.todayBytes / DAILY_BUDGET_BYTES,
       monthly_budget_ratio: report.neon.periodBytes / MONTHLY_BUDGET_BYTES } : {}) }
   const batch = [{event:'mikka_ops_snapshot',timestamp:report.observedAt,properties}]
