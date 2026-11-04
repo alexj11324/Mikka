@@ -5,7 +5,7 @@ const id = suffix => `00000000-0000-4000-8000-${String(suffix).padStart(12, '0')
 const receipt = { executionId: 'synthetic-execution', providerGenerationId: 'synthetic-generation', modelId: 'openai/gpt-6-luna-decisions',
   requestDigest: 'a'.repeat(64), startedAt: '2026-11-03T00:00:00Z', completedAt: '2026-11-03T00:00:00.100Z', imageDigests: [], vision: 'no-image-input' }
 const replayContract = { caseIds: Array.from({ length: 12 }, (_, i) => `case-${i}`), datasetDigest: 'b'.repeat(64),
-  baselinePolicy: 'group-route-v0', candidatePolicy: 'group-contribution-v2', comparisonVersion: 'group-decision-comparison-v2' }
+  baselinePolicy: 'group-route-v0', candidatePolicy: 'group-contribution-v3', comparisonVersion: 'group-decision-comparison-v2' }
 const replay = () => {
   let serial = 100
   const rows = (policyVersion, count) => replayContract.caseIds.map(caseId => {
@@ -84,12 +84,15 @@ test('release, origin, account and staged policy contracts fail before normal lo
     {env:{...env,SMOKE_OWNER_EMAIL:'other@example.invalid'}},
     {verifySource:()=> 'b'.repeat(40)},
     {dependencies:{livePolicy:'group-contribution-v2',contract:replayContract}},
+    {dependencies:{livePolicy:'group-contribution-v3',contract:replayContract}},
+    {dependencies:{livePolicy:'group-contribution-v1',contract:{...replayContract,candidatePolicy:'group-contribution-v2'}}},
+    {dependencies:{livePolicy:'group-contribution-v1',contract:{...replayContract,comparisonVersion:'group-decision-comparison-v3'}}},
   ]){const f=scenario();await assert.rejects(f.run(extra));assert.equal(f.calls.length,0)}
 })
 test('normal owner proof precedes the fixed synthetic replay and one acknowledged signout',async()=>{
   const f=scenario(),result=await f.run()
   assert.equal(result.status,'passed');assert.equal(result.scopeConfirmed,true)
-  assert.equal(result.livePolicy,'group-contribution-v1');assert.equal(result.candidatePolicy,'group-contribution-v2')
+  assert.equal(result.livePolicy,'group-contribution-v1');assert.equal(result.candidatePolicy,'group-contribution-v3')
   assert.equal(result.accounting.logicalReplays,24);assert.equal(result.accounting.candidateCompleted,12)
   assert.equal(result.policyChanged,false);assert.equal(result.executionPerformed,false);assert.equal(result.productionAccepted,false)
   assert.equal(f.counts.replay,1);assert.equal(f.counts.logout,1)

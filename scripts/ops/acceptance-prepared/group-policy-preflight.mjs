@@ -31,7 +31,7 @@ export async function runPolicyPreflight({env=process.env,repo=process.cwd(),fet
   check(!env.GROUP_REPLAY_ORIGIN || env.GROUP_REPLAY_ORIGIN===ORIGIN,'preflight_origin_rejected')
   check(verifySource()===revision,'preflight_source_mismatch')
   const api=dependencies??await sourceDependencies(repo),contract=api.contract
-  check(api.livePolicy==='group-contribution-v1' && contract?.candidatePolicy==='group-contribution-v2'
+  check(api.livePolicy==='group-contribution-v1' && contract?.candidatePolicy==='group-contribution-v3'
     && contract.baselinePolicy==='group-route-v0' && contract.comparisonVersion===COMPARISON
     && Array.isArray(contract.caseIds) && contract.caseIds.length===12 && new Set(contract.caseIds).size===12,'preflight_policy_contract')
   const email=env.SMOKE_OWNER_EMAIL,password=env.SMOKE_OWNER_PASSWORD

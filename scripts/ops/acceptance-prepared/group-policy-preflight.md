@@ -2,7 +2,7 @@
 
 This inert candidate uses the existing normal Smoke owner's authenticated API,
 not direct Decision provider credentials or a fabricated billing scope. The
-fixed application must expose group-contribution-v2 for explicit replay while
+fixed application must expose group-contribution-v3 for explicit replay while
 its normal live policy remains group-contribution-v1. The baseline stays v0.
 
 It reads only the two existing named Smoke email/password secrets through the
@@ -45,3 +45,9 @@ cmd_2e8f2618e7ad4ce8bbd973cb0b75. They cover identity and membership boundaries,
 correct comparison, candidate uncertainty, deployment drift, deadline,
 unknown logout and rejection of any write outside normal auth/fixed replay.
 These are local injected transports, not paid model or production evidence.
+
+## v3 preparation
+
+Only the explicit candidate advances to `group-contribution-v3`. Normal live policy remains `group-contribution-v1`; baseline `group-route-v0`, dataset `group-decision-cases-v2`, comparison `group-decision-comparison-v2`, and protocol `group-sequential-v1` are unchanged. A v2 candidate or a live v2/v3 contract is rejected before login. Actual failed v2 preflight 41785533094 remains failed; this file does not rerun it or promote the new policy. The eight-minute driver and fifteen-minute workflow budgets, two named Smoke secrets, one normal session, one fixed 24-case replay and logout requirements remain unchanged.
+
+The exact v3 preflight, current outer validator and sibling modules were exercised together in the 92/92 zero-skip offline run `cmd_ecb6e5f364404d36bf6a6fb9bc7b`; all 14 MJS syntax checks passed. `V3-VERIFICATION.json` includes the historical-runtime red result and the exact test command. No provider or production request was made by this verification.
