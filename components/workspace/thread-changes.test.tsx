@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { before, mock, test } from 'node:test'
-import type { ReactNode } from 'react'
+import { createContext, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { parseUnifiedDiff } from '@/lib/thread-changes'
 
@@ -14,8 +14,8 @@ type Drawn = { fileDiff: import('@pierre/diffs').FileDiffMetadata; options: Reco
 let drawn: Drawn[] = []
 mock.module('@pierre/diffs/react', { namedExports: { FileDiff: (props: Drawn & { renderHeaderPrefix?: () => ReactNode; renderHeaderMetadata?: () => ReactNode }) => {
   drawn.push({ fileDiff: props.fileDiff, options: props.options })
-  return <diffs-container><div slot="header-prefix">{props.renderHeaderPrefix?.()}</div>{props.renderHeaderMetadata && <div slot="header-metadata">{props.renderHeaderMetadata()}</div>}</diffs-container>
-} } })
+  return <div data-diffs-stub=""><div slot="header-prefix">{props.renderHeaderPrefix?.()}</div>{props.renderHeaderMetadata && <div slot="header-metadata">{props.renderHeaderMetadata()}</div>}</div>
+}, VirtualizerContext: createContext(undefined) } })
 mock.module('next-themes', { namedExports: { useTheme: () => ({ resolvedTheme: 'dark' }) } })
 let ThreadChangesView: typeof import('./thread-changes')['ThreadChangesView']
 before(async () => { ({ ThreadChangesView } = await import('./thread-changes')) })
