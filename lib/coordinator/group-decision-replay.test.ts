@@ -10,62 +10,84 @@ import { runGroupDecisionReplay } from '../../scripts/group-decision-replay'
 const ui='00000000-0000-4000-8000-000000000001',coding='00000000-0000-4000-8000-000000000002'
 // Synthetic transport fixtures test the gate, not live model quality.
 const receipt:DecisionExecution={executionId:'synthetic-execution',modelId:DECISION_MODEL,providerGenerationId:'synthetic-generation',startedAt:'2026-11-03T00:00:00.000Z',completedAt:'2026-11-03T00:00:00.100Z',requestDigest:'a'.repeat(64),imageDigests:[],vision:'no-image-input'}
-const answer=(values:Record<string,string>,execution=receipt)=>({answers:new Map<string,Exclude<DecisionAnswer,{type:'refusal'}>>(Object.entries(values).map(([name,choice])=>[name,{name,type:'choice',choice}])),execution})
-const response=(action:string,id:string,extra:Record<string,string>={})=>answer({action,reason:'useful_answer',contributions:'single',task_operation:'none',task_target:'none',report_timing:'now',responder_0:id,responder_1:'end',responder_2:'end',...extra})
+let sequence=0
+const answer=(values:Record<string,string>,execution?:DecisionExecution)=>({answers:new Map<string,Exclude<DecisionAnswer,{type:'refusal'}>>(Object.entries(values).map(([name,choice])=>[name,{name,type:'choice',choice}])),execution:execution??{...receipt,executionId:`synthetic-${++sequence}`,providerGenerationId:`synthetic-generation-${sequence}`}})
+const response=(action:string,id:string,extra:Record<string,string>={}):typeof invokeDecision=>async(_purpose,_input,questions)=>{
+  const values:Record<string,string>={intent:action==='ignore'?'ignore_ordinary_conversation':action==='delegate'?'delegate_task_followup':'reply_useful_answer',responder_0:id,responder_1:'end',responder_2:'end',task_plan:'continue_0',report_timing:'now',...extra}
+  return answer(Object.fromEntries(questions.map(question=>{const value=values[question.name];assert.ok(value);return[question.name,value]})))
+}
 
 test('fixed-case replay uses the model route, never expected labels, and never executes its projection',async()=>{
   let calls=0
-  const invoke:typeof invokeDecision=async(purpose,input,questions)=>{
-    calls++;assert.equal(purpose,'group-routing')
+  const scripted=response('reply',ui)
+  const invoke:typeof invokeDecision=async(purpose,input,questions,...rest)=>{
+    calls++;assert.equal(purpose,'group-routing');assert.equal(questions.length,1)
     assert.ok(typeof input!=='string')
     const supplied=JSON.parse(input.text)
     assert.equal(supplied.policyVersion,GROUP_POLICY_VERSION)
     assert.ok(!('expected' in supplied));assert.doesNotMatch(input.text,/maxPublicMessages|evidenceKind/)
-    assert.ok(questions.some(question=>question.name==='action'))
     // Intentionally wrong for small-talk: the observation must preserve it.
-    return response('reply',ui)
+    return scripted(purpose,input,questions,...rest)
   }
   const row=await replayGroupDecision('small-talk',GROUP_POLICY_VERSION,invoke)
-  assert.equal(calls,1);assert.equal(row.route?.action,'reply');assert.deepEqual(row.route?.responders,[ui])
+  assert.equal(calls,2);assert.equal(row.route?.action,'reply');assert.deepEqual(row.route?.responders,[ui])
   assert.equal(row.executionPerformed,false);assert.equal(row.policyChanged,false)
-  assert.equal(row.projection?.intervention,true);assert.equal(row.decisionLatencyMs,100);assert.equal(row.decisionCostUsd,null)
-  assert.equal(summarizeGroupDecisionReplay([row]).falseIntervention,1)
+  assert.equal(row.projection?.intervention,true);assert.equal(row.decisionLatencyMs,200);assert.equal(row.decisionCostUsd,null)
+  assert.deepEqual(row.decisionCalls,{attempted:2,receipted:2,unreceipted:0})
+  const summary=summarizeGroupDecisionReplay([row])
+  assert.equal(summary.falseIntervention,1);assert.equal(summary.logicalReplays,1);assert.equal(summary.decisionCalls.receipted,2)
   assert.ok(!JSON.stringify(row).includes('今天午饭'))
 })
 
 test('baseline and candidate share fixed inputs but use distinct prompts; mentions and task targets stay host-bound',async()=>{
   const before=await replayGroupDecision('small-talk',GROUP_BASELINE_VERSION,async(_purpose,_input,questions)=>{
-    assert.ok(!questions.some(question=>question.name==='action'));return answer({responder_0:ui,responder_1:'end',responder_2:'end'})
+    assert.ok(!questions.some(question=>question.name==='intent'));assert.equal(questions.length,1)
+    return answer({[questions[0].name]:questions[0].name==='responder_0'?ui:'end'})
   })
-  const after=await replayGroupDecision('small-talk',GROUP_POLICY_VERSION,async()=>response('ignore','end'))
+  const after=await replayGroupDecision('small-talk',GROUP_POLICY_VERSION,response('ignore','end'))
   assert.equal(before.inputDigest,after.inputDigest);assert.equal(before.route?.action,'reply');assert.equal(after.route?.action,'ignore')
-  const mentioned=await replayGroupDecision('explicit-mention',GROUP_POLICY_VERSION,async(_purpose,input)=>{
-    assert.ok(typeof input!=='string');const supplied=JSON.parse(input.text);assert.deepEqual(supplied.members.map((member:{id:string})=>member.id),[ui]);return response('reply',ui)
+  const mentioned=await replayGroupDecision('explicit-mention',GROUP_POLICY_VERSION,async(_purpose,input,questions)=>{
+    assert.ok(typeof input!=='string');const supplied=JSON.parse(input.text);assert.deepEqual(supplied.members.map((member:{id:string})=>member.id),[ui]);assert.equal(questions[0].name,'intent')
+    return answer({intent:'reply_useful_answer'})
   })
-  assert.equal(mentioned.route?.by,'mention')
-  const delegated=await replayGroupDecision('silent-delegation',GROUP_POLICY_VERSION,async(_purpose,input)=>{
+  assert.equal(mentioned.route?.by,'mention');assert.deepEqual(mentioned.route?.responders,[ui])
+  const scripted=response('delegate',coding,{report_timing:'on_completion'})
+  const delegated=await replayGroupDecision('silent-delegation',GROUP_POLICY_VERSION,async(purpose,input,questions,...rest)=>{
     assert.ok(typeof input!=='string');const supplied=JSON.parse(input.text);assert.equal(supplied.message.tasks[0].reporterId,coding)
-    return response('delegate',coding,{task_operation:'continue',task_target:supplied.message.tasks[0].issueId,report_timing:'on_completion'})
+    return scripted(purpose,input,questions,...rest)
   })
   assert.equal(delegated.route?.delegation?.reportTiming,'on_completion');assert.equal(delegated.executionPerformed,false)
-  assert.equal(summarizeGroupDecisionReplay([delegated]).failures.length,0)
+  assert.equal(delegated.decisions.length,3);assert.equal(summarizeGroupDecisionReplay([delegated]).failures.length,0)
   const noisy={...delegated,route:{...delegated.route!,delegation:{...delegated.route!.delegation!,reportTiming:'now' as const}}}
   assert.deepEqual(summarizeGroupDecisionReplay([noisy]).failures,[{caseId:'silent-delegation',reason:'report_timing'}])
 })
 
-test('missing/malformed receipts cannot be counted as actual inference; runtime faults are not invented provider responses',async()=>{
-  for(const invoke of [async()=>null,async()=>{throw Error('PRIVATE_UPSTREAM_DETAIL')},async()=>({...response('reply',ui),execution:{...receipt,requestDigest:'invalid'}})]) {
+test('missing/malformed receipts cannot be measured as actual inference; runtime faults are not invented provider responses',async()=>{
+  for(const invoke of [async()=>null,async()=>{throw Error('PRIVATE_UPSTREAM_DETAIL')},async()=>answer({intent:'reply_useful_answer'},{...receipt,requestDigest:'invalid'})]) {
     const row=await replayGroupDecision('ui-help',GROUP_POLICY_VERSION,invoke)
     assert.equal(row.status,'unavailable');assert.equal(row.receipt,null);assert.equal(row.route,null);assert.equal(row.projection,null)
     assert.equal(summarizeGroupDecisionReplay([row]).measured,0);assert.ok(!JSON.stringify(row).includes('PRIVATE'))
   }
-  const invalid=await replayGroupDecision('ui-help',GROUP_POLICY_VERSION,async()=>response('reply','foreign'))
-  assert.equal(invalid.status,'invalid_decision');assert.ok(invalid.receipt);assert.equal(summarizeGroupDecisionReplay([invalid]).measured,0)
+  const invalid=await replayGroupDecision('ui-help',GROUP_POLICY_VERSION,response('reply','foreign'))
+  assert.equal(invalid.status,'invalid_decision');assert.ok(invalid.receipt);assert.equal(invalid.failureReason,'choice_outside_contract')
+  assert.equal(invalid.decisions.length,2);assert.equal(summarizeGroupDecisionReplay([invalid]).measured,0)
   for(const id of ['unknown','decision-outage','duplicate-delivery'])await assert.rejects(replayGroupDecision(id,GROUP_POLICY_VERSION,async()=>assert.fail('no call')),/unsupported_group_replay_case/)
   assert.equal(GROUP_REPLAY_CASE_IDS.length,12)
   const normal={caseId:'ui-help',policyVersion:GROUP_POLICY_VERSION}
   assert.equal(groupDecisionReplayInput.safeParse(normal).success,true)
-  for(const extra of [{prompt:'arbitrary'},{members:[]},{workspaceId:'foreign'},{userId:'foreign'},{policyVersion:'arbitrary'}])assert.equal(groupDecisionReplayInput.safeParse({...normal,...extra}).success,false)
+  for(const extra of [{prompt:'arbitrary'},{members:[]},{workspaceId:'foreign'},{userId:'foreign'},{policyVersion:'arbitrary'},{retainInvalidReceipt:true}])assert.equal(groupDecisionReplayInput.safeParse({...normal,...extra}).success,false)
+})
+
+test('cost and latency include invalid paid requests; partial/unknown costs never become a complete total',async()=>{
+  const row=await replayGroupDecision('ui-help',GROUP_POLICY_VERSION,response('reply','foreign'))
+  row.decisions[0].decisionCostUsd=0.000138;row.decisions[1].decisionCostUsd=null
+  const summary=summarizeGroupDecisionReplay([row])
+  assert.equal(summary.measured,0);assert.equal(summary.cost.knownUsd,0.000138)
+  assert.equal(summary.cost.knownCalls,1);assert.equal(summary.cost.unknownCalls,1);assert.equal(summary.cost.completeTotalUsd,null)
+  assert.equal(summary.decisionLatency.samples,2);assert.equal(summary.decisionCalls.receipted,2)
+  const legacy={...row,receipt,decisions:undefined,decisionCostUsd:0.000138} as unknown as typeof row
+  const old=summarizeGroupDecisionReplay([legacy])
+  assert.equal(old.measured,0);assert.equal(old.cost.knownUsd,0.000138);assert.equal(old.cost.knownCalls,1);assert.equal(old.cost.unknownCalls,0)
 })
 
 test('real replay runner fails before calls without normal auth/fixed deployment and stops on unreceipted evidence',async()=>{

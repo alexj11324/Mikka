@@ -3,6 +3,8 @@ import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import type { Directory } from '@/lib/group-conversations-store'
 import type { GroupDecisionTrace } from './group-decision-trace'
+import { priceGroupDecisions, traceDecisionSteps } from './group-decision-trace'
+import { groupDecisionTotals } from './group-decision-chain'
 
 export const groupFeedbackInput = z.object({ messageId: z.uuid(), kind: z.enum(['helpful','unhelpful','wrong_member','missed_intervention','unwanted_task','reaction_positive','reaction_negative']), targetId: z.uuid().nullable().optional() }).strict()
 export async function recordGroupFeedback(client: Pick<PoolClient, 'query'>, input: {
@@ -50,15 +52,22 @@ export async function handleGroupDecisionQuality(pool: Pool, directory: Director
     }
     const limit = Number(req.limit ?? '50')
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) return finish(422, { error: 'invalid_limit' })
-    const { rows } = await client.query<{ messageId: string; status: string; error: string | null; trace: GroupDecisionTrace; costMicroUsd: number | null; feedback: unknown[] }>(`SELECT t."messageId",t.status,t.error,t.trace,
-      (SELECT sum(u."costMicroUsd")::float8 FROM hosted_usage u WHERE u."generationId"=t.trace->'execution'->>'providerGenerationId' AND u.model=t.trace->'execution'->>'modelId' AND u.state='settled') AS "costMicroUsd",
+    const { rows } = await client.query<{ messageId: string; status: string; error: string | null; trace: GroupDecisionTrace; feedback: unknown[] }>(`SELECT t."messageId",t.status,t.error,t.trace,
       COALESCE((SELECT jsonb_agg(jsonb_build_object('kind',f.kind,'source',f.source,'targetId',f."targetId",'createdAt',f."createdAt") ORDER BY f."createdAt") FROM group_decision_feedback f WHERE f."messageId"=t."messageId"),'[]'::jsonb)
       || COALESCE((SELECT jsonb_agg(jsonb_build_object('kind',CASE r.emoji WHEN '👍' THEN 'reaction_positive' WHEN '👎' THEN 'reaction_negative' ELSE 'reaction' END,
         'source','human_reaction','emoji',r.emoji,'replyMessageId',m.id,'createdAt',r."createdAt") ORDER BY r."createdAt")
         FROM conversation_messages m JOIN message_reactions r ON r."messageId"=m.id
         WHERE m."conversationId"=t."conversationId" AND m."replyToId"=t."messageId" AND m."authorType" IN ('agent','bot')),'[]'::jsonb) AS feedback
       FROM group_turns t JOIN conversation_messages m ON m.id=t."messageId" WHERE t."conversationId"=$1 ORDER BY m.position DESC LIMIT $2`, [req.conversationId, limit])
-    return finish(200, { turns: rows.map(({ costMicroUsd, ...row }) => ({ ...row, decisionCostUsd: costMicroUsd === null ? null : costMicroUsd / 1_000_000 })), costScope: 'primary-routing-decision-api', feedbackIsGroundTruth: false })
+    const steps=rows.flatMap(row=>traceDecisionSteps(row.trace))
+    const priced=await priceGroupDecisions(client,steps)
+    const costs=new Map(priced.map(step=>[step.id,step.decisionCostUsd??null]))
+    return finish(200, { turns: rows.map(row=>{
+      const decisions=traceDecisionSteps(row.trace).map(step=>({...step,decisionCostUsd:costs.get(step.id)??null}))
+      const totals=groupDecisionTotals(decisions,row.trace.decisionsOmitted??0)
+      return {...row,trace:{...row.trace,decisions,decisionLatencyMs:totals.decisionLatencyMs},...totals,
+        decisionCostUsd:decisions.length?totals.decisionCostUsd:null}
+    }), costScope: 'routing-decision-chain', feedbackIsGroundTruth: false })
   } catch (error) { await client.query('ROLLBACK'); throw error }
   finally { client.release() }
 }
