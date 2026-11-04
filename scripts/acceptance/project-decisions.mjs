@@ -23,7 +23,7 @@ export const CASES = Object.freeze([
   { id: 'official_claude', model: 'claude-haiku-5-5', provider: 'claude', harness: 'claude_code', kind: 'subscription' },
   { id: 'official_codex', model: 'gpt-6-luna', provider: 'codex', harness: 'codex', kind: 'subscription' },
 ])
-const ACTIONS = new Set(['saveProject', 'listProjects', 'saveIssue', 'setProjectIssues', 'getIssue', 'getIssueThread', 'changeModelOrder'])
+const ACTIONS = new Set(['saveProject', 'listProjects', 'saveIssue', 'setProjectIssues', 'getIssueThread', 'changeModelOrder'])
 const uuid = value => typeof value === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value)
 const sha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value)
 const digest = value => createHash('sha256').update(value).digest('hex')
@@ -67,6 +67,27 @@ export function publicFailure(error) {
     ...(['balance', 'auth', 'unavailable', 'quota'].includes(detail.providerKind) ? { providerKind: detail.providerKind } : {}),
     ...(['checking', 'quota', 'expired', 'paused', 'missing', 'keyRefused', 'balance', 'providerUnavailable', 'noDevice'].includes(detail.block) ? { block: detail.block } : {}),
   }
+}
+
+/** This one GET returns a normal ChatView with a persistent business error.
+ * Keep only control state; neither the historical error nor chat bodies leave here. */
+export async function readChatState(request, botId) {
+  check(uuid(botId), 'bot_scope', 'failed')
+  const response = await request('/api/mobile/chat?bot=' + botId)
+  check(response.ok, 'http_refused', 'blocked', { httpStatus: response.status })
+  const value = await response.json().catch(() => null)
+  const failure = value?.failure
+  const knownFailure = failure === null || (failure && typeof failure === 'object' && !Array.isArray(failure)
+    && (failure.kind === 'failed'
+      || (failure.kind === 'hosted' && typeof failure.code === 'string')
+      || (failure.kind === 'subscription' && typeof failure.notice === 'string')
+      || (failure.kind === 'wake' && ['wake_failed', 'wake_start_unconfirmed', 'wake_exhausted'].includes(failure.code))))
+  check(value && typeof value === 'object' && !Array.isArray(value)
+    && Array.isArray(value.items) && typeof value.working === 'boolean'
+    && (value.error === null || typeof value.error === 'string')
+    && (value.streamRunId === undefined || typeof value.streamRunId === 'string')
+    && knownFailure, 'response_invalid')
+  return { working: value.working, streamRunId: value.streamRunId ?? null, failed: failure !== null }
 }
 
 export function triggerGuard(env, event) {
@@ -128,36 +149,71 @@ export async function attestDeployment({ env = process.env, event, fetchImpl = f
     workerReleaseRunId: worker.id, workerReleaseSha: guard.revision, checkedAt: new Date(now()).toISOString() }
 }
 
+const ACTION_PAGES = ['/en', '/en?section=projects', '/en/settings?section=models']
+const CHUNK_PREFIX = '/mikka/_next/static/chunks/'
+// Next's compiler emits five arguments. Turbopack may use long bracket-member
+// imports; production minification may use direct or dot-member references.
+const identifier = String.raw`[$A-Z_a-z][$\w]*`
+const member = identifier + String.raw`(?:\s*(?:\.\s*` + identifier
+  + String.raw`|\[\s*(?:"` + identifier + String.raw`"|'` + identifier + String.raw`')\s*\]))*`
+const referenceCall = new RegExp(
+  String.raw`(?:\bcreateServerReference|\[\s*(?:"createServerReference"|'createServerReference')\s*\])\s*\)?\s*\(\s*(["'])([a-f0-9]{40,64})\1\s*,\s*`
+  + member + String.raw`\s*,\s*(?:void\s+0|undefined)\s*,\s*` + member
+  + String.raw`\s*,\s*(["'])([A-Za-z]+)\3\s*\)`, 'g')
+
+function publicChunk(value) {
+  try {
+    const raw = value.startsWith('static/chunks/') ? '/mikka/_next/' + value : value
+    const url = new URL(raw, ORIGIN)
+    if (url.origin !== ORIGIN || url.username || url.password || !url.pathname.startsWith(CHUNK_PREFIX)) return null
+    const path = raw.split(/[?#]/, 1)[0]
+    const parts = /(?:^|\/)static\/chunks\/(.+\.js)$/.exec(path)?.[1].split('/').map(decodeURIComponent)
+    if (!parts?.length || parts.some(part => !part || part === '.' || part === '..' || /[/\\]/.test(part))) return null
+    return CHUNK_PREFIX + parts.map(encodeURIComponent).join('/') + url.search
+  } catch { return null }
+}
+
 /** Only deployment-published named UI Server Actions; no manifest or private server access. */
-export async function discoverActions(request) {
-  const queue = [], seen = new Set(), refs = {}
-  for (const path of ['/en', '/en/projects']) {
-    const response = await request(path)
-    if (!response.ok) continue
-    const html = await response.text()
-    check(html.length <= 8_000_000, 'response_invalid')
-    for (const match of html.matchAll(/(?:src|href)="([^"]+\.js(?:\?[^"]*)?)"/g)) {
-      const url = new URL(match[1], ORIGIN)
-      if (url.origin === ORIGIN && url.pathname.startsWith('/mikka/_next/static/chunks/') && !queue.includes(url.pathname)) queue.push(url.pathname)
+export async function discoverActions(request, diagnostics = {}) {
+  const queue = [], queued = new Set(), seen = new Set(), refs = {}
+  Object.assign(diagnostics, { required: [...ACTIONS], found: [], missing: [...ACTIONS],
+    pagesRead: 0, pagesFailed: 0, chunksRead: 0, chunksFailed: 0, chunksRemaining: 0 })
+  const enqueue = value => {
+    const path = publicChunk(value)
+    if (path && !queued.has(path) && queue.length < 3000) { queued.add(path); queue.push(path) }
+  }
+  try {
+    for (const path of ACTION_PAGES) {
+      const response = await request(path).catch(() => null)
+      if (!response?.ok) { diagnostics.pagesFailed++; continue }
+      const html = await response.text()
+      diagnostics.pagesRead++
+      check(html.length <= 8_000_000, 'response_invalid')
+      for (const match of html.matchAll(/(?:src|href)\s*=\s*(["'])([^"']+\.js(?:\?[^"']*)?)\1/g))
+        enqueue(match[2].replaceAll('&amp;', '&'))
     }
+    while (queue.length && seen.size < 200 && Object.keys(refs).length < ACTIONS.size) {
+      const batch = queue.splice(0, Math.min(20, 200 - seen.size))
+      for (const path of batch) seen.add(path)
+      const reads = await Promise.allSettled(batch.map(async path => {
+        const response = await request(path).catch(() => null)
+        if (!response?.ok) { diagnostics.chunksFailed++; return }
+        const source = await response.text()
+        diagnostics.chunksRead++
+        check(source.length <= 8_000_000, 'response_invalid')
+        for (const match of source.matchAll(referenceCall))
+          if (ACTIONS.has(match[4])) refs[match[4]] = match[2]
+        for (const match of source.matchAll(/(["'])((?:static\/chunks\/|\/mikka\/_next\/static\/chunks\/)[^"'\\\r\n]+\.js(?:\?[^"'\\\r\n]*)?)\1/g))
+          enqueue(match[2])
+      }))
+      for (const read of reads) if (read.status === 'rejected') throw read.reason
+    }
+    return refs
+  } finally {
+    diagnostics.found = [...ACTIONS].filter(name => refs[name])
+    diagnostics.missing = [...ACTIONS].filter(name => !refs[name])
+    diagnostics.chunksRemaining = queue.length
   }
-  while (queue.length && seen.size < 200 && Object.keys(refs).length < ACTIONS.size) {
-    const batch = queue.splice(0, 20).filter(path => !seen.has(path))
-    for (const path of batch) seen.add(path)
-    await Promise.all(batch.map(async path => {
-      const response = await request(path)
-      if (!response.ok) return
-      const source = await response.text()
-      check(source.length <= 8_000_000, 'response_invalid')
-      for (const match of source.matchAll(/createServerReference\)\("([a-f0-9]{40,64})",[^;]{0,140}?"([A-Za-z]+)"\)/g))
-        if (ACTIONS.has(match[2])) refs[match[2]] = match[1]
-      for (const match of source.matchAll(/static\/chunks\/[a-zA-Z0-9_.-]+\.js/g)) {
-        const next = '/mikka/_next/' + match[0]
-        if (!seen.has(next) && !queue.includes(next) && queue.length < 3000) queue.push(next)
-      }
-    }))
-  }
-  return refs
 }
 
 export function actionResult(text, name) {
@@ -175,7 +231,7 @@ export function actionResult(text, name) {
     const shape = value => value && typeof value === 'object' && (value.error
       || (name === 'listProjects' && Array.isArray(value))
       || (['saveProject', 'setProjectIssues'].includes(name) && value.project)
-      || (['saveIssue', 'getIssue'].includes(name) && value.issue)
+      || (name === 'saveIssue' && value.issue)
       || (name === 'getIssueThread' && value.thread && Array.isArray(value.chunks))
       || (name === 'changeModelOrder' && Array.isArray(value.entries) && typeof value.customized === 'boolean'))
     result = [...rows.values()].find(shape)
@@ -490,8 +546,8 @@ export async function runProjectDecisionsAcceptance({ env = process.env, event, 
           }
           if (['failed', 'blocked', 'cancelled', 'revoked'].includes(state.task.status)) throw new AcceptanceError('task_blocked')
         }
-        const chat = await json('/api/mobile/chat?bot=' + bot.id)
-        if (!state && !chat.working && chat.failure) throw new AcceptanceError('provider_refused')
+        const chat = await readChatState(request, bot.id)
+        if (!state && !chat.working && chat.failed) throw new AcceptanceError('provider_refused')
         await wait(3000)
       }
       check(result.status === 'pass', 'task_timeout')
@@ -551,7 +607,7 @@ export async function runProjectDecisionsAcceptance({ env = process.env, event, 
               const value = await response.json().catch(() => null)
               check(response.ok || (response.status === 409 && value?.error === 'runChainEnded'), 'cleanup_incomplete', 'failed')
             }
-            const chat = await json('/api/mobile/chat?bot=' + bot.id)
+            const chat = await readChatState(request, bot.id)
             const tasks = await Promise.all([...cleanupTaskIds].map(id => json('/api/factory/tasks/' + id)))
             const statuses = await Promise.all([...runIds].map(id => json('/api/runs/' + id + '/evidence')))
             const signature = [...cleanupTaskIds, ...runIds].sort().join(',')
@@ -599,7 +655,8 @@ export async function runProjectDecisionsAcceptance({ env = process.env, event, 
     check(Array.isArray(bots) && bots.length > 0 && bots.every(bot => bot.ownerId === ownerId && bot.workspaceId === bots[0].workspaceId)
       && uuid(bots[0].workspaceId), 'workspace_missing')
     workspaceId = bots[0].workspaceId
-    refs = await discoverActions(request)
+    report.actionDiscovery = {}
+    refs = await discoverActions(request, report.actionDiscovery)
     // A refused API path does not gate or substitute either official subscription path.
     for (const item of CASES) report.cases.push(await runCase(item))
     await pin()
@@ -623,6 +680,11 @@ async function output(name, report) {
   const summary = ['## Project decisions acceptance', '', 'Application: ' + (report.revision ?? 'unavailable'),
     'Result: ' + report.status, '', '| Path | Result | Code |', '| --- | --- | --- |',
     ...(report.cases ?? []).map(item => '| ' + item.case + ' | ' + item.status + ' | ' + (item.code ?? '') + ' |'),
+    ...(report.actionDiscovery?.required ? ['',
+      'Actions found: ' + (report.actionDiscovery.found.join(', ') || 'none'),
+      'Actions missing: ' + (report.actionDiscovery.missing.join(', ') || 'none'),
+      'Public pages read/failed: ' + report.actionDiscovery.pagesRead + '/' + report.actionDiscovery.pagesFailed,
+      'Public chunks read/failed/remaining: ' + report.actionDiscovery.chunksRead + '/' + report.actionDiscovery.chunksFailed + '/' + report.actionDiscovery.chunksRemaining] : []),
     '', 'Only fixed metadata, IDs and hashes are reported. A blocked path is not a pass.',
     'Synthetic project, Bot and decision evidence is retained; owned live work is stopped.', ''].join('\n')
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, summary)

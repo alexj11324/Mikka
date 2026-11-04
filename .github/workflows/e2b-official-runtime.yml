@@ -19,6 +19,9 @@ on:
       - '.github/workflows/model-provider-fallback-acceptance.yml'
       - 'scripts/acceptance/model-provider-fallback.mjs'
       - 'scripts/acceptance/model-provider-fallback.test.mjs'
+      - '.github/workflows/project-decisions-acceptance.yml'
+      - 'scripts/acceptance/project-decisions.mjs'
+      - 'scripts/acceptance/project-decisions.test.mjs'
   pull_request:
     paths: *runtime_paths
   workflow_dispatch:
