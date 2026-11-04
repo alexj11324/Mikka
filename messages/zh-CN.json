@@ -3582,6 +3582,7 @@
       "subscriptionRoute": "订阅执行路由",
       "snapshotMissing": "未记录身份快照",
       "participants": "执行身份",
+      "workspace": "工作区",
       "requester": "任务发起者",
       "botOwner": "Bot 所有者",
       "executionPrincipal": "执行主体",

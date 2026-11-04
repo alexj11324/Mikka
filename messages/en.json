@@ -3582,6 +3582,7 @@
       "subscriptionRoute": "Subscription route",
       "snapshotMissing": "No recorded identity snapshot",
       "participants": "Execution identity",
+      "workspace": "Workspace",
       "requester": "Requester",
       "botOwner": "Bot owner",
       "executionPrincipal": "Execution principal",

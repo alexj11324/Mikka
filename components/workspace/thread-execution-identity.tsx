@@ -65,6 +65,7 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
     </dl>
     {!identity ? <p className="text-muted-foreground">{t('snapshotMissing')}</p> : <>
       <section className="flex flex-col gap-3"><h3 className="font-medium">{t('participants')}</h3><dl className="flex flex-col gap-3">
+        <ValueRow label={t('workspace')}>{identity.workspaceId ? <span className="break-all">{identity.workspaceId}</span> : t('notRecorded')}</ValueRow>
         <ValueRow label={t('requester')}><AccountReference id={identity.requester} /></ValueRow>
         <ValueRow label={t('botOwner')}>{identity.botOwner ? <AccountReference id={identity.botOwner} /> : t('notRecorded')}</ValueRow>
         <ValueRow label={t('executionPrincipal')}><AccountReference id={identity.executionPrincipal} /></ValueRow>
@@ -81,7 +82,7 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
       <section className="flex flex-col gap-3"><h3 className="font-medium">{t('billing')}</h3>{(['model', 'runtime'] as const).map(kind => {
         const account = identity.billingAccount[kind]
         return <dl key={kind} className="flex flex-col gap-1"><ValueRow label={t(`${kind}Billing`)}><span>{t(`accountKinds.${account.kind}`)}</span></ValueRow>
-          <ValueRow label={t('payer')}><AccountReference id={account.ownerId} /></ValueRow><ValueRow label={t('amount')}><span>{t(`amounts.${account.amount}`)}</span></ValueRow>
+          <ValueRow label={t('payer')}><AccountReference id={account.ownerId} /></ValueRow><ValueRow label={t('resourceReference')}><span className="break-all">{account.resourceId}</span></ValueRow><ValueRow label={t('amount')}><span>{t(`amounts.${account.amount}`)}</span></ValueRow>
         </dl>
       })}</section>
     </>}
