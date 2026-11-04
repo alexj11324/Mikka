@@ -21,14 +21,13 @@ import { factoryEventId } from './event-id';
 /** A repair inherits requirements only across the recorded host transition and
  * the adjacent, independently verified failed check. Findings are not answers. */
 async function repairAnswerCandidate(tx: Pick<PoolClient, 'query'>, task: FactoryTask, attemptId: string, childRunId: string | null): Promise<string | null> {
-  const { rows } = await tx.query(`SELECT a.*,e."eventId" AS "repairEventId",e.request,e.result AS repair,to_jsonb(f) AS previous,to_jsonb(adjacent) AS adjacent,
+  const { rows } = await tx.query(`SELECT a.*,e."eventId" AS "repairEventId",e.request,e.result AS repair,to_jsonb(f) AS previous,
       to_jsonb(c) AS candidate,r.id AS "checkRunId",r."botId",r.status AS "runStatus",r."stopReason",r."stopRequestedAt",r."retryOf",r."sessionId" AS "runSessionId",r.kind,r."baseBranch",r."deviceRepoId",r.report,r.error,
       child."continuesRunId",COALESCE(c.sha,CASE WHEN c.kind='deliverable' THEN producer.report->>'deliverableCommit' END,producer.report->>'sourceCommit') AS sha
     FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id AND a.id=$6
     LEFT JOIN factory_events e ON e."taskId"=t.id AND e.request->'change'->>'action'='repair' AND e.result->'task'->>'attemptId'=a.id::text
-    LEFT JOIN factory_attempts f ON f."taskId"=t.id AND f.id::text=e.request->'binding'->>'attemptId'
-    LEFT JOIN factory_attempts adjacent ON adjacent."taskId"=t.id AND adjacent.position=a.position-1
-      AND COALESCE(adjacent.output->>'requestEpoch',t."sourceEventId"::text)=t."sourceEventId"::text
+    LEFT JOIN factory_attempts f ON f."taskId"=t.id AND f.position=a.position-1
+      AND COALESCE(f.output->>'requestEpoch',t."sourceEventId"::text)=t."sourceEventId"::text
     LEFT JOIN factory_candidates c ON c."taskId"=t.id AND c.id=f."candidateId"
     LEFT JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=t."userId" AND producer."issueId"=t."issueId"
     LEFT JOIN agent_runs r ON r.id=f."runId" AND r."userId"=t."userId" AND r."issueId"=t."issueId"
@@ -38,11 +37,11 @@ async function repairAnswerCandidate(tx: Pick<PoolClient, 'query'>, task: Factor
     [task.id, task.userId, task.issueId, task.sourceEventId, task.attemptId, attemptId, task.candidateId]);
   if (rows.length > 1) throw new FactoryError('factorySourceMismatch');
   const row = rows[0], previous = row?.previous, candidate = row?.candidate, repair = row?.repair?.task;
-  const recorded = Array.isArray(row?.repair?.attempts) ? row.repair.attempts.find((a: { id: string }) => a.id === row.request?.binding?.attemptId) : undefined;
+  const savedExecute = Array.isArray(row?.repair?.attempts) ? row.repair.attempts.find((a: { id: string }) => a.id === row.id) : undefined;
+  const recorded = Number.isInteger(savedExecute?.position) ? row.repair.attempts.find((a: { position: number }) => a.position === savedExecute.position - 1) : undefined;
   const failedCheck = (a: { stage?: string; status?: string; output?: { completion?: { trustedFailureProvenance?: boolean } } } | undefined) =>
     !!a && ['review', 'verify'].includes(a.stage ?? '') && a.status === 'failed' && a.output?.completion?.trustedFailureProvenance === true;
-  const checkRepair = failedCheck(row?.adjacent) || failedCheck(recorded) ||
-    (typeof row?.request?.binding?.attemptId === 'string' && row.repairEventId === factoryEventId('check-repair', row.request.binding.attemptId));
+  const checkRepair = failedCheck(previous) || failedCheck(recorded);
   // Ordinary executions and approval rejection have no failed-check ancestry.
   // A known check-repair edge with a missing receipt must never restore old targets.
   if (!checkRepair) return null;
@@ -53,7 +52,11 @@ async function repairAnswerCandidate(tx: Pick<PoolClient, 'query'>, task: Factor
   const sameTask = (value: Record<string, unknown> | undefined) => value?.id === task.id && value.userId === task.userId && value.issueId === task.issueId && value.sourceEventId === task.sourceEventId;
   if (!candidate || !sameTask(repair) || repair.attemptId !== row.id || repair.stage !== 'execute' || repair.status !== 'pending' || repair.candidateId !== null ||
     row.stage !== 'execute' || row.position !== previous.position + 1 || (row.output?.requestEpoch ?? task.sourceEventId) !== task.sourceEventId ||
-    row.request?.binding?.taskId !== task.id || row.request.binding.issueId !== task.issueId || row.request.binding.candidateId !== candidate.id ||
+    savedExecute?.stage !== 'execute' || savedExecute.status !== 'pending' || savedExecute.position !== row.position || savedExecute.runId !== null ||
+    recorded?.id !== previous.id || recorded.candidateId !== candidate.id || recorded.runId !== row.checkRunId || recorded.sessionId !== previous.sessionId || !isDeepStrictEqual(recorded.output, previous.output) ||
+    row.request?.binding?.taskId !== task.id || !Number.isInteger(row.request.binding.revision) || row.request.binding.revision < 1 ||
+    repair.revision !== row.request.binding.revision + 1 || receipt?.revision !== row.request.binding.revision ||
+    ![factoryEventId('check-repair', previous.id), factoryEventId('check-recovery-apply-v2', previous.id)].includes(row.repairEventId) ||
     (childRunId ? row.runId !== childRunId || row.continuesRunId !== candidate.runId : row.id !== task.attemptId || row.runId !== null || task.stage !== 'execute' || task.status !== 'pending') ||
     (previous.output?.requestEpoch ?? task.sourceEventId) !== task.sourceEventId || !sameTask(receipt) || receipt.attemptId !== previous.id || receipt.candidateId !== candidate.id || receipt.stage !== previous.stage || receipt.status !== 'failed' ||
     !row.checkRunId || !['succeeded', 'failed', 'stopped'].includes(row.runStatus) || row.stopRequestedAt || row.retryOf || ['cancelled', 'revoked'].includes(row.stopReason) ||

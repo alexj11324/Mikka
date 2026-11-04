@@ -1417,6 +1417,9 @@ test(
           } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release(); queuedRepairPrompt = originalRepairRequest; }
           const repairing = await state(pending.task.id);
           assert.equal(repairing.task.candidateId, null, 'the normal repair transition clears the current candidate');
+          const repairReceipt = (await db.query('SELECT request FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2',
+            [pending.task.id, factoryEventId('check-repair', failedAttempt.id)])).rows[0];
+          assert.deepEqual(Object.keys(repairReceipt.request.binding).sort(), ['revision', 'taskId'], 'real lifecycle receipts omit legacy display binding fields');
           const repairAttempt = repairing.attempts.find(a => a.id === repairing.task.attemptId)!;
           const repairRun = (await db.query('SELECT * FROM agent_runs WHERE id=$1', [repairAttempt.runId])).rows[0];
           const assertAnswer = (prompt: string) => {
@@ -1445,6 +1448,7 @@ test(
             ['old failed epoch', `UPDATE factory_attempts SET output=jsonb_set(output,'{requestEpoch}',to_jsonb($2::text)) WHERE id=$1`, [failedAttempt.id, randomUUID()]],
             ['missing repair receipt', 'DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [pending.task.id, factoryEventId('check-repair', failedAttempt.id)]],
             ['corrupt repair result', `UPDATE factory_events SET result=jsonb_set(result,'{task}','{}') WHERE "taskId"=$1 AND "eventId"=$2`, [pending.task.id, factoryEventId('check-repair', failedAttempt.id)]],
+            ['wrong repair revision', `UPDATE factory_events SET request=jsonb_set(request,'{binding,revision}','999999') WHERE "taskId"=$1 AND "eventId"=$2`, [pending.task.id, factoryEventId('check-repair', failedAttempt.id)]],
             ['changed failed status', `UPDATE factory_attempts SET status='passed' WHERE id=$1`, [failedAttempt.id]],
             ['missing canonical finish', 'DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [pending.task.id, finishId]],
             ['corrupt canonical attempts', `UPDATE factory_events SET result=jsonb_set(result,'{attempts}','{}') WHERE "taskId"=$1 AND "eventId"=$2`, [pending.task.id, finishId]],
