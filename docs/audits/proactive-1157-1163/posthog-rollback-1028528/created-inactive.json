@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "connected-posthog-tool",
+  "projectId": 670821,
+  "projectName": "Mikka",
+  "flagId": 1028528,
+  "key": "mikka-group-contribution-off",
+  "active": false,
+  "version": 1,
+  "createdAt": "2026-11-04T04:11:49.139600Z",
+  "evaluationRuntime": "all",
+  "groups": [
+    {
+      "properties": [
+        {
+          "key": "deployment",
+          "type": "person",
+          "operator": "exact",
+          "value": "production"
+        }
+      ],
+      "rolloutPercentage": 100
+    }
+  ],
+  "link": "https://us.posthog.com/project/670821/feature-flags/1028528",
+  "productionToggleAttempted": false,
+  "roundTripVerified": false,
+  "note": "Created inactive. Application integration and real behavior verification pending. Other flags and permissions unchanged."
+}

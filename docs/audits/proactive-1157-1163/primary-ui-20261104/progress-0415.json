@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "manual-normal-product-ui",
+  "observedBetween": [
+    "2026-11-04T04:04:00Z",
+    "2026-11-04T04:14:59Z"
+  ],
+  "account": "202322024",
+  "workspace": "Factory 双订阅验收 1122",
+  "noCookieExport": true,
+  "noBrowserFetch": true,
+  "noProductionSQL": true,
+  "noNewAccessGranted": true,
+  "cc": {
+    "issueId": "586eb600-8027-4439-8ac8-b17fd5d3037f",
+    "taskId": "586be5be-e65d-4cc5-a5e9-5804b535544b",
+    "displayId": "ALEX-35",
+    "executeRunId": "35eceed4-56d6-435f-828e-3fee46ef5524",
+    "executeSessionId": "4e8b9e6a-4cba-49a2-9bf4-6f182a9f6404",
+    "requestEpoch": "f494c06b-bea2-49f1-8f23-8fd7f5c8f352",
+    "reviewRunId": "7b4fb6c5-8819-4089-8d65-b43f8a105a94",
+    "candidateId": "e76e120e-1546-4d71-8cfa-a4300d4aebcf",
+    "candidateSha": "ce485806a6532547c3e32684cc34ae00a35eb67d",
+    "initialFile": "factory-1160-cc.txt",
+    "initialBytes": 53,
+    "initialSha256": "0fb3a1aa110579dbaa93d2c2666caea6db4913bde07cd3673c77b5d1c67350ba",
+    "factoryUi": "Independent review and verification passed; 5/5 criteria; waiting for owner acceptance",
+    "initialOwnerAccepted": false,
+    "continuationSent": false,
+    "frozenCredentialEvidenceObserved": false,
+    "url": "https://app.aspectlylabs.com/mikka?bot=d6bf6e81-2ff8-4f2d-ad94-003d94b934bb&issue=586eb600-8027-4439-8ac8-b17fd5d3037f&thread=35eceed4-56d6-435f-828e-3fee46ef5524"
+  },
+  "codex": {
+    "issueId": "7eb69f9e-95c0-416e-99ab-ab4ecb084344",
+    "taskId": "b253a7b5-6d44-42b4-b42a-0681e012f006",
+    "displayId": "ALEX-36",
+    "executeRunId": "aef4a580-56d2-437d-8e9e-fad3e263b1b2",
+    "requestEpoch": "446e8a37-d9f8-4ce0-832b-6b1f44066df8",
+    "initialFile": "factory-1160-codex.txt",
+    "initialBytes": 56,
+    "initialSha256": "2a18787536aa43c92a4923c47abb923fd2214196dfd9f3221f7bf1d48f3494fe",
+    "initialOwnerAccepted": false,
+    "continuationSent": false,
+    "frozenCredentialEvidenceObserved": false,
+    "url": "https://app.aspectlylabs.com/mikka?bot=c73c8059-b9bf-469c-8d27-22301ae3e475&thread=aef4a580-56d2-437d-8e9e-fad3e263b1b2"
+  },
+  "boundary": "Harness and actual command/inspection records are visible. Current model menu and model self-report are not proof of the run's frozen subscription. No official-subscription continuation acceptance is claimed yet."
+}
