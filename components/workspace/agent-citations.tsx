@@ -16,7 +16,7 @@ import { Mikka } from '@/components/ui/svgs/mikka'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { statusIconTints } from '@/lib/status-appearance'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES } from '@/components/workspace/issue-properties'
-import { ThreadStatus, ThreadStatusIcon } from '@/components/workspace/thread-status-icon'
+import { ThreadStatus, ThreadStatusIcon, threadGroupOfRun } from '@/components/workspace/thread-status-icon'
 import { openThread } from '@/components/workspace/workspace-navigation'
 
 export type LinkPreviews = Record<string, LinkPreview | null>
@@ -157,16 +157,21 @@ export function RunCitation({ run }: { run: RunSource }) {
   const HarnessIcon = run.harness === 'claude_code' ? Claude : OpenAI
   const harness = run.harness === 'claude_code' ? 'Claude Code' : 'Codex'
   // A thread is a bubble in the chip's accent, its state a dot on it, as on the thread card and the Threads list; the coding agent's mark is in the hover card (R-78).
+  const tState = useTranslations('Shell.threads.state')
   const issue = run.issue
   const name = runThreadName(run)
+  const group = threadGroupOfRun(run.status, run.outcome)
+  const attention = group === 'waiting' || group === 'blocked'
   return <InlineCitation>
     <InlineCitationTrigger
       variant="object"
       aria-label={issue ? t('openThread', { name }) : t('runOf', { bot: run.agentName })}
       onClick={issue ? () => openThread(run.id) : undefined}
     >
-      <ThreadStatusIcon status={run.status} outcome={run.outcome} small accent />
+      <ThreadStatusIcon status={run.status} outcome={run.outcome} small accent dot={attention} />
       <InlineCitationLabel>{name}</InlineCitationLabel>
+      {/* Waiting for you or blocked: the dot, its colour and its word together (R-87); other states are in the hover card. */}
+      {attention && <span data-thread-attention={group} className={cn('ml-1 rounded-sm px-1 text-xs font-medium', group === 'blocked' ? 'bg-destructive/10 text-destructive' : 'bg-warning/15 text-warning-foreground')}>{tState(group)}</span>}
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>

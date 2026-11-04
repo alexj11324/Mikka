@@ -32,7 +32,7 @@ export const GROUP_BADGES: Record<ThreadGroup, 'secondary' | 'warning-light' | '
 }
 
 
-export function ThreadStatusIcon({ status = '', outcome, waiting = false, group, small = false, accent = false }: {
+export function ThreadStatusIcon({ status = '', outcome, waiting = false, group, small = false, accent = false, dot = true }: {
   status?: string
   outcome?: ThreadOutcome | string | null
   /** 等你回复 (Figma 382:6469): the thread waits on a question. */
@@ -41,14 +41,16 @@ export function ThreadStatusIcon({ status = '', outcome, waiting = false, group,
   small?: boolean
   /** In a chip: the bubble takes the chip's accent instead of the muted grey. */
   accent?: boolean
+  /** Off where the state is not shown beside it (a chip that is not waiting or blocked): the bubble alone, never colour without its word (R-87). */
+  dot?: boolean
 }) {
   const t = useTranslations('Shell.threads.state')
   const shown = group ?? threadGroupOfRun(status, outcome, waiting)
   return <span role="img" aria-label={t(shown)} data-group={shown} className={cn('pointer-events-none relative inline-flex shrink-0', accent ? 'text-object-chip-foreground' : 'text-muted-foreground')}>
     <MessageCircle aria-hidden="true" className={cn(small ? 'size-3.5' : 'size-5')} />
-    <span aria-hidden="true" data-thread-dot={shown} className={cn('absolute -top-0.5 -right-0.5 rounded-full ring-2 ring-background', small ? 'size-1.5' : 'size-2',
+    {dot && <span aria-hidden="true" data-thread-dot={shown} className={cn('absolute -top-0.5 -right-0.5 rounded-full ring-2 ring-background', small ? 'size-1.5' : 'size-2',
       shown === 'running' && 'bg-muted-foreground motion-safe:animate-pulse', shown === 'waiting' && 'bg-warning', shown === 'blocked' && 'bg-destructive',
-      shown === 'resolved' && 'bg-success', shown === 'idle' && 'border border-muted-foreground bg-background')} />
+      shown === 'resolved' && 'bg-success', shown === 'idle' && 'border border-muted-foreground bg-background')} />}
   </span>
 }
 

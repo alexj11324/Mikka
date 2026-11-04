@@ -173,7 +173,8 @@ test('a reply draws its thinking and its tools as shadcn Trace rows: several cal
     // Stored: one summary line, closed, side effects first, with how many failed; a call that never returned failed too.
     await view.render(<ReplyActivity tools={[...tools, { call: 'c5', name: 'get_issue', state: 'done' as const }]} />)
     assert.equal(group()?.getAttribute('data-activity-group'), 'error')
-    assert.equal(group()?.querySelector('[data-slot="trace-title"]')?.textContent, 'Created 1 task · Dispatched 2 threads · Looked up tasks · 2 failed')
+    assert.ok(group()?.querySelector('svg.lucide-circle-alert'), 'a failure is an icon, a colour and a word together (R-87)')
+    assert.equal(group()?.querySelector('[data-slot="trace-title"]')?.textContent, 'Created 1 task · Dispatched 2 threads · Looked up tasks2 failed')
     // Stored, a tool that never returned failed: the docs' row for a call that is not streaming.
     await view.render(<ReplyActivity tools={[tools[1]]} />)
     assert.deepEqual(rows(), [['error', 'Start thread', 'error']])

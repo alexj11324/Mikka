@@ -49,7 +49,9 @@ test('a thread chip shows its status and opens the thread beside the chat (?thre
     const [taskChip, ...threadChips] = chips
     // Each thread chip leads with a bubble, its group a dot on it (R-52), the same marks as the thread card and the list.
     assert.deepEqual(threadChips.map(chip => chip.querySelector('[role="img"]')?.getAttribute('aria-label')), ['Running', 'Blocked', 'Resolved'])
-    assert.deepEqual(threadChips.map(chip => chip.querySelector('[data-thread-dot]')?.getAttribute('data-thread-dot')), ['running', 'blocked', 'resolved'])
+    // Only a state that needs the person shows on the chip, as a dot and its word together (R-87); the rest is in the hover card.
+    assert.deepEqual(threadChips.map(chip => chip.querySelector('[data-thread-dot]')?.getAttribute('data-thread-dot') ?? null), [null, 'blocked', null])
+    assert.deepEqual(threadChips.map(chip => chip.querySelector('[data-thread-attention]')?.textContent ?? null), [null, 'Blocked', null])
     for (const chip of threadChips) assert.ok(chip.querySelector('svg')?.getAttribute('class')?.includes('lucide-message-circle'), 'a thread is a bubble, never a task\'s circle')
     assert.equal(threadChips[0].getAttribute('aria-label'), 'Open thread: ZHIX-4 Rebuild the shell')
     await act(async () => { threadChips[1].click() })

@@ -146,7 +146,7 @@ function ToolGroup({ tools, live }: { tools: readonly ChatTool[]; live: boolean 
       <TraceCollapsibleTrigger>
         <TraceLine status={running ? 'running' : undefined}>
           <TraceIcon>{running ? <LoaderCircleIcon className="animate-spin" /> : failures ? <CircleAlert className="text-destructive" /> : <LeadIcon />}</TraceIcon>
-          <TraceTitle>{summary}{failures > 0 && !running && <span className="text-destructive"> · {t('failedCount', { count: failures })}</span>}</TraceTitle>
+          <TraceTitle>{summary}{failures > 0 && !running && <span className="ml-1.5 rounded-sm bg-destructive/10 px-1 text-destructive">{t('failedCount', { count: failures })}</span>}</TraceTitle>
         </TraceLine>
       </TraceCollapsibleTrigger>
       <ExpandAllButton />

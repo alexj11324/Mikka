@@ -80,8 +80,11 @@ source wins in a conflict is in [`README.md`](README.md).
   rounded, then the title in the accent with no underline, at the text's own
   size and line height, so a chip reads as a word of the sentence; a long title
   wraps like the words around it, each line keeping the fill. The icon says what
-  it is: a task's status circle, a thread's bubble with its state dot (R-52;
-  [decision](decisions/2026-11-04-2220-task-circle-thread-bubble.md)). The task
+  it is: a task's status circle, a thread's bubble (R-52;
+  [decision](decisions/2026-11-04-2220-task-circle-thread-bubble.md)). A thread
+  chip shows its state only when it needs the person, 等待你 or 受阻: the dot on
+  the bubble and the word beside the title, on a tint (R-87); other states are in
+  its hover card. The task
   number is in the hover card, not the chip. A thread chip opens the thread's own
   conversation, as a thread card does (R-66); only a task chip opens the task. A
   task and its thread are one piece of work (R-81): when a reply cites both, only
@@ -244,7 +247,7 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   Figma: page 「AI 侧栏 · 全局」.
 - **R-66** When the Coordinator dispatches a thread, the chat shows one
   thread card under its reply: status icon (never the bot's avatar), thread
-  name, then on the right one PR badge for the PRs it produced: the summary
+  name, then on the right the state's badge (its word on its tint, R-87) and one PR badge for the PRs it produced: the summary
   state's git mark in its GitHub colour (any open: green; else any draft:
   grey; else any merged: purple; else closed: red) and the count. Hovering
   the badge, or tapping it on a phone, lists each PR (title; state mark,
