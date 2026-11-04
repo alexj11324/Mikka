@@ -286,6 +286,8 @@ export class MemoryServer {
         return { owner: "external", reason: "device_offline" }
       case "quota_exhausted":
         return { owner: "external", reason: "quota_exhausted" }
+      case "provider_failure":
+        return { owner: "external", reason: "provider_failure" }
       case "cancelled":
         return { owner: "human", reason: "cancelled" }
     }

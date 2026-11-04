@@ -7,6 +7,7 @@
 // the daemon builds `RunReport`s with it, the server validates them with it,
 // and `agent_run.report` stores exactly this shape.
 import { z } from "zod"
+import { providerFailureSchema } from "./provider-failure"
 
 export const RUN_QUESTION_KINDS = [
   "context",
@@ -40,6 +41,8 @@ export const RUN_STOP_REASONS = [
   "device_lost",
   /** The subscription's quota or rate limit ran out mid-run (see `resetsAt`). */
   "quota_exhausted",
+  /** The model provider refused the request or remained unavailable after its short retries. */
+  "provider_failure",
 ] as const
 export const runStopReason = z.enum(RUN_STOP_REASONS)
 export type RunStopReason = z.infer<typeof runStopReason>
@@ -158,6 +161,10 @@ export const runReport = z.object({
    * reported it; null when it gave no time. Set by the daemon only.
    */
   resetsAt: z.iso.datetime({ offset: true }).nullable().optional(),
+  /** Classified by the adapter from a terminal provider error; never agent-supplied. */
+  providerFailure: providerFailureSchema.optional(),
+  /** Final upload for provider_failure or native quota_exhausted; unavailable requires the original worktree. */
+  providerCheckpoint: z.enum(["ready", "unavailable"]).optional(),
   /** Daemon-owned receipt for an exact, unchanged read-only candidate. */
   check: z.object({
     sha: z.string().regex(/^[a-f0-9]{40}$/),

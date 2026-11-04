@@ -8,7 +8,7 @@ import * as deviceProtocol from '@mikka/protocol/device'
 import * as policySnapshotProtocol from '@mikka/protocol/policy-snapshot'
 import * as repositoryProtocol from '@mikka/protocol/repository'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
-import { constrainedAssignmentPolicy } from '../run-assignment-policy'
+import { constrainedAssignmentPolicy, intersectRunPolicy } from '../run-assignment-policy'
 import { ModelAdmissionError } from '../model-admission/contract'
 import { deploymentSwitch, type DeploymentSwitch } from '@/lib/deployment-switches'
 const fixtureEnv={MIKKA_BYOS_ENABLED:'0',MIKKA_FACTORY_ROUTING_ENABLED:'1',MIKKA_FACTORY_LIFECYCLE_ENABLED:'1'}
@@ -53,7 +53,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
       // The explicit rejection case proves the route still consults both scopes.
       if(modelDenied&&scope.workspaceId==='task-workspace')throw new ModelAdmissionError('modelRouteDenied')
     }},
-    '@/lib/run-assignment-policy':{constrainedAssignmentPolicy},
+    '@/lib/run-assignment-policy':{constrainedAssignmentPolicy,intersectRunPolicy},
     '@/lib/run-claim-response':{authorizedClaimResponse:async(_user:string,_run:unknown,_lease:string,respond:(current:typeof run)=>Response)=>respond(run)},
     '@/lib/run-publications':{prepareRunPublication:async()=>({policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,git_push:'allow'}}}),persistRunCompletion:async()=>{assert.equal(issueDenied,true);calls.push('rejectPublication')}},
     '@/lib/run-publication-result':{PublicationError:class extends Error {}},

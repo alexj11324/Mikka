@@ -5,7 +5,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { runPrompt } from '@/lib/run-prompt'
-import { freezeWorkerDefinition } from '@/lib/agent-kit/worker'
+import { freezeWorkerDefinition, type WorkerModelDispatch } from '@/lib/agent-kit/worker'
 import type { AgentExecution } from '@/lib/agent-kit/store'
 import { ComputerError } from './store'
 import { RunModelMissingError } from './run-model'
@@ -23,6 +23,9 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   withoutBot?: boolean
   /** Required (lib/computer/run-model.ts): a new run's from 优先使用的模型, a thread's next run its own. Never 'auto' or empty. */
   model: string
+  /** Host-recorded preference or explicit choice; the resolved model alone grants no fallback. */
+  modelDispatch?: WorkerModelDispatch
+  policyCeiling?: Parameters<typeof freezeWorkerDefinition>[0]['policyCeiling']
   /** The run this one continues, named in the error when the model is missing. */
   threadRunId?: string
   idempotencyKey?: string; execution?: AgentExecution
@@ -59,7 +62,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     const allowLocalRecovery = request && request.destination == null ? true as const : undefined
     // Absent stays byte-compatible with historical fingerprints; a replay
     // cannot upgrade an old cloud-only run to a newly inferred permission.
-    const selectionFingerprint = createHash('sha256').update(JSON.stringify([input.subscriptionBindingId ?? null, model, input.apiKeyId ?? null, input.apiKey ?? null, ...(allowLocalRecovery ? [{ allowLocalRecovery }] : [])])).digest('hex')
+    const selectionFingerprint = createHash('sha256').update(JSON.stringify([input.subscriptionBindingId ?? null, model, input.apiKeyId ?? null, input.apiKey ?? null, ...(allowLocalRecovery ? [{ allowLocalRecovery }] : []), ...(input.modelDispatch ? [{ modelDispatch: input.modelDispatch }] : []), ...(input.policyCeiling ? [{ policyCeiling: input.policyCeiling }] : [])])).digest('hex')
     let target = (await client.query(`SELECT m."deviceId",a.instructions,a.harness,repo."baseBranch" FROM bots b
       JOIN bot_desktops d ON d."botId"=b.id AND d."ownerId"=b."ownerId" AND d."workspaceId"=b."workspaceId"
       JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId" AND m.state='running'
@@ -97,7 +100,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     if (!subscription && !apiKey) throw new ComputerError(409,'Bot subscription unavailable')
     // The hosted runner starts a subscription run only on that subscription's own model: a different one is refused here, not at startup.
     if (subscription && subscription.modelId !== model) throw new ComputerError(409, 'Bot subscription unavailable')
-    const frozen = freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model,allowLocalRecovery,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
+    const frozen = freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model,modelDispatch:input.modelDispatch,policyCeiling:input.policyCeiling,allowLocalRecovery,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
     frozen.executionIdentity = await freezeExecutionIdentity(client, { userId: actor.userId, botId: runBotId, deviceId: target.deviceId, agentDefinition: frozen }, undefined, actor.workspaceId)
     // A writable github.com run gets its task branch here, like a local run's (decision 2026-11-02-1600).
     const github = input.readOnly ? false : (await client.query('SELECT 1 FROM device_repos WHERE id=$1 AND "userId"=$2 AND "repoPath" LIKE \'v2/github.com/%\'', [input.deviceRepoId, actor.userId])).rowCount === 1

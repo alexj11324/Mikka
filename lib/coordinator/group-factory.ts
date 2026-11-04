@@ -10,6 +10,7 @@ import { withBasePath } from '@/lib/base-path'
 import { ActionFailureError } from '@/lib/action-error'
 import { groupCopy, readGroupLocale, type GroupLocale } from './group-copy'
 import { runArtifactSubmissions } from '@/lib/artifacts/run-submissions'
+import type { RunModel } from '@/lib/computer/run-model'
 
 type Scope = Parameters<NonNullable<GroupRuntime['delegate']>>[0]
 type Query = Pick<PoolClient,'query'>
@@ -266,7 +267,7 @@ async function dispatchStandaloneTask(userId:string,input:Parameters<GroupFactor
     if (!runtime) return {error:'cloudComputerUnavailable' as const}
     const source=target?.kind==='cloud' ? target.entry.source : null
     const subscriptionBindingId=source?.kind==='subscription' && target?.kind==='cloud' ? await bindAgentToConnection(pool,{ownerId:userId,workspaceId},runtime.agentId,harness,source.connectionId,target.model) : undefined
-    const selection=kept ?? (target?.kind==='cloud' ? {model:target.model,...(subscriptionBindingId?{subscriptionBindingId}:{}),...(source?.kind==='api_key'?{apiKeyId:source.keyId}:{})} : null)
+    const selection:RunModel|null=kept ?? (target?.kind==='cloud' ? {model:target.model,modelDispatch:{mode:'preference',location:'cloud',entry:target.entry},...(subscriptionBindingId?{subscriptionBindingId}:{}),...(source?.kind==='api_key'?{apiKeyId:source.keyId}:{})} : null)
     if (!selection) return {error:'threadModelUnavailable' as const}
     const {dispatchComputerTask}=await import('@/workflows/coordinator/steps')
     return dispatchComputerTask(userId,{botId,issueId:input.issueId,harness,note,...selection,sourceEventId:input.sourceEventId,factoryBotId:botId,...(previous?{threadRunId:previous.id}:{}),...(previous?.readOnly?{readOnly:true}:{})},`group:${input.sourceEventId}`)

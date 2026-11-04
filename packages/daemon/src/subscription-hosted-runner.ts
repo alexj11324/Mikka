@@ -35,6 +35,7 @@ import type { AgentSandbox } from "./agents/sandbox";
 import { requireRunToolApproval } from "./agents/tool-approval";
 import { createNativeSubscriptionBroker } from "./subscription-native-broker";
 import { DaemonError, ServerUnreachableError } from "./errors";
+import { ProviderFailureError } from "@mikka/protocol/provider-failure";
 import { createApiKeyBroker } from "./api-key-broker";
 import type { RunCredential } from "./agents/run-credential";
 import type { ServerLink } from "./server-link";
@@ -55,7 +56,7 @@ const unavailable = (cause?: unknown) =>
   new Error(cause instanceof ClaudeInitializationError ? cause.code : "subscription_hosted_runtime_unavailable", cause === undefined ? undefined : { cause });
 /** Why a start failed, in words a person can act on; never argv or env. */
 const startFailure = (error: unknown) => {
-  if (error instanceof ClaudeInitializationError) return error;
+  if (error instanceof ClaudeInitializationError || error instanceof ProviderFailureError) return error;
   const value = error as { stderr?: unknown; message?: unknown };
   const stderr = String(value.stderr ?? "").trim();
   return new Error((stderr || (error instanceof Error ? error.message : String(error))).slice(-500));
