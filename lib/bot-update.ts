@@ -10,13 +10,14 @@ const patchSchema = z.object({
   name: z.string().trim().min(1).max(BOT_NAME_MAX).optional(),
   color: z.enum(BOT_COLORS).optional(),
   shape: z.enum(BOT_SHAPES).optional(),
+  publicRole: z.string().trim().max(2000).optional(),
 })
 
 /**
  * Renames a bot or changes its look. Only its owner, in the workspace it was
  * made in, may change it; any other bot reads as not found.
  */
-export async function updateOwnedBot(owner: { ownerId: string; workspaceId: string }, input: { botId: string; name?: string; color?: string; shape?: string }) {
+export async function updateOwnedBot(owner: { ownerId: string; workspaceId: string }, input: { botId: string; name?: string; color?: string; shape?: string; publicRole?: string }) {
   const parsed = patchSchema.safeParse(input)
   if (!parsed.success) {
     const issue = parsed.error.issues[0]
@@ -25,12 +26,12 @@ export async function updateOwnedBot(owner: { ownerId: string; workspaceId: stri
     throw new ActionFailureError('validationGeneric')
   }
   const { botId, ...patch } = parsed.data
-  if (patch.name === undefined && patch.color === undefined && patch.shape === undefined) throw new ActionFailureError('validationGeneric')
-  let row: { id: string; name: string; color: string; shape: string } | undefined
+  if (patch.name === undefined && patch.color === undefined && patch.shape === undefined && patch.publicRole === undefined) throw new ActionFailureError('validationGeneric')
+  let row: { id: string; name: string; color: string; shape: string; publicRole:string } | undefined
   try {
     [row] = await db.update(bots).set({ ...patch, updatedAt: new Date() })
       .where(and(eq(bots.id, botId), eq(bots.ownerId, owner.ownerId), eq(bots.workspaceId, owner.workspaceId)))
-      .returning({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape })
+      .returning({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, publicRole:bots.publicRole })
   } catch (error) {
     // 23505 is the per-person, per-workspace name index.
     if ((error as { code?: string }).code === '23505' || (error as { cause?: { code?: string } }).cause?.code === '23505') throw new ActionFailureError('botDuplicateName')
