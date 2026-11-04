@@ -2536,6 +2536,25 @@
       }
     },
     "searchEmpty": "没有匹配的设置",
+    "mcpConnections": {
+      "title": "自定义 MCP",
+      "loading": "正在读取自定义 MCP 连接",
+      "share": "分享给工作区成员",
+      "shareLabel": "将「{name}」分享给工作区成员",
+      "sharedBy": "分享者：{name}",
+      "member": "工作区成员",
+      "paused": "已停用",
+      "onlyYou": "仅自己",
+      "sharedReadOnly": "已分享给工作区成员",
+      "unconfirmed": "状态未确认",
+      "loadFailed": "自定义 MCP 连接状态无法读取",
+      "shareUnconfirmed": "分享变更未确认，当前分享状态未知",
+      "checkAgain": "重新检查",
+      "confirmTitle": "向「{workspace}」成员分享「{name}」？",
+      "currentWorkspace": "当前工作区",
+      "confirmAuthority": "成员可使用此连接已授权的工具。外部服务可能向连接账户收费。",
+      "confirmShare": "分享连接"
+    },
     "apiKeys": {
       "add": "添加 API Key",
       "addConfirm": "添加",

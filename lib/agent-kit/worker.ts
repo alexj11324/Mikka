@@ -5,10 +5,13 @@ import type { Harness } from '@mikka/protocol/harness'
 import { digest, type DefinitionSnapshot } from './definition'
 import { snapshotMailboxTools, workerMailboxScope, type WorkerMailboxScope, type WorkerMailboxGrant } from '../personal-mailbox-capability'
 import type { RepositoryAdmission } from '../repository-admission'
+import { mcpAuthoritySchema, type McpAuthority } from '../plugins/contracts'
 
 export interface WorkerDefinitionSnapshot {
   /** Trusted dispatch identity; absent on historical runs, never inferred retroactively. */
   executionIdentity?: ExecutionIdentity
+  /** Copied only from the host's authorized parent execution; legacy workers gain nothing. */
+  customMcp?: McpAuthority
   schemaVersion: 1
   kind: 'worker'
   harness: Harness
@@ -46,6 +49,8 @@ export function freezeWorkerDefinition(input: { harness: Harness; instructions: 
   // Explicit dispatches already carry the provider model from their exact
   // binding. A subscription alone preserves the existing CLI auto selection.
   const model = apiKey?.model ?? input.model
+  const customMcp = input.parent?.personalPlugins?.mcpAuthority?.servers.length
+    ? mcpAuthoritySchema.parse(structuredClone(input.parent.personalPlugins.mcpAuthority)) : undefined
   const tools = input.mailboxEnabled ? snapshotMailboxTools(input.parent) : []
   const mailbox = tools.length && input.mailboxScope && ['claude_code', 'codex'].includes(input.harness)
     ? { version: 2 as const, tools, scope: workerMailboxScope.parse(input.mailboxScope) } : undefined
@@ -55,10 +60,11 @@ export function freezeWorkerDefinition(input: { harness: Harness; instructions: 
     ...(input.allowLocalRecovery === true ? { allowLocalRecovery: true as const } : {}),
     cliModelSelection: model ? 'explicit' : 'auto',
     schemaVersion: 1, kind: 'worker', harness: input.harness, instructions: input.instructions,
-    definitionDigest: workerDefinitionDigest({ harness: input.harness, instructions: input.instructions, model, pinnedDeviceId: input.pinnedDeviceId, allowLocalRecovery: input.allowLocalRecovery, subscription, apiKey, mailbox, readOnly: input.readOnly }),
+    definitionDigest: workerDefinitionDigest({ harness: input.harness, instructions: input.instructions, model, pinnedDeviceId: input.pinnedDeviceId, allowLocalRecovery: input.allowLocalRecovery, subscription, apiKey, mailbox, customMcp, readOnly: input.readOnly }),
     promptDigest: digest(input.prompt), modelSource: subscription ? 'subscription' : apiKey ? 'api_key' : 'native-default', ...(subscription ? { subscription } : {}), ...(apiKey ? { apiKey } : {}),
     parent: input.parent && input.executionId ? { executionId: input.executionId,revisionId: input.parent.revisionId,revision: input.parent.revision,definitionDigest: input.parent.definitionDigest } : null,
     ...(mailbox ? { mailbox } : {}),
+    ...(customMcp ? { customMcp } : {}),
     ...(input.readOnly ? { readOnly: true as const } : {}),
   }
 }

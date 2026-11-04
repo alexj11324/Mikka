@@ -162,3 +162,26 @@ test('automatic local recovery is an explicit standing grant, preserved by retri
   assert.equal(retryWorkerDefinition(legacy, 'Retry')?.allowLocalRecovery, undefined)
   assert.equal(apiKeyWorkerDefinition(automatic, 'Continue', { keyId: randomUUID(), model: 'fixture-model' }).allowLocalRecovery, true)
 })
+
+test('recovery placement and shared MCP authority remain independent frozen grants through retries and credential continuation', () => {
+  const parent = makeSnapshot(randomUUID(), 2, base(), 'host', { harness: 'codex', model: null })
+  const server = { id: randomUUID(), name: 'Team resource', revision: 1, ownerId: 'resource-owner', grantId: randomUUID() }
+  parent.personalPlugins = { servers: [server], skills: [], mcpAuthority: { requester: 'requester', workspaceId: randomUUID(), servers: [server] } }
+  const input = { harness: 'codex' as const, instructions: 'Current request', prompt: 'Task', parent, executionId: randomUUID() }
+  const original = freezeWorkerDefinition({ ...input, allowLocalRecovery: true })
+  assert.notEqual(original.definitionDigest, freezeWorkerDefinition(input).definitionDigest, 'placement authority is part of the same standing definition')
+  const changedGrant = structuredClone(parent)
+  changedGrant.personalPlugins!.mcpAuthority!.servers[0].grantId = randomUUID()
+  assert.notEqual(original.definitionDigest, freezeWorkerDefinition({ ...input, parent: changedGrant, allowLocalRecovery: true }).definitionDigest,
+    're-sharing the same MCP server creates different authority even when recovery placement is unchanged')
+  const legacyParent = structuredClone(parent)
+  delete legacyParent.personalPlugins
+  assert.equal(freezeWorkerDefinition({ ...input, parent: legacyParent, allowLocalRecovery: true }).customMcp, undefined)
+  for (const continuation of [retryWorkerDefinition(original, 'Retry')!, apiKeyWorkerDefinition(original, 'Continue', { keyId: randomUUID(), model: 'fixture-model' })]) {
+    assert.equal(continuation.allowLocalRecovery, true)
+    assert.deepEqual(continuation.customMcp, original.customMcp)
+    assert.deepEqual(continuation.parent, original.parent)
+    continuation.customMcp!.servers[0].grantId = randomUUID()
+    assert.equal(original.customMcp!.servers[0].grantId, server.grantId, 'continuations do not mutate historical resource grants')
+  }
+})

@@ -3,9 +3,11 @@ import { pool } from '@/lib/db'
 import { PersonalPluginStore } from './store'
 import { createPersonalMcpRuntime } from './mcp'
 import type { PersonalPluginSnapshot } from './contracts'
+import { WorkspaceMcpStore } from './workspace-mcp'
 
 export const personalPlugins = new PersonalPluginStore(pool)
 export const runPersonalMcp = createPersonalMcpRuntime(personalPlugins)
+export const workspaceMcp = new WorkspaceMcpStore(pool)
 
 export function personalSkillInstructions(snapshot: PersonalPluginSnapshot) {
   if (!snapshot.skills.length) return ''

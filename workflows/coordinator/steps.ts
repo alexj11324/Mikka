@@ -374,8 +374,13 @@ export async function personalMcp(userId: string, botId: string, executionId: st
   const ownerScope = await agentScope(userId, botId)
   const execution = executionId ? await agentKitStore.readExecution(ownerScope, executionId) : null
   if (execution && execution.status !== 'running') return { error: 'agentExecutionClosed' }
+  if (execution?.snapshot.personalPlugins?.mcpAuthority?.workspaceId !== undefined && execution.snapshot.personalPlugins.mcpAuthority.workspaceId !== ownerScope.workspaceId) return { error: 'mcpUnavailable' }
   const { runPersonalMcp } = await import('@/lib/plugins/runtime')
-  return runPersonalMcp(userId, execution ? execution.snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined, input)
+  return runPersonalMcp(userId, execution ? execution.snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined, input, async () => {
+    await assertNativeToolScope(userId, scope)
+    const currentScope = await agentScope(userId, botId)
+    if (currentScope.workspaceId !== ownerScope.workspaceId || executionId && (await agentKitStore.readExecution(currentScope, executionId)).status !== 'running') throw new (await import('@/lib/plugins/contracts')).PluginError('agentExecutionClosed', 403)
+  })
 }
 // Remote tools may have side effects and no idempotency key. The workflow must
 // preserve the first uncertain outcome rather than replaying this step.

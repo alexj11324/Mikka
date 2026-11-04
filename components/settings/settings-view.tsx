@@ -125,7 +125,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'preferences': return <><AppearanceSection /><IssuePrefixSettings /><ReplayOnboarding /></>
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
-    case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} />
+    case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} workspaceId={!preview ? workspaceId : undefined} workspaceName={workspaceName} />
     case 'models': return <>{workspaceId && !preview ? <ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} team={team} /> : waiting}</>
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting

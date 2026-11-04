@@ -3,17 +3,24 @@ import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
 import { act, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
+import type { McpWorkspacePage } from '@/lib/plugins/contracts'
 
 type App = 'github' | 'linear' | 'telegram'
 type State = 'connected' | 'notConnected' | 'paused' | null
 type Read = { states: Partial<Record<App, State>>; failed: App[] }
 let read: { data?: Read; error?: Error; isLoading?: boolean; isValidating?: boolean }
 let ownFetcher: () => Promise<Read>
+let mcpRead: { data?: McpWorkspacePage; error?: Error }
 const retry = mock.fn(async () => undefined)
 const names = { github: 'GitHub', linear: 'Linear', telegram: 'Telegram' }
 const t = (key: string, args?: Record<string, string>) => key === 'connectionStatusFailed' ? `Could not read ${args?.names}` : key
 mock.module('next-intl', { namedExports: { useTranslations: () => t } })
-mock.module('swr', { defaultExport: (_key: unknown, fetcher: () => Promise<Read>) => { ownFetcher = fetcher; return { ...read, mutate: retry } }, namedExports: { useSWRConfig: () => ({ cache: new Map([['plugin-own-app-states', { data: read.data }]]) }) } })
+mock.module('swr', { defaultExport: (key: unknown, fetcher: () => Promise<Read>) => {
+  if (key === null) return { mutate: retry }
+  if (Array.isArray(key) && key[0] === 'settings:mcp-connections') return { ...mcpRead, mutate: retry }
+  ownFetcher = fetcher
+  return { ...read, mutate: retry }
+}, namedExports: { useSWRConfig: () => ({ cache: new Map([['plugin-own-app-states', { data: read.data }]]) }) } })
 mock.module('swr/infinite', { defaultExport: () => ({ size: 1, setSize: async () => undefined }) })
 let connected: { loading: boolean; error: string; connectedToolkits(): string[]; accountsFor(): never[]; pending: string; canLink: boolean }
 mock.module(new URL('./connected-apps.tsx', import.meta.url).href, { namedExports: {
@@ -57,6 +64,7 @@ before(async () => {
 })
 beforeEach(() => {
   read = { data: { states: { github: null, linear: null, telegram: null }, failed: [] } }
+  mcpRead = {}
   connected = { loading: false, error: '', connectedToolkits: () => [], accountsFor: () => [], pending: '', canLink: true }
   retry.mock.resetCalls(); linear.mock.resetCalls(); telegram.mock.resetCalls()
   linear.mock.mockImplementation(async () => ({ configured: true, connected: true }))
@@ -73,13 +81,32 @@ beforeEach(() => {
 })
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); mock.restoreAll() })
 after(() => browser.close())
-const render = async (section: 'connections' | 'plugins' = 'connections') => { await act(async () => root.render(<PluginsView section={section} rootLabel="Connections" />)) }
+const render = async (section: 'connections' | 'plugins' = 'connections', workspaceId?: string) => { await act(async () => root.render(<PluginsView section={section} rootLabel="Connections" workspaceId={workspaceId} />)) }
 const retryButton = () => [...container.querySelectorAll('button')].find(item => item.textContent === 'retry')
 
 test('successfully empty connections show the empty state', async () => {
   await render()
   assert.ok(container.textContent?.includes('noConnections'))
   assert.equal(container.querySelector('[role="alert"]'), null)
+})
+
+test('custom MCP connections and their read failures participate in the existing Connections empty state', async () => {
+  const workspaceId = '00000000-0000-4000-8000-000000000001'
+  mcpRead = { data: { workspaceId, workspaceKind: 'team', canShare: true, count: 1, servers: [{
+    id: '00000000-0000-4000-8000-000000000002', name: 'Research MCP', url: null, transport: 'http',
+    enabled: true, revision: 1, authKind: 'header', createdAt: '2026-11-04T00:00:00.000Z',
+    ownerId: 'peer', ownerName: 'Peer', mine: false, shared: true,
+  }] } }
+  await render('connections', workspaceId)
+  assert.ok(container.textContent?.includes('Research MCP'))
+  assert.ok(!container.textContent?.includes('noConnections'))
+  mcpRead = { error: new Error('Unavailable') }
+  await render('connections', workspaceId)
+  assert.ok(container.querySelector('[role="alert"]')?.textContent?.includes('loadFailed'))
+  assert.ok(!container.textContent?.includes('noConnections'))
+  mcpRead = { data: { workspaceId, workspaceKind: 'team', canShare: true, count: 0, servers: [] } }
+  await render('connections', workspaceId)
+  assert.ok(container.textContent?.includes('noConnections'))
 })
 
 test('initial native reads show loading without claiming no connections', async () => {
