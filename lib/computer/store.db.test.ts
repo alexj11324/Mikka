@@ -11,6 +11,7 @@ import { provisionCloudDevice, renewCloudDeviceToken } from './cloud-device'
 import { claimWorkerLease, renewWorkerLease, releaseWorkerLease } from './worker-lease'
 import { startCloudWorker } from './cloud-worker'
 import { queueCloudRun } from './queue-run'
+import { rebindExecutionDevice } from '../execution-identity'
 import { authorizedAccessName } from '../subscription-access-snapshot'
 import { ensureBotRuntime } from './bot-runtime'
 import { bindBotSubscription } from './bot-subscription'
@@ -26,6 +27,14 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
   const admin = new Pool({ connectionString: databaseURL })
   await admin.query(`CREATE SCHEMA ${schema}`)
   const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
+  const { workspacePool } = await import('../workspace-db')
+  const previousWorkspaceOptions = workspacePool.options.options
+  const previousWorkspaceURL = workspacePool.options.connectionString
+  // This suite declares COMPUTER_TEST_DATABASE_URL / E2E_DATABASE_URL only.
+  // The real workspace membership read must use that same disposable target,
+  // even when app/workspace database environment variables are absent in CI.
+  workspacePool.options.connectionString = databaseURL
+  workspacePool.options.options = `-c search_path=${schema}`
   let created = 0, failSync = false, failStart = false, epoch = 0, computerAllowed = true, computerPolicyVersion = 0
   const syncedLeases: { sandboxId: string; policyVersion: number; computerAllowed?: boolean; display: number }[] = []
   const runtime = {
@@ -43,6 +52,10 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES (\'alice\'),(\'bob\')')
     const migration = await readFile(new URL('../../drizzle/20261027164501_cloud_computers.sql', import.meta.url), 'utf8')
     await pool.query(migration); await pool.query(migration)
+    await pool.query('ALTER TABLE bots ADD COLUMN IF NOT EXISTS "archivedAt" timestamptz')
+    await pool.query('CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,status text); CREATE TABLE user_e2b_keys ("userId" text PRIMARY KEY); CREATE TABLE workspace_e2b_keys ("createdBy" text)')
+    await pool.query('INSERT INTO mikka_workspace_members VALUES ($1,$2,\'active\'),($1,$3,\'active\'),($4,$2,\'active\')', [actor.workspaceId, actor.userId, bob.userId, otherWorkspace.workspaceId])
+    await pool.query('INSERT INTO user_e2b_keys VALUES ($1),($2)', [actor.userId, bob.userId])
     await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "issueId" uuid, "agentId" uuid, "botId" uuid REFERENCES bots(id), status text NOT NULL, kind text, prompt text, "baseBranch" text, "deviceRepoId" uuid, "deviceId" uuid, "startedAt" timestamptz, "finishedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz, "agentDefinition" jsonb, "dispatchFingerprint" text)')
     const bindingMigration = await readFile(new URL('../../drizzle/20261027164502_computer_run_bindings.sql', import.meta.url), 'utf8')
     await pool.query(bindingMigration); await pool.query(bindingMigration)
@@ -193,7 +206,9 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
       await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId")
         SELECT "runId","workspaceId","ownerId","botId",$2,'snapshot-thread',$3,'running',$4 FROM computer_run_bindings WHERE "runId"=$1
         ON CONFLICT ("runId") DO UPDATE SET "sandboxId"=EXCLUDED."sandboxId",state='running',"deviceId"=EXCLUDED."deviceId"`, [runId, `sandbox-${runId}`, randomUUID(), deviceId])
-      await pool.query('UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [runId, deviceId])
+      const source = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0]
+      const definition = await rebindExecutionDevice(pool, source, deviceId, pool)
+      await pool.query('UPDATE agent_runs SET "deviceId"=$2,"agentDefinition"=$3 WHERE id=$1', [runId, deviceId, JSON.stringify(definition)])
       return deviceId
     }
     const cloudRun = randomUUID(), consumer = randomUUID(), cloudSubscription = randomUUID(), wrongSubscription = randomUUID()
@@ -546,6 +561,8 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(await decideComputerReview(pool, actor, askingAgain.id, askingAgain.digest, true), false)
   } finally {
     console.log(`Retained computer test schema: ${schema}`)
-    await pool.end(); await admin.end()
+    workspacePool.options.options = previousWorkspaceOptions
+    workspacePool.options.connectionString = previousWorkspaceURL
+    await workspacePool.end(); await pool.end(); await admin.end()
   }
 })

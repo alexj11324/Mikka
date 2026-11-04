@@ -1,4 +1,6 @@
 import 'server-only'
+import type { ExecutionIdentity } from '../execution-identity'
+import { executionAccountUsage, type ExecutionAccountUsage } from './execution-accounts'
 // 用量 (V14 / S-A) read model from data that exists today: threads (run chains)
 // per bot and their run time. There is no credit meter yet, so no points.
 import { and, eq, inArray, lt, sql } from 'drizzle-orm'
@@ -19,6 +21,8 @@ export interface UsageRow { id: string; name: string; threads: number; seconds: 
 export interface BotUsageRow extends UsageRow { color: string; shape: string; ownerId: string | null }
 export interface WorkspaceUsage {
   month: string
+  /** Only the requester sees their own model/runtime account references, including on a shared Bot. */
+  executionAccounts?: ExecutionAccountUsage[]
   hosted?: Awaited<ReturnType<typeof import('../abuse/runtime')['hostedUsage']['status']>>
   /** Admins see every bot and member; members only their own bots (S-A). */
   scope: 'workspace' | 'own'
@@ -63,10 +67,19 @@ export async function workspaceUsage(actorId: string, workspaceId: string, month
     if (ownerId === null) return { id: '', name: '', awaitingTakeover: true as const, ...totals }
     return { id: ownerId, name: names.get(ownerId) ?? ownerId, threads: mine.reduce((sum, bot) => sum + bot.threads, 0), seconds: mine.reduce((sum, bot) => sum + bot.seconds, 0) }
   }).sort((a, b) => b.threads - a.threads || b.seconds - a.seconds)
+  const { rows: accountRuns } = await pool.query<{ identity: ExecutionIdentity | null; seconds: number }>(`SELECT "agentDefinition"->'executionIdentity' AS identity,
+    CASE WHEN "startedAt" IS NULL THEN 0 ELSE greatest(0,extract(epoch FROM (least(COALESCE("finishedAt",now()),$4::timestamptz)-greatest("startedAt",$3::timestamptz))))::float8 END AS seconds
+    FROM agent_runs WHERE "userId"=$1 AND "agentDefinition"->'executionIdentity'->>'workspaceId'=$2
+      AND "createdAt"<$4 AND ("finishedAt" IS NULL OR "finishedAt">=$3)`, [actorId, workspaceId, start, end])
+  const executionAccounts = executionAccountUsage(accountRuns)
+  const accountOwners = [...new Set(executionAccounts.map(account => account.ownerId))]
+  const accountNames = accountOwners.length ? new Map((await workspaceDb.select({ userId: workspaceMembers.userId, name: workspaceMembers.name }).from(workspaceMembers)
+    .where(and(eq(workspaceMembers.workspaceId, workspaceId), inArray(workspaceMembers.userId, accountOwners)))).map(member => [member.userId, member.name])) : new Map<string, string>()
+  for (const account of executionAccounts) account.ownerName = accountNames.get(account.ownerId) || account.ownerId
   if (admin) await (await import('../abuse/runtime')).ensureLegacyVerification(workspaceId)
   return {
     ...(admin ? {hosted:await (await import('../abuse/runtime')).hostedUsage.status(workspaceId)} : {}),
-    month, scope: admin ? 'workspace' : 'own',
+    month, executionAccounts, scope: admin ? 'workspace' : 'own',
     totals: { threads: botUsage.reduce((sum, bot) => sum + bot.threads, 0), seconds: botUsage.reduce((sum, bot) => sum + bot.seconds, 0) },
     bots: botUsage, members: memberUsage,
     daily: monthDays(month).map(date => ({ date, threads: byDay.get(date) ?? 0 })),

@@ -1,3 +1,4 @@
+import type { ExecutionIdentity } from '../execution-identity'
 import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
 import type { SendKey } from '../send-key'
 import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
@@ -911,6 +912,8 @@ export const artifacts = pgTable('artifacts', {
 }, table => [index('artifacts_user_idx').on(table.userId, table.updatedAt), index('artifacts_run_idx').on(table.runId)])
 
 export const artifactVersions = pgTable('artifact_versions', {
+  /** Immutable author/resource/payer provenance; null means historical or external OAuth. */
+  executionIdentity: jsonb('executionIdentity').$type<ExecutionIdentity | null>(),
   id: uuid('id').primaryKey(),
   artifactId: uuid('artifactId').notNull().references(() => artifacts.id, { onDelete: 'cascade' }),
   version: integer('version').notNull(),

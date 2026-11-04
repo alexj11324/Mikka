@@ -1,3 +1,4 @@
+import type { ExecutionIdentity } from '../execution-identity'
 import { workerDefinitionDigest } from './worker-digest'
 import { z } from 'zod'
 import type { Harness } from '@mikka/protocol/harness'
@@ -6,6 +7,8 @@ import { snapshotMailboxTools, workerMailboxScope, type WorkerMailboxScope, type
 import type { RepositoryAdmission } from '../repository-admission'
 
 export interface WorkerDefinitionSnapshot {
+  /** Trusted dispatch identity; absent on historical runs, never inferred retroactively. */
+  executionIdentity?: ExecutionIdentity
   schemaVersion: 1
   kind: 'worker'
   harness: Harness

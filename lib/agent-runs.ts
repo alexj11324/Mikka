@@ -1,4 +1,5 @@
 import 'server-only'
+import type { ExecutionIdentity } from './execution-identity'
 import { personalMailboxEnabled } from './personal-mailbox-config'
 import { byosEnabled } from './cloud-computer-flag'
 import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
@@ -31,6 +32,8 @@ import { runBotName } from '@/lib/run-bot-name'
 // with the session's user; the Coordinator calls them with its owner's.
 
 export interface RunView {
+  /** Owner-only trusted provenance; omitted from workspace summaries and null on historical runs. */
+  executionIdentity?: ExecutionIdentity | null
   id: string
   pauseReason?: 'human_control' | 'quota_exhausted' | null
   waitFor?: string
@@ -58,6 +61,7 @@ export interface RunDetail {
 }
 
 export const runViewColumns = {
+  executionIdentity: sql<ExecutionIdentity | null>`${agentRuns.agentDefinition}->'executionIdentity'`,
   id: agentRuns.id, issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: runBotName,
   harness: sql<SupportedHarness>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`, status: agentRuns.status, outcome: agentRuns.outcome, pauseReason: agentRuns.pauseReason, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
   error: agentRuns.error, report: agentRuns.report, createdAt: agentRuns.createdAt,

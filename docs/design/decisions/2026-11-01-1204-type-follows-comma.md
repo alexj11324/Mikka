@@ -14,3 +14,5 @@ Font rules match app.comma.surf as served on 2026-11-01:
 - Fonts are held until loaded (`font-display: block`) with no metric-adjusted fallback face.
 
 - Sizes: `text-xs` 12/18, `text-sm` 13/20, `text-md` 15/24, `text-lg` 18/28 at -0.01em, `text-xl` 20/30 at -0.01em, `text-2xl` 24/32. Chat messages are 13 on a 21px line, as Comma's message text (`text-sm` plus 8px).
+
+Earlier rule, from 2026-11-01-0140 (now removed): documents (a task's title and description, the Artifact reader, comments) used a 24/32 title, 18/28 headings, a 15/24 body and 12/16 meta, with chat at 14/22. This decision keeps those document steps and moves chat to 13/21 and meta to 12/18 to match Comma.

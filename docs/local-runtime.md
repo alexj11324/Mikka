@@ -154,7 +154,7 @@ never Mikka 默认 and never the AI Gateway:
   only; never write it to a file, a commit, a log or a report.
 - `pnpm dev:local` adds it to every local account and picks DS 4.1 Flash for
   the Coordinator and the Bots (`scripts/dev-local/seed-model-keys.ts`). Outside
-  dev:local, add it as a DeepSeek key in Settings › API 与订阅 and pick DS 4.1
+  dev:local, add it as a DeepSeek key in Settings › 模型与订阅 and pick DS 4.1
   Flash by hand.
 - Mikka 默认 (hosted, billed through the AI Gateway) is not used for local
   work, so a local run needs neither `AI_GATEWAY_API_KEY` nor a card
@@ -195,7 +195,8 @@ Not substituted:
 `pnpm test:dev-local` covers the guard, the routing, the cron schedule and the
 real AI SDK gateway provider against the substitutes.
 
-`pnpm test:local-loop` runs the five MVP acceptance items through HTTP and the
+`pnpm test:local-loop` runs acceptance items 1–7 by default (the five MVP
+items plus the two mailbox items below) through HTTP and the
 real daemon CLI, using Node 24 in cloud Linux. Supply the same loopback
 `E2E_DATABASE_URL`, `MIKKA_DATABASE_URL` and `DATABASE_URL`, with
 `MIKKA_LOCAL_TEST_ACCOUNTS=1`. The harness creates its own uniquely named
@@ -222,13 +223,13 @@ device credentials, releases its account lease and removes its daemon's
 temporary credential files. Disposable databases and repository evidence are
 retained for diagnosis.
 
-The default also runs item 6: real Agent mailbox tools, automatic idle-Bot
+Item 6: real Agent mailbox tools, automatic idle-Bot
 notification, a reply, explicit inbox/ACK, exact-send retry and owner isolation.
 Item 7 verifies notifications reaching a running daemon worker, separately
 from the native-Bot exchange.
 
 For a focused probe, use `LOCAL_LOOP_ITEMS=1` or `LOCAL_LOOP_ITEMS=4,5`; the
-selected scope is recorded and does not establish a full five-item pass.
+selected scope is recorded and does not establish a full default pass.
 `--existing` attaches to a running local service using that run's
 `MIKKA_TEST_ENVIRONMENT_FILE` and matching database targets. It acquires its
 own account lease and, when needed, its own daemon credential. Items 4 and 5

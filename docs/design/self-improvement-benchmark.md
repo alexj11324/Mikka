@@ -1,5 +1,10 @@
 # Frozen operator report benchmark
 
+> Note (2026-11-03): the fixed trigger of 25 distinct failures or a seven-day-old
+> failure named below was later replaced by the Decision API's `propose` answer
+> (`lib/self-improvement/proposal-judgment.ts`,
+> [decision 2026-11-01-1500](decisions/2026-11-01-1500-self-improvement-and-profile-decided-by-decision-api.md)).
+
 The task measures a real Harness session's ability to submit an accurate operator
 report from bounded execution records. It never reads or scores Skill prose and
 never calls a model during scoring. The records are reporting fixtures; a passing

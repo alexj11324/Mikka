@@ -1,4 +1,5 @@
 import 'server-only'
+import { rebindExecutionDevice, revalidateExecutionIdentity, ExecutionIdentityError } from './execution-identity'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
@@ -58,9 +59,19 @@ export async function renewRunLeases(deviceId: string, runIds: readonly string[]
   // cannot be held here; revoke it without making PostgreSQL reject the whole beat.
   const validRunIds = runIds.filter(id => RUN_UUID.test(id))
   const leaseExpiresAt = new Date(now.getTime() + RUN_LEASE_MS)
-  const renewed = validRunIds.length ? await db.update(agentRuns)
+  const candidates = validRunIds.length ? await db.select().from(agentRuns).where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, validRunIds), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]))) : []
+  const authorized: string[] = []
+  for (const run of candidates) {
+    try { await revalidateExecutionIdentity(pool, run); authorized.push(run.id) }
+    catch (error) {
+      if (!(error instanceof ExecutionIdentityError)) throw error
+      // The daemon receives revoked on this heartbeat and removes injected credentials.
+      await db.update(agentRuns).set({ stopRequestedAt: now, leaseExpiresAt: now, updatedAt: now }).where(and(eq(agentRuns.id, run.id), eq(agentRuns.deviceId, deviceId), inArray(agentRuns.status, [...LEASED_RUN_STATUSES])))
+    }
+  }
+  const renewed = authorized.length ? await db.update(agentRuns)
     .set({ leaseExpiresAt, updatedAt: now })
-    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, validRunIds), inArray(agentRuns.status, [...LEASED_RUN_STATUSES])))
+    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, authorized), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), isNull(agentRuns.stopRequestedAt)))
     .returning({ id: agentRuns.id }) : []
   const held = new Set(renewed.map(run => run.id))
   const revoked = runIds.filter(id => !held.has(id))
@@ -100,7 +111,7 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
     // Nothing waits on an offline device (设备离线时 is gone): another device takes it, else the person gets the card.
     const target = await takeoverTarget(run, now)
     if (target) {
-      await db.update(agentRuns).set({ deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, updatedAt: now })
+      await db.update(agentRuns).set({ deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, agentDefinition: await rebindExecutionDevice(pool, run, target.deviceId), updatedAt: now })
         .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
       notifyDeviceWork(target.deviceId)
       continue
@@ -190,7 +201,7 @@ async function reclaimLostRun(run: Run, now: Date) {
     if (cloud) return true
     await tx.insert(agentRuns).values({
       id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
-      agentDefinition: retryWorkerDefinition(run.agentDefinition, retryPrompt(run.prompt, outcome.attempt)),
+      agentDefinition: retryWorkerDefinition(target ? await rebindExecutionDevice(pool, run, target.deviceId) : run.agentDefinition, retryPrompt(run.prompt, outcome.attempt)),
       deviceId: target?.deviceId ?? run.deviceId, deviceRepoId: target?.deviceRepoId ?? run.deviceRepoId, status: 'queued', kind: run.kind, baseBranch: run.baseBranch,
       prompt: retryPrompt(run.prompt, outcome.attempt), attempt: outcome.attempt, retryOf: run.id,
     })

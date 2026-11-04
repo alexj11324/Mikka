@@ -4,7 +4,7 @@
 
 | 文件 | 内容 |
 | --- | --- |
-| `app/actions/settings-activity.ts` | `listSavedLogins` `deleteSavedLogin` `listSavedLoginUsage` `listActivity` |
+| `app/actions/settings-activity.ts` | `listSavedLogins` `saveSavedLogin` `replaceSavedLoginPassword` `deleteSavedLogin` `listSavedLoginUsage` `listActivity` |
 | `app/actions/agents.ts` | `renameDevice` `removeDevice`（和已有的 `listDevices` `setDeviceEnabled` 放在一起） |
 | `lib/settings/saved-logins.ts` | 已保存登录的查询和删除 |
 | `lib/settings/activity.ts`、`lib/settings/activity-cursor.ts` | 活动时间线和游标 |
@@ -107,8 +107,8 @@ type ActivitySummary =
 
 字段确认（读过写入点）：
 
-- `pending_actions.decidedAt` 只在本人决定时写入：`decidePendingAction`、`approved-writes.decide`、`writeRepositoryPushApproval`。策略自动放行的写操作直接以 `running` 插入、`decidedAt` 为空，所以不算“用户批准/拒绝”，不进时间线。Coordinator 直接发出的、未被判为破坏性操作的邮件和日历写入（`writeAccountAction`，R-77）同样如此：发出前插入 `running`，结束后改为 `done` / `failed`，结果不明时保持 `running`。`decision` 由 `status` 推出：`declined` 为拒绝，其余（`running` / `done` / `failed`）为批准；`status` 原样返回，UI 可以显示“已批准但执行失败”。
-- `summary` 只带操作类型和少量定位信息（浏览器/登录操作的 `origin`、仓库推送的 `repo`），不带邮件正文、收件人等 `input` 内容；详情用 `pendingActionId` 跳转。
+- `pending_actions.decidedAt` 只在本人决定时写入：`decidePendingAction`（`lib/pending-actions.ts`）和 `lib/operations/approved-writes.ts`。仓库推送审批已经去掉（Agent 用自己的 GitHub 凭据推送，#1023）；以前留下的 `approve_repository_push` 行仍显示仓库名。策略自动放行的写操作直接以 `running` 插入、`decidedAt` 为空，所以不算“用户批准/拒绝”，不进时间线。Coordinator 直接发出的、未被判为破坏性操作的邮件和日历写入（`writeAccountAction`，R-77）同样如此：发出前插入 `running`，结束后改为 `done` / `failed`，结果不明时保持 `running`。`decision` 由 `status` 推出：`declined` 为拒绝，其余（`running` / `done` / `failed`）为批准；`status` 原样返回，UI 可以显示“已批准但执行失败”。
+- `summary` 只带操作类型和少量定位信息（浏览器/登录操作的 `origin`、旧仓库推送行的 `repo`），不带邮件正文、收件人等 `input` 内容；详情用 `pendingActionId` 跳转。
 - `attention_log.reason` 是 Coordinator 记录的原因原文（模型写的文本，或系统写的 `told without recording` 等），原样返回，不翻译。`url` 是 matter 的来源链接。
 - 只把 `notify`（告诉了用户）当成提醒；`handoff` / `quiet` / `snooze` / `handled` 是内部决策，不进时间线。
 
@@ -125,15 +125,16 @@ type ActivitySummary =
 - 副作用：更新 `devices.name`，并置 `devices."nameLocked" = true`。daemon 每次启动都会 `register` 并上报主机名，加锁后 register 不再覆盖用户起的名字。
 - 错误码：`authRequired`；`validationNameRequired`（空）；`deviceNameTooLong`（超过 60）；`deviceNotFound`（id 不合法、不是自己的、云设备、已移除）。
 
-### `removeDevice(id): ActionResult<{ id: string; revokedTokens: number }>`
+### `removeDevice(id): ActionResult<{ id: string; revokedTokens: number; uninstall: 'queued' | 'not_possible' }>`
 
 - 只能移除自己的本地设备。
-- 设备上有正在运行的线程（`agent_runs.status` 为 `queued` / `preparing` / `running` / `waiting_input` / `finishing`）时拒绝，返回 `deviceHasActiveRuns`，UI 提示先停止。
+- 设备上有正在运行的线程（`agent_runs.status` 为 `queued` / `preparing` / `running` / `paused` / `waiting_input` / `finishing`）时拒绝，返回 `deviceHasActiveRuns`，UI 提示先停止。
 - 否则在一个事务里（设备行 `FOR UPDATE`；运行准入读设备行 `FOR SHARE` 并要求 `enabled`，所以检查之后不会再有新运行进来）：
-  1. 撤销这台设备的全部 daemon 凭据：`device_token_devices` 里记录过的 token，以及 `boundDeviceId` 指向它的 token，`revokedAt = now()`。`authenticateDevice` 只认 `revokedAt IS NULL`，daemon 下一次请求任何 `/v1/devices/*` 都是 401。
+  1. 处理这台设备的 daemon 凭据（`device_token_devices` 里记录过的 token，以及 `boundDeviceId` 指向它的 token）：
+     - 设备在线（`lastSeenAt` 在 60 秒内）：给 daemon 排一条 `uninstall` 设备命令，凭据不立即撤销，只把 `expiresAt` 缩到最多 10 分钟后（`DEVICE_UNINSTALL_GRACE_MS`），让 daemon 还能收到这条命令。返回 `uninstall: 'queued'`，`revokedTokens: 0`。
+     - 设备离线：`revokedAt = now()`，并写 `device_credential_revocations`。`authenticateDevice` 只认 `revokedAt IS NULL`，daemon 下一次请求任何 `/v1/devices/*` 都是 401。返回 `uninstall: 'not_possible'` 和撤销的 token 数。
   2. 解除该设备上 agent 的设备绑定（`agents.deviceId = NULL`），之后派发返回 `agentNoDevice`。
   3. 设备行变成墓碑：`removedAt = now()`、`enabled = false`。
-- 返回撤销的 token 数。
 - 错误码：`authRequired`；`deviceNotFound`（不合法、不是自己的、云设备、已移除）；`deviceHasActiveRuns`。
 
 #### 为什么用墓碑，不物理删除
@@ -163,7 +164,7 @@ type ActivitySummary =
 
 #### daemon 凭据和设备的对应关系
 
-本地设备的 token 是用户级的，表里原本没有“哪个 token 属于哪台设备”。新增 `device_token_devices(tokenId, deviceId, userId)`：`POST /v1/devices/register` 和 `POST /v1/devices/:id/heartbeat` 在确认设备属于调用者且未移除后记录这一对（`lib/device-link.ts` 的 `linkDeviceToken`，设备行 `FOR SHARE`，和移除互斥）。daemon 每 15 秒心跳一次，所以上线前已在运行的 daemon 也会在下一次心跳时被记录。
+本地设备的 token 是用户级的，表里原本没有“哪个 token 属于哪台设备”。新增 `device_token_devices(tokenId, deviceId, userId)`：`POST /v1/devices/register` 和 `POST /v1/devices/:id/heartbeat` 在确认设备属于调用者且未移除后记录这一对（`lib/device-link.ts` 的 `linkDeviceToken`，设备行 `FOR SHARE`，和移除互斥）。daemon 每次启动都会 register；默认每 15 秒心跳一次，但连着推送通道（`cloudflare/device-gateway`）、空闲且没有线程时不心跳。所以上线前已在运行的 daemon 会在下一次 register 或心跳时被记录。
 
 - 同一个 token 被复制到两台机器时，移除其中一台会撤销这个 token，另一台也需要重新登录。
 - 没有在这台设备上用过的同用户 token 不受影响；用它拿墓碑 id 去 register 会得到一台新设备，不会复活墓碑。

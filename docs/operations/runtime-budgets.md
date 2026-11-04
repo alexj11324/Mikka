@@ -1,8 +1,8 @@
 # Runtime request and CPU budgets
 
 These checks prevent idle polling and distinguish useful work from successful
-empty responses. They reuse browser CI, Vercel observability and the existing
-operational logs. The minute Worker keeps its current cadence and two-minute
+empty responses. They reuse daemon and unit tests, Vercel observability and
+the existing operational logs. The minute Worker keeps its current cadence and two-minute
 dispatch/due-work objectives in [observability.md](observability.md).
 
 ## Executable client budgets
@@ -17,8 +17,9 @@ not enforced until they move to an API or unit check.
 | Settings, including the legacy initial settings entry | Zero background task/thread/board/chat reads over 36 seconds, including focus and online events | Same browser spec |
 | Return from settings | Exactly one immediate refresh for each action, then the normal 60-second budget | Same browser spec |
 | Leave the workspace document | Zero further workspace reads over 30 seconds | Same browser spec |
-| Empty filesystem or command poll | One requested cycle in total, normally 25 seconds; early responses wait only the remainder; configured zero has a one-second minimum | `packages/daemon/test/fs-polling.test.ts`, `commands-polling.test.ts` |
-| Queued filesystem work or commands | Process immediately; command acknowledgments do not wait for an idle cycle | Same daemon tests |
+| Idle device with the push gateway | No command poll and no database heartbeat while no run is held; one command read on connect and on each `work` signal; the 30-second `ping` is answered by the Durable Object | `packages/daemon/test/device-gateway.node-test.ts`, `cloudflare/device-gateway/src/route.test.ts` |
+| Empty command long-poll (fallback without a gateway) | One requested cycle in total, normally 25 seconds; early responses wait only the remainder; configured zero has a one-second minimum | `packages/daemon/test/commands-polling.test.ts` |
+| Queued commands | Process immediately; command acknowledgments do not wait for an idle cycle | Same daemon tests |
 | Consecutive transport failures | Existing exponential waits of 1, 2, 4, 8, 16, 30 seconds, capped at 30; success resets the backoff | Same daemon tests |
 | Stop or disconnect | Cancel idle/retry waits; ignore late command results on shutdown; no next request or server queue query after cancellation | Daemon tests and `app/v1/devices/[deviceId]/commands/route.test.ts` |
 
@@ -30,11 +31,21 @@ scheduling around completed requests; lower bounds catch a broken refresh path.
 Settings' own reads are outside the background workspace budget. These are
 bounded regression checks, not a global request throttle.
 
-The filesystem endpoint currently returns an authenticated empty result
-immediately. Its client supplies the idle wait; adding a server-side sleep
-would retain a function invocation without adding useful behavior. Existing
-daemon installations must upgrade to receive the client pacing fix. Web
-deployment alone does not update them.
+The daemon learns about new work from the device gateway
+(`cloudflare/device-gateway`, one Durable Object per device over a hibernating
+WebSocket). The server posts an empty signal (`lib/device-gateway-notify.ts`)
+after it commits the work; the daemon then reads it through
+`GET /v1/devices/:deviceId/commands`. `GET /v1/devices/:deviceId/gateway` gives
+the daemon its socket ticket. When `DEVICE_GATEWAY_URL` or
+`DEVICE_GATEWAY_PUSH_SECRET` is unset, or the socket does not open, the daemon
+falls back to the command long-poll. That poll still checks every 2 seconds on
+the server. See the
+[decision](../design/decisions/2026-11-03-2030-device-push-gateway.md).
+
+Current daemons no longer poll `GET /v1/devices/:deviceId/fs/requests`. The
+route still answers an authenticated empty list for older daemons. Existing
+daemon installations must upgrade to receive these changes. Web deployment
+alone does not update them.
 
 ## Native Vercel monitors
 
@@ -53,8 +64,9 @@ The temporary test monitor was deleted after the check.
 | Route CPU total anomaly | Production, 15-minute CPU sum per route, above three standard deviations, with at least 10,000 ms CPU | `ar_01a191b3-55e0-72c7-81a5-e5df7c11ed17` |
 | CPU per invocation anomaly | Production, 15-minute CPU sum / invocation count per route, above three standard deviations, with at least 10,000 ms total CPU | `ar_01a191b3-661a-7059-8626-8656bbf8429d` |
 
-At a 25-second idle cadence, a filesystem client normally starts about 12–13
-requests in five minutes; 18 allows a small restart burst. Commands are excluded
+Current daemons do not call the filesystem-request route, so this monitor now
+catches older daemons. At their 25-second idle cadence, such a client normally
+starts about 12–13 requests in five minutes; 18 allows a small restart burst. Commands are excluded
 from this absolute count alert because useful queued commands can return
 immediately. On an alert, identify the deployment, route, environment and client
 version; inspect request counts, CPU per invocation and outcomes together. Check

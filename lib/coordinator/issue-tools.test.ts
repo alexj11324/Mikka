@@ -58,6 +58,14 @@ test('issue tools are available in the default definition and global capability 
   }
 })
 
+test('GitHub discovery accepts an exact schema lookup and its bounded page cursor without adding call arguments', () => {
+  const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true })
+  const schema = tools.github_tools!.inputSchema as { safeParse(input: unknown): { success: boolean } }
+  assert.equal(schema.safeParse({ tool: 'actions_run_trigger', cursor: 'x'.repeat(4096) }).success, true)
+  assert.equal(schema.safeParse({ cursor: 'x'.repeat(4097) }).success, false)
+  assert.equal(schema.safeParse({ name: 'actions_run_trigger', arguments: { method: 'run_workflow' } }).success, false)
+})
+
 test('scheduled reads cannot request write tools and retain their trusted read scope', async () => {
   const scope = { holder: 'holder', turnId: 'turn', callId: 'scope-call' }
   const tools = registry.createCoordinatorRegistry('owner', 'bot', scope, { readOnly: true, readToolIds: ['get_issue', 'create_issue', 'stop_run'] })

@@ -1199,6 +1199,7 @@
     "runNotActive": "This run has ended and has no answerable question.",
     "threadReplaced": "A newer thread took this task over. Send it there.",
     "threadCannotContinue": "This thread works on no task, so it can’t run again.",
+    "threadRecoveryUnavailable": "The original session cannot be resumed right now.",
     "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response.",
     "savedLoginNotFound": "This login does not exist or was already deleted.",
     "savedLoginSiteInvalid": "Enter an https site address.",
@@ -2487,7 +2488,23 @@
       "hours": "{count} h",
       "balance": "Balance",
       "points": "{points} points",
-      "awaitingTakeover": "Awaiting takeover"
+      "awaitingTakeover": "Awaiting takeover",
+      "executionAccounts": "Accounts used for your tasks",
+      "accountKind": "Resource",
+      "accountPayer": "Account holder",
+      "accountBilling": "Billing",
+      "accountKinds": {
+        "api_key": "Model API key",
+        "subscription": "Model subscription",
+        "native_login": "Device model account",
+        "local_device": "Personal device",
+        "e2b": "Personal E2B account"
+      },
+      "accountAmounts": {
+        "provider_unknown": "Billed by provider / amount unknown",
+        "metered": "Billed by actual usage",
+        "not_applicable": "No platform compute charge"
+      }
     },
     "billing": {
       "loading": "Loading billing",

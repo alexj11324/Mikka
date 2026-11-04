@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { after, mock, test } from 'node:test'
+import { after, before, mock, test } from 'node:test'
 import { agentRuns, agents, bots, devices } from './db/schema'
 import { DEFAULT_AGENT_DEFINITION } from './agent-kit/builtin'
 import { makeSnapshot } from './agent-kit/definition'
@@ -12,6 +12,11 @@ const owner = 'synthetic-owner', botId = '28700000-0000-4000-8000-000000000011'
 const workspaceId = '28700000-0000-4000-8000-000000000012', globalId = '00000000-0000-4000-8000-000000000001'
 const agentId = '28700000-0000-4000-8000-000000000013', repoId = '28700000-0000-4000-8000-000000000014', issueId = '28700000-0000-4000-8000-000000000015'
 const connectionId = '28700000-0000-4000-8000-000000000019'
+before(async () => {
+  const workspaceModule = await import('./workspace-db')
+  mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: { ...workspaceModule, workspacePool: { query: async () => ({ rows: [{ userId: owner }] }) } } })
+})
+
 const repoUrl = 'https://github.com/example/fixture.git'
 const execution = { status: 'running' as const, id: '28700000-0000-4000-8000-000000000016', snapshot: makeSnapshot('28700000-0000-4000-8000-000000000017', 1, { ...DEFAULT_AGENT_DEFINITION, tools: ['mailbox_inbox'] }, 'HOST', { harness: 'ai_sdk', model: 'synthetic' }) }
 let ownedBot = true, botQueries = 0
@@ -86,6 +91,10 @@ test('actual cloud producer pins the existing host-authorized Bot/workspace with
       assert.ok(sql.includes('b."ownerId"=$2 AND b."workspaceId"=$3'))
       return { rows: [{ deviceId: 'device', harness: 'codex', instructions: 'Fixture', baseBranch: 'main' }] }
     }
+    if (sql.startsWith('SELECT "ownerId","workspaceId" FROM bots')) return { rows: [{ ownerId: owner, workspaceId }] }
+    if (sql.startsWith('SELECT "ownerId",kind,enabled FROM devices')) return { rows: [{ ownerId: owner, kind: 'cloud', enabled: true }] }
+    if (sql.startsWith('SELECT b."ownerId",b."workspaceId"')) return { rows: [{ ownerId: owner, workspaceId, revision: '1', modelId: 'fixture', route: 'codex_cli', shared: false }] }
+    if (sql.startsWith('SELECT 1 FROM user_e2b_keys')) return { rows: [{}] }
     if (sql.startsWith('SELECT 1 FROM byos_connections c')) {
       assert.deepEqual(params, [connectionId, owner, 1, 'codex'])
       assert.ok(sql.includes('c."ownerId"=$2') && sql.includes('c.epoch=$3'))

@@ -1,4 +1,6 @@
 import 'server-only'
+import { executionMembersActive, revalidateExecutionIdentity, ExecutionIdentityError } from './execution-identity'
+import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
 import { randomUUID } from 'node:crypto'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
@@ -321,6 +323,8 @@ export async function openApiKeyForChat(query: Query, userId: string, workspaceI
   const usable = (await usableApiKeys(query, userId, workspaceId)).find(key => key.id === keyId)
   const baseUrl = usable && apiKeyChatBaseUrl(usable)
   if (!usable || !baseUrl) throw new WorkspaceError('apiKeyNotFound')
+  const { rows: [owner] } = await query.query<{ ownerId: string }>('SELECT "ownerId" FROM model_api_keys WHERE id=$1', [keyId])
+  if (!owner || (owner.ownerId !== userId && !await executionMembersActive(workspaceId, [userId, owner.ownerId]))) throw new WorkspaceError('apiKeyNotFound')
   const { row, apiKey } = await openKey(query, keyId, env)
   return { apiKey, baseUrl, keyOwnerId: row.ownerId }
 }
@@ -339,13 +343,18 @@ const ACTIVE_RUN = ['queued', 'preparing', 'running', 'paused', 'waiting_input',
  */
 export async function apiKeyForRun(query: Query, runId: string, keyId: string, harness: ApiKeyHarness, env: Env = process.env): Promise<ApiKeyRunCredential> {
   z.uuid().parse(runId); z.uuid().parse(keyId)
-  const { rows: [run] } = await query.query<{ userId: string; workspaceId: string | null; status: string }>(
-    'SELECT r."userId",b."workspaceId"::text AS "workspaceId",r.status FROM agent_runs r LEFT JOIN bots b ON b.id=r."botId" WHERE r.id=$1', [runId])
-  if (!run || !ACTIVE_RUN.includes(run.status)) throw new WorkspaceError('apiKeyNotFound')
+  const { rows: [run] } = await query.query<{ userId: string; botId: string | null; deviceId: string | null; agentDefinition: WorkerDefinitionSnapshot | null; workspaceId: string | null; status: string; stopRequestedAt: Date | null }>(
+    'SELECT r."userId",r."botId",r."deviceId",r."agentDefinition",b."workspaceId"::text AS "workspaceId",r.status,r."stopRequestedAt" FROM agent_runs r LEFT JOIN bots b ON b.id=r."botId" WHERE r.id=$1', [runId])
+  if (!run || run.stopRequestedAt || !ACTIVE_RUN.includes(run.status)) throw new WorkspaceError('apiKeyNotFound')
+  if (run.agentDefinition && run.agentDefinition.apiKey?.keyId !== keyId) throw new WorkspaceError('apiKeyNotFound')
+  try { await revalidateExecutionIdentity(query, run) }
+  catch (error) { if (error instanceof ExecutionIdentityError) throw new WorkspaceError('apiKeyNotFound'); throw error }
   const usable = run.workspaceId
     ? (await usableApiKeys(query, run.userId, run.workspaceId)).some(key => key.id === keyId)
     : Boolean((await query.query('SELECT 1 FROM model_api_keys WHERE id=$1 AND "ownerId"=$2', [keyId, run.userId])).rowCount)
   if (!usable) throw new WorkspaceError('apiKeyNotFound')
+  const { rows: [owner] } = await query.query<{ ownerId: string }>('SELECT "ownerId" FROM model_api_keys WHERE id=$1', [keyId])
+  if (!owner || (owner.ownerId !== run.userId && (!run.agentDefinition?.apiKey || !run.workspaceId || !await executionMembersActive(run.workspaceId, [run.userId, owner.ownerId])))) throw new WorkspaceError('apiKeyNotFound')
   const { row, apiKey } = await openKey(query, keyId, env)
   const endpoint = apiKeyEndpoint(row, harness)
   if (!endpoint) throw new WorkspaceError('apiKeyNotFound')

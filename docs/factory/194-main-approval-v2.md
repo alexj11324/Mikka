@@ -2,9 +2,15 @@
 
 > Update 2026-10-29: the mandatory signed review and trusted `reviewKey` below
 > are now the optional strict deployment. Mikka's default follows the Warp
-> Factories model: advisory review, registered policy as the authority, no
-> application merge. See `warp-aligned-factory.md` for the current behavior;
-> this page remains the record of the #194 batch.
+> Factories model: advisory review, registered policy as the authority. See
+> `warp-aligned-factory.md` for the current behavior; this page remains the
+> record of the #194 batch.
+>
+> Update: `policy-authorization.ts`, `worker-publication.ts` and
+> `decision-execution.ts` were removed in #493
+> (`second-stage-simplification.md`). Since #528 a code candidate is accepted
+> by the person's own merge of its PR (`lib/factory/merge.ts`); only a skill
+> candidate still goes through approval and publication.
 
 This #194 batch extracts non-enterprise publication consumers from closed PR229
 and PR316, then removes the unconditional human-approval requirement. It does not

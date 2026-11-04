@@ -16,6 +16,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/run-leases.ts', file: 'tests/run-recovery.db.test.ts', script: 'test:run-recovery-db' },
   { marker: 'app/v1/runs/[runId]/checkpoint/route.ts', file: 'tests/checkpoint-recovery.db.test.ts', script: 'test:run-recovery-db' },
   { marker: 'lib/mcp/worker.ts', file: 'lib/mcp/worker-authorization.db.test.ts', script: 'test:worker-authorization-db' },
+  { marker: 'lib/execution-identity.ts', file: 'lib/execution-identity.db.test.ts', script: 'test:worker-authorization-db' },
   { marker: 'lib/device-revocation.ts', file: 'lib/device-revocation.db.test.ts', script: 'test:device-revocation-db' },
   { marker:'lib/abuse/store.ts',file:'lib/abuse/store.db.test.ts',script:'test:abuse-db' },
   { marker:'lib/search/rate-limit.ts',file:'lib/search/rate-limit.db.test.ts',script:'test:abuse-db' },

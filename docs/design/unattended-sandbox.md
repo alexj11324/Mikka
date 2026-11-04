@@ -2,6 +2,12 @@
 
 Decision: Alex, 2026-10-29. Implements the unattended sandbox scope tracked in #404.
 
+Status (2026-11-03): runs no longer use a sandbox, a Docker container or a
+network relay, and nothing is asked per tool or destination
+([1312](decisions/2026-11-01-1312-cloud-runs-without-docker.md),
+[2335](decisions/2026-11-01-2335-e2b-official-templates.md)). The sections
+below say what holds now.
+
 ## Execution defaults
 
 An authenticated, owned cloud device receives public web egress by default.
@@ -11,19 +17,18 @@ Existing explicit ask/deny choices, read-only runs and administrator ceilings re
 binding. Project dependency installation is allowed by default within the sandbox;
 project shell execution does not require Git publication permission.
 
-A destination ceiling limits reachability; it is not consent. An effective network
-allow proceeds without a prompt. An explicit ask obtains one exact host/port grant
-and reuses it within the same run. Concurrent connections share that decision.
-Every connection still rechecks live authority; cancellation, revocation or a new
-run cannot reuse the old grant. Publication and other external effects retain their
-own host-controlled authorization.
+Agents reach the open internet by default
+([1230](decisions/2026-11-01-1230-network-open-by-default.md)). A run asks for
+no per-host grant: Claude Code runs in `bypassPermissions` and Codex with
+approvals `never` (2335). The daemon's live gate
+(`packages/daemon/src/agents/tool-approval.ts`) still stops a run whose lease,
+owner or policy is no longer live. Publication and other external effects
+retain their own host-controlled authorization.
 
-Hosted tasks keep Docker network-none, a read-only root filesystem, a private task
-home and provider credential custody outside the task. The owned HTTP/CONNECT relay
-allows public web destinations, rejects private/metadata addresses and validates the
-complete DNS answer before connecting to the selected address. It does not inject
-platform credentials into arbitrary requests. Applications must honor the supplied
-proxy configuration; this is not unrestricted host networking.
+Each hosted task runs on its own E2B machine, which is the isolation between
+tasks; there is no Docker container, read-only root or HTTP/CONNECT relay.
+Provider credentials stay outside the task: the CLI reaches the model only
+through the run's broker.
 
 ## Browser tasks
 
@@ -50,7 +55,8 @@ connections while external creation is pending. Waiting for a person does not sp
 the task's active-operation budget. Transient failures use bounded recovery; a
 permanently failed queued start becomes terminal and cannot block later work.
 
-The computer policy control exposes allow, ask and deny, round-trips its current
+The computer policy control exposes allow and deny
+(`components/settings/computer-policy-settings.tsx`), round-trips its current
 value, and remains disabled for non-administrators.
 
 ## Rollout and verification
@@ -62,8 +68,8 @@ production migration. Existing explicit policy rows are not rewritten to allow.
 
 The mandatory cloud-backend database gate includes the unattended regressions.
 `pnpm test:unattended` checks visual input, policy and network contracts. The
-unattended-sandbox workflow additionally executes the real Chromium gateway and a
-real network-none Docker public download. Official CLI synthetic acceptance, the
+unattended-sandbox workflow additionally executes the real Chromium gateway
+(`scripts/e2b/subagent-guard.test.py`, `scripts/e2b/subagent-visual-browser.test.py`). Official CLI synthetic acceptance, the
 full database inventory and selected application browser gates remain required.
 Model/provider fixtures establish protocol behavior, not live third-party account
 acceptance. Preserve exact revision and environment provenance with test evidence.

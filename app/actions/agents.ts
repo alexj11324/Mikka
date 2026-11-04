@@ -387,7 +387,7 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
         const recovered=await factoryRuntimeForBot(question.botId).questions.recover({source:'human',userId:user.id,sessionId:session.session.id},input)
         return {runId:recovered.continuationRunId,continued:true}
       } catch(error) {
-        if(error instanceof FactoryError)throw new ActionFailureError(error.code==='factoryNotFound'?'runNotFound':'threadCannotContinue')
+        if(error instanceof FactoryError)throw new ActionFailureError(error.code==='factoryNotFound'?'runNotFound':'threadRecoveryUnavailable')
         throw error
       }
     }

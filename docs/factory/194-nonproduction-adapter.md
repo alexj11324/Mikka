@@ -4,7 +4,7 @@
 
 ## Existing server wiring
 
-`lib/factory/server.ts` supplies `configuredLocalPublicationAdapters(process.env)` to the existing approval service. Enabling the local target requires all of these explicit, nonsecret runtime settings:
+Since #528, `lib/factory/server.ts` no longer gives this adapter to the approval service: a code candidate is accepted by merging its PR. `configuredLocalPublicationAdapters(process.env)` is still read by the local monitor probe (`lib/factory/monitor-probe.ts`). Enabling the local target requires all of these explicit, nonsecret runtime settings:
 
 ```sh
 NODE_ENV=development
