@@ -19,6 +19,9 @@ export async function inspectRetainedDeliverable(input, roots = {
       !/^[0-9a-f]{64}$/.test(input.checkpoint?.patchSha256) || !Number.isSafeInteger(input.checkpoint?.patchBytes) ||
       input.checkpoint.patchBytes < 1 || input.checkpoint.patchBytes > 16 * 1024 * 1024 ||
       !Number.isSafeInteger(input.checkpoint?.files) || input.checkpoint.files < 1) fail('scope_mismatch')
+  const legacyQuestion = input.legacyQuestionSubmission
+  if (legacyQuestion !== undefined && (!legacyQuestion || !uuid.test(legacyQuestion.questionId) ||
+      !uuid.test(legacyQuestion.continuesRunId) || legacyQuestion.continuesRunId === input.producerRunId)) fail('scope_mismatch')
   const exactDirectory = value => {
     try { return fs.lstatSync(value).isDirectory() && fs.realpathSync(value) === value } catch { return false }
   }
@@ -42,10 +45,22 @@ export async function inspectRetainedDeliverable(input, roots = {
     entry = entries?.[input.producerRunId]
   } catch { fail('journal_unavailable') }
   const assignment = entry?.assignment
-  if (entry?.state !== 'succeeded' || entry?.stopReason !== 'submitted' || entry.sessionId !== input.producerSessionId ||
+  if (entry?.sessionId !== input.producerSessionId ||
       entry.worktree !== input.worktreePath || entry.baseCommit !== input.sourceCommit || !Number.isFinite(Date.parse(entry.updatedAt)) ||
       assignment?.runId !== input.producerRunId || assignment.deviceId !== input.deviceId || assignment.issueId !== input.issueId ||
-      assignment.repoId !== input.deviceRepoId) fail('journal_mismatch')
+      assignment.repoId !== input.deviceRepoId) fail('journal_binding_mismatch')
+  // Before execution purpose reached question claims, the daemon marked an
+  // unverified submission stopped while the host recognized the Factory
+  // delivery as succeeded. Admit only that exact persisted old contract.
+  // The fixed error is a local predicate; it never enters output or logs.
+  const legacySubmitted = legacyQuestion && entry.state === 'stopped' &&
+    entry.error === 'Submitted, but no verify command ran; the work is unverified' && entry.questionResumeState === 'accepted' &&
+    entry.deliverableCommit === undefined && assignment.kind === 'implement' && assignment.policy?.readOnly !== true &&
+    ['codex', 'claude_code'].includes(assignment.harness) && assignment.factoryExecuteKind === undefined &&
+    assignment.factoryCheck === undefined && assignment.verifyCommand === undefined && assignment.requireSessionResume === true &&
+    assignment.preserveQuestionWorktree === true && assignment.questionId === legacyQuestion.questionId &&
+    assignment.continuesRunId === legacyQuestion.continuesRunId && assignment.resumeSessionId === input.producerSessionId
+  if (entry.stopReason !== 'submitted' || (entry.state !== 'succeeded' && !legacySubmitted)) fail('journal_state_mismatch')
   const terminal = new Set(['succeeded', 'failed', 'stopped', 'cancelled'])
   if (Object.values(entries).some(value => !terminal.has(value?.state))) fail('active_run')
   const common = path.join(input.repoPath, '.git'), worktrees = path.join(common, 'worktrees')
@@ -101,7 +116,7 @@ if (process.argv[1] === '--mikka-retained-delivery-probe') {
     const input = JSON.parse(Buffer.from(process.argv[2], 'base64url').toString('utf8'))
     process.stdout.write(JSON.stringify({ ok: true, value: await inspectRetainedDeliverable(input) }))
   } catch (error) {
-    const codes = new Set(['scope_mismatch', 'path_mismatch', 'journal_unavailable', 'journal_mismatch', 'active_run', 'git_unavailable', 'git_filter',
+    const codes = new Set(['scope_mismatch', 'path_mismatch', 'journal_unavailable', 'journal_binding_mismatch', 'journal_state_mismatch', 'active_run', 'git_unavailable', 'git_filter',
       'dirty', 'index_flags', 'checkpoint_mismatch', 'changed'].map(code => `retained_delivery_${code}`))
     process.stdout.write(JSON.stringify({ ok: false, code: codes.has(error?.message) ? error.message : 'retained_delivery_probe_failed' }))
   }

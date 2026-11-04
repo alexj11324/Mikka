@@ -22,6 +22,9 @@ export interface RetainedDeliverableScope {
   producerRunId: string
   producerSessionId: string
   producerReportDigest: string
+  /** A historical submitted question omitted the host execution purpose.
+   * Only a server-successful, unverified delivery may admit its stopped journal. */
+  legacyQuestionSubmission?: { questionId: string; continuesRunId: string }
   deviceId: string
   deviceRepoId: string
   repoPath: string
@@ -149,10 +152,19 @@ export async function retainedDeliverableForRecovery(tx: DeliverableRecoveryQuer
   try { patch = gunzipSync(row.patch, { maxOutputLength: MAX_RETAINED_DIFF_BYTES }) }
   catch { return null }
   if (!patch.length) return null
+  const continuation = producer.questionContinuation
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+  const legacyQuestionSubmission = producer.kind === 'implement' && producer.agentDefinition?.readOnly !== true &&
+    producer.report.verify?.status === 'not_run' && producer.report.publish?.pushed !== true &&
+    continuation?.requireSessionResume === true && continuation.originSessionId === producer.sessionId &&
+    typeof continuation.questionId === 'string' && uuid.test(continuation.questionId) &&
+    typeof producer.continuesRunId === 'string' && uuid.test(producer.continuesRunId) && producer.continuesRunId !== producer.id
+    ? { questionId: continuation.questionId as string, continuesRunId: producer.continuesRunId as string } : undefined
   const scope: RetainedDeliverableScope = {
     ownerId: task.userId, workspaceId: row.workspaceId, botId: task.botId, taskId: task.id, issueId: task.issueId,
     sourceEventId: task.sourceEventId, revision: task.revision, attemptId: task.attemptId, candidateId: candidate.id,
     producerRunId: producer.id, producerSessionId: producer.sessionId, producerReportDigest: questionFingerprint(producer.report),
+    ...(legacyQuestionSubmission ? { legacyQuestionSubmission } : {}),
     deviceId: producer.deviceId, deviceRepoId: producer.deviceRepoId, repoPath: row.repoPath, worktreePath: producer.worktreePath,
     sourceCommit: producer.report.sourceCommit, machineRunId: review.id, sandboxId: row.sandboxId,
     machineOperationId: row.machineOperationId, machineSnapshotId: row.machineSnapshotId,

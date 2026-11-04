@@ -51,7 +51,8 @@ const defaultRuntime: RetainedDeliverableRuntime = {
   log: line => console.warn(line),
 }
 const PROBE_CODES = new Set(['scope_mismatch', 'path_mismatch', 'journal_unavailable', 'journal_mismatch', 'active_run',
-  'git_unavailable', 'git_filter', 'dirty', 'index_flags', 'checkpoint_mismatch', 'changed', 'probe_failed'].map(code => `retained_delivery_${code}`))
+  'journal_binding_mismatch', 'journal_state_mismatch', 'git_unavailable', 'git_filter', 'dirty', 'index_flags',
+  'checkpoint_mismatch', 'changed', 'probe_failed'].map(code => `retained_delivery_${code}`))
 
 /** The task store supplies its canonical owner/access lock. No caller-provided
  * path, VM id or report becomes authority without the full locked DB reread. */
@@ -157,6 +158,7 @@ export function createRetainedDeliverableObserver(pool: Pool,
           producerRunId: scope.producerRunId, producerSessionId: scope.producerSessionId, deviceId: scope.deviceId,
           deviceRepoId: scope.deviceRepoId, issueId: scope.issueId, repoPath: scope.repoPath, worktreePath: scope.worktreePath,
           sourceCommit: scope.sourceCommit, checkpoint: { files: scope.checkpoint.files, patchSha256: scope.checkpoint.patchSha256, patchBytes: scope.checkpoint.patchBytes },
+          ...(scope.legacyQuestionSubmission ? { legacyQuestionSubmission: scope.legacyQuestionSubmission } : {}),
         })
         return sandbox.commands.run(`/usr/bin/timeout --signal=TERM --kill-after=2s ${(executionMs / 1000).toFixed(3)}s ${command}`,
           { user: 'user', timeoutMs: requestTimeoutMs, requestTimeoutMs, signal: AbortSignal.timeout(requestTimeoutMs) })

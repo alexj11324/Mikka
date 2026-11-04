@@ -20,7 +20,7 @@ import { factoryCheckIndependent } from './check-independence'
 import { sweepFactoryWatchdog } from './watchdog'
 import { approvalEvidence } from './evidence'
 import { factoryEventId } from './event-id'
-import type { ObserveRetainedDeliverable, RetainedDeliverableScope, RetainedDeliverableSnapshot } from './deliverable-recovery'
+import { retainedDeliverableForRecovery, type ObserveRetainedDeliverable, type RetainedDeliverableScope, type RetainedDeliverableSnapshot } from './deliverable-recovery'
 import { readDeliverableSnapshotReceipt, resolveFactoryCandidateSha } from './deliverable-snapshot'
 
 const url = process.env.E2E_DATABASE_URL
@@ -88,6 +88,7 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       await pool.query(`UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1`, [producerRunId, JSON.stringify({ questionId: originalQuestionId, originRunId: originId, originSessionId: 'original-native-session', requireSessionResume: true, requiredSandboxId: sandboxId })])
       await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,"stopReason","sessionId","agentDefinition",prompt)
         SELECT $2,"userId","issueId","agentId","deviceId","deviceRepoId","botId",'stopped','asked_human','original-native-session',"agentDefinition",'Original question' FROM agent_runs WHERE id=$1`, [producerRunId, originId])
+      await pool.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [producerRunId, originId])
       await pool.query('UPDATE factory_attempts SET position=2,ordinal=2 WHERE id=$1', [producerAttemptId])
       await pool.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId","sessionId",reason) VALUES($1,$2,'execute',1,1,'waiting',$3,'original-native-session','Original question')`, [originAttemptId, blocked.id, originId])
       await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1::uuid,'owner',$2,'run_question',$1::text,'{}')`, [originalQuestionEventId, botId])
@@ -254,6 +255,33 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       assert.deepEqual(f.counts(), { observedCount: 1, releaseCount: 1, dispatchCount: 1, startCount: 1 })
     })
 
+    await t.test('only the successful unverified question producer receives the exact legacy journal allowance', async () => {
+      const f = await fixture(), client = await pool.connect()
+      try {
+        const eligible = await retainedDeliverableForRecovery(client, f.task)
+        assert.deepEqual(eligible?.scope.legacyQuestionSubmission, { questionId: f.originalQuestionId, continuesRunId: f.originId })
+        const changes: [string, unknown[]][] = [
+          [`UPDATE agent_runs SET kind='plan' WHERE id=$1`, [f.producerRunId]],
+          [`UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",'{readOnly}','true') WHERE id=$1`, [f.producerRunId]],
+          [`UPDATE agent_runs SET report=jsonb_set(report,'{verify,status}','"passed"') WHERE id=$1`, [f.producerRunId]],
+          [`UPDATE agent_runs SET report=report||'{"publish":{"pushed":true}}'::jsonb WHERE id=$1`, [f.producerRunId]],
+          [`UPDATE agent_runs SET "continuesRunId"=NULL WHERE id=$1`, [f.producerRunId]],
+          [`UPDATE agent_runs SET "continuesRunId"=id WHERE id=$1`, [f.producerRunId]],
+          [`UPDATE agent_runs SET "questionContinuation"=jsonb_set("questionContinuation",'{questionId}','"invalid"') WHERE id=$1`, [f.producerRunId]],
+          [`UPDATE agent_runs SET "questionContinuation"=jsonb_set("questionContinuation",'{requireSessionResume}','false') WHERE id=$1`, [f.producerRunId]],
+          [`UPDATE agent_runs SET status='stopped' WHERE id=$1`, [f.producerRunId]],
+        ]
+        for (const [sql, args] of changes) {
+          await client.query('BEGIN')
+          try {
+            await client.query(sql, args)
+            assert.equal((await retainedDeliverableForRecovery(client, f.task))?.scope.legacyQuestionSubmission, undefined, sql)
+          } finally { await client.query('ROLLBACK') }
+        }
+        assert.equal(f.counts().observedCount, 0)
+      } finally { client.release() }
+    })
+
     for (const fault of ['owner', 'revision', 'answered', 'active', 'lease', 'passed', 'accepted', 'uncertain_operation', 'existing_snapshot'] as const) await t.test(`eligibility refuses ${fault} before VM observation`, async () => {
       const f = await fixture()
       if (fault === 'answered') await pool.query('UPDATE factory_questions SET "answerId"=$2 WHERE id=$1', [f.question.id, randomUUID()])
@@ -290,13 +318,15 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       assert.equal((await pool.query('SELECT "workerLeaseId" FROM thread_machines WHERE "runId"=$1', [f.oldReviewId])).rows[0].workerLeaseId, null)
     })
 
-    for (const fault of ['task_revision', 'question_revision', 'checkpoint', 'lease_transfer'] as const) await t.test(`final CAS refuses ${fault} drift after provider I/O`, async () => {
+    for (const fault of ['task_revision', 'question_revision', 'checkpoint', 'producer_predecessor', 'producer_question', 'lease_transfer'] as const) await t.test(`final CAS refuses ${fault} drift after provider I/O`, async () => {
       const f = await fixture()
       const replacement = randomUUID()
       const observe = f.observer({ duringObservation: async () => {
         if (fault === 'task_revision') await pool.query('UPDATE factory_tasks SET revision=revision+1 WHERE id=$1', [f.task.id])
         if (fault === 'question_revision') await pool.query('UPDATE factory_questions SET revision=revision+1 WHERE id=$1', [f.question.id])
         if (fault === 'checkpoint') await pool.query('UPDATE run_checkpoints SET "updatedAt"=now() WHERE "runId"=$1', [f.producerRunId])
+        if (fault === 'producer_predecessor') await pool.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [f.producerRunId, f.oldReviewId])
+        if (fault === 'producer_question') await pool.query(`UPDATE agent_runs SET "questionContinuation"=jsonb_set("questionContinuation",'{questionId}',to_jsonb($2::text)) WHERE id=$1`, [f.producerRunId, randomUUID()])
         if (fault === 'lease_transfer') await pool.query('UPDATE thread_machines SET "workerLeaseId"=$2 WHERE "runId"=$1', [f.oldReviewId, replacement])
       } })
       const result = await handleFactory(f.human(observe), f.request)
