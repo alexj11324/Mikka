@@ -1,5 +1,6 @@
 import 'server-only'
 import type { Pool } from 'pg'
+import { machineChanged } from '@/lib/live/computer-state'
 
 export interface AccountCloudProvider {
   kill(workspaceId: string, sandboxId: string): Promise<void>
@@ -57,6 +58,7 @@ export async function cleanupOwnedCloudMachines(ownerId: string, database: Pool,
         if (row.deviceId) await client.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "userId"=$1 AND "boundDeviceId"=$2', [ownerId, row.deviceId])
         await client.query('UPDATE cloud_machines SET state=\'error\',"runtimeReady"=false,"workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "workspaceId"=$1 AND "ownerId"=$2', [machine.workspaceId, ownerId])
       }
+      if (!pending) await machineChanged(client, database, ownerId, machine.workspaceId)
       await client.query('COMMIT')
     } catch { await client.query('ROLLBACK'); reasons.add('cloud_runtime_cleanup_required'); continue }
     finally { client.release() }

@@ -175,6 +175,12 @@ function liveChannel(owner, workspace) {
 function liveSocket(channel, exp, Client = WebSocket) {
   const socket = new Client(`${origin.replace('http:', 'ws:')}/v1/live/${channel}/socket`, ticket(`live:${channel}`, exp))
   sockets.add(socket)
+  socket.liveReady = event(socket, 'message').then(message => {
+    const value = JSON.parse(message.data)
+    assert.equal(value.type, 'live_ready'); assert.equal(value.version, 1)
+    assert.ok(value.kinds.includes('approved_writes') && value.kinds.includes('approved_write'))
+    return value
+  })
   return socket
 }
 
@@ -203,13 +209,16 @@ test('real browser tabs multicast within one owner/workspace and isolate peers a
   const first = liveSocket(channel), second = liveSocket(channel)
   const elsewhere = liveSocket(otherWorkspace), peer = liveSocket(otherOwner)
   await Promise.all([first, second, elsewhere, peer].map(socket => event(socket, 'open')))
+  await Promise.all([first, second, elsewhere, peer].map(socket => socket.liveReady))
   const elsewhereEvents = [], peerEvents = []
   elsewhere.addEventListener('message', message => elsewhereEvents.push(JSON.parse(message.data)))
   peer.addEventListener('message', message => peerEvents.push(JSON.parse(message.data)))
-  const invalidation = { kind: 'factory_task', id: deviceId }
-  const received = [event(first, 'message'), event(second, 'message')]
-  await pushLive(channel, [invalidation])
-  assert.deepEqual((await Promise.all(received)).map(message => JSON.parse(message.data)), [invalidation, invalidation])
+  for (const kind of ['factory_task', 'approved_writes', 'approved_write']) {
+    const invalidation = { kind, id: deviceId }
+    const received = [event(first, 'message'), event(second, 'message')]
+    await pushLive(channel, [invalidation])
+    assert.deepEqual((await Promise.all(received)).map(message => JSON.parse(message.data)), [invalidation, invalidation])
+  }
   assert.equal(first.readyState, WebSocket.OPEN)
   const marker = { kind: 'thread', id: '769840bb-21d8-4949-995b-873aeedcc464' }
   const markers = [event(elsewhere, 'message'), event(peer, 'message')]
@@ -225,7 +234,7 @@ test('an expired browser ticket cannot receive later invalidations on an existin
   const exp = Math.ceil(Date.now() / 1000) + 1
   const socket = liveSocket(channel, exp, WireWebSocket)
   try {
-    await event(socket, 'open')
+    await event(socket, 'open'); await socket.liveReady
     const messages = []
     socket.addEventListener('message', message => messages.push(message.data))
     await delay(Math.max(0, exp * 1000 - Date.now()) + 20)
