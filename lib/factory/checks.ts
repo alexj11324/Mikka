@@ -1,5 +1,5 @@
 import { factoryRunBotMatches } from './run-scope'
-import { cloudTaskTarget } from '../computer/cloud-task-target'
+import { cloudTaskTarget, ownedCloudTaskTarget } from '../computer/cloud-task-target'
 import type { Pool, PoolClient } from "pg";
 import { isDeepStrictEqual } from 'node:util';
 import { orchestratorSettings } from '@mikka/protocol/orchestrator';
@@ -250,6 +250,8 @@ export async function configureFactoryCheck(
   const cloudTarget = row.deviceKind === 'cloud' && row.runtimeBotId && row.runtimeWorkspaceId
     ? await cloudTaskTarget(tx, { userId: task.userId, workspaceId: row.runtimeWorkspaceId },
       { botId: row.runtimeBotId, agentId: row.agentId, deviceRepoId: row.deviceRepoId })
+      ?? await ownedCloudTaskTarget(tx, { userId: task.userId, workspaceId: row.runtimeWorkspaceId },
+        { botId: row.runtimeBotId, agentId: row.agentId, deviceRepoId: row.deviceRepoId, runId, issueId: task.issueId })
     : null
   if (
     !row.enabled ||

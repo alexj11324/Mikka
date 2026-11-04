@@ -409,7 +409,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       const input = { botId:personState.botId,issueId,agentId:parent.agentId,deviceRepoId:parent.repoId,title:'Inspect delivery',body:'Read the existing result.',
         model:source.agentDefinition.model,subscriptionBindingId:source.agentDefinition.subscription.bindingId,readOnly:true,idempotencyKey:`factory:${pending.task.attemptId}` }
       await client.query(`UPDATE cloud_machines SET state=$3 WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId, parentState])
-      const otherBot = randomUUID(), otherDevice = randomUUID()
+      const otherBot = randomUUID(), otherDevice = randomUUID(), unmappedRepo = randomUUID()
+      await client.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") SELECT $1,"deviceId",$2,$3 FROM agents WHERE id=$4`, [unmappedRepo,actor.userId,`/fixture/unmapped/${unmappedRepo}`,parent.agentId])
       await client.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled) VALUES ($1,$2,'Other device','cloud',true)`, [otherDevice,actor.userId])
       await client.query('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)', [otherBot,actor.workspaceId,actor.userId,'Another Bot'])
       await client.query('INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,2)', [otherBot,actor.workspaceId,actor.userId])
@@ -418,6 +419,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       await assert.rejects(queueCloudRun(appPool, {...actor,workspaceId:randomUUID()}, input, client), {status:409})
       await assert.rejects(queueCloudRun(appPool, actor, {...input,botId:otherBot}, client), {status:409}, 'a different Bot cannot borrow this runtime')
       for (const [label, sql, values] of [
+        ['missing Bot runtime', 'DELETE FROM bot_cloud_runtimes WHERE "botId"=$1', [personState.botId]],
+        ['unmapped private repository', 'UPDATE bot_cloud_runtimes SET "repoId"=$2 WHERE "botId"=$1', [personState.botId,unmappedRepo]],
         ['disabled device', 'UPDATE devices SET enabled=false WHERE id=(SELECT "deviceId" FROM agents WHERE id=$1)', [parent.agentId]],
         ['different repository device', 'UPDATE device_repos SET "deviceId"=$2 WHERE id=$1', [parent.repoId, otherDevice]],
         ['archived Bot', 'UPDATE bots SET "archivedAt"=now() WHERE id=$1', [personState.botId]],

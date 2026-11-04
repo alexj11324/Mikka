@@ -33,6 +33,8 @@ import {
 } from "./dispatch";
 import { createFactoryClaim } from "./claim";
 import { createFactoryQuestions, questionReference } from "./questions/store";
+import { queueCloudQuestionContinuation } from "./questions/queue-continuation";
+import { cloudTaskTarget, ownedCloudTaskTarget } from "../computer/cloud-task-target";
 import { humanQuestionAnswerSchema, questionFingerprint } from './questions/contract';
 import { factoryEventId } from './event-id';
 import { handleFactoryQuestion } from "./questions/http";
@@ -891,6 +893,111 @@ test(
             );
           },
         );
+      for (const phase of ['review', 'verify'] as const) for (const machineState of ['running', 'paused'] as const)
+        await t.test(phase + ' question continuation keeps its owned ' + machineState + ' VM, issue, candidate and original session without a parent runtime', async () => {
+          const pending = await pendingReview();
+          let origin = await start(pending.task);
+          if (phase === 'verify') {
+            await terminal(origin.runId, 'review-' + pending.task.id);
+            await reconcile('owner');
+            origin = await start((await state(pending.task.id)).task);
+          }
+          const childDevice = randomUUID(), childRepo = randomUUID(), connectionId = randomUUID(), credentialId = randomUUID();
+          const nativeSession = 'original-question-' + origin.runId, sandboxId = 'retained-question-' + origin.runId;
+          await db.query("INSERT INTO devices(id,\"ownerId\",name,kind,enabled,\"lastSeenAt\",harnesses) VALUES($1,'owner','Retained task','cloud',true,now()-interval '1 hour','[{\"harness\":\"codex\",\"installed\":true}]')", [childDevice]);
+          await db.query("INSERT INTO device_repos(id,\"deviceId\",\"userId\",\"repoPath\",\"remoteUrl\",\"baseBranch\",\"verifyCommand\") VALUES($1,$2,'owner','/retained','/fixture/repo','main',$3)", [childRepo, childDevice, command]);
+          await db.query("INSERT INTO byos_connections(id,\"ownerId\",\"workspaceId\",state,epoch,provider,\"secretName\",\"providerSubject\",\"secretDigest\") VALUES($1,'owner',$2,'connected',1,'codex','synthetic-retained-question-' || $1::uuid::text,'synthetic-subject',repeat('a',64))", [connectionId, billingWorkspaceId]);
+          await db.query("INSERT INTO byos_bindings(id,\"ownerId\",\"workspaceId\",\"consumerId\",\"connectionId\",\"connectionRevision\",route,\"modelId\") VALUES($1,'owner',$2,$3,$4,1,'codex_cli','fixture-model')", [credentialId, billingWorkspaceId, agentId, connectionId]);
+          const definition = freezeWorkerDefinition({ harness: 'codex', instructions: 'Frozen fixture', prompt: 'Original check', parent: null, executionId: null, model: 'fixture-model', subscription: { id: credentialId, modelId: 'fixture-model', route: 'codex_cli' } });
+          await db.query("UPDATE agent_runs SET \"deviceId\"=$2,\"deviceRepoId\"=$3,\"agentDefinition\"=$4,status='stopped',\"stopReason\"='asked_human',\"sessionId\"=$5,report=$6 WHERE id=$1",
+            [origin.runId, childDevice, childRepo, JSON.stringify(definition), nativeSession, JSON.stringify({ question: { questionId: randomUUID(), kind: 'decision', question: 'Which acceptance path?', options: ['A', 'B'] } })]);
+          await db.query('INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES($1,$2,$3,\'owner\')', [origin.runId, coordinatorBot, billingWorkspaceId]);
+          await db.query('INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId") VALUES($1,$2,\'owner\',$3,$4,\'codex\',$5,$6,$7,$8,$9)',
+            [origin.runId, billingWorkspaceId, coordinatorBot, pending.task.issueId, randomUUID(), machineState, sandboxId, childDevice, childRepo]);
+          // This is the task-device reassignment normally performed when the
+          // first check VM is created. No parent metadata or provider is mocked.
+          await db.query("UPDATE factory_attempts SET output=jsonb_set(jsonb_set(output,'{check,deviceRepoId}',to_jsonb($2::text)),'{check,environment}',to_jsonb($3::text)) WHERE id=$1",
+            [origin.task.attemptId, childRepo, 'device:' + childDevice]);
+          const cloudDispatch = createFactoryDispatch(db, store, async (tx, owner, input, botId, context) => {
+            const result = await queueCloudQuestionContinuation(tx, owner, input, botId, context);
+            assert.ok(result, 'The normal cloud continuation must not use a new-run fallback');
+            return result;
+          });
+          const cloudQuestions = createFactoryQuestions(db, authorize, store, cloudDispatch, assignment);
+          const q = await cloudQuestions.record('owner', origin.runId);
+          const browserSessionId = randomUUID();
+          await db.query('INSERT INTO "session"(id,"userId",token,"expiresAt","createdAt","updatedAt") VALUES($1,\'owner\',$2,now()+interval \'1 hour\',now(),now())', [browserSessionId, randomUUID()]);
+          const beforeRun = (await db.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=$1', [origin.runId])).rows;
+          const beforeCandidate = (await db.query('SELECT to_jsonb(c) AS candidate FROM factory_candidates c WHERE id=$1', [pending.task.candidateId])).rows;
+          const answer = { reference: questionReference(q), answerId: randomUUID(), text: 'A' };
+          const resumed = await cloudQuestions.answer({ source: 'human', userId: 'owner', sessionId: browserSessionId }, answer);
+          const run = (await db.query('SELECT * FROM agent_runs WHERE id=$1', [resumed.continuationRunId])).rows[0];
+          assert.equal(run.issueId, pending.task.issueId);
+          assert.equal(run.botId, coordinatorBot);
+          assert.equal(run.deviceId, childDevice);
+          assert.equal(run.deviceRepoId, childRepo);
+          assert.equal(run.questionContinuation.originSessionId, nativeSession);
+          assert.equal(run.questionContinuation.requiredSandboxId, sandboxId);
+          assert.equal(run.agentDefinition.definitionDigest, definition.definitionDigest);
+          assert.deepEqual(run.agentDefinition.subscription, definition.subscription);
+          assert.equal((await state(pending.task.id)).task.candidateId, pending.task.candidateId);
+          assert.deepEqual((await db.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=$1', [origin.runId])).rows, beforeRun);
+          assert.deepEqual((await db.query('SELECT to_jsonb(c) AS candidate FROM factory_candidates c WHERE id=$1', [pending.task.candidateId])).rows, beforeCandidate);
+          assert.deepEqual((await db.query('SELECT state,"sandboxId" FROM thread_machines WHERE "runId"=$1', [origin.runId])).rows[0], { state: 'ended', sandboxId: null });
+          assert.deepEqual((await db.query('SELECT state,"sandboxId","deviceId","repoId" FROM thread_machines WHERE "runId"=$1', [run.id])).rows[0], { state: machineState, sandboxId, deviceId: childDevice, repoId: childRepo });
+          const tx = await db.connect();
+          try {
+            await tx.query('BEGIN');
+            const actor = { userId: 'owner', workspaceId: billingWorkspaceId };
+            const input = { botId: coordinatorBot, agentId, deviceRepoId: childRepo, runId: run.id, issueId: run.issueId };
+            assert.equal(await cloudTaskTarget(tx, actor, input), null, 'A task VM cannot be used as a fresh parent runtime');
+            assert.equal((await ownedCloudTaskTarget(tx, actor, input))?.deviceId, childDevice);
+            for (const bad of [{ ...input, botId: randomUUID() }, { ...input, runId: origin.runId }, { ...input, runId: randomUUID() }, { ...input, agentId: randomUUID() }, { ...input, deviceRepoId: repoId }, { ...input, issueId: randomUUID() }])
+              assert.equal(await ownedCloudTaskTarget(tx, actor, bad), null);
+            assert.equal(await ownedCloudTaskTarget(tx, { ...actor, userId: 'other' }, input), null);
+            assert.equal(await ownedCloudTaskTarget(tx, { ...actor, workspaceId: randomUUID() }, input), null);
+            const otherBot = randomUUID();
+            await tx.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,\'owner\',\'Other fixture bot\')', [otherBot, billingWorkspaceId]);
+            for (const [sql, params] of [
+              ['UPDATE computer_run_bindings SET "botId"=$2 WHERE "runId"=$1', [run.id, otherBot]],
+              ['UPDATE thread_machines SET "botId"=$2 WHERE "runId"=$1', [run.id, otherBot]],
+              ['UPDATE agent_runs SET "botId"=$2 WHERE id=$1', [run.id, otherBot]],
+              ['UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [run.id, deviceId]],
+              ['UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1', [run.id, repoId]],
+              ['UPDATE thread_machines SET "deviceId"=$2 WHERE "runId"=$1', [run.id, deviceId]],
+              ['UPDATE thread_machines SET "repoId"=$2 WHERE "runId"=$1', [run.id, repoId]],
+              ['UPDATE devices SET enabled=false WHERE id=$1', [childDevice]],
+              ["UPDATE thread_machines SET state='ended',\"sandboxId\"=NULL WHERE \"runId\"=$1", [run.id]],
+            ] as const) {
+              await tx.query('SAVEPOINT custody');
+              await tx.query(sql, [...params]);
+              assert.equal(await ownedCloudTaskTarget(tx, actor, input), null, sql);
+              await tx.query('ROLLBACK TO SAVEPOINT custody');
+            }
+            // Admission preserves a paused/stale task VM. Its worker still has
+            // to reconnect before claim; this is independent of parent state.
+            const cloudClaim = createFactoryClaim(store, cloudQuestions, assignment);
+            await tx.query('SAVEPOINT worker_not_ready');
+            await assert.rejects(cloudClaim(tx, 'owner', childDevice, run.id, new Date(Date.now() + 60000).toISOString()),
+              (error: unknown) => error instanceof FactoryError && error.code === 'factoryQuestionContinuationUnavailable');
+            await tx.query('ROLLBACK TO SAVEPOINT worker_not_ready');
+            await tx.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [childDevice]);
+            await tx.query("UPDATE thread_machines SET state='running' WHERE \"runId\"=$1", [run.id]);
+            const extras = await cloudClaim(tx, 'owner', childDevice, run.id, new Date(Date.now() + 60000).toISOString());
+            assert.equal(extras.requireSessionResume, true);
+            assert.equal(extras.resumeSessionId, nativeSession);
+            assert.equal(extras.baseBranch, sha);
+            assert.deepEqual(extras.factoryCheck, { stage: phase, inferCommand: false, reportOnly: false });
+            assert.equal(extras.verifyCommand, command);
+          } finally { await tx.query('ROLLBACK'); tx.release(); }
+          const replayed = await cloudQuestions.answer({ source: 'human', userId: 'owner', sessionId: browserSessionId }, answer);
+          assert.equal(replayed.continuationRunId, run.id);
+          assert.equal(replayed.replayed, true);
+          await terminal(run.id, nativeSession);
+          if (phase === 'verify') await toolChunks(run.id);
+          await reconcile('owner');
+          assert.equal((await state(pending.task.id)).task.stage, phase === 'review' ? 'verify' : 'approval');
+        });
       for (const phase of ["review", "verify"] as const)
         for (const failed of [false, true])
           await t.test(

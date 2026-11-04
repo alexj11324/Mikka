@@ -231,7 +231,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (!refreshRuntime) await revalidateExecutionIdentity(client, run)
     exactQuestionMachine = run.questionContinuation?.requireSessionResume === true
     const repositoryTask = Boolean(run.remoteUrl)
-    const template = repositoryTask ? taskTemplate(run.runHarness) : computerTemplate()
+    const freshTemplate = () => repositoryTask ? taskTemplate(run.runHarness) : computerTemplate()
     let machine = (await client.query('SELECT * FROM thread_machines WHERE "runId"=$1 FOR UPDATE', [runId])).rows[0]
     if (!refreshRuntime && !exactQuestionMachine && run.issueId && machine?.sandboxId && machine.deviceId &&
       machine.ownerId === actor.userId && machine.workspaceId === actor.workspaceId && machine.issueId === run.issueId &&
@@ -295,7 +295,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
         throw error
       })
       refreshPhase = 'admission'
-      if (!state) machine = await replaceGoneSandbox(client, runId, template)
+      if (!state) machine = await replaceGoneSandbox(client, runId, freshTemplate())
       else if (state.state !== 'paused' && !refreshRuntime) {
         const current = await provider.connect(machine.sandboxId, actor.workspaceId)
         if ((await current.files.read('/opt/mikka/worker-source-sha', {user:'root'})).trim() !== process.env.MIKKA_CLOUD_WORKER_SHA) throw new ComputerError(409, 'Worker version mismatch; refresh the idle task runtime')
@@ -317,6 +317,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       // with Mikka's worker, decision 2026-11-01-2335): the daemon clones its admitted
       // remote and creates the task worktree from the configured base branch.
       // Non-repository work starts from the official desktop template too.
+      const template = freshTemplate()
       const adopted = run.issueId ? await adoptTaskMachine(client, actor, runId, run, template) : null
       if (adopted) { machine = adopted; retainedSandboxId = adopted.sandboxId }
       else {
@@ -363,7 +364,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (refreshRuntime && !connected) throw new ComputerError(409, 'Original task machine unavailable')
     if (machine.sandboxId && !connected) {
       // The sandbox is gone at the provider: recreate this thread from its official template.
-      machine = await replaceGoneSandbox(pool, runId, template, leaseId)
+      machine = await replaceGoneSandbox(pool, runId, freshTemplate(), leaseId)
       if (!machine) throw new ComputerError(409, 'Thread provisioning cancelled')
     }
     const sandbox = connected ?? await provider.create(machine.snapshotId, machine.operationId, { application: 'mikka-thread', workspaceId: actor.workspaceId, runId }, actor.userId)
