@@ -1,0 +1,276 @@
+{
+  "sourceCommit": "238da19ca6b465c258ffe69a953092835119d8ef",
+  "sourceTree": "8d52cedc17719053f618604d8847ab296c74a2fa",
+  "baseCommit": "a3694a390613d044837df8f7f838f6f6d8ae0c2b",
+  "localGates": {
+    "liveDatabase": {
+      "passed": 31,
+      "failed": 0
+    },
+    "deviceGateway": {
+      "groups": [
+        9,
+        39,
+        9
+      ],
+      "failed": 0
+    },
+    "typegen": {
+      "steps": 146,
+      "workflows": 6
+    },
+    "typecheckExit": 0,
+    "lintExit": 0,
+    "productionBuildExit": 0
+  },
+  "checks": [
+    {
+      "name": "UI policy (strict)",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158002/job/126745097859",
+      "completedAt": "2026-11-04T17:34:44Z"
+    },
+    {
+      "name": "Production build and browser interactions",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158002/job/126744966413",
+      "completedAt": "2026-11-04T17:34:25Z"
+    },
+    {
+      "name": "analytics-ssr",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878157866/job/126744785700",
+      "completedAt": "2026-11-04T17:34:03Z"
+    },
+    {
+      "name": "deploy",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "skipped",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158010/job/126743766895",
+      "completedAt": "2026-11-04T17:31:49Z"
+    },
+    {
+      "name": "Analytics SSR (full)",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878157866/job/126743375257",
+      "completedAt": "2026-11-04T17:33:57Z"
+    },
+    {
+      "name": "Cloud credential access (OIDC)",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "skipped",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158002/job/126743372735",
+      "completedAt": "2026-11-04T17:31:01Z"
+    },
+    {
+      "name": "Database checks (4/4)",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158002/job/126743370638",
+      "completedAt": "2026-11-04T17:34:20Z"
+    },
+    {
+      "name": "Database checks (2/4)",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158002/job/126743370630",
+      "completedAt": "2026-11-04T17:34:19Z"
+    },
+    {
+      "name": "Database checks (3/4)",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158002/job/126743370620",
+      "completedAt": "2026-11-04T17:34:09Z"
+    },
+    {
+      "name": "Core unit checks",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158002/job/126743370581",
+      "completedAt": "2026-11-04T17:34:00Z"
+    },
+    {
+      "name": "Database checks (1/4)",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158002/job/126743370539",
+      "completedAt": "2026-11-04T17:33:55Z"
+    },
+    {
+      "name": "Source checks",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158002/job/126743370482",
+      "completedAt": "2026-11-04T17:32:11Z"
+    },
+    {
+      "name": "Integration unit checks",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158002/job/126743370336",
+      "completedAt": "2026-11-04T17:34:37Z"
+    },
+    {
+      "name": "Daemon checks",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158002/job/126743370253",
+      "completedAt": "2026-11-04T17:34:03Z"
+    },
+    {
+      "name": "publish",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "skipped",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878157863/job/126743345246",
+      "completedAt": "2026-11-04T17:30:58Z"
+    },
+    {
+      "name": "validate",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "skipped",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878157863/job/126743343616",
+      "completedAt": "2026-11-04T17:30:58Z"
+    },
+    {
+      "name": "check",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "skipped",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878157863/job/126743342122",
+      "completedAt": "2026-11-04T17:30:58Z"
+    },
+    {
+      "name": "test",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878157863/job/126743265412",
+      "completedAt": "2026-11-04T17:30:57Z"
+    },
+    {
+      "name": "Changed files",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158002/job/126743264739",
+      "completedAt": "2026-11-04T17:31:01Z"
+    },
+    {
+      "name": "test",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158010/job/126743264729",
+      "completedAt": "2026-11-04T17:31:49Z"
+    },
+    {
+      "name": "backend",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878157989/job/126743264635",
+      "completedAt": "2026-11-04T17:32:05Z"
+    },
+    {
+      "name": "Local driver (Linux Xvfb)",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878157989/job/126743264446",
+      "completedAt": "2026-11-04T17:31:13Z"
+    },
+    {
+      "name": "runtime",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158017/job/126743264375",
+      "completedAt": "2026-11-04T17:32:33Z"
+    },
+    {
+      "name": "Browser tests (before merge)",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878158020/job/126743264189",
+      "completedAt": "2026-11-04T17:30:54Z"
+    },
+    {
+      "name": "Changed files",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878157866/job/126743264171",
+      "completedAt": "2026-11-04T17:31:02Z"
+    },
+    {
+      "name": "Local driver (macOS permissions, nonblocking)",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878157989/job/126743264000",
+      "completedAt": "2026-11-04T17:31:15Z"
+    },
+    {
+      "name": "custody",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878157926/job/126743263542",
+      "completedAt": "2026-11-04T17:35:42Z"
+    },
+    {
+      "name": "ssh",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41878157851/job/126743263127",
+      "completedAt": "2026-11-04T17:36:14Z"
+    },
+    {
+      "name": "GitGuardian Security Checks",
+      "head": "238da19ca6b465c258ffe69a953092835119d8ef",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/runs/126743249030",
+      "completedAt": "2026-11-04T17:31:33Z"
+    }
+  ],
+  "visualReview": {
+    "reviewedAt": "2026-11-04 18:07:11 UTC",
+    "count": 12,
+    "findings": [
+      "Task title, document and loaded thread row are visible on every task screenshot.",
+      "Desktop task and conversation panels remain separate and readable.",
+      "Mobile task and conversation screens fit the viewport; long titles use the existing truncation treatment.",
+      "English and Chinese interface labels and both themes render with no layout overlap."
+    ],
+    "limits": [
+      "Display records are synthetic; they are not provider execution receipts.",
+      "Screenshots do not demonstrate production delivery, live WebSocket delivery or production egress savings.",
+      "Initial screenshot timing exposed an unloaded thread list on three desktop captures; the driver now waits for the real loaded list. Product source was not changed to obtain these final captures."
+    ]
+  },
+  "cleanup": "Only reserved synthetic task/run resources were removed. TestAccountPool pairs were released dirty and quarantined."
+}
