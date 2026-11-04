@@ -18,7 +18,7 @@ mock.module(u('../lib/document-sync.ts'), { namedExports: { DocumentSync: class 
 const stub = (name: string) => () => <div data-stub={name} />
 for (const [file, names] of [
   ['issue-detail-actions', ['IssueDetailActions']], ['issue-description-history', ['IssueDescriptionHistory']], ['issue-relations', ['IssueRelations']],
-  ['issue-members', ['IssueMembers']], ['issue-detail-properties', ['IssueDetailProperties']], ['issue-threads', ['IssueThreads', 'ThreadEvents']],
+  ['issue-members', ['IssueMembers']], ['issue-detail-properties', ['IssueDetailProperties']], ['issue-threads', ['IssueThreads']],
   ['issue-thread-panel', ['IssueThreadPanel']], ['factory-acceptance', ['FactoryAcceptance', 'FactoryAcceptancePanel']], ['issue-activity-feed', ['IssueActivityFeed']],
 ] as const) mock.module(u(`../components/workspace/${file}.tsx`), { namedExports: Object.fromEntries(names.map(name => [name, stub(name)])) })
 mock.module(u('../components/workspace/issue-detail-header.tsx'), { namedExports: { IssueDetailHeader: ({ saveLabel }: { saveLabel: string }) => <header data-save-label={saveLabel}>{saveLabel}</header> } })

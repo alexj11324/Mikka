@@ -35,6 +35,7 @@
     "./platform": "./src/platform.ts",
     "./preview": "./src/preview.ts",
     "./profile": "./src/profile.ts",
+    "./provider-failure": "./src/provider-failure.ts",
     "./quota": "./src/quota.ts",
     "./agent-policy": "./src/agent-policy.ts",
     "./policy-snapshot": "./src/policy-snapshot.ts",

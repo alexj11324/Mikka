@@ -15,6 +15,13 @@ on:
       - 'scripts/e2b/**'
       - 'lib/computer/official-runtime.ts'
       - '.github/workflows/e2b-official-runtime.yml'
+      # This issue's acceptance requires a same-application-SHA runtime proof.
+      - '.github/workflows/model-provider-fallback-acceptance.yml'
+      - 'scripts/acceptance/model-provider-fallback.mjs'
+      - 'scripts/acceptance/model-provider-fallback.test.mjs'
+      - '.github/workflows/project-decisions-acceptance.yml'
+      - 'scripts/acceptance/project-decisions.mjs'
+      - 'scripts/acceptance/project-decisions.test.mjs'
   pull_request:
     paths: *runtime_paths
   workflow_dispatch:

@@ -23,10 +23,18 @@ export class ToolApprovalGate {
   private readonly stop = new AbortController()
   private checking?: Promise<boolean>
   private reason?: 'device_lost'
+  private readonly monitors = new Set<{ check?: () => Promise<unknown>; running: boolean; dirty: boolean; intervalMs: number }>()
+  private timer?: ReturnType<typeof setInterval>
+  private intervalMs?: number
+  private monitoring?: Promise<void>
+  private dirty = false
   constructor(readonly runId: string, private readonly host: ToolApprovalHost) {}
   revoke(reason?: 'device_lost') {
     if (this.revoked) return
     this.reason = reason
+    clearInterval(this.timer)
+    this.timer = undefined
+    this.monitors.clear()
     this.stop.abort()
   }
   get revoked(): boolean { return this.stop.signal.aborted }
@@ -45,6 +53,64 @@ export class ToolApprovalGate {
         .finally(() => { this.checking = undefined })
     }
     return this.checking
+  }
+
+  /** One background liveness check per run. Extra credential checks share its
+   * fresh result for that tick only; actual operations still call checkLive.
+   * Slow credential I/O must never delay the next liveness check. */
+  monitor(check?: () => Promise<unknown>, intervalMs = 1000): () => void {
+    if (this.revoked) return () => {}
+    if (!Number.isFinite(intervalMs) || intervalMs <= 0 || intervalMs > 1000) throw new Error('Run monitor interval unavailable')
+    const monitor = { check, running: false, dirty: false, intervalMs }
+    this.monitors.add(monitor)
+    this.scheduleMonitor()
+    return () => { this.monitors.delete(monitor); this.scheduleMonitor() }
+  }
+  private scheduleMonitor() {
+    const intervalMs = this.monitors.size ? Math.min(...[...this.monitors].map(monitor => monitor.intervalMs)) : undefined
+    if (intervalMs === this.intervalMs) return
+    clearInterval(this.timer)
+    this.intervalMs = intervalMs
+    this.timer = intervalMs === undefined ? undefined : setInterval(() => this.requestCheck(false), intervalMs)
+    this.timer?.unref()
+  }
+  /** A push invalidates an in-flight check as well as a settled one. Generic
+   * work frames may be lost, so the one-second safety timer stays enabled. */
+  invalidate() {
+    this.requestCheck(true)
+  }
+  private requestCheck(invalidated: boolean) {
+    if (this.revoked || !this.monitors.size) return
+    if (this.monitoring && !invalidated) return
+    this.dirty = true
+    if (this.monitoring) return
+    // A real operation may have started the shared HTTP request before this
+    // push, while no background check existed yet. Its old success cannot
+    // satisfy the invalidation; finish it, then issue one fresh request.
+    let olderOperation = invalidated && this.checking !== undefined
+    this.monitoring = (async () => {
+      while (this.dirty && !this.revoked && this.monitors.size) {
+        this.dirty = false
+        if (!await this.checkLive()) { this.revoke(); return }
+        if (olderOperation) { olderOperation = false; this.dirty = true; continue }
+        for (const monitor of this.monitors) {
+          if (!monitor.check) continue
+          monitor.dirty = true
+          if (monitor.running) continue
+          monitor.running = true
+          void (async () => {
+            while (monitor.dirty && !this.revoked && this.monitors.has(monitor)) {
+              monitor.dirty = false
+              await monitor.check!()
+            }
+          })().catch(() => { if (this.monitors.has(monitor)) this.revoke() })
+            .finally(() => { monitor.running = false })
+        }
+      }
+    })().finally(() => {
+      this.monitoring = undefined
+      if (this.dirty) this.requestCheck(true)
+    })
   }
 }
 

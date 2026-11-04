@@ -1,4 +1,5 @@
 import { prepareCloudQuestionRecovery, queueCloudQuestionContinuation, wakeCloudQuestionContinuation } from './questions/queue-continuation';
+import { queueLocalQuestionContinuation } from './questions/queue-local-continuation';
 import 'server-only';
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { automaticFactoryDispatch } from './automatic-dispatch'
@@ -37,7 +38,7 @@ export function factoryRuntimeForBot(botId: string | null, lifecycle: FactoryLif
   const store = createFactoryStore(pool,factoryAuthorize,botId,{...lifecycle,independent:factoryCheckIndependent,gates:{...factoryCheckGates,approval:approvalGate,publish:publishGate,monitor:monitorGate,...lifecycle.gates}});
   const validate = validateCheck ?? ((tx:PoolClient,task:import('./store').FactoryTask,id:string) => task.stage === 'monitor' ? factoryMonitorDispatchAssignment(tx,task.userId,id) : factoryCheckAssignment(tx,task.userId,id));
   const dispatch = createFactoryDispatch(pool,store,
-    async (tx,userId,input,scopeBot,context) => await queueCloudQuestionContinuation(tx,userId,input,scopeBot,context) ?? queueFactoryRun(tx,userId,input,scopeBot,context), {
+    async (tx,userId,input,scopeBot,context) => await queueCloudQuestionContinuation(tx,userId,input,scopeBot,context) ?? await queueLocalQuestionContinuation(tx,userId,input,scopeBot,context) ?? queueFactoryRun(tx,userId,input,scopeBot,context), {
       lockAdmission: async (tx,userId,input) => { await lockCliAgentPolicy(tx,userId,input.agentId,botId); },
       replay: defaultFactoryDispatchAdapters.replay,
       configure: {

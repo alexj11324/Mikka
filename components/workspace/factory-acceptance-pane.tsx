@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useLiveKey } from '@/hooks/use-live-key'
+import { useFormatter, useTranslations } from 'next-intl'
 import { CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, Laptop, RefreshCw, Server } from 'lucide-react'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -62,9 +63,12 @@ type Derived = { state: AcceptanceState; active?: unknown; publication?: unknown
 
 /** List, header and pane read the same ledger and the same state machine, so they always agree. A code candidate is accepted by merging its PR; a skill is enabled. */
 export function useAcceptance(task: FactoryTask) {
-  const { data: ledger, mutate: reload, error: ledgerError } = useSWR<Ledger>(`/api/factory/tasks/${task.id}/approval?view=ledger`, request, { refreshInterval: 5000 })
-  const { data: detail } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${task.id}`, request)
-  // The list keeps polling while a recovered candidate passes its checks. An
+  const ledgerKey = `/api/factory/tasks/${task.id}/approval?view=ledger`
+  const detailKey = `/api/factory/tasks/${task.id}`
+  const { data: ledger, mutate: reload, error: ledgerError } = useSWR<Ledger>(ledgerKey, request, { refreshInterval: 0 })
+  const { data: detail } = useSWR<AcceptanceDetail>(detailKey, request, { refreshInterval: 0 })
+  useLiveKey('factory_task', task.id, [ledgerKey, detailKey], detail?.liveWorkspaceId ?? null)
+  // The list refreshes while a recovered candidate passes its checks. An
   // older cached detail with that same candidate must not hide newer approval.
   const current = detail?.task && detail.task.candidateId === task.candidateId &&
     (typeof task.revision !== 'number' || (typeof detail.task.revision === 'number' && detail.task.revision >= task.revision)) ? detail.task : task
@@ -122,7 +126,9 @@ function CandidateCard({ candidate, detail, environment, isSkill }: { candidate?
 
 /** Frame 06 header: the machine that produced the candidate. Reads the same task detail as the pane. */
 export function CandidateMachine({ taskId }: { taskId: string }) {
-  const { data } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${taskId}`, request)
+  const key = `/api/factory/tasks/${taskId}`
+  const { data } = useSWR<AcceptanceDetail>(key, request, { refreshInterval: 0 })
+  useLiveKey('factory_task', taskId, [key], data?.liveWorkspaceId ?? null)
   const machine = data?.delivery?.machine
   if (!machine?.name) return null
   const Icon = machine.kind === 'cloud' ? Cloud : Laptop
@@ -154,6 +160,7 @@ const RESULT_WORD = { review: { passed: 'reviewPassed', failed: 'reviewFailed' }
 /** Figma `Factory/ResultRow`: the independent review or verify, its verdict and its thread. */
 function ResultLine({ row, onOpenThread }: { row: ResultRow; onOpenThread?: (runId: string) => void }) {
   const t = useTranslations('FactoryAcceptance')
+  const format = useFormatter()
   const done = row.status === 'passed' || row.status === 'failed'
   const word = row.status === 'passed' || row.status === 'failed' ? t(RESULT_WORD[row.stage][row.status]) : t('inProgress')
   const meta = row.stage === 'verify' ? (row.total ? `${row.passed}/${row.total}` : null) : row.total - row.passed > 0 ? t('opinions', { count: String(row.total - row.passed) }) : null
@@ -168,6 +175,11 @@ function ResultLine({ row, onOpenThread }: { row: ResultRow; onOpenThread?: (run
       ? <Button variant="secondary" size="xs" onClick={() => onOpenThread(row.runId!)}><Verdict passed={done ? row.status === 'passed' : null} />{thread}</Button>
       : <span className="text-xs text-muted-foreground">{thread}</span>}
     {row.sha && <span className="font-mono text-xs text-muted-foreground">{shortSha(row.sha)}</span>}
+    {row.commandSources?.map(source => <div key={`${source.runId}:${source.recoveryEventId}`} className="flex w-full min-w-0 flex-wrap items-center gap-2 pl-6 text-xs text-muted-foreground">
+      <span>{t('questionCommandSource')}</span>
+      <time dateTime={source.observedAt}>{format.dateTime(new Date(source.observedAt), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
+      {onOpenThread && <Button variant="secondary" size="xs" onClick={() => onOpenThread(source.runId)}>{t('sourceExecution')}</Button>}
+    </div>)}
   </li>
 }
 
@@ -185,6 +197,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   const { data: evidence, error: evidenceError } = useSWR<Evidence>(task.stage === 'approval' || acceptance?.superseded || acceptance?.state === 'merged' ? `/api/factory/tasks/${task.id}/approval` : null, request)
   // Checks and the delivery header (B8/B9/B11) are read-only extras; the pane works without them.
   const { data: detail, mutate: reloadDetail } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${task.id}`, request)
+  useLiveKey('factory_task', task.id, task.stage === 'approval' || acceptance?.superseded || acceptance?.state === 'merged' ? [`/api/factory/tasks/${task.id}/approval`] : [], detail?.liveWorkspaceId ?? null)
   const detailRevision = detail?.task?.revision
   useEffect(() => {
     if (typeof task.revision === 'number' && typeof detailRevision === 'number' && detailRevision < task.revision)

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { before, mock, test } from 'node:test'
+import { createContext, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { parseUnifiedDiff } from '@/lib/thread-changes'
 
@@ -8,6 +9,14 @@ import { parseUnifiedDiff } from '@/lib/thread-changes'
 const zh = JSON.parse(readFileSync(new URL('../../messages/zh-CN.json', import.meta.url), 'utf8')) as Record<string, Record<string, string>>
 mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string, values: Record<string, unknown> = {}) =>
   zh[namespace][key].replace(/\{(\w+)\}/g, (_, name: string) => String(values[name])) } })
+// @pierre/diffs draws inside a shadow root on the client; record what each file hands it.
+type Drawn = { fileDiff: import('@pierre/diffs').FileDiffMetadata; options: Record<string, unknown> }
+let drawn: Drawn[] = []
+mock.module('@pierre/diffs/react', { namedExports: { FileDiff: (props: Drawn & { renderHeaderPrefix?: () => ReactNode; renderHeaderMetadata?: () => ReactNode }) => {
+  drawn.push({ fileDiff: props.fileDiff, options: props.options })
+  return <div data-diffs-stub=""><div slot="header-prefix">{props.renderHeaderPrefix?.()}</div>{props.renderHeaderMetadata && <div slot="header-metadata">{props.renderHeaderMetadata()}</div>}</div>
+}, VirtualizerContext: createContext(undefined) } })
+mock.module('next-themes', { namedExports: { useTheme: () => ({ resolvedTheme: 'dark' }) } })
 let ThreadChangesView: typeof import('./thread-changes')['ThreadChangesView']
 before(async () => { ({ ThreadChangesView } = await import('./thread-changes')) })
 
@@ -31,28 +40,38 @@ new file mode 100644
 `)
 
 function render(props: Partial<Parameters<typeof ThreadChangesView>[0]> = {}) {
+  drawn = []
   return renderToStaticMarkup(<ThreadChangesView changes={changes} wrap="wrap" onWrapChange={() => {}} filesOpen={false} onFilesOpenChange={() => {}} {...props} />)
 }
 
-test('long lines wrap by default: the code wraps, no horizontal scroller', () => {
+test('long lines wrap by default; 横向滚动 hands the renderer a scrolling layout', () => {
   const html = render()
   assert.match(html, /data-wrap="wrap"/)
-  assert.match(html, /whitespace-pre-wrap/)
-  assert.doesNotMatch(html, /thread-changes-hscroll/)
-  // Each line has one row; a wrapped line's continuation has no number of its own.
-  assert.equal(html.match(/data-slot="thread-changes-line"/g)?.length, 6)
+  assert.deepEqual(drawn.map(file => file.options.overflow), ['wrap', 'wrap'])
+  render({ wrap: 'scroll' })
+  assert.deepEqual(drawn.map(file => file.options.overflow), ['scroll', 'scroll'])
+  // The long-line control shows which one is on.
+  const scrolling = render({ wrap: 'scroll' })
+  assert.match(scrolling, /data-wrap="scroll"/)
+  assert.match(scrolling, /aria-label="长行"/)
+  assert.match(scrolling, />换行</)
+  assert.match(scrolling, />横向滚动</)
 })
 
-test('横向滚动 keeps each line on one row and scrolls the code, numbers staying put', () => {
-  const html = render({ wrap: 'scroll' })
-  assert.match(html, /data-wrap="scroll"/)
-  assert.match(html, /data-slot="thread-changes-hscroll"/)
-  assert.match(html, /sticky left-0/)
-  assert.doesNotMatch(html, /whitespace-pre-wrap/)
-  // The long-line control shows which one is on.
-  assert.match(html, /aria-label="长行"/)
-  assert.match(html, />换行</)
-  assert.match(html, />横向滚动</)
+test('each file is drawn by the library with its own look: stacked lines, the theme Mikka is in, a sticky header', () => {
+  render()
+  for (const { options } of drawn) {
+    assert.equal(options.diffStyle, 'unified')
+    assert.equal(options.themeType, 'dark')
+    assert.equal(options.stickyHeader, true)
+    // Pierre's WebAssembly highlighter: the default Shiki engine takes ~4 s on a 3,000-line change.
+    assert.equal(options.preferredHighlighter, 'highlights')
+    assert.equal(options.collapsed, false)
+    // Pierre's default themes: nothing of Mikka's old diff styling is passed in.
+    assert.equal(options.theme, undefined)
+    assert.equal(options.unsafeCSS, undefined)
+  }
+  assert.deepEqual(drawn.map(file => [file.fileDiff.name, file.fileDiff.type]), [['app/pricing/table.tsx', 'change'], ['lib/pricing/competitors.ts', 'new']])
 })
 
 test('the file list is folded into 「N 个文件 +x −y」 until opened', () => {
@@ -68,13 +87,19 @@ test('the file list is folded into 「N 个文件 +x −y」 until opened', () =
   assert.match(open, /aria-label="文件列表"/)
 })
 
-test('lines the diff left out read 「N 行未修改」; files follow in order with sticky headers', () => {
+test('lines the diff left out stay out, with each hunk at its own line numbers; files follow in order', () => {
   const html = render()
-  assert.deepEqual([...html.matchAll(/data-slot="thread-changes-unchanged"[^>]*>([^<]+)</g)].map(match => match[1]), ['18 行未修改', '19 行未修改'])
-  assert.doesNotMatch(html, /未显示/)
+  const [table, created] = drawn.map(file => file.fileDiff.hunks)
+  // 18 lines before line 19, then old lines 21–39 between the hunks.
+  assert.deepEqual(table.map(hunk => [hunk.collapsedBefore, hunk.deletionStart, hunk.deletionCount, hunk.additionStart, hunk.additionCount]), [[18, 19, 2, 19, 2], [19, 40, 1, 40, 1]])
+  assert.deepEqual(created.map(hunk => [hunk.collapsedBefore, hunk.additionStart, hunk.additionCount]), [[0, 1, 1]])
   const order = [...html.matchAll(/<section aria-label="([^"]+)"/g)].map(match => match[1])
   assert.deepEqual(order, ['app/pricing/table.tsx', 'lib/pricing/competitors.ts'])
-  assert.equal(html.match(/sticky -top-3/g)?.length, 2)
+})
+
+test('each file header carries its fold control in the library header', () => {
+  const html = render()
+  assert.deepEqual([...html.matchAll(/<div slot="header-prefix"><button[^>]*aria-expanded="true"[^>]*aria-label="([^"]+)"/g)].map(match => match[1]), ['收起 table.tsx', '收起 competitors.ts'])
 })
 
 test('read-only: nothing to edit, comment on, run or mark as viewed', () => {

@@ -36,8 +36,8 @@ import { chatPollInterval } from '@/lib/coordinator/chat-poll-interval'
 import { useLiveCitations } from './use-live-citations'
 import type { CoordinatorLiveReply } from '@/lib/coordinator-stream-client'
 import { ThreadCard } from './thread-card'
-import { ReplyActivity } from './reply-activity'
-import { Shimmer } from '@/components/ai-elements/shimmer'
+import { ReplyActivity, ReplyWaiting } from './reply-activity'
+import { replySegments, type ReplySegment } from '@/lib/coordinator/reply-segments'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { PendingActions } from './pending-actions'
 import { SubagentLoginNeeds } from './subagent-login-needs'
@@ -94,6 +94,12 @@ function streamedItem(reply: CoordinatorLiveReply): Chat['items'][number] {
     ...(reply.tools?.length || reply.thinking ? { activity: { tools: reply.tools ?? [], thought: Boolean(reply.thinking) } } : {}) }
 }
 
+/** A reply's rows top to bottom (lib/coordinator/reply-segments.ts); its thinking, when it thought, leads them. */
+function replyRows(item: Chat['items'][number], live: CoordinatorLiveReply | undefined): ReplySegment[] {
+  const rows = replySegments(item.text, item.activity?.tools ?? [])
+  return (item.activity?.thought || live?.thinking) && rows[0]?.kind !== 'tools' ? [{ kind: 'tools', tools: [] }, ...rows] : rows
+}
+
 /** A live reply's thinking as the activity shows it: still thinking, or the whole seconds it took (at least one). */
 function liveThinking(reply: CoordinatorLiveReply) {
   return reply.thinking && { active: reply.thinking.since !== undefined, seconds: Math.max(1, Math.round(reply.thinking.ms / 1000)), ...(reply.thinking.text ? { text: reply.thinking.text } : {}) }
@@ -140,6 +146,11 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const reconnectStream = useRef<() => void>(() => {})
   // A poll names the version it shows; an unchanged chat comes back as its live state only (lib/coordinator/chat-poll.ts).
   const shown = useRef<{ chat?: Chat; fullReadAt: number }>({ fullReadAt: 0 })
+  // SWR re-reads a function interval only when its running timer fires, so a send would wait out the quiet 30 s
+  // before the turn's stream connects. A number from the latest chat restarts the timer as soon as the turn starts,
+  // whichever hook read it: the bot list and the workspace read this same key with their own fetchers, and a
+  // revalidation they win never calls this hook's onSuccess.
+  const [pollEvery, setPollEvery] = useState(() => chatPollInterval(undefined))
   const { data, mutate, error: loadError } = useSWR<Chat>(coordinatorChatKey(botId), async () => {
     const known = knownVersion(shown.current.chat, shown.current.fullReadAt, Date.now())
     const previous = shown.current.chat
@@ -148,10 +159,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     if (!('unchanged' in next) && (next.metadataRefresh || next.after === undefined)) shown.current.fullReadAt = Date.now()
     return mergeChat(shown.current.chat, next)
   }, {
-    refreshInterval: chatPollInterval,
+    refreshInterval: pollEvery,
     onSuccess: () => reconnectStream.current(),
   })
-  useEffect(() => { shown.current.chat = data }, [data])
+  useEffect(() => { shown.current.chat = data; setPollEvery(chatPollInterval(data)) }, [data])
   const [loadingHistory, setLoadingHistory] = useState(false)
   async function loadHistory() {
     if (!data?.historyBefore || loadingHistory) return
@@ -399,11 +410,13 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
                     {/* A tapped 建议 card: the same card, then only what it adds (R-21, R-40). */}
                     {item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} />}
-                    {/* Before the words, as they happened: thinking, then each tool. The same slot live and stored, so storing keeps it. */}
-                    {item.activity && <ReplyActivity tools={item.activity.tools} thinking={live ? liveThinking(live) : undefined} thought={item.activity.thought} reasoningAt={item.activity.reasoningAt} botId={botId} />}
-                    {item.text && (item.from === 'coordinator'
-                      ? <ReplyAnswer value={live ? null : answers.get(item.position) ?? null}><CoordinatorReply text={item.text} citations={live ? live.committedThrough === undefined ? liveCitations.streaming : liveCitations.settled : citations} isStreaming={Boolean(live && live.committedThrough === undefined)} /></ReplyAnswer>
-                      : <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap"><PersonWords text={item.text} before={<>{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.notes?.map(note => <BrowserNoteLine key={note.n} note={note} />)}</>} /></BubbleContent></Bubble>)}
+                    {/* Top to bottom as it happened: thinking, then the words and each tool after the words said before it.
+                        The same rows live and stored, so storing keeps them in place. */}
+                    {item.from === 'coordinator'
+                      ? <ReplyAnswer value={live ? null : answers.get(item.position) ?? null}>{replyRows(item, live).map((segment, index) => segment.kind === 'tools'
+                        ? <ReplyActivity key={index} tools={segment.tools} {...(index === 0 && item.activity ? { thinking: live ? liveThinking(live) : undefined, thought: item.activity.thought, reasoningAt: item.activity.reasoningAt } : {})} botId={botId} live={Boolean(live && live.committedThrough === undefined)} />
+                        : <CoordinatorReply key={index} text={segment.text} citations={live ? live.committedThrough === undefined ? liveCitations.streaming : liveCitations.settled : citations} isStreaming={Boolean(live && live.committedThrough === undefined)} />)}</ReplyAnswer>
+                      : item.text && <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap"><PersonWords text={item.text} before={<>{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.notes?.map(note => <BrowserNoteLine key={note.n} note={note} />)}</>} /></BubbleContent></Bubble>}
                     {item.artifacts.length > 0 && <div className={cn('flex flex-col gap-2', embedded ? 'items-start gap-1.5' : 'w-full')}>
                       {item.artifacts.flatMap(id => { const artifact = data?.artifacts[id]; return artifact ? [embedded
                         ? <ArtifactChip key={id} artifact={artifact} active={id === embedded.activeArtifactId} onOpen={openArtifact} />
@@ -436,9 +449,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 </span>
               </MessageContent></Message>
             </MessageScrollerItem>}
-            {/* The working line fades in (R-37: opacity on a duration). It leaves at once: an exit would keep its height
-                after the reply lands and pull the scroll position back (coordinator-scroll.spec). */}
-            {data?.working && items.length > 0 && <p role="status" className={cn('flex items-center gap-2 text-sm text-muted-foreground', workingEnter && ENTER)}><Shimmer as="span">{t('working')}</Shimmer></p>}
+            {/* Before the reply has anything to show: the Trace's Thinking row. Once the reply streams, its own Trace takes
+                over. It fades in (R-37: opacity on a duration) and leaves at once: an exit would keep its height after the
+                reply lands and pull the scroll position back (coordinator-scroll.spec). */}
+            {data?.working && items.length > 0 && !stream.replies.length && !(lastSaid?.from === 'coordinator' && lastSaid.text) && <div className={cn('flex', workingEnter && ENTER)}><ReplyWaiting /></div>}
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <AnimatePresence initial={false}>

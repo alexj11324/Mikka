@@ -170,17 +170,42 @@ async function takeoverTarget(run: { id: string; userId: string; agentId: string
  * machine that does not have their worktree.
  */
 export async function latestCheckpoint(retryOf: string): Promise<RunCheckpoint | null> {
-  const chain = [retryOf]
-  while (chain.length < MAX_RUN_ATTEMPTS) {
-    const [row] = await db.select({ retryOf: agentRuns.retryOf }).from(agentRuns).where(eq(agentRuns.id, chain.at(-1)!)).limit(1)
-    if (!row?.retryOf) break
-    chain.push(row.retryOf)
+  // Changing providers does not spend an infrastructure retry. Bound its
+  // history separately, while retaining the existing three-attempt limit.
+  const maxProviderAttempts = 128, visited = new Set<string>()
+  type SnapshotSource = Pick<Run, 'id' | 'retryOf' | 'userId' | 'issueId' | 'botId' | 'deviceRepoId' | 'stopReason' | 'report'> & {
+    repoOwner: string | null; repoPath: string | null; remoteUrl: string | null
+    baseCommit: string | null; patch: Buffer | null; files: number | null; takenAt: Date | null; unavailableReason: string | null
   }
-  const { rows: [checkpoint] } = await pool.query<{ baseCommit: string; patch: Buffer; files: number; takenAt: Date; unavailableReason: string | null }>(
-    'SELECT "baseCommit",patch,files,"updatedAt" AS "takenAt","unavailableReason" FROM run_checkpoints WHERE "runId"=ANY($1::uuid[]) ORDER BY array_position($1::uuid[],"runId") LIMIT 1', [chain])
-  if (!checkpoint) return null
-  return { baseCommit: checkpoint.baseCommit, patch: checkpoint.patch.toString('base64'), files: checkpoint.files, takenAt: checkpoint.takenAt.toISOString(),
-    ...(checkpoint.unavailableReason ? { unavailableReason: 'too_large' as const } : {}) }
+  let source: SnapshotSource | undefined, current: string | null = retryOf
+  let providerAttempts = 0, infrastructureAttempts = 0
+  while (current && !visited.has(current)) {
+    visited.add(current)
+    const { rows }: { rows: SnapshotSource[] } = await pool.query<SnapshotSource>(`SELECT r.id,r."retryOf",r."userId",r."issueId",r."botId",r."deviceRepoId",r."stopReason",r.report,
+      repo."userId" AS "repoOwner",repo."repoPath",repo."remoteUrl",c."baseCommit",c.patch,c.files,c."updatedAt" AS "takenAt",c."unavailableReason"
+      FROM agent_runs r LEFT JOIN device_repos repo ON repo.id=r."deviceRepoId"
+      LEFT JOIN run_checkpoints c ON c."runId"=r.id AND c."userId"=r."userId" WHERE r.id=$1`, [current])
+    const row: SnapshotSource | undefined = rows[0]
+    if (!row || (row.deviceRepoId && row.repoOwner !== row.userId)) break
+    const origin: SnapshotSource = source ?? row
+    source = origin
+    if (row.userId !== origin.userId || row.issueId !== origin.issueId || row.botId !== origin.botId) break
+    if (row.deviceRepoId !== origin.deviceRepoId && !(row.repoPath && origin.repoPath && row.repoPath === origin.repoPath &&
+      repositoryBindingMatches(row.repoPath, row.remoteUrl, { allowFile: daemonTestMode(process.env) }) &&
+      repositoryBindingMatches(origin.repoPath, origin.remoteUrl, { allowFile: daemonTestMode(process.env) }))) break
+    if (row.stopReason === 'provider_failure') {
+      if (++providerAttempts > maxProviderAttempts) break
+      // A failed final upload invalidates any older tree, even when reached
+      // through a later infrastructure retry which has no checkpoint yet.
+      if (row.report?.providerCheckpoint === 'unavailable') break
+    } else if (++infrastructureAttempts > MAX_RUN_ATTEMPTS) break
+    if (row.baseCommit && row.patch && row.files !== null && row.takenAt) {
+      return { baseCommit: row.baseCommit, patch: row.patch.toString('base64'), files: row.files, takenAt: row.takenAt.toISOString(),
+        ...(row.unavailableReason ? { unavailableReason: 'too_large' as const } : {}) }
+    }
+    current = row.retryOf
+  }
+  return null
 }
 
 type Run = typeof agentRuns.$inferSelect
@@ -288,10 +313,12 @@ async function cloudTarget(run: Run): Promise<CloudTarget | null> {
 /** The lost run's own model when the cloud runs its Agent; else 优先使用的模型's first cloud entry for that harness. */
 async function cloudRetryModel(run: Run, cloud: CloudTarget) {
   const { chooseCloudRunModel } = await import('@/lib/computer/run-model')
-  if (run.agentDefinition?.harness === cloud.harness && run.agentDefinition?.model) return { model: run.agentDefinition.model }
+  if (run.agentDefinition?.harness === cloud.harness && run.agentDefinition?.model) return { model: run.agentDefinition.model,
+    ...(run.agentDefinition.modelDispatch ? { modelDispatch: structuredClone(run.agentDefinition.modelDispatch) } : {}),
+    ...(run.agentDefinition.policyCeiling ? { policyCeiling: structuredClone(run.agentDefinition.policyCeiling) } : {}) }
   const chosen = await chooseCloudRunModel(pool, { ownerId: run.userId, workspaceId: cloud.workspaceId, botId: run.botId }, cloud.agentId, cloud.harness)
   if ('error' in chosen) throw new Error('No cloud model')
-  return chosen
+  return { ...chosen, ...(run.agentDefinition?.policyCeiling ? { policyCeiling: structuredClone(run.agentDefinition.policyCeiling) } : {}) }
 }
 
 /**
@@ -331,6 +358,11 @@ export async function startThreadMachine(actor: { userId: string; workspaceId: s
   } catch (error) {
     const { RetainedTaskMachineUnavailable } = await import('@/lib/cloud-computer/thread-machines')
     if (error instanceof RetainedTaskMachineUnavailable) return { state: 'unavailable' as const, reason: 'retained_runtime' as const }
+    // A concurrent durable handoff owns this run's provisioning lease. Its
+    // first VM is not a failed attempt, and only that lease may finish/clean it.
+    const { ComputerError } = await import('@/lib/computer/store')
+    if (error instanceof ComputerError && error.status === 409 && error.message === 'Thread provisioning in progress')
+      return { state: 'unavailable' as const, reason: 'provisioning' as const }
     // A question continuation cannot replace its original native session VM.
     // Keep the committed answer/run and placement for the same answer's retry.
     const [continuation] = await db.select({ question: agentRuns.questionContinuation }).from(agentRuns)

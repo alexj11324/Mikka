@@ -73,6 +73,8 @@ export interface ServerLink {
   /** Authenticated policy validation before repository/setup effects, including resume. */
   verifyRunPolicy?(assignment: RunAssignment, signal: AbortSignal): Promise<unknown>
   prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
+  /** A gateway hint only; every live run rechecks its current authority. */
+  invalidateRunControls?(): void
   /** The server's Decisions API on behalf of one run (server-decision.ts). */
   decide?: ServerDecide
   /** Optional host-only adapter for the claimed run; never model-supplied. */
@@ -286,6 +288,8 @@ export class MemoryServer {
         return { owner: "external", reason: "device_offline" }
       case "quota_exhausted":
         return { owner: "external", reason: "quota_exhausted" }
+      case "provider_failure":
+        return { owner: "external", reason: "provider_failure" }
       case "cancelled":
         return { owner: "human", reason: "cancelled" }
     }

@@ -14,6 +14,7 @@ import type {
   RunPolicy,
   RunSkill,
   StopReason,
+  ProviderFailure,
 } from "@mikka/protocol"
 
 import type { ToolApprovalGate } from "../agents/tool-approval"
@@ -38,6 +39,8 @@ export interface ExitEvent {
   report?: AgentReport
   /** A failed session ended on the CLI's quota or rate-limit error (runs/quota-exhausted.ts). */
   quota?: QuotaSignal
+  /** Terminal model-provider failure, after the CLI's bounded retry loop. Never model/tool output. */
+  providerFailure?: ProviderFailure
 }
 
 /** The agent's part of the handoff report; the daemon adds the rest. */
@@ -69,6 +72,8 @@ export interface SessionOptions {
   github?: { endpoint: string; repository: string; branch?: string; runToken: string; issueId: string }
   /** Trusted server-issued app entries (one MCP server each), never model-selected. */
   apps?: RunApps
+  /** Trusted claimed run MCP; independent of optional app connections. */
+  mcp?: import('../agents/run-apps').RunMcp
   /** Fixed container paths supplied by the hosted runner, never by the assignment. */
   githubRuntime?: { nodeBinary: string; ghBinary: string }
   /** Trusted, run-bound host gate. Never populated from model input. */

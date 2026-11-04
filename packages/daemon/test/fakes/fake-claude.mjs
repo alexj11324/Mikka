@@ -51,6 +51,7 @@ const out = (event) =>
     `${JSON.stringify({ session_id: sessionId, ...event })}\n`
   )
 let n = 0
+let providerPrompts = 0
 const text = (value) =>
   out({
     type: "assistant",
@@ -85,6 +86,19 @@ lines.on("line", async (line) => {
   const asked = JSON.parse(line)?.message?.content?.[0]?.text
   if (typeof asked !== "string") return
   const message = asked
+  if (message.startsWith('PROVIDER_DIAGNOSTIC ')) {
+    const scenario = JSON.parse(message.slice('PROVIDER_DIAGNOSTIC '.length))
+    writeFileSync(`${process.env.CLAUDE_CONFIG_DIR}/provider-prompts.json`, JSON.stringify({ prompts: ++providerPrompts }))
+    if (scenario.retry) out({ type: 'system', subtype: 'api_retry', attempt: 1, max_retries: 2, retry_delay_ms: 1, error_status: 503, error: 'server_error' })
+    if (scenario.inspectRetries) text(JSON.stringify({ retries: process.env.CLAUDE_CODE_MAX_RETRIES, watchdog: process.env.CLAUDE_CODE_RETRY_WATCHDOG }))
+    if (scenario.modelText) text(scenario.modelText)
+    if (scenario.toolError) out({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'fixture-tool', is_error: true, content: scenario.toolError }] } })
+    if (scenario.failure) {
+      if (scenario.assistantError) out({ type: 'assistant', error: scenario.assistantError, message: { id: 'provider', content: [{ type: 'text', text: scenario.failure.result ?? 'private provider diagnostic' }] } })
+      out({ type: 'result', subtype: 'success', is_error: true, total_cost_usd: 0, usage: { input_tokens: 0, output_tokens: 0 }, ...scenario.failure })
+    } else result()
+    return
+  }
   if (message === 'TOOL_PROGRESS_TEST') {
     const progress = { type: 'tool_progress', tool_use_id: 'ci-watch', tool_name: 'Bash', parent_tool_use_id: null, elapsed_time_seconds: 11, uuid: randomUUID() }
     out({ ...progress, session_id: 'foreign-session' })

@@ -1,20 +1,23 @@
 'use client'
 
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { getSingularPatch, Virtualizer } from '@pierre/diffs'
+import { FileDiff, VirtualizerContext } from '@pierre/diffs/react'
 import { useTranslations } from 'next-intl'
 import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
+import { useDiffOptions } from '@/components/agents/file-diff'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
-import { DIFF_WRAP_KEY, diffWrapFrom, splitPath, type ChangedFile, type DiffBlock, type DiffLine, type DiffWrap, type ThreadChanges } from '@/lib/thread-changes'
+import { DIFF_WRAP_KEY, diffWrapFrom, filePatch, splitPath, type ChangedFile, type DiffWrap, type ThreadChanges } from '@/lib/thread-changes'
 
 /**
  * A thread's 改动 tab (Figma 820:4843), read-only: no terminal, no inline
  * comments, nothing to edit. The file list is folded into 「N 个文件 +x −y」
- * until opened; the files follow one after another, each header sticking to the
- * top while its lines scroll; long lines wrap unless the person picked 横向滚动.
+ * until opened; the files follow one after another, each drawn by @pierre/diffs
+ * with its header sticking to the top while its lines scroll; long lines wrap
+ * unless the person picked 横向滚动.
  */
 export function ThreadChangesPane({ changes, stateKey = 'changes' }: { changes: ThreadChanges; stateKey?: string }) {
   const [wrap, setWrap] = useDiffWrap()
@@ -40,6 +43,13 @@ export function ThreadChangesView({ changes, wrap, onWrapChange, filesOpen, onFi
   const sections = useRef(new Map<string, HTMLElement>())
   const [closed, setClosed] = useViewState<string[]>(`${stateKey}:closed-files`, [])
   const scroll = useViewScroll<HTMLDivElement>(stateKey)
+  const [virtualizer] = useState(() => typeof window === 'undefined' ? undefined : new Virtualizer())
+  useLayoutEffect(() => {
+    const node = scroll.current
+    if (!node || !virtualizer) return
+    virtualizer.setup(node)
+    return () => virtualizer.cleanUp()
+  }, [scroll, virtualizer])
   return <div data-slot="thread-changes" data-wrap={wrap} className="flex min-h-0 flex-1 flex-col">
     <div className="flex shrink-0 items-center gap-2 px-3 py-2">
       <Button variant="ghost" size="sm" className="-ml-1.5 gap-1.5 px-1.5" aria-expanded={filesOpen} aria-controls={listId} onClick={() => onFilesOpenChange(!filesOpen)}>
@@ -63,14 +73,19 @@ export function ThreadChangesView({ changes, wrap, onWrapChange, filesOpen, onFi
         </Button>
       </li> })}
     </ul>}
-    <div ref={scroll} data-slot="thread-changes-scroll" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-      {changes.files.map(file => {
-        const open = !closed.includes(file.path)
-        return <FileSection key={file.path} file={file} open={open} wrap={wrap}
-          ref={node => { if (node) sections.current.set(file.path, node); else sections.current.delete(file.path) }}
-          onOpenChange={next => setClosed(current => next ? current.filter(path => path !== file.path) : [...current, file.path])} />
-      })}
-    </div>
+    {/* Only the lines in view are drawn: a change of thousands of lines opens at once. */}
+    <VirtualizerContext.Provider value={virtualizer}>
+      <div ref={scroll} data-slot="thread-changes-scroll" className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="flex flex-col gap-3">
+          {changes.files.map(file => {
+            const open = !closed.includes(file.path)
+            return <FileSection key={file.path} file={file} open={open} wrap={wrap}
+              ref={node => { if (node) sections.current.set(file.path, node); else sections.current.delete(file.path) }}
+              onOpenChange={next => setClosed(current => next ? current.filter(path => path !== file.path) : [...current, file.path])} />
+          })}
+        </div>
+      </div>
+    </VirtualizerContext.Provider>
   </div>
 }
 
@@ -89,59 +104,18 @@ function Counts({ additions, deletions }: { additions: number; deletions: number
 
 function FileSection({ file, open, wrap, onOpenChange, ref }: { file: ChangedFile; open: boolean; wrap: DiffWrap; onOpenChange: (open: boolean) => void; ref: (node: HTMLElement | null) => void }) {
   const t = useTranslations('IssueThreads')
-  const { name, dir } = splitPath(file.path)
-  return <section ref={ref} aria-label={file.path} data-slot="thread-changes-file" className="shrink-0 overflow-clip rounded-lg border border-border bg-background">
-    {/* Sticks to the top of the scrolling list while this file's lines go by. */}
-    <div data-slot="thread-changes-file-header" className="sticky -top-3 z-10 flex h-10 items-center gap-2 bg-background pr-1.5 pl-1">
-      <Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-expanded={open} aria-label={t(open ? 'changesCollapseFile' : 'changesExpandFile', { name })} onClick={() => onOpenChange(!open)}>
+  const { name } = splitPath(file.path)
+  const fileDiff = useMemo(() => getSingularPatch(filePatch(file)), [file])
+  // Binary files have no lines to draw: just the header, then the note.
+  const options = useDiffOptions({ overflow: wrap, collapsed: !open || file.binary, stickyHeader: true })
+  return <section ref={ref} aria-label={file.path} data-slot="thread-changes-file" className="shrink-0">
+    <FileDiff fileDiff={fileDiff} options={options} disableWorkerPool
+      renderHeaderPrefix={() => <Button variant="ghost" size="icon-xs" className="text-muted-foreground" aria-expanded={open} aria-label={t(open ? 'changesCollapseFile' : 'changesExpandFile', { name })} onClick={() => onOpenChange(!open)}>
         {open ? <ChevronDown data-icon="inline-start" /> : <ChevronRight data-icon="inline-start" />}
-      </Button>
-      <span className="shrink-0 truncate text-sm font-medium">{name}</span>
-      <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{dir}</span>
-      <Counts additions={file.additions} deletions={file.deletions} />
-      {file.url && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('changesOpenFile')} render={<a href={file.url} target="_blank" rel="noopener noreferrer" />} />}>
+      </Button>}
+      renderHeaderMetadata={file.url ? () => <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" className="text-muted-foreground" aria-label={t('changesOpenFile')} render={<a href={file.url} target="_blank" rel="noopener noreferrer" />} />}>
         <ExternalLink data-icon="inline-start" />
-      </TooltipTrigger><TooltipContent side="bottom">{t('changesOpenFile')}</TooltipContent></Tooltip>}
-    </div>
-    {open && (file.binary
-      ? <p className="px-3 py-2 text-xs text-muted-foreground">{t('changesBinary')}</p>
-      : <DiffRows blocks={file.blocks} wrap={wrap} />)}
+      </TooltipTrigger><TooltipContent side="bottom">{t('changesOpenFile')}</TooltipContent></Tooltip> : undefined} />
+    {open && file.binary && <p className="px-3 py-2 text-xs text-muted-foreground">{t('changesBinary')}</p>}
   </section>
-}
-
-
-/** The file's lines in order; a run the diff left out is one 「N 行未修改」 row. */
-export function DiffRows({ blocks, wrap }: { blocks: DiffBlock[]; wrap: DiffWrap }) {
-  const t = useTranslations('IssueThreads')
-  // Horizontal scrolling moves a run of lines together, with its numbers staying put.
-  const runs: Array<{ kind: 'unchanged'; count: number; key: number } | { kind: 'lines'; lines: DiffLine[]; key: number }> = []
-  blocks.forEach((block, index) => {
-    if (block.kind === 'unchanged') runs.push({ kind: 'unchanged', count: block.count, key: index })
-    else { const last = runs.at(-1); if (last?.kind === 'lines') last.lines.push(block.line); else runs.push({ kind: 'lines', lines: [block.line], key: index }) }
-  })
-  return <div className="font-mono text-xs/5">
-    {runs.map(run => run.kind === 'unchanged'
-      ? <p key={run.key} data-slot="thread-changes-unchanged" className="flex h-7 items-center bg-muted/60 px-3 font-sans text-muted-foreground">{t('changesUnchanged', { count: run.count })}</p>
-      : wrap === 'wrap'
-        ? <div key={run.key}>{run.lines.map((line, index) => <div key={index} data-slot="thread-changes-line" className={cn('flex', line.kind === 'added' && 'bg-success/10', line.kind === 'removed' && 'bg-destructive/10')}>
-            <LineNumbers line={line} />
-            <code className="min-w-0 flex-1 pr-3 break-all whitespace-pre-wrap">{line.text}</code>
-          </div>)}</div>
-        : <div key={run.key} data-slot="thread-changes-hscroll" className="overflow-x-auto">
-            <div className="w-max min-w-full">{run.lines.map((line, index) => <div key={index} data-slot="thread-changes-line" className={cn('flex', line.kind === 'added' && 'bg-success/10', line.kind === 'removed' && 'bg-destructive/10')}>
-              <span className="sticky left-0 z-[1] flex shrink-0 bg-background"><LineNumbers line={line} /></span>
-              <code className="pr-3 whitespace-pre">{line.text}</code>
-            </div>)}</div>
-          </div>)}
-  </div>
-}
-
-function LineNumbers({ line }: { line: DiffLine }) {
-  return <span className={cn('grid shrink-0 grid-cols-[3rem_3rem_1.25rem] select-none', line.kind === 'added' && 'bg-success/10', line.kind === 'removed' && 'bg-destructive/10')}>
-    <span className="pr-2 text-right text-muted-foreground tabular-nums">{line.old ?? ''}</span>
-    <span className="pr-2 text-right text-muted-foreground tabular-nums">{line.new ?? ''}</span>
-    <span className={cn('text-center', line.kind === 'added' ? 'text-success-foreground' : line.kind === 'removed' ? 'text-destructive' : 'text-muted-foreground')}>
-      {line.kind === 'added' ? '+' : line.kind === 'removed' ? '−' : ''}
-    </span>
-  </span>
 }

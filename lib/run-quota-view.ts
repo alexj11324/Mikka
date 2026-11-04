@@ -1,5 +1,7 @@
 import 'server-only'
 import { pool } from '@/lib/db'
+import { modelFallbackRecordSchema, projectModelFallback, type ThreadModelFallbackView } from './run-model-fallback-view'
+import { factoryEventId } from './factory/event-id'
 
 /**
  * What an open thread shows about its subscription's quota (lib/run-quota.ts):
@@ -48,4 +50,59 @@ export async function threadQuotaView(userId: string, runIds: readonly string[],
     }
   }
   return { switched, paused }
+}
+
+/** Runtime-provider recovery is a host-owned run receipt, not the legacy
+ * subscription-quota event. The caller obtained these ids from readRunChain
+ * for this owner; the query and projection retain both boundaries. */
+export async function threadModelFallbackState(userId: string, runIds: readonly string[], liveRunId?: string): Promise<{ notices: ThreadModelFallbackView[]; pending: boolean }> {
+  if (!runIds.length) return { notices: [], pending: false }
+  const { rows } = await pool.query<{ id: string; status: string; stopReason: string | null; stopRequestedAt: Date | null; record: unknown; failure: unknown }>(
+    `SELECT id,status,"stopReason","stopRequestedAt",report->'modelFallback' AS record,report->'providerFailure' AS failure FROM agent_runs
+      WHERE "userId"=$1 AND id=ANY($2::uuid[]) ORDER BY "createdAt",id`, [userId, runIds])
+  const chain = new Set(rows.map(row => row.id))
+  // Independent Factory checks clear retryOf when adopted. Their host event,
+  // task attempts and frozen digest prove the switch without changing the
+  // conversation's send/stop chain or treating a caller-supplied id as access.
+  const receipts = rows.flatMap(row => {
+    const parsed = modelFallbackRecordSchema.safeParse(row.record)
+    const receipt = parsed.success ? parsed.data : null
+    return receipt?.state === 'switched' && receipt.retryRunId && receipt.nextDefinitionDigest && !chain.has(receipt.retryRunId)
+      ? [{ sourceId: row.id, childId: receipt.retryRunId, digest: receipt.nextDefinitionDigest, eventId: factoryEventId('provider-check-continuation', row.id) }] : []
+  })
+  const independent = new Map(receipts.length ? (await pool.query<{ sourceId: string; childId: string }>(`
+    WITH wanted AS (
+      SELECT * FROM unnest($2::uuid[],$3::uuid[],$4::text[],$5::uuid[]) AS receipt("sourceId","childId",digest,"eventId")
+    )
+    SELECT source.id AS "sourceId",child.id AS "childId" FROM wanted w
+    JOIN agent_runs source ON source.id=w."sourceId" AND source."userId"=$1
+    JOIN agent_runs child ON child.id=w."childId" AND child."userId"=source."userId" AND child."issueId"=source."issueId"
+    JOIN factory_attempts prior ON prior."runId"=source.id AND prior.stage IN ('review','verify','monitor')
+    JOIN factory_attempts adopted ON adopted."runId"=child.id AND adopted."taskId"=prior."taskId" AND adopted.stage=prior.stage
+      AND adopted."candidateId" IS NOT DISTINCT FROM prior."candidateId"
+    JOIN factory_tasks task ON task.id=prior."taskId" AND task."userId"=source."userId" AND task."issueId"=source."issueId"
+    JOIN factory_events event ON event."taskId"=task.id AND event."eventId"=w."eventId"
+      AND event.request->>'priorRunId'=source.id::text AND event.result->>'runId'=child.id::text
+    WHERE child."retryOf" IS NULL AND source."stopReason"='provider_failure'
+      AND child."agentDefinition"->>'definitionDigest'=w.digest
+      AND source.report->'modelFallback'->>'state'='switched'
+      AND source.report->'modelFallback'->>'retryRunId'=child.id::text
+      AND source.report->'modelFallback'->>'nextDefinitionDigest'=w.digest`,
+  [userId, receipts.map(item => item.sourceId), receipts.map(item => item.childId), receipts.map(item => item.digest), receipts.map(item => item.eventId)])).rows
+    .map(row => [row.sourceId, row.childId]) : [])
+  const notices = rows.flatMap(row => {
+    const child = independent.get(row.id)
+    const view = projectModelFallback(row.id, row.record, row.failure, child ? new Set([...chain, child]) : chain)
+    return view ? [view] : []
+  })
+  const pending = rows.some(row => {
+    if (row.id !== liveRunId || row.status !== 'failed' || row.stopReason !== 'provider_failure' || row.stopRequestedAt) return false
+    const receipt = modelFallbackRecordSchema.safeParse(row.record)
+    return receipt.success && receipt.data.state === 'pending'
+  })
+  return { notices, pending }
+}
+
+export async function threadModelFallbackView(userId: string, runIds: readonly string[]): Promise<ThreadModelFallbackView[]> {
+  return (await threadModelFallbackState(userId, runIds)).notices
 }

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { factoryChanged } from '../live/factory'
 import type { Pool, PoolClient } from 'pg'
 import { ActionFailureError } from '../action-error'
 import { FactoryError } from './contract'
@@ -101,6 +102,7 @@ export async function advanceFactoryRequest(tx: PoolClient, task: FactoryTask, s
   await tx.query('INSERT INTO factory_events("taskId","eventId",request,result) VALUES($1,$2,$3,$4)',
     [task.id, eventId, JSON.stringify({ kind: 'request_epoch', sourceEventId, previousEpoch, previousRunId: source.payload.previousRunId, supersededRunIds: stoppedRunIds }),
       JSON.stringify({ task: next, requestEpoch: sourceEventId })])
+  await factoryChanged(tx, next)
   return next
 }
 

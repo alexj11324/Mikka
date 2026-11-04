@@ -45,6 +45,7 @@ import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
 import { mailboxToolResult } from '../run-mailbox'
 import { NATIVE_AUTH_PLACEHOLDER } from '../subscription-native-broker'
+import { classifyProviderFailure, ProviderFailureError, providerFailureMessage, type ProviderFailure } from "@mikka/protocol/provider-failure"
 import type {
   DeltaNotification,
   ErrorNotification,
@@ -139,6 +140,40 @@ function toml(value: string | string[]): string {
 
 function text(value: string): UserInput[] {
   return [{ type: "text", text: value, text_elements: [] }]
+}
+
+/** Only a terminal app-server provider error may reach this classifier. */
+export function codexProviderFailure(error: unknown): ProviderFailure | undefined {
+  if (!error || typeof error !== "object") return undefined
+  const value = error as Record<string, unknown>
+  // turn/start can reject through JSON-RPC's structured error data.
+  if (value.data && typeof value.data === "object" && "codexErrorInfo" in value.data) {
+    const data = value.data as Record<string, unknown>
+    return codexProviderFailure({ ...data, message: typeof data.message === "string" ? data.message : value.message })
+  }
+  const info = codexFailureInfo(error)
+  const categories: Partial<Record<CodexFailureInfo["category"], string>> = {
+    unauthorized: "authentication_failed", rateLimitExceeded: "rate_limit",
+    serverOverloaded: "overloaded", flexUnavailable: "overloaded", internalServerError: "server_error",
+    httpConnectionFailed: "connection_error", responseStreamConnectionFailed: "connection_error",
+    responseStreamDisconnected: "connection_error", responseTooManyFailedAttempts: "connection_error",
+  }
+  const category = categories[info.category]
+  const unspecified = ["unknown", "other", "rpc_refused"].includes(info.category)
+  if (!category && !unspecified) return undefined
+  const httpError = ["httpConnectionFailed", "responseStreamConnectionFailed", "responseStreamDisconnected", "responseTooManyFailedAttempts"].includes(info.category)
+  const diagnostic = (httpError || unspecified) && typeof value.message === "string" ? value.message : ""
+  const bodyStart = diagnostic.indexOf("{")
+  const bodyEnd = diagnostic.lastIndexOf("}")
+  const prefixStatus = /^(?:stream disconnected before completion:\s*)?(?:unexpected status|HTTP status|API Error:)\s*([1-5]\d{2})\b/i.exec(diagnostic)?.[1]
+  // Some official versions retain only this native API status prefix in the
+  // terminal error. No arbitrary model/tool HTTP text is searched.
+  if (unspecified && !prefixStatus) return classifyProviderFailure(error)
+  return classifyProviderFailure({
+    status: info.httpStatus ?? (prefixStatus ? Number(prefixStatus) : undefined),
+    code: category,
+    ...(bodyStart >= 0 && bodyEnd >= bodyStart ? { responseBody: diagnostic.slice(bodyStart, bodyEnd + 1) } : {}),
+  })
 }
 
 /** Codex thread items as UI message chunks, at item start and completion. */
@@ -342,6 +377,7 @@ export class CodexAdapter implements AgentAdapter {
     const ctx = new RunContext({
       harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
+      mcp: options.mcp,
       apps: options.apps,
       githubRuntime: options.githubRuntime,
       childPath,
@@ -373,7 +409,8 @@ export class CodexAdapter implements AgentAdapter {
       `mcp_servers.${MCP_SERVER_NAME}.command=${toml(mcp.command)}`,
       "-c",
       `mcp_servers.${MCP_SERVER_NAME}.args=${toml(mcp.args)}`,
-      ...Object.entries(mcp.env).flatMap(([key, value]) => [
+      ...(options.mcp ? ["-c", `mcp_servers.${MCP_SERVER_NAME}.env_vars=${toml(Object.keys(ctx.decisionMcpEnv()))}`] : []),
+      ...Object.entries(mcp.env).filter(([key]) => !key.startsWith("MIKKA_DECISION_MCP_")).flatMap(([key, value]) => [
         "-c",
         `mcp_servers.${MCP_SERVER_NAME}.env.${key}=${toml(value)}`,
       ]),
@@ -384,6 +421,13 @@ export class CodexAdapter implements AgentAdapter {
       ] : []),
       ...codexAppArgs(options.apps),
       ...credential.args,
+      // Custom API-key and hosted-broker providers own their retry settings.
+      // The reserved built-in OpenAI provider rejects overrides and keeps its
+      // native finite retry loop; never replace official subscription auth.
+      ...(credential.args.length ? [
+        "-c", "model_providers.mikka.request_max_retries=2",
+        "-c", "model_providers.mikka.stream_max_retries=2",
+      ] : []),
       ...(brokerAuth ? [
         "-c", "model_providers.mikka.requires_openai_auth=false",
         "-c", "model_providers.mikka.supports_websockets=false",
@@ -396,7 +440,7 @@ export class CodexAdapter implements AgentAdapter {
     ]
     const spawnOptions = {
       cwd: ctx.worktree,
-      env: { ...options.env, ...(childPath ? { PATH: childPath } : {}), ...ctx.tempEnv(), ...credential.env, CODEX_HOME: codexHome.home },
+      env: { ...options.env, ...(childPath ? { PATH: childPath } : {}), ...ctx.tempEnv(), ...ctx.decisionMcpEnv(), ...credential.env, CODEX_HOME: codexHome.home },
       policy: ctx.policy(),
       pidFile: paths.pidFile,
       marker: ctx.runDir,
@@ -420,6 +464,7 @@ export class CodexAdapter implements AgentAdapter {
     let cancelling = false
     let lastError: string | undefined
     let lastFailure: CodexFailureInfo | undefined
+    let providerFailure: ProviderFailure | undefined
     let turnStartFailure: string | undefined
     const subscriptionFailure = (phase: CodexFailurePhase, info: CodexFailureInfo) => {
       try { log.warn({ event: 'codex_subscription_turn_failed', phase, ...info }, 'Codex subscription turn failed') }
@@ -595,17 +640,20 @@ export class CodexAdapter implements AgentAdapter {
           rateLimits = (params as RateLimitsNotification).rateLimits
           return
         case "error": {
-          const { error, willRetry } = params as ErrorNotification
+          const { error, willRetry, threadId: errorThread } = params as ErrorNotification
+          if (errorThread && errorThread !== sessionId) return
           if (!willRetry) quota = mergeQuota(quota, codexQuotaSignal(error, rateLimits))
           if (!willRetry) {
             lastFailure = codexFailureInfo(error)
+            providerFailure = codexProviderFailure(error)
             lastError = managedAuth
               ? subscriptionFailure('error_notification', lastFailure)
-              : `Codex: ${error.message}`
+              : providerFailure ? providerFailureMessage(providerFailure) : `Codex: ${error.message}`
           }
           return
         }
         case "turn/completed":
+          if ((params as TurnNotification).threadId !== sessionId) return
           if (options.mailbox && pendingTurnStart) {
             const completed = (params as TurnNotification).turn
             void pendingTurnStart.then(() => {
@@ -638,6 +686,19 @@ export class CodexAdapter implements AgentAdapter {
       if (cancelling) return finish({ outcome: "cancelled" })
       const handoff = ctx.readHandoff(log)
       if (handoff) return finish(handoff)
+      if (turn.status === "failed" || lastError) {
+        providerFailure = codexProviderFailure(turn.error) ?? providerFailure
+        if (providerFailure) {
+          quota = mergeQuota(quota, codexQuotaSignal(turn.error, rateLimits))
+          const failure = codexFailureInfo(turn.error)
+          return finish({
+            outcome: "failed", providerFailure, ...(quota ? { quota } : {}),
+            error: managedAuth
+              ? subscriptionFailure('turn_completed', failure.category === 'unknown' && lastFailure ? lastFailure : failure)
+              : providerFailureMessage(providerFailure),
+          })
+        }
+      }
       const next = pending.shift()
       if (next) {
         await startTurn(next).catch((error: unknown) =>
@@ -645,7 +706,8 @@ export class CodexAdapter implements AgentAdapter {
             outcome: "failed",
             error: managedAuth
               ? turnStartFailure ?? subscriptionFailure('turn_start', codexFailureInfo(error))
-              : `Codex: ${errorMessage(error)}`
+              : error instanceof ProviderFailureError ? error.message : `Codex: ${errorMessage(error)}`,
+            ...(error instanceof ProviderFailureError ? { providerFailure: error.providerFailure } : {}),
           })
         )
         return
@@ -671,6 +733,7 @@ export class CodexAdapter implements AgentAdapter {
     const startTurn = async (message: string) => {
       lastError = undefined
       lastFailure = undefined
+      providerFailure = undefined
       turnStartFailure = undefined
       quota = undefined
       const verify = externalAuth?.verify ?? brokerAuth?.verify
@@ -681,12 +744,13 @@ export class CodexAdapter implements AgentAdapter {
         threadId: sessionId,
         input: text(message)
       })
-      const response = (managedAuth
-        ? result.catch((error: unknown) => {
-            turnStartFailure = subscriptionFailure('turn_start', codexFailureInfo(error))
-            throw new Error(turnStartFailure)
-          })
-        : result)
+      const response = result.catch((error: unknown) => {
+        providerFailure = codexProviderFailure(error)
+        if (managedAuth) turnStartFailure = subscriptionFailure('turn_start', codexFailureInfo(error))
+        if (providerFailure) throw new ProviderFailureError(providerFailure)
+        if (managedAuth) throw new Error(turnStartFailure)
+        throw error
+      })
       if (options.mailbox) {
         pendingTurnStart = response.then(({ turn }) => { if (!ending) activeTurn = turn.id })
         try { await pendingTurnStart } finally { pendingTurnStart = null }
@@ -702,9 +766,11 @@ export class CodexAdapter implements AgentAdapter {
       if (handoff) return queue.exit(handoff)
       queue.exit({
         outcome: "failed",
+        ...(providerFailure ? { providerFailure } : {}),
+        ...(quota ? { quota } : {}),
         error: managedAuth
           ? subscriptionFailure('child_exit', { category: 'cli_exited_early' })
-          : `codex app-server exited (${signal ?? code}): ${child.stderrTail() || "no output"}`
+          : providerFailure ? providerFailureMessage(providerFailure) : `codex app-server exited (${signal ?? code}): ${child.stderrTail() || "no output"}`
       })
     })
 
@@ -798,6 +864,7 @@ export class CodexAdapter implements AgentAdapter {
           ...(typeof code === 'number' && Number.isInteger(code) && code >= -32768 && code <= -32000 ? { rpcCode: code } : {}) }, 'Subscription startup failed') } catch { /* Keep the original refusal. */ }
       }
       await finish(null)
+      if (error instanceof ProviderFailureError) throw error
       if (managedAuth) throw new Error(turnStartFailure ?? SUBSCRIPTION_AUTH_ERROR)
       throw new Error(
         `Could not start codex app-server: ${errorMessage(error)}. ${child.stderrTail()}`.trim(),

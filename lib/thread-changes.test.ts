@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { diffWrapFrom, parseUnifiedDiff, splitPath } from './thread-changes'
+import { getSingularPatch } from '@pierre/diffs'
+import { diffWrapFrom, filePatch, parseUnifiedDiff, splitPath } from './thread-changes'
 
 const DIFF = `diff --git a/app/pricing/components/pricing-table.tsx b/app/pricing/components/pricing-table.tsx
 index 1111111..2222222 100644
@@ -75,4 +76,41 @@ test('long lines wrap unless horizontal scrolling was chosen', () => {
   assert.equal(diffWrapFrom('anything'), 'wrap')
   assert.equal(diffWrapFrom('wrap'), 'wrap')
   assert.equal(diffWrapFrom('scroll'), 'scroll')
+})
+
+test('each file goes back to the renderer as its own patch, hunks at their own line numbers', () => {
+  const [table, created, renamed, binary] = parseUnifiedDiff(DIFF).files.map(file => getSingularPatch(filePatch(file)))
+  assert.deepEqual(table.hunks.map(hunk => [hunk.collapsedBefore, hunk.deletionStart, hunk.deletionCount, hunk.additionStart, hunk.additionCount, hunk.additionLines, hunk.deletionLines]),
+    [[18, 19, 3, 19, 4, 2, 1], [36, 58, 2, 59, 2, 1, 1]])
+  assert.deepEqual([created.type, created.hunks[0].additionStart, created.hunks[0].additionCount], ['new', 1, 2])
+  assert.deepEqual([renamed.type, renamed.prevName, renamed.name], ['rename-pure', 'old-name.ts', 'new-name.ts'])
+  assert.deepEqual([binary.name, binary.hunks.length], ['public/logo.png', 0])
+})
+
+test('a hunk that only adds or only removes starts where git puts its empty side', () => {
+  const text = `diff --git a/a.ts b/a.ts
+--- a/a.ts
++++ b/a.ts
+@@ -3,1 +3,2 @@
+-x
++y
++z
+@@ -10,0 +12,2 @@
++p
++q
+@@ -20,2 +22,0 @@
+-r
+-s
+`
+  const [file] = parseUnifiedDiff(text).files
+  assert.equal(filePatch(file).split('\n').filter(line => line.startsWith('@@')).join('|'), '@@ -3,1 +3,2 @@|@@ -10,0 +12,2 @@|@@ -20,2 +22,0 @@')
+})
+
+test('a change of thousands of lines round-trips whole', () => {
+  const lines = Array.from({ length: 3000 }, (_, index) => index % 3 === 0 ? `-old ${index}` : index % 3 === 1 ? `+new ${index}` : ` same ${index}`)
+  const [file] = parseUnifiedDiff(`diff --git a/big.ts b/big.ts\n--- a/big.ts\n+++ b/big.ts\n@@ -1,2000 +1,2000 @@\n${lines.join('\n')}\n`).files
+  const drawn = getSingularPatch(filePatch(file))
+  assert.equal(drawn.hunks.length, 1)
+  assert.deepEqual([drawn.hunks[0].additionLines, drawn.hunks[0].deletionLines, drawn.hunks[0].additionCount, drawn.hunks[0].deletionCount], [1000, 1000, 2000, 2000])
+  assert.equal(drawn.unifiedLineCount, 3000)
 })

@@ -9,6 +9,7 @@ import { remoteKey } from '@mikka/protocol/repository'
 import type { FactoryTask } from '../lib/factory/store'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { ALLOWED_MODEL, seedAllowedModel } from './support/allowed-model'
+import { liveChannelId } from '../lib/live/scope'
 
 const connection = process.env.E2E_DATABASE_URL
 const enabled = disposableDatabase()
@@ -30,6 +31,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
   t.after(() => { if (priorByos === undefined) delete process.env.MIKKA_BYOS_ENABLED; else process.env.MIKKA_BYOS_ENABLED = priorByos })
   const { pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
+  const { readOrder } = await import('../lib/model-order')
   const { queueRun, queueFactoryRun } = await import('../lib/agent-runs')
   const { acceptedEventStillMatches } = await import('../lib/run-admission-store')
   const { lockCliAgentPolicy, readCliAgentPolicy } = await import('../lib/agent-tool-approval/policy-store')
@@ -121,6 +123,12 @@ test('real Factory admission preserves host scope, policy and transaction owners
       const admitted = await dispatch(f)
       const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [admitted.runId])).rows[0]
       const publication = (await pool.query('SELECT * FROM run_publications WHERE "runId"=$1', [admitted.runId])).rows[0]
+      const defaultOrder = await readOrder(pool, { ownerId: f.userId, workspaceId: f.workspaceId })
+      assert.equal(defaultOrder.customized, false, 'ordinary Factory admission uses the untouched default order')
+      assert.equal(defaultOrder.entries[0].source.kind, 'subscription')
+      assert.ok(defaultOrder.entries[0].id.startsWith('default:'))
+      assert.ok(!defaultOrder.entries[0].id.includes('\u0000'), 'the default row id is safe to freeze in JSONB')
+      assert.deepEqual(run.agentDefinition.modelDispatch.entry, defaultOrder.entries[0], 'admission preserves the chosen model and credential identity')
       assert.equal(run.agentDefinition.repositoryAdmission.authority, 'owner_credential')
       assert.equal(run.agentDefinition.repositoryAdmission.approvedAt, undefined)
       assert.equal(run.agentDefinition.repositoryAdmission.remoteKey, f.remoteKey)
@@ -324,8 +332,11 @@ test('real Factory admission preserves host scope, policy and transaction owners
 
     await t.test('gateway wake belongs to the outer commit, including a host that starts lifecycle work immediately', async () => {
       const f = await fixture({ destination: 'selected' })
+      // This legacy null-Bot task uses the owner's personal scope for browser updates.
+      await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [f.workspaceId])
       const pending: Promise<unknown>[] = []
       const received: string[] = []
+      const browserReceived: unknown[] = []
       const contextKey = Symbol.for('@vercel/request-context')
       const globals = globalThis as unknown as Record<symbol, unknown>
       const previousContext = globals[contextKey]
@@ -337,7 +348,6 @@ test('real Factory admission preserves host scope, policy and transaction owners
             response.end(JSON.stringify({ online: true, lastSeenAt: new Date().toISOString() }))
             return
           }
-          assert.equal(request.url, `/v1/devices/${f.deviceId}/push`)
           // This separate connection cannot see the admission transaction until
           // its run, publication, Factory binding and receipt have all committed.
           const { rows } = await pool.query(`SELECT r.id FROM agent_runs r
@@ -346,7 +356,13 @@ test('real Factory admission preserves host scope, policy and transaction owners
             JOIN factory_events e ON e."taskId"=a."taskId" AND e.result->>'runId'=r.id::text
             WHERE r."deviceId"=$1 AND r."userId"=$2 AND r.status='queued'`, [f.deviceId, f.userId])
           assert.equal(rows.length, 1, 'the signal cannot outrun the complete Factory commit')
-          received.push(rows[0].id)
+          if (request.url === `/v1/devices/${f.deviceId}/push`) received.push(rows[0].id)
+          else {
+            assert.equal(request.url, `/v1/live/${liveChannelId({ ownerId: f.userId, workspaceId: f.workspaceId })}/push`)
+            const chunks: Buffer[] = []
+            for await (const chunk of request) chunks.push(Buffer.from(chunk))
+            browserReceived.push(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+          }
           response.writeHead(204).end()
         } catch (error) {
           received.push(`invalid:${error instanceof Error ? error.message : 'unknown'}`)
@@ -371,11 +387,12 @@ test('real Factory admission preserves host scope, policy and transaction owners
         await tx.query('ROLLBACK')
         assert.equal(pending.length, 0, 'rolled-back work produces no wake')
         const result = await dispatch(f)
-        assert.equal(pending.length, 1, 'the transaction owner sends exactly once after commit')
         await Promise.all(pending)
-        assert.deepEqual(received, [result.runId])
+        assert.deepEqual(received, [result.runId], 'the transaction owner wakes the daemon exactly once after commit')
+        assert.deepEqual(browserReceived, [[{ kind: 'factory_task', id: f.task.id }, { kind: 'factory_issue', id: f.issueId }]], 'the browser receives only committed invalidation keys')
+        const scheduled = pending.length
         await dispatch(f)
-        assert.equal(pending.length, 1, 'strict dispatch replay does not duplicate the wake')
+        assert.equal(pending.length, scheduled, 'strict dispatch replay does not duplicate either notification')
       } finally {
         await tx.query('ROLLBACK'); tx.release()
         await Promise.allSettled(pending)

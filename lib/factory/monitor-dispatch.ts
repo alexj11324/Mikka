@@ -6,6 +6,7 @@ import type { FactoryTask } from "./store";
 import { digest } from "./evidence";
 import { readFactoryPublicationReceiptV2 } from "./publication-receipt";
 import { monitorPublicationSupported } from "./monitor-probe";
+import { intersectRunPolicy } from '../run-assignment-policy';
 
 type Publication = Awaited<ReturnType<typeof readFactoryPublicationReceiptV2>>;
 const live = ["queued", "preparing", "running", "waiting_input", "finishing"];
@@ -180,6 +181,6 @@ export async function factoryMonitorDispatchAssignment(
   return {
     baseBranch: receipt.candidate.sha,
     verifyCommand: row.output.monitorDispatch.command as string,
-    policy: applyApprovalMode({...defaultRunPolicy(),networkAllow:[]},"read_only"),
+    policy: applyApprovalMode(intersectRunPolicy({...defaultRunPolicy(),networkAllow:[]},row.agentDefinition?.policyCeiling),"read_only"),
   };
 }

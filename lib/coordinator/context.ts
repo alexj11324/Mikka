@@ -129,6 +129,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         payload.verification === 'not_run' ? "This run's host post-run verifier was not run. This does not describe commands called by the Agent or separate Factory checks. Do not claim verification passed from this field alone. Mention a draft PR only when the server-confirmed publication includes one." : null,
         payload.daemonUpgradeRequired ? 'Mikka on its device is too old to run it. Tell the person that Mikka on that device needs an update, then dispatch the issue again. Nothing is wrong with their GitHub or other connections.' : null,
         payload.noMachine ? `Its machine went offline and no other machine can continue it. Draw this card and dispatch the issue again after the person answers: ${JSON.stringify(payload.noMachine)}` : null,
+        payload.noModel ? `The model provider could not serve this task and no permitted automatic continuation is available. Draw this card with every entry's reason and the model settings action. A model the person explicitly picked must stay picked; wait for their choice before dispatching again: ${JSON.stringify(payload.noModel)}` : null,
         observation ? `Current host observation: ${JSON.stringify(observation)}\nUse this for the task's current state; the ended run above remains its history. factory.requestEpoch identifies the current owner request; factory.runAttempt.requestEpoch identifies the ended run's request, or null for legacy history. An ended run from a different request epoch cannot prove the current request's result: its summary, postRunVerify and repository handoffs remain historical. Current publication and checks belong to the current request. Repository handoffs link the preserved predecessor to its authorized successor. Do not redispatch while a successor or Factory stage is queued or running. Review, this run's post-run verifier and the separate Factory verify stage have distinct results. These facts do not replace owner approval.` : null,
         note,
       ].filter(Boolean).join('\n')
@@ -305,7 +306,8 @@ export function instructionsWithPersonal(instructions: string, personal: string)
 
 /** One entry in the chat the person sees. */
 /** A tool a reply used, as the chat shows it: `running` until its result is stored. */
-export interface ChatTool { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string }
+/** `at`: how much of the reply's text came before this tool ran, so the chat draws it after those words. */
+export interface ChatTool { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string; at?: number }
 /** `reasoningAt`: the stored rows whose reasoning is readable text, fetched only when the person opens it (chat-projection.ts keeps its length). */
 export interface ChatActivity { tools: ChatTool[]; thought: boolean; reasoningAt?: number[] }
 
@@ -476,7 +478,11 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       const stream = (message as { mikkaStreamId?: unknown }).mikkaStreamId
       const streamId = typeof stream === 'string' ? stream : undefined
       const shows = Boolean(cited.text || steps.length || thought)
-      if (last?.from === 'coordinator' && !waiting.ids.length && !briefingBoundary) {
+      const merges = last?.from === 'coordinator' && !waiting.ids.length && !briefingBoundary
+      // A step's tools run after its words: they sit after the reply's text so far, this step's included.
+      const at = (merges ? [last.text, cited.text].filter(Boolean).join('\n\n') : cited.text).length
+      for (const step of steps) step.at = at
+      if (last && merges) {
         if (!last.streamId && shows && streamId) last.streamId = streamId
         if (steps.length || thought) last.activity = { tools: [...last.activity?.tools ?? [], ...steps], thought: Boolean(last.activity?.thought || thought),
           ...(last.activity?.reasoningAt || readable ? { reasoningAt: [...last.activity?.reasoningAt ?? [], ...(readable ? [position] : [])] } : {}) }

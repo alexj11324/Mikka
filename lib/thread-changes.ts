@@ -100,3 +100,41 @@ export const DIFF_WRAP_KEY = 'mikka:diff-wrap'
 export function diffWrapFrom(stored: string | null | undefined): DiffWrap {
   return stored === 'scroll' ? 'scroll' : 'wrap'
 }
+
+/**
+ * One file back as a git patch, for the diff renderer: hunks are the runs of
+ * lines between 「N 行未修改」 gaps, each headed by its own line numbers.
+ */
+export function filePatch(file: ChangedFile): string {
+  const oldPath = file.previousPath ?? file.path
+  const out = [`diff --git a/${oldPath} b/${file.path}`]
+  if (file.status === 'added') out.push('new file mode 100644')
+  if (file.status === 'deleted') out.push('deleted file mode 100644')
+  const hunks: DiffLine[][] = []
+  for (const block of file.blocks) {
+    if (block.kind === 'unchanged') { if (hunks.at(-1)?.length) hunks.push([]); continue }
+    if (!hunks.length) hunks.push([])
+    hunks.at(-1)!.push(block.line)
+  }
+  const filled = hunks.filter(lines => lines.length > 0)
+  // The renderer reads a rename from a similarity line; only 100% (nothing changed) is shown, as a pure rename.
+  if (file.previousPath) out.push(`similarity index ${filled.length ? 50 : 100}%`, `rename from ${file.previousPath}`, `rename to ${file.path}`)
+  if (filled.length) {
+    out.push(`--- ${file.status === 'added' ? '/dev/null' : `a/${oldPath}`}`, `+++ ${file.status === 'deleted' ? '/dev/null' : `b/${file.path}`}`)
+    // New minus old line numbers so far: where a hunk with no line on one side starts on that side.
+    let shift = 0
+    for (const lines of filled) {
+      const oldCount = lines.filter(line => line.kind !== 'added').length
+      const newCount = lines.filter(line => line.kind !== 'removed').length
+      const firstOld = lines.find(line => line.old !== null)?.old
+      const firstNew = lines.find(line => line.new !== null)?.new
+      // git writes an empty side as the line before it (`-12,0`, `-0,0` for a new file).
+      const oldStart = firstOld ?? Math.max(0, (firstNew ?? 1) - 1 - shift)
+      const newStart = firstNew ?? Math.max(0, (firstOld ?? 1) - 1 + shift)
+      out.push(`@@ -${oldStart},${oldCount} +${newStart},${newCount} @@`)
+      for (const line of lines) out.push((line.kind === 'added' ? '+' : line.kind === 'removed' ? '-' : ' ') + line.text)
+      shift += newCount - oldCount
+    }
+  }
+  return `${out.join('\n')}\n`
+}

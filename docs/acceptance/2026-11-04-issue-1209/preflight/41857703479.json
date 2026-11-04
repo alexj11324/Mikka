@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 1,
-  "status": "failed",
-  "error": "preflight_failed",
-  "policyChanged": false,
-  "executionPerformed": false,
-  "productionAccepted": false,
-  "runnerDigest": "5527d5fead980084e091fb41965727435375ca18c60d34a5acd04b5948ff09e7"
-}

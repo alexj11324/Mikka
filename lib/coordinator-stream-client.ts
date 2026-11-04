@@ -1,7 +1,7 @@
 import type { CoordinatorStreamEvent } from './coordinator/stream'
 
 /** A tool a live reply is using, as the stream reports it. */
-export type CoordinatorLiveTool = { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string }
+export type CoordinatorLiveTool = { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string; at?: number }
 
 export type CoordinatorLiveReply = {
   id: string
@@ -10,7 +10,7 @@ export type CoordinatorLiveReply = {
   quiet?: boolean
   /** Tools in the order they were called; each keeps its latest state. */
   tools?: CoordinatorLiveTool[]
-  /** How long the model has thought so far (`ms`), since when it is thinking now, and what it thought (masked; only when readable). */
+  /** How long the model has thought so far (`ms`), since when it is thinking now, and what it has thought (masked, as it streams; only when readable). */
   thinking?: { ms: number; since?: number; text?: string }
 }
 
@@ -32,9 +32,12 @@ export function coordinatorStreamReply(replies: CoordinatorLiveReply[], event: C
     if (event.type === 'thinking') {
       const thinking = reply.thinking ?? { ms: 0 }
       if (event.state === 'start') return thinking.since === undefined ? { ...reply, thinking: { ...thinking, since: now } } : reply
+      // What it thinks arrives as it thinks; the server separates blocks and replaces a retried step's part.
+      if (event.state === 'delta') return { ...reply, thinking: { ...thinking, text: (thinking.text ?? '') + event.text } }
+      if (event.state === 'reset') { const { text: _text, ...rest } = thinking; return { ...reply, thinking: { ...rest, ...(event.text ? { text: event.text } : {}) } } }
       if (thinking.since === undefined) return reply
-      const text = [thinking.text, event.text].filter(Boolean).join('\n\n')
-      return { ...reply, thinking: { ms: thinking.ms + Math.max(0, now - thinking.since), ...(text ? { text } : {}) } }
+      const { since: _since, ...rest } = thinking
+      return { ...reply, thinking: { ...rest, ms: thinking.ms + Math.max(0, now - thinking.since) } }
     }
     return { ...reply, committedThrough: event.through, quiet: event.quiet }
   })
@@ -64,11 +67,11 @@ function parseEvent(line: string): CoordinatorStreamEvent {
       }
       if (event.type === 'tool' && typeof event.call === 'string' && typeof event.name === 'string' && ['running', 'done', 'error'].includes(event.state)) {
         return { type: 'tool', id: event.id, call: event.call, name: event.name, state: event.state,
-          ...(typeof event.input === 'string' ? { input: event.input } : {}), ...(typeof event.output === 'string' ? { output: event.output } : {}) }
+          ...(typeof event.input === 'string' ? { input: event.input } : {}), ...(typeof event.output === 'string' ? { output: event.output } : {}),
+          ...(Number.isSafeInteger(event.at) && event.at >= 0 ? { at: event.at } : {}) }
       }
-      if (event.type === 'thinking' && (event.state === 'start' || event.state === 'end')) {
-        return { type: 'thinking', id: event.id, state: event.state, ...(event.state === 'end' && typeof event.text === 'string' && event.text ? { text: event.text } : {}) }
-      }
+      if (event.type === 'thinking' && (event.state === 'start' || event.state === 'end')) return { type: 'thinking', id: event.id, state: event.state }
+      if (event.type === 'thinking' && (event.state === 'delta' || event.state === 'reset') && typeof event.text === 'string') return { type: 'thinking', id: event.id, state: event.state, text: event.text }
     }
   }
   throw new Error('Invalid Coordinator stream event')

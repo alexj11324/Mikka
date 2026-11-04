@@ -1,15 +1,17 @@
 import 'server-only'
+import { runDecisionWarnings, type ProjectDecisionWarning } from './project-decision-warnings'
 import type { ExecutionIdentity } from './execution-identity'
 import { personalMailboxEnabled } from './personal-mailbox-config'
 import { byosEnabled } from './cloud-computer-flag'
 import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
-import { freezeWorkerDefinition } from '@/lib/agent-kit/worker'
+import { freezeWorkerDefinition, type WorkerModelDispatch } from '@/lib/agent-kit/worker'
 import type { AgentExecution } from '@/lib/agent-kit/store'
 import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db, pool, withDatabaseClient } from '@/lib/db'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
+import type { RunModel } from '@/lib/computer/run-model'
 import { agents, agentRuns, bots, deviceRepos, devices, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
@@ -55,6 +57,7 @@ export interface RunView {
 }
 
 export interface RunDetail {
+  decisionWarnings?: ProjectDecisionWarning[]
   run: RunView
   chunks: Record<string, unknown>[]
   messages: { id: string; text: string; createdAt: Date }[]
@@ -77,6 +80,9 @@ export const runViewColumns = {
 type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string
   /** Required (lib/computer/run-model.ts): a new run's from 优先使用的模型, a thread's next run its own; never left to the CLI. */
   model: string
+  /** The host's original selection policy, never inferred from the required model argument. */
+  modelDispatch?: WorkerModelDispatch
+  policyCeiling?: RunModel['policyCeiling']
   /** The run this one continues, named when the model is missing. */
   threadRunId?: string
   pinnedDeviceId?: string; readOnly?: boolean
@@ -91,7 +97,7 @@ export async function queueRun(userId: string, input: LocalDispatchInput, botId:
 /** Only the Factory/Skill host calls this with an already-open transaction.
  * Repository ids identify prior scheduling metadata; they confer no authority. */
 /** What the host already decided for a Factory run: its model and credential (lib/computer/run-model.ts), the computer it is pinned to, read-only. */
-export type FactoryRunSelection = { model?: string; subscriptionBindingId?: string; apiKeyId?: string; pinnedDeviceId?: string; readOnly?: boolean; execution?: AgentExecution }
+export type FactoryRunSelection = { model?: string; subscriptionBindingId?: string; apiKeyId?: string; modelDispatch?: WorkerModelDispatch; policyCeiling?: RunModel['policyCeiling']; pinnedDeviceId?: string; readOnly?: boolean; execution?: AgentExecution }
 export async function queueFactoryRun(tx: import('pg').PoolClient, userId: string, input: DispatchInput,
   botId: string | null = null, context?: { sourceEventId: string; attemptId: string }, sourceRunId?: string, selection: FactoryRunSelection = {}): Promise<DispatchResult> {
   const parsed = dispatchInput.safeParse(input)
@@ -135,9 +141,62 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
   })
 }
 
+/** Host-only provider recovery. The caller holds the source's Factory/issue/run
+ * locks and commits its continuation receipt and frozen identity in this same
+ * transaction. A different harness gets a new ordinary admission, never the
+ * sourceRunId replay exception that is restricted to the original Agent. */
+export async function queueProviderFallbackRun(tx: import('pg').PoolClient, userId: string, source: typeof agentRuns.$inferSelect,
+  input: RunModel & { agentId: string; deviceRepoId: string }) {
+  const invalid = () => new ActionFailureError('runInvalid', { reason: 'sourceRunMismatch' })
+  if (source.userId !== userId || !source.issueId || !source.deviceRepoId || input.modelDispatch?.mode !== 'preference' ||
+    Boolean(input.apiKeyId) === Boolean(input.subscriptionBindingId)) throw invalid()
+  const { factoryDispatchDatabase } = await import('./factory/transaction')
+  const executor = factoryDispatchDatabase(tx)
+  return withDatabaseClient(tx, async () => {
+    const [current] = await executor.select().from(agentRuns).where(and(eq(agentRuns.id, source.id), eq(agentRuns.userId, userId))).for('update')
+    if (!current || current.issueId !== source.issueId || current.botId !== source.botId || current.deviceRepoId !== source.deviceRepoId ||
+      current.status !== 'failed' || current.stopReason !== 'provider_failure' || current.stopRequestedAt || current.questionContinuation ||
+      current.agentDefinition?.modelDispatch?.mode !== 'preference' || current.agentDefinition.modelDispatch.location === 'cloud') throw invalid()
+    const [original] = await executor.select().from(deviceRepos).where(and(eq(deviceRepos.id, current.deviceRepoId!), eq(deviceRepos.userId, userId))).limit(1)
+    const [repo] = await executor.select().from(deviceRepos).where(and(eq(deviceRepos.id, input.deviceRepoId), eq(deviceRepos.userId, userId))).limit(1)
+    const [agent] = await executor.select().from(agents).where(and(eq(agents.id, input.agentId), eq(agents.userId, userId))).limit(1)
+    if (!original?.remoteUrl || original.deviceId !== current.deviceId || !repo?.remoteUrl || !agent?.deviceId || repo.deviceId !== agent.deviceId ||
+      (current.agentDefinition.pinnedDeviceId && current.agentDefinition.pinnedDeviceId !== agent.deviceId)) throw invalid()
+    const [device] = await executor.select({ kind: devices.kind }).from(devices).where(and(eq(devices.id, current.deviceId!), eq(devices.ownerId, userId))).limit(1)
+    if (!device || (device.kind === 'cloud' && current.agentDefinition.allowLocalRecovery !== true)) throw invalid()
+    try {
+      const options = { allowFile: daemonTestMode(process.env) }
+      if (normalizeRepository(original.remoteUrl, options).key !== normalizeRepository(repo.remoteUrl, options).key) throw invalid()
+    } catch { throw invalid() }
+    const { executionIdentitySchema } = await import('./execution-identity')
+    const originalIdentity = executionIdentitySchema.safeParse(current.agentDefinition.executionIdentity)
+    if (!originalIdentity.success || originalIdentity.data.requester !== userId || originalIdentity.data.executionPrincipal !== userId ||
+      originalIdentity.data.outputOwner !== userId || originalIdentity.data.botId !== current.botId) throw new ActionFailureError('executionAccountUnavailable')
+    const result = await queueAdmittedRun(userId, {
+      ...input, issueId: current.issueId!, repo: repo.remoteUrl,
+      threadRunId: current.id, requestKey: `provider:${current.id}`, pinnedDeviceId: current.agentDefinition.pinnedDeviceId,
+      readOnly: current.agentDefinition.readOnly,
+    }, current.botId, undefined, current.agentDefinition.repositoryAdmission?.requestEventId, current.source,
+    // The wrapper authorizes the failed source above. All target policy,
+    // credential, task-destination and publication checks still run normally.
+    { executor, repo, client: tx, workspaceHint: originalIdentity.data.workspaceId })
+    const [queued] = await executor.select({ definition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, result.runId), eq(agentRuns.userId, userId))).limit(1)
+    const definition = queued?.definition
+    if (!definition || definition.model !== input.model || (input.apiKeyId && definition.apiKey?.keyId !== input.apiKeyId) ||
+      (input.subscriptionBindingId && definition.subscription?.bindingId !== input.subscriptionBindingId)) throw new ActionFailureError('executionAccountUnavailable')
+    // The failed credential may already be disconnected or deleted. The new
+    // admission authenticates its replacement; the requester's standing scope
+    // must still equal the original host-frozen identity.
+    const nextIdentity = executionIdentitySchema.safeParse(definition.executionIdentity)
+    const standing = ['requester', 'executionPrincipal', 'outputOwner', 'botId', 'botOwner', 'workspaceId', 'personalResourcePolicy'] as const
+    if (!nextIdentity.success || standing.some(field => originalIdentity.data[field] !== nextIdentity.data[field])) throw new ActionFailureError('executionAccountUnavailable')
+    return result
+  })
+}
+
 async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 'model'> & { model?: string }, botId: string | null, execution?: AgentExecution,
   requestEventId?: string, source: 'mcp' | null = null,
-  internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string }) {
+  internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string; workspaceHint?: string | null }) {
   const executor = internal?.executor ?? db
   // Every local run is frozen with its model, a Factory or Skill run included: a caller that left it out fails here, before anything is read or written.
   if (typeof input.model !== 'string' || !input.model.trim() || input.model.trim() === 'auto') {
@@ -159,7 +218,8 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
   const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
   const captureDefinition = true
   const query = internal?.client ?? pool
-  const workspaceId = botId ? (await query.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, userId])).rows[0]?.workspaceId : undefined
+  const workspaceId = botId ? (await query.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, userId])).rows[0]?.workspaceId
+    : input.modelDispatch ? internal?.workspaceHint ?? await (await import('./execution-settings')).executionWorkspace(userId, null) : undefined
   if (botId && !workspaceId) throw new ActionFailureError('botNotFound')
   const found = captureDefinition && byosEnabled() ? await nativeRunBinding(query, userId, agent.id, agent.harness, workspaceId, parsed.data.subscriptionBindingId) : null
   if (parsed.data.subscriptionBindingId && (!found || (parsed.data.model && parsed.data.model !== found.modelId))) throw new ActionFailureError('executionAccountUnavailable')
@@ -177,8 +237,15 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
     mailboxScope = { botId, workspaceId: bot?.workspaceId ?? (await import('@/lib/device-link')).WORKSPACE_ID }
   }
   const agentDefinition = captureDefinition
-    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
+    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model, modelDispatch: input.modelDispatch, policyCeiling: input.policyCeiling, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
     : null
+  if (agentDefinition && input.modelDispatch && !botId) {
+    // Bot-less preferences belong to the actual execution workspace. Persist
+    // that scope now so health/recovery never consult another workspace later.
+    const { freezeExecutionIdentity, ExecutionIdentityError } = await import('./execution-identity')
+    agentDefinition.executionIdentity = await freezeExecutionIdentity(query, { userId, botId, deviceId: agent.deviceId, agentDefinition }, undefined, workspaceId)
+      .catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
+  }
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
     deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
 }
@@ -187,7 +254,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
 async function factoryRunModel(userId: string, botId: string | null, agentId: string, chosen: Omit<FactoryRunSelection, 'execution' | 'pinnedDeviceId' | 'readOnly'>,
   source: Parameters<typeof import('@/lib/computer/run-model').threadRunModel>[0]) {
   const { threadRunModel, chooseLocalRunModel } = await import('@/lib/computer/run-model')
-  if (chosen.model?.trim()) return { model: chosen.model, ...(chosen.subscriptionBindingId ? { subscriptionBindingId: chosen.subscriptionBindingId } : {}), ...(chosen.apiKeyId ? { apiKeyId: chosen.apiKeyId } : {}) }
+  if (chosen.model?.trim()) return { model: chosen.model, ...(chosen.subscriptionBindingId ? { subscriptionBindingId: chosen.subscriptionBindingId } : {}), ...(chosen.apiKeyId ? { apiKeyId: chosen.apiKeyId } : {}), ...(chosen.modelDispatch ? { modelDispatch: chosen.modelDispatch } : {}), ...(chosen.policyCeiling ? { policyCeiling: chosen.policyCeiling } : {}) }
   const kept = threadRunModel(source)
   if (kept) return kept
   const [agent] = await db.select({ id: agents.id, deviceId: agents.deviceId, harness: agents.harness }).from(agents).where(and(eq(agents.id, agentId), eq(agents.userId, userId))).limit(1)
@@ -197,7 +264,7 @@ async function factoryRunModel(userId: string, botId: string | null, agentId: st
   if (!workspaceId) throw new ActionFailureError('runModelMissing')
   const picked = await chooseLocalRunModel(pool, { ownerId: userId, workspaceId, botId }, { id: agent.id, deviceId: agent.deviceId, harness: agent.harness })
   if ('error' in picked) throw new ActionFailureError('runModelMissing')
-  return picked
+  return { ...picked, ...(chosen.policyCeiling ? { policyCeiling: chosen.policyCeiling } : {}) }
 }
 
 /** A device run's credential source; the bot's workspace decides whose API keys it may use. */
@@ -244,7 +311,8 @@ export async function readRun(userId: string, runId: string): Promise<RunDetail 
     .where(eq(runChunks.runId, run.id)).orderBy(asc(runChunks.seq))
   const messages = await db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt })
     .from(runMessages).where(eq(runMessages.runId, run.id)).orderBy(asc(runMessages.createdAt))
-  return { run, chunks: chunks.map(row => row.chunk), messages }
+  const decisionWarnings = await runDecisionWarnings(pool, userId, run.id)
+  return { run, chunks: chunks.map(row => row.chunk), messages, decisionWarnings }
 }
 
 /** A message to the running agent; the daemon delivers it. */
@@ -275,15 +343,19 @@ export async function addRunMessage(
       run.status,
     )
   ) {
-    const { factoryQuestions } = await import('@/lib/factory/server')
+    const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
     const { pool } = await import('@/lib/db')
     const {
       rows: [identity],
     } = await pool.query(
-      'SELECT id FROM factory_questions WHERE "originRunId"=$1 AND "userId"=$2',
+      `SELECT q.id,t."botId" FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId"
+       WHERE q."originRunId"=$1 AND q."userId"=$2 AND t."userId"=$2`,
       [run.id, userId],
     )
     if (!identity) throw new ActionFailureError('runNotActive')
+    // The task owns this scope. A worker can also belong to a Bot when its
+    // legacy Factory task is unscoped; neither the caller nor worker chooses it.
+    const factoryQuestions = factoryRuntimeForBot(identity.botId).questions
     const q = await factoryQuestions.read(userId, identity.id)
     if (q.status === 'resolved' && q.continuationRunId) {
       const previous = q.answer as {

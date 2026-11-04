@@ -3,6 +3,7 @@
 // grouping is testable without a server.
 
 import type { EvidenceEntry } from './evidence-view'
+import type { QuestionCommandOrigin } from './question-command-sources'
 
 export type CheckStatus = 'pending' | 'running' | 'waiting' | 'passed' | 'failed' | 'blocked' | 'cancelled' | 'revoked'
 export interface AcceptanceCheck {
@@ -15,6 +16,8 @@ export interface AcceptanceCheck {
   /** `command` and `exitCode` (#541): what checked this criterion, when the verify agent reported it. */
   criteria: { criterionId: string | null; text: string | null; passed: boolean; evidence: string | null; command?: string | null; exitCode?: number | null }[]
   verify: { status: string; command: string | null; exitCode: number | null } | null
+  /** Host-validated sources actually cited by this check on the current candidate. */
+  commandSources?: QuestionCommandOrigin[]
 }
 /**
  * The task detail's delivery header. `pullRequest.title`, `previewDatabaseBranch`
@@ -44,7 +47,7 @@ export interface AcceptanceTaskView {
   revision?: number
   completionRecovery?: { binding: { taskId: string; revision: number } }
 }
-export interface AcceptanceDetail { task?: AcceptanceTaskView; checks?: AcceptanceCheck[]; delivery?: AcceptanceDelivery; completionRecovery?: AcceptanceTaskView['completionRecovery'] }
+export interface AcceptanceDetail { task?: AcceptanceTaskView; checks?: AcceptanceCheck[]; delivery?: AcceptanceDelivery; completionRecovery?: AcceptanceTaskView['completionRecovery']; liveWorkspaceId?: string | null }
 export interface AcceptanceBinding { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }
 export type CandidateCheckState = { stage: 'review' | 'verify'; status: 'failed' | 'pending' | 'running' }
 
@@ -101,7 +104,7 @@ export function candidateCheckRetryConfirmed(task: AcceptanceTaskView, value: un
 /** One piece of evidence plus, for text from a verify run, the command it ran. */
 export interface AcceptanceItem { entry: EvidenceEntry; command: { text: string; exitCode: number | null } | null }
 export interface CriterionGroup { key: string; title: string | null; passed: boolean | null; items: AcceptanceItem[] }
-export interface ResultRow { stage: 'review' | 'verify'; status: CheckStatus; runId: string | null; sha: string | null; passed: number; total: number }
+export interface ResultRow { stage: 'review' | 'verify'; status: CheckStatus; runId: string | null; sha: string | null; passed: number; total: number; commandSources?: QuestionCommandOrigin[] }
 
 const isMedia = (entry: EvidenceEntry) => Boolean(entry.captureId) && (entry.kind === 'screenshot' || entry.kind === 'video')
 
@@ -145,7 +148,7 @@ export function resultRows(checks: readonly AcceptanceCheck[], candidateId: stri
   return (['review', 'verify'] as const).flatMap(stage => {
     const check = latestCheck(checks, stage, candidateId)
     if (!check) return []
-    return [{ stage, status: check.status, runId: check.runId, sha: check.candidateSha, passed: check.criteria.filter(c => c.passed).length, total: check.criteria.length }]
+    return [{ stage, status: check.status, runId: check.runId, sha: check.candidateSha, passed: check.criteria.filter(c => c.passed).length, total: check.criteria.length, commandSources: check.commandSources }]
   })
 }
 

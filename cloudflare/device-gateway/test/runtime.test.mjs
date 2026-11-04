@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createHmac } from 'node:crypto'
+import { createHash, createHmac } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
@@ -12,14 +12,14 @@ import { build } from 'esbuild'
 const require = createRequire(import.meta.url)
 const wranglerRequire = createRequire(realpathSync(require.resolve('wrangler/package.json')))
 const { Miniflare, Log, LogLevel, convertV4MiniflareOptions } = wranglerRequire('miniflare')
+const WireWebSocket = wranglerRequire('ws')
 const secret = 'local-gateway-integration-test-secret'
 const deviceId = '6f1c2b8e-2a8e-4c39-9d1a-3b5d7c9e1f20'
 const sockets = new Set()
 let runtime
 let origin
 
-function ticket(id = deviceId) {
-  const exp = Math.floor(Date.now() / 1000) + 300
+function ticket(id = deviceId, exp = Math.floor(Date.now() / 1000) + 300) {
   const mac = createHmac('sha256', secret).update(`${id}.${exp}`).digest('hex')
   return `mikka-ticket-${exp}-${mac}`
 }
@@ -166,4 +166,89 @@ test('a real socket upgrade refuses a ticket for another device', async () => {
   socket.addEventListener('open', () => { opened = true })
   await event(socket, 'error')
   assert.equal(opened, false)
+})
+
+function liveChannel(owner, workspace) {
+  return createHash('sha256').update(JSON.stringify([owner, workspace])).digest('hex')
+}
+
+function liveSocket(channel, exp, Client = WebSocket) {
+  const socket = new Client(`${origin.replace('http:', 'ws:')}/v1/live/${channel}/socket`, ticket(`live:${channel}`, exp))
+  sockets.add(socket)
+  return socket
+}
+
+async function pushLive(channel, events) {
+  const response = await fetch(`${origin}/v1/live/${channel}/push`, {
+    method: 'POST', headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' }, body: JSON.stringify(events),
+  })
+  assert.equal(response.status, 204)
+}
+
+// The installed Miniflare TCP upgrade proxy exchanges Close frames but can
+// leave the TCP read side open. Observe the actual RFC Close frame, rather than
+// waiting for its FIN. ws is the existing pinned runtime's wire decoder; ordinary
+// upgrade, ping and multicast tests above still use Node's built-in WebSocket.
+function closeFrame(socket) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('No server Close frame')), 5_000)
+    socket._receiver.once('conclude', (code, reason) => { clearTimeout(timeout); resolve({ code, reason: reason.toString() }) })
+  })
+}
+
+test('real browser tabs multicast within one owner/workspace and isolate peers and other workspaces', async () => {
+  const channel = liveChannel('owner', 'workspace-one')
+  const otherWorkspace = liveChannel('owner', 'workspace-two')
+  const otherOwner = liveChannel('peer', 'workspace-one')
+  const first = liveSocket(channel), second = liveSocket(channel)
+  const elsewhere = liveSocket(otherWorkspace), peer = liveSocket(otherOwner)
+  await Promise.all([first, second, elsewhere, peer].map(socket => event(socket, 'open')))
+  const elsewhereEvents = [], peerEvents = []
+  elsewhere.addEventListener('message', message => elsewhereEvents.push(JSON.parse(message.data)))
+  peer.addEventListener('message', message => peerEvents.push(JSON.parse(message.data)))
+  const invalidation = { kind: 'factory_task', id: deviceId }
+  const received = [event(first, 'message'), event(second, 'message')]
+  await pushLive(channel, [invalidation])
+  assert.deepEqual((await Promise.all(received)).map(message => JSON.parse(message.data)), [invalidation, invalidation])
+  assert.equal(first.readyState, WebSocket.OPEN)
+  const marker = { kind: 'thread', id: '769840bb-21d8-4949-995b-873aeedcc464' }
+  const markers = [event(elsewhere, 'message'), event(peer, 'message')]
+  await pushLive(otherWorkspace, [marker]); await pushLive(otherOwner, [marker])
+  await Promise.all(markers)
+  assert.deepEqual(elsewhereEvents, [marker])
+  assert.deepEqual(peerEvents, [marker])
+  for (const socket of [first, second, elsewhere, peer]) socket.close(1000, 'done')
+})
+
+test('an expired browser ticket cannot receive later invalidations on an existing socket', async () => {
+  const channel = liveChannel('expiry-owner', 'workspace-one')
+  const exp = Math.ceil(Date.now() / 1000) + 1
+  const socket = liveSocket(channel, exp, WireWebSocket)
+  try {
+    await event(socket, 'open')
+    const messages = []
+    socket.addEventListener('message', message => messages.push(message.data))
+    await delay(Math.max(0, exp * 1000 - Date.now()) + 20)
+    const closed = closeFrame(socket)
+    await pushLive(channel, [{ kind: 'factory_task', id: deviceId }])
+    assert.equal((await closed).code, 4001)
+    assert.deepEqual(messages, [])
+  } finally { socket.terminate() }
+})
+
+test('daemon reconnects retain their one-socket replacement and work signal', async () => {
+  const first = new WireWebSocket(`${origin.replace('http:', 'ws:')}/v1/devices/${deviceId}/socket`, ticket())
+  try {
+    await event(first, 'open')
+    const oldMessages = []
+    first.addEventListener('message', message => oldMessages.push(message.data))
+    const replaced = closeFrame(first)
+    const second = connect(); await event(second, 'open')
+    assert.equal((await replaced).code, 4000)
+    const work = event(second, 'message')
+    await fetch(`${origin}/v1/devices/${deviceId}/push`, { method: 'POST', headers: { authorization: `Bearer ${secret}` } })
+    assert.equal((await work).data, 'work')
+    assert.deepEqual(oldMessages, [])
+    second.close(1000, 'done')
+  } finally { first.terminate() }
 })

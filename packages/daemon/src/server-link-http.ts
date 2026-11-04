@@ -116,6 +116,12 @@ export function serverUrl(base: string, path: string): URL {
 }
 
 export class HttpServerLink implements ServerLink {
+  private readonly runControls = new Set<ToolApprovalGate>()
+
+  /** Work frames are hints, never authority: re-read each active run. */
+  invalidateRunControls() {
+    for (const gate of this.runControls) gate.invalidate()
+  }
   async downloadChatFile(assignment: RunAssignment, id: string, signal: AbortSignal) {
     const transfer = await this.call('GET', `/v1/devices/${seg(assignment.deviceId)}/runs/${seg(assignment.runId)}/attachments/${seg(id)}`, { schema: chatFileTransferSchema, signal, timeoutMs: 60000 })
     if ('data' in transfer) return transfer
@@ -233,15 +239,10 @@ export class HttpServerLink implements ServerLink {
         } catch (error) { refusal(phase, 'check_failed', error); return false }
       }
     })
-    let checking = false
-    const monitor = setInterval(() => {
-      if (checking || gate.revoked) return
-      checking = true
-      void gate.checkLive().then(live => { if (!live) gate.revoke() }).finally(() => { checking = false })
-    },1000)
-    monitor.unref()
+    this.runControls.add(gate)
+    const offMonitor = gate.monitor()
     const abort = () => gate.revoke()
-    gate.onRevoke(() => { liveness.abort(); clearInterval(monitor); signal.removeEventListener('abort',abort) })
+    gate.onRevoke(() => { liveness.abort(); offMonitor(); this.runControls.delete(gate); signal.removeEventListener('abort',abort) })
     if (signal.aborted) gate.revoke()
     else signal.addEventListener('abort', abort, { once: true })
     return gate
