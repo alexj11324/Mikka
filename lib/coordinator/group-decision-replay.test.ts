@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from './group-decision-policy'
-import { GROUP_REPLAY_CASE_IDS, replayGroupDecision, summarizeGroupDecisionReplay } from './group-decision-replay'
+import { GROUP_REPLAY_CASE_IDS, replayGroupDecision, summarizeGroupDecisionReplay, type GroupDecisionReplay } from './group-decision-replay'
 import { groupDecisionReplayInput } from './group-decision-replay-api'
 import { DECISION_MODEL, type DecisionAnswer } from './decision'
 import type { DecisionExecution, invokeDecision } from './decide'
@@ -60,7 +60,7 @@ test('baseline and candidate share fixed inputs but use distinct prompts; mentio
   })
   assert.equal(delegated.route?.delegation?.reportTiming,'on_completion');assert.equal(delegated.executionPerformed,false)
   assert.equal(delegated.decisions.length,3);assert.equal(summarizeGroupDecisionReplay([delegated]).failures.length,0)
-  const noisy={...delegated,route:{...delegated.route!,delegation:{...delegated.route!.delegation!,reportTiming:'now' as const}}}
+  const noisy={...delegated,route:{...delegated.route!,delegation:{...delegated.route!.delegation!,reportTiming:'now' as const}},projection:{...delegated.projection!,reportTiming:'now'}}
   assert.deepEqual(summarizeGroupDecisionReplay([noisy]).failures,[{caseId:'silent-delegation',reason:'report_timing'}])
 })
 
@@ -188,7 +188,7 @@ test('full-dataset accuracy retains uncertain and missing cases in its denominat
 
 // Synthetic transport fixtures exercise comparison semantics, not model quality.
 // Actual replay inputs still exclude these expected labels.
-async function comparisonFixture({baselineFailure='uncertain',candidateFailure=false}:{baselineFailure?:string;candidateFailure?:boolean}={}) {
+async function comparisonFixture({baselineFailure='uncertain',candidateFailure=false,mutate}:{baselineFailure?:string;candidateFailure?:boolean;mutate?:(row:GroupDecisionReplay)=>GroupDecisionReplay}={}) {
   const env={GROUP_REPLAY_CONVERSATION:ui,GROUP_REPLAY_DEPLOYMENT:'dpl_fixture',GROUP_REPLAY_REVISION:'b'.repeat(40),GROUP_REPLAY_COOKIE:'fixture-session'}
   const requested:string[]=[]
   const report=await runGroupDecisionReplay({env,fetchImpl:async(url,options)=>{
@@ -210,7 +210,8 @@ async function comparisonFixture({baselineFailure='uncertain',candidateFailure=f
       }
       return answer({[name]:values[name]})
     }
-    return Response.json(await replayGroupDecision(body.caseId,body.policyVersion,invoke))
+    const row=await replayGroupDecision(body.caseId,body.policyVersion,invoke)
+    return Response.json(mutate?mutate(row):row)
   }})
   return {report,requested}
 }
@@ -235,5 +236,30 @@ test('new comparison rejects candidate uncertainty and non-semantic baseline fai
     const {report,requested}=await comparisonFixture(options)
     assert.equal(report.qualityAccepted,false);assert.equal(report.comparison.decisionReviewReady,false)
     assert.equal(new Set(requested).size,requested.length,'no failed observation is retried')
+  }
+})
+
+
+test('a complete baseline requires an intact typed route and matching projection before comparison',async()=>{
+  const mutations:((row:GroupDecisionReplay)=>void)[]=[
+    row=>{row.route=null},
+    row=>{row.projection=null},
+    row=>{row.projection!.selectedResponderCount++},
+    row=>{row.route!.responders=['00000000-0000-4000-8000-000000000099']},
+  ]
+  for(const mutate of mutations){
+    let changed=false
+    const {report,requested}=await comparisonFixture({mutate:row=>{
+      if(!changed && row.policyVersion===GROUP_BASELINE_VERSION && row.status==='complete'){changed=true;mutate(row)}
+      return row
+    }})
+    assert.equal(changed,true)
+    assert.equal(report.collectionComplete,false)
+    assert.equal(report.qualityAccepted,false)
+    assert.equal(report.error,'replay_unbound_evidence')
+    assert.equal(report.comparison.baselineClassifiable,false)
+    assert.equal(report.candidate.length,0)
+    assert.equal(new Set(requested).size,requested.length)
+    assert.ok(report.baseline.at(-1)?.receipt,'malformed observation retains its real receipt')
   }
 })

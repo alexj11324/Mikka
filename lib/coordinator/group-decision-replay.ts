@@ -75,6 +75,27 @@ export async function replayGroupDecision(caseId: string, policyVersion: GroupPo
       delegationOperation:safeRoute.delegation?.operation ?? null,reportTiming:safeRoute.delegation?.reportTiming ?? null}:null }
 }
 
+/** A complete status is not sufficient evidence: the typed route and its
+ * non-executing projection must agree and use only the fixed case's members. */
+export function groupReplayCompleted(row: GroupDecisionReplay) {
+  const route=row.route,projection=row.projection,item=cases.find(entry=>entry.id===row.caseId)
+  if(row.status!=='complete' || !route || !projection || !item
+    || !['model','mention','lead'].includes(route.by) || !['ignore','observe','reply','delegate','clarify'].includes(route.action ?? '')
+    || !Array.isArray(route.responders) || new Set(route.responders).size!==route.responders.length) return false
+  const eligible=new Set(item.mentions?.length?item.mentions:dataset.members.map(member=>member.id))
+  if(route.responders.some(id=>typeof id!=='string' || !eligible.has(id))) return false
+  const active=!['ignore','observe'].includes(route.action!)
+  if(active?route.responders.length===0:route.responders.length!==0) return false
+  const delegation=route.delegation
+  if(route.action==='delegate'){
+    if(!delegation || route.responders.length!==1 || !['create','continue','status','stop'].includes(delegation.operation)
+      || (delegation.operation==='create'?delegation.issueId!==null:typeof delegation.issueId!=='string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(delegation.issueId))
+      || delegation.reportTiming!==undefined && !['now','on_completion'].includes(delegation.reportTiming)) return false
+  }else if(delegation!=null) return false
+  return projection.intervention===active && projection.selectedResponderCount===route.responders.length
+    && projection.delegationOperation===(delegation?.operation ?? null) && projection.reportTiming===(delegation?.reportTiming ?? null)
+}
+
 /** A fully receipted explicit abstention is an observed semantic failure. It
  * never becomes an ignore route, a successful silence or a candidate pass. */
 export function groupReplayAbstained(row: GroupDecisionReplay) {
@@ -116,7 +137,7 @@ export function summarizeGroupDecisionReplay(results: readonly GroupDecisionRepl
       && new Set(decisions.map(step=>step.receipt?.providerGenerationId)).size===decisions.length
       && new Set(decisions.map(step=>step.receipt?.executionId)).size===decisions.length
       && decisions[0].receipt?.executionId===receipt?.executionId)
-    if (!receipt || row.status!=='complete' || !row.route || !completeChain) {
+    if (!receipt || !groupReplayCompleted(row) || !row.route || !completeChain) {
       if (groupReplayAbstained(row)) abstentions++
       if (item.expected.intervene===true) {missedIntervention++;unresolvedPositive++}
       if (item.expected.intervene===false) unresolvedNegative++

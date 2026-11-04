@@ -53,3 +53,13 @@ provider billing totals or production acceptance.
 
 The live rollout still requires the authorized group, Factory execution,
 independent review/verification, ownership checks and rollback acceptance.
+
+## Review correction before release
+
+Independent review found that a forged complete status could omit its route or
+projection and still classify as a baseline observation. The collector now rejects
+missing or malformed routes, foreign responders, and inconsistent projections;
+the summary uses the same typed predicate and retains the rejected receipt. No
+additional provider request is made after the malformed observation. A new
+negative contract failed on the previous source, then the combined 55-test suite,
+full typecheck, focused lint and diff checks passed (cmd_acb8c5821e6c4572bc48295c46af).

@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from '../lib/coordinator/group-decision-policy'
-import { GROUP_REPLAY_CASE_IDS, GROUP_REPLAY_COMPARISON_VERSION, GROUP_REPLAY_DATASET, GROUP_REPLAY_DATASET_DIGEST, groupReplayAbstained, summarizeGroupDecisionReplay, type GroupDecisionReplay } from '../lib/coordinator/group-decision-replay'
+import { GROUP_REPLAY_CASE_IDS, GROUP_REPLAY_COMPARISON_VERSION, GROUP_REPLAY_DATASET, GROUP_REPLAY_DATASET_DIGEST, groupReplayAbstained, groupReplayCompleted, summarizeGroupDecisionReplay, type GroupDecisionReplay } from '../lib/coordinator/group-decision-replay'
 import { GROUP_DECISION_PROTOCOL, GROUP_MAX_ROUTING_DECISIONS, groupDecisionFailures, groupDecisionTotals } from '../lib/coordinator/group-decision-chain'
 import { groupDecisionReceipt, groupDecisionSteps } from '../lib/coordinator/group-decision-trace'
 
@@ -41,6 +41,7 @@ export async function runGroupDecisionReplay({env=process.env,fetchImpl=fetch}:{
         const row=data as GroupDecisionReplay|null
         if(!row || row.schemaVersion!==1 || row.caseId!==caseId || row.policyVersion!==policyVersion || row.datasetDigest!==GROUP_REPLAY_DATASET_DIGEST || row.executionPerformed!==false || row.policyChanged!==false || row.evidenceKind!=='actual-decision-inference')throw Error('replay_unbound_evidence')
         rows.push(row)
+        if(row.status==='complete' && !groupReplayCompleted(row))throw Error('replay_unbound_evidence')
         // A receipted invalid judgment is still an observation. Keep it and move
         // to the next fixed case once; never retry it or select another provider.
         // A service/auth failure or missing primary evidence still stops work.
@@ -79,7 +80,7 @@ export async function runGroupDecisionReplay({env=process.env,fetchImpl=fetch}:{
   // it to succeed on every case hides exactly the defects a candidate must fix.
   // Transport, receipt and malformed-response failures are not comparable.
   const baselineClassifiable=report.baseline.length===GROUP_REPLAY_CASE_IDS.length
-    && report.baseline.every(row=>row.status==='complete' || groupReplayAbstained(row))
+    && report.baseline.every(row=>groupReplayCompleted(row) || groupReplayAbstained(row))
   const decisionReviewReady=report.collectionComplete && baselineClassifiable && candidate.coverage===1 && candidate.failures.length===0
     && candidate.falseIntervention<=baseline.falseIntervention && candidate.missedIntervention<=baseline.missedIntervention
   if(decisionReviewReady){report.status='comparison_ready';report.error=null}
