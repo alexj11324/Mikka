@@ -4,6 +4,7 @@
 - Source: Alex, relayed by the coordinating session: 「线程列表里『等待你』这一组的状态图标现在是空心圆，和『进行中』的转圈、『空闲』的圆加斜线不好区分。『等待你』统一改用举手图标。」
 - Rule: R-52 (等待你's icon)
 - Replaces: —
+- Superseded by: [2026-11-04-2220-task-circle-thread-bubble.md](2026-11-04-2220-task-circle-thread-bubble.md)
 
 A thread waiting for you shows a raised hand (lucide `Hand`) instead of a
 hollow circle, everywhere a thread's state shows: the right column's 线程 and

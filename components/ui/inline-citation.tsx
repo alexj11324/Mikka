@@ -15,16 +15,25 @@ function InlineCitation({ ...props }: PreviewCardPrimitive.Root.Props) {
 
 /**
  * The chip. A source (web page) is styled like the streaming-text SourceChip, with no box; a Mikka object (task,
- * thread) is a boxed chip. A button by default; pass `render={<a href=… />}` for a web page.
+ * thread) is a boxed chip. A button by default; pass `render={<a href=… />}` for a web page. An object chip is an
+ * inline `span` with the button role and keys: a `<button>` is one unbreakable box, so a long title could not wrap with
+ * the sentence and the whole chip jumped to the next line (R-15).
  */
+const objectButton = <span role="button" tabIndex={0} onKeyDown={event => {
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  event.preventDefault()
+  event.currentTarget.click()
+}} />
+
 function InlineCitationTrigger({
   className,
   variant = "source",
   delay = 200,
   closeDelay = 100,
-  render = <button type="button" />,
+  render,
   ...props
 }: PreviewCardPrimitive.Trigger.Props & { variant?: "source" | "object" }) {
+  render ??= variant === "object" ? objectButton : <button type="button" />
   return (
     <HoverCardTrigger
       data-slot="inline-citation-trigger"

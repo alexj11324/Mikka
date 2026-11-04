@@ -6,7 +6,7 @@ import { runThreadName, type RunSource } from '@/lib/coordinator/citations'
 import { machineName, runInfoParts } from '@/lib/run-info-view'
 import { Button } from '@/components/ui/button'
 import { PullRequestsBadge } from '@/components/workspace/pull-requests-badge'
-import { ThreadStatusIcon } from '@/components/workspace/thread-status-icon'
+import { ThreadStatus, ThreadStatusIcon } from '@/components/workspace/thread-status-icon'
 import { cn } from '@/lib/utils'
 
 /** A thread as a card (R-66 frame 356:4750), shared by the chat and the thread list: the whole card opens it. */
@@ -25,6 +25,8 @@ export function ThreadCard({ run, onOpen }: { run: RunSource; onOpen: (thread: {
       <span className="truncate text-sm leading-5 font-medium">{name}</span>
       {run.info && <RunInfoLine info={run.info} />}
     </div>
+    {/* The state's word beside its bubble and dot: icon, colour and word together (R-87). */}
+    <span className="pointer-events-none relative shrink-0"><ThreadStatus status={run.status} outcome={run.outcome} icon={false} /></span>
     {run.pullRequests && <PullRequestsBadge pullRequests={run.pullRequests} />}
     <ChevronRight aria-hidden="true" className="pointer-events-none relative size-4 shrink-0 text-muted-foreground" />
   </div>
