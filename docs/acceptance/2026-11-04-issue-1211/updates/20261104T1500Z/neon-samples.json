@@ -1,0 +1,30 @@
+[
+  {
+    "observedAt": "2026-11-04T15:00:01.405Z",
+    "runId": "cc7403af-24e5-4295-8aac-6538a5502e89",
+    "issueId": "9cd1c842-c316-4426-a080-b05f4b26812d",
+    "status": "stopped",
+    "startedAt": "2026-11-04T14:57:50.893Z",
+    "finishedAt": "2026-11-04T14:59:07.244Z",
+    "model": "gpt-6-luna",
+    "harness": "codex",
+    "modelSource": "subscription",
+    "cliModelSelection": "explicit",
+    "apiKeyModel": null,
+    "subscriptionModel": "gpt-6-luna",
+    "credentialType": "subscription",
+    "subscriptionRoute": "codex_cli",
+    "lastSeq": 152,
+    "lastEventAt": "2026-11-04T14:59:06.269Z",
+    "lastReplyAt": "2026-11-04T14:59:05.941Z",
+    "otherOwnerRunningRuns": "0",
+    "otherRunningRuns": "0",
+    "otherWindowRuns": "0",
+    "rawOtherOwnerRunningRuns": "26",
+    "rawOtherRunningRuns": "54",
+    "rawOtherWindowRuns": "58",
+    "historicalOwnerRunningRows": "26",
+    "historicalRunningRows": "54",
+    "historicalWindowRows": "58"
+  }
+]

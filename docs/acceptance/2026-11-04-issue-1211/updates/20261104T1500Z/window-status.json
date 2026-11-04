@@ -1,0 +1,14 @@
+{
+  "status": "invalid_window",
+  "productionAcceptance": false,
+  "windowStart": "2026-11-04T15:00:00.000Z",
+  "windowEnd": "2026-11-04T16:00:00.000Z",
+  "build": "bff53413d9d64a48618010dfe4611024251e5293",
+  "deploymentId": "dpl_4kZ7pUMoULur1GKEUhcBqVqmhH2J",
+  "initialRunId": "cc7403af-24e5-4295-8aac-6538a5502e89",
+  "successorRunId": "277d9758-1ece-4434-88ff-0fd6a8fba4f1",
+  "successorStartedAt": "2026-11-04T15:00:13.962Z",
+  "reason": "The initial run stopped for a normal repository switch before the hour. At 15:00:01.405Z the observed initial run was stopped; the successor did not start until after the hour began. Preparation and queued time cannot count as sustained work.",
+  "neonSamples": 1,
+  "nextWindow": "Requires an explicit normal-UI goal with the next window; the current frozen task ends at 16:00 UTC."
+}

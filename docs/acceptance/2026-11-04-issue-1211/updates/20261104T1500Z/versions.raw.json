@@ -1,0 +1,31 @@
+{
+  "version": 3,
+  "workloadDigest": "5f28e01fc001cc242359cc2a2bdf1d8db9923b5dd9e3c1c298767c76d6c00eee",
+  "manifestSha256": "490d52e0b13f43223a82f715688a3257bb091592bef9748d8130497dce80c8d1",
+  "sourceSha": "2a0e398762d35a94ac673d04ce3683d9de1568d7",
+  "executionPath": "codex_subscription",
+  "expected": {
+    "model": "gpt-6-luna",
+    "harness": "codex",
+    "credentialType": "subscription",
+    "subscriptionRoute": "codex_cli"
+  },
+  "windowStart": "2026-11-04T15:00:00.000Z",
+  "windowEnd": "2026-11-04T16:00:00.000Z",
+  "expectedBuild": "bff53413d9d64a48618010dfe4611024251e5293",
+  "deploymentId": "dpl_4kZ7pUMoULur1GKEUhcBqVqmhH2J",
+  "status": "observing",
+  "checks": [
+    {
+      "at": "2026-11-04T15:00:00.173Z",
+      "minute": 0,
+      "build": "bff53413d9d64a48618010dfe4611024251e5293"
+    },
+    {
+      "at": "2026-11-04T15:01:00.054Z",
+      "minute": 1,
+      "build": "bff53413d9d64a48618010dfe4611024251e5293"
+    }
+  ],
+  "observerScope": "Public build checks only. Neon progress, provider deployment/alias, hourly billing bucket, route metrics and audit artifact are reviewed separately."
+}

@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 1,
+  "status": "invalid_window_cancelled",
+  "productionAcceptance": false,
+  "measurementComparisonEligible": false,
+  "declaredWindow": {
+    "start": "2026-11-04T15:00:00.000Z",
+    "end": "2026-11-04T16:00:00.000Z"
+  },
+  "production": {
+    "build": "bff53413d9d64a48618010dfe4611024251e5293",
+    "deploymentId": "dpl_4kZ7pUMoULur1GKEUhcBqVqmhH2J",
+    "webDeployRun": 41848285618
+  },
+  "workload": {
+    "sourceSha": "2a0e398762d35a94ac673d04ce3683d9de1568d7",
+    "manifestSha256": "490d52e0b13f43223a82f715688a3257bb091592bef9748d8130497dce80c8d1",
+    "workloadDigest": "5f28e01fc001cc242359cc2a2bdf1d8db9923b5dd9e3c1c298767c76d6c00eee",
+    "files": 297
+  },
+  "ids": {
+    "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+    "botId": "d8e8da7b-56d1-4d03-8c47-62e48647c0d6",
+    "issueId": "9cd1c842-c316-4426-a080-b05f4b26812d",
+    "issueNumber": "ALEX-40",
+    "factoryTaskId": "a17cc866-715a-4820-8208-aea2c860e9b2",
+    "requestEpoch": "9f70bdd9-0de0-4843-898d-837eb58c0b43"
+  },
+  "ownerActions": {
+    "dispatchPromptsSent": 1,
+    "ownerRequestRecordedAt": "2026-11-04T14:56:23.291Z",
+    "stopClicks": 1,
+    "stopRequestedAt": "2026-11-04T15:02:06.016Z",
+    "duplicateDispatches": 0,
+    "ownerRetries": 0
+  },
+  "reason": "The preparation dispatch selected dispatch_bot_computer without an explicit repository. Its initial worktree was empty. A normal host repository switch created a successor which started at 15:00:13.962Z, after the fixed hour began. The entire 15:00-16:00 window is ineligible; preparation, queue time, and partial work are not an hour.",
+  "operatorCorrection": "The initial dispatch wrapper incorrectly treated omitting a repository as the way to avoid publication. The repository path supports dispatch_run with explicit repo and readOnly:true; the future dispatch must verify its actual receipt, selected repository, read-only policy, model, and native claim before measuring.",
+  "frozenCore": {
+    "sourceEventId": "9f70bdd9-0de0-4843-898d-837eb58c0b43",
+    "recordedAt": "2026-11-04T14:56:23.291Z",
+    "normalization": "Only literal backslash-n line separators in host handoff.goal.text decoded to LF; no trimming, paragraph edits, or content replacement.",
+    "utf8BytesEqual": true,
+    "utf8Bytes": 1988,
+    "expectedCoreSha256": "2c7e19c75a16d111cbf226eefcfcc0a826cddf85c995dc3f5b17a0b88824a203",
+    "actualCoreSha256": "2c7e19c75a16d111cbf226eefcfcc0a826cddf85c995dc3f5b17a0b88824a203",
+    "note": "This SHA hashes the concrete prompt text, not the workload specification digest. The issue body omitted the final early-completion/quota paragraph, but the actual frozen host handoff goal retained the complete original core. The issue and epoch were not edited to hide this discrepancy."
+  },
+  "runs": [
+    {
+      "observedAt": "2026-11-04T15:02:14.483Z",
+      "id": "cc7403af-24e5-4295-8aac-6538a5502e89",
+      "status": "stopped",
+      "stopRequestedAt": null,
+      "stopReason": "blocked",
+      "startedAt": "2026-11-04T14:57:50.893Z",
+      "finishedAt": "2026-11-04T14:59:07.244Z",
+      "sessionId": "01a1a711-5713-70e1-bffa-33f13088e878",
+      "continuesRunId": null,
+      "model": "gpt-6-luna",
+      "source": "subscription",
+      "bindingId": "71572c48-4d87-420b-85b1-108e8004f679",
+      "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5",
+      "connectionRevision": "2",
+      "route": "codex_cli",
+      "apiKeyId": null,
+      "sandboxId": "iytvtervfuu2bt5jtopgk",
+      "machineState": "paused"
+    },
+    {
+      "observedAt": "2026-11-04T15:02:14.483Z",
+      "id": "277d9758-1ece-4434-88ff-0fd6a8fba4f1",
+      "status": "failed",
+      "stopRequestedAt": "2026-11-04T15:02:06.016Z",
+      "stopReason": "error",
+      "startedAt": "2026-11-04T15:00:13.962Z",
+      "finishedAt": "2026-11-04T15:02:07.822Z",
+      "sessionId": "01a1a713-98ad-7481-8e73-3529c97ed2d9",
+      "continuesRunId": "cc7403af-24e5-4295-8aac-6538a5502e89",
+      "model": "gpt-6-luna",
+      "source": "subscription",
+      "bindingId": "71572c48-4d87-420b-85b1-108e8004f679",
+      "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5",
+      "connectionRevision": "2",
+      "route": "codex_cli",
+      "apiKeyId": null,
+      "sandboxId": "izf06kvjqxjgepvxm1ro3",
+      "machineState": "running"
+    }
+  ],
+  "factoryCancellation": {
+    "observedAt": "2026-11-04T15:02:23.776Z",
+    "id": "a17cc866-715a-4820-8208-aea2c860e9b2",
+    "stage": "execute",
+    "status": "cancelled",
+    "revision": 6,
+    "activeRuns": "0",
+    "runs": [
+      {
+        "id": "cc7403af-24e5-4295-8aac-6538a5502e89",
+        "error": null,
+        "status": "stopped",
+        "stopRequestedAt": null
+      },
+      {
+        "id": "277d9758-1ece-4434-88ff-0fd6a8fba4f1",
+        "error": "Codex subscription execution failed (child_exit: cli_exited_early)",
+        "status": "failed",
+        "stopRequestedAt": "2026-11-04T15:02:06.016+00:00"
+      }
+    ]
+  },
+  "machineObservations": [
+    {
+      "observedAt": "2026-11-04T15:07:20.730Z",
+      "runId": "cc7403af-24e5-4295-8aac-6538a5502e89",
+      "sandboxId": "iytvtervfuu2bt5jtopgk",
+      "state": "paused",
+      "endedAt": null,
+      "hasWorkerLease": false,
+      "workerLeaseUntil": null
+    },
+    {
+      "observedAt": "2026-11-04T15:07:20.730Z",
+      "runId": "277d9758-1ece-4434-88ff-0fd6a8fba4f1",
+      "sandboxId": "izf06kvjqxjgepvxm1ro3",
+      "state": "paused",
+      "endedAt": null,
+      "hasWorkerLease": false,
+      "workerLeaseUntil": null
+    }
+  ],
+  "publicationMetadata": [
+    {
+      "id": "cc7403af-24e5-4295-8aac-6538a5502e89",
+      "readOnly": null,
+      "cliModelSelection": "explicit",
+      "hasRepositoryAdmission": false,
+      "publicationRows": "0",
+      "pullRequestRows": "0"
+    },
+    {
+      "id": "277d9758-1ece-4434-88ff-0fd6a8fba4f1",
+      "readOnly": null,
+      "cliModelSelection": "explicit",
+      "hasRepositoryAdmission": true,
+      "publicationRows": "1",
+      "pullRequestRows": "0"
+    }
+  ],
+  "repositoryChecks": [
+    {
+      "runId": "cc7403af-24e5-4295-8aac-6538a5502e89",
+      "toolInputSeqs": [
+        50,
+        52,
+        54
+      ],
+      "toolOutputSeqs": [
+        51,
+        53,
+        55
+      ],
+      "head": "6c0e6d91a0a4a69ea973503472e38567c586a7d9",
+      "frozenSourcePresent": false,
+      "repositorySwitch": "alexj11324/Mikka",
+      "note": "git cat-file and package.json lookup failed. The compound shell command ended with exit 0; that exit code is not evidence that the frozen commit existed."
+    },
+    {
+      "runId": "277d9758-1ece-4434-88ff-0fd6a8fba4f1",
+      "toolInputSeqs": [
+        64,
+        66,
+        68
+      ],
+      "toolOutputSeqs": [
+        65,
+        67,
+        69
+      ],
+      "head": "bff53413d9d64a48618010dfe4611024251e5293",
+      "frozenSourcePresent": true,
+      "manifestFileCount": 297,
+      "commandExitCodes": [
+        0,
+        0,
+        0
+      ],
+      "note": "Metadata checks reached the target repository only after the window began. No audit records, test pass, delivered audit artifact, or full-hour work are claimed."
+    }
+  ],
+  "modelSettingsRestoration": {
+    "fingerprintMatchedBeforeRestoration": true,
+    "beforeSha256": "6d4b69c3891b2ede5e272d1d16ea04cfcc463f0623492876fa8dd506f804f879",
+    "temporaryPostSha256": "be61fe728f63ec796c7fc79d97107e8b625a9feb52355eb407cbef2e26462c31",
+    "restoredSha256": "c37a4c477db350af107f603619b98dda88b0e8751b8212991c9af9137c284228",
+    "savedAt": "2026-11-04T15:09:15.020892+00:00",
+    "removedOnlyEntryId": "12e7fead-96d4-48b3-995e-bbab97afc8ed",
+    "originalFourEntriesAndOrderPreserved": true,
+    "allFiveChatChoicesPreserved": true,
+    "note": "The final full fingerprint differs because the normal UI save rewrites timestamps. Semantic comparison excludes only settings.updatedAt and entries.createdAt; all other fields match the before snapshot. The new audit Bot's explicit Luna chat binding remains; original390 settings were not guessed or changed."
+  },
+  "observerFiles": [
+    "20261104T1500Z/neon-samples.json",
+    "20261104T1500Z/versions.raw.json",
+    "20261104T1500Z/window-status.json"
+  ],
+  "limits": [
+    "One Neon progress sample and two public version observations are preserved only as diagnostic evidence.",
+    "No full-hour Vercel/Neon/PostHog comparison or passing production acceptance is claimed.",
+    "Machine pause and lease observations are application database evidence, not an independently queried E2B provider receipt.",
+    "The successor had a repository publication admission row but no pull request row; no push or PR tool appeared among its three recorded read-only metadata commands."
+  ],
+  "next": "A new full window needs a separately recorded normal UI goal, a pinned deployment, explicit repository/readOnly dispatch, and the unchanged core apart from window times. No old prompt will be resent."
+}
