@@ -415,12 +415,17 @@ test(
           reason: "Independent review",
         });
       }
-      const start = async (task: FactoryTask) =>
-        dispatch("owner", {
+      const start = async (task: FactoryTask) => {
+        // A positive local-device fixture represents a daemon which is still
+        // online. Refresh its real heartbeat for each dispatch, rather than
+        // relying on the suite finishing inside the 60-second presence window.
+        await db.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1 AND "ownerId"=\'owner\' AND kind=\'local\'', [deviceId]);
+        return dispatch("owner", {
           binding: factoryBinding(task),
           agentId,
           deviceRepoId: repoId,
         });
+      };
       async function terminal(
         id: string,
         session: string,
@@ -501,6 +506,38 @@ test(
           );
       }
       const state = (id: string) => store.read("owner", id);
+      await t.test('a stale local heartbeat rejects direct dispatch until the same pending check receives a real fresh heartbeat', async () => {
+        const pending = await pendingReview();
+        const before = await state(pending.task.id);
+        const runsBefore = (await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [pending.task.issueId])).rows;
+        const gateway = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET };
+        delete process.env.DEVICE_GATEWAY_URL;
+        delete process.env.DEVICE_GATEWAY_PUSH_SECRET;
+        try {
+          await db.query('UPDATE devices SET "lastSeenAt"=now()-interval \'61 seconds\' WHERE id=$1', [deviceId]);
+          const stale = (await db.query('SELECT "lastSeenAt" FROM devices WHERE id=$1', [deviceId])).rows[0].lastSeenAt;
+          await assert.rejects(dispatch("owner", { binding: factoryBinding(pending.task), agentId, deviceRepoId: repoId }),
+            (error: unknown) => error instanceof FactoryError && error.code === 'factoryCheckHarnessUnavailable');
+          assert.deepEqual(await state(pending.task.id), before, 'failed admission leaves the exact pending check intact');
+          assert.deepEqual((await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [pending.task.issueId])).rows,
+            runsBefore, 'the rejected dispatch cannot commit an orphan run');
+
+          const accepted = await start(pending.task);
+          const heartbeat = (await db.query('SELECT "lastSeenAt","lastSeenAt"<=clock_timestamp() AS "notFuture" FROM devices WHERE id=$1', [deviceId])).rows[0];
+          assert.ok(heartbeat.lastSeenAt.getTime() > stale.getTime());
+          assert.equal(heartbeat.notFuture, true, 'the fixture uses a real current heartbeat, never a future timestamp');
+          assert.ok(accepted.runId);
+          assert.equal((await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1', [pending.task.issueId])).rowCount, runsBefore.length + 1);
+          const admitted = await state(pending.task.id);
+          assert.equal(admitted.task.candidateId, pending.task.candidateId);
+          assert.equal(admitted.task.stage, 'review');
+          await store.apply("owner", factoryBinding(admitted.task), randomUUID(), { action: "cancel", reason: "Presence fixture complete" });
+        } finally {
+          await db.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId]);
+          if (gateway.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = gateway.url;
+          if (gateway.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = gateway.secret;
+        }
+      });
       for (const stage of ["review", "verify"] as const) {
         for (const prerequisite of ["harness"] as const) {
           await t.test(
