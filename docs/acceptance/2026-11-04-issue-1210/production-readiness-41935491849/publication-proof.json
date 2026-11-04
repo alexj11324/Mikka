@@ -1,0 +1,28 @@
+{
+  "merge": "c07c1db11effa078da7ed70a4c371d41feda84e5",
+  "mergeTree": "1db6fd2179a6488e23b6c0caaa673c93924b087b",
+  "webRun": 41934692696,
+  "webJob": 126940392552,
+  "driver": "2e8c641f2ebcc2a3ff527786f18e2b2bcb10dde5",
+  "driverTree": "55317989d3d35455ca2ca05d8ea039f04e610c25",
+  "planBlob": "cff12de040373b77171f102f1018c01f7dc589b6",
+  "priorTrusted": "aea16ebeda8dd9fbaac119a18d04d265322b951e",
+  "premergeEvidence": "6cb2c761315be201fad78d136a02d7f6ade1a4fa",
+  "triggerAudit": {
+    "historicalPaidWorkflowPresent": false,
+    "all23WorkflowBlobsUnchanged": true,
+    "includes22YamlAnd1Readme": true
+  },
+  "status": "completed_partial_not_execution_ready",
+  "publicPin": {
+    "checkedAt": "2026-11-04T23:39:36.751Z",
+    "status": 200,
+    "build": "c07c1db11effa078da7ed70a4c371d41feda84e5"
+  },
+  "artifact": {
+    "id": 13374455631,
+    "bytes": 1590,
+    "sha256": "a55ac2bc293411d98dd5878df849abe7c06ba4281e1e0e2af83d8a46e0f57042"
+  },
+  "run": 41935491849
+}
