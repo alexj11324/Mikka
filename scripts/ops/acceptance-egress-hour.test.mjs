@@ -99,10 +99,11 @@ function provider({ changeAlias = false, excluded = false, error = false, incomp
     assert.equal(init.method, 'POST')
     const body = JSON.parse(init.body)
     assert.deepEqual(body.scope, { ownerId: TEAM, projectIds: [PROJECT] })
-    assert.deepEqual(body.groupBy, ['route', legacy ? 'http_status' : 'httpStatus', ...(observation ? [legacy ? 'deployment_id' : 'deploymentId'] : [])])
+    if (!(observation && truncated && body.groupBy?.length !== 3))
+      assert.deepEqual(body.groupBy, ['route', legacy ? 'http_status' : 'httpStatus', ...(observation ? [legacy ? 'deployment_id' : 'deploymentId'] : [])])
     assert.equal(body.filter, observation ? 'environment:production' : 'environment:production AND ' + (legacy ? 'deployment_id' : 'deploymentId') + ':"' + input.deploymentId + '"')
     assert.deepEqual(body.timeRange, { start: window.from, end: window.to })
-    assert.equal(body.seriesSelection.mode, 'exact')
+    if (body.groupBy?.length) assert.equal(body.seriesSelection.mode, 'exact')
     if (error) return new Response('synthetic-secret-never-exported', { status: 403 })
     const count = body.metrics.value.metric === COUNT
     assert.ok(count ? (countOnly ? ['count'] : ['sum', 'count']).includes(body.metrics.value.aggregation) : body.metrics.value.aggregation === 'sum')
@@ -269,5 +270,94 @@ test('failed project observation records actual response shape without claiming 
     assert.ok(!serialized.includes('synthetic-secret'))
     assert.ok(!serialized.includes('/[locale]'))
     assert.ok(!serialized.includes('dpl_'))
+  }
+})
+
+function partitionProvider({ groupsPerDeployment = 60, deploymentCount = 2, legacy = false, countOnly = false,
+  drift = false, missingRoute = false, wrongScope = false, duplicateDeployment = false, excludedPartition = false,
+  missingCpuDeployment = false } = {}) {
+  const other = provider({ observation: true, legacy, countOnly }), queries = []
+  const dep = legacy ? 'deployment_id' : 'deploymentId', status = legacy ? 'http_status' : 'httpStatus'
+  const rows = Array.from({ length: deploymentCount }, (_, d) => Array.from({ length: groupsPerDeployment }, (_, i) => ({
+    dimensions: { route: '/api/synthetic/' + i, [status]: i % 9 ? '200' : '503', [dep]: 'dpl_partition' + d },
+    requests: i + d + 1, cpuMs: (i + 1) * 2.25 + d,
+  }))).flat()
+  const fetchImpl = async (url, init) => {
+    if (new URL(url).pathname !== '/metrics/v1' || init?.method !== 'POST') return other.fetchImpl(url, init)
+    const body = JSON.parse(init.body); queries.push(body)
+    assert.deepEqual(body.scope, { ownerId: TEAM, projectIds: [PROJECT] })
+    assert.deepEqual(body.timeRange, { start: window.from, end: window.to })
+    assert.equal(body.bucketSeconds, 300)
+    const count = body.metrics.value.metric === COUNT
+    assert.equal(body.metrics.value.aggregation, count && countOnly ? 'count' : 'sum')
+    const grouped = body.groupBy ?? []
+    assert.ok([0, 1, 3].includes(grouped.length))
+    if (grouped.length) {
+      assert.equal(body.seriesSelection.mode, 'exact'); assert.equal(body.seriesSelection.limit, 100)
+      assert.deepEqual(grouped, grouped.length === 1 ? [dep] : ['route', status, dep])
+    } else { assert.equal(body.seriesSelection, undefined); assert.equal(body.groupBy, undefined) }
+    const match = body.filter.match(new RegExp('^environment:production AND ' + dep + ':"(dpl_partition[0-9]+)"$'))
+    assert.ok(body.filter === 'environment:production' || match)
+    if (grouped.length < 3) assert.equal(body.filter, 'environment:production')
+    let selected = match ? rows.filter(row => row.dimensions[dep] === match[1]) : rows
+    if (match && missingRoute) selected = selected.slice(1)
+    const reduced = new Map()
+    for (const row of selected) {
+      const dimensions = Object.fromEntries(grouped.map(key => [key, row.dimensions[key]])), key = JSON.stringify(dimensions)
+      const current = reduced.get(key) ?? { dimensions, values: { value: 0 } }
+      current.values.value += count ? row.requests : row.cpuMs; reduced.set(key, current)
+    }
+    let summary = [...reduced.values()].sort((a, b) => b.values.value - a.values.value).slice(0, 100)
+    if (!grouped.length && count && drift) summary[0].values.value++
+    if (grouped.length === 1 && duplicateDeployment) summary.push(structuredClone(summary[0]))
+    if (grouped.length === 1 && !count && missingCpuDeployment) summary.pop()
+    if (match && wrongScope) summary[0].dimensions[dep] = 'dpl_foreign'
+    return Response.json({ summary, series: [], ...(match && excludedPartition ? { meta: { excludedIntervals: [{}] } } : {}) })
+  }
+  return { fetchImpl, queries, expectedRequests: rows.reduce((sum, row) => sum + row.requests, 0),
+    expectedCpuMs: rows.reduce((sum, row) => sum + row.cpuMs, 0), groups: rows.length }
+}
+
+const observePartitions = async options => {
+  const source = partitionProvider(options)
+  const report = await collectHour({ input: observationInput, now, fetchImpl: source.fetchImpl,
+    vercelToken: 'synthetic-vercel-secret', neonToken: 'synthetic-neon-secret' })
+  return { report, source }
+}
+
+test('a capped project hour is recovered by disjoint deployment queries with unchanged scope and reconciled totals', async () => {
+  for (const options of [{}, { legacy: true, countOnly: true }]) {
+    const { report, source } = await observePartitions(options)
+    assert.equal(report.status, 'collected', report.reasons.join(',')); assert.equal(report.productionAcceptance, false)
+    assert.equal(report.vercel.coverage, 'disjoint_deployments_reconciled_to_project_totals')
+    assert.equal(report.vercel.groups.length, source.groups); assert.equal(source.groups, 120)
+    assert.equal(report.vercel.requests, source.expectedRequests); assert.equal(report.vercel.cpuMs, source.expectedCpuMs)
+    assert.equal(report.vercel.reconciliation.totalRequests, source.expectedRequests)
+    assert.equal(report.vercel.reconciliation.totalCpuMs, source.expectedCpuMs)
+    assert.deepEqual(report.vercel.reconciliation.partitions.map(p => p.groups), [60, 60])
+    assert.equal(report.vercel.reconciliation.from, window.from); assert.equal(report.vercel.reconciliation.to, window.to)
+    assert.equal(report.vercelResponseShape.count.summary.length, 100)
+    assert.equal(report.vercelResponseShape.partitioning.partitions.length, 2)
+    assert.equal(source.queries.length, 10)
+    assert.ok(!JSON.stringify(report).includes('synthetic-secret'))
+    assert.ok(!JSON.stringify(report.vercelResponseShape).includes('dpl_partition'))
+  }
+})
+
+test('partition limits, incomplete sums, mixed scopes, duplicates and missing metric groups remain insufficient', async () => {
+  for (const [options, reason] of [
+    [{ groupsPerDeployment: 100 }, 'metric_groups_missing_or_truncated'],
+    [{ deploymentCount: 17, groupsPerDeployment: 7 }, 'metric_partition_limit_exceeded'],
+    [{ drift: true }, 'metric_partition_totals_mismatch'],
+    [{ missingRoute: true }, 'metric_partition_totals_mismatch'],
+    [{ wrongScope: true }, 'metric_partition_scope_invalid'],
+    [{ duplicateDeployment: true }, 'metric_duplicate_group'],
+    [{ excludedPartition: true }, 'vercel_metric_intervals_excluded'],
+    [{ missingCpuDeployment: true }, 'cpu_request_scope_mismatch'],
+  ]) {
+    const { report, source } = await observePartitions(options)
+    assert.equal(report.status, 'insufficient'); assert.deepEqual(report.reasons, [reason])
+    assert.equal(report.vercel, undefined); assert.equal(report.productionAcceptance, false)
+    assert.ok(source.queries.length <= 10); assert.ok(report.neon.bytes > 0)
   }
 })

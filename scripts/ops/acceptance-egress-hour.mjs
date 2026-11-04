@@ -11,6 +11,7 @@ const iso = value => new Date(value).toISOString()
 const safeCode = error => /^[a-z][a-z0-9_]{0,100}$/.test(error?.message ?? '') ? error.message : 'collection_failed'
 const keys = ['role', 'scope', 'from', 'to', 'deploymentId', 'expectedBuild', 'workloadDigest', 'concurrentTasks']
 const OBSERVATION_GROUP_LIMIT = 100
+const OBSERVATION_DEPLOYMENT_LIMIT = 16
 
 /** Inputs describe one completed UTC hour, never a rolling or inferred window. */
 export function fixedHour(raw, now = Date.now()) {
@@ -163,6 +164,87 @@ function metricResponseShape(raw) {
     values: describe(first?.values, ['value']) }
 }
 
+function observationRollupQuery(metric, aggregation, window, dimensions, grouped) {
+  const query = projectMetricQuery(metric, aggregation, window, dimensions)
+  if (grouped) query.groupBy = [dimensions.deploymentId]
+  else { delete query.groupBy; delete query.seriesSelection }
+  return query
+}
+
+function observationRollupRows(raw, metric, deploymentDimension) {
+  if (raw?.meta?.excludedIntervals?.length) fail('vercel_metric_intervals_excluded')
+  if (!Array.isArray(raw?.summary) || raw.summary.length >= OBSERVATION_GROUP_LIMIT) fail('metric_groups_missing_or_truncated')
+  if (!raw.summary.length) fail('vercel_no_groups_reported')
+  if (!deploymentDimension && raw.summary.length !== 1) fail('metric_rollup_scope_invalid')
+  const rows = new Map()
+  for (const point of raw.summary) {
+    const actual = point?.dimensions
+    if (!actual || typeof actual !== 'object' || Array.isArray(actual)
+      || Object.keys(actual).length !== (deploymentDimension ? 1 : 0)) fail('metric_rollup_scope_invalid')
+    const key = deploymentDimension ? actual[deploymentDimension] : 'project'
+    if (deploymentDimension && !/^dpl_[A-Za-z0-9]{1,100}$/.test(key ?? '')) fail('metric_deployment_dimension_invalid')
+    const value = point?.values?.value
+    if (!Number.isFinite(value) || value < 0 || (metric === COUNT && !Number.isSafeInteger(value))) fail('metric_value_invalid')
+    if (rows.has(key)) fail('metric_duplicate_group')
+    rows.set(key, value)
+  }
+  return rows
+}
+
+const cpuEqual = (a, b) => Math.abs(a - b) <= Math.max(1e-7, Math.max(Math.abs(a), Math.abs(b)) * 1e-9)
+function requireObservationTotals(actualCount, actualCpu, expectedCount, expectedCpu) {
+  if (!Number.isSafeInteger(actualCount) || actualCount !== expectedCount || !cpuEqual(actualCpu, expectedCpu)) fail('metric_partition_totals_mismatch')
+}
+
+/** A capped top-N is never summed as a complete project hour. Enumerate a
+ * bounded set of disjoint deployments over the unchanged hour, then reconcile
+ * each partition and the combined result against independent uncapped totals.
+ * A partition that still reaches the cap remains insufficient. */
+async function partitionObservation(read, window, dimensions, countContract, cpuContract, shape, recordShape) {
+  const [totalCountRaw, totalCpuRaw, deploymentCountRaw, deploymentCpuRaw] = await Promise.all([
+    read('/metrics/v1', observationRollupQuery(COUNT, countContract.aggregation, window, dimensions, false)),
+    read('/metrics/v1', observationRollupQuery(CPU, cpuContract.aggregation, window, dimensions, false)),
+    read('/metrics/v1', observationRollupQuery(COUNT, countContract.aggregation, window, dimensions, true)),
+    read('/metrics/v1', observationRollupQuery(CPU, cpuContract.aggregation, window, dimensions, true)),
+  ])
+  shape.partitioning = { kind: 'disjoint_deployments', maximumDeployments: OBSERVATION_DEPLOYMENT_LIMIT,
+    totals: { count: metricResponseShape(totalCountRaw), cpu: metricResponseShape(totalCpuRaw) },
+    deployments: { count: metricResponseShape(deploymentCountRaw), cpu: metricResponseShape(deploymentCpuRaw) }, partitions: [] }
+  recordShape(shape)
+  const totalCount = observationRollupRows(totalCountRaw, COUNT).get('project')
+  const totalCpu = observationRollupRows(totalCpuRaw, CPU).get('project')
+  const deploymentCounts = observationRollupRows(deploymentCountRaw, COUNT, dimensions.deploymentId)
+  const deploymentCpu = observationRollupRows(deploymentCpuRaw, CPU, dimensions.deploymentId)
+  if (deploymentCounts.size !== deploymentCpu.size || [...deploymentCounts.keys()].some(key => !deploymentCpu.has(key))) fail('cpu_request_scope_mismatch')
+  if (deploymentCounts.size > OBSERVATION_DEPLOYMENT_LIMIT) fail('metric_partition_limit_exceeded')
+  requireObservationTotals([...deploymentCounts.values()].reduce((sum, value) => sum + value, 0),
+    [...deploymentCpu.values()].reduce((sum, value) => sum + value, 0), totalCount, totalCpu)
+  const counts = new Map(), cpu = new Map(), partitions = []
+  for (const deploymentId of [...deploymentCounts.keys()].sort()) {
+    const query = (metric, aggregation) => ({ ...projectMetricQuery(metric, aggregation, window, dimensions),
+      filter: `environment:production AND ${dimensions.deploymentId}:"${deploymentId}"` })
+    const [countRaw, cpuRaw] = await Promise.all([
+      read('/metrics/v1', query(COUNT, countContract.aggregation)), read('/metrics/v1', query(CPU, cpuContract.aggregation)),
+    ])
+    shape.partitioning.partitions.push({ count: metricResponseShape(countRaw), cpu: metricResponseShape(cpuRaw) })
+    recordShape(shape)
+    const countRows = observationRows(countRaw, COUNT, dimensions), cpuRows = observationRows(cpuRaw, CPU, dimensions)
+    if ([...countRows.values(), ...cpuRows.values()].some(row => row.deploymentId !== deploymentId)) fail('metric_partition_scope_invalid')
+    const totals = aggregate(cpuRows, countRows)
+    requireObservationTotals(totals.requests, totals.cpuMs, deploymentCounts.get(deploymentId), deploymentCpu.get(deploymentId))
+    for (const [destination, rows] of [[counts, countRows], [cpu, cpuRows]]) for (const [key, row] of rows) {
+      if (destination.has(key)) fail('metric_duplicate_group')
+      destination.set(key, row)
+    }
+    partitions.push({ deploymentId, groups: countRows.size, requests: totals.requests, cpuMs: totals.cpuMs })
+  }
+  const totals = aggregate(cpu, counts)
+  requireObservationTotals(totals.requests, totals.cpuMs, totalCount, totalCpu)
+  return { counts, cpu, reconciliation: { method: 'disjoint_deployments', maximumDeployments: OBSERVATION_DEPLOYMENT_LIMIT,
+    from: window.from, to: window.to, totalRequests: totalCount, totalCpuMs: totalCpu,
+    countComparison: 'exact', cpuAbsoluteToleranceMs: 1e-7, cpuRelativeTolerance: 1e-9, partitions } }
+}
+
 async function projectObservation(read, window, recordShape) {
   const context = async () => {
     const alias = activeAlias(await read('/v4/aliases/' + PRODUCTION_ALIAS))
@@ -178,9 +260,15 @@ async function projectObservation(read, window, recordShape) {
     read('/metrics/v1', projectMetricQuery(COUNT, countContract.aggregation, window, dimensions)),
     read('/metrics/v1', projectMetricQuery(CPU, cpuContract.aggregation, window, dimensions)),
   ])
-  recordShape({ count: metricResponseShape(countsRaw), cpu: metricResponseShape(cpuRaw), queryGroupLimit: OBSERVATION_GROUP_LIMIT })
+  const shape = { count: metricResponseShape(countsRaw), cpu: metricResponseShape(cpuRaw), queryGroupLimit: OBSERVATION_GROUP_LIMIT }
+  recordShape(shape)
+  if (countsRaw?.meta?.excludedIntervals?.length || cpuRaw?.meta?.excludedIntervals?.length) fail('vercel_metric_intervals_excluded')
+  if (!Array.isArray(countsRaw?.summary) || !Array.isArray(cpuRaw?.summary)) fail('metric_groups_missing_or_truncated')
+  const partitioned = countsRaw.summary.length >= OBSERVATION_GROUP_LIMIT || cpuRaw.summary.length >= OBSERVATION_GROUP_LIMIT
+    ? await partitionObservation(read, window, dimensions, countContract, cpuContract, shape, recordShape) : null
   const after = await context()
-  const counts = observationRows(countsRaw, COUNT, dimensions), cpu = observationRows(cpuRaw, CPU, dimensions)
+  const counts = partitioned?.counts ?? observationRows(countsRaw, COUNT, dimensions)
+  const cpu = partitioned?.cpu ?? observationRows(cpuRaw, CPU, dimensions)
   const totals = aggregate(cpu, counts)
   if (!Number.isSafeInteger(totals.requests) || !Number.isSafeInteger(totals.errors)) fail('metric_value_invalid')
   const groups = [...counts].map(([key, row]) => ({ deploymentId: row.deploymentId, route: row.route, httpStatus: row.httpStatus,
@@ -194,7 +282,8 @@ async function projectObservation(read, window, recordShape) {
     }
   }
   return { scope: 'project-production', measurement: 'function_invocation_observability_aggregates',
-    coverage: 'returned_groups_below_query_limit', groupLimit: OBSERVATION_GROUP_LIMIT,
+    coverage: partitioned ? 'disjoint_deployments_reconciled_to_project_totals' : 'returned_groups_below_query_limit',
+    groupLimit: OBSERVATION_GROUP_LIMIT, ...(partitioned ? { reconciliation: partitioned.reconciliation } : {}),
     contextAtCollection: { before, after, aliasChanged: JSON.stringify(before) !== JSON.stringify(after) },
     metricContract: { count: countContract, cpu: cpuContract, dimensions,
       selectionBasis: 'current_vercel_cli_catalog_default_for_count_unit' },
