@@ -61,7 +61,7 @@ const transport = {
   insert(table: unknown) { return { values(value: Record<string, unknown>) {
     if (table === runMessages) { inserted.push(value); return Promise.resolve() }
     assert.equal(table, coordinatorEvents)
-    return { async onConflictDoNothing() { events.push(value) } }
+    return { onConflictDoNothing() { events.push(value); return { returning: async () => [{ id: value.id }] } } }
   } } },
 }
 const database = { ...transport, async transaction<T>(fn: (tx: typeof transport) => Promise<T>) { return fn(transport) } }

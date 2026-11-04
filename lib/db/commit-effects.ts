@@ -88,8 +88,10 @@ export function hasCommitEffect(client: PoolClient, key: string) {
 export function afterCommit(client: PoolClient, key: string, effect: Effect) {
   const state = (client as ObservedClient)[STATE]
   if (!state) throw new Error('Commit effects require an observed database client')
-  if (state.active) state.effects.set(key, effect)
-  else run(effect) // An autocommitted write has already succeeded.
+  // COMMIT can be issued after the originating request context has exited.
+  const committed = AsyncLocalStorage.bind(effect)
+  if (state.active) state.effects.set(key, committed)
+  else run(committed) // An autocommitted write has already succeeded.
 }
 
 /** The pinned node-postgres Drizzle transaction holds the same observed client

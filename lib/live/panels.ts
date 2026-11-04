@@ -1,5 +1,4 @@
 import type { PoolClient } from 'pg'
-import { AsyncLocalStorage } from 'node:async_hooks'
 import { afterDatabaseCommit, databaseCommitScope } from '../db/commit-effects'
 import { LIVE_ID, type LiveInvalidation } from './events'
 import { liveGatewayConfig, type LiveScope } from './scope'
@@ -115,9 +114,9 @@ async function changed(executor: object, kind: 'issue_document' | 'run' | 'threa
       await Promise.all(targets.map(target => sendLiveInvalidations(target.scope, target.events)))
     })
   }
-  afterDatabaseCommit(executor, `${kind}:${id}`, () => scheduleLive(AsyncLocalStorage.bind(() => kind === 'thread'
+  afterDatabaseCommit(executor, `${kind}:${id}`, () => scheduleLive(() => kind === 'thread'
     ? batchStreamInvalidation(databaseScope, id, publish)
-    : publish())))
+    : publish()))
 }
 
 export const documentChanged = (executor: object, issueId: string) => changed(executor, 'issue_document', issueId)
@@ -144,7 +143,7 @@ export async function documentScopesBeforeChange(issue: { id: string; userId: st
 export async function documentScopeChanged(executor: object, issueId: string, previous: LiveScope[]) {
   if (!liveGatewayConfig(process.env)) return
   const { scheduleLive, sendLiveInvalidations } = await import('./notify')
-  afterDatabaseCommit(executor, `issue-scope:${issueId}`, () => scheduleLive(AsyncLocalStorage.bind(async () => {
+  afterDatabaseCommit(executor, `issue-scope:${issueId}`, () => scheduleLive(async () => {
     const { pool, withoutDatabaseClient } = await import('../db/request-scope')
     const { workspacePool } = await import('../workspace-db')
     await withoutDatabaseClient(async () => {
@@ -158,5 +157,5 @@ export async function documentScopeChanged(executor: object, issueId: string, pr
         { kind: 'issue_document', id: issueId }, { kind: 'factory_issue', id: issueId },
       ])))
     })
-  })))
+  }))
 }

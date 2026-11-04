@@ -9,7 +9,7 @@ import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits, databaseCommitScope, captureDatabaseQuery } from '../db/commit-effects'
 import { documentLiveTargets, runLiveTargets, runChanged, threadLiveReferences } from './panels'
 import type { LiveInvalidation } from './events'
-import type { LiveScope } from './scope'
+import { liveChannelId, type LiveScope } from './scope'
 
 const url = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs PostgreSQL')
@@ -18,15 +18,20 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 test('panel notifications follow actual committed writes and persisted owner/workspace scopes', { skip: !url, timeout: 180_000 }, async t => {
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
-  const notification = mock.module('./notify', { namedExports: {
-    scheduleLive: (work: () => Promise<void>) => { pending.push(work) },
-    sendLiveInvalidations: async (scope: LiveScope, events: LiveInvalidation[]) => { sent.push({ scope, events }) },
+  const nextServer = await import('next/server')
+  const scheduler = mock.module('next/server', { namedExports: { ...nextServer,
+    after: (work: () => Promise<void>) => { pending.push(work) },
   } })
+  const channelScopes = new Map<string, LiveScope>(), unexpectedPaths: string[] = []
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   process.env.DEVICE_GATEWAY_URL = 'https://gateway.example.invalid'
   process.env.DEVICE_GATEWAY_PUSH_SECRET = 'isolated-panel-test-secret'
-  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
-    assert.equal(new URL(String(input)).hostname, 'gateway.example.invalid', 'no provider or production request is allowed')
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, options?: RequestInit) => {
+    const target = new URL(String(input))
+    assert.equal(target.hostname, 'gateway.example.invalid', 'no provider or production request is allowed')
+    const scope = channelScopes.get(target.pathname)
+    if (!scope) unexpectedPaths.push(target.pathname)
+    sent.push({ scope: scope ?? { ownerId: 'unexpected', workspaceId: target.pathname }, events: JSON.parse(String(options?.body)) })
     return new Response(null, { status: 204 })
   })
   const admin = new Pool({ connectionString: url, max: 1 })
@@ -47,6 +52,10 @@ test('panel notifications follow actual committed writes and persisted owner/wor
       await databasePool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$1||'@panel.example.invalid',true,now(),now())`, [userId])
     }
     const personal = randomUUID(), a = randomUUID(), b = randomUUID(), foreignPersonal = randomUUID()
+    for (const ownerId of ['owner', 'peer', 'suspended', 'foreign']) for (const workspaceId of [personal, a, b, foreignPersonal]) {
+      const scope = { ownerId, workspaceId }
+      channelScopes.set(`/v1/live/${liveChannelId(scope)}/push`, scope)
+    }
     for (const [id, owner, kind] of [[personal, 'owner', 'personal'], [a, 'owner', 'team'], [b, 'owner', 'team'], [foreignPersonal, 'foreign', 'personal']]) {
       await databasePool.query(`INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES ($1,$2,'Fixture',$3)`, [id, owner, kind])
     }
@@ -333,10 +342,11 @@ test('panel notifications follow actual committed writes and persisted owner/wor
   } finally {
     await scope.close()
     globalDb.workspacePool = previousWorkspace
-    notification.restore()
+    scheduler.restore()
     if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = previous.url
     if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
     await dropTestDatabase(admin, database, databasePool)
     await admin.end()
+    assert.deepEqual(unexpectedPaths, [], 'the real notifier can address only the fixture scopes')
   }
 })

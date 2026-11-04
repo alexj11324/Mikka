@@ -53,9 +53,14 @@ const transport = {
         messages.push(...(value as Array<{ position: number; message: StoredMessage['message'] }>))
         return Promise.resolve()
       }
-      return { async onConflictDoNothing() {
-        if (table === coordinatorEvents) events.push({ id: 'stored-peer-id', createdAt: new Date('2026-10-27T12:00:00Z'), ...value })
-        else assert.equal(table, coordinatorSessions)
+      return { onConflictDoNothing() {
+        if (table === coordinatorEvents) {
+          const row = { id: 'stored-peer-id', createdAt: new Date('2026-10-27T12:00:00Z'), ...value }
+          events.push(row)
+          return { returning: async () => [{ id: row.id }] }
+        }
+        assert.equal(table, coordinatorSessions)
+        return Promise.resolve()
       } }
     } }
   },
