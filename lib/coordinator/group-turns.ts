@@ -11,6 +11,7 @@ import { initializeGroupDecisionTrace, recordGroupDecisionRoute, recordGroupDeci
 import { GROUP_MAX_RESPONDERS } from './group-decision-chain'
 import { recordGroupFeedback } from './group-decision-feedback'
 import { groupCopy, readGroupLocale } from './group-copy'
+import { openGroupTurnSession } from './group-turn-session'
 
 export const GROUP_MAX_ROUNDS = GROUP_MAX_RESPONDERS
 export type GroupAgent = RoutingMember
@@ -85,12 +86,13 @@ export async function enqueueGroupTurn(client: PoolClient, conversationId: strin
  * A crashed generation is marked failed on next wake, NEVER automatically replayed.
  */
 export async function processGroupTurn(pool: Pool, conversationId: string, runtime: GroupRuntime, deadline = Date.now() + 220000): Promise<boolean> {
-  const client = await pool.connect()
+  const session = await openGroupTurnSession(pool)
+  const { client } = session
   let locked = false
-  let discard = false
   let messageId: string | undefined
   try {
     const acquired = await client.query(`SELECT pg_try_advisory_lock(hashtextextended(current_database() || '.' || current_schema() || '.group-turn.' || $1,0)) AS acquired`, [conversationId])
+    session.assertHeld()
     if (!acquired.rows[0].acquired) return false
     locked = true
     // An unavailable routing decision has not woken a responder. Retry only
@@ -278,8 +280,8 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     throw error
   } finally {
     try { if (locked) await client.query(`SELECT pg_advisory_unlock(hashtextextended(current_database() || '.' || current_schema() || '.group-turn.' || $1,0))`, [conversationId]) }
-    catch { discard = true }
-    finally { client.release(discard) }
+    catch { /* A lost physical session has already released its locks. */ }
+    finally { await session.close() }
   }
 }
 

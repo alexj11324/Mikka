@@ -11,11 +11,24 @@ import { DECISION_MODEL, type DecisionAnswer } from './decision'
 import type { DecisionExecution } from './decide'
 import { UnknownMentionError, routingInput } from './group-routing'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
+import { groupTurnSessionOptions, openGroupTurnSession } from './group-turn-session'
 
 const a = randomUUID(), b = randomUUID(), outsider = randomUUID()
 const members: GroupAgent[] = [a,b].map((id,i) => ({ id, name: `Agent ${i}`, description: `role ${i}` }))
 const message = { text: 'everyone', mentions: [] }
 const receipt: DecisionExecution = {executionId:'synthetic-execution',modelId:DECISION_MODEL,providerGenerationId:'synthetic-generation',startedAt:'2026-01-01T00:00:00.000Z',completedAt:'2026-01-01T00:00:01.000Z',requestDigest:'a'.repeat(64),imageDigests:[],vision:'no-image-input'}
+test('group session uses the same database/role/TLS and only bypasses the documented Neon transaction pooler',()=>{
+  const source=new URL('postgresql://ep-group-pooler.c-7.us-east-2.aws.neon.tech/app?sslmode=require')
+  source.username=randomUUID();source.password=randomUUID()
+  const options=groupTurnSessionOptions({connectionString:source.href,options:'-c search_path=group_fixture',max:5})
+  const target=new URL(options.connectionString!)
+  assert.equal(target.hostname,'ep-group.c-7.us-east-2.aws.neon.tech')
+  assert.equal(target.username,source.username);assert.equal(target.password,source.password)
+  assert.equal(target.pathname,source.pathname);assert.equal(target.search,source.search)
+  assert.equal(options.options,'-c search_path=group_fixture');assert.equal(options.max,1)
+  assert.equal(groupTurnSessionOptions({host:'localhost-pooler.example.test'}).host,'localhost-pooler.example.test')
+  assert.throws(()=>groupTurnSessionOptions({connectionString:source.href+'&host=foreign.invalid'}),/NEON_CONNECTION_OVERRIDE_REFUSED/)
+})
 test('group failure diagnostics preserve finite underlying causes and never private provider text', () => {
   const wrapped = (cause:unknown) => Object.assign(new Error('private prompt and credential'), { name:'AI_NoOutputGeneratedError',cause })
   assert.equal(groupGenerationFailure(wrapped(new DOMException('private upstream URL','TimeoutError'))),'generation_timeout')
@@ -120,6 +133,35 @@ test('private routing rejects foreign/self/third peers and an unavailable writer
 // Only a disposable loopback *_e2e database, even if REQUIRE_DB is set.
 const dbURL = disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined
 if (process.env.REQUIRE_DB === '1' && !dbURL) throw new Error('REQUIRE_DB=1 requires a loopback *_e2e database')
+test('PG17: group sessions own different backends and close releases reentrant locks even after a socket loss',{skip:!dbURL},async t=>{
+  const database=new Pool({connectionString:dbURL})
+  t.after(()=>database.end())
+  const first=await openGroupTurnSession(database),second=await openGroupTurnSession(database)
+  const key=`group-session-fixture:${randomUUID()}`
+  const lock=(session:typeof first)=>session.client.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired',[key])
+  const firstPid=(await first.client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+  try {
+    assert.notEqual((await second.client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid,firstPid)
+    assert.equal((await lock(first)).rows[0].acquired,true)
+    assert.equal((await lock(first)).rows[0].acquired,true,'PostgreSQL re-enters a lock on the same backend')
+    assert.equal((await lock(second)).rows[0].acquired,false,'the other worker cannot re-enter that backend')
+    await first.close()
+    assert.equal((await lock(second)).rows[0].acquired,true,'physical close releases all nested acquisitions')
+  } finally {await first.close();await second.close()}
+  assert.equal((await database.query("SELECT count(*)::int n FROM pg_locks WHERE locktype='advisory' AND pid=$1",[firstPid])).rows[0].n,0)
+  const lost=await openGroupTurnSession(database)
+  try {
+    await lock(lost)
+    const pid=(await lost.client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+    const ended=new Promise<void>(resolve=>lost.client.once('end',()=>resolve()))
+    assert.equal((await database.query('SELECT pg_terminate_backend($1) AS terminated',[pid])).rows[0].terminated,true)
+    await ended
+    assert.throws(()=>lost.assertHeld(),/group_turn_session_lost/)
+    await assert.rejects(lost.client.query('SELECT 1'))
+  } finally {await lost.close()}
+  const recovered=await openGroupTurnSession(database)
+  try {assert.equal((await lock(recovered)).rows[0].acquired,true)} finally {await recovered.close()}
+})
 test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, rounds, correction persistence and privacy', { skip: !dbURL }, async () => {
   const pool = new Pool({ connectionString: dbURL })
   const schema = `turns_${randomUUID().replaceAll('-','')}`
@@ -425,6 +467,42 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     await processGroupTurn(scoped,id,{...sequentialRuntime,route:stopJudge.route})
     const stoppedChain=(await scoped.query('SELECT error,trace FROM group_turns WHERE "messageId"=$1',[stoppedDecision])).rows[0]
     assert.equal(stoppedDecisionCalls,1);assert.equal(stoppedChain.error,'stopped');assert.equal(stoppedChain.trace.decisions.length,1)
+
+    // A transaction pooler can lend one physical backend to two logical
+    // clients between statements. PostgreSQL's session lock then re-enters;
+    // a history poll must not classify a still-live Decision as interrupted.
+    const pooledGroup=await create(), pooledMessage=await send(pooledGroup,'quiet pooled fixture')
+    const backend=await scoped.connect()
+    const pooledClient=new Proxy(backend,{get(target,property){
+      if(property==='release') return ()=>{}
+      const value=Reflect.get(target,property,target)
+      return typeof value==='function'?value.bind(target):value
+    }})
+    const transactionPool=new Proxy(scoped,{get(target,property){
+      if(property==='connect') return async()=>pooledClient
+      const value=Reflect.get(target,property,target)
+      return typeof value==='function'?value.bind(target):value
+    }})
+    let completeDecision!:()=>void, decisionEntered!:()=>void, pooledCalls=0
+    const decisionReady=new Promise<void>(resolve=>{decisionEntered=resolve})
+    const decisionRelease=new Promise<void>(resolve=>{completeDecision=resolve})
+    const pooledJudge=createGroupJudgment(async()=>{
+      pooledCalls++;decisionEntered();await decisionRelease
+      return {answers:new Map([['intent',{type:'choice' as const,name:'intent',choice:'observe_context'}]]),execution:{...receipt,executionId:'pooled-decision',providerGenerationId:'pooled-generation'}}
+    })
+    const pooledRuntime={...runtime,route:pooledJudge.route}
+    const liveDecision=processGroupTurn(transactionPool,pooledGroup,pooledRuntime)
+    try {
+      await decisionReady
+      assert.equal(await processGroupTurn(transactionPool,pooledGroup,pooledRuntime),false)
+      const live=(await scoped.query('SELECT status,error,trace FROM group_turns WHERE "messageId"=$1',[pooledMessage])).rows[0]
+      assert.equal(live.status,'running','a concurrent history poll must not interrupt the live worker')
+      assert.equal(live.error,null);assert.equal(live.trace.status,'pending');assert.equal(pooledCalls,1)
+    } finally {completeDecision();await liveDecision;backend.release()}
+    const pooledFinished=(await scoped.query('SELECT status,error,trace FROM group_turns WHERE "messageId"=$1',[pooledMessage])).rows[0]
+    assert.equal(pooledFinished.status,'complete');assert.equal(pooledFinished.error,null)
+    assert.equal(pooledFinished.trace.decisions[0].receipt.providerGenerationId,'pooled-generation')
+    assert.deepEqual(pooledFinished.trace.events,[],'quiet routing does not wake or generate')
     assert.ok(generated.includes('first')); assert.ok(laterRoot)
   } finally { releasePending(); await scoped.end(); await pool.end() }
 })

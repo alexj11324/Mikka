@@ -1,0 +1,31 @@
+import { Pool, type PoolConfig } from 'pg'
+import { directPoolOptions } from '../../scripts/postgres-connection.mjs'
+
+/** A group worker holds a session lock across provider I/O. Neon's transaction
+ * pooler may lend the same backend to another logical client during that I/O,
+ * allowing the second worker to re-enter the first worker's session lock.
+ * Reuse the configured database, role and TLS; only its documented Neon
+ * pooler host changes, as in the account-deletion lock owner. */
+export function groupTurnSessionOptions(options: PoolConfig): PoolConfig {
+  return { ...directPoolOptions(options), max: 1, connectionTimeoutMillis: 5_000, application_name: 'mikka-group-turn' }
+}
+
+/** One physical connection belongs to this worker until close. Never return
+ * an advisory-locked backend to a reusable pool, including on errors. */
+export async function openGroupTurnSession(database: Pool) {
+  const sessions = new Pool(groupTurnSessionOptions(database.options))
+  const client = await sessions.connect().catch(async error => { await sessions.end(); throw error })
+  let lost = false, closed: Promise<void> | undefined
+  const invalidate = () => { lost = true }
+  client.on('error', invalidate); client.on('end', invalidate)
+  sessions.on('error', invalidate)
+  const assertHeld = () => { if (lost) throw new Error('group_turn_session_lost') }
+  const close = () => closed ??= (async () => {
+    try { await client.end() }
+    finally {
+      client.release(true); await sessions.end()
+      client.off('error', invalidate); client.off('end', invalidate)
+    }
+  })()
+  return { client, assertHeld, close }
+}
