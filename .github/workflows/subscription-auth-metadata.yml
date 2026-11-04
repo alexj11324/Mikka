@@ -28,8 +28,8 @@ jobs:
           node-version: 24
       - name: Verify read-only transport and redaction without credentials
         run: node --test scripts/ops/subscription-auth-metadata.test.mjs
-      - name: Read the existing project configuration metadata once
-        run: node scripts/ops/subscription-auth-metadata.mjs
+      - name: Inspect selected runtime identities and their own permission metadata once
+        run: node scripts/ops/subscription-auth-metadata.mjs --runtime
       - name: Preserve only the allowlisted metadata report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
