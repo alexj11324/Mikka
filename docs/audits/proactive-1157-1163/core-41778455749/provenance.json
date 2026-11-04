@@ -1,0 +1,16 @@
+{
+  "workflowRunId": 41778455749,
+  "jobId": 126404205895,
+  "head": "f5b44327484152686c48a68e9f79a673ad55b7c7",
+  "source": "62bb445860642cb110b37e00794daf06ab454f88",
+  "deploymentId": "dpl_419jqfp1pAwM8QJY2Bt1if7sbH2t",
+  "artifactId": 13298385931,
+  "artifactZipSha256": "d1390461cc7452cfb47613c5813bb37b969137ff4ac0f02bb4df5b8a90b5e7cd",
+  "resultsSha256": "05dc85a33db2a928e45c6cadcd13a85003131df8450404deb0f13363af50ac98",
+  "resultsBytes": 109597,
+  "resultsGitBlob": "a1bf0c18c22762f7891c5f91d0dfbb6935452553",
+  "artifactDownloadVerified": true,
+  "resultsUnmodified": true,
+  "status": "fail",
+  "qualityAccepted": false
+}

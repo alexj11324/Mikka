@@ -1,0 +1,309 @@
+{
+  "schemaVersion": 1,
+  "kind": "normal-owner-ui-frozen-run-observation",
+  "recordedFrom": "root agent direct normal browser UI observations; this file is a transcription, not a new API/provider execution",
+  "observedAt": {
+    "initialStages": "2026-11-04T05:08:00Z/2026-11-04T05:09:59Z",
+    "initialAcceptanceApproximate": "2026-11-04T05:11:00Z",
+    "localQualification": "2026-11-04T05:15:00.971Z"
+  },
+  "lastCanonicalBeforeInitialObservations": {
+    "source": "59ecb8cde452b2688a4b22a8c01b6baa40710fce",
+    "deploymentId": "dpl_FTjSNnJnTNSLymKbjciJa4R12wmL",
+    "observedAt": "2026-11-04T05:07:57.901Z",
+    "httpStatus": 200,
+    "commandId": "cmd_cae1372f5bcc45d284afca3d0c82",
+    "perRunObservationDeploymentCaptured": false
+  },
+  "runs": [
+    {
+      "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+      "requesterId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "botOwnerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "executionPrincipalId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "outputOwnerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "modelPayerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "runtimePayerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "resourceAccess": "own",
+      "resourceOwners": [
+        "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ"
+      ],
+      "credentialType": "subscription",
+      "externalModelCost": {
+        "status": "unknown",
+        "amountUsd": null
+      },
+      "stage": "execute",
+      "runId": "35eceed4-56d6-435f-828e-3fee46ef5524",
+      "harness": "claude_code",
+      "model": "claude-opus-5-5",
+      "subscriptionRoute": "claude_code_cli",
+      "deviceId": "0832fedc-3a69-4607-8a96-4c6b02007873",
+      "subscriptionBindingId": "dabd9bd4-2a79-40a8-85dc-1b3db772db19",
+      "subscriptionRevision": 2,
+      "runtime": {
+        "kind": "e2b",
+        "payerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+        "resourceId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+        "costStatus": "unknown",
+        "amountUsd": null
+      }
+    },
+    {
+      "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+      "requesterId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "botOwnerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "executionPrincipalId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "outputOwnerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "modelPayerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "runtimePayerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "resourceAccess": "own",
+      "resourceOwners": [
+        "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ"
+      ],
+      "credentialType": "subscription",
+      "externalModelCost": {
+        "status": "unknown",
+        "amountUsd": null
+      },
+      "stage": "review",
+      "runId": "7b4fb6c5-8819-4089-8d65-b43f8a105a94",
+      "harness": "claude_code",
+      "model": "claude-opus-5-5",
+      "subscriptionRoute": "claude_code_cli",
+      "deviceId": "0832fedc-3a69-4607-8a96-4c6b02007873",
+      "subscriptionBindingId": "dabd9bd4-2a79-40a8-85dc-1b3db772db19",
+      "subscriptionRevision": 2,
+      "runtime": {
+        "kind": "e2b",
+        "payerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+        "resourceId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+        "costStatus": "unknown",
+        "amountUsd": null
+      }
+    },
+    {
+      "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+      "requesterId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "botOwnerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "executionPrincipalId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "outputOwnerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "modelPayerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "runtimePayerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "resourceAccess": "own",
+      "resourceOwners": [
+        "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ"
+      ],
+      "credentialType": "subscription",
+      "externalModelCost": {
+        "status": "unknown",
+        "amountUsd": null
+      },
+      "stage": "verify",
+      "runId": "548d0cb2-cd4a-4634-8e2a-b32766ad72cf",
+      "harness": "claude_code",
+      "model": "claude-opus-5-5",
+      "subscriptionRoute": "claude_code_cli",
+      "deviceId": "0832fedc-3a69-4607-8a96-4c6b02007873",
+      "subscriptionBindingId": "dabd9bd4-2a79-40a8-85dc-1b3db772db19",
+      "subscriptionRevision": 2,
+      "runtime": {
+        "kind": "e2b",
+        "payerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+        "resourceId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+        "costStatus": "unknown",
+        "amountUsd": null
+      }
+    },
+    {
+      "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+      "requesterId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "botOwnerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "executionPrincipalId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "outputOwnerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "modelPayerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "runtimePayerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "resourceAccess": "own",
+      "resourceOwners": [
+        "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ"
+      ],
+      "credentialType": "subscription",
+      "externalModelCost": {
+        "status": "unknown",
+        "amountUsd": null
+      },
+      "stage": "execute",
+      "runId": "aef4a580-56d2-437d-8e9e-fad3e263b1b2",
+      "harness": "codex",
+      "model": "gpt-5.6-luna",
+      "subscriptionRoute": "codex_cli",
+      "deviceId": "e7bdb4f7-88e7-4f4e-a66d-2a78ead110cb",
+      "subscriptionBindingId": "f9b001ce-1e64-41b0-874e-821cd5cba522",
+      "subscriptionRevision": 2,
+      "runtime": {
+        "kind": "e2b",
+        "payerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+        "resourceId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+        "costStatus": "unknown",
+        "amountUsd": null
+      }
+    },
+    {
+      "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+      "requesterId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "botOwnerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "executionPrincipalId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "outputOwnerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "modelPayerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "runtimePayerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "resourceAccess": "own",
+      "resourceOwners": [
+        "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ"
+      ],
+      "credentialType": "subscription",
+      "externalModelCost": {
+        "status": "unknown",
+        "amountUsd": null
+      },
+      "stage": "review",
+      "runId": "48701b07-6e09-4519-8eb7-03c1e38aeb28",
+      "harness": "codex",
+      "model": "gpt-5.6-luna",
+      "subscriptionRoute": "codex_cli",
+      "deviceId": "e7bdb4f7-88e7-4f4e-a66d-2a78ead110cb",
+      "subscriptionBindingId": "f9b001ce-1e64-41b0-874e-821cd5cba522",
+      "subscriptionRevision": 2,
+      "runtime": {
+        "kind": "e2b",
+        "payerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+        "resourceId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+        "costStatus": "unknown",
+        "amountUsd": null
+      }
+    },
+    {
+      "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+      "requesterId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "botOwnerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "executionPrincipalId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "outputOwnerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "modelPayerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "runtimePayerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "resourceAccess": "own",
+      "resourceOwners": [
+        "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ"
+      ],
+      "credentialType": "subscription",
+      "externalModelCost": {
+        "status": "unknown",
+        "amountUsd": null
+      },
+      "stage": "verify",
+      "runId": "68bee26b-3d69-4361-8eed-fc4944641d49",
+      "harness": "codex",
+      "model": "gpt-5.6-luna",
+      "subscriptionRoute": "codex_cli",
+      "deviceId": "e7bdb4f7-88e7-4f4e-a66d-2a78ead110cb",
+      "subscriptionBindingId": "f9b001ce-1e64-41b0-874e-821cd5cba522",
+      "subscriptionRevision": 2,
+      "runtime": {
+        "kind": "e2b",
+        "payerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+        "resourceId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+        "costStatus": "unknown",
+        "amountUsd": null
+      }
+    },
+    {
+      "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+      "requesterId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "botOwnerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "executionPrincipalId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "outputOwnerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "modelPayerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "runtimePayerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "resourceAccess": "own",
+      "resourceOwners": [
+        "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ"
+      ],
+      "credentialType": "subscription",
+      "externalModelCost": {
+        "status": "unknown",
+        "amountUsd": null
+      },
+      "stage": "local-subscription-qualification",
+      "runId": "d40ef1dd-3180-4119-89a6-ec7a20ee304e",
+      "harness": "codex",
+      "model": "gpt-5.6-luna",
+      "subscriptionRoute": "codex_cli",
+      "deviceId": "0c2424b4-0a48-4a1a-bb20-e7802dc9848b",
+      "subscriptionBindingId": "ea3eef9e-6847-4dd9-8f96-af5df0a84ef4",
+      "subscriptionRevision": 2,
+      "runtime": {
+        "kind": "local_device",
+        "payerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+        "resourceId": "0c2424b4-0a48-4a1a-bb20-e7802dc9848b",
+        "costStatus": "not_applicable",
+        "amountUsd": null
+      }
+    }
+  ],
+  "initialTaskAcceptance": [
+    {
+      "harness": "claude_code",
+      "criteriaPassed": 5,
+      "criteriaTotal": 5,
+      "artifactBytes": 53,
+      "artifactSha256Prefix": "0fb3",
+      "fullDigestIncluded": false,
+      "normalOwnerAccepted": true
+    },
+    {
+      "harness": "codex",
+      "criteriaPassed": 3,
+      "criteriaTotal": 3,
+      "artifactBytes": 56,
+      "artifactSha256Prefix": "2a187",
+      "fullDigestIncluded": false,
+      "normalOwnerAccepted": true
+    }
+  ],
+  "continuations": {
+    "acceptedAsPassing": false,
+    "claudeCode": {
+      "sendOutcomeInitially": "unknown; UI reported failed during deployment change",
+      "observedRunId": "d4cd1bd8-8566-4803-8a39-e2aefb7bac3e",
+      "uniqueOwnerMessageVisible": true,
+      "nativeExecutionObserved": true,
+      "reportedDurationSeconds": 19.7,
+      "reportedSteps": 4,
+      "frozenSubscriptionAndResourceRefsMatchInitial": true,
+      "producerClaimedArtifactBytes": 74,
+      "independentReviewVerified": false,
+      "newEpochAcceptanceVerified": false
+    },
+    "codex": {
+      "firstSendOutcome": "unknown; refreshed latest actual run remained original execute and no new owner message was visible",
+      "secondNormalOwnerSendApproximate": "2026-11-04T05:20:00Z",
+      "secondSendOutcome": "awaiting host/UI confirmation; no repeated click by this subagent"
+    }
+  },
+  "localQualification": {
+    "nativeAdmissionObserved": true,
+    "statusShellExecuted": false,
+    "cloudHandoffProven": false,
+    "blockedReason": "native_shell_unavailable under readOnly"
+  },
+  "limits": {
+    "providerBillingLog": false,
+    "independentExternalChargeObservation": false,
+    "realGmailTwoMemberAcceptance": false,
+    "productionTwoMemberSharedMcpToolAcceptance": false,
+    "screenshotsPublishedWithThisRecord": false
+  },
+  "screenshotObservation": {
+    "browserPathReportedByRoot": "/home/oai/share/mikka-primary-codex-identity-20261104-0509.jpg",
+    "nativeFileAvailableAtRecordTime": false
+  },
+  "deploymentNote": "The first 59ec automatic build failed with OOM. FTj succeeded on actual Standard 4-core/8GB build logs; the one-time turbo request did not change permanent project settings."
+}

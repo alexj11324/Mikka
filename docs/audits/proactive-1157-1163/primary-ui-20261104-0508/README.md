@@ -1,0 +1,7 @@
+# Primary account: frozen execution identity observed through normal UI
+
+The facts in `observations.json` transcribe the root agent's direct normal browser UI observations. They are not a fresh programmatic account query. Each of the six initial execute/review/verify runs showed its own frozen official subscription route and model; the same requester, Bot owner, execution principal, resource owners, model payer, runtime payer and output owner were visible. External amounts remained unknown, not zero.
+
+The additional local-device Codex run proves the recorded admission/native execution identity only. Its read-only task could not run a status shell, and it is not Cloud-to-local handoff evidence. Both first-version Tasks were normally accepted by the owner. Continuations were being reconciled during a deployment change and are explicitly not marked as passed. CC's subsequent visible user message and new run disprove any inference that a generic send error means the server made no change.
+
+Root reported a browser-side screenshot, but no native file was available when this record was written; this record contains no fabricated screenshot link. Full artifact digests were not included in the observation handoff, so only explicitly labeled prefixes appear here. Billing fields are Mikka host snapshots, not provider invoices. The observed workspace has no Gmail connection, and no Gmail authorization or mailbox read was performed.
