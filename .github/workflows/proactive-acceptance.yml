@@ -1,20 +1,23 @@
-name: Temporary fixed group Factory diagnostic
+name: Temporary group policy preflight
 on:
   push:
     branches: [acceptance/proactive-1157-1163]
     paths:
       - '.github/workflows/proactive-acceptance.yml'
-      - 'scripts/ops/group-factory-diagnostic.mjs'
+      - 'scripts/ops/group-policy-preflight.mjs'
+      - 'scripts/ops/group-policy-preflight.test.mjs'
+      - 'scripts/ops/run-proactive-acceptance.mjs'
+      - 'scripts/ops/owner-mcp-boundaries.mjs'
 permissions:
   contents: read
 concurrency:
-  group: proactive-group-factory-diagnostic-once
+  group: proactive-production-acceptance-once
   cancel-in-progress: false
 jobs:
-  diagnostic:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/proactive-1157-1163' && github.run_attempt == 1
+  candidate-preflight:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/proactive-1157-1163'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
       id-token: write
@@ -22,8 +25,10 @@ jobs:
       run:
         working-directory: source
     env:
-      DIAGNOSTIC_SOURCE_SHA: 7b6c1ee1b4a53563b2d6d9885ad992858514cd7a
-      DIAGNOSTIC_OUTPUT: ${{ github.workspace }}/group-factory-diagnostic/results.json
+      GROUP_REPLAY_ORIGIN: https://app.aspectlylabs.com
+      GROUP_REPLAY_DEPLOYMENT: dpl_4hjwCkNCz8TNMYsmK3zbgKHCXAFe
+      GROUP_REPLAY_REVISION: aee3b8d23fc1431b4c0f6c98d9852d1402bc723e
+      GROUP_POLICY_PREFLIGHT_OUTPUT: ${{ github.workspace }}/group-policy-preflight-sanitized/results.json
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -31,17 +36,18 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ env.DIAGNOSTIC_SOURCE_SHA }}
+          ref: ${{ env.GROUP_REPLAY_REVISION }}
           path: source
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
-      - name: Install exact-source pg dependency before reading any secret
+      - name: Verify the reviewed runner without credentials
+        working-directory: driver/scripts/ops
+        run: node --test group-policy-preflight.test.mjs
+      - name: Install fixed source dependencies before receiving credentials
         run: npm exec --yes --package pnpm@10.34.3 -- pnpm install --frozen-lockfile --filter '!@mikka/mobile' --ignore-scripts
-      - name: Read only the existing named production connection
-        id: connection
-        continue-on-error: true
+      - name: Read the existing Smoke email only
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -49,21 +55,29 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /vercel
-          secret-name: MIKKA_DATABASE_URL
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
           recursive: false
           include-imports: false
-      - name: Observe exact failed group scope in one read-only transaction
-        timeout-minutes: 3
-        env:
-          DIAGNOSTIC_SECRET_READ: ${{ steps.connection.outcome }}
-        run: node ../driver/scripts/ops/group-factory-diagnostic.mjs
-      - name: Upload sanitized bounded observation only
+      - name: Read the existing Smoke password only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Compare fixed baseline and candidate through the normal owner API once
+        run: node --import tsx ../driver/scripts/ops/group-policy-preflight.mjs
+      - name: Upload sanitized evidence only
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: group-factory-diagnostic-${{ github.run_id }}
-          path: group-factory-diagnostic/results.json
+          name: group-policy-preflight-${{ github.run_id }}
+          path: group-policy-preflight-sanitized/results.json
           if-no-files-found: error
           retention-days: 7
-
