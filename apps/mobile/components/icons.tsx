@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { Animated, Easing, useColorScheme, View } from 'react-native'
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg'
-import { Circle as CircleIcon, CircleAlert, CircleCheck, CirclePause, CircleSlash, Cloud, LoaderCircle, Laptop, Server } from 'lucide-react-native'
+import { Cloud, LoaderCircle, Laptop, MessageCircle, Server } from 'lucide-react-native'
 import type { MachineKind, Source, ThreadStatus } from '@/lib/types'
 import { colors } from '@/lib/theme'
+import { threadDot } from '@/lib/thread-icon'
 
 /** The two-line menu mark from the frames (ChatGPT iOS). */
 export function MenuIcon({ size = 22, color = colors.ink }: { size?: number; color?: string }) {
@@ -30,16 +31,35 @@ export function Spinner({ size = 18, color = colors.secondary }: { size?: number
   )
 }
 
-/** A thread's status icon; a thread is never drawn with its bot's avatar (glossary). */
+/**
+ * A thread's status icon: a speech bubble with its state as a dot on the corner (R-52). A circle is always a task, so a
+ * thread borrows none: 进行中 a pulsing grey dot, 等待你 orange, 受阻 red, 已解决 green, 空闲 a hollow ring. The icon's
+ * label names the state, so the colour is never the only sign (R-87). A thread is never drawn with its bot's avatar.
+ */
 export function StatusIcon({ status, size = 18 }: { status: ThreadStatus; size?: number }) {
-  switch (status) {
-    case 'running': return <Spinner size={size} />
-    case 'waiting': return <CircleIcon size={size} color={colors.secondary} strokeWidth={2} />
-    case 'paused': return <CirclePause size={size} color={colors.secondary} strokeWidth={2} />
-    case 'failed': return <CircleAlert size={size} color={colors.danger} strokeWidth={2} />
-    case 'done': return <CircleCheck size={size} color={colors.success} strokeWidth={2} />
-    case 'stopped': return <CircleSlash size={size} color={colors.secondary} strokeWidth={2} />
-  }
+  const { dot, label } = threadDot(status)
+  const pulse = useRef(new Animated.Value(1)).current
+  useEffect(() => {
+    if (dot !== 'running') return
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 0.35, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]))
+    loop.start()
+    return () => loop.stop()
+  }, [dot, pulse])
+  const spot = Math.max(6, Math.round(size * 0.4))
+  const fill = dot === 'waiting' ? colors.orange : dot === 'blocked' ? colors.danger : dot === 'resolved' ? colors.success : dot === 'idle' ? colors.page : colors.secondary
+  return (
+    <View accessible accessibilityRole="image" accessibilityLabel={label} style={{ width: size, height: size }}>
+      <MessageCircle size={size} color={colors.secondary} strokeWidth={2} />
+      <Animated.View testID={`thread-dot-${dot}`} style={{
+        position: 'absolute', top: -1, right: -1, width: spot, height: spot, borderRadius: spot / 2, backgroundColor: fill,
+        borderWidth: dot === 'idle' ? 1.5 : 2, borderColor: dot === 'idle' ? colors.secondary : colors.page,
+        opacity: dot === 'running' ? pulse : 1,
+      }} />
+    </View>
+  )
 }
 
 export function MachineIcon({ machine, size = 13, color = colors.secondary }: { machine: MachineKind; size?: number; color?: string }) {

@@ -19,4 +19,4 @@ badges write the state beside it, and the icon's label names it. The board card'
 waiting count use the same dots. `scripts/ui-policy.mjs` (`icons/thread-not-circle`) keeps circles out of
 `ThreadStatusIcon`.
 
-The phone app (`apps/mobile`) draws its own native icons and still shows the old set; it follows in its own change.
+The phone app (`apps/mobile`) draws the same bubble and dot with its native colours (等待你 is systemOrange there): its `StatusIcon` and the 线程 filter menu, which shows each group's bubble and uses the `bubble.left` symbol in the native menu.
