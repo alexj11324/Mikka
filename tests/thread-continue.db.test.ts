@@ -77,6 +77,78 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   const first = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string; thread: string }
   assert.equal(first.thread, 'new', JSON.stringify(first))
 
+  await t.test('a lost reply and concurrent retries reuse one owner submission, epoch, run and message', async () => {
+    const b = await person()
+    const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `submission:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+    await end(initial.runId, 'succeeded')
+    const requestId = randomUUID(), text = 'Continue with exactly 74 bytes; this is one submitted request.'
+    const accepted = await sendThreadMessage(b.id, initial.runId, text, 'user', requestId)
+    // The first response may have been lost during a deployment. Neither the
+    // latest run nor a repeated click changes this original request identity.
+    const replay = await sendThreadMessage(b.id, initial.runId, text, 'user', requestId)
+    assert.deepEqual(replay, accepted)
+    const parallel = await Promise.all(Array.from({ length: 3 }, () => sendThreadMessage(b.id, initial.runId, text, 'user', requestId)))
+    for (const result of parallel) assert.deepEqual(result, accepted)
+    const { rows: [counts] } = await pool.query(`SELECT
+      (SELECT count(*)::int FROM coordinator_events WHERE "userId"=$1 AND payload->>'text'=$2) AS events,
+      (SELECT count(*)::int FROM run_messages WHERE "userId"=$1 AND text=$2) AS messages,
+      (SELECT count(*)::int FROM agent_runs WHERE "userId"=$1) AS runs`, [b.id, text])
+    assert.deepEqual(counts, { events: 1, messages: 1, runs: 2 })
+    const eventId = (await pool.query(`SELECT id FROM coordinator_events WHERE "userId"=$1 AND payload->'threadSubmission'->>'requestId'=$2`, [b.id, requestId])).rows[0].id
+    // Simulate a response/storage interruption after normal admission: the
+    // durable Factory epoch remains, but the outer acknowledgement/display do not.
+    await pool.query(`UPDATE coordinator_events SET payload=payload #- '{threadSubmission,result}' WHERE id=$1`, [eventId])
+    await pool.query('DELETE FROM run_messages WHERE id=$1 AND "userId"=$2', [eventId, b.id])
+    assert.deepEqual(await sendThreadMessage(b.id, initial.runId, text, 'user', requestId), accepted)
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_messages WHERE id=$1', [eventId])).rows[0].n, 1)
+    await assert.rejects(sendThreadMessage(b.id, initial.runId, 'Changed payload.', 'user', requestId), { code: 'submissionConflict' })
+    const otherIssue = await seedIssue(pool, b.id)
+    await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1', [otherIssue, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 9000 + users.length } } })])
+    const other = await steps.dispatchRun(b.id, { issueId: otherIssue, repo: 'octo/repo', requestKey: `other:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+    assert.ok(other.runId, JSON.stringify(other))
+    await assert.rejects(sendThreadMessage(b.id, other.runId, text, 'user', requestId), { code: 'submissionConflict' })
+    const nextId = randomUUID()
+    const concurrent = await Promise.allSettled(Array.from({ length: 3 }, () => sendThreadMessage(b.id, initial.runId, 'A later explicit owner request.', 'user', nextId)))
+    assert.ok(concurrent.some(result => result.status === 'fulfilled'))
+    for (const result of concurrent) if (result.status === 'rejected') assert.equal(result.reason.message, 'threadSubmissionOutcomeUnconfirmed')
+    const next = await sendThreadMessage(b.id, initial.runId, 'A later explicit owner request.', 'user', nextId)
+    assert.ok(next.runId)
+    for (const result of concurrent) if (result.status === 'fulfilled') assert.deepEqual(result.value, next)
+    assert.equal((await pool.query(`SELECT count(*)::int AS n FROM coordinator_events WHERE "userId"=$1 AND payload->'threadSubmission'->>'requestId'=$2`, [b.id, nextId])).rows[0].n, 1)
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_messages WHERE "userId"=$1 AND text=$2', [b.id, 'A later explicit owner request.'])).rows[0].n, 1)
+    const beforeReplay = (await pool.query(`SELECT "sourceEventId","attemptId",revision FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2`, [b.id, b.issueId])).rows[0]
+    assert.deepEqual(await sendThreadMessage(b.id, initial.runId, text, 'user', requestId), accepted)
+    const afterReplay = (await pool.query(`SELECT "sourceEventId","attemptId",revision FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2`, [b.id, b.issueId])).rows[0]
+    assert.deepEqual(afterReplay, beforeReplay, 'an old accepted request never advances or stops the newer epoch')
+  })
+
+  await t.test('an intent without a host receipt remains unconfirmed and is not executed again', async () => {
+    const { submitThreadOnce } = await import('../lib/thread-submission')
+    const input = { userId: a.id, requestId: randomUUID(), rootRunId: first.runId, requestedRunId: first.runId,
+      previousRunId: first.runId, issueId: a.issueId, botId: a.botId, text: 'Synthetic interrupted owner submission.', mode: 'message' as const }
+    let deliveries = 0
+    await assert.rejects(submitThreadOnce(pool, input, async () => { deliveries++; throw new Error('synthetic interruption') }), /synthetic interruption/)
+    await assert.rejects(submitThreadOnce(pool, input, async () => { deliveries++; return { runId: first.runId, continued: false } }), /threadSubmissionOutcomeUnconfirmed/)
+    assert.equal(deliveries, 1)
+  })
+
+  await t.test('an ordinary owned live message is acknowledged once even after its run ends', async () => {
+    const runId = randomUUID(), requestId = randomUUID(), text = 'One ordinary owner message.'
+    await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status,prompt,"botId")
+      SELECT $1,"userId","agentId","deviceId",'running','Synthetic ordinary live thread',"botId"
+      FROM agent_runs WHERE id=$2`, [runId, first.runId])
+    assert.deepEqual(await sendThreadMessage(a.id, runId, text, 'user', requestId), { runId, continued: false })
+    const eventId = (await pool.query(`SELECT id FROM coordinator_events WHERE "userId"=$1 AND payload->'threadSubmission'->>'requestId'=$2`, [a.id, requestId])).rows[0].id
+    await end(runId, 'succeeded')
+    await pool.query(`UPDATE coordinator_events SET payload=payload #- '{threadSubmission,result}' WHERE id=$1`, [eventId])
+    assert.deepEqual(await sendThreadMessage(a.id, runId, text, 'user', requestId), { runId, continued: false })
+    const { sendOwnedRunMessage } = await import('../lib/run-control')
+    const { db } = await import('../lib/db')
+    await sendOwnedRunMessage(db, a.id, { runId, text, messageId: eventId })
+    await assert.rejects(sendOwnedRunMessage(db, a.id, { runId, text: 'Different.', messageId: eventId }), { code: 'submissionConflict' })
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_messages WHERE "runId"=$1', [runId])).rows[0].n, 1)
+  })
+
   await t.test('a working Factory thread records the new target and stops its stale executor', async () => {
     const sent = await sendThreadMessage(a.id, first.runId, 'Also cover the empty input.')
     assert.deepEqual(sent, { runId: first.runId, continued: false })

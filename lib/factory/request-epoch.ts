@@ -106,7 +106,7 @@ export async function advanceFactoryRequest(tx: PoolClient, task: FactoryTask, s
 
 /** Owner messages to an active thread use the same epoch path as terminal
  * continuations. Peer/model messages never call this entry point. */
-export async function continueActiveFactoryRequest(pool: Pool, userId: string, runId: string, text: string, sourceEventId?: string) {
+export async function continueActiveFactoryRequest(pool: Pool, userId: string, runId: string, text: string, sourceEventId?: string, submission?: { recordOwnerMessage: true }) {
   const { rows: [identity] } = await pool.query(`SELECT t.id,t."botId",t."issueId" FROM factory_attempts a
     JOIN factory_tasks t ON t.id=a."taskId" WHERE a."runId"=$1 AND t."userId"=$2`, [runId, userId])
   if (!identity) return false
@@ -122,7 +122,7 @@ export async function continueActiveFactoryRequest(pool: Pool, userId: string, r
       VALUES($1,$2,$3,$4,'user_message',$5,$6,'background',now()) ON CONFLICT DO NOTHING`, [id, userId, task.botId, task.issueId, `thread-continuation:${id}`,
       JSON.stringify({ text, source: 'thread_continuation', previousRunId: runId, postedToChat: true })])
     await advanceFactoryRequest(tx, task, id, supersededRunIds)
-    if (!sourceEventId) await tx.query(`INSERT INTO run_messages(id,"runId","userId",text,origin,"mailboxWakeDepth","deliveredAt")
+    if (!sourceEventId || submission?.recordOwnerMessage) await tx.query(`INSERT INTO run_messages(id,"runId","userId",text,origin,"mailboxWakeDepth","deliveredAt")
       VALUES($1,$2,$3,$4,'owner',-1,now()) ON CONFLICT DO NOTHING`, [id, runId, userId, text])
     await tx.query('COMMIT')
   } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }

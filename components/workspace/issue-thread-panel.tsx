@@ -8,6 +8,8 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowLeft, Square, SquareKanban, X } from 'lucide-react'
 import { getIssueThread, getThreadChanges, sendIssueThreadReply, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
+import { checkPageBuildBeforeAction } from '@/lib/app-build'
+import { prepareThreadReply, type ThreadReplySubmission } from '@/lib/thread-submission-input'
 import { mergeThreadChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
 import { ThreadExecutionIdentity } from './thread-execution-identity'
@@ -98,12 +100,14 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const viewingChanges = hasChanges && tab === 'changes'
   const transcript = useViewScroll<HTMLDivElement>(`thread:${runId}:chat`, !!data && !viewingChanges && !accepting)
   const [draft, setDraft] = useViewState(`thread:${runId}:draft`, '')
+  const [submission, setSubmission] = useViewState<ThreadReplySubmission | null>(`thread:${runId}:submission`, null)
   // Words picked from the agent's reply with 引用: they head the next message as quote lines.
   const [replyQuote, setReplyQuote] = useViewState<string | null>(`thread:${runId}:quote`, null)
   const rootRef = useRef<HTMLElement>(null)
   const [sending, setSending] = useState(false)
   // false, or what to say: the refusal's reason when the server gave one (threadReplaced…), else 发送失败.
   const [sendFailed, setSendFailed] = useState<string | false>(false)
+  useEffect(() => { if (submission && !sending) setSendFailed(t('sendFailed')) }, [submission, sending, t])
   const actionError = useActionError()
   const [stopAttempt, setStopAttempt] = useState<number | null>(null)
   const [stopFailed, setStopFailed] = useState(false)
@@ -151,8 +155,13 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     if (!text || sending || stopRequested || question === 'resuming') return
     setSending(true); setSendFailed(false)
     try {
-      const result = await sendIssueThreadReply({ issueId, runId: liveRunId, text: retry === undefined ? withReplyQuote(text, replyQuote) : text, ...(retryOriginalSession ? { retryOriginalSession } : {}) })
-      if (result.error) { setSendFailed(actionError(result.error)); return }
+      if (!await checkPageBuildBeforeAction()) return
+      const words = retry === undefined ? withReplyQuote(text, replyQuote) : text
+      const request = retryOriginalSession ? { runId: liveRunId, text: words, retryOriginalSession } : prepareThreadReply(submission, liveRunId, words)
+      if ('requestId' in request) setSubmission(request)
+      const result = await sendIssueThreadReply({ issueId, ...request })
+      if (result.error) { setSendFailed(actionError(result.error)); if ('requestId' in request) setSubmission(null); return }
+      if ('requestId' in request) setSubmission(null)
       if (retry === undefined) { setDraft(current => current.trim() === text ? '' : current); setReplyQuote(null) }
       void mutate(); void mutateCache(['issue-threads', issueId])
     }
