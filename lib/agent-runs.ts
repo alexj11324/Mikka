@@ -340,15 +340,19 @@ export async function addRunMessage(
       run.status,
     )
   ) {
-    const { factoryQuestions } = await import('@/lib/factory/server')
+    const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
     const { pool } = await import('@/lib/db')
     const {
       rows: [identity],
     } = await pool.query(
-      'SELECT id FROM factory_questions WHERE "originRunId"=$1 AND "userId"=$2',
+      `SELECT q.id,t."botId" FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId"
+       WHERE q."originRunId"=$1 AND q."userId"=$2 AND t."userId"=$2`,
       [run.id, userId],
     )
     if (!identity) throw new ActionFailureError('runNotActive')
+    // The task owns this scope. A worker can also belong to a Bot when its
+    // legacy Factory task is unscoped; neither the caller nor worker chooses it.
+    const factoryQuestions = factoryRuntimeForBot(identity.botId).questions
     const q = await factoryQuestions.read(userId, identity.id)
     if (q.status === 'resolved' && q.continuationRunId) {
       const previous = q.answer as {
