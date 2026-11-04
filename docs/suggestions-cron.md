@@ -1,12 +1,25 @@
 # Suggestions schedules
 
-Three schedules keep the 建议 page and each person's profile current (R-21, R-73). Vercel Hobby runs crons at most once a day, so a Cloudflare Worker, `cloudflare/suggestions-cron`, fires them instead. The Worker only calls Mikka with a bearer secret; the logic stays in the Next.js app, so the schedules can move to `vercel.json` later without touching the endpoints.
+Three schedules keep the 建议 page and each person's profile current (R-21, R-73). They do not use Vercel Cron (`vercel.json` has no crons). The Cloudflare Worker `cloudflare/suggestions-cron` (`mikka-suggestions-cron`) fires them. The Worker only calls Mikka with a bearer secret; the logic stays in the Next.js app.
 
-| Cron (UTC) | Endpoint | What it does |
+The Worker has one trigger, `* * * * *` (`wrangler.jsonc`). On each run it reads Cloudflare's `scheduledTime` and calls, in parallel (`src/index.mjs`):
+
+| When (UTC) | Endpoints |
+| --- | --- |
+| Every minute | `/api/cron/coordinator-wakes`, `/api/cron/schedules`, `/api/cron/run-recovery`, `/api/cron/account-deletions`, `/api/cron/audit-retention`, `/api/cron/ops-monitor` (`MINUTE_ENDPOINTS`) |
+| Minutes 0, 15, 30 and 45 | `/api/cron/briefings` |
+| Minute 0 | `/api/cron/suggestions-reconcile` |
+| Minute 30 | `/api/cron/user-facts` |
+
+Because it uses `scheduledTime`, a late run still does the work of the minute it was scheduled for. Each endpoint gets its call even when another fails (`Promise.allSettled`); any failure then fails the run. `runSchedule` still accepts the older single cron strings (`*/15 * * * *`, `0 * * * *`, `30 * * * *`) and then calls only that endpoint. Deployment steps: [`operations/minute-worker-deployment.md`](operations/minute-worker-deployment.md).
+
+The three suggestions endpoints:
+
+| Cadence (UTC) | Endpoint | What it does |
 | --- | --- | --- |
-| `*/15 * * * *` | `GET /mikka/api/cron/briefings` | Writes the daily briefing for everyone whose local time is past 08:00 and who has none for today yet, and has the Coordinator push it |
-| `0 * * * *` | `GET /mikka/api/cron/suggestions-reconcile` | Backfills events a webhook may have missed in the last 26 hours, and, in parallel, sweeps Factory monitor completions (see below) |
-| `30 * * * *` | `GET /mikka/api/cron/user-facts` | Merges the profile facts of everyone whose local time is past 04:00 and who has not been merged today |
+| Every 15 minutes | `GET /mikka/api/cron/briefings` | Writes the daily briefing for everyone whose local time is past 08:00 and who has none for today yet, and has the Coordinator push it |
+| Hourly, minute 0 | `GET /mikka/api/cron/suggestions-reconcile` | Backfills events a webhook may have missed in the last 26 hours, and, in parallel, sweeps Factory monitor completions (see below) |
+| Hourly, minute 30 | `GET /mikka/api/cron/user-facts` | Merges the profile facts of everyone whose local time is past 04:00 and who has not been merged today |
 
 All three endpoints answer 503 without `CRON_SECRET`, 401 for a wrong bearer, and otherwise a JSON summary of counts (no personal data). Reconciliation also returns 503 when GitHub is unconfigured, or 502 when a source fails. A provider that refuses one person's own authorization (a revoked or expired token) is not a failed source: that person's app is skipped and counted under `reconnect`, and the run carries on with everyone else. Each stops starting new people after about 40–45 seconds; the next run picks up whoever is left.
 
@@ -22,12 +35,13 @@ The briefing is delivered by the Coordinator, not shown in 建议 (R-21). Writin
 
 ## Nightly profile merge from 04:00 local time
 
-Each stored notification is read once for facts about the person after it is rated (`lib/profile/extract.ts`, R-73, `docs/design/proactive.md` § 2.2); the facts go to `user_facts` (`drizzle/20261027231815_user_facts.sql`). Once a local day the merge (`lib/profile/facts.ts` `planConsolidation`, no model call):
+Each stored notification is read once for facts about the person after it is rated (`lib/profile/extract.ts`, R-73, `docs/design/proactive.md` § 2.2); the facts go to `user_facts` (`drizzle/20261027231815_user_facts.sql`). Once a local day the merge (`lib/profile/facts.ts` `planConsolidation`) runs a few code rules and asks the Decision API the rest (decision 2026-11-01-1500):
 
-- turns scattered purchases into patterns: three or more on one topic become an interest (川菜调料 ×3 → 川菜), three or more orders from one merchant at one time of day become a routine, two or more places in one area become a place;
-- expires deadlines and subscriptions past `expiresAt`;
-- fades facts not seen for 30 days (confidence × 0.95 a night, expired below 0.2);
-- keeps one answer per slot (for example `home_city`): the person's correction, else the newest.
+- code rule: a deadline or subscription past `expiresAt` expires;
+- Decision API: whether a group of purchases, orders or places is a lasting pattern (interest, routine, place); a count alone never makes one;
+- Decision API: whether a fact not seen for a while is kept, lowered or expired; the person's corrections never fade;
+- one answer per slot (for example `home_city`): the person's correction wins, otherwise the Decision API picks;
+- a call without an answer changes nothing; those items are asked again the next night.
 
 Proactive work is behind four switches (`docs/design/proactive.md` § 3), and any one of them off stops it:
 
@@ -96,8 +110,10 @@ The Worker logs each endpoint path, HTTP status, and whitelisted numeric summary
 
 Upload `cloudflare/suggestions-cron/src/index.mjs` as an ES module from the
 reviewed commit using the authorized Cloudflare API credential. It has no
-imports and needs no build. Apply all three crons, `MIKKA_URL`, and observability
-settings from `wrangler.jsonc` separately when uploading through the API.
+imports and needs no build. Apply the single `* * * * *` trigger, `MIKKA_URL`
+and the observability settings from `wrangler.jsonc` separately when uploading
+through the API. Deploy only after the matching app deployment is READY and
+its migrations have run ([`operations/minute-worker-deployment.md`](operations/minute-worker-deployment.md)).
 
 The Worker needs only `MIKKA_URL` and the secret binding `CRON_SECRET`. Its
 secret must match the production app's value in Infisical `prod:/vercel`.
@@ -113,17 +129,17 @@ Worker bindings.
 
 ## Acceptance boundary
 
-The ordinary `pnpm build` does not run migrations. Review the pending SQL
-manifest, then configure the authorized production deployment's Build Command
-as `pnpm migrate && pnpm build`. This invokes `scripts/migrate.mjs` in the
-production build; do not apply the Production SQL manually. Initialize a
-Preview only against its dedicated cloud database with `MIGRATE=1`.
+`pnpm build` runs `scripts/migrate.mjs` last, after `next build` succeeds, so a
+Vercel production deploy applies pending migrations itself. Do not apply the
+Production SQL by hand. Off production it skips unless `MIGRATE=1` (or every
+target is a loopback database); initialize a Preview only against its
+dedicated cloud database with `MIGRATE=1`.
 
 GitHub's redelivery API returns 202 when it accepts the request. The receiving
 Mikka webhook also returns 202 before asynchronous suggestion ingestion
 finishes. Neither status proves a suggestion was saved. Verify the actual
 GitHub delivery response and resulting ingestion separately, and inspect the
-Cloudflare scheduled-run history for every trigger.
+Cloudflare scheduled-run history and the Worker log line of each endpoint.
 
 Run the source-only Worker checks with:
 `node --test cloudflare/suggestions-cron/src/index.test.mjs`.

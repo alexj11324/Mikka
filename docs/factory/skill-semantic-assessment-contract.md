@@ -2,9 +2,13 @@
 
 This source increment is based on the existing #316 registration, frozen case
 assignments and mount receipts. It adds no scheduler, publication path or Skill
-registry. Model benchmark/live evaluation remains explicitly OFF in server.ts.
+registry. Model benchmark/live evaluation stays off unless the
+`mikka-skill-model-evaluation` switch is on (`lib/deployment-switches.ts`,
+read in `lib/self-improvement/registered-evaluation.ts`; default off).
 
 ## Minimal interfaces and file boundaries
+
+The files below are in `lib/self-improvement/`.
 
 - `comparison-collector.ts`: read-only `loadComparison({userId, issueId,
   proposalId, evaluationId})` reads existing Skill case/arm/run/session/mount/

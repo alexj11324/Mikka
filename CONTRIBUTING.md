@@ -15,7 +15,7 @@ Thank you for helping improve Mikka.
 ## Pull requests
 
 - Branch from `main` and keep each pull request to one change. How work moves
-  from a branch to `main` (local first, hot reload, trunk-based merging, module owners, numbers,
+  from a branch to `main` (local first, hot reload, ownership and merging, numbers,
   E2B dev templates) is in [`docs/dev-workflow.md`](docs/dev-workflow.md).
 - Write commit messages in English, in the form `<type>: <description>`, where
   the type is one of `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`
@@ -27,10 +27,12 @@ Thank you for helping improve Mikka.
   pnpm check
   ```
 
-- Each pull request branches from `main`, changes one thing, and is
-  squash-merged by the coordinator once CI is green
-  ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 5). Backend changes are
-  Codex's; others ask first (the module owners table there). CI evaluates GitHub's
+- Work is assigned through a GitHub issue to one agent, who owns it end to
+  end. Nobody pushes to `main` directly. The assigned agent opens a pull
+  request from a branch and squash-merges it itself once CI is green on the
+  latest head and the PR is mergeable. After the merge the same agent watches
+  the production deployment and accepts the change in production
+  ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 5). CI evaluates GitHub's
   synthetic PR merge commit (the PR combined with its target branch) rather
   than just the standalone PR head. An unrelated merge to `main` does not
   require rebasing a still-mergeable PR; a real conflict must be resolved and
@@ -111,17 +113,18 @@ under Alex's identity (a GitHub App install, an OAuth consent) or a session
 permission prompt may be asked of him. The named accounts set up outside the
 pool: `docs/design/decisions/2026-11-01-0300-agents-inject-test-logins.md`.
 
-Cloud machines start from E2B's own `desktop`, `claude` and `codex` templates with the
-Mikka worker added ([decision 2026-11-01-2335](docs/design/decisions/2026-11-01-2335-e2b-official-templates.md)).
-The three templates are released by CI, not by hand: a push to `main` that
-changes a path the templates package (`WORKER_PATHS` in `scripts/e2b/build-template.py`)
-or `scripts/e2b/` runs `.github/workflows/e2b-template.yml`, which builds them,
-makes them public, sets `E2B_BYO_COMPUTER_TEMPLATE`, `E2B_CLAUDE_TEMPLATE`,
-`E2B_CODEX_TEMPLATE` and `MIKKA_CLOUD_WORKER_SHA` together
-in Vercel Production and redeploys. To test worker changes before that, build
-`-dev` templates from the branch with the same script and point only your local
-or test environment at them; never overwrite the production templates or Vercel's
-production variables ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 7).
+Cloud machines start from new instances of E2B's official `desktop`, `claude`
+and `codex` templates. The Mikka worker is added in its own directory on the
+instance; the official templates are not changed
+([decision 2026-11-03-1430](docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md)).
+A push to `main` that changes the worker paths runs
+`.github/workflows/e2b-official-runtime.yml`. It validates new official
+instances and publishes only the application configuration to Vercel
+Production. The older `e2b-template.yml`, which built derived templates, is
+paused and must not be resumed
+([`.github/workflows/README.md`](.github/workflows/README.md#cloud-worker-template-release)).
+Never change the production templates or Vercel's production variables by
+hand ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 7).
 
 ## License
 

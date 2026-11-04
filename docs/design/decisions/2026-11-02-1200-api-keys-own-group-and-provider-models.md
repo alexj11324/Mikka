@@ -3,6 +3,7 @@
 - Date: 2026-11-02
 - Source: Alex, relayed by the coordinator session, after a DeepSeek key added in 「API 与订阅」 showed under the ChatGPT / Codex card and none of its models could be picked: 「API Key 应该自成一组，或者按服务商分组，不该挂在订阅下面。…模型列表只用服务商 /models 接口返回的值，不写死；拉取失败时在 key 那一行显示原因，并提供「重新获取模型」按钮；拉取成功后，输入框的模型菜单和「Bot 与 Agents」都能选到这些模型。」
 - Rule: — (R-40 and R-74 stand)
+- Superseded in part by: [2026-11-02-1400](2026-11-02-1400-model-order-dispatch.md) (key models move out of 「Bot 与 Agents」 into 模型与订阅)
 - Replaces: orchestration.md § 1 "subscriptions, API keys and custom providers in one list", as to the layout only.
 
 「API 与订阅」 shows the subscriptions (模型订阅) and the API keys (API Key)

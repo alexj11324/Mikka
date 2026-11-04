@@ -19,4 +19,4 @@ updates the remembered value. Dialogs and pending server operations retain
 their existing lifecycle.
 
 This fixes behavior without changing layout, copy or the default collapsed
-resolved group on a first visit. See the [audit and verification record](../../audits/2026-11-03-navigation-state.md).
+resolved group on a first visit. See the audit and verification record.
