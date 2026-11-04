@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "kind": "exact-github-actions-artifact-preservation",
+  "workflow": {
+    "id": 41785533094,
+    "headSha": "11560bdc245cd4c881326288e2b9a38ea21adf99",
+    "event": "push",
+    "name": "Temporary group policy preflight",
+    "path": ".github/workflows/proactive-acceptance.yml",
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "failure",
+    "createdAt": "2026-11-04T06:26:26Z",
+    "updatedAt": "2026-11-04T06:27:40Z",
+    "jobs": [
+      {
+        "id": 126426685111,
+        "name": "candidate-preflight",
+        "conclusion": "failure",
+        "startedAt": "2026-11-04T06:26:29Z",
+        "completedAt": "2026-11-04T06:27:40Z"
+      }
+    ]
+  },
+  "artifact": {
+    "id": 13300887960,
+    "name": "group-policy-preflight-41785533094",
+    "zipBytes": 10478,
+    "zipSha256": "a8378bd68504030ef1876c72f7415bcfd160adad9a091407d745dc60506de33d",
+    "githubDigestMatched": true,
+    "zipGitBlob": "d95b67f21b161c266e7a3ef773474d5814a4c823"
+  },
+  "report": {
+    "file": "results.json",
+    "bytes": 86314,
+    "sha256": "088f82d7808246613c8340a4a712ff659bf060fae9f54716e887af234826b63e",
+    "gitBlob": "1d029058dd9a9b7bd7ab8f6e5cb07b59ceb0f5e8",
+    "rawBytesUnchanged": true,
+    "status": "failed",
+    "sourceRevision": "aee3b8d23fc1431b4c0f6c98d9852d1402bc723e",
+    "deploymentId": "dpl_4hjwCkNCz8TNMYsmK3zbgKHCXAFe",
+    "startedAt": "2026-11-04T06:26:57.637Z",
+    "finishedAt": "2026-11-04T06:27:36.496Z",
+    "runnerDigest": "3b052ecff198d777f89287d0ca5739acdde6c10a526692a97e6e4f6128870a67"
+  },
+  "transport": {
+    "artifactDownloadedThrough": "GitHub download_workflow_artifact file reference",
+    "temporaryOwnedSandboxPath": "/vercel/Mikka-thread-submission-ui/.cache/preflight-41785533094",
+    "fullFilesReassembledFromBoundedChunks": true,
+    "bothGitBlobHashesMatchedRemoteBytes": true
+  },
+  "analysisReadme": "Root independently read the full original report and confirmed the sole candidate mismatch before this README was written."
+}

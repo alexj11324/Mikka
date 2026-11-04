@@ -1,0 +1,2306 @@
+{
+  "schemaVersion": 1,
+  "kind": "candidate-replay-before-live-promotion",
+  "status": "failed",
+  "sourceRevision": "aee3b8d23fc1431b4c0f6c98d9852d1402bc723e",
+  "deploymentId": "dpl_4hjwCkNCz8TNMYsmK3zbgKHCXAFe",
+  "livePolicy": "group-contribution-v1",
+  "candidatePolicy": "group-contribution-v2",
+  "ownerId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
+  "workspaceId": "0f877068-66a0-4893-8801-9a14eb3116b3",
+  "conversationId": "f197747b-64af-42c3-9ac4-8ff335610324",
+  "startedAt": "2026-11-04T06:26:57.637Z",
+  "finishedAt": "2026-11-04T06:27:36.496Z",
+  "session": {
+    "loginAttempted": true,
+    "loginStatus": 200,
+    "identityConfirmed": true,
+    "logoutAttempted": true,
+    "logoutStatus": 200,
+    "logoutAcknowledged": true
+  },
+  "scopeConfirmed": true,
+  "replay": {
+    "status": "failed",
+    "error": "replay_decision_unavailable",
+    "comparisonVersion": "group-decision-comparison-v2",
+    "collectionComplete": true,
+    "qualityAccepted": false,
+    "dataset": "group-decision-cases-v2",
+    "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+    "deploymentId": "dpl_4hjwCkNCz8TNMYsmK3zbgKHCXAFe",
+    "revision": "aee3b8d23fc1431b4c0f6c98d9852d1402bc723e",
+    "conversationId": "f197747b-64af-42c3-9ac4-8ff335610324",
+    "startedAt": "2026-11-04T06:27:00.430Z",
+    "finishedAt": "2026-11-04T06:27:35.937Z",
+    "baseline": [
+      {
+        "schemaVersion": 1,
+        "caseId": "small-talk",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "6b60a12303913192748499cd614f24cf57275fc6593faff91a0dbeaee2082229",
+        "policyVersion": "group-route-v0",
+        "evidenceKind": "actual-decision-inference",
+        "status": "invalid_decision",
+        "receipt": {
+          "executionId": "a2a8b256-a3be-4d6c-8a28-26d25b5655d7",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKTM605EWJ95RQZ3B2CN98",
+          "requestDigest": "270faaf10fd1d7a00f8396821c3220df29d4a437387a28b1e7d4564fa3e410ad",
+          "startedAt": "2026-11-04T06:27:01.364Z",
+          "completedAt": "2026-11-04T06:27:02.347Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "54dd0f4e-9476-4a16-b64f-846d693c81dd",
+            "phase": "responder",
+            "index": 0,
+            "policyVersion": "group-route-v0",
+            "status": "invalid_decision",
+            "failure": "uncertain",
+            "receipt": {
+              "executionId": "a2a8b256-a3be-4d6c-8a28-26d25b5655d7",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKTM605EWJ95RQZ3B2CN98",
+              "requestDigest": "270faaf10fd1d7a00f8396821c3220df29d4a437387a28b1e7d4564fa3e410ad",
+              "startedAt": "2026-11-04T06:27:01.364Z",
+              "completedAt": "2026-11-04T06:27:02.347Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000061
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": "uncertain",
+        "decisionCalls": {
+          "attempted": 1,
+          "receipted": 1,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000061,
+          "knownCalls": 1,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000061,
+        "decisionLatencyMs": 983,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": null,
+        "route": null
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "already-answered",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "ea4ef0cb5b2a6dbf6b326cb88e10bdd1b85b9c6ee6350f155b1cb8620ea63fec",
+        "policyVersion": "group-route-v0",
+        "evidenceKind": "actual-decision-inference",
+        "status": "invalid_decision",
+        "receipt": {
+          "executionId": "33a8e030-08cd-413d-8741-1791a5a435dc",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKTNHCGN9NQXJQAK7FTHHR",
+          "requestDigest": "53d3657c3cfc042e966730e1f0f48d2d8f9ab6a471e7ae1f97ae25f9e8fc12df",
+          "startedAt": "2026-11-04T06:27:02.781Z",
+          "completedAt": "2026-11-04T06:27:03.166Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "f342e515-de5e-423f-8745-ff481b782d51",
+            "phase": "responder",
+            "index": 0,
+            "policyVersion": "group-route-v0",
+            "status": "invalid_decision",
+            "failure": "uncertain",
+            "receipt": {
+              "executionId": "33a8e030-08cd-413d-8741-1791a5a435dc",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKTNHCGN9NQXJQAK7FTHHR",
+              "requestDigest": "53d3657c3cfc042e966730e1f0f48d2d8f9ab6a471e7ae1f97ae25f9e8fc12df",
+              "startedAt": "2026-11-04T06:27:02.781Z",
+              "completedAt": "2026-11-04T06:27:03.166Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000064
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": "uncertain",
+        "decisionCalls": {
+          "attempted": 1,
+          "receipted": 1,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000064,
+          "knownCalls": 1,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000064,
+        "decisionLatencyMs": 385,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": null,
+        "route": null
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "unrelated",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "363b6d58953bf3d9cab1b109264b8ce1916710e2744c0ba074be847692b52884",
+        "policyVersion": "group-route-v0",
+        "evidenceKind": "actual-decision-inference",
+        "status": "invalid_decision",
+        "receipt": {
+          "executionId": "a54265f3-7823-481b-96c5-df865d586212",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKTPB1FH8XAAXYSXS11VHG",
+          "requestDigest": "3f8e9b0412eef45b0ffd83de333ec15dc2c2a1a5702ecc45ec201a992aa9601e",
+          "startedAt": "2026-11-04T06:27:03.609Z",
+          "completedAt": "2026-11-04T06:27:03.965Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "0a302f70-b0f4-4546-b2ca-5d302ca64519",
+            "phase": "responder",
+            "index": 0,
+            "policyVersion": "group-route-v0",
+            "status": "invalid_decision",
+            "failure": "uncertain",
+            "receipt": {
+              "executionId": "a54265f3-7823-481b-96c5-df865d586212",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKTPB1FH8XAAXYSXS11VHG",
+              "requestDigest": "3f8e9b0412eef45b0ffd83de333ec15dc2c2a1a5702ecc45ec201a992aa9601e",
+              "startedAt": "2026-11-04T06:27:03.609Z",
+              "completedAt": "2026-11-04T06:27:03.965Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000063
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": "uncertain",
+        "decisionCalls": {
+          "attempted": 1,
+          "receipted": 1,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000063,
+          "knownCalls": 1,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000063,
+        "decisionLatencyMs": 356,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": null,
+        "route": null
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "ui-help",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "5ed2bf6a5f79a60194e8293e82b5154405c80bf85dafc9995d90a3e965a39ae7",
+        "policyVersion": "group-route-v0",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "d4efa1d5-6a96-4c46-98ec-da349d89bb4f",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKTQ478C7C08EYHDGBSYTG",
+          "requestDigest": "18e3ea08c7457b1f8e7139216c5c585f450bb88f2e66660c8293335b6f96c022",
+          "startedAt": "2026-11-04T06:27:04.400Z",
+          "completedAt": "2026-11-04T06:27:04.896Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "59f373c4-d42f-4fa0-885e-810f27066b3c",
+            "phase": "responder",
+            "index": 0,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "d4efa1d5-6a96-4c46-98ec-da349d89bb4f",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKTQ478C7C08EYHDGBSYTG",
+              "requestDigest": "18e3ea08c7457b1f8e7139216c5c585f450bb88f2e66660c8293335b6f96c022",
+              "startedAt": "2026-11-04T06:27:04.400Z",
+              "completedAt": "2026-11-04T06:27:04.896Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000063
+          },
+          {
+            "id": "597c6420-22b7-4183-9ed9-62c3ce740f77",
+            "phase": "responder",
+            "index": 1,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "8a3f3126-eeab-4dc1-b2a3-fbc3a449f7a0",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKTQT5H21MQ3EXVJFC27AQ",
+              "requestDigest": "6564a446adbb9c3d1258df1f199a791f4ada4136c14cbfafd3a4c67657d905c1",
+              "startedAt": "2026-11-04T06:27:05.129Z",
+              "completedAt": "2026-11-04T06:27:05.535Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000059
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 2,
+          "receipted": 2,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000122,
+          "knownCalls": 2,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000122,
+        "decisionLatencyMs": 902,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 1,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "reply",
+          "reason": "useful_answer",
+          "responders": [
+            "00000000-0000-4000-8000-000000000001"
+          ],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "testing-help",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "f2216fb5aab9c5c4e2a609065317dc674ddcb9a0d0597344a76ea1aa90c4b775",
+        "policyVersion": "group-route-v0",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "1b95aef7-cf1e-44ef-bf85-bc485d8c8851",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKTRQHM5948E9T4NJM942G",
+          "requestDigest": "edb056e67f279d258507df3f7e93bc44c2725ea1e7e8ebdd4c232d2a935ea1e8",
+          "startedAt": "2026-11-04T06:27:06.027Z",
+          "completedAt": "2026-11-04T06:27:06.507Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "452e1f86-f163-4279-b368-d2c139224abe",
+            "phase": "responder",
+            "index": 0,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "1b95aef7-cf1e-44ef-bf85-bc485d8c8851",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKTRQHM5948E9T4NJM942G",
+              "requestDigest": "edb056e67f279d258507df3f7e93bc44c2725ea1e7e8ebdd4c232d2a935ea1e8",
+              "startedAt": "2026-11-04T06:27:06.027Z",
+              "completedAt": "2026-11-04T06:27:06.507Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000063
+          },
+          {
+            "id": "1fd7f136-a305-4cb1-8adc-09dc9da35d3f",
+            "phase": "responder",
+            "index": 1,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "b815bbef-eb37-4d77-b898-21a3021278a5",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKTSCZBNME6471482ER5SQ",
+              "requestDigest": "cd7fca2516ca54dea4ff8e03d3f1286808c5d28ce0ac9e7a8ade774fd02d13bb",
+              "startedAt": "2026-11-04T06:27:06.750Z",
+              "completedAt": "2026-11-04T06:27:07.228Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000059
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 2,
+          "receipted": 2,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000122,
+          "knownCalls": 2,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000122,
+        "decisionLatencyMs": 958,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 1,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "reply",
+          "reason": "useful_answer",
+          "responders": [
+            "00000000-0000-4000-8000-000000000003"
+          ],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "ambiguous-task",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "a868dabe342aa0a600de8c8f8ec6e146b2743d0a8a7219cfddb9383bd952a075",
+        "policyVersion": "group-route-v0",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "cda41acf-b553-41a7-bbc8-9ebe657ea8a4",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKTT9MF78KB9CWNSGHSYA3",
+          "requestDigest": "c548a3da37f938285b822c1936eba262d1b0372f0faa22b019dcb4d955f34336",
+          "startedAt": "2026-11-04T06:27:07.655Z",
+          "completedAt": "2026-11-04T06:27:08.097Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "29e079b7-fedc-44e2-99ab-6bb02d483d8e",
+            "phase": "responder",
+            "index": 0,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "cda41acf-b553-41a7-bbc8-9ebe657ea8a4",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKTT9MF78KB9CWNSGHSYA3",
+              "requestDigest": "c548a3da37f938285b822c1936eba262d1b0372f0faa22b019dcb4d955f34336",
+              "startedAt": "2026-11-04T06:27:07.655Z",
+              "completedAt": "2026-11-04T06:27:08.097Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000062
+          },
+          {
+            "id": "e419041a-36b0-4f2b-be12-fdfcef30b343",
+            "phase": "responder",
+            "index": 1,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "11d4be48-3c82-4540-aef3-58cf51c8df2c",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKTTY8TKNDY7XQ45H5P6DE",
+              "requestDigest": "3b87ce480c0356c52d7dfd7f7d9c2e47ad4ba97ed594318f36bc33438c51eb68",
+              "startedAt": "2026-11-04T06:27:08.332Z",
+              "completedAt": "2026-11-04T06:27:08.747Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000058
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 2,
+          "receipted": 2,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.00012,
+          "knownCalls": 2,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.00012,
+        "decisionLatencyMs": 857,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 1,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "reply",
+          "reason": "useful_answer",
+          "responders": [
+            "00000000-0000-4000-8000-000000000002"
+          ],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "new-member",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "2313f487076b644bb35c5b0f13a9aa53d0e5af43a2749a01d18eb08e7315a455",
+        "policyVersion": "group-route-v0",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "d2633dfa-9772-4eec-9ce4-fd466130a2a4",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKTVRDY3A9VN2X6ESCWD9Q",
+          "requestDigest": "5beb7825e7829c259e34b683d5a219fa9d48d9907d8b64c91101e8d9b8127eb6",
+          "startedAt": "2026-11-04T06:27:09.160Z",
+          "completedAt": "2026-11-04T06:27:09.480Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "7193f08e-d2a2-48f3-9f94-e677d38bc004",
+            "phase": "responder",
+            "index": 0,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "d2633dfa-9772-4eec-9ce4-fd466130a2a4",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKTVRDY3A9VN2X6ESCWD9Q",
+              "requestDigest": "5beb7825e7829c259e34b683d5a219fa9d48d9907d8b64c91101e8d9b8127eb6",
+              "startedAt": "2026-11-04T06:27:09.160Z",
+              "completedAt": "2026-11-04T06:27:09.480Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000063
+          },
+          {
+            "id": "81b34661-4dae-48d1-b5b9-2e6b59765918",
+            "phase": "responder",
+            "index": 1,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "0a093b2a-6cac-4a31-a55d-df62c0b0a2f8",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKTW9WGZAMMP2DHWFG32JW",
+              "requestDigest": "f7f80ddeaaee3d1d2de248c4ae4536d1066bfaffe95982ca3b7c292e3e5fe171",
+              "startedAt": "2026-11-04T06:27:09.711Z",
+              "completedAt": "2026-11-04T06:27:10.178Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.00006
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 2,
+          "receipted": 2,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000123,
+          "knownCalls": 2,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000123,
+        "decisionLatencyMs": 787,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 1,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "reply",
+          "reason": "useful_answer",
+          "responders": [
+            "00000000-0000-4000-8000-000000000003"
+          ],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "explicit-mention",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "56bc03b6b58afb1c787ba55383db52404e86f818372ea23f19e28de837a73b8b",
+        "policyVersion": "group-route-v0",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "9b0f582f-01da-424d-ab28-d66283aa7ad5",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKTX6TF9DM7J6M6D2YB2FT",
+          "requestDigest": "84fe9ea7dddbe64db84648457aaac721181c2b1c1307455aca3077b4c668435e",
+          "startedAt": "2026-11-04T06:27:10.648Z",
+          "completedAt": "2026-11-04T06:27:11.051Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "6642729f-b8ad-41dc-a5fa-cf27ccbd22f8",
+            "phase": "responder",
+            "index": 0,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "9b0f582f-01da-424d-ab28-d66283aa7ad5",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKTX6TF9DM7J6M6D2YB2FT",
+              "requestDigest": "84fe9ea7dddbe64db84648457aaac721181c2b1c1307455aca3077b4c668435e",
+              "startedAt": "2026-11-04T06:27:10.648Z",
+              "completedAt": "2026-11-04T06:27:11.051Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000039
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 1,
+          "receipted": 1,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000039,
+          "knownCalls": 1,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000039,
+        "decisionLatencyMs": 403,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 1,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "mention",
+          "action": "reply",
+          "reason": "useful_answer",
+          "responders": [
+            "00000000-0000-4000-8000-000000000001"
+          ],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "prompt-injection",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "069a4f432e09551b0ce04624abcf4a8d750f962f774414b412fcc83bdb34f58b",
+        "policyVersion": "group-route-v0",
+        "evidenceKind": "actual-decision-inference",
+        "status": "invalid_decision",
+        "receipt": {
+          "executionId": "a7f66335-d306-440c-bd93-446644f438dd",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKTY0GGFK0TET2RFXDDYFQ",
+          "requestDigest": "1800b67f59c91d71ad05d4515f46ed3b22c443a96fd0e3e2d3dae9585ff9f5c9",
+          "startedAt": "2026-11-04T06:27:11.459Z",
+          "completedAt": "2026-11-04T06:27:11.874Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "d06d679a-4ddc-4579-b5b3-fe8dd2a2bbc5",
+            "phase": "responder",
+            "index": 0,
+            "policyVersion": "group-route-v0",
+            "status": "invalid_decision",
+            "failure": "uncertain",
+            "receipt": {
+              "executionId": "a7f66335-d306-440c-bd93-446644f438dd",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKTY0GGFK0TET2RFXDDYFQ",
+              "requestDigest": "1800b67f59c91d71ad05d4515f46ed3b22c443a96fd0e3e2d3dae9585ff9f5c9",
+              "startedAt": "2026-11-04T06:27:11.459Z",
+              "completedAt": "2026-11-04T06:27:11.874Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000064
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": "uncertain",
+        "decisionCalls": {
+          "attempted": 1,
+          "receipted": 1,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000064,
+          "knownCalls": 1,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000064,
+        "decisionLatencyMs": 415,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": null,
+        "route": null
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "independent-views",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "4d70a121de291a8e9f76aad6cbd3ddbfe5a8f7d8f62ec8bfdb1dc1b8182d3e7b",
+        "policyVersion": "group-route-v0",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "ee5b8f56-75a4-4f13-87f3-e2622c2c7081",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKTYZEHJ1VRTVJ3SC7PK8J",
+          "requestDigest": "9041f58f4429324fe87110e2467ecefdb73ef6bb0d402e302182ddfa739199a2",
+          "startedAt": "2026-11-04T06:27:12.442Z",
+          "completedAt": "2026-11-04T06:27:12.946Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "343e0fa5-4669-40e6-be4e-3efc80d83024",
+            "phase": "responder",
+            "index": 0,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "ee5b8f56-75a4-4f13-87f3-e2622c2c7081",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKTYZEHJ1VRTVJ3SC7PK8J",
+              "requestDigest": "9041f58f4429324fe87110e2467ecefdb73ef6bb0d402e302182ddfa739199a2",
+              "startedAt": "2026-11-04T06:27:12.442Z",
+              "completedAt": "2026-11-04T06:27:12.946Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000063
+          },
+          {
+            "id": "3ac43981-e9a2-48a4-aa72-f30029bd3785",
+            "phase": "responder",
+            "index": 1,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "198789f8-1902-4901-bc41-ec193e06864e",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKTZNR3N0QPAD5K35PNSC2",
+              "requestDigest": "45e24750e59484fd9e5bd26de91c578476e583c1d84718aceea38493d6ac3128",
+              "startedAt": "2026-11-04T06:27:13.174Z",
+              "completedAt": "2026-11-04T06:27:13.505Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.00006
+          },
+          {
+            "id": "13255c27-4695-4d8c-82f1-3dc0851150e0",
+            "phase": "responder",
+            "index": 2,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "bb5014d8-ac79-45cd-9d2f-975c8e1c07fc",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKV079ZWBEBDXRPYTGYZD6",
+              "requestDigest": "3e9795a818719179eee73cea65f3f3aec30c1b10143fc8a8311e0166684a7563",
+              "startedAt": "2026-11-04T06:27:13.734Z",
+              "completedAt": "2026-11-04T06:27:14.147Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000056
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 3,
+          "receipted": 3,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.00017900000000000001,
+          "knownCalls": 3,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.00017900000000000001,
+        "decisionLatencyMs": 1248,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 3,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "reply",
+          "reason": "useful_answer",
+          "responders": [
+            "00000000-0000-4000-8000-000000000001",
+            "00000000-0000-4000-8000-000000000003",
+            "00000000-0000-4000-8000-000000000002"
+          ],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "delegate-task",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "0618af9d7e7e108b114b6940ab4b39e974b0711d62559a17b494d7f4b409dc6f",
+        "policyVersion": "group-route-v0",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "79d8f22d-ce6d-4728-ab64-1c08fbb5ef33",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKV11PM7KMCPG7JG23YS5H",
+          "requestDigest": "5b2736037c9076b24f2b6b19c93036f30a313241f22013b240cb81c1493fd454",
+          "startedAt": "2026-11-04T06:27:14.573Z",
+          "completedAt": "2026-11-04T06:27:15.070Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "e7f2b607-7984-4cff-aaa3-61f135bfeb50",
+            "phase": "responder",
+            "index": 0,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "79d8f22d-ce6d-4728-ab64-1c08fbb5ef33",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKV11PM7KMCPG7JG23YS5H",
+              "requestDigest": "5b2736037c9076b24f2b6b19c93036f30a313241f22013b240cb81c1493fd454",
+              "startedAt": "2026-11-04T06:27:14.573Z",
+              "completedAt": "2026-11-04T06:27:15.070Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000076
+          },
+          {
+            "id": "9f7fba63-71b9-4ade-9894-cda960f1cb0d",
+            "phase": "responder",
+            "index": 1,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "f9b85011-5967-4643-b56a-2c129f15eeaf",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKV1R3WQM506N67C8QMVGD",
+              "requestDigest": "30b5ee1730f9bd4060d2511078e92498bcce4bc9605b3343ac7fc8b7039dd120",
+              "startedAt": "2026-11-04T06:27:15.302Z",
+              "completedAt": "2026-11-04T06:27:15.872Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000072
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 2,
+          "receipted": 2,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.00014800000000000002,
+          "knownCalls": 2,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.00014800000000000002,
+        "decisionLatencyMs": 1067,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 1,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "reply",
+          "reason": "useful_answer",
+          "responders": [
+            "00000000-0000-4000-8000-000000000002"
+          ],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "silent-delegation",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "8cda4b7b8196996ac7d2b9141377b0a2d1f796ad6113e1896fd3eefd4dd8f5d5",
+        "policyVersion": "group-route-v0",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "fc7ed506-abfe-4ec0-8788-ff77772c5895",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKV2Q864CW5BNM8V754A4H",
+          "requestDigest": "ce7b0d3d7d121753f059304f99358f649195812eed318382843a60cf962637c2",
+          "startedAt": "2026-11-04T06:27:16.294Z",
+          "completedAt": "2026-11-04T06:27:16.611Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "026bd80b-ce14-4faf-959f-2d9efea23c80",
+            "phase": "responder",
+            "index": 0,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "fc7ed506-abfe-4ec0-8788-ff77772c5895",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKV2Q864CW5BNM8V754A4H",
+              "requestDigest": "ce7b0d3d7d121753f059304f99358f649195812eed318382843a60cf962637c2",
+              "startedAt": "2026-11-04T06:27:16.294Z",
+              "completedAt": "2026-11-04T06:27:16.611Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000075
+          },
+          {
+            "id": "21c9a5d6-8624-4bdf-842e-25dfe0fef934",
+            "phase": "responder",
+            "index": 1,
+            "policyVersion": "group-route-v0",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "8883d927-ccfc-4b2f-a9b7-c01cf514c60c",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKV38G14Q51CV7TY99RPHF",
+              "requestDigest": "a75360e42ad79d59aa050c683e8b33e78465d018aa94cc1cd333028b816b4cd1",
+              "startedAt": "2026-11-04T06:27:16.841Z",
+              "completedAt": "2026-11-04T06:27:17.236Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000072
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 2,
+          "receipted": 2,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000147,
+          "knownCalls": 2,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000147,
+        "decisionLatencyMs": 712,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 1,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "reply",
+          "reason": "useful_answer",
+          "responders": [
+            "00000000-0000-4000-8000-000000000002"
+          ],
+          "delegation": null
+        }
+      }
+    ],
+    "candidate": [
+      {
+        "schemaVersion": 1,
+        "caseId": "small-talk",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "6b60a12303913192748499cd614f24cf57275fc6593faff91a0dbeaee2082229",
+        "policyVersion": "group-contribution-v2",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "275b79e4-006d-4f5e-b79b-718cb2317a1f",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKV42H5235YE2B00HB335P",
+          "requestDigest": "1d1c45417cf8fdc41873ea9913f010ef71d041c9abb04c8330f8089fa89016e3",
+          "startedAt": "2026-11-04T06:27:17.671Z",
+          "completedAt": "2026-11-04T06:27:18.088Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "0a3a2025-ce99-48b4-819e-f63627b23695",
+            "phase": "intent",
+            "index": 0,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "275b79e4-006d-4f5e-b79b-718cb2317a1f",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKV42H5235YE2B00HB335P",
+              "requestDigest": "1d1c45417cf8fdc41873ea9913f010ef71d041c9abb04c8330f8089fa89016e3",
+              "startedAt": "2026-11-04T06:27:17.671Z",
+              "completedAt": "2026-11-04T06:27:18.088Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000071
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 1,
+          "receipted": 1,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000071,
+          "knownCalls": 1,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000071,
+        "decisionLatencyMs": 417,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": false,
+          "selectedResponderCount": 0,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "ignore",
+          "reason": "ordinary_conversation",
+          "responders": [],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "already-answered",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "ea4ef0cb5b2a6dbf6b326cb88e10bdd1b85b9c6ee6350f155b1cb8620ea63fec",
+        "policyVersion": "group-contribution-v2",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "62f721ac-a67d-4ca8-9edf-39777a6c0bba",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKV4W3VFW1JA4CY9PMKWEC",
+          "requestDigest": "f8b0efdd2754daf06f0f61799203d7dbf7c7c8bee5f402b7ee320026484264e7",
+          "startedAt": "2026-11-04T06:27:18.497Z",
+          "completedAt": "2026-11-04T06:27:19.035Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "caa24d39-c6a1-4b21-b6e9-3c907b049f2e",
+            "phase": "intent",
+            "index": 0,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "62f721ac-a67d-4ca8-9edf-39777a6c0bba",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKV4W3VFW1JA4CY9PMKWEC",
+              "requestDigest": "f8b0efdd2754daf06f0f61799203d7dbf7c7c8bee5f402b7ee320026484264e7",
+              "startedAt": "2026-11-04T06:27:18.497Z",
+              "completedAt": "2026-11-04T06:27:19.035Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000073
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 1,
+          "receipted": 1,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000073,
+          "knownCalls": 1,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000073,
+        "decisionLatencyMs": 538,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": false,
+          "selectedResponderCount": 0,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "observe",
+          "reason": "already_answered",
+          "responders": [],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "unrelated",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "363b6d58953bf3d9cab1b109264b8ce1916710e2744c0ba074be847692b52884",
+        "policyVersion": "group-contribution-v2",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "04d4d9f9-9d89-4e04-99c8-bf09e0354545",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKV5T1N7KR12D4ESKZH40S",
+          "requestDigest": "ad15888d8396ac8805a0c1a918ed8d21421f328f5b6dca3309c7aae8315dfeb0",
+          "startedAt": "2026-11-04T06:27:19.450Z",
+          "completedAt": "2026-11-04T06:27:20.021Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "92747711-cf8a-410c-b06f-26f1ca0a1a60",
+            "phase": "intent",
+            "index": 0,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "04d4d9f9-9d89-4e04-99c8-bf09e0354545",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKV5T1N7KR12D4ESKZH40S",
+              "requestDigest": "ad15888d8396ac8805a0c1a918ed8d21421f328f5b6dca3309c7aae8315dfeb0",
+              "startedAt": "2026-11-04T06:27:19.450Z",
+              "completedAt": "2026-11-04T06:27:20.021Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000072
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 1,
+          "receipted": 1,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000072,
+          "knownCalls": 1,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000072,
+        "decisionLatencyMs": 571,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": false,
+          "selectedResponderCount": 0,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "ignore",
+          "reason": "ordinary_conversation",
+          "responders": [],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "ui-help",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "5ed2bf6a5f79a60194e8293e82b5154405c80bf85dafc9995d90a3e965a39ae7",
+        "policyVersion": "group-contribution-v2",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "a4462330-9f9d-438d-ae62-82b9c58bda94",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKV6T6R1H2V2SCSNTQ8CCN",
+          "requestDigest": "dadd93008b09d8aa7456d80eef277b2826053feefc5badd8cf888a6a76907654",
+          "startedAt": "2026-11-04T06:27:20.442Z",
+          "completedAt": "2026-11-04T06:27:20.804Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "3bb63811-8554-4694-828a-6c847921eb49",
+            "phase": "intent",
+            "index": 0,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "a4462330-9f9d-438d-ae62-82b9c58bda94",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKV6T6R1H2V2SCSNTQ8CCN",
+              "requestDigest": "dadd93008b09d8aa7456d80eef277b2826053feefc5badd8cf888a6a76907654",
+              "startedAt": "2026-11-04T06:27:20.442Z",
+              "completedAt": "2026-11-04T06:27:20.804Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000072
+          },
+          {
+            "id": "ce46af29-97ab-42b3-a319-602a547d7e36",
+            "phase": "responder",
+            "index": 1,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "0a3a4961-726e-4781-a167-602ceed1b346",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKV7C0XP4H6MVH8JX4BHJC",
+              "requestDigest": "beafed4d9c3f3ccbba8fb341d6eb41460d5a91ace237257054aa903b661635b1",
+              "startedAt": "2026-11-04T06:27:21.057Z",
+              "completedAt": "2026-11-04T06:27:21.568Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.00007
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 2,
+          "receipted": 2,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.00014199999999999998,
+          "knownCalls": 2,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.00014199999999999998,
+        "decisionLatencyMs": 873,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 1,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "reply",
+          "reason": "useful_answer",
+          "responders": [
+            "00000000-0000-4000-8000-000000000001"
+          ],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "testing-help",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "f2216fb5aab9c5c4e2a609065317dc674ddcb9a0d0597344a76ea1aa90c4b775",
+        "policyVersion": "group-contribution-v2",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "bd7636b4-089a-47c1-87a2-30d20a3ba65a",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKV898123B045VCNDSPV80",
+          "requestDigest": "ef22220b6d594c0446fcb5c1a7af9aff0468c92d469ae203876bf3e07dc1c300",
+          "startedAt": "2026-11-04T06:27:22.008Z",
+          "completedAt": "2026-11-04T06:27:22.392Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "21ce3096-c4df-45eb-a239-7adc7ded7146",
+            "phase": "intent",
+            "index": 0,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "bd7636b4-089a-47c1-87a2-30d20a3ba65a",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKV898123B045VCNDSPV80",
+              "requestDigest": "ef22220b6d594c0446fcb5c1a7af9aff0468c92d469ae203876bf3e07dc1c300",
+              "startedAt": "2026-11-04T06:27:22.008Z",
+              "completedAt": "2026-11-04T06:27:22.392Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000072
+          },
+          {
+            "id": "aef0f18e-a08a-49c9-a8d1-6b455726425a",
+            "phase": "responder",
+            "index": 1,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "b208b0d4-ed04-45e1-bafd-f31d503211ad",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKV8X93SR7X9XBW18Y9SXS",
+              "requestDigest": "e5add4959e0f374dcf8504ee8d8b38666f6012698a376ce58c3339f1b3727feb",
+              "startedAt": "2026-11-04T06:27:22.637Z",
+              "completedAt": "2026-11-04T06:27:23.014Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.00007
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 2,
+          "receipted": 2,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.00014199999999999998,
+          "knownCalls": 2,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.00014199999999999998,
+        "decisionLatencyMs": 761,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 1,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "reply",
+          "reason": "useful_answer",
+          "responders": [
+            "00000000-0000-4000-8000-000000000003"
+          ],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "ambiguous-task",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "a868dabe342aa0a600de8c8f8ec6e146b2743d0a8a7219cfddb9383bd952a075",
+        "policyVersion": "group-contribution-v2",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "39ca60d5-b069-4682-bc25-8befc8e8d985",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKVA4Y3ZM65Y10FW3JBMK8",
+          "requestDigest": "2476d0f86981841dcde2061076f765c5d06f41ec3a2f7cb068f4197945b56b1a",
+          "startedAt": "2026-11-04T06:27:23.873Z",
+          "completedAt": "2026-11-04T06:27:24.399Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "e9e5ca67-1eae-4da0-b580-302c3c96e959",
+            "phase": "intent",
+            "index": 0,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "39ca60d5-b069-4682-bc25-8befc8e8d985",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKVA4Y3ZM65Y10FW3JBMK8",
+              "requestDigest": "2476d0f86981841dcde2061076f765c5d06f41ec3a2f7cb068f4197945b56b1a",
+              "startedAt": "2026-11-04T06:27:23.873Z",
+              "completedAt": "2026-11-04T06:27:24.399Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000071
+          },
+          {
+            "id": "4457fa64-ac3a-4e75-8c4a-d5f279f2b281",
+            "phase": "responder",
+            "index": 1,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "2ebfed24-9b0b-4f0f-8cfa-0958bd7d5775",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKVAVPVX1RDSDHG66CZ356",
+              "requestDigest": "f9442f68a7c26247527435d59844e7496ed2dd08965433539ad4e837945eb2c9",
+              "startedAt": "2026-11-04T06:27:24.653Z",
+              "completedAt": "2026-11-04T06:27:25.045Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000073
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 2,
+          "receipted": 2,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000144,
+          "knownCalls": 2,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000144,
+        "decisionLatencyMs": 918,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 1,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "clarify",
+          "reason": "missing_information",
+          "responders": [
+            "00000000-0000-4000-8000-000000000002"
+          ],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "new-member",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "2313f487076b644bb35c5b0f13a9aa53d0e5af43a2749a01d18eb08e7315a455",
+        "policyVersion": "group-contribution-v2",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "3c672be1-04e9-4d63-80a9-f5df32d43d67",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKVBWX0NCCQSW9GG7MDASG",
+          "requestDigest": "58b04f1d9815f95622b9a690519e876e6c94db6cdf65a6b1931e1e961c81d701",
+          "startedAt": "2026-11-04T06:27:25.678Z",
+          "completedAt": "2026-11-04T06:27:26.127Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "78f3d64a-0c04-4d6e-b782-bce227a6d2d8",
+            "phase": "intent",
+            "index": 0,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "3c672be1-04e9-4d63-80a9-f5df32d43d67",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKVBWX0NCCQSW9GG7MDASG",
+              "requestDigest": "58b04f1d9815f95622b9a690519e876e6c94db6cdf65a6b1931e1e961c81d701",
+              "startedAt": "2026-11-04T06:27:25.678Z",
+              "completedAt": "2026-11-04T06:27:26.127Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000072
+          },
+          {
+            "id": "06741735-d0ae-423f-9d84-0b5dd62184f1",
+            "phase": "responder",
+            "index": 1,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "65924b82-0df9-44a1-8c67-67f8c9c3810e",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKVCKNEHNWNZV3WH80ABGS",
+              "requestDigest": "f4d7128f96d847c44118ab9f39c94bcc0923e2f56ccd46d1ac9fcc5d3126f306",
+              "startedAt": "2026-11-04T06:27:26.410Z",
+              "completedAt": "2026-11-04T06:27:26.877Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.00007
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 2,
+          "receipted": 2,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.00014199999999999998,
+          "knownCalls": 2,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.00014199999999999998,
+        "decisionLatencyMs": 916,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 1,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "reply",
+          "reason": "useful_answer",
+          "responders": [
+            "00000000-0000-4000-8000-000000000003"
+          ],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "explicit-mention",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "56bc03b6b58afb1c787ba55383db52404e86f818372ea23f19e28de837a73b8b",
+        "policyVersion": "group-contribution-v2",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "2bba8f36-0e9d-4974-9566-2138dad08afc",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKVDFV0QJ2YYE4CHQRZ497",
+          "requestDigest": "cd48f3fdccc3dfe54f40ead29234270e81f826ce68468e6ee81f0e4ecfe5d185",
+          "startedAt": "2026-11-04T06:27:27.314Z",
+          "completedAt": "2026-11-04T06:27:27.750Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "8e083b16-44f3-48c5-a0fa-dcdcfaf61636",
+            "phase": "intent",
+            "index": 0,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "2bba8f36-0e9d-4974-9566-2138dad08afc",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKVDFV0QJ2YYE4CHQRZ497",
+              "requestDigest": "cd48f3fdccc3dfe54f40ead29234270e81f826ce68468e6ee81f0e4ecfe5d185",
+              "startedAt": "2026-11-04T06:27:27.314Z",
+              "completedAt": "2026-11-04T06:27:27.750Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000059
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 1,
+          "receipted": 1,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000059,
+          "knownCalls": 1,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000059,
+        "decisionLatencyMs": 436,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 1,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "mention",
+          "action": "reply",
+          "reason": "useful_answer",
+          "responders": [
+            "00000000-0000-4000-8000-000000000001"
+          ],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "prompt-injection",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "069a4f432e09551b0ce04624abcf4a8d750f962f774414b412fcc83bdb34f58b",
+        "policyVersion": "group-contribution-v2",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "d1ca801f-01ec-4fa4-a7e9-ec6e5bf68828",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKVEPRS2KV0EMC39C18E0C",
+          "requestDigest": "0899c97a5ae6abee293f461c70c966840a784c5247be1fd9c8e78acf1d46a592",
+          "startedAt": "2026-11-04T06:27:28.562Z",
+          "completedAt": "2026-11-04T06:27:28.964Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "dd95a0c0-825d-43a2-a804-77f1257af007",
+            "phase": "intent",
+            "index": 0,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "d1ca801f-01ec-4fa4-a7e9-ec6e5bf68828",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKVEPRS2KV0EMC39C18E0C",
+              "requestDigest": "0899c97a5ae6abee293f461c70c966840a784c5247be1fd9c8e78acf1d46a592",
+              "startedAt": "2026-11-04T06:27:28.562Z",
+              "completedAt": "2026-11-04T06:27:28.964Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000073
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 1,
+          "receipted": 1,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000073,
+          "knownCalls": 1,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000073,
+        "decisionLatencyMs": 402,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": false,
+          "selectedResponderCount": 0,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "ignore",
+          "reason": "ordinary_conversation",
+          "responders": [],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "independent-views",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "4d70a121de291a8e9f76aad6cbd3ddbfe5a8f7d8f62ec8bfdb1dc1b8182d3e7b",
+        "policyVersion": "group-contribution-v2",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "3f383755-2d2e-49c8-9524-9b9830e9dbb7",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKVFHT0RPQAVZNYXDJ3DAG",
+          "requestDigest": "0f72b6bdfc8229aad28c627d69eb06caa158f3b1cf3e1a1842c4e7b82bb45c19",
+          "startedAt": "2026-11-04T06:27:29.438Z",
+          "completedAt": "2026-11-04T06:27:29.861Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "2608cce2-6543-4c4f-add1-30a95db18aae",
+            "phase": "intent",
+            "index": 0,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "3f383755-2d2e-49c8-9524-9b9830e9dbb7",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKVFHT0RPQAVZNYXDJ3DAG",
+              "requestDigest": "0f72b6bdfc8229aad28c627d69eb06caa158f3b1cf3e1a1842c4e7b82bb45c19",
+              "startedAt": "2026-11-04T06:27:29.438Z",
+              "completedAt": "2026-11-04T06:27:29.861Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000073
+          },
+          {
+            "id": "f7f420e1-43fd-41f3-85ef-5071584e2edc",
+            "phase": "responder",
+            "index": 1,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "d67b39e4-7557-4230-b33f-641d084dd3b6",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKVG6JR0HR90FXGBBR70SR",
+              "requestDigest": "566b7fec8c2084463d3f51848460cabb829ee5dd91c5a336dafc237e404a2498",
+              "startedAt": "2026-11-04T06:27:30.114Z",
+              "completedAt": "2026-11-04T06:27:30.480Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000074
+          },
+          {
+            "id": "f5da4c63-1c9d-4416-9d6f-444d277ea548",
+            "phase": "responder",
+            "index": 2,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "f38c2568-9c73-475c-b000-3f8272ff1a9f",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKVGT8J5SYV9YKXGZKB36F",
+              "requestDigest": "109840d2621f3c7a0037128d710f99a79510ca12a8a23c01331ea251da4bbf3a",
+              "startedAt": "2026-11-04T06:27:30.733Z",
+              "completedAt": "2026-11-04T06:27:31.230Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000067
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 3,
+          "receipted": 3,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000214,
+          "knownCalls": 3,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000214,
+        "decisionLatencyMs": 1286,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 1,
+          "delegationOperation": null,
+          "reportTiming": null
+        },
+        "route": {
+          "by": "model",
+          "action": "reply",
+          "reason": "independent_contributions",
+          "responders": [
+            "00000000-0000-4000-8000-000000000001"
+          ],
+          "delegation": null
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "delegate-task",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "0618af9d7e7e108b114b6940ab4b39e974b0711d62559a17b494d7f4b409dc6f",
+        "policyVersion": "group-contribution-v2",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "c7758920-052e-4de5-a83f-5afce1c8e438",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKVHTRP4EXTWN55YEJ2FNN",
+          "requestDigest": "ca0f22957e7f52a558c8ece2a63c0e6d0829787d3bec6ad243c52bca539a33a2",
+          "startedAt": "2026-11-04T06:27:31.722Z",
+          "completedAt": "2026-11-04T06:27:32.141Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "2f2ac536-2c16-45b1-8cc8-633076a03b70",
+            "phase": "intent",
+            "index": 0,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "c7758920-052e-4de5-a83f-5afce1c8e438",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKVHTRP4EXTWN55YEJ2FNN",
+              "requestDigest": "ca0f22957e7f52a558c8ece2a63c0e6d0829787d3bec6ad243c52bca539a33a2",
+              "startedAt": "2026-11-04T06:27:31.722Z",
+              "completedAt": "2026-11-04T06:27:32.141Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000085
+          },
+          {
+            "id": "70e04c41-bc06-4f86-8a72-0adc8bda525e",
+            "phase": "delegation",
+            "index": 1,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "d962b9bd-5d32-49a5-aaf5-7ab54952a7d1",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKVJK1D2JFZ69ZKW9TXBN5",
+              "requestDigest": "b26a0773f76d8bcb6f6e2b63b03e819ce12a6416b2dd152dc51d9b9d041d3435",
+              "startedAt": "2026-11-04T06:27:32.531Z",
+              "completedAt": "2026-11-04T06:27:32.925Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000082
+          },
+          {
+            "id": "b2bfb460-08f4-4686-8840-64d4ac32ca1e",
+            "phase": "report_timing",
+            "index": 2,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "36e999fa-b145-4972-8910-7ec3fd3c04fc",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKVK6D4E16HWS1TVNWC8NN",
+              "requestDigest": "e15fae089d17f1c4706782c1418bb35b252b230d4ff60ff199bf3ad484dcc977",
+              "startedAt": "2026-11-04T06:27:33.171Z",
+              "completedAt": "2026-11-04T06:27:33.592Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000073
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 3,
+          "receipted": 3,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.00023999999999999998,
+          "knownCalls": 3,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.00023999999999999998,
+        "decisionLatencyMs": 1234,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 1,
+          "delegationOperation": "continue",
+          "reportTiming": "now"
+        },
+        "route": {
+          "by": "model",
+          "action": "delegate",
+          "reason": "task_followup",
+          "responders": [
+            "00000000-0000-4000-8000-000000000002"
+          ],
+          "delegation": {
+            "operation": "continue",
+            "issueId": "00000000-0000-4000-8000-000000000010",
+            "reportTiming": "now"
+          }
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "caseId": "silent-delegation",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "8cda4b7b8196996ac7d2b9141377b0a2d1f796ad6113e1896fd3eefd4dd8f5d5",
+        "policyVersion": "group-contribution-v2",
+        "evidenceKind": "actual-decision-inference",
+        "status": "complete",
+        "receipt": {
+          "executionId": "72e29b14-65a8-4681-8a91-703c02c35cfa",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JKVM1WAREQ4MFGWNTPNV0D",
+          "requestDigest": "aee6897ad4fc7e94491528e0025e6bc6ca07baa9d0878dcd1f836967fe0f0181",
+          "startedAt": "2026-11-04T06:27:34.021Z",
+          "completedAt": "2026-11-04T06:27:34.412Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "19be239b-1d75-4e97-be38-2918d362c225",
+            "phase": "intent",
+            "index": 0,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "72e29b14-65a8-4681-8a91-703c02c35cfa",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKVM1WAREQ4MFGWNTPNV0D",
+              "requestDigest": "aee6897ad4fc7e94491528e0025e6bc6ca07baa9d0878dcd1f836967fe0f0181",
+              "startedAt": "2026-11-04T06:27:34.021Z",
+              "completedAt": "2026-11-04T06:27:34.412Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000084
+          },
+          {
+            "id": "8b99f366-a87e-468a-b3a6-bd43aa5b6d0d",
+            "phase": "delegation",
+            "index": 1,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "12fc429f-92f8-457d-b3fc-37a23a89bea0",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKVMPGB920KPNV9763FY68",
+              "requestDigest": "329fcd44f326d914a1f8eb61abf0e68826d77f09fee8cc29b894a96b9f8de40d",
+              "startedAt": "2026-11-04T06:27:34.656Z",
+              "completedAt": "2026-11-04T06:27:35.088Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000082
+          },
+          {
+            "id": "7660fa79-9af3-4e13-8e8f-ec8f036d1678",
+            "phase": "report_timing",
+            "index": 2,
+            "policyVersion": "group-contribution-v2",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "executionId": "9ca40ed5-e668-4647-9190-f772efa5048c",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JKVNBJZABY2KPEWJN0ZK1K",
+              "requestDigest": "acd7af94909efadb9adc37c2b7a783558bd01dc62055ab18452f2f5b0584d30e",
+              "startedAt": "2026-11-04T06:27:35.334Z",
+              "completedAt": "2026-11-04T06:27:35.814Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000072
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 3,
+          "receipted": 3,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.00023799999999999998,
+          "knownCalls": 3,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.00023799999999999998,
+        "decisionLatencyMs": 1303,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "projection": {
+          "intervention": true,
+          "selectedResponderCount": 1,
+          "delegationOperation": "continue",
+          "reportTiming": "on_completion"
+        },
+        "route": {
+          "by": "model",
+          "action": "delegate",
+          "reason": "task_followup",
+          "responders": [
+            "00000000-0000-4000-8000-000000000002"
+          ],
+          "delegation": {
+            "operation": "continue",
+            "issueId": "00000000-0000-4000-8000-000000000010",
+            "reportTiming": "on_completion"
+          }
+        }
+      }
+    ],
+    "comparison": {
+      "baseline": {
+        "cases": 12,
+        "logicalReplays": 12,
+        "observed": 12,
+        "observationCoverage": 1,
+        "measured": 8,
+        "coverage": 0.6666666666666666,
+        "accuracyDenominator": 12,
+        "abstentions": 4,
+        "unresolvedPositive": 0,
+        "unresolvedNegative": 4,
+        "intentionalNonIntervention": 0,
+        "missingCaseIds": [],
+        "actionAccuracy": 0.4166666666666667,
+        "responderAccuracy": 0.5833333333333334,
+        "falseIntervention": 0,
+        "missedIntervention": 0,
+        "failures": [
+          {
+            "caseId": "small-talk",
+            "reason": "invalid_decision"
+          },
+          {
+            "caseId": "already-answered",
+            "reason": "invalid_decision"
+          },
+          {
+            "caseId": "unrelated",
+            "reason": "invalid_decision"
+          },
+          {
+            "caseId": "ambiguous-task",
+            "reason": "action"
+          },
+          {
+            "caseId": "prompt-injection",
+            "reason": "invalid_decision"
+          },
+          {
+            "caseId": "independent-views",
+            "reason": "responder"
+          },
+          {
+            "caseId": "delegate-task",
+            "reason": "action"
+          },
+          {
+            "caseId": "silent-delegation",
+            "reason": "action"
+          },
+          {
+            "caseId": "silent-delegation",
+            "reason": "report_timing"
+          }
+        ],
+        "decisionCalls": {
+          "attempted": 20,
+          "receipted": 20,
+          "unreceipted": 0
+        },
+        "cost": {
+          "scope": "routing-decision-chain",
+          "knownUsd": 0.001252,
+          "knownCalls": 20,
+          "unknownCalls": 0,
+          "omittedCalls": 0,
+          "completeTotalUsd": 0.001252,
+          "knownObservations": 20,
+          "unknownObservations": 0
+        },
+        "decisionLatency": {
+          "scope": "provider-request",
+          "samples": 20,
+          "p50Ms": 415,
+          "p95Ms": 983
+        },
+        "runtimeCasesExcluded": [
+          "decision-outage",
+          "duplicate-delivery"
+        ]
+      },
+      "candidate": {
+        "cases": 12,
+        "logicalReplays": 12,
+        "observed": 12,
+        "observationCoverage": 1,
+        "measured": 12,
+        "coverage": 1,
+        "accuracyDenominator": 12,
+        "abstentions": 0,
+        "unresolvedPositive": 0,
+        "unresolvedNegative": 0,
+        "intentionalNonIntervention": 4,
+        "missingCaseIds": [],
+        "actionAccuracy": 1,
+        "responderAccuracy": 0.9166666666666666,
+        "falseIntervention": 0,
+        "missedIntervention": 0,
+        "failures": [
+          {
+            "caseId": "independent-views",
+            "reason": "responder"
+          }
+        ],
+        "decisionCalls": {
+          "attempted": 22,
+          "receipted": 22,
+          "unreceipted": 0
+        },
+        "cost": {
+          "scope": "routing-decision-chain",
+          "knownUsd": 0.0016100000000000003,
+          "knownCalls": 22,
+          "unknownCalls": 0,
+          "omittedCalls": 0,
+          "completeTotalUsd": 0.0016100000000000003,
+          "knownObservations": 22,
+          "unknownObservations": 0
+        },
+        "decisionLatency": {
+          "scope": "provider-request",
+          "samples": 22,
+          "p50Ms": 421,
+          "p95Ms": 538
+        },
+        "runtimeCasesExcluded": [
+          "decision-outage",
+          "duplicate-delivery"
+        ]
+      },
+      "baselineClassifiable": true,
+      "decisionReviewReady": false,
+      "requiresHumanReview": true,
+      "executionAcceptanceRequired": true
+    },
+    "executionPerformed": false,
+    "productionAccepted": false,
+    "policyChanged": false
+  },
+  "accounting": {
+    "scope": "routing-decision-chain",
+    "comparisonVersion": "group-decision-comparison-v2",
+    "logicalReplays": 24,
+    "receiptedLogicalReplays": 24,
+    "completedLogicalReplays": 20,
+    "unobservedLogicalReplays": 0,
+    "baselineClassifiable": true,
+    "baselineCompleted": 8,
+    "baselineAbstentions": 4,
+    "candidateCompleted": 12,
+    "evidenceValid": true,
+    "collectionComplete": true,
+    "qualityAccepted": false,
+    "valid": true,
+    "decisionCalls": {
+      "attempted": 42,
+      "receipted": 42,
+      "unreceipted": 0
+    },
+    "decisionCost": {
+      "knownUsd": 0.002862000000000001,
+      "knownCalls": 42,
+      "unknownCalls": 0,
+      "omittedCalls": 0
+    },
+    "decisionCostUsd": 0.002862000000000001,
+    "maximumProviderCalls": 96
+  },
+  "error": "preflight_candidate_rejected",
+  "policyChanged": false,
+  "executionPerformed": false,
+  "productionAccepted": false,
+  "runnerDigest": "3b052ecff198d777f89287d0ca5739acdde6c10a526692a97e6e4f6128870a67"
+}
