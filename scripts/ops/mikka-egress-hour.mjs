@@ -56,7 +56,21 @@ const uuid = value => /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]
 const runId = env.EGRESS_RUN_ID, issueId = env.EGRESS_ISSUE_ID
 if (process.argv[2] === 'neon-sql') {
   check(uuid(runId) && uuid(issueId), 'egress_run_and_issue_required')
-  const sql = 'SELECT now() AS "observedAt", r.id AS "runId", r."issueId", r.status, r."startedAt", r."finishedAt", ' +
+  // Preserve raw counts. A row never admitted to an executor is not a live
+  // model task just because a historical fixture retained status=running.
+  // Exclude it only while all authority and activity fields prove it inert
+  // for the entire day before this window; any new activity includes it again.
+  const windowStart = "'" + new Date(start).toISOString() + "'::timestamptz"
+  const windowEnd = "'" + new Date(end).toISOString() + "'::timestamptz"
+  const historicalCutoff = windowStart + " - interval '1 day'"
+  const sql = 'WITH other_runs AS MATERIALIZED (SELECT other.id,other."userId",other.status, ' +
+    '(other."startedAt"<' + windowEnd + ' AND coalesce(other."finishedAt",now())>' + windowStart + ') AS overlaps, ' +
+    'COALESCE((other."agentDefinition" IS NULL AND other."leaseExpiresAt" IS NULL AND other.source IS NULL ' +
+    'AND other."startedAt"<' + historicalCutoff + ' AND other."updatedAt"<' + historicalCutoff +
+    ' AND NOT EXISTS(SELECT 1 FROM run_chunks activity WHERE activity."runId"=other.id AND activity."createdAt">=' + historicalCutoff + ')),false) AS "historicalUnadmitted" ' +
+    'FROM agent_runs other WHERE other.id<>\'' + runId + '\'::uuid AND (other.status=\'running\' OR ' +
+    '(other."startedAt"<' + windowEnd + ' AND coalesce(other."finishedAt",now())>' + windowStart + '))) ' +
+    'SELECT now() AS "observedAt", r.id AS "runId", r."issueId", r.status, r."startedAt", r."finishedAt", ' +
     'r."agentDefinition"->>\'model\' AS model, r."agentDefinition"->>\'harness\' AS harness, ' +
     'r."agentDefinition"->>\'modelSource\' AS "modelSource", r."agentDefinition"->>\'cliModelSelection\' AS "cliModelSelection", ' +
     'r."agentDefinition"->\'apiKey\'->>\'model\' AS "apiKeyModel", ' +
@@ -66,11 +80,15 @@ if (process.argv[2] === 'neon-sql') {
     'WHEN r."agentDefinition"->\'apiKey\' IS NOT NULL AND r."agentDefinition"->\'apiKey\'<>\'null\'::jsonb THEN \'api_key\' ' +
     'WHEN r."agentDefinition"->\'subscription\' IS NOT NULL AND r."agentDefinition"->\'subscription\'<>\'null\'::jsonb THEN \'subscription\' ELSE \'unknown\' END AS "credentialType", ' +
     'r."agentDefinition"->\'subscription\'->>\'route\' AS "subscriptionRoute", c.seq AS "lastSeq", c."createdAt" AS "lastEventAt", r."lastReplyAt", ' +
-    '(SELECT count(*) FROM agent_runs other WHERE other.status=\'running\' AND other."userId"=r."userId" AND other.id<>r.id) AS "otherOwnerRunningRuns", ' +
-    '(SELECT count(*) FROM agent_runs other WHERE other.status=\'running\' AND other.id<>r.id) AS "otherRunningRuns", ' +
-    '(SELECT count(*) FROM agent_runs other WHERE other.id<>r.id AND other."startedAt"<\'' + new Date(end).toISOString() +
-    '\'::timestamptz AND coalesce(other."finishedAt",now())>\'' + new Date(start).toISOString() +
-    '\'::timestamptz) AS "otherWindowRuns" ' +
+    '(SELECT count(*) FROM other_runs other WHERE other.status=\'running\' AND other."userId"=r."userId" AND NOT other."historicalUnadmitted") AS "otherOwnerRunningRuns", ' +
+    '(SELECT count(*) FROM other_runs other WHERE other.status=\'running\' AND NOT other."historicalUnadmitted") AS "otherRunningRuns", ' +
+    '(SELECT count(*) FROM other_runs other WHERE other.overlaps AND NOT other."historicalUnadmitted") AS "otherWindowRuns", ' +
+    '(SELECT count(*) FROM other_runs other WHERE other.status=\'running\' AND other."userId"=r."userId") AS "rawOtherOwnerRunningRuns", ' +
+    '(SELECT count(*) FROM other_runs other WHERE other.status=\'running\') AS "rawOtherRunningRuns", ' +
+    '(SELECT count(*) FROM other_runs other WHERE other.overlaps) AS "rawOtherWindowRuns", ' +
+    '(SELECT count(*) FROM other_runs other WHERE other.status=\'running\' AND other."userId"=r."userId" AND other."historicalUnadmitted") AS "historicalOwnerRunningRows", ' +
+    '(SELECT count(*) FROM other_runs other WHERE other.status=\'running\' AND other."historicalUnadmitted") AS "historicalRunningRows", ' +
+    '(SELECT count(*) FROM other_runs other WHERE other.overlaps AND other."historicalUnadmitted") AS "historicalWindowRows" ' +
     'FROM agent_runs r LEFT JOIN LATERAL (SELECT seq,"createdAt" FROM run_chunks WHERE "runId"=r.id ORDER BY seq DESC LIMIT 1) c ON true ' +
     'WHERE r.id=\'' + runId + '\'::uuid AND r."issueId"=\'' + issueId + '\'::uuid;';
   console.log(JSON.stringify({ project_id: 'autumn-fire-21908520', branch_id: 'br-autumn-rain-b5leflom', database_name: 'orvilo_mvp', sql }, null, 2))
@@ -93,6 +111,14 @@ if (process.argv[2] === 'check-neon') {
     check(expected.credentialType === 'api_key'
       ? sample.apiKeyModel === expected.model && sample.subscriptionModel === null
       : sample.apiKeyModel === null && sample.subscriptionModel === expected.model, 'egress_credential_model_changed')
+    for (const [actual, raw, historical] of [
+      ['otherOwnerRunningRuns', 'rawOtherOwnerRunningRuns', 'historicalOwnerRunningRows'],
+      ['otherRunningRuns', 'rawOtherRunningRuns', 'historicalRunningRows'],
+      ['otherWindowRuns', 'rawOtherWindowRuns', 'historicalWindowRows'],
+    ]) {
+      check([actual, raw, historical].every(key => /^\d+$/.test(String(sample[key]))), 'egress_activity_scope_evidence_missing')
+      check(Number(sample[actual]) + Number(sample[historical]) === Number(sample[raw]), 'egress_activity_scope_mismatch')
+    }
     check(Number(sample.otherOwnerRunningRuns) === 0, 'egress_concurrent_owner_run')
     check(Number(sample.otherRunningRuns) === 0, 'egress_concurrent_project_run')
     check(Number(sample.otherWindowRuns) === 0, 'egress_other_run_overlapped_window')

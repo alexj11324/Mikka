@@ -39,6 +39,8 @@ const goodSamples = path => Array.from({ length: 13 }, (_, index) => {
     subscriptionModel: expected.credentialType === 'subscription' ? expected.model : null,
     lastSeq: 100 + index, lastEventAt: new Date(start + index * 300_000).toISOString(), lastReplyAt: null,
     otherOwnerRunningRuns: '0', otherRunningRuns: '0', otherWindowRuns: '0',
+    rawOtherOwnerRunningRuns: '0', rawOtherRunningRuns: '0', rawOtherWindowRuns: '0',
+    historicalOwnerRunningRows: '0', historicalRunningRows: '0', historicalWindowRows: '0',
   }
 })
 let count = 0
@@ -87,9 +89,9 @@ try {
     assert.match(validate('api_key_flash', conflict).stderr, /egress_execution_path_changed/)
   })
   await test('other project activity, missing samples, and early completion cannot count as a full hour', () => {
-    const active = goodSamples('api_key_flash'); active[5].otherRunningRuns = '1'
+    const active = goodSamples('api_key_flash'); active[5].otherRunningRuns = active[5].rawOtherRunningRuns = '1'
     assert.match(validate('api_key_flash', active).stderr, /egress_concurrent_project_run/)
-    const brief = goodSamples('api_key_flash'); brief[12].otherWindowRuns = '1'
+    const brief = goodSamples('api_key_flash'); brief[12].otherWindowRuns = brief[12].rawOtherWindowRuns = '1'
     assert.match(validate('api_key_flash', brief).stderr, /egress_other_run_overlapped_window/)
     const earlyLast = goodSamples('api_key_flash')
     earlyLast[12].observedAt = new Date(start + 3_600_000 - 1_000).toISOString()
@@ -107,6 +109,23 @@ try {
     assert.equal(result.status, 0, result.stderr)
     assert.deepEqual(JSON.parse(result.stdout).review, [{ minute: 30, reason: 'no_new_events_requires_artifact_and_test_review' }])
   })
+  await test('historical unadmitted rows retain raw counts and cannot hide real activity or omit scope evidence', () => {
+    const samples = goodSamples('codex_subscription')
+    for (const sample of samples) {
+      sample.rawOtherOwnerRunningRuns = sample.historicalOwnerRunningRows = '26'
+      sample.rawOtherRunningRuns = sample.historicalRunningRows = '54'
+      sample.rawOtherWindowRuns = sample.historicalWindowRows = '58'
+    }
+    const result = validate('codex_subscription', samples)
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(JSON.parse(result.stdout).samples[0].rawOtherWindowRuns, '58')
+    samples[5].rawOtherWindowRuns = '59'
+    assert.match(validate('codex_subscription', samples).stderr, /egress_activity_scope_mismatch/)
+    samples[5].otherWindowRuns = '1'
+    assert.match(validate('codex_subscription', samples).stderr, /egress_other_run_overlapped_window/)
+    delete samples[0].rawOtherWindowRuns
+    assert.match(validate('codex_subscription', samples).stderr, /egress_activity_scope_evidence_missing/)
+  })
   await test('generated production observation is one scoped SELECT with no credential values', () => {
     const result = execute('neon-sql', 'claude_subscription')
     assert.equal(result.status, 0, result.stderr)
@@ -114,7 +133,8 @@ try {
     assert.equal(query.project_id, 'autumn-fire-21908520')
     assert.equal(query.branch_id, 'br-autumn-rain-b5leflom')
     assert.equal(query.database_name, 'orvilo_mvp')
-    assert.match(query.sql, /^SELECT now\(\)/)
+    assert.match(query.sql, /^WITH other_runs AS MATERIALIZED \(SELECT /)
+    assert.match(query.sql, /SELECT now\(\)/)
     assert.match(query.sql, new RegExp(runId))
     assert.match(query.sql, new RegExp(issueId))
     assert.doesNotMatch(query.sql, /\b(?:INSERT|UPDATE|DELETE|ALTER|DROP|TRUNCATE)\b/i)
