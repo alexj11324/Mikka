@@ -3,6 +3,8 @@ name: Desktop shell
 # Checks the Electron shell and the shared platform contract. Packaging,
 # signing and notarization run on the release runners, not here.
 
+# Pull requests only: the same suite already passed on the PR, and main's
+# CI workflow (ui-policy.yml) still verifies every merged commit.
 on:
   pull_request:
     paths:
@@ -21,24 +23,7 @@ on:
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - '.github/workflows/desktop.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'apps/desktop/**'
-      - 'packages/protocol/**'
-      - 'lib/platform/**'
-      - 'components/desktop/**'
-      - 'app/actions/task-runs.ts'
-      - 'components/devices/**'
-      - 'components/coordinator/new-task-dialog.tsx'
-      - 'app/**/settings/**'
-      - 'next.config.mjs'
-      - 'lib/auth-return.ts'
-      - 'instrumentation-client.ts'
-      - 'lib/analytics-policy.ts'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read

@@ -126,6 +126,10 @@ old module owners (backend was Codex's).
    A change to auth, signup, privilege or credentials says so in the PR.
 4. **Stacked PRs** merge in order. After a base merges, retarget the next PR
    to `main`.
+   Do not merge `main` into a PR only to keep it current: branch protection
+   does not require an up-to-date branch, and each merge reruns the full CI.
+   Merge `main` in when there is a conflict, or when a change that just landed
+   touches the same code and the PR must be checked against it.
 5. **After the merge** the owner watches the Vercel production deployment
    until it is READY and the production domain serves that commit. Pending
    migrations run through the existing flow (`pnpm build` runs

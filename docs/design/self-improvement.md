@@ -33,8 +33,8 @@ fact. #232 remains the Skill registry owner.
   no changes to shared Factory, protocol, registry or permission contracts.
 - `lib/issue-access.ts`: the identical optional transaction executor already
   present in #192's candidate; no permission-rule change. Parent must dedupe it.
-- Tests and `.github/workflows/self-improvement.yml`: source tests and actual
-  isolated PG17/HTTP checks. Full build/typecheck remain existing remote CI.
+- Tests: source tests run in CI's core unit job, and the isolated PG17 checks
+  in its database shards (`test:self-improvement-db`, `test:skill-semantic-db`).
 
 ## Rules and controls
 

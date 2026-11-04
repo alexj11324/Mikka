@@ -1,6 +1,7 @@
 name: Desktop release
 
-# Publishes signed, notarized Apple Silicon installers for every main push.
+# Publishes signed, notarized Apple Silicon installers for each main push that
+# changes the app or something it bundles (the daemon client, protocol, lockfile).
 # Versions use a fixed epoch above earlier calendar versions and the workflow
 # run number: 2026.10000.<run_number>. Retries keep the version and built commit.
 # Manual builds that skip notarization remain drafts.
@@ -15,6 +16,19 @@ name: Desktop release
 on:
   push:
     branches: [main]
+    paths:
+      - 'apps/desktop/**'
+      - 'packages/daemon/**'
+      - 'packages/protocol/**'
+      - 'lib/daemon-commands.ts'
+      - 'lib/local-device-setup.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'patches/**'
+      - 'scripts/release/**'
+      - 'config/release-security.json'
+      - '.github/workflows/desktop-release.yml'
   workflow_dispatch:
     inputs:
       skip_notarization:
