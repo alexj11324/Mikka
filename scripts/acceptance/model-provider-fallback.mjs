@@ -22,7 +22,7 @@ const sha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value)
 const hash = value => createHash('sha256').update(value).digest('hex')
 const runStatuses = new Set(['queued', 'preparing', 'running', 'waiting_input', 'paused', 'finishing', 'succeeded', 'failed', 'stopped', 'cancelled'])
 const terminalTask = new Set(['cancelled', 'revoked', 'failed', 'blocked', 'completed', 'succeeded'])
-const actionsAllowed = new Set(['getIssueThread', 'changeModelOrder', 'listWorkspaceBots', 'getIssue', 'setIssueDeleted', 'getDeletedIssue', 'getArtifact'])
+const actionsAllowed = new Set(['getIssueThread', 'changeModelOrder', 'getIssue', 'setIssueDeleted', 'getDeletedIssue', 'getArtifact'])
 const serverCodes = new Set(['authRequired', 'workspaceAccessDenied', 'executionModelUnknown', 'executionAccountUnavailable', 'executionRuleOrderInvalid', 'modelUnavailable', 'botNotFound', 'factoryStale', 'factoryStopped', 'factoryNotFound', 'factoryLifecycleUnavailable', 'factoryUnavailable', 'issueOutdated', 'runChainEnded', 'runNotFound', 'subscription_unavailable', 'backend_unavailable', 'validationGeneric'])
 const codes = new Set([
   'configuration_required', 'origin_rejected', 'merge_scope_rejected', 'build_mismatch', 'build_mapping_required',
@@ -228,7 +228,6 @@ export function actionResult(text, name) {
     const shape = value => value && typeof value === 'object' && (value.error
       || (name === 'getIssueThread' && value.thread && Array.isArray(value.chunks))
       || (name === 'changeModelOrder' && Array.isArray(value.entries) && typeof value.customized === 'boolean')
-      || (name === 'listWorkspaceBots' && Array.isArray(value.bots))
       || (['getIssue', 'setIssueDeleted'].includes(name) && value.issue)
       || (name === 'getDeletedIssue' && uuid(value.id) && value.deletedAt)
       || (name === 'getArtifact' && uuid(value.id) && Array.isArray(value.versions) && 'runId' in value && 'issueId' in value))
@@ -237,6 +236,19 @@ export function actionResult(text, name) {
   if (result?.error) throw new AcceptanceError('action_refused', 'blocked', { serverCode: result.error })
   check(result !== undefined, 'action_refused')
   return result
+}
+
+/** The workspace read counts every unfinished Bot run, including other owners
+ * and old queued/paused runs; the capped mobile list is only an extra check. */
+export async function assertWorkspaceIdle(read) {
+  const state = await read('/api/settings/workspace-bots')
+  check(Array.isArray(state?.bots) && state.bots.every(bot => bot && ['idle', 'running'].includes(bot.status)
+    && Number.isSafeInteger(bot.runningThreads) && bot.runningThreads >= 0), 'response_invalid')
+  check(state.bots.every(bot => bot.status === 'idle' && bot.runningThreads === 0), 'workspace_busy')
+  const own = await read('/api/mobile/threads')
+  check(Array.isArray(own?.threads) && own.threads.every(thread => thread
+    && ['running', 'waiting', 'paused', 'failed', 'done', 'stopped'].includes(thread.status)), 'response_invalid')
+  check(own.threads.every(thread => !['running', 'waiting', 'paused'].includes(thread.status)), 'workspace_busy')
 }
 
 export async function runModelProviderAcceptance({ env = process.env, fetchImpl = fetch, wait = delay, now = Date.now } = {}) {
@@ -284,13 +296,7 @@ export async function runModelProviderAcceptance({ env = process.env, fetchImpl 
       ? json(`/api/settings/api-keys?workspace=${workspaceId}`) : Promise.resolve({ keys: [] }), json(`/api/subscriptions?workspace=${workspaceId}`)])
     return { order, keys, connections, ownerId }
   }
-  async function quietWorkspace() {
-    const state = await action('listWorkspaceBots', [])
-    check(Array.isArray(state?.bots), 'response_invalid')
-    check(state.bots.every(bot => bot.status === 'idle' && bot.runningThreads === 0), 'workspace_busy')
-    const own = await json('/api/mobile/threads')
-    check(Array.isArray(own?.threads) && own.threads.every(thread => !['running', 'waiting', 'paused'].includes(thread.status)), 'workspace_busy')
-  }
+  const quietWorkspace = () => assertWorkspaceIdle(json)
   async function changeChecked(current, change) {
     await pin()
     check(orderFingerprint(await orderRead()) === orderFingerprint(current), 'order_restore_conflict')

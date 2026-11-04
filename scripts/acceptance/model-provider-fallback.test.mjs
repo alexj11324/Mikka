@@ -15,7 +15,7 @@ const KEY = '10000000-0000-4000-8000-000000000005'
 const CLAUDE = '10000000-0000-4000-8000-000000000006'
 const CODEX = '10000000-0000-4000-8000-000000000007'
 const BINDING = '10000000-0000-4000-8000-000000000008'
-const actionNames = ['getIssueThread', 'changeModelOrder', 'listWorkspaceBots', 'getIssue', 'setIssueDeleted', 'getDeletedIssue', 'getArtifact']
+const actionNames = ['getIssueThread', 'changeModelOrder', 'getIssue', 'setIssueDeleted', 'getDeletedIssue', 'getArtifact']
 const refs = Object.fromEntries(actionNames.map((name, index) => [name, String(index + 1).repeat(40)]))
 const pr = () => ({ number: 1232, merged: true, merge_commit_sha: SHA, body: 'Refs #1225', base: { ref: 'main', repo: { full_name: REPOSITORY } } })
 const deployed = () => ({ name: 'Web deploy', status: 'completed', conclusion: 'success', head_branch: 'main', head_sha: SHA,
@@ -207,9 +207,11 @@ test('RSC result decoding follows the action return reference and rejects unappr
   assert.throws(() => actionResult('0:{"a":"$@1"}\n1:{"error":"executionModelUnknown"}', 'changeModelOrder'),
     error => publicFailure(error).serverCode === 'executionModelUnknown')
   assert.throws(() => actionResult('1:{"id":"key"}', 'createApiKey'), /action_not_allowed/)
+  assert.throws(() => actionResult('1:{"bots":[]}', 'listWorkspaceBots'), /action_not_allowed/)
 })
 
-function preflightFetch({ missingDeepseek = false, codexOnlyDefault = false } = {}) {
+function preflightFetch({ missingDeepseek = false, codexOnlyDefault = false,
+  workspaceState = { bots: [{ status: 'idle', runningThreads: 0 }] }, workspaceStatus = 200, threads = [] } = {}) {
   const state = inventory(), calls = []
   if (missingDeepseek) state.keys.keys = []
   if (codexOnlyDefault) {
@@ -232,14 +234,15 @@ function preflightFetch({ missingDeepseek = false, codexOnlyDefault = false } = 
     }
     if (path === '/mikka/en' && method === 'GET') return new Response('<script src="/mikka/_next/static/chunks/actions.js"></script>')
     if (path === '/mikka/_next/static/chunks/actions.js') return new Response(actionNames.map(name => `createServerReference)("${refs[name]}",x,"${name}")`).join(';'))
-    if (path === '/mikka/en') {
-      assert.equal(init.headers['next-action'], refs.listWorkspaceBots, 'preflight invokes only the workspace read action')
-      return new Response('0:{"a":"$@1"}\n1:{"bots":[{"status":"idle","runningThreads":0}]}\n')
-    }
+    if (path === '/mikka/en') throw new Error('preflight must not invoke a server action')
     if (path === '/mikka/api/settings/api-keys') return respond(state.keys)
     if (path === '/mikka/api/settings/model-order') return respond(state.order)
+    if (path === '/mikka/api/settings/workspace-bots') {
+      assert.equal(method, 'GET')
+      return Response.json(workspaceState, { status: workspaceStatus })
+    }
     if (path === '/mikka/api/subscriptions') return respond(state.connections)
-    if (path === '/mikka/api/mobile/threads') return respond({ threads: [] })
+    if (path === '/mikka/api/mobile/threads') return respond({ threads })
     if (path === '/mikka/api/mobile/model') return respond({ groups: CASES.slice(1).map((item, index) => ({ kind: 'subscription', provider: item.provider,
       options: [{ id: index ? CODEX : CLAUDE, provider: item.provider, modelId: item.model }] })) })
     throw new Error(`Unexpected private request ${path}`)
@@ -256,9 +259,55 @@ test('real HTTP preflight creates no task, Bot, key, binding or order and still 
   assert.equal(report.cases[0].code, 'source_missing')
   assert.equal(report.sessionClosed, true)
   const writes = calls.filter(call => call.method !== 'GET').map(call => call.path)
-  assert.deepEqual(writes, ['/mikka/api/auth/sign-in/email', '/mikka/en', '/mikka/en', '/mikka/api/auth/sign-out'])
+  assert.deepEqual(writes, ['/mikka/api/auth/sign-in/email', '/mikka/api/auth/sign-out'])
+  assert.equal(calls.filter(call => call.path === '/mikka/api/settings/workspace-bots').length, 2)
   const output = JSON.stringify(report)
   for (const value of ['private-password', 'private-cookie', 'example.invalid', OWNER, KEY, CLAUDE, CODEX]) assert.ok(!output.includes(value), value)
+})
+
+test('a busy workspace Bot or waiting own thread blocks every paid case before order or task writes', async () => {
+  for (const fixture of [
+    { workspaceState: { bots: [{ ownerId: 'another-workspace-member', status: 'running', runningThreads: 1 }] } },
+    { workspaceState: { bots: [{ status: 'idle', runningThreads: 1 }] } },
+    { threads: [{ status: 'paused' }] },
+    { threads: [{ status: 'waiting' }] },
+  ]) {
+    const { fetchImpl, calls } = preflightFetch(fixture)
+    const report = await runModelProviderAcceptance({ env: { ...env(), MIKKA_PROVIDER_ACCEPTANCE_MODE: 'active',
+      MIKKA_WORKER_RELEASE_SHA: SHA, MIKKA_WORKER_RELEASE_RUN_ID: '12345' }, fetchImpl })
+    assert.deepEqual(report.cases.map(item => [item.status, item.code]), CASES.map(() => ['blocked', 'workspace_busy']))
+    assert.equal(report.sessionClosed, true)
+    assert.deepEqual(calls.filter(call => call.method !== 'GET').map(call => call.path),
+      ['/mikka/api/auth/sign-in/email', '/mikka/api/auth/sign-out'])
+  }
+})
+
+test('the workspace GET refuses HTTP failures and the existing action error body independently for all three cases', async () => {
+  for (const [workspaceStatus, error] of [[401, 'authRequired'], [403, 'workspaceAccessDenied'], [200, 'workspaceAccessDenied']]) {
+    const { fetchImpl, calls } = preflightFetch({ workspaceStatus, workspaceState: { error, secret: 'private-upstream-body' } })
+    const report = await runModelProviderAcceptance({ env: env(), fetchImpl })
+    assert.deepEqual(report.cases.map(item => [item.status, item.code, item.httpStatus, item.serverCode]),
+      CASES.map(() => ['blocked', 'http_refused', workspaceStatus, error]))
+    assert.equal(calls.filter(call => call.path === '/mikka/api/settings/workspace-bots').length, 3)
+    assert.ok(!JSON.stringify(report).includes('private-upstream-body'))
+    assert.deepEqual(calls.filter(call => call.method !== 'GET').map(call => call.path),
+      ['/mikka/api/auth/sign-in/email', '/mikka/api/auth/sign-out'])
+  }
+})
+
+test('missing or malformed activity data cannot establish an idle workspace', async () => {
+  for (const fixture of [
+    { workspaceState: null }, { workspaceState: { bots: null } },
+    { workspaceState: { bots: [null] } }, { workspaceState: { bots: [{ status: 'idle', runningThreads: '0' }] } },
+    { workspaceState: { bots: [{ status: 'unknown', runningThreads: 0 }] } },
+    { threads: null }, { threads: [{ status: 'unknown' }] },
+  ]) {
+    const { fetchImpl, calls } = preflightFetch(fixture)
+    const report = await runModelProviderAcceptance({ env: env(), fetchImpl })
+    assert.deepEqual(report.cases.map(item => [item.status, item.code]), CASES.map(() => ['blocked', 'response_invalid']))
+    assert.deepEqual(calls.filter(call => call.method !== 'GET').map(call => call.path),
+      ['/mikka/api/auth/sign-in/email', '/mikka/api/auth/sign-out'])
+  }
 })
 
 test('an un-restorable Claude check order blocks only that path and still preflights a safe default Codex order', async () => {

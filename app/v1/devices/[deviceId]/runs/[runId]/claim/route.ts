@@ -100,7 +100,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   // a fresh execution, even when their Factory attempt is no longer present.
   if (run.retryOf && await blockQuestionRetry(pool, caller.userId, run.issueId, runId) && (await afterRunEnded(caller.userId, runId), true)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
   const [lost] = run.retryOf
-    ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId, stopReason: agentRuns.stopReason, agentDefinition: agentRuns.agentDefinition, report: agentRuns.report }).from(agentRuns).where(eq(agentRuns.id, run.retryOf)).limit(1)
+    ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId, agentId: agentRuns.agentId, stopReason: agentRuns.stopReason, agentDefinition: agentRuns.agentDefinition, report: agentRuns.report }).from(agentRuns)
+      .where(and(eq(agentRuns.id, run.retryOf), eq(agentRuns.userId, caller.userId), run.issueId === null ? isNull(agentRuns.issueId) : eq(agentRuns.issueId, run.issueId))).limit(1)
     : []
   const providerCheckpointUnavailable = lost?.stopReason === 'provider_failure' && lost.report?.providerCheckpoint === 'unavailable'
   // A failed final upload supersedes any older patch. Only the original
@@ -291,13 +292,17 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   // when the harness can, its session; the daemon falls back to `prompt`.
   // Another machine has no such worktree and starts from the latest
   // checkpoint instead.
+  // Historical runs have no frozen definition. Only the same owned Agent
+  // proves their harness; an unknown source on another Agent cannot resume.
+  const retryHarness = lost?.agentDefinition?.harness
+    ?? (lost?.agentDefinition == null && lost?.agentId === run.agentId ? agent.harness : undefined)
   const retry = run.retryOf
     ? {
       // A continuation after a used-up quota (lib/run-quota.ts) is told that, not a lost machine.
       continuesRunId: run.retryOf, followUp: lost?.stopReason === 'provider_failure' ? providerContinuationNote() : lost?.stopReason === 'quota_exhausted' ? quotaContinuationNote() : retryNote(run.attempt),
       // A fallback keeps the worktree across harnesses, but native session
       // identifiers belong only to the harness that created them.
-      ...(lost?.sessionId && lost.deviceId === deviceId && lost.agentDefinition?.harness === harness ? { resumeSessionId: lost.sessionId } : {}),
+      ...(lost?.sessionId && lost.deviceId === deviceId && retryHarness === harness ? { resumeSessionId: lost.sessionId } : {}),
       ...(resumeFrom && !requireWorktreeContinuation ? { resumeFrom } : {}),
       ...(requireWorktreeContinuation ? { requireWorktreeContinuation: true as const } : {}),
     }

@@ -18,7 +18,7 @@ before(async () => { ({ ThreadModelFallbackNotice: Notice } = await import('./th
 
 const from = { harness: 'codex', model: 'fixture-first', source: 'api_key' } as const
 const to = { harness: 'claude_code', model: 'fixture-next', source: 'subscription' } as const
-const switched: ThreadModelFallbackView = { runId: 'fixture-run', state: 'switched', from, to, failure: 'balance' }
+const switched: ThreadModelFallbackView = { runId: 'fixture-run', state: 'switched', continuationRunId: 'fixture-child', from, to, failure: 'balance' }
 
 test('confirmed switches name both models and the reason in either locale, with shared entity marks', () => {
   for (const language of ['zh-CN', 'en'] as const) {

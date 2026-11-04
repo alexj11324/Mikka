@@ -9,7 +9,8 @@ const choiceSchema = z.strictObject({
 export type ModelFallbackChoice = z.infer<typeof choiceSchema>
 
 /** Written only by the host on the source run, never accepted from a daemon's
- * report. Receipt fields stay on the server; the view exposes model labels. */
+ * report. Private receipt fields stay on the server; the view exposes model
+ * labels and the authorized continuation id for the composer's current agent. */
 export const modelFallbackRecordSchema = z.strictObject({
   state: z.enum(['pending', 'switched', 'blocked', 'picked', 'stopped']),
   fallback: z.enum(['balance', 'unavailable']),
@@ -33,7 +34,14 @@ export type ThreadModelFallbackView = {
   failure: ProviderFailure['kind']
   reasons?: ModelFallbackRecord['reasons']
   card?: ModelFallbackRecord['card']
-} & ({ state: 'switched'; to: ModelFallbackChoice } | { state: 'blocked' | 'picked' })
+} & ({ state: 'switched'; to: ModelFallbackChoice; continuationRunId: string } | { state: 'blocked' | 'picked' })
+
+/** A historical switch must not rename a later manually selected run. These
+ * notices are host-confirmed; only the current live child's target applies. */
+export function threadComposerHarness(harness: string, liveRunId: string, notices: readonly ThreadModelFallbackView[]): string {
+  const current = notices.find(item => item.state === 'switched' && item.continuationRunId === liveRunId)
+  return current?.state === 'switched' ? current.to.harness : harness
+}
 
 /** A pending intent is not a switch. The read path must prove its committed
  * child belongs to this owner's chain or independent Factory check before
@@ -49,7 +57,7 @@ export function projectModelFallback(runId: string, record: unknown, failure: un
     ...(item.reasons ? { reasons: item.reasons } : {}), ...(item.card ? { card: item.card } : {}),
   }
   if (item.state === 'switched') {
-    return item.to && item.retryRunId && chainRunIds.has(item.retryRunId) ? { ...view, state: 'switched', to: item.to } : null
+    return item.to && item.retryRunId && chainRunIds.has(item.retryRunId) ? { ...view, state: 'switched', to: item.to, continuationRunId: item.retryRunId } : null
   }
   return item.state === 'blocked' || item.state === 'picked' ? { ...view, state: item.state } : null
 }
