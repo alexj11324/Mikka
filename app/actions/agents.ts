@@ -350,7 +350,7 @@ function safeHttpUrl(value: string) {
 }
 
 /** Something a person says in a running thread; the daemon delivers it to the agent. */
-export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; retryOriginalSession?: true }): Promise<{ runId: string; continued: boolean }> {
+export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true }): Promise<{ runId: string; continued: boolean }> {
   const text = z.string().trim().min(1).max(10_000).safeParse(input.text)
   if (!text.success) throw new ActionFailureError('messageRequired')
   const { row, user } = await readableThread(input.issueId, input.runId)
@@ -360,6 +360,8 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
   if(!session?.user||!session.session?.id||session.user.id!==user.id)throw new ActionFailureError('authRequired')
   if(row.userId!==user.id)throw new ActionFailureError('runNotFound')
   if(input.retryOriginalSession!==undefined && input.retryOriginalSession!==true)throw new ActionFailureError('runInvalid')
+  if(input.requestId!==undefined && !z.uuid().safeParse(input.requestId).success)throw new ActionFailureError('validationGeneric')
+  if(input.requestId!==undefined && input.retryOriginalSession)throw new ActionFailureError('validationGeneric')
   if(input.retryOriginalSession && row.issueId) {
     // Only the existing owner Retry control requests recovery. A typed label,
     // Bot message or ordinary send never acquires this authority.
@@ -393,7 +395,7 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
     }
   }
   // A working thread gets it as a message; an ended one runs again in the same thread (R-81, lib/thread-continue.ts).
-  return sendThreadMessage(user.id,row.id,text.data,{source:'human',sessionId:session.session.id})
+  return sendThreadMessage(user.id,row.id,text.data,{source:'human',sessionId:session.session.id},input.requestId)
 }
 
 /**
@@ -402,7 +404,7 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
  * dispatch with no machine or model) returned as its code, so the thread says
  * why instead of 「发送失败」. Other failures still throw.
  */
-export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; retryOriginalSession?: true }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
+export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
   return runAction(async () => { const result=await sendIssueThreadMessage(input); return { sent: true as const,...result } })
 }
 
