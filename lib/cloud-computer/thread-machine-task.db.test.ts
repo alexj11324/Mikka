@@ -781,9 +781,9 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       const before = await parked(issueId);
       const next = await run(issueId);
       const { calls, provider } = fake();
-      await assert.rejects(ensureThreadMachine(pool, actor, next, provider));
+      await assert.rejects(ensureThreadMachine(pool, actor, next, provider), RetainedTaskMachineUnavailable);
       assert.deepEqual(calls, [`connect:${before.sandboxId}`]);
-      assert.deepEqual(await machine(next), { state: "paused", sandboxId: before.sandboxId, deviceId: before.device, issueId });
+      assert.deepEqual(await machine(next), { state: "error", sandboxId: before.sandboxId, deviceId: before.device, issueId });
       assert.deepEqual(await machine(before.runId), { state: "ended", sandboxId: null, deviceId: before.device, issueId }, "the old row gives the sandbox up without a kill");
     });
 
