@@ -8,6 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
 import pg from 'pg'
 import { assertDevLocal } from './guard.mjs'
+import { createAcceptanceCheck } from './acceptance-check.mjs'
 import { bootstrapEnvironment, recordRunnerEvidenceSecrets } from '../test-accounts/bootstrap.mjs'
 import { acquireTestAccounts, recordAuthenticationSecrets } from '../test-accounts/session.mjs'
 import { TestAccountPool } from '../test-accounts/pool.mjs'
@@ -346,7 +347,7 @@ async function startSecondDaemon(signal) {
 async function accept(device) {
   const only = selectedItems
   const failures = []
-  const check = async (...args) => { try { const result = await step(...args); completedItems.push(Number(/^item(\d+)/.exec(args[0])[1])); return result } catch (error) { failures.push(error) } }
+  const check = createAcceptanceCheck({ step, isInterrupted: () => interrupted, completedItems, failures })
   const repo = 'https://github.com/mikka-e2e/core-loop.git'
   if (only.includes('1')) await check('item1-core-loop', 600_000, async signal => {
     const id = await dispatch('item1', `创建一个新任务，在本机 ${device.name}（设备ID ${device.id}）用 Claude Code 修改 ${repo}。在 README.md 追加一行 local acceptance ${runId}，提交并开 PR。任务描述完整保留验收标记。`, signal)
