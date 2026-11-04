@@ -9,6 +9,8 @@ import { runMayUseCredentialSql } from './personal-policy'
 import { resolveSubscriptionModel } from './subscription-model'
 import { nativeBrokerContextSchema, nativeLeaseSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { accountLabel, failedUsage, parseSubscriptionUsage, type SubscriptionUsage, type WorkerUsage } from './subscription-usage'
+import { BACKEND_FAILURES, GENERATION_FAILURES, PRIVATE_FAILURES, generationFailureDetails } from './subscription-generation-diagnostics'
+import { stepIdentity } from './model-call-timing'
 
 export interface SubscriptionCapabilities {
   /** Whether the route runs for this subscription owner (lib/subscription-routes.ts). */
@@ -92,11 +94,11 @@ export class SubscriptionService {
                   const { value, done } = await reader.read()
                   if (closed) return
                   if (done) { closed = true; reader.releaseLock(); controller.close(); return }
-                  if (value.type === 'error') logGenerationFailure('stream_part', value.error)
+                  if (value.type === 'error') await logGenerationFailure('stream_part', value.error)
                   controller.enqueue(value.type === 'error' ? { type: 'error', error: subscriptionGenerationError(value.error) } : value)
                 } catch (error) {
                   if (closed) return
-                  logGenerationFailure('stream', error)
+                  await logGenerationFailure('stream', error)
                   closed = true; reader.releaseLock()
                   controller.enqueue({ type: 'error', error: subscriptionGenerationError(error) }); controller.close()
                 }
@@ -104,7 +106,7 @@ export class SubscriptionService {
               async cancel(reason) { closed = true; await reader.cancel(reason); reader.releaseLock() }
             })
             return { ...result, stream }
-          } catch (error) { logGenerationFailure('start', error); throw subscriptionGenerationError(error) }
+          } catch (error) { await logGenerationFailure('start', error); throw subscriptionGenerationError(error) }
         }
         return model
       }
@@ -243,16 +245,6 @@ export class SubscriptionService {
   }
 }
 
-const GENERATION_FAILURES = new Set([
-  'binding_required', 'account_unavailable', 'binding_mismatch', 'stale_binding',
-  'pending_auth', 'reconnect_required', 'disconnected', 'quota_unknown', 'quota_exhausted',
-  'provider_approval_required', 'backend_unavailable', 'isolation_required', 'billing_unverified',
-  'subscription_rate_limited', 'provider_access_denied', 'provider_request_rejected',
-  'provider_temporarily_unavailable', 'provider_route_unavailable',
-])
-const BACKEND_FAILURES = new Set(['subscription_timeout', 'subscription_worker_unavailable', 'metadata_unavailable', 'secret_store_unavailable', 'operation_failed'])
-const PRIVATE_FAILURES = new Set(['provider_operation_failed', 'invalid_credential_bundle', 'stale_operation', 'credential_busy', 'secret_create_outcome_unknown', 'secret_not_found', 'credential_integrity_failed', 'subscription_cancelled'])
-
 /** Only fixed, typed refusal codes cross into persisted chat errors. SDK
  * wrappers may carry the original error in cause; raw provider text cannot. */
 export function subscriptionGenerationError(error: unknown): Error {
@@ -275,9 +267,11 @@ export function subscriptionGenerationError(error: unknown): Error {
  */
 export function generationFailureCode(error: unknown): string {
   if ((error instanceof SubscriptionRefusal || error instanceof WorkerRefusal) && (GENERATION_FAILURES.has(error.code) || BACKEND_FAILURES.has(error.code) || PRIVATE_FAILURES.has(error.code))) return error.code
-  if (error instanceof Error && /^[A-Za-z]{1,40}$/.test(error.name)) return error.name
-  return 'unknown'
+  return generationFailureDetails(error).errorClass
 }
-function logGenerationFailure(stage: 'start' | 'stream' | 'stream_part', error: unknown) {
-  console.warn(JSON.stringify({ level: 'warn', msg: 'subscription_generation_failed', stage, code: generationFailureCode(error) }))
+async function logGenerationFailure(stage: 'start' | 'stream' | 'stream_part', error: unknown) {
+  try {
+    const identity = await stepIdentity()
+    console.warn(JSON.stringify({ level: 'warn', msg: 'subscription_generation_failed', stage, code: generationFailureCode(error), ...generationFailureDetails(error), workflowRunId: identity.workflowRunId ?? null, stepId: identity.stepId ?? null, attempt: identity.attempt ?? null }))
+  } catch { /* diagnostics cannot change the model result */ }
 }

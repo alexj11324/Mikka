@@ -3,6 +3,8 @@ import { WorkflowAgent, type WorkflowAgentStreamOptions } from '@ai-sdk/workflow
 import type { ToolSet } from 'ai'
 import { SubscriptionWorkflowModel } from './subscription-workflow-model'
 import type { HostedRuntimeSnapshot } from './subscription-model-snapshot'
+import { getWorkflowMetadata } from 'workflow'
+import { generationFailureDetails } from './subscription-generation-diagnostics'
 
 /** How long one tool call took, by name only (no input or output). */
 export type ToolTiming = { tool: string; ms: number; failed: boolean }
@@ -37,6 +39,11 @@ export async function runHostedWorkflowTurn(runtime: HostedRuntimeSnapshot, tool
     : new SubscriptionWorkflowModel(runtime.modelSelection)
   const toolTimings: ToolTiming[] = []
   const result = await new WorkflowAgent({ model,tools:timedTools(tools,toolTimings) }).stream({ ...options,maxRetries:0 })
-  if ('error' in result) throw new Error('subscription_generation_failed')
+  if ('error' in result) {
+    let workflowRunId: string | null = null
+    try { workflowRunId = getWorkflowMetadata().workflowRunId } catch { /* outside a Workflow in unit tests */ }
+    try { console.warn(JSON.stringify({ level: 'warn', msg: 'subscription_generation_failed', stage: 'workflow_result', ...generationFailureDetails(result.error), workflowRunId })) } catch { /* diagnostics cannot mask the refusal */ }
+    throw new Error('subscription_generation_failed')
+  }
   return { text:result.steps.at(-1)?.text ?? '',finishReason:result.finishReason,responseMessages:result.steps.flatMap(step => step.response.messages),toolTimings,modelCalls:result.steps.length }
 }
