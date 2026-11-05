@@ -1,29 +1,31 @@
 import { auth } from '@/lib/api-auth'
-import { computerEventPollDelay } from '@/lib/computer/event-poll'
 import { pool } from '@/lib/db'
-import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { workspacePool } from '@/lib/workspace-db'
+import { LIVE_ID } from '@/lib/live/events'
+import { computerEventCursor } from '@/lib/computer/event-page'
+import { readComputerEvents } from '@/lib/computer/event-log'
+import { withRequestLog } from '@/lib/request-log'
+
 export const runtime = 'nodejs'
-export const maxDuration = 300
-/** Owner/workspace-filtered resumable events; never carries CDP targets or tokens. */
-export async function GET(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session?.user) return new Response(null, { status: 401 })
-  const context = await loadWorkspaceContext(undefined, session.user)
-  const previous = request.headers.get('last-event-id') ?? new URL(request.url).searchParams.get('after') ?? '0'
-  if (!/^\d{1,16}$/.test(previous)) return new Response(null, { status: 400 })
-  let cursor = previous
-  const encoder = new TextEncoder()
-  const stream = new ReadableStream({ async start(controller) {
-    const until = Date.now() + 240_000
-    try {
-      while (!request.signal.aborted && Date.now() < until) {
-        const { rows } = await pool.query('SELECT seq,event FROM subagent_events WHERE "ownerId"=$1 AND "workspaceId"=$2 AND seq>$3 ORDER BY seq LIMIT 100', [session.user.id, context.workspace.id, cursor])
-        for (const row of rows) { cursor = String(row.seq); controller.enqueue(encoder.encode(`id: ${cursor}\nevent: data-subagent\ndata: ${JSON.stringify(row.event.data)}\n\n`)) }
-        if (!rows.length) controller.enqueue(encoder.encode(': keepalive\n\n'))
-        await new Promise(resolve => setTimeout(resolve, computerEventPollDelay(rows.length)))
-      }
-    } catch { /* Client disconnect and database failures close the stream. */ }
-    finally { try { controller.close() } catch { /* Already cancelled. */ } }
-  } })
-  return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'private, no-store', 'X-Accel-Buffering': 'no' } })
+export const dynamic = 'force-dynamic'
+const headers = { 'cache-control': 'private, no-store' }
+
+/** Browser notifications contain no data; each incremental read authorizes again. */
+async function events(request: Request) {
+  if (request.headers.has('authorization')) return new Response(null, { status: 401, headers })
+  const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
+  if (!session?.user) return new Response(null, { status: 401, headers })
+  const params = new URL(request.url).searchParams
+  const workspaceId = params.get('workspace') ?? ''
+  const cursor = computerEventCursor(params.get('after') ?? '0')
+  if (!LIVE_ID.test(workspaceId) || cursor === null) return new Response(null, { status: 400, headers })
+  const member = await workspacePool.query(
+    `SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active'`,
+    [workspaceId, session.user.id],
+  )
+  if (!member.rowCount) return new Response(null, { status: 403, headers })
+  const page = await readComputerEvents(pool, { ownerId: session.user.id, workspaceId }, cursor)
+  return Response.json(page, { headers })
 }
+
+export const GET = withRequestLog('/api/computer/events', events)
