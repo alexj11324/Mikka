@@ -182,4 +182,64 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   await sweepFactoryWatchdog(pool, recovery, recoveryTime)
   assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "retryOf"=$1', [continued.runId])).rows[0].n, 1)
   assert.equal(interruptions, 0)
+
+  await t.test('initial spec dispatch is atomic, idempotent and cannot replace a locked stage', async () => {
+    const { queueFactoryTask } = await import('../lib/factory/task-dispatch')
+    const { queueFactoryRun } = await import('../lib/agent-runs')
+    const { rows: [agent] } = await pool.query('SELECT id FROM agents WHERE "userId"=$1 AND "deviceId"=$2', [userId, deviceId])
+    const { rows: [repo] } = await pool.query('SELECT id FROM device_repos WHERE "userId"=$1 AND "deviceId"=$2', [userId, deviceId])
+    await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
+    let number = 1276000
+    const request = async () => {
+      const issue = randomUUID(), source = randomUUID()
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Plan the tax fix',$3,'todo','normal')`,
+        [issue, userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: ++number } } })])
+      await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
+        VALUES($1,$2,$3,$4,'user_message',$5,$6)`, [source, userId, botId, issue, `spec-source:${source}`, JSON.stringify({ text: 'Write a specification before implementing the tax fix.' })])
+      return { issueId: issue, botId, agentId: agent.id as string, deviceRepoId: repo.id as string,
+        sourceEventId: source, key: `spec:${randomUUID()}`, needsSpec: true, note: 'Plan first.',
+        queue: queueFactoryRun }
+    }
+    const observed = async (issue: string) => (await pool.query(`SELECT
+      (SELECT count(*)::int FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2) AS tasks,
+      (SELECT count(*)::int FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" WHERE t."userId"=$1 AND t."issueId"=$2) AS attempts,
+      (SELECT count(*)::int FROM agent_runs WHERE "userId"=$1 AND "issueId"=$2) AS runs,
+      (SELECT count(*)::int FROM run_publications WHERE "userId"=$1 AND "issueId"=$2) AS publications`, [userId, issue])).rows[0]
+
+    const input = await request()
+    const [first, replay] = await Promise.all([queueFactoryTask(pool, userId, input), queueFactoryTask(pool, userId, input)])
+    assert.equal(replay.runId, first.runId)
+    const { rows: [plan] } = await pool.query(`SELECT r.kind,r."agentDefinition",t.stage,t.status,t."sourceEventId"
+      FROM agent_runs r JOIN factory_attempts a ON a."runId"=r.id JOIN factory_tasks t ON t.id=a."taskId" WHERE r.id=$1`, [first.runId])
+    assert.deepEqual([plan.kind, plan.stage, plan.status, plan.sourceEventId, plan.agentDefinition.readOnly], ['plan', 'spec', 'running', input.sourceEventId, true])
+    const onePlan = { tasks: 1, attempts: 1, runs: 1, publications: 0 }
+    assert.deepEqual(await observed(input.issueId), onePlan)
+    for (const change of [{ needsSpec: false }, { note: 'Changed plan.' }, { sourceEventId: randomUUID() }, { selection: ['different-profile'] }])
+      await assert.rejects(queueFactoryTask(pool, userId, { ...input, ...change }), { code: 'factoryReplayMismatch' })
+    for (const needsSpec of [undefined, false, true])
+      await assert.rejects(queueFactoryTask(pool, userId, { ...input, key: randomUUID(), needsSpec }), { code: 'factoryRunStillActive' })
+    assert.deepEqual(await observed(input.issueId), onePlan)
+
+    // A Profile decision made before another request routed a plan must fail
+    // closed instead of changing that now-locked route to implementation.
+    const raced = await request()
+    const pending = await runtime.store.route(userId, { issueId: raced.issueId, eventId: randomUUID(), sourceEventId: raced.sourceEventId, rationale: 'The owner requested a specification.', needsSpec: true })
+    await assert.rejects(queueFactoryTask(pool, userId, { ...raced, needsSpec: false }), { code: 'factoryStale' })
+    await assert.rejects(queueFactoryTask(pool, userId, { ...raced, sourceEventId: randomUUID() }), { code: 'factorySourceMismatch' })
+    assert.deepEqual(await observed(raced.issueId), { tasks: 1, attempts: 1, runs: 0, publications: 0 })
+    assert.deepEqual((await pool.query('SELECT id,"attemptId",stage,status FROM factory_tasks WHERE id=$1', [pending.task.id])).rows[0],
+      { id: pending.task.id, attemptId: pending.task.attemptId, stage: 'spec', status: 'pending' })
+
+    const advanced = await request()
+    const execution = await runtime.store.route(userId, { issueId: advanced.issueId, eventId: randomUUID(), sourceEventId: advanced.sourceEventId, rationale: 'Current implementation route.', needsSpec: false })
+    await assert.rejects(queueFactoryTask(pool, userId, advanced), { code: 'factoryStale' })
+    assert.deepEqual((await pool.query('SELECT id,stage,status FROM factory_tasks WHERE id=$1', [execution.task.id])).rows[0], { id: execution.task.id, stage: 'execute', status: 'pending' })
+
+    const aborted = await request()
+    await assert.rejects(queueFactoryTask(pool, userId, { ...aborted, queue: async (...args) => {
+      await queueFactoryRun(...args)
+      throw new Error('fixtureQueueAborted')
+    } }), /fixtureQueueAborted/)
+    assert.deepEqual(await observed(aborted.issueId), { tasks: 0, attempts: 0, runs: 0, publications: 0 }, 'a queue failure rolls back the route, run, attempt and publication together')
+  })
 })

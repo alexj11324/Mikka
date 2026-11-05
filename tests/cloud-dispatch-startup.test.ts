@@ -20,6 +20,8 @@ let selectedHarness: 'codex' | 'claude_code' = 'codex'
 let selectedModel = model
 let deviceId = 'device', repoId = 'repo'
 let previous: { id: string; status: string; stopRequestedAt: null; agentId: string; readOnly: boolean } | null = null
+let pendingSpec = false
+const selectedStages: (string | undefined)[] = []
 let modelResolutions = 0, bindingSelections = 0, credentialReads = 0
 const queued = new Map<string, Record<string, unknown>>()
 const subscription = { id: bindingId, consumerId: agentId, ownerId: owner, workspaceId, connectionId: 'connection', connectionRevision: 3, route: 'codex_cli', modelId: model }
@@ -32,6 +34,7 @@ async function query(sql: string, values: unknown[] = []) {
   if (sql.includes('FROM suggestion_executions')) return { rows: [], rowCount: Number(suggestionAllowed) }
   if (sql.startsWith('SELECT "agentDefinition"')) return { rows: [{ agentDefinition: { model, subscription: { bindingId } } }], rowCount: 1 }
   if (sql.includes('FROM agent_runs')) return { rows: previous ? [{ ...previous, remoteUrl: null, harness: 'codex', cloudWorkspaceId: workspaceId, cloudBotId: botId }] : [], rowCount: Number(Boolean(previous)) }
+  if (sql.includes('FROM factory_tasks')) return { rows: pendingSpec ? [{ stage: 'spec', status: 'pending' }] : [], rowCount: Number(pendingSpec) }
   if (sql.includes('FROM bots') || sql.includes('FROM bot_cloud_runtimes')) return { rows: present && values[0] === botId && values[1] === owner ? [target()] : [], rowCount: Number(present) }
   throw new Error(`Unexpected query in startup fixture: ${sql}`)
 }
@@ -57,7 +60,8 @@ stub('../lib/model-dispatch.ts', {
   },
 })
 stub('../lib/factory/agent-profile.ts', { ...profileDefinitions, assertProfileTarget: unused, assertProfileSelection: unused,
-  resolveAgentProfileDispatch: async (db: unknown, scope: unknown, request: { asked?: { harness: string; model?: string } }) => {
+  resolveAgentProfileDispatch: async (db: unknown, scope: unknown, request: { stage?: string; asked?: { harness: string; model?: string } }) => {
+    selectedStages.push(request.stage)
     const { resolveModelDispatch } = await import('../lib/model-dispatch')
     return { target: await resolveModelDispatch(db as never, scope as never, request.asked as never), selectionMode: request.asked?.model ? 'picked' : 'preference' }
   },
@@ -121,12 +125,21 @@ beforeEach(() => {
   calls.length = 0; failure = null; queueFailure = null; settledStartup = true; present = workspaceAllowed = issueAllowed = suggestionAllowed = true
   permission = undefined; awake = credentialAvailable = true; switchedCredential = moveDevice = replaceAgent = revokeDuringWake = revokeWorkspaceDuringWake = false
   selectedSource = 'subscription'; selectedHarness = 'codex'; selectedModel = model; deviceId = 'device'; repoId = 'repo'
-  previous = null; modelResolutions = bindingSelections = credentialReads = 0; queued.clear()
+  previous = null; pendingSpec = false; selectedStages.length = 0; modelResolutions = bindingSelections = credentialReads = 0; queued.clear()
 })
 
 test('cloud startup succeeds only after both machine preparation and lifecycle launch', async () => {
   const result = await dispatch(owner, { botId, issueId, harness: 'codex', model: 'synthetic-model' }, 'synthetic-call')
   assert.ok('runId' in result)
+  assert.deepEqual(calls, ['queue', 'machine', 'lifecycle'])
+})
+
+for (const existing of [false, true]) test(`a ${existing ? 'pending' : 'requested'} specification selects the planner before normal desktop admission`, async () => {
+  pendingSpec = existing
+  const result = await dispatchThread(owner, { botId, issueId, harness: 'codex', ...(existing ? {} : { needsSpec: true }) }, 'spec-call')
+  assert.ok('runId' in result)
+  assert.deepEqual(selectedStages, ['spec'])
+  assert.equal(queued.get('coordinator:spec-call')?.needsSpec, true)
   assert.deepEqual(calls, ['queue', 'machine', 'lifecycle'])
 })
 
