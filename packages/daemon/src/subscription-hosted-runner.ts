@@ -36,6 +36,8 @@ import { requireRunToolApproval } from "./agents/tool-approval";
 import { createNativeSubscriptionBroker } from "./subscription-native-broker";
 import { DaemonError, ServerUnreachableError } from "./errors";
 import { ProviderFailureError } from "@mikka/protocol/provider-failure";
+import { CodedError, findCodedError, logCodedError } from "@mikka/protocol/coded-error";
+import type { UserErrorDetail } from "@mikka/protocol/user-error-codes";
 import { createApiKeyBroker } from "./api-key-broker";
 import type { RunCredential } from "./agents/run-credential";
 import type { ServerLink } from "./server-link";
@@ -52,8 +54,13 @@ const bootstrap = fileURLToPath(
 );
 const computerProxy = fileURLToPath(new URL("./computer/proxy.mjs", import.meta.url));
 const placeholder = "mikka-native-broker-placeholder";
-const unavailable = (cause?: unknown) =>
-  new Error(cause instanceof ClaudeInitializationError ? cause.code : "subscription_hosted_runtime_unavailable", cause === undefined ? undefined : { cause });
+type Detail = UserErrorDetail<"subscription_hosted_runtime_unavailable">;
+/** One code for the UI; the detail says which check failed, the cause is kept (decision 2026-11-05-0330). */
+const unavailable = (detail: Detail, cause?: unknown) =>
+  cause instanceof ClaudeInitializationError ? new Error(cause.code, { cause })
+    : new CodedError("subscription_hosted_runtime_unavailable", { detail, cause });
+const isUnavailable = (error: unknown): error is CodedError =>
+  error instanceof CodedError && error.code === "subscription_hosted_runtime_unavailable";
 /** Why a start failed, in words a person can act on; never argv or env. */
 const startFailure = (error: unknown) => {
   if (error instanceof ClaudeInitializationError || error instanceof ProviderFailureError) return error;
@@ -81,7 +88,7 @@ async function stopGroup(child: ReturnType<typeof spawn>, graceMs = 3000) {
 const blockedSandbox: AgentSandbox = {
   kind: "none",
   async wrap() {
-    throw unavailable();
+    throw unavailable("host_unsupported");
   },
 };
 
@@ -152,8 +159,8 @@ export async function createHostedBotRunner(host: {
     !host.link.nativeContext ||
     !host.link.nativeRequest
   )
-    throw unavailable();
-  if (host.dockerSocket !== undefined && host.dockerSocket !== "unix:///run/mikka-container/docker.sock") throw unavailable();
+    throw unavailable("host_unsupported");
+  if (host.dockerSocket !== undefined && host.dockerSocket !== "unix:///run/mikka-container/docker.sock") throw unavailable("host_unsupported");
   // Runs use no Docker (decision 2026-11-01-1312). The template's worker still
   // passes its socket; it is accepted and unused.
   const bareEnv = { PATH: process.env.PATH, LANG: "C.UTF-8" };
@@ -161,7 +168,7 @@ export async function createHostedBotRunner(host: {
   // runner creates; a leftover must not block the machine.
   rmSync(join(host.stateDir, "native-resources"), { recursive: true, force: true });
   const binaries = hostedBinaries(host.binaries);
-  if (!binaries.codex && !binaries.claude_code) throw unavailable();
+  if (!binaries.codex && !binaries.claude_code) throw unavailable("cli_missing");
   // A verify command runs directly on the task's machine against a private git
   // copy, so it cannot change the worktree's own `.git`.
   const command = async (
@@ -292,7 +299,7 @@ export async function createHostedBotRunner(host: {
         (assignment.requireSessionResume && !selected) ||
         (options.continueSession && (!selected || !assignment.requireSessionResume))
       )
-        throw unavailable();
+        throw unavailable("assignment_invalid");
       const continuation = options.continueSession;
       if (selected && assignment.requireSessionResume) {
         const sourceId = continuation?.runId ?? assignment.runId;
@@ -308,7 +315,7 @@ export async function createHostedBotRunner(host: {
           source.assignment.repoId !== assignment.repoId || realpathSync(source.worktree) !== realpathSync(options.cwd) ||
           !binding || binding.bindingId !== selected.bindingId || binding.ownerId !== selected.ownerId ||
           binding.workspaceId !== selected.workspaceId || binding.consumerId !== selected.consumerId || binding.route !== selected.route)
-          throw unavailable();
+          throw unavailable("resume_mismatch");
       }
       // A subscription model runs only if this machine's CLI reported it; the run fails with the reason, never on another model.
       if (selected && host.reportedModels) {
@@ -361,13 +368,13 @@ export async function createHostedBotRunner(host: {
       let offMonitor = () => {};
       let offRevoke = () => {};
       const assertOpen = () => {
-        if (closed || gate.revoked || lifetime.signal.aborted) throw unavailable();
+        if (closed || gate.revoked || lifetime.signal.aborted) throw unavailable("run_closed");
       };
       const live = async () => {
         assertOpen();
         if (!await gate.checkLive()) {
           gate.revoke();
-          throw unavailable();
+          throw unavailable("run_closed");
         }
         assertOpen();
       };
@@ -428,7 +435,7 @@ export async function createHostedBotRunner(host: {
           startup.sameRoute = first.route === selected.route;
           startup.sameModel = first.modelId === options.model;
           if (first.route !== selected.route || first.modelId !== options.model)
-            throw unavailable();
+            throw unavailable("context_changed");
           startup.contextReady = true;
           const revision = first.revision;
           const check = async (phase: StartupPhase = "context_check", checkAuthority = true) => {
@@ -451,7 +458,7 @@ export async function createHostedBotRunner(host: {
                 current.modelId !== first.modelId ||
                 !startup.expiryFuture
               )
-                throw unavailable();
+                throw unavailable("context_changed");
               return current;
             } catch (error) {
               reportFailure(error);
@@ -509,7 +516,7 @@ export async function createHostedBotRunner(host: {
           !lstatSync(join(shadow, ".git")).isDirectory() ||
           !realpathSync(shadow).startsWith(realpathSync(paths.runDir) + "/")
         )
-          throw unavailable();
+          throw unavailable("workspace_invalid");
         const ledger = join(
           host.stateDir,
           "native-ledgers",
@@ -528,7 +535,7 @@ export async function createHostedBotRunner(host: {
         } : undefined;
         // Legacy ledgers are sufficient: their frozen scope is joined to the
         // daemon's original SID/worktree journal, never inferred from a new run.
-        if (continuation && existsSync(ledger)) throw unavailable();
+        if (continuation && existsSync(ledger)) throw unavailable("ledger_mismatch");
         const previousLedger = continuation
           ? join(host.stateDir, "native-ledgers", continuation.runId + ".json") : ledger;
         const previous = scope ? readJson(previousLedger) as
@@ -537,7 +544,7 @@ export async function createHostedBotRunner(host: {
         if (scope && ((existsSync(previousLedger) &&
           (!previous || JSON.stringify(previous.scope) !== JSON.stringify(expectedScope) || typeof previous.sessionId !== "string")) ||
           (assignment.requireSessionResume && (!previous || previous.sessionId !== assignment.resumeSessionId))))
-          throw unavailable();
+          throw unavailable("ledger_mismatch");
         if (scope) mkdirSync(dirname(ledger), { recursive: true, mode: 0o700 });
         const record = async (sessionId: string) => {
           assertOpen();
@@ -586,15 +593,15 @@ export async function createHostedBotRunner(host: {
           !runDir.startsWith(realpathSync(host.stateDir) + "/runs/")
         ) {
           await close();
-          throw unavailable();
+          throw unavailable("workspace_invalid");
         }
         const computer = assignment.computer;
         if (computer && (!host.computerBroker || (selected && computer.ownerId !== selected.ownerId))) {
           await close();
-          throw unavailable();
+          throw unavailable("computer_unavailable");
         }
         computerGrant = computer ? host.computerBroker!.spec(assignment.runId, decide("computer_use", { policy: assignment.policy }), { display: computer.display }) : undefined;
-        if (computer && !computerGrant) { await close(); throw unavailable(); }
+        if (computer && !computerGrant) { await close(); throw unavailable("computer_unavailable"); }
         const computerMcp = computerGrant ? {
           command: process.execPath, args: [computerProxy, computerGrant.socketPath, computerGrant.token, "--captures"], env: {},
         } : undefined;
@@ -622,7 +629,7 @@ export async function createHostedBotRunner(host: {
               ) ||
                 ((key === "CLAUDE_CODE_OAUTH_TOKEN" || key === "MIKKA_MODEL_API_KEY") && value !== placeholder))
             )
-              throw unavailable();
+              throw unavailable("env_not_clean");
           // 4e3: the user variables arrive through their own channel, after the platform guard above.
           const task = withTaskEnv(env, assignment.taskEnv);
           if (task.dropped.length) console.warn(`run ${assignment.runId}: skipped reserved task variables ${task.dropped.join(", ")}`);
@@ -693,7 +700,7 @@ export async function createHostedBotRunner(host: {
                   stateDir: host.stateDir,
                   computerMcp,
                   spawnHosted: (config, token) => {
-                    if (token !== placeholder) throw unavailable();
+                    if (token !== placeholder) throw unavailable("credential_mismatch");
                     return spawnHosted(config);
                   },
                 })
@@ -719,7 +726,7 @@ export async function createHostedBotRunner(host: {
                   onHostedSession: record,
                   computerMcp,
                   spawnHosted: (config, token) => {
-                    if (token !== placeholder) throw unavailable();
+                    if (token !== placeholder) throw unavailable("credential_mismatch");
                     return spawnHosted(config);
                   },
                   subscriptionAuth: {
@@ -752,7 +759,7 @@ export async function createHostedBotRunner(host: {
             : await adapter.start(runtimeOptions);
           if (assignment.requireSessionResume && session.sessionId !== assignment.resumeSessionId) {
             await session.cancel();
-            throw unavailable();
+            throw unavailable("session_mismatch");
           }
           started = true;
           // A quick, successful adapter may already have ended and revoked its
@@ -789,14 +796,17 @@ export async function createHostedBotRunner(host: {
           try {
             await close();
           } catch (cleanup) {
-            throw unavailable(new AggregateError([reason, cleanup]));
+            throw unavailable("cleanup_failed", new AggregateError([reason, cleanup]));
           }
-          if (!(error instanceof Error && error.message === "subscription_hosted_runtime_unavailable"))
+          if (!isUnavailable(error))
             console.warn(`run ${assignment.runId}: hosted CLI did not start: ${reason.message}`);
-          throw unavailable(reason);
+          if (isUnavailable(error)) throw error;
+          // A check inside the adapter (verify, token) keeps its detail; anything else is adapter_start_failed.
+          throw unavailable((findCodedError(error, "subscription_hosted_runtime_unavailable")?.detail as Detail | undefined) ?? "adapter_start_failed", reason);
         }
       } catch (error) {
         reportFailure(error);
+        if (error instanceof CodedError) logCodedError(error, { runId: assignment.runId, harness: kind }, options.log);
         await close();
         throw error;
       }

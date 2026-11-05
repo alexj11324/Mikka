@@ -2,6 +2,7 @@ import 'server-only'
 import { runMayUseCredentialSql } from './personal-policy'
 import { infisicalWorkloadToken } from './infisical-workload'
 import type { Pool } from 'pg'
+import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
 import type { CredentialScope } from '../packages/daemon/src/subscription-worker-client'
 
 export async function authorizedAccessName(database: Pick<Pool, 'query'>, scope: CredentialScope, use: { bindingId: string; consumerId: string; runId?: string }, revision: unknown,
@@ -14,10 +15,13 @@ export async function authorizedAccessName(database: Pick<Pool, 'query'>, scope:
   const runOwner = rows[0].runOwner
   if (typeof runOwner === 'string' && runOwner !== scope.ownerId) {
     try { await member(runOwner, String(rows[0].workspaceId)); await member(scope.ownerId, String(rows[0].workspaceId)) }
-    catch { throw new Error('subscription_access_unavailable') }
+    catch (error) { throw new CodedError('subscription_access_unavailable', { detail: 'member_inactive', cause: error }) }
   }
   return name
 }
+
+type SnapshotDetail = 'request_invalid' | 'identity_failed' | 'fetch_failed' | 'http_refused' | 'body_too_large' | 'body_invalid' | 'secret_invalid'
+const refused = (detail: SnapshotDetail | 'member_inactive', cause?: unknown) => new CodedError('subscription_access_unavailable', { detail, cause })
 
 // The control plane reads exactly one authorized projection; the execution
 // child gets no Infisical identity and cannot read other connections or grants.
@@ -27,19 +31,24 @@ export async function subscriptionAccessSnapshot(options: {
   fetcher?: typeof fetch
 }): Promise<{ name: string; value: string }> {
   try {
-    if (!/^mikka-byos-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(options.name) || !options.project || !options.environment || !options.path.startsWith('/')) throw new Error()
+    if (!/^mikka-byos-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(options.name) || !options.project || !options.environment || !options.path.startsWith('/')) throw refused('request_invalid')
     const fetcher = options.fetcher ?? fetch
-    const token = await infisicalWorkloadToken(options.origin, options.clientId, options.clientSecret, options.signal, fetcher)
+    const token = await infisicalWorkloadToken(options.origin, options.clientId, options.clientSecret, options.signal, fetcher).catch(error => { throw refused('identity_failed', error) })
     const url = new URL(`/api/v4/secrets/${options.name}`, options.origin)
     for (const [key, value] of Object.entries({ projectId: options.project, environment: options.environment, secretPath: options.path, type: 'shared', version: '1', viewSecretValue: 'true', expandSecretReferences: 'false', includeImports: 'false' })) url.searchParams.set(key, value)
-    const response = await fetcher(url, { headers: { authorization: `Bearer ${token}` }, redirect: 'error', signal: AbortSignal.any([AbortSignal.timeout(12_000), ...(options.signal ? [options.signal] : [])]) })
-    if (!response.ok) throw new Error()
+    const response = await fetcher(url, { headers: { authorization: `Bearer ${token}` }, redirect: 'error', signal: AbortSignal.any([AbortSignal.timeout(12_000), ...(options.signal ? [options.signal] : [])]) }).catch(error => { throw refused('fetch_failed', error) })
+    if (!response.ok) throw refused('http_refused', { name: 'HttpStatus', code: response.status })
     const body = await response.text()
-    if (Buffer.byteLength(body) > 262144) throw new Error()
-    const secret = JSON.parse(body)?.secret
-    if (secret?.secretKey !== options.name || secret.version !== 1 || secret.secretValueHidden || typeof secret.secretValue !== 'string' || !secret.secretValue || Buffer.byteLength(secret.secretValue) > 32768) throw new Error()
+    if (Buffer.byteLength(body) > 262144) throw refused('body_too_large')
+    let secret: { secretKey?: unknown; version?: unknown; secretValueHidden?: unknown; secretValue?: unknown } | undefined
+    // error-cause: a JSON parse error quotes the body, which may hold the secret.
+    try { secret = JSON.parse(body)?.secret } catch { throw refused('body_invalid') }
+    if (secret?.secretKey !== options.name || secret.version !== 1 || secret.secretValueHidden || typeof secret.secretValue !== 'string' || !secret.secretValue || Buffer.byteLength(secret.secretValue) > 32768) throw refused('secret_invalid')
     return { name: options.name, value: secret.secretValue }
-  } catch {
-    throw new Error('subscription_access_unavailable')
+  } catch (error) {
+    // The response body and the secret never reach the log or the error: only the detail and the cause's name and code.
+    const refusal = error instanceof CodedError && error.code === 'subscription_access_unavailable' ? error : refused('fetch_failed', error)
+    logCodedError(refusal)
+    throw refusal
   }
 }

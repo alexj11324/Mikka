@@ -1,6 +1,7 @@
 import 'server-only'
 import { hostedModel } from '@/lib/abuse/model'
 import { hostedBillingScope } from '@/lib/abuse/context'
+import { CodedError } from '@mikka/protocol/coded-error'
 import { COORDINATOR_MODEL } from './model'
 import { generateText, streamText, Output } from 'ai'
 import { and, eq } from 'drizzle-orm'
@@ -59,8 +60,9 @@ export const groupRuntime: GroupRuntime = {
   async delegate(scope,client) { return (await import('./group-factory')).delegateGroupTask(client,scope) },
   async generate(agent, input) {
     const scope = hostedBillingScope.getStore()
-    if (!scope) throw new Error('verification_required')
-    if (agent.memberType === 'bot' && !scope.ownerId) throw new Error('verification_required')
+    // Same code the chat shows today; the detail tells the two missing scopes apart in the stored error and logs.
+    if (!scope) throw new CodedError('verification_required', { detail: 'billing_scope_missing' })
+    if (agent.memberType === 'bot' && !scope.ownerId) throw new CodedError('verification_required', { detail: 'billing_owner_missing' })
     // 停止 in the group aborts it too (lib/coordinator/group-turns.ts).
     const signal = input.signal ? AbortSignal.any([AbortSignal.timeout(20000), input.signal]) : AbortSignal.timeout(20000)
     let streamFailure: unknown

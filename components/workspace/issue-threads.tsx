@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ThreadStatus, ThreadStatusIcon } from './thread-status-icon'
 import { cn } from '@/lib/utils'
 import { InlineLoadError } from '@/components/load-error'
+import { useRunErrorText } from './run-error-text'
 
 export function useIssueThreads(issueId: string) {
   return useSWR(['issue-threads', issueId], () => listIssueThreads(issueId), { refreshInterval: threads => runListRefreshInterval(threads?.map(threadQuestionView)), revalidateOnReconnect: true })
@@ -25,6 +26,7 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
   const t = useTranslations('IssueThreads')
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
+  const runErrorText = useRunErrorText()
   const { data, error, mutate } = useIssueThreads(issueId)
   if (error) return <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
   if (!data?.length) return null
@@ -34,7 +36,8 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
       {data.map(thread => {
         const name = thread.detail?.name ?? (thread.ownerName ? t('ownerThread', { name: thread.ownerName }) : t('hidden'))
         // The bot runs the thread; the coding agent it hands work to is a step inside it, not the runner (R-05).
-        const meta = thread.detail?.summary ?? null
+        // A known failure code shows its words; the code itself stays in the thread's 详情.
+        const meta = runErrorText(thread.detail?.summary ?? null).message
         const view = threadQuestionView(thread)
         const body = <>
           <ThreadStatusIcon status={view.status} outcome={view.outcome} waiting={view.waiting} />
