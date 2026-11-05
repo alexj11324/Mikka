@@ -1,0 +1,262 @@
+{
+  "observedAt": "2026-11-05T01:25:00Z",
+  "base": "efef5b5a5a8a55deb3c504b05fb736d4003e942c",
+  "tree": "26ceed5c34a4409bae48dc6bc39c0f23a8529a9a",
+  "consumerCount": 20,
+  "codeWired": 9,
+  "remaining": 11,
+  "codeWiredIsProductionPass": false,
+  "consumers": [
+    {
+      "path": "components/workspace/task-detail.tsx",
+      "blob": "a85a9712b41912532da38b16640cc97b93a12b3d",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/workspace/task-detail.tsx"
+    },
+    {
+      "path": "components/workspace/issue-thread-panel.tsx",
+      "blob": "183fc19cc2e3c90d033691b3c4ce6cf8aa5780c1",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/workspace/issue-thread-panel.tsx"
+    },
+    {
+      "path": "hooks/use-computer.ts",
+      "blob": "28fb05fcc66ae1550ac9112b98cc05747ec08587",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/hooks/use-computer.ts"
+    },
+    {
+      "path": "components/workspace/group-chat-view.tsx",
+      "blob": "b38431db16a53b38526cc13039d18e49fa724673",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/workspace/group-chat-view.tsx"
+    },
+    {
+      "path": "components/coordinator/coordinator-chat.tsx",
+      "blob": "5ad0d38066561e2a74f3687c665e6ed865c6a518",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/coordinator/coordinator-chat.tsx"
+    },
+    {
+      "path": "components/workspace/factory-acceptance-pane.tsx",
+      "blob": "1a8fc9f5e2792e180f1c913dd5eb0ffa97cb4445",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/workspace/factory-acceptance-pane.tsx"
+    },
+    {
+      "path": "components/devices/devices-settings.tsx",
+      "blob": "3645ed4f561e3be11e1624686f836d1e741d6d4a",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/devices/devices-settings.tsx"
+    },
+    {
+      "path": "components/workspace/issue-threads.tsx",
+      "blob": "a13665fc51dd11af0b235d9dc23eedf7c79b6e26",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/workspace/issue-threads.tsx"
+    },
+    {
+      "path": "components/coordinator/pending-actions.tsx",
+      "blob": "5bbc469d621346ffcf9e46991fde34d3c024cc53",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/coordinator/pending-actions.tsx"
+    },
+    {
+      "path": "components/coordinator/approved-write-actions.tsx",
+      "blob": "dc5a691004f8344162a7d90343ba0c0dffc753dc",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/coordinator/approved-write-actions.tsx"
+    },
+    {
+      "path": "components/workspace/issue-members.tsx",
+      "blob": "da06c201938d0a7a3ce5b6ad71f530dbd50439d4",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/workspace/issue-members.tsx"
+    },
+    {
+      "path": "components/workspace/issue-relations.tsx",
+      "blob": "124cef2783c372a93723f0e497fbd9ba3d691b70",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/workspace/issue-relations.tsx"
+    },
+    {
+      "path": "components/workspace/factory-acceptance.tsx",
+      "blob": "b265d9d135ef135fce560b00a532fe68abc2d130",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/workspace/factory-acceptance.tsx"
+    },
+    {
+      "path": "components/artifacts/artifact-viewer.tsx",
+      "blob": "ecab53b7d9265f54cb2c0e23da78a6bef63d8d48",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/artifacts/artifact-viewer.tsx"
+    },
+    {
+      "path": "components/desktop/desktop-integration.tsx",
+      "blob": "7844345217cfe58ee1b88c949cc4eddc8e0063df",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/desktop/desktop-integration.tsx"
+    },
+    {
+      "path": "components/workspace/board-page.tsx",
+      "blob": "9c076a7bcb2d282e3e2fcf7edb2042fe80d6af52",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/workspace/board-page.tsx"
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "blob": "271260be8d71c085e2895fbc33d9f37c9cf9e8e3",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/workspace/issue-workspace.tsx"
+    },
+    {
+      "path": "components/nav/bot-list.tsx",
+      "blob": "dbee06a40e68c5ac309ab2632549506fd05236cc",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/nav/bot-list.tsx"
+    },
+    {
+      "path": "components/settings/settings-data-preloader.tsx",
+      "blob": "02dc3871c3fd1285f531db9812ece65cf84ab823",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/settings/settings-data-preloader.tsx"
+    },
+    {
+      "path": "components/workspace/issue-pull-request-link.tsx",
+      "blob": "494ef054bd2799e87192204ffa34427b4d63bb09",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/workspace/issue-pull-request-link.tsx"
+    }
+  ],
+  "supportingSources": [
+    {
+      "path": "app/actions/artifacts.ts",
+      "blob": "0bb6e8ab0c3770dfe17cbb83717f96409ee25072",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/app/actions/artifacts.ts"
+    },
+    {
+      "path": "lib/artifacts/store.ts",
+      "blob": "f212d840a26490c4826f63c278b1b0381d3ce63a",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/artifacts/store.ts"
+    },
+    {
+      "path": "lib/artifacts/types.ts",
+      "blob": "6f2cd1daa67017d43cc2dcecf4b4ec5477210a38",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/artifacts/types.ts"
+    },
+    {
+      "path": "app/actions/collaboration.ts",
+      "blob": "4564f410a6fc0eeda19b5c86fc8d556341acba34",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/app/actions/collaboration.ts"
+    },
+    {
+      "path": "app/actions/issue-operations.ts",
+      "blob": "34bdec7d312ba7cc0e94fadca3c2a3c466823e7f",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/app/actions/issue-operations.ts"
+    },
+    {
+      "path": "lib/coordinator/chat-poll-interval.ts",
+      "blob": "8e5f47cb4813fe9e2f1ff49951ad3e9064512ece",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/coordinator/chat-poll-interval.ts"
+    },
+    {
+      "path": "lib/issue-run-conversation.ts",
+      "blob": "1b6efcb2ec6830c932c200c662f8c9e9d137d9ac",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/issue-run-conversation.ts"
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "blob": "d05c1428f827de08ec07a56a0c516deceafe98c2",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/hooks/use-live-lists.ts"
+    },
+    {
+      "path": "lib/live/lists.ts",
+      "blob": "1333ef431ffbbd261cc5a22d5b2abbb61f4a741c",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/live/lists.ts"
+    },
+    {
+      "path": "components/workspace-app.tsx",
+      "blob": "9c0c6461f4a01adb490ded0d0c3dc3ebfdb306e3",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/components/workspace-app.tsx"
+    },
+    {
+      "path": "lib/platform/desktop-notifications.ts",
+      "blob": "e32edc7af48d37c5e67febb70f1aa2e8494d3976",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/platform/desktop-notifications.ts"
+    },
+    {
+      "path": "app/actions/desktop-notifications.ts",
+      "blob": "6739f4dd30bbd1b80872a28ea5062c902a35bffd",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/app/actions/desktop-notifications.ts"
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "blob": "36148af8c26049fe5d0fd73539275997ce5956e5",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/app/actions/task-runs.ts"
+    },
+    {
+      "path": "lib/live/list-read.ts",
+      "blob": "c94492fc70ec5d5502d1f1ea59ac06b7a32d1a72",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/live/list-read.ts"
+    },
+    {
+      "path": "lib/document-sync.ts",
+      "blob": "af148406bd444323adca8afc0ff6b6195646281f",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/document-sync.ts"
+    },
+    {
+      "path": "lib/group-messages.ts",
+      "blob": "e49b96e3d7011f72d59b7fc0e6faa7eb8c88fcd9",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/group-messages.ts"
+    },
+    {
+      "path": "lib/group-conversations-store.ts",
+      "blob": "995a09aa0436b63861176dd27350eb7f7354d537",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/group-conversations-store.ts"
+    },
+    {
+      "path": "lib/artifacts/delete.ts",
+      "blob": "72c6978621e6f6d1819b29bfe37993bb5dd14963",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/artifacts/delete.ts"
+    },
+    {
+      "path": "app/api/github/pull-request-status/route.ts",
+      "blob": "db1d76bcb7b4b679418b890df978c483d49e45d9",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/app/api/github/pull-request-status/route.ts"
+    },
+    {
+      "path": "lib/github/publication-webhook.ts",
+      "blob": "2ba0707f8da4126c34a1715571ec657f500ae130",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/github/publication-webhook.ts"
+    },
+    {
+      "path": "lib/coordinator-event-store.ts",
+      "blob": "49b32723de1d0cc902baaafebdbc936988b725ee",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/coordinator-event-store.ts"
+    },
+    {
+      "path": "app/actions/agents.ts",
+      "blob": "e218c4414eb1fa4d64d2f5916abb6bb906927165",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/app/actions/agents.ts"
+    },
+    {
+      "path": "lib/coordinator/group-turns.ts",
+      "blob": "b8bcce0edbffa25c0860afdbc28e6dca66874b64",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/coordinator/group-turns.ts"
+    },
+    {
+      "path": "lib/coordinator/store.ts",
+      "blob": "40892a2ae8a823e87e095de0a9845c43cd5344d4",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/coordinator/store.ts"
+    },
+    {
+      "path": "lib/agent-runs.ts",
+      "blob": "54a0b6eb4cc5dba0fba9948db963a8351a401edd",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/agent-runs.ts"
+    },
+    {
+      "path": "lib/run-control.ts",
+      "blob": "cd82450ebd528758efcb368abcea527c38b293f4",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/run-control.ts"
+    },
+    {
+      "path": "lib/run-completion.ts",
+      "blob": "8dcde11d0b20d84d68fd604b879a90319471ad0f",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/lib/run-completion.ts"
+    },
+    {
+      "path": "app/v1/runs/[runId]/route.ts",
+      "blob": "3d2772cafde857efa51ca79fc90c385267948b36",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/app/v1/runs/[runId]/route.ts"
+    },
+    {
+      "path": "app/v1/runs/[runId]/events/route.ts",
+      "blob": "4e68ce5fc80df7d0763f1a439c45c9c2418a9f86",
+      "url": "https://github.com/alexj11324/Mikka/blob/efef5b5a5a8a55deb3c504b05fb736d4003e942c/app/v1/runs/[runId]/events/route.ts"
+    }
+  ],
+  "selectedNext": "DesktopIntegration task-run live consumer",
+  "productionWrites": 0,
+  "modelCalls": 0,
+  "testsRerun": 0
+}
