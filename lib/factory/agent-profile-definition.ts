@@ -33,6 +33,7 @@ export interface AgentProfile extends AgentProfileDefinition {
 }
 export interface AgentProfileSelection {
   profileId: string; version: number; digest: string; name: string
+  /** A code: `explicit`, `default`, or the Decision's reason (agent-profile-decision.ts). Runs before 2026-11-05 hold an English sentence. */
   source: 'explicit' | 'decision' | 'default'; reason: string
   scope: AgentProfileScope
   definition: AgentProfileDefinition
@@ -66,7 +67,7 @@ export function builtinAgentProfileDefinition(): AgentProfileDefinition {
 }
 export function builtinAgentProfileSelection(scope: AgentProfileScope, targetEntry: OrderEntry): AgentProfileSelection {
   const definition = builtinAgentProfileDefinition(), skills: AgentProfileSkill[] = []
-  return { profileId: BUILTIN_AGENT_PROFILE_ID, version: BUILTIN_AGENT_PROFILE_VERSION, digest: agentProfileDigest(definition, skills), name: definition.name, source: 'default', reason: 'Existing model preference and explicit task constraints.', scope: { ownerId: scope.ownerId, workspaceId: scope.workspaceId }, definition, skills, instructions: '', targetEntry }
+  return { profileId: BUILTIN_AGENT_PROFILE_ID, version: BUILTIN_AGENT_PROFILE_VERSION, digest: agentProfileDigest(definition, skills), name: definition.name, source: 'default', reason: 'default', scope: { ownerId: scope.ownerId, workspaceId: scope.workspaceId }, definition, skills, instructions: '', targetEntry }
 }
 
 /** A native continuation may retain a user revision, but cannot redefine the

@@ -2,6 +2,7 @@ import 'server-only'
 import { and, eq, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db, pool } from '@/lib/db'
+import { notifyRunControl } from '@/lib/device-gateway-notify'
 import { agentRuns, bots } from '@/lib/db/schema'
 import { teamMembers, teams } from '@/lib/db/team-schema'
 import { workspaceInvitations, workspaceMembers } from '@/lib/db/workspace-schema'
@@ -96,6 +97,8 @@ export async function releaseDepartingMember(workspaceId: string, userId: string
   // Runs there on their subscription stop now, including other members' bots they had shared it with.
   await stopRunsUsingSubscriptions(pool, { ownerId: userId, workspaceId })
   await stopRunsUsingApiKeys(pool, { ownerId: userId, workspaceId })
+  // Their own runs lose the membership their policy needs: wake those daemons.
+  await notifyRunControl(pool, { userId })
 }
 
 /** Reactivation brings a suspended member's own bots back; their subscription stays unshared until they share it again. */

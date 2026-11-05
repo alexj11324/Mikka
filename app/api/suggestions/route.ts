@@ -1,4 +1,5 @@
-import { after, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { pool } from '@/lib/db'
 import { getApiSession } from '@/lib/api-auth'
 import type { SuggestionSource } from '@/lib/db/schema'
@@ -28,28 +29,28 @@ export async function GET(request: Request) {
   const user = (await getApiSession({ headers: request.headers }))?.user
   if (!user) return NextResponse.json({ error: 'authRequired' }, { status: 401, headers })
   // Hobby cron runs once a day, so opening the list is when a missing trigger gets re-created.
-  after(async () => {
+  afterJob('after:composio-triggers', async () => {
     try { await ensureComposioTriggers(user.id) }
     catch (error) { console.error('Composio trigger check failed', error instanceof Error ? error.message : error) }
   })
   const params = new URL(request.url).searchParams
   const browserTimeZone = params.get('tz')
   if (browserTimeZone) {
-    after(async () => {
+    afterJob('after:record-time-zone', async () => {
       try { await recordTimeZone(user.id, browserTimeZone) }
       catch (error) { console.error('Time zone could not be saved', error instanceof Error ? error.message : error) }
     })
   }
   const locale = params.get('locale')
   if (locale && (ACTION_LOCALES as readonly string[]).includes(locale)) {
-    after(async () => {
+    afterJob('after:remember-locale', async () => {
       try { await rememberLocale(user.id, locale as ActionLocale) }
       catch (error) { console.error('Remembering the locale failed', error instanceof Error ? error.message : error) }
     })
   }
   // A zone picked in Settings wins over what this browser or IP reports.
   const timeZone = await manualTimeZone(user.id) ?? browserTimeZone ?? request.headers.get('x-vercel-ip-timezone')
-  const [, items] = await Promise.all([todaysBriefing(user.id, timeZone, { onPushed: () => after(() => wakeCoordinator(user.id)) }), listSuggestions(user.id)])
+  const [, items] = await Promise.all([todaysBriefing(user.id, timeZone, { onPushed: () => afterJob('after:coordinator-wake', () => wakeCoordinator(user.id)) }), listSuggestions(user.id)])
   const executions = items.length ? (await pool.query('SELECT "suggestionId",status,"runId","subagentId" FROM suggestion_executions WHERE "ownerId"=$1 AND "suggestionId"=ANY($2::uuid[])', [user.id, items.map(item => item.id)])).rows : []
   const execution = new Map(executions.map(row => [row.suggestionId as string, row]))
   const groups = new Map<SuggestionSource, typeof items>()

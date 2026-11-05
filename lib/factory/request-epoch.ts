@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { factoryChanged } from '../live/factory'
+import { runControlChanged } from '../device-gateway-notify'
 import type { Pool, PoolClient } from 'pg'
 import { ActionFailureError } from '../action-error'
 import { FactoryError } from './contract'
@@ -82,6 +83,7 @@ export async function advanceFactoryRequest(tx: PoolClient, task: FactoryTask, s
     WHERE id IN (SELECT "runId" FROM factory_attempts WHERE "taskId"=$1)
       AND "userId"=$2 AND "issueId"=$3 AND status IN ('queued','preparing','running','paused','waiting_input','finishing') RETURNING id`, [task.id, task.userId, task.issueId])
   const stoppedRunIds = fencedRuns.map(run => run.id)
+  runControlChanged(tx, { runIds: stoppedRunIds })
   supersededRunIds?.push(...stoppedRunIds)
   await tx.query(`UPDATE run_tokens SET "revokedAt"=COALESCE("revokedAt",now())
     WHERE "userId"=$2 AND "runId" IN (SELECT "runId" FROM factory_attempts WHERE "taskId"=$1)`, [task.id, task.userId])
