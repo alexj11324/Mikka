@@ -14,10 +14,13 @@ let refreshUnconfirmed = false
 const events: string[] = []
 const translate = Object.assign((key: string) => key, { has: () => false })
 mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'time' }) } })
-mock.module('swr', { defaultExport: () => ({ data, mutate: async (value?: OrderView) => { events.push(value ? 'order-cache' : 'order'); return data } }) })
+mock.module('swr', { defaultExport: () => ({ data, mutate: async (value?: OrderView) => { events.push(value ? 'order-cache' : 'order'); return data } }), namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) } })
+const liveKeys: unknown[] = []
+const changes: unknown[] = []
+mock.module(new URL('../../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKey: (...args: unknown[]) => { liveKeys.push(args) } } })
 mock.module('next/link', { defaultExport: ({ children, href }: { children: ReactNode; href: string }) => <a href={href}>{children}</a> })
 mock.module(new URL('../../app/actions/model-order.ts', import.meta.url).href, { namedExports: {
-  changeModelOrder: async () => data,
+  changeModelOrder: async (change: unknown) => { changes.push(change); return data },
   checkModelOrderQuota: async (id: string, workspace: string) => {
     assert.equal(workspace, workspaceId)
     assert.ok(data.entries.some(row => row.source.kind === 'subscription' && row.source.connectionId === id))
@@ -55,7 +58,7 @@ before(async () => {
   ;({ ModelOrderSettings } = await import('./model-order-settings'))
 })
 beforeEach(() => {
-  configured = true; refreshFails = false; refreshUnconfirmed = false; events.length = 0
+  configured = true; refreshFails = false; refreshUnconfirmed = false; events.length = 0; changes.length = 0
   data = { location: 'cloud', customized: true, preferredHarness: 'claude_code', credentials: 1, entries: [], candidates: [], devices: 0, cloudReady: true, cloudModels: {}, first: { kind: 'cloud' }, readyDeviceIds: [], deviceModels: {} }
   container = browser.document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container)
@@ -153,4 +156,25 @@ test('an unavailable provider read keeps checking even when the HTTP request suc
   await act(async () => button('checkQuota')!.click())
   assert.ok(container.querySelector('[role="alert"]')?.textContent?.includes('quotaCheckUnconfirmed'))
   assert.equal(container.querySelector('li [role="status"]')?.textContent, 'blocked.checking')
+})
+
+test('the list is the 优先使用的 Agent\'s own: the other Agent\'s rows stay out, a move sends only its rows, and the list re-reads on a live push', async () => {
+  const claude = [{ ...row(null), model: 'claude-opus' }, { ...row(null), model: 'claude-sonnet' }]
+  const codex = { ...row(null), model: 'gpt-codex', harness: 'codex' as const, provider: 'codex', agents: ['codex' as const] }
+  data = { ...data, entries: [claude[0], codex, claude[1]] }
+  await render()
+  const text = container.textContent ?? ''
+  assert.match(text, /claude-opus/); assert.match(text, /claude-sonnet/)
+  assert.doesNotMatch(text, /gpt-codex/, 'Codex rows belong to the Codex list')
+  assert.ok(liveKeys.some(args => (args as unknown[])[0] === 'workspace_settings'), 'it listens for 模型与订阅 changes')
+  const down = [...container.querySelectorAll('[role="menuitem"], button')].find(item => item.textContent?.trim() === 'moveDown')
+  if (down) {
+    await act(async () => { (down as HTMLElement).click() })
+    const reorder = changes.find(change => (change as { kind?: string }).kind === 'reorder') as { ids: string[] } | undefined
+    if (reorder) assert.deepEqual(reorder.ids, [claude[1].id, claude[0].id], 'only this Agent\'s rows, in their new order')
+  }
+  data = { ...data, preferredHarness: 'codex' }
+  await render()
+  assert.match(container.textContent ?? '', /gpt-codex/)
+  assert.doesNotMatch(container.textContent ?? '', /claude-opus/)
 })

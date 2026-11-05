@@ -7,10 +7,10 @@ import { deviceOnlineStates } from './device-presence'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import { ActionFailureError } from './action-error'
 import { apiKeyHarnesses } from './model-api-key-providers'
-import { subscriptionAvailability } from './subscription-quota'
+import { shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
 import { providerHealthStates, providerSourceKey } from './model-provider-health'
 import {
-  agentsByOffer, defaultOrder, deviceModel, entryKey, offerKey, planDispatch, whyNoDevice,
+  agentsByOffer, defaultOrderByAgent, deviceModel, entryKey, offerKey, planDispatch, whyNoDevice,
   type CredentialState, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
 } from './model-order-plan'
 
@@ -34,7 +34,7 @@ export interface OrderRow extends OrderEntry {
   agents: OrderHarness[]
   /** Why it cannot run now, or null when it can. noDevice when no place of 运行位置 runs it, with what the closest computer lacks. */
   block: null
-    | { reason: 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'keyRefused' | 'balance' | 'providerUnavailable'; resetsAt?: string | null }
+    | { reason: 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'modelGone' | 'keyRefused' | 'balance' | 'providerUnavailable'; resetsAt?: string | null }
     | { reason: 'noDevice'; device: NoDeviceWhy }
 }
 
@@ -116,7 +116,7 @@ async function settingsRow(query: Query, scope: OrderScope) {
 export async function readOrder(query: Query, scope: OrderScope, candidates?: (OrderCandidate & { provider: string })[]): Promise<{ location: RunLocation; customized: boolean; preferredHarness: OrderHarness; entries: OrderEntry[] }> {
   const settings = await settingsRow(query, scope)
   if (!settings.customized) {
-    const list = defaultOrder(candidates ?? await orderCandidates(query, scope), settings.preferredHarness)
+    const list = defaultOrderByAgent(candidates ?? await orderCandidates(query, scope), settings.preferredHarness)
     // The entry is also frozen in a run's JSONB definition. Keep the NUL-separated
     // identity key in memory, but give its opaque row id a stable JSONB-safe form.
     return { ...settings, entries: list.map(item => ({ id: `default:${encodeURIComponent(entryKey(item))}`, harness: item.harness, model: item.model, source: item.source })) }
@@ -125,6 +125,14 @@ export async function readOrder(query: Query, scope: OrderScope, candidates?: (O
     'SELECT id,harness,model,"sourceKind","sourceId"::text AS "sourceId" FROM model_order_entries WHERE "ownerId"=$1 AND "workspaceId"=$2 ORDER BY position,id',
     [scope.ownerId, scope.workspaceId])
   return { ...settings, entries: rows.map(toEntry) }
+}
+
+/**
+ * The order dispatch tries with no Agent named (decision 2026-11-05-0400): the 优先使用的 Agent's own list first,
+ * then the other Agent's list, each in its own order. The page shows only the first; the second is a fallback.
+ */
+export function dispatchOrder<T extends Pick<OrderEntry, 'harness'>>(entries: readonly T[], preferred: OrderHarness): T[] {
+  return [...entries.filter(entry => entry.harness === preferred), ...entries.filter(entry => entry.harness !== preferred)]
 }
 
 export type RefreshOrderQuota = (scope: OrderScope, connectionId: string, signal: AbortSignal, credentialOwnerId?: string) => Promise<void>
@@ -188,11 +196,14 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
     if (entry.source.kind === 'subscription') {
       const row = connections.get(entry.source.connectionId)
       const provider = row?.provider ?? (entry.harness === 'codex' ? 'codex' : 'claude')
-      const availability = subscriptionAvailability(row?.quota, entry.model, provider, checkedAt)
+      // Settings shows the last read allowance; dispatch (probe) needs a fresh one.
+      const availability = (options.probe === false ? shownSubscriptionAvailability : subscriptionAvailability)(row?.quota, entry.model, provider, checkedAt)
       const credential: CredentialState = !row ? { usable: false, reason: 'missing' }
         : row.state === 'reconnect_required' ? { usable: false, reason: 'expired' }
           : row.paused ? { usable: false, reason: 'paused' }
-            : row.state !== 'connected' || !available.has(entryKey(entry)) ? { usable: false, reason: 'missing' }
+            : row.state !== 'connected' ? { usable: false, reason: 'missing' }
+              // Connected, but its account no longer reports this model (刷新模型): unavailable, kept in the list.
+              : !available.has(entryKey(entry)) ? { usable: false, reason: 'modelGone' }
               : health.get(providerSourceKey(entry.source)) ?? health.get(entryKey(entry)) ?? (
                 availability.status === 'exhausted' ? { usable: false, reason: 'quota', resetsAt: availability.resetsAt }
                 : availability.status === 'checking' ? { usable: false, reason: 'checking' }
@@ -249,11 +260,13 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
   const { rows: connected } = await query.query<{ id: string }>(`SELECT id::text AS id FROM byos_connections WHERE "ownerId"=$1 AND state='connected'`, [scope.ownerId])
   const subscriptions = new Set([...connected.map(row => row.id), ...candidates.flatMap(candidate => candidate.source.kind === 'subscription' ? [candidate.source.connectionId] : [])])
   const credentials = subscriptions.size + (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).length
-  const ready = order.location === 'cloud' && await (await import('./rule-dispatch')).cloudReady(query, { ...scope, botId: null, harness: order.entries[0]?.harness ?? 'claude_code' })
+  // 会先用 and the ready devices follow dispatch: the 优先使用的 Agent's list first.
+  const runnable = dispatchOrder(order.entries, order.preferredHarness)
+  const ready = order.location === 'cloud' && await (await import('./rule-dispatch')).cloudReady(query, { ...scope, botId: null, harness: runnable[0]?.harness ?? 'claude_code' })
   const credential = (entry: OrderEntry) => states.get(entry.id)?.credential ?? { usable: false, reason: 'missing' } as const
   // 会先用: what dispatch would pick for a new run now, from the same plan.
   const cloudModels = Object.fromEntries(order.entries.map(entry => [entry.id, cloudModelSupport(entry)]))
-  const plan = planDispatch({ entries: order.entries, location: order.location, devices, credential, cloudReady: ready, cloudModel: entry => cloudModels[entry.id] })
+  const plan = planDispatch({ entries: runnable, location: order.location, devices, credential, cloudReady: ready, cloudModel: entry => cloudModels[entry.id] })
   const firstDevice = plan.kind === 'device' ? devices.find(device => device.id === plan.deviceId) : undefined
   return {
     location: order.location,
@@ -264,7 +277,7 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
     cloudReady: ready,
     cloudModels,
     first: plan.kind === 'cloud' ? { kind: 'cloud' } : firstDevice ? { kind: 'device', id: firstDevice.id, name: firstDevice.name, server: firstDevice.server } : null,
-    readyDeviceIds: devices.filter(device => planDispatch({ entries: order.entries, location: 'local', devices: [device], credential, cloudReady: false }).kind === 'device').map(device => device.id),
+    readyDeviceIds: devices.filter(device => planDispatch({ entries: runnable, location: 'local', devices: [device], credential, cloudReady: false }).kind === 'device').map(device => device.id),
     deviceModels: Object.fromEntries(devices.map(device => [device.id,
       [...new Set(order.entries.filter(entry => deviceModel({ ...device, enabled: true, online: true }, entry)).map(entry => entry.model))]])),
     entries: order.entries.map(entry => {
@@ -290,9 +303,10 @@ export type OrderChange =
   /** `at`: where the first added entry goes (undo of 移出列表 puts it back); the end by default. */
   | { kind: 'add'; entries: z.infer<typeof candidateInput>[]; at?: number }
   | { kind: 'remove'; id: string }
+  /** The whole list, or one Agent's rows in their new order. */
   | { kind: 'reorder'; ids: string[] }
   | { kind: 'location'; location: RunLocation }
-  /** 优先使用的 Agent; rows of models both Agents run that were on the old one follow it. */
+  /** 优先使用的 Agent: which Agent's list the page shows and dispatch runs; no row moves. */
   | { kind: 'preferred'; harness: OrderHarness }
   /** One row's Agent, for a model both Agents run. */
   | { kind: 'harness'; id: string; harness: OrderHarness }
@@ -320,16 +334,7 @@ export async function changeOrder(pool: Pool, scope: OrderScope, change: OrderCh
       const preferred = harnessSchema.parse(change.harness)
       await client.query(`INSERT INTO model_order_settings ("ownerId","workspaceId","preferredHarness") VALUES ($1,$2,$3)
         ON CONFLICT ("ownerId","workspaceId") DO UPDATE SET "preferredHarness"=EXCLUDED."preferredHarness","updatedAt"=now()`, [scope.ownerId, scope.workspaceId, preferred])
-      // An untouched list follows at read time; a stored one moves the rows that were on the old preferred Agent.
-      if (!current.customized || preferred === current.preferredHarness) { await client.query('COMMIT'); return }
-      const agents = agentsByOffer(candidates)
-      const have = new Set(current.entries.map(entryKey))
-      const moved = current.entries.map(entry => {
-        const both = (agents.get(offerKey(entry))?.length ?? 0) > 1
-        const next = { ...entry, harness: preferred }
-        return both && entry.harness === current.preferredHarness && !have.has(entryKey(next)) ? next : entry
-      })
-      for (const entry of moved) await client.query('UPDATE model_order_entries SET harness=$4 WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3', [entry.id, scope.ownerId, scope.workspaceId, entry.harness])
+      // Each Agent keeps its own rows and order; switching only picks which list the page shows and dispatch runs.
       await client.query('COMMIT')
       return
     }
@@ -367,8 +372,15 @@ export async function changeOrder(pool: Pool, scope: OrderScope, change: OrderCh
       if (entries.length === before) throw new ActionFailureError('executionRuleNotFound')
     } else {
       const ids = z.array(z.string().min(1).max(200)).parse(change.ids)
-      if (ids.length !== entries.length || new Set(ids).size !== ids.length || ids.some(id => !entries.some(entry => entry.id === id))) throw new ActionFailureError('executionRuleOrderInvalid')
-      entries = ids.map(id => entries.find(entry => entry.id === id)!)
+      if (new Set(ids).size !== ids.length || ids.some(id => !entries.some(entry => entry.id === id))) throw new ActionFailureError('executionRuleOrderInvalid')
+      // One Agent's list (the page shows one at a time): its rows take each other's places; the other Agent's stay put.
+      const moved = new Set(ids)
+      const harness = entries.find(entry => entry.id === ids[0])?.harness
+      const whole = ids.length === entries.length
+      if (!whole && (entries.some(entry => entry.harness === harness) && entries.filter(entry => entry.harness === harness).length !== ids.length
+        || ids.some(id => entries.find(entry => entry.id === id)!.harness !== harness))) throw new ActionFailureError('executionRuleOrderInvalid')
+      const next = ids.map(id => entries.find(entry => entry.id === id)!)
+      entries = whole ? next : entries.map(entry => moved.has(entry.id) ? next.shift()! : entry)
     }
     await client.query('DELETE FROM model_order_entries WHERE "ownerId"=$1 AND "workspaceId"=$2', [scope.ownerId, scope.workspaceId])
     for (const [position, entry] of entries.entries()) {

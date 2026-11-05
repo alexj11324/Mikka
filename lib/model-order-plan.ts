@@ -34,7 +34,7 @@ export interface OrderEntry {
 /** Why a credential cannot run now; `resetsAt` when it comes back on its own. */
 export type CredentialState =
   | { usable: true }
-  | { usable: false; reason: 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'keyRefused' | 'balance' | 'providerUnavailable'; resetsAt?: string | null }
+  | { usable: false; reason: 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'modelGone' | 'keyRefused' | 'balance' | 'providerUnavailable'; resetsAt?: string | null }
 
 export interface PoolDevice {
   id: string
@@ -243,6 +243,17 @@ export function defaultOrder(all: readonly OrderCandidate[], preferred: OrderHar
   if (codex) picked.push(codex)
   if (!picked.length && candidates[0]) picked.push(candidates[0])
   return picked
+}
+
+/**
+ * The untouched list: a default for each Agent, kept apart (decision 2026-11-05-0400). 优先使用的 Agent picks which
+ * one the page shows and dispatch tries first; switching it never moves a stored row between them.
+ */
+export function defaultOrderByAgent(all: readonly OrderCandidate[], preferred: OrderHarness = 'claude_code'): OrderCandidate[] {
+  const seen = new Set<string>()
+  // A model both Agents run stays on the 优先使用的 Agent, as before; each Agent's own models fill its list.
+  return (['claude_code', 'codex'] as const).flatMap(harness => defaultOrder(onPreferredAgent(all, preferred).filter(candidate => candidate.harness === harness), harness))
+    .filter(candidate => { const key = entryKey(candidate); if (seen.has(key)) return false; seen.add(key); return true })
 }
 
 /** The model and credential, whatever the Agent. */

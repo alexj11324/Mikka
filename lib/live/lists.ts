@@ -155,6 +155,18 @@ export const ownerProfileListsChanged = (executor: object, ownerId: string) => c
   return mergeTargets(scopes.map(scope => target(scope, ['workspace_settings', 'issue_list'])))
 })
 
+/**
+ * 模型与订阅 changed for an account: a subscription connected, paused or removed, its allowance or model list read
+ * again. Its own settings list connections across workspaces, and teammates may see it shared, so every workspace the
+ * account is an active member of re-reads its settings. No connection, model or quota crosses the channel.
+ */
+export const ownerSettingsChanged = (executor: object, ownerId: string) => changed(executor, `owner-settings:${ownerId}`, async (_database, workspace) => {
+  const { rows: scopes } = await workspace.query<LiveScope>(`SELECT DISTINCT audience."userId" AS "ownerId",w.id AS "workspaceId"
+    FROM mikka_workspaces w JOIN mikka_workspace_members source ON source."workspaceId"=w.id AND source."userId"=$1 AND source.status='active'
+    JOIN mikka_workspace_members audience ON audience."workspaceId"=w.id AND audience.status='active'`, [ownerId])
+  return mergeTargets(scopes.map(scope => target(scope, ['workspace_settings'])))
+})
+
 /** The account's workspace directory and personal issue identifiers are read
  * across selected workspaces. Their transport still uses the actual owned
  * home, and carries only that known list key. */

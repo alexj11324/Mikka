@@ -1,9 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import useSWR, { useSWRConfig } from 'swr'
+import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
+import { toast } from 'sonner'
+import { refreshSubscriptionModels } from '@/app/actions/model-order'
+import { useLiveKey } from '@/hooks/use-live-key'
 import { modelOrderKey } from '@/components/settings/model-order-settings'
-import { Check, Copy, MoreHorizontal, TriangleAlert } from 'lucide-react'
+import { Check, Copy, MoreHorizontal, RefreshCw, TriangleAlert } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
@@ -78,6 +81,22 @@ export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { 
   // The workspace's own SWR cache (workspace-app.tsx), not swr's global one: 启用 and a disconnect re-read 优先使用的模型.
   const { mutate: mutateCached } = useSWRConfig()
   const refresh = useCallback(async () => { await mutate(); void mutateCached(modelOrderKey(workspaceId)) }, [mutate, mutateCached, workspaceId])
+  // Connected, paused or removed elsewhere (another tab, the desktop app's sign-in): this list re-reads (no polling).
+  useLiveKey('workspace_settings', workspaceId, [unstable_serialize(subscriptionsKey(workspaceId))], workspaceId, { minIntervalMs: 2_000 })
+  /** 刷新模型: the account is asked for its models again; 优先使用的模型 shows the answer, a model gone marked unavailable. */
+  const [refreshingModels, setRefreshingModels] = useState<string | null>(null)
+  const refreshModels = useCallback(async (connection: { id: string; label: string }) => {
+    setRefreshingModels(connection.id)
+    const id = toast.loading(t('refreshingModels', { label: connection.label }))
+    try {
+      const result = await refreshSubscriptionModels(connection.id, workspaceId)
+      if (result.error) throw new Error(result.error)
+      await mutateCached(modelOrderKey(workspaceId), result.view, { revalidate: false })
+      toast.success(t('modelsRefreshed', { label: connection.label, count: result.models }), { id })
+    } catch {
+      toast.error(t('modelsRefreshFailed', { label: connection.label }), { id })
+    } finally { setRefreshingModels(null) }
+  }, [mutateCached, t, workspaceId])
   const failureMessage = useCallback((failure: unknown, key: 'startFailed' | 'finishFailed', provider: Provider) => {
     if (failure instanceof InvalidAuthorization) return t('refusedPage', { provider: t(provider) })
     const code = failure instanceof RequestError ? failure.code : ''
@@ -274,6 +293,7 @@ export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { 
                         <DropdownMenuTrigger disabled={pending || !!attempt} render={<Button variant="ghost" size="icon-sm" aria-label={t('rowMenu', { label: account ?? product })} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuGroup>
+                            {healthy && <DropdownMenuItem disabled={refreshingModels === connection.id} onClick={() => { void refreshModels({ id: connection.id, label: account ?? product }) }}><RefreshCw />{t('refreshModels')}</DropdownMenuItem>}
                             {live
                               ? <DropdownMenuItem variant="destructive" onClick={() => setDisconnecting({ ...connection, label: account ?? product })}>{t('disconnect')}</DropdownMenuItem>
                               : <DropdownMenuItem variant="destructive" onClick={() => { void remove(connection) }}>{t('remove')}</DropdownMenuItem>}

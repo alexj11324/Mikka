@@ -33,7 +33,9 @@ export class SubscriptionRepository {
     return { ...subscriptionBindingSchema.parse({ ...binding, connectionRevision: Number(row.connectionRevision) }), modelId: String(modelId) }
   }
   async saveQuota(row: ConnectionRow, quota: QuotaSnapshot) {
-    await this.pool.query('update byos_connections set quota=$3 where id=$1 and "ownerId"=$2 and epoch=$4 and state=\'connected\'', [row.id, row.ownerId, JSON.stringify(quotaSnapshotSchema.parse(quota)), row.epoch])
+    const { rowCount } = await this.pool.query('update byos_connections set quota=$3 where id=$1 and "ownerId"=$2 and epoch=$4 and state=\'connected\'', [row.id, row.ownerId, JSON.stringify(quotaSnapshotSchema.parse(quota)), row.epoch])
+    // 待检查 in 优先使用的模型 follows a new read wherever it came from (检查额度, the meters, dispatch).
+    if (rowCount) await (await import('./live/lists')).ownerSettingsChanged(this.pool, row.ownerId).catch(() => console.warn('[live] settings invalidation unavailable'))
   }
   /** The owner's own sign-in email, for Settings; fenced to the read's epoch. */
   async saveAccountLabel(row: ConnectionRow, label: string) {

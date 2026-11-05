@@ -5,6 +5,7 @@ import { WorkerRefusal } from '../packages/daemon/src/subscription-worker-client
 import { noteLogUser } from './request-log'
 import { accountLabel, failedUsage, usageCache } from './subscription-usage'
 import { stopRunsUsingSubscriptions } from './personal-policy'
+import { ownerSettingsChanged } from './live/lists'
 
 const id = z.uuid()
 const input = z.discriminatedUnion('action', [
@@ -27,6 +28,7 @@ export interface SubscriptionHTTPDependencies {
 }
 /** The refusal code a client may see. Worker codes are a fixed snake_case set
  * (packages/subscription-worker/errors.go); anything else stays generic. */
+
 export function refusalCode(error: unknown) {
   if (error instanceof SubscriptionRefusal) return error.code
   if (error instanceof WorkerRefusal && /^[a-z_]{1,64}$/.test(error.code)) return error.code
@@ -96,6 +98,10 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
       else { await worker.call(body.action, { revision: body.revision }, request.signal); result = await service.status(session.userId, row.id, request.signal) }
       // 断开连接 / 移除: runs using this connection stop now, wherever they run.
       if (body.action === 'disconnect' || body.action === 'remove') await stopRunsUsingSubscriptions(service.repository.pool, { ownerId: session.userId, connectionId: row.id })
+      // Connected, paused, removed or signed out: every open 模型与订阅 page re-reads (no polling, no content on the wire).
+      // A device sign-in still waiting changed nothing yet.
+      const pending = body.action === 'poll' && (result as { pending?: unknown } | null)?.pending === true
+      if (body.action !== 'bind' && body.action !== 'status' && !pending) await ownerSettingsChanged(service.repository.pool, session.userId)
       return Response.json(result, { headers })
     } catch (error) {
       const code = refusalCode(error)

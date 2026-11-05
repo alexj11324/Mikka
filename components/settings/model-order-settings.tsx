@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import useSWR from 'swr'
+import useSWR, { unstable_serialize } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ChevronDown, GripVertical, KeyRound, MoreHorizontal } from 'lucide-react'
 import { arrayMove } from '@dnd-kit/sortable'
@@ -22,6 +22,7 @@ import { E2BKeyDialog, useOwnE2BKey } from '@/components/settings/e2b-key-dialog
 import type { OrderRow, OrderView } from '@/lib/model-order'
 import type { OrderCandidate, OrderHarness } from '@/lib/model-order-plan'
 import { settingsRead } from '@/lib/settings-read'
+import { useLiveKey } from '@/hooks/use-live-key'
 import { settingsHref } from '@/lib/settings-sections'
 import { usePresence } from '@/lib/use-presence'
 import { useActionError } from '@/lib/use-action-error'
@@ -58,6 +59,11 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   const [keyOpen, setKeyOpen] = useState(false)
   const keyDialog = usePresence(keyOpen)
   const data = order.data && !order.data.error ? order.data : null
+  // One Agent's list at a time (decision 2026-11-05-0400): 优先使用的 Agent picks it; each keeps its own order.
+  const shown = data ? data.entries.filter(entry => entry.harness === data.preferredHarness) : []
+  const offered = data ? data.candidates.filter(candidate => candidate.harness === data.preferredHarness) : []
+  // A subscription connected, paused or read again elsewhere: this list re-reads (no polling).
+  useLiveKey('workspace_settings', workspaceId, [unstable_serialize(modelOrderKey(workspaceId))], workspaceId, { minIntervalMs: 2_000 })
 
   async function checkQuota(connectionId: string) {
     setPending(true); setFailed(null)
@@ -93,10 +99,13 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   const move = (from: number, to: number) => {
     if (!data) return
     // 重试 on a list that changed meanwhile: nothing left to move clears the mark.
-    if (to < 0 || to >= data.entries.length || from === to) { setUnsaved(null); return }
-    const entries = arrayMove(data.entries, from, to)
-    const id = data.entries[from].id
-    void save({ kind: 'reorder', ids: entries.map(entry => entry.id) }, { ...data, entries }, () => setUnsaved({ id, to }))
+    if (to < 0 || to >= shown.length || from === to) { setUnsaved(null); return }
+    // Only this Agent's rows move, into each other's places; the other Agent's list is untouched.
+    const moved = arrayMove(shown, from, to)
+    const queue = [...moved]
+    const entries = data.entries.map(entry => entry.harness === data.preferredHarness ? queue.shift()! : entry)
+    const id = shown[from].id
+    void save({ kind: 'reorder', ids: moved.map(entry => entry.id) }, { ...data, entries }, () => setUnsaved({ id, to }))
   }
   /** 移出列表 at once; the toast's 撤销 puts the same model back where it was (R2). */
   const remove = async (row: OrderRow) => {
@@ -152,7 +161,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
     {/* What a task dispatched to an Agent runs on (Alex, 2026-11-02): the preferred Agent and the models in
         order, one card. Bot chats pick their own model; this is a preference order, not a permission. */}
     <SettingsSection id="model-order-heading" title={t('title')} description={t('description')}
-      action={data.entries.length > 0 && <Button type="button" {...settingsSectionAction} disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button>}>
+      action={shown.length > 0 && <Button type="button" {...settingsSectionAction} disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button>}>
       <SettingRow title={t('preferredAgent')} description={t('preferredAgentHint')}>
         <ToggleGroup aria-label={t('preferredAgent')} variant="segment" spacing={0.5} value={[data.preferredHarness]} disabled={pending}
           onValueChange={values => { const next = values[0]; if ((next === 'claude_code' || next === 'codex') && next !== data.preferredHarness) void save({ kind: 'preferred', harness: next }, { ...data, preferredHarness: next }) }}>
@@ -160,11 +169,11 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
           <ToggleGroupItem value="codex">{harnessName('codex')}</ToggleGroupItem>
         </ToggleGroup>
       </SettingRow>
-      {data.entries.length === 0
+      {shown.length === 0
         ? <div className="flex flex-col items-center gap-3 px-5 py-7">
           {/* C8: one line naming what is missing, and the one button that gets it (R-41). */}
-          {data.candidates.length > 0
-            ? <><p className="text-sm text-muted-foreground">{t('empty')}</p>
+          {offered.length > 0
+            ? <><p className="text-sm text-muted-foreground">{data.entries.length ? t('emptyAgent', { agent: harnessName(data.preferredHarness) }) : t('empty')}</p>
               <Button type="button" disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button></>
             : <><p className="text-sm text-muted-foreground">{data.credentials === 0 ? t('emptyNoCredential') : t('emptyNoModels')}</p>
               <span className="flex flex-wrap justify-center gap-2">
@@ -172,11 +181,11 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
                 <Button nativeButton={false} variant="secondary" render={<a href="#api-keys-heading" />}>{t(data.credentials === 0 ? 'addApiKey' : 'openApiKey')}</Button>
               </span></>}
         </div>
-        : <OrderList rows={data.entries} pending={pending} unsaved={unsaved} preferred={data.preferredHarness} repair={repair} onMove={move} onRemove={row => { void remove(row) }}
+        : <OrderList rows={shown} pending={pending} unsaved={unsaved} preferred={data.preferredHarness} repair={repair} onMove={move} onRemove={row => { void remove(row) }}
           onAgent={(row, harness) => void save({ kind: 'harness', id: row.id, harness }, { ...data, entries: data.entries.map(entry => entry.id === row.id ? { ...entry, harness } : entry) })} />}
     </SettingsSection>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={failed.retry} />}
-    {adding && <AddModelsDialog candidates={data.candidates} onClose={async picked => {
+    {adding && <AddModelsDialog candidates={offered} onClose={async picked => {
       setAdding(false)
       if (picked.length) await save({ kind: 'add', entries: picked.map(({ harness, model, source }) => ({ harness, model, source })) })
     }} />}
