@@ -98,7 +98,7 @@ test('real Factory notifications retain their database across COMMIT and delayed
         await tx.query('BEGIN'); const task = await route(tx)
         assert.equal(queued.length, 0)
         await requestScope.run(() => tx.query('COMMIT'))
-        assert.equal(queued.length, 1)
+        assert.equal(queued.length, 2, 'Factory and project-map invalidations each retain the originating database')
         assert.equal(sent.length, before)
         await drain()
         assert.deepEqual(sent.slice(before), [expected(task)])
@@ -113,7 +113,7 @@ test('real Factory notifications retain their database across COMMIT and delayed
         assert.equal(queued.length, 0)
         await tx.query('COMMIT') // Deliberately outside requestScope.run.
         assert.equal((await requestPool.query('SELECT id FROM factory_tasks WHERE id=$1', [task.id])).rowCount, 1)
-        assert.equal(queued.length, 1)
+        assert.equal(queued.length, 2, 'Factory and project-map invalidations each retain the originating database')
         await drain()
         assert.deepEqual(sent.slice(before), [expected(task)])
       } finally { await tx.query('ROLLBACK'); tx.release() }
@@ -129,7 +129,7 @@ test('real Factory notifications retain their database across COMMIT and delayed
         await app.pool.query('UPDATE factory_tasks SET reason=\'Committed context fixture\' WHERE id=$1', [task.id])
         await factoryCommitted(task.id)
       })
-      assert.equal(queued.length, 1); await drain()
+      assert.equal(queued.length, 2, 'Factory and project-map invalidations each retain the originating database'); await drain()
       assert.deepEqual(sent.slice(before), [expected(task)])
     })
 
@@ -137,7 +137,7 @@ test('real Factory notifications retain their database across COMMIT and delayed
       const tx = await requestPool.connect(), before = sent.length
       try {
         await tx.query('BEGIN'); await route(tx); await requestScope.run(() => tx.query('COMMIT'))
-        assert.equal(queued.length, 1)
+        assert.equal(queued.length, 2, 'Factory and project-map invalidations each retain the originating database')
         await defaultPool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [intended, owner])
         await drain()
         assert.equal(sent.length, before)
