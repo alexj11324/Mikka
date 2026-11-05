@@ -1,0 +1,46 @@
+// oxlint-disable-next-line no-restricted-imports -- the one place that schedules after() work
+import { after } from 'next/server'
+import { waitUntil } from '@vercel/functions'
+import { runJob, type JobKind } from '@/lib/tracing/jobs'
+
+// Work that outlives its request, labelled as its own job for tracing and the
+// db_sample log (docs/operations/tracing.md, "Background work").
+
+/** A fixed job name, never ids or user data: `after:<job>` or `cron:<route>/<part>`. */
+export type JobLabel = `after:${string}` | `cron:${string}`
+
+export type AfterJobOptions = {
+  /** Outside a request (a script, a test) run the work now, kept alive with waitUntil, instead of throwing as after() does. */
+  orRun?: boolean
+  /** Test seam for next/server's after(). */
+  schedule?: (task: () => unknown) => void
+}
+
+const kindOf = (label: JobLabel): JobKind => (label.startsWith('cron:') ? 'cron' : 'background')
+
+/**
+ * next/server's after(), with the deferred work run as its own job: a new root
+ * span named `label`, linked to the request that scheduled it, with that label
+ * as `mikka.route` and `mikka.client_kind` `background` (`cron` for `cron:`).
+ *
+ * after() runs its callback in a snapshot of the scheduling request's async
+ * context (Next's bindSnapshot), so without this the work's queries would
+ * carry the request's route, under a request span that has already ended.
+ * runJob is entered inside that callback, after the snapshot is restored, so
+ * its label is the one in force when the work runs. Do not bind `task` (or
+ * this callback) with AsyncLocalStorage.bind/snapshot: entering a bound task
+ * restores the request's context, losing the label and Next's own after-phase
+ * store.
+ */
+export function afterJob(label: JobLabel, task: () => unknown, { orRun = false, schedule = after }: AfterJobOptions = {}): void {
+  const run = () => runJob(label, kindOf(label), task, { detach: true })
+  try { schedule(run) } catch (error) {
+    if (!orRun) throw error
+    waitUntil(Promise.resolve().then(run).catch(() => {}))
+  }
+}
+
+/** Wraps a cron route handler, so its queries carry `cron:<name>` and `mikka.client_kind=cron` inside the request span. */
+export function cronJob<A extends unknown[], R>(name: string, handler: (...args: A) => R): (...args: A) => R {
+  return (...args) => runJob(`cron:${name}`, 'cron', () => handler(...args))
+}

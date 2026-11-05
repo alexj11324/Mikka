@@ -1,4 +1,5 @@
 import 'server-only'
+// oxlint-disable-next-line no-restricted-imports -- an analytics flush, no database work to label
 import { after } from 'next/server'
 import { PostHog } from 'posthog-node'
 import { gatedFeatureEnabled } from '@/lib/feature-flags'

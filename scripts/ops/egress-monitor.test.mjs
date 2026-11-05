@@ -71,6 +71,14 @@ test('large-result census and random small samples retain separate inclusion wei
   assert.equal(report.sampledBytes,100100)
 })
 
+test('background job labels group like routes; anything else stays unattributed',()=>{
+  const common={msg:'db_sample',timestamp:new Date(now-1000).toISOString(),sampleRate:1,statement:'abc123def456',rows:1,bytes:10}
+  const routes=['after:coordinator-wake','cron:run-recovery','workflow:runPublication/publishResult','after:bad label','user@example.com']
+  const events=[{deploymentId:'dpl_test',environment:'production',message:routes.map(route=>JSON.stringify({...common,route})).join('\n')}]
+  const grouped=summarize(events,'dpl_test',now).queries.map(q=>String(q.route)).sort()
+  assert.deepEqual(grouped,['after:coordinator-wake','cron:run-recovery','null','workflow:runPublication/publishResult'])
+})
+
 test('real collector contract combines closed daily usage and current-day hourly usage without double counting',async()=>{
   const alias={alias:'app.aspectlylabs.com',projectId:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH',deploymentId:'dpl_test',updatedAt:1}
   const sample={msg:'db_sample',timestamp:new Date(now-1000).toISOString(),sampleRate:.01,statement:'abc123def456',route:'/actions/issues/poll',rows:1,bytes:100}

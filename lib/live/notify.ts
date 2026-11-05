@@ -1,6 +1,4 @@
-import { after } from 'next/server'
-import { AsyncLocalStorage } from 'node:async_hooks'
-import { waitUntil } from '@vercel/functions'
+import { afterJob } from '@/lib/background'
 import { liveInvalidations, type LiveInvalidation } from './events'
 import { liveChannelId, liveGatewayConfig, type LiveScope } from './scope'
 
@@ -26,10 +24,10 @@ export async function sendLiveInvalidations(scope: LiveScope, events: LiveInvali
 
 /** Call only after the owning database transaction has committed. */
 export function scheduleLive(work: () => Promise<void>) {
-  // after() may invoke this after the request scope has ended. Scope is
-  // retained for fresh reads; permissions are still resolved by the work.
-  const guarded = AsyncLocalStorage.bind(async () => { try { await work() } catch { console.warn('[live] committed invalidation failed') } })
-  try { after(guarded) } catch { waitUntil(guarded()) }
+  // after() runs this once the response is sent, in the scheduling request's
+  // async context (its scope stays available for fresh reads), traced as its
+  // own job; permissions are still resolved by the work.
+  afterJob('after:live-notify', async () => { try { await work() } catch { console.warn('[live] committed invalidation failed') } }, { orRun: true })
 }
 
 export function notifyLive(scope: LiveScope, events: LiveInvalidation[]) {

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { createServer, type AddressInfo, type Server, type Socket } from 'node:net'
 import { createRequire } from 'node:module'
 import { after, before, describe, test } from 'node:test'
@@ -8,7 +9,9 @@ import { registerInstrumentations } from '@opentelemetry/instrumentation'
 import { InMemorySpanExporter, type ReadableSpan, type SpanExporter } from '@opentelemetry/sdk-trace-base'
 import type { NodeTracerProvider } from '@opentelemetry/sdk-trace-node'
 import type { Pool as PgPool } from 'pg'
+import { afterJob, cronJob } from '@/lib/background'
 import { describeSample, withDatabaseOperation } from '@/lib/db/egress-sample'
+import { currentRoute, routeScope } from './labels'
 import { traceSampleRate, traceSettings } from './config'
 import { EXPORT_PAUSE_MS, SafeExporter, createPgInstrumentation, createTracerProvider } from './node'
 import { normalizeStatement, scrubString, statementId } from './sanitize'
@@ -84,6 +87,8 @@ describe('server tracing', () => {
   let pool: PgPool
   let spans: ReadableSpan[] = []
   let payload = ''
+  let jobLabel: string | undefined
+  let stepLabel: string | undefined
 
   const email = 'alice.secret@example.com'
   const token = 'mk_live_TOKENVALUE123'
@@ -111,6 +116,43 @@ describe('server tracing', () => {
       root.setAttribute('http.route', '/v1/devices/[deviceId]/commands')
       root.end()
     })
+
+    // Next's after(): the callback runs once the response is done, in a
+    // snapshot of the scheduling request's async context (bindSnapshot).
+    const scheduled: (() => unknown)[] = []
+    const nextAfter = (task: () => unknown) => { const snapshot = AsyncLocalStorage.snapshot(); scheduled.push(() => snapshot(task)) }
+    await tracer.startActiveSpan('POST', { kind: SpanKind.SERVER, attributes: { 'http.method': 'POST', 'http.target': '/mikka/api/coordinator/messages' } }, async root => {
+      await routeScope.run('/api/coordinator/messages', async () => {
+        await pool.query('select 1 as "request_read"')
+        afterJob('after:coordinator-wake', async () => {
+          jobLabel = currentRoute()
+          await pool.query('select "note" from "issues" where "email" = $1 and "body" = $2', [email, prompt])
+        }, { schedule: nextAfter })
+        // The same work scheduled with a bare after(): the pitfall afterJob avoids.
+        nextAfter(() => pool.query('select 3 as "bare_after"'))
+      })
+      root.end()
+    })
+    for (const task of scheduled) await task()
+
+    // A Workflow step body runs inside the SDK's step context, on the step delivery request.
+    const stepContext = ((globalThis as Record<symbol, unknown>)[Symbol.for('WORKFLOW_STEP_CONTEXT_STORAGE')] ??= new AsyncLocalStorage()) as AsyncLocalStorage<unknown>
+    await tracer.startActiveSpan('POST', { kind: SpanKind.SERVER, attributes: { 'http.method': 'POST', 'http.target': '/mikka/.well-known/workflow/v1/step' } }, async root => {
+      await stepContext.run({
+        stepMetadata: { stepName: 'step//./workflows/run-publication/steps//publishResult', stepId: 'step_1', attempt: 1 },
+        workflowMetadata: { workflowName: 'workflow//./workflows/run-publication/workflow//runPublication', workflowRunId: 'wrun_1' },
+      }, async () => {
+        stepLabel = currentRoute()
+        await pool.query('select 4 as "step_read"')
+      })
+      root.end()
+    })
+
+    // A cron handler: its own job span inside the cron request.
+    await tracer.startActiveSpan('GET', { kind: SpanKind.SERVER, attributes: { 'http.method': 'GET', 'http.target': '/mikka/api/cron/run-recovery' } }, async root => {
+      await cronJob('run-recovery', () => pool.query('select 5 as "cron_read"'))()
+      root.end()
+    })
     await provider.forceFlush()
     spans = memory.getFinishedSpans()
     payload = JSON.stringify(spans.map(span => ({ name: span.name, attributes: span.attributes, events: span.events, status: span.status, links: span.links, resource: span.resource.attributes })))
@@ -123,7 +165,10 @@ describe('server tracing', () => {
     trace.disable()
   })
 
-  const dbSpans = () => spans.filter(span => span.name.startsWith('pg.query'))
+  const traceOf = (span: ReadableSpan) => span.spanContext().traceId
+  const requestTrace = () => traceOf(spans.find(span => span.name === 'GET' && span.attributes['http.target'] === '/mikka/v1/devices/dev_1/commands')!)
+  const dbSpans = () => spans.filter(span => span.name.startsWith('pg.query') && traceOf(span) === requestTrace())
+  const query = (text: string) => spans.find(span => span.name.startsWith('pg.query') && span.attributes['db.query.text'] === text)!
 
   test('a span per statement, with route, client kind, operation, statement id, rows and size', () => {
     assert.equal(dbSpans().length, 3)
@@ -142,11 +187,49 @@ describe('server tracing', () => {
     for (const span of spans) {
       assert.equal(span.resource.attributes['service.name'], 'mikka-web')
       assert.equal(span.resource.attributes['deployment.environment'], 'production')
-      assert.equal(span.attributes['mikka.client_kind'], 'daemon')
+      if (traceOf(span) === requestTrace()) assert.equal(span.attributes['mikka.client_kind'], 'daemon')
     }
     const root = spans.find(span => span.name === 'GET')!
     assert.equal(root.attributes['http.target'], '/mikka/v1/devices/dev_1/commands')
     assert.equal(root.attributes['mikka.route'], '/v1/devices/[deviceId]/commands')
+  })
+
+  test("an after() job's queries carry the job's route in their own trace, not the scheduling request's", () => {
+    const request = spans.find(span => span.name === 'POST' && span.attributes['http.target'] === '/mikka/api/coordinator/messages')!
+    const job = spans.find(span => span.name === 'after:coordinator-wake')!
+    const statement = query('select "note" from "issues" where "email" = $1 and "body" = $2')
+    assert.equal(query('select ? as "request_read"').attributes['mikka.route'], '/api/coordinator/messages')
+    assert.equal(job.parentSpanContext, undefined)
+    assert.equal(job.links[0]?.context.spanId, request.spanContext().spanId)
+    assert.notEqual(traceOf(job), traceOf(request))
+    assert.equal(job.attributes['mikka.route'], 'after:coordinator-wake')
+    assert.equal(job.attributes['mikka.client_kind'], 'background')
+    assert.equal(traceOf(statement), traceOf(job))
+    assert.equal(statement.parentSpanContext?.spanId, job.spanContext().spanId)
+    assert.equal(statement.attributes['mikka.route'], 'after:coordinator-wake')
+    assert.equal(statement.attributes['mikka.client_kind'], 'background')
+    // The db_sample line reads the same label.
+    assert.equal(jobLabel, 'after:coordinator-wake')
+    // Without afterJob, deferred work still runs as the request it came from.
+    const bare = query('select ? as "bare_after"')
+    assert.equal(bare.attributes['mikka.route'], '/api/coordinator/messages')
+    assert.equal(traceOf(bare), traceOf(request))
+  })
+
+  test('a Workflow step is labelled with its workflow and step', () => {
+    const statement = query('select ? as "step_read"')
+    assert.equal(statement.attributes['mikka.route'], 'workflow:runPublication/publishResult')
+    assert.equal(statement.attributes['mikka.client_kind'], 'workflow')
+    assert.equal(stepLabel, 'workflow:runPublication/publishResult')
+  })
+
+  test('a cron handler runs as cron:<name> inside its request', () => {
+    const request = spans.find(span => span.attributes['http.target'] === '/mikka/api/cron/run-recovery')!
+    const job = spans.find(span => span.name === 'cron:run-recovery')!
+    const statement = query('select ? as "cron_read"')
+    assert.equal(job.parentSpanContext?.spanId, request.spanContext().spanId)
+    assert.equal(statement.attributes['mikka.route'], 'cron:run-recovery')
+    assert.equal(statement.attributes['mikka.client_kind'], 'cron')
   })
 
   test('no parameter value, row content, error value, token, email, prompt or password leaves the process', () => {
@@ -220,7 +303,10 @@ describe('helpers', () => {
     assert.equal(clientKindFor('/mikka/api/mobile/threads?x=1'), 'mobile')
     assert.equal(clientKindFor('/mikka/api/cron/briefings'), 'cron')
     assert.equal(clientKindFor('/mikka/api/webhooks/github'), 'worker')
-    assert.equal(clientKindFor('/mikka/.well-known/workflow/v1/step'), 'worker')
+    assert.equal(clientKindFor('/mikka/.well-known/workflow/v1/step'), 'workflow')
+    assert.equal(clientKindFor('after:live-notify'), 'background')
+    assert.equal(clientKindFor('cron:run-recovery/group-turns'), 'cron')
+    assert.equal(clientKindFor('workflow:runPublication/publishResult'), 'workflow')
     assert.equal(clientKindFor('/mikka/en/settings'), 'web')
     assert.equal(clientKindFor('/actions/issues/update'), 'web')
     assert.equal(clientKindFor('/mikka'), 'web')

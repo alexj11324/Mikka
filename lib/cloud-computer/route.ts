@@ -1,5 +1,6 @@
 import 'server-only'
-import { after, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { z } from 'zod'
 import { start } from 'workflow/api'
 import { auth } from '@/lib/api-auth'
@@ -23,7 +24,7 @@ export async function subagentRoute(request: Request, botId: string, id?: string
     if (!id) {
       const { task } = startSubagentSchema.parse(await request.json())
       const row = await store.create(actor, botId, task)
-      after(() => start(webSubagentWorkflow, [actor, botId, row.id]).then(() => undefined))
+      afterJob('after:subagent-start', () => start(webSubagentWorkflow, [actor, botId, row.id]).then(() => undefined))
       return response({ subagentId: row.id, state: row.status }, 202)
     }
     if (action === 'viewer') return response(await store.viewer(actor, botId, id))

@@ -1,5 +1,4 @@
-import { after } from 'next/server'
-import { waitUntil } from '@vercel/functions'
+import { afterJob } from '@/lib/background'
 import { setTimeout as delay } from 'node:timers/promises'
 import { deviceGatewayEndpoint } from './device-gateway-client'
 
@@ -30,8 +29,7 @@ export function notifyDeviceWork(deviceId: string | null | undefined) {
   if (!deviceId) return
   const endpoint = deviceGatewayEndpoint(deviceId, 'push')
   if (!endpoint) return
-  try { after(() => sendWake(deviceId, endpoint)) }
-  catch { waitUntil(sendWake(deviceId, endpoint)) }
+  afterJob('after:device-wake', () => sendWake(deviceId, endpoint), { orRun: true })
 }
 
 /** The outer Factory/Skill transaction has committed before this lookup. */
