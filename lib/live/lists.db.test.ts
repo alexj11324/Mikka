@@ -196,7 +196,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
         assert.equal(scheduled.length, 0)
         assert.equal((await database.query('SELECT status FROM agent_runs WHERE id=$1', [runId])).rows[0].status, 'running')
         await wrongScope.run(() => client.query('COMMIT'))
-        assert.equal(scheduled.length, 1)
+        assert.equal(scheduled.length, 2, 'list and project-map invalidations each defer until COMMIT')
       } finally { client.release() }
       await wrongScope.run(drain)
       assert.equal(received.length, 1)
@@ -258,7 +258,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
       await assert.rejects(scope.run(() => stopOwnedRun(db, 'peer', runId)), /runNotFound/)
       await drain(); assert.equal(received.length, 0)
       await scope.run(() => stopOwnedRun(db, 'owner', runId))
-      assert.equal(scheduled.length, 1)
+      assert.equal(scheduled.length, 2, 'list and project-map invalidations retain independent after-COMMIT work')
       assert.ok((await database.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [runId])).rows[0].stopRequestedAt)
       await drain()
       assert.deepEqual(received.map(value => ({ scope: value.scope, events: value.events })), [{

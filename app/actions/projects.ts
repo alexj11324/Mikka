@@ -52,6 +52,7 @@ async function persistProject(owner: string, input: unknown, partial: boolean) {
       const names: Record<string, string> = { status: i18nText("Projects.fields.status"), priority: i18nText("Projects.fields.priority"), lead: i18nText("Projects.fields.lead"), startDate: i18nText("Projects.fields.startDate"), targetDate: i18nText("Projects.fields.targetDate"), properties: i18nText("Projects.detail.detailsLabel"), name: i18nText("Settings.workspaceForm.name"), summary: i18nText("Projects.fields.summary"), description: i18nText("Projects.form.descriptionHeading"), team: i18nText("Settings.sections.teams.title") }
       const message = patch?.success ? i18nText("FeatureCopy.c_976c2152", { value0: (Object.keys(patch.data.changes).map(key => names[key]).join('、')) }) : id ? i18nText("Projects.activity.updatedOverview") : i18nText("Projects.activity.created")
       await tx.insert(projectEvents).values({ id: crypto.randomUUID(), userId: projectOwner, projectId: project.id, message })
+      await (await import('@/lib/live/project-map')).projectMapChanged(tx, project.id)
       return { project }
     })
   } catch { return { error: i18nText("Errors.projectSaveFailed") } }
@@ -81,6 +82,7 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
         const issueIds = project.id === input.projectId ? [...new Set([...project.issueIds, input.issueId])] : project.issueIds.filter(id => id !== input.issueId)
         await tx.update(projects).set({ issueIds, revision: project.revision + 1, updatedAt: new Date() }).where(and(eq(projects.id, project.id), eq(projects.userId, owner)))
         await tx.insert(projectEvents).values({ id: crypto.randomUUID(), userId: owner, projectId: project.id, message: project.id === input.projectId ? i18nText("Projects.activity.tasksAdded") : i18nText("Projects.activity.tasksRemoved") })
+        await (await import('@/lib/live/project-map')).projectMapChanged(tx, project.id)
       }
       return result
     })
@@ -118,6 +120,7 @@ export async function setProjectIssues(input: { id: string; revision: number; is
       const [project] = await tx.update(projects).set({ issueIds: ids, revision: input.revision + 1, updatedAt: new Date() }).where(and(eq(projects.id, input.id), eq(projects.userId, current.userId), eq(projects.revision, input.revision))).returning()
       if (!project) return { error: i18nText("Errors.projectSaveConflict") }
       await tx.insert(projectEvents).values({ id: crypto.randomUUID(), userId: current.userId, projectId: project.id, message: i18nText("FeatureCopy.c_310e5541", { value0: (ids.length) }) })
+      await (await import('@/lib/live/project-map')).projectMapChanged(tx, project.id)
       return { project }
     })
   } catch { return { error: i18nText("Errors.projectIssuesSaveFailed") } }
