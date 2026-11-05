@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Platform, Pressable, StyleSheet, View } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import { useRouter } from 'expo-router'
@@ -18,6 +19,8 @@ import { colors } from '@/lib/theme'
 export default function MessageActions() {
   const router = useRouter()
   const message = heldMessage()
+  const afterClose = useRef<(() => void) | null>(null)
+  useEffect(() => () => { afterClose.current?.() }, [])
   if (!message) return null
   const close = (then?: () => void) => { router.back(); then?.() }
   const react = message.react
@@ -46,7 +49,11 @@ export default function MessageActions() {
         <Row icon={<Symbol name="doc.on.doc" size={18} web={<Copy size={20} color={colors.ink} />} />} label="复制" trailing={null}
           onPress={() => close(() => { void Clipboard.setStringAsync(message.text); tap() })} />
         <Row icon={<Symbol name="character.cursor.ibeam" size={18} web={<TextSelect size={20} color={colors.ink} />} />} label="选择文本" trailing={null}
-          onPress={() => { router.back(); router.push('/message-text') }} />
+          onPress={() => {
+            // In the chat, the words become selectable in place once this sheet has gone (it would take the focus).
+            if (message.onSelect) { afterClose.current = message.onSelect; router.back() }
+            else { router.back(); router.push('/message-text') }
+          }} />
       </Group>
     </View>
   )
