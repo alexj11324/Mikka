@@ -16,7 +16,7 @@ test('model ids read as people write them', () => {
   }
 })
 test('a model that cannot run says so and offers 换模型', () => {
-  assert.deepEqual(modelStatusLine({ ...current, availability: 'unavailable' }), { line: '这个模型现在用不了', change: true })
+  assert.deepEqual(modelStatusLine({ ...current, availability: undefined }), { line: '这个模型现在用不了', change: true })
 })
 test('same-plan accounts and API keys have distinguishable headings', () => {
   const first = groupTitle({ kind: 'subscription', provider: 'claude', plan: 'Max', credentialLabel: 'first@example.test', options: [] })
