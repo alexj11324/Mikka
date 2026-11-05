@@ -81,7 +81,17 @@ export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
     await waitForCacheHydration(cache)
     const previous = cache.get(unstable_serialize(key))?.data as IssueRead | undefined
     return loadIssue(id, props.user.id, previous?.id === id ? previous : undefined)
-  }, { revalidateOnFocus: false, revalidateOnMount: true, onSuccess: () => setLoadedId(id) })
+  }, { revalidateOnFocus: false, revalidateOnMount: false, onSuccess: () => setLoadedId(id) })
+  useEffect(() => {
+    let active = true
+    setLoadedId(null)
+    // A rapid reopen can reuse SWR's previous request without this instance's
+    // onSuccess. Start a fresh authorized read after hydration, even when the
+    // previous instance still has an in-flight request. Only onSuccess unlocks
+    // the form: mutate can resolve with old cache data when a read is refused.
+    void waitForCacheHydration(cache).then(() => active ? mutate() : undefined).catch(() => {})
+    return () => { active = false }
+  }, [cache, id, mutate, props.user.id])
   if (error) return <UnavailableIssue id={id} onRetry={() => { void mutate() }} onClose={props.onClose} />
   if (!data) return <div role="status" aria-label={t('reading')} className="mx-auto flex w-full max-w-170 flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></div>
   // Show a local snapshot immediately, but do not seed a writable Y.Doc from
@@ -269,9 +279,11 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     return operation
   }, [initial.id, preview, sync, onSaved, refreshVersions])
   useEffect(() => {
-    onRegisterFlush(save)
+    // A preview cannot acquire an editable draft, so leaving it needs no save.
+    // Keep save() itself refused until the normal read verifies access.
+    onRegisterFlush(preview ? () => Promise.resolve(true) : save)
     return () => onRegisterFlush(null)
-  }, [onRegisterFlush, save])
+  }, [onRegisterFlush, preview, save])
   useEffect(() => {
     if (!editSequence || !syncState.ready) return
     const timer = setTimeout(() => { void save() }, 700)

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
-import { act, type ReactNode } from 'react'
+import { act, useEffect, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import type { State } from 'swr'
 import type { JSONContent } from '@tiptap/react'
@@ -8,6 +8,8 @@ import { Window } from 'happy-dom'
 import { LIVE_KINDS } from '../lib/live/events'
 import type { IssueView } from '../app/actions/issues'
 import type { ActivityVersion } from '../lib/issue-activity'
+import { PersistentReadCache } from '../lib/swr/persistent-cache'
+import type { ReadStorage, StoredRead } from '../lib/swr/indexed-db'
 
 // Mount the real TaskDetail, DocumentSync, ActivityFeed, SWR and live channel.
 // Only server/transport boundaries and unrelated visual children are fixtures.
@@ -83,8 +85,8 @@ mock.module(at('components/workspace/issue-detail-properties.tsx'), { namedExpor
 mock.module(at('components/workspace/issue-editor.tsx'), { namedExports: {
   // An empty valid Yjs seed keeps the real DocumentSync lifecycle in this test.
   createDocumentSeed: () => new Uint8Array([0, 0]),
-  IssueEditor: ({ content, onChange, activity, afterDescription }: { content: JSONContent; onChange: (value: JSONContent) => void; activity: ReactNode; afterDescription: ReactNode }) =>
-    <><textarea data-description="" value={bodyText(content)} onChange={event => onChange(body(event.currentTarget.value))} />{afterDescription}<section data-activity="">{activity}</section></>,
+  IssueEditor: ({ content, disabled, onChange, activity, afterDescription }: { content: JSONContent; disabled: boolean; onChange: (value: JSONContent) => void; activity: ReactNode; afterDescription: ReactNode }) =>
+    <><textarea data-description="" readOnly={disabled} value={bodyText(content)} onChange={event => onChange(body(event.currentTarget.value))} />{afterDescription}<section data-activity="">{activity}</section></>,
 } })
 
 const browser = new Window({ url: 'https://mikka.example/mikka/en' })
@@ -107,6 +109,8 @@ class FakeSocket {
 
 let createRoot: typeof import('react-dom/client')['createRoot']
 let SWRConfig: typeof import('swr')['SWRConfig']
+let useSWRConfig: typeof import('swr')['useSWRConfig']
+let swrDefaults: typeof import('../components/swr-defaults')['swrDefaults']
 let LiveProvider: typeof import('../hooks/use-live-key')['LiveProvider']
 let TaskDetail: typeof import('../components/workspace/task-detail')['TaskDetail']
 let root: Root, container: HTMLDivElement, cache: Map<string, State>
@@ -120,7 +124,8 @@ before(async () => {
   }
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, WebSocket: FakeSocket })
   ;({ createRoot } = await import('react-dom/client'))
-  ;({ SWRConfig } = await import('swr'))
+  ;({ SWRConfig, useSWRConfig } = await import('swr'))
+  ;({ swrDefaults } = await import('../components/swr-defaults'))
   ;({ LiveProvider } = await import('../hooks/use-live-key'))
   ;({ TaskDetail } = await import('../components/workspace/task-detail'))
 })
@@ -152,12 +157,25 @@ const properties = () => container.querySelector('[data-properties]')!
 const title = () => container.querySelector<HTMLTextAreaElement>('#task-title')!
 const description = () => container.querySelector<HTMLTextAreaElement>('[data-description]')!
 const activity = () => container.querySelector('[data-activity]')?.textContent ?? ''
-async function mount(ready = true) {
-  await act(async () => root.render(<SWRConfig value={{ provider: () => cache, dedupingInterval: 0, shouldRetryOnError: false }}>
-    <LiveProvider ownerId={owner} workspaceId={workspaceId}><TaskDetail id={issueId} thread={null} origin="Tasks"
+function HydrateFixtureCache() {
+  const { cache, mutate } = useSWRConfig()
+  useEffect(() => {
+    if (cache instanceof PersistentReadCache) void cache.hydrate((key, data) => mutate(key, data, { revalidate: false }))
+  }, [cache, mutate])
+  return null
+}
+async function renderDetail(visible: boolean) {
+  // Keep the provider mounted when a task closes: SWR retains both completed
+  // and pending reads across a quick reopen, with its default dedupe interval.
+  await act(async () => root.render(<SWRConfig value={{ ...(cache instanceof PersistentReadCache ? swrDefaults : {}), provider: () => cache, shouldRetryOnError: false }}>
+    {cache instanceof PersistentReadCache && <HydrateFixtureCache />}
+    <LiveProvider ownerId={owner} workspaceId={workspaceId}>{visible && <TaskDetail id={issueId} thread={null} origin="Tasks"
       user={{ id: owner, name: 'Owner', email: 'owner@example.invalid' }} navigation={{ index: -1, total: 0, onOpen: noop }}
-      onOpen={noop} onSaved={noop} onDirty={noop} onClose={noop} onDeleted={noop} onRegisterFlush={registerFlush} /></LiveProvider>
+      onOpen={noop} onSaved={noop} onDirty={noop} onClose={noop} onDeleted={noop} onRegisterFlush={registerFlush} />}</LiveProvider>
   </SWRConfig>))
+}
+async function mount(ready = true) {
+  await renderDetail(true)
   if (!ready) return
   await until(() => !!description() && sockets.some(socket => socket.readyState === 1) && activity().includes('createdTask'), 'task, activity and live channel mounted')
   await wait(100)
@@ -219,6 +237,150 @@ test('a shared-task response after an account cookie change cannot validate the 
   assert.equal(description(), null)
   assert.equal(documentReads, 0)
   assert.equal(writes.length, 0)
+})
+
+test('a quick reopen revalidates a completed SWR read before unlocking the cached task', { timeout: 10_000 }, async () => {
+  await mount()
+  const before = { issueReads, documentReads, versionReads }
+  let release!: () => void
+  const waiting = new Promise<void>(resolve => { release = resolve })
+  readOverride = async () => { await waiting; return structuredClone(stored) }
+  try {
+    await renderDetail(false)
+    assert.equal(flush, null, 'closing unregisters the previous form')
+    await mount(false)
+    await until(() => !!description(), 'the same task reopens from the retained SWR cache')
+    assert.equal(title().readOnly, true)
+    assert.equal(description().readOnly, true)
+    assert.equal(container.querySelector('[role="region"]')?.getAttribute('aria-busy'), 'true')
+    assert.equal((container.querySelector('[data-history]') as HTMLButtonElement).disabled, true)
+    assert.equal(documentReads, before.documentReads, 'the reopened snapshot cannot create a writable document')
+    assert.equal(versionReads, before.versionReads, 'the reopened snapshot cannot fetch its activity before authorization')
+    await act(async () => { assert.equal(await flush!(), true, 'an untouched preview must not block navigation') })
+    assert.equal(writes.length, 0)
+    await until(() => issueReads > before.issueReads, 'the reopened task checks current access despite SWR retaining the previous request')
+    await act(async () => release())
+    await until(() => !!title() && !title().readOnly && documentReads > before.documentReads && activity().includes('createdTask'), 'the reopened form unlocks after its current authorized read')
+    assert.equal(description().readOnly, false)
+    await act(async () => { assert.equal(await flush!(), true) })
+    assert.equal(writes.length, 0)
+  } finally { release() }
+})
+
+test('closing and reopening during the first conditional read unlocks the new form only after authorization', { timeout: 10_000 }, async () => {
+  const { unstable_serialize } = await import('swr')
+  cache.set(unstable_serialize(['issue', issueId]), { data: { ...structuredClone(stored), readVersion: '1'.padStart(32, '0') } })
+  let releaseOld!: () => void, releaseCurrent!: () => void
+  const oldRead = new Promise<void>(resolve => { releaseOld = resolve })
+  const currentRead = new Promise<void>(resolve => { releaseCurrent = resolve })
+  let started = 0
+  readOverride = async () => { await (++started === 1 ? oldRead : currentRead); return structuredClone(stored) }
+  try {
+    await mount(false)
+    await until(() => !!description() && issueReads > 0, 'the first cached preview waits on authorization')
+    assert.equal(title().readOnly, true)
+    assert.equal(description().readOnly, true)
+    await act(async () => { assert.equal(await flush!(), true, 'the pending read must not trap the user in a preview') })
+    await renderDetail(false)
+    assert.equal(flush, null)
+    await mount(false)
+    await until(() => !!description() && issueReads >= 2, 'the new form starts its own read while the original read is still pending')
+    assert.equal(issueReads, 2)
+    assert.equal(title().readOnly, true)
+    assert.equal(description().readOnly, true)
+    assert.equal(documentReads, 0)
+    assert.equal(versionReads, 0)
+    assert.equal(writes.length, 0)
+    await act(async () => releaseOld())
+    assert.equal(container.querySelector('[role="region"]')?.getAttribute('aria-busy'), 'true')
+    assert.equal(title().readOnly, true, 'the old request cannot authorize the newly mounted form')
+    assert.equal(description().readOnly, true)
+    assert.equal(documentReads, 0)
+    assert.equal(versionReads, 0)
+    assert.equal(writes.length, 0)
+    await act(async () => releaseCurrent())
+    await until(() => !!title() && !title().readOnly && documentReads > 0 && activity().includes('createdTask'), 'only the current authorization unlocks the reopened form')
+    assert.equal(description().readOnly, false)
+    await act(async () => { assert.equal(await flush!(), true) })
+    assert.equal(writes.length, 0)
+  } finally { releaseOld(); releaseCurrent() }
+})
+
+test('a task reopened before persistent hydration starts its authorized read after the SWR pause ends', { timeout: 10_000 }, async () => {
+  const { unstable_serialize } = await import('swr')
+  const rawKey = ['issue', issueId], key = unstable_serialize(rawKey)
+  const readVersion = String(stored.revision).padStart(32, '0')
+  let releaseDisk!: (rows: StoredRead[]) => void
+  let releaseRead!: () => void
+  const disk = new Promise<StoredRead[]>(resolve => { releaseDisk = resolve })
+  const network = new Promise<void>(resolve => { releaseRead = resolve })
+  const storage: ReadStorage = {
+    activate: () => disk,
+    write: async () => undefined, remove: async () => undefined, clear: async () => undefined,
+  }
+  const persistent = new PersistentReadCache({ userId: owner, workspaceId, build: 'fixture-build', role: 'admin' }, storage)
+  cache = persistent
+  readOverride = async () => { await network; return structuredClone(stored) }
+  try {
+    await mount(false)
+    assert.equal(persistent.isHydrated, false)
+    assert.equal(issueReads, 0, 'SWR remains paused while storage activation is pending')
+    assert.equal(documentReads, 0)
+    await renderDetail(false)
+    await mount(false)
+    assert.equal(persistent.isHydrated, false)
+    assert.equal(issueReads, 0, 'remounting must not start a read before the disk cursor is available')
+    assert.equal(documentReads, 0)
+    assert.equal(versionReads, 0)
+    await act(async () => {
+      releaseDisk([{ key, rawKey, data: { ...structuredClone(stored), readVersion }, savedAt: Date.now() }])
+      await persistent.hydrated
+    })
+    await until(() => !!description() && issueReads > 0, 'the current mount explicitly authorizes its restored preview after hydration')
+    assert.equal(issueReads, 1, 'the unmounted instance must not launch another read when hydration resolves')
+    assert.deepEqual(knownVersions, [readVersion])
+    assert.equal(title().readOnly, true)
+    assert.equal(description().readOnly, true)
+    assert.equal(documentReads, 0)
+    assert.equal(versionReads, 0)
+    await act(async () => { assert.equal(await flush!(), true) })
+    await act(async () => releaseRead())
+    await until(() => !!title() && !title().readOnly && documentReads > 0 && activity().includes('createdTask'), 'the post-hydration authorization unlocks the current form')
+    assert.equal(description().readOnly, false)
+    assert.equal(writes.length, 0)
+    await act(async () => { assert.equal(await flush!(), true) })
+  } finally {
+    await renderDetail(false)
+    await act(async () => { releaseDisk([]); releaseRead(); await persistent.hydrated; await persistent.flushed() })
+  }
+})
+
+for (const refusal of ['workspaceAccessDenied', 'foreign-viewer'] as const) test(`a quick reopen stays read-only when current authorization returns ${refusal}`, { timeout: 10_000 }, async () => {
+  await mount()
+  const before = { documentReads, versionReads }
+  let release!: () => void
+  const waiting = new Promise<void>(resolve => { release = resolve })
+  readOverride = async () => { await waiting; return structuredClone(stored) }
+  if (refusal === 'foreign-viewer') readViewerId = 'other-viewer'
+  else readFailure = refusal
+  try {
+    await renderDetail(false)
+    await mount(false)
+    await until(() => !!description(), 'the previously authorized task reopens as a preview')
+    assert.equal(title().readOnly, true)
+    assert.equal(description().readOnly, true)
+    assert.equal(documentReads, before.documentReads)
+    assert.equal(versionReads, before.versionReads)
+    await act(async () => { assert.equal(await flush!(), true) })
+    await act(async () => release())
+    await until(() => container.textContent?.includes('unavailableTitle') === true, 'the current authorization refusal removes the old preview')
+    assert.equal(title(), null)
+    assert.equal(description(), null)
+    assert.equal(flush, null, 'the unavailable task retains no writable form')
+    assert.equal(documentReads, before.documentReads, 'revoked access never creates a new document exchange')
+    assert.equal(versionReads, before.versionReads)
+    assert.equal(writes.length, 0)
+  } finally { release() }
 })
 
 test('a committed acceptance event refreshes the mounted task status and activity without reload', { timeout: 10_000 }, async () => {
