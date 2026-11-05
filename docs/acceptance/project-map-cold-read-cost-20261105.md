@@ -26,7 +26,7 @@ accounts for 16,077 bytes and each visible-issue read for 4,102 bytes.
 | Graph snapshot transaction and two metadata batches | 4 | One pure SELECT containing every projection and source authorization |
 | Fresh secret masking material | 5 | Two reads, preserving the workspace/app database split |
 | Cookie session in this trace | 0 | No authentication changes |
-| Total for this observed cookie path | 14 | Expected 8; requires the linked PostgreSQL CI result and production readback |
+| Total for this observed cookie path | 14 | Eight in the isolated cached-session fixture below; production readback remains pending |
 
 The earlier isolated full-HTTP benchmark used PAT authentication, with
 15 statements / 10 SELECTs and no configured secret key. Those numbers are a
@@ -73,7 +73,10 @@ masker and PAT authentication are unchanged.
 
 ## Verification and byte reporting
 
-The linked CI must run `test:project-decisions-db`, including:
+For PR head `2b6ca07cc7b46970f4b693757be70a1ce1448343`,
+[CI run 42126423740, database job 4](https://github.com/alexj11324/Mikka/actions/runs/42126423740/job/127591767660)
+ran `test:project-decisions-db`: **39 passed, zero failed, canceled or skipped**.
+The suite includes:
 
 - The existing owner/peer, revocation, private run, workspace conflict,
   source-locator, paging and snapshot-change cases.
@@ -98,9 +101,44 @@ The linked CI must run `test:project-decisions-db`, including:
   PostgreSQL predicates, including suspended members, foreign scopes, legacy
   key ownership and corrupt ciphertext behavior.
 
-At implementation handoff, local source checks passed; the actual database
-measurements above remain pending the linked CI. This executor cannot start
-native PostgreSQL under its UID-0-only mapping. No database was started and
-no cloud database was allocated for that failed setup. The PR receipt must
-attach CI's measured before/after values and the final deployment readback
-before describing the cost target as achieved.
+The same real PostgreSQL run reported these exact-layout measurements. All
+values are bytes; each collector uses one SELECT. The uncompressed and compact
+columns run the new single-statement projections against the same facts,
+isolating transport encoding rather than claiming a legacy collector run.
+
+| Graph layout | Uncompressed collector JSON | Compact collector JSON | Unchanged logical budget bytes | Complete HTTP DB JSON | Complete HTTP statements / SELECTs |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 100 issues + 399 runs + root = 500 nodes | 152,324 | 39,075 | 162,843 | 64,604 | 8 / 8 |
+| 100 issues + 899 runs + root = 1,000 nodes | 318,824 | 74,025 | 341,343 | 99,554 | 8 / 8 |
+
+The complete HTTP measurements include fresh pre/post workspace and issue
+ACL, live revision, all graph facts and two real masking reads. They use the
+cached-session resolver stub described above; they exclude cookie parsing,
+PostgreSQL wire framing and production network time. Both regression ceilings
+passed. The production baseline and this isolated result have different
+environments, so their difference is not a measured production improvement.
+Deployment-bound production readback is still required.
+
+## Independent CI suite timeout
+
+The full CI run is **not green**: database job 2 hit the existing 120-second
+parent deadline in the Factory Profile suite after #1449 added ten sequential
+cross-Harness candidate recheck cases. This is separate from the map suite in
+database job 4. The observed comparison is:
+
+| Profile suite observation | Main `82789ddf380841a4f3ea637d940005bbbd2cecdd` | PR merge tree `b454194a8cd1d6ecc5c684e6efc09daa4efb1098` |
+| --- | ---: | ---: |
+| Parent duration | 109,049.686 ms, passed | 120,511.028 ms, parent timed out |
+| First 48 child cases | All passed; 89,976.877 ms in total | All passed; 105,676.074 ms in total |
+| Ten new recheck cases | 46,395.628 ms in total | 55,391.957 ms in total |
+| Whole factory-checks command | 272 passed, zero failed/canceled/skipped | 257 passed, 12 failed, one canceled, zero skipped |
+
+The [main baseline job](https://github.com/alexj11324/Mikka/actions/runs/42126327488/job/127591439120)
+and [PR job](https://github.com/alexj11324/Mikka/actions/runs/42126423740/job/127591767632)
+show that the PR's first child failure was `Cannot use a pool after calling
+end on the pool` after the parent deadline triggered cleanup. All 12 failures
+share that error; the final two normal cases were not registered. No earlier
+product assertion failed. The follow-up changes only this parent's finite
+budget to 180 seconds, retaining every case, assertion, cleanup action, the
+15-second statement timeout and the 5-second lock timeout. Its complete CI
+result remains required; the failed head is not rerun to obtain a faster runner.
