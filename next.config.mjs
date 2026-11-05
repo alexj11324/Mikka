@@ -74,7 +74,8 @@ const nextConfig = {
   transpilePackages: ['@mikka/protocol'],
   // better-auth/react must share Next's SSR React dispatcher with client components.
   // Externalizing the whole package loads native React and crashes enabled analytics.
-  serverExternalPackages: ['ai', 'drizzle-orm', 'officeparser', '@e965/xlsx', 'music-metadata'],
+  // OpenTelemetry stays external so the pg instrumentation can patch the `pg` that lib/db requires (lib/tracing/node.ts).
+  serverExternalPackages: ['ai', 'drizzle-orm', 'officeparser', '@e965/xlsx', 'music-metadata', '@opentelemetry/api', '@opentelemetry/instrumentation', '@opentelemetry/instrumentation-pg', '@opentelemetry/sdk-trace-node', '@opentelemetry/exporter-trace-otlp-proto'],
   async headers() {
     return [{ source: '/(.*)', headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },
