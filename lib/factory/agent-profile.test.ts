@@ -174,7 +174,7 @@ test('host check context separates Review from implementation and projects no pr
   assert.match(input.currentWork.evidence, /single review/)
   assert.deepEqual(input.currentWork.candidate, { id: work.candidate.id, kind: 'deliverable', sha: null })
   assert.deepEqual(input.currentWork.producer, { runId: work.producer.runId, harness: 'claude_code', model: 'haiku-fixture', profile: { id: work.producer.profile.id, version: 1 } })
-  assert.equal(input.originalTask.role, 'untrusted_background'); assert.equal(input.originalTask.content, original.content)
+  assert.equal(input.acceptanceReference.originalTask.role, 'untrusted_background'); assert.equal(input.acceptanceReference.originalTask.content, original.content)
   assert.ok(!JSON.stringify(input.currentWork).includes('ORIGINAL_')); assert.ok(!JSON.stringify(input).includes('PRIVATE_'))
   assert.deepEqual(input.candidates, catalog, 'stage context does not preselect a role or harness')
   const questions = profileDecisionQuestions(catalog)

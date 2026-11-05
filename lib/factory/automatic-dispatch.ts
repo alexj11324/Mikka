@@ -9,7 +9,7 @@ import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding } from './dispatch'
-import { configureFactoryCheck } from './checks'
+import { configureFactoryCheck, currentFactoryRequest } from './checks'
 import { checkFactoryRepairBudget } from './check-recovery-evidence'
 import { observeFactoryProfileDispatch } from './reconcile'
 import { FactoryError, factoryFlowVersion } from './contract'
@@ -55,6 +55,8 @@ export function automaticFactoryDispatch(pool: Pool) {
       WHERE f."taskId"=$1 AND f.stage='execute' ORDER BY f.position DESC LIMIT 1`, [task.id])
     if (!source) throw new FactoryError('factoryRunMismatch')
     const check = task.stage !== 'execute'
+    const checkStage = task.stage === 'review' || task.stage === 'verify' ? task.stage : undefined
+    const candidateId = task.candidateId
     if (checkStart && (!check || checkStart.taskId !== task.id || checkStart.candidateId !== task.candidateId ||
         checkStart.sourceEventId !== task.sourceEventId || checkStart.attemptId === task.attemptId ||
         checkStart.run.deviceKind !== source.deviceKind || checkStart.run.agentDefinition.executionIdentity.workspaceId !==
@@ -92,7 +94,12 @@ export function automaticFactoryDispatch(pool: Pool) {
     }, { issueId: task.issueId, stage: task.stage, location: source.deviceKind === 'cloud' ? 'cloud' : 'local',
       defaultHarness: source.harness, cloudPurpose: source.remoteUrl ? 'task' : 'desktop',
       ...(source.agentDefinition?.pinnedDeviceId ? { deviceId: source.agentDefinition.pinnedDeviceId } : {}),
-    }, { transaction: tx, checkWork }) : undefined
+    }, { transaction: tx, checkWork,
+      ...(checkStage && candidateId ? { independentCheck: async () => ({
+        taskId: task.id, requestEpoch: task.sourceEventId, candidateId, stage: checkStage,
+        currentOwnerRequest: await currentFactoryRequest(tx, task),
+      }) } : {}),
+    }) : undefined
     if (profileChoice?.target.kind === 'none') throw new FactoryError('factoryCheckHarnessUnavailable')
     const { rows: [pending] } = await tx.query('SELECT output,position FROM factory_attempts WHERE id=$1 AND "taskId"=$2', [task.attemptId, task.id])
     const recovery = pending?.output?.watchdogRecovery

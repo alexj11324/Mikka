@@ -53,6 +53,15 @@ type DispatchDependencies = {
   resolve?: typeof resolveModelDispatch
   decision?: typeof invokeDecision
   modelDecision?: typeof invokeDecision
+  /** Host-only work from the locked Factory task, never a client choice or
+   * an execution grant. Read its Owner context only when a Decision is needed. */
+  independentCheck?: () => Promise<{
+    taskId: string
+    requestEpoch: string
+    candidateId: string
+    stage: 'review' | 'verify'
+    currentOwnerRequest: string
+  }>
 }
 type Eligible = { row: ProfileRow; target: Exclude<ModelDispatch, { kind: 'none' }>; public: PublicAgentProfile }
 const requestConstraints = async (pool: Pool, scope: AgentProfileScope, request: Partial<AgentProfileDispatchRequest>) => {
@@ -259,7 +268,8 @@ export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchSco
     const issue = await issueForUser(scope.ownerId, request.issueId)
     if (!issue) throw new AgentProfileError('agentProfileScopeNotFound', 404)
     const catalog = eligible.map(item => item.public)
-    const input = maskFactoryNote(profileDecisionInput({ title: issue.title, content: JSON.stringify(issue.content).slice(0, 12_000), stage: request.stage ?? 'execute', note: request.note?.slice(0, 4000) }, catalog, deps.checkWork))
+    const check = await deps.independentCheck?.()
+    const input = maskFactoryNote(profileDecisionInput({ title: issue.title, content: JSON.stringify(issue.content).slice(0, 12_000), stage: request.stage ?? 'execute', note: request.note?.slice(0, 4000) }, catalog, deps.checkWork, check))
     execution = await hostedBillingScope.run({ workspaceId: scope.workspaceId, ownerId: scope.ownerId }, () => (deps.decision ?? invokeDecision)('factory-agent-profile', input, profileDecisionQuestions(catalog), undefined, { retainInvalidReceipt: true }))
     const result = profileDecisionSelection(catalog, execution?.answers ?? null)
     if ('unavailable' in result) {
