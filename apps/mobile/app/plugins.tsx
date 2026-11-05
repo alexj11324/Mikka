@@ -1,4 +1,5 @@
-import { type ReactElement, useEffect, useMemo, useState } from 'react'
+import { ReadNotice } from '@/components/ReadNotice'
+import { type ReactElement, useEffect, useMemo, useRef, useState } from 'react'
 import { FlatList, Image, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native'
 import * as WebBrowser from 'expo-web-browser'
 import { Puzzle, Search } from 'lucide-react-native'
@@ -97,7 +98,7 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl {...refresh} />}
-      ListHeaderComponent={header}
+      ListHeaderComponent={<>{header}<ReadNotice error={catalog.error || accounts.error} hasData={Boolean(catalog.error ? catalog.data : accounts.data)} label={catalog.error ? "应用目录" : "连接状态"} onRetry={reload} /></>}
       contentContainerStyle={styles.list}
       ListEmptyComponent={catalog.loading ? <View style={styles.center}><Spinner /></View>
         : <Text style={styles.note}>{catalog.error ? '应用加载失败' : needle ? `没有找到「${query.trim()}」` : catalog.data?.configured === false ? '应用商店未配置' : '没有应用'}</Text>}
@@ -108,7 +109,7 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
             <Text style={styles.name} numberOfLines={1}>{row.item.name}</Text>
             {row.item.description ? <Text style={styles.detail} numberOfLines={1}>{row.item.description}</Text> : null}
           </View>
-          {connected.has(row.item.id) ? <Text style={styles.state}>已连接</Text> : row.item.own ? null : <Text style={styles.connect}>连接</Text>}
+          {connected.has(row.item.id) ? <Text style={styles.state}>已连接</Text> : row.item.own ? null : accounts.error ? <Text style={styles.state}>连接状态未知</Text> : <Text style={styles.connect}>连接</Text>}
           <Symbol name="chevron.right" size={13} color={colors.tertiary} />
         </Pressable>
       )}
@@ -129,17 +130,27 @@ function Skills({ query, header }: { query: string; header: ReactElement }) {
   const [pages, setPages] = useState<SkillsPage[]>([])
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
-  const load = async (page: number) => {
-    if (debounced.length === 1) { setPages([]); setLoading(false); return }
-    setLoading(true)
-    setFailed(false)
-    const params = new URLSearchParams({ ...(debounced ? { q: debounced } : {}), ...(page ? { page: String(page) } : {}) })
+  const request = useRef(0), busy = useRef(false), failedPage = useRef(0)
+  const currentQuery = useRef(debounced)
+  currentQuery.current = debounced
+  const load = async (page: number, replace = false) => {
+    if (busy.current && !replace) return
+    const ticket = ++request.current, query = debounced
+    if (query.length === 1) { busy.current = false; setPages([]); setLoading(false); setFailed(false); return }
+    busy.current = true; failedPage.current = page
+    setLoading(true); setFailed(false)
+    const current = () => ticket === request.current && query === currentQuery.current
+    const params = new URLSearchParams({ ...(query ? { q: query } : {}), ...(page ? { page: String(page) } : {}) })
     try {
       const next = await api<SkillsPage>(`/api/skills/search${params.size ? `?${params}` : ''}`)
-      setPages(current => page ? [...current, next] : [next])
-    } catch { setFailed(true) } finally { setLoading(false) }
+      if (current()) setPages(previous => page ? [...previous, next] : [next])
+    } catch { if (current()) setFailed(true) }
+    finally { if (current()) { busy.current = false; setLoading(false) } }
   }
-  useEffect(() => { void load(0) }, [debounced])
+  useEffect(() => {
+    setPages([]); void load(0, true)
+    return () => { request.current++; busy.current = false }
+  }, [debounced])
   const refresh = useRefresh(() => load(0))
   const skills = pages.flatMap(page => page.data)
   const hasMore = Boolean(pages.at(-1)?.hasMore)
@@ -152,13 +163,13 @@ function Skills({ query, header }: { query: string; header: ReactElement }) {
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl {...refresh} />}
-      ListHeaderComponent={header}
+      ListHeaderComponent={<>{header}<ReadNotice error={failed} hasData={pages.length > 0} label="技能" onRetry={() => load(failedPage.current)} /></>}
       contentContainerStyle={styles.list}
       onEndReachedThreshold={0.6}
       onEndReached={() => { if (hasMore && !loading && !failed) void load(pages.length) }}
       ListFooterComponent={loading && skills.length ? <View style={styles.center}><Spinner /></View> : undefined}
       ListEmptyComponent={loading ? <View style={styles.center}><Spinner /></View>
-        : <Text style={styles.note}>{failed ? '技能加载失败' : debounced.length === 1 ? '再多输入一个字' : `没有找到「${debounced}」`}</Text>}
+        : failed ? undefined : <Text style={styles.note}>{debounced.length === 1 ? '再多输入一个字' : debounced ? `没有找到「${debounced}」` : '没有技能'}</Text>}
       renderItem={({ item }) => (
         <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync(item.url)} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
           <View style={[styles.icon, styles.iconBlank]}><Symbol name="sparkles" size={16} color={colors.secondary} web={<Puzzle size={16} color={colors.secondary} />} /></View>
@@ -176,8 +187,8 @@ function Skills({ query, header }: { query: string; header: ReactElement }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
   header: { gap: 12, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
-  search: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 40, borderRadius: 20, paddingHorizontal: 14, backgroundColor: colors.bubble },
-  searchInput: { flex: 1, minWidth: 0, width: 0, height: 40, fontSize: 16, fontFamily: font, color: colors.text, outlineStyle: 'none' } as never,
+  search: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, borderRadius: 22, paddingHorizontal: 14, backgroundColor: colors.bubble },
+  searchInput: { flex: 1, minWidth: 0, width: 0, minHeight: 44, fontSize: 16, fontFamily: font, color: colors.text, outlineStyle: 'none' } as never,
   list: { paddingBottom: 32 },
   section: { fontSize: 13, color: colors.secondary, marginLeft: 20, marginTop: 18, marginBottom: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, paddingHorizontal: 20, paddingVertical: 8 },

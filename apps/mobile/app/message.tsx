@@ -1,11 +1,11 @@
-import { Pressable, StyleSheet, View } from 'react-native'
+import { Platform, Pressable, StyleSheet, View } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import { useRouter } from 'expo-router'
 import { Copy, Reply, TextSelect } from 'lucide-react-native'
 import { Row } from '@/components/settings'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
-import { Group } from '@/components/ui'
+import { CloseButton, Group } from '@/components/ui'
 import { tap } from '@/lib/haptics'
 import { heldMessage, REACTIONS } from '@/lib/message-actions'
 import { colors } from '@/lib/theme'
@@ -23,6 +23,10 @@ export default function MessageActions() {
   const react = message.react
   return (
     <View style={styles.sheet}>
+      {Platform.OS === 'web' ? <View style={styles.webHeader}>
+        <Text accessibilityRole="header" style={styles.title}>消息操作</Text>
+        <CloseButton onPress={() => close()} />
+      </View> : null}
       {react ? (
         <View style={styles.reactions}>
           {REACTIONS.map(emoji => (
@@ -50,6 +54,8 @@ export default function MessageActions() {
 
 const styles = StyleSheet.create({
   sheet: { flex: 1, backgroundColor: colors.grouped, paddingHorizontal: 16, paddingTop: 24 },
+  webHeader: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  title: { fontSize: 20, fontWeight: '600', color: colors.ink },
   reactions: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.surface, borderRadius: 26, padding: 6, marginBottom: 20 },
   emoji: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   emojiOn: { backgroundColor: colors.bubble },

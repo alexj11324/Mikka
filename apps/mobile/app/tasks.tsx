@@ -1,3 +1,4 @@
+import { ReadNotice } from '@/components/ReadNotice'
 import { Pressable, RefreshControl, SectionList, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ArrowUpRight, Circle, CircleCheck, CircleDashed, CircleDot, CircleX } from 'lucide-react-native'
@@ -44,7 +45,8 @@ export default function TasksScreen() {
         {...underBar}
         refreshControl={<RefreshControl {...refresh} />}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-        ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : <Text style={styles.empty}>{error ? '任务加载失败。' : '还没有任务。'}</Text>}
+        ListHeaderComponent={<ReadNotice error={error} hasData={Boolean(data)} label="任务" onRetry={reload} />}
+        ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : error ? undefined : <Text style={styles.empty}>还没有任务。</Text>}
         renderSectionHeader={({ section }) => <Text style={styles.section}>{section.title}</Text>}
         renderItem={({ item }) => (
           // The task opens on the web, signed in: issue editing stays there (mobile.md, out of scope).
@@ -63,7 +65,7 @@ export default function TasksScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
   section: { fontSize: 13, color: colors.secondary, marginLeft: 20, marginTop: 16, marginBottom: 6 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, height: 48 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, minHeight: 48, paddingVertical: 10 },
   key: { fontSize: 13, color: colors.secondary, minWidth: 56 },
   title: { flex: 1, fontSize: 16 },
   empty: { textAlign: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },

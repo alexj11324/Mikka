@@ -1,11 +1,12 @@
+import { ReadNotice } from '@/components/ReadNotice'
 import { useEffect, useState } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
 import { Spinner } from '@/components/icons'
 import { Markdown } from '@/components/Markdown'
 import { NavBar, underBar } from '@/components/NavBar'
-import { Text } from '@/components/Text'
-import { authHeaders } from '@/lib/api'
+import { authHeaders, REQUEST_TIMEOUT_MS } from '@/lib/api'
+import { apiCache } from '@/lib/api-cache'
 import { API_URL } from '@/lib/config'
 import { colors } from '@/lib/theme'
 
@@ -14,25 +15,29 @@ export default function ArtifactScreen() {
   const { id, v, title } = useLocalSearchParams<{ id: string; v: string; title?: string }>()
   const [text, setText] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     let alive = true
+    const context = apiCache.context(), controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    setText(null); setFailed(false)
     void (async () => {
       try {
-        const response = await fetch(`${API_URL}/api/artifacts/${id}/versions/${v}/download`, { headers: await authHeaders() })
+        const response = await fetch(`${API_URL}/api/artifacts/${id}/versions/${v}/download`, { headers: await authHeaders(), credentials: 'include', signal: controller.signal })
         if (!response.ok) throw new Error(String(response.status))
         const body = await response.text()
-        if (alive) setText(body)
+        if (alive) apiCache.commit(context, () => setText(body))
       } catch {
-        if (alive) setFailed(true)
-      }
+        if (alive) apiCache.commit(context, () => setFailed(true))
+      } finally { clearTimeout(timer) }
     })()
-    return () => { alive = false }
-  }, [id, v])
+    return () => { alive = false; controller.abort(); clearTimeout(timer) }
+  }, [id, v, attempt])
   return (
     <View style={styles.screen}>
       <NavBar title={title ?? ''} />
       <ScrollView {...underBar} contentContainerStyle={styles.body}>
-        {text !== null ? <Markdown text={text} /> : failed ? <Text style={styles.note}>没能打开</Text> : <View style={styles.center}><Spinner /></View>}
+        {text !== null ? <Markdown text={text} /> : failed ? <ReadNotice error label="文档" onRetry={() => setAttempt(current => current + 1)} /> : <View style={styles.center}><Spinner /></View>}
       </ScrollView>
     </View>
   )

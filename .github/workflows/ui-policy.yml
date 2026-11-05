@@ -158,6 +158,7 @@ jobs:
           pnpm --filter @mikka/protocol exec vitest run src/run.test.ts
           pnpm --filter @mikka/daemon exec vitest run test/factory-check.test.ts test/runs.test.ts test/hardening.test.ts src/permissions.test.ts
       - run: pnpm test:mobile-push
+      - run: pnpm test:mobile
       - run: pnpm test:coordinator-native-relay
       - run: pnpm test:coordinator-native-scope
       - run: pnpm test:coordinator-issue-tools
