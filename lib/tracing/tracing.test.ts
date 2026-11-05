@@ -97,7 +97,7 @@ describe('server tracing', () => {
     provider.register()
     registerInstrumentations({ tracerProvider: provider, instrumentations: [createPgInstrumentation()] })
     // Loaded after the instrumentation hooks require, as lib/db is after instrumentation.ts.
-    const { Pool } = createRequire(import.meta.url)('pg') as typeof import('pg')
+    const { Pool } = createRequire(import.meta.url)('pg') as { Pool: typeof PgPool }
     server = fakePostgres()
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
     const { port } = server.address() as AddressInfo
