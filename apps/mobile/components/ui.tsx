@@ -40,6 +40,18 @@ export function RoundButton({ onPress, children, label, dot, disabled = false, b
   )
 }
 
+/**
+ * A text action that floats over or beside content (重试): a capsule of the system's interactive Liquid Glass on
+ * iOS 26, a white lifted capsule on earlier iOS and the web, so it never blends into the grey bubbles around it.
+ */
+export function GlassButton({ label, onPress, busy = false, disabled = false }: { label: string; onPress: () => void; busy?: boolean; disabled?: boolean }) {
+  const blocked = disabled || busy
+  const content = <>{busy ? <Spinner size={14} color={colors.secondary} /> : null}<Text style={styles.glassLabel}>{label}</Text></>
+  const a11y = { accessibilityRole: 'button' as const, accessibilityState: { disabled: blocked, busy }, 'aria-disabled': Platform.OS === 'web' ? blocked : undefined, 'aria-busy': Platform.OS === 'web' ? busy : undefined, disabled: blocked, onPress }
+  if (glass) return <Pressable {...a11y} style={blocked ? { opacity: 0.4 } : undefined}><GlassView isInteractive={!blocked} style={styles.glassCapsule}>{content}</GlassView></Pressable>
+  return <Pressable {...a11y} style={({ pressed }) => [styles.glassCapsule, styles.liftedCapsule, blocked && { opacity: 0.4 }, pressed && { backgroundColor: colors.pressed }]}>{content}</Pressable>
+}
+
 export function BackButton({ onPress }: { onPress: () => void }) {
   return <RoundButton label="返回" onPress={onPress}><ChevronLeft size={22} color={colors.ink} strokeWidth={2.2} /></RoundButton>
 }
@@ -202,13 +214,13 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
             {accessory}
             <View style={{ flex: 1 }} />
             {onStop && empty && !sending ? (
-              <Pressable accessibilityRole="button" accessibilityLabel="停止" onPress={() => { tap(); onStop() }} style={styles.send}>
-                <Square size={14} color={colors.onAccent} fill={colors.onAccent} strokeWidth={2.4} />
+              <Pressable accessibilityRole="button" accessibilityLabel="停止" hitSlop={4} onPress={() => { tap(); onStop() }} style={styles.send}>
+                <Square size={12} color={colors.onAccent} fill={colors.onAccent} strokeWidth={2.4} />
               </Pressable>
             ) : (
-              <Pressable accessibilityRole="button" accessibilityLabel="发送" accessibilityState={{ disabled: sendBlocked, busy: sending }} aria-disabled={Platform.OS === 'web' ? sendBlocked : undefined} aria-busy={Platform.OS === 'web' ? sending : undefined} onPress={() => void send()} disabled={sendBlocked}
+              <Pressable accessibilityRole="button" accessibilityLabel="发送" hitSlop={4} accessibilityState={{ disabled: sendBlocked, busy: sending }} aria-disabled={Platform.OS === 'web' ? sendBlocked : undefined} aria-busy={Platform.OS === 'web' ? sending : undefined} onPress={() => void send()} disabled={sendBlocked}
                 style={[styles.send, sendBlocked && { backgroundColor: colors.tertiary }]}>
-                <ArrowUp size={20} color={colors.onAccent} strokeWidth={2.4} />
+                <ArrowUp size={17} color={colors.onAccent} strokeWidth={2.4} />
               </Pressable>
             )}
           </View>
@@ -267,6 +279,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 17, fontWeight: '600' },
   subtitle: { fontSize: 11, color: colors.secondary, marginTop: 1 },
   glassRound: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  glassCapsule: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 36, paddingHorizontal: 16, borderRadius: 18 },
+  liftedCapsule: { backgroundColor: colors.surface, ...lift },
+  glassLabel: { fontSize: 15, fontWeight: '600', color: colors.ink },
   composerWrap: { paddingHorizontal: 16, paddingTop: 10, gap: 8 },
   overlay: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   // What scrolls under the composer fades out, as under the iOS bar at the top.
@@ -286,7 +301,8 @@ const styles = StyleSheet.create({
   removeMark: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   attachmentAction: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   problem: { fontSize: 13, color: colors.danger },
-  send: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accentFill, alignItems: 'center', justifyContent: 'center' },
+  // 36 points, as the Claude and ChatGPT apps' send button; its hitSlop keeps the 44-point target.
+  send: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.accentFill, alignItems: 'center', justifyContent: 'center', margin: 4 },
   groupLabel: { fontSize: 13, color: colors.secondary, marginLeft: 16, marginBottom: 7 },
   group: { backgroundColor: colors.surface, borderRadius: 14, overflow: 'hidden' },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginLeft: 16 },

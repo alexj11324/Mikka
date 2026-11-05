@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View, type ScrollViewInstance } from 'react-native'
 import { ChatScrollView } from '@/components/ChatScrollView'
+import { GestureDetector } from 'react-native-gesture-handler'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BotAvatar, Spinner } from '@/components/icons'
@@ -8,8 +9,7 @@ import { BotBubble, CopyButton, MyBubble, Reactions, TimedRow, useTimeReveal } f
 import { Markdown } from '@/components/Markdown'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Text } from '@/components/Text'
-import { Composer } from '@/components/ui'
-import { CardButton } from '@/components/cards'
+import { Composer, GlassButton } from '@/components/ui'
 import { ReadNotice } from '@/components/ReadNotice'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { StopFailed } from '@/components/StopFailed'
@@ -42,7 +42,7 @@ export default function GroupChat() {
   const home = useHome()
   const me = home.data?.user.id
   const scroll = useRef<ScrollViewInstance>(null)
-  const { offset, handlers } = useTimeReveal()
+  const { offset, gesture: timeReveal, scrollLocked } = useTimeReveal()
   const apiContext = apiCache.context()
   const chatScroll = useChatScroll(scroll, `${id}:${apiContext}`)
   const [composerHeight, setComposerHeight] = useState(90)
@@ -163,14 +163,15 @@ export default function GroupChat() {
   return (
     <View style={styles.screen}>
       <NavBar title={title} material />
-      <View style={{ flex: 1, overflow: 'hidden' }} {...handlers}>
-        <ChatScrollView ref={scroll} testID="group-chat-scroll" bounces alwaysBounceVertical {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd"
+      <GestureDetector gesture={timeReveal}>
+      <View style={{ flex: 1, overflow: 'hidden' }}>
+        <ChatScrollView scrollEnabled={!scrollLocked} ref={scroll} testID="group-chat-scroll" bounces alwaysBounceVertical {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd"
           contentContainerStyle={[styles.list, { paddingBottom: composerHeight + 16 }]} onScroll={chatScroll.onScroll} scrollEventThrottle={16} onContentSizeChange={chatScroll.onContentSizeChange}>
           {!page.data && !page.error ? <View style={styles.loading}><Spinner /></View> : null}
           <ReadNotice error={page.error} hasData={Boolean(page.data)} label="群聊" onRetry={page.reload} />
           <ReadNotice error={reactionState.error} hasData={reactionSnapshot?.identity === identity} label="回应" onRetry={reactionState.reload} />
           <ReadNotice error={members.error} hasData={Boolean(members.data)} label="群成员" onRetry={members.reload} />
-          {before ? <View style={styles.history}><CardButton label="加载更早消息" busy={loadingHistory} onPress={() => void loadEarlier()} /></View> : null}
+          {before ? <View style={styles.history}><GlassButton label="加载更早消息" busy={loadingHistory} onPress={() => void loadEarlier()} /></View> : null}
           <ReadNotice error={historyError} label="更早消息" onRetry={loadEarlier} />
           {messages.map((message, index) => {
             const time = clockTime(message.createdAt)
@@ -206,10 +207,11 @@ export default function GroupChat() {
           {stopFailed ? <StopFailed busy={stopping} onRetry={() => void stop()} /> : null}
         </ChatScrollView>
       </View>
+      </GestureDetector>
       <ChatScrollToLatest visible={!chatScroll.atEnd} bottom={composerHeight + 8} onPress={chatScroll.toLatest} />
       <OfflineBanner top={insets.top + 66} />
       <Composer value={text} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} attach attachmentScope={{ kind: 'group', id }} overlay onHeight={setComposerHeight}
-        notice={reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><CardButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : undefined}
+        notice={reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : undefined}
         quote={quote} onClearQuote={() => setQuote(null)} onStop={working && !stopping ? () => void stop() : undefined} />
     </View>
   )

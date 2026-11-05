@@ -1,9 +1,9 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import * as Clipboard from 'expo-clipboard'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import Reanimated, { cancelAnimation, FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
+import Reanimated, { cancelAnimation, FadeInDown, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
-import { AccessibilityInfo, Animated, Image, PanResponder, Platform, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
+import { AccessibilityInfo, Image, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
 import { Check, CircleAlert, Copy, Ellipsis, Reply } from 'lucide-react-native'
 import { CardButton } from '@/components/cards'
 import { MessageMenu, NATIVE_MESSAGE_MENU } from '@/components/MessageMenu'
@@ -106,7 +106,7 @@ export function OutgoingBubble({ text, photos, failed, unconfirmed = false, onRe
 export function ThreadCard({ title, status, info, onPress, action }: { title: string; status: ThreadStatus; info?: string | null; onPress: () => void; action?: string }) {
   const body = (
     <>
-      <StatusIcon status={status} size={20} />
+      <StatusIcon status={status} size={18} />
       <View style={{ flex: 1 }}>
         <Text style={styles.threadTitle} numberOfLines={1}>{title}</Text>
         {info ? <Text style={styles.threadInfo} numberOfLines={1}>{info}</Text> : null}
@@ -147,34 +147,40 @@ export function EventLine({ text }: { text: string }) {
 const REVEAL = 56
 
 /**
- * Message times are hidden; dragging the chat from right to left reveals each
- * message's time on the right, as in iMessage (Figma 01b).
+ * Message times are hidden; dragging the chat from right to left reveals each message's time on the right, as in
+ * Messages (Figma 01b). One shared value for every row, on the UI thread (expo-animation: Gesture Handler and
+ * Reanimated, never PanResponder). The drag locks to an axis, as Messages does: it starts only when the finger moves
+ * mostly left, and fails once it moves mostly up or down, so a scroll that has begun keeps the list; while the reveal
+ * is on, the list stops scrolling (`scrollLocked`), because a vertical UIScrollView's own pan also starts on a
+ * sideways drag. Past the times it rubber-bands, and SNAP_BACK brings it home with the finger's velocity.
  */
 export function useTimeReveal() {
-  const offset = useRef(new Animated.Value(0)).current
+  const offset = useSharedValue(0)
+  const start = useSharedValue({ x: 0, y: 0 })
   const reduceMotion = useReducedMotionPreference()
-  const preference = useRef(reduceMotion)
-  preference.current = reduceMotion
-  useEffect(() => {
-    if (reduceMotion) { offset.stopAnimation(); offset.setValue(0) }
-    return () => offset.stopAnimation()
-  }, [offset, reduceMotion])
-  const responder = useMemo(() => {
-    const reset = () => {
-      offset.stopAnimation()
-      if (preference.current) offset.setValue(0)
-      else Animated.spring(offset, { toValue: 0, useNativeDriver: Platform.OS !== 'web', ...SNAP_BACK }).start()
-    }
-    return PanResponder.create({
-    onMoveShouldSetPanResponder: (_, g) => g.dx < -8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
-    onPanResponderGrant: () => offset.stopAnimation(),
-    // Past the times the drag meets rubber-band resistance instead of a wall.
-    onPanResponderMove: (_, g) => offset.setValue(g.dx >= -REVEAL ? Math.min(0, g.dx) : -REVEAL - rubberBand(-g.dx - REVEAL, REVEAL / 2)),
-    onPanResponderRelease: reset,
-    onPanResponderTerminate: reset,
+  const [scrollLocked, setScrollLocked] = useState(false)
+  useEffect(() => { if (reduceMotion) { cancelAnimation(offset); offset.set(0) } }, [offset, reduceMotion])
+  const gesture = useMemo(() => Gesture.Pan()
+    .manualActivation(true)
+    .onTouchesDown(event => { const touch = event.allTouches[0]; if (touch) start.set({ x: touch.absoluteX, y: touch.absoluteY }) })
+    .onTouchesMove((event, state) => {
+      const touch = event.allTouches[0]
+      if (!touch) return
+      const dx = touch.absoluteX - start.get().x, dy = touch.absoluteY - start.get().y
+      if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) state.fail()
+      else if (dx < -10 && Math.abs(dx) > 1.5 * Math.abs(dy)) state.activate()
     })
-  }, [offset])
-  return { offset, handlers: responder.panHandlers }
+    .onStart(() => { cancelAnimation(offset); scheduleOnRN(setScrollLocked, true) })
+    .onUpdate(event => {
+      const x = -event.translationX
+      offset.set(x <= REVEAL ? -Math.max(0, x) : -REVEAL - rubberBand(x - REVEAL, REVEAL / 2))
+    })
+    // Also after a cancelled drag: the list never stays locked. Unlocking an unlocked list renders nothing.
+    .onFinalize(event => {
+      offset.set(reduceMotion ? 0 : withSpring(0, { ...SNAP_BACK, velocity: event.velocityX }))
+      scheduleOnRN(setScrollLocked, false)
+    }), [offset, reduceMotion, start])
+  return { offset, gesture, scrollLocked }
 }
 
 /** How far a message is dragged right before letting go quotes it. */
@@ -186,7 +192,7 @@ const QUOTE_AT = 56
  * arrow behind it; letting go past the mark quotes it in the composer, with a
  * tick, as in iMessage and Claude. A spring takes it back on the UI thread.
  */
-export function TimedRow({ time, offset, children, align = 'left', onQuote, onLongPress, menu }: { time?: string; offset: Animated.Value; children: ReactNode; align?: 'left' | 'right'; onQuote?: () => void; onLongPress?: () => void; menu?: HeldMessage }) {
+export function TimedRow({ time, offset, children, align = 'left', onQuote, onLongPress, menu }: { time?: string; offset: SharedValue<number>; children: ReactNode; align?: 'left' | 'right'; onQuote?: () => void; onLongPress?: () => void; menu?: HeldMessage }) {
   const drag = useSharedValue(0)
   const reduceMotion = useReducedMotionPreference()
   const quote = useCallback(() => { tap(); onQuote?.() }, [onQuote])
@@ -211,19 +217,20 @@ export function TimedRow({ time, offset, children, align = 'left', onQuote, onLo
   const native = NATIVE_MESSAGE_MENU && Boolean(menu)
   const long = Gesture.LongPress().enabled(Boolean(onLongPress) && !native).minDuration(380).onStart(() => { scheduleOnRN(held) })
   const moved = useAnimatedStyle(() => ({ transform: [{ translateX: drag.value }] }))
+  const revealed = useAnimatedStyle(() => ({ transform: [{ translateX: offset.get() }] }))
   const arrow = useAnimatedStyle(() => ({ opacity: Math.min(1, drag.value / QUOTE_AT), transform: [{ scale: reduceMotion ? 1 : 0.6 + 0.4 * Math.min(1, drag.value / QUOTE_AT) }] }))
   return (
     <View>
     <GestureDetector gesture={Gesture.Race(pan, long)}>
       <Reanimated.View>
         <Reanimated.View style={[styles.quoteArrow, arrow]} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
-          <Symbol name="arrowshape.turn.up.left" size={16} color={colors.secondary} web={<Reply size={16} color={colors.secondary} />} />
+          <Symbol name="arrowshape.turn.up.left" size={15} color={colors.secondary} web={<Reply size={15} color={colors.secondary} />} />
         </Reanimated.View>
         <Reanimated.View style={moved}>
-          <Animated.View style={{ transform: [{ translateX: offset }], alignItems: align === 'right' ? 'flex-end' : 'stretch' }}>
+          <Reanimated.View style={[revealed, { alignItems: align === 'right' ? 'flex-end' : 'stretch' }]}>
             {native ? <MessageMenu message={menu}><View style={{ alignItems: align === 'right' ? 'flex-end' : 'stretch' }}>{children}</View></MessageMenu> : children}
             {time ? <Text style={styles.time}>{time}</Text> : null}
-          </Animated.View>
+          </Reanimated.View>
         </Reanimated.View>
       </Reanimated.View>
     </GestureDetector>
@@ -256,11 +263,11 @@ export function ReplyActions({ text, onQuote, onMore }: { text: string; onQuote:
   return (
     <View style={styles.replyActions}>
       <CopyButton text={text} />
-      <Pressable accessibilityRole="button" accessibilityLabel="回复" onPress={() => { tap(); onQuote() }} style={({ pressed }) => [styles.copy, pressed && { backgroundColor: colors.pressed }]}>
-        <Symbol name="arrowshape.turn.up.left" size={15} color={colors.secondary} web={<Reply size={15} color={colors.secondary} />} />
+      <Pressable accessibilityRole="button" accessibilityLabel="回复" hitSlop={6} onPress={() => { tap(); onQuote() }} style={({ pressed }) => [styles.copy, pressed && { backgroundColor: colors.pressed }]}>
+        <Symbol name="arrowshape.turn.up.left" size={14} color={colors.secondary} web={<Reply size={14} color={colors.secondary} />} />
       </Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="更多" onPress={onMore} style={({ pressed }) => [styles.copy, pressed && { backgroundColor: colors.pressed }]}>
-        <Symbol name="ellipsis" size={15} color={colors.secondary} web={<Ellipsis size={15} color={colors.secondary} />} />
+      <Pressable accessibilityRole="button" accessibilityLabel="更多" hitSlop={6} onPress={onMore} style={({ pressed }) => [styles.copy, pressed && { backgroundColor: colors.pressed }]}>
+        <Symbol name="ellipsis" size={14} color={colors.secondary} web={<Ellipsis size={14} color={colors.secondary} />} />
       </Pressable>
     </View>
   )
@@ -279,8 +286,8 @@ export function CopyButton({ text }: { text: string }) {
     setTimeout(() => setCopied(false), 1500)
   }
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={copied ? '已复制' : '复制'} onPress={() => void copy()} style={({ pressed }) => [styles.copy, pressed && { backgroundColor: colors.pressed }]}>
-      <Symbol name={copied ? 'checkmark' : 'doc.on.doc'} size={15} color={colors.secondary} web={copied ? <Check size={15} color={colors.secondary} /> : <Copy size={15} color={colors.secondary} />} />
+    <Pressable accessibilityRole="button" accessibilityLabel={copied ? '已复制' : '复制'} hitSlop={6} onPress={() => void copy()} style={({ pressed }) => [styles.copy, pressed && { backgroundColor: colors.pressed }]}>
+      <Symbol name={copied ? 'checkmark' : 'doc.on.doc'} size={14} color={colors.secondary} web={copied ? <Check size={14} color={colors.secondary} /> : <Copy size={14} color={colors.secondary} />} />
     </Pressable>
   )
 }
@@ -328,9 +335,10 @@ const styles = StyleSheet.create({
   event: { alignSelf: 'center', textAlign: 'center', fontSize: 12, lineHeight: 17, color: colors.secondary, marginHorizontal: 24 },
   time: { position: 'absolute', right: -REVEAL + 6, bottom: 4, fontSize: 11, color: colors.secondary },
   quoteArrow: { position: 'absolute', left: 4, top: 0, bottom: 0, justifyContent: 'center' },
-  copy: { alignSelf: 'flex-start', minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
+  // A 32-point button whose 6-point hitSlop keeps the 44-point target (the glyph at text size, as in ChatGPT and Claude).
+  copy: { alignSelf: 'flex-start', width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   // The icons' own 44-point targets sit flush with the bubble's left edge, a little under it.
-  replyActions: { flexDirection: 'row', alignSelf: 'flex-start', marginLeft: -12, marginTop: -2, marginBottom: -10 },
+  replyActions: { flexDirection: 'row', alignSelf: 'flex-start', gap: 4, marginLeft: -8, marginTop: -4, marginBottom: -4 },
 })
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { ChatFiles } from './ChatFiles'
