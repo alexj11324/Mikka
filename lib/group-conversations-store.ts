@@ -151,6 +151,14 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         const after = before == null && req.after != null ? decimal(req.after, '') : null
         const limit = Number(decimal(req.limit, '50'))
         if (limit > 100) return fail(422)
+        // The newest page carries the group key's revision, read before the page itself.
+        // Best effort, in a savepoint: a missing revision only means the next push reads.
+        let revision = 0
+        if (before == null) {
+          await q('SAVEPOINT live_revision')
+          try { revision = Number((await q(`SELECT revision::text FROM live_revisions WHERE kind='group_chat' AND id=$1`, [req.id])).rows[0]?.revision ?? 0); await q('RELEASE SAVEPOINT live_revision') }
+          catch { await q('ROLLBACK TO SAVEPOINT live_revision') }
+        }
         // A poll that already has the latest message reads who is answering, not the page again.
         const tip = after == null ? null : (await q(`SELECT "lastPosition"::text AS position FROM conversations WHERE id=$1`, [req.id])).rows[0]
         const idle = after != null && tip != null && BigInt(tip.position) <= BigInt(after)
@@ -187,6 +195,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         result = { messages, timeline, nextBefore: more ? messages.at(-1)?.position : null, agentStatus: active.rows[0] ?? null,
           ...(idle ? { unchanged: true } : {}),
           ...(appended ? { appended: true } : {}),
+          ...(revision > 0 ? { revision } : {}),
           ...(queueAgents ? { leadAgentId: group.leadAgentId ?? null, leadBotId: group.leadBotId ?? null, routingError: ['group_judgment_pending','group_lead_required'].includes(failed.rows[0]?.error) ? { code: 'group_judgment_pending' } : null, stopped: failed.rows[0]?.error === GROUP_TURN_STOPPED } : {}) }
       } else if (req.resource === 'messages' && req.method === 'POST') {
         const input = parse(message, req.body)

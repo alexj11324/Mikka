@@ -172,12 +172,13 @@ function liveChannel(owner, workspace) {
   return createHash('sha256').update(JSON.stringify([owner, workspace])).digest('hex')
 }
 
-function liveSocket(channel, exp, Client = WebSocket) {
-  const socket = new Client(`${origin.replace('http:', 'ws:')}/v1/live/${channel}/socket`, ticket(`live:${channel}`, exp))
+function liveSocket(channel, exp, Client = WebSocket, version = 1) {
+  const socket = new Client(`${origin.replace('http:', 'ws:')}/v1/live/${channel}/socket${version === 2 ? '?revisions=1' : ''}`, ticket(`live:${channel}`, exp))
   sockets.add(socket)
   socket.liveReady = event(socket, 'message').then(message => {
     const value = JSON.parse(message.data)
-    assert.equal(value.type, 'live_ready'); assert.equal(value.version, 1)
+    assert.equal(value.type, 'live_ready'); assert.equal(value.version, version)
+    assert.equal(Object.keys(value).length, version === 2 ? 4 : 3, 'a version 1 reader accepts exactly three fields')
     assert.ok(value.kinds.includes('approved_writes') && value.kinds.includes('approved_write'))
     return value
   })
@@ -227,6 +228,25 @@ test('real browser tabs multicast within one owner/workspace and isolate peers a
   assert.deepEqual(elsewhereEvents, [marker])
   assert.deepEqual(peerEvents, [marker])
   for (const socket of [first, second, elsewhere, peer]) socket.close(1000, 'done')
+})
+
+test('a version 1 tab gets the plain key while a version 2 tab on the same channel gets its revision', async () => {
+  const channel = liveChannel('revision-owner', 'workspace-one')
+  const older = liveSocket(channel), newer = liveSocket(channel, undefined, WebSocket, 2)
+  await Promise.all([older, newer].map(socket => event(socket, 'open')))
+  assert.ok((await newer.liveReady).revisions.includes('bot_chat'))
+  await older.liveReady
+  const key = { kind: 'bot_chat', id: deviceId }
+  const received = [event(older, 'message'), event(newer, 'message')]
+  await pushLive(channel, [{ ...key, rev: 41 }])
+  assert.deepEqual((await Promise.all(received)).map(message => JSON.parse(message.data)), [key, { ...key, rev: 41 }])
+  // A key without a revision reaches both unchanged; a revision on a kind without one is refused.
+  const plain = [event(older, 'message'), event(newer, 'message')]
+  await pushLive(channel, [key])
+  assert.deepEqual((await Promise.all(plain)).map(message => JSON.parse(message.data)), [key, key])
+  const refused = await fetch(`${origin}/v1/live/${channel}/push`, { method: 'POST', headers: { authorization: `Bearer ${secret}` }, body: JSON.stringify([{ kind: 'factory_task', id: deviceId, rev: 1 }]) })
+  assert.equal(refused.status, 400)
+  for (const socket of [older, newer]) socket.close(1000, 'done')
 })
 
 test('an expired browser ticket cannot receive later invalidations on an existing socket', async () => {

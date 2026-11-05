@@ -74,7 +74,9 @@ export function GroupChatView({ group, userId, people }: {
     { revalidateOnFocus: false },
   )
   // While the live channel is down, the live layer falls back to one read a minute.
-  useLiveKey('group_chat', group.id, [infiniteKey(pageKey(group.id)), unstable_serialize(groupMembersKey(group.id))], group.workspaceId, { minIntervalMs: GROUP_MERGE_MS })
+  // Only the pages hold the group's revision (its newest page); the members always read.
+  const pagesKey = infiniteKey(pageKey(group.id))
+  useLiveKey('group_chat', group.id, [pagesKey, unstable_serialize(groupMembersKey(group.id))], group.workspaceId, { minIntervalMs: GROUP_MERGE_MS, revisions: { [pagesKey]: pages?.[0]?.revision } })
   const messages = pages ? chronological(pages) : []
   const reactions = useMessageReactions(messages.map(message => message.id))
   const older = pages?.at(-1)?.nextBefore ?? null
