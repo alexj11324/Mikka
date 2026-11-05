@@ -21,7 +21,7 @@ async function prefetch() {
 /**
  * True once a newer JS update has been downloaded (decision
  * 2026-10-31-2010-ota-updates). Checks on launch and whenever the app comes
- * back to the foreground; the drawer then offers 重启以更新.
+ * back to the foreground; the account sheet and 对话 then offer 重启以更新.
  */
 export function useUpdateReady(): boolean {
   const { isUpdatePending } = Updates.useUpdates()

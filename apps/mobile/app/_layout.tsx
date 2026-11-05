@@ -55,6 +55,8 @@ function SessionGate() {
         <Stack.Screen name="new-bot" options={{ presentation: 'modal' }} />
         <Stack.Screen name="new-group" options={{ presentation: 'modal' }} />
         <Stack.Screen name="message-text" options={{ presentation: 'modal' }} />
+        {/* The account sheet (#1386 item 8): the system page sheet, swipe down to close. */}
+        <Stack.Screen name="account" options={{ presentation: 'modal', contentStyle: { backgroundColor: colors.grouped } }} />
         <Stack.Screen name="settings" options={{ presentation: 'modal', headerShown: false, ...(Platform.OS === 'ios' ? {} : { animation: 'slide_from_bottom' }) }} />
       </Stack>
     </HomeProvider>

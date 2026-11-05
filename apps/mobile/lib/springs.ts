@@ -5,8 +5,6 @@
  */
 /** A dragged message coming back (swipe to quote, the time reveal): ζ ≈ 0.73, about 4% overshoot, ~0.35 s. */
 export const SNAP_BACK = { mass: 1, stiffness: 320, damping: 26 }
-/** The side drawer opening or closing: ζ ≈ 0.82, about 1% overshoot plus the finger's speed, ~0.4 s. */
-export const DRAWER = { mass: 0.9, stiffness: 300, damping: 27 }
 /** A new message arriving: rises 8 pt and fades in, ζ ≈ 0.8, ~0.3 s. */
 export const ENTER = { mass: 1, stiffness: 380, damping: 31 }
 
