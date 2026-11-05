@@ -2,6 +2,9 @@ import { z } from 'zod'
 import { digest } from '@/lib/agent-kit/definition'
 import type { OrderEntry } from '@/lib/model-order-plan'
 import type { DecisionExecution } from '@/lib/coordinator/decide'
+import { BUILTIN_AGENT_PROFILE_ID } from './agent-profile-reference'
+
+export { BUILTIN_AGENT_PROFILE_ID } from './agent-profile-reference'
 
 const harness = z.enum(['claude_code', 'codex'])
 const source = z.discriminatedUnion('kind', [
@@ -60,7 +63,6 @@ export function agentProfileInstructions(definition: AgentProfileDefinition, ski
 
 /** This immutable receipt documents the zero-configuration route; it grants no
  * capabilities and does not create a mutable profile row. */
-export const BUILTIN_AGENT_PROFILE_ID = 'default'
 export const BUILTIN_AGENT_PROFILE_VERSION = 1
 export function builtinAgentProfileDefinition(): AgentProfileDefinition {
   return parseAgentProfile({ name: 'Default Agent', description: '', roles: [], enabled: true, harness: 'auto', model: { mode: 'inherit' }, instructions: '', skills: [] })

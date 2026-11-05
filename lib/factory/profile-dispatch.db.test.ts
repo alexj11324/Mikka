@@ -89,15 +89,17 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   const model = { claude_code: 'claude-haiku-5-5', codex: 'gpt-6-luna' } as const
   const caps = () => (['claude_code', 'codex'] as const).map(harness => ({ harness, installed: true, models: [model[harness]], subscriptionBroker: true, computerBroker: true }))
   const template = templateModelsFixture(Object.values(model)); t.after(() => template.restore())
-  const fixture = async (withProfiles = true, missingCodex = false) => {
+  const fixture = async (withProfiles = true, missingCodex = false, profileId?: 'default') => {
     const ownerId = await seedUser(pool, 'profile-stage')
     const { id: workspaceId } = await seedWorkspace(pool, ownerId, [{ userId: ownerId, role: 'admin' }])
     await pool.query("UPDATE mikka_workspaces SET kind='personal' WHERE id=$1", [workspaceId])
     const botId = await seedBot(pool, workspaceId, ownerId), issueId = await seedIssue(pool, ownerId)
     const scope = { ownerId, workspaceId, botId }, actor = { userId: ownerId, workspaceId }
-    const sourceEventId = randomUUID(), deviceId = randomUUID(), repoId = randomUUID()
+    const submissionId = randomUUID()
+    const submitted = profileId ? await (await import('../coordinator-submission')).recordPersonalSubmission(modules[0].db, ownerId, 'Create a checked deliverable', { botId, submissionId, profileId }) : null
+    const sourceEventId = submitted?.eventId ?? randomUUID(), deviceId = randomUUID(), repoId = randomUUID()
     const agents = { claude_code: randomUUID(), codex: randomUUID() }, connections = { claude_code: randomUUID(), codex: randomUUID() }
-    await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1::uuid,$2,$3,$4,'user_message',$1::text,'{"text":"Create a checked deliverable"}')`, [sourceEventId, ownerId, botId, issueId])
+    if (!submitted) await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1::uuid,$2,$3,$4,'user_message',$1::text,'{"text":"Create a checked deliverable"}')`, [sourceEventId, ownerId, botId, issueId])
     await pool.query(`INSERT INTO user_e2b_keys ("userId",ciphertext,iv,"keyVersion",last4) VALUES ($1,'synthetic-unopened','synthetic-unopened',1,'test')`, [ownerId])
     await pool.query(`INSERT INTO model_order_settings ("ownerId","workspaceId",location,customized) VALUES ($1,$2,'cloud',true)`, [ownerId, workspaceId])
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Prepared cloud fixture','cloud',true,now(),$3)`, [deviceId, ownerId, JSON.stringify(caps())])
@@ -122,9 +124,13 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     const routed = await store.route(ownerId, { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Synthetic subscription profile stage fixture' })
     return { scope, actor, ownerId, workspaceId, botId, issueId, sourceEventId, deviceId, repoId, agents, connections, implement, review, store, task: routed.task }
   }
-  const exercise = async (withProfiles: boolean, missingCodex: boolean) => {
-    const f = await fixture(withProfiles, missingCodex), beforeDecisions = decisionCounts()
-    const selected = withProfiles ? await profiles.resolveAgentProfileDispatch(pool, f.scope, { issueId: f.issueId, profileId: f.implement!.id, location: 'cloud', cloudPurpose: 'desktop' }) : null
+  const exercise = async (withProfiles: boolean, missingCodex: boolean, explicitDefault = false) => {
+    const f = await fixture(withProfiles, missingCodex, explicitDefault ? 'default' : undefined), beforeDecisions = decisionCounts()
+    const profileId = explicitDefault
+      ? await (await import('./profile-request')).requestedAgentProfile(pool, f.scope, f.sourceEventId, f.implement!.id)
+      : f.implement?.id
+    if (explicitDefault) assert.equal(profileId, 'default')
+    const selected = withProfiles ? await profiles.resolveAgentProfileDispatch(pool, f.scope, { issueId: f.issueId, profileId, location: 'cloud', cloudPurpose: 'desktop', ...(explicitDefault ? { asked: { harness: 'claude_code' as const, model: model.claude_code } } : {}) }) : null
     assert.equal(selected?.target.kind ?? 'cloud', 'cloud')
     const subscriptionBindingId = await bindAgentToConnection(pool, f.scope, f.agents.claude_code, 'claude_code', f.connections.claude_code, model.claude_code)
     const dispatch = createFactoryDispatch(pool, f.store, (tx, _owner, _input, _bot, context) => queueCloudRun(pool, f.actor, {
@@ -166,7 +172,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       assert.equal(frozen.source, 'decision'); assert.equal(frozen.effort, 'low')
       assert.equal(frozen.targetEntry.source.connectionId, f.connections.codex)
       assert.match(run.prompt, /PRIVATE_PROFILE_Review/)
-      assert.equal(sourceBefore.agentDefinition.agentProfile.profileId, f.implement!.id)
+      assert.equal(sourceBefore.agentDefinition.agentProfile.profileId, explicitDefault ? 'default' : f.implement!.id)
       assert.deepEqual(decisionCounts(), { profile: beforeDecisions.profile + 1, model: beforeDecisions.model }, 'a fixed Profile selects its role once without model routing')
     } else {
       assert.equal(frozen.profileId, 'default'); assert.equal(frozen.source, 'default')
@@ -186,6 +192,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   await t.test('CC implementation selects independent Codex Review with frozen exact Profile and subscription', async () => exercise(true, false))
   await t.test('a prepared sleeping parent gains its missing Codex metadata without provider I/O', async () => exercise(true, true))
   await t.test('no configured Profile retains CC despite Codex being first in model preference', async () => exercise(false, false))
+  await t.test('an owner Default task still permits the host to choose independent Codex Review for its next stage', async () => exercise(true, false, true))
   for (const quotaResult of ['fresh', 'available', 'exhausted', 'unknown', 'disconnect', 'pause', 'epoch'] as const) await t.test({
     fresh: 'default Profile admits explicitly named Codex after another preferred Harness',
     available: 'default Profile refreshes the same Codex quota after cloud preparation outlives its 60-second observation',
@@ -345,6 +352,104 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.equal(rows[0].id, f.runId); assert.equal(rows[0].status, status)
     assert.deepEqual(rows[0].agentDefinition, f.definition, 'the exact Profile, model and credential remain frozen')
   }
+  await t.test('task-form Default reaches real queue and claim, then the owner answer resumes the same frozen native Profile', async () => {
+    const [{ requestedAgentProfile }, { createFactoryQuestions }, { queueCloudQuestionContinuation }, { createFactoryClaim }, { factoryEventId }] = await Promise.all([
+      import('./profile-request'), import('./questions/store'), import('./questions/queue-continuation'), import('./claim'), import('./event-id'),
+    ])
+    const f = await fixture(true, false, 'default'), beforeDecisions = decisionCounts()
+    const originalEvent = (await pool.query('SELECT * FROM coordinator_events WHERE id=$1', [f.sourceEventId])).rows[0]
+    assert.equal(originalEvent.kind, 'user_message'); assert.equal(originalEvent.payload.profileId, 'default')
+    const profileId = await requestedAgentProfile(pool, f.scope, f.sourceEventId, f.review!.id)
+    assert.equal(profileId, 'default', 'the model cannot replace the actual task-form choice with the eligible review role')
+    const selected = await profiles.resolveAgentProfileDispatch(pool, f.scope, {
+      issueId: f.issueId, stage: 'execute', profileId, location: 'cloud', cloudPurpose: 'desktop',
+      asked: { harness: 'codex', model: model.codex },
+    })
+    const target = selected.target
+    if (target.kind !== 'cloud') assert.fail('the selected Default must use the prepared cloud destination')
+    assert.equal(target.harness, 'codex'); assert.equal(target.model, model.codex)
+    assert.equal(selected.selectionMode, 'picked')
+    assert.equal(selected.agentProfile?.profileId, 'default'); assert.equal(selected.agentProfile?.version, 1)
+    assert.equal(selected.agentProfile?.source, 'default'); assert.equal(selected.agentProfile?.reason, 'default')
+    assert.equal(selected.agentProfile?.decision, undefined); assert.equal(selected.agentProfile?.instructions, '')
+    assert.deepEqual(selected.agentProfile?.targetEntry.source, { kind: 'subscription', connectionId: f.connections.codex })
+    const subscriptionBindingId = await bindAgentToConnection(pool, f.scope, f.agents.codex, 'codex', f.connections.codex, model.codex)
+    let firstQueues = 0, nativeQueues = 0
+    const dispatch = createFactoryDispatch(pool, f.store, async (tx, owner, input, bot, context) => {
+      assert.equal(context.sourceEventId, f.sourceEventId)
+      assert.equal(await requestedAgentProfile(tx, f.scope, context.sourceEventId, input.profileId), 'default')
+      if (context.questionOriginRunId) {
+        const continued = await queueCloudQuestionContinuation(tx, owner, input, bot, context)
+        assert.ok(continued, 'the answer must use the original native session adapter')
+        nativeQueues++
+        return continued
+      }
+      firstQueues++
+      return queueCloudRun(pool, f.actor, {
+        botId: f.botId, issueId: f.issueId, agentId: f.agents.codex, deviceRepoId: f.repoId,
+        title: 'Owner-selected Default', body: 'Continue the original native task after the owner answers.',
+        model: model.codex, subscriptionBindingId, agentProfile: selected.agentProfile,
+        modelDispatch: { mode: 'picked', location: 'cloud', entry: target.entry },
+        idempotencyKey: `factory:${context.attemptId}`, sourceEventId: context.sourceEventId,
+      }, tx)
+    })
+    const authorize = async (owner: string, issue: string, tx: import('pg').PoolClient) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [issue, owner])).rowCount === 1
+    const questions = createFactoryQuestions(pool, authorize, f.store, dispatch)
+    const factoryClaim = createFactoryClaim(f.store, questions)
+    const first = await dispatch(f.ownerId, { binding: factoryBinding(f.task), agentId: f.agents.codex, deviceRepoId: f.repoId, profileId })
+    const sandboxId = `synthetic-default-thread-${first.runId}`
+    // Provider preparation and completion are synthetic. The production queue,
+    // Factory claim, question store and native continuation all use real SQL.
+    await pool.query(`UPDATE thread_machines SET state='running',"deviceId"=$2,"issueId"=$3,"repoId"=$4,"sandboxId"=$5,"snapshotId"='synthetic-codex' WHERE "runId"=$1`, [first.runId, f.deviceId, f.issueId, f.repoId, sandboxId])
+    const lease = new Date(Date.now() + 30_000)
+    let claimMetadata: Record<string, unknown> = {}
+    const claimRun = (runId: string) => claimCloudRun(pool, f.actor, runId, f.deviceId, lease, subscriptionBindingId,
+      async tx => { claimMetadata = await factoryClaim(tx, f.ownerId, f.deviceId, runId, lease.toISOString()) }, undefined, false)
+    assert.equal((await claimRun(first.runId))?.ownerId, f.ownerId)
+    const origin = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [first.runId])).rows[0]
+    assert.equal(origin.status, 'preparing'); assert.ok(origin.startedAt)
+    assert.deepEqual(origin.agentDefinition.agentProfile, selected.agentProfile)
+    assert.equal(origin.agentDefinition.definitionDigest, workerDefinitionDigest(origin.agentDefinition))
+    const nativeSession = `synthetic-codex-native-${first.runId}`, questionId = randomUUID()
+    await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"=$2,"finishedAt"=now(),report=$3 WHERE id=$1`, [first.runId, nativeSession, JSON.stringify({
+      summary: 'Synthetic native question hand-in', question: { questionId, kind: 'decision', question: 'Continue this same task?', options: ['Continue'] },
+    })])
+    const question = await questions.record(f.ownerId, first.runId)
+    const humanSessionId = randomUUID()
+    await pool.query(`INSERT INTO "session" (id,"userId",token,"expiresAt","createdAt","updatedAt") VALUES ($1,$2,$3,now()+interval '1 hour',now(),now())`, [humanSessionId, f.ownerId, `fixture-${randomUUID()}`])
+    const actor = { source: 'human' as const, userId: f.ownerId, sessionId: humanSessionId }
+    const answer = { reference: question.reference, answerId: randomUUID(), text: 'Continue the same task in the original session.' }
+    const resumed = await questions.answer(actor, answer)
+    assert.equal((await questions.answer(actor, answer)).continuationRunId, resumed.continuationRunId)
+    assert.equal(resumed.task.sourceEventId, f.sourceEventId)
+    assert.equal(firstQueues, 1); assert.equal(nativeQueues, 1)
+    const child = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [resumed.continuationRunId])).rows[0]
+    assert.equal(child.status, 'queued'); assert.equal(child.sessionId, null)
+    assert.deepEqual(child.agentDefinition.agentProfile, origin.agentDefinition.agentProfile)
+    assert.equal(child.agentDefinition.definitionDigest, origin.agentDefinition.definitionDigest)
+    assert.equal(child.agentDefinition.subscription.bindingId, subscriptionBindingId)
+    assert.equal(child.questionContinuation.originRunId, first.runId)
+    assert.equal(child.questionContinuation.originSessionId, nativeSession)
+    assert.equal(child.questionContinuation.requiredSandboxId, sandboxId)
+    const receiptId = factoryEventId('question-resume', answer.answerId)
+    const receipt = (await pool.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, receiptId])).rows[0]
+    await pool.query('DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, receiptId])
+    try { await assert.rejects(claimRun(child.id), AgentProfileAdmissionError, 'the Default pin cannot replace the native continuation receipt') }
+    finally { await pool.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)', [f.task.id, receiptId, JSON.stringify(receipt.request), JSON.stringify(receipt.result)]) }
+    await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [f.connections.codex])
+    try { assert.equal(await claimRun(child.id), null, 'the frozen Default role cannot bypass current subscription authorization') }
+    finally { await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [f.connections.codex]) }
+    assert.equal((await claimRun(child.id))?.ownerId, f.ownerId)
+    assert.equal(claimMetadata.resumeSessionId, nativeSession); assert.equal(claimMetadata.continuesRunId, first.runId)
+    assert.equal(claimMetadata.requireSessionResume, true); assert.equal(claimMetadata.preserveQuestionWorktree, true)
+    const claimed = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [child.id])).rows[0]
+    assert.equal(claimed.status, 'preparing')
+    assert.deepEqual(claimed.agentDefinition, child.agentDefinition)
+    assert.equal((await pool.query('SELECT "bindingId" FROM byos_native_runs WHERE "runId"=$1', [child.id])).rows[0].bindingId, subscriptionBindingId)
+    assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 2)
+    assert.deepEqual((await pool.query('SELECT * FROM coordinator_events WHERE id=$1', [f.sourceEventId])).rows[0], originalEvent)
+    assert.deepEqual(decisionCounts(), beforeDecisions, 'a named model on Default does not invoke either Decision during first dispatch or same-session answer')
+  })
   await t.test('queue Available crosses 60s before claim; one exact-source usage refresh admits the original run', async t => {
     t.mock.timers.enable({ apis: ['Date'], now: Date.now() })
     const f = await claimFixture(), before = usageCalls.length
@@ -399,7 +504,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       assert.equal((await pool.query('SELECT 1 FROM byos_native_runs WHERE "runId"=$1', [f.runId])).rowCount, 0)
     })
   }
-  assert.deepEqual(decisionInputs.map(call => call.purpose), ['factory-agent-profile', 'factory-agent-profile', 'task-model-routing'])
+  assert.deepEqual(decisionInputs.map(call => call.purpose), ['factory-agent-profile', 'factory-agent-profile', 'task-model-routing', 'factory-agent-profile'])
   // Validate captured inputs outside the transport: model routing intentionally
   // catches transport errors, which must not swallow a privacy assertion.
   for (const call of decisionInputs) {

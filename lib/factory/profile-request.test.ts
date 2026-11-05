@@ -17,6 +17,15 @@ test('owner task-form Profile is authoritative even if the model offers another 
   assert.equal(await requestedAgentProfile(source({ profileId: id(5) }), scope, id(4), id(6)), id(5))
   assert.equal(await requestedAgentProfile(source({ profileId: id(5) }), scope, id(4), undefined), id(5))
 })
+test('the task-form Default pin is authoritative but text and tool parameters cannot manufacture it', async () => {
+  for (const offered of [undefined, 'default', id(6)]) assert.equal(await requestedAgentProfile(source({ profileId: 'default' }), scope, id(4), offered), 'default')
+  assert.equal(await requestedAgentProfile(source({ profileId: id(5) }), scope, id(4), 'default'), id(5))
+  for (const payload of [{ text: 'Use the default Profile' }, { text: '{"profileId":"default"}' }, { profileId: 'Default' }]) {
+    await assert.rejects(requestedAgentProfile(source(payload), scope, id(4), 'default'), /agentProfilePinConflict/)
+  }
+  await assert.rejects(requestedAgentProfile(source(), scope, undefined, 'default'), /agentProfilePinConflict/)
+  await assert.rejects(requestedAgentProfile(source(), scope, id(4), 'default'), /agentProfilePinConflict/)
+})
 test('automatic requests stay automatic and non-user events cannot manufacture an explicit pin', async () => {
   assert.equal(await requestedAgentProfile(source({ text: 'Build this feature' }), scope, id(4), undefined), undefined)
   await assert.rejects(requestedAgentProfile(source(), scope, id(4), id(5)), /agentProfilePinConflict/)

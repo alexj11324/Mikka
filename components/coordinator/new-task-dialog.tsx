@@ -35,6 +35,7 @@ import { ChatFileCards } from '@/components/chat/chat-file-cards'
 import { CHAT_FILE_ACCEPT } from '@mikka/protocol/chat-attachments'
 import { useAgentProfiles } from '@/components/settings/factory-profiles-data'
 import { TaskProfileNotice, TaskProfilePicker } from './task-profile-picker'
+import { BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-reference'
 
 const MAX_LENGTH = 8000
 
@@ -86,7 +87,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
   const profiles = useAgentProfiles(workspaceId, open, picked ? picked === 'cloud' ? { location: 'cloud' } : { location: 'local', deviceId: picked } : undefined)
   const [profilePick, setProfilePick] = useState<{ workspaceId: string; id: string } | null>(null)
   const profileId = profilePick?.workspaceId === workspaceId ? profilePick?.id : undefined
-  const profileAllowed = !profileId || (!profiles.error && profiles.data?.availability[profileId]?.available === true)
+  const profileAllowed = !profileId || (!profiles.error && (profileId === BUILTIN_AGENT_PROFILE_ID ? profiles.data?.defaultAvailability : profiles.data?.availability[profileId])?.available === true)
   const openerFocus = useOpenerFocus(open)
   const [coordinatorUnavailable, setCoordinatorUnavailable] = useState(false)
   const tCoordinator = useTranslations('Coordinator')

@@ -577,15 +577,34 @@ test('actual server action stamps only its authenticated same-origin browser ses
   }finally{actionHeaders=new Headers()}
 })
 
-test('task Profile is frozen in the immutable user submission and cannot be changed on retry', async () => {
+for (const profileId of ['default', 'a1284000-0000-4000-8000-000000000005']) test(`task Profile ${profileId} is frozen in the immutable user submission and cannot be changed on retry`, async () => {
   const f = fixture()
-  const profileId = 'a1284000-0000-4000-8000-000000000005'
   const options = { botId: COORDINATOR_BOT, submissionId, profileId, taskDestination: { kind: 'cloud' as const } }
   const sent = await recordPersonalSubmission(f.executor, 'owner', 'Build this feature', options)
   assert.deepEqual(await recordPersonalSubmission(f.executor, 'owner', 'Build this feature', options), { duplicate: true, eventId: sent.eventId })
   assert.equal((([...f.rows.values()][0].payload) as Record<string, unknown>).profileId, profileId)
   await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'Build this feature', { ...options, profileId: 'a1284000-0000-4000-8000-000000000006' }), SubmissionConflictError)
   await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'Build this feature', { ...options, profileId: undefined }), SubmissionConflictError)
+})
+
+test('the task-form Default choice needs no custom row and retains normal submission gates', async () => {
+  current = fixture(); callbacks.length = 0; userId = 'owner'; enabled = true
+  overrideDeploymentSwitch('issueTools', true)
+  const send = (profileId = 'default') => sendCoordinatorMessage('do the task', null, null, submissionId, undefined, undefined, undefined, undefined, profileId)
+  try {
+    assert.deepEqual(await send(), { queued: true })
+    assert.deepEqual([...current.rows.values()][0].payload, { text: 'do the task', profileId: 'default' })
+    assert.deepEqual(await send(), { queued: true })
+    assert.equal(current.rows.size, 1)
+    const wakes = callbacks.length
+    for (const invalid of ['Default', 'auto', 'legacy', ' default']) assert.deepEqual(await send(invalid), { error: 'validationGeneric', params: undefined })
+    assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, undefined, undefined, undefined, undefined, undefined, 'default'), { error: 'validationGeneric', params: undefined })
+    enabled = false
+    assert.deepEqual(await send(), { error: 'coordinatorUnavailable', params: undefined })
+    enabled = true; overrideDeploymentSwitch('issueTools', false)
+    assert.deepEqual(await send(), { error: 'issueToolsDisabled', params: undefined })
+    assert.equal(current.rows.size, 1); assert.equal(callbacks.length, wakes)
+  } finally { enabled = true; overrideDeploymentSwitch('issueTools', undefined) }
 })
 
 

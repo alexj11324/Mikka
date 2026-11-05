@@ -6,8 +6,25 @@ import { agentProfileSkillsCatalog, resolveAgentProfileSkills } from './agent-pr
 import { profileDecisionQuestions, selectedProfileAnswer } from './agent-profile-decision'
 import type { DecisionAnswer } from '@/lib/coordinator/decision'
 import { createAgentProfileHandler } from './agent-profile-http'
+import { agentProfileReferenceSchema } from './agent-profile-reference'
+import { factoryDispatchSchema } from './dispatch-schema'
 
 const profile = () => parseAgentProfile({ name: 'Backend', harness: 'codex', model: { mode: 'inherit' }, skills: ['systematic-debugging'], instructions: 'Private project guidance.' })
+
+test('task Profile references accept only Default or a UUID; host continuation flags are not public', () => {
+  const binding = { taskId: randomUUID(), issueId: randomUUID(), attemptId: randomUUID(), candidateId: null, revision: 1 }
+  const input = { binding, agentId: randomUUID(), deviceRepoId: randomUUID() }
+  for (const profileId of ['default', randomUUID()]) {
+    assert.equal(agentProfileReferenceSchema.parse(profileId), profileId)
+    assert.equal(factoryDispatchSchema.parse({ ...input, profileId }).profileId, profileId)
+  }
+  for (const profileId of ['Default', 'auto', 'legacy', ' default', '', 'not-a-profile', null, { id: 'default' }]) {
+    assert.equal(agentProfileReferenceSchema.safeParse(profileId).success, false)
+    assert.equal(factoryDispatchSchema.safeParse({ ...input, profileId }).success, false)
+  }
+  assert.equal(factoryDispatchSchema.safeParse({ ...input, defaultOnly: true }).success, false)
+  assert.equal(factoryDispatchSchema.safeParse({ ...input, profileId: 'default', defaultOnly: true }).success, false)
+})
 
 test('strict Profile input only permits references and additive instructions', () => {
   assert.equal(profile().enabled, true)
@@ -82,6 +99,10 @@ test('Profile HTTP guards owner scope, same origin, strict bodies, and optimisti
   assert.equal((await handler(make({ profile: profile() }))).status, 201)
   const stale = await handler(new Request(url, { method: 'PATCH', headers: { origin: 'https://mikka.example', 'content-type': 'application/json' }, body: JSON.stringify({ profile: profile(), version: 1 }) }), id)
   assert.equal(stale.status, 409); assert.deepEqual(await stale.json(), { error: 'agentProfileVersionConflict' })
+  for (const method of ['GET', 'PATCH', 'DELETE']) {
+    const request = new Request(url, { method, ...(method !== 'GET' ? { headers: { origin: 'https://mikka.example', 'content-type': 'application/json' }, body: JSON.stringify({ profile: profile(), version: 1 }) } : {}) })
+    assert.equal((await handler(request, 'default')).status, 400, 'the built-in receipt never becomes a mutable Profile row')
+  }
   assert.deepEqual(calls, ['list', 'create', 'update'])
 })
 
