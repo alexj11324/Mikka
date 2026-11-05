@@ -12,6 +12,7 @@ let availabilityReads = 0, availabilityFailure = false
 let items: ApprovedWriteItem[] = [], legacy: PendingActionView[] = []
 const calls: Record<string, unknown>[] = [], oldDecisions: unknown[] = [], notices: string[] = []
 const translate = Object.assign((key: string) => key, { has: () => false })
+mock.module('posthog-js', { defaultExport: { onFeatureFlags: () => () => {}, getFeatureFlag: () => undefined } })
 mock.module('next-intl', { namedExports: { useTranslations: () => translate } })
 mock.module(new URL('../lib/auth-client.ts', import.meta.url).href, { namedExports: { authClient: { useSession: () => ({ data: { user: { id: viewerId }, session: { id: 'session-' + viewerId } }, isPending: false }) } } })
 mock.module(new URL('../app/actions/pending-actions.ts', import.meta.url).href, { namedExports: { decidePendingAction: async (id: string, approve: boolean) => { oldDecisions.push({ id, approve }); legacy = legacy.filter(item => item.id !== id); return { status: 'done' } } } })
@@ -46,6 +47,7 @@ beforeEach(() => {
   items = []; legacy = []; calls.length = 0; oldDecisions.length = 0; notices.length = 0
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
   globalThis.fetch = async (url, options) => {
+    if (String(url).endsWith('/api/workspace/switcher')) return Response.json({ accounts: [{ id: viewerId, choices: [] }] })
     if (String(url).endsWith('/api/pending-actions')) return Response.json(legacy)
     assert.ok(String(url).endsWith('/api/approved-writes'))
     if (options?.method === 'GET') { availabilityReads++; return Response.json({ enabled: !disabled }, { status: availabilityFailure ? 503 : 200 }) }
@@ -112,7 +114,7 @@ test('closing availability removes retained uncertain cards and stops their list
   assert.equal(calls.length, beforeClose, 'unmounted view and disabled list must not continue posting')
 })
 
-test('a lost decision response keeps the same card unconfirmed and polls only view instead of resending', async () => {
+test('a lost decision response keeps the same card unconfirmed and reads only view instead of resending', async () => {
   items = [proposal('same-action')]; lostDecision = true
   await render()
   await click([...card('send_slack_message').querySelectorAll('button')].find(button => button.textContent === 'approveSend')!)
