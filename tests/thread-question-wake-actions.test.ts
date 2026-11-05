@@ -34,7 +34,14 @@ let actions: typeof import('../app/actions/agents')
 before(async () => {
   mock.module('next/headers', { namedExports: { headers: async () => requestHeaders } })
   stub('../lib/auth.ts', { auth: { api: { getSession: async () => ({ user: { id: viewer }, session: { id: 'fixture-human-session' } }) } } })
-  stub('../lib/db/index.ts', { pool, db: { select: (fields: Record<string, unknown>) => selection('prompt' in fields ? [fixtureRun()] : 'id' in fields ? memberIds.map(id => ({ id })) : []) } })
+  stub('../lib/db/index.ts', { pool, db: { select: (fields: Record<string, unknown>) => {
+    if ('prompt' in fields) return selection([fixtureRun()])
+    if ('summary' in fields) {
+      const { prompt, report: _report, error: _error, ...row } = fixtureRun()
+      return selection([{ ...row, name: prompt, summary: null }])
+    }
+    return selection('id' in fields ? memberIds.map(id => ({ id })) : [])
+  } } })
   stub('../lib/workspace-db.ts', { workspaceDb: { select: () => selection([]) }, workspacePool: pool })
   stub('../lib/deployment-switches.ts', { deploymentSwitch: () => factoryEnabled })
   stub('../lib/issue-access.ts', { requireIssueAccess: async () => ({ issue: { id: ISSUE, userId: OWNER }, user: { id: viewer } }) })
