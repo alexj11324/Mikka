@@ -2,6 +2,7 @@ import { remoteKey } from "@mikka/protocol/repository";
 import { factoryChanged } from "../../live/factory";
 import { runChanged } from "../../live/panels";
 import { runListChanged } from '../../live/lists';
+import { wakeCoordinatorAfterCommit } from '../../coordinator/wake-after-commit';
 import { notifyQueuedLocalRun } from '../../device-gateway-notify';
 import { factoryCheckAssignment, factoryReportQuestionAssignment } from "../checks";
 import { factoryMonitorDispatchAssignment } from "../monitor-dispatch";
@@ -407,6 +408,7 @@ export function createFactoryQuestions(
             task.botId,
           ],
         );
+        wakeCoordinatorAfterCommit(tx, userId);
         const state = await store.apply(
           userId,
           binding(task),
@@ -482,6 +484,7 @@ export function createFactoryQuestions(
             task.botId,
           ],
         );
+        wakeCoordinatorAfterCommit(tx, userId);
         const {
           rows: [updated],
         } = await tx.query<FactoryQuestion>(
