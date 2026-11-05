@@ -22,8 +22,9 @@ export function reportedCandidateShaSql(candidate = 'c', producer = 'producer') 
   return `CASE WHEN ${candidate}.kind='deliverable' THEN ${producer}.report->>'deliverableCommit' ELSE COALESCE(${candidate}.sha,${producer}.report->>'sourceCommit') END`
 }
 
-/** The original receipt stays immutable. A later snapshot recovery may project
- * its report references only after proving an explicit predecessor relation. */
+/** The original receipt stays immutable, including when the next Review was
+ * blocked after successful execution was consumed. A later snapshot recovery
+ * may project its report references only after proving a predecessor relation. */
 export async function completedRecoveryEvidence(tx: Query, task: Scope, candidate: Pick<Candidate, 'id' | 'runId'>) {
   const { rows } = await tx.query(`SELECT a.id,a.stage,a.status,r.id AS "runId",r."sessionId",
       completion.request->'change'->'evidence' AS evidence,receipt."eventId" AS "completionRecoveryEventId",completion."eventId" AS "completionEventId",
@@ -43,7 +44,8 @@ export async function completedRecoveryEvidence(tx: Query, task: Scope, candidat
       AND receipt.result#>>'{task,id}'=t.id::text AND receipt.result#>>'{task,userId}'=t."userId" AND receipt.result#>>'{task,issueId}'=t."issueId"::text
       AND receipt.result#>>'{task,sourceEventId}'=t."sourceEventId"::text AND receipt.result#>>'{task,candidateId}'=c.id::text
       AND (receipt.result#>>'{task,stage}'='review' OR (t.route->>'flowVersion'='2' AND receipt.result#>>'{task,route,flowVersion}'='2' AND receipt.result#>>'{task,stage}'='approval'))
-      AND receipt.result#>>'{task,status}' IN ('pending','running')
+      AND (receipt.result#>>'{task,status}' IN ('pending','running')
+        OR (receipt.result#>>'{task,stage}'='review' AND receipt.result#>>'{task,status}'='blocked'))
       AND completion.request#>>'{binding,taskId}'=t.id::text AND completion.request#>>'{change,action}'='finish'
       AND completion.request#>>'{change,status}'='passed' AND completion.request#>>'{change,output,runId}'=r.id::text
       AND completion.result#>>'{task,id}'=t.id::text AND completion.result#>>'{task,userId}'=t."userId" AND completion.result#>>'{task,issueId}'=t."issueId"::text

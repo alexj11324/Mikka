@@ -76,7 +76,7 @@ export function ToolApprovalCode({
 }: ToolApprovalCodeProps) {
   return (
     <View
-      className={`rounded-lg border border-border bg-surface px-2.5 py-2 ${className}`}
+      className={`rounded-lg border border-border bg-default px-2.5 py-2 ${className}`}
     >
       <Text className="font-mono text-xs leading-5 text-foreground/85">
         {code}
@@ -358,14 +358,14 @@ export function ToolApproval({
   );
 
   const allowClass = high ? "bg-destructive" : "bg-primary";
-  const allowText = high ? "text-background" : "text-on-primary";
+  const allowText = high ? "text-surface" : "text-on-primary";
   const allow =
     confirmBy === "hold" ? (
       <HoldButton
         label="Allow once"
         className={allowClass}
         textClassName={allowText}
-        fillClassName="bg-background/25"
+        fillClassName="bg-surface/25"
         duration={hold}
         reduce={reduce}
         onConfirm={onApprove}
@@ -383,7 +383,7 @@ export function ToolApproval({
     confirmBy === "hold" ? (
       <HoldButton
         label="Always allow"
-        className="border border-border-strong bg-background"
+        className="border border-border-strong bg-surface"
         textClassName="text-foreground"
         fillClassName="bg-foreground/10"
         duration={hold}
@@ -393,7 +393,7 @@ export function ToolApproval({
     ) : (
       <ActionButton
         label="Always allow"
-        className="border border-border-strong bg-background"
+        className="border border-border-strong bg-surface"
         textClassName="text-foreground"
         reduce={reduce}
         onPress={onAlwaysAllow}
@@ -404,7 +404,7 @@ export function ToolApproval({
   return (
     <View
       accessibilityState={{ busy }}
-      className={`w-full overflow-hidden rounded-2xl border ${high && pending ? "border-destructive/30 bg-destructive/5" : "border-border bg-surface/50"} ${className}`}
+      className={`w-full overflow-hidden rounded-2xl border ${high && pending ? "border-destructive/30 bg-destructive/5" : "border-border bg-default/50"} ${className}`}
       {...props}
     >
       <View className="gap-2 p-4">
@@ -460,7 +460,7 @@ export function ToolApproval({
       </View>
       {parameters.length > 0 ? (
         <Disclosure open={open} reduce={reduce}>
-          <View className="mx-4 mb-4 gap-3 rounded-xl border border-border bg-background/70 p-3">
+          <View className="mx-4 mb-4 gap-3 rounded-xl border border-border bg-surface/70 p-3">
             {parameters.map((parameter) => (
               <View key={parameter.id} style={styles.parameter}>
                 <Text className="text-xs text-muted">{parameter.label}</Text>

@@ -17,7 +17,7 @@ import { artifactChanged } from '@/lib/live/artifacts'
  */
 export async function deleteOwnArtifact(userId: string, artifactId: string): Promise<boolean> {
   const retired = await withAccountWrite(userId, async () => {
-    const [own] = await db.select({ id: artifacts.id }).from(artifacts)
+    const [own] = await db.select({ id: artifacts.id, issueId: artifacts.issueId }).from(artifacts)
       .where(and(eq(artifacts.id, artifactId), eq(artifacts.userId, userId))).limit(1).for('update')
     if (!own) return null
     const keys = (await db.select({ key: artifactVersions.storageKey }).from(artifactVersions)
@@ -25,6 +25,7 @@ export async function deleteOwnArtifact(userId: string, artifactId: string): Pro
     for (const key of keys) await db.execute(sql`insert into account_storage_retirements("userId","storageKey") values(${userId},${key}) on conflict do nothing`)
     await db.delete(artifacts).where(and(eq(artifacts.id, own.id), eq(artifacts.userId, userId)))
     await artifactChanged(db, userId, own.id)
+    if (own.issueId) await (await import('@/lib/live/project-map')).projectMapIssueChanged(db, own.issueId)
     return keys
   })
   if (!retired) return false

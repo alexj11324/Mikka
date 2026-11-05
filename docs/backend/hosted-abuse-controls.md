@@ -69,8 +69,8 @@ verification grants exactly USD 1 once, not a periodically renewed credit.
   `TURNSTILE_SECRET_KEY` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, already set by
   Claude. No secret is returned by these APIs. OAuth does not require Turnstile.
 - Missing Turnstile secret in Vercel production fails with
-  `SIGNUP_VERIFICATION_UNAVAILABLE` and an error log. Local/preview deployments
-  without keys skip verification. Invalid/missing tokens use
+  `SIGNUP_VERIFICATION_UNAVAILABLE` and an error log. Local and other
+  non-production runs without keys skip verification. Invalid/missing tokens use
   `TURNSTILE_INVALID` / `TURNSTILE_REQUIRED`.
 - Signup errors also include `DISPOSABLE_EMAIL`, `EMAIL_ALREADY_REGISTERED`,
   `SIGNUP_RATE_LIMITED`. Original email addresses remain unchanged. The

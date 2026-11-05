@@ -112,7 +112,7 @@ export function CitationStack({ citations, limit = 3 }: CitationStackProps) {
         <View
           key={item.id}
           style={[styles.stackItem, index > 0 && styles.overlap]}
-          className="border-2 border-background bg-background"
+          className="border-2 border-surface bg-surface"
         >
           <CitationFavicon url={item.url} icon={item.icon} size={14} />
         </View>
@@ -211,7 +211,7 @@ function SourceCard({
           },
           style,
         ]}
-        className="gap-3 rounded-2xl border border-border bg-background p-3"
+        className="gap-3 rounded-2xl border border-border bg-surface p-3"
       >
         <View style={styles.cardRow}>
           <CitationFavicon url={item.url} icon={item.icon} size={20} />
@@ -298,7 +298,7 @@ export function Citation({
         })
       }
       style={styles.marker}
-      className="rounded-md bg-surface active:bg-border-strong"
+      className="rounded-md bg-default active:bg-border-strong"
     >
       <Text
         className="text-[10px] font-semibold text-muted"
@@ -340,7 +340,7 @@ function CitationRow({
         disabled={!tappable}
         onPress={() => open(item, onOpenSource)}
         style={styles.row}
-        className="rounded-lg px-1.5 py-1.5 active:bg-surface"
+        className="rounded-lg px-1.5 py-1.5 active:bg-default"
       >
         <CitationFavicon url={item.url} icon={item.icon} />
         <View style={styles.flex}>
@@ -459,7 +459,7 @@ export function Citations({
       >
         <BookGlyph size={16} color={muted} />
         <Text className="text-sm font-medium text-muted">{title}</Text>
-        <View className="rounded-full bg-surface px-1.5 py-0.5">
+        <View className="rounded-full bg-default px-1.5 py-0.5">
           <Text
             className="text-[10px] font-semibold text-muted"
             style={styles.tabular}

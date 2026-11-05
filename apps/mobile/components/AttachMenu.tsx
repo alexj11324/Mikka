@@ -15,7 +15,7 @@ export function AttachMenu({ images, onPick, onPasteImage }: { images: boolean; 
     <Pressable accessibilityRole="button" accessibilityLabel="添加"
       onPress={() => { tap(); holdComposer({ images, pick: onPick, pasteImage: onPasteImage }); router.push('/attach') }}
       style={({ pressed }) => [styles.button, pressed && { opacity: 0.5 }]}>
-      <Symbol name="plus" size={20} color={colors.ink} web={<Plus size={22} color={colors.ink} strokeWidth={2} />} />
+      <Symbol name="plus" size={17} color={colors.ink} web={<Plus size={19} color={colors.ink} strokeWidth={2} />} />
     </Pressable>
   )
 }

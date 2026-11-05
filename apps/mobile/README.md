@@ -6,8 +6,9 @@ in `docs/design/README.md`. Figma page `268:4750` is archived (#1296);
 `358:9186` is a reference to verify, not an accepted redesign spec.
 
 The screens read the server's `app/api/mobile/*` routes (mobile.md,
-"Engineering"). `EXPO_PUBLIC_API_URL` points the app at a preview deployment,
-with the base path (e.g. `https://<preview>/mikka`); the default is production.
+"Engineering"). `EXPO_PUBLIC_API_URL` points the app at another server, with
+the base path (e.g. a local production build at `http://127.0.0.1:3000/mikka`);
+the default is production. Branches have no Vercel Preview.
 
 ```sh
 pnpm install                       # from the repository root

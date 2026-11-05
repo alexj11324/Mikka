@@ -14,13 +14,13 @@ Tracking: #237; composed delivery PR #316; source PRs #238/#247.
 
 | Requirement | Evidence required |
 | --- | --- |
-| Real feedback and immutable provenance | Authenticated fixed Preview and production reads of a real CLI run, its feedback, scorer version, exact Skill bytes and device receipt/mount record |
+| Real feedback and immutable provenance | Authenticated pre-merge (local/Docker production build) and production reads of a real CLI run, its feedback, scorer version, exact Skill bytes and device receipt/mount record |
 | Failure-derived candidate | Unchanged 25 distinct failures or seven-day trigger, one logical proposal, real model candidate commit derived from those failure reports, only the allowlisted Skill file changed |
 | Real fixed comparison | Baseline and candidate use identical frozen task cases, evaluator/threshold digest, Harness/model/policy, repository fixture and actual daemon execution; candidate improves with no regression; deliberately wrong output fails |
 | Independent Factory gates | Separate real execute/review/verify sessions bind the exact candidate SHA, artifact digest, evaluation and source scope |
 | Human approval and activation | Existing authenticated evidence read and actual human approval authorize `activate_skill` for that candidate/version/scope; missing, stale or revoked approval is rejected |
 | Monitoring and recovery | Existing Factory monitor reads the active artifact and a subsequent mounted run; a real failure creates the existing incident flow, withdrawal stops further execution, and recovery is verified against a freshly approved version |
-| Complete delivery | Exact-head CI, independent source/security review, fixed Preview, production user flow and sanitized playable video attached to the delivery PR, read back successfully |
+| Complete delivery | Exact-head CI, independent source/security review, pre-merge production-build check, production user flow and sanitized playable video attached to the delivery PR, read back successfully |
 
 ## Existing boundaries to retain
 
@@ -84,7 +84,9 @@ collector with an explicitly synthetic judgment transport.
 - [ ] Repair only the existing UI paths needed for actual feedback, evidence
   review, approval and terminal question recovery; keep the current chat/shell.
 - [ ] Run cloud PG/HTTP/CI and independent review, fix demonstrated failures,
-  freeze the exact Preview, then use actual OAuth and the local updated daemon.
+  freeze the exact commit in a local/Docker production build with an isolated
+  database (branches have no Vercel Preview), then use actual OAuth and the
+  local updated daemon.
 - [ ] Collect real qualifying failures, generate and evaluate a real candidate,
   obtain the candidate-bound human approval, validate activation/monitor/recovery,
   repeat the production user flow and attach/read back the playable video.
@@ -109,6 +111,6 @@ publication/monitor, actual device claim/heartbeat/resume/chunk ingestion, daemo
 adapters/RunContext/verification, current feedback/approval UI. Tests: immutable
 PG/HTTP boundaries, required database inventory, real benchmark negative controls,
 daemon mounting, actual deployed OAuth/user path and recorded acceptance. Config:
-branch-specific Preview database/secrets and existing cloud identity; no local
-credential files. Exports/protocol: only the shared artifact/evaluation/mount
+an isolated test database, existing cloud identity and secrets delivered
+from Infisical; no local credential files. Exports/protocol: only the shared artifact/evaluation/mount
 fields needed by these concrete consumers.

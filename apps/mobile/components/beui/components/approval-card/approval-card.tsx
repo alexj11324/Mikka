@@ -385,7 +385,7 @@ export function ApprovalCard({
               }}
               className={entry.options?.length ? "mt-1.5" : ""}
               classNames={{
-                field: "h-11 rounded-xl border-0 bg-background/70",
+                field: "h-11 rounded-xl border-0 bg-surface/70",
                 input: "px-3 text-sm",
               }}
             />
@@ -435,7 +435,7 @@ export function ApprovalCard({
   return (
     <View
       accessibilityState={{ busy }}
-      className={`w-full overflow-hidden rounded-2xl bg-surface p-4 ${className}`}
+      className={`w-full overflow-hidden rounded-2xl bg-default p-4 ${className}`}
       {...props}
     >
       <View style={styles.layout}>

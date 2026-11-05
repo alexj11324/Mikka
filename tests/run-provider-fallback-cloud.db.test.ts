@@ -10,7 +10,7 @@ import type { OrderEntry } from '../lib/model-order-plan'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { fakeThreadMachines } from './support/thread-machine-fake'
 
-test('cloud provider recovery preserves scope and uses the runtime placement after waking it', { skip: !dbUrl }, async t => {
+test('cloud provider recovery preserves scope and uses fresh task machines without waking its parent', { skip: !dbUrl }, async t => {
   const names = ['WORKSPACE_SECRETS_KEY', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED', 'MIKKA_FACTORY_LIFECYCLE_ENABLED', 'NEXT_PUBLIC_POSTHOG_KEY'] as const
   const saved = new Map(names.map(name => [name, process.env[name]]))
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
@@ -36,7 +36,6 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
   const workers = ['claude_code', 'codex'].map(harness => ({ harness, installed: true, subscriptionBroker: true, toolApproval: true }))
   const machines = await fakeThreadMachines(pool, workers)
   const { threadMachineProvider } = await import('../lib/cloud-computer/thread-machines')
-  const { ensureBotRuntime } = await import('../lib/computer/bot-runtime')
   const { botRuntimeProvisioner, ensureBotCloudRuntime } = await import('../lib/computer/auto-runtime')
   const { chooseCloudRunModel } = await import('../lib/computer/run-model')
   const { queueCloudRun } = await import('../lib/computer/queue-run')
@@ -52,7 +51,6 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
   const order = await import('../lib/model-order')
   const { entryKey } = await import('../lib/model-order-plan')
   const users: string[] = [], workspaces: string[] = []
-  const refuseWake = new Set<string>()
   const provisions = new Map<string, number>()
   const realProvision = botRuntimeProvisioner.provision
   type Placement = { userId: string; botId: string; issueId: string; agentId: string; deviceId: string; deviceRepoId: string }
@@ -66,21 +64,11 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
     launchPlacements.set(metadata.runId, placement)
     return createFixtureMachine(template, operationId, metadata, ownerId)
   }
-  // A wake replaces the parent cloud device but calls the real runtime
-  // reconciler, which retains both Agent ids and moves their repo bindings.
+  // Registration is the real metadata-only implementation. Count calls so a
+  // sleeping parent cannot silently trigger another registration or wake.
   botRuntimeProvisioner.provision = async (database, actor, botId) => {
     provisions.set(botId, (provisions.get(botId) ?? 0) + 1)
-    if (refuseWake.has(botId)) throw new Error('Synthetic E2B capacity refusal')
-    const deviceId = randomUUID(), sandboxId = `cloud-fixture-${randomUUID()}`
-    await database.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt")
-      VALUES ($1,$2,'Cloud fixture','cloud',true,$3,now())`, [deviceId, actor.userId, JSON.stringify(workers.map(worker => ({ ...worker, computerBroker: true })))])
-    await database.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady")
-      VALUES ($1,$2,$3,$4,$5,'running',true) ON CONFLICT ("workspaceId","ownerId") DO UPDATE
-      SET "operationId"=EXCLUDED."operationId","sandboxId"=EXCLUDED."sandboxId","deviceId"=EXCLUDED."deviceId",state='running',"runtimeReady"=true`,
-    [actor.workspaceId, actor.userId, randomUUID(), sandboxId, deviceId])
-    await database.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1) ON CONFLICT ("botId") DO NOTHING`, [botId, actor.workspaceId, actor.userId])
-    const sandbox = { sandboxId, commands: { run: async () => ({ stdout: '', stderr: '', exitCode: 0 }) } }
-    await ensureBotRuntime(database, actor, botId, sandbox as never, deviceId)
+    await realProvision(database, actor, botId)
   }
   t.after(async () => {
     botRuntimeProvisioner.provision = realProvision
@@ -117,6 +105,9 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
   const runtime = async (botId: string, harness: string) => (await pool.query<{ agentId: string; deviceId: string; repoId: string }>(`
     SELECT rt."agentId",a."deviceId",rt."repoId" FROM bot_cloud_runtimes rt JOIN agents a ON a.id=rt."agentId"
     WHERE rt."botId"=$1 AND rt.harness=$2`, [botId, harness])).rows[0]
+  const parentSnapshot = async (actor: { userId: string; workspaceId: string }) => (await pool.query(
+    'SELECT to_jsonb(m) AS machine,to_jsonb(d) AS device FROM cloud_machines m JOIN devices d ON d.id=m."deviceId" WHERE m."ownerId"=$1 AND m."workspaceId"=$2',
+    [actor.userId, actor.workspaceId])).rows[0]
   const row = async (runId: string) => (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0]
   const children = async (runId: string) => (await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [runId])).rows
   const fixture = async (label: string) => {
@@ -173,8 +164,9 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
       providerFailure: { kind: 'balance', retryable: false, status: 402, code: 'payment_required' } },
   })
 
-  await t.test('402 crosses harnesses in cloud after wake moves the same Agent to a new device and repository', async () => {
-    const f = await fixture('provider-cloud-wake')
+  await t.test('402 crosses harnesses using a fresh task container while its sleeping parent stays unchanged', async () => {
+    const f = await fixture('provider-cloud-sleeping')
+    const beforeParent = await parentSnapshot(f.actor)
     await complete(f.actor, f.runId)
     const original = await row(f.runId), [queuedChild, ...extra] = await children(f.runId)
     let child = queuedChild
@@ -202,9 +194,8 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
     child = await row(child.id)
 
     const moved = await runtime(f.botId, 'codex')
-    assert.equal(moved.agentId, f.priorTarget.agentId, 'waking retains the target Agent id')
-    assert.notEqual(moved.deviceId, f.priorTarget.deviceId)
-    assert.notEqual(moved.repoId, f.priorTarget.repoId)
+    assert.deepEqual(moved, f.priorTarget, 'sleeping parent execution identities stay unchanged')
+    assert.deepEqual(await parentSnapshot(f.actor), beforeParent, 'no parent VM state, lease, heartbeat or capabilities change')
     const queued = launchPlacements.get(child.id)
     assert.ok(queued, 'the durable host step must launch the actual task machine')
     assert.deepEqual([queued.userId, queued.botId, queued.issueId, queued.agentId, queued.deviceId], [f.actor.userId, f.botId, f.issueId, moved.agentId, moved.deviceId])
@@ -217,8 +208,9 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
     assert.equal(child.deviceId, machine.deviceId)
     assert.equal(child.deviceRepoId, machine.repoId)
     assert.notEqual(child.deviceId, moved.deviceId, 'a task uses its own machine after admission')
+    assert.notEqual(child.deviceId, f.admitted.deviceId, 'the new harness receives a fresh task machine')
     assert.notEqual(child.deviceId, f.localDeviceId)
-    assert.equal(provisions.get(f.botId), 2)
+    assert.equal(provisions.get(f.botId), 1, 'the parent is not reprovisioned for provider recovery')
     assert.equal(lifecycleStarts.filter(item => item.runId === child.id).length, 1, 'handoff does not start a second lifecycle')
     assert.equal(networkAttempts, 0)
   })
@@ -346,9 +338,11 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
     } finally { park.mock.restore(); start.mock.restore() }
   })
 
-  await t.test('a refused cloud wake cannot move a frozen cloud task onto its available local device', async () => {
+  await t.test('disabled cloud execution identity cannot move a frozen cloud task onto its available local device', async () => {
+
     const f = await fixture('provider-cloud-refused')
-    refuseWake.add(f.botId)
+    await pool.query('UPDATE devices SET enabled=false WHERE id=$1 AND "ownerId"=$2', [f.priorTarget.deviceId, f.actor.userId])
+    const beforeParent = await parentSnapshot(f.actor)
     await complete(f.actor, f.runId)
     const original = await row(f.runId)
     assert.equal(original.report.modelFallback.state, 'blocked')
@@ -356,7 +350,8 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
     assert.equal(original.report.modelFallback.reasons.find((entry: { choice: { model: string } }) => entry.choice.model === 'fixture-codex-b')?.reason, 'noDevice')
     assert.deepEqual(await children(f.runId), [])
     assert.equal((await pool.query('SELECT count(*)::int AS count FROM agent_runs WHERE "userId"=$1 AND "deviceId"=$2', [f.actor.userId, f.localDeviceId])).rows[0].count, 0)
-    assert.equal(provisions.get(f.botId), 2)
+    assert.equal(provisions.get(f.botId), 2, 'the real registration rejects the disabled identity')
+    assert.deepEqual(await parentSnapshot(f.actor), beforeParent, 'refusal cannot rewrite disabled parent metadata')
     assert.equal(networkAttempts, 0)
   })
 

@@ -254,7 +254,7 @@ export function MorphingModal({
             accessibilityViewIsModal
             accessibilityLabel={accessibilityLabel}
             style={[styles.card, panelStyle]}
-            className={`border border-border bg-background ${className}`}
+            className={`border border-border bg-surface ${className}`}
           >
             <ModalContext.Provider value={{ close, reduce }}>
               <Animated.View style={[styles.clip, sizeStyle]}>

@@ -92,7 +92,7 @@ export function MultiSelectTrigger({
       onLayout={() => {
         if (open) measure();
       }}
-      className={`min-h-11 w-full flex-row items-center gap-2 rounded-xl border bg-background py-1.5 pr-1 pl-2.5 ${context.open ? "border-border-strong" : "border-border"} ${context.disabled ? "opacity-50" : ""} ${className}`}
+      className={`min-h-11 w-full flex-row items-center gap-2 rounded-xl border bg-surface py-1.5 pr-1 pl-2.5 ${context.open ? "border-border-strong" : "border-border"} ${context.disabled ? "opacity-50" : ""} ${className}`}
     >
       {/* Covers the field, so a tap anywhere but a chip's X opens the list. */}
       <Pressable
@@ -174,7 +174,7 @@ export function MultiSelectValue({
             entering={context.reduce ? undefined : CHIP_IN}
             exiting={context.reduce ? undefined : CHIP_OUT}
             layout={context.reduce ? undefined : CHIP_MOVE}
-            className={`h-7 max-w-full flex-row items-center gap-1 rounded-lg bg-surface pr-1 pl-2 ${chipClassName}`}
+            className={`h-7 max-w-full flex-row items-center gap-1 rounded-lg bg-default pr-1 pl-2 ${chipClassName}`}
           >
             <View pointerEvents="none" className="shrink">
               {children ? (

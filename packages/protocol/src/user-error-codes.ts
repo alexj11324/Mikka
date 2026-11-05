@@ -9,6 +9,16 @@
 // No imports: the CI guard loads this file directly with Node.
 export const USER_ERROR_CODES = {
   factory_spec_approval_required: [],
+  map_invalid_request: ["invalid_query", "invalid_token"],
+  map_not_found: [],
+  map_snapshot_changed: ["source_changed"],
+  map_snapshot_expired: [],
+  map_too_large: ["limit"],
+  map_source_too_large: ["limit"],
+  map_scope_conflict: [],
+  map_unavailable: ["database", "signing_key"],
+  map_auth_required: [],
+
   /** A subscription run on the bot owner's own device (subscription-local-runner.ts). */
   subscription_local_runtime_unavailable: [
     "assignment_invalid",

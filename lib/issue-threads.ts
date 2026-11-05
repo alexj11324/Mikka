@@ -126,6 +126,12 @@ export interface IssueThreadRow {
   botColor?: string | null; botShape?: string | null
 }
 
+/** The list has already projected the same name and summary in PostgreSQL. */
+export type IssueThreadListRow = Omit<IssueThreadRow, 'prompt' | 'report' | 'error'> & {
+  name: string
+  summary: string | null
+}
+
 /** Markdown syntax a prompt may open with ("# Title", "- item", "**bold**"): never part of a name. */
 function plainLine(line: string) {
   return line.replace(/^(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)+/, '').replace(/(\*\*|__|`|~~)/g, '').trim()
@@ -153,7 +159,7 @@ export function taskFreeThreadMembers(ownerId: string, bot: { workspaceMemberIds
   return new Set(bot.workspaceMemberIds ?? [])
 }
 
-export function projectIssueThreads(rows: readonly IssueThreadRow[], issueId: string | null, viewerId: string, memberIds: ReadonlySet<string>): IssueThread[] {
+export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThreadListRow)[], issueId: string | null, viewerId: string, memberIds: ReadonlySet<string>): IssueThread[] {
   if (!memberIds.has(viewerId)) return []
   // One row per run here; chains are folded once, by root, on the read path (lib/run-chain.ts).
   return rows.filter(row => row.issueId === issueId && memberIds.has(row.userId))
@@ -164,7 +170,7 @@ export function projectIssueThreads(rows: readonly IssueThreadRow[], issueId: st
       stopping: runIsActive(row.status) && !!row.stopRequestedAt,
       ownerName: row.userId === viewerId ? null : row.ownerName ?? null,
       detail: canReadThread(row.userId, viewerId, memberIds)
-        ? { name: threadName(row.prompt, row.agentName), agentName: row.agentName, harness: row.harness, summary: runSummaryText({ report: row.report, error: row.error }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null }
+        ? { name: 'prompt' in row ? threadName(row.prompt, row.agentName) : row.name, agentName: row.agentName, harness: row.harness, summary: 'report' in row ? runSummaryText({ report: row.report, error: row.error }) : row.summary, bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null }
         : null,
       rootRunId: row.id, latestRunId: row.id,
       attempts: [{ runId: row.id, attempt: 1, status: row.status, outcome: row.outcome ?? null, stopping: runIsActive(row.status) && !!row.stopRequestedAt, createdAt: row.createdAt, finishedAt: row.finishedAt }],

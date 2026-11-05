@@ -177,7 +177,7 @@ function Row({
 
   return (
     <Animated.View
-      className={`overflow-hidden bg-surface ${item.disabled ? "opacity-50" : ""} ${classNames?.item ?? ""}`}
+      className={`overflow-hidden bg-default ${item.disabled ? "opacity-50" : ""} ${classNames?.item ?? ""}`}
       style={rowStyle}
     >
       <Pressable
