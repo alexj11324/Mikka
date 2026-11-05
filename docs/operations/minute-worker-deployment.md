@@ -25,3 +25,51 @@ and its tracked migrations have run. Keep the existing native-synced
 observability. No new Worker, paid plan, identity or secret-delivery mechanism is
 required. Verify the remote trigger list and secret-binding presence after
 deployment; record actual production observation separately from source tests.
+
+## Automated main release
+
+The **Minute Worker** workflow (`.github/workflows/suggestions-cron.yml`) runs
+source tests on pull requests. Its deployment job runs only for this
+repository's main branch, after the existing exact-commit main CI gate. It reuses
+the current GitHub OIDC identity and the existing Cloudflare account/token and
+read-only Vercel team token in Infisical `prod:/platform`. It does not retrieve,
+upload or rotate `CRON_SECRET`; native Secret Sync remains its writer.
+
+Before a write, the release checks that the fixed Worker already exists, has
+only the expected `MIKKA_URL` and `CRON_SECRET` bindings, has one minute trigger,
+has observability enabled, and exposes neither its workers.dev nor preview URL.
+It rejects mismatches before invoking Wrangler. The fixed Vercel project and
+alias must be READY, have a successful **Web deploy** run for that deployed
+commit, and return that same commit from the public `/mikka/api/version`.
+A newer main commit is accepted only when it contains this release and leaves
+all Worker/release inputs unchanged; a newer change to those inputs supersedes
+the old release. Main, deployment and public build are checked again before the
+write.
+
+Wrangler updates this existing Worker once, using `--keep-vars` and the
+repository's fixed config. Deployment preserves existing secret bindings;
+no secret file or new resource is supplied. The release then verifies that its
+returned version is active at 100% and rechecks the bindings, single trigger,
+URL flags and observability. An uncertain upload or failed readback stops the
+job without retrying the write. The logged receipt contains only source/build
+SHAs, deployment/version IDs and configuration checks.
+
+Use the main-only workflow dispatch for an intentional release of the current
+main. A documentation-only main commit that Web deploy skipped will not satisfy
+the matching-application gate; wait for a normal application deployment rather
+than authorizing an older build. After an uncertain write, inspect the active
+version read-only before deciding whether another release is needed.
+
+## Runtime observation
+
+A successful release receipt proves deployment identity and configuration,
+not that each scheduled endpoint has run. Record normal scheduled Worker
+history and the matching production route logs separately. Check a UTC
+quarter-hour for ops-monitor and a UTC hour boundary for account-deletions and
+audit-retention, including the three every-minute endpoints and their existing
+authentication/failure behavior. Do not invoke production cron routes manually
+to manufacture observation traffic or include secret values in evidence.
+
+Provider references: [Wrangler deploy and secret preservation](https://developers.cloudflare.com/workers/wrangler/commands/workers/),
+[Worker subdomain flags](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/subdomain/methods/get/),
+[Worker script schedules](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/schedules/methods/get/).

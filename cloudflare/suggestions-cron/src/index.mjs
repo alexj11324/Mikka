@@ -6,7 +6,28 @@ export const SCHEDULES = {
   '30 * * * *': '/api/cron/user-facts',
 }
 
-export const MINUTE_ENDPOINTS = ['/api/cron/coordinator-wakes', '/api/cron/schedules', '/api/cron/run-recovery']
+/**
+ * Reconciliation sweeps, in minutes between runs. Their work starts from the
+ * write that makes it due and wakes at its due time (#1212); a sweep only
+ * recovers a start that was lost (the process died between COMMIT and start).
+ * - coordinator-wakes 5: a lost start is a person's unanswered message, so it
+ *   gets the shortest catch-up inside the 5-15 min range.
+ * - schedules 10: occurrences, retries and leases run on the schedules due
+ *   timer at their persisted time; a lost start is a timer start lost after a
+ *   create, update, resume or failed read, rare enough for a 10 min catch-up.
+ */
+export const SWEEP_MINUTES = {
+  '/api/cron/coordinator-wakes': 5,
+  '/api/cron/schedules': 10,
+  '/api/cron/run-recovery': 1,
+}
+
+export const MINUTE_ENDPOINTS = Object.keys(SWEEP_MINUTES)
+
+/** The sweeps due in this UTC minute, in MINUTE_ENDPOINTS order. */
+export function sweepsAt(minute) {
+  return MINUTE_ENDPOINTS.filter(path => minute % SWEEP_MINUTES[path] === 0)
+}
 
 /** @typedef {{ MIKKA_URL?: string, CRON_SECRET?: string }} Env */
 
@@ -20,11 +41,11 @@ export async function runSchedule(cron, env, fetcher = fetch, scheduledTime = Da
   const endpoint = SCHEDULES[cron]
   if (!endpoint) throw new Error('Unknown suggestions schedule')
   if (!env.MIKKA_URL || !env.CRON_SECRET) throw new Error('MIKKA_URL and CRON_SECRET must be set')
-  const endpoints = cron === '* * * * *' ? [...MINUTE_ENDPOINTS] : [endpoint]
+  // Cloudflare supplies the scheduled timestamp, so a delayed invocation
+  // still runs the original UTC quarter-hour/hour/half-hour work.
+  const minute = new Date(scheduledTime).getUTCMinutes()
+  const endpoints = cron === '* * * * *' ? sweepsAt(minute) : [endpoint]
   if (cron === '* * * * *') {
-    // Cloudflare supplies the scheduled timestamp, so a delayed invocation
-    // still runs the original UTC quarter-hour/hour/half-hour work.
-    const minute = new Date(scheduledTime).getUTCMinutes()
     if (minute === 0) endpoints.push('/api/cron/account-deletions', '/api/cron/audit-retention')
     if (minute % 15 === 0) endpoints.push('/api/cron/ops-monitor')
     if (minute % 15 === 0) endpoints.push(SCHEDULES['*/15 * * * *'])
@@ -35,7 +56,8 @@ export async function runSchedule(cron, env, fetcher = fetch, scheduledTime = Da
   const results = await Promise.allSettled(endpoints.map(path => runEndpoint(path, env, fetcher)))
   const failed = results.find(result => result.status === 'rejected')
   if (failed) throw failed.reason
-  return results[0].value
+  // A minute with no endpoint due (every sweep slower than 1 min) makes no request.
+  return results[0]?.value ?? null
 }
 
 async function runEndpoint(endpoint, env, fetcher) {
