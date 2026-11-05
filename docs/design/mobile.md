@@ -45,6 +45,10 @@ The **home screen** is a messaging app's chat list. It has no title.
   ([decision](decisions/2026-11-01-1215-star-is-the-pin.md)).
 - Then come the sections 正在工作, Bot and 群聊. Each row has its last line and
   time, newest first (the web bot list, R-01; R-06).
+- Each chat row taps open with the system's link transition. A long press opens its menu over a live preview. A
+  swipe left pins it, and holding then moving drags it among the pins or the list
+  ([decision](decisions/2026-11-05-2010-ios-home-list-interactions.md)). Sections fold. An avatar shows a waiting
+  mark or its unread count. Hidden chats are listed under 隐藏的聊天 at the foot.
 - 「重启以更新」 shows above the list once an update has downloaded
   ([decision](decisions/2026-10-31-2010-ota-updates.md)).
 

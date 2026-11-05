@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { BotAvatar, Spinner } from '@/components/icons'
 import { Symbol } from '@/components/Symbol'
@@ -35,26 +36,42 @@ export const rowKey = (row: ChatRow) => row.kind === 'bot' ? row.bot.id : row.gr
 
 /** A bot (avatar, name, last line, when) or a group chat (a people symbol, its last message, a dot while unread), as a messaging app's list. */
 export function ChatRowView({ row, onPress }: { row: ChatRow; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => pressed && { backgroundColor: colors.pressed }}>
+      <ChatRowContent row={row} />
+    </Pressable>
+  )
+}
+
+/**
+ * What a chat row draws, without its press: the home list wraps it in its link, swipe and drag. `badge` replaces the
+ * unread dot with a mark on the avatar's corner (features/home `ChatBadge`).
+ */
+export function ChatRowContent({ row, badge }: { row: ChatRow; badge?: ReactNode }) {
   const bot = row.kind === 'bot' ? row.bot : null
   const group = row.kind === 'group' ? row.group : null
   const line = chatLine(bot ? { bot } : { group: group! })
+  const dot = badge === undefined && group && Number(group.unreadCount) > 0
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
-      {bot ? <BotAvatar color={bot.color} shape={bot.shape} size={54} />
-        : <View style={styles.groupIcon}><Symbol name="person.2.fill" size={22} color={colors.secondary} web={<Text style={styles.groupGlyph}>群</Text>} /></View>}
+    <View style={styles.row}>
+      <View>
+        {bot ? <BotAvatar color={bot.color} shape={bot.shape} size={54} />
+          : <View style={styles.groupIcon}><Symbol name="person.2.fill" size={22} color={colors.secondary} web={<Text style={styles.groupGlyph}>群</Text>} /></View>}
+        {badge}
+      </View>
       <View style={styles.body}>
         <View style={styles.top}>
           <Text style={styles.name} numberOfLines={1}>{bot ? bot.name : group!.title}</Text>
           {bot?.working ? <Spinner size={13} /> : row.at ? <Text style={styles.when}>{shortWhen(row.at)}</Text> : null}
         </View>
-        {line || (group && Number(group.unreadCount) > 0) ? (
+        {line || dot ? (
           <View style={styles.top}>
             <Text style={[styles.line, { flex: 1 }]} numberOfLines={1}>{line ?? ''}</Text>
-            {group && Number(group.unreadCount) > 0 ? <View style={styles.unread} /> : null}
+            {dot ? <View style={styles.unread} /> : null}
           </View>
         ) : null}
       </View>
-    </Pressable>
+    </View>
   )
 }
 

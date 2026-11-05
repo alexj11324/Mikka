@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { dragProgress, drawerWidth, settlesOpen, surfaceRadius } from '../features/shell/model/drawer.ts'
-import { moveWorkspace, orderWorkspaces, parseWorkspaceOrder } from '../features/shell/model/workspace-order.ts'
+import { dragSlot, moveTo, moveWorkspace, orderWorkspaces, parseWorkspaceOrder } from '../features/shell/model/workspace-order.ts'
 
 test('the drawer is the screen less 52 points, between 280 and 360', () => {
   assert.equal(drawerWidth(393), 341)
@@ -36,6 +36,11 @@ test('workspaces keep the order the person gave them; new ones follow, gone ones
   assert.deepEqual(moveWorkspace(['a', 'b', 'c'], 'c', 1), ['a', 'b', 'c'])
   assert.deepEqual(parseWorkspaceOrder('["a",3,"b"]'), ['a', 'b'])
   assert.deepEqual(parseWorkspaceOrder('{oops'), [])
+  assert.deepEqual(moveTo(['a', 'b', 'c'], 0, 2), ['b', 'c', 'a'])
+  assert.deepEqual(moveTo(['a', 'b', 'c'], 2, 0), ['c', 'a', 'b'])
+  assert.equal(dragSlot(0, 80, 52, 3), 2)
+  assert.equal(dragSlot(1, -200, 52, 3), 0)
+  assert.equal(dragSlot(1, 20, 52, 3), 1)
 })
 
 const chat = (key: string, extra: Partial<import('../features/home/model/home-list.ts').ListChat> = {}) => ({
@@ -77,4 +82,17 @@ test('a drop pins, moves a pin, or places a chat in its own section and unpins i
   assert.deepEqual(dropOrder(chats, 'g1', { area: 'list', before: 'b1' }), { pinned: ['p1', 'p2'], list: ['b1', 'b2', 'g1'] }, 'beside an earlier section: the top of its own')
   const full = [...Array.from({ length: MAX_PINS }, (_, i) => chat(`p${i}`, { pinned: true, pinOrder: i })), chat('x')]
   assert.equal(dropOrder(full, 'x', { area: 'pins', index: 0 }), null, 'no room among the pins')
+})
+
+test('the row swipe: armed past 144 pt until back under 128; released, it pins, opens at 88 or closes', async () => {
+  const { armedAt, settleSwipe } = await import('../features/home/model/pin-swipe.ts')
+  assert.equal(armedAt(150, false), true)
+  assert.equal(armedAt(140, false), false)
+  assert.equal(armedAt(130, true), true, 'between the marks it stays as it was')
+  assert.equal(armedAt(120, true), false)
+  assert.equal(settleSwipe(-150, 0, true), 'pin')
+  assert.equal(settleSwipe(-60, 0, false), 'open')
+  assert.equal(settleSwipe(-30, 0, false), 'close')
+  assert.equal(settleSwipe(-20, -400, false), 'open', 'a quick flick left opens it')
+  assert.equal(settleSwipe(-80, 600, false), 'close', 'a flick back closes it')
 })
