@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import { after, before, mock, test } from 'node:test'
-import { act, createElement, StrictMode } from 'react'
+import { act, StrictMode } from 'react'
 import { Window } from 'happy-dom'
 import { clearPersistentReadCaches, PersistentReadCache, readCacheNamespace, type ReadCacheScope } from './persistent-cache'
 import type { ReadStorage, StoredRead } from './indexed-db'
 import { registerLiveKeyConnection } from './live-focus'
 
 const scope: ReadCacheScope = { userId: 'owner', workspaceId: 'team', build: 'build-one', role: 'admin' }
-const deferred = <T>() => {
+const deferred = <T,>() => {
   let resolve!: (value: T) => void
   return { promise: new Promise<T>(done => { resolve = done }), resolve: (value: T) => resolve(value) }
 }
@@ -171,12 +171,12 @@ for (const strict of [false, true]) test(`real SWR${strict ? ' in StrictMode' : 
     const result = swr.default('preferences', async () => { reads++; return network.promise })
     const text = result.data?.theme ?? 'loading'
     seen.push(text)
-    return createElement('output', null, text)
+    return <output>{text}</output>
   }
-  const container = document.createElement('div'), root = createRoot(container)
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
   try {
-    const content = createElement(swr.SWRConfig, { value: { ...swrDefaults, provider: () => cache } }, createElement(HydrateReadCache), createElement(Read))
-    await act(async () => root.render(strict ? createElement(StrictMode, null, content) : content))
+    const content = <swr.SWRConfig value={{ ...swrDefaults, provider: () => cache }}><HydrateReadCache /><Read /></swr.SWRConfig>
+    await act(async () => root.render(strict ? <StrictMode>{content}</StrictMode> : content))
     assert.equal(reads, 0, 'no FETCH start timestamp exists before hydration mutations')
     assert.equal(container.textContent, 'loading')
     await act(async () => { disk.resolve([stored({ theme: 'disk preview' })]); await cache.hydrated })
@@ -197,12 +197,11 @@ test('real SWR starts a cold read after an empty or failed disk hydrate', async 
     let reads = 0
     function Read() {
       const { data } = swr.default('preferences', async () => { reads++; return { theme: 'network only' } })
-      return createElement('output', null, data?.theme ?? 'loading')
+      return <output>{data?.theme ?? 'loading'}</output>
     }
-    const container = document.createElement('div'), root = createRoot(container)
+    const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
     try {
-      await act(async () => root.render(createElement(swr.SWRConfig, { value: { ...swrDefaults, provider: () => cache } },
-        createElement(HydrateReadCache), createElement(Read))))
+      await act(async () => root.render(<swr.SWRConfig value={{ ...swrDefaults, provider: () => cache }}><HydrateReadCache /><Read /></swr.SWRConfig>))
       assert.equal(container.textContent, 'network only')
       assert.equal(reads, 1)
     } finally { await act(async () => root.unmount()); await cache.flushed() }
@@ -221,13 +220,15 @@ test('the authenticated boundary seeds real SWR before an inner fallback can be 
   function Read() {
     const { data, mutate } = swr.default('preferences', async () => { reads++; return held.promise })
     revalidate = mutate
-    return createElement('output', null, data?.theme ?? 'loading')
+    return <output>{data?.theme ?? 'loading'}</output>
   }
-  const container = document.createElement('div'), root = createRoot(container)
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
   try {
-    await act(async () => root.render(createElement(swr.SWRConfig, { value: swrDefaults },
-      createElement(AuthenticatedReadCache, { ownerId: scope.userId, workspace: { workspaceId: scope.workspaceId, role: 'admin' }, initialReads: [{ key: 'preferences', data: fresh }],
-        children: createElement(swr.SWRConfig, { value: { fallback: { preferences: fresh } } }, createElement(Read)) }))))
+    await act(async () => root.render(<swr.SWRConfig value={swrDefaults}>
+      <AuthenticatedReadCache ownerId={scope.userId} workspace={{ workspaceId: scope.workspaceId, role: 'admin' }} initialReads={[{ key: 'preferences', data: fresh }]}>
+        <swr.SWRConfig value={{ fallback: { preferences: fresh } }}><Read /></swr.SWRConfig>
+      </AuthenticatedReadCache>
+    </swr.SWRConfig>))
     assert.equal(container.textContent, 'fresh server')
     await act(async () => { disk.resolve([stored({ theme: 'old disk' })]); await disk.promise })
     assert.equal(container.textContent, 'fresh server')
@@ -251,9 +252,9 @@ test('hydration respects a read explicitly disabled on mount', async () => {
     swr.default(['coordinator-chat-metadata', 'bot'], async () => { reads++; return 'metadata' }, { revalidateOnMount: false })
     return null
   }
-  const container = document.createElement('div'), root = createRoot(container)
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
   try {
-    await act(async () => root.render(createElement(swr.SWRConfig, { value: { ...swrDefaults, provider: () => cache } }, createElement(HydrateReadCache), createElement(Read))))
+    await act(async () => root.render(<swr.SWRConfig value={{ ...swrDefaults, provider: () => cache }}><HydrateReadCache /><Read /></swr.SWRConfig>))
     assert.equal(reads, 0)
   } finally { await act(async () => root.unmount()); await cache.flushed() }
 })
@@ -266,11 +267,11 @@ test('real SWR keeps a connected key fresh for five minutes, then validates in t
   const focus = async () => { await act(async () => { browser.dispatchEvent(new browser.Event('focus')); await new Promise(resolve => setTimeout(resolve, 10)) }) }
   function Read() {
     const { data, isLoading } = swr.default('preferences', async () => { reads++; return reads === 2 ? held.promise : `read ${reads}` }, { dedupingInterval: 0 })
-    return createElement('output', { 'data-loading': String(isLoading) }, data ?? 'loading')
+    return <output data-loading={String(isLoading)}>{data ?? 'loading'}</output>
   }
-  const container = document.createElement('div'), root = createRoot(container)
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
   try {
-    await act(async () => root.render(createElement(swr.SWRConfig, { value: { ...swrDefaults, provider: () => cache } }, createElement(HydrateReadCache), createElement(Read))))
+    await act(async () => root.render(<swr.SWRConfig value={{ ...swrDefaults, provider: () => cache }}><HydrateReadCache /><Read /></swr.SWRConfig>))
     assert.equal(reads, 1)
     now += 240_000; await focus(); assert.equal(reads, 1)
     now += 60_001; await focus(); assert.equal(reads, 2)
@@ -292,11 +293,11 @@ test('a server-denied workspace clears durable data without hydrating or refresh
   let clears = 0, activations = 0
   const clear = mock.method(IndexedReadStorage.prototype, 'clear', async () => { clears++ })
   const activate = mock.method(IndexedReadStorage.prototype, 'activate', async () => { activations++; return [] })
-  const container = document.createElement('div'), root = createRoot(container)
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
   const beforeRefresh = refreshes
   try {
     requestedWorkspace = 'revoked-workspace'
-    await act(async () => root.render(createElement(AuthenticatedReadCache, { ownerId: scope.userId, workspace: null, children: createElement('output', null, 'unavailable') })))
+    await act(async () => root.render(<AuthenticatedReadCache ownerId={scope.userId} workspace={null}><output>unavailable</output></AuthenticatedReadCache>))
     assert.equal(clears, 1)
     assert.equal(activations, 0)
     assert.equal(refreshes, beforeRefresh)

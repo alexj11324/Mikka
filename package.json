@@ -210,7 +210,7 @@
     "test:project-decisions-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/project-map/decisions.db.test.ts lib/project-map/http.db.test.ts lib/project-map/sources.db.test.ts",
     "test:project-decisions": "node --test scripts/acceptance/project-decisions.test.mjs && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/project-map/sources.test.ts",
     "test:pending-actions-live": "node --import tsx --test lib/live/pending-action-cache.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/pending-actions.live.test.tsx app/api/pending-actions/route.test.ts",
-    "test:read-cache": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/swr/*.test.ts lib/coordinator/chat-read-client.test.ts lib/settings-read.test.ts && node --import tsx --test scripts/acceptance/read-cache.test.mjs scripts/acceptance/run-read-cache.test.mjs scripts/acceptance/read-cache-production.test.mjs"
+    "test:read-cache": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/swr/*.test.ts lib/swr/*.test.tsx lib/coordinator/chat-read-client.test.ts lib/settings-read.test.ts && node --import tsx --test scripts/acceptance/read-cache.test.mjs scripts/acceptance/run-read-cache.test.mjs scripts/acceptance/read-cache-production.test.mjs"
   },
   "dependencies": {
     "@ai-sdk/mcp": "2.0.81",
