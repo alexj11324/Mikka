@@ -308,7 +308,8 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const botId = await seedBot(pool, scope.workspaceId, scope.ownerId), repoId = randomUUID()
     const repository = normalizeRepository(`https://github.com/synthetic/default-task-${randomUUID()}.git`)
     await pool.query(`INSERT INTO device_repos(id,"userId","deviceId","repoPath","remoteUrl","baseBranch") VALUES ($1,$2,$3,$4,$5,'main')`, [repoId, scope.ownerId, deviceId, repository.key, repository.remoteUrl])
-    const factory = createFactoryStore(pool, async (owner, issue, tx) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [issue, owner])).rowCount === 1, botId)
+    const [{ factoryCheckGates }, { factoryCheckIndependent }] = await Promise.all([import('./checks'), import('./check-independence')])
+    const factory = createFactoryStore(pool, async (owner, issue, tx) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [issue, owner])).rowCount === 1, botId, { independent: factoryCheckIndependent, gates: factoryCheckGates })
     const dispatch = createFactoryDispatch(pool, factory, (tx, owner, input, bot, context) => queueFactoryRun(tx, owner, input, bot, context))
     // Source-pin admission is independent of the existing difficulty-routing toggle.
     await order.changeOrder(pool, scope, { kind: 'autoRouting', enabled: false })
