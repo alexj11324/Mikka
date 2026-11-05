@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { IntlProvider } from 'next-intl'
 import * as actualViewState from '../lib/hooks/view-state'
 import * as actualAppBuild from '../lib/app-build'
+import type { FactoryTask } from '../components/workspace/factory-acceptance-pane'
 
 // R-10: every conversation ends in the shared composer. An open thread is one, so it keeps
 // the composer after it finishes: an Artifact window, a task's thread and a thread opened
@@ -15,6 +16,7 @@ const at = (path: string) => new URL(`../${path}`, import.meta.url).href
 let thread: Record<string, unknown> | null
 let draftText = ''
 let pageChecks = 0
+let acceptance: FactoryTask | null = null
 mock.module('swr', {
   defaultExport: (key: unknown) => Array.isArray(key) && key[0] === 'issue-thread'
     ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [] }, mutate: () => {} }
@@ -29,7 +31,11 @@ mock.module(at('lib/hooks/view-state.tsx'), { namedExports: {
 mock.module(at('lib/app-build.ts'), { namedExports: { ...actualAppBuild, checkPageBuildBeforeAction: async () => { pageChecks++; return true } } })
 mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, pollIssueThreads: async () => null, getIssueThread: async () => null, getThreadChanges: async () => ({ state: 'none' }), sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async () => { replyCalls++; return { sent: true } }, stopRun: async () => ({}) } })
 mock.module(at('app/actions/artifacts.ts'), { namedExports: { listRunArtifacts: async () => [] } })
-mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: { useThreadAcceptance: () => null, AcceptanceStateBadge: () => null } })
+mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: {
+  useThreadAcceptance: () => acceptance,
+  useAcceptanceTasks: () => ({ tasks: acceptance ? [acceptance] : [], allTasks: acceptance ? [acceptance] : [] }),
+  AcceptanceStateBadge: () => null,
+} })
 mock.module(at('components/workspace/factory-acceptance-pane.tsx'), { namedExports: { FactoryAcceptancePane: () => null } })
 mock.module(at('components/workspace/self-improvement.tsx'), { namedExports: { ThreadFeedback: () => null } })
 let composer: { label: string; value: string; submitDisabled?: boolean; onSubmit: () => void } | null = null
@@ -44,7 +50,7 @@ before(async () => { ({ IssueThreadPanel } = await import('../components/workspa
 const base = { id: 'run-1', issueId: 'issue-1', status: 'succeeded', outcome: null, question: null, continuation: null, stopping: false, ownedByCurrentUser: true,
   createdAt: new Date(0), finishedAt: new Date(0), latestRunId: 'run-1', prompt: 'Fix it', stopRequestedAt: null, replyAvailable: true, retryAvailable: true, quota: null, feedbackEligible: false,
   detail: { name: 'ZHIX-2 Fix it', agentName: 'Claude Code', harness: 'claude_code', summary: null } }
-beforeEach(() => { thread = { ...base }; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0 })
+beforeEach(() => { thread = { ...base }; acceptance = null; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0 })
 const render = (props: Partial<Parameters<typeof IssueThreadPanel>[0]> = {}) => renderToStaticMarkup(<IntlProvider locale="en" timeZone="UTC" messages={messages}>
   <IssueThreadPanel issueId="issue-1" runId="run-1" onClose={() => {}} {...props} />
 </IntlProvider>)
@@ -145,3 +151,72 @@ test('the ordinary producer and a current check question keep their composer con
     if (!question) assert.match(html, /<button[^>]*>Retry<\/button>/)
   }
 })
+
+const acceptedTask = (patch: Partial<FactoryTask> = {}): FactoryTask => ({
+  id: 'factory-task-1', issueId: 'issue-1', stage: 'approval', status: 'passed', reason: 'Accepted',
+  candidateId: 'candidate-1', candidateRunId: 'run-1', isSkillCandidate: false, ...patch,
+})
+function expectStatusBadge(html: string, group: string, message?: string) {
+  assert.match(html, new RegExp(`<span\\b(?=[^>]*data-slot="badge")(?=[^>]*data-group="${group}")[^>]*>`), message)
+}
+
+test('acceptance resolves the current producer badge without rewriting its outcome or disabling its ordinary composer', () => {
+  draftText = 'Keep this producer follow-up draft'
+  thread = { ...base, outcome: 'needs_input' }
+  acceptance = acceptedTask({ status: 'pending' })
+  expectStatusBadge(render(), 'waiting')
+  acceptance = acceptedTask()
+  const html = render()
+  expectStatusBadge(html, 'resolved')
+  assert.match(html, /Resolved<\/span>/)
+  assert.equal(thread.outcome, 'needs_input', 'acceptance is a display fact, not a rewrite of the stored run outcome')
+  assert.equal(composer?.value, draftText)
+  assert.equal(composer?.submitDisabled, false, 'an accepted producer keeps its existing Send permission')
+  assert.doesNotMatch(html, /data-composer-send="" disabled=""/)
+  assert.equal(pageChecks, 0, 'rendering acceptance must not issue a reply')
+  assert.equal(replyCalls, 0)
+})
+
+test('an acceptance display cannot grant Send when the server has withheld ordinary continuation', () => {
+  draftText = 'Preserve a guarded draft'
+  thread = { ...base, outcome: 'needs_input', replyAvailable: false, retryAvailable: false }
+  acceptance = acceptedTask()
+  const html = render()
+  expectStatusBadge(html, 'resolved')
+  assert.equal(composer?.submitDisabled, true)
+  assert.equal(composer?.value, draftText)
+  composer?.onSubmit()
+  assert.equal(pageChecks, 0)
+  assert.equal(replyCalls, 0)
+})
+
+const retainedPanelStates: { name: string; task?: Partial<FactoryTask>; run?: Record<string, unknown>; group: string; stopping?: boolean }[] = [
+  { name: 'another issue', task: { issueId: 'other-issue' }, group: 'waiting' },
+  { name: 'an earlier candidate producer', task: { candidateRunId: 'older-run' }, group: 'waiting' },
+  { name: 'a missing current candidate', task: { candidateId: null }, group: 'waiting' },
+  { name: 'a skill candidate', task: { isSkillCandidate: true }, group: 'waiting' },
+  { name: 'approval not yet accepted', task: { status: 'pending' }, group: 'waiting' },
+  { name: 'a passed check before approval', task: { stage: 'review' }, group: 'waiting' },
+  { name: 'a failed producer', run: { status: 'failed', outcome: 'blocked' }, group: 'blocked' },
+  { name: 'a historical failed review', task: { candidateRunId: 'producer-run' }, run: { status: 'failed', outcome: 'blocked' }, group: 'blocked' },
+  { name: 'a later successful continuation', run: { latestRunId: 'run-2', continuation: { id: 'run-2', status: 'succeeded', outcome: 'needs_input', stopping: false } }, group: 'waiting' },
+  { name: 'an active run', run: { status: 'running' }, group: 'running' },
+  { name: 'a waiting input run', run: { status: 'waiting_input' }, group: 'waiting' },
+  { name: 'an unanswered question', run: { question: 'waiting' }, group: 'waiting' },
+  { name: 'a resuming question', run: { question: 'resuming', latestRunId: 'run-2', continuation: { id: 'run-2', status: 'queued', stopping: false } }, group: 'running' },
+  { name: 'a failed question wake', run: { question: 'resuming', latestRunId: 'run-2', continuation: { id: 'run-2', status: 'queued', stopping: false }, questionWake: { generation: 'wake-1', error: 'Original task machine unavailable' } }, group: 'blocked' },
+  { name: 'a quota-paused run', run: { status: 'paused' }, group: 'blocked' },
+  { name: 'a requested stop', run: { status: 'running', stopping: true }, group: 'running', stopping: true },
+]
+for (const scenario of retainedPanelStates) {
+  test(`accepted candidate metadata does not replace the panel state of ${scenario.name}`, () => {
+    thread = { ...base, outcome: 'needs_input', ...scenario.run }
+    acceptance = acceptedTask(scenario.task)
+    const html = render()
+    assert.doesNotMatch(html, /data-group="resolved"/)
+    if (scenario.stopping) assert.match(html, /Stopping[^<]*<\/span>/)
+    else expectStatusBadge(html, scenario.group, scenario.name)
+    assert.equal(pageChecks, 0)
+    assert.equal(replyCalls, 0)
+  })
+}

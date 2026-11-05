@@ -108,7 +108,9 @@ function TaskForm({ initial, thread: openThread, origin, user, onSaved, onDirty,
   const syncState = useSyncExternalStore(sync?.subscribe ?? noSubscribe, sync?.getSnapshot ?? readOnlySnapshot, sync?.getSnapshot ?? readOnlySnapshot)
   const syncKey = sync ? ['document-sync', saved.id, sync.doc.clientID] : null
   const { mutate: retrySync } = useSWR(syncKey, () => sync?.exchange(saved.id), { refreshInterval: 0, revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false })
-  useLiveKey('issue_document', sync ? saved.id : null, syncKey ? [unstable_serialize(syncKey)] : [], syncState.workspaceId ?? null, { minIntervalMs: 1500 })
+  // A committed acceptance changes the issue and its history without editing
+  // the Yjs body. All three reads follow the same authorized document event.
+  useLiveKey('issue_document', sync ? saved.id : null, syncKey ? [unstable_serialize(syncKey), unstable_serialize(['issue', saved.id]), unstable_serialize(['versions', saved.id])] : [], syncState.workspaceId ?? null, { minIntervalMs: 1500 })
   useEffect(() => {
     // Delay disposal so React Strict Mode's immediate effect replay retains this document.
     if (!sync) return
@@ -158,6 +160,22 @@ function TaskForm({ initial, thread: openThread, origin, user, onSaved, onDirty,
   const [replacement, setReplacement] = useState<{ content: JSONContent; version: number }>()
   const { data: versions, error: historyError, mutate: refreshVersions } = useSWR(['versions', saved.id], () => listIssueVersions(saved.id))
   const { data: connections } = useSWR(['issue-connections', saved.id], () => listIssueConnections(saved.id))
+  useEffect(() => {
+    const previous = savedRef.current
+    if (initial.id !== previous.id || initial.revision <= previous.revision) return
+    const current = draft.current
+    const next = { ...current }
+    // Only fields unchanged since the last server snapshot adopt its newer
+    // value. Updating the draft too keeps a later text save from reopening Done.
+    if (current.title === previous.title && !composing.current) { next.title = initial.title; setTitle(initial.title) }
+    if (current.status === previous.status) { next.status = initial.status; setStatus(initial.status) }
+    if (current.priority === previous.priority) { next.priority = initial.priority; setPriority(initial.priority) }
+    if (JSON.stringify(current.content) === JSON.stringify(previous.content)) { next.content = initial.content; setContent(initial.content) }
+    draft.current = next
+    savedRef.current = initial
+    setSaved(initial)
+    // This is a read, not an edit: keep generation, selection and the Y.Doc.
+  }, [initial])
   const hasUnsavedChanges = dirty
   useEffect(() => { onDirty(hasUnsavedChanges || pending) }, [hasUnsavedChanges, pending, onDirty])
   useEffect(() => {
@@ -187,16 +205,22 @@ function TaskForm({ initial, thread: openThread, origin, user, onSaved, onDirty,
       try {
         do {
           const snapshot = { ...draft.current }
+          const revision = savedRef.current.revision
           if (!snapshot.title.trim()) { setError(saveMessages.current.t('titleRequired')); return false }
           const yjs = sync?.getSnapshot() ?? readOnlySnapshot()
           const bodyDirty = JSON.stringify(snapshot.content) !== JSON.stringify(savedRef.current.content)
           if (sync && (yjs.pending || bodyDirty) && yjs.ready) await sync.flush(initial.id)
           else if (bodyDirty && !yjs.ready) { setError(saveMessages.current.t('documentNotConnected')); return false }
+          // A live update during the flush must be included in the next
+          // snapshot, never paired with fields captured at an older revision.
+          if (savedRef.current.revision !== revision) continue
           if (snapshot.generation !== acknowledged.current) {
-            const result = await saveIssue({ id: initial.id, revision: savedRef.current.revision, title: snapshot.title, content: snapshot.content, status: snapshot.status, priority: snapshot.priority })
+            const result = await saveIssue({ id: initial.id, revision, title: snapshot.title, content: snapshot.content, status: snapshot.status, priority: snapshot.priority })
             if (!('issue' in result) || !result.issue) { setError(saveMessages.current.actionError(result.error ?? 'issueSaveFailed')); return false }
-            savedRef.current = result.issue
-            setSaved(result.issue)
+            if (result.issue.revision >= savedRef.current.revision) {
+              savedRef.current = result.issue
+              setSaved(result.issue)
+            }
             acknowledged.current = snapshot.generation
             setDirty(draft.current.generation !== acknowledged.current)
             void refreshVersions().catch(() => {})
@@ -221,6 +245,7 @@ function TaskForm({ initial, thread: openThread, origin, user, onSaved, onDirty,
     return () => clearTimeout(timer)
   }, [editSequence, syncState.ready, save])
   function adopt(issue: Issue) {
+    if (issue.revision < savedRef.current.revision) return
     savedRef.current = issue; setSaved(issue); setStatus(issue.status); setPriority(issue.priority)
     draft.current = { ...draft.current, status: issue.status, priority: issue.priority }
     void refreshVersions().catch(() => {}); onSaved(issue.id)

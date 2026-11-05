@@ -13,7 +13,7 @@ import { prepareThreadReply, type ThreadReplySubmission } from '@/lib/thread-sub
 import { mergeThreadChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
 import { ThreadExecutionIdentity } from './thread-execution-identity'
-import { threadQuestionView } from '@/lib/issue-threads'
+import { acceptedProducerOutcome, threadQuestionView } from '@/lib/issue-threads'
 import { threadComposerHarness } from '@/lib/run-model-fallback-view'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { QuoteChip, QuoteLine } from '@/components/artifacts/artifact-quote'
@@ -124,6 +124,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   // Once answered it reads as the running thread it continues, with nothing to send or stop yet;
   // as soon as the resumed run starts, messages and stop go to that run.
   const view = data ? threadQuestionView(data.thread) : null
+  const displayOutcome = data ? acceptedProducerOutcome(data.thread, issueId, acceptance ? [acceptance] : []) : null
   const question = view?.question ?? null
   const liveRunId = view?.runId ?? runId
   const active = !!view && question !== 'resuming' && runIsActive(view.status)
@@ -232,7 +233,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <ThreadStatus status={view?.status ?? data.thread.status} outcome={view ? view.outcome : data.thread.outcome} stopping={stopRequested} waiting={question === 'waiting'} />
+            <ThreadStatus status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} />
             <span>{t('started', { time: format.dateTime(new Date(data.thread.createdAt), { hour: '2-digit', minute: '2-digit' }) })}</span>
             {/* The bot that dispatched it, also when it is not the chat beside it (R-78, R-82). */}
             {detail?.agentName && <span>{detail.agentName} {t('dispatched')}</span>}
