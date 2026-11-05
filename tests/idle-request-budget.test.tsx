@@ -188,7 +188,7 @@ Object.assign(fixtures, {
   // The device is online through the gateway (its last HTTP heartbeat is an hour old): presence has no write.
   'agents.pollDevices': () => ({ devices: [{ id: DEVICE, name: 'Ada’s MacBook', deviceType: 'laptop', hostname: 'ada-mbp', platform: 'darwin', arch: 'arm64', harnesses: [], online: true, enabled: true, lastSeenAt: new Date(AT), repos: [] }], live, presenceFallback: true }),
   'artifacts.getArtifact': () => ({ id: ARTIFACT, kind: 'markdown', title: 'Release notes', latestVersion: 2, runId: RUN, issueId: ISSUE, botId: BOT, shared: false,
-    versions: [1, 2].map(version => ({ version, authorName: 'Scout', authorColor: 'bleu', authorShape: 'cercle', createdAt: AT })) }),
+    versions: [1, 2].map(version => ({ version, authorName: 'Scout', authorColor: 'bleu', authorShape: 'cercle', createdAt: AT })), live }),
   'artifacts.listRunArtifacts': () => [],
   'agents.pollIssueThreads': () => ({ threads: [thread], live: { workspaceId: WORKSPACE } }),
   'agents.getIssueThread': () => ({ live: { runs: [{ id: RUN, workspaceId: WORKSPACE }], issueWorkspaceId: WORKSPACE, questionDeadline: null }, thread: { ...thread, prompt: 'Fix the sign-in redirect', stopRequestedAt: null, feedbackEligible: false, error: null, quota: null }, chunks: [{ chunk: { type: 'text-delta', id: 't1', delta: 'Looking at the redirect handler.' }, at: new Date(AT) }], messages: [], chunkCursor: null, chunksAppend: false }),
