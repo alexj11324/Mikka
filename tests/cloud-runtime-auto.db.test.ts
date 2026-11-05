@@ -25,6 +25,22 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   let lifecycleStarts = 0
   const stageHandoffs: [{userId:string;workspaceId:string},string|null,string][] = []
   mock.module('workflow/api', { namedExports: { start: async (workflow: {name:string}, args: unknown[]) => { lifecycleStarts++; if (workflow.name === 'factoryCloudStageHandoff') stageHandoffs.push(args as typeof stageHandoffs[number]); return { runId: 'synthetic-workflow' } } } })
+  // Only the external Decision transport is synthetic. Profile eligibility,
+  // source authorization, transaction admission and frozen selections stay real.
+  const profileForStage: Record<string, string> = {}
+  const profileSelections: { stage: string; profileId: string }[] = []
+  mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, { namedExports: {
+    invokeDecision: async (purpose: string, raw: unknown) => {
+      if (purpose !== 'factory-agent-profile') return null
+      const input = typeof raw === 'string' ? JSON.parse(raw) : raw as { task: { stage: string }; candidates: { id: string }[] }
+      const stage = input.task.stage, profileId = profileForStage[stage]
+      assert.ok(profileId && input.candidates.some((candidate: { id: string }) => candidate.id === profileId), 'the current stage must select a real eligible fixture Profile')
+      profileSelections.push({ stage, profileId })
+      return { answers: new Map([['profile', { name: 'profile', type: 'choice', choice: `${profileId}:stage_fit`, confidence: .95 }]]),
+        execution: { executionId: randomUUID(), modelId: 'synthetic-profile-decision', providerGenerationId: 'isolated-cloud-spec-test',
+          startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
+    },
+  } })
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const threadMachines = await fakeThreadMachines(pool, [{ harness: 'codex', installed: true, subscriptionBroker: true, toolApproval: true }])
@@ -58,6 +74,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     await pool.query('DELETE FROM model_order_entries WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM model_order_settings WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM factory_tasks WHERE "userId" = ANY($1)', [users])
+    await pool.query('DELETE FROM factory_agent_profiles WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM coordinator_bots WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM computer_run_bindings WHERE "ownerId" = ANY($1)', [users])
@@ -611,4 +628,201 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.deepEqual([(await current()).stage, (await current()).status], ['approval', 'passed'])
   })
 
+  // These regressions drive the ordinary cloud entry points. The real PG
+  // lifecycle is exercised with explicit synthetic native completions; they
+  // do not claim that a provider executed a plan or a browser signed in.
+  type SpecPerson = Awaited<ReturnType<typeof person>>
+  const ownerSpecRequest = async (who: SpecPerson, text = 'Plan this small repository change and wait for human approval.') => {
+    const { db } = await import('../lib/db')
+    const { recordPersonalSubmission } = await import('../lib/coordinator-submission')
+    return (await recordPersonalSubmission(db, who.id, text, { botId: who.botId, submissionId: randomUUID() })).eventId
+  }
+  const specState = async (who: SpecPerson) => {
+    const { rows: [task] } = await pool.query(`SELECT t.*,a."runId",a.status AS "attemptStatus" FROM factory_tasks t
+      JOIN factory_attempts a ON a.id=t."attemptId" WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId"=$3 ORDER BY t."createdAt" DESC,t.id DESC LIMIT 1`, [who.id, who.issueId, who.botId])
+    const { rows: [counts] } = await pool.query(`SELECT
+      (SELECT count(*)::int FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2) AS tasks,
+      (SELECT count(*)::int FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" WHERE t."userId"=$1 AND t."issueId"=$2) AS attempts,
+      (SELECT count(*)::int FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" WHERE t."userId"=$1 AND t."issueId"=$2 AND a.stage='execute') AS executions,
+      (SELECT count(*)::int FROM agent_runs WHERE "userId"=$1 AND "issueId"=$2) AS runs,
+      (SELECT count(*)::int FROM run_publications WHERE "userId"=$1 AND "runId" IN (SELECT id FROM agent_runs WHERE "issueId"=$2)) AS publications,
+      (SELECT count(*)::int FROM factory_spec_approvals s JOIN factory_tasks t ON t.id=s."taskId" WHERE t."userId"=$1 AND t."issueId"=$2) AS approvals`, [who.id, who.issueId])
+    const run = task?.runId ? (await pool.query(`SELECT r.*,d.kind AS "deviceKind",repo."remoteUrl",m.state AS "machineState"
+      FROM agent_runs r JOIN devices d ON d.id=r."deviceId" JOIN device_repos repo ON repo.id=r."deviceRepoId"
+      LEFT JOIN thread_machines m ON m."runId"=r.id WHERE r.id=$1`, [task.runId])).rows[0] : null
+    return { task, counts, run }
+  }
+  const completeSpec = async (who: SpecPerson, runId: string) => {
+    const { persistRunCompletion } = await import('../lib/run-publications')
+    const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
+    await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"startedAt"=clock_timestamp()-interval '1 second' WHERE id=$1`, [runId, `isolated-planner-${runId}`])
+    await persistRunCompletion(who.id, runId, { stopReason: 'submitted', report: {
+      summary: 'APPROVED_SPEC_CONTEXT_1276: use the two-section document plan. Synthetic native specification result in an isolated PG regression.', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null,
+    } })
+    assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [runId])).rows[0].status, 'succeeded')
+    await factoryRuntimeForBot(who.botId).reconcile.run(who.id, runId)
+    const ready = await specState(who)
+    assert.deepEqual([ready.task.stage, ready.task.status, ready.counts.executions, ready.counts.publications, ready.counts.approvals], ['spec', 'passed', 0, 0, 0])
+    return ready
+  }
+  for (const [index, entry] of ['coordinator', 'desktop', 'http'].entries()) await t.test(`normal ${entry} cloud needsSpec starts a genuine plan without publication authority`, async () => {
+    const who = await person(`cloud-spec-${entry}`)
+    await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1', [who.issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1201 + index } } })])
+    const { AgentProfileStore } = await import('../lib/factory/agent-profile')
+    const profiles = new AgentProfileStore(pool), profileScope = { ownerId: who.id, workspaceId: who.workspaceId }
+    const definition = (role: string) => ({ name: role, description: `${role} for an isolated cloud spec regression`, roles: [role], enabled: true,
+      harness: 'codex' as const, model: { mode: 'fixed' as const, harness: 'codex' as const, model: 'gpt-5', source: { kind: 'subscription' as const, connectionId: who.connection } },
+      instructions: `FIXTURE_ROLE_${role}`, skills: [] })
+    const planner = await profiles.create(profileScope, definition('spec'))
+    const executor = await profiles.create(profileScope, definition('execute'))
+    profileForStage.spec = planner.id; profileForStage.execute = executor.id
+    const decisionsBefore = profileSelections.length
+    try {
+      let result: { runId?: string; error?: string }
+      let sourceEventId: string | undefined
+      if (entry === 'http') {
+        const { POST } = await import('../app/api/bots/[botId]/computer/runs/route')
+        httpOwner = who.id
+        try {
+          const response = await POST(new Request(`https://mikka.example/mikka/api/bots/${who.botId}/computer/runs`, {
+            method: 'POST', headers: { origin: 'https://mikka.example', 'content-type': 'application/json' },
+            body: JSON.stringify({ issueId: who.issueId, needsSpec: true, harness: 'codex', note: 'Plan before implementation; wait for the human spec approval.' }),
+          }), { params: Promise.resolve({ botId: who.botId }) })
+          result = await response.json(); assert.equal(response.status, 202, JSON.stringify(result))
+        } finally { httpOwner = null }
+      } else {
+        sourceEventId = await ownerSpecRequest(who)
+        result = await (entry === 'coordinator'
+          ? steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', needsSpec: true, sourceEventId, requestKey: `spec:${randomUUID()}` }, undefined, who.botId)
+          : steps.dispatchComputerThread(who.id, { botId: who.botId, issueId: who.issueId, harness: 'codex', needsSpec: true, sourceEventId }, `spec:${randomUUID()}`, undefined, undefined, who.botId)) as typeof result
+      }
+      assert.ok(result.runId, JSON.stringify(result))
+      const planned = await specState(who)
+      assert.deepEqual([planned.task.stage, planned.task.status, planned.task.route.flowVersion, planned.task.route.needsSpec], ['spec', 'running', 2, true])
+      if (sourceEventId) assert.equal(planned.task.sourceEventId, sourceEventId)
+      assert.deepEqual(planned.counts, { tasks: 1, attempts: 1, executions: 0, runs: 1, publications: 0, approvals: 0 })
+      assert.deepEqual([planned.run.id, planned.run.kind, planned.run.deviceKind, planned.run.machineState], [result.runId, 'plan', 'cloud', 'running'])
+      assert.equal(planned.run.agentDefinition.readOnly, true)
+      assert.equal(planned.run.agentDefinition.repositoryAdmission, undefined, 'a spec cannot acquire implementation publication authority')
+      assert.equal(planned.run.agentDefinition.agentProfile.profileId, planner.id)
+      assert.equal(planned.run.agentDefinition.model, 'gpt-5')
+      assert.equal(planned.run.agentDefinition.apiKey, undefined)
+      assert.equal(planned.run.agentDefinition.subscription.route, 'codex_cli')
+      assert.equal(planned.run.agentDefinition.executionIdentity.requester, who.id)
+      assert.equal(planned.run.agentDefinition.executionIdentity.billingAccount.model.kind, 'subscription')
+      assert.equal(planned.run.agentDefinition.executionIdentity.billingAccount.model.ownerId, who.id)
+      assert.ok(profileSelections.slice(decisionsBefore).some(choice => choice.stage === 'spec' && choice.profileId === planner.id), 'normal profile selection receives the actual spec stage')
+      if (entry !== 'coordinator') return
+
+      const { rows: [plannerMachine] } = await pool.query(`SELECT m."sandboxId",m."deviceId",m."repoId",token.id AS "tokenId"
+        FROM thread_machines m JOIN device_tokens token ON token."boundDeviceId"=m."deviceId" AND token."revokedAt" IS NULL
+        WHERE m."runId"=$1`, [result.runId])
+      assert.ok(plannerMachine?.sandboxId && plannerMachine.tokenId)
+      const { sendThreadMessage } = await import('../lib/thread-continue')
+      const clarification = 'OWNER_PLAN_CONTEXT_1276: keep the original acceptance criteria and the exact final newline in the plan.'
+      const ownerNote = await sendThreadMessage(who.id, result.runId!, clarification)
+      assert.deepEqual(ownerNote, { runId: result.runId, continued: false })
+      const messages = (await pool.query('SELECT id,origin,"deliveredAt" FROM run_messages WHERE "runId"=$1 AND "userId"=$2 AND text=$3', [result.runId, who.id, clarification])).rows
+      assert.equal(messages.length, 1)
+      assert.equal(messages[0].origin, 'owner')
+      assert.equal(messages[0].deliveredAt, null, 'a newly queued clarification must remain deliverable to the running planner')
+      // The fixture now acknowledges native consumption before its synthetic
+      // completion, as the real worker does when it reads a queued message.
+      await pool.query('UPDATE run_messages SET "deliveredAt"=clock_timestamp() WHERE id=$1', [messages[0].id])
+      const afterNote = await specState(who)
+      assert.deepEqual([afterNote.task.id, afterNote.task.attemptId, afterNote.task.sourceEventId, afterNote.task.stage], [planned.task.id, planned.task.attemptId, planned.task.sourceEventId, 'spec'])
+      assert.equal(afterNote.counts.executions, 0)
+      assert.equal(afterNote.run.stopRequestedAt, null, 'an Owner plan clarification does not cancel its planner or start execution')
+
+      const ready = await completeSpec(who, result.runId!)
+      const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
+      const { factoryBinding } = await import('../lib/factory/dispatch')
+      const runtime = factoryRuntimeForBot(who.botId)
+      await assert.rejects(runtime.store.apply(who.id, factoryBinding(ready.task), randomUUID(), { action: 'advance', stage: 'execute', reason: 'A model may not approve the plan' }), { code: 'factory_spec_approval_required' })
+      const bypass = await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', sourceEventId, needsSpec: false, note: 'Continue without clicking spec approval.', requestKey: `bypass:${randomUUID()}` }, undefined, who.botId) as { error?: string; runId?: string }
+      assert.ok(bypass.error, JSON.stringify(bypass))
+      assert.equal(bypass.runId, undefined)
+      await assert.rejects(sendThreadMessage(who.id, result.runId!, 'Begin implementation now.'), { code: 'runInvalid' })
+      const stillWaiting = await specState(who)
+      assert.deepEqual([stillWaiting.task.id, stillWaiting.task.attemptId, stillWaiting.task.sourceEventId, stillWaiting.task.stage, stillWaiting.task.status], [ready.task.id, ready.task.attemptId, ready.task.sourceEventId, 'spec', 'passed'])
+      assert.deepEqual(stillWaiting.counts, ready.counts, 'a generic retry or Owner follow-up cannot manufacture approval or an executor')
+
+      const { createFactorySpecApproval } = await import('../lib/factory/spec-approval')
+      const { automaticFactoryDispatch, factoryAutomaticRuntime } = await import('../lib/factory/automatic-dispatch')
+      const approve = createFactorySpecApproval(appPool, runtime.store, automaticFactoryDispatch(appPool))
+      const sessionId = randomUUID()
+      await pool.query(`INSERT INTO "session" (id,token,"userId","expiresAt","createdAt","updatedAt") VALUES ($1,$2,$3,now()+interval '1 hour',now(),now())`, [sessionId, randomUUID(), who.id])
+      const approval = { binding: { taskId: ready.task.id, revision: ready.task.revision }, eventId: randomUUID() }
+      const beforeHandoffs = stageHandoffs.length, previousEnqueue = factoryAutomaticRuntime.enqueue
+      factoryAutomaticRuntime.enqueue = threadMachines.enqueueDurable
+      let replies: Awaited<ReturnType<typeof approve>>[]
+      try { replies = await Promise.all([approve({ userId: who.id, sessionId }, approval), approve({ userId: who.id, sessionId }, approval)]) }
+      finally { factoryAutomaticRuntime.enqueue = previousEnqueue }
+      assert.equal(replies.filter(reply => reply.replayed).length, 1)
+      assert.equal(stageHandoffs.length, beforeHandoffs + 1, 'approval queues one durable host handoff, including concurrent replay')
+      const [handoffActor, previousRunId, implementationRunId] = stageHandoffs.at(-1)!
+      assert.equal(previousRunId, result.runId)
+      const { handoffFactoryCloudStage } = await import('../lib/factory/cloud-stage-handoff')
+      assert.equal(await handoffFactoryCloudStage(appPool, handoffActor, previousRunId, implementationRunId), true, 'the normal host handoff starts the fresh executor after approval commits')
+      const implementation = await specState(who)
+      assert.equal(implementation.task.id, ready.task.id)
+      assert.equal(implementation.task.sourceEventId, ready.task.sourceEventId)
+      assert.deepEqual([implementation.task.stage, implementation.task.status, implementation.counts.approvals, implementation.counts.executions, implementation.counts.runs], ['execute', 'running', 1, 1, 2])
+      assert.notEqual(implementation.task.attemptId, ready.task.attemptId)
+      assert.notEqual(implementation.run.id, planned.run.id)
+      assert.equal(implementation.run.kind, 'implement')
+      assert.equal(implementation.run.agentDefinition.readOnly, undefined, 'real human approval removes the planner read-only grant for a fresh writable executor')
+      assert.equal(implementation.run.agentDefinition.agentProfile.profileId, executor.id, 'implementation selects its own current Profile')
+      assert.equal(implementation.run.agentDefinition.profileOriginRunId, undefined)
+      assert.equal(implementation.run.continuesRunId, null)
+      assert.equal(implementation.run.sessionId, null, 'implementation cannot inherit the planner native session')
+      // One task retains its VM; the independent executor takes custody with
+      // new credentials, without inheriting the planner's native session.
+      assert.equal(implementation.run.deviceId, plannerMachine.deviceId)
+      assert.deepEqual((await pool.query('SELECT state,"sandboxId" FROM thread_machines WHERE "runId"=$1', [planned.run.id])).rows[0], { state: 'ended', sandboxId: null }, 'the completed planner gives up the task machine')
+      assert.deepEqual((await pool.query('SELECT "ownerId","workspaceId","botId","issueId","deviceId","repoId","sandboxId",state FROM thread_machines WHERE "runId"=$1', [implementation.run.id])).rows[0], {
+        ownerId: who.id, workspaceId: who.workspaceId, botId: who.botId, issueId: who.issueId,
+        deviceId: plannerMachine.deviceId, repoId: plannerMachine.repoId, sandboxId: plannerMachine.sandboxId, state: 'running',
+      }, 'the executor owns this same task runtime after the real handoff')
+      const tokens = (await pool.query('SELECT id,"revokedAt" FROM device_tokens WHERE "boundDeviceId"=$1', [plannerMachine.deviceId])).rows
+      assert.ok(tokens.find(token => token.id === plannerMachine.tokenId)?.revokedAt, 'the planner worker credential is revoked')
+      const activeTokens = tokens.filter(token => token.revokedAt === null)
+      assert.equal(activeTokens.length, 1)
+      assert.notEqual(activeTokens[0].id, plannerMachine.tokenId, 'the executor receives a new worker credential')
+      assert.equal(implementation.run.machineState, 'running')
+      assert.equal(implementation.run.agentDefinition.repositoryAdmission?.authority, 'owner_credential')
+      assert.equal(implementation.counts.publications, 1)
+      assert.match(implementation.run.prompt, /Factory implementation owns validation/)
+      assert.match(implementation.run.prompt, /APPROVED_SPEC_CONTEXT_1276/, 'the fresh executor receives the actual approved plan content')
+      assert.match(implementation.run.prompt, /OWNER_PLAN_CONTEXT_1276/, 'the fresh executor retains the Owner clarification consumed during planning')
+      assert.ok(profileSelections.slice(decisionsBefore).some(choice => choice.stage === 'execute' && choice.profileId === executor.id))
+    } finally { delete profileForStage.spec; delete profileForStage.execute }
+  })
+
+  await t.test('an intake-created pending cloud spec is dispatched in place, and a different source cannot replace it', async () => {
+    const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
+    const who = await person('cloud-pending-spec')
+    const sourceEventId = await ownerSpecRequest(who)
+    const runtime = factoryRuntimeForBot(who.botId)
+    const routed = await runtime.store.route(who.id, { issueId: who.issueId, sourceEventId, eventId: randomUUID(), rationale: 'An intake requested a real specification.', needsSpec: true })
+    const otherSource = await ownerSpecRequest(who, 'A distinct Owner request is not the existing spec source.')
+    const refused = await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', sourceEventId: otherSource, requestKey: `wrong-source:${randomUUID()}` }, undefined, who.botId) as { error?: string; runId?: string }
+    assert.ok(refused.error, JSON.stringify(refused))
+    assert.equal(refused.runId, undefined)
+    const pending = await specState(who)
+    assert.deepEqual([pending.task.id, pending.task.attemptId, pending.task.sourceEventId, pending.task.stage, pending.task.status], [routed.task.id, routed.task.attemptId, sourceEventId, 'spec', 'pending'])
+    assert.deepEqual(pending.counts, { tasks: 1, attempts: 1, executions: 0, runs: 0, publications: 0, approvals: 0 })
+    const key = `existing-spec:${randomUUID()}`
+    // The existing task, rather than the caller's omitted flag, owns its stage.
+    const input = { issueId: who.issueId, repo: 'octo/repo', sourceEventId, requestKey: key }
+    const result = await steps.dispatchRun(who.id, input, undefined, who.botId) as { runId?: string; error?: string }
+    assert.ok(result.runId, JSON.stringify(result))
+    const started = await specState(who)
+    assert.deepEqual([started.task.id, started.task.attemptId, started.task.sourceEventId, started.task.stage, started.task.status], [routed.task.id, routed.task.attemptId, sourceEventId, 'spec', 'running'])
+    assert.deepEqual([started.run.kind, started.run.agentDefinition.readOnly], ['plan', true])
+    assert.deepEqual(started.counts, { tasks: 1, attempts: 1, executions: 0, runs: 1, publications: 0, approvals: 0 })
+    const replay = await steps.dispatchRun(who.id, input, undefined, who.botId) as { runId?: string }
+    assert.equal(replay.runId, result.runId)
+    assert.deepEqual((await specState(who)).counts, started.counts, 'a resend cannot create a second plan or replace the pending task')
+  })
 })

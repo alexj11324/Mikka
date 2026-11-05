@@ -13,7 +13,7 @@ export { factoryDispatchSchema, type FactoryDispatchInput };
 export type QueueFactoryRun = (tx: PoolClient, userId: string, input: DispatchInput, sourceRunId?: string) => Promise<DispatchResult>;
 export type FactoryQueue = (tx: PoolClient, userId: string, input: {
   issueId: string; agentId: string; deviceRepoId: string; note?: string; profileId?: string;
-}, botId: string | null, context: { sourceEventId: string; attemptId: string; questionOriginRunId?: string; questionHistoryRunId?: string }) => Promise<{ runId: string }>;
+}, botId: string | null, context: { sourceEventId: string; attemptId: string; stage?: FactoryStage; questionOriginRunId?: string; questionHistoryRunId?: string }) => Promise<{ runId: string }>;
 /** Installed by the owning consumer; no model may select a callback or gate. */
 export interface FactoryDispatchAdapters {
   lockAdmission?: (tx: PoolClient, userId: string, input: FactoryDispatchInput) => Promise<void>;
@@ -87,7 +87,7 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
       if (task.status !== 'pending' || !['spec','execute','review','verify','monitor'].includes(task.stage)) fail('factoryTransition');
       const configure = adapters.configure[task.stage];
       if (!configure) fail('factoryDispatchAdapterRequired');
-      const queued = await queue(tx,userId,{issueId:task.issueId,agentId:input.agentId,deviceRepoId:input.deviceRepoId,note:input.note,...(input.profileId ? {profileId:input.profileId} : {})},task.botId,{sourceEventId:task.sourceEventId,attemptId:task.attemptId,...(questionOriginRunId ? {questionOriginRunId} : {}),...(questionHistoryRunId ? {questionHistoryRunId} : {})});
+      const queued = await queue(tx,userId,{issueId:task.issueId,agentId:input.agentId,deviceRepoId:input.deviceRepoId,note:input.note,...(input.profileId ? {profileId:input.profileId} : {})},task.botId,{sourceEventId:task.sourceEventId,attemptId:task.attemptId,stage:task.stage,...(questionOriginRunId ? {questionOriginRunId} : {}),...(questionHistoryRunId ? {questionHistoryRunId} : {})});
       await tx.query('UPDATE factory_attempts SET output=output || $2::jsonb WHERE id=$1', [task.attemptId, JSON.stringify({ requestEpoch: task.sourceEventId })]);
       const configured = await configure(tx,task,queued.runId);
       const handoff = await persistFactoryHandoff(tx, task);
