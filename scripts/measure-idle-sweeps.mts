@@ -18,7 +18,7 @@ for (const proto of [pg.Client.prototype, pg.Pool.prototype]) {
 process.env.CRON_SECRET = 'idle-measure-local-only'
 process.env.AI_GATEWAY_API_KEY ??= 'idle-measure-placeholder' // coordinatorEnabled(); nothing is due, so no model call
 const request = (path: string) => new Request(`http://localhost/mikka/api/cron/${path}`, { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } })
-const routes = { reconcile: () => import('../app/api/cron/reconcile/route'), 'coordinator-wakes': () => import('../app/api/cron/coordinator-wakes/route'), schedules: () => import('../app/api/cron/schedules/route'), 'run-recovery': () => import('../app/api/cron/run-recovery/route') }
+const routes = { reconcile: () => import('../app/api/cron/reconcile/route'), 'account-deletions': () => import('../app/api/cron/account-deletions/route'), 'audit-retention': () => import('../app/api/cron/audit-retention/route'), 'coordinator-wakes': () => import('../app/api/cron/coordinator-wakes/route'), schedules: () => import('../app/api/cron/schedules/route'), 'run-recovery': () => import('../app/api/cron/run-recovery/route') }
 const result: Record<string, number> = {}
 for (const [name, load] of Object.entries(routes)) {
   const { GET } = await load()

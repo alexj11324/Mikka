@@ -8,7 +8,7 @@ import { wakeTokens, wakeTransport, workflowWakesEnabled } from './workflow-wake
  * it when none runs. The job's cron route stays as a slow reconciliation sweep
  * that only recovers a start lost between COMMIT and here.
  */
-export type DueKind = 'schedules' | 'run-recovery'
+export type DueKind = 'schedules' | 'run-recovery' | 'account-deletions'
 export type DueJob = { run(): Promise<number | null>; next(): Promise<number | null> }
 
 export const dueJobs: Record<DueKind, DueJob> = {
@@ -21,6 +21,20 @@ export const dueJobs: Record<DueKind, DueJob> = {
     run: async () => { const { recoverRuns } = await import('./run-recovery'); await recoverRuns(work => work()); return (await import('./run-recovery-due')).runRecoveryNextDue() },
     next: async () => (await import('./run-recovery-due')).runRecoveryNextDue(),
   },
+  'account-deletions': {
+    run: async () => {
+      const [{ sweepAccountDeletions }, { cleanupChatFiles }] = await Promise.all([import('./account/deletion-jobs'), import('./chat-attachments/store')])
+      await sweepAccountDeletions()
+      await cleanupChatFiles()
+      return accountDeletionsNextDue()
+    },
+    next: () => accountDeletionsNextDue(),
+  },
+}
+
+async function accountDeletionsNextDue() {
+  const [{ pool }, { nextAccountDeletionsDue }] = await Promise.all([import('./db'), import('./account-deletions-due')])
+  return nextAccountDeletionsDue(pool)
 }
 
 /** Tests replace `start` here to observe timer starts without a Workflow world. */

@@ -11,8 +11,8 @@ const headers = { 'cache-control': 'no-store' }
 
 /**
  * The single safety-net sweep (#1371), called every 15 minutes by the minute
- * Worker. Coordinator wakes, schedules and run recovery start from their writes
- * and their durable timers; this recovers only work already due that none of
+ * Worker. Coordinator wakes, schedules, run recovery and account deletion
+ * start from their writes and their durable timers; this recovers only work already due that none of
  * them picked up (a start lost between COMMIT and its wake, a timer that
  * failed). Worst case, such work runs 15 minutes after its due time. An idle
  * call costs one statement.
@@ -27,6 +27,11 @@ async function handleGET(request: Request) {
     if (due.schedules) {
       counts.scheduleCounts = await (await import('@/lib/schedules/runtime')).sweepSchedules()
       await armDueTimer('schedules')
+    }
+    if (due.deletions) {
+      const [{ sweepAccountDeletions }, { cleanupChatFiles }] = await Promise.all([import('@/lib/account/deletion-jobs'), import('@/lib/chat-attachments/store')])
+      counts.deletionCounts = { ...await sweepAccountDeletions(), attachments: await cleanupChatFiles() }
+      await armDueTimer('account-deletions')
     }
     if (due.recovery) {
       counts.recoveryCounts = await (await import('@/lib/run-recovery')).recoverRuns(work => afterJob('cron:reconcile/group-turns', work))
