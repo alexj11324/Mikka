@@ -6,8 +6,8 @@ import Reanimated, { Extrapolation, interpolate, ReduceMotion, useAnimatedReacti
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 import { tap } from '@/lib/haptics'
-import { colors } from '@/lib/theme'
-import { CLOSE_PAN, DRAWER_SPRING, dragProgress, drawerWidth, OPEN_PAN, ROUNDED_AT, settlesOpen, surfaceRadius } from '../model/drawer'
+import { colors, drawerLift } from '@/lib/theme'
+import { CLOSE_PAN, DRAWER_SPRING, dragProgress, drawerWidth, OPEN_PAN, ROUNDED_AT, settlesOpen, surfaceDim, surfaceRadius, surfaceScale } from '../model/drawer'
 import { DrawerContent } from './drawer-content'
 
 type AppDrawerValue = {
@@ -26,7 +26,7 @@ const SPRING = { ...DRAWER_SPRING, reduceMotion: ReduceMotion.System }
 /**
  * The app's frame (#1408 Phase 2): one Stack on a surface that slides right to show the drawer lying under it. On
  * the home screen a drag to the right pulls the surface open; the header's workspace button opens it too. While open,
- * the surface is dimmed, rounded to the screen's corners and shadowed; a tap on it or a drag back closes the drawer.
+ * the surface rounds to the screen's corners, lifts with a soft shadow and takes a light veil; a tap on it or a drag back closes the drawer.
  */
 export function AppDrawer({ children }: { children: ReactNode }) {
   const router = useRouter()
@@ -35,6 +35,7 @@ export function AppDrawer({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets()
   const width = drawerWidth(screen)
   const radius = surfaceRadius(insets)
+  const lift = drawerLift.shadowOpacity
   const progress = useSharedValue(0)
   const blockOpen = useSharedValue(false)
   // The same as `shown`, on the UI thread: the drags read it as they start, so a render never rebuilds them mid-drag.
@@ -103,15 +104,23 @@ export function AppDrawer({ children }: { children: ReactNode }) {
     if (atRest && before === false) scheduleOnRN(closed)
   }, [closed])
 
-  const surface = useAnimatedStyle(() => ({
+  const surface = useAnimatedStyle(() => {
+    const open = progress.get()
+    return {
+      borderRadius: interpolate(open, [0, ROUNDED_AT], [0, radius], Extrapolation.CLAMP),
+      // Scale first, then slide by the full drawer width, so the shrink does not eat the slide.
+      transform: [{ scale: surfaceScale(open) }, { translateX: open * width }],
+      shadowOpacity: open * lift,
+    }
+  })
+  const clip = useAnimatedStyle(() => ({
     borderRadius: interpolate(progress.get(), [0, ROUNDED_AT], [0, radius], Extrapolation.CLAMP),
-    transform: [{ translateX: progress.get() * width }],
   }))
   const drawer = useAnimatedStyle(() => ({
     opacity: interpolate(progress.get(), [0, 1], [0.5, 1]),
     transform: [{ translateX: interpolate(progress.get(), [0, 1], [-24, 0]) }],
   }))
-  const dim = useAnimatedStyle(() => ({ opacity: progress.get() }))
+  const dim = useAnimatedStyle(() => ({ opacity: surfaceDim(progress.get()) }))
 
   const value = useMemo(() => ({ open, close, go, hold }), [close, go, hold, open])
   return (
@@ -123,12 +132,14 @@ export function AppDrawer({ children }: { children: ReactNode }) {
         </Reanimated.View>
         <GestureDetector gesture={Gesture.Exclusive(closePan, openPan)}>
           <Reanimated.View style={[styles.surface, surface]}>
-            <View style={styles.fill} pointerEvents={shown ? 'none' : 'auto'}
-              accessibilityElementsHidden={shown} importantForAccessibility={shown ? 'no-hide-descendants' : 'auto'}>
-              {children}
-            </View>
-            <Reanimated.View style={[StyleSheet.absoluteFill, styles.dim, dim]} pointerEvents="none" />
-            {shown ? <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="关闭侧栏" onPress={close} /> : null}
+            <Reanimated.View style={[styles.clip, clip]}>
+              <View style={styles.fill} pointerEvents={shown ? 'none' : 'auto'}
+                accessibilityElementsHidden={shown} importantForAccessibility={shown ? 'no-hide-descendants' : 'auto'}>
+                {children}
+              </View>
+              <Reanimated.View style={[StyleSheet.absoluteFill, styles.dim, dim]} pointerEvents="none" />
+              {shown ? <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="关闭侧栏" onPress={close} /> : null}
+            </Reanimated.View>
           </Reanimated.View>
         </GestureDetector>
       </View>
@@ -144,9 +155,20 @@ export function useAppDrawer(): AppDrawerValue {
 
 const styles = StyleSheet.create({
   frame: { flex: 1, backgroundColor: colors.drawer },
-  drawer: { position: 'absolute', top: 0, bottom: 0, left: 0 },
-  // The shadow falls to the left, on the drawer, and the corners curve as the screen's do.
-  surface: { flex: 1, overflow: 'hidden', backgroundColor: colors.page, borderCurve: 'continuous', boxShadow: '-12px 0 32px rgba(0, 0, 0, 0.28)' },
+  drawer: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: colors.drawer },
+  // Shadow lives on the shell, which is not clipped, so it follows the radius. The clip hides the page's square corners.
+  surface: {
+    flex: 1,
+    backgroundColor: colors.page,
+    borderCurve: 'continuous',
+    shadowColor: drawerLift.shadowColor,
+    shadowOffset: drawerLift.shadowOffset,
+    shadowRadius: drawerLift.shadowRadius,
+    shadowOpacity: 0,
+    elevation: drawerLift.elevation,
+    boxShadow: drawerLift.boxShadow,
+  },
+  clip: { flex: 1, overflow: 'hidden', backgroundColor: colors.page, borderCurve: 'continuous' },
   fill: { flex: 1 },
-  dim: { backgroundColor: colors.scrim },
+  dim: { backgroundColor: colors.drawerDim },
 })
