@@ -1,4 +1,4 @@
-import { runTitle, type CitationSource, type EventLine } from './types'
+import { runName, type CitationSource, type EventLine } from './types'
 
 const RUN_ENDED: Record<string, string> = { succeeded: '已完成', failed: '失败了', stopped: '已停止', cancelled: '已取消' }
 const ISSUE_STATUS: Record<string, string> = { backlog: '待整理', todo: '待办', doing: '进行中', review: '评审中', done: '已完成', canceled: '已取消', duplicate: '重复' }
@@ -15,7 +15,8 @@ const WHAT: Partial<Record<EventLine['kind'], string>> = {
 export function eventText(line: EventLine | undefined, sources: Record<string, CitationSource>): string {
   if (!line) return '有一条新动态'
   const run = line.runId ? sources[line.runId] : undefined
-  const thread = run?.kind === 'run' ? runTitle(run) : '一个线程'
+  // The thread by its task's title; the task's key (ALEX-45) is an internal id (#1386).
+  const thread = run?.kind === 'run' ? runName(run) : '一个线程'
   const issue = line.issueId ? sources[line.issueId] : undefined
   const task = issue?.kind === 'issue' ? issue.title : line.title ? `「${line.title}」` : '一个任务'
   switch (line.kind) {
@@ -26,4 +27,15 @@ export function eventText(line: EventLine | undefined, sources: Record<string, C
     case 'other': return '有一条新动态'
     default: return `${thread} ${WHAT[line.kind] ?? ''}`.trim()
   }
+}
+
+/**
+ * A thread still waiting for the person's answer is a card, not a grey line (#1386): its name without the task's key,
+ * 「在等你回答」 and 去回答. Once answered (its group has moved on) it is an ordinary event line again.
+ */
+export function questionCard(line: EventLine | undefined, sources: Record<string, CitationSource>): { runId: string; title: string } | null {
+  if (line?.kind !== 'runQuestion' || !line.runId) return null
+  const run = sources[line.runId]
+  if (run?.kind !== 'run' || (run.group && run.group !== 'waiting')) return null
+  return { runId: run.id, title: runName(run) }
 }

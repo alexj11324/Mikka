@@ -163,7 +163,7 @@ export default function GroupChat() {
     <View style={styles.screen}>
       <NavBar title={title} material />
       <View style={{ flex: 1, overflow: 'hidden' }} {...handlers}>
-        <ChatScrollView ref={scroll} testID="group-chat-scroll" {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd"
+        <ChatScrollView ref={scroll} testID="group-chat-scroll" bounces alwaysBounceVertical {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd"
           contentContainerStyle={[styles.list, { paddingBottom: composerHeight + 16 }]} onScroll={chatScroll.onScroll} scrollEventThrottle={16} onContentSizeChange={chatScroll.onContentSizeChange}>
           {!page.data && !page.error ? <View style={styles.loading}><Spinner /></View> : null}
           <ReadNotice error={page.error} hasData={Boolean(page.data)} label="群聊" onRetry={page.reload} />

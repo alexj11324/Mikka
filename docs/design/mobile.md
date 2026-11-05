@@ -175,6 +175,31 @@ precedent. Figma frames 07, 07a–07e.
 Left out: sign-in provider, push-device list, explanatory footers, counts.
 Administration (members, teams, devices) stays on the web.
 
+## Native first
+
+Wherever iOS has a native control or behavior, the app uses it; we build our own only where nothing native exists
+([2026-11-05-1230](decisions/2026-11-05-1230-ios-native-first.md)). Native today: the stack header with the system
+material and its back swipe, the header's 更多 (UIMenu via `Stack.Toolbar.Menu`), the model picker and 「+」 (SwiftUI
+`Menu`), segmented controls (SwiftUI `Picker`), switches (`UISwitch`), the activity indicator, sheets (`formSheet` with
+detents, `modal` page sheets), and the scroll views' bounce and momentum. The vendored beui kit is not used for any of
+these.
+
+What is still our own, and why:
+
+| Control | Why it is ours |
+|---|---|
+| Message bubbles, event lines, the thread card (`components/chat.tsx`) | iOS has no chat transcript control. |
+| Swipe right to quote, swipe left for times (`TimedRow`, `useTimeReveal`) | Messages' gestures are not public API; ours follow them, on `lib/springs.ts`. |
+| Long-press message actions (`app/message.tsx`, a native `formSheet`) | The native context menu with a preview (`@expo/ui` `ContextMenu`) needs the bubble hosted in SwiftUI and a device to check it; it moves to its own PR (#1386 follow-up). UIKit has no reaction row on a context menu: the emoji row would sit in the preview, as in Messages. |
+| The reply action row (copy · 回复 · 更多) | Not a system control; ChatGPT and Claude draw it the same way. |
+| The composer (`Composer` in `components/ui.tsx`) | iOS has no chat composer; its text field is the system's `UITextView`. |
+| The side drawer (`components/Drawer.tsx`) | iOS has no drawer; it moves on the system-like `DRAWER` spring. |
+| Settings rows (`components/settings.tsx` `Row`) | Drawn as an inset grouped list; moving them to `@expo/ui` `Form` is a separate change. |
+| Reactions, mention chips, cards (`cards.tsx`) | No system equivalent. |
+
+Motion: `apps/mobile/lib/springs.ts` holds the one spring family (snap back ζ≈0.73, drawer ζ≈0.82, a new message
+rising 8 pt at ζ≈0.8). Every animation keeps its Reduce Motion branch.
+
 ## Layout and states
 
 To draw for each screen: empty, loading, normal, error, offline, dark mode,

@@ -14,14 +14,15 @@ import { useHome } from '@/lib/home'
 import { restartToUpdate, useUpdateReady } from '@/lib/updates'
 import { colors } from '@/lib/theme'
 import { useReducedMotionPreference } from '@/lib/reduced-motion'
+import { DRAWER } from '@/lib/springs'
 
 type DrawerState = { open: () => void; close: () => void; isOpen: boolean }
 type NativeView = ComponentRef<typeof View>
 const DrawerContext = createContext<DrawerState>({ open: () => {}, close: () => {}, isOpen: false })
 export const useDrawer = () => useContext(DrawerContext)
 
-// Close to UIKit's default spring: settles fast, no visible bounce.
-const SPRING = { damping: 30, stiffness: 300, mass: 0.9, overshootClamping: true }
+// lib/springs.ts: UIKit-like, carries the finger's speed, overshoots a little and settles (#1386).
+const SPRING = DRAWER
 
 /** The tab roots: a chat or thread pushed over them keeps the system's swipe back instead. */
 const drawerRoot = (path: string) => path === '/chats' || path === '/threads' || path === '/search'
@@ -149,7 +150,8 @@ export function DrawerHost({ children }: { children: ReactNode }) {
     })
 
   const contentStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: progress.value * panel }],
+    // A bounce past closed would pull the tabs off the left edge; past open it shows as the drawer's give.
+    transform: [{ translateX: Math.max(0, progress.value) * panel }],
     borderTopLeftRadius: interpolate(progress.value, [0, 0.15], [0, 28], 'clamp'),
     borderBottomLeftRadius: interpolate(progress.value, [0, 0.15], [0, 28], 'clamp'),
     shadowOpacity: progress.value * 0.12,
