@@ -10,7 +10,7 @@ const databaseURL = process.env.E2E_DATABASE_URL
 const disposable = disposableDatabase(process.env, databaseURL)
 if (process.env.REQUIRE_DB === '1' && !disposable) throw new Error('Subscription acquisition expiry tests require an isolated local database')
 
-const migration = '20261105035000_byos_acquire_expiry.sql'
+const migration = '20261105150000_byos_acquire_expiry.sql'
 const digest = 'a'.repeat(64)
 
 async function withDatabase(run: (pool: Pool) => Promise<void>) {
