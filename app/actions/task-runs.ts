@@ -22,14 +22,11 @@ export interface TaskRun {
   /** The newest run on the issue: a notification opens it beside its task (R-82). */
   runId: string
   issueTitle: string
-  agentId: string
   /** The Agent running the newest thread (Claude Code, Codex): the desktop notification's line (R-78). */
   agentName: string
   status: RunStatus
   /** How it came out once it ended, as the decision model judged it; null while running or not judged yet (R-52). */
   outcome: RunOutcome | null
-  error: string | null
-  finishedAt: string | null
   /** The Bot that owns the task's newest thread, with its own bloub look (R-25); null for the Coordinator's own work. */
   bot: { id: string; name: string; color: string; shape: string } | null
   /** The coding agents (harnesses) of the task's threads, newest first: the board card's agent marks. */
@@ -53,8 +50,8 @@ async function readTaskRuns() {
   // A run whose device went offline is retried (or lands in 等你) by the minute
   // run-recovery cron (sweepExpiredRunLeases), not by this poll.
   const rows = await db.selectDistinctOn([agentRuns.issueId], {
-    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: issues.title, agentId: agentRuns.agentId, agentName: runAgentName,
-    status: agentRuns.status, outcome: agentRuns.outcome, error: agentRuns.error, finishedAt: agentRuns.finishedAt,
+    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: issues.title, agentName: runAgentName,
+    status: agentRuns.status, outcome: agentRuns.outcome,
     botId: runBotId,
     expiresAt: sql<Date | null>`(select min(r."createdAt")+interval '30 days' from agent_runs r where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt">now()-interval '30 days')`,
     harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r."agentId" where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt" > now() - interval '30 days' group by a.harness order by max(r."createdAt") desc)`,
@@ -64,7 +61,7 @@ async function readTaskRuns() {
   const botIds = [...new Set(rows.flatMap(row => row.botId ? [row.botId] : []))]
   const looks = botIds.length ? await db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }).from(bots).where(and(eq(bots.ownerId, session.user.id), inArray(bots.id, botIds))) : []
   const live = await ownerListRead(session.user.id, rows.map(row => row.expiresAt), observedAt, begun)
-  const items: TaskRun[] = rows.map(({ botId, expiresAt: _expiresAt, ...row }) => ({ ...row, issueId: row.issueId!, finishedAt: row.finishedAt?.toISOString() ?? null, bot: looks.find(look => look.id === botId) ?? null }))
+  const items: TaskRun[] = rows.map(({ botId, expiresAt: _expiresAt, ...row }) => ({ ...row, issueId: row.issueId!, bot: looks.find(look => look.id === botId) ?? null }))
   return { items, live }
 }
 
