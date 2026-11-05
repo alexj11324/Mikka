@@ -15,9 +15,7 @@
     "devices": {
       "agents.listDevices": { "max": 11, "tracking": "#1212", "why": "device list, refreshInterval 5 s" }
     },
-    "artifact-viewer": {
-      "artifacts.getArtifact": { "max": 4, "tracking": "#1212", "why": "artifact detail, refreshInterval 15 s" }
-    },
+    "artifact-viewer": {},
     "nav-bot-list": {}
   }
 }
