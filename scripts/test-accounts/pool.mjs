@@ -17,7 +17,7 @@ const TABLES = Object.freeze({
   coordinator_bots: ['coordinator_bots', 'botId'], coordinator_sessions: ['coordinator_sessions', 'botId'],
   devices: ['devices', 'id'], conversations: ['conversations', 'id'],
   conversation_members: ['conversation_members', 'conversationId'], conversation_messages: ['conversation_messages', 'id'],
-  artifacts: ['artifacts', 'id'], artifact_versions: ['artifact_versions', 'id'],
+  artifacts: ['artifacts', 'id'], artifact_versions: ['artifact_versions', 'id'], artifact_shares: ['artifact_shares', 'id'],
 })
 const quote = name => `"${name.replaceAll('"', '""')}"`
 const digest = value => createHash('sha256').update(value).digest('hex')

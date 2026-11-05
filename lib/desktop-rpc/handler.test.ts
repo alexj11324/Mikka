@@ -109,6 +109,8 @@ test('native header adapter preserves browser authority but strips all bearer co
 
 test('registry schemas reject forged authority, malformed nested input and extra arguments', () => {
   const cases: [keyof typeof desktopActionSchemas, unknown[]][] = [
+    ['desktop.workspaceLink', ['valid-slug', { userId: peer }]],
+    ['desktop.workspaceLink', ['../private']],
     ['workspace.switchWorkspace', [{ workspaceId: owner, ownerId: peer }]],
     ['coordinator.sendCoordinatorMessage', ['hello', null, null, owner, { kind: 'device', deviceId: 'invalid' }]],
     ['issue-metadata.updateIssueMetadata', [{ id: owner, revision: 1, patch: { userId: peer } }]],

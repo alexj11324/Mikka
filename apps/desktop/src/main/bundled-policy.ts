@@ -35,6 +35,7 @@ const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [new RegExp(`^/api/(?:bots/${ID}(?:/(?:definition|subagents(?:/${ID}(?:/(?:stop|viewer|credentials(?:/(?:challenge|login))?))?)?|computer(?:/(?:runtimes|subscription|takeover|runs|wake|handback|viewer))?))?|conversations/${ID}(?:/(?:decisions(?:/replay)?|members|stop|read|messages))?|suggestions/${ID}(?:/start)?|threads/${ID}/(?:machine|credentials(?:/(?:challenge|login))?))$`), ['GET', 'POST', 'PATCH', 'DELETE']],
   [new RegExp(`^/api/(?:workspaces/${ID}/(?:audit-log(?:/retention)?|skills|computer-policy|model-admission)|teams/${ID}/members|projects/${ID}/decisions(?:/from-message)?|conversation-links/${ID}/messages|integrations/composio/catalog/${ID}|devices/${ID}/commands|device-tokens/${ID}/revoke|computer/approvals/${ID})$`), ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']],
   [new RegExp(`^/api/(?:chat/attachments/${ID}|captures/${ID}|captures/shared/${ID}|artifacts/${ID}/versions/[0-9]+/(?:download|frame)|artifacts/shared/${ID}/frame|avatars/${ID}/${ID}|account/export/${ID})$`), ['GET']],
+  [new RegExp(`^/api/artifacts/shared/${ID}$`), ['GET']],
   [new RegExp(`^/api/(?:mobile/(?:bots|artifacts)/${ID}|runs/${ID}/evidence)$`), ['GET']],
   [new RegExp(`^/api/factory/(?:agent-profiles/${ID}|tasks/${ID}(?:/(?:approval|dispatch(?:/cloud)?|evidence/${ID}))?|questions/${ID}(?:/recover)?|monitor-incidents/${ID}/links)$`), ['GET', 'POST', 'PATCH', 'DELETE']],
 ]

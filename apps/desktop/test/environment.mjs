@@ -6,6 +6,7 @@ import { randomBytes } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import { mkdir, open, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
+import { createServer } from 'node:net'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -40,23 +41,49 @@ await mkdir('.cache/e2e', { recursive: true, mode: 0o700 })
 await mkdir('.cache/desktop-runtime', { recursive: true, mode: 0o700 })
 const children = []
 let worker
+let stopping = false
+let rejectServerExit
+const serverExit = new Promise((_, reject) => { rejectServerExit = reject })
+// Startup checks below also observe this promise; attach a handler immediately
+// so a failed child during setup cannot become an unhandled rejection.
+serverExit.catch(() => {})
+
+async function requireFreePort(serverPort, host) {
+  const probe = createServer()
+  await new Promise((resolve, reject) => {
+    probe.once('error', () => reject(new Error(`DESKTOP_TEST_PORT_${serverPort}_IN_USE`)))
+    probe.listen({ port: serverPort, host, exclusive: true }, () => probe.close(resolve))
+  })
+}
+
+function signalServer(child, signal) {
+  if (!child.pid) return
+  try {
+    // Next may create descendants. Every server has its own process group;
+    // teardown must not leave an old build occupying the next run's port.
+    process.kill(process.platform === 'win32' ? child.pid : -child.pid, signal)
+  } catch (error) { if (error.code !== 'ESRCH') throw error }
+}
 async function run(command, args, env = process.env) {
   const child = spawn(command, args, { cwd: root, env, stdio: 'inherit' })
   const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('exit', resolve) })
   if (code !== 0) throw new Error(`DESKTOP_TEST_SETUP_EXIT_${code}`)
 }
 async function start(directory, serverPort, label, metrics) {
-  const log = await open(resolve('.cache/desktop-runtime', `${label}.log`), 'a', 0o600)
+  const logPath = resolve('.cache/desktop-runtime', `${label}-${sha.slice(0, 12)}-${process.pid}.log`)
+  const log = await open(logPath, 'wx', 0o600)
   const env = { ...process.env, ...(metrics ? { MIKKA_DESKTOP_METRICS_SOCKET: `/tmp/mikka-${label}-${process.pid}.sock` } : {}) }
   const args = [...(metrics ? ['--require', resolve(harnessRoot, 'apps/desktop/test/db-metrics.cjs')] : []), resolve(directory, 'node_modules/next/dist/bin/next'), 'start', '--hostname', label === 'bundled' ? '0.0.0.0' : '127.0.0.1', '--port', String(serverPort)]
-  const child = spawn(process.execPath, args, { cwd: directory, env, stdio: ['ignore', log.fd, log.fd] })
+  const child = spawn(process.execPath, args, { cwd: directory, env, detached: process.platform !== 'win32', stdio: ['ignore', log.fd, log.fd] })
   children.push(child)
+  child.once('error', () => rejectServerExit(new Error(`DESKTOP_TEST_${label}_SERVER_FAILED`)))
+  child.once('exit', () => { if (!stopping) rejectServerExit(new Error(`DESKTOP_TEST_${label}_SERVER_EXITED`)) })
   await log.close()
   for (let attempt = 0; attempt < 120; attempt++) {
     if (child.exitCode !== null) throw new Error(`DESKTOP_TEST_${label}_SERVER_EXITED`)
     try {
       const response = await fetch(`http://127.0.0.1:${serverPort}/mikka/api/version`, { signal: AbortSignal.timeout(1500) })
-      if (response.ok) return { pid: child.pid, port: serverPort, socket: env.MIKKA_DESKTOP_METRICS_SOCKET }
+      if (response.ok && child.exitCode === null) return { pid: child.pid, port: serverPort, socket: env.MIKKA_DESKTOP_METRICS_SOCKET, log: logPath }
     } catch { /* bounded startup readiness, never application polling */ }
     await delay(500)
   }
@@ -64,6 +91,8 @@ async function start(directory, serverPort, label, metrics) {
 }
 
 try {
+  await requireFreePort(port, '0.0.0.0')
+  await requireFreePort(port + 1, '127.0.0.1')
   const compiled = await build({ entryPoints: [resolve('cloudflare/device-gateway/src/index.ts')], bundle: true, format: 'esm', platform: 'neutral', external: ['cloudflare:workers', 'node:crypto'], write: false })
   const options = {
     workers: [{ name: 'desktop-acceptance-gateway', modules: true, script: compiled.outputFiles[0].text,
@@ -84,11 +113,14 @@ try {
   if (separator !== -1) {
     const [command, ...args] = process.argv.slice(separator + 1)
     if (!command) throw new Error('DESKTOP_TEST_COMMAND_REQUIRED')
-    await run(command, args)
+    await Promise.race([run(command, args), serverExit])
   } else {
-    await new Promise(resolve => { process.once('SIGINT', resolve); process.once('SIGTERM', resolve) })
+    await Promise.race([new Promise(resolve => { process.once('SIGINT', resolve); process.once('SIGTERM', resolve) }), serverExit])
   }
 } finally {
-  for (const child of children) child.kill('SIGTERM')
+  stopping = true
+  for (const child of children) signalServer(child, 'SIGTERM')
+  if (children.length) await delay(1_000)
+  for (const child of children) signalServer(child, 'SIGKILL')
   await worker?.dispose()
 }

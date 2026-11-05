@@ -194,6 +194,13 @@ function screens(fixture) {
     },
   })
   return [
+    { name: 'workspace-link', open: async target => {
+      // The web's slug entry is intentionally outside its locale segment.
+      await target.page.goto(`${target.base}/w/${fixture.workspaceSlug}`, { waitUntil: 'domcontentloaded' })
+      await target.page.waitForURL(url => [environment.basePath, `${environment.basePath}/`, `${environment.basePath}/en`, `${environment.basePath}/en/`].includes(url.pathname))
+      await go(target)
+      await target.page.getByText('Review the desktop workspace, including conversations, tasks, artifacts and settings.', { exact: true }).waitFor()
+    } },
     ...['details', 'threads', 'prs', 'computer'].map(tab => panel(false, tab)),
     ...['details', 'threads', 'prs', 'computer'].map(tab => panel(true, tab)),
     route('group', `/?group=${fixture.group}`, text('The desktop review is ready. Please check the task and its artifacts.')),
@@ -218,6 +225,20 @@ function screens(fixture) {
   ]
 }
 
+function publicScreens(fixture) {
+  return [
+    { name: 'shared-markdown', token: fixture.markdownToken, ready: page => page.getByRole('heading', { name: fixture.artifactTitle, exact: true }).first().waitFor() },
+    { name: 'shared-html', token: fixture.htmlToken, ready: page => page.frameLocator('iframe').getByRole('heading', { name: 'Desktop review', exact: true }).waitFor() },
+    { name: 'shared-missing', token: 'mks_missing-desktop-review', ready: page => page.getByText(messages.Artifact.sharedNotFoundHint, { exact: true }).waitFor() },
+  ].map(({ name, token, ready }) => ({ name, open: async target => {
+    // Public capability links are exercised before either app receives a
+    // leased session. Tokens are recorded only in the private evidence scanner.
+    try { await target.page.goto(`${target.base}/en/a/${token}`, { waitUntil: 'domcontentloaded' }) }
+    catch { throw new Error(`Public artifact navigation failed: ${name}`) }
+    await ready(target.page)
+  } }))
+}
+
 try {
   scope = await acquireTestAccounts({ runId: `parity-${started}`, workerId: 'desktop-parity', requestId: `parity-${started}`, ttlMs: 300_000 })
   fixtures = await createParityFixtures(scope)
@@ -240,11 +261,12 @@ try {
       await page.goto(`${target.base}/en/sign-in`, { waitUntil: 'domcontentloaded' })
       await theme(target, appearance)
       await capture('sign-in', appearance, async () => { await page.locator('input[type="email"]').waitFor() })
+      for (const screen of publicScreens(fixtures.fixture)) await capture(screen.name, appearance, screen.open)
     }
     await context.addCookies(JSON.parse(await readFile(scope.owner.storageStatePath, 'utf8')).cookies)
     await selectFixtureWorkspace(target)
     const matrix = screens(fixtures.fixture)
-    report.requiredScreens = ['sign-in', ...matrix.map(screen => screen.name)]
+    report.requiredScreens = ['sign-in', ...publicScreens(fixtures.fixture).map(screen => screen.name), ...matrix.map(screen => screen.name)]
     for (const appearance of report.themes) {
       await theme(target, appearance)
       for (const screen of matrix) await capture(screen.name, appearance, screen.open)
@@ -263,10 +285,11 @@ try {
       await theme(target, appearance)
     }
     await pair('sign-in', appearance, targets, async target => { await target.page.locator('input[type="email"]').waitFor() })
+    for (const screen of publicScreens(fixtures.fixture)) await pair(screen.name, appearance, targets, screen.open)
   }
   await authenticate(bundled, hosted)
   const matrix = screens(fixtures.fixture)
-  report.requiredScreens = ['sign-in', ...matrix.map(screen => screen.name), 'offline']
+  report.requiredScreens = ['sign-in', ...publicScreens(fixtures.fixture).map(screen => screen.name), ...matrix.map(screen => screen.name), 'offline']
   for (const appearance of report.themes) {
     for (const target of targets) await theme(target, appearance)
     for (const screen of matrix) await pair(screen.name, appearance, targets, screen.open)

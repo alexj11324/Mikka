@@ -17,6 +17,8 @@ import { launchElectron } from './electron-launch.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 const environment = await loadEnvironment()
+const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
+assert.equal(environment.deploymentSha, revision, 'Lifecycle acceptance must test the attested application revision')
 const output = resolve(process.env.MIKKA_DESKTOP_EVIDENCE ?? '.cache/desktop-evidence')
 const pairs = Number(process.env.MIKKA_DESKTOP_COLD_PAIRS ?? 5)
 if (!Number.isInteger(pairs) || pairs < 5 || pairs > 20) throw new Error('LIFECYCLE_REQUIRES_5_TO_20_COLD_PAIRS')
@@ -27,7 +29,7 @@ const viewport = { width: 1440, height: 960 }
 const message = 'Review the desktop workspace, including conversations, tasks, artifacts and settings.'
 const menuNames = Object.fromEntries(await Promise.all(['zh-CN', 'en'].map(async locale => [locale, JSON.parse(await readFile(join(root, 'messages', `${locale}.json`), 'utf8')).Nav.workspaceMenu])))
 const evidence = {
-  version: 1, revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+  version: 1, revision,
   environmentId: environment.id, origin: environment.origin, database: environment.database.name,
   startedAt: new Date().toISOString(), viewport, checks: [], samples: [],
   measurement: {
@@ -141,6 +143,59 @@ async function offline(app, value) {
   }, value)
 }
 
+async function opaqueFrameBoundary(app, page) {
+  const marker = `lifecycle-${process.pid}-${Date.now()}`
+  // Observe the actual transport without replacing any response. Counting only
+  // this unique query prevents normal live updates from affecting the check.
+  await app.evaluate(({ session }, marker) => {
+    const backend = session.fromPartition('persist:mikka-dev-bundled-backend')
+    const probe = { backend, original: backend.fetch, marker, calls: 0 }
+    globalThis.__mikkaLifecycleFrameProbe = probe
+    backend.fetch = function (input, init) {
+      const url = new URL(typeof input === 'string' ? input : input.url)
+      if (url.searchParams.get('desktop-frame-boundary') === marker) probe.calls++
+      return probe.original.call(this, input, init)
+    }
+  }, marker)
+  try {
+    await page.evaluate(() => new Promise(resolve => {
+      const frame = document.createElement('iframe')
+      frame.id = 'mikka-lifecycle-opaque-frame'
+      frame.name = frame.id
+      frame.hidden = true
+      frame.sandbox.add('allow-scripts')
+      frame.srcdoc = '<!doctype html><title>Untrusted frame</title><p>Boundary probe</p>'
+      frame.addEventListener('load', () => resolve(), { once: true })
+      document.body.append(frame)
+    }))
+    const frame = page.frame({ name: 'mikka-lifecycle-opaque-frame' })
+    assert.ok(frame, 'the browser created the sandboxed frame')
+    const result = await frame.evaluate(async marker => {
+      let parentDenied = false
+      try { void parent.document.body } catch { parentDenied = true }
+      let fetchDenied = false
+      let status = null
+      try {
+        status = (await fetch(`mikka://app/mikka/api/workspace?desktop-frame-boundary=${marker}`, { signal: AbortSignal.timeout(5000) })).status
+      } catch { fetchDenied = true }
+      return { bridge: typeof window.mikka, node: typeof window.require, parentDenied, fetchDenied, status }
+    }, marker)
+    assert.equal(result.bridge, 'undefined', 'subframes receive no native IPC bridge')
+    assert.equal(result.node, 'undefined')
+    assert.equal(result.parentDenied, true, 'an opaque frame cannot read the application or its bridge')
+    assert.ok(result.fetchDenied || result.status === 403, 'the untrusted frame cannot read an authenticated API')
+    assert.equal(await app.evaluate(() => globalThis.__mikkaLifecycleFrameProbe.calls), 0, 'the opaque frame must never reach the main bearer transport')
+    check('real sandboxed frame has no IPC/Node or parent access, and its API request never reaches the main bearer transport')
+  } finally {
+    await page.evaluate(() => document.getElementById('mikka-lifecycle-opaque-frame')?.remove()).catch(() => {})
+    await app.evaluate(() => {
+      const probe = globalThis.__mikkaLifecycleFrameProbe
+      if (probe) probe.backend.fetch = probe.original
+      delete globalThis.__mikkaLifecycleFrameProbe
+    })
+  }
+}
+
 try {
   // The lease helper renews this five-minute lease while the process is alive.
   scope = await acquireTestAccounts({ runId: `desktop-lifecycle-${Date.now()}`, workerId: 'lifecycle', requestId: `lifecycle-${process.pid}-${Date.now()}`, ttlMs: 300_000 })
@@ -194,6 +249,7 @@ try {
   await usable(run.page)
   assert.equal(await run.page.evaluate(() => document.cookie), '')
   check('two leased browser identities remain private in main and the real account/workspace menu switches back to the retained owner')
+  await opaqueFrameBoundary(run.app, run.page)
   await usable(run.page, 'Keep this unsent draft during the outage')
   await offline(run.app, true)
   const failedStatus = await run.page.evaluate(async () => (await fetch('/mikka/api/desktop/rpc', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: 1, action: 'desktop.bootstrap', args: [] }) })).status)

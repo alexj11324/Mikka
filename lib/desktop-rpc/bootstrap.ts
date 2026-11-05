@@ -5,6 +5,7 @@ import { emailSignInEnabled } from '@/lib/email-sign-in'
 import { onboardingDone } from '@/lib/onboarding'
 import { byoE2BKeyEnabled, getE2BKeyStatus } from '@/lib/secrets/e2b'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
+import { readWorkspaceLink } from '@/lib/workspace-admin/links'
 import { ActionFailureError } from '@/lib/action-error'
 import { safeDesktopSession } from './session'
 import type { DesktopBootstrap, DesktopConfig } from './wire'
@@ -32,4 +33,10 @@ export async function desktopBootstrap(): Promise<DesktopBootstrap> {
 export async function desktopAccounts() {
   const accounts = await auth.api.listUserAccounts({ headers: await headers() })
   return accounts.map(account => ({ id: account.id, providerId: account.providerId }))
+}
+
+export async function desktopWorkspaceLink(slug: string) {
+  const session = await desktopSession()
+  if (!session) throw new ActionFailureError('authRequired')
+  return readWorkspaceLink(session.user.id, slug)
 }

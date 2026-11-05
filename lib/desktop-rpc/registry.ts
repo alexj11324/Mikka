@@ -1,6 +1,6 @@
 import 'server-only'
 import { desktopActionSchemas, type DesktopActionName } from './schemas'
-import { desktopBootstrap, desktopSession, desktopAccounts } from './bootstrap'
+import { desktopBootstrap, desktopSession, desktopAccounts, desktopWorkspaceLink } from './bootstrap'
 import type { DesktopActions } from './handler'
 import * as actions0 from '@/app/actions/account'
 import * as actions1 from '@/app/actions/agents'
@@ -44,6 +44,7 @@ const functions = {
   'desktop.bootstrap': desktopBootstrap,
   'desktop.session': desktopSession,
   'desktop.accounts': desktopAccounts,
+  'desktop.workspaceLink': desktopWorkspaceLink,
   'account.updateDisplayName': actions0.updateDisplayName,
   'account.uploadAvatar': actions0.uploadAvatar,
   'account.getPasswordStatus': actions0.getPasswordStatus,

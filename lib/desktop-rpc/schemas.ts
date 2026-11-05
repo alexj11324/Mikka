@@ -71,6 +71,7 @@ export const desktopActionSchemas = {
   'desktop.bootstrap': none,
   'desktop.session': none,
   'desktop.accounts': none,
+  'desktop.workspaceLink': tuple(slug),
   'account.updateDisplayName': tuple(text(80).trim().min(1)),
   'account.uploadAvatar': tuple(avatar),
   'account.getPasswordStatus': none,

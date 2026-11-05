@@ -28,6 +28,8 @@ import { getTransportState, setTransportState, subscribeTransport } from './tran
 import { Offline } from './offline'
 
 const Workspace = lazy(() => import('./workspace'))
+const SharedArtifactRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.SharedArtifactRoute })))
+const WorkspaceLinkRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.WorkspaceLinkRoute })))
 
 /** Runtime-specific composition only. The application surfaces below are the
  * exact same components, data hooks and lazy chunks as the web application. */
@@ -108,19 +110,23 @@ function Routes({ bootstrap }: { bootstrap: DesktopBootstrap }) {
   const user = bootstrap.user
   const authentication = path === '/sign-in' || path === '/sign-up'
   const invitation = /^\/invite\/([^/]+)$/.exec(path)
-  const browserRoute = path === '/forgot-password' || path === '/reset-password' || path === '/verify-email' || path === '/oauth/consent' || path.startsWith('/a/')
+  const sharedArtifact = /^\/a\/([^/]+)$/.exec(path)
+  const workspaceLink = /^\/w\/([a-z0-9]([a-z0-9-]{1,62}[a-z0-9]))$/.exec(path)
+  const browserRoute = path === '/forgot-password' || path === '/reset-password' || path === '/verify-email' || path === '/oauth/consent'
   useEffect(() => {
     if (path === '/dashboard') navigate(`/${location.search}`, true, { locale }, true)
     else if (path === '/devices') navigate('/settings?section=devices', true, { locale }, true)
     else if (user && authentication && query.get('addAccount') !== '1') navigate(safeAuthReturn(query.get('next') ?? undefined), true, { locale }, true)
-    else if (!user && !authentication && !invitation && !browserRoute) {
+    else if (!user && !authentication && !invitation && !browserRoute && !sharedArtifact) {
       const next = safeAuthReturn(`${path}${location.search}`)
       navigate(`/sign-in${next === '/' ? '' : `?next=${encodeURIComponent(next)}`}`, true, { locale }, true)
     }
   }, [location.href, user?.id])
   if (browserRoute || path === '/sign-up') return <BrowserRoute signUp={path === '/sign-up'} />
+  if (sharedArtifact) return <Suspense fallback={<WorkspaceLoading />}><SharedArtifactRoute key={sharedArtifact[1]} token={sharedArtifact[1]} /></Suspense>
   if (invitation) return <main className="flex min-h-dvh items-center justify-center bg-muted/30 p-5"><InvitationCard token={/^[a-f0-9]{64}$/.test(invitation[1]) ? invitation[1] : ''} email={user?.email ?? null} /></main>
   if (authentication || !user) return <AuthForm key={path} mode={path === '/sign-up' ? 'sign-up' : 'sign-in'} addAccount={query.get('addAccount') === '1'} next={query.get('next') ?? undefined} googleEnabled={bootstrap.googleEnabled} githubEnabled={bootstrap.githubEnabled} emailEnabled={bootstrap.emailEnabled} oauthFailed={query.get('oauth') === 'failed' || query.has('error')} />
+  if (workspaceLink) return <Suspense fallback={<WorkspaceLoading />}><WorkspaceLinkRoute key={workspaceLink[1]} slug={workspaceLink[1]} /></Suspense>
   if (path === '/device') return <DeviceAuthorization account={user.email} initialCode={query.get('user_code') ?? ''} />
   if (path === '/workspaces/new') return <NewWorkspace email={user.email} />
   if (path === '/devices') return <WorkspaceLoading />
