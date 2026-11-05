@@ -13,7 +13,9 @@ let subscriptions = 0, cleanups = 0
 const calls: { key: unknown; fetcher: (...args: unknown[]) => unknown; config: Config }[] = []
 const live: unknown[][] = []
 const reads: string[] = []
+let renewMutate: (() => Promise<unknown>) | undefined
 const mutate = async (update?: (current: ComputerState) => ComputerState | undefined) => {
+  if (!update && renewMutate) return renewMutate()
   if (update) state = update(state)!
   return state
 }
@@ -24,7 +26,10 @@ mock.module('swr', {
   namedExports: { unstable_serialize },
 })
 mock.module(new URL('../hooks/use-live-key.tsx', import.meta.url).href, {
-  namedExports: { useLiveKey: (...args: unknown[]) => { live.push(args) } },
+  namedExports: {
+    useLiveKey: (...args: unknown[]) => { live.push(args) },
+    watchPageVisibility: (changed: () => void) => { document.addEventListener('visibilitychange', changed); return () => document.removeEventListener('visibilitychange', changed) },
+  },
 })
 mock.module(new URL('../lib/computer/client.ts', import.meta.url).href, { namedExports: {
   isMockedComputer: (id: string) => id.startsWith('demo-'),
@@ -40,6 +45,7 @@ mock.module(new URL('../lib/computer/client.ts', import.meta.url).href, { namedE
 } })
 let useComputer: typeof import('../hooks/use-computer')['useComputer']
 let useViewerGrant: typeof import('../hooks/use-computer')['useViewerGrant']
+let viewerRenewalDelay: typeof import('../hooks/use-computer')['viewerRenewalDelay']
 function Probe({ botId }: { botId?: string | null }) { useComputer(botId); return null }
 function Viewer({ enabled = true }: { enabled?: boolean }) { useViewerGrant('fixture-bot', 'control', enabled); return null }
 
@@ -51,7 +57,7 @@ before(async () => {
   Object.defineProperty(globalThis, 'document', { configurable: true, value: browser.document })
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   ;({ createRoot } = await import('react-dom/client'))
-  ;({ useComputer, useViewerGrant } = await import('../hooks/use-computer'))
+  ;({ useComputer, useViewerGrant, viewerRenewalDelay } = await import('../hooks/use-computer'))
 })
 beforeEach(() => {
   state = { machine: 'sleeping', control: 'idle' }; listener = undefined; subscriptions = 0; cleanups = 0
@@ -118,18 +124,39 @@ test('mock pushes keep their existing patches and release the previous Bot liste
   assert.equal(cleanups, 2); assert.equal(listener, undefined)
 })
 
-test('short-lived viewer grants keep their original renewal deadline and disabled behavior', async () => {
-  await act(async () => root.render(<Viewer />))
-  const config = calls[0].config
-  assert.equal(config.revalidateOnFocus, false)
-  assert.equal(typeof config.refreshInterval, 'function')
-  const interval = config.refreshInterval as (grant?: ViewerGrant) => number
-  const now = Date.now(), nowMock = mock.method(Date, 'now', () => now)
+test('short-lived viewer grants renew once, at their own expiry, never on an interval (#1212)', async () => {
+  const issued = Date.now()
+  const grant = { url: 'wss://fixture.invalid', expiresAt: new Date(issued + 90_000).toISOString() }
+  assert.equal(viewerRenewalDelay(grant, issued), 60_000, 'half a minute before it expires')
+  assert.equal(viewerRenewalDelay({ ...grant, expiresAt: new Date(issued + 10_000).toISOString() }, issued), 5_000, 'never sooner than 5 s')
+  const renewals: number[] = []
+  mock.timers.enable({ apis: ['setTimeout', 'Date'], now: issued })
   try {
-    assert.equal(interval(), 0)
-    assert.equal(interval({ url: 'wss://fixture.invalid', expiresAt: new Date(now + 90_000).toISOString() }), 60_000)
-    assert.equal(interval({ url: 'wss://fixture.invalid', expiresAt: new Date(now + 10_000).toISOString() }), 5_000)
-  } finally { nowMock.mock.restore() }
+    state = grant as never
+    renewMutate = async () => { renewals.push(Date.now()); return state }
+    await act(async () => root.render(<Viewer />))
+    const config = calls[0].config
+    assert.equal(config.revalidateOnFocus, false)
+    assert.equal(config.refreshInterval, undefined, 'no interval reads the grant')
+    await act(async () => { mock.timers.tick(59_999) })
+    assert.deepEqual(renewals, [])
+    await act(async () => { mock.timers.tick(1) })
+    assert.equal(renewals.length, 1, 'one renewal at the grant\'s own deadline')
+    await act(async () => { mock.timers.tick(120_000) })
+    assert.equal(renewals.length, 1, 'the same grant is not renewed again; the next grant sets its own timer')
+    // Hidden at its deadline: the renewal waits until the page is shown.
+    Object.defineProperty(browser.document, 'visibilityState', { configurable: true, value: 'hidden' })
+    state = { ...grant, expiresAt: new Date(Date.now() + 90_000).toISOString() } as never
+    await act(async () => root.render(<Viewer />))
+    await act(async () => { mock.timers.tick(60_000) })
+    assert.equal(renewals.length, 1)
+    Object.defineProperty(browser.document, 'visibilityState', { configurable: true, value: 'visible' })
+    await act(async () => { browser.document.dispatchEvent(new browser.Event('visibilitychange') as never) })
+    assert.equal(renewals.length, 2)
+  } finally {
+    mock.timers.reset(); renewMutate = undefined
+    Object.defineProperty(browser.document, 'visibilityState', { configurable: true, value: 'visible' })
+  }
   await act(async () => root.render(<Viewer enabled={false} />))
   assert.equal(calls.at(-1)!.key, null)
 })

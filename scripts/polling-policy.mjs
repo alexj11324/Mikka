@@ -31,8 +31,7 @@ export const pollingAllowlist = {
   // Web: SWR polling that reads our database.
   'components/desktop/desktop-integration.tsx': db(web, 'desktop link status re-read every POLL_MS', 1),
   'components/workspace/group-chat-view.tsx': db(web, 'group chat re-read every ANSWER_POLL_MS while an agent answers', 2),
-  'components/workspace/issue-pull-request-link.tsx': db(web, 'linked pull request status re-read every 60 s through our API', 1),
-  'hooks/use-computer.ts': db(web, 'computer grant re-read before it expires (at least every 5 s)', 1),
+  'components/workspace/issue-pull-request-link.tsx': db(web, 'a PR with no webhook of ours (linked by hand, or a repository without the app) is re-checked with GitHub every 5 min while visible; a run-delivered PR also re-reads on pull_request_status', 1),
   'components/swr-defaults.tsx': db(web, 'LIST_POLL_MS, the 60 s list poll interval', 1),
   'lib/coordinator/chat-poll.ts': db(web, 'FULL_READ_EVERY_MS: the chat poll does a full read every 60 s', 1),
   'components/settings/subscription-settings.tsx': db(web, 'subscription usage re-read every USAGE_EVERY_MS (5 min); the 30 s setInterval is only the clock that ages the "updated" label', 3),

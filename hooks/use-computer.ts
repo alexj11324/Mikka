@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
-import { useLiveKey } from '@/hooks/use-live-key'
+import { useLiveKey, watchPageVisibility } from '@/hooks/use-live-key'
 import { computerApi, isMockedComputer, subscribeComputerEvents, type ComputerRead } from '@/lib/computer/client'
 import { computerReadDeadline } from '@/lib/computer/state-deadline'
 import type { ViewerGrant, ViewerMode } from '@/lib/computer/types'
@@ -33,10 +33,29 @@ export function useComputer(botId: string | null | undefined) {
   return swr
 }
 
-/** A short-lived noVNC URL, renewed half a minute before it expires. */
+/** When a grant is renewed: half a minute before it expires, never sooner than 5 s after it was issued. */
+export function viewerRenewalDelay(grant: ViewerGrant, now = Date.now()) {
+  return Math.max(5000, Date.parse(grant.expiresAt) - now - 30_000)
+}
+
+/**
+ * A short-lived noVNC URL, renewed half a minute before it expires. One timer
+ * per grant at its own expiry, not a periodic read (#1212): a renewal only
+ * happens while the viewer is open, and a hidden page renews once it is shown.
+ */
 export function useViewerGrant(botId: string | null | undefined, mode: ViewerMode, enabled: boolean) {
-  return useSWR<ViewerGrant>(botId && enabled ? ['computer-viewer', botId, mode] : null, ([, id, viewMode]: [string, string, ViewerMode]) => computerApi.viewer(id, viewMode), {
+  const swr = useSWR<ViewerGrant>(botId && enabled ? ['computer-viewer', botId, mode] : null, ([, id, viewMode]: [string, string, ViewerMode]) => computerApi.viewer(id, viewMode), {
     revalidateOnFocus: false,
-    refreshInterval: grant => grant ? Math.max(5000, Date.parse(grant.expiresAt) - Date.now() - 30_000) : 0,
   })
+  const { data: grant, mutate } = swr
+  const active = Boolean(botId && enabled)
+  useEffect(() => {
+    if (!active || !grant) return
+    let due = false
+    const renew = () => { if (document.visibilityState === 'visible') void mutate(); else due = true }
+    const timer = setTimeout(renew, viewerRenewalDelay(grant))
+    const unwatch = watchPageVisibility(() => { if (due && document.visibilityState === 'visible') { due = false; void mutate() } })
+    return () => { clearTimeout(timer); unwatch() }
+  }, [active, grant, mutate])
+  return swr
 }
