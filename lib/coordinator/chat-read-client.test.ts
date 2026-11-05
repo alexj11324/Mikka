@@ -59,24 +59,84 @@ test('a newer cache write wins over the response to an older cursor', async () =
   assert.equal(await pending, newer)
 })
 
-test('a projected tool in the historical prefix gets one full repair, then resumes cursor reads', async () => {
-  const tool = { call: 'call-1', name: 'github_call', state: 'error', at: 0, target: 'private/repo', displayName: 'Dynamic operation', errorCode: 'upstream_denied', errorDetail: 'workspace_mismatch' }
+test('a projected tool in the historical prefix restores metadata without replaying its body, then resumes cursor reads', async () => {
+  const tool = { call: 'call-1', name: 'github_call', state: 'error', at: 0, target: 'private/repo', displayName: 'GitHub · Dynamic operation', errorCode: 'upstream_denied', errorDetail: 'workspace_mismatch' }
   const full = { ...chat(), cursor: 500, continuation: { after: 490, cursor: 500, prefix: 'c'.repeat(32) }, items: [
     { ...chat().items[1], position: 301, activity: { tools: [tool] } }, { ...chat().items[1], position: 500 },
   ] }
   const projected = persistentReadData(chatKeys.detail(botId), full) as typeof full
-  assert.equal(projected.continuation, undefined)
+  assert.deepEqual(projected.continuation, full.continuation)
   assert.ok(!JSON.stringify(projected).includes('private/repo'))
   const cache: Cache = new Map([[key, { data: projected }]])
-  answer = async () => ({ chat: full })
+  answer = async () => ({ chat: { ...full, after: 490, baseCursor: 500, items: [full.items[1]], toolMetadata: {
+    baseCursor: 500, prefix: full.continuation.prefix, rows: [
+      { position: 301, parts: [{ ordinal: 1, type: 'tool-call', toolCallId: 'call-1', toolName: 'github_call', target: tool.target, operationName: 'dynamic_operation' }] },
+      { position: 302, parts: [{ ordinal: 1, type: 'tool-result', toolCallId: 'call-1', status: 'error', errorCode: tool.errorCode, errorDetail: tool.errorDetail }] },
+    ],
+  } } })
   const repaired = await readCachedCoordinatorChat(cache, botId)
-  assert.equal(calls[0][1], undefined); assert.equal(calls[0][2], undefined)
-  assert.deepEqual(repaired.items[0].activity?.tools[0], tool, 'the full network read restores metadata before the saved tail cursor')
+  assert.equal(calls[0][1], undefined)
+  assert.deepEqual(calls[0][2], { ...full.continuation, restoreToolMetadata: true, sourceIds: [], artifactIds: [] })
+  assert.deepEqual(repaired.items[0].activity?.tools[0], tool, 'the overlay restores metadata before the saved tail cursor')
+  assert.equal(repaired.items[0].text, full.items[0].text, 'the prefix body stayed in the cache')
+  assert.equal('toolMetadata' in repaired, false)
+  assert.equal('restoreToolMetadata' in repaired, false)
   cache.set(key, { data: repaired })
   answer = async () => ({ chat: { unchanged: true, version: oldVersion, cursor: 500, working: false, error: null, botId, enabled: true, live: chat().live } })
   await readCachedCoordinatorChat(cache, botId)
   assert.equal(calls[1][1], oldVersion)
   assert.deepEqual(calls[1][2], { ...full.continuation, sourceIds: [], artifactIds: [] })
+})
+
+test('missing prefix metadata takes one bounded full reset and consumes the repair hint', async () => {
+  const preview = { ...chat(), restoreToolMetadata: true }
+  const cache: Cache = new Map([[key, { data: preview }]])
+  answer = async () => ({ chat: calls.length === 1 ? { ...chat(), after: 1, baseCursor: 2, items: [chat().items[1]] } : chat() })
+  const repaired = await readCachedCoordinatorChat(cache, botId)
+  assert.equal(calls.length, 2)
+  assert.deepEqual(calls[1], [botId])
+  assert.equal('restoreToolMetadata' in repaired, false)
+})
+
+for (const change of ['object', 'prefix'] as const) test(`a late metadata overlay cannot validate or overwrite a same-cursor ${change} change`, async () => {
+  const preview = { ...chat(), restoreToolMetadata: true }
+  const cache: Cache = new Map([[key, { data: preview }]])
+  let release!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  answer = async () => { await gate; return { chat: { ...chat(), after: 1, baseCursor: 2, items: [chat().items[1]],
+    toolMetadata: { baseCursor: 2, prefix: 'c'.repeat(32), rows: [] } } } }
+  const pending = readCachedCoordinatorChat(cache, botId)
+  await Promise.resolve()
+  const newer = change === 'object' ? { ...preview } : preview
+  if (change === 'prefix') newer.continuation.prefix = 'd'.repeat(32)
+  cache.set(key, { data: newer })
+  release()
+  assert.equal(await pending, newer)
+  assert.equal(newer.restoreToolMetadata, true)
+  answer = async () => ({ chat: chat() })
+  await readCachedCoordinatorChat(cache, botId)
+  assert.equal(calls[1][1], undefined, 'a discarded overlay must not validate the old preview')
+})
+
+test('the metadata fallback full read also preserves an in-place prefix change while in flight', async () => {
+  const preview = { ...chat(), restoreToolMetadata: true }
+  const cache: Cache = new Map([[key, { data: preview }]])
+  let release!: () => void, started!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  const fullStarted = new Promise<void>(resolve => { started = resolve })
+  answer = async () => {
+    if (calls.length === 1) return { chat: { ...chat(), after: 1, baseCursor: 2, items: [chat().items[1]] } }
+    started(); await gate; return { chat: chat() }
+  }
+  const pending = readCachedCoordinatorChat(cache, botId)
+  await fullStarted
+  preview.continuation.prefix = 'd'.repeat(32)
+  release()
+  assert.equal(await pending, preview)
+  assert.equal(preview.restoreToolMetadata, true)
+  answer = async () => ({ chat: chat() })
+  await readCachedCoordinatorChat(cache, botId)
+  assert.equal(calls[2][1], undefined)
 })
 
 test('a late full repair preserves a newer cache write and leaves the preview unvalidated', async () => {

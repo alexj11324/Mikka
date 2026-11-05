@@ -40,6 +40,12 @@ function clean(value: unknown, context: Projection, depth = 0, allowed?: Readonl
   }
   const result: Record<string, unknown> = {}
   for (const [key, field] of Object.entries(value)) {
+    // The one-time network overlay is not an ordinary read model. Its dynamic
+    // labels must never bypass activity.tools' allowlist via a root field.
+    if (context.chat && depth === 0 && key === 'toolMetadata') {
+      if (field !== undefined) context.needsChatMetadataRefresh = true
+      continue
+    }
     // This read returns public Linear team identifiers, not credential keys.
     // Keep the exception at its exact root field; each string still gets scanned.
     const publicTeamKeys = context.issuePrefix && depth === 0 && key === 'teamKeys' && Array.isArray(field) && field.every(item => typeof item === 'string')
@@ -83,8 +89,7 @@ export function persistentReadData(key: unknown, data: unknown): unknown {
   // Existing input/output/quote redaction alone keeps its incremental cursor.
   if (context.sensitive || context.changed && !context.chat) return undefined
   if (context.chat && context.needsChatMetadataRefresh && value && typeof value === 'object' && !Array.isArray(value)) {
-    const { continuation: _continuation, ...preview } = value as Record<string, unknown>
-    return preview
+    return { ...value, restoreToolMetadata: true }
   }
   return value
 }

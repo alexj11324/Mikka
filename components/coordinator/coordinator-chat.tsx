@@ -183,7 +183,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const liveHome = liveOwner ? ownerListWorkspace(data, liveOwner) : null
   // A push this chat already read (a duplicate, or the echo of this tab's own send) is skipped.
   useLiveKey('bot_chat', unavailable ? null : liveHome && data?.botId ? data.botId : UNRESOLVED_LIST_SCOPE, [unstable_serialize(chatKey)], liveHome,
-    { minIntervalMs: CHAT_MERGE_MS, deadline: liveOwner ? listReadDeadline(data, liveOwner) : undefined, revisions: { [unstable_serialize(chatKey)]: heldRevision(data, 'bot_chat', data?.botId) } })
+    { minIntervalMs: CHAT_MERGE_MS, deadline: liveOwner ? listReadDeadline(data, liveOwner) : undefined, revisions: { [unstable_serialize(chatKey)]: heldRevision(data, 'bot_chat', data?.botId) }, shareAcrossTabs: true })
   // Cards and cited names have no chat write (lib/coordinator/chat-poll.ts). An
   // artifact push or visibility catch-up refreshes metadata using the same cursor.
   const metadataKey = useMemo(() => chatKeys.metadata(botId), [botId])

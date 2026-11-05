@@ -92,14 +92,21 @@ function fixture(options = {}) {
           } } }) })
       }
       const current = options.changed && read >= 2 ? V2 : V1
-      if (args[1] === current) return flight({ chat: { botId: BOT, version: current, cursor: options.changed ? 3 : 2, unchanged: true, live: live() } })
-      const cursor = options.changed && read >= 2 ? 3 : 2, previous = args[2]
+      const cursor = (options.toolMetadata ? 4 : 2) + (options.changed && read >= 2 ? 1 : 0), previous = args[2]
+      if (args[1] === current) return flight({ chat: { botId: BOT, version: current, cursor, unchanged: true, live: live() } })
       const after = previous?.after ?? -1
+      const failedTool = ['errorCode', 'errorDetail'].includes(options.toolMetadata)
       return flight({ chat: { botId: BOT, version: current, cursor, live: live(), sources: {}, artifacts: {},
-        items: Array.from({ length: cursor }, (_, index) => ({ position: index + 1, text: PRIVATE,
-          ...(options.toolMetadata && index === 0 ? { activity: { tools: [{ call: 'tool-call', name: 'Read', state: 'done', at: 1, [options.toolMetadata]: PRIVATE }] } } : {}),
-        })).filter(item => item.position > after),
+        items: Array.from({ length: cursor }, (_, index) => ({ position: index + 1, from: index === 2 ? 'person' : 'coordinator', text: PRIVATE,
+          ...(options.toolMetadata && index === 0 ? { activity: { tools: [{ call: 'tool-call', name: 'github_call', state: failedTool ? 'error' : 'done', at: 1, [options.toolMetadata]: PRIVATE }] } } : {}),
+        })).filter(item => item.position > after && !(options.toolMetadata && item.position === 2)),
         continuation: { after: cursor - 1, cursor, prefix: PREFIX },
+        ...(previous?.restoreToolMetadata ? { toolMetadata: { baseCursor: previous.cursor, prefix: previous.prefix, rows: options.incompleteMetadata ? [] : [
+          { position: 1, parts: [{ ordinal: 1, type: 'tool-call', toolCallId: 'tool-call', toolName: 'github_call',
+            ...(options.toolMetadata === 'target' ? { target: PRIVATE } : {}), ...(options.toolMetadata === 'displayName' ? { operationName: PRIVATE } : {}) }] },
+          { position: 2, parts: [{ ordinal: 1, type: 'tool-result', toolCallId: 'tool-call', status: failedTool ? 'error' : 'done',
+            ...(failedTool ? { [options.toolMetadata]: PRIVATE } : {}) }] },
+        ] } } : {}),
         ...(previous ? { after, baseCursor: previous.cursor, metadataRefresh: true } : {}) } })
     }
     if (url.pathname === '/mikka/en' || url.pathname === '/mikka/en/settings') return new Response('<script src="/mikka/_next/static/chunks/read.js"></script>')
@@ -299,23 +306,37 @@ test('plain chat persistence retains its continuation and measures an incrementa
   assert.equal(measure.receivedItems, 1)
 })
 
-test('projected tool metadata requires one full restored chat repair before later incremental catch-up', async () => {
+test('projected tool metadata is measured as a prefix overlay without retransmitting cached message bodies', async () => {
   for (const toolMetadata of ['target', 'displayName', 'errorCode', 'errorDetail']) {
     const f = fixture({ toolMetadata }), report = await f.run()
     assert.equal(report.status, 'pass', toolMetadata)
     assert.equal(report.browserCacheVerified, false)
     const chats = f.actions.filter(action => action.name === 'syncCoordinatorChat')
     assert.equal(chats[1].args[1], V1, 'the preceding warm read still has its complete in-memory snapshot')
-    assert.deepEqual(chats[2].args, [BOT, null, null], 'discarded prefix metadata cannot reuse either proof')
+    assert.equal(chats[2].args[1], null, 'the restored view is reauthorized before known-version reads')
+    assert.deepEqual(chats[2].args[2], { after: 3, cursor: 4, prefix: PREFIX, restoreToolMetadata: true, sourceIds: [], artifactIds: [] })
     assert.equal(chats[3].args[1], null)
-    assert.equal(chats[3].args[2].cursor, 2, 'the repair response supplies the next incremental continuation')
+    assert.equal(chats[3].args[2].cursor, 4, 'the repair response supplies the next incremental continuation')
+    assert.equal(chats[3].args[2].restoreToolMetadata, undefined, 'the successful repair consumes its hint')
     const reads = report.reads.filter(read => read.action === 'syncCoordinatorChat')
-    assert.equal(reads[2].responseMode, 'snapshot')
-    assert.equal(reads[2].receivedItems, 2, 'the repaired prefix is included in measured HTTP bytes')
+    assert.equal(reads[2].responseMode, 'delta')
+    assert.equal(reads[2].receivedItems, 1, 'only the overlapping tail includes message bodies')
+    assert.equal(reads[2].toolMetadataRows, 2, 'both prefix metadata rows are included in measured HTTP bytes')
     assert.equal(reads[3].responseMode, 'delta')
     assert.equal(reads[3].receivedItems, 1)
     assert.equal(JSON.stringify(report).includes(PRIVATE), false)
   }
+})
+
+test('an incomplete metadata repair counts its one full reset and resumes normal cursor reads', async () => {
+  const f = fixture({ toolMetadata: 'target', incompleteMetadata: true }), report = await f.run()
+  assert.equal(report.status, 'pass')
+  assert.equal(report.browserCacheVerified, false)
+  const reloads = report.reads.filter(read => read.action === 'syncCoordinatorChat' && read.scenario === 'reload-restored')
+  assert.deepEqual(reloads.map(read => read.responseMode), ['delta', 'snapshot'])
+  const chats = f.actions.filter(action => action.name === 'syncCoordinatorChat')
+  assert.deepEqual(chats[3].args, [BOT])
+  assert.equal(chats[4].args[2].restoreToolMetadata, undefined)
 })
 
 test('rejected task, thread and activity records reload without their former version or row proofs', async () => {

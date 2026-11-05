@@ -1,0 +1,194 @@
+import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
+import { Socket } from 'node:net'
+import test from 'node:test'
+import pg from 'pg'
+import { disposableDatabase } from './helpers/e2e-target.mjs'
+import { withActivitySession } from './fixtures/activity-runtime.mjs'
+import type { TabChannel } from '../lib/live/tab-share'
+import { mergeList, type ListPosition } from '../lib/list-poll'
+
+// Only a disposable loopback *_e2e database is admissible; required in CI.
+const required = process.env.REQUIRE_DB === '1'
+const enabled = disposableDatabase()
+if (required && !enabled) throw new Error('Read single-flight DB test requires a loopback *_e2e database')
+
+const sockets = new Set<Socket>()
+const connect = Socket.prototype.connect
+Socket.prototype.connect = function (this: Socket, ...args: unknown[]) { sockets.add(this); return Reflect.apply(connect, this, args) } as typeof Socket.prototype.connect
+const received = () => [...sockets].reduce((sum, socket) => sum + socket.bytesRead, 0)
+let queries = 0
+const query = pg.Client.prototype.query
+pg.Client.prototype.query = function (this: pg.Client, ...args: unknown[]) { queries++; return Reflect.apply(query, this, args) } as typeof pg.Client.prototype.query
+
+/** Same-origin BroadcastChannel: same name, other instances, asynchronous delivery. */
+function hub() {
+  const named = new Map<string, Set<TabChannel>>()
+  return (name: string): TabChannel => {
+    const channel: TabChannel = {
+      onmessage: null,
+      postMessage(data: unknown) { const copy = structuredClone(data); for (const other of named.get(name) ?? []) if (other !== channel) setImmediate(() => other.onmessage?.({ data: copy } as MessageEvent)) },
+      close() { named.get(name)?.delete(channel) },
+    }
+    if (!named.has(name)) named.set(name, new Set())
+    named.get(name)!.add(channel)
+    return channel
+  }
+}
+
+async function fixture(prefix: string) {
+  const { pool } = await import('../lib/db')
+  const { workspacePool } = await import('../lib/workspace-db')
+  const { actAs } = await import('../lib/acting-user')
+  const { saveIssue } = await import('../app/actions/issues')
+  const owner = `${prefix}-${randomUUID()}`
+  await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [owner, `${owner}@example.invalid`])
+  const personal = randomUUID()
+  await workspacePool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,'Personal','personal')`, [personal, owner])
+  await workspacePool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$2,$3,'admin')`, [personal, owner, `${owner}@example.invalid`])
+  for (let index = 0; index < 20; index++) {
+    const saved = await withActivitySession(owner, () => actAs(owner, () => saveIssue({ title: `Task ${index}`, content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'words '.repeat(80) }] }] }, status: 'todo', priority: 'normal' })))
+    assert.ok('issue' in saved && saved.issue)
+  }
+  return { owner, personal }
+}
+
+/** Hold a completed payload query, so another request definitely enters while
+ * the first single-flight is pending. The manifest/version reads stay live. */
+function holdNextListRows() {
+  let reached!: () => void, release!: () => void
+  const atRows = new Promise<void>(resolve => { reached = resolve })
+  const gate = new Promise<void>(resolve => { release = resolve })
+  const original = pg.Client.prototype.query
+  let armed = true
+  pg.Client.prototype.query = function (this: pg.Client, ...args: unknown[]) {
+    const argument = args[0]
+    const sql = typeof argument === 'string' ? argument : argument && typeof argument === 'object' && 'text' in argument ? String(argument.text) : ''
+    const result: unknown = Reflect.apply(original, this, args)
+    if (armed && sql.includes('"task_list"."id" in (')) {
+      armed = false
+      return Promise.resolve(result).then(async value => { reached(); await gate; return value })
+    }
+    return result
+  } as typeof pg.Client.prototype.query
+  return { atRows, release, restore: () => { release(); pg.Client.prototype.query = original } }
+}
+
+function timely<T>(promise: Promise<T>) {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  return Promise.race([promise, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('read did not cross the held-query barrier')), 10_000) })]).finally(() => clearTimeout(timer))
+}
+
+test('one push to 3 tabs and 2 devices of one person: one list read instead of five', { skip: !enabled, timeout: 180_000 }, async t => {
+  const { actAs } = await import('../lib/acting-user')
+  const { pollIssues } = await import('../app/actions/issues')
+  const { TabShare, tabShareChannelName } = await import('../lib/live/tab-share')
+  const { readCacheNamespace } = await import('../lib/swr/persistent-cache')
+  const { measureWithoutSingleFlight, singleFlightJoined } = await import('../lib/single-flight')
+  const results: Record<string, { listReads: number; queries: number; bytes: number }> = {}
+  for (const mode of ['before', 'after'] as const) {
+    const { owner, personal } = await fixture(`single-flight-${mode}`)
+    const open = hub()
+    const read = () => withActivitySession(owner, () => actAs(owner, () => pollIssues()), personal)
+    const namespace = readCacheNamespace({ userId: owner, workspaceId: personal, build: 'fixture-build', role: 'admin' })
+    const tabs = [0, 1, 2].map(() => new TabShare(tabShareChannelName(namespace, personal), open))
+    let listReads = 0
+    const counted = () => { listReads++; return read() }
+    measureWithoutSingleFlight(mode === 'before')
+    const joined = singleFlightJoined()
+    queries = 0; const before = received()
+    // Every client flushes its key at the same moment after the push.
+    const tabReads = tabs.map(tab => mode === 'after' ? tab.run('issues', counted, () => {}) : counted())
+    const deviceReads = [counted(), counted()]
+    const values = await Promise.all([...tabReads, ...deviceReads]) as Awaited<ReturnType<typeof read>>[]
+    results[mode] = { listReads, queries, bytes: received() - before }
+    for (const value of values.filter(Boolean)) assert.equal(value.items?.length, 20, 'every client shows the whole list')
+    t.diagnostic(JSON.stringify({ mode, ...results[mode], sharedOnServer: singleFlightJoined() - joined }))
+    for (const tab of tabs) tab.close()
+  }
+  measureWithoutSingleFlight(false)
+  assert.equal(results.before.listReads, 5)
+  assert.equal(results.after.listReads, 3, 'the tabs read once; each device asks the server')
+  // Each request reauthorizes its complete manifest and reads its revision;
+  // the tabs collapse their request and identical payload queries can join.
+  assert.ok(results.after.queries < results.before.queries * 0.6 && results.after.bytes < results.before.bytes / 2, JSON.stringify(results))
+  t.diagnostic(JSON.stringify({ measured: results }))
+})
+
+test('concurrent reads of two people, or of a removed member, are never shared', { skip: !enabled, timeout: 180_000 }, async () => {
+  const { workspacePool } = await import('../lib/workspace-db')
+  const { actAs } = await import('../lib/acting-user')
+  const { pollIssues } = await import('../app/actions/issues')
+  const owner = await fixture('single-flight-owner'), peer = await fixture('single-flight-peer')
+  const read = (who: { owner: string; personal: string }, workspace?: string) => withActivitySession(who.owner, () => actAs(who.owner, () => pollIssues()), workspace ?? who.personal)
+  const [mine, theirs] = await Promise.all([read(owner), read(peer)])
+  assert.ok(mine.items?.every((item: { ownerId: string }) => item.ownerId === owner.owner))
+  assert.ok(theirs.items?.every((item: { ownerId: string }) => item.ownerId === peer.owner))
+  // The peer joins the owner's personal workspace as a member, then is suspended. Its next
+  // concurrent read resolves its own authorization first and never takes the owner's list.
+  await workspacePool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$2,$3,'member')`, [owner.personal, peer.owner, `${peer.owner}@example.invalid`])
+  await workspacePool.query(`update mikka_workspace_members set status='suspended' where "workspaceId"=$1 and "userId"=$2`, [owner.personal, peer.owner])
+  const [ownerRead, revoked] = await Promise.all([read(owner), read(peer, owner.personal)])
+  assert.equal(ownerRead.items?.length, 20)
+  assert.notEqual(revoked.live.selectedWorkspaceId, owner.personal)
+  assert.ok(revoked.items?.every((item: { ownerId: string }) => item.ownerId === peer.owner), 'a removed member sees none of the workspace list')
+})
+
+test('concurrent empty, partial and full snapshots of one owner each receive the rows they need', { skip: !enabled, timeout: 180_000 }, async () => {
+  const { actAs } = await import('../lib/acting-user')
+  const { pollIssues } = await import('../app/actions/issues')
+  const { owner, personal } = await fixture('single-flight-proofs')
+  const read = (positions?: readonly ListPosition[]) => withActivitySession(owner, () => actAs(owner, () => pollIssues(undefined, positions)), personal)
+  const cold = await read()
+  assert.ok(cold.items); assert.ok(cold.positions)
+  const [left, right] = [cold.positions.slice(0, 10), cold.positions.slice(10)]
+  const barrier = holdNextListRows(), pending = read(left)
+  try {
+    await timely(barrier.atRows)
+    const [rightRead, emptyRead, fullRead] = await timely(Promise.all([read(right), read([]), read()]))
+    barrier.release()
+    const leftRead = await pending
+    const held = (positions: readonly ListPosition[]) => cold.items!.filter(row => positions.some(position => position.id === row.id))
+    assert.deepEqual(leftRead.items?.map(row => row.id), right.map(row => row.id))
+    assert.deepEqual(rightRead.items?.map(row => row.id), left.map(row => row.id))
+    assert.deepEqual(mergeList(held(left), leftRead), cold.items)
+    assert.deepEqual(mergeList(held(right), rightRead), cold.items)
+    assert.equal(emptyRead.items?.length, 20); assert.equal(fullRead.items?.length, 20)
+    assert.equal(emptyRead.delta, true); assert.equal(fullRead.delta, undefined)
+  } finally { barrier.restore(); await pending.catch(() => undefined) }
+})
+
+test('a request after a task-link revoke cannot join the older authorized manifest still in flight', { skip: !enabled, timeout: 180_000 }, async () => {
+  const { workspacePool } = await import('../lib/workspace-db')
+  const { actAs } = await import('../lib/acting-user')
+  const { pollIssues } = await import('../app/actions/issues')
+  const { promoteExistingIssueForUser } = await import('../lib/team-issue-promotion')
+  const owner = await fixture('single-flight-revoke-owner'), peer = await fixture('single-flight-revoke-peer')
+  const first = await withActivitySession(owner.owner, () => actAs(owner.owner, () => pollIssues()), owner.personal)
+  assert.ok(first.items?.length)
+  const issueId = first.items[0].id, workspaceId = randomUUID(), teamId = randomUUID()
+  await workspacePool.query(`insert into mikka_workspaces(id,"userId",name) values($1,$2,'Flight team')`, [workspaceId, owner.owner])
+  for (const [userId, role] of [[owner.owner, 'admin'], [peer.owner, 'member']]) {
+    await workspacePool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$2,$3,$4)`, [workspaceId, userId, `${userId}@example.invalid`, role])
+  }
+  await workspacePool.query(`insert into mikka_teams(id,"workspaceId","userId",name,identifier) values($1,$2,$3,'Flight team','FLIGHT')`, [teamId, workspaceId, owner.owner])
+  const promotion = await withActivitySession(owner.owner, () => promoteExistingIssueForUser(owner.owner, { requestId: randomUUID(), issueId, revision: 1, teamId, expectedTeamId: null }))
+  assert.ok('issue' in promotion)
+  const read = () => withActivitySession(peer.owner, () => actAs(peer.owner, () => pollIssues()), workspaceId)
+  assert.ok((await read()).items?.some(item => item.id === issueId))
+
+  const barrier = holdNextListRows(), pending = read()
+  try {
+    await timely(barrier.atRows)
+    // Same owner, workspace, role and team scopes; only this task's link is gone.
+    await workspacePool.query('delete from mikka_team_issues where "issueId"=$1', [issueId])
+    const revoked = await timely(read())
+    assert.ok(revoked.items?.every(item => item.id !== issueId))
+    assert.ok(revoked.positions?.every(position => position.id !== issueId))
+    barrier.release()
+    assert.ok((await pending).items?.some(item => item.id === issueId), 'the held leader proves the two reads overlapped')
+  } finally {
+    barrier.restore()
+    await pending.catch(() => undefined)
+  }
+})

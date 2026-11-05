@@ -1,5 +1,7 @@
 'use server'
 
+import { singleFlight } from '@/lib/single-flight'
+
 import { createHash } from 'node:crypto'
 import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
 import { headers } from 'next/headers'
@@ -14,7 +16,7 @@ import { replyLine } from '@/lib/thread-groups'
 import { queryVersion } from '@/lib/db/query-version'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { ownerListRead } from '@/lib/live/list-read-server'
-import { changedListIds, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
+import { changedListIds, listPositionKey, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
 import { cacheReadAction } from '@/lib/cache-read-action'
 import { beginOwnerListRead } from '@/lib/live/revision-read'
 
@@ -160,16 +162,20 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
     const manifest = await db.select({ id: visible.id, version: sql<string>`md5(to_jsonb(thread_list_expiry)::text)` }).from(visible)
       .orderBy(desc(sql`greatest(${visible.lastReplyAt}, ${visible.updatedAt})`), desc(visible.createdAt), desc(visible.id))
     const positions = manifest.map(row => ({ id: row.id, version: createHash('sha256').update(`${session.user.id}:${row.version}`).digest('hex').slice(0, 32) }))
-    const changedIds = changedListIds(positions, previous)
-    const rows = changedIds.length ? await db.select().from(visible).where(inArray(visible.id, changedIds))
-      .orderBy(desc(sql`greatest(${visible.lastReplyAt}, ${visible.updatedAt})`), desc(visible.createdAt), desc(visible.id)) : []
-    const items: Thread[] = rows.map(({ deviceId, deviceName, deviceType, waitingForDevice, harness, ...row }) => ({
-      // A cloud run waits on its own sandbox, never on a machine the person can turn on.
-      ...(waitingForDevice && deviceId && deviceName !== null && deviceType
-        ? { waitingFor: { deviceId, deviceName, deviceType, harness } } : {}),
-      ...row, harness: harness ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
-      lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
-    }))
-    return { version, items, positions, ...(previous ? { delta: true as const } : {}), live, presenceFallback }
+    // Auth, current version and the full deletion/expiry manifest belong to
+    // each request. Only identical changed-row reads can join after that proof.
+    return singleFlight(['/actions/threads/poll', session.user.id, version, known ?? null, listPositionKey(previous), JSON.stringify(positions)], async () => {
+      const changedIds = changedListIds(positions, previous)
+      const rows = changedIds.length ? await db.select().from(visible).where(inArray(visible.id, changedIds))
+        .orderBy(desc(sql`greatest(${visible.lastReplyAt}, ${visible.updatedAt})`), desc(visible.createdAt), desc(visible.id)) : []
+      const items: Thread[] = rows.map(({ deviceId, deviceName, deviceType, waitingForDevice, harness, ...row }) => ({
+        // A cloud run waits on its own sandbox, never on a machine the person can turn on.
+        ...(waitingForDevice && deviceId && deviceName !== null && deviceType
+          ? { waitingFor: { deviceId, deviceName, deviceType, harness } } : {}),
+        ...row, harness: harness ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+        lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
+      }))
+      return { version, items, positions, ...(previous ? { delta: true as const } : {}), live, presenceFallback }
+    })
   })
 }

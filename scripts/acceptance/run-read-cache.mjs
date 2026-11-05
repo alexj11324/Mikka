@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process'
 import { channel } from 'node:diagnostics_channel'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { availableParallelism, cpus, totalmem } from 'node:os'
 import { resolve } from 'node:path'
+import { StringDecoder } from 'node:string_decoder'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
+import { stripVTControlCharacters } from 'node:util'
 import { loadEnvironment, assertDeploymentIdentity, EnvironmentError } from '../test-accounts/environment.mjs'
 import { runReadCacheAcceptance, publicFailure, ReadCacheAcceptanceError } from './read-cache.mjs'
 
@@ -14,6 +17,95 @@ const processSignals = new Set(['SIGHUP', 'SIGINT', 'SIGQUIT', 'SIGILL', 'SIGTRA
 
 export function publicOwnedFailure(error) {
   return { ...publicFailure(error), ...ownedFailures.get(error) }
+}
+
+/** Two snapshots and event-driven counters only. /proc reads are confined to
+ * the owned CLI's direct children; their PIDs and cgroup path stay private. */
+export function createOwnedRuntimeObserver({ readFileImpl = readFile, hardware = () => ({ cpuCount: cpus().length, availableCpuCount: availableParallelism(), systemMemoryBytes: totalmem() }) } = {}) {
+  const counters = { ready: 0, compiling: 0, compiled: 0, httpCompleted: 0, nextError: 0, fatalError: 0, heapOutOfMemory: 0, esbuildDeadlock: 0 }
+  const streams = Object.fromEntries(['stdout', 'stderr'].map(name => [name, { decoder: new StringDecoder('utf8'), tail: '' }]))
+  const number = value => /^\d+$/u.test(String(value ?? '')) && Number.isSafeInteger(Number(value)) ? Number(value) : null
+  const field = (text, name) => number(new RegExp(`^${name}:?\\s+(\\d+)(?:\\s|$)`, 'm').exec(text ?? '')?.[1])
+  const bytes = (text, name) => { const value = field(text, name); return value === null ? null : number(value * 1024) }
+  const read = async path => { try { return await readFileImpl(path, 'utf8') } catch { return null } }
+  let start = null, finishPromise, sealed = false
+  const line = raw => {
+    const value = stripVTControlCharacters(raw).trimStart()
+    if (/^(?:✓\s*)?Ready in\b/u.test(value)) counters.ready++
+    if (/^(?:○\s*)?Compiling\b/u.test(value)) counters.compiling++
+    // Next 16.4 webpack does not emit this on every successful compile.
+    // Zero is only the observed marker count, never proof that compilation hung.
+    if (/^(?:✓\s*)?Compiled\b/u.test(value)) counters.compiled++
+    if (/^(?:GET|POST|HEAD)\s+\S+\s+[1-5]\d{2}\s+in\b/u.test(value)) counters.httpCompleted++
+    if (/^⨯\s/u.test(value)) counters.nextError++
+    if (value.startsWith('FATAL ERROR:')) counters.fatalError++
+    if (/^FATAL ERROR:.*(?:heap limit|heap out of memory|Allocation failed)/iu.test(value)) counters.heapOutOfMemory++
+    if (value.startsWith('fatal error: all goroutines are asleep - deadlock!')) counters.esbuildDeadlock++
+  }
+  const snapshot = async child => {
+    const [meminfo, membership, children] = await Promise.all([
+      read('/proc/meminfo'), read('/proc/self/cgroup'),
+      Number.isSafeInteger(child?.pid) && child.pid > 0 && child.exitCode == null && child.signalCode == null ? read(`/proc/${child.pid}/task/${child.pid}/children`) : null,
+    ])
+    const member = /^0::(\/[^\r\n\0]*)$/mu.exec(membership ?? '')?.[1]
+    const cgroup = member && !member.split('/').some(part => part === '.' || part === '..') ? `/sys/fs/cgroup${member === '/' ? '' : member}` : null
+    const [current, maximum, peak, events] = cgroup ? await Promise.all(['memory.current', 'memory.max', 'memory.peak', 'memory.events'].map(file => read(`${cgroup}/${file}`))) : [null, null, null, null]
+    const childIds = typeof children === 'string' && /^\s*(?:\d+(?:\s+\d+)*)?\s*$/u.test(children) ? children.trim().split(/\s+/u).filter(Boolean).map(Number).filter(pid => Number.isSafeInteger(pid) && pid > 0) : null
+    const workers = childIds === null ? null : await Promise.all(childIds.slice(0, 8).map(async pid => {
+      const status = await read(`/proc/${pid}/status`), parent = field(status, 'PPid')
+      const stillDirectChild = parent === null ? null : parent === child.pid
+      return { stillDirectChild,
+        state: stillDirectChild ? /^State:\s+([RSDZTtXxKWPI])\b/mu.exec(status)?.[1] ?? null : null,
+        rssBytes: stillDirectChild ? bytes(status, 'VmRSS') : null,
+        peakRssBytes: stillDirectChild ? bytes(status, 'VmHWM') : null }
+    }))
+    const maxBytes = number(maximum?.trim())
+    return { cgroup, childIds, public: {
+      systemAvailableBytes: bytes(meminfo, 'MemAvailable'),
+      cgroupVersion: cgroup ? 2 : null,
+      cgroupCurrentBytes: number(current?.trim()), cgroupMaxBytes: maxBytes,
+      cgroupMaxUnlimited: maximum?.trim() === 'max' ? true : maxBytes === null ? null : false,
+      cgroupPeakBytes: number(peak?.trim()), cgroupOom: field(events, 'oom'), cgroupOomKill: field(events, 'oom_kill'),
+      ownedDirectChildCount: childIds?.length ?? null, workers,
+    } }
+  }
+  return {
+    output(stream, data) {
+      if (sealed || !Object.hasOwn(streams, stream)) return
+      const state = streams[stream], parts = state.decoder.write(Buffer.isBuffer(data) ? data : Buffer.from(data)).split('\n')
+      for (let index = 0; index < parts.length; index++) {
+        // Retain only a bounded line prefix until newline, never raw log history.
+        state.tail = (state.tail + parts[index]).slice(0, 4096)
+        if (index < parts.length - 1) { line(state.tail); state.tail = '' }
+      }
+    },
+    async ready(child) {
+      // Observability failures are unknown values, not an acceptance bypass or
+      // a replacement for the original application/attestation error.
+      try { start = await snapshot(child) } catch { start = null }
+    },
+    finish(child) {
+      finishPromise ??= (async () => {
+        let end = null, machine = {}
+        try { end = await snapshot(child) } catch { /* Unobservable: keep null. */ }
+        try { machine = hardware() ?? {} } catch { /* Unobservable: keep null. */ }
+        for (const state of Object.values(streams)) { line((state.tail + state.decoder.end()).slice(0, 4096)); state.tail = '' }
+        sealed = true
+        const sameCgroup = start?.cgroup && start.cgroup === end?.cgroup
+        const delta = (name, monotonic = false) => {
+          const first = start?.public[name], last = end?.public[name]
+          return !sameCgroup || first == null || last == null || monotonic && last < first ? null : last - first
+        }
+        return {
+          cpuCount: number(machine.cpuCount), availableCpuCount: number(machine.availableCpuCount), systemMemoryBytes: number(machine.systemMemoryBytes),
+          output: { ...counters }, start: start?.public ?? null, end: end?.public ?? null,
+          retainedDirectChildren: start?.childIds && end?.childIds ? start.childIds.filter(pid => end.childIds.includes(pid)).length : null,
+          cgroupCurrentBytesDelta: delta('cgroupCurrentBytes'), cgroupOomDelta: delta('cgroupOom', true), cgroupOomKillDelta: delta('cgroupOomKill', true),
+        }
+      })()
+      return finishPromise
+    },
+  }
 }
 
 // Node 24's bundled Undici publishes {request}, {request,response:{statusCode}}
@@ -133,6 +225,7 @@ export async function runOwnedReadCacheAcceptance() {
   const origin = new URL(environment.origin)
   if (origin.protocol !== 'http:') throw new EnvironmentError('HTTP_RUNNER_REQUIRES_HTTP_ORIGIN')
   const observedRequests = observeOwnedRequests(environment)
+  const runtime = createOwnedRuntimeObserver()
   let server, serverStdoutBytes = 0, serverStderrBytes = 0
   const cancel = () => { void stop(server) }
   process.once('SIGINT', cancel)
@@ -150,11 +243,13 @@ export async function runOwnedReadCacheAcceptance() {
       server.once('exit', failed)
       server.stdout.on('data', data => {
         serverStdoutBytes += data.length
+        runtime.output('stdout', data)
         recent = (recent + data.toString()).slice(-2048)
         if (/Ready in/u.test(recent)) { clearTimeout(timeout); resolve() }
       })
-      server.stderr.on('data', data => { serverStderrBytes += data.length })
+      server.stderr.on('data', data => { serverStderrBytes += data.length; runtime.output('stderr', data) })
     })
+    await runtime.ready(server)
     const preparingAt = Date.now()
     await prepareAttestationRoute(environment)
     const initialRouteCompileMs = Date.now() - preparingAt
@@ -163,12 +258,15 @@ export async function runOwnedReadCacheAcceptance() {
     await prepareLandingRoute(environment)
     const initialLandingCompileMs = Date.now() - landingPreparingAt
     const result = await runReadCacheAcceptance()
-    const summary = { ...result, initialRouteCompileMs, initialLandingCompileMs, serverStdoutBytes, serverStderrBytes }
+    const ownedRuntime = await runtime.finish(server)
+    const summary = { ...result, initialRouteCompileMs, initialLandingCompileMs, serverStdoutBytes, serverStderrBytes, ownedRuntime }
     await mkdir('.cache/e2e', { recursive: true, mode: 0o700 })
     await writeFile('.cache/e2e/http-acceptance-summary.json', `${JSON.stringify(summary, null, 2)}\n`, { mode: 0o600 })
     return summary
   } catch (error) {
     observedRequests.recordFailure(error, server)
+    const ownedRuntime = await runtime.finish(server)
+    if (ownedFailures.has(error)) ownedFailures.set(error, { ...ownedFailures.get(error), ownedRuntime })
     throw error
   } finally {
     observedRequests.close()

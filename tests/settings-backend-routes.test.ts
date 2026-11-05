@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { before, mock, test } from 'node:test'
 import { verifyStripeSignature } from '../lib/billing/stripe'
 
@@ -21,10 +22,22 @@ let settingsRoute: typeof import('../app/api/settings/[read]/route')
 const workspaceBotCalls: unknown[][] = []
 let workspaceBotResult: unknown = { bots: [] }
 let workspaceBotFailure: Error | null = null
+const currentSession = new AsyncLocalStorage<string>()
+let sessionGate: Promise<void> = Promise.resolve()
+let sessionReads = 0
 
 before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => user ? { user } : null } } } })
-  mock.module('@/lib/workspace-access', { namedExports: { WorkspaceError } })
+  mock.module('@/lib/db/request-scope', { namedExports: { inDatabaseTransaction: () => false } })
+  mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => { if (!user) throw new Error('authRequired'); return user } } })
+  mock.module('@/lib/workspace-access', { namedExports: { WorkspaceError, loadWorkspaceContext: async (requested?: string) => {
+    if (requested && requested !== workspaceId) throw new WorkspaceError('workspaceAccessDenied')
+    return { workspace: { id: workspaceId }, role: 'admin' }
+  } } })
+  mock.module('@/app/actions/account', { namedExports: {
+    getPasswordStatus: () => { throw new Error('unexpected settings read') },
+    listSessions: async () => { const id = currentSession.getStore(); sessionReads++; await sessionGate; return { sessions: [{ id, current: true }] } },
+  } })
   mock.module('@/lib/audit/export', { namedExports: { AuditExportError, readAuditExportPage: async (...args: unknown[]) => {
     calls.push(args)
     if (auditError) throw auditError
@@ -44,7 +57,6 @@ before(async () => {
   // Exercise the existing GET adapter without loading unrelated settings
   // services. The Bot action retains its own auth/current-workspace checks.
   for (const [module, names] of Object.entries({
-    '@/app/actions/account': ['getPasswordStatus', 'listSessions'],
     '@/app/actions/preferences': ['getPreferences'],
     '@/app/actions/issue-prefix': ['getIssuePrefixState'],
     '@/app/actions/settings-activity': ['listSavedLogins'],
@@ -105,6 +117,21 @@ test('workspace-bots GET preserves auth and membership refusals and never substi
   assert.equal(unknown.status, 404)
   assert.deepEqual(await unknown.json(), { error: 'notFound' })
   assert.equal(workspaceBotCalls.length, callsBefore)
+})
+
+test('concurrent devices of one owner retain their own current-session marker', async () => {
+  user = { id: 'admin' }; sessionReads = 0
+  let release!: () => void
+  sessionGate = new Promise(resolve => { release = resolve })
+  const reads = ['device-a', 'device-b'].map(id => currentSession.run(id, () => settingsRoute.GET(
+    new Request('https://mikka.example/api/settings/sessions'), { params: Promise.resolve({ read: 'sessions' }) })))
+  try {
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(sessionReads, 2, 'session-specific reads cannot join another device of the same account')
+    release()
+    const responses = await Promise.all(reads)
+    assert.deepEqual(await Promise.all(responses.map(response => response.json())), ['device-a', 'device-b'].map(id => ({ sessions: [{ id, current: true }] })))
+  } finally { release(); sessionGate = Promise.resolve(); await Promise.allSettled(reads) }
 })
 
 test('audit JSON resumes the same snapshot and preserves explicit export failures', async () => {

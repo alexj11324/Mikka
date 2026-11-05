@@ -51,7 +51,7 @@ export function useLiveIssueList(ownerId: string, workspaceId: string | undefine
   const serialized = key ? unstable_serialize(key) : null
   // A push this list already read is skipped; each scope has its own revision.
   useLiveKeys(unavailable ? [] : scopes.map(scope => ({ kind: 'issue_list', id: scope ?? UNRESOLVED_LIST_SCOPE, workspaceId: scope,
-    revisions: serialized ? { [serialized]: heldRevision(result.data, 'issue_list', scope) } : undefined })), serialized ? [serialized] : [], null, { minIntervalMs: LIST_MERGE_MS })
+    revisions: serialized ? { [serialized]: heldRevision(result.data, 'issue_list', scope) } : undefined })), serialized ? [serialized] : [], null, { minIntervalMs: LIST_MERGE_MS, shareAcrossTabs: true })
   return { ...result, data: unavailable ? undefined : result.data }
 }
 
@@ -76,11 +76,11 @@ export function useLiveThreadList(ownerId: string, paused = false) {
   const unavailable = result.error instanceof ListReadScopeError || result.error instanceof CacheReadError
   const home = unavailable ? null : ownerListWorkspace(result.data, ownerId)
   const keys = [unstable_serialize(key)]
-  useLiveKey('thread_list', unavailable ? null : home ?? UNRESOLVED_LIST_SCOPE, keys, home, { minIntervalMs: LIST_MERGE_MS, deadline: listReadDeadline(result.data, ownerId), revisions: { [keys[0]]: heldRevision(result.data, 'thread_list', home) } })
+  useLiveKey('thread_list', unavailable ? null : home ?? UNRESOLVED_LIST_SCOPE, keys, home, { minIntervalMs: LIST_MERGE_MS, deadline: listReadDeadline(result.data, ownerId), revisions: { [keys[0]]: heldRevision(result.data, 'thread_list', home) }, shareAcrossTabs: true })
   // Presence is not a durable run write. Until the independent Device DO watch
   // can prove its expiry notification, keep its shared 60s fallback alongside
   // the real home channel. A null scope never creates another socket/ticket.
-  useLiveKey('thread_list', result.data?.presenceFallback && home ? UNRESOLVED_LIST_SCOPE : null, keys, null, { minIntervalMs: LIST_MERGE_MS })
+  useLiveKey('thread_list', result.data?.presenceFallback && home ? UNRESOLVED_LIST_SCOPE : null, keys, null, { minIntervalMs: LIST_MERGE_MS, shareAcrossTabs: true })
   return { ...result, data: unavailable ? undefined : result.data }
 }
 
@@ -94,7 +94,7 @@ export function useLiveTaskRunList(ownerId: string, enabled = true) {
   }), liveListReadOptions)
   const home = result.error instanceof ListReadScopeError ? null : ownerListWorkspace(result.data, ownerId)
   useLiveKey('task_run_list', key ? home ?? UNRESOLVED_LIST_SCOPE : null, key ? [unstable_serialize(key)] : [], home, { minIntervalMs: LIST_MERGE_MS, deadline: listReadDeadline(result.data, ownerId),
-    revisions: key ? { [unstable_serialize(key)]: heldRevision(result.data, 'task_run_list', home) } : undefined })
+    revisions: key ? { [unstable_serialize(key)]: heldRevision(result.data, 'task_run_list', home) } : undefined, shareAcrossTabs: true })
   return { ...result, data: result.error instanceof ListReadScopeError ? undefined : result.data }
 }
 
@@ -109,7 +109,7 @@ export function useLiveBotChatList(ownerId: string) {
   // The pinned Coordinator row already shares this normal authorized cache.
   // Only the list's own key holds the list's revision; 'coordinator-chat' always reads.
   useLiveKey('bot_chat_list', home ?? UNRESOLVED_LIST_SCOPE, [unstable_serialize(key), unstable_serialize(chatKeys.detail())], home, { minIntervalMs: LIST_MERGE_MS, deadline: listReadDeadline(result.data, ownerId),
-    revisions: { [unstable_serialize(key)]: heldRevision(result.data, 'bot_chat_list', home) } })
+    revisions: { [unstable_serialize(key)]: heldRevision(result.data, 'bot_chat_list', home) }, shareAcrossTabs: true })
   return { ...result, data: result.error instanceof ListReadScopeError ? undefined : result.data }
 }
 

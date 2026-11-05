@@ -29,7 +29,8 @@ import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
 import { runSummaryText } from '@/lib/issue-run-conversation'
 import { threadName } from '@/lib/issue-threads'
 import { coordinatorChatState } from './chat-state'
-import { compactChatMessage } from './chat-projection'
+import { compactChatMessage, compactChatToolMetadata } from './chat-projection'
+import type { ChatToolMetadata, ChatToolMetadataRow } from './chat-tool-metadata'
 import { coordinatorLeaseActive } from './lease'
 import { readPreferences } from '@/lib/preferences'
 import type { InboxEvent } from '@/lib/push-reasons'
@@ -449,6 +450,10 @@ export interface ChatView {
   /** The artifacts shown as cards, by id. */
   artifacts: Record<string, ArtifactSummary>
   continuation?: { after: number; prefix: string; cursor: number }
+  /** A disk projection requests a one-time display-metadata repair. */
+  restoreToolMetadata?: true
+  /** Response-only, consumed before the snapshot enters SWR or persistence. */
+  toolMetadata?: ChatToolMetadata
   historyBefore?: number
 }
 
@@ -574,14 +579,32 @@ async function chatPrefix(userId: string, botId: string, through: number) {
   return result.hash
 }
 
+/** Hash and metadata share one statement snapshot, so a concurrent prefix edit
+ * cannot pair an old proof with new tool labels. Only these aggregates leave
+ * PostgreSQL; the stored message is read there solely to prove the prefix. */
+async function chatPrefixMetadata(userId: string, botId: string, through: number, cursor: number) {
+  const rows = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, parts: compactChatToolMetadata.as('parts') })
+    .from(coordinatorMessages).where(and(messagesOf(userId, botId), sql`${coordinatorMessages.position} <= ${through}`)).orderBy(desc(coordinatorMessages.position)).limit(200).as('chat_prefix')
+  const [result] = await db.select({
+    hash: sql<string>`md5(coalesce(string_agg(${rows.id}::text || ':' || md5(${rows.message}::text), ',' order by ${rows.position}), ''))`,
+    rows: sql<ChatToolMetadataRow[]>`coalesce(jsonb_agg(jsonb_build_object('position', ${rows.position}, 'parts', ${rows.parts}) order by ${rows.position}) filter (where ${rows.position} >= ${Math.max(0, cursor - 199)} and jsonb_array_length(${rows.parts}) > 0), '[]'::jsonb)`,
+  }).from(rows)
+  return result
+}
+
 /** Replay the last rendered item too, so tool results and multi-step replies merge exactly as a full read. */
-export async function chatUpdate(userId: string, botId: string, continuation?: NonNullable<ChatView['continuation']>) {
-  if (continuation && continuation.after <= continuation.cursor && await chatPrefix(userId, botId, continuation.after) === continuation.prefix) {
+export async function chatUpdate(userId: string, botId: string, continuation?: NonNullable<ChatView['continuation']> & { restoreToolMetadata?: true }) {
+  const prefix = continuation && continuation.after <= continuation.cursor
+    ? continuation.restoreToolMetadata ? await chatPrefixMetadata(userId, botId, continuation.after, continuation.cursor)
+      : { hash: await chatPrefix(userId, botId, continuation.after), rows: undefined }
+    : undefined
+  if (continuation && prefix && prefix.hash === continuation.prefix) {
     const latest = await chatVersion(userId, 200, botId)
     if (continuation.cursor <= latest.cursor) {
       const tail = await chatView(userId, 200, botId, { after: continuation.after })
       // A reconnect after a long absence must not silently skip a window of messages.
-      if (!tail.historyBefore) return { ...tail, streamRunId: latest.streamRunId, working: latest.working, error: latest.error, after: continuation.after, baseCursor: continuation.cursor }
+      if (!tail.historyBefore) return { ...tail, streamRunId: latest.streamRunId, working: latest.working, error: latest.error, after: continuation.after, baseCursor: continuation.cursor,
+        ...(prefix.rows ? { toolMetadata: { baseCursor: continuation.cursor, prefix: continuation.prefix, rows: prefix.rows } } : {}) }
     }
   }
   return chatView(userId, 200, botId)

@@ -94,18 +94,27 @@ test('request logs mark only authenticated admission outcomes without payload or
   } finally { log.mock.restore(); warn.mock.restore() }
 })
 
-test('every pull-request action still refreshes publication without loading notification processing', async () => {
-  for (const action of ['opened', 'closed', 'edited', 'synchronize']) {
+test('pull-request actions that can change a delivery refresh it without loading notification processing', async () => {
+  const actions = ['opened', 'reopened', 'closed', 'edited', 'synchronize', 'ready_for_review', 'converted_to_draft']
+  for (const action of actions) {
     const payload = { action, pull_request: { number: 7 } }
     assert.equal((await POST(request('pull_request', payload))).status, 202)
     await callbacks.shift()!()
     assert.deepEqual(refresh.mock.calls.at(-1)!.arguments, ['pull_request', payload])
   }
-  assert.equal(refresh.mock.callCount(), 4)
+  assert.equal(refresh.mock.callCount(), actions.length)
   assert.equal(readNotifications.mock.callCount(), 0)
   assert.equal(ingest.mock.callCount(), 0)
   assert.ok(loaded.some(url => url.includes('lib/github/publication-webhook.ts')))
   assert.equal(loaded.some(url => url.includes('lib/suggestions/sources.ts') || url.includes('lib/suggestions/store.ts')), false)
+})
+
+test('pull-request actions that change nothing stored stop before any background work (#1212)', async () => {
+  for (const action of ['labeled', 'unlabeled', 'review_request_removed', 'unassigned', 'auto_merge_enabled', 'locked', 'milestoned']) {
+    assert.equal((await POST(request('pull_request', { action, pull_request: { number: 7 } }))).status, 204, action)
+  }
+  assert.deepEqual(callbacks, [])
+  assert.equal(refresh.mock.callCount(), 0)
 })
 
 test('created comments retain notification ingestion and do not refresh publications', async () => {
@@ -128,15 +137,21 @@ test('notification candidates that match no Mikka account do not call ingestion'
   assert.equal(ingest.mock.callCount(), 0)
 })
 
-test('publication failure cannot suppress an accepted PR notification', async () => {
+test('a review request is a notification only: it changes nothing a delivery stores', async () => {
+  assert.equal((await POST(request('pull_request', { action: 'review_requested', requested_reviewer: { id: 42 } }))).status, 202)
+  await callbacks.shift()!()
+  assert.equal(refresh.mock.callCount(), 0)
+  assert.equal(readNotifications.mock.callCount(), 1)
+  assert.equal(ingest.mock.callCount(), 1)
+})
+
+test('a publication refresh failure is logged and does not fail the delivery', async () => {
   refresh.mock.mockImplementation(async () => { throw Error('test publication failure') })
   const error = mock.method(console, 'error', () => {})
   try {
-    assert.equal((await POST(request('pull_request', { action: 'review_requested', requested_reviewer: { id: 42 } }))).status, 202)
+    assert.equal((await POST(request('pull_request', { action: 'closed', pull_request: { number: 7 } }))).status, 202)
     await callbacks.shift()!()
     assert.equal(refresh.mock.callCount(), 1)
-    assert.equal(readNotifications.mock.callCount(), 1)
-    assert.equal(ingest.mock.callCount(), 1)
     assert.equal(error.mock.callCount(), 1)
   } finally { error.mock.restore() }
 })

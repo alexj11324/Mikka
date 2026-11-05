@@ -121,7 +121,7 @@ test('detail and activity revalidate current access while returning only changed
     const revokedChat = successful(await readChat(botId, previousChat.version, continuation))
     assert.ok(revokedChat.chat && 'unchanged' in revokedChat.chat, 'the conversation itself did not change')
     assert.deepEqual(revokedChat.chat.metadata?.sources, {}, 'an unchanged message version cannot retain a revoked task title')
-    assert.deepEqual(mergeChat(previousChat, revokedChat.chat).sources, {})
+    assert.deepEqual(mergeChat(previousChat, revokedChat.chat)?.sources, {})
     assert.equal((await syncCoordinatorChat(botId)).error, 'authRequired', 'expected auth failures survive the Server Action boundary')
     await pool.query('delete from bots where id=$1', [botId])
     assert.equal((await readChat(botId, previousChat.version, continuation)).error, 'botNotFound')

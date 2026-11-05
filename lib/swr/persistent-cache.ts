@@ -176,6 +176,12 @@ export async function waitForCacheHydration(cache: object) {
   if (cache instanceof PersistentReadCache) await cache.hydrated
 }
 
+/** Cross-tab reads have the same authority boundary as the authenticated
+ * provider. Memory fallbacks and a retired provider cannot export/adopt data. */
+export function readCacheShareNamespace(cache: object, ownerId: string): string | null {
+  return cache instanceof PersistentReadCache && cache.isEnabled && cache.ownerId === ownerId ? cache.namespace : null
+}
+
 /** Successful logout, account deletion and workspace/account switches share
  * this path. No token, account content or credential is broadcast. */
 export async function clearPersistentReadCaches() {

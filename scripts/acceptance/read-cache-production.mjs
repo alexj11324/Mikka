@@ -170,6 +170,7 @@ export function mergeReadChat(previous, next) {
   check(merged && Array.isArray(merged.items) && proof && integer(proof.after) && integer(proof.cursor)
     && proof.after <= proof.cursor && proof.cursor === merged.cursor && version(proof.prefix), 'chat_merge_invalid')
   check(new Set(merged.items.map(item => item.position)).size === merged.items.length, 'chat_merge_invalid')
+  check(!merged.restoreToolMetadata && !('toolMetadata' in merged), 'chat_merge_invalid')
   return merged
 }
 
@@ -179,6 +180,7 @@ const listArguments = previous => {
   return [held && held.length === previous.positions?.length ? previous.version : undefined, held]
 }
 const chatProof = chat => chat?.continuation && { ...chat.continuation,
+  ...(chat.restoreToolMetadata ? { restoreToolMetadata: true } : {}),
   sourceIds: Object.keys(chat.sources ?? {}).slice(0, 400), artifactIds: Object.keys(chat.artifacts ?? {}).slice(0, 400) }
 const mode = value => value?.unchanged === true ? 'unchanged' : value?.delta === true || value?.after !== undefined ? 'delta' : 'snapshot'
 
@@ -240,6 +242,7 @@ export async function runProductionReadCache({ env = process.env, event, attesta
     const record = measurements.at(-1)
     record.responseMode = mode(value)
     if (Array.isArray(value?.items)) record.receivedItems = value.items.length
+    if (Array.isArray(value?.toolMetadata?.rows)) record.toolMetadataRows = value.toolMetadata.rows.length
   }
   const action = async (name, args, surface, scenario) => access(await client.action(name, args, surface, scenario))
   try {
@@ -267,7 +270,7 @@ export async function runProductionReadCache({ env = process.env, event, attesta
     report.existingVisibleTasks = held.issues.items.length
     for (const scenario of SCENARIOS) {
       // Restore the same allowed read models as the browser. A rejected record
-      // has no proof; redacted tool labels can require one full chat repair.
+      // has no proof; redacted tool labels request a prefix metadata repair.
       // This still does not exercise IndexedDB, first paint, or a focus event.
       if (scenario === 'reload-restored') held = {
         issues: restoreRead(issueKeys.list(ownerId, workspaceId), held.issues),
@@ -286,7 +289,15 @@ export async function runProductionReadCache({ env = process.env, event, attesta
       const refreshMetadata = scenario === 'reload-restored' || scenario === 'scoped-focus-catchup'
       const chat = (await action('syncCoordinatorChat', [botId, refreshMetadata ? undefined : held.chat?.version, chatProof(held.chat)], 'bot-chat', scenario)).chat
       check(chat?.botId === botId, 'scope_changed'); listScope(chat); measureResult(chat)
-      held.chat = mergeReadChat(held.chat, chat)
+      try { held.chat = mergeReadChat(held.chat, chat) }
+      catch (error) {
+        // Match the browser's single bounded reset when a restored prefix's
+        // tool identities cannot be repaired completely. Both responses count.
+        if (!(error instanceof ProductionReadCacheError && error.code === 'chat_merge_invalid' && held.chat?.restoreToolMetadata && chat.after !== undefined)) throw error
+        const full = (await action('syncCoordinatorChat', [botId], 'bot-chat', scenario)).chat
+        check(full?.botId === botId, 'scope_changed'); listScope(full); measureResult(full)
+        held.chat = mergeReadChat(undefined, full)
+      }
       const detail = await action('pollIssue', [issueId, held.detail?.readVersion], 'task-detail', scenario)
       check(detail.viewerId === ownerId, 'scope_changed'); check(version(detail.version), 'response_invalid'); measureResult(detail)
       if (detail.unchanged === true) check(held.detail?.readVersion === detail.version, 'list_merge_invalid')
@@ -308,9 +319,10 @@ export async function runProductionReadCache({ env = process.env, event, attesta
     cookie = ''
     // No rows, identifiers, cursor hashes, cookie material or upstream errors
     // enter evidence. Application/driver SHAs identify the tested deployment.
-    report.reads = measurements.map(({ operation, scenario, httpStatus, httpBytes, jsonBytes, traceId, responseMode, receivedItems }) => ({
+    report.reads = measurements.map(({ operation, scenario, httpStatus, httpBytes, jsonBytes, traceId, responseMode, receivedItems, toolMetadataRows }) => ({
       action: operation, scenario, httpStatus, httpBytes, resultBytes: jsonBytes, traceId,
       ...(responseMode ? { responseMode } : {}), ...(receivedItems === undefined ? {} : { receivedItems }),
+      ...(toolMetadataRows === undefined ? {} : { toolMetadataRows }),
     }))
     report.finishedAt = now()
   }

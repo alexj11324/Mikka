@@ -1,5 +1,7 @@
 'use server'
 
+import { singleFlight } from '@/lib/single-flight'
+
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { createHash } from 'node:crypto'
 import { and, desc, eq, getTableColumns, inArray, or, sql } from 'drizzle-orm'
@@ -39,7 +41,7 @@ import { issueRelationsChanged } from '@/lib/live/issue-detail'
 import { ownerListRead } from '@/lib/live/list-read-server'
 import { beginOwnerListRead } from '@/lib/live/revision-read'
 import { issuePrefixes, linearIssueLinks, linearTeamSyncs } from '@/lib/db/schema'
-import { changedListIds, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
+import { changedListIds, listPositionKey, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
 import { cacheReadAction } from '@/lib/cache-read-action'
 
 type IssueRow = typeof issues.$inferSelect
@@ -142,12 +144,22 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
   // whose visible projection differs from the caller's held snapshot.
   const positions = manifest.filter(row => { const link = links.find(item => item.issueId === row.id); return row.scope === 'personal' || !link || teams.some(team => team.id === link.teamId) })
     .map(row => ({ id: row.id, version: createHash('sha256').update(JSON.stringify([userId, context.workspace.id, row.signature, links.find(link => link.issueId === row.id)?.teamId ?? null])).digest('hex').slice(0, 32) }))
-  const changedIds = changedListIds(positions, previous)
-  const rows = changedIds.length ? await db.select().from(candidates).where(inArray(candidates.id, changedIds)).orderBy(desc(candidates.updatedAt), desc(candidates.id)) : []
-  const liveRows = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
-  const identifiers = await taskIdentifiers(liveRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
-  // The body stays in Postgres: only its attrs (metadata) and checklist counts are read, not up to 100 whole bodies per poll.
-  return { version, live, positions, ...(previous ? { delta: true as const } : {}), items: liveRows.map(({ content, checklistTotal, checklistChecked, ...issue }) => ({ ...issue, identifier: identifiers.get(issue.id) ?? null, teamId: links.find(link => link.issueId === issue.id)?.teamId ?? null, metadata: readIssueMetadata(content), checklist: checklistView(checklistTotal, checklistChecked) })) }
+  // Every request rebuilds visibility and the complete manifest before it may
+  // join. A removed task/link therefore cannot inherit an older flight even
+  // when this person's workspace role and team membership are unchanged.
+  // A workspace token also has a narrower predicate than a browser session.
+  return singleFlight(['/actions/issues/poll', userId, context.workspace.id, context.role,
+    actingContext.getStore()?.tokenWorkspaceId ?? null, allTeams.map(team => `${team.id}:${team.workspaceId}`).sort().join(','),
+    version, known ?? null, listPositionKey(previous), JSON.stringify(positions)], async () => {
+    const changedIds = changedListIds(positions, previous)
+    const rows = changedIds.length ? await db.select().from(candidates).where(inArray(candidates.id, changedIds)).orderBy(desc(candidates.updatedAt), desc(candidates.id)) : []
+    const liveRows = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
+    const identifiers = await taskIdentifiers(liveRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
+    // The leader's revision was read before these rows. Never stamp a joined
+    // response with the joining request's possibly newer live revision.
+    // The body stays in Postgres; only metadata and checklist counts are read.
+    return { version, live, positions, ...(previous ? { delta: true as const } : {}), items: liveRows.map(({ content, checklistTotal, checklistChecked, ...issue }) => ({ ...issue, identifier: identifiers.get(issue.id) ?? null, teamId: links.find(link => link.issueId === issue.id)?.teamId ?? null, metadata: readIssueMetadata(content), checklist: checklistView(checklistTotal, checklistChecked) })) }
+  })
 }
 
 /** A missing, deleted or inaccessible task is an expected answer, not a server error. */

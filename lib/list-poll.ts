@@ -25,6 +25,13 @@ export function readListPositions(value: unknown, limit: number): ListPosition[]
   return value.map(({ id, version }) => ({ id, version }))
 }
 
+/** A flight must distinguish a full read from an empty/partial held snapshot.
+ * Only validated, bounded proofs reach here. Their order does not affect which
+ * rows need reading, so identical sets from separate clients share one key. */
+export function listPositionKey(positions: readonly ListPosition[] | undefined): string | null {
+  return positions === undefined ? null : JSON.stringify([...positions].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+}
+
 /** A partial/mutated local cache only claims rows it still contains. */
 export function heldListPositions<T extends { id: string }>(snapshot: { items: T[]; positions?: ListPosition[] } | undefined) {
   if (!snapshot?.positions) return undefined

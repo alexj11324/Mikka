@@ -1,5 +1,6 @@
 'use server'
 
+import { singleFlight } from '@/lib/single-flight'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { ownerListRead } from '@/lib/live/list-read-server'
 import { beginOwnerListRead } from '@/lib/live/revision-read'
@@ -18,7 +19,7 @@ import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
 import { botChats, chatVersionState, chatView, citationSources, storedReasoning, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import * as chatStore from '@/lib/coordinator/store'
-import type { UnchangedChat } from '@/lib/coordinator/chat-poll'
+import { refreshChatMetadata, type UnchangedChat } from '@/lib/coordinator/chat-poll'
 import type { CitationSource } from '@/lib/coordinator/citations'
 import { reasoningText } from '@/lib/coordinator/stream-response'
 import { credentialChatFingerprints } from '@/lib/credentials/chat-guard'
@@ -86,7 +87,7 @@ export async function getCoordinatorChat(botId: string | null = null): Promise<C
 }
 
 const versionSchema = z.string().regex(/^[0-9a-f]{32}$/).optional()
-const continuationSchema = z.object({ after: z.number().int().min(0), cursor: z.number().int().min(0), prefix: z.string().regex(/^[0-9a-f]{32}$/), sourceIds: z.array(z.uuid()).max(400).optional(), artifactIds: z.array(z.uuid()).max(400).optional() }).optional()
+const continuationSchema = z.object({ after: z.number().int().min(0), cursor: z.number().int().min(0), prefix: z.string().regex(/^[0-9a-f]{32}$/), restoreToolMetadata: z.literal(true).optional(), sourceIds: z.array(z.uuid()).max(400).optional(), artifactIds: z.array(z.uuid()).max(400).optional() }).optional()
 
 /**
  * The chat for a poll that already shows version `known`: only its live state
@@ -104,37 +105,42 @@ export async function syncCoordinatorChat(botId: string | null = null, known?: s
 }
 
 async function readCoordinatorChat(botId: string | null, known?: string, continuation?: z.infer<typeof continuationSchema>): Promise<CoordinatorChat | UnchangedChat> {
+  // Each request is authorized on its own: the session and its ownership of this bot.
   const user = await getUser()
   const bot = await ownBot(user, botId)
   const enabled = coordinatorEnabled()
   const parsed = versionSchema.safeParse(known)
+  const proof = continuationSchema.safeParse(continuation)
+  const previous = proof.success && proof.data ? { ...proof.data,
+    sourceIds: [...new Set(proof.data.sourceIds ?? [])].sort(), artifactIds: [...new Set(proof.data.artifactIds ?? [])].sort(),
+  } : undefined
+  const heldVersion = parsed.success ? parsed.data : undefined
   // Before the chat: a push at this revision or below is already in what follows.
   const begun = await beginOwnerListRead(user.id, [], [{ kind: 'bot_chat', id: bot.id }])
   const { expiries, observedAt, ...current } = await chatVersionState(user.id, 200, bot.id)
   // The owner's home channel says when to read again; a lease running out is the one change with no write.
   const live = await ownerListRead(user.id, expiries, observedAt, begun)
-  const proof = continuationSchema.safeParse(continuation)
-  // A message version does not grant continued access to its cited task or
-  // artifact. Reauthorize cached decorations even when the transcript itself
-  // is unchanged; absence removes a deleted/revoked card in the client merge.
-  let metadata: Pick<ChatView, 'sources' | 'artifacts'> | undefined
-  if (proof.success && proof.data) {
+  // Each request observes the current version before joining: a deletion or a
+  // new turn cannot join an older transcript still being read. Normalize only
+  // the validated, bounded cursor; a full read and a saved tail stay distinct.
+  const shared = await singleFlight(['/actions/coordinator/poll', user.id, bot.id, current.version, heldVersion ?? null,
+    previous ? JSON.stringify(previous) : null], async (): Promise<CoordinatorChat | UnchangedChat> => {
+    if (heldVersion === current.version && !previous?.restoreToolMetadata) return { unchanged: true, ...current, botId: bot.id, enabled, working: enabled && current.working, live }
+    const chat = await chatStore.chatUpdate(user.id, bot.id, previous)
+    // Carry the leader's revision, read before its transcript. A joiner's newer
+    // revision must never acknowledge a write absent from this shared data.
+    return { ...chat, version: current.version, botId: bot.id, enabled, working: enabled && chat.working, live }
+  })
+  // This stays outside the flight, after awaiting it: cited task and artifact
+  // access may have changed while another request was reading the transcript.
+  return refreshChatMetadata(shared, previous, async ({ sourceIds, artifactIds }) => {
     const { artifactSummaries } = await import('@/lib/artifacts/store')
     const [sources, artifacts] = await Promise.all([
-      citationSources(user.id, (proof.data.sourceIds ?? []).map(id => `[[issue:${id}]] [[run:${id}]]`)),
-      artifactSummaries(user.id, proof.data.artifactIds ?? []),
+      citationSources(user.id, sourceIds.map(id => `[[issue:${id}]] [[run:${id}]]`)),
+      artifactSummaries(user.id, artifactIds),
     ])
-    metadata = { sources, artifacts }
-  }
-  if (parsed.success && parsed.data === current.version) return { unchanged: true, ...current, botId: bot.id, enabled, working: enabled && current.working, live, ...(metadata ? { metadata } : {}) }
-  const chat: ChatView & { after?: number; baseCursor?: number } = await chatStore.chatUpdate(user.id, bot.id, proof.success ? proof.data : undefined)
-  // Refresh card names and authorization independently from historical message bodies.
-  if (metadata) {
-    chat.sources = { ...metadata.sources, ...chat.sources }
-    chat.artifacts = { ...metadata.artifacts, ...chat.artifacts }
-  }
-  // The version read first: a message stored in between makes the next poll read again, never miss it.
-  return { ...chat, ...(!known || metadata ? { metadataRefresh: true } : {}), version: current.version, botId: bot.id, enabled, working: enabled && chat.working, live }
+    return { sources, artifacts }
+  })
 }
 
 /** A bounded older page overlaps the first rendered item, preserving multi-step reply grouping. */

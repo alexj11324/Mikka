@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { changedListIds, heldListPositions, mergeList, readListPositions, unchangedList } from './list-poll'
+import { changedListIds, heldListPositions, listPositionKey, mergeList, readListPositions, unchangedList } from './list-poll'
 
 test('an unchanged poll preserves current optimistic data; a changed snapshot replaces it', () => {
   const current = [{ id: 'new-local-task' }]
@@ -26,4 +26,14 @@ test('invalid proofs fall back to full reads, and a local cache only claims rows
   assert.equal(readListPositions([a, b], 1), undefined)
   assert.deepEqual(heldListPositions({ items: [{ id: b.id }], positions: [a, b] }), [b])
   assert.deepEqual(changedListIds([a, b], heldListPositions({ items: [{ id: b.id }], positions: [a, b] })), [a.id])
+})
+
+test('flight proof keys distinguish full, empty and different held subsets without depending on their order', () => {
+  const a = { id: '10000000-0000-4000-8000-000000000001', version: 'a'.repeat(32) }
+  const b = { id: '10000000-0000-4000-8000-000000000002', version: 'b'.repeat(32) }
+  const proofs = [b, a]
+  assert.equal(listPositionKey(proofs), listPositionKey([a, b]))
+  assert.deepEqual(proofs, [b, a], 'canonicalizing a flight key does not reorder a client manifest')
+  assert.equal(new Set([undefined, [], [a], [b], [a, b]].map(listPositionKey)).size, 5)
+  assert.notEqual(listPositionKey([a]), listPositionKey([{ ...a, version: b.version }]))
 })
