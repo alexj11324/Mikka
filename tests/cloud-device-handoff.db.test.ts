@@ -65,6 +65,7 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
       await pool.query('INSERT INTO device_repos(id,"userId","deviceId","repoPath","remoteUrl","baseBranch") VALUES($1,$2,$3,$4,$5,\'main\')', [repoId, userId, parentDevice, remoteKey, remoteUrl])
       await pool.query('INSERT INTO cloud_machines("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES($1,$2,$3,$4,$5,\'running\',true)', [workspaceId, userId, randomUUID(), `synthetic-parent-${id}`, parentDevice])
       await pool.query('INSERT INTO bot_desktops("botId","workspaceId","ownerId",display) VALUES($1,$2,$3,1)', [botId, workspaceId, userId])
+      await pool.query('INSERT INTO bot_cloud_runtimes ("botId","ownerId","workspaceId",harness,"agentId","repoId") VALUES ($1,$2,$3,\'codex\',$4,$5)', [botId, userId, workspaceId, agentId, repoId])
       const e2b = sealSecret('synthetic-provider-fixture', userE2bKeyAad(userId))
       await pool.query('INSERT INTO user_e2b_keys("userId",ciphertext,iv,"keyVersion",last4) VALUES($1,$2,$3,$4,\'test\')', [userId, e2b.ciphertext, e2b.iv, e2b.keyVersion])
       const key = sealSecret('synthetic-model-fixture', ['model_api_key', keyId, userId].join('\0'))

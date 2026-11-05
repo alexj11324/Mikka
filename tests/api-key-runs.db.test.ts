@@ -117,6 +117,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     await pool.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)`, [p.botId, p.workspaceId, p.id])
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'claude_code\',$4)', [agentId, p.id, cloudDevice, `cloud-${agentId.slice(0, 8)}`])
     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, cloudDevice, p.id, normalizeRepository(p.remote).key, p.remote])
+    await pool.query('INSERT INTO bot_cloud_runtimes ("botId","ownerId","workspaceId",harness,"agentId","repoId") VALUES ($1,$2,$3,\'claude_code\',$4,$5)', [p.botId,p.id,p.workspaceId,agentId,repoId])
     return { cloudDevice, agentId, repoId }
   }
 
@@ -400,6 +401,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
       const { cloudDevice, agentId } = await botComputer(p)
       const computerRepo = randomUUID(), actor = { userId:p.id, workspaceId:p.workspaceId }
       await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,$4)', [computerRepo, cloudDevice, p.id, '/home/user/.mikka/bot-workspaces/fixture'])
+      await pool.query('UPDATE bot_cloud_runtimes SET "repoId"=$2 WHERE "botId"=$1', [p.botId,computerRepo])
       const { runId } = await queueCloudRun(pool, actor, { botId:p.botId, issueId:p.issueId, agentId, deviceRepoId:computerRepo, title:'Inspect files', body:'Read the delivery only', model:'key-model-a', readOnly:true })
       const machines = await fakeThreadMachines(pool, desktopMachine)
       const thread = await machines.start(actor,runId).finally(() => machines.restore())
@@ -429,6 +431,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
       // A computer task (no remote) needs a desktop: refused at claim, the run stays queued.
       const computerRepo = randomUUID()
       await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,$4)', [computerRepo, cloudDevice, p.id, '/home/user/.mikka/bot-workspaces/fixture'])
+      await pool.query('UPDATE bot_cloud_runtimes SET "repoId"=$2 WHERE "botId"=$1', [p.botId,computerRepo])
       const computerRun = (await queue(computerRepo)).runId
       const computerThread = await machines.start(actor, computerRun)
       const refused = await claim(computerThread.deviceId, computerRun, computerThread.token)
@@ -473,6 +476,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     }
     const computerRepo = randomUUID()
     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,$4)', [computerRepo, cloudDevice, p.id, '/home/user/.mikka/bot-workspaces/fixture'])
+      await pool.query('UPDATE bot_cloud_runtimes SET "repoId"=$2 WHERE "botId"=$1', [p.botId,computerRepo])
     const repository = await queue(repoId, taskMachine)
     const computerTask = await queue(computerRepo, desktopMachine)
     // An admin denies computer use once both threads are queued on their own machines.
