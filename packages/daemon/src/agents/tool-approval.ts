@@ -3,6 +3,8 @@
 // Claude Code in bypassPermissions, Codex with approvals "never"); this gate
 // only stops a run whose lease, owner or policy is no longer live.
 
+import { RunAuthorityLease, type RunAuthoritySource } from './run-authority'
+
 export interface ToolApprovalHost {
   /** Must reflect current run lease, owner, and revocation state. */
   isLive(runId: string): boolean | Promise<boolean>
@@ -28,13 +30,20 @@ export class ToolApprovalGate {
   private intervalMs?: number
   private monitoring?: Promise<void>
   private dirty = false
-  constructor(readonly runId: string, private readonly host: ToolApprovalHost) {}
+  private readonly authority?: RunAuthorityLease
+  constructor(readonly runId: string, private readonly host: ToolApprovalHost, source?: RunAuthoritySource) {
+    if (source) {
+      this.authority = new RunAuthorityLease(runId,source,()=>this.revoke())
+      this.authority.start()
+    }
+  }
   revoke(reason?: 'device_lost') {
     if (this.revoked) return
     this.reason = reason
     clearInterval(this.timer)
     this.timer = undefined
     this.monitors.clear()
+    this.authority?.close()
     this.stop.abort()
   }
   get revoked(): boolean { return this.stop.signal.aborted }
@@ -47,7 +56,13 @@ export class ToolApprovalGate {
   async checkLive(): Promise<boolean> {
     if (this.revoked) return false
     if (!this.checking) {
-      const work = Promise.resolve().then(() => this.revoked ? false : this.host.isLive(this.runId))
+      const work = Promise.resolve().then(async () => {
+        if (this.revoked || (this.authority && (!await this.authority.ready || !this.authority.current))) return false
+        // Even with a source lease, every operation still gets a fresh answer
+        // from the original host. Only its redundant background poll changes.
+        const live = await this.host.isLive(this.runId)
+        return live && (!this.authority || this.authority.current)
+      })
       this.checking = abortable(work, this.stop.signal)
         .then(live => live && !this.revoked, () => false)
         .finally(() => { this.checking = undefined })
@@ -67,16 +82,18 @@ export class ToolApprovalGate {
     return () => { this.monitors.delete(monitor); this.scheduleMonitor() }
   }
   private scheduleMonitor() {
-    const intervalMs = this.monitors.size ? Math.min(...[...this.monitors].map(monitor => monitor.intervalMs)) : undefined
+    const monitored = [...this.monitors].filter(monitor => !this.authority || monitor.check)
+    const intervalMs = monitored.length ? Math.min(...monitored.map(monitor => monitor.intervalMs)) : undefined
     if (intervalMs === this.intervalMs) return
     clearInterval(this.timer)
     this.intervalMs = intervalMs
     this.timer = intervalMs === undefined ? undefined : setInterval(() => this.requestCheck(false), intervalMs)
     this.timer?.unref()
   }
-  /** A push invalidates an in-flight check as well as a settled one. Generic
-   * work frames may be lost, so the one-second safety timer stays enabled. */
+  /** Legacy clients retain the one-second safety timer. A negotiated source
+   * handles lost hints using its independent bounded authority challenges. */
   invalidate() {
+    if (this.authority) this.authority.invalidate()
     this.requestCheck(true)
   }
   private requestCheck(invalidated: boolean) {
@@ -91,7 +108,7 @@ export class ToolApprovalGate {
     this.monitoring = (async () => {
       while (this.dirty && !this.revoked && this.monitors.size) {
         this.dirty = false
-        if (!await this.checkLive()) { this.revoke(); return }
+        if (!(this.authority ? await this.authority.ready && this.authority.current : await this.checkLive())) { this.revoke(); return }
         if (olderOperation) { olderOperation = false; this.dirty = true; continue }
         for (const monitor of this.monitors) {
           if (!monitor.check) continue
@@ -118,3 +135,4 @@ export function requireRunToolApproval(runId: string, gate?: ToolApprovalGate): 
   if (!gate || gate.runId !== runId || gate.revoked) throw new Error('Run tool approval unavailable')
   return gate
 }
+

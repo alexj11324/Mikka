@@ -16,6 +16,7 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 import { z } from "zod"
 import { chatFileDownloadSchema, chatFileTransferSchema, CHAT_FILE_MAX_BYTES } from '@mikka/protocol/chat-attachments'
 import { ToolApprovalGate } from "./agents/tool-approval"
+import type { RunAuthoritySource } from './agents/run-authority'
 import type { ServerDecide, ServerDecisionAnswer } from "./server-decision"
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
@@ -177,7 +178,7 @@ export class HttpServerLink implements ServerLink {
     } catch { return null }
   }
 
-  async prepareRunToolApproval(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
+  async prepareRunToolApproval(assignment: RunAssignment, signal: AbortSignal, check: () => void, _worktree?: string, authority?: RunAuthoritySource) {
     if (!assignment.policy || !assignment.policyRevision) throw new Error('Run policy unavailable')
     let context = signal.aborted ? null : await this.verifyRunPolicy(assignment,signal)
     const policyRevision = assignment.policyRevision
@@ -238,7 +239,7 @@ export class HttpServerLink implements ServerLink {
           }
         } catch (error) { refusal(phase, 'check_failed', error); return false }
       }
-    })
+    }, authority)
     this.runControls.add(gate)
     const offMonitor = gate.monitor()
     const abort = () => gate.revoke()

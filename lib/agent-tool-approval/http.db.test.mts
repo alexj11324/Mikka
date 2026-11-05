@@ -3,12 +3,16 @@ import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import { execFile } from 'node:child_process'
+import { mkdtemp, copyFile, chmod, access, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { resolve, join } from 'node:path'
 import { promisify } from 'node:util'
-import { Pool } from 'pg'
+import { Pool, type PoolClient } from 'pg'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import { remoteKey } from '@mikka/protocol/repository'
+import { instrumentFixtureAuthority } from '../../tests/helpers/run-authority-version-fixture'
 
 const url = process.env.APPROVAL_TEST_DATABASE_URL
 if (!url) throw new Error('isolated database required')
@@ -37,6 +41,9 @@ mock.module(new URL('../personal-mailbox-config.ts', import.meta.url).href, { na
 mock.module(new URL('../auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async ({ headers }: { headers: Headers }) => ({ user: { id: headers.get('cookie') === 'owner=1' ? owner : 'other' } }) } } } })
 let server: Server, origin: string
 let claimed: import('@mikka/protocol/device').RunAssignment | undefined
+let holdControlResponse: { runId: string; entered: () => void; released: Promise<void> } | undefined
+const controlRequests = new Map<string, number>()
+let authorityWorkspacePool: Pool | undefined
 const originalFetch = globalThis.fetch
 before(async () => {
   // The preceding policy-store suite retains its deliberately minimal schema.
@@ -77,7 +84,13 @@ before(async () => {
       const request = new Request(`${origin}${req.url}`, { method: req.method, headers: req.headers as HeadersInit, ...(req.method==='GET' || req.method==='HEAD' ? {} : {body:Buffer.concat(chunks)}) })
       const runRoute = /^\/v1\/runs\/([^/]+)\/(tool-approval|policy-snapshot)$/.exec(pathname)
       const routeRunId = runRoute?.[1] ?? runId
-      const response = req.url === '/api/agent-cli-policy' ? await settings.POST(request) : req.url?.endsWith('/claim') ? await claim.POST(request, { params: Promise.resolve({ runId,deviceId }) }) : runRoute?.[2] === 'policy-snapshot' ? await (req.method==='GET' ? policy.GET : policy.POST)(request, {params:Promise.resolve({runId:routeRunId})}) : await device.POST(request, { params: Promise.resolve({ runId: routeRunId }) })
+      const claimRoute = /^\/v1\/devices\/([^/]+)\/runs\/([^/]+)\/claim$/.exec(pathname)
+      if (runRoute?.[2] === 'tool-approval') controlRequests.set(routeRunId, (controlRequests.get(routeRunId) ?? 0) + 1)
+      const response = req.url === '/api/agent-cli-policy' ? await settings.POST(request) : claimRoute ? await claim.POST(request, { params: Promise.resolve({ runId:claimRoute[2],deviceId:claimRoute[1] }) }) : runRoute?.[2] === 'policy-snapshot' ? await (req.method==='GET' ? policy.GET : policy.POST)(request, {params:Promise.resolve({runId:routeRunId})}) : await device.POST(request, { params: Promise.resolve({ runId: routeRunId }) })
+      // Only delivery is delayed. Device authentication, policy and lease reads
+      // above are the real HTTP route and real committed PostgreSQL state.
+      const held = runRoute?.[2] === 'tool-approval' && holdControlResponse?.runId === routeRunId ? holdControlResponse : undefined
+      if (held) { held.entered(); await held.released }
       res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()))
     } catch(error) {
       // HTTP failures may include a Drizzle query or response object. Keep the
@@ -92,6 +105,7 @@ after(async () => {
   if (server) {server.closeAllConnections();await new Promise<void>(r => server.close(() => r()))}
   globalThis.fetch=originalFetch
   if(pool)await pool.end()
+  if(authorityWorkspacePool)await authorityWorkspacePool.end()
   const workspacePool=(globalThis as {workspacePool?:Pool}).workspacePool
   if(workspacePool)await workspacePool.end()
   for(const [key,value] of Object.entries(previousEnv)){if(value===undefined)delete process.env[key];else process.env[key]=value}
@@ -213,3 +227,120 @@ test('real authenticated HTTP retains a lease-loss cause but never invents it fo
   assert.deepEqual(await stopped.json(),{error:'approvalUnavailable'})
   assert.equal((await check({revokeReason:'device_lost'})).status,400,'the caller cannot supply a host cause')
 })
+
+async function assertIdleChildDeadline(fault:'http_delivery'|'postgres_barrier') {
+  const idleRun = randomUUID(), idleAgent = randomUUID()
+  await pool.query(`UPDATE devices SET harnesses=$2 WHERE id=$1`, [deviceId, JSON.stringify([
+    {harness:'codex',installed:true,toolApproval:true},
+    {harness:'claude_code',installed:true,toolApproval:true},
+  ])])
+  await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'claude_code',$4)`, [idleAgent,owner,deviceId,`Synthetic silent CLI ${fault}`])
+  await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId","issueId","deviceRepoId",status,"agentId",kind,prompt) VALUES ($1,$2,$3,$4,$5,'queued',$6,'implement','SILENT_AUTHORITY_TEST')`, [idleRun,owner,deviceId,issueId,repoId,idleAgent])
+  const response = await fetch(`${origin}/v1/devices/${deviceId}/runs/${idleRun}/claim`, {method:'POST',headers:{'x-mikka-client-version':'0.0.375',authorization:'Bearer synthetic',[REPO_ORIGIN_HEADER]:'1',[POLICY_SNAPSHOT_HEADER]:POLICY_SNAPSHOT_VERSION}})
+  const body = await response.json()
+  assert.equal(response.status,200,`real isolated claim: ${response.status === 200 ? 'accepted' : JSON.stringify(body)}`)
+  const assignment = body as import('@mikka/protocol/device').RunAssignment
+  const { HttpServerLink } = await import('../../packages/daemon/src/server-link-http')
+  const { ClaudeAdapter } = await import('../../packages/daemon/src/adapters/claude')
+  const { createLogger } = await import('../../packages/daemon/src/log')
+  const { stopOwnedRun } = await import('../run-control')
+  const { db } = await import('../db/index')
+  const { completeRunAuthoritySource } = await import('../run-authority/source')
+  if(!authorityWorkspacePool) {
+    const workspaceName=`authority_ws_${randomUUID().replaceAll('-','')}_e2e`
+    const admin=new Pool({connectionString:url,max:1})
+    try {await admin.query(`CREATE DATABASE "${workspaceName}"`)} finally {await admin.end()}
+    const workspaceURL=new URL(application);workspaceURL.pathname=`/${workspaceName}`
+    await promisify(execFile)(process.execPath,['scripts/migrate.mjs'],{env:{...process.env,MIGRATE:'1',DATABASE_URL:workspaceURL.toString()},maxBuffer:4<<20,timeout:120_000})
+    authorityWorkspacePool=new Pool({connectionString:workspaceURL.toString(),max:4})
+    await instrumentFixtureAuthority(pool)
+    await instrumentFixtureAuthority(authorityWorkspacePool)
+  }
+  let challenges=0
+  const versionQueries={app:0,workspace:0}
+  const counted=(database:Pool,key:'app'|'workspace')=>({query:((...args:unknown[])=>{versionQueries[key]++;return Reflect.apply(database.query,database,args)}) as Pool['query']})
+  const completeSource=completeRunAuthoritySource({runId:idleRun,app:counted(pool,'app'),workspace:counted(authorityWorkspacePool,'workspace'),read:async signal=>{
+    const checked=await fetch(`${origin}/v1/runs/${idleRun}/tool-approval`,{method:'POST',signal,headers:{'x-mikka-client-version':'0.0.375',authorization:'Bearer synthetic','content-type':'application/json'},body:JSON.stringify({operation:'check',deviceId,policyRevision:assignment.policyRevision})})
+    if(!checked.ok)return {live:false,validForMs:0}
+    const current=await checked.json() as {live:boolean;paused?:boolean}
+    // This first source fixture opts in only an active local run. Paused-run
+    // restoration and production source placement remain separate work.
+    const {rows:[timed]}=await pool.query<{remainingMs:number}>(`SELECT EXTRACT(EPOCH FROM (LEAST(r."leaseExpiresAt",COALESCE(t."expiresAt",'infinity'::timestamptz))-clock_timestamp()))*1000 AS "remainingMs"
+      FROM agent_runs r JOIN device_tokens t ON t."userId"=r."userId" AND t."tokenHash"=$2 WHERE r.id=$1`,[idleRun,createHash('sha256').update('synthetic').digest('hex')])
+    const remaining=Math.min(Number(timed?.remainingMs),assignment.policySnapshot!.payload.expiresAt-Date.now())
+    return {live:current.live&&!current.paused,validForMs:remaining}
+  }})
+  const link = new HttpServerLink(origin)
+  Object.assign(link,{credential:'synthetic'})
+  const gate = await link.prepareRunToolApproval(assignment,new AbortController().signal,()=>{},undefined,(challenge,signal)=>{challenges++;return completeSource(challenge,signal)})
+  const dir = await mkdtemp(join(tmpdir(),'mikka-idle-authority-'))
+  const marker = join(dir,'child-exit')
+  const binary = join(dir,'fake-claude.mjs')
+  await copyFile(resolve('packages/daemon/test/fakes/fake-claude.mjs'),binary)
+  await copyFile(resolve('packages/daemon/test/fakes/mcp-call.mjs'),join(dir,'mcp-call.mjs'))
+  await chmod(binary,0o700)
+  await promisify(execFile)('git',['init','-q','-b','main',dir])
+  await promisify(execFile)('git',['-C',dir,'-c','user.name=Synthetic','-c','user.email=synthetic@example.invalid','commit','-q','--allow-empty','-m','Isolated fixture'])
+  const exists = (path:string) => access(path).then(()=>true,()=>false)
+  const until = async (condition:()=>boolean|Promise<boolean>, timeout:number) => {
+    const deadline=performance.now()+timeout
+    while (!await condition() && performance.now()<deadline) await new Promise(resolve=>setTimeout(resolve,5))
+    return condition()
+  }
+  let release!:()=>void, entered!:()=>void
+  const released=new Promise<void>(r=>{release=r}), held=new Promise<void>(r=>{entered=r})
+  let exitedAt:number|undefined, revokedAt:number|undefined
+  const events:unknown[]=[]
+  const adapter=new ClaudeAdapter({stateDir:dir,binary})
+  let session:Awaited<ReturnType<typeof adapter.start>>|undefined
+  let consumed:Promise<void>|undefined
+  let blocker:PoolClient|undefined
+  let postgresBarrierBlocked=false
+  gate.onRevoke(()=>{revokedAt=performance.now()})
+  try {
+    session=await adapter.start({runId:idleRun,cwd:dir,prompt:`HANG SIGTERM_EXIT_143:${marker}`,policy:assignment.policy,env:{PATH:process.env.PATH??''},log:createLogger(),toolApproval:gate})
+    consumed=(async()=>{for await(const event of session!.events()){events.push(event);if(event.type==='exit')exitedAt=performance.now()}})()
+    assert.equal(await until(()=>exists(`${marker}.ready`),5000),true,'the actual child must be running before fault injection')
+    if(fault==='http_delivery') {
+      holdControlResponse={runId:idleRun,entered,released}
+      await Promise.race([held,new Promise<never>((_,reject)=>setTimeout(()=>reject(Error('No actual background authority request')),2500))])
+    }
+    const eventsBeforeStop=events.length
+    assert.equal(exitedAt,undefined,'the actual child must still be running before Stop is submitted')
+    const committedAt=performance.now()
+    assert.equal(await stopOwnedRun(db,owner,idleRun),false,'an admitted run requests daemon cancellation instead of ending synchronously')
+    const commitReturnedAt=performance.now()
+    if(fault==='postgres_barrier') {
+      // The Stop and its version have committed. Block the actual subsequent
+      // source SELECT at PostgreSQL, without replacing its result or clock.
+      blocker=await pool.connect()
+      await blocker.query('BEGIN')
+      await blocker.query('LOCK TABLE run_authority_version IN ACCESS EXCLUSIVE MODE')
+      postgresBarrierBlocked=await until(async()=>Number((await pool.query(`SELECT count(*) AS n FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE 'SELECT source::text,%'`)).rows[0].n)>0,600)
+      assert.equal(postgresBarrierBlocked,true,'the source barrier must actually be waiting inside PostgreSQL')
+    }
+    const observed=await pool.query(`SELECT "stopRequestedAt" IS NOT NULL AS stopped FROM agent_runs WHERE id=$1`,[idleRun])
+    assert.equal(observed.rows[0].stopped,true,'a separate pool query sees the committed stop')
+    await until(()=>exitedAt!==undefined,Math.max(0,1000-(performance.now()-commitReturnedAt)))
+    const observedAt=performance.now()
+    const deadlineMet=exitedAt!==undefined && exitedAt-commitReturnedAt<=1000
+    const eventsAfterStop=events.slice(eventsBeforeStop).map(event=>(event as {type:string}).type)
+    console.info(JSON.stringify({event:'authority_idle_child_deadline',sourceSha:'a410b292cc53cfef43992a91d7696023e3481567',fault,runId:idleRun,committedStop:true,commitDurationMs:commitReturnedAt-committedAt,observationAfterCommitMs:observedAt-commitReturnedAt,revokedAfterCommitMs:revokedAt===undefined?null:revokedAt-commitReturnedAt,childExitAfterCommitMs:exitedAt===undefined?null:exitedAt-commitReturnedAt,childSignalMarker:await exists(marker)?(await readFile(marker,'utf8')).trim():null,authorityHttpRequests:controlRequests.get(idleRun)??0,challenges,versionQueries,postgresBarrierBlocked,eventsAfterStop,deadlineMs:1000,deadlineMet}))
+    assert.equal(deadlineMet,true,'a silent actual CLI must stop by the local one-second authority deadline even when the origin response stalls')
+    assert.ok(exitedAt!==undefined && exitedAt-committedAt<=1000,'the measured exit also satisfies the conservative bound from before the Stop transaction')
+    assert.equal(gate.revoked,true,'the authority deadline must revoke the actual gate')
+    assert.equal((await readFile(marker,'utf8')).trim(),'143','the actual child must have handled SIGTERM and exited')
+    assert.deepEqual(eventsAfterStop,['exit'])
+  } finally {
+    if(blocker){await blocker.query('ROLLBACK');blocker.release()}
+    holdControlResponse=undefined
+    gate.revoke();release()
+    if(session)await session.cancel()
+    await consumed
+    await rm(dir,{recursive:true,force:true})
+  }
+}
+
+test('idle CLI stops within one second after committed Stop with stalled HTTP delivery', {timeout:60_000},()=>assertIdleChildDeadline('http_delivery'))
+test('idle CLI stops within one second after committed Stop with an actual blocked PostgreSQL barrier', {timeout:60_000},()=>assertIdleChildDeadline('postgres_barrier'))
+
