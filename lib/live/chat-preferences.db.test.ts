@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { wireKeys } from './wire-keys.test-support'
 import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import test, { mock } from 'node:test'
@@ -30,8 +31,7 @@ test('a pin or mute change pushes its bot chat keys to the owner home, after the
     assert.equal(target.hostname, 'gateway.example.invalid', 'no provider or production request is allowed')
     const scope = channelScopes.get(target.pathname)
     if (!scope) unexpected.push(target.pathname)
-    const events: LiveInvalidation[] = JSON.parse(String(options?.body))
-    for (const event of events) assert.deepEqual(Object.keys(event).sort(), ['id', 'kind'], 'a key carries a kind and an id, never the preference')
+    const events: LiveInvalidation[] = wireKeys(JSON.parse(String(options?.body)), 'a key carries a kind and an id, never the preference')
     sent.push({ scope: scope ?? { ownerId: 'unexpected', workspaceId: target.pathname }, events })
     return new Response(null, { status: 204 })
   })

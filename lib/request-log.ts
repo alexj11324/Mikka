@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, randomUUID } from 'node:crypto'
+import { channel } from 'node:diagnostics_channel'
 
 // Start and completion JSON lines per API request, written to stdout so Vercel Runtime Logs
 // (free on every plan) can search it. Only safe fields: never headers,
@@ -8,6 +9,18 @@ import { createHash, randomUUID } from 'node:crypto'
 export type RequestLogOutcome = 'empty' | 'work' | 'ignored'
 type Store = { userId?: string; outcome?: RequestLogOutcome }
 const requestScope = new AsyncLocalStorage<Store>()
+const requestClientChannel = channel('mikka.request.client')
+const requestErrorChannel = channel('mikka.request.error')
+
+/** Attribution only, never authentication. Ignore headers on machine-only routes. */
+export function requestClientAttributes(request: Request, route: string): Record<string, string> {
+  if (request.headers.get('x-mikka-client-kind') !== 'mobile' || !route.startsWith('/api/')
+    || /^\/api\/(?:cron|webhooks|runs)(?:\/|$)/.test(route)) return {}
+  const version = request.headers.get('x-mikka-app-version')
+  return { 'mikka.client_kind': 'mobile',
+    ...(version && /^\d{1,4}\.\d{1,4}\.\d{1,4}$/.test(version) ? { 'mikka.app.version': version } : {}),
+  }
+}
 // The route template of the request being handled, read by the database sample
 // and the tracer (lib/tracing/labels.ts) through this global key. Kept local:
 // scripts/ops load this file with plain Node, without the @/ alias.
@@ -76,6 +89,11 @@ export function withRequestLog<R extends Request, A extends unknown[], T extends
   return async (request, ...rest) => {
     const started = performance.now()
     const store: Store = {}
+    // A built-in diagnostic channel keeps plain-Node ops scripts independent of the tracing SDK.
+    // Its only subscriber stamps the active Next span; requests work identically with tracing off.
+    if (requestClientChannel.hasSubscribers) {
+      try { requestClientChannel.publish(requestClientAttributes(request, route)) } catch { /* best effort */ }
+    }
     const requestId = requestIdFor(request), invocationId = randomUUID()
     // A missing completion remains observable when a handler/process is killed.
     try { sink(JSON.stringify({ level: 'info', msg: 'api_request_started', timestamp: new Date().toISOString(),
@@ -102,6 +120,7 @@ export function withRequestLog<R extends Request, A extends unknown[], T extends
       write(response.status)
       return response
     } catch (error) {
+      try { requestErrorChannel.publish(error) } catch { /* tracing is best effort */ }
       write(500, error)
       throw error
     }

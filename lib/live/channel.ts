@@ -1,4 +1,4 @@
-import { liveCapabilities, liveInvalidation, LIVE_ID, type LiveKind } from './events'
+import { liveInvalidation, liveReadiness, LIVE_ID, LIVE_REVISION_PARAM, type LiveKind } from './events'
 
 export const LIVE_FALLBACK_MS = 60_000
 const HEARTBEAT_MS = 30_000
@@ -20,10 +20,16 @@ export type LiveSubscriptionOptions = {
   /** Minimum spacing for changes, never for reconnect/visibility catch-up. */ minIntervalMs?: number
   /** One read at a server-derived deadline. A real HTTP read may identify its
    * observation only while the server still reports a future deadline. */ deadline?: { at: string; afterMs: number; observation?: number } | null
+  /** Per SWR key: this entity's revision its current data was read at (read
+   * before the data, lib/live/revisions.ts). A push at or below it skips that
+   * key's read; a missing or unknown revision always reads. */ revisions?: Readonly<Record<string, number | null | undefined>> | null
 }
 export type LiveSubscription = (() => void) & { update(options: LiveSubscriptionOptions): void }
-type Subscription = { kind: LiveKind; id: string; keys: readonly string[]; refresh: (key: string) => unknown; minIntervalMs: number; deadlineAt: number | null; deadlineKey: string | null; deadlineObservation: number | null; timer: string }
-type PendingRead = { refresh: Subscription['refresh']; at: number }
+type Subscription = { kind: LiveKind; id: string; keys: readonly string[]; refresh: (key: string) => unknown; minIntervalMs: number; deadlineAt: number | null; deadlineKey: string | null; deadlineObservation: number | null; timer: string; revisions: Map<string, number> }
+/** `waits: null` reads unconditionally; otherwise the read is skipped once every listed revision is held. */
+type PendingRead = { refresh: Subscription['refresh']; at: number; waits: { subscription: Subscription; key: string; rev: number }[] | null }
+const heldRevisions = (value: LiveSubscriptionOptions['revisions']) => new Map(Object.entries(value ?? {})
+  .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isSafeInteger(entry[1]) && entry[1] > 0))
 
 /** One connection per mounted owner/workspace; repeated badges share each SWR read. */
 export class LiveChannel {
@@ -34,6 +40,9 @@ export class LiveChannel {
   private generation = 0
   private connected = false
   private capabilities = new Set<LiveKind>()
+  private revisionKinds = new Set<LiveKind>()
+  /** Reads a push did not need because the key's data already held its revision. */
+  skippedReads = 0
   private retryMs = 1_000
   private pong = true
   private timers = new Map<string, Timer>()
@@ -51,7 +60,7 @@ export class LiveChannel {
       deadlineAt: options.deadline && Number.isFinite(options.deadline.afterMs) ? this.localNow() + Math.max(0, options.deadline.afterMs) : null,
       deadlineKey: options.deadline?.at ?? null,
       deadlineObservation: Number.isFinite(options.deadline?.observation) ? options.deadline!.observation! : null,
-      timer: `deadline:${++this.nextDeadline}` }
+      timer: `deadline:${++this.nextDeadline}`, revisions: heldRevisions(options.revisions) }
     this.subscriptions.add(subscription)
     if (this.subscriptions.size === 1) {
       this.unwatch = this.runtime.watchVisibility(() => this.visibilityChanged())
@@ -73,6 +82,8 @@ export class LiveChannel {
     return Object.assign(stop, { update: (next: LiveSubscriptionOptions) => {
       if (!this.subscriptions.has(subscription)) return
       subscription.minIntervalMs = Math.max(0, next.minIntervalMs ?? 0)
+      // A revision only moves forward: an older response cannot reopen a covered push.
+      for (const [key, rev] of heldRevisions(next.revisions)) if (rev > (subscription.revisions.get(key) ?? 0)) subscription.revisions.set(key, rev)
       const key = next.deadline?.at ?? null
       const observation = Number.isFinite(next.deadline?.observation) ? next.deadline!.observation! : null
       if (key === subscription.deadlineKey) {
@@ -114,7 +125,7 @@ export class LiveChannel {
 
   private closeSocket() {
     this.connected = false
-    this.capabilities.clear()
+    this.capabilities.clear(); this.revisionKinds.clear()
     this.controller?.abort()
     this.controller = null
     this.clear('heartbeat'); this.clear('renew')
@@ -154,18 +165,27 @@ export class LiveChannel {
     })
   }
 
-  private invalidate(kind?: LiveKind, id?: string, immediate = false, unsupportedOnly = false) {
+  private invalidate(kind?: LiveKind, id?: string, immediate = false, unsupportedOnly = false, rev?: number) {
     if (!this.runtime.visible()) return
     for (const subscription of this.subscriptions) {
       if (kind && (subscription.kind !== kind || subscription.id !== id)) continue
       if (unsupportedOnly && this.connected && this.capabilities.has(subscription.kind)) continue
       for (const key of subscription.keys) {
+        // A duplicate push, or the echo of this tab's own write, is already shown.
+        if (rev !== undefined && (subscription.revisions.get(key) ?? 0) >= rev) { this.skippedReads++; continue }
         const at = kind && !immediate ? Math.max(this.localNow(), (this.lastRead.get(key) ?? -Infinity) + subscription.minIntervalMs) : this.localNow()
         const previous = this.pending.get(key)
-        this.pending.set(key, { refresh: subscription.refresh, at: Math.min(at, previous?.at ?? Infinity) })
+        const wait = rev === undefined ? null : [{ subscription, key, rev }]
+        const waits = !wait || (previous && !previous.waits) ? null : [...previous?.waits ?? [], ...wait]
+        this.pending.set(key, { refresh: subscription.refresh, at: Math.min(at, previous?.at ?? Infinity), waits })
       }
     }
     this.scheduleFlush()
+  }
+
+  /** Every push behind this read is covered by data that arrived meanwhile. */
+  private covered(read: PendingRead) {
+    return read.waits !== null && read.waits.every(({ subscription, key, rev }) => (subscription.revisions.get(key) ?? 0) >= rev)
   }
 
   private scheduleFlush() {
@@ -181,8 +201,10 @@ export class LiveChannel {
   private flush() {
     if (!this.runtime.visible()) return
     const activeKeys = new Set([...this.subscriptions].flatMap(value => [...value.keys]))
-    for (const [key, { refresh, at }] of this.pending) {
+    for (const [key, read] of this.pending) {
+      const { refresh, at } = read
       if (!activeKeys.has(key)) { this.pending.delete(key); continue }
+      if (this.covered(read)) { this.pending.delete(key); this.skippedReads++; continue }
       if (this.inFlight.has(key) || at > this.localNow()) continue
       this.pending.delete(key)
       this.lastRead.set(key, this.localNow())
@@ -238,7 +260,10 @@ export class LiveChannel {
       const ticket = await this.runtime.ticket(controller.signal)
       if (generation !== this.generation || !this.runtime.visible()) return
       if (!ticket || ticket.expiresAt <= this.runtime.now()) { this.disconnected(generation, LIVE_FALLBACK_MS); return }
-      const socket = this.socket = this.runtime.socket(ticket)
+      // Ask for revisions. An older Worker ignores the parameter and answers version 1.
+      const url = new URL(ticket.url)
+      url.searchParams.set(LIVE_REVISION_PARAM, '1')
+      const socket = this.socket = this.runtime.socket({ ...ticket, url: url.href })
       socket.onopen = () => {
         if (generation !== this.generation) return
         this.connected = true; this.retryMs = 1_000; this.pong = true
@@ -254,15 +279,16 @@ export class LiveChannel {
         if (typeof message.data !== 'string' || message.data.length > 2_048) return
         try {
           const parsed: unknown = JSON.parse(message.data)
-          const capabilities = liveCapabilities(parsed)
-          if (capabilities) {
-            this.capabilities = new Set(capabilities)
+          const readiness = liveReadiness(parsed)
+          if (readiness) {
+            this.capabilities = new Set(readiness.kinds)
+            this.revisionKinds = new Set(readiness.revisions)
             if (this.allSupported()) this.clear('fallback'); else this.fallback()
             return
           }
           if (message.data.length > 256) return
-          const value = liveInvalidation(parsed)
-          if (value) this.invalidate(value.kind, value.id)
+          const value = liveInvalidation(parsed, this.revisionKinds.size > 0)
+          if (value) this.invalidate(value.kind, value.id, false, false, value.rev !== undefined && this.revisionKinds.has(value.kind) ? value.rev : undefined)
         } catch { /* malformed keys/capabilities cannot trigger reads or disable fallback */ }
       }
       socket.onclose = socket.onerror = () => this.disconnected(generation)

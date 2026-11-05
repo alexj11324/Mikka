@@ -9,9 +9,11 @@ diffing `pg_stat_statements`. This adds to the
 
 ## What is traced
 
-Only Mikka's own Next.js server, Node runtime (`instrumentation.ts` →
-`lib/tracing/node.ts`). Nothing from the daemon, the desktop or mobile apps, or
-users' own Claude Code or Codex sessions.
+Mikka's own Next.js server, Node runtime (`instrumentation.ts` →
+`lib/tracing/node.ts`), and the daemon's own operations (service
+`mikka-daemon`, see [Daemon](#daemon)). Nothing from the desktop app or users'
+own Claude Code or Codex sessions. The mobile app sends trace context, not
+spans (see [Mobile app](#mobile-app)).
 
 - Next.js request spans: the root `GET /route/[param]` span, route handler,
   render and outbound `fetch` spans.
@@ -28,7 +30,9 @@ Every span has `service.name=mikka-web` and `deployment.environment`
 | Attribute | Meaning |
 | --- | --- |
 | `mikka.route` | Grouping key: the `withRequestLog('/api/…')` route, the `withDatabaseOperation('/actions/…')` action, a background job (`after:<job>`, `cron:<name>`, `workflow:<workflow>/<step>`), or Next's route template |
-| `mikka.client_kind` | `daemon` (`/v1/*`, `/api/runs/mcp/*`, `/api/runs/github-token`), `mobile` (`/api/mobile/*`), `cron` (`/api/cron/*`, `cron:` jobs), `workflow` (Workflow steps, `/.well-known/workflow/*`), `background` (`after:` jobs), `worker` (`/api/webhooks/*`) or `web` |
+| `mikka.client_kind` | `daemon` (`/v1/*`, `/api/runs/mcp/*`, `/api/runs/github-token`), `mobile` (`/api/mobile/*`, or any other `/api/*` request the iOS app sends; see [Mobile app](#mobile-app)), `cron` (`/api/cron/*`, `cron:` jobs), `workflow` (Workflow steps, `/.well-known/workflow/*`), `background` (`after:` jobs), `worker` (`/api/webhooks/*`) or `web` |
+| `mikka.app.version` | The iOS app's version (`1.2.3`), on `mobile` spans only |
+| `error.type`, `mikka.error.code`, `mikka.error.detail` | On a failed request or job: the error's class name, and the code and detail of the first coded error in its cause chain (`@mikka/protocol/tracing`). Never the message |
 
 Database spans also have:
 
@@ -39,6 +43,68 @@ Database spans also have:
 | `db.query.text` | Parameterized SQL, literals replaced by `?`, cut to 200 characters |
 | `db.response.returned_rows` | Rows returned or affected |
 | `mikka.db.response_bytes_approx` | Result JSON size, estimated from the first 50 rows (not wire bytes) |
+
+## Mobile app
+
+The iOS app exports no spans of its own. Every request it sends to Mikka's
+`/api/*` (`apps/mobile/lib/tracing.ts`, from `@mikka/protocol/trace-context`)
+carries:
+
+- `traceparent`: a fresh W3C trace context per request, flagged not sampled.
+  The server's sampler decides as for any caller, so the app cannot force a
+  trace to be kept. The server's spans join that trace id.
+- `x-mikka-client-kind: mobile` and `x-mikka-app-version` (only a numeric
+  `x.y.z` version; anything else is left out).
+
+`withRequestLog` stamps `mikka.client_kind=mobile` and `mikka.app.version` on
+the request's span, and child spans inherit them. The headers are attribution
+only, never authentication, and are ignored on machine routes
+(`/api/cron/*`, `/api/webhooks/*`, `/api/runs/*`) and `/v1/*`. Requests to other
+hosts (uploads, OAuth providers) get no headers.
+
+## Daemon
+
+`packages/daemon/src/tracing.ts` traces Mikka's own daemon operations on the
+user's computer, as service `mikka-daemon`:
+
+| Span | What |
+| --- | --- |
+| `daemon.run` | One run, from start to its end; `mikka.outcome` is the run's stop reason (`submitted`, `turn_ended`, `cancelled`, `error` …) |
+| `daemon.run.repository`, `daemon.run.worktree`, `daemon.adapter.start` | The run's start-up stages; `daemon.adapter.start` is where a harness that cannot start fails (`subscription_local_runtime_unavailable`) |
+| `daemon.run.lease` | Claiming a run from the server |
+| `daemon.tool_approval`, `daemon.tool_approval.refused` | Preparing the run's tool-approval gate; a liveness refusal |
+| `daemon.gateway.connect` | Opening the device gateway socket, until it opens or fails |
+| `GET /v1/devices/[id]/…` | Every call to the server, named by route template (ids become `[id]`, no query), with `http.response.status_code` |
+
+Each span has `mikka.client_kind=daemon`, `mikka.run.id_hash` (sha256 prefix
+of the run id, never the id), `mikka.harness`, `mikka.outcome`, and on failure
+`error.type`, `mikka.error.code` and `mikka.error.detail`. Filter the error
+code with `mikka.error.code = subscription_local_runtime_unavailable` to see
+why runs fail on users' computers.
+
+- **Joining the server's trace.** Each `/v1/*` call sends `traceparent`, so
+  the server's request and database spans are children of the daemon span.
+  Both sides head-sample by the same trace-id ratio: at equal rates the
+  server keeps exactly the traces the daemon kept.
+- **Settings.** The server hands them over in the device registration
+  response (`tracing`: endpoint, the public `phc_` project token, sample rate,
+  environment); `daemonTraceSettings()` in `lib/tracing/config.ts` sends them
+  only for the PostHog endpoint and only when server tracing is on. A daemon
+  never gets a personal key.
+- **Sampling and turning it off.** The server's rate (default 10%).
+  `MIKKA_DAEMON_TRACE_SAMPLE_RATE` on the daemon can lower it, never raise it;
+  `0`, or `MIKKA_DAEMON_TRACING=0`, turns daemon tracing off.
+- **Never blocks.** A batch processor exports every 10 s from a queue of 512
+  (then drops). A failed or thrown export drops its spans and pauses exporting
+  for a minute; shutdown waits at most 2 s. Nothing is registered globally,
+  so an agent SDK's own OpenTelemetry is unaffected.
+- **Privacy.** Only an allowlist of attributes leaves the computer; strings
+  go through the same rules as the server (`@mikka/protocol/tracing`
+  `scrubString`), and paths under a home directory become `[home]`. No
+  prompts, file content, paths, environment variables, tokens or emails; no
+  span events or status messages. Tested in `packages/daemon/src/tracing.test.ts`.
+  The daemon traces only its own work, never what the user's Claude Code or
+  Codex does, and passes no trace context to agent CLIs.
 
 ## Background work
 
@@ -99,6 +165,77 @@ get the database spans themselves rather than their traces:
 `apm-attributes-list` and `apm-attribute-values-list` list the attribute keys
 and values; `apm-trace-get` returns one trace's tree. Counts are sampled:
 multiply by `1 / MIKKA_TRACE_SAMPLE_RATE` for totals.
+
+## Dashboard and alerts
+
+The [「Mikka 数据库与错误」 dashboard](https://us.posthog.com/project/670821/dashboard/2306506)
+answers "who drives database transfer, and what fails" without SQL. Its
+collection health lives on the
+[monitoring dashboard](https://us.posthog.com/project/670821/dashboard/2297143).
+
+Read every number on it this way:
+
+- **Counts are sampled.** Traces are kept at 10% (`MIKKA_TRACE_SAMPLE_RATE`).
+  `sampled_*` columns are what arrived; `estimated_*_x10` multiply by 10 and
+  are what the charts draw. If the sample rate changes, the ×10 is wrong.
+- **Bytes are not Neon's bytes.** `mikka.db.response_bytes_approx` is the
+  JSON size of the returned rows, estimated from the first 50 rows. It ranks
+  routes and statements; it is not network transfer and not the bill. The
+  budget tiles and alerts use Neon's own numbers from the ops snapshot
+  ([database transfer](database-egress.md)).
+- **Hours are UTC**; the project's time zone is Asia/Shanghai. Hours with no
+  spans are left out, not drawn as zero.
+- **Error counts are spans** with `status_code = 2`, grouped by
+  `mikka.error.code` (else `error.type`); one failed request can produce
+  several.
+
+| Tile | Source |
+| --- | --- |
+| Reading note | `scripts/ops/posthog/dashboard-note.md` |
+| Daily / billing-period transfer budget | Ops snapshot (`daily-budget.sql`, `monthly-budget.sql`) |
+| 7d coverage and missing attributes | `coverage.sql` |
+| DB queries per hour by route, top 15, 24h and 7d | `route-queries.sql` |
+| DB response JSON bytes per hour by route, top 15, 24h and 7d | `route-bytes.sql` |
+| Queries and bytes by `mikka.client_kind` | `client-kinds.sql` |
+| Heaviest 20 statements, with parameterized SQL | `statements.sql` |
+| Error causes by code / detail; errors by route / code / detail | `error-causes.sql`, `errors.sql` |
+
+### Alerts
+
+Five alerts, the plan's limit. All check hourly and email the subscribed
+users (Alex). In each alert's email, the `source` column names the route or
+error code and its numbers.
+
+| Alert | Fires when | Tune |
+| --- | --- | --- |
+| Mikka transfer reaches 50% of 5 GB operating budget | The billing period's Neon transfer reaches 50% of 5 GB (`monthly-budget.sql`) | The threshold `upper: 0.5` in `ALERTS` |
+| Mikka monitoring collection failed or heartbeat absent | No healthy ops snapshot in the last hour (`heartbeat.sql`) | — |
+| [1324] Mikka 来源数据库小时异常 | One `mikka-web` route's sampled DB queries in the last full UTC hour exceed `max(3 × its 7-day hourly median, 200)` (≈2,000 real queries), or its sampled JSON bytes exceed `max(3 × median, 1 MB)` (≈10 MB). Needs 24 observed hours of history; bytes only when ≥95% of the hour's queries carry a size (`alert-source-anomaly.sql`) | `3 *` (the multiple) and the floors `200` / `1000000` in `metrics`; `covered_hours >= 24` for warm-up |
+| [1324] Mikka 日速率外推超过5GB月预算 | Today's Neon transfer so far, scaled to 24 h and to the month's days, exceeds 5 GB. Only from 03:00 UTC, with a snapshot ≤60 min and provider data ≤180 min old (`alert-daily-pace.sql`) | `5000000000` (the budget) and `utc_hours >= 3` |
+| [1324] Mikka 错误码小时突增 | One service's error spans for one code in the last full UTC hour exceed `max(3 × its 7-day hourly median, 5)` (≈50 real spans), after 24 observed hours (`alert-error-spike.sql`) | `3 *` and the floor `5` in `metrics` |
+
+An alert that evaluates `any_row` reads at most 50 rows: the two hourly
+queries end in `LIMIT 50` and sort firing rows first. No current telemetry
+returns `NULL` (not firing); the heartbeat alert covers collection.
+
+### Changing them
+
+`scripts/ops/posthog-observability.mjs` holds the dashboard, its insights
+and the alerts; the SQL is in `scripts/ops/posthog/`. It finds each object by
+its production id, else its `key:<name>` tag, else its exact name, and
+changes only what differs, so running it twice changes nothing.
+
+```sh
+# POSTHOG_PERSONAL_API_KEY: a personal API key (phx_…) with insight, dashboard
+# and alert write access, kept in Infisical prod:/platform; never in a file.
+infisical run --env=prod --path=/platform -- node scripts/ops/posthog-observability.mjs           # plan, read-only
+infisical run --env=prod --path=/platform -- node scripts/ops/posthog-observability.mjs --check   # exit 1 on drift
+infisical run --env=prod --path=/platform -- node scripts/ops/posthog-observability.mjs --apply
+```
+
+Edit the definitions or SQL in a PR, then apply once it merges. A change made
+in the PostHog app shows as drift in the next `--check`; copy it back into the
+repository or it is overwritten on the next `--apply`.
 
 ## Sampling and cost
 

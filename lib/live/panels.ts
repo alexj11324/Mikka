@@ -124,7 +124,7 @@ export async function runChangeTargets(database: Database, workspaceDatabase: Da
 
 async function changed(executor: object, kind: 'issue_document' | 'run' | 'thread', id: string) {
   if (!liveGatewayConfig(process.env)) return
-  const { scheduleLive, sendLiveInvalidations } = await import('./notify')
+  const { scheduleLive } = await import('./notify')
   const databaseScope = databaseCommitScope(executor)
   const publish = async () => {
     const { pool, withoutDatabaseClient } = await import('../db/request-scope')
@@ -133,7 +133,7 @@ async function changed(executor: object, kind: 'issue_document' | 'run' | 'threa
       const targets = kind === 'issue_document' ? await documentLiveTargets(pool, workspacePool, id)
         : kind === 'run' ? await runChangeTargets(pool, workspacePool, id)
         : await runLiveTargets(pool, workspacePool, id, kind)
-      await Promise.all(targets.map(target => sendLiveInvalidations(target.scope, target.events)))
+      await (await import('./publish')).sendLiveTargets(pool, targets)
     })
   }
   afterDatabaseCommit(executor, `${kind}:${id}`, () => scheduleLive(() => kind === 'thread'

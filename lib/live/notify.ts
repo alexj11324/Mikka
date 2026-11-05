@@ -1,20 +1,33 @@
 import { afterJob } from '@/lib/background'
-import { liveInvalidations, type LiveInvalidation } from './events'
+import { liveInvalidations, withoutRevisions, type LiveInvalidation } from './events'
 import { liveChannelId, liveGatewayConfig, type LiveScope } from './scope'
 
-export async function sendLiveInvalidations(scope: LiveScope, events: LiveInvalidation[], env = process.env, send = fetch) {
+/** The Worker deploys after the app (.github/workflows/device-gateway.yml). An
+ * older Worker refuses a revision field, so this instance sends plain keys for a while. */
+const PLAIN_AFTER_REFUSAL_MS = 10 * 60_000
+let plainUntil = 0
+export function resetLiveRevisionFallback() { plainUntil = 0 }
+
+export async function sendLiveInvalidations(scope: LiveScope, events: LiveInvalidation[], env = process.env, send = fetch, now = Date.now) {
   const config = liveGatewayConfig(env)
-  if (!config || !liveInvalidations(events)) return
+  if (!config || !liveInvalidations(events, true)) return
   const url = new URL(`/v1/live/${liveChannelId(scope)}/push`, config.url)
+  const revised = events.some(event => event.rev !== undefined)
+  let body = revised && now() < plainUntil ? withoutRevisions(events) : events
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const response = await send(url, {
         method: 'POST', redirect: 'error', signal: AbortSignal.timeout(3_000),
         headers: { authorization: `Bearer ${config.secret}`, 'content-type': 'application/json' },
-        body: JSON.stringify(events),
+        body: JSON.stringify(body),
       })
       await response.body?.cancel().catch(() => {})
       if (response.ok) return
+      if (response.status === 400 && body.some(event => event.rev !== undefined)) {
+        // The same keys without revisions: every client then simply reads.
+        plainUntil = now() + PLAIN_AFTER_REFUSAL_MS
+        body = withoutRevisions(events); attempt--; continue
+      }
       if (response.status < 500 && response.status !== 429) break
     } catch { /* a retry carries the same invalidation keys only */ }
     if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)))

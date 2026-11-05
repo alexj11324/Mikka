@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { wireKeys } from './wire-keys.test-support'
 import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { createServer } from 'node:http'
@@ -23,7 +24,7 @@ test('legacy pending producers invalidate only their committed owner-personal li
   const sent: { path: string; events: unknown }[] = []
   const receiver = createServer(async (request, response) => {
     let body = ''; for await (const part of request) body += part
-    sent.push({ path: request.url!, events: JSON.parse(body) }); response.writeHead(204); response.end()
+    sent.push({ path: request.url!, events: wireKeys(JSON.parse(body)) }); response.writeHead(204); response.end()
   })
   receiver.listen(0, '127.0.0.1'); await once(receiver, 'listening')
   const address = receiver.address(); assert.ok(address && typeof address !== 'string')

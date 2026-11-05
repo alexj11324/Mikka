@@ -47,6 +47,7 @@ import { ThreadFeedback } from './self-improvement'
 import { InlineLoadError } from '@/components/load-error'
 import { FieldError } from '@/components/ui/field'
 import { closeOnEscape, useFocusReturn } from '@/hooks/use-focus-return'
+import { heldRevision } from '@/lib/live/revisions'
 import { useLiveKey, useLiveKeys } from '@/hooks/use-live-key'
 
 // R-32 chat: 13/21 as in Comma, also for the agent's Markdown inside a bubble.
@@ -91,8 +92,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   }, { refreshInterval: 0, revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false })
   const liveRuns = data?.live?.runs ?? [{ id: runId, workspaceId: null }]
   const liveKeys = [unstable_serialize(key)]
-  useLiveKeys(liveRuns.map(reference => ({ ...reference, kind: 'thread' as const })), liveKeys, null, { minIntervalMs: 2000 })
-  useLiveKeys(liveRuns.map(reference => ({ ...reference, kind: 'run' as const })), liveKeys, null)
+  // A push this thread already read is skipped; only the opened run's keys carry a revision.
+  useLiveKeys(liveRuns.map(reference => ({ ...reference, kind: 'thread' as const, revisions: { [liveKeys[0]]: heldRevision(data, 'thread', reference.id) } })), liveKeys, null, { minIntervalMs: 2000 })
+  useLiveKeys(liveRuns.map(reference => ({ ...reference, kind: 'run' as const, revisions: { [liveKeys[0]]: heldRevision(data, 'run', reference.id) } })), liveKeys, null)
   useLiveKey('factory_issue', issueId, liveKeys, data?.live?.issueWorkspaceId ?? null, { deadline: data?.live?.questionDeadline })
   // Frame 06: a thread whose candidate waits for acceptance has 对话 | 验收 in its header.
   const { tasks: acceptanceTasks, allTasks } = useAcceptanceTasks(issueId)

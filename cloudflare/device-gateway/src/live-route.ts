@@ -16,7 +16,7 @@ async function readInvalidations(request: Request) {
       if (bytes > 2048) { await reader.cancel(); return null }
       text += decoder.decode(part.value, { stream: true })
     }
-    return liveInvalidations(JSON.parse(text + decoder.decode()))
+    return liveInvalidations(JSON.parse(text + decoder.decode()), true)
   } catch { return null }
 }
 

@@ -60,6 +60,7 @@ import {
 } from "./errors"
 import { DAEMON_VERSION } from "./paths"
 import { createRunMailbox } from './run-mailbox'
+import { daemonTracer, routeTemplate, runIdHash } from "./tracing"
 import type {
   ChunkBatch,
   DeviceInfo,
@@ -193,6 +194,8 @@ export class HttpServerLink implements ServerLink {
     const refusal = (phase: string, reason: 'check_failed' | 'run_not_live', error?: unknown) => {
       if (reported || liveness.signal.aborted || signal.aborted) return
       reported = true
+      void daemonTracer.span("daemon.tool_approval.refused", { "mikka.run.id_hash": runIdHash(assignment.runId), "mikka.harness": assignment.harness, "mikka.outcome": reason },
+        async span => { if (error !== undefined) span.fail(error, reason) }).catch(() => undefined)
       const status = error instanceof DaemonError && error.code >= 100 && error.code <= 599 ? error.code : null
       try { console.warn(JSON.stringify({ event: 'run_liveness_refused', runId: assignment.runId, deviceId: assignment.deviceId,
         phase, reason, errorClass: error instanceof ServerUnreachableError ? 'ServerUnreachableError' : error instanceof DaemonError ? 'DaemonError' : reason === 'run_not_live' ? null : 'unknown', status: reason === 'run_not_live' ? 200 : status })) }
@@ -299,6 +302,22 @@ export class HttpServerLink implements ServerLink {
       signal,
     }: { timeoutMs?: number; signal?: AbortSignal } = {}
   ): Promise<Response> {
+    const route = routeTemplate(path)
+    return daemonTracer.span(`${method} ${route}`, { "mikka.route": route, "url.path": route, "http.request.method": method }, async span => {
+      const response = await this.sendTraced(method, path, body, token, { timeoutMs, signal })
+      span.set("http.response.status_code", response.status)
+      if (response.status >= 400) span.set("mikka.outcome", `http_${response.status}`)
+      return response
+    })
+  }
+
+  private async sendTraced(
+    method: string,
+    path: string,
+    body: unknown,
+    token: string | null,
+    { timeoutMs, signal }: { timeoutMs: number; signal?: AbortSignal },
+  ): Promise<Response> {
     try {
       const response = await this.fetchImpl(serverUrl(this.baseUrl, path), {
         method,
@@ -313,6 +332,7 @@ export class HttpServerLink implements ServerLink {
           [RECOVERY_WORKTREE_HEADER]: '1',
           [MODEL_CREDENTIAL_HEADER]: '1',
           [MAILBOX_NOTICE_HEADER]: '1',
+          ...daemonTracer.headers(),
           ...(token ? { authorization: `Bearer ${token}` } : {}),
           ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}),
         },
@@ -390,11 +410,11 @@ export class HttpServerLink implements ServerLink {
     knownDeviceId?: string
   ) {
     this.credential = credential
-    const { deviceId } = await this.call("POST", devicePaths.register(), {
+    const { deviceId, tracing } = await this.call("POST", devicePaths.register(), {
       body: { ...info, ...(knownDeviceId ? { deviceId: knownDeviceId } : {}) },
       schema: deviceRegistered,
     })
-    return { deviceId }
+    return { deviceId, tracing }
   }
 
   async heartbeat(

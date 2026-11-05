@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { wireKeys } from './wire-keys.test-support'
 import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import test, { mock } from 'node:test'
@@ -34,8 +35,7 @@ test('bot chat keys reach only the owner home, after the actual writer commits',
     assert.equal(target.hostname, 'gateway.example.invalid', 'no provider or production request is allowed')
     const scope = channelScopes.get(target.pathname)
     if (!scope) unexpected.push(target.pathname)
-    const events: LiveInvalidation[] = JSON.parse(String(options?.body))
-    for (const event of events) assert.deepEqual(Object.keys(event).sort(), ['id', 'kind'], 'a key carries a kind and an id, never a message')
+    const events: LiveInvalidation[] = wireKeys(JSON.parse(String(options?.body)), 'a key carries a kind and an id, never a message')
     // The same writers wake an MCP reply wait on the bot's workspace; lib/mcp/reply-live.db.test.ts covers that key.
     const chatEvents = events.filter(event => event.kind !== 'coordinator_session')
     if (chatEvents.length) sent.push({ scope: scope ?? { ownerId: 'unexpected', workspaceId: target.pathname }, events: chatEvents })
