@@ -1,5 +1,6 @@
 'use client'
 
+import { issueKeys } from '@/lib/swr/keys'
 import { useRef, useState } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
@@ -45,7 +46,7 @@ export function IssueRelations({ liveWorkspaceId = null, viewerId, task, mode, o
   const groupLabel = (value: RelationKind) => t.has(`groupLabel.${value}` as never) ? t(`groupLabel.${value}` as never) : value
   const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
   const { mutate: refresh } = useSWRConfig()
-  const connectionsKey = ['issue-connections', task.id] as const
+  const connectionsKey = issueKeys.connections(task.id)
   const { data: rows, error, mutate } = useSWR(connectionsKey, () => listIssueConnections(task.id))
   // No timer (#1212): a change to this task or one connected to it pushes `issue_relations` on the
   // task's own channel, the one its document syncs on. Without one it is read once a minute.

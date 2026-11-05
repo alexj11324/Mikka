@@ -7,8 +7,9 @@ import { useTranslations } from 'next-intl'
 import { getIssueThread } from '@/app/actions/agents'
 import { getArtifact } from '@/app/actions/artifacts'
 import { listBots } from '@/app/actions/bots'
+import { botKeys, chatKeys, threadKeys } from '@/lib/swr/keys'
 import type { CoordinatorChat as CoordinatorChatView } from '@/app/actions/coordinator'
-import { CoordinatorChat, coordinatorChatKey } from '@/components/coordinator/coordinator-chat'
+import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
 import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { IssueThreadPanel } from '@/components/workspace/issue-thread-panel'
@@ -48,15 +49,15 @@ export function ArtifactWindow({ artifactId }: { artifactId: string }) {
   const fromThread = Boolean(runId) && openThreadId === runId
   const threadMade = Boolean(runId) && (Boolean(issueId) || fromThread)
   // The same key as the thread panel beside it, so both read one request.
-  const { data: thread } = useSWR(threadMade ? ['issue-thread', issueId, runId] : null, () => getIssueThread(issueId, runId!))
-  const { data: bots, error: botsError } = useSWR(botId && !threadMade ? 'bots' : null, listBots)
+  const { data: thread } = useSWR(threadMade ? threadKeys.detail(issueId, runId!) : null, () => getIssueThread(issueId, runId!))
+  const { data: bots, error: botsError } = useSWR(botId && !threadMade ? botKeys.all() : null, listBots)
   // The Coordinator's own bot is the Coordinator chat, never a second bot.
   const bot = botId ? bots?.find(item => item.id === botId && !item.coordinator) : undefined
   // The chat beside it underlines what it already quoted; the same key as that chat, so one request.
   const chatBotId = bot?.id ?? null
   // Read only from the cache: the CoordinatorChat embedded below reads this key with its own
   // incremental fetcher (a first page, then only what changed). This window never reads the chat itself.
-  const { data: chat } = useSWR<CoordinatorChatView>(detail && !threadMade ? coordinatorChatKey(chatBotId) : null, null)
+  const { data: chat } = useSWR<CoordinatorChatView>(detail && !threadMade ? chatKeys.detail(chatBotId) : null, null)
   const quotes = chat?.items.flatMap(item => item.quote ? [item.quote] : []) ?? []
   const shared = { artifactId, onArtifactChange: openArtifact, onClose: closeArtifact }
   // Until the artifact says where it came from (or when it is not the person's), the reader shows its own loading or error.

@@ -4,6 +4,13 @@ import { registerHooks } from 'node:module'
 import { AsyncLocalStorage } from 'node:async_hooks'
 const sessions = new AsyncLocalStorage()
 export const activityFixtureSession = () => sessions.getStore() ?? null
+/**
+ * @template T
+ * @param {string} userId
+ * @param {() => T} callback
+ * @param {string} [workspaceId]
+ * @returns {T}
+ */
 export const withActivitySession = (userId, callback, workspaceId) => sessions.run({user:{id:userId,name:'Synthetic',email:`${userId}@example.invalid`},workspaceId}, callback)
 const sources = new Map([
   ['server-only', 'export {}'],

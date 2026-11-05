@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
 import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
@@ -27,7 +28,7 @@ export function AccessTokensSettings({ workspaceId }: { workspaceId?: string }) 
   const t = useTranslations('Settings.tokens')
   const locale = useLocale()
   const actionError = useActionError()
-  const tokens = useSWR(['settings:tokens', workspaceId ?? ''], () => listAccessTokens(workspaceId))
+  const tokens = useSWR(settingsKeys.tokens(workspaceId), () => listAccessTokens(workspaceId))
   const [creating, setCreating] = useState(false)
   const createDialog = usePresence(creating)
   const [revoking, setRevoking] = useState<PersonalAccessTokenView | null>(null)

@@ -1,7 +1,8 @@
 import { sql, type SQL } from 'drizzle-orm'
 import { coordinatorMessages } from '@/lib/db/schema'
-import { QUOTE_KEYS, QUOTE_PREVIEW_CHARS, QUOTE_SPACE } from './context'
+import { HIDDEN_TOOLS, QUOTE_KEYS, QUOTE_PREVIEW_CHARS, QUOTE_SPACE } from './context'
 import { compactToolCallMetadata, compactToolResultMetadata } from './tool-metadata-sql'
+import type { ChatToolMetadataPart } from './chat-tool-metadata'
 
 /** Characters of a tool's input or output a chat summary keeps. */
 export const TOOL_PREVIEW_CHARS = 200
@@ -57,3 +58,17 @@ export const compactChatMessage: SQL<Record<string, unknown>> = sql`case when js
       else p end order by ord)
     from jsonb_array_elements(${coordinatorMessages.message}->'content') with ordinality as part(p, ord)), '[]'::jsonb))
   else ${coordinatorMessages.message} end`
+
+const hiddenTools = sql.raw([...HIDDEN_TOOLS].map(name => `'${name}'`).join(','))
+
+/** The prefix repair does not select compactChatMessage: even ordinary reply
+ * text, input/output previews and dispatch receipts stay inside PostgreSQL. */
+export const compactChatToolMetadata: SQL<ChatToolMetadataPart[]> = sql`coalesce((
+  select jsonb_agg(case p->>'type'
+    when 'tool-call' then jsonb_build_object('type', 'tool-call', 'ordinal', ord, 'toolCallId', p->'toolCallId', 'toolName', p->'toolName') || ${compactToolCallMetadata}
+    when 'tool-result' then jsonb_build_object('type', 'tool-result', 'ordinal', ord, 'toolCallId', p->'toolCallId') || ${compactToolResultMetadata}
+    end order by ord)
+  from jsonb_array_elements(case when jsonb_typeof(${coordinatorMessages.message}->'content') = 'array' then ${coordinatorMessages.message}->'content' else '[]'::jsonb end) with ordinality as part(p, ord)
+  where (${coordinatorMessages.message}->>'role' = 'assistant' and p->>'type' = 'tool-call' and p->>'toolName' not in (${hiddenTools}))
+    or (${coordinatorMessages.message}->>'role' = 'tool' and p->>'type' = 'tool-result')
+), '[]'::jsonb)`

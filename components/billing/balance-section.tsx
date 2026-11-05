@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
@@ -13,9 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { getCreditBilling, POINTS_PER_USD, POINTS_PURCHASE_AMOUNTS, startPointsPurchase, type CreditTransaction } from '@/lib/billing/verification-client'
 import { useActionError } from '@/lib/use-action-error'
 
-export function creditBillingKey(workspaceId: string) {
-  return ['credit-billing', workspaceId] as const
-}
+export const creditBillingKey = settingsKeys.creditBilling
 
 const STATUS: Record<CreditTransaction['type'], 'paid' | 'credited' | 'refunded'> = { topup: 'paid', verification: 'credited', refund: 'refunded' }
 

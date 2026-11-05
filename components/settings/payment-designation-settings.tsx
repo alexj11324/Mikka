@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
@@ -20,12 +21,12 @@ export function PaymentDesignationSettings({ workspaceId }: { workspaceId: strin
   const commonT = useTranslations('Common')
   const format = useFormatter()
   const actionError = useActionError()
-  const designation = useSWR(['settings:payment-designation', workspaceId], () => getPaymentDesignation(workspaceId))
+  const designation = useSWR(settingsKeys.paymentDesignation(workspaceId), () => getPaymentDesignation(workspaceId))
   const [pending, setPending] = useState(false)
   const [failed, setFailed] = useState<{ designated: boolean; message: string; share?: boolean } | null>(null)
   const data = designation.data && !designation.data.error ? designation.data : null
   // 我的点数也可用于这个团队 (decision 2026-10-31-2300 item 4): any member of a team, in the same 付款 section.
-  const share = useSWR(['settings:credit-share', workspaceId], () => getCreditShare(workspaceId))
+  const share = useSWR(settingsKeys.creditShare(workspaceId), () => getCreditShare(workspaceId))
   const shareData = share.data && !share.data.error ? share.data : null
   const [sharePending, setSharePending] = useState(false)
 

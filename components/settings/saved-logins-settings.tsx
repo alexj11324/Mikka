@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useRef, useState, type FormEvent } from 'react'
 import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
@@ -34,7 +35,7 @@ export function SavedLoginsSettings() {
   const t = useTranslations('Settings.logins')
   const actionError = useActionError()
   const locale = useLocale()
-  const { data, error, isLoading, mutate } = useSWR('account:saved-logins', () => settingsRead<Awaited<ReturnType<typeof listSavedLogins>>>('saved-logins'))
+  const { data, error, isLoading, mutate } = useSWR(settingsKeys.savedLogins(), () => settingsRead<Awaited<ReturnType<typeof listSavedLogins>>>('saved-logins'))
   const [editing, setEditing] = useState<Editing | null>(null)
   const sheet = usePresence(editing)
   const [removing, setRemoving] = useState<SavedLogin | null>(null)

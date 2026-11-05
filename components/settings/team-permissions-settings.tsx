@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -32,7 +33,7 @@ function SharePolicySettings({ workspaceId }: { workspaceId: string }) {
   const appT = useTranslations('Settings.appPolicy')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const policy = useSWR(['settings:share-policy', workspaceId], () => settingsRead<Awaited<ReturnType<typeof getSharePolicy>>>('share-policy', { workspace: workspaceId }))
+  const policy = useSWR(settingsKeys.sharePolicy(workspaceId), () => settingsRead<Awaited<ReturnType<typeof getSharePolicy>>>('share-policy', { workspace: workspaceId }))
   const [pending, setPending] = useState(false)
   const [failed, setFailed] = useState<{ access: AppAccess; message: string } | null>(null)
   const data = policy.data && !policy.data.error ? policy.data : null
@@ -72,7 +73,7 @@ function AppPolicySettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.appPolicy')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const policy = useSWR(['settings:app-policy', workspaceId], () => settingsRead<Awaited<ReturnType<typeof getAppPolicy>>>('app-policy', { workspace: workspaceId }))
+  const policy = useSWR(settingsKeys.appPolicy(workspaceId), () => settingsRead<Awaited<ReturnType<typeof getAppPolicy>>>('app-policy', { workspace: workspaceId }))
   const [pending, setPending] = useState<PolicyApp | null>(null)
   const [failed, setFailed] = useState<{ app: PolicyApp; access: AppAccess; message: string } | null>(null)
   const data = policy.data && !policy.data.error ? policy.data : null

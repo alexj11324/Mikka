@@ -50,6 +50,9 @@ export function createGroupJudgment(invoke: Invoke, policyVersion?: GroupPolicyV
       if (!members.length || new Set(members.map(member=>member.id)).size !== members.length) fail('members_unavailable')
       const allowedMembers = message.mentions.length ? members.filter(member=>message.mentions.includes(member.id)) : members
       if (!allowedMembers.length || message.mentions.some(id=>!members.some(member=>member.id===id))) fail('reporter_unavailable')
+      const instructions = policy.instructions + (allowedMembers.some(member=>member.executionAvailable && member.executionReason==='quota_check_required')
+        ? ' A member with executionAvailable=true and executionReason=quota_check_required can receive a Factory delegation, with an official quota check required before execution. Normal dispatch refreshes that quota and enforces all execution gates before queuing; it can still refuse. The pending check itself is not missing permission or proof that work has started.'
+        : '')
       const ask = async (phase: GroupDecisionPhase, question: Extract<DecisionQuestion,{type:'choice'}>) => {
         if (decisions.length >= GROUP_MAX_ROUTING_DECISIONS) fail('call_budget_exhausted')
         // Persist earlier charged requests before the next provider boundary.
@@ -59,7 +62,7 @@ export function createGroupJudgment(invoke: Invoke, policyVersion?: GroupPolicyV
         decisions.push(step)
         let result: Awaited<ReturnType<Invoke>>
         try {
-          result = await invoke('group-routing', {text:JSON.stringify({instructions:policy.instructions,policyVersion:policy.version,decisionProtocol:GROUP_DECISION_PROTOCOL,message,members:allowedMembers,leadId,corrections,confirmed:{action:baseline || decisions.length>1 ? action : null,reason:baseline || decisions.length>1 ? reason : null,responders:[...responders],delegation:delegation ?? null},responderLimit:GROUP_MAX_RESPONDERS})}, [question],undefined,{retainInvalidReceipt:true})
+          result = await invoke('group-routing', {text:JSON.stringify({instructions,policyVersion:policy.version,decisionProtocol:GROUP_DECISION_PROTOCOL,message,members:allowedMembers,leadId,corrections,confirmed:{action:baseline || decisions.length>1 ? action : null,reason:baseline || decisions.length>1 ? reason : null,responders:[...responders],delegation:delegation ?? null},responderLimit:GROUP_MAX_RESPONDERS})}, [question],undefined,{retainInvalidReceipt:true})
         } catch { return fail('unavailable') }
         if (!result) return fail('unavailable')
         step.receipt = groupDecisionReceipt(result.execution)

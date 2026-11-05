@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
@@ -23,7 +24,7 @@ export function BillingSettings({ workspaceId, personal = false }: { workspaceId
   const computerBilling = useGatedFeature('computerBilling')
   const locale = useLocale()
   const actionError = useActionError()
-  const billing = useSWR(['settings:billing', workspaceId], () => settingsRead<Awaited<ReturnType<typeof getBilling>>>('billing', { workspace: workspaceId }))
+  const billing = useSWR(settingsKeys.billing(workspaceId), () => settingsRead<Awaited<ReturnType<typeof getBilling>>>('billing', { workspace: workspaceId }))
   const { mutate } = useSWRConfig()
   // 免费额度 and 余额 (#558, #559) come first, whether or not a plan is set up.
   const credits = <>

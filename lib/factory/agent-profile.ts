@@ -78,7 +78,7 @@ const requestConstraints = async (pool: Pool, scope: AgentProfileScope, request:
 function publicProfile(row: ProfileRow, target: Exclude<ModelDispatch, { kind: 'none' }>): PublicAgentProfile {
   return { id: row.id, name: row.definition.name, description: row.definition.description, roles: [...row.definition.roles], harness: target.entry.harness, model: target.model }
 }
-async function eligibleProfiles(pool: Pool, scope: DispatchScope, rows: ProfileRow[], request: Partial<AgentProfileDispatchRequest>, deps: DispatchDependencies = {}, readOnly = false) {
+async function eligibleProfiles(pool: Pool, scope: DispatchScope, rows: ProfileRow[], request: Partial<AgentProfileDispatchRequest>, deps: DispatchDependencies = {}, readOnly = false, deferStaleQuota = false) {
   const constraints = await requestConstraints(pool, scope, request)
   const eligible: Eligible[] = [], availability: Record<string, { available: boolean; reason?: string }> = {}
   for (const row of rows) {
@@ -94,7 +94,7 @@ async function eligibleProfiles(pool: Pool, scope: DispatchScope, rows: ProfileR
     const target = await (deps.resolve ?? resolveModelDispatch)(pool, scope, request.asked?.model ? request.asked : undefined, request.location, constraints.deviceId, {
       harness, agentId: request.agentId, withoutCloud: request.withoutCloud, cloudPurpose: request.cloudPurpose,
       ...(fixed ? { exactEntry: { id: `profile:${row.id}:${row.version}`, harness: fixed.harness, model: fixed.model, source: fixed.source } } : {}),
-      bindSubscription: false, ...(readOnly ? { skipCatalogueRefresh: true, probeQuota: false } : {}),
+      bindSubscription: false, ...(readOnly ? { skipCatalogueRefresh: true, probeQuota: false, ...(deferStaleQuota ? { deferStaleQuota: true as const } : {}) } : {}),
     })
     availability[row.id] = target.kind === 'none' ? { available: false, reason: target.reason } : { available: true }
     if (target.kind !== 'none') eligible.push({ row, target, public: publicProfile(row, target) })
@@ -109,9 +109,10 @@ export async function listPublicAgentProfiles(pool: Pool, scope: DispatchScope, 
   finally { await member.close() }
 }
 
-/** Read-only runtime availability for group routing and task previews. It uses
- * the same eligible set as dispatch, without selecting a role or binding a source. */
-export async function agentProfileDispatchAvailability(pool: Pool, scope: DispatchScope, request: Partial<AgentProfileDispatchRequest> = {}): Promise<{ available: boolean; reason?: string }> {
+/** Read-only availability without selecting a role or binding a source. Group
+ * intents alone may defer a positive-but-stale official quota to real dispatch;
+ * previews and every admission/claim keep the strict current-allowance gate. */
+export async function agentProfileDispatchAvailability(pool: Pool, scope: DispatchScope, request: Partial<AgentProfileDispatchRequest> = {}, options: { deferStaleQuota?: true } = {}): Promise<{ available: boolean; reason?: string }> {
   validateProfileScope(scope)
   const member = await acquireProfileMembership(scope)
   try {
@@ -121,15 +122,15 @@ export async function agentProfileDispatchAvailability(pool: Pool, scope: Dispat
     if (request.profileId && !builtin && !explicit) return { available: false, reason: 'agentProfileNotFound' }
     if (explicit && !explicit.definition.enabled) return { available: false, reason: 'agentProfileDisabled' }
     if (!builtin && (explicit || rows.some(row => row.definition.enabled))) {
-      const result = await eligibleProfiles(pool, scope, explicit ? [explicit] : rows, request, {}, true)
+      const result = await eligibleProfiles(pool, scope, explicit ? [explicit] : rows, request, {}, true, options.deferStaleQuota)
       await member.check()
-      if (result.eligible.length) return { available: true }
+      if (result.eligible.length) return { available: true, ...(result.eligible.some(item => item.target.quotaCheckPending) ? { reason: 'quota_check_required' } : {}) }
       if (explicit || (!request.asked && !request.agentId)) return { available: false, reason: explicit ? result.availability[explicit.id]?.reason ?? 'agentProfileUnavailable' : 'agentProfileUnavailable' }
     }
     const constraints = await requestConstraints(pool, scope, request)
-    const target = await resolveModelDispatch(pool, scope, request.asked?.model ? request.asked : undefined, request.location, constraints.deviceId, { harness: constraints.harness ?? request.defaultHarness, cloudPurpose: request.cloudPurpose, withoutCloud: request.withoutCloud, agentId: request.agentId, skipCatalogueRefresh: true, probeQuota: false, bindSubscription: false })
+    const target = await resolveModelDispatch(pool, scope, request.asked?.model ? request.asked : undefined, request.location, constraints.deviceId, { harness: constraints.harness ?? request.defaultHarness, cloudPurpose: request.cloudPurpose, withoutCloud: request.withoutCloud, agentId: request.agentId, skipCatalogueRefresh: true, probeQuota: false, bindSubscription: false, ...(options.deferStaleQuota ? { deferStaleQuota: true } : {}) })
     await member.check()
-    return target.kind === 'none' ? { available: false, reason: target.reason } : { available: true }
+    return target.kind === 'none' ? { available: false, reason: target.reason } : { available: true, ...(target.quotaCheckPending ? { reason: 'quota_check_required' } : {}) }
   } finally { await member.close() }
 }
 

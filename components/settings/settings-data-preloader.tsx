@@ -43,7 +43,7 @@ export function SettingsDataPreloader({ ownerId, userKey, workspaceId, onWorkspa
     if (directory) void mutate(teamDirectoryKey(directory.workspace.id), directory, { revalidate: false })
   }, [ownerId, workspaceId, members, directory, mutate, onWorkspaceResolved])
 
-  useEffect(() => prefetchConnectedApps(cache), [cache])
+  useEffect(() => prefetchConnectedApps(cache, mutate), [cache, mutate])
 
   return null
 }

@@ -11,7 +11,7 @@ const t = (key: string, args?: Record<string, string>) => args ? `${key} ${JSON.
 mock.module('next-intl', { namedExports: { useTranslations: () => t } })
 mock.module('sonner', { namedExports: { toast: { success: () => undefined } } })
 const signOut = mock.fn(async () => undefined)
-mock.module('@/lib/auth-client', { namedExports: { authClient: { useSession: () => ({ data: { user: { id: 'app-user', email: 'alex@acme.test' } }, isPending: false }), signOut } } })
+mock.module('@/lib/auth-client', { namedExports: { authClient: { useSession: () => ({ data: { user: { id: 'app-user', email: 'alex@acme.test' } }, isPending: false }), signOut }, endSession: signOut } })
 mock.module(new URL('./connected-apps.tsx', import.meta.url).href, { namedExports: {
   AppTile: () => null, ToolGroup: ({ title }: { title: string; children?: ReactNode }) => <p>{title}</p>,
 } })

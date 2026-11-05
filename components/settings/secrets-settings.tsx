@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
@@ -44,7 +45,7 @@ export function SecretsSettings({ workspaceId, workspaceName }: { workspaceId: s
   const t = useTranslations('Settings.secrets')
   const actionError = useActionError()
   const locale = useLocale()
-  const list = useSWR(['settings:secrets', workspaceId], () => settingsRead<Awaited<ReturnType<typeof listSecrets>>>('secrets', { workspace: workspaceId }))
+  const list = useSWR(settingsKeys.secrets(workspaceId), () => settingsRead<Awaited<ReturnType<typeof listSecrets>>>('secrets', { workspace: workspaceId }))
   const [filter, setFilter] = useState<Filter>('all')
   const [editing, setEditing] = useState<Editing | null>(null)
   const sheet = usePresence(editing)
