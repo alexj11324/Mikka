@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { gzipSync } from 'node:zlib'
@@ -25,7 +25,9 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
     originalLog(...args)
   }
   t.after(() => { console.log = originalLog; overrideDeploymentSwitch('dbEgressSample', undefined) })
-  mock.module('@/lib/auth', { namedExports: { MOBILE_APP_ORIGIN: 'mikka://', auth: { api: { getSession: async () => null } } } })
+  let cachedSessionOwner: string | null = null
+  mock.module('@/lib/auth', { namedExports: { MOBILE_APP_ORIGIN: 'mikka://', auth: { api: { getSession: async () => cachedSessionOwner
+    ? { user: { id: cachedSessionOwner }, session: { id: 'isolated-cached-session' } } : null } } } })
   const { Pool } = await import('pg')
   const connection = new Pool({ connectionString: dbUrl, max: 3 })
   const { pool } = await import('@/lib/db'), { workspacePool } = await import('@/lib/workspace-db')
@@ -34,8 +36,10 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
   const { resolveProjectScope, resolveProjectReadScope } = await import('./scope')
   const { collectMapFacts } = await import('./read-store')
   const { graphPage, projectGraph } = await import('./graph')
-  const { mapQuerySchema } = await import('./read-contracts')
-  const { readMapToken, signMapToken } = await import('./cursor')
+  const { mapQuerySchema, MAP_NODE_LIMIT, MAP_SOURCE_LIMIT, MAP_METADATA_BYTES } = await import('./read-contracts')
+  const { readMapToken, signMapToken, fingerprint } = await import('./cursor')
+  const { mapFactsSql } = await import('./read-sql')
+  const { compactMapRowsSql, decodeMapRows } = await import('./read-transport')
   const contracts = await import('./response-contracts')
   const page = await import('../../app/api/projects/[projectId]/map/route')
   const node = await import('../../app/api/projects/[projectId]/map/nodes/[nodeId]/route')
@@ -111,7 +115,7 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
       assert.ok(!JSON.stringify(result.rows).includes(hidden)); return result
     } } as Pick<PoolClient, 'query'>
     const facts = await collectMapFacts(measured, scope, true)
-    assert.ok(calls <= 4, `metadata and source authorization used ${calls} roundtrips`); assert.ok(bytes < 20 * 1024)
+    assert.equal(calls, 1, 'metadata and every source authorization share one SQL snapshot'); assert.ok(bytes < 20 * 1024)
     assert.equal(facts.runs[0].modelId, 'gpt-6-luna'); assert.equal(facts.runs[0].outcome, null)
     assert.equal(facts.candidates[0].accepted, false)
     await connection.query(`INSERT INTO factory_merges(id,"taskId","candidateId","userId","eventId","pullRequestUrl",sha,status,source)
@@ -324,8 +328,7 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
       assert.equal((await get()).status, 413)
     } finally { await connection.query('DELETE FROM factory_attempts WHERE "taskId"=$1 AND ordinal>=100', [taskId]) }
   })
-  await t.test('two individually bounded metadata batches cannot exceed the cumulative SQL byte budget', async () => {
-    const { MAP_METADATA_BYTES } = await import('./read-contracts')
+  await t.test('the full logical projections share one budget even when their compact representation is small', async () => {
     const originalContent = (await connection.query('SELECT content FROM issues WHERE id=$1', [issueId])).rows[0].content
     const content = { type: 'doc', attrs: { mikka: { blockedByIds: Array.from({ length: 17_000 }, () => randomUUID()) } } }
     const batches: { bytes: number; rows: unknown[] | null }[] = []
@@ -338,13 +341,92 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
         SELECT gen_random_uuid(),$1,'review',g,g,'passed',repeat('x',4000) FROM generate_series(100,229) g`, [taskId])
       await assert.rejects(collectMapFacts(measured, await resolveProjectReadScope(owner, projectId, home.id), true),
         (error: unknown) => (error as { code: string }).code === 'map_too_large')
-      assert.equal(batches.length, 2)
-      assert.ok(batches.every(batch => Number(batch.bytes) < MAP_METADATA_BYTES))
-      assert.ok(batches.reduce((sum, batch) => sum + Number(batch.bytes), 0) > MAP_METADATA_BYTES)
-      assert.ok(Array.isArray(batches[0].rows)); assert.equal(batches[1].rows, null)
+      assert.equal(batches.length, 1)
+      assert.ok(Number(batches[0].bytes) > MAP_METADATA_BYTES)
+      assert.equal(batches[0].rows, null)
     } finally {
       await connection.query('UPDATE issues SET content=$2 WHERE id=$1', [issueId, JSON.stringify(originalContent)])
       await connection.query('DELETE FROM factory_attempts WHERE "taskId"=$1 AND ordinal>=100', [taskId])
+    }
+  })
+  await t.test('real PostgreSQL compact timestamps and JSON key order retain the exact facts fingerprint', async () => {
+    const stamps = ['2026-11-05T12:34:56.123456+00:00', '1969-12-31T23:59:59.123456+00:00', '1969-12-31T23:59:59.999999+00:00', '1970-01-01T00:00:00.000001+00:00']
+    const { rows: [row] } = await connection.query(`WITH projection_1 AS (
+      SELECT $2::uuid AS id,($1::uuid[])[1] AS "issueId",'cancelled'::text AS status,NULL::text AS outcome,
+        stamp AS "createdAt",stamp AS "finishedAt",NULL::uuid AS "retryOf",NULL::uuid AS "continuesRunId",
+        NULL::uuid AS "threadReplacedBy",'codex'::text AS harness,NULL::text AS "modelId",true AS owned
+      FROM unnest($3::timestamptz[]) stamp)
+      SELECT (SELECT jsonb_agg(to_jsonb(projection_1) ORDER BY "createdAt",id) FROM projection_1) AS original,
+        ${compactMapRowsSql('projection_1', 'runs')} AS compact`, [[issueId], runId, stamps])
+    const expected = row.original.map((run: Record<string, unknown>) => ({ ...run,
+      createdAt: new Date(String(run.createdAt)).toISOString(), finishedAt: new Date(String(run.finishedAt)).toISOString() }))
+    const decoded = decodeMapRows(row.compact, 'runs', [issueId], MAP_NODE_LIMIT)
+    assert.deepEqual(decoded, expected)
+    assert.equal(JSON.stringify(decoded), JSON.stringify(expected))
+    assert.equal(fingerprint(decoded), fingerprint(expected))
+  })
+  await t.test('100 issues and 399/899 runs keep exact 500/1000-node cold reads small without dropping global facts', async () => {
+    const shared = await seedWorkspace(connection, owner, [{ userId: owner, role: 'admin' }])
+    const team = await seedTeam(connection, shared.id, owner)
+    const project = await seedProject(connection, owner, [{ teamId: team.id, workspaceId: shared.id }])
+    const bot = await seedBot(connection, shared.id, owner), ids = Array.from({ length: 100 }, () => randomUUID())
+    await connection.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope,"linearSyncBlocked","createdAt")
+      SELECT id,$2,'Synthetic load fixture '||lpad(n::text,3,'0')||' — no provider execution','{"type":"doc"}'::jsonb,
+        'canceled','normal','workspace',true,'2026-10-28T19:56:34.123456Z'::timestamptz+n*interval '1 millisecond'
+      FROM unnest($1::uuid[]) WITH ORDINALITY AS fixture(id,n)`, [ids, owner])
+    await connection.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId")
+      SELECT unnest($1::uuid[]),$2,$3,$4`, [ids, team.id, shared.id, owner])
+    await connection.query('UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [project, JSON.stringify(ids)])
+    const appendRuns = (from: number, to: number) => connection.query(`INSERT INTO agent_runs(id,"userId","agentId","botId","issueId",status,"createdAt","finishedAt")
+      SELECT gen_random_uuid(),$1,$2,$3,($4::uuid[])[((n-1)%100)+1],'cancelled',
+        '2026-10-28T19:56:34.123456Z'::timestamptz+n*interval '1 millisecond',
+        '2026-10-28T19:56:34.123456Z'::timestamptz+n*interval '1 millisecond'
+      FROM generate_series($5::integer,$6::integer) n`, [owner, agentId, bot, ids, from, to])
+    await appendRuns(1,399)
+    for (const totalRuns of [399,899]) {
+      if (totalRuns === 899) await appendRuns(400,899)
+      const nodes = totalRuns + 101
+      const scope = await resolveProjectReadScope(owner, project, shared.id)
+      const values = [scope.issueIds, scope.userId, scope.workspaceId, MAP_NODE_LIMIT + 1, MAP_SOURCE_LIMIT + 1, false, scope.projectId, MAP_METADATA_BYTES]
+      const uncompressed = await connection.query(mapFactsSql(false), values)
+      let collectorQueries = 0, collectorBytes = 0, logicalBytes = 0
+      const measured = { query: async (sql: string, bound?: unknown[]) => {
+        const result = await connection.query(sql, bound); collectorQueries++; collectorBytes += Buffer.byteLength(JSON.stringify(result.rows))
+        logicalBytes += Number(result.rows[0].bytes); return result
+      } } as Pick<PoolClient, 'query'>
+      const facts = await collectMapFacts(measured, scope, false), original = uncompressed.rows[0]
+      const expected = { ...facts,
+        issues: original.rows[0].map((issue: Record<string, unknown>) => ({ ...issue, createdAt: new Date(String(issue.createdAt)).toISOString() })),
+        runs: original.rows[1].map((run: Record<string, unknown>) => ({ ...run, createdAt: new Date(String(run.createdAt)).toISOString(),
+          finishedAt: run.finishedAt ? new Date(String(run.finishedAt)).toISOString() : null })),
+      }
+      assert.deepEqual(facts, expected)
+      assert.equal(JSON.stringify(facts), JSON.stringify(expected)); assert.equal(fingerprint(facts), fingerprint(expected))
+      assert.equal(logicalBytes, Number(original.bytes)); assert.equal(collectorQueries, 1)
+      assert.equal(facts.issues.length, 100); assert.equal(facts.runs.length, totalRuns); assert.equal(projectGraph(facts).nodes.length, nodes)
+      assert.ok(collectorBytes < (totalRuns === 399 ? 50 : 85) * 1024, `compact collector returned ${collectorBytes} bytes`)
+      t.diagnostic(JSON.stringify({ fixture: 'isolated-exact-production-layout', issues: 100, runs: totalRuns, nodes,
+        uncompressedSingleStatementBytes: Buffer.byteLength(JSON.stringify(uncompressed.rows)), compactSingleStatementBytes: collectorBytes,
+        unchangedLogicalBytes: logicalBytes, statements: collectorQueries }))
+
+      // The session resolver is stubbed to model the independently observed zero-
+      // query cookie-cache hit. PAT authorization remains exercised below. Enable
+      // real secret reads here so the HTTP count includes production's mask path.
+      const previousKey = process.env.WORKSPACE_SECRETS_KEY
+      try {
+        process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('base64')
+        cachedSessionOwner = owner; measurement = { queries: 0, selects: 0, bytes: 0 }; overrideDeploymentSwitch('dbEgressSample', true)
+        const response = await get('', null, '/mikka/api/projects/' + project + '/map', shared.id), body = await response.json()
+        assert.equal(response.status, 200, JSON.stringify(body)); assert.equal(body.page.matchedCount, nodes)
+        assert.equal(measurement.queries, 8); assert.equal(measurement.selects, 8)
+        assert.ok(measurement.bytes <= (nodes === 500 ? 80 * 1024 : 100_000), `cached-session path returned ${measurement.bytes} DB JSON bytes`)
+        t.diagnostic(JSON.stringify({ fixture: 'isolated-exact-production-layout-http', issues: 100, runs: totalRuns, nodes, ...measurement,
+          auth: 'cached session resolver stub; no cookie parsing measured', masking: 'enabled, two real database reads',
+          includes: 'fresh pre/post workspace and issue ACL, live revision, all graph facts, masking', excludes: 'PostgreSQL wire framing and production network' }))
+      } finally {
+        cachedSessionOwner = null; measurement = null; overrideDeploymentSwitch('dbEgressSample', undefined)
+        if (previousKey === undefined) delete process.env.WORKSPACE_SECRETS_KEY; else process.env.WORKSPACE_SECRETS_KEY = previousKey
+      }
     }
   })
   await t.test('500/1000 executions have fixed query count and measured per-read KB', async () => {
@@ -363,11 +445,11 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
         result = graphPage(projectGraph(facts), mapQuerySchema.parse({ workspaceId: home.id }))
         times.push(performance.now() - started)
       }
-      assert.ok(queryCount <= 2, `metadata used ${queryCount} roundtrips`); assert.equal(result!.nodes.length, 50)
+      assert.equal(queryCount, 1, 'one complete metadata snapshot'); assert.equal(result!.nodes.length, 50)
       const raw = JSON.stringify(result)
       assert.ok(gzipSync(raw).byteLength < 150 * 1024)
       const legacy = (await connection.query('SELECT sum(octet_length(prompt)+octet_length(report::text))::int AS bytes FROM agent_runs WHERE "issueId"=$1', [issue])).rows[0].bytes
-      t.diagnostic(JSON.stringify({ fixture: 'isolated-map-read', count, queries: queryCount, databaseJsonBytes: dbBytes,
+      t.diagnostic(JSON.stringify({ fixture: 'isolated-map-read', runs: count, nodes: count + 2, queries: queryCount, databaseJsonBytes: dbBytes,
         pageBytes: Buffer.byteLength(raw), gzipBytes: gzipSync(raw).byteLength,
         p95Ms: times.sort((a, b) => a - b)[Math.ceil(times.length * 0.95) - 1], legacyPromptReportBytes: legacy }))
       const representativeRun = (await connection.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id LIMIT 1', [issue])).rows[0].id
@@ -400,7 +482,7 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
         assert.ok(Math.max(...transfer) < 1024 * 1024 + 32 * 1024)
         if (operation === 'page') assert.ok(gzipBytes <= 150 * 1024)
         const sorted = durations.sort((a, b) => a - b)
-        t.diagnostic(JSON.stringify({ fixture: 'isolated-full-http', count, operation, samples: durations.length,
+        t.diagnostic(JSON.stringify({ fixture: 'isolated-full-http', runs: count, nodes: count + 2, operation, samples: durations.length,
           statements: Math.max(...reads), selects: Math.max(...selects), databaseJsonBytes: Math.max(...transfer),
           httpBytes, gzipBytes, p50Ms: sorted[4], p95Ms: sorted[9], includes: 'PAT, current workspace/project/task ACL, revision, facts and source reads',
           excludes: 'PostgreSQL wire framing and production network' }))

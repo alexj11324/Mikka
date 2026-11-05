@@ -17,7 +17,9 @@ import type { FactorySnapshot } from './store'
 process.env.MIKKA_BYOS_ENABLED = '1'
 process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 
-test('real PG: independent cross-Harness Profile stages and recorded cloud runtimes', { skip: !dbUrl, timeout: 120_000 }, async t => {
+// #1449 adds ten sequential cross-Harness candidate rechecks. Allow their
+// measured CI work while retaining the per-statement and lock timeouts below.
+test('real PG: independent cross-Harness Profile stages and recorded cloud runtimes', { skip: !dbUrl, timeout: 180_000 }, async t => {
   assert.ok(dbUrl)
   const admin = new Pool({ connectionString: dbUrl })
   const database = `factory_profile_dispatch_${randomUUID().replaceAll('-', '')}_e2e`

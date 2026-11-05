@@ -29,6 +29,33 @@ function tokenScope(reader: IssueReader) {
   return actor?.userId === reader ? actor.tokenWorkspaceId : undefined
 }
 
+const databaseUuid = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
+
+/** Only the SQL transport is compact: preserve every raw link, including
+ * duplicates and invalid team pairs, before applying the existing scope rules. */
+export function decodeProjectReadLinks(workspaceId: string, rawLinks: unknown, rawIssueLinks: unknown) {
+  if (!Array.isArray(rawLinks) || !Array.isArray(rawIssueLinks) || rawLinks.length > 100 || rawIssueLinks.length > 100)
+    throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
+  // PostgreSQL returns UUID columns in lower case, including for upper-case
+  // request IDs. Keep that representation rather than changing scope equality.
+  const currentWorkspace = workspaceId.toLowerCase()
+  const decodeWorkspace = (value: unknown) => {
+    if (value === 0) return currentWorkspace
+    if (typeof value === 'string' && databaseUuid.test(value)) return value
+    throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
+  }
+  return {
+    links: rawLinks.map(value => ({ workspaceId: decodeWorkspace(value) })),
+    issueLinks: rawIssueLinks.map((row: unknown) => {
+      if (!Array.isArray(row) || row.length !== 3 || typeof row[0] !== 'string' || !databaseUuid.test(row[0]) || (row[2] !== 0 && row[2] !== 1))
+        throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
+      const linkedWorkspace = decodeWorkspace(row[1])
+      if (row[2] === 1 && linkedWorkspace !== currentWorkspace) throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
+      return { issueId: row[0], workspaceId: linkedWorkspace, allowed: row[2] === 1 }
+    }),
+  }
+}
+
 /** Map GET authorization in two bounded reads, one per authority database.
  * Re-run this whole function after reading content; none of its membership or
  * link facts survive a request. Decision writes retain resolveProjectScope. */
@@ -43,10 +70,12 @@ export async function resolveProjectReadScope(reader: IssueReader, projectId: st
     workspace: { kind: workspaces.kind, userId: workspaces.userId },
     project: { id: projects.id, userId: projects.userId, name: projects.name, revision: projects.revision, issueIds: boundedIds, createdAt: projects.createdAt },
     // Keep raw Project links: filtering orphaned/mismatched teams here could hide a scope conflict.
-    links: sql<{ workspaceId: string }[]>`COALESCE((SELECT jsonb_agg(link) FROM (
+    links: sql<unknown>`COALESCE((SELECT jsonb_agg(CASE WHEN link."workspaceId"=${workspaces.id}
+      THEN to_jsonb(0) ELSE to_jsonb(link."workspaceId") END) FROM (
       SELECT ${teamProjects.workspaceId} AS "workspaceId" FROM ${teamProjects}
       WHERE ${teamProjects.projectId}=${projects.id} LIMIT 101) link),'[]'::jsonb)`,
-    issueLinks: sql<{ issueId: string; workspaceId: string; allowed: boolean }[]>`COALESCE((SELECT jsonb_agg(link) FROM (
+    issueLinks: sql<unknown>`COALESCE((SELECT jsonb_agg(jsonb_build_array(link."issueId",
+      CASE WHEN link."workspaceId"=${workspaces.id} THEN to_jsonb(0) ELSE to_jsonb(link."workspaceId") END,CASE WHEN link.allowed THEN 1 ELSE 0 END)) FROM (
       SELECT scope_issues."issueId",scope_issues."workspaceId",
         scope_teams.id IS NOT NULL AND scope_issues."workspaceId"=${workspaces.id} AS allowed
       FROM ${teamIssues} scope_issues LEFT JOIN ${teams} scope_teams
@@ -59,8 +88,8 @@ export async function resolveProjectReadScope(reader: IssueReader, projectId: st
     .innerJoin(projects, eq(projects.id, projectId))
     .where(eq(workspaces.id, workspaceId)).limit(1)
   if (!row) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
-  const { workspace, project, links, issueLinks } = row
-  if (links.length > 100 || issueLinks.length > 100) throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
+  const { workspace, project } = row
+  const { links, issueLinks } = decodeProjectReadLinks(workspaceId, row.links, row.issueLinks)
   const projectWorkspaces = new Set(links.map(link => link.workspaceId))
   if (links.length && !projectWorkspaces.has(workspaceId)) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
   if (projectWorkspaces.size > 1) throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
