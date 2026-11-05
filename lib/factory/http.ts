@@ -16,7 +16,7 @@ const controlSchema = z
   .object({
     binding: revisionBindingSchema,
     eventId: z.uuid(),
-    action: z.enum(["cancel", "revoke", "retry", "repair"]),
+    action: z.enum(["cancel", "revoke", "retry", "repair", "recheck"]),
     reason: z.string().trim().min(1).max(4000),
   })
   .strict();
@@ -83,7 +83,9 @@ export async function handleFactory(
     return {
       status: 200,
       // A person typed this reason; mask before it reaches task/attempt rows.
-      body: await store.apply(req.userId, binding, eventId, { action, reason: maskFactoryNote(reason) }),
+      body: action === 'recheck'
+        ? (await store.recheckCandidate(req.userId, binding, eventId, maskFactoryNote(reason))).result
+        : await store.apply(req.userId, binding, eventId, { action, reason: maskFactoryNote(reason) }),
     };
   } catch (error) {
     if (!(error instanceof FactoryError)) throw error;

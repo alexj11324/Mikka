@@ -107,6 +107,7 @@ export function providerContinuationMatches(prior: Run, next: Run): boolean {
  * and continuation prompt. Only their exact current host adoption event can
  * authorize that transformation; the worker cannot supply this receipt. */
 export async function providerContinuationLaunchMatches(query: Query, prior: Run, next: Run): Promise<boolean> {
+  if (await (await import('./factory/candidate-recheck')).candidateRecheckPinsRun(query, prior.userId, prior.id)) return false
   if (providerContinuationMatches(prior, next)) return true
   const definition = next.agentDefinition
   if (next.retryOf !== null || !definition || next.prompt !== prior.prompt || definition.promptDigest !== digest(prior.prompt) ||
@@ -173,11 +174,11 @@ function reasonLine(reason: string): string {
   } as Record<string, string>)[reason] ?? copy.needsModelUnavailable
 }
 
-async function unavailableRecord(pool: Pool, scope: Scope, run: Run, attempted: Set<string>, skipped: SkippedEntry[] = []): Promise<ModelFallbackRecord> {
+async function unavailableRecord(pool: Pool, scope: Scope, run: Run, attempted: Set<string>, skipped: SkippedEntry[] = [], ownerPinned = false): Promise<ModelFallbackRecord> {
   const candidates = await orderCandidates(pool, scope), { entries } = await readOrder(pool, scope, candidates)
   const states = await credentialStates(pool, scope, entries, candidates, undefined, { probe: false })
   const receipt = record(run) ?? pendingProviderFallback(run, providerFailureSchema.parse(run.report?.providerFailure))
-  const picked = run.agentDefinition?.modelDispatch?.mode !== 'preference'
+  const picked = ownerPinned || run.agentDefinition?.modelDispatch?.mode !== 'preference'
   const failure = providerFailureSchema.parse(run.report?.providerFailure)
   // An explicit pick never probes the rest of the order. Its card can explain
   // that model's failure, but cannot claim healthy, untried models have no place.
@@ -237,6 +238,8 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
     const { rows: tasks } = await client.query(`SELECT t.status,t."sourceEventId" AS "requestEpoch",a.output->>'requestEpoch' AS epoch,t."attemptId",a.id FROM factory_attempts a
       JOIN factory_tasks t ON t.id=a."taskId" WHERE a."runId"=$1 AND t."userId"=$2`, [source.id, source.userId])
     if (tasks.some(task => task.status !== 'running' || (task.epoch && task.requestEpoch !== task.epoch) || task.attemptId !== task.id)) return await stopped()
+    if (target && await (await import('./factory/candidate-recheck')).candidateRecheckPinsRun(client, source.userId, source.id))
+      throw new ActionFailureError('runInvalid')
     let continuation: Continuation | null = null
     await withDatabaseClient(client, async () => {
       if (target && source.agentDefinition && source.issueId) {
@@ -314,6 +317,11 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
   const scope = await fallbackScope(pool, source), stored = await readOrder(pool, scope)
   const { autoModelRouting } = stored
   const attempted = await attemptedEntries(pool, source, dispatchOrder(stored.entries, stored.preferredHarness), autoModelRouting)
+  // The Owner requested these checks on their original subscription/model.
+  // Keep the historical preference snapshot intact; the host receipt pins
+  // this round before any alternate model selection or runtime preparation.
+  if (await (await import('./factory/candidate-recheck')).candidateRecheckPinsRun(pool, userId, source.id))
+    return settle(pool, source, await unavailableRecord(pool, scope, source, attempted, [], true))
   if (source.agentDefinition?.modelDispatch?.mode !== 'preference' || source.questionContinuation || source.agentDefinition?.agentProfile?.definition.model.mode === 'fixed')
     return settle(pool, source, await unavailableRecord(pool, scope, source, attempted))
   const { rows: [origin] } = await pool.query<{ kind: string; remoteUrl: string | null }>(`SELECT d.kind,repo."remoteUrl" FROM devices d

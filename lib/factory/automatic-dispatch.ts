@@ -15,7 +15,8 @@ import { observeFactoryProfileDispatch } from './reconcile'
 import { FactoryError, factoryFlowVersion } from './contract'
 import { notifyDeviceWork } from '../device-gateway-notify'
 import type { FactoryTask, createFactoryStore } from './store'
-import type { FactoryCheckStartRecovery } from './check-start-recovery'
+import { assertRecoveredCheck, type FrozenFactoryCheck } from './check-start-recovery'
+import { candidateRecheckRound, candidateRecheckDispatchSource, refreshRecheckSource, admitRecheckSource } from './candidate-recheck'
 import type { ProfileCheckWork } from './agent-profile-decision'
 
 /** Provider I/O boundary; no model input selects these callbacks. */
@@ -32,8 +33,12 @@ export const factoryAutomaticRuntime = {
 
 /** The host, rather than a model tool call, queues every independent stage. */
 export function automaticFactoryDispatch(pool: Pool) {
-  return observeFactoryProfileDispatch(async (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, prior: FactoryTask, _run: Record<string, any>, checkStart?: FactoryCheckStartRecovery) => {
+  return observeFactoryProfileDispatch(async (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, prior: FactoryTask, _run: Record<string, any>, initialCheckStart?: FrozenFactoryCheck) => {
     let task = await store.lockTask(tx, prior.userId, prior.id)
+    const recheck = initialCheckStart ? null : await candidateRecheckRound(tx, task)
+    // This Owner request is for new checks on the retained candidate. A real
+    // failed check stays failed; only a separate repair action may replace it.
+    if (recheck && task.status === 'failed') return
     if (task.status === 'failed' && ['review','verify'].includes(task.stage)) {
       const { rows: [attempt] } = await tx.query('SELECT output FROM factory_attempts WHERE id=$1', [task.attemptId])
       if (attempt?.output?.completion?.trustedFailureProvenance === true) {
@@ -47,6 +52,18 @@ export function automaticFactoryDispatch(pool: Pool) {
       }
     }
     if (task.status !== 'pending' || !['execute','review','verify'].includes(task.stage)) return
+    const checkStart = initialCheckStart ?? (recheck ? await candidateRecheckDispatchSource(tx, task, recheck) : undefined)
+    if (recheck && checkStart) {
+      await refreshRecheckSource(pool, checkStart)
+      await admitRecheckSource(tx, checkStart)
+    }
+    const assertFrozenDispatch = async (runId: string) => {
+      if (!checkStart) return
+      const { rows: [queued] } = await tx.query(`SELECT r.*,a.output->'check' AS "checkAssignment" FROM factory_attempts a
+        JOIN agent_runs r ON r.id=a."runId" WHERE a.id=$1 AND a."taskId"=$2 AND r.id=$3`, [task.attemptId, task.id, runId])
+      if (!queued) throw new FactoryError('factoryCheckBindingMismatch')
+      assertRecoveredCheck(checkStart, queued, queued.checkAssignment)
+    }
     const { rows: [source] } = await tx.query(`SELECT r.*,repo."remoteUrl",d.kind AS "deviceKind",b."botId" AS "runtimeBotId",b."workspaceId",COALESCE(r."agentDefinition"->>'harness',a.harness) AS harness
       FROM factory_attempts f JOIN agent_runs r ON r.id=f."runId"
       JOIN agents a ON a.id=r."agentId" JOIN devices d ON d.id=r."deviceId"
@@ -212,6 +229,7 @@ export function automaticFactoryDispatch(pool: Pool) {
           verify: (client, current, id) => configureFactoryCheck(client, current, id, checkStart.selection.policyCeiling),
         } } : defaultFactoryDispatchAdapters)
       const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId, deviceRepoId }, tx)
+      await assertFrozenDispatch(result.runId)
       await registerRoutingAdmission(result.runId)
       if (continueImplementation) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
       if (recovery && !check) await tx.query('UPDATE agent_runs SET "retryOf"=$2,attempt=$3 WHERE id=$1', [result.runId, source.id, source.attempt + 1])
@@ -245,6 +263,7 @@ export function automaticFactoryDispatch(pool: Pool) {
       verify: (client, current, id) => configureFactoryCheck(client, current, id, checkStart?.selection.policyCeiling),
     } })
     const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId: runtime.agentId, deviceRepoId: repoId }, tx)
+    await assertFrozenDispatch(result.runId)
     await registerRoutingAdmission(result.runId)
     if (continueImplementation) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
     return async () => {
