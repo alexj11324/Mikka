@@ -4,7 +4,7 @@
 
 关联：[Issue #1296](https://github.com/alexj11324/Mikka/issues/1296)、[PR #1359](https://github.com/alexj11324/Mikka/pull/1359)。
 
-**当前结论：生产 `7cae54d3` 上，ALEX-60 已真实完成恢复后的 Claude 独立 review 和 Owner Accept；正常操作暴露的两个 UI 状态同步缺口已修复。`9aae0ca` 的 CI、Docker production build 和真实浏览器验收已通过：正常 Accept 后原组件无刷新显示 Done、producer Resolved、Factory Accepted 和更新后的 Activity，历史 Blocked 保留；标题草稿在短暂保存错误后自动保存且未丢失。375 深色页面也已截图复核。PR #1359 当前最终组合为 `a871356a`，正常整合主线 `9727fcfc`，精确 CI 为 23 success + 5 条件 skip；该组合在新隔离 PG7 的 UI91、真PG81、完整 production build 已通过。旧 PG6 的过期 lease 已正常 quarantine，随后整个自有环境和私密状态已销毁，未伪称 fixture 逐项 cleanup 成功。新 PG7 已正常清理 fixture / 释放租约并销毁私密环境。PR #1359 已于 09:38:58 合并，主 CI42004112823 的 12 个 jobs 全部成功；Web42004112987 成功，部署 dpl_9KVFQS2Gwncgwof6HmsDyhr8Svg6 READY，公开 version 为精确 9cc。修复后的真实生产任务显示 Done / Factory Accepted，当前 producer 在列表和详情均 Resolved，历史失败仍 Blocked。Docker 已 stopped。原生提交与真机验收、API 余额不足仍按实际边界保留。**
+**当前结论：生产 `7cae54d3` 上，ALEX-60 已真实完成恢复后的 Claude 独立 review 和 Owner Accept；正常操作暴露的两个 UI 状态同步缺口已修复。`9aae0ca` 的 CI、Docker production build 和真实浏览器验收已通过：正常 Accept 后原组件无刷新显示 Done、producer Resolved、Factory Accepted 和更新后的 Activity，历史 Blocked 保留；标题草稿在短暂保存错误后自动保存且未丢失。375 深色页面也已截图复核。PR #1359 当前最终组合为 `a871356a`，正常整合主线 `9727fcfc`，精确 CI 为 23 success + 5 条件 skip；该组合在新隔离 PG7 的 UI91、真PG81、完整 production build 已通过。旧 PG6 的过期 lease 已正常 quarantine，随后整个自有环境和私密状态已销毁，未伪称 fixture 逐项 cleanup 成功。新 PG7 已正常清理 fixture / 释放租约并销毁私密环境。PR #1359 已于 09:38:58 合并，主 CI42004112823 的 12 个 jobs 全部成功；Web42004112987 成功，部署 dpl_9KVFQS2Gwncgwof6HmsDyhr8Svg6 READY，公开 version 为精确 9cc。修复后的真实生产任务显示 Done / Factory Accepted，当前 producer 在列表和详情均 Resolved，历史失败仍 Blocked。Docker 已 stopped。收尾复核另取得既有 build 8 于 11:27 上传 App Store Connect 成功的工作流回执，桌面发布也已成功。TestFlight 处理完成／可安装与真机验收、API 余额不足仍按实际边界保留。**
 
 本文只补充本轮结果，不将既有全部 UI、三模型路径或原生设备验收重新宣告完成。生产模型证据与下面的隔离合成报告 fixture 分开记录。
 
@@ -200,7 +200,7 @@ owning agent 与独立视觉 reviewer 均已审阅以下精确 a871 截图：无
 | 生产 smoke | [42004413085](https://github.com/alexj11324/Mikka/actions/runs/42004413085) success；该运行早于本次 Web READY，单独列回执，不把它代替上面的 9cc 生产域名/页面验收 |
 | Daemon 发布 | [42004112856](https://github.com/alexj11324/Mikka/actions/runs/42004112856) success，09:47:59 |
 | E2B runtime 发布 | [42004113017](https://github.com/alexj11324/Mikka/actions/runs/42004113017) success，09:48:02 |
-| Desktop 发布 | [42004112938](https://github.com/alexj11324/Mikka/actions/runs/42004112938) 在 09:49 核对时仍 in_progress；未提前填写成功 |
+| Desktop 发布 | [42004112938](https://github.com/alexj11324/Mikka/actions/runs/42004112938) **success**，10:07:02 完成；签名打包、installer inventory、精确提交 checks、candidate 校验与 GitHub release 均成功 |
 | Docker 最终停止 | `sbx_001m6mjh8at15tpaxcxdmscetmz`，8 vCPU / 16 GiB；完成服务、lease、session、PG6/PG7 清理后已请求 stop，管理 API **09:49:05 读回 stopped**；停止后未访问会自动唤醒的 endpoint |
 
 ### 生产最终截图
@@ -219,10 +219,16 @@ owning agent 与独立视觉 reviewer 均已审阅以下精确 a871 截图：无
 ### OTA 与原生边界
 
 - 精确 [9cc 的 mobile-update.yml](https://github.com/alexj11324/Mikka/blob/9cc753c660f31a95598998c43545ea030240e9e2/.github/workflows/mobile-update.yml) 只对 main push 的 apps/mobile/** 或 packages/protocol/** 触发；本次十个变更路径不命中，因此没有新的 9cc OTA 工作流。
-- 最近生产 OTA 仍为 [41990588486](https://github.com/alexj11324/Mikka/actions/runs/41990588486/job/127121612092)，源 7ca，07:57:12 Published；production / iOS，runtime `0ec11b32ade9dcb4bcf87a751626ec5ba9acaa2d`，group `0a7a2061-2f5a-4244-83df-3c292c31e65a`，update `01a1aab6-3a6c-724e-bbf5-3aff50ef9cbb`。
-- 已有 iOS build 8：`a9b373b6-da29-43f0-9176-25a60eae1985` 为 FINISHED，来源 ec9c2860。Apple 提交所需 secret 配置修复已在 main；重新提交现有 binary 仍需通过既有 mobile-native workflow_dispatch。当前连接器不提供 dispatch，浏览器在 GitHub 登录页，尚未声称已提交或 TestFlight 可安装。
+- 本轮 09:49 核对的最近生产 OTA 为 [41990588486](https://github.com/alexj11324/Mikka/actions/runs/41990588486/job/127121612092)，源 7ca，07:57:12 Published；production / iOS，runtime `0ec11b32ade9dcb4bcf87a751626ec5ba9acaa2d`，group `0a7a2061-2f5a-4244-83df-3c292c31e65a`，update `01a1aab6-3a6c-724e-bbf5-3aff50ef9cbb`。
+- 已有 iOS build 8：`a9b373b6-da29-43f0-9176-25a60eae1985` 为 FINISHED，来源 ec9c2860。收尾时发现已有成功的 [Mobile native release 42018868921](https://github.com/alexj11324/Mikka/actions/runs/42018868921)；工作流 SHA `29f0d915a2ee10748aed6938a578cc6d539b90df`，**复用同一个 build 8，没有重新构建**。精确 binary/source 核验及提交步骤均 success，日志于 **11:27:20.942 UTC 确认上传到 App Store Connect 成功**，整个 run 于 11:27:26 success。
+- 原生 [job127216236381](https://github.com/alexj11324/Mikka/actions/runs/42018868921/job/127216236381) 明确记录 EXISTING_BUILD_ID 为上述 a9b、EXPECTED_BUILD_COMMIT 为完整 ec9；[EAS submission be257c2e-f174-4192-8bee-12a1d552645e](https://expo.dev/accounts/alexj3653/projects/mikka/submissions/be257c2e-f174-4192-8bee-12a1d552645e)。这项已有发布是在本浏览器登录等待期间完成；安全登录请求后来取消，本执行通过只读日志核对收到成功回执，**没有再次触发或重复上传**。
+- Apple 上传回执在当时提示后续处理；它没有证明处理已经完成、测试者可安装或设备已安装。本报告只确认 ASC 上传成功，TestFlight 可安装和真机状态仍未取得直接证据。
 - 没有 iOS 真机或 simulator，因此 VoiceOver、Dynamic Type、系统 Reduce Motion、haptics、真机安装与原生完整流程仍未验证；Expo Web 的实际截图/回归不替代这些项目。
 - API 路径保留原 deepseek-flash 的 Insufficient Balance，未换模型、来源、账户，也未追加付费重试。Claude/Codex 的真实生产接受证据仍按各自原记录保存。
+
+
+
+**收尾版本说明：**本轮 Web 部署及图像验收绑定 09:44 的 9cc。20:48 再读取公开 version 时，后续批次已推进到 `484d7ac66b5eba692b53ad8759e4b558a6232dfb`，当时 main 为 `2e4e8380e0387b43c5c844756ade7801f0afdca1` 且另一个 Web 工作流正在执行。没有把 9cc 的截图、a871 的 Docker 回归或后续其他批次改记为同一次验收。
 
 ## 9. 完成状态
 
@@ -233,8 +239,9 @@ owning agent 与独立视觉 reviewer 均已审阅以下精确 a871 截图：无
 - [x] 9cc 的原生产任务及线程详情复验通过；生产真实模型记录与隔离合成 fixture 不混淆。
 - [x] PG6 按过期 scope 守卫进入 quarantine 后销毁整个自有环境；PG7 正常清理 fixture / 释放租约，activeLeases=0、validSessions=0，随后销毁整个环境。
 - [x] Docker Sandbox 管理 API 已确认 stopped。
-- [ ] 既有 iOS binary 的 App Store Connect / TestFlight 重新提交和实际可安装状态。
+- [x] 既有 iOS build 8 复用提交至 App Store Connect，工作流和实际上传日志均成功，没有重复 build / submit。
+- [ ] TestFlight 处理完成、实际可安装及安装状态。
 - [ ] 原生设备专属可用性与 motion 验收。
 - [ ] API 供应商余额恢复后的原模型路径；本轮保留余额不足，不执行额外付费重试。
 
-Issue #1296 保持 open，以免将上述认证、设备和余额阻塞项目写成已通过。已经完成的 UI 修复、Web 发布与生产复验闭环有独立版本、CI 和图像证据。
+Issue #1296 保持 open，以免将尚无直接证据的 TestFlight 可安装、原生设备验收和余额阻塞项目写成已通过。GitHub 登录不再是已有 binary 上传的未完成条件。已经完成的 UI 修复、Web 发布与生产复验闭环有独立版本、CI 和图像证据。

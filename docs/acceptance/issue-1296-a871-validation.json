@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-11-05 09:50:46 UTC",
+  "recorded_at": "2026-11-05 20:51:56 UTC",
   "repository": "alexj11324/Mikka",
   "pr": 1359,
   "head": "a871356a227543f3e662d0841359e4dcfdbe3713",
@@ -295,8 +295,9 @@
     {
       "id": 42004112938,
       "name": "Desktop release",
-      "status": "in_progress",
-      "conclusion": null
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-05T10:07:02Z"
     },
     {
       "id": 42004112987,
@@ -324,8 +325,32 @@
     }
   ],
   "remaining": {
-    "native_submission": "Existing finished iOS binary re-submission blocked on GitHub browser authentication; connector has no dispatch tool",
-    "native_device_checks": "not performed",
-    "api": "deepseek-flash Insufficient Balance; no additional paid retries"
+    "native_submission": "completed: existing build 8 uploaded to App Store Connect via workflow 42018868921",
+    "native_device_checks": "not performed; no native device or simulator",
+    "api": "deepseek-flash Insufficient Balance; no additional paid retries",
+    "testflight_installability": "No direct evidence of processing completion or installability"
+  },
+  "native_submission": {
+    "workflow_run": 42018868921,
+    "workflow_sha": "29f0d915a2ee10748aed6938a578cc6d539b90df",
+    "job_id": 127216236381,
+    "conclusion": "success",
+    "completed_at": "2026-11-05T11:27:26Z",
+    "existing_build_id": "a9b373b6-da29-43f0-9176-25a60eae1985",
+    "source_commit": "ec9c2860c7614fef044d883ed2344211818e27e1",
+    "build_number": 8,
+    "submission_id": "be257c2e-f174-4192-8bee-12a1d552645e",
+    "submission_url": "https://expo.dev/accounts/alexj3653/projects/mikka/submissions/be257c2e-f174-4192-8bee-12a1d552645e",
+    "upload_succeeded_at": "2026-11-05T11:27:20.942Z",
+    "rebuild": false,
+    "source": "Existing separate workflow run discovered after browser authentication was cancelled; no repeated submission by this agent",
+    "testflight_installability_verified": false,
+    "native_device_verified": false
+  },
+  "later_observations": {
+    "public_version": "484d7ac66b5eba692b53ad8759e4b558a6232dfb",
+    "main_sha": "2e4e8380e0387b43c5c844756ade7801f0afdca1",
+    "observed_at": "2026-11-05 20:48 UTC",
+    "original_9cc_images_not_relabelled": true
   }
 }
