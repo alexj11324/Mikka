@@ -1,0 +1,75 @@
+import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { AppState, Platform } from 'react-native'
+import { authHeaders } from '@/lib/api'
+import { API_URL } from '@/lib/config'
+import { createLiveClient, type LiveRef, type LiveSpecOptions } from './live-client'
+
+export { UNRESOLVED_LIVE_ID, type LiveRef } from './live-client'
+export { listRef } from './live-keys'
+
+const TICKET_TIMEOUT_MS = 15_000
+
+/** The live ticket for one owner/workspace channel, as the signed-in person (the same session cookie `api` sends). */
+async function ticket(workspaceId: string, signal: AbortSignal): Promise<unknown> {
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  const timer = setTimeout(abort, TICKET_TIMEOUT_MS)
+  signal.addEventListener('abort', abort)
+  try {
+    const response = await fetch(`${API_URL}/api/live/ticket?workspace=${encodeURIComponent(workspaceId)}`, {
+      headers: { accept: 'application/json', ...await authHeaders() },
+      credentials: Platform.OS === 'web' ? 'include' : 'omit',
+      signal: controller.signal,
+    })
+    return response.ok ? await response.json() : null
+  } finally {
+    clearTimeout(timer)
+    signal.removeEventListener('abort', abort)
+  }
+}
+
+export const live = createLiveClient({
+  appState: AppState,
+  ticket,
+  socket: (url, protocol) => new WebSocket(url, protocol),
+  monotonicNow: typeof performance !== 'undefined' && typeof performance.now === 'function' ? () => performance.now() : undefined,
+})
+
+/** A deadline as the server observed it, for a read that started at `requestedAt` (performance clock). */
+export type LiveDeadline = { at: string; afterMs: number } | null | undefined
+export type LiveSpec = { refs: readonly LiveRef[]; minIntervalMs?: number; deadline?: LiveDeadline }
+
+const clock = () => typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()
+
+/** The channel's deadline, anchored at the request start so a slow answer never postpones it. */
+export function anchoredDeadline(deadline: LiveDeadline, requestedAt: number | null, now = clock()): LiveSpecOptions['deadline'] {
+  if (!deadline || !Number.isFinite(deadline.afterMs)) return null
+  const elapsed = requestedAt === null ? Infinity : Math.max(0, now - requestedAt)
+  return { at: deadline.at, afterMs: Math.max(0, deadline.afterMs - elapsed), ...(requestedAt !== null && deadline.afterMs > 0 ? { observation: requestedAt } : {}) }
+}
+
+/**
+ * Calls `refresh` when one of `spec.refs` changes on the server (after its COMMIT).
+ * A ref with no id listens to nothing; one with no scope re-reads every minute.
+ */
+export function useLive(spec: LiveSpec, refresh: () => unknown, requestedAt: number | null = null) {
+  const generation = useSyncExternalStore(live.watch, live.generation, live.generation)
+  const latest = useRef(refresh)
+  latest.current = refresh
+  const key = useRef(`live:${Math.random().toString(36).slice(2)}`).current
+  const refs = JSON.stringify(spec.refs.filter(ref => ref.id).map(ref => [ref.kind, ref.id, ref.scope ?? null]))
+  const options = { minIntervalMs: spec.minIntervalMs ?? 0, deadline: anchoredDeadline(spec.deadline, requestedAt) }
+  const timing = useRef(options)
+  timing.current = options
+  const handle = useRef<ReturnType<typeof live.subscribe> | null>(null)
+  useEffect(() => {
+    const parsed = (JSON.parse(refs) as [LiveRef['kind'], string, string | null][]).map(([kind, id, scope]) => ({ kind, id, scope }))
+    if (!parsed.length) return
+    const subscription = live.subscribe(parsed, key, () => latest.current(), timing.current)
+    handle.current = subscription
+    return () => { subscription(); if (handle.current === subscription) handle.current = null }
+  }, [refs, key, generation])
+  const deadlineAt = options.deadline?.at ?? null
+  const observation = options.deadline?.observation
+  useEffect(() => { handle.current?.update(timing.current) }, [options.minIntervalMs, deadlineAt, observation])
+}

@@ -41,14 +41,7 @@ export const pollingAllowlist = {
   'lib/billing/hosted-usage.ts': db(web, 'pollUntil, the bounded poll helper behind the billing notices', 1),
   // Mobile: useApi polling that reads our database.
   'apps/mobile/lib/useApi.ts': db(web, 'the useApi polling timer (every screen that passes an interval)', 2),
-  'apps/mobile/components/ChatScreen.tsx': db(web, 'chat re-read every 3.75 s while working, 45 s otherwise, pending actions every 10 s; the 1 s setInterval is the elapsed clock', 3),
-  'apps/mobile/components/ChatList.tsx': db(web, 'group conversations re-read every 30 s', 1),
-  'apps/mobile/components/ThreadsScreen.tsx': db(web, 'thread list re-read every 10 s', 1),
   'apps/mobile/app/groups/[id].tsx': db(web, 'group messages every 2.5 s while answering (8 s otherwise), members every 60 s, reactions every 15 s', 3),
-  'apps/mobile/app/tasks.tsx': db(web, 'task list re-read every 30 s', 1),
-  'apps/mobile/app/thread/[id].tsx': db(web, 'thread re-read every 4 s while running, 30 s once ended', 1),
-  'apps/mobile/lib/home.tsx': db(web, 'drawer home data re-read every minute', 1),
-  'apps/mobile/app/bots/[id]/info.tsx': db(web, 'bot page and computer status re-read every 15 s', 2),
   // Server: loops that re-query our database.
   'app/api/computer/events/route.ts': db(server, 'the "SSE" route re-queries subagent_events in a loop', 1),
   'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll re-checks device commands until the deadline', 1),
@@ -85,6 +78,7 @@ export const pollingAllowlist = {
   'apps/mobile/components/beui/components/loading-states/agent-progress.tsx': ui('progress animation', 1),
   'apps/mobile/components/beui/components/loading-states/reasoning-text.tsx': ui('reasoning text animation', 2),
   'apps/mobile/components/beui/components/tool-result/tool-result.tsx': ui('elapsed-time clock', 1),
+  'apps/mobile/components/ChatScreen.tsx': ui('the 1 s elapsed clock of a reply in progress; the chat and its proposals are pushed (lib/live.ts)', 1),
   'components/version-guard.tsx': ui('checks the public build metadata once a minute (decision 2026-11-03-1437); no database read', 1),
 }
 

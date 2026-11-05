@@ -1,0 +1,61 @@
+// Which live keys each screen listens to: the ones the web listens to for the same data
+// (hooks/use-live-lists.ts, components/devices/devices-settings.tsx, hooks/use-computer.ts,
+// components/workspace/issue-thread-panel.tsx). `home` is the person's own home channel
+// (GET /api/mobile/home `live.workspaceId`), `open` the workspace the app has open.
+import { UNRESOLVED_LIVE_ID, type LiveRef } from './live-client'
+import type { BotPage, ComputerStatus, ThreadDetail, Threads } from './types'
+
+type Spec = { refs: LiveRef[]; minIntervalMs?: number; deadline?: { at: string; afterMs: number } | null }
+const LIST_MERGE_MS = 2_000
+
+/** A list's key is its channel's own workspace id; with no channel known it reads once a minute and asks for no ticket. */
+export const listRef = (kind: LiveRef['kind'], scope: string | null | undefined): LiveRef => ({ kind, id: scope || UNRESOLVED_LIVE_ID, scope: scope || null })
+
+/** A read that refreshes only by the minute fallback, never by push. */
+export const minuteRef = (kind: LiveRef['kind']): LiveRef => ({ kind, id: UNRESOLVED_LIVE_ID, scope: null })
+
+/**
+ * 线程: the threads (thread_list) and the machines (device_list). A machine coming online
+ * writes (its heartbeat route pushes device_list); going offline writes nothing, so while one
+ * shows online the web's shared presence fallback stays: one read a minute (presenceFallback).
+ */
+export function threadsLive(data: Threads | null, home: string | null | undefined): Spec {
+  const presence = !data || data.devices.some(device => device.online)
+  return { minIntervalMs: LIST_MERGE_MS, refs: [listRef('thread_list', home), listRef('device_list', home), ...(presence ? [minuteRef('device_list')] : [])] }
+}
+
+/**
+ * A bot's page: its threads, their PRs and 资料库 follow its runs (thread_list); 置顶 / 通知 and what
+ * its chat changes, schedules included, follow its chat (bot_chat); a rename or removal, the roster (bot_list).
+ */
+export function botPageLive(_data: BotPage | null, botId: string | null | undefined, home: string | null | undefined, open: string | null | undefined): Spec {
+  return {
+    minIntervalMs: LIST_MERGE_MS,
+    refs: [
+      listRef('thread_list', home),
+      { kind: 'bot_chat', id: botId && home ? botId : UNRESOLVED_LIVE_ID, scope: home || null },
+      listRef('bot_list', open),
+    ],
+  }
+}
+
+/** 任务: the open workspace's tasks, and the person's own (personal) ones on their home channel (useLiveIssueList). */
+export function tasksLive(home: string | null | undefined, open: string | null | undefined): Spec {
+  const scopes = [...new Set([open || null, home || null])]
+  return { minIntervalMs: LIST_MERGE_MS, refs: scopes.map(scope => listRef('issue_list', scope)) }
+}
+
+/** One thread: each of its runs' text (`thread`) and state (`run`), on the channel the server resolved for that run. */
+export function threadLive(data: ThreadDetail | null, runId: string): Spec {
+  const runs = data?.live?.runs ?? [{ id: runId, workspaceId: null }]
+  return {
+    minIntervalMs: LIST_MERGE_MS,
+    refs: runs.flatMap(run => (['thread', 'run'] as const).map(kind => ({ kind, id: run.workspaceId ? run.id : UNRESOLVED_LIVE_ID, scope: run.workspaceId }))),
+  }
+}
+
+/** A bot's computer: its state key, and the moment the server says it changes with no write (a lease, a wake). */
+export function computerLive(data: ComputerStatus | null, botId: string | null | undefined): Spec {
+  const scope = data?.live?.workspaceId ?? null
+  return { minIntervalMs: 500, deadline: data?.live?.deadline, refs: [{ kind: 'computer_state', id: botId && scope ? botId : UNRESOLVED_LIVE_ID, scope }] }
+}
