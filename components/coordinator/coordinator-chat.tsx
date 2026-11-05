@@ -34,6 +34,7 @@ import { ChatComposer } from './chat-composer'
 import { BotModelPicker, botModelMenuKey, openModelPicker } from './bot-model-picker'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
+import { heldRevision } from '@/lib/live/revisions'
 import { useLiveKey, useLiveKeys, watchPageVisibility } from '@/hooks/use-live-key'
 import { listReadDeadline, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { useLiveCitations } from './use-live-citations'
@@ -181,8 +182,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // While the channel is down the live layer falls back to one read a minute. The stream still carries a turn.
   const liveOwner = data?.live?.ownerId
   const liveHome = liveOwner ? ownerListWorkspace(data, liveOwner) : null
+  // A push this chat already read (a duplicate, or the echo of this tab's own send) is skipped.
   useLiveKey('bot_chat', liveHome && data?.botId ? data.botId : UNRESOLVED_LIST_SCOPE, [unstable_serialize(chatKey)], liveHome,
-    { minIntervalMs: CHAT_MERGE_MS, deadline: liveOwner ? listReadDeadline(data, liveOwner) : undefined })
+    { minIntervalMs: CHAT_MERGE_MS, deadline: liveOwner ? listReadDeadline(data, liveOwner) : undefined, revisions: { [unstable_serialize(chatKey)]: heldRevision(data, 'bot_chat', data?.botId) } })
   // Cards and cited names have no chat write (lib/coordinator/chat-poll.ts). An artifact's own key marks them
   // stale and reads the chat once, in full; the read that catches up after the page was hidden is full too.
   const metadataKey = useMemo(() => ['coordinator-chat-metadata', botId ?? 'coordinator'] as const, [botId])

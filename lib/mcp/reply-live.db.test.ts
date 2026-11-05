@@ -55,7 +55,8 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
   const notification = mock.module('../live/notify', { namedExports: {
     ...original,
     sendLiveInvalidations: async (scope: { ownerId: string; workspaceId: string }, events: Parameters<typeof original.sendLiveInvalidations>[1]) => {
-      deliveries.push({ ...scope, events })
+      // Compare which keys went where; the revisions are checked by lib/live tests.
+      deliveries.push({ ...scope, events: events.map(({ kind, id }) => ({ kind, id })) })
       await original.sendLiveInvalidations(scope, events)
     },
   } })
@@ -90,7 +91,7 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
         if (message.data === 'pong') return
         const value = JSON.parse(String(message.data))
         if (value?.type === 'live_ready') {
-          assert.deepEqual(value, liveReady(), 'the deployed Worker explicitly supports the reply kind')
+          assert.deepEqual(value, liveReady(2), 'the deployed Worker explicitly supports the reply kind, and the revision keys this channel asked for')
           state.ready = true
         } else state.received.push(value)
       })

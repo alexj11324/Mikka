@@ -5,6 +5,8 @@ export type ListLiveRead = {
   /** The authenticated reader's owned personal transport, or slow fallback. */
   workspaceId: string | null
   deadline?: { at: string; afterMs: number }
+  /** Live keys' revisions, read before this list (lib/live/revisions.ts). */
+  revisions?: Record<string, number>
 }
 export type ObservedList = { live?: ListLiveRead; requestedAt?: number }
 
