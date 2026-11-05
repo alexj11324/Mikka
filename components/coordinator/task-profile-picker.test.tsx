@@ -11,7 +11,6 @@ import type { CoordinatorMessageContext } from './use-coordinator-submit'
 const Selection = createContext<{ pick?: (value: string) => void; disabled?: boolean }>({})
 const Wrap = ({ children }: { children?: ReactNode }) => <div>{children}</div>
 let Button: typeof import('../ui/button')['Button']
-let Separator: typeof import('../ui/separator')['Separator']
 mock.module(new URL('../ui/select.tsx', import.meta.url).href, { namedExports: {
   Select: ({ children, onValueChange, disabled }: { children: ReactNode; onValueChange?: (value: string) => void; disabled?: boolean }) =>
     <Selection.Provider value={{ pick: onValueChange, disabled }}>{children}</Selection.Provider>,
@@ -19,7 +18,7 @@ mock.module(new URL('../ui/select.tsx', import.meta.url).href, { namedExports: {
     const parent = useContext(Selection)
     return <Button type="button" data-option={value} disabled={disabled || parent.disabled} onClick={() => parent.pick?.(value)}>{children}</Button>
   },
-  SelectContent: Wrap, SelectGroup: Wrap, SelectLabel: Wrap, SelectSeparator: () => <Separator />, SelectTrigger: Wrap, SelectValue: () => null,
+  SelectContent: Wrap, SelectGroup: Wrap, SelectLabel: Wrap, SelectSeparator: () => null, SelectTrigger: Wrap, SelectValue: () => null,
 } })
 mock.module(new URL('../ui/dialog.tsx', import.meta.url).href, { namedExports: {
   Dialog: Wrap, DialogContent: Wrap, DialogTitle: Wrap, DialogDescription: Wrap,
@@ -72,7 +71,6 @@ before(async () => {
   }
   ;({ createRoot } = await import('react-dom/client'))
   ;({ Button } = await import('../ui/button'))
-  ;({ Separator } = await import('../ui/separator'))
   ;({ TaskProfilePicker, TaskProfileNotice } = await import('./task-profile-picker'))
   ;({ NewTaskDialog } = await import('./new-task-dialog'))
 })
