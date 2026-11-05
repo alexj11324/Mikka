@@ -1,5 +1,7 @@
 import 'server-only'
 import { z } from 'zod'
+import { workspaceLink } from '@/components/workspace/workspace-navigation'
+import { withBasePath } from '../base-path'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
 import { logCodedError } from '@mikka/protocol/coded-error'
 import { ProjectMapError } from './contracts'
@@ -131,7 +133,7 @@ function nodeDetail(facts: MapFacts, graph: MapGraph, target: string, _query: Ma
   return {
     schemaVersion: 1 as const, node, sections: [
       { kind: 'tasks', items: facts.issues.filter(issue => taskIds.has(issue.id)).map(issue =>
-        ({ id: issue.id, title: issue.title, status: issue.status, href: '/mikka/?issue=' + issue.id })) },
+        ({ id: issue.id, title: issue.title, status: issue.status, href: withBasePath(workspaceLink({ issue: issue.id })) })) },
       { kind: 'decisions', items: decisionItems },
       { kind: 'artifacts', items: facts.artifacts.filter(artifact => artifact.runId ? runIds.has(artifact.runId) : container && taskIds.has(artifact.issueId)).map(artifact =>
         ({ id: artifact.id, versionId: artifact.versionId, title: artifact.title, mediaType: artifact.kind === 'html' ? 'text/html' : 'text/markdown',
@@ -143,10 +145,10 @@ function nodeDetail(facts: MapFacts, graph: MapGraph, target: string, _query: Ma
       { kind: 'conversation_summary', items: decisions.map(value =>
         ({ text: value.summary, provenance: value.provenance, sourceRefs: value.sources.map(source => 'source:' + source.sourceRef) })) },
       { kind: 'threads', items: ownedRuns.map(run =>
-        ({ rootRunId: rootRun(run.id), harness: run.harness, status: run.status, href: '/mikka/?issue=' + run.issueId + '&thread=' + run.id })) },
+        ({ rootRunId: rootRun(run.id), harness: run.harness, status: run.status, href: withBasePath(workspaceLink({ issue: run.issueId, thread: run.id })) })) },
     ],
     references: {
-      runs: ownedRuns.map(run => ({ id: run.id, rootRunId: rootRun(run.id), href: '/mikka/?issue=' + run.issueId + '&thread=' + run.id })),
+      runs: ownedRuns.map(run => ({ id: run.id, rootRunId: rootRun(run.id), href: withBasePath(workspaceLink({ issue: run.issueId, thread: run.id })) })),
       pullRequests: facts.publications.filter(publication => runIds.has(publication.runId))
         .map(({ repositoryKey, number, url, commitSha }) => ({ repositoryKey, number, url, commitSha })),
       sources: [...sourceRefs, ...ownedRuns.map(run => 'run:' + run.id)],

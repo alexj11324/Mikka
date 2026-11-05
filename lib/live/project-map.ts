@@ -1,4 +1,3 @@
-import 'server-only'
 import type { PoolClient } from 'pg'
 import { afterDatabaseCommit } from '../db/commit-effects'
 import { liveGatewayConfig, type LiveScope } from './scope'

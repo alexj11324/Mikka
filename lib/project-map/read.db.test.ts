@@ -10,6 +10,9 @@ import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedTeam, s
 test('project map uses real PostgreSQL and normal HTTP PAT authorization', { skip: !dbUrl, timeout: 180_000 }, async t => {
   // Sample every SQL result on the real app/workspace pools only during the
   // bounded benchmark below. No parameters or row contents enter diagnostics.
+  const previousBasePath = process.env.MIKKA_BASE_PATH
+  process.env.MIKKA_BASE_PATH = '/mikka'
+  t.after(() => { if (previousBasePath === undefined) delete process.env.MIKKA_BASE_PATH; else process.env.MIKKA_BASE_PATH = previousBasePath })
   mock.method(Math, 'random', () => 0)
   const { overrideDeploymentSwitch } = await import('../deployment-switches')
   let measurement: { queries: number; selects: number; bytes: number } | null = null
@@ -129,6 +132,8 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
     assert.equal(detail.status, 200)
     const body = contracts.mapNodeResponseSchema.parse(await detail.json())
     assert.deepEqual(body.sections.map((section: { kind: string }) => section.kind), ['tasks', 'decisions', 'artifacts', 'checks', 'conversation_summary', 'threads'])
+    assert.equal(body.sections[0].items[0].href, '/mikka?issue=' + issueId)
+    assert.equal(body.references.runs.find(value => value.id === runId)?.href, '/mikka?issue=' + issueId + '&thread=' + runId)
     const artifact = body.sections[2].items[0]
     assert.equal(artifact.versionId, versionId)
     assert.equal(artifact.href, '/mikka/api/artifacts/' + artifactId + '/versions/1/download')

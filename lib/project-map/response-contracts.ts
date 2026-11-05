@@ -9,6 +9,8 @@ const edgeKind = z.enum(['continues', 'fork', 'merge', 'depends_on'])
 const sourceEvidence = z.enum(['host_verified', 'declared', 'inferred'])
 const provenance = z.enum(['recorded', 'inferred']), captureMode = z.enum(['live', 'human_marked', 'reconstructed'])
 const options = z.array(decisionOptionSchema).max(20)
+// Canonical app-root links have no trailing slash before their query.
+const appHref = z.string().regex(/^\/mikka(?:\/|\?|$)/)
 const live = z.object({ ownerId: z.string().min(1).max(200), workspaceId: z.uuid(),
   revisions: z.record(z.string().regex(/^project_map:[a-f0-9-]{36}$/), z.number().int().positive()).refine(value => Object.keys(value).length <= 1) }).strict()
 const snapshot = z.object({ id: z.string().max(8192), expiresAt: time, layoutVersion: z.literal(1) }).strict()
@@ -48,7 +50,7 @@ export const mapPageResponseSchema = z.object({
   page: page.extend({ matchedCount: order }).strict(),
 }).strict()
 
-const task = z.object({ id: z.uuid(), title: z.string(), status: z.string(), href: z.string().startsWith('/mikka/') }).strict()
+const task = z.object({ id: z.uuid(), title: z.string(), status: z.string(), href: appHref }).strict()
 export const mapDecisionDetailSchema = z.object({
   id: z.uuid(), kind: z.enum(['choose', 'redirect', 'abandon', 'merge', 'confirm']),
   title: z.string(), summary: z.string(), reason: z.string(), options, selectedOptionId: id.nullable(),
@@ -61,8 +63,8 @@ const artifact = z.object({ id: z.uuid(), versionId: z.uuid(), title: z.string()
 const check = z.object({ attemptId: z.uuid(), candidateId: z.uuid(), runId: z.uuid().nullable(),
   stage: z.enum(['review', 'verify']), status: z.string(), reason: z.string().nullable(), checkedAt: time.nullable(), sourceRefs: refs }).strict()
 const summary = z.object({ text: z.string(), provenance, sourceRefs: refs }).strict()
-const thread = z.object({ rootRunId: z.uuid(), harness: z.string().nullable(), status: z.string(), href: z.string().startsWith('/mikka/') }).strict()
-const run = z.object({ id: z.uuid(), rootRunId: z.uuid(), href: z.string().startsWith('/mikka/') }).strict()
+const thread = z.object({ rootRunId: z.uuid(), harness: z.string().nullable(), status: z.string(), href: appHref }).strict()
+const run = z.object({ id: z.uuid(), rootRunId: z.uuid(), href: appHref }).strict()
 const publication = z.object({ repositoryKey: z.string(), number: z.number().int().positive(),
   url: z.string().regex(/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[1-9][0-9]*\/?$/),
   commitSha: z.string().regex(/^[a-f0-9]{40}$/).nullable() }).strict()
