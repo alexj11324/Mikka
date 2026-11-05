@@ -55,7 +55,7 @@ export const pollingAllowlist = {
   'lib/coordinator/group-turns.ts': db(server, 'untilStopped fallback timer only: 15 s while the worker LISTENs for the stop push, 1 s if LISTEN is unavailable', 1),
   'workflows/coordinator/native-turn.ts': db(server, 'native coordinator turn re-reads its state every second (up to 180 times)', 1),
   'workflows/factory-stage/workflow.ts': db(server, 'stage maintenance step every 30 s for up to 12 h', 1),
-  'workflows/run-publication/workflow.ts': db(server, 'publish and fail results retried every 30 s until done', 2),
+  'workflows/run-publication/workflow.ts': db(server, 'untilDone: publish and fail results retried with exponential backoff, 30 s doubling to a 10 min cap, until done (GitHub outage or another worker\'s lease; nothing to push)', 1),
   'workflows/subagent/workflow.ts': db(server, 'subagent tick every 1–30 s until terminal', 1),
   'workflows/thread-machine/workflow.ts': db(server, 'thread machine maintenance every 30 s for up to 12 h', 1),
   // Daemon: loops that call our server, which reads the database.
