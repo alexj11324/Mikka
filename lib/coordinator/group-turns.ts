@@ -127,7 +127,9 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       return hostedBillingScope.run({ workspaceId: root.workspaceId, ownerId: root.userId }, work)
     }
     messageId = root.messageId
-    await client.query(`UPDATE group_turns SET status='running',"updatedAt"=now() WHERE "messageId"=$1`, [messageId])
+    // Stop may commit after the queue read; it must win over this claim.
+    const claimed = await client.query(`UPDATE group_turns SET status='running',"updatedAt"=now() WHERE "messageId"=$1 AND status='queued'`, [messageId])
+    if (!claimed.rowCount) return true
     const authorized = async () => {
       if (!await runtime.authorized(root.workspaceId, root.userId) || !await runtime.authorized(root.workspaceId, root.createdBy)) return false
       const member = await client.query(`SELECT 1 FROM conversation_members WHERE "conversationId"=$1 AND "memberType"='user' AND "memberId"=$2 AND "leftAt" IS NULL`, [conversationId, root.userId])
@@ -249,6 +251,8 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
           await client.query('BEGIN')
           try {
             await client.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE', [conversationId])
+            // Use the same final Stop fence as a public reply.
+            if ((await client.query(`SELECT status FROM group_turns WHERE "messageId"=$1 FOR UPDATE`, [messageId])).rows[0]?.status !== 'running') { await client.query('ROLLBACK'); return false }
             const current = await eligible()
             const sender = current.find(a => a.id === senderId), recipient = current.find(a => a.id === recipientId)
             if (!sender || !recipient || senderId === recipientId) { await client.query('ROLLBACK'); return false }
