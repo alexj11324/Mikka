@@ -8,6 +8,8 @@ export type HeldMessage = {
   onQuote: () => void
   /** A stored message can take a reaction: the person's current one, and how to set or clear it. */
   react?: { current: string | null; set: (emoji: string | null) => void }
+  /** 选择文本 in the chat itself (#1408 Phase 3): the message's words become selectable where they are. */
+  onSelect?: () => void
 }
 
 let held: HeldMessage | null = null

@@ -14,7 +14,8 @@ import { useLiveKey } from '@/hooks/use-live-key'
 import type { AcceptanceDetail } from '@/lib/factory/acceptance-view'
 import { approveSpecConfirmed, approveSpecError, approveSpecErrorCode, approveSpecErrorKey, flowKey, flowTone, pullRequestLink, readFlow, type ApproveSpecFailure, type FactoryFlow, type FlowStage, type NeedsYouKind } from '@/lib/factory/flow-client'
 import { RunErrorDetails } from './run-error-text'
-import { RequestError, request, type FactoryTask } from './factory-acceptance-pane'
+import { RequestError, request } from '@/lib/factory/browser-request'
+import type { FactoryTask } from './factory-acceptance-pane'
 import { navigate, openArtifact } from './workspace-navigation'
 
 /** The task snapshot, as the Factory detail route returns it: v2 marks itself in `route`, and each attempt names its run. */
@@ -28,19 +29,29 @@ export function useFactoryTaskDetail(taskId: string) {
   return useSWR<FactoryTaskDetail>(taskDetailKey(taskId), request, { refreshInterval: 0 })
 }
 
-export const isFlowV2 = (detail: FactoryTaskDetail | undefined) => detail?.task?.route?.flowVersion === 2
+export const isFlowV2 = (detail: AcceptanceDetail | undefined) => detail?.task?.route?.flowVersion === 2
+
+/** The card, producer header and acceptance pane share one SWR key and live invalidation. */
+export function useFactoryFlow(taskId: string, detail: AcceptanceDetail | undefined, enabled = true) {
+  const key = flowKey(taskId)
+  const result = useSWR(enabled ? key : null, request, { refreshInterval: 0 })
+  useLiveKey('factory_task', enabled ? taskId : null, enabled ? [key, taskDetailKey(taskId)] : [], detail?.liveWorkspaceId ?? null)
+  return { ...result, flow: enabled ? readFlow(result.data) : null }
+}
 
 const NEEDS_YOU_ICONS: Record<NeedsYouKind, LucideIcon> = {
   spec_review: ClipboardList, question: MessageCircleQuestion, pr_review: GitPullRequest, blocked: CircleAlert, failed: CircleX,
 }
 
 /** R-87: the state is an icon, a colour and a word; a stage still at work spins. */
-function FlowBadge({ flow }: { flow: FactoryFlow }) {
+export function FactoryFlowBadge({ flow }: { flow: FactoryFlow }) {
   const t = useTranslations('FactoryFlow')
-  const Icon = flow.needsYou ? NEEDS_YOU_ICONS[flow.needsYou.kind] : flow.stage === 'completed' ? GitMerge : flow.stage === 'cancelled' ? Ban : null
+  const acceptance = useTranslations('FactoryAcceptance')
+  const accepted = flow.stage === 'completed' && flow.completion === 'accepted'
+  const Icon = flow.needsYou ? NEEDS_YOU_ICONS[flow.needsYou.kind] : flow.stage === 'completed' ? accepted ? Check : GitMerge : flow.stage === 'cancelled' ? Ban : null
   return <Badge variant="outline" tone={flowTone(flow)}>
     {Icon ? <Icon aria-hidden="true" /> : <Spinner />}
-    {flow.needsYou ? t(`card.needsYou.${flow.needsYou.kind}`) : t(`stages.${flow.stage}`)}
+    {flow.needsYou ? t(`card.needsYou.${flow.needsYou.kind}`) : accepted ? acceptance('state.accepted') : t(`stages.${flow.stage}`)}
   </Badge>
 }
 
@@ -57,13 +68,14 @@ function CountBadges({ counts }: { counts: NonNullable<FactoryFlow['acceptance']
 /** The stages this task went through; skipped ones are not in the list (decision 2026-11-04-2200). Read-only reUI Stepper. */
 function StageList({ flow }: { flow: FactoryFlow }) {
   const t = useTranslations('FactoryFlow')
+  const acceptance = useTranslations('FactoryAcceptance')
   const active = flow.stages.indexOf(flow.stage) + 1
   const done = flow.stage === 'completed'
   return <Stepper value={active} role="list" aria-label={t('card.stageList')} indicators={{ completed: <Check aria-hidden="true" /> }}>
     <StepperNav className="flex-wrap gap-y-2">
       {flow.stages.map((stage: FlowStage, index) => <StepperItem key={stage} step={index + 1} completed={done} role="listitem" aria-current={index + 1 === active ? 'step' : undefined} className="gap-1.5 not-last:flex-none">
         <StepperIndicator className="size-4">{index + 1 === active && !done ? <span className="size-1.5 rounded-full bg-current" /> : null}</StepperIndicator>
-        <StepperTitle className="text-xs font-normal text-muted-foreground data-[state=active]:font-medium data-[state=active]:text-foreground">{t(`stages.${stage}`)}</StepperTitle>
+        <StepperTitle className="text-xs font-normal text-muted-foreground data-[state=active]:font-medium data-[state=active]:text-foreground">{stage === 'completed' && flow.completion === 'accepted' ? acceptance('state.accepted') : t(`stages.${stage}`)}</StepperTitle>
         {index < flow.stages.length - 1 && <StepperSeparator className="mx-1 w-6 group-data-[orientation=horizontal]/stepper-nav:flex-none" />}
       </StepperItem>)}
     </StepperNav>
@@ -83,13 +95,11 @@ type Approval = { busy: boolean; error: (ApproveSpecFailure & { revision: number
 export function FactoryFlowCard({ task, detail, onOpenThread }: { task: FactoryTask; detail: FactoryTaskDetail | undefined; onOpenThread: (runId: string) => void }) {
   const t = useTranslations('FactoryFlow')
   const key = flowKey(task.id)
-  const { data, error, mutate, isValidating } = useSWR(key, request, { refreshInterval: 0 })
-  useLiveKey('factory_task', task.id, [key, taskDetailKey(task.id)], detail?.liveWorkspaceId ?? null)
+  const { flow, error, mutate, isValidating } = useFactoryFlow(task.id, detail)
   const { mutate: revalidate } = useSWRConfig()
   const [approval, setApproval] = useState<Approval>({ busy: false, error: null })
   const click = useRef<{ revision: number; eventId: string } | null>(null)
   const busy = useRef(false)
-  const flow = readFlow(data)
 
   if (!flow) return error ? <div className="w-full max-w-[26.25rem]"><InlineLoadError message={t('card.loadError')} retryLabel={t('card.retry')} onRetry={() => { if (!isValidating) void mutate() }} /></div> : null
 
@@ -125,9 +135,9 @@ export function FactoryFlowCard({ task, detail, onOpenThread }: { task: FactoryT
 
   return <div className="w-full max-w-[40rem]">
     <Item variant="muted" data-stage={flow.stage} data-needs-you={kind}>
-      <ItemContent className="min-w-0 gap-2">
+      <ItemContent className="min-w-0 basis-64 gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
-          <FlowBadge flow={flow} />
+          <FactoryFlowBadge flow={flow} />
           {flow.acceptance && <CountBadges counts={flow.acceptance.counts} />}
         </div>
         <StageList flow={flow} />

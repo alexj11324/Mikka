@@ -5,6 +5,8 @@ import { readFile, readdir } from 'node:fs/promises';
 import { Pool } from 'pg';
 import { orderMigrations } from '../../scripts/migration-order.mjs';
 import { createFactoryStore } from './store';
+import { readFactoryTaskView } from './public-task';
+import { handleFactoryFlow } from './flow-http';
 import { factoryCriteria } from './task-detail';
 import { runDecisionWarnings, factoryDecisionWarnings, reviewDecisionExplanation } from '../project-decision-warnings';
 import { citedQuestionCommandSources } from './question-command-sources';
@@ -21,7 +23,7 @@ function guarded(url: string) {
   return u;
 }
 
-test('task detail GET exposes criteria and delivery without unused fields or writes', { skip: !base, timeout: 120_000 }, async () => {
+test('task detail GET exposes criteria and delivery without unused fields or writes', { skip: !base, timeout: 120_000 }, async t => {
   const admin = guarded(base!);
   const name = `fac_x_${randomUUID().replaceAll('-', '')}_e2e`;
   const adminPool = new Pool({ connectionString: admin.toString(), max: 1 });
@@ -77,6 +79,121 @@ test('task detail GET exposes criteria and delivery without unused fields or wri
     assert.equal(review.criteria[1].criterionId, null);
     assert.deepEqual(review.verify, { status: 'passed', command: 'pnpm test', exitCode: 0 });
     assert.deepEqual(detail.delivery, { candidateSha: sha, previewDatabaseBranch: 'preview/ac-7', machineName: 'Build server', repository: 'o/r', environment: 'device:x', pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' }, previewUrl: null, deploymentEnvironment: null }, 'no receipt: deploymentEnvironment null');
+
+    await t.test('public task readers keep the v1 contract on a one-connection pool', async () => {
+      const single = new Pool({ connectionString: target.toString(), max: 1 });
+      try {
+        assert.deepEqual(await readFactoryTaskView(single, createFactoryStore(single, async () => true), 'owner', taskId), detail);
+        assert.deepEqual(await store.listPublicForIssue('owner', issueId), await store.listForIssue('owner', issueId));
+      } finally { await single.end(); }
+    });
+
+    await t.test('v2 tool detail and issue context share canonical flow, bindings, real history and current-candidate merge evidence', async () => {
+      const [triagePlaceholder, specPlaceholder, handoffAttempt, mergeId, acceptanceId, nextReport] = Array.from({ length: 6 }, () => randomUUID());
+      await pool.query(`INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,reason) VALUES
+        ($1,$4,'clarify',1,4,'cancelled','unused'),($2,$4,'spec',1,5,'cancelled','unused'),($3,$4,'approval',1,6,'pending','handoff')`,
+        [triagePlaceholder, specPlaceholder, handoffAttempt, taskId]);
+      await pool.query(`UPDATE factory_tasks SET route='{"flowVersion":2}',stage='publish',status='passed',"attemptId"=$2,reason='token=private-fixture' WHERE id=$1`, [taskId, handoffAttempt]);
+      try {
+        const stable = await snapshot();
+        const view = await readFactoryTaskView(pool, store, 'owner', taskId);
+        assert.equal(view.contractVersion, 2);
+        if (view.contractVersion !== 2) assert.fail('expected the v2 public reader');
+        assert.equal(view.task.stage, 'handoff', 'raw publish/passed cannot claim completion');
+        assert.equal(view.task.needsYou?.kind, 'pr_review');
+        assert.deepEqual(view.task.stages, ['implement', 'review', 'handoff']);
+        assert.equal('status' in view.task, false); assert.equal('route' in view.task, false);
+        assert.deepEqual(view.binding, { taskId, issueId, attemptId: handoffAttempt, candidateId, revision: detail.task.revision });
+        assert.deepEqual(view.attempts.map(attempt => [attempt.id, attempt.stage, attempt.runId]), [[implAttempt, 'implement', implRun], [reviewAttempt, 'review', reviewRun]]);
+        assert.deepEqual(view.history, { limit: 20, total: 2, truncated: false });
+        assert.deepEqual(view.candidates.map(candidate => [candidate.id, candidate.runId, candidate.sha]), [[candidateId, implRun, sha]]);
+        assert.match(view.reason, /token=\[REDACTED\]/);
+        assert.doesNotMatch(JSON.stringify(view), /private-fixture|"verify"|"spec"|"triage"/);
+        const flow = await handleFactoryFlow(pool, store, (() => assert.fail('GET cannot approve')) as never, {
+          actor: { userId: 'owner', sessionId: 'normal-browser' }, authorization: null, method: 'GET', taskId, origin: null, url: `https://app.invalid/api/factory/tasks/${taskId}/flow`,
+        });
+        assert.equal(flow.status, 200); assert.deepEqual(flow.body, view.task, 'the browser and tools read the same projection');
+        const [listed] = (await store.listPublicForIssue('owner', issueId)).tasks;
+        assert.equal(listed.stage, view.task.stage); assert.equal('status' in listed, false); assert.equal('route' in listed, false);
+        assert.ok('binding' in listed); assert.deepEqual(listed.binding, view.binding);
+        assert.equal(listed.needsYou?.kind, view.task.needsYou?.kind);
+        assert.equal((await store.listForIssue('owner', issueId)).tasks[0].status, 'passed', 'legacy HTTP/internal list stays compatible');
+        assert.deepEqual(await snapshot(), stable, 'both public reads are read-only');
+        await assert.rejects(readFactoryTaskView(pool, store, 'other', taskId), { code: 'factoryNotFound' });
+        await assert.rejects(readFactoryTaskView(pool, createFactoryStore(pool, async () => true, randomUUID()), 'owner', taskId), { code: 'factoryNotFound' });
+        assert.deepEqual((await createFactoryStore(pool, async () => true, randomUUID()).listPublicForIssue('owner', issueId)).tasks, []);
+        await pool.query(`UPDATE coordinator_events SET kind='run_completed' WHERE id=$1`, [sourceEventId]);
+        try {
+          await assert.rejects(readFactoryTaskView(pool, store, 'owner', taskId), { code: 'factoryNotFound' });
+          assert.deepEqual((await store.listPublicForIssue('owner', issueId)).tasks, [], 'invalid source disappears from the public list too');
+        } finally { await pool.query(`UPDATE coordinator_events SET kind='user_message' WHERE id=$1`, [sourceEventId]); }
+
+        // A concurrent confirmed merge cannot split the read's task state from its binding.
+        const merged = () => pool.query(`INSERT INTO factory_merges (id,"taskId","candidateId","userId","eventId","pullRequestUrl",sha,status,source,"mergeCommitSha")
+          VALUES ($1,$2,$3,'owner',$4,'https://github.com/o/r/pull/7',$5,'merged','github',$6)`, [mergeId, taskId, candidateId, randomUUID(), sha, 'd'.repeat(40)]);
+        const concurrent = await readFactoryTaskView(pool, { read: store.read, readTask: async (tx, user, id) => {
+          const frozen = await store.readTask(tx, user, id); await merged(); return frozen;
+        } }, 'owner', taskId);
+        assert.equal(concurrent.task.stage, 'handoff', 'one repeatable snapshot excludes a merge committed after authorization');
+        assert.equal((await readFactoryTaskView(pool, store, 'owner', taskId)).task.stage, 'completed');
+        assert.equal((await store.listPublicForIssue('owner', issueId)).tasks[0].stage, 'completed');
+        await pool.query('DELETE FROM factory_merges WHERE id=$1', [mergeId]);
+        await pool.query(`UPDATE factory_attempts SET status='failed' WHERE id=$1`, [reviewAttempt]);
+        const failed = await readFactoryTaskView(pool, store, 'owner', taskId);
+        assert.equal(failed.attempts.find(attempt => attempt.id === reviewAttempt)?.status, 'failed', 'actual failed review history is retained');
+        await pool.query(`INSERT INTO factory_deliverable_acceptances (id,"taskId","candidateId","userId","sessionId","eventId")
+          VALUES ($1,$2,$3,'owner','fixture-session',$4)`, [acceptanceId, taskId, candidateId, randomUUID()]);
+        assert.equal((await readFactoryTaskView(pool, store, 'owner', taskId)).task.stage, 'handoff', 'a repository still requires an actual merge');
+        await pool.query(`UPDATE factory_candidates SET kind='report' WHERE id=$1`, [candidateId]);
+        const accepted = await readFactoryTaskView(pool, store, 'owner', taskId);
+        assert.equal(accepted.contractVersion, 2);
+        if (accepted.contractVersion !== 2) assert.fail('expected v2 report');
+        assert.equal(accepted.task.stage, 'completed'); assert.equal(accepted.task.completion, 'accepted');
+        assert.equal(accepted.task.needsYou, undefined);
+        assert.equal((await store.listPublicForIssue('owner', issueId)).tasks[0].stage, 'completed');
+        await pool.query(`UPDATE factory_deliverable_acceptances SET "userId"='other' WHERE id=$1`, [acceptanceId]);
+        assert.equal((await readFactoryTaskView(pool, store, 'owner', taskId)).task.stage, 'handoff', 'another owner cannot complete the report');
+        await pool.query(`UPDATE factory_deliverable_acceptances SET "userId"='owner' WHERE id=$1`, [acceptanceId]);
+        await pool.query(`INSERT INTO factory_candidates (id,"taskId",sha,kind,repository,environment,scope,"runId")
+          VALUES ($1,$2,$3,'report','o/r','device:x','report',$4)`, [nextReport, taskId, 'e'.repeat(40), implRun]);
+        await pool.query('UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1', [taskId, nextReport]);
+        assert.equal((await readFactoryTaskView(pool, store, 'owner', taskId)).task.stage, 'handoff', 'the older report acceptance never completes a new candidate');
+        assert.equal((await store.listPublicForIssue('owner', issueId)).tasks[0].stage, 'handoff');
+      } finally {
+        await pool.query('DELETE FROM factory_merges WHERE id=$1', [mergeId]);
+        await pool.query('DELETE FROM factory_deliverable_acceptances WHERE id=$1', [acceptanceId]);
+        await pool.query(`UPDATE factory_tasks SET route='{}',stage='verify',status='running',"attemptId"=$2,"candidateId"=$3,reason='fixture' WHERE id=$1`, [taskId, verifyAttempt, candidateId]);
+        await pool.query(`UPDATE factory_candidates SET kind='repository' WHERE id=$1`, [candidateId]);
+        await pool.query('DELETE FROM factory_candidates WHERE id=$1', [nextReport]);
+        await pool.query(`UPDATE factory_attempts SET status='passed' WHERE id=$1`, [reviewAttempt]);
+        await pool.query('DELETE FROM factory_attempts WHERE id=ANY($1::uuid[])', [[triagePlaceholder, specPlaceholder, handoffAttempt]]);
+      }
+    });
+
+    await t.test('v2 clarification preserves its latest missing context without inventing an execution history', async () => {
+      const clarificationIssue = randomUUID(), requestId = randomUUID(), answerId = randomUUID();
+      await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Clarify fixture','{}','todo','normal')`, [clarificationIssue]);
+      await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"clarify"}')`, [requestId, requestId]);
+      const routed = await store.route('owner', { issueId: clarificationIssue, sourceEventId: requestId, eventId: randomUUID(), rationale: 'Needs context', missingInformation: ['Which file?'], missingPermissions: ['Permission token=fixture'], needsSpec: true });
+      const read = () => readFactoryTaskView(pool, store, 'owner', routed.task.id);
+      try {
+        const first = await read(); assert.equal(first.contractVersion, 2);
+        if (first.contractVersion !== 2) assert.fail('expected v2 clarification');
+        assert.equal(first.task.stage, 'triage'); assert.equal(first.task.needsYou?.kind, 'question');
+        assert.deepEqual(first.attempts, []);
+        assert.deepEqual(first.clarification, { missingInformation: ['Which file?'], missingPermissions: ['Permission token=[REDACTED]'], needsSpec: true });
+        await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"README; more context follows"}')`, [answerId, answerId]);
+        await store.apply('owner', first.binding, randomUUID(), { action: 'resolve', sourceEventId: answerId, rationale: 'File identified', missingInformation: ['Which heading?'], missingPermissions: [], needsSpec: true });
+        const next = await read(); assert.equal(next.contractVersion, 2);
+        if (next.contractVersion !== 2) assert.fail('expected v2 clarification');
+        assert.deepEqual(next.clarification, { missingInformation: ['Which heading?'], missingPermissions: [], needsSpec: true }, 'latest unresolved response supersedes the original route');
+        assert.equal(next.binding.revision, first.binding.revision + 1); assert.equal('route' in next.task, false);
+      } finally {
+        await pool.query('DELETE FROM factory_tasks WHERE id=$1', [routed.task.id]);
+        await pool.query('DELETE FROM coordinator_events WHERE id=ANY($1::uuid[])', [[requestId, answerId]]);
+        await pool.query('DELETE FROM issues WHERE id=$1', [clarificationIssue]);
+      }
+    });
 
     assert.deepEqual(detail.decisionWarnings, [], 'ordinary completed work has no decision warning');
     const successor = randomUUID(), decisionId = randomUUID(), changedCandidate = randomUUID(), rejectionEvent = randomUUID();

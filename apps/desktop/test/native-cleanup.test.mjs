@@ -36,13 +36,25 @@ async function daemon(t) {
   return { profile, child }
 }
 
+async function observeChildExit(child, stop) {
+  // Linux can prove an exited/zombie PID before Node delivers its ChildProcess
+  // exit event. Subscribe first, preserve assertions at the stop boundary, then
+  // await that same child's bounded event before inspecting the exit code.
+  const exited = once(child, 'exit', { signal: AbortSignal.timeout(25_000) })
+  const [, [code, signal]] = await Promise.all([stop(), exited])
+  assert.equal(code, 0)
+  assert.equal(signal, null)
+  assert.equal(child.exitCode, 0)
+}
+
 test('drain authenticates exact profiles and waits past socket closure to process exit', async t => {
   const owned = await daemon(t)
   const foreign = await daemon(t)
   const started = performance.now()
-  assert.deepEqual(await stopLocalDaemons([owned.profile, owned.profile]), { profilesStopped: true })
-  assert.ok(performance.now() - started >= 200, 'socket close alone is not completion')
-  assert.equal(owned.child.exitCode, 0)
+  await observeChildExit(owned.child, async () => {
+    assert.deepEqual(await stopLocalDaemons([owned.profile, owned.profile]), { profilesStopped: true })
+    assert.ok(performance.now() - started >= 200, 'socket close alone is not completion')
+  })
   assert.equal(foreign.child.exitCode, null, 'a different profile remains running')
   assert.deepEqual(await stopLocalDaemons([foreign.profile]), { profilesStopped: true })
 })
@@ -85,9 +97,10 @@ test('an already closed socket still waits for the recorded daemon process to fi
   child.send('begin-stop')
   assert.equal((await closed)[0], 'socket-closed')
   const started = performance.now()
-  assert.deepEqual(await stopLocalDaemons([profile]), { profilesStopped: true })
-  assert.ok(performance.now() - started >= 200)
-  assert.equal(child.exitCode, 0)
+  await observeChildExit(child, async () => {
+    assert.deepEqual(await stopLocalDaemons([profile]), { profilesStopped: true })
+    assert.ok(performance.now() - started >= 200)
+  })
 })
 
 test('a refused socket without its daemon PID cannot authorize database cleanup', async t => {

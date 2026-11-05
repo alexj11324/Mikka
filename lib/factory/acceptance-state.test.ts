@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { acceptanceState, acceptanceStateKey, mergeAcceptance } from './acceptance-state'
+import { acceptanceState, acceptanceStateKey, flowMergeAcceptance, mergeAcceptance } from './acceptance-state'
 
 const now = Date.parse('2026-10-29T12:00:00Z')
 const approval = (patch: Record<string, unknown> = {}) => ({ id: 'a1', candidateId: 'c1', expiresAt: '2026-10-29T13:00:00Z', revokedAt: null, createdAt: '2026-10-29T10:00:00Z', ...patch })
@@ -91,4 +91,16 @@ test('a code candidate is accepted by merging its PR (#528)', () => {
   assert.deepEqual(merged({ merges: [merge({ candidateId: 'c0' })] }), { state: 'pending' }, 'a merge of an older candidate does not count')
   assert.deepEqual(merged({ stage: 'execute' }), { state: 'unavailable' })
   assert.equal(acceptanceStateKey('merged', false), 'state.merged')
+})
+
+test('v2 merge controls use only canonical handoff/completion while preserving current-candidate refusals', () => {
+  const flow = { stage: 'handoff' as const, needsYou: { kind: 'pr_review' as const, since: '2026-11-05T00:00:00Z' } }
+  const merge = { candidateId: 'current', status: 'merged' as const, code: null, pullRequestUrl: 'https://github.com/o/r/pull/7', createdAt: '2026-11-05T00:00:00Z' }
+  assert.deepEqual(flowMergeAcceptance({ flow, candidateId: 'current', merges: [] }), { state: 'pending' })
+  assert.deepEqual(flowMergeAcceptance({ flow, candidateId: 'current', merges: [merge] }), { state: 'merging' }, 'a receipt cannot overrule the public flow')
+  assert.deepEqual(flowMergeAcceptance({ flow: { stage: 'completed' }, candidateId: 'current', merges: [] }), { state: 'merged' })
+  assert.deepEqual(flowMergeAcceptance({ flow, candidateId: 'current', merges: [{ ...merge, status: 'failed', code: 'githubMergeBlocked' }] }), { state: 'pending', refusal: 'githubMergeBlocked' })
+  assert.deepEqual(flowMergeAcceptance({ flow, candidateId: 'current', merges: [{ ...merge, candidateId: 'old', status: 'failed', code: 'githubMergeBlocked' }] }), { state: 'pending' })
+  for (const pending of [null, { stage: 'review' as const }, { stage: 'handoff' as const, needsYou: { kind: 'question' as const, since: flow.needsYou.since } }])
+    assert.deepEqual(flowMergeAcceptance({ flow: pending, candidateId: 'current', merges: [merge] }), { state: 'unavailable' })
 })

@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto'
 import { gunzipSync } from 'node:zlib'
 import { headers } from 'next/headers'
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import type { SelectResult } from 'drizzle-orm/query-builders/select.types'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
@@ -215,6 +216,9 @@ const threadColumns = {
   botColor: sql<string | null>`(select b.color from bots b where b.id = ${runBotId})`, botShape: sql<string | null>`(select b.shape from bots b where b.id = ${runBotId})`,
 }
 
+// Read-only location and changes need authority, not conversation content.
+const threadIdentityColumns = { id: agentRuns.id, userId: agentRuns.userId }
+
 const { prompt: _prompt, sessionId: _sessionId, deviceRepoId: _deviceRepoId, report: _report, error: _error, ...threadListColumns } = threadColumns
 
 /** The issue's threads, as much of each as this viewer may see (R-62). */
@@ -253,18 +257,26 @@ async function readIssueThreads(issueId: string) {
  * workspace of the bot that dispatched it, or its owner alone when no bot did
  * (taskFreeThreadMembers); either way only its owner reads it.
  */
-async function readableThread(issueId: string | null, runId: string) {
+type ThreadColumns = typeof threadColumns | typeof threadIdentityColumns
+type ReadableThreadResult<T extends ThreadColumns> = {
+  row: SelectResult<T, 'partial', { agent_runs: 'not-null'; agents: 'not-null'; user: 'nullable' }>
+  user: { id: string }
+}
+
+function readableThread(issueId: string | null, runId: string, columns: typeof threadColumns): Promise<ReadableThreadResult<typeof threadColumns>>
+function readableThread(issueId: string | null, runId: string, columns: typeof threadIdentityColumns): Promise<ReadableThreadResult<typeof threadIdentityColumns>>
+async function readableThread(issueId: string | null, runId: string, columns: ThreadColumns): Promise<ReadableThreadResult<typeof threadColumns> | ReadableThreadResult<typeof threadIdentityColumns>> {
   if (issueId !== null) {
     const access = await issueThreadAccess(issueId)
     if (!z.uuid().safeParse(runId).success) throw new ActionFailureError('runNotFound')
-    const [row] = await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
+    const [row] = await db.select(columns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.issueId, access.issue.id))).limit(1)
     if (!row || !canReadThread(row.userId, access.user.id, access.memberIds)) throw new ActionFailureError('runNotFound')
     return { row, user: access.user }
   }
   const user = { id: await getUserId() }
   if (!z.uuid().safeParse(runId).success) throw new ActionFailureError('runNotFound')
-  const [row] = await db.select({ ...threadColumns, botWorkspaceId: sql<string | null>`(select b."workspaceId" from bots b where b.id = ${runBotId})`, hasBot: sql<boolean>`${runBotId} is not null` })
+  const [row] = await db.select({ ...columns, botWorkspaceId: sql<string | null>`(select b."workspaceId" from bots b where b.id = ${runBotId})`, hasBot: sql<boolean>`${runBotId} is not null` })
     .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
     .where(and(eq(agentRuns.id, runId), isNull(agentRuns.issueId))).limit(1)
   if (!row) throw new ActionFailureError('runNotFound')
@@ -282,11 +294,15 @@ async function readableThread(issueId: string | null, runId: string) {
  * that thread, exactly as getIssueThread decides.
  */
 export async function findThreadIssue(runId: string): Promise<{ issueId: string | null } | null> {
+  return withDatabaseOperation('/actions/threads/find-issue', () => readThreadIssue(runId))
+}
+
+async function readThreadIssue(runId: string): Promise<{ issueId: string | null } | null> {
   if (!z.uuid().safeParse(runId).success) return null
   const [run] = await db.select({ issueId: agentRuns.issueId }).from(agentRuns).where(eq(agentRuns.id, runId)).limit(1)
   if (!run) return null
   try {
-    await readableThread(run.issueId, runId)
+    await readableThread(run.issueId, runId, threadIdentityColumns)
     return { issueId: run.issueId }
   } catch { return null }
 }
@@ -363,7 +379,7 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   // Before any of the thread: this run's keys' revisions (other attempts carry none, so they always read).
   const { readRevisions } = await import('@/lib/live/revision-read')
   const revisions = await readRevisions([{ kind: 'thread', id: runId }, { kind: 'run', id: runId }])
-  const { row, user } = await readableThread(issueId, runId)
+  const { row, user } = await readableThread(issueId, runId, threadColumns)
   // The run that resumes this one after an answered question, or runs it again after it ended (R-81), is the same thread: its chain (BE-18).
   const [projected] = projectIssueThreads([row], row.issueId, user.id, new Set([user.id]))
   const chain = projected ? await readRunChain(pool, row.userId, row.id) : null
@@ -441,7 +457,11 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
  * (app/v1/runs/[runId]/checkpoint). Read-only; whoever may read the thread sees it.
  */
 export async function getThreadChanges(issueId: string | null, runId: string): Promise<ThreadChangesResult> {
-  const { row } = await readableThread(issueId, runId)
+  return withDatabaseOperation('/actions/threads/changes', () => readThreadChanges(issueId, runId))
+}
+
+async function readThreadChanges(issueId: string | null, runId: string): Promise<ThreadChangesResult> {
+  const { row } = await readableThread(issueId, runId, threadIdentityColumns)
   const chain = await readRunChain(pool, row.userId, row.id)
   const runIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
   const { rows: [checkpoint] } = await pool.query<{ patch: Buffer; unavailableReason: string | null }>(
@@ -470,7 +490,7 @@ function safeHttpUrl(value: string) {
 export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<{ runId: string; continued: boolean }> {
   const text = z.string().trim().min(1).max(10_000).safeParse(input.text)
   if (!text.success) throw new ActionFailureError('messageRequired')
-  const { row, user } = await readableThread(input.issueId, input.runId)
+  const { row, user } = await readableThread(input.issueId, input.runId, threadColumns)
   const requestHeaders=await headers()
   if(!desktopHumanSessionId()&&(requestHeaders.has('authorization')||!requestHeaders.get('cookie')))throw new ActionFailureError('authRequired')
   const session=await auth.api.getSession({headers:requestHeaders,query:{disableCookieCache:true}})

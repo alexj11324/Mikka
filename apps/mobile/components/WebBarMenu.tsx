@@ -7,7 +7,8 @@ import { CloseButton, Group } from '@/components/ui'
 import { colors, lift } from '@/lib/theme'
 
 /** The Web fallback exposes every native toolbar menu item, including its selection state. */
-export function WebBarMenu({ item }: { item: BarMenu }) {
+/** `plain` draws `item.web` as it is (a chat title), without the round button around it. */
+export function WebBarMenu({ item, plain = false }: { item: BarMenu; plain?: boolean }) {
   const [open, setOpen] = useState(false)
   const id = useId()
   const triggerId = `bar-menu-trigger-${id}`
@@ -32,7 +33,7 @@ export function WebBarMenu({ item }: { item: BarMenu }) {
   return <>
     <Pressable nativeID={triggerId} accessibilityRole="button" accessibilityLabel={item.label}
       accessibilityState={{ expanded: open }} aria-expanded={open} onPress={show}
-      style={({ pressed }) => [styles.trigger, pressed && { backgroundColor: colors.pressed }]}>
+      style={({ pressed }) => plain ? [styles.plain, pressed && { opacity: 0.6 }] : [styles.trigger, pressed && { backgroundColor: colors.pressed }]}>
       {item.web}
     </Pressable>
     <Modal visible={open} transparent animationType="none" onRequestClose={close} onShow={focusMenu} accessibilityLabel={item.label}>
@@ -62,6 +63,7 @@ export function WebBarMenu({ item }: { item: BarMenu }) {
 
 const styles = StyleSheet.create({
   trigger: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, ...lift },
+  plain: { minHeight: 44, justifyContent: 'center' },
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
   backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.scrim },
   panel: { width: '100%', maxWidth: 360, maxHeight: '80%', borderRadius: 20, backgroundColor: colors.grouped, paddingHorizontal: 16, paddingTop: 12, ...lift },

@@ -108,10 +108,13 @@ idle-budget test is not represented as the one-hour runtime measurement.
 - Prefer the current agent VM. Builds and unit checks run there. Use Docker
   Agentic Platform when the required native runtime cannot be exercised there;
   stop disposable machines after use.
-- The updated issue explicitly prohibits Vercel deployments. Run `next build`
-  and `next start` against an independent `mikka_e2e` PostgreSQL in Docker or
-  GitHub Actions. Publish only that test server's port for the unsigned test
-  package. Never use `next dev` for acceptance or change Vercel settings.
+- Runtime acceptance uses `next build` and `next start` against independent
+  PostgreSQL in Docker or GitHub Actions. Publish the isolated server's port
+  for the unsigned test package; do not use `next dev` for acceptance.
+  [Alex's later authorization](https://github.com/alexj11324/Mikka/issues/1415#issuecomment-6667238449)
+  supersedes the original prohibition on merge, deployment and production
+  configuration changes. Complete verification and retain a concrete rollback
+  before making the necessary production cutover.
 - The first baseline build exceeded the current VM's 8 GiB cgroup limit
   (`memory.events`: `oom_kill=1`). Full builds and regression can use a Large
   Docker sandbox; the ordinary Medium sandbox is stopped during this work.

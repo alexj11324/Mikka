@@ -17,6 +17,8 @@ import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
 import { assertNativeViewport, assertViewportPng, setNativeViewport } from './native-viewport.mjs'
 import { authDiagnosticRoute, nativeDiagnosticFailure, readNativeAuthDiagnostics, startNativeAuthDiagnostics, stopNativeAuthDiagnostics } from './native-auth-diagnostics.mjs'
+import { observeReads, pageReadRequirements, pageReady, readActionIds } from './parity-page-ready.mjs'
+import { settingsReadRequirements, settingsReady } from './parity-settings-ready.mjs'
 
 // A real production backend and one leased dataset serve both modes. These
 // screenshots exercise application routes, components and RPCs; there are no
@@ -29,9 +31,11 @@ const output = resolve(process.env.MIKKA_DESKTOP_EVIDENCE ?? '.cache/desktop-evi
 const started = Date.now()
 const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
 const messages = JSON.parse(await readFile(join(root, 'messages/en.json'), 'utf8'))
+const initialWorkspaceMenuNames = [messages.Nav.workspaceMenu, JSON.parse(await readFile(join(root, 'messages/zh-CN.json'), 'utf8')).Nav.workspaceMenu]
+const actionIds = await readActionIds(resolve(process.env.MIKKA_TEST_APP_DIR ?? process.cwd()))
 const report = {
   version: 1, mode, appRevision: environment.deploymentSha, harnessRevision: revision,
-  harnessSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).update(await readFile(new URL('./parity-fixtures.mjs', import.meta.url))).update(await readFile(new URL('./parity-images.mjs', import.meta.url))).update(await readFile(new URL('./native-viewport.mjs', import.meta.url))).update(await readFile(new URL('./native-auth-diagnostics.mjs', import.meta.url))).update(await readFile(new URL('./parity-reader-defaults.mjs', import.meta.url))).digest('hex'),
+  harnessSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).update(await readFile(new URL('./parity-fixtures.mjs', import.meta.url))).update(await readFile(new URL('./parity-images.mjs', import.meta.url))).update(await readFile(new URL('./native-viewport.mjs', import.meta.url))).update(await readFile(new URL('./native-auth-diagnostics.mjs', import.meta.url))).update(await readFile(new URL('./parity-reader-defaults.mjs', import.meta.url))).update(await readFile(new URL('./parity-page-ready.mjs', import.meta.url))).update(await readFile(new URL('./parity-settings-ready.mjs', import.meta.url))).digest('hex'),
   environmentId: environment.id, database: environment.database.name, origin: environment.origin,
   viewport: { width: 1440, height: 900 }, colorThreshold: 0, maximumChangedRatio: 0.001,
   timeZone: 'UTC',
@@ -69,6 +73,20 @@ async function launch(mode) {
   })
   applications.add(application)
   const page = await application.firstWindow({ timeout: 90_000 })
+  stage = `renderer-ready-${mode}`
+  page.setDefaultTimeout(45_000)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  page.on('pageerror', error => errors.push({ mode, name: error.name }))
+  await page.waitForLoadState('domcontentloaded')
+  // Initial hosted navigation may still be redirecting to sign-in after the
+  // first DOMContentLoaded. Wait for the real anonymous or signed-in surface
+  // before reading its viewport; keep all dimension assertions unchanged.
+  let initialSurface = page.locator('input[type="email"]')
+  for (const name of initialWorkspaceMenuNames) initialSurface = initialSurface.or(page.getByRole('button', { name, exact: true }))
+  await initialSurface.first().waitFor()
+  const base = mode === 'bundled' ? 'mikka://app/mikka' : `${environment.origin}${environment.basePath}`
+  if (mode === 'bundled') await page.waitForFunction(() => Boolean(window.mikka?.bundled))
+  else assert.equal(new URL(page.url()).origin, environment.origin, 'Hosted comparison must use the attested backend')
   stage = `viewport-${mode}`
   const nativeViewport = await setNativeViewport(application, page, report.viewport)
   // Keep the public CDP session attached until this app closes. The same UTC
@@ -79,14 +97,6 @@ async function launch(mode) {
   const actualTimeZone = await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
   assert.equal(actualTimeZone, report.timeZone)
   report.nativeViewports.push({ mode, ...nativeViewport, timeZone: { method: 'cdp_timezone_override', actual: actualTimeZone } })
-  stage = `renderer-ready-${mode}`
-  page.setDefaultTimeout(45_000)
-  await page.emulateMedia({ reducedMotion: 'reduce' })
-  page.on('pageerror', error => errors.push({ mode, name: error.name }))
-  await page.waitForLoadState('domcontentloaded')
-  const base = mode === 'bundled' ? 'mikka://app/mikka' : `${environment.origin}${environment.basePath}`
-  if (mode === 'bundled') await page.waitForFunction(() => Boolean(window.mikka?.bundled))
-  else assert.equal(new URL(page.url()).origin, environment.origin, 'Hosted comparison must use the attested backend')
   await assertNativeViewport(page, report.viewport)
   return { mode, application, page, base }
 }
@@ -100,8 +110,12 @@ async function closeTarget(target) {
 
 async function go(target, suffix = '/') {
   await scope?.assertActive()
-  await target.page.goto(`${target.base}/en${suffix === '/' ? '' : suffix}`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-  await target.page.getByRole('button', { name: messages.Nav.workspaceMenu, exact: true }).first().waitFor()
+  const href = `${target.base}/en${suffix === '/' ? '' : suffix}`
+  await target.page.goto(href, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  // The artifact opens a real modal, which correctly hides the background
+  // workspace control from the accessibility tree. Wait for that surface.
+  if (new URL(href).searchParams.has('artifact')) await target.page.getByRole('dialog').waitFor()
+  else await target.page.getByRole('button', { name: messages.Nav.workspaceMenu, exact: true }).first().waitFor()
 }
 
 async function theme(target, value) {
@@ -276,22 +290,44 @@ function screens(fixture) {
     name: `${bot ? 'bot' : 'coordinator'}-${tab}`,
     open: async target => {
       await go(target, bot ? `/?bot=${fixture.bot}` : '/')
-      // SSR exposes the default tab before the saved view state is restored.
-      // Base UI links the active panel only after its client registration.
-      await target.page.getByRole('tablist', { name: messages.Shell.panel.tabs, exact: true }).locator('[role="tab"][aria-selected="true"][aria-controls]').waitFor()
-      await target.page.getByRole('tab', { name: messages.Shell.panel[tab], exact: true }).click()
-      await target.page.getByRole('tab', { name: messages.Shell.panel[tab], exact: true, selected: true }).waitFor()
-      await target.page.getByRole('tabpanel', { name: messages.Shell.panel[tab], exact: true }).waitFor()
+      // Before the real roster arrives, a bot URL briefly renders the
+      // Coordinator's panel. Wait for the requested conversation before
+      // acting; a registered tab alone can still belong to that placeholder.
+      await target.page.getByRole('list', { name: messages.Nav.bots, exact: true }).getByRole('button', { name: fixture.botName, exact: true }).waitFor()
+      const overview = target.page.getByRole('complementary', { name: messages.Shell.panel.label, exact: true })
+      await overview.getByRole('heading', { name: bot ? fixture.botName : messages.Nav.coordinator, exact: true }).waitFor()
+      await overview.getByRole('tablist', { name: messages.Shell.panel.tabs, exact: true }).locator('[role="tab"][aria-selected="true"][aria-controls]').waitFor()
+      await overview.getByRole('tab', { name: messages.Shell.panel[tab], exact: true }).click()
+      await overview.getByRole('tab', { name: messages.Shell.panel[tab], exact: true, selected: true }).waitFor()
+      await overview.getByRole('tabpanel', { name: messages.Shell.panel[tab], exact: true }).waitFor()
     },
-    check: async target => assert.equal(await target.page.getByRole('tab', { name: messages.Shell.panel[tab], exact: true }).getAttribute('aria-selected'), 'true', 'Captured panel must still be the requested tab'),
+    check: async target => {
+      const overview = target.page.getByRole('complementary', { name: messages.Shell.panel.label, exact: true })
+      const heading = overview.getByRole('heading', { name: bot ? fixture.botName : messages.Nav.coordinator, exact: true })
+      assert.equal(await heading.count(), 1, 'Captured panel must belong to the requested conversation')
+      assert.equal(await heading.isVisible(), true, 'Captured conversation heading must be visible')
+      assert.equal(await overview.getByRole('tab', { name: messages.Shell.panel[tab], exact: true }).getAttribute('aria-selected'), 'true', 'Captured panel must still be the requested tab')
+    },
   })
   const taskView = view => ({
     name: view,
     open: async target => {
       await go(target, '/?section=all-issues')
+      const layout = target.page.getByRole('group', { name: messages.Shell.board.viewLabel, exact: true })
+      // The initial HTML selects Board while the browser preference is still
+      // restoring. Wait for registration and that existing preference's commit
+      // before selecting a view once; never replace the saved preference here.
+      await layout.locator('button[tabindex="0"]').waitFor()
+      const saved = await target.page.evaluate(() => {
+        try { return JSON.parse(localStorage.getItem('mikka:board-v2') ?? 'null')?.view ?? null }
+        catch { return null }
+      })
+      assert.ok(saved === null || saved === 'board' || saved === 'list', 'Board fixture preference must be a known layout')
+      const initial = messages.Shell.board[saved === 'list' ? 'viewList' : 'viewBoard']
+      await layout.getByRole('button', { name: initial, exact: true, pressed: true }).waitFor()
       const label = messages.Shell.board[view === 'board' ? 'viewBoard' : 'viewList']
-      await target.page.getByRole('button', { name: label, exact: true }).click()
-      await target.page.getByRole('button', { name: label, exact: true, pressed: true }).waitFor()
+      await layout.getByRole('button', { name: label, exact: true }).click()
+      await layout.getByRole('button', { name: label, exact: true, pressed: true }).waitFor()
       await target.page.getByText(fixture.issueTitle, { exact: true }).first().waitFor()
     },
     check: async target => assert.equal(await target.page.getByRole('button', { name: messages.Shell.board[view === 'board' ? 'viewBoard' : 'viewList'], exact: true }).getAttribute('aria-pressed'), 'true', 'Captured task layout must still be the requested view'),
@@ -315,7 +351,12 @@ function screens(fixture) {
     taskView('board'),
     taskView('list'),
     route('projects', '/?section=projects'),
-    route('team-home', `/?team=${fixture.team}`),
+    route('team-home', `/?team=${fixture.team}`, async page => {
+      await page.getByRole('heading', { name: fixture.teamName, exact: true, level: 1 }).waitFor()
+      // The two leased members and their avatars arrive after the team shell.
+      // Include their actual DOM in the existing semantic mask measurement.
+      await page.getByRole('tab', { name: `${messages.Invite.roles.member} · 2`, exact: true }).waitFor()
+    }),
     route('team-tasks', `/?section=team-issues&team=${fixture.team}`, text(fixture.issueTitle)),
     route('team-projects', `/?section=team-projects&team=${fixture.team}`),
     route('plugins', '/?section=plugins'),
@@ -344,12 +385,23 @@ function screens(fixture) {
     })),
   ]
   assert.equal(new Set(matrix.map(screen => screen.name)).size, matrix.length, 'Every parity screen needs a unique evidence name')
-  return matrix
+  return matrix.map(screen => ({ ...screen, open: async target => {
+    const section = screen.name.startsWith('settings-') ? screen.name.slice('settings-'.length) : null
+    const requirements = section ? settingsReadRequirements(section, fixture) : pageReadRequirements(screen.name, fixture)
+    const readsFinished = observeReads(target.page, requirements, actionIds, environment.basePath)
+    await screen.open(target)
+    await readsFinished()
+    if (section) await settingsReady(target.page, section, fixture, messages)
+    else await pageReady(target.page, screen.name, fixture, messages)
+  } }))
 }
 
 function publicScreens(fixture) {
   return [
-    { name: 'shared-markdown', token: fixture.markdownToken, ready: page => page.getByRole('heading', { name: fixture.artifactTitle, exact: true }).first().waitFor() },
+    { name: 'shared-markdown', token: fixture.markdownToken, ready: async page => {
+      await page.getByRole('heading', { name: fixture.artifactTitle, exact: true }).first().waitFor()
+      await page.getByText('The workspace shares its components with the web application.', { exact: true }).waitFor()
+    } },
     { name: 'shared-html', token: fixture.htmlToken, ready: page => page.frameLocator('iframe').getByRole('heading', { name: 'Desktop review', exact: true }).waitFor() },
     { name: 'shared-missing', token: 'mks_missing-desktop-review', ready: page => page.getByText(messages.Artifact.sharedNotFoundHint, { exact: true }).waitFor() },
   ].map(({ name, token, ready }) => ({ name, open: async target => {
@@ -366,6 +418,7 @@ try {
   scope = await acquireTestAccounts({ runId: `parity-${started}`, workerId: 'desktop-parity', requestId: `parity-${started}`, ttlMs: 300_000 })
   stage = 'create-fixtures'
   fixtures = await createParityFixtures(scope)
+  report.fixtureEpoch = fixtures.fixture.epoch
   stage = 'capture-native-baseline'
   if (mode === 'desktop') nativeResources = await captureNativeResources(scope)
   if (mode === 'web-capture') {

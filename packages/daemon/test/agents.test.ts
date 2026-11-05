@@ -2,7 +2,7 @@
 // context's handoff file, and the daemon's commit and push of a verified run.
 import { spawn } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
-import { existsSync, symlinkSync, truncateSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, symlinkSync, truncateSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 
@@ -325,11 +325,121 @@ describe("mikka MCP server", () => {
 })
 
 describe("run context", () => {
-  it('keeps artifact-reader advertising unchanged for writable executions, planning and command checks', async () => {
+  it.each(['clean', 'process'] as const)('gives a Codex plan fixed repository observations without executing a %s filter', async filter => {
+    const repo = await makeRepo(), other = await makeRepo(), worktree = await worktreeOf(repo)
+    await execa('git', ['remote', 'add', 'origin', 'https://fixture-user:fixture-token@github.com/Example/Correct.git?token=private-query#private-fragment'], { cwd: repo })
+    await execa('git', ['remote', 'add', 'origin', 'https://github.com/example/other.git'], { cwd: other })
+    mkdirSync(join(worktree, 'docs'))
+    writeFileSync(join(worktree, 'docs', 'context.md'), 'Plan from observed repository files.\n')
+    const head = (await execa('git', ['rev-parse', 'HEAD'], { cwd: worktree })).stdout
+    const before = (await execa('git', ['--no-optional-locks', 'status', '--porcelain=v1', '-z'], { cwd: worktree })).stdout
+    const index = readFileSync(join(repo, '.git', 'worktrees', 'wt', 'index'))
+    const marker = join(tempDir(), 'must-not-run')
+    const hostile = join(tempDir(), 'hostile.sh')
+    writeFileSync(hostile, `#!/bin/sh\ntouch '${marker}'\n`, { mode: 0o755 })
+    for (const name of ['core.fsmonitor', 'core.pager']) await execa('git', ['config', name, hostile], { cwd: repo })
+    await execa('git', ['config', 'core.hooksPath', join(repo, '.git', 'hooks')], { cwd: repo })
+    writeFileSync(join(repo, '.git', 'hooks', 'post-index-change'), `#!/bin/sh\ntouch '${marker}'\n`, { mode: 0o755 })
+    await execa('git', ['config', `filter.probe.${filter}`, hostile], { cwd: repo })
+    await execa('git', ['config', 'filter.probe.required', 'true'], { cwd: repo })
+    writeFileSync(join(worktree, '.gitattributes'), 'README.md filter=probe\n')
+    // Keep the size unchanged so status hashes the working copy rather than
+    // concluding it changed from stat alone; that path invokes clean filters.
+    writeFileSync(join(worktree, 'README.md'), '# Sandboz\n')
+    const ctx = new RunContext({ harness: 'codex', kind: 'plan', worktree, runDir: tempDir(), privateDir: tempDir(), policy: { ...defaultRunPolicy(), readOnly: true } })
+    const client = mcpClient(ctx.handoffFile, ctx.mcpServer().args.slice(3), { ...process.env, GIT_DIR: join(other, '.git'), GIT_WORK_TREE: other, GIT_PAGER: hostile })
+    try {
+      expect(JSON.stringify(await client.request('tools/list'))).toContain('inspect_repository')
+      const read = async (args: unknown) => {
+        const response = await client.request('tools/call', { name: 'inspect_repository', arguments: args }) as { result: { isError?: boolean; content: { text: string }[] } }
+        expect(response.result.isError).not.toBe(true)
+        expect(JSON.stringify(response)).not.toMatch(/fixture-user|fixture-token|private-query|private-fragment/)
+        return JSON.parse(response.result.content[0].text)
+      }
+      expect(await read({})).toMatchObject({ head, repository: 'example/correct', origin: 'https://github.com/example/correct.git',
+        path: '.', status: { dirty: true, truncated: false },
+        entries: expect.arrayContaining([{ name: 'README.md', kind: 'file' }, { name: 'docs', kind: 'directory' }]), truncated: false })
+      expect((await read({ path: 'docs' })).entries).toEqual([{ name: 'context.md', kind: 'file' }])
+      expect((await read({})).entries.some((entry: { name: string }) => entry.name === '.git')).toBe(false)
+      expect((await read({})).status.porcelain).toContain(' M README.md\0')
+      expect((await read({})).status.porcelain).toContain(before)
+      expect(existsSync(marker)).toBe(false)
+      expect(readFileSync(join(repo, '.git', 'worktrees', 'wt', 'index'))).toEqual(index)
+      expect((await execa('git', ['rev-parse', 'HEAD'], { cwd: worktree })).stdout).toBe(head)
+      expect(ctx.readHandoff()).toBeNull()
+    } finally { client.close() }
+  })
+
+  it('lets a read-only Codex plan read its bound README without execution or repository-selection tools', async () => {
+    const worktree = await worktreeOf(await makeRepo())
+    const before = (await execa('git', ['rev-parse', 'HEAD'], { cwd: worktree })).stdout
+    const ctx = new RunContext({ harness: 'codex', kind: 'plan', worktree, runDir: tempDir(), privateDir: tempDir(), policy: { ...defaultRunPolicy(), readOnly: true } })
+    const client = mcpClient(ctx.handoffFile, ctx.mcpServer().args.slice(3))
+    try {
+      const tools = JSON.stringify(await client.request('tools/list'))
+      expect(tools).toContain('inspect_artifact')
+      expect(tools).not.toContain('switch_repository')
+      expect(tools).not.toContain('verify_command')
+      const observed = await client.request('tools/call', { name: 'inspect_artifact', arguments: { path: 'README.md' } }) as { result: { content: { text: string }[] } }
+      expect(JSON.parse(observed.result.content[0].text)).toMatchObject({ path: 'README.md', head: before, contentUtf8: '# Sandbox\n', contentMatchesGit: true })
+      for (const name of ['shell', 'write_file', 'switch_repository', 'verify_command']) {
+        expect(await client.request('tools/call', { name, arguments: { command: 'touch write-must-not-run' } })).toMatchObject({ error: { code: -32602 } })
+      }
+      expect((await execa('git', ['status', '--porcelain'], { cwd: worktree })).stdout).toBe('')
+      expect((await execa('git', ['rev-parse', 'HEAD'], { cwd: worktree })).stdout).toBe(before)
+      expect(ctx.readHandoff()).toBeNull()
+      expect(ctx.policy().allowWrite).not.toContain(worktree)
+      expect(ctx.policy().denyWrite).toContain(worktree)
+      await client.request('tools/call', { name: 'submit', arguments: { summary: 'Observed the README before planning.',
+        spec: { title: 'Document the sandbox', sections: [{ heading: 'Scope', items: ['Keep the observed sandbox heading.'] }] },
+        split: { issues: [{ key: 'readme', title: 'Document the sandbox', criteria: [{ body: 'README retains the observed heading.' }] }] },
+      } })
+      expect(ctx.readHandoff()).toMatchObject({ outcome: 'succeeded', stopReason: 'submitted', report: { plan: { spec: { title: 'Document the sandbox' } } } })
+      expect((await execa('git', ['status', '--porcelain'], { cwd: worktree })).stdout).toBe('')
+    } finally { client.close() }
+  })
+
+  it('bounds plan repository inspection and refuses paths, symlinks and free-form commands', async () => {
+    const repo = await makeRepo(), worktree = await worktreeOf(repo), outside = tempDir()
+    writeFileSync(join(outside, 'secret.txt'), 'outside-private-value')
+    symlinkSync(outside, join(worktree, 'outside-directory'))
+    symlinkSync(join(outside, 'secret.txt'), join(worktree, 'outside-file'))
+    for (let i = 0; i < 240; i++) writeFileSync(join(worktree, `${String(i).padStart(3, '0')}-${'x'.repeat(110)}.txt`), '')
+    const ctx = new RunContext({ harness: 'codex', kind: 'plan', worktree, runDir: tempDir(), privateDir: tempDir(), policy: { ...defaultRunPolicy(), readOnly: true } })
+    const client = mcpClient(ctx.handoffFile, ctx.mcpServer().args.slice(3))
+    const inspect = (args: unknown) => client.request('tools/call', { name: 'inspect_repository', arguments: args }) as Promise<{ result: { isError?: boolean; content: { text: string }[] } }>
+    try {
+      const observed = await inspect({})
+      expect(observed.result.isError).not.toBe(true)
+      expect(Buffer.byteLength(JSON.stringify(observed))).toBeLessThan(32 * 1024)
+      const value = JSON.parse(observed.result.content[0].text)
+      expect(value.entries.length).toBeLessThanOrEqual(200)
+      expect(value.truncated).toBe(true)
+      expect(value.status).toMatchObject({ dirty: true, truncated: true })
+      expect(Buffer.byteLength(value.status.porcelain)).toBeLessThanOrEqual(8192)
+      expect(value.entries.some((entry: { name: string }) => ['.git', 'outside-directory', 'outside-file'].includes(entry.name))).toBe(false)
+      for (const path of ['../', outside, '.git', '.git/../', 'outside-directory', 'outside-directory/secret.txt', 'outside-file']) {
+        const refused = await inspect({ path })
+        expect(refused.result.isError).toBe(true)
+        expect(JSON.stringify(refused)).not.toContain('outside-private-value')
+        const file = await client.request('tools/call', { name: 'inspect_artifact', arguments: { path } })
+        expect(file).toMatchObject({ result: { isError: true } })
+        expect(JSON.stringify(file)).not.toContain('outside-private-value')
+      }
+      expect((await inspect({ command: 'touch write-must-not-run' })).result.isError).toBe(true)
+      expect(existsSync(join(worktree, 'write-must-not-run'))).toBe(false)
+      writeFileSync(join(repo, '.git', 'worktrees', 'wt', 'index'), 'invalid-index-private-value')
+      const failed = await inspect({})
+      expect(failed.result.isError).toBe(true)
+      expect(JSON.stringify(failed)).not.toMatch(/invalid-index-private-value|"dirty":false/)
+      expect(ctx.readHandoff()).toBeNull()
+    } finally { client.close() }
+  })
+
+  it('keeps artifact-reader advertising unchanged for writable executions and command checks', async () => {
     const worktree = await worktreeOf(await makeRepo())
     for (const options of [
       { kind: 'implement' as const, policy: defaultRunPolicy() },
-      { kind: 'plan' as const, policy: { ...defaultRunPolicy(), readOnly: true } },
       { kind: 'implement' as const, policy: { ...defaultRunPolicy(), readOnly: true }, factoryCheck: { stage: 'verify' as const, reportOnly: false, inferCommand: false } },
     ]) {
       const ctx = new RunContext({ harness: 'codex', worktree, runDir: tempDir(), privateDir: tempDir(), ...options })

@@ -4,17 +4,21 @@ import { TestAccountError } from '../../../scripts/test-accounts/pool.mjs'
 import { captureParityReadReceipts, parityBotReadKeys } from './parity-reads.mjs'
 import { captureParityReaderDefaults } from './parity-reader-defaults.mjs'
 
-const AT = '2026-01-15T12:00:00.000Z'
 const quote = value => `"${value.replaceAll('"', '""')}"`
 
 /** Real application rows, confined to a leased pair and freshly reserved IDs.
  * No provider, auth, RPC or UI response is simulated. The disabled device and
  * ended run never dispatch work or spend model/provider credits. */
-export async function createParityFixtures(scope) {
+export async function createParityFixtures(scope, { epoch = process.env.MIKKA_DESKTOP_FIXTURE_EPOCH ?? `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z` } = {}) {
   await scope.assertActive()
+  // Threads deliberately have a 30-day list window. Keep the same explicit
+  // recent UTC day in paired captures, and record it with the evidence.
+  const at = Date.parse(epoch)
+  if (!/^\d{4}-\d{2}-\d{2}T00:00:00\.000Z$/.test(epoch) || !Number.isFinite(at) || at > Date.now() || at <= Date.now() - 30 * 86_400_000) throw new TestAccountError('PARITY_FIXTURE_EPOCH_INVALID')
+  const AT = epoch
   const ids = Object.fromEntries(['workspace', 'team', 'coordinator', 'bot', 'issue', 'version', 'device', 'agent', 'run', 'chunk', 'group', 'groupMessage', 'markdown', 'markdownVersion', 'markdownShare', 'html', 'htmlVersion', 'htmlShare', 'coordinatorUser', 'coordinatorReply', 'botUser', 'botReply'].map(key => [key, randomUUID()]))
   const fixture = {
-    ...ids, workspaceName: 'Desktop acceptance', teamName: 'Application', botName: 'Ada', groupName: 'Release review',
+    ...ids, epoch, workspaceName: 'Desktop acceptance', teamName: 'Application', botName: 'Ada', groupName: 'Release review',
     issueTitle: 'Review the desktop workspace', artifactTitle: 'Desktop review notes', htmlTitle: 'Desktop review preview',
     // The address is visible in Settings. Independent baseline/candidate
     // databases need the same display text; fresh UUIDs still own every row.

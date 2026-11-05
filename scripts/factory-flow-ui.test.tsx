@@ -167,12 +167,39 @@ test('a 409 quota refusal names the model problem, shows its code and ends the c
   })
 })
 
-test('every Profile model detail has copy in both languages', () => {
+for (const [code, detail, expected] of [
+  ['agentProfileDisabled', null, '执行配置已停用'],
+  ['agentProfileArchived', null, '执行配置已归档'],
+  ['agentProfileVersionConflict', null, '执行配置已更新，请重新查看后批准。'],
+  ['agentProfileDecisionUnavailable', 'decision_unavailable', '未取得执行配置的选择结果'],
+  ['agentProfileDecisionUnavailable', 'no_suitable_profile', '没有适合此任务的执行配置'],
+  ['agentProfileDecisionUnavailable', 'invalid_profile_answer', '执行配置的选择结果格式无效'],
+  ['agentProfileDecisionUnavailable', 'unknown_profile', '选中的执行配置不在可用列表中'],
+  ['agentProfileDecisionUnavailable', 'uncertain_profile', '无法确定合适的执行配置'],
+  ['agentProfileDecisionUnavailable', 'invalid_reason', '执行配置的选择理由无效'],
+] as const) {
+  test('an answered ' + code + (detail ? '/' + detail : '') + ' names its reason and ends the click', async () => {
+    flow = specFlow()
+    await render()
+    await withFetch([json(409, { error: code, ...(detail ? { detail } : {}) }), json(200, { binding: { taskId: TASK, revision: 6 }, stage: 'implement' })], async sent => {
+      await act(async () => { button('批准方案')!.click() })
+      assert.equal(document.querySelector('[role="alert"] p')?.textContent?.trim(), expected)
+      assert.equal(button('重新确认'), undefined)
+      await act(async () => { button('批准方案')!.click() })
+      assert.equal(sent.length, 2)
+      assert.notEqual(sent[1].body.input.eventId, sent[0].body.input.eventId)
+    })
+  })
+}
+
+test('every Profile refusal has distinct copy in both languages', () => {
   const en = JSON.parse(readFileSync(new URL('../messages/en.json', import.meta.url), 'utf8'))
   for (const messages of [zh, en]) {
     const copy = messages.FactoryFlow.card.approveError
     for (const key of ['default', 'checking', 'quota', 'expired', 'paused', 'missing', 'removed', 'model_gone', 'key_refused', 'balance', 'provider_unavailable']) assert.equal(typeof copy.profileModel[key], 'string', key)
-    for (const key of ['stale', 'transition', 'evidence', 'signedOut', 'notFound', 'profile', 'refused', 'unknown']) assert.equal(typeof copy[key], 'string', key)
+    for (const key of ['stale', 'transition', 'evidence', 'signedOut', 'notFound', 'profile', 'profileDisabled', 'profileArchived', 'profileVersionConflict', 'refused', 'unknown']) assert.equal(typeof copy[key], 'string', key)
+    for (const key of ['decision_unavailable', 'no_suitable_profile', 'invalid_profile_answer', 'unknown_profile', 'uncertain_profile', 'invalid_reason']) assert.equal(typeof copy.profileDecision[key], 'string', key)
+    assert.equal(new Set([copy.profile, copy.profileDisabled, copy.profileArchived, copy.profileVersionConflict, ...Object.values(copy.profileDecision)]).size, 10)
   }
 })
 

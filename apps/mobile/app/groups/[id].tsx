@@ -12,7 +12,7 @@ import { BotBubble, CopyButton, MyBubble, Reactions, TimedRow, useTimeReveal } f
 import { Markdown } from '@/components/Markdown'
 import { NavBar } from '@/components/NavBar'
 import { Text } from '@/components/Text'
-import { Composer } from '@/components/ui'
+import { Composer } from '@/features/chat/components/chat-composer'
 import { GlassButton } from '@/components/GlassButton'
 import { ReadNotice } from '@/components/ReadNotice'
 import { OfflineBanner } from '@/components/OfflineBanner'
