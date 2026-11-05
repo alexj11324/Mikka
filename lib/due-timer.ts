@@ -79,19 +79,22 @@ async function startDueTimer(kind: DueKind) {
   return start(dueTimer, [kind])
 }
 
+/** Production run recovery elects and hands over its own owner (lib/due-timer-owner.ts, #1403); it is never cancelled here. */
+const ownsItsDeployment = (kind: DueKind) => kind === 'run-recovery' && process.env.VERCEL_ENV === 'production'
+
 /** Kinds this process has seen held by a run on its own deployment; checked once per process. */
 const current = new Set<DueKind>()
 
 /**
  * A timer run is pinned to the deployment that started it and keeps that code
- * for its whole life (#1410). The first arm of each kind in a process on a newer
+ * for its whole life (#1410). Every kind but production run recovery, which owns its handover (#1403): The first arm of each kind in a process on a newer
  * deployment cancels a run on another deployment and starts its successor here.
  * The successor's first pass does whatever came due meanwhile. True when it
  * replaced one. Workflow API calls only, no database.
  */
 export async function replaceStaleDueTimer(kind: DueKind): Promise<boolean> {
   const deploymentId = process.env.VERCEL_DEPLOYMENT_ID
-  if (!deploymentId || current.has(kind) || !workflowWakesEnabled()) return false
+  if (!deploymentId || current.has(kind) || !workflowWakesEnabled() || ownsItsDeployment(kind)) return false
   const holder = await timerHolder(wakeTokens.dueTimer(kind))
   if (!holder) return false
   current.add(kind)
@@ -116,6 +119,17 @@ export function forgetCheckedDueTimers() { current.clear() }
 /** Wakes the job's running timer, or starts one. Best effort: the slow sweep re-arms a lost start. */
 export async function armDueTimer(kind: DueKind): Promise<void> {
   if (!workflowWakesEnabled()) return
+  if (kind === 'run-recovery' && process.env.VERCEL_ENV === 'production') {
+    try { await (await import('./due-timer-owner')).armCurrentRecoveryTimer() }
+    catch (error) {
+      const { CodedError, logCodedError } = await import('@mikka/protocol/coded-error')
+      // A guard has already emitted its closed metadata at the failed check.
+      if (!(error instanceof CodedError && error.code === 'due_timer_owner_unavailable')) {
+        logCodedError(new CodedError('due_timer_owner_unavailable', { detail: 'sdk_operation_failed', cause: error }), { kind, phase: 'arm' })
+      }
+    }
+    return
+  }
   try {
     if (await replaceStaleDueTimer(kind)) return
   } catch (error) {

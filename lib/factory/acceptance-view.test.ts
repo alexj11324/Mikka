@@ -214,6 +214,32 @@ test('candidate retry returns only the existing revision binding for one exact f
   }
 })
 
+test('an unsubmitted review uses its distinct host capability and confirms a fresh same-candidate checker', () => {
+  const { task, ledger } = retryFixture()
+  const blocked = { ...task, status: 'blocked', route: { flowVersion: 2 } }
+  const capability = { binding: { taskId: 't1', revision: 24 } }
+  const latest = check({ stage: 'review', attemptId: 'a1', status: 'blocked', runId: 'ended-check-run' })
+  const detail = { task: blocked, checkSubmissionRecovery: capability, checks: [latest] }
+  assert.deepEqual(candidateCheckRetry(blocked, detail, ledger)?.binding, capability.binding)
+  for (const patch of [
+    { checkSubmissionRecovery: undefined }, { checkSubmissionRecovery: { binding: { taskId: 'other', revision: 24 } } },
+    { checkSubmissionRecovery: { binding: { taskId: 't1', revision: 23 } } }, { checkStartRecovery: capability },
+    { checkDispatchRecovery: capability }, { checks: [{ ...latest, runId: null }] },
+  ]) assert.equal(candidateCheckRetry(blocked, { ...detail, ...patch }, ledger), null)
+  assert.equal(candidateCheckRetry(blocked, detail, { ...ledger, attemptId: 'old' }), null)
+  const next = { ...blocked, revision: 26, attemptId: 'a2', status: 'running' }
+  const attempt = { id: 'a2', taskId: 't1', candidateId: 'c1', stage: 'review', status: 'running', runId: 'new-independent-run' }
+  const receipt = { contractVersion: 1, task: next, attempts: [attempt], candidates: [{ id: 'c1', taskId: 't1' }] }
+  assert.equal(candidateCheckRetryConfirmed(blocked, receipt, undefined, undefined, capability), true)
+  assert.equal(candidateCheckRetryConfirmed(blocked, receipt), false)
+  assert.equal(candidateCheckRetryConfirmed(blocked, receipt, capability, undefined, capability), false)
+  assert.equal(candidateCheckRetryConfirmed(blocked, { ...receipt, attempts: [{ ...attempt, runId: null }] }, undefined, undefined, capability), false)
+  assert.equal(candidateCheckRetryConfirmed(blocked, { ...receipt, task: { ...next, candidateId: 'other' } }, undefined, undefined, capability), false)
+  const verdict = { ...blocked, status: 'failed' }
+  assert.equal(candidateCheckRetry(verdict, { task: verdict, checks: [{ ...latest, status: 'failed' }] }, ledger), null,
+    'an actual v2 review verdict still cannot receive another review')
+})
+
 test('an explicit single-review flow never offers the rejected generic failed-review retry', () => {
   for (const stage of ['review', 'verify'] as const) {
     const { task, detail, ledger } = retryFixture(stage)
