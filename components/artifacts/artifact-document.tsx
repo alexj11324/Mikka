@@ -8,6 +8,7 @@ import { markdownDiff, remarkDiff } from '@/lib/artifacts/diff'
 import { remarkMarks, type TextMark } from '@/lib/artifacts/marks'
 import type { ArtifactMedia, ArtifactVersionInfo } from '@/lib/artifacts/types'
 import { withBasePath } from '@/lib/base-path'
+import { publicAppOrigin } from '@/lib/platform/public-origin'
 import { ArtifactAuthorAvatar } from './artifact-card'
 import { SelectionActions } from './selection-actions'
 
@@ -40,7 +41,7 @@ export function ownCapture(href: unknown, media: readonly ArtifactMedia[], origi
 }
 const capturePath = (capture: ArtifactMedia) => withBasePath(`/api/captures/${capture.captureId}`)
 const NO_MEDIA: readonly ArtifactMedia[] = []
-const pageOrigin = () => typeof window === 'undefined' ? 'http://localhost' : window.location.origin
+const pageOrigin = () => typeof window === 'undefined' ? 'http://localhost' : publicAppOrigin()
 
 const components = (title: string, media: readonly ArtifactMedia[]): Components => ({
   // The page already shows the title; a first heading repeating it is dropped.

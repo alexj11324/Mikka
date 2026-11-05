@@ -153,6 +153,18 @@ try {
     assert.equal(sample.unknownReadings, 0)
   }
   report.warmup = { bundled: nativeWarmup, web: webWarmup }
+  if (report.acceptanceRun) {
+    // Catch real periodic daemon/database regressions before spending the full
+    // hour. The acceptance interval still starts from fresh counters below.
+    await Promise.all([metrics(runtime.bundled.socket, true), metrics(runtime.hosted.socket, true)])
+    await delay(60_000)
+    const [bundled, web] = await Promise.all([metrics(runtime.bundled.socket), metrics(runtime.hosted.socket)])
+    report.preflight = { durationMs: 60_000, bundled, web }
+    assert.equal(bundled.unknownReadings, 0)
+    assert.equal(web.unknownReadings, 0)
+    assert.ok(bundled.queryCalls <= web.queryCalls, `Native preflight queries ${bundled.queryCalls} > web ${web.queryCalls}`)
+    assert.ok(bundled.pgProtocolReceiveBytes <= web.pgProtocolReceiveBytes, `Native preflight DB bytes ${bundled.pgProtocolReceiveBytes} > web ${web.pgProtocolReceiveBytes}`)
+  }
   const [nativeStart, webStart] = await Promise.all([metrics(runtime.bundled.socket, true), metrics(runtime.hosted.socket, true)])
   report.startedAt = new Date().toISOString()
   report.measurementStart = { bundled: nativeStart, web: webStart }

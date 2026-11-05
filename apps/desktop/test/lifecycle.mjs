@@ -34,7 +34,7 @@ const menuNames = Object.fromEntries(await Promise.all(['zh-CN', 'en'].map(async
 const evidence = {
   version: 1, revision,
   environmentId: environment.id, origin: environment.origin, database: environment.database.name,
-  startedAt: new Date().toISOString(), viewport, checks: [], samples: [],
+  startedAt: new Date().toISOString(), viewport, checks: [], samples: [], nativeStates: [],
   measurement: {
     clock: 'Node performance.now, immediately before Electron launch to visible seeded message and enabled composer accepting a draft',
     process: 'fresh Electron process for every sample; existing authenticated profile; same backend/account/workspace',
@@ -74,6 +74,20 @@ async function close(app) {
   // another renderer/profile starts, outside the usable-chat timing interval.
   await stopLocalDaemons([appProfiles.get(app)])
   active.delete(app)
+}
+
+async function recordNativeState(page, phase, mode) {
+  // This observes the actual local IPC state. It neither starts a service nor
+  // performs a backend read, and always runs after readiness timing stops.
+  const state = await page.evaluate(async () => {
+    const [device, installer] = await Promise.all([window.mikka.device.status(), window.mikka.ssh?.state()])
+    return {
+      device: { status: device.status, signedIn: device.signedIn, server: device.server, deviceIdPresent: Boolean(device.deviceId) },
+      installer: installer ? { status: installer.status, step: installer.step, retryable: installer.retryable ?? false } : null,
+    }
+  })
+  evidence.nativeStates.push({ phase, mode, ...state })
+  return state
 }
 
 async function usable(page, draft = '') {
@@ -219,12 +233,14 @@ try {
   application = run.app
   ownerEmail = (await nativeSignIn(run.app, run.page)).user.email
   await selectFixture(run.page)
+  await recordNativeState(run.page, 'authenticated-profile', 'bundled')
   await run.page.evaluate(() => localStorage.setItem('theme', 'light'))
   await close(run.app); application = null
   run = await launch('hosted')
   application = run.app
   await seedHosted(run.app, run.page)
   await selectFixture(run.page)
+  await recordNativeState(run.page, 'authenticated-profile', 'hosted')
   await run.page.evaluate(() => localStorage.setItem('theme', 'light'))
   await run.app.evaluate(async ({ session }) => { await session.fromPartition('persist:mikka-dev').cookies.flushStore() })
   await close(run.app); application = null
@@ -239,6 +255,7 @@ try {
       await usable(run.page, 'Lifecycle readiness draft')
       const milliseconds = Math.round((performance.now() - run.started) * 100) / 100
       evidence.samples.push({ pair, order: order.indexOf(mode) + 1, mode, milliseconds })
+      await recordNativeState(run.page, `cold-pair-${pair}`, mode)
       assert.equal(run.errors.length, 0, 'cold launch must not produce uncaught renderer errors')
       await run.page.locator('textarea[data-chat-composer]').first().fill('')
       await close(run.app); application = null
@@ -261,6 +278,7 @@ try {
   await ownerGroup.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: true }).click()
   await waitForBundledSession(run.page, scope.owner.userId)
   await usable(run.page)
+  await recordNativeState(run.page, 'retained-owner-after-account-switch', 'bundled')
   assert.equal(await run.page.evaluate(() => document.cookie), '')
   check('two leased browser identities remain private in main and the real account/workspace menu switches back to the retained owner')
   await opaqueFrameBoundary(run.app, run.page)

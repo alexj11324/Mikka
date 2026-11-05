@@ -71,6 +71,16 @@ test('renderer CSP has no remote code, eval, inline scripts, external fetch, wor
   assert.match(RENDERER_CSP, /worker-src 'none'/)
 })
 
+test('Factory flow accepts only a strict UUID and its two declared methods', () => {
+  const path = `/api/factory/tasks/${identity.user.id}/flow`
+  for (const method of ['GET', 'POST']) assert.equal(allowedApiPath(path, method), true)
+  for (const method of ['HEAD', 'PATCH', 'DELETE', 'PUT', 'OPTIONS']) assert.equal(allowedApiPath(path, method), false)
+  for (const id of ['task_1', identity.user.id.replaceAll('-', ''), identity.user.id.replace('-461b-', '-z61b-'), identity.user.id.replace('-bca2-', '-1ca2-')]) {
+    for (const method of ['GET', 'POST']) assert.equal(allowedApiPath(`/api/factory/tasks/${id}/flow`, method), false)
+  }
+  assert.equal(allowedApiPath(`${path}/extra`, 'GET'), false)
+})
+
 test('local entry/assets load without backend; missing assets and symlink escape fail closed', async t => {
   const root = await fixture(t)
   await mkdir(join(root, 'assets'))

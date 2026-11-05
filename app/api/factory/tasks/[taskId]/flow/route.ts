@@ -12,7 +12,9 @@ const respond = withRequestLog('/api/factory/tasks/[taskId]/flow', async (reques
   noteLogUser(actor?.userId);
   const { taskId } = await context.params;
   const result = await handleFactoryFlow(pool,factoryHumanStore,factorySpecApproval,{
-    actor, authorization: request.headers.get('authorization'), method: request.method, taskId,
+    // Only the fresh human session verified above may cross the browser/native
+    // adapter. Invalid or delegated credentials retain the core's refusal.
+    actor, authorization: actor ? null : request.headers.get('authorization'), method: request.method, taskId,
     origin: request.headers.get('origin'), url: request.url,
     ...(request.method === 'POST' ? { body: await request.json().catch(() => null) } : {}),
   });
