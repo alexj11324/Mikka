@@ -87,3 +87,34 @@ test('refresh staging terminates a foreground process that ignores TERM before i
 test('private runtime switch preserves files and refuses unsafe process states', async () => {
   await promisify(execFile)('python3', ['packages/daemon/scripts/refresh-cloud-worker.test.py'])
 })
+
+
+test('runtime refusal receipt exposes only closed code and phase from the expected command', async () => {
+  for (const action of ['switch', 'rollback'] as const) {
+    const fault = Object.assign(new Error('PRIVATE-CREDENTIAL provider message'), { name: 'CommandExitError', exitCode: 1,
+      stderr: JSON.stringify({ protocol: 'mikka-runtime-refresh-refusal/v1', action, phase: 'journal_before_stop', code: 'runtime_journal_missing' }),
+      stdout: 'PRIVATE-CREDENTIAL stdout', command: 'PRIVATE-CREDENTIAL command', cause: { token: 'PRIVATE-CREDENTIAL' } })
+    const sandbox = { commands: { run: async () => { throw fault } } } as never
+    await assert.rejects(switchOfficialWorkerRelease(sandbox, release, identity, action, async () => ''), (error: unknown) => {
+      assert.ok(error instanceof Error)
+      assert.equal(error.name, 'RuntimeRefreshError')
+      assert.deepEqual(Object.fromEntries(['code', 'runtimePhase', 'exitCode'].map(key => [key, (error as unknown as Record<string, unknown>)[key]])), {
+        code: 'runtime_journal_missing', runtimePhase: 'journal_before_stop', exitCode: 1,
+      })
+      assert.doesNotMatch(error.message + JSON.stringify(error), /PRIVATE-CREDENTIAL/)
+      assert.equal(error.cause, undefined)
+      return true
+    })
+  }
+})
+
+test('unknown, extra, oversized, or wrong-action runtime stderr is never promoted to a trusted receipt', async () => {
+  const valid = { protocol: 'mikka-runtime-refresh-refusal/v1', action: 'switch', phase: 'journal_before_stop', code: 'runtime_journal_missing' }
+  for (const stderr of ['PRIVATE-CREDENTIAL', JSON.stringify({ ...valid, phase: 'PRIVATE-CREDENTIAL' }),
+    JSON.stringify({ ...valid, code: 'runtime_PRIVATE_CREDENTIAL' }), JSON.stringify({ ...valid, action: 'rollback' }),
+    JSON.stringify({ ...valid, detail: 'PRIVATE-CREDENTIAL' }), JSON.stringify(valid) + '\nPRIVATE-CREDENTIAL', ' '.repeat(2048) + JSON.stringify(valid)]) {
+    const fault = Object.assign(new Error('PRIVATE-CREDENTIAL'), { name: 'CommandExitError', exitCode: 1, stderr })
+    const sandbox = { commands: { run: async () => { throw fault } } } as never
+    await assert.rejects(switchOfficialWorkerRelease(sandbox, release, identity, 'switch', async () => ''), error => error === fault)
+  }
+})
