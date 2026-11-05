@@ -155,9 +155,14 @@ old module owners (backend was Codex's).
 8. A documentation conflict is resolved by whoever merges: they edit the
    documents directly.
 
-Before any merge, the change is verified end to end locally or on a preview
-deployment with its own database branch; production is never the test
-environment.
+Before any merge, the change is verified end to end in CI (for example
+`Production build and browser interactions`) or with a production build
+(`next build`, `next start`) in a local or Docker sandbox, against its own
+isolated PostgreSQL database (`mikka_e2e`) and leased test accounts
+([`test-accounts.md`](test-accounts.md)); production is never the test
+environment. Pull requests and branches have no Vercel Preview: every build
+runs on GitHub Actions, and only `main` deploys, to production
+([decision 2026-11-05-1632](design/decisions/2026-11-05-1632-no-vercel-preview.md)).
 
 ## 6. Numbers
 
