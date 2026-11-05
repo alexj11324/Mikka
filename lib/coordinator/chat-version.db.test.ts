@@ -36,6 +36,30 @@ dbTest('the chat version changes exactly when the conversation or its inbox does
     const empty = await store.chatVersion(owner, 200, botId)
     assert.deepEqual({ ...empty, version: undefined }, { version: undefined, cursor: 0, working: false, error: null })
 
+    await t.test('full and compact reads derive the same live deadline from their existing session and inbox', async () => {
+      const leaseUntil = new Date(Date.now() + 300_000), wakeLeaseUntil = new Date(Date.now() + 120_000)
+      const eventId = randomUUID()
+      await db.insert(schema.coordinatorSessions).values({ userId: owner, botId, leaseHolder: 'fixture-live-lease', leaseUntil })
+      await db.insert(schema.coordinatorEvents).values({ id: eventId, userId: owner, botId, kind: 'user_message', dedupeKey: `chat-live:${eventId}`, payload: { text: 'Live deadline fixture' }, wakeAttempts: 1, wakeLeaseUntil })
+      try {
+        const before = Date.now()
+        const full = await store.chatViewState(owner, 200, botId)
+        const version = await store.chatVersionState(owner, 200, botId)
+        const expected = [leaseUntil.toISOString(), wakeLeaseUntil.toISOString()].sort()
+        assert.deepEqual(full.expiries.map(date => date.toISOString()).sort(), expected)
+        assert.deepEqual(version.expiries.map(date => date.toISOString()).sort(), expected)
+        assert.ok(full.observedAt >= before && full.observedAt <= Date.now())
+        assert.equal(full.chat.working, true)
+        assert.equal('expiries' in await store.chatView(owner, 200, botId), false, 'ordinary/history callers retain the existing ChatView shape')
+        await db.update(schema.coordinatorSessions).set({ leaseUntil: new Date(0) }).where(and(eq(schema.coordinatorSessions.userId, owner), eq(schema.coordinatorSessions.botId, botId)))
+        await db.update(schema.coordinatorEvents).set({ tier: 'background' }).where(eq(schema.coordinatorEvents.id, eventId))
+        assert.deepEqual((await store.chatViewState(owner, 200, botId)).expiries, [], 'expired leases and background inbox work do not schedule a read')
+      } finally {
+        await db.delete(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.id, eventId))
+        await db.delete(schema.coordinatorSessions).where(and(eq(schema.coordinatorSessions.userId, owner), eq(schema.coordinatorSessions.botId, botId)))
+      }
+    })
+
     const reply = 'A long answer. '.repeat(200)
     await db.insert(schema.coordinatorMessages).values(Array.from({ length: 40 }, (_, index) => ({
       id: randomUUID(), userId: owner, botId, position: index + 1,

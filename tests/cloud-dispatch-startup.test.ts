@@ -10,6 +10,7 @@ const priorRunId = '10000000-0000-4000-8000-000000000006'
 const workspaceId = 'workspace', agentId = 'agent', model = 'synthetic-model'
 const calls: string[] = []
 let failure: 'wake' | 'machine' | 'lifecycle' | null = null
+let queueFailure: Error | null = null
 let settledStartup = true
 let present = true, workspaceAllowed = true, issueAllowed = true, suggestionAllowed = true
 let permission: string | undefined, awake = true, credentialAvailable = true, switchedCredential = false
@@ -93,6 +94,7 @@ stub('../lib/factory/queue-cloud.ts', { queueFactoryCloudRun: async (_pool: unkn
   if (!awake || !credentialAvailable) throw new ComputerError(409, 'Bot subscription unavailable')
   assert.equal(input.agentId, agentId)
   assert.equal(input.deviceRepoId, repoId, 'queue uses the prepared runtime, not the pre-wake repository')
+  if (queueFailure) throw queueFailure
   const key = input.idempotencyKey as string
   if (queued.has(key)) assert.deepEqual(input, queued.get(key), 'the same retry retains its exact request')
   else queued.set(key, structuredClone(input))
@@ -116,7 +118,7 @@ let dispatch: typeof import('../workflows/coordinator/steps')['dispatchComputerT
 let dispatchThread: typeof import('../workflows/coordinator/steps')['dispatchComputerThread']
 before(async () => { ({ dispatchComputerTask: dispatch, dispatchComputerThread: dispatchThread } = await import('../workflows/coordinator/steps')) })
 beforeEach(() => {
-  calls.length = 0; failure = null; settledStartup = true; present = workspaceAllowed = issueAllowed = suggestionAllowed = true
+  calls.length = 0; failure = null; queueFailure = null; settledStartup = true; present = workspaceAllowed = issueAllowed = suggestionAllowed = true
   permission = undefined; awake = credentialAvailable = true; switchedCredential = moveDevice = replaceAgent = revokeDuringWake = revokeWorkspaceDuringWake = false
   selectedSource = 'subscription'; selectedHarness = 'codex'; selectedModel = model; deviceId = 'device'; repoId = 'repo'
   previous = null; modelResolutions = bindingSelections = credentialReads = 0; queued.clear()
@@ -126,6 +128,36 @@ test('cloud startup succeeds only after both machine preparation and lifecycle l
   const result = await dispatch(owner, { botId, issueId, harness: 'codex', model: 'synthetic-model' }, 'synthetic-call')
   assert.ok('runId' in result)
   assert.deepEqual(calls, ['queue', 'machine', 'lifecycle'])
+})
+
+test('a desktop profile admission refusal reaches the tool with safe guidance and starts no run', async () => {
+  const { AgentProfileAdmissionError } = await import('../lib/factory/profile-admission')
+  queueFailure = Object.assign(new AgentProfileAdmissionError(), { message: 'synthetic-private-admission-detail' })
+  selectedHarness = 'claude_code'
+  const result = await dispatchThread(owner, { botId, issueId, harness: 'claude_code', model }, 'profile-admission-call')
+  assert.deepEqual(result, {
+    error: 'agentProfileUnavailable',
+    detail: 'The profile or its authorized execution source changed before admission. Select an available profile again.',
+  })
+  assert.equal(queued.size, 0)
+  assert.deepEqual(calls, ['queue'], 'a refused admission starts no machine or lifecycle and is not retried')
+  assert.equal(modelResolutions, 1, 'refusal does not select another model')
+  assert.equal(bindingSelections, 1, 'refusal does not bind another subscription')
+  assert.ok(!JSON.stringify(result).includes('synthetic-private-admission-detail'))
+})
+
+test('direct desktop callers retain a profile refusal code and safe guidance without exception details', async () => {
+  queueFailure = Object.assign(new profileDefinitions.AgentProfileError('agentProfileVersionConflict'), { message: 'synthetic-private-profile-detail' })
+  const result = await dispatch(owner, { botId, issueId, harness: 'codex', model, subscriptionBindingId: bindingId }, 'profile-version-call')
+  assert.deepEqual(result, {
+    error: 'agentProfileVersionConflict',
+    detail: 'No run was dispatched. The selected Factory profile is unavailable or no eligible profile fits this request.',
+  })
+  assert.equal(queued.size, 0)
+  assert.deepEqual(calls, ['queue'])
+  assert.equal(modelResolutions, 0)
+  assert.equal(bindingSelections, 0)
+  assert.ok(!JSON.stringify(result).includes('synthetic-private-profile-detail'))
 })
 
 test('model arguments cannot grant local recovery; only the separate host placement argument can', async () => {
