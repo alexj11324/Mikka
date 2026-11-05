@@ -271,7 +271,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
     try {
       const result = await request(`/api/factory/tasks/${task.id}`, { binding: retryCheck.binding, eventId: submission.eventId,
         action: 'retry', reason: submission.reason })
-      if (!candidateCheckRetryConfirmed(task, result, detail?.checkStartRecovery)) setCheckError({ key: retryCheck.key, unknown: true })
+      if (!candidateCheckRetryConfirmed(task, result, detail?.checkStartRecovery, detail?.checkDispatchRecovery)) setCheckError({ key: retryCheck.key, unknown: true })
     } catch (caught) {
       setCheckError({ key: retryCheck.key, unknown: !(caught instanceof RequestError) || caught.status >= 500 })
     } finally {

@@ -90,7 +90,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   const model = { claude_code: 'claude-haiku-5-5', codex: 'gpt-6-luna' } as const
   const caps = () => (['claude_code', 'codex'] as const).map(harness => ({ harness, installed: true, models: [model[harness]], subscriptionBroker: true, computerBroker: true }))
   const template = templateModelsFixture(Object.values(model)); t.after(() => template.restore())
-  const fixture = async (withProfiles = true, missingCodex = false, profileId?: 'default') => {
+  const fixture = async (withProfiles = true, missingCodex = false, inherit = false, profileId?: 'default') => {
     const ownerId = await seedUser(pool, 'profile-stage')
     const { id: workspaceId } = await seedWorkspace(pool, ownerId, [{ userId: ownerId, role: 'admin' }])
     await pool.query("UPDATE mikka_workspaces SET kind='personal' WHERE id=$1", [workspaceId])
@@ -119,14 +119,19 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     }
     const profileStore = new profiles.AgentProfileStore(pool)
     const definition = (harness: OrderHarness, role: string) => ({ name: role, description: `${role} public capability`, roles: [role], harness, model: { mode: 'fixed', harness, model: model[harness], source: { kind: 'subscription', connectionId: connections[harness] } }, instructions: `PRIVATE_PROFILE_${role}`, skills: [role === 'Review' ? 'independent-review' : 'systematic-debugging'], effort: 'low' })
-    const implement = withProfiles ? await profileStore.create(scope, definition('claude_code', 'Implement')) : null
+    const implement = withProfiles ? await profileStore.create(scope, inherit ? {
+      name: 'Frontend', description: 'Implement responsive frontend behavior and validate it.', roles: ['execute', 'frontend'],
+      harness: 'claude_code', model: { mode: 'inherit' },
+      instructions: 'PRIVATE_PROFILE_frontend-v1\nImplement the requested UI and report concrete validation.',
+      skills: ['implementation-evidence'],
+    } : definition('claude_code', 'Implement')) : null
     const review = withProfiles ? await profileStore.create(scope, definition('codex', 'Review')) : null
     const store = createFactoryStore(pool, async (userId, id, tx) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [id, userId])).rowCount === 1, botId, { independent: factoryCheckIndependent, gates: factoryCheckGates })
     const routed = await store.route(ownerId, { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Synthetic subscription profile stage fixture' })
     return { scope, actor, ownerId, workspaceId, botId, issueId, sourceEventId, deviceId, repoId, agents, connections, implement, review, store, task: routed.task }
   }
   const exercise = async (withProfiles: boolean, missingCodex: boolean, autoModelRouting = true, explicitDefault = false) => {
-    const f = await fixture(withProfiles, missingCodex, explicitDefault ? 'default' : undefined), beforeDecisions = decisionCounts()
+    const f = await fixture(withProfiles, missingCodex, false, explicitDefault ? 'default' : undefined), beforeDecisions = decisionCounts()
     if (!autoModelRouting) await pool.query('UPDATE model_order_settings SET "autoModelRouting"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [f.ownerId, f.workspaceId])
     const profileId = explicitDefault
       ? await (await import('./profile-request')).requestedAgentProfile(pool, f.scope, f.sourceEventId, f.implement!.id)
@@ -193,6 +198,60 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     if (missingCodex) { assert.notEqual(runtime.agentId, f.agents.codex); assert.equal(runtime.repoId, f.repoId) }
     return { ...f, source, current, attempt, candidate, run }
   }
+  await t.test('Decision rejection retains closed diagnostics and filtered availability without creating a run or binding', async t => {
+    const f = await fixture(), profileStore = new profiles.AgentProfileStore(pool)
+    const disabled = await profileStore.create(f.scope, { name: 'PRIVATE_DISABLED_PROFILE', description: 'PRIVATE_DISABLED_CAPABILITY', enabled: false, harness: 'codex', model: { mode: 'inherit' } })
+    await pool.query('UPDATE byos_connections SET quota=NULL WHERE id=$1', [f.connections.codex])
+    const oldUsageProbe = usageProbe; usageProbe = async () => {}
+    const warnings: string[] = []
+    const warning = t.mock.method(console, 'warn', (line: unknown) => { warnings.push(String(line)) })
+    const beforeBindings = (await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [f.ownerId])).rows
+    const execution = { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions' as const, providerGenerationId: 'PRIVATE_PROVIDER_GENERATION', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' as const }
+    const privateAnswer = 'PRIVATE_RAW_DECISION_RESPONSE'
+    const responses = [
+      { detail: 'decision_unavailable', answers: null },
+      { detail: 'invalid_profile_answer', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>() },
+      { detail: 'no_suitable_profile', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
+        ['profile', { name: 'profile', type: 'choice', choice: 'none' }], ['reason', { name: 'reason', type: 'choice', choice: 'uncertain' }],
+      ]) },
+      { detail: 'unknown_profile', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
+        ['profile', { name: 'profile', type: 'choice', choice: privateAnswer }], ['reason', { name: 'reason', type: 'choice', choice: 'stage_fit' }],
+      ]) },
+    ]
+    try {
+      for (const response of responses) {
+        let decisions = 0
+        await assert.rejects(profiles.resolveAgentProfileDispatch(pool, f.scope, { issueId: f.issueId, stage: 'review', location: 'cloud', cloudPurpose: 'desktop' }, {
+          decision: async (purpose, input, questions, _signal, diagnostics) => {
+            decisions++
+            assert.equal(purpose, 'factory-agent-profile'); assert.deepEqual(diagnostics, { retainInvalidReceipt: true })
+            assert.ok(!JSON.stringify(input).includes('PRIVATE_PROFILE_Implement'))
+            const choices = questions[0].type === 'choice' ? questions[0].choices.map(item => item.value) : []
+            assert.deepEqual(choices, [f.implement!.id, 'none'])
+            return response.answers ? { answers: response.answers, execution } : null
+          },
+        }), error => {
+          assert.ok(error instanceof profiles.AgentProfileError)
+          assert.equal(error.code, 'agentProfileDecisionUnavailable'); assert.equal(error.message, 'agentProfileDecisionUnavailable')
+          assert.equal(error.status, 409); assert.equal(error.detail, response.detail)
+          return true
+        })
+        assert.equal(decisions, 1)
+        const logged = JSON.parse(warnings.at(-1)!)
+        assert.equal(logged.code, 'agentProfileDecisionUnavailable'); assert.equal(logged.detail, response.detail)
+        assert.equal(logged.issueId, f.issueId); assert.equal(logged.stage, 'review')
+        assert.equal(logged.candidateCount, 1); assert.equal(logged.candidateIds, f.implement!.id)
+        assert.equal(logged.profileCount, 3); assert.equal(logged.profileDiagnosticsTruncated, false)
+        assert.deepEqual(new Set(logged.profileAvailability.split(',')), new Set([`${f.implement!.id}:available`, `${f.review!.id}:checking`, `${disabled.id}:disabled`]))
+        assert.equal(logged.decisionExecutionId, response.answers ? execution.executionId : undefined)
+        assert.deepEqual(logged.causes, [])
+      }
+      assert.equal(warnings.length, responses.length)
+      for (const forbidden of [privateAnswer, 'PRIVATE_PROFILE_', disabled.name, disabled.description, execution.providerGenerationId, f.ownerId, f.connections.codex, f.connections.claude_code]) assert.ok(!warnings.join('\n').includes(forbidden), forbidden)
+      assert.deepEqual((await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [f.ownerId])).rows, beforeBindings)
+      assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 0)
+    } finally { warning.mock.restore(); usageProbe = oldUsageProbe }
+  })
   await t.test('CC implementation selects independent Codex Review with frozen exact Profile and subscription', async () => { await exercise(true, false) })
   await t.test('a prepared sleeping parent gains its missing Codex metadata without provider I/O', async () => { await exercise(true, true) })
   await t.test('no configured Profile retains CC despite Codex being first in model preference', async () => { await exercise(false, false) })
@@ -579,14 +638,22 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   const { claimCloudRun } = await import('../computer/claim')
   const { assertRunProfileClaim, AgentProfileAdmissionError } = await import('./profile-admission')
   const { rebindExecutionDevice } = await import('../execution-identity')
-  const claimFixture = async () => {
-    const f = await fixture()
-    const selected = await profiles.resolveAgentProfileDispatch(pool, f.scope, { issueId: f.issueId, profileId: f.implement!.id, location: 'cloud', cloudPurpose: 'desktop' })
+  const claimFixture = async (inherit = false) => {
+    const f = await fixture(true, false, inherit)
+    if (inherit) decisionProfile = f.implement!.id
+    const selected = await profiles.resolveAgentProfileDispatch(pool, f.scope, { issueId: f.issueId, ...(inherit ? {} : { profileId: f.implement!.id }), location: 'cloud', cloudPurpose: 'desktop' })
+    if (selected.target.kind !== 'cloud') assert.fail(JSON.stringify(selected.target))
     const subscriptionBindingId = await bindAgentToConnection(pool, f.scope, f.agents.claude_code, 'claude_code', f.connections.claude_code, model.claude_code)
-    const { runId } = await queueCloudRun(pool, f.actor, {
+    const queue: typeof queueCloudRun = inherit ? async (db, actor, input) => {
+      const dispatch = createFactoryDispatch(db, f.store, tx => queueCloudRun(db, actor, input, tx))
+      return dispatch(f.ownerId, { binding: factoryBinding(f.task), agentId: f.agents.claude_code, deviceRepoId: f.repoId })
+    } : queueCloudRun
+    const { runId } = await queue(pool, f.actor, {
       botId: f.botId, issueId: f.issueId, agentId: f.agents.claude_code, deviceRepoId: f.repoId,
       title: 'Claim the frozen Profile', body: 'Synthetic freshness boundary', model: model.claude_code,
-      subscriptionBindingId, agentProfile: selected.agentProfile, readOnly: true,
+      ...(inherit ? { sourceEventId: f.sourceEventId } : {}),
+      subscriptionBindingId, agentProfile: selected.agentProfile, readOnly: !inherit,
+      ...(inherit ? { modelDispatch: { mode: selected.selectionMode ?? 'preference', location: 'cloud', entry: selected.target.entry, ...(selected.target.routing ? { routing: selected.target.routing } : {}) } } : {}),
     })
     // The same handoff as provisioning, with no provider or model call.
     const threadDevice = randomUUID()
@@ -594,10 +661,25 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     await pool.query(`UPDATE thread_machines SET state='running',"deviceId"=$2,"sandboxId"=$3 WHERE "runId"=$1`, [runId, threadDevice, `synthetic-thread-${runId}`])
     const source = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0]
     const definition = await rebindExecutionDevice(pool, source, threadDevice, pool)
+    assert.ok(definition)
     await pool.query('UPDATE agent_runs SET "deviceId"=$2,"agentDefinition"=$3 WHERE id=$1', [runId, threadDevice, JSON.stringify(definition)])
-    return { ...f, runId, threadDevice, subscriptionBindingId, definition }
+    if (inherit) {
+      const threadRepo = randomUUID()
+      await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","baseBranch")
+        SELECT $1,$2,"userId","repoPath","baseBranch" FROM device_repos WHERE id=$3`, [threadRepo, threadDevice, f.repoId])
+      await pool.query('UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1', [runId, threadRepo])
+      await pool.query('UPDATE thread_machines SET "repoId"=$2 WHERE "runId"=$1', [runId, threadRepo])
+    }
+    return { ...f, runId, threadDevice, subscriptionBindingId, definition, inherit }
   }
-  const claim = (f: Awaited<ReturnType<typeof claimFixture>>) => claimCloudRun(pool, f.actor, f.runId, f.threadDevice, new Date(Date.now() + 30_000), f.subscriptionBindingId, undefined, undefined, false)
+  const claim = async (f: Awaited<ReturnType<typeof claimFixture>>) => {
+    const lease = new Date(Date.now() + 30_000)
+    const beforeClaim = f.inherit ? async (tx: import('pg').PoolClient) => {
+      const result = await (await import('./runtime')).guardFactoryClaim(tx, f.ownerId, f.threadDevice, f.runId, lease.toISOString())
+      assert.equal(result.preserveQuestionWorktree, true)
+    } : undefined
+    return claimCloudRun(pool, f.actor, f.runId, f.threadDevice, lease, f.subscriptionBindingId, beforeClaim, undefined, false)
+  }
   const refreshQuota = async (connectionId: string, used = .1) => {
     await pool.query(`UPDATE byos_connections SET quota=jsonb_set(jsonb_set(quota,'{observedAt}',$2::jsonb),'{windows,0,used}',$3::jsonb) WHERE id=$1`, [connectionId, JSON.stringify(new Date().toISOString()), JSON.stringify(used)])
   }
@@ -611,7 +693,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     const [{ requestedAgentProfile }, { createFactoryQuestions }, { queueCloudQuestionContinuation }, { createFactoryClaim }, { factoryEventId }] = await Promise.all([
       import('./profile-request'), import('./questions/store'), import('./questions/queue-continuation'), import('./claim'), import('./event-id'),
     ])
-    const f = await fixture(true, false, 'default'), beforeDecisions = decisionCounts()
+    const f = await fixture(true, false, false, 'default'), beforeDecisions = decisionCounts()
     const originalEvent = (await pool.query('SELECT * FROM coordinator_events WHERE id=$1', [f.sourceEventId])).rows[0]
     assert.equal(originalEvent.kind, 'user_message'); assert.equal(originalEvent.payload.profileId, 'default')
     const profileId = await requestedAgentProfile(pool, f.scope, f.sourceEventId, f.review!.id)
@@ -752,7 +834,14 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
         if (fault === 'model') await pool.query(`UPDATE byos_bindings SET "modelId"='changed-model' WHERE id=$1`, [f.subscriptionBindingId])
         if (fault === 'stop') await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [f.runId])
       }
-      if (['usage-error', 'still-unknown', 'quota', 'profile'].includes(fault)) await assert.rejects(claim(f), AgentProfileAdmissionError)
+      if (['usage-error', 'still-unknown', 'quota', 'profile'].includes(fault)) await assert.rejects(claim(f), error => {
+        assert.ok(error instanceof AgentProfileAdmissionError)
+        assert.equal(error.code, 'agentProfileUnavailable'); assert.equal(error.detail, 'current_profile')
+        assert.ok(error.cause instanceof profiles.AgentProfileError)
+        assert.equal(error.cause.code, fault === 'profile' ? 'agentProfileVersionConflict' : 'agentProfileModelUnavailable')
+        if (fault !== 'profile') assert.equal(error.cause.detail, fault === 'quota' ? 'quota' : 'checking')
+        return true
+      })
       else assert.equal(await claim(f), null)
       assert.deepEqual(usageCalls.slice(before), [{ ownerId: f.ownerId, connectionId: f.connections.claude_code }])
       await unchangedRun(f)
@@ -768,4 +857,40 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.ok(serialized.includes('review'))
     if (call.purpose === 'factory-agent-profile') assert.ok(JSON.stringify(call.questions).includes(call.profileId))
   }
+  await t.test('unchanged inherited frontend Profile survives JSONB, device handoff and expired quota at first cloud claim', async t => {
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() })
+    const before = decisionCounts()
+    const f = await claimFixture(true)
+    const frozen = f.definition.agentProfile!
+    assert.equal(frozen.version, 1)
+    assert.equal(frozen.profileId, f.implement!.id)
+    assert.equal(frozen.digest, f.implement!.digest)
+    assert.equal(frozen.source, 'decision')
+    assert.equal(frozen.definition.model.mode, 'inherit')
+    assert.deepEqual(frozen.definition.skills, ['implementation-evidence'])
+    assert.equal(frozen.effort, undefined)
+    assert.equal(frozen.targetEntry.harness, 'claude_code')
+    assert.equal(frozen.targetEntry.model, model.claude_code)
+    assert.deepEqual(frozen.targetEntry.source, { kind: 'subscription', connectionId: f.connections.claude_code })
+    assert.deepEqual(f.definition.modelDispatch?.entry, frozen.targetEntry, 'the preferred order UUID and full source entry survive freezing and relocation unchanged')
+    await profiles.assertProfileSelection(pool, f.scope, frozen)
+    await assertRunProfileClaim(pool, f.runId)
+    t.mock.timers.tick(60_001)
+    await assert.rejects(assertRunProfileClaim(pool, f.runId), error => {
+      assert.ok(error instanceof AgentProfileAdmissionError)
+      assert.equal(error.detail, 'current_profile')
+      assert.ok(error.cause instanceof profiles.AgentProfileError)
+      assert.equal(error.cause.code, 'agentProfileModelUnavailable'); assert.equal(error.cause.detail, 'checking')
+      return true
+    })
+    const beforeUsage = usageCalls.length
+    usageProbe = async (ownerId, connectionId) => {
+      assert.equal(ownerId, f.ownerId); assert.equal(connectionId, f.connections.claude_code)
+      await refreshQuota(connectionId)
+    }
+    assert.ok(await claim(f))
+    await unchangedRun(f, 'preparing')
+    assert.deepEqual(usageCalls.slice(beforeUsage), [{ ownerId: f.ownerId, connectionId: f.connections.claude_code }])
+    assert.deepEqual(decisionCounts(), { profile: before.profile + 1, model: before.model + 1 })
+  })
 })

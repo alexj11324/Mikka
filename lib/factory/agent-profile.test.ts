@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { AgentProfileError, agentProfileDigest, agentProfileInstructions, parseAgentProfile } from './agent-profile-definition'
 import { agentProfileSkillsCatalog, resolveAgentProfileSkills } from './agent-profile-skills'
-import { profileDecisionQuestions, selectedProfileAnswer } from './agent-profile-decision'
+import { profileDecisionDiagnostics, profileDecisionQuestions, profileDecisionSelection, selectedProfileAnswer } from './agent-profile-decision'
 import type { DecisionAnswer } from '@/lib/coordinator/decision'
 import { createAgentProfileHandler } from './agent-profile-http'
 import { agentProfileReferenceSchema } from './agent-profile-reference'
@@ -76,6 +76,44 @@ test('Decision refusals, stale/unknown IDs, names, low confidence and absent rea
   assert.equal(question.type, 'choice')
   const payload = JSON.stringify(question.type === 'choice' ? question.choices.map(choice => choice.description) : [])
   for (const forbidden of ['instructions', 'connectionId', 'keyId', 'ownerId', 'content']) assert.ok(!payload.includes(`"${forbidden}"`))
+})
+
+test('Decision rejection diagnostics distinguish safe none, bad answers and unavailable execution without selecting a fallback', () => {
+  const cases = [
+    [null, 'decision_unavailable'],
+    [answer('none', .9, 'uncertain'), 'no_suitable_profile'],
+    [new Map(), 'invalid_profile_answer'],
+    [answer('PRIVATE_PROFILE credential response'), 'unknown_profile'],
+    [answer(catalog[0].id, .54), 'uncertain_profile'],
+    [answer(catalog[0].id, .99, 'uncertain'), 'invalid_reason'],
+    [answer('none'), 'invalid_reason'],
+  ] as const
+  for (const [answers, expected] of cases) {
+    assert.deepEqual(profileDecisionSelection(catalog, answers), { unavailable: expected })
+    assert.equal(selectedProfileAnswer(catalog, answers), null)
+    assert.ok(!JSON.stringify(profileDecisionSelection(catalog, answers)).includes('PRIVATE_PROFILE'))
+  }
+  assert.deepEqual(profileDecisionSelection(catalog, answer(catalog[0].id)), { selected: { id: catalog[0].id, reason: 'capability_fit' } })
+})
+
+test('Decision rejection logs bound UUIDs and closed availability codes without profile or provider text', () => {
+  const third = randomUUID(), hidden = 'PRIVATE_ACCOUNT_AND_PROVIDER_MESSAGE'
+  const availability = {
+    [catalog[0].id]: { available: true }, [catalog[1].id]: { available: false, reason: 'checking' },
+    [third]: { available: false, reason: hidden }, [hidden]: { available: false, reason: hidden },
+  }
+  const fields = profileDecisionDiagnostics(catalog.slice(0, 1), availability)
+  assert.deepEqual(fields, {
+    candidateCount: 1, candidateIds: catalog[0].id, profileCount: 4,
+    profileAvailability: `${catalog[0].id}:available,${catalog[1].id}:checking,${third}:other`, profileDiagnosticsTruncated: true,
+  })
+  const logged = JSON.stringify(fields)
+  for (const value of [hidden, ...catalog.flatMap(item => [item.name, item.description, item.model])]) assert.ok(!logged.includes(value))
+  const many = Array.from({ length: 70 }, () => ({ ...catalog[0], id: randomUUID() }))
+  const bounded = profileDecisionDiagnostics(many, Object.fromEntries(many.map(item => [item.id, { available: false, reason: 'disabled' }])))
+  assert.equal(bounded.candidateCount, 70); assert.equal(bounded.profileCount, 70); assert.equal(bounded.profileDiagnosticsTruncated, true)
+  assert.equal(bounded.candidateIds.split(',').length, 50); assert.equal(bounded.profileAvailability.split(',').length, 50)
+  assert.ok(!JSON.stringify(bounded).includes(many[50].id))
 })
 
 test('Profile HTTP guards owner scope, same origin, strict bodies, and optimistic version errors', async () => {
