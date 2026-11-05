@@ -7,14 +7,16 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { runSummaryText } from '@/lib/issue-run-conversation'
 import { ENDED_RUN_STATUSES, OUTCOME_CHOICES, OUTCOME_QUESTIONS, outcomeText, readOutcome, type OutcomeEvidence } from '@/lib/run-outcome'
 import { runListChanged } from '@/lib/live/lists'
+import { OUTCOME_RETRY_AT_SQL } from '@/lib/run-recovery-due'
 
 /** Ended runs older than this are not judged (the backfill window too). */
 export const OUTCOME_WINDOW_DAYS = 7
 /** How many runs one minute sweep judges. */
 const SWEEP_LIMIT = 10
 
-/** An unanswered run is asked again after this long, while it is inside the window. */
-const RETRY_AFTER = '1 hour'
+/** An unanswered run is asked again at OUTCOME_RETRY_AT_SQL (lib/run-recovery-due.ts): after as long as it
+ * has already waited, at least an hour, while it is inside the window (#1371). */
+const RETRY_DUE = `${OUTCOME_RETRY_AT_SQL} <= now()`
 
 type Verdict = { outcome: RunOutcome; decidedBy: 'decision'; reason: string }
 
@@ -66,14 +68,14 @@ async function evidenceOf(runId: string): Promise<{ userId: string; botId: strin
  * Judges one ended run with the decision model. The run is claimed first
  * (outcomeAt), so a sweep and the completion hook never judge it at the same
  * time. With no answer the outcome stays empty, the thread sits under 受阻 or
- * 等待你 (never 已解决, R-52), and the sweep asks again after RETRY_AFTER.
+ * 等待你 (never 已解决, R-52), and the sweep asks again at RETRY_DUE.
  * Nothing in code guesses an outcome.
  */
 export async function judgeRunOutcome(runId: string, judges: OutcomeJudges = defaultJudges, claimed = false): Promise<RunOutcome | null> {
   if (!claimed) {
     const [claim] = await db.update(agentRuns).set({ outcomeAt: new Date() })
       .where(and(eq(agentRuns.id, runId), sql`${agentRuns.outcome} IS NULL AND ${agentRuns.status} IN ('succeeded', 'stopped', 'failed', 'cancelled')
-        AND (${agentRuns.outcomeAt} IS NULL OR ${agentRuns.outcomeAt} < now() - ${RETRY_AFTER}::interval)`))
+        AND (${agentRuns.outcomeAt} IS NULL OR ${sql.raw(RETRY_DUE)})`))
       .returning({ id: agentRuns.id })
     if (!claim) return null
   }
@@ -90,7 +92,7 @@ export async function judgeRunOutcome(runId: string, judges: OutcomeJudges = def
 /**
  * The minute sweep (app/api/cron/run-recovery): claims up to SWEEP_LIMIT ended
  * runs from the last OUTCOME_WINDOW_DAYS with no outcome (never asked, or
- * unanswered more than RETRY_AFTER ago), newest first, and judges them. It is
+ * unanswered and past RETRY_DUE), newest first, and judges them. It is
  * also the backfill: runs that ended before outcomes existed are judged as it
  * reaches them, and older ones are left alone.
  */
@@ -99,10 +101,10 @@ export async function judgePendingOutcomes(judges: OutcomeJudges = defaultJudges
     `UPDATE agent_runs SET "outcomeAt" = now() WHERE id IN (
        SELECT id FROM agent_runs
        WHERE outcome IS NULL AND status = ANY($1::text[])
-         AND ("outcomeAt" IS NULL OR "outcomeAt" < now() - $4::interval)
+         AND ("outcomeAt" IS NULL OR ${RETRY_DUE})
          AND coalesce("finishedAt", "updatedAt") > now() - make_interval(days => $2)
        ORDER BY coalesce("finishedAt", "updatedAt") DESC LIMIT $3 FOR UPDATE SKIP LOCKED)
-     RETURNING id`, [[...ENDED_RUN_STATUSES], OUTCOME_WINDOW_DAYS, limit, RETRY_AFTER])
+     RETURNING id`, [[...ENDED_RUN_STATUSES], OUTCOME_WINDOW_DAYS, limit])
   let judged = 0
   for (const { id } of rows) if (await judgeRunOutcome(id, judges, true).catch(() => null)) judged++
   return judged

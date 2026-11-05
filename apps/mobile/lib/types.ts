@@ -188,11 +188,9 @@ export interface Settings {
   apps: { app: Source; connected: boolean; account: string | null }[]
 }
 
-/** A run's name as the app shows it: its task as "MIK-11 群聊建表" when it has one (glossary), else its own name. */
-export function runTitle(run: RunSource): string {
-  if (!run.issue) return run.name
-  const key = run.issue.identifier ?? (run.issue.number === null ? null : `#${run.issue.number}`)
-  return key ? `${key} ${run.issue.title}` : run.issue.title
+/** A run as people name it on a card or a chip: its task's title, never the task's key (#1386). */
+export function runName(run: RunSource): string {
+  return run.issue?.title || run.name
 }
 
 /** A proposal waiting for the person (`GET /api/pending-actions`; lib/pending-action-view.ts on the server). */

@@ -16,7 +16,7 @@ import { colors, font, lift, plainColor } from '@/lib/theme'
 const glass = Platform.OS === 'ios' && isLiquidGlassAvailable()
 
 /**
- * A round floating button (the drawer's search, the web bar's buttons). On
+ * A round floating button (the web bar's buttons). On
  * iOS 26 it is the system's interactive Liquid Glass; earlier iOS and the web
  * draw a white circle with a soft lift.
  */
@@ -225,7 +225,7 @@ export function Capsule({ children }: { children: ReactNode }) {
     : <View style={[styles.capsule, { backgroundColor: colors.surface }, lift]}>{children}</View>
 }
 
-/** A field's surface (the composer, the drawer's search): Liquid Glass on iOS 26, white with a lift elsewhere. */
+/** A field's surface (the composer): Liquid Glass on iOS 26, white with a lift elsewhere. */
 export function Field({ style, children }: { style: StyleProp<ViewStyle>; children: ReactNode }) {
   return glass ? <GlassView style={[style, { backgroundColor: undefined }]}>{children}</GlassView> : <View style={[style, lift]}>{children}</View>
 }

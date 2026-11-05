@@ -4,7 +4,7 @@ import { CircleDot } from 'lucide-react-native'
 import { StatusIcon } from '@/components/icons'
 import { runIcon } from '@/lib/thread-icon'
 import { Text } from '@/components/Text'
-import { runTitle, type CitationSource } from '@/lib/types'
+import { runName, type CitationSource } from '@/lib/types'
 import { colors, font } from '@/lib/theme'
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { ChatFiles } from './ChatFiles'
@@ -109,9 +109,10 @@ function inline(text: string, sources: Record<string, CitationSource>, onOpen: (
 
 /** A task or thread named inline: a boxed chip with its icon and title in the accent; tapping opens it (R-15). */
 export function MentionChip({ source, onPress }: { source: CitationSource; onPress?: () => void }) {
-  const label = source.kind === 'issue' ? source.title : runTitle(source)
+  // The title alone, so a cut-off chip still shows the words that say where it goes; the label names the kind (#1386).
+  const label = source.kind === 'issue' ? source.title : runName(source)
   return (
-    <Pressable accessibilityRole="link" onPress={onPress} style={styles.mention}>
+    <Pressable accessibilityRole="link" accessibilityLabel={`${source.kind === 'issue' ? '任务' : '线程'}：${label}`} onPress={onPress} style={styles.mention}>
       {source.kind === 'run' ? <StatusIcon status={runIcon(source)} size={14} /> : <CircleDot size={14} color={colors.secondary} strokeWidth={2} />}
       <Text style={styles.mentionText} numberOfLines={1}>{label}</Text>
     </Pressable>

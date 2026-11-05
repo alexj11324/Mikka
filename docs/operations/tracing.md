@@ -214,9 +214,14 @@ error code and its numbers.
 | [1324] Mikka 日速率外推超过5GB月预算 | Today's Neon transfer so far, scaled to 24 h and to the month's days, exceeds 5 GB. Only from 03:00 UTC, with a snapshot ≤60 min and provider data ≤180 min old (`alert-daily-pace.sql`) | `5000000000` (the budget) and `utc_hours >= 3` |
 | [1324] Mikka 错误码小时突增 | One service's error spans for one code in the last full UTC hour exceed `max(3 × its 7-day hourly median, 5)` (≈50 real spans), after 24 observed hours (`alert-error-spike.sql`) | `3 *` and the floor `5` in `metrics` |
 
-An alert that evaluates `any_row` reads at most 50 rows: the two hourly
-queries end in `LIMIT 50` and sort firing rows first. No current telemetry
-returns `NULL` (not firing); the heartbeat alert covers collection.
+Every alert query returns exactly one row and the alert reads it
+(`first_row`). PostHog refuses an `any_row` alert whose query its `LIMIT`
+cuts short, and production has more routes than that limit. The two hourly
+queries rate each source (`per_source`: 1 breach, 0 none, `NULL` without
+current telemetry) and return the worst value; `source` names up to five
+breaching sources, worst first, or the heaviest one when none breaches.
+`NULL` (no current telemetry) does not fire; the heartbeat alert covers
+collection.
 
 ### Changing them
 
