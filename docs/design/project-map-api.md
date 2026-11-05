@@ -142,7 +142,7 @@ source 查询只重核本次决定的最多 50 个 sourceRef 及最多 51 个 ru
 
 地图元数据有独立预算：每项目最多 100 个 issue ID（SQL 投影同时限制 4 KiB）、2000 个节点、2000 条路线、20000 条边、10000 个来源引用，整次 app DB 元数据投影合计最多 1 MiB。超限明确返回 413；项目关联异常返回 409。**256 KiB 是原始来源响应硬界限，不是地图列表原始 JSON 的硬界限。** 列表目标是默认页 gzip ≤150 KiB；根节点连接大量独立运行时，跨页边和边界节点会使首屏 raw JSON 大于 256 KiB，仍不包含 transcript。
 
-应用库读取在短只读 repeatable-read 事务内；项目/工作区权限在读取前后重新检查。它不是跨两库的统一 MVCC 快照。workspace PAT 的成员资格被停用后，认证层使 PAT 失效并返回 401；已认证但不可见的项目/来源返回 404。
+应用库的完整地图 facts 与来源授权在一条纯只读 SELECT 中读取，使用该语句的一致快照，无额外 BEGIN/COMMIT。项目/工作区权限仍在读取前后分别重查两个 authority DB，脱敏材料也每次重新读取；它不是跨两库的统一 MVCC 快照。workspace PAT 的成员资格被停用后，认证层使 PAT 失效并返回 401；已认证但不可见的项目/来源返回 404。
 
 ### 实时刷新与错误
 
@@ -168,12 +168,14 @@ Medium 4 CPU / 8 GiB、PostgreSQL 17，500/1000 个 run（另有 project/task �
 
 上述初版测量的 collector 无决定来源时为 8 个批量查询，有来源的代表项目为 10 个；完整 page/node/path/overview 链路为 38 个 SQL statements（33 SELECT），source 为 35（30 SELECT）。每路 p95：500 runs 32.78–104.14 ms, 1000 runs 34.54–145.06 ms；这是同机 loopback，不是生产同区或用户端 p95。
 
-2026-11-05 的生产 500 节点测量（固定部署 `86e35a1400cb`）返回正确，但 warmup 1209 ms、后续三次 1276/686/709 ms，未达到 500 ms 目标，也不足以宣称通过 p95。后续优化把 GET 的每次 scope 解析合并为最多两个 authority DB 查询，并保留读前、读后的完整 ACL 重查；metadata 在同一个只读 repeatable-read 事务内分批，collector 无来源 8→2 次、有来源的代表项目 10→4 次，跨批共享 1 MiB 的 SQL 预算。source 的专用来源授权链保持不变。
+2026-11-05 的生产 500 节点测量（固定部署 `86e35a1400cb`）返回正确，但 warmup 1209 ms、后续三次 1276/686/709 ms，未达到 500 ms 目标，也不足以宣称通过 p95。第一轮优化（#1452）把 GET 的每次 scope 解析合并为最多两个 authority DB 查询，并保留读前、读后的完整 ACL 重查；当时 metadata 在同一个只读 repeatable-read 事务内分批，collector 无来源 8→2 次、有来源的代表项目 10→4 次，跨批共享 1 MiB 的 SQL 预算。
 
-**collector 往返、完整 HTTP SELECT 数、完整 SQL statements 和生产延迟分别记录。** 新 PG 回归对 page/node/path/overview 设置 ≤12 SELECT 预算，并继续输出所有五路的实际 statements、SELECT、DB/HTTP/gzip 字节与耗时；不能将其解释为所有五路已达到完整 HTTP ≤12 statements。生产修复后的 500/1000 节点结果必须在精确部署版本上实测，并在 #1247 回填。
+当前成本优化（#1460）进一步把 collector 合为一条 SELECT，压缩 scope/issue/run 的内部传输，并把地图脱敏材料的 5 次读取合为 2 次。1 MiB 仍按压缩前的完整逻辑对象累计；所有拓扑事实、来源三态授权、读前/读后 ACL 与内容 fingerprint 保留。source GET 的专用授权链保持不变。
+
+**collector 往返、完整 HTTP SELECT 数、完整 SQL statements 和生产延迟分别记录。** #1460 的真实 PG 回归中，100 issues + 399/899 runs + root 的精确 500/1000 节点首屏分别读取 64,604/99,554 B DB JSON，均为 8 条 SELECT；此用例使用缓存 session resolver stub 和真实启用的脱敏读取，未测 cookie 解析。原有 PAT 用例为 500/1000 runs（实际 502/1002 节点），page/node/path/overview 为 12 statements、9 SELECT，source 为 19 statements、14 SELECT。完整口径、CI 版本与生产改前 trace 见[成本回执](../acceptance/project-map-cold-read-cost-20261105.md)。隔离结果不代表生产修复后的延迟；生产结果须绑定精确部署版本并在 #1247 回填。
 
 ### 验收与交接边界
 
 隔离回归包括共享 schema、真实 PG/HTTP 的 cursor/ACL/source、500/1000 规模、提交/回滚/幂等 live revision。正常应用验收另外使用实际 Next 与自动租用测试账号，记录固定 source SHA、origin、隔离数据库、资源清理、lease release 和 evidence audit；该结果写在 PR/issue，不拿 handler 集成代替。
 
-上线后仍需按 #1245/#1247 对真实 Owner 两条订阅任务的决定、分叉/放弃、Artifact、同候选检查、原始来源逐项核实，并给出部署 SHA、真实项目脱敏 JSON。当前代码和隔离结果不构成这项生产证据。没有足够规模的既有授权生产项目时，生产 500/1000 性能项保持未完成，不造生产垃圾数据。
+生产验收按 #1245/#1247 各自的回执记录真实 Owner 两条订阅任务的决定、分叉/放弃、Artifact、同候选检查、原始来源，以及部署 SHA 和真实项目脱敏 JSON。当前代码和隔离结果不构成这项生产证据。本次 #1247 已获 Owner 明确授权建立专用、无 provider 执行的 synthetic 500/1000 节点规模 fixture；其测量与真实执行链验收分开记录，fixture 已按本次方案归档并保留运行历史。这项授权限于本次隔离 fixture，不构成后续任意生产数据写入的规则。

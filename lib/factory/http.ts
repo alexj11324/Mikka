@@ -1,4 +1,5 @@
 import { maskFactoryNote } from "./note-mask";
+import { logCodedError } from "@mikka/protocol/coded-error";
 import { z } from "zod";
 import { revisionBindingSchema, FactoryError } from "./contract";
 import type { createFactoryStore } from "./store";
@@ -89,6 +90,7 @@ export async function handleFactory(
     };
   } catch (error) {
     if (!(error instanceof FactoryError)) throw error;
+    if (req.method === "POST") logCodedError(error, { taskId: req.taskId });
     return {
       status:
         error.code === "factoryNotFound"
