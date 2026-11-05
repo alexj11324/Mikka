@@ -100,7 +100,7 @@ test('proxy strips credentials, cookies, redirects and remote policy; preserves 
     const stream = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('data: first\n\n')); controller.close() } })
     return new Response(stream, { headers: { 'content-type': 'text/event-stream', 'set-cookie': `session_token=${secret}`, authorization: secret, 'x-mikka-session-token': secret, 'content-security-policy': "default-src * 'unsafe-eval'", 'x-mikka-stream-key': 'next-cursor' } })
   } })
-  const response = await serve(new Request(`${RENDERER_URL}/api/coordinator/stream?after=1`, { headers: { authorization: 'Bearer malicious', cookie: 'session_token=malicious', 'x-mikka-stream-key': 'opaque-replay-cursor' } }))
+  const response = await serve(Object.assign(new Request(`${RENDERER_URL}/api/coordinator/stream?after=1`, { headers: { authorization: 'Bearer malicious', cookie: 'session_token=malicious', 'x-mikka-stream-key': 'opaque-replay-cursor' } }), { initiatorOrigin: 'mikka://app' }))
   assert.equal(response.headers.get('set-cookie'), null)
   assert.equal(response.headers.get('authorization'), null)
   assert.equal(response.headers.get('x-mikka-session-token'), null)
@@ -108,6 +108,12 @@ test('proxy strips credentials, cookies, redirects and remote policy; preserves 
   assert.equal(response.headers.get('content-security-policy'), RENDERER_CSP)
   assert.match(await response.text(), /data: first/)
   for (const request of [new Request(`${RENDERER_URL}/api/auth/token`), new Request(`${RENDERER_URL}/api/desktop/rpc`, { method: 'POST', headers: { origin: 'https://evil.test' } }), new Request(`${RENDERER_URL}/api/desktop/rpc`, { method: 'POST', headers: { origin: 'null' } }), new Request(`${RENDERER_URL}/api/workspace`, { headers: { 'sec-fetch-site': 'cross-site' } })]) assert.equal((await serve(request)).status, 403)
+  // Electron removes Origin:null before dispatch, but retains this trusted
+  // browser-provided field even for GETs that have no Origin or fetch metadata.
+  for (const initiatorOrigin of ['null', 'https://evil.test', 'mikka://app.evil']) {
+    const request = Object.assign(new Request(`${RENDERER_URL}/api/workspace`), { initiatorOrigin })
+    assert.equal((await serve(request)).status, 403)
+  }
   assert.equal(calls, 1)
 })
 

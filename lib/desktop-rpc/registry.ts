@@ -96,7 +96,6 @@ const functions = {
   'collaboration.listMembers': actions7.listMembers,
   'collaboration.inviteMember': actions7.inviteMember,
   'collaboration.removeMember': actions7.removeMember,
-  'coordinator.getCoordinatorChat': actions8.getCoordinatorChat,
   'coordinator.pollCoordinatorChat': actions8.pollCoordinatorChat,
   'coordinator.coordinatorHistory': actions8.coordinatorHistory,
   'coordinator.coordinatorCitationSources': actions8.coordinatorCitationSources,

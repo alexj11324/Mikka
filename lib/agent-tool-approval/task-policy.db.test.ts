@@ -19,6 +19,7 @@ import { defaultRunPolicy, type RunPolicy } from '@mikka/protocol/agent-policy'
 import { freezeWorkerDefinition } from '../agent-kit/worker'
 import { intersectRunPolicy } from '../run-assignment-policy'
 import { continuedRunPolicyCeiling } from '../computer/run-model'
+import { humanSessionHeaders } from '../desktop-rpc/handler'
 
 const target = process.env.E2E_DATABASE_URL
 if (target) {
@@ -77,10 +78,22 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
   await pool.query('INSERT INTO device_tokens (id,"userId","tokenHash") VALUES ($1,$2,$3)', [tokenId, owner, createHash('sha256').update(token).digest('hex')])
   const { POST } = await import('../../app/v1/runs/[runId]/tool-approval/route')
   const snapshotRoutes = await import('../../app/v1/runs/[runId]/policy-snapshot/route')
-  // Execute the real browser route body/store against PG. Only the browser
-  // session identity is synthetic; this is not a login/OAuth acceptance test.
+  // Execute the real route, human-session header boundary and store against PG.
+  // Only session identity is synthetic; this is not login/OAuth acceptance.
+  const ownerSessionToken = 'A'.repeat(32), foreignSessionToken = 'B'.repeat(32)
   const settingsModules: Record<string, unknown> = { 'zod': { z }, '@/lib/db': { pool },
-    '@/lib/api-auth': { auth: { api: { getSession: async ({headers}: {headers: Headers}) => ({user:{id:headers.get('cookie')==='owner=1'?owner:'other-owner'}}) } } },
+    '@/lib/api-auth': { auth: { api: { getSession: async ({ headers, query }: { headers: Headers; query?: { disableCookieCache?: boolean } }) => {
+      assert.equal(query?.disableCookieCache, true, 'settings must revalidate the human session')
+      const authorization = headers.get('authorization')
+      if (authorization) {
+        assert.equal(headers.has('cookie'), false, 'browser cookies must never rescue a bearer')
+        const id = authorization === `Bearer ${ownerSessionToken}` ? owner : authorization === `Bearer ${foreignSessionToken}` ? 'other-owner' : null
+        return id ? { user: { id } } : null
+      }
+      const cookie = headers.get('cookie')
+      return cookie === 'owner=1' ? { user: { id: owner } } : cookie === 'other=1' ? { user: { id: 'other-owner' } } : null
+    } } } },
+    '@/lib/desktop-rpc/handler': { humanSessionHeaders },
     '@/lib/agent-tool-approval/policy-store': { readCliRunPolicy, readCliAgentPolicy },
     '@/lib/agent-tool-approval/policy-settings': { setCliPolicy, setCliAgentPolicy },
   }
@@ -104,6 +117,28 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
   const checkHTTP = (policyRevision: string, runId = a.run) => fetch(`http://127.0.0.1:${address.port}/v1/runs/${runId}/tool-approval`, {
     method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ operation: 'check', deviceId: device, policyRevision }),
+  })
+  await t.test('human settings retain same-origin, fresh-session and tenant checks for browser and native callers', async () => {
+    const origin = `http://127.0.0.1:${address.port}`
+    const readSettings = (headers: Record<string, string>) => fetch(`${origin}/api/agent-cli-policy`, {
+      method: 'POST', headers: { origin, 'content-type': 'application/json', ...headers },
+      body: JSON.stringify({ operation: 'read', runId: a.run }),
+    })
+    const expected = await read(a.run)
+    const validHeaders: Record<string, string>[] = [{ cookie: 'owner=1' }, { authorization: `Bearer ${ownerSessionToken}`, cookie: 'other=1' }]
+    for (const headers of validHeaders) {
+      const response = await readSettings(headers)
+      assert.equal(response.status, 200)
+      assert.deepEqual(await response.json(), JSON.parse(JSON.stringify(expected)))
+    }
+    for (const authorization of [`Bearer ${'C'.repeat(32)}`, `Bearer mkp_${'a'.repeat(43)}`, 'Bearer invalid']) {
+      assert.equal((await readSettings({ authorization, cookie: 'owner=1' })).status, 401)
+    }
+    assert.equal((await readSettings({ authorization: `Bearer ${foreignSessionToken}`, cookie: 'owner=1' })).status, 409)
+    assert.equal((await readSettings({ cookie: 'other=1' })).status, 409)
+    assert.equal((await readSettings({ authorization: `Bearer ${ownerSessionToken}`, origin: 'https://foreign.example.invalid' })).status, 401)
+    assert.equal((await readSettings({ cookie: 'owner=1', origin: '' })).status, 401)
+    assert.equal((await readSettings({})).status, 401)
   })
   await t.test('signed policy HTTP context and renewal bind the current run and retain final restrictions', async () => {
     const issuer=`http://127.0.0.1:${address.port}`,url=`${issuer}/v1/runs/${a.run}/policy-snapshot`,auth={'x-mikka-client-version':'0.0.456',authorization:`Bearer ${token}`,'content-type':'application/json'}

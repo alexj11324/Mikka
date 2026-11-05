@@ -7,7 +7,8 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { performance } from 'node:perf_hooks'
 import { setTimeout as delay } from 'node:timers/promises'
-import { _electron as electron, chromium } from '@playwright/test'
+import { chromium } from '@playwright/test'
+import { launchElectron } from './electron-launch.mjs'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 
@@ -59,8 +60,8 @@ try {
     if (data === 'pong') webLive.pong++
     else { try { if (JSON.parse(data).type === 'live_ready') webLive.ready++ } catch { /* not a live control frame */ } }
   }))
-  application = await electron.launch({
-    args: [join(root, 'apps/desktop'), ...(process.getuid?.() === 0 ? ['--no-sandbox'] : [])], cwd: root,
+  application = await launchElectron({
+    args: [join(root, 'apps/desktop')], cwd: root,
     env: { ...process.env, MIKKA_DESKTOP_RENDERER: 'bundled', MIKKA_USER_DATA_DIR: join(tmpdir(), `mikka-idle-${process.pid}-${Date.now()}`) }, timeout: 90_000,
   })
   const page = await application.firstWindow({ timeout: 90_000 })
@@ -118,6 +119,12 @@ try {
   assert.ok(webLive.ready > 0 && webLive.pong > 0, 'Web live channel must be healthy before measurement')
   const nativeLive = await page.evaluate(() => window.__mikkaIdleLive)
   assert.ok(nativeLive.pong > 0, 'Native live channel must be healthy before measurement')
+  const [nativeWarmup, webWarmup] = await Promise.all([metrics(runtime.bundled.socket), metrics(runtime.hosted.socket)])
+  for (const sample of [nativeWarmup, webWarmup]) {
+    assert.ok(sample.queryCalls > 0 && sample.pgProtocolReceiveBytes > 0, 'Warmup must prove the real PostgreSQL driver is instrumented')
+    assert.equal(sample.unknownReadings, 0)
+  }
+  report.warmup = { bundled: nativeWarmup, web: webWarmup }
   const [nativeStart, webStart] = await Promise.all([metrics(runtime.bundled.socket, true), metrics(runtime.hosted.socket, true)])
   report.startedAt = new Date().toISOString()
   report.measurementStart = { bundled: nativeStart, web: webStart }

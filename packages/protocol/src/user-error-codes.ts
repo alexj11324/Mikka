@@ -10,6 +10,9 @@
 export const USER_ERROR_CODES = {
   desktop_client_update_required: [],
   desktop_session_expired: [],
+  desktop_session_changed: [],
+  desktop_account_limit_reached: [],
+  desktop_request_failed: [],
   desktop_backend_unreachable: [],
   desktop_rpc_request_invalid: [],
   desktop_rpc_action_unknown: [],

@@ -56,8 +56,11 @@ export function bundledProtocol(root: string, auth: Pick<BundledAuth, 'request'>
     if (path === null) return failure(400, 'invalid_path')
     if (path.startsWith('/api/')) {
       const origin = request.headers.get('origin')
-      // Sandboxed artifact frames have an opaque origin, so cannot act as the app.
-      if ((origin && origin !== RENDERER_ORIGIN) || request.headers.get('sec-fetch-site') === 'cross-site' || !allowedApiPath(path, request.method)) return failure(403, 'desktop_route_denied')
+      // Electron supplies the actual initiator separately and strips an opaque
+      // Origin header while constructing Request. Check both so sandboxed
+      // artifact frames and external BrowserPane frames cannot borrow main auth.
+      const initiator = (request as Request & { initiatorOrigin?: string }).initiatorOrigin
+      if ((initiator !== undefined && initiator !== RENDERER_ORIGIN) || (origin && origin !== RENDERER_ORIGIN) || request.headers.get('sec-fetch-site') === 'cross-site' || !allowedApiPath(path, request.method)) return failure(403, 'desktop_route_denied')
       try {
         const headers = new Headers()
         request.headers.forEach((value, key) => { if (REQUEST_HEADERS.has(key)) headers.set(key, value) })

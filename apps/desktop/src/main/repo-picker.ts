@@ -16,7 +16,11 @@ export async function pickRepo(): Promise<PickRepoResult> {
     let remoteUrl: string | null = null
     try { remoteUrl = (await exec('git', ['-C', root, 'remote', 'get-url', 'origin'], { timeout: 10_000, maxBuffer: 8192, windowsHide: true })).stdout.trim() || null } catch { /* A repository need not have a remote. */ }
     // Never send URL userinfo (embedded Git credentials) back to a renderer.
-    if (remoteUrl && /^https?:/i.test(remoteUrl)) { const url = new URL(remoteUrl); url.username = ''; url.password = ''; remoteUrl = url.href }
+    if (remoteUrl && /^[a-z][a-z0-9+.-]*:\/\//i.test(remoteUrl)) {
+      const url = new URL(remoteUrl)
+      url.username = ''; url.password = ''; url.search = ''; url.hash = ''
+      remoteUrl = url.href
+    }
     return { status: 'picked', repo: { path: root, name: basename(root), remoteUrl } }
   } catch { return { status: 'not_a_repo', path } }
 }

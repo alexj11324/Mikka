@@ -1,7 +1,7 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { NextIntlClientProvider, useTranslations } from 'next-intl'
 import { SWRConfig } from 'swr'
-import { ArrowLeft, CloudOff, WifiOff } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import en from '@/messages/en.json'
 import zh from '@/messages/zh-CN.json'
@@ -25,6 +25,7 @@ import { Link } from './i18n-navigation'
 import { localeOf, navigate, REFRESH_EVENT, useLocation, withoutLocale } from './location'
 import { openCurrentPageInBrowser } from './open-settings'
 import { getTransportState, setTransportState, subscribeTransport } from './transport-state'
+import { Offline } from './offline'
 
 const Workspace = lazy(() => import('./workspace'))
 
@@ -139,16 +140,6 @@ function NewWorkspace({ email }: { email: string }) {
       <CreateWorkspaceForm />
     </main>
   </div>
-}
-
-function Offline({ pending, retry }: { pending: boolean; retry: () => void }) {
-  const t = useTranslations('DesktopRenderer')
-  return <main className="desktop-offline"><section>
-    {navigator.onLine ? <CloudOff aria-hidden="true" /> : <WifiOff aria-hidden="true" />}
-    <h1>{t(navigator.onLine ? 'serverUnavailable' : 'networkUnavailable')}</h1>
-    <p role="status">{t(pending ? 'reconnecting' : 'offlineHint')}</p>
-    <button type="button" disabled={pending} onClick={retry}>{t('retry')}</button>
-  </section></main>
 }
 
 function ConnectionStatus({ offline, retry }: { offline: boolean; retry: () => void }) {

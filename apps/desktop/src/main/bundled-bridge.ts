@@ -19,7 +19,7 @@ export function registerBundledBridge(auth: BundledAuth, live: BundledLive, view
       }
       return Promise.resolve().then(() => run(owner, ...input)).catch(() => {
         // Never serialize an upstream response, token-bearing URL or native stack.
-        throw new Error('desktop_request_failed / 桌面请求失败，请重试')
+        throw new Error('desktop_request_failed')
       })
     })
   }

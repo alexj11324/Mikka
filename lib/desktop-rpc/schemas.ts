@@ -123,7 +123,6 @@ export const desktopActionSchemas = {
   'collaboration.listMembers': oneId,
   'collaboration.inviteMember': tuple(uuid, z.email().max(254)),
   'collaboration.removeMember': tuple(uuid, id),
-  'coordinator.getCoordinatorChat': tuple(bot.optional()),
   'coordinator.pollCoordinatorChat': tuple(bot.optional(), version.optional(), object({ after: count, cursor: count, prefix: version, sourceIds: z.array(uuid).max(400).optional(), artifactIds: z.array(uuid).max(400).optional() }).optional()),
   'coordinator.coordinatorHistory': tuple(bot, count),
   'coordinator.coordinatorCitationSources': tuple(z.array(uuid).min(1).max(50)),

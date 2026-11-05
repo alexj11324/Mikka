@@ -4931,6 +4931,9 @@
   "RunErrors": {
     "desktop_client_update_required": { "default": "Update Mikka to continue" },
     "desktop_session_expired": { "default": "Sign in to Mikka again" },
+    "desktop_session_changed": { "default": "The account or workspace changed. Try again" },
+    "desktop_account_limit_reached": { "default": "Five accounts are already signed in" },
+    "desktop_request_failed": { "default": "The desktop request failed. Try again" },
     "desktop_backend_unreachable": { "default": "Cannot connect to Mikka" },
     "desktop_rpc_request_invalid": { "default": "Check the information and try again" },
     "desktop_rpc_action_unknown": { "default": "This action is unavailable in this version of Mikka" },

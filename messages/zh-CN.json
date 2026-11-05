@@ -4931,6 +4931,9 @@
   "RunErrors": {
     "desktop_client_update_required": { "default": "请更新 Mikka 后继续" },
     "desktop_session_expired": { "default": "请重新登录 Mikka" },
+    "desktop_session_changed": { "default": "账号或工作区已切换，请重试" },
+    "desktop_account_limit_reached": { "default": "已登录五个账号" },
+    "desktop_request_failed": { "default": "桌面请求失败，请重试" },
     "desktop_backend_unreachable": { "default": "无法连接 Mikka" },
     "desktop_rpc_request_invalid": { "default": "请检查填写的内容后重试" },
     "desktop_rpc_action_unknown": { "default": "当前版本的 Mikka 不支持此操作" },

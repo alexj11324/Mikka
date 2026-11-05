@@ -40,7 +40,7 @@ export const navigationAllowlist = {
   'components/teams/team-directory.tsx': { 'navigation/router': { count: 1, reason: 'Settings › 团队 falls back to the router where pushSettingsHistory cannot' } },
   'components/teams/team-settings-details.tsx': { 'navigation/router': { count: 1, reason: 'Settings › 团队 falls back to the router where pushSettingsHistory cannot' } },
   'components/desktop/desktop-integration.tsx': { 'navigation/router': { count: 1, reason: 'a notification link that is not a place in the app window' } },
-  'lib/auth-return.ts': { 'navigation/address': { count: 4, reason: 'validates where sign-in may return to; it accepts only these exact shapes' } },
+  'lib/auth-return.ts': { 'navigation/address': { count: 3, reason: 'validates where sign-in may return to; it accepts only these exact shapes' } },
   'lib/mobile-web-target.ts': { 'navigation/address': { count: 5, reason: 'validates where the phone app may open the web; it accepts only these exact shapes' } },
   'app/api/integrations/github/connect/route.ts': { 'navigation/address': { count: 1, reason: 'sign-in return to the GitHub app page (section=plugins&app=github)' } },
   'lib/github/connect-callback.ts': { 'navigation/address': { count: 1, reason: 'the GitHub app page (section=plugins&app=github) after its install callback' } },

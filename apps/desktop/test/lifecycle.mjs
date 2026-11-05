@@ -9,10 +9,11 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { _electron as electron, chromium } from '@playwright/test'
+import { chromium } from '@playwright/test'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 import { createParityFixtures } from './parity-fixtures.mjs'
+import { launchElectron } from './electron-launch.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 const environment = await loadEnvironment()
@@ -37,16 +38,16 @@ const evidence = {
   },
 }
 const check = name => { evidence.checks.push({ name, result: 'passed' }); console.log(`PASS ${name}`) }
-let scope, browser, fixtures, application
+let scope, browser, fixtures, application, ownerEmail
 let passed = false
 const active = new Set()
 
 async function launch(mode, extraArgs = []) {
   await scope.assertActive()
   const started = performance.now()
-  const app = await electron.launch({
+  const app = await launchElectron({
     ...(process.env.MIKKA_DESKTOP_EXECUTABLE ? { executablePath: process.env.MIKKA_DESKTOP_EXECUTABLE } : {}),
-    args: [...(process.env.MIKKA_DESKTOP_EXECUTABLE ? [] : [join(root, 'apps/desktop')]), ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), ...extraArgs],
+    args: [...(process.env.MIKKA_DESKTOP_EXECUTABLE ? [] : [join(root, 'apps/desktop')]), ...extraArgs],
     cwd: root, env: { ...process.env, MIKKA_DESKTOP_RENDERER: mode, MIKKA_USER_DATA_DIR: profiles[mode] }, timeout: 90_000,
   })
   active.add(app)
@@ -81,7 +82,8 @@ async function selectFixture(page) {
   await usable(page)
 }
 
-async function nativeSignIn(app, page) {
+async function nativeSignIn(app, page, account = scope.owner) {
+  await page.waitForLoadState('domcontentloaded')
   await page.waitForFunction(() => Boolean(window.mikka?.bundled))
   await app.evaluate(({ shell }) => {
     globalThis.__mikkaLifecycleExternal = null
@@ -99,15 +101,19 @@ async function nativeSignIn(app, page) {
   }
   assert.ok(external, 'main opens the ordinary system-browser handoff')
   assert.equal(new URL(external).origin, environment.origin)
-  const context = await browser.newContext({ storageState: scope.owner.storageStatePath })
+  const context = await browser.newContext({ storageState: account.storageStatePath })
   try {
     const browserPage = await context.newPage()
+    const returned = page.waitForEvent('domcontentloaded', { timeout: 60_000 })
+    returned.catch(() => {})
     await browserPage.goto(external, { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await handoff
-    await page.waitForFunction(() => window.mikka.bundled.session().then(session => Boolean(session?.user?.id)))
+    await returned
+    await page.waitForFunction(expected => window.mikka.bundled.session().then(session => session?.user?.id === expected), account.userId)
     const session = await page.evaluate(() => window.mikka.bundled.session())
-    assert.equal(session.user.id, scope.owner.userId)
-    await scope.recordResource({ type: 'session', id: session.session.id, ownerId: scope.owner.userId })
+    assert.equal(session.user.id, account.userId)
+    await scope.recordResource({ type: 'session', id: session.session.id, ownerId: account.userId })
+    return session
   } finally { await context.close() }
 }
 
@@ -136,12 +142,13 @@ async function offline(app, value) {
 }
 
 try {
-  scope = await acquireTestAccounts({ runId: `desktop-lifecycle-${Date.now()}`, workerId: 'lifecycle', requestId: `lifecycle-${process.pid}-${Date.now()}`, ttlMs: 1_200_000 })
+  // The lease helper renews this five-minute lease while the process is alive.
+  scope = await acquireTestAccounts({ runId: `desktop-lifecycle-${Date.now()}`, workerId: 'lifecycle', requestId: `lifecycle-${process.pid}-${Date.now()}`, ttlMs: 300_000 })
   fixtures = await createParityFixtures(scope)
   browser = await chromium.launch({ headless: true })
   let run = await launch('bundled')
   application = run.app
-  await nativeSignIn(run.app, run.page)
+  ownerEmail = (await nativeSignIn(run.app, run.page)).user.email
   await selectFixture(run.page)
   await run.page.evaluate(() => localStorage.setItem('theme', 'light'))
   await close(run.app); application = null
@@ -176,6 +183,17 @@ try {
   check('at least five paired fresh-process launches reach the same usable seeded chat')
 
   run = await launch('bundled'); application = run.app
+  // Both identities were already leased through ordinary server auth. Reuse
+  // their real browser sessions through PKCE; do not fake a provider challenge.
+  await nativeSignIn(run.app, run.page, scope.peer)
+  const menuLocale = await run.page.evaluate(() => document.documentElement.lang)
+  await run.page.getByRole('button', { name: menuNames[menuLocale], exact: true }).first().click()
+  const ownerGroup = run.page.getByRole('group').filter({ has: run.page.getByText(ownerEmail, { exact: true }) })
+  await ownerGroup.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: true }).click()
+  await run.page.waitForFunction(owner => window.mikka.bundled.session().then(session => session?.user.id === owner), scope.owner.userId)
+  await usable(run.page)
+  assert.equal(await run.page.evaluate(() => document.cookie), '')
+  check('two leased browser identities remain private in main and the real account/workspace menu switches back to the retained owner')
   await usable(run.page, 'Keep this unsent draft during the outage')
   await offline(run.app, true)
   const failedStatus = await run.page.evaluate(async () => (await fetch('/mikka/api/desktop/rpc', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: 1, action: 'desktop.bootstrap', args: [] }) })).status)

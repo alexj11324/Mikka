@@ -3,13 +3,15 @@ import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { createServer } from 'node:net'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { _electron as electron, chromium } from '@playwright/test'
+import { chromium } from '@playwright/test'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 import { createParityFixtures } from './parity-fixtures.mjs'
 import { compareImages, screenshot } from './parity-images.mjs'
+import { launchElectron } from './electron-launch.mjs'
 
 // A real production backend and one leased dataset serve both modes. These
 // screenshots exercise application routes, components and RPCs; there are no
@@ -44,9 +46,9 @@ let cleanupError
 async function launch(mode) {
   const profile = join(tmpdir(), `mikka-parity-${mode}-${process.pid}-${started}`)
   profiles.push(profile)
-  const application = await electron.launch({
+  const application = await launchElectron({
     ...(process.env.MIKKA_DESKTOP_EXECUTABLE ? { executablePath: process.env.MIKKA_DESKTOP_EXECUTABLE } : {}),
-    args: [...(process.env.MIKKA_DESKTOP_EXECUTABLE ? [] : [join(root, 'apps/desktop')]), ...(process.getuid?.() === 0 ? ['--no-sandbox'] : [])],
+    args: process.env.MIKKA_DESKTOP_EXECUTABLE ? [] : [join(root, 'apps/desktop')],
     cwd: root,
     env: { ...process.env, MIKKA_DESKTOP_RENDERER: mode, MIKKA_USER_DATA_DIR: profile },
     timeout: 90_000,
@@ -96,6 +98,44 @@ async function pair(name, appearance, targets, open) {
   report.screens.push(result)
   await writeFile(join(output, 'parity.json'), `${JSON.stringify(report, null, 2)}\n`)
   console.log(`${comparison.passed ? 'PASS' : 'FAIL'} ${appearance}/${name}: ${(comparison.changedRatio * 100).toFixed(5)}% pixels${comparison.maskGeometryMatches ? '' : '; mask geometry differs'}`)
+}
+
+async function offlinePairs(targets) {
+  const portProbe = createServer()
+  await new Promise(resolve => portProbe.listen(0, '127.0.0.1', resolve))
+  const closedPort = portProbe.address().port
+  await new Promise(resolve => portProbe.close(resolve))
+  async function network(target, blocked) {
+    // Chromium performs the real failed connection. Only these isolated app
+    // sessions use the closed proxy; the shared backend and lease stay live.
+    await target.application.evaluate(async ({ BrowserWindow, session }, { mode, blocked, port }) => {
+      const window = BrowserWindow.getAllWindows()[0]
+      const transport = mode === 'bundled' ? session.fromPartition('persist:mikka-dev-bundled-backend') : window.webContents.session
+      await transport.setProxy(blocked
+        ? { proxyRules: `http=127.0.0.1:${port};https=127.0.0.1:${port}`, proxyBypassRules: '<-loopback>' }
+        : { mode: 'direct' })
+      await transport.closeAllConnections()
+      if (blocked) await transport.clearCache()
+    }, { mode: target.mode, blocked, port: closedPort })
+  }
+  for (const appearance of report.themes) {
+    for (const target of targets) await theme(target, appearance)
+    try {
+      await pair('offline', appearance, targets, async target => {
+        await network(target, true)
+        await target.page.reload({ waitUntil: 'domcontentloaded' }).catch(error => {
+          if (target.mode !== 'hosted' || !/ERR_(?:PROXY_CONNECTION_FAILED|TUNNEL_CONNECTION_FAILED)/.test(error.message)) throw error
+        })
+        if (target.mode === 'hosted') await target.page.waitForURL('file:**/offline.html?**')
+        else await target.page.locator('.desktop-offline').waitFor()
+        await target.page.getByRole('status').waitFor()
+        assert.equal(new URL(target.page.url()).protocol, target.mode === 'hosted' ? 'file:' : 'mikka:')
+      })
+    } finally {
+      for (const target of targets) await network(target, false)
+      for (const target of targets) await go(target)
+    }
+  }
 }
 
 async function authenticate(bundled, hosted) {
@@ -226,11 +266,12 @@ try {
   }
   await authenticate(bundled, hosted)
   const matrix = screens(fixtures.fixture)
-  report.requiredScreens = ['sign-in', ...matrix.map(screen => screen.name)]
+  report.requiredScreens = ['sign-in', ...matrix.map(screen => screen.name), 'offline']
   for (const appearance of report.themes) {
     for (const target of targets) await theme(target, appearance)
     for (const screen of matrix) await pair(screen.name, appearance, targets, screen.open)
   }
+  await offlinePairs(targets)
   assert.deepEqual(errors, [], 'The reused renderer must have no uncaught page errors')
   assert.equal(report.screens.length, report.requiredScreens.length * report.themes.length, 'Every screen must be captured in both themes')
   assert.equal(report.screens.filter(screen => !screen.passed).length, 0, 'Every screenshot must differ by at most 0.1% with identical dynamic-mask geometry')

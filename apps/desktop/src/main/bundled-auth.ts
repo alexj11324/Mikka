@@ -166,7 +166,7 @@ export class BundledAuth {
     if (!parsed || generation !== this.generation) throw new Error('Sign-in expired / 登录已过期')
     // Same-account reauthentication replaces only that account; add-account
     // retains the other encrypted sessions, bounded like the web switcher.
-    if (!this.saved.has(parsed.identity.user.id) && this.saved.size >= 5) throw new Error('Desktop account limit reached / 桌面账号数量已达上限')
+    if (!this.saved.has(parsed.identity.user.id) && this.saved.size >= 5) throw new Error('desktop_account_limit_reached')
     if (!await this.commitAccount(parsed, generation)) return
     this.options.changed()
   }

@@ -93,6 +93,44 @@ function sharedStyles() {
   }
 }
 
+/** The installed fallback owns this presentation. Read its real CSS and SVG
+ * paths instead of maintaining a second offline design in the React app. */
+function nativeOfflineView() {
+  return {
+    name: 'mikka-native-offline-view',
+    setup(builder) {
+      builder.onResolve({ filter: /^mikka:native-offline(?:\.css)?$/ }, args => ({ path: args.path, namespace: 'native-offline' }))
+      builder.onLoad({ filter: /.*/, namespace: 'native-offline' }, async args => {
+        const source = await readFile(resolve(desktop, 'src/offline.html'), 'utf8')
+        if (args.path.endsWith('.css')) {
+          const styles = /<style>([\s\S]*?)<\/style>/.exec(source)?.[1]
+          if (!styles) throw new Error('Native offline styles are missing')
+          const css = postcss.parse(styles)
+          css.walkRules(rule => {
+            if (rule.parent?.type === 'atrule' && rule.parent.name.includes('keyframes')) return
+            rule.selectors = rule.selectors.flatMap(selector => {
+              if (selector === ':root' || selector === 'body') return ['.desktop-offline']
+              if (selector === '*') return ['.desktop-offline', '.desktop-offline *']
+              if (selector === 'main') return ['.desktop-offline section']
+              return [`.desktop-offline ${selector}`]
+            })
+          })
+          css.walkAtRules('keyframes', rule => { rule.params = `desktop-offline-${rule.params}` })
+          css.walkDecls('animation', declaration => { declaration.value = declaration.value.replace(/^pulse\b/, 'desktop-offline-pulse') })
+          return { contents: css.toString(), loader: 'css' }
+        }
+        const paths = Object.fromEntries(['network', 'server'].map(kind => {
+          const svg = new RegExp(`<svg id="icon-${kind}"[^>]*>([\\s\\S]*?)<\\/svg>`).exec(source)?.[1]
+          const values = [...(svg ?? '').matchAll(/<path d="([^"]+)"\s*\/>/g)].map(match => match[1])
+          if (!values.length) throw new Error(`Native offline ${kind} icon is missing`)
+          return [kind, values]
+        }))
+        return { contents: `import 'mikka:native-offline.css'; export const paths = ${JSON.stringify(paths)};`, loader: 'js' }
+      })
+    },
+  }
+}
+
 /** OpenUI's icon catalogue has ~2,000 dynamic entry points, although it uses
  * the same Lucide modules the application already imports. Keep its exact
  * names and Promise/module contract while sharing one local icon catalogue;
@@ -187,7 +225,7 @@ export async function buildRenderer({ outdir = resolve(desktop, 'dist/renderer')
       // Neither the shell environment nor backend credentials are spread here.
       'process.env': '{}',
     },
-    plugins: [applicationBoundary(actions), bundledIconCatalogue(), bundledSyntaxCatalogue(), sharedStyles()],
+    plugins: [applicationBoundary(actions), bundledIconCatalogue(), bundledSyntaxCatalogue(), sharedStyles(), nativeOfflineView()],
     logLevel: 'info',
   })
   const outputs = Object.entries(result.metafile.outputs)
