@@ -34,6 +34,7 @@ import { teamIssues } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, taskFreeThreadMembers, threadQuestionRunId, withRunChain, type IssueThread } from '@/lib/issue-threads'
 import { readThreadQuestionState, type ThreadQuestionDeadline } from '@/lib/issue-thread-questions'
+import { runIsActive } from '@/lib/issue-run-conversation'
 import { listIssueRunChains, readRunChain } from '@/lib/run-chain'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import { parseUnifiedDiff, type ThreadChangesResult } from '@/lib/thread-changes'
@@ -286,7 +287,7 @@ export interface IssueThreadDetail {
   /** Authorized scopes for every attempt; browser state never guesses them. */
   live?: { runs: import('@/lib/live/panels').ThreadLiveReference[]; issueWorkspaceId: string | null; questionDeadline: ThreadQuestionDeadline | null }
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
-  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean; /** The latest masked run error or the host's fixed wake failure. */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null; /** Host-confirmed provider recovery, within this owner's thread chain. */ modelFallback?: import('@/lib/run-model-fallback-view').ThreadModelFallbackView[] | null; /** Keep polling while the host prepares a continuation; no uncommitted switch is displayed. */ modelFallbackPending?: boolean }
+  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; /** Host projection for the existing controls; mutations still revalidate. */ replyAvailable: boolean; retryAvailable: boolean; feedbackEligible:boolean; /** The latest masked run error or the host's fixed wake failure. */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null; /** Host-confirmed provider recovery, within this owner's thread chain. */ modelFallback?: import('@/lib/run-model-fallback-view').ThreadModelFallbackView[] | null; /** Keep polling while the host prepares a continuation; no uncommitted switch is displayed. */ modelFallbackPending?: boolean }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
   /** Where `chunks` ends; passed back, the next read returns only later chunks. */
@@ -318,6 +319,30 @@ async function threadQuestions(threads: readonly IssueThread[], viewerId: string
       : null
     return { ...thread, question, questionWake }
   })), deadline }
+}
+
+/** Shared with the explicit owner Retry action: a check can recover its own
+ * strict question, never become an ordinary task continuation. */
+async function originalSessionRetry(userId: string, runId: string, issueId: string) {
+  const requestId=factoryEventId('question-owner-retry',runId)
+  const eventId=factoryEventId('question-recover',requestId)
+  const {rows:[question]}=await pool.query(`SELECT q.id AS "questionId",q.revision AS "questionRevision",
+    q.status AS "questionStatus",q."continuationRunId",q."originRunId",q."originSessionId",t."botId",t.status AS "taskStatus",r.status AS "runStatus",
+    jsonb_build_object('taskId',t.id,'issueId',t."issueId",'attemptId',t."attemptId",'candidateId',t."candidateId",'revision',t.revision) AS binding,
+    e.request AS "recoveryRequest"
+    FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=$1
+    JOIN agent_runs r ON r.id=$2 AND r."userId"=$1 AND r."issueId"=$3
+    LEFT JOIN factory_events e ON e."taskId"=t.id AND e."eventId"=$4 AND e.request->>'kind'='question_recover'
+      AND e.request->>'userId'=$1 AND e.request->'input'->>'expectedFailedRunId'=r.id::text
+      AND e.request->'input'->'reference'->>'questionId'=q.id::text
+    WHERE q."userId"=$1 AND q."issueId"=$3 AND t."issueId"=$3
+      AND r."questionContinuation"->>'requireSessionResume'='true'
+      AND (q."continuationRunId"=r.id OR e."eventId" IS NOT NULL OR q.id::text=r."questionContinuation"->>'questionId')`,[userId,runId,issueId,eventId])
+  return { requestId, question }
+}
+
+function originalSessionRetryAvailable(question: { recoveryRequest?: unknown; questionStatus: string; taskStatus: string; runStatus: string; continuationRunId: string | null } | undefined, runId: string) {
+  return !!question && (!!question.recoveryRequest || (question.questionStatus === 'blocked' && question.taskStatus === 'blocked' && question.runStatus === 'failed' && question.continuationRunId === runId))
 }
 
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
@@ -355,6 +380,24 @@ export async function getIssueThread(issueId: string | null, runId: string, afte
   }
   const questionWake = thread.questionWake ?? null
   if (questionWake) error = questionWake.error
+  const liveStatus = live?.status ?? row.status
+  let replyAvailable = true
+  let retryAvailable = !!questionWake || liveStatus === 'failed'
+  if (!runIsActive(liveStatus)) {
+    // Independent checks cannot enter ordinary continuation (latestTaskRun).
+    // Read the latest run's host binding, never a report or the root's stage.
+    const { rows: [target] } = await pool.query<{ independentCheck: boolean }>(`SELECT EXISTS (
+      SELECT 1 FROM factory_attempts a WHERE a."runId"=r.id AND a.stage IN ('review','verify','monitor')
+      ) AS "independentCheck" FROM agent_runs r
+      WHERE r.id=$1 AND r."userId"=$2 AND r."issueId" IS NOT DISTINCT FROM $3::uuid`, [thread.latestRunId, user.id, row.issueId])
+    replyAvailable = !!target && (!target.independentCheck || thread.question === 'waiting')
+    if (!target) retryAvailable = false
+    else if (target.independentCheck) {
+      const recovery = liveStatus === 'failed' && row.issueId
+        ? await originalSessionRetry(user.id, thread.latestRunId, row.issueId) : null
+      retryAvailable = originalSessionRetryAvailable(recovery?.question, thread.latestRunId)
+    }
+  }
   const quota = row.userId === user.id
     ? await (await import('@/lib/run-quota-view')).threadQuotaView(user.id, chain?.attempts.map(attempt => attempt.runId) ?? [row.id], thread.latestRunId)
     : null
@@ -369,7 +412,7 @@ export async function getIssueThread(issueId: string | null, runId: string, afte
   ])
   return {
     live: { runs, issueWorkspaceId, questionDeadline },
-    thread: { ...thread, questionWake, prompt: row.prompt, stopRequestedAt, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
+    thread: { ...thread, questionWake, prompt: row.prompt, stopRequestedAt, replyAvailable, retryAvailable, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
     chunkCursor: read.cursor,
@@ -435,22 +478,9 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
   if(input.retryOriginalSession && row.issueId) {
     // Only the existing owner Retry control requests recovery. A typed label,
     // Bot message or ordinary send never acquires this authority.
-    const requestId=factoryEventId('question-owner-retry',row.id)
-    const eventId=factoryEventId('question-recover',requestId)
-    const {rows:[question]}=await pool.query(`SELECT q.id AS "questionId",q.revision AS "questionRevision",
-      q.status AS "questionStatus",q."continuationRunId",q."originRunId",q."originSessionId",t."botId",t.status AS "taskStatus",r.status AS "runStatus",
-      jsonb_build_object('taskId',t.id,'issueId',t."issueId",'attemptId',t."attemptId",'candidateId',t."candidateId",'revision',t.revision) AS binding,
-      e.request AS "recoveryRequest"
-      FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=$1
-      JOIN agent_runs r ON r.id=$2 AND r."userId"=$1 AND r."issueId"=$3
-      LEFT JOIN factory_events e ON e."taskId"=t.id AND e."eventId"=$4 AND e.request->>'kind'='question_recover'
-        AND e.request->>'userId'=$1 AND e.request->'input'->>'expectedFailedRunId'=r.id::text
-        AND e.request->'input'->'reference'->>'questionId'=q.id::text
-      WHERE q."userId"=$1 AND q."issueId"=$3 AND t."issueId"=$3
-        AND r."questionContinuation"->>'requireSessionResume'='true'
-        AND (q."continuationRunId"=r.id OR e."eventId" IS NOT NULL OR q.id::text=r."questionContinuation"->>'questionId')`,[user.id,row.id,row.issueId,eventId])
+    const { requestId, question } = await originalSessionRetry(user.id, row.id, row.issueId)
     if(question) {
-      if(!question.recoveryRequest && (question.questionStatus!=='blocked'||question.taskStatus!=='blocked'||question.runStatus!=='failed'||question.continuationRunId!==row.id))throw new ActionFailureError('threadCannotContinue')
+      if(!originalSessionRetryAvailable(question, row.id))throw new ActionFailureError('threadCannotContinue')
       // One SQL snapshot selects either the original receipt input or the
       // current reference. Concurrent clicks therefore send the same request.
       const input=question.recoveryRequest?.input ?? {requestId,expectedFailedRunId:row.id,reference:{questionId:question.questionId,questionRevision:question.questionRevision,binding:question.binding,originRunId:question.originRunId,originSessionId:question.originSessionId}}
