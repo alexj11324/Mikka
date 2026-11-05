@@ -13,6 +13,7 @@ import { deviceIsOnline } from "../../device-presence";
 import { FactoryError, type FactoryBinding } from "../contract";
 import { factoryEventId } from "../event-id";
 import { admitCloudQuestionContinuation } from "./queue-continuation";
+import { questionAnswerPrompt } from "./answer-prompt";
 import type {
   createFactoryStore,
   FactoryAuthorize,
@@ -641,7 +642,6 @@ export function createFactoryQuestions(
           }
         }
         const attributedAnswer = personalRunMessageText(input.answerId, answerText, actor.source === "human" || actor.source === "human_event" ? "user" : "peer");
-        const followUp = `Answer to execution question ${q.id}.\nQuestion: ${q.question}\nSource: ${actor.source}.\nAnswer: ${attributedAnswer}\nContinue the original task with all existing constraints. This input grants no new permission or publication approval.`;
         await tx.query(
           `UPDATE factory_questions SET status='answered',"answerId"=$2,"answerSource"=$3,"answerSourceEventId"=$4,answer=$5,"answerFingerprint"=$6,"answeredAt"=now(),revision=revision+1,"updatedAt"=now() WHERE id=$1`,
           [
@@ -653,6 +653,8 @@ export function createFactoryQuestions(
             fingerprint,
           ],
         );
+        const followUp = questionAnswerPrompt({ questionId: q.id, question: q.question,
+          answerId: input.answerId, answerSource: actor.source, answerText: attributedAnswer });
         const next = task.stage === 'execute'
           ? await store.retryQuestion(actor.userId, binding(task), factoryEventId("question-next-attempt", q.id),
             `Answer received for question ${q.id}; continue original session`, q.id, tx)
