@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { currentDesktopSession } from '@/lib/desktop-rpc/session'
+import { readDesktopSession } from '@/lib/desktop-rpc/session'
+import { nativeSessionHeaders } from '@/lib/desktop-rpc/session-cache'
 
 /**
  * The session is cached in a signed cookie for 5 minutes (lib/auth.ts
@@ -32,17 +33,18 @@ export const SESSION_OPTIONS = {
 
 /** Makes `auth.api.getSession` skip the cookie cache inside withFreshSession. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- better-auth's getSession is overloaded; the wrapper only adds a query flag.
-export function readFreshSessionsInScope(api: { getSession: (context: any) => Promise<unknown> }) {
+export function readFreshSessionsInScope(api: { getSession: (context: any) => Promise<unknown> }, native?: { cookieName: () => Promise<string> }) {
   const read = api.getSession
   api.getSession = (context: { headers?: Headers; query?: Record<string, unknown> } | undefined) => {
-    // RPC already checked this bearer against the database in this request. Reuse
-    // that identity, including for an action which receives ambient browser cookies.
-    const desktop = currentDesktopSession()
-    if (desktop) return Promise.resolve(desktop)
+    const mustBeFresh = sessionMustBeFresh() || context?.query?.disableCookieCache === true
+    const desktop = readDesktopSession(mustBeFresh)
+    if (desktop) return desktop
     if (context?.headers?.has('authorization')) {
-      const headers = new Headers(context.headers)
-      headers.delete('cookie')
-      return read({ ...context, headers, query: { ...context.query, disableCookieCache: true } })
+      const input = context.headers
+      return (async () => {
+        const headers = nativeSessionHeaders(input, native ? await native.cookieName() : undefined, Boolean(native && !mustBeFresh))
+        return read({ ...context, headers, query: { ...context.query, disableCookieCache: mustBeFresh || !native } })
+      })()
     }
     return read(sessionMustBeFresh() ? { ...context, query: { ...context?.query, disableCookieCache: true } } : context)
   }

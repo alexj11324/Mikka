@@ -9,6 +9,7 @@ import { createDesktopRpc } from '../lib/desktop-rpc/handler'
 import { encode, decode } from '../lib/desktop-rpc/wire'
 import { withDesktopSession, safeDesktopSession } from '../lib/desktop-rpc/session'
 import { withBasePath } from '../lib/base-path'
+import { DESKTOP_SESSION_CACHE_HEADER, validDesktopSessionCache } from '../lib/desktop-rpc/session-cache'
 
 const url = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs isolated PostgreSQL')
@@ -28,7 +29,7 @@ test('native RPC verifies real bearer sessions, tenant membership, expiry and on
       emailAndPassword: { enabled: true }, trustedOrigins: [origin], logger: { disabled: true }, session: fresh.SESSION_OPTIONS,
       plugins: [bearer(), oneTimeToken({ expiresIn: 1, storeToken: 'hashed' })],
     })
-    fresh.readFreshSessionsInScope(auth.api)
+    fresh.readFreshSessionsInScope(auth.api, { cookieName: async () => (await auth.$context).authCookies.sessionData.name })
     const register = async (name: string) => {
       const email = `desktop-rpc-${randomUUID()}@example.invalid`, password = randomBytes(24).toString('hex')
       const send = (path: string, body: unknown) => auth.handler(new Request(`${origin}${withBasePath(`/api/auth/${path}`)}`, {
@@ -107,6 +108,10 @@ test('native RPC verifies real bearer sessions, tenant membership, expiry and on
       assert.equal(response.status, 200)
       const value = await response.json()
       assert.equal(value.token, alice.token); assert.equal(value.user.id, alice.id); assert.deepEqual(Object.keys(value.session), ['id'])
+      const cache = response.headers.get(DESKTOP_SESSION_CACHE_HEADER)
+      assert.ok(validDesktopSessionCache(cache), 'the one-use SDK exchange supplies the existing signed proof privately')
+      const cold = await auth.api.getSession({ headers: new Headers({ authorization: `Bearer ${value.token}`, [DESKTOP_SESSION_CACHE_HEADER]: cache }) })
+      assert.equal(cold?.user.id, alice.id)
       assert.equal((await exchange(proof)).status, 400)
       const bad = await create()
       assert.equal((await exchange({ ...bad, verifier: randomBytes(32).toString('base64url') })).status, 400)

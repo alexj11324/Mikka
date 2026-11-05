@@ -8,6 +8,7 @@ import { chromium } from '@playwright/test'
 import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
+import { waitForBundledSession } from './bundled-session.mjs'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 
@@ -31,6 +32,7 @@ let browser
 let scope
 let nativeResources
 let passed = false
+let failure
 
 try {
   scope = await acquireTestAccounts({ runId: `desktop-${started}`, workerId: 'bundled-smoke', requestId: `desktop-${started}`, ttlMs: 300_000 })
@@ -95,8 +97,7 @@ try {
   assert.equal(new URL(external).origin, environment.origin)
   await systemBrowser.goto(external, { waitUntil: 'domcontentloaded', timeout: 60_000 })
   await handoff
-  await page.waitForFunction(() => window.mikka.bundled.session().then(value => Boolean(value?.user?.id)))
-  const publicSession = await page.evaluate(() => window.mikka.bundled.session())
+  const publicSession = await waitForBundledSession(page, scope.owner.userId)
   assert.equal(publicSession.user.id, scope.owner.userId)
   assert.deepEqual(Object.keys(publicSession.session), ['id'])
   await scope.recordResource({ type: 'session', id: publicSession.session.id, ownerId: scope.owner.userId })
@@ -133,6 +134,8 @@ try {
   assert.equal(await page.evaluate(() => window.mikka.bundled.session()), null)
   check('sign-out clears the main-owned session')
   passed = true
+} catch (error) {
+  failure = error
 } finally {
   const cleanupErrors = []
   const failedCleanup = error => { passed = false; cleanupErrors.push(error) }
@@ -152,5 +155,6 @@ try {
   await writeFile(join(output, 'smoke.json'), `${JSON.stringify(evidence, null, 2)}\n`)
   await auditEvidence([output], { environment })
   if (!cleanupErrors.length) await rm(profile, { recursive: true, force: true })
-  if (cleanupErrors.length) throw new AggregateError(cleanupErrors, 'DESKTOP_SMOKE_CLEANUP_FAILED')
+  if (cleanupErrors.length) failure = new AggregateError([...(failure ? [failure] : []), ...cleanupErrors], 'DESKTOP_SMOKE_CLEANUP_FAILED')
 }
+if (failure) throw failure

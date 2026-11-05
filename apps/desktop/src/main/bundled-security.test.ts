@@ -192,6 +192,7 @@ test('loopback validates nonce/code exactly, ignores wrong attempts and accepts 
 
 test('browser handoff creates/exchanges PKCE only in main and publishes only public identity', { timeout: 5000 }, async t => {
   const vault = new SessionVault(await fixture(t), 'https://server.test/mikka', encryption())
+  const sessionCache = Buffer.from('private-existing-signed-session-cache').toString('base64url')
   let registration: { state: string; callback: string; challenge: string } | undefined
   let opened: URL | undefined
   let complete!: () => void
@@ -208,7 +209,7 @@ test('browser handoff creates/exchanges PKCE only in main and publishes only pub
       assert.equal(body.code, code)
       assert.equal(body.state, registration?.state)
       assert.equal(createHash('sha256').update(body.verifier).digest('base64url'), registration?.challenge)
-      return Response.json({ ...identity, token: secret })
+      return Response.json({ ...identity, token: secret }, { headers: { 'x-mikka-session-cache': sessionCache } })
     },
   })
   t.after(() => auth.dispose())
@@ -223,6 +224,7 @@ test('browser handoff creates/exchanges PKCE only in main and publishes only pub
   await finished
   assert.deepEqual(auth.session(), identity)
   assert.equal((await vault.load())?.token, secret)
+  assert.equal((await vault.load())?.sessionCache, sessionCache)
   assert.equal(JSON.stringify(auth.session()).includes(secret), false)
 })
 

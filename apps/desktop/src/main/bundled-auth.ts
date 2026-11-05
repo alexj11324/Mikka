@@ -3,7 +3,7 @@ import type { BundledSession, BundledSignIn } from '@mikka/protocol/bridge'
 import { remoteBase, safeAppNext } from './bundled-policy'
 import { startBundledLoopback } from './bundled-loopback'
 import type { LoopbackAuthServer } from './loopback'
-import { publicSession, storedSession, type SessionVault, type StoredSession } from './session-vault'
+import { publicSession, responseSessionCache, SESSION_CACHE_HEADER, storedSession, type SessionVault, type StoredSession } from './session-vault'
 import { accountChoice, responseWorkspace, rpcEnvelope } from './bundled-accounts'
 import { openBundledWebPage } from './bundled-web'
 
@@ -13,6 +13,7 @@ export class BundledAuth {
   private current: StoredSession | null = null
   private readonly saved = new Map<string, StoredSession>()
   private generation = 0
+  private pendingStorage: Promise<void> = Promise.resolve()
   private listener: LoopbackAuthServer | null = null
   private timeout: ReturnType<typeof setTimeout> | null = null
   private readonly base: URL
@@ -28,19 +29,56 @@ export class BundledAuth {
     for (const account of stored?.accounts ?? []) this.saved.set(account.identity.user.id, account)
     this.current = stored?.activeUserId ? this.saved.get(stored.activeUserId) ?? null : null
   }
+  private snapshot() {
+    if (this.current) this.saved.set(this.current.identity.user.id, this.current)
+    return this.saved.size ? { activeUserId: this.current?.identity.user.id ?? null, accounts: [...this.saved.values()] } : null
+  }
+  private serializeStorage<T>(work: () => Promise<T>): Promise<T> {
+    const result = this.pendingStorage.then(work)
+    this.pendingStorage = result.then(() => {}, () => {})
+    return result
+  }
   private persist(): Promise<void> {
     if (this.current) this.saved.set(this.current.identity.user.id, this.current)
-    return this.options.vault.saveAccounts(this.saved.size ? { activeUserId: this.current?.identity.user.id ?? null, accounts: [...this.saved.values()] } : null)
+    // Read state when the queued operation starts, so an older read's cache
+    // update cannot overwrite a newly committed account on disk.
+    return this.serializeStorage(() => this.options.vault.saveAccounts(this.snapshot()))
   }
   private async commitAccount(account: StoredSession, generation: number): Promise<boolean> {
-    const next = new Map(this.saved)
-    next.set(account.identity.user.id, account)
-    await this.options.vault.saveAccounts({ activeUserId: account.identity.user.id, accounts: [...next.values()] })
-    if (generation !== this.generation) return false
-    this.saved.clear()
-    for (const [id, saved] of next) this.saved.set(id, saved)
-    this.current = account
-    return true
+    return this.serializeStorage(async () => {
+      if (generation !== this.generation) return false
+      const prior = this.saved.get(account.identity.user.id)
+      const inheritedCache = prior?.token === account.token && prior.sessionCache === account.sessionCache
+      const next = new Map(this.saved)
+      next.set(account.identity.user.id, account)
+      const candidate = { activeUserId: account.identity.user.id, accounts: [...next.values()] }
+      const written = JSON.stringify(candidate)
+      await this.options.vault.saveAccounts(candidate)
+      if (generation !== this.generation) {
+        // A cancelled handoff/signout must not reappear after restarting.
+        await this.options.vault.saveAccounts(this.snapshot())
+        return false
+      }
+      const latest = this.saved.get(account.identity.user.id)
+      if (inheritedCache && latest?.token === account.token) account = { ...account, sessionCache: latest.sessionCache }
+      this.saved.set(account.identity.user.id, account)
+      this.current = account
+      // Preserve concurrent revocations and cache updates of other accounts.
+      const current = this.snapshot()
+      if (JSON.stringify(current) !== written) await this.options.vault.saveAccounts(current)
+      return true
+    })
+  }
+  private async rememberCache(account: StoredSession, value: string | undefined): Promise<void> {
+    const retained = this.saved.get(account.identity.user.id)
+    if (value === undefined || retained?.token !== account.token || retained.sessionCache === (value || undefined)) return
+    if (value) retained.sessionCache = value
+    else delete retained.sessionCache
+    if (this.current?.token === account.token && this.current.identity.user.id === account.identity.user.id) {
+      if (value) this.current.sessionCache = value
+      else delete this.current.sessionCache
+    }
+    await this.persist()
   }
   session(): BundledSession | null { return this.current ? structuredClone(this.current.identity) : null }
   /** Main-only authorization scope; neither token nor workspace selector crosses IPC. */
@@ -58,15 +96,18 @@ export class BundledAuth {
     const target = new URL(`${this.base.pathname.replace(/\/$/, '')}${path}`, this.base.origin)
     if (target.origin !== this.base.origin) throw new Error('Invalid backend origin')
     const headers = new Headers(init.headers)
-    headers.delete('cookie'); headers.delete('authorization'); headers.delete('proxy-authorization')
+    headers.delete('cookie'); headers.delete('authorization'); headers.delete('proxy-authorization'); headers.delete(SESSION_CACHE_HEADER)
     headers.set('origin', this.base.origin)
     headers.set('x-mikka-client', 'desktop')
     headers.set('x-mikka-client-version', this.options.version)
     headers.set('x-mikka-desktop-protocol', '1')
     const token = account?.token
     if (token) headers.set('authorization', `Bearer ${token}`)
+    if (account?.sessionCache) headers.set(SESSION_CACHE_HEADER, account.sessionCache)
     if (account?.workspace && !path.startsWith('/api/auth/')) headers.set('cookie', `mikka-workspace=${account.workspace}`)
-    return this.options.fetch(target.href, { ...init, headers, credentials: 'omit', redirect: 'error', cache: 'no-store' })
+    const response = await this.options.fetch(target.href, { ...init, headers, credentials: 'omit', redirect: 'error', cache: 'no-store' })
+    if (account) await this.rememberCache(account, response.status === 401 ? '' : responseSessionCache(response.headers))
+    return response
   }
 
   /** Main-only primitive; callers supply known routes. Never accepts renderer credentials. */
@@ -104,7 +145,7 @@ export class BundledAuth {
     // never forwarded by the protocol and is accepted only for this exact RPC.
     const rotated = response.headers.get('x-mikka-session-token')
     if (response.ok && token && this.current?.token === token && rotated && rotated !== token && rpc) {
-      const replacement = storedSession({ ...this.current, token: rotated })
+      const replacement = storedSession({ ...this.current, token: rotated, sessionCache: undefined })
       if (rpc.action === 'account.changePassword' && replacement) {
         this.cancel(); this.generation++
         this.current = replacement
@@ -120,6 +161,20 @@ export class BundledAuth {
       }
     }
     if (response.ok && token && this.current?.token === token && path.split('?')[0] === '/api/workspace/switcher') response = await this.withSavedAccounts(response, init)
+    if (response.ok && token && this.current?.token === token && rpc?.action === 'desktop.bootstrap') {
+      const profileScope = this.scope()
+      const body = await response.clone().json().catch(() => null) as { version?: unknown; ok?: unknown; result?: unknown } | null
+      if (token !== this.current?.token || profileScope !== this.scope()) return Response.json({ version: rpc.version, ok: false, error: { code: 'desktop_session_changed' } }, { status: 409 })
+      const identity = body?.version === rpc.version && body.ok === true ? publicSession(body.result) : null
+      // Existing profile edits already refresh bootstrap. Reuse that trusted
+      // projection so a later session() read cannot put an older avatar/name
+      // back into the UI. This is neither an owner switch nor a new auth read.
+      if (identity && this.current && identity.user.id === this.current.identity.user.id && identity.session.id === this.current.identity.session.id && JSON.stringify(identity) !== JSON.stringify(this.current.identity)) {
+        this.current = { ...this.current, identity }
+        await this.persist()
+      }
+      if (token !== this.current?.token || profileScope !== this.scope()) return Response.json({ version: rpc.version, ok: false, error: { code: 'desktop_session_changed' } }, { status: 409 })
+    }
     return response
   }
 
@@ -159,10 +214,10 @@ export class BundledAuth {
     return Response.json({ ...(body as Record<string, unknown>), accounts: [own, ...results.filter(item => item !== null)] }, { status: response.status, headers: { 'cache-control': 'no-store' } })
   }
 
-  private async accept(value: unknown, generation: number): Promise<void> {
+  private async accept(value: unknown, generation: number, sessionCache?: string): Promise<void> {
     const input = value as { token?: unknown }
     const identity = publicSession(value)
-    const parsed = storedSession({ token: input?.token, identity })
+    const parsed = storedSession({ token: input?.token, identity, sessionCache })
     if (!parsed || generation !== this.generation) throw new Error('Sign-in expired / 登录已过期')
     // Same-account reauthentication replaces only that account; add-account
     // retains the other encrypted sessions, bounded like the web switcher.
@@ -191,7 +246,7 @@ export class BundledAuth {
           body: JSON.stringify({ state, code, verifier, client: 'bundled' }), signal: AbortSignal.timeout(30_000),
         }, false)
         if (!response.ok) throw new Error('Sign-in exchange failed')
-        await this.accept(await response.json(), generation)
+        await this.accept(await response.json(), generation, responseSessionCache(response.headers))
         if (generation === this.generation) this.options.returned(next)
       })().catch(() => { if (generation === this.generation) this.options.changed() })
     })
@@ -228,14 +283,17 @@ export class BundledAuth {
     const body = await response.json() as { token?: unknown; code?: unknown }
     if (!response.ok) return { code: typeof body.code === 'string' && /^[A-Z0-9_]{1,100}$/.test(body.code) ? body.code : 'INVALID_EMAIL_OR_PASSWORD', status: response.status }
     if (typeof body.token !== 'string' || generation !== this.generation) return { code: 'INVALID_EMAIL_OR_PASSWORD', status: 401 }
+    const initialCache = responseSessionCache(response.headers)
+    const identityHeaders = new Headers({ authorization: `Bearer ${body.token}`, origin: this.base.origin, 'x-mikka-client': 'desktop', 'x-mikka-client-version': this.options.version, 'x-mikka-desktop-protocol': '1' })
+    if (initialCache) identityHeaders.set(SESSION_CACHE_HEADER, initialCache)
     // Use the newly returned token only in main, before exposing public identity.
     const identityResponse = await this.options.fetch(new URL(`${this.base.pathname.replace(/\/$/, '')}/api/auth/get-session`, this.base.origin).href, {
-      headers: { authorization: `Bearer ${body.token}`, origin: this.base.origin, 'x-mikka-client': 'desktop', 'x-mikka-client-version': this.options.version, 'x-mikka-desktop-protocol': '1' },
+      headers: identityHeaders,
       redirect: 'error', cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(15_000),
     })
     if (!identityResponse.ok) return { code: 'INVALID_EMAIL_OR_PASSWORD', status: 401 }
     const identity = publicSession(await identityResponse.json())
-    await this.accept({ ...identity, token: body.token }, generation)
+    await this.accept({ ...identity, token: body.token }, generation, responseSessionCache(identityResponse.headers) ?? initialCache)
     return null
   }
 

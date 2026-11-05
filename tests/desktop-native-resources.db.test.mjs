@@ -44,7 +44,7 @@ test('native test cleanup fences the real lease, baseline and database graph', {
     await pool.transaction(async client => {
       await client.query('INSERT INTO mikka_test_accounts.pairs(id,environment_id,generation,state,active_lease_id) VALUES($1,$2,1,\'leased\',$3)', [pairId, environment.id, leaseId])
       await client.query('INSERT INTO mikka_test_accounts.leases(id,environment_id,request_id,run_id,worker_id,pair_id,generation,expires_at,ttl_ms,state) VALUES($1,$2,$3,$3,$4,$3,1,clock_timestamp()+interval \'5 minutes\',300000,\'active\')', [leaseId, environment.id, pairId, lease.workerId])
-      for (const user of users) await client.query('INSERT INTO "user"(id,name,email,"createdAt","updatedAt") VALUES($1,$1,$2,now(),now())', [user, `${user}@example.invalid`])
+      for (const user of users) await client.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,false,now(),now())', [user, `${user}@example.invalid`])
       for (const [index, role] of ['owner', 'peer'].entries()) await client.query('INSERT INTO mikka_test_accounts.accounts(slot_id,pair_id,role,user_id) VALUES($1,$2,$3,$4)', [`${pairId}:${role}`, pairId, role, users[index]])
     })
     const baseline = await localDevice(users[0]), foreign = await localDevice(users[2])
@@ -90,7 +90,7 @@ test('native test cleanup fences the real lease, baseline and database graph', {
     await t.test('a cascade-linked runtime turn is detected before any graph rows are deleted', async () => {
       const captured = await captureNativeResources(scope)
       const created = await graph(users[0]), turn = randomUUID(); reviews.push(turn)
-      await database.query('INSERT INTO native_coordinator_turns(id,"userId","deviceId",holder,round,payload,"expiresAt") VALUES($1,$2,$3,$1,1,\'{}\',now()+interval \'5 minutes\')', [turn, users[0], created.device])
+      await database.query('INSERT INTO native_coordinator_turns(id,"userId","deviceId",holder,round,payload,"expiresAt") VALUES($1,$2,$3,$4,1,\'{}\',now()+interval \'5 minutes\')', [turn, users[0], created.device, turn])
       await assert.rejects(captured.cleanup({ drained: true }), { code: 'NATIVE_RESOURCE_REFERENCED' })
       assert.equal(await count('devices', 'id', [created.device]), 1)
       assert.equal(await count('native_coordinator_turns', 'id', [turn]), 1)

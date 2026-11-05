@@ -51,6 +51,39 @@ The implementation and final RPC/version contract are recorded with its tests
 in this PR. The server is never allowed to import or execute arbitrary names
 provided by the client.
 
+### Native session cache and fresh authorization
+
+Ordinary native reads reuse Better Auth's existing signed `session_data` proof,
+with the same 300-second lifetime as web reads. The SDK verifies its signature,
+cache version, expiry and exact session-token binding. Neither a browser cookie
+nor a foreign account's proof can authenticate the desktop RPC. There is no
+independent server TTL or cross-request identity cache.
+
+Main retains this proof beside its bearer in the existing OS-encrypted account
+vault. The private request/response header is `x-mikka-session-cache`, bounded
+to 16,384 base64url characters. An absent response header preserves the proof;
+an empty value clears it. The renderer never receives the proof, bearer,
+authentication cookies or private response headers. Old REST routes can renew
+the same proof through the SDK's exact `session_data` response cookie; main
+retains only that bounded value, never the Cookie header or a cookie jar.
+
+The original money, permission, credential and deletion entry points still
+require a fresh database session. A cached RPC identity upgrades once within
+that request; a revoked result remains null and cannot fall back to cookies.
+Sign-in auditing must succeed before a proof is issued. Password rotation
+clears the old proof, while profile updates carry the SDK's already signed new
+name/image into the existing bootstrap refresh without another identity read.
+
+`tests/desktop-session-cache.db.test.ts` compares the original
+`preferences.getPreferences` action with the old and new native transports,
+counting all authentication and business SQL plus PostgreSQL socket response
+bytes on warmed connections. The isolated fixture measured 2 queries / 635 B
+for web and cached native reads, versus 4 queries / 1,694 B for the old native
+transport. Separate cases cover HTTP and REST renewal, tampering, another
+account's proof, version changes, expiry, revocation, profile changes and
+mandatory fresh reads. This focused measurement does not replace the full
+runtime idle and UI acceptance evidence.
+
 ## Validation plan
 
 | Requirement | Evidence required |

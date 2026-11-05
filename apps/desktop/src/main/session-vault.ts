@@ -9,11 +9,88 @@ export interface EncryptedStorage {
   decrypt(value: Buffer): Promise<string>
 }
 
-export interface StoredSession { token: string; identity: BundledSession; workspace?: string }
+export interface StoredSession { token: string; identity: BundledSession; workspace?: string; sessionCache?: string }
 export interface StoredAccounts { activeUserId: string | null; accounts: StoredSession[] }
 export const MAX_STORED_ACCOUNTS = 5
 
 export const WORKSPACE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+export const SESSION_CACHE_HEADER = 'x-mikka-session-cache'
+const MAX_VAULT_BYTES = 128 * 1024
+
+/** Opaque existing BetterAuth compact session_data. Only the server validates
+ * its signature, bearer binding and expiry; main never invents a cache TTL. */
+export function validSessionCache(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= 16_384 && /^[A-Za-z0-9_-]+$/.test(value)
+}
+export function responseSessionCache(headers: Headers): string | undefined {
+  const value = headers.get(SESSION_CACHE_HEADER)
+  // Explicit private response state wins, including a rotation's clear.
+  if (value !== null) return validSessionCache(value) ? value : ''
+  const cookies = headers.get('set-cookie')
+  if (!cookies) return undefined
+  if (cookies.length > 64 * 1024) return ''
+
+  // Some existing REST handlers renew the SDK cache through nextCookies only.
+  // Extract exactly that opaque proof; never retain a cookie jar, session_token
+  // or OAuth cookie. Commas in Expires/quoted unrelated values are not borders.
+  const parts: string[] = []
+  let start = 0, quoted = false, escaped = false
+  for (let index = 0; index < cookies.length; index++) {
+    const character = cookies[index]
+    if (escaped) { escaped = false; continue }
+    if (quoted && character === '\\') { escaped = true; continue }
+    if (character === '"') { quoted = !quoted; continue }
+    if (!quoted && character === ',' && /^[\t ]*[!#$%&'*+.^_\x60|~0-9A-Za-z-]+=/.test(cookies.slice(index + 1))) {
+      parts.push(cookies.slice(start, index)); start = index + 1
+    }
+  }
+  parts.push(cookies.slice(start))
+  const families = new Map<string, { direct?: string; chunks: Map<number, string>; names: Set<string> }>()
+  for (const part of parts) {
+    const [pair = '', ...attributes] = part.trim().split(';')
+    const equals = pair.indexOf('=')
+    if (equals < 0) continue
+    const name = pair.slice(0, equals).trim()
+    const match = /^(__Secure-)?better-auth\.session_data(?:\.(.*))?$/.exec(name)
+    if (!match) continue
+    const prefix = match[1] ?? ''
+    const family = families.get(prefix) ?? { chunks: new Map<number, string>(), names: new Set<string>() }
+    families.set(prefix, family)
+    if (family.names.has(name)) return ''
+    family.names.add(name)
+    let chunk: number | undefined
+    if (match[2] !== undefined) {
+      if (!/^(?:0|[1-9][0-9]*)$/.test(match[2])) return ''
+      chunk = Number(match[2])
+      if (!Number.isSafeInteger(chunk) || chunk >= 32) return ''
+    }
+    let deleted = false
+    for (const attribute of attributes) {
+      const maxAge = /^\s*max-age\s*=\s*(.*?)\s*$/i.exec(attribute)
+      if (!maxAge) continue
+      if (!/^-?[0-9]+$/.test(maxAge[1]!) || !Number.isSafeInteger(Number(maxAge[1]))) return ''
+      if (Number(maxAge[1]) <= 0) deleted = true
+    }
+    const content = deleted ? '' : pair.slice(equals + 1).trim()
+    if (content && !validSessionCache(content)) return ''
+    if (chunk === undefined) family.direct = content
+    else family.chunks.set(chunk, content)
+  }
+  if (!families.size) return undefined
+  let result = ''
+  for (const family of families.values()) {
+    const chunks = [...family.chunks].filter(([, content]) => content).sort(([a], [b]) => a - b)
+    if (family.direct && chunks.length) return ''
+    let content = family.direct ?? ''
+    if (chunks.length) {
+      if (chunks.some(([index], expected) => index !== expected)) return ''
+      content = chunks.map(([, value]) => value).join('')
+    }
+    if (content && (!validSessionCache(content) || result)) return ''
+    if (content) result = content
+  }
+  return result
+}
 
 export function publicSession(value: unknown): BundledSession | null {
   if (!value || typeof value !== 'object') return null
@@ -24,11 +101,11 @@ export function publicSession(value: unknown): BundledSession | null {
 
 export function storedSession(value: unknown): StoredSession | null {
   if (!value || typeof value !== 'object') return null
-  const candidate = value as { token?: unknown; identity?: unknown; workspace?: unknown }
+  const candidate = value as { token?: unknown; identity?: unknown; workspace?: unknown; sessionCache?: unknown }
   const identity = publicSession(candidate.identity)
   // oxlint-disable-next-line no-control-regex -- Credentials cannot contain header separators or control bytes.
   return identity && typeof candidate.token === 'string' && candidate.token.length >= 16 && candidate.token.length <= 4096 && !/[\s\x00-\x1f\x7f]/.test(candidate.token)
-    ? { identity, token: candidate.token, ...(typeof candidate.workspace === 'string' && WORKSPACE_ID.test(candidate.workspace) ? { workspace: candidate.workspace } : {}) } : null
+    ? { identity, token: candidate.token, ...(typeof candidate.workspace === 'string' && WORKSPACE_ID.test(candidate.workspace) ? { workspace: candidate.workspace } : {}), ...(validSessionCache(candidate.sessionCache) ? { sessionCache: candidate.sessionCache } : {}) } : null
 }
 
 /** All retained identities are main-process data. Reject a malformed account
@@ -79,7 +156,7 @@ export class SessionVault {
         let value: StoredAccounts | null = null
         let migrate = false
         try {
-          if ((await file.stat()).size > 64 * 1024 || !await this.encryption.available()) return null
+          if ((await file.stat()).size > MAX_VAULT_BYTES || !await this.encryption.available()) return null
           const parsed = JSON.parse(await this.encryption.decrypt(await file.readFile())) as { version?: unknown; server?: unknown; value?: unknown }
           if (parsed.server !== this.server) return null
           if (parsed.version === 2) value = storedAccounts(parsed.value)
@@ -109,6 +186,7 @@ export class SessionVault {
     if (!value || !value.accounts.length) { await rm(this.path, { force: true }); return }
     await this.ensureAvailable()
     const ciphertext = await this.encryption.encrypt(JSON.stringify({ version: 2, server: this.server, value }))
+    if (ciphertext.length > MAX_VAULT_BYTES) throw new Error('Desktop session storage exceeds its size limit')
     await mkdir(this.directory, { recursive: true, mode: 0o700 })
     const temporary = `${this.path}.${process.pid}.tmp`
     const file = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o600)

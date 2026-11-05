@@ -16,6 +16,7 @@ import { createParityFixtures } from './parity-fixtures.mjs'
 import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
+import { waitForBundledSession } from './bundled-session.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 const environment = await loadEnvironment()
@@ -39,6 +40,7 @@ const evidence = {
     process: 'fresh Electron process for every sample; existing authenticated profile; same backend/account/workspace',
     cache: 'normal profile/OS caches; no OS cache purge, artificial network delay or renderer response substitution',
     pairing: 'alternating bundled-first and hosted-first order',
+    daemon: 'after every sample, cancel installers, close Electron and prove that exact profile daemon exited before launching the next process; drain time is outside readiness timing',
   },
 }
 const check = name => { evidence.checks.push({ name, result: 'passed' }); console.log(`PASS ${name}`) }
@@ -46,6 +48,7 @@ let scope, browser, fixtures, nativeResources, application, ownerEmail
 let passed = false
 let cleanupFailure
 const active = new Set()
+const appProfiles = new WeakMap()
 
 async function launch(mode, extraArgs = []) {
   await scope.assertActive()
@@ -56,6 +59,7 @@ async function launch(mode, extraArgs = []) {
     cwd: root, env: { ...process.env, MIKKA_DESKTOP_RENDERER: mode, MIKKA_USER_DATA_DIR: profiles[mode] }, timeout: 90_000,
   })
   active.add(app)
+  appProfiles.set(app, profiles[mode])
   const page = await app.firstWindow({ timeout: 90_000 })
   page.setDefaultTimeout(60_000)
   const errors = []
@@ -63,7 +67,14 @@ async function launch(mode, extraArgs = []) {
   await app.evaluate(({ BrowserWindow }, bounds) => { BrowserWindow.getAllWindows().find(window => !window.isDestroyed())?.setContentSize(bounds.width, bounds.height) }, viewport)
   return { app, page, errors, started }
 }
-async function close(app) { if (!app) return; try { await closeElectron(app) } finally { active.delete(app) } }
+async function close(app) {
+  if (!app) return
+  await closeElectron(app)
+  // The installed service label is per OS user. Drain its exact profile before
+  // another renderer/profile starts, outside the usable-chat timing interval.
+  await stopLocalDaemons([appProfiles.get(app)])
+  active.delete(app)
+}
 
 async function usable(page, draft = '') {
   await page.getByText(message, { exact: false }).first().waitFor({ state: 'visible' })
@@ -114,8 +125,7 @@ async function nativeSignIn(app, page, account = scope.owner) {
     await browserPage.goto(external, { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await handoff
     await returned
-    await page.waitForFunction(expected => window.mikka.bundled.session().then(session => session?.user?.id === expected), account.userId)
-    const session = await page.evaluate(() => window.mikka.bundled.session())
+    const session = await waitForBundledSession(page, account.userId)
     assert.equal(session.user.id, account.userId)
     await scope.recordResource({ type: 'session', id: session.session.id, ownerId: account.userId })
     return session
@@ -249,7 +259,7 @@ try {
   await run.page.getByRole('button', { name: menuNames[menuLocale], exact: true }).first().click()
   const ownerGroup = run.page.getByRole('group').filter({ has: run.page.getByText(ownerEmail, { exact: true }) })
   await ownerGroup.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: true }).click()
-  await run.page.waitForFunction(owner => window.mikka.bundled.session().then(session => session?.user.id === owner), scope.owner.userId)
+  await waitForBundledSession(run.page, scope.owner.userId)
   await usable(run.page)
   assert.equal(await run.page.evaluate(() => document.cookie), '')
   check('two leased browser identities remain private in main and the real account/workspace menu switches back to the retained owner')

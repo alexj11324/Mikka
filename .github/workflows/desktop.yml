@@ -22,6 +22,10 @@ on:
       - 'lib/desktop-rpc/**'
       - 'lib/live/**'
       - 'lib/auth*.ts'
+      - 'lib/fresh-session.ts'
+      - 'lib/request-log.ts'
+      - 'scripts/test-accounts/**'
+      - 'tests/desktop-*'
       - 'messages/**'
       - 'i18n/**'
       - 'next.config.mjs'
@@ -182,7 +186,7 @@ jobs:
     name: Apple Silicon packaged acceptance and unsigned Mikka Dev
     needs: [smoke, icon]
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 150
     env:
       CI: 'true'
       MIKKA_LOCAL_TEST_ACCOUNTS: '1'
@@ -244,7 +248,9 @@ jobs:
           pnpm --filter @mikka/desktop build
           pnpm --filter @mikka/desktop exec electron-builder --dir --config electron-builder.acceptance.yml --mac --arm64 --publish never
       - name: Real packaged Apple Silicon native acceptance
-        run: node apps/desktop/test/environment.mjs -- node apps/desktop/test/run-acceptance.mjs bundled-smoke parity lifecycle
+        # The idle case measures a full real hour with the registered macOS
+        # daemon active, after all other native windows and fixtures are drained.
+        run: node apps/desktop/test/environment.mjs -- node apps/desktop/test/run-acceptance.mjs bundled-smoke parity lifecycle idle
         env:
           MIKKA_DESKTOP_EXECUTABLE: ${{ github.workspace }}/apps/desktop/release-acceptance/mac-arm64/Mikka Dev.app/Contents/MacOS/Mikka Dev
       - name: Build Alex's isolated test package with production inspector fuse

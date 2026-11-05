@@ -12,6 +12,7 @@ import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 import { createParityFixtures } from './parity-fixtures.mjs'
 import { compareImages, screenshot } from './parity-images.mjs'
 import { launchElectron } from './electron-launch.mjs'
+import { waitForBundledSession } from './bundled-session.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
 
@@ -39,16 +40,19 @@ let fixtures
 let nativeResources
 let systemBrowser
 let webBrowser
-const applications = []
+const applications = new Set()
 const profiles = []
+const pendingImages = new Map()
 const errors = []
 let passed = false
 let cleaned = false
 let cleanupError
 
 async function launch(mode) {
-  const profile = join(tmpdir(), `mikka-parity-${mode}-${process.pid}-${started}`)
-  profiles.push(profile)
+  // Both modes use the same real local daemon/device. Their Chromium session
+  // partitions remain separate, and only one app owns this profile at a time.
+  const profile = profiles[0] ?? join(tmpdir(), `mikka-parity-${process.pid}-${started}`)
+  if (!profiles.length) profiles.push(profile)
   const application = await launchElectron({
     ...(process.env.MIKKA_DESKTOP_EXECUTABLE ? { executablePath: process.env.MIKKA_DESKTOP_EXECUTABLE } : {}),
     args: process.env.MIKKA_DESKTOP_EXECUTABLE ? [] : [join(root, 'apps/desktop')],
@@ -56,7 +60,7 @@ async function launch(mode) {
     env: { ...process.env, MIKKA_DESKTOP_RENDERER: mode, MIKKA_USER_DATA_DIR: profile },
     timeout: 90_000,
   })
-  applications.push(application)
+  applications.add(application)
   const page = await application.firstWindow({ timeout: 90_000 })
   await application.evaluate(({ BrowserWindow }) => {
     const window = BrowserWindow.getAllWindows()[0]
@@ -75,6 +79,11 @@ async function launch(mode) {
   return { mode, application, page, base }
 }
 
+async function closeTarget(target) {
+  await closeElectron(target.application)
+  applications.delete(target.application)
+}
+
 async function go(target, suffix = '/') {
   await scope?.assertActive()
   await target.page.goto(`${target.base}/en${suffix === '/' ? '' : suffix}`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
@@ -82,8 +91,8 @@ async function go(target, suffix = '/') {
 }
 
 async function theme(target, value) {
-  // Apply the ordinary persisted appearance preference to both isolated
-  // profiles. This changes no application response or business state.
+  // Apply the ordinary persisted appearance preference to each renderer
+  // partition. This changes no application response or business state.
   await target.page.evaluate(value => localStorage.setItem('theme', value), value)
   await target.page.emulateMedia({ colorScheme: value, reducedMotion: 'reduce' })
   await target.page.reload({ waitUntil: 'domcontentloaded' })
@@ -91,12 +100,17 @@ async function theme(target, value) {
 }
 
 async function pair(name, appearance, targets, open) {
-  const images = []
+  const key = `${appearance}/${name}`
+  const images = pendingImages.get(key) ?? new Map()
   for (const target of targets) {
     await open(target)
-    images.push(await screenshot(target.page, join(output, `${appearance}-${name}-${target.mode}.png`)))
+    assert.ok(!images.has(target.mode), 'Each native mode is captured once per screen')
+    images.set(target.mode, await screenshot(target.page, join(output, `${appearance}-${name}-${target.mode}.png`)))
   }
-  const comparison = await compareImages(images[0], images[1], join(output, `${appearance}-${name}-diff.png`))
+  pendingImages.set(key, images)
+  if (!images.has('hosted') || !images.has('bundled')) return
+  const comparison = await compareImages(images.get('hosted'), images.get('bundled'), join(output, `${appearance}-${name}-diff.png`))
+  pendingImages.delete(key)
   const result = { name, theme: appearance, ...comparison }
   report.screens.push(result)
   await writeFile(join(output, 'parity.json'), `${JSON.stringify(report, null, 2)}\n`)
@@ -141,7 +155,7 @@ async function offlinePairs(targets) {
   }
 }
 
-async function authenticate(bundled, hosted) {
+async function authenticateHosted(hosted) {
   const state = JSON.parse(await readFile(scope.owner.storageStatePath, 'utf8'))
   // Hosted fallback remains a normal web session. Bundled receives no cookies;
   // its session goes through the actual browser/loopback/PKCE implementation.
@@ -158,6 +172,10 @@ async function authenticate(bundled, hosted) {
     await partition.cookies.set({ url: origin, name: 'NEXT_LOCALE', value: 'en', path: '/' })
     await partition.cookies.flushStore()
   }, { cookies: state.cookies, origin: environment.origin })
+  await selectFixtureWorkspace(hosted)
+}
+
+async function authenticateBundled(bundled) {
   systemBrowser = await chromium.launch({ headless: true })
   const context = await systemBrowser.newContext({ storageState: scope.owner.storageStatePath })
   const page = await context.newPage()
@@ -165,7 +183,7 @@ async function authenticate(bundled, hosted) {
     globalThis.__mikkaParityExternal = null
     shell.openExternal = async url => { globalThis.__mikkaParityExternal = url }
   })
-  const handoff = bundled.page.evaluate(() => window.mikka.bundled.signIn({ provider: 'google', next: '/', locale: 'en' }))
+  const handoff = bundled.page.evaluate(() => window.mikka.bundled.signIn({ provider: 'google', next: '/settings?section=account', locale: 'en' }))
   let handoffError
   handoff.catch(error => { handoffError = error })
   let external
@@ -179,22 +197,37 @@ async function authenticate(bundled, hosted) {
   assert.equal(new URL(external).origin, environment.origin)
   await page.goto(external, { waitUntil: 'domcontentloaded', timeout: 60_000 })
   await handoff
-  await bundled.page.waitForFunction(() => window.mikka.bundled.session().then(value => Boolean(value?.user?.id)))
-  const identity = await bundled.page.evaluate(() => window.mikka.bundled.session())
+  const identity = await waitForBundledSession(bundled.page, scope.owner.userId)
   assert.equal(identity.user.id, scope.owner.userId)
   assert.deepEqual(Object.keys(identity.session), ['id'])
   await scope.recordResource({ type: 'session', id: identity.session.id, ownerId: scope.owner.userId })
   await systemBrowser.close(); systemBrowser = undefined
-  for (const target of [hosted, bundled]) await selectFixtureWorkspace(target)
+  await selectFixtureWorkspace(bundled)
 }
 
 async function selectFixtureWorkspace(target) {
-  await go(target)
+  // Select the fixture before mounting a personal conversation or its reads.
+  await go(target, '/settings?section=account')
   await target.page.getByRole('button', { name: messages.Nav.workspaceMenu, exact: true }).first().click()
   await target.page.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: false }).click()
   await target.page.waitForURL(url => url.pathname === `${environment.basePath}/en` || url.pathname === `${environment.basePath}/en/`)
   await target.page.getByRole('button', { name: messages.Nav.workspaceMenu, exact: true }).first().waitFor()
-  await target.page.getByText('Review the desktop workspace, including conversations, tasks, artifacts and settings.', { exact: true }).waitFor()
+  await coordinatorReady(target.page)
+}
+
+async function coordinatorReady(page) {
+  await page.getByRole('region', { name: messages.Coordinator.conversation, exact: true }).getByText('Review the desktop workspace, including conversations, tasks, artifacts and settings.', { exact: true }).waitFor()
+}
+
+async function nativeDeviceReady(target) {
+  const deadline = Date.now() + 180_000
+  while (Date.now() < deadline) {
+    await scope.assertActive()
+    const state = await target.page.evaluate(async () => ({ device: await window.mikka.device.status(), install: await window.mikka.ssh.state() }))
+    if (state.device.status === 'online' && state.device.deviceId && state.device.signedIn === true && state.device.server === 'online' && !['running', 'fingerprint'].includes(state.install?.status)) return
+    await new Promise(resolve => setTimeout(resolve, 250))
+  }
+  throw new Error('PARITY_NATIVE_DEVICE_NOT_READY')
 }
 
 function screens(fixture) {
@@ -214,7 +247,7 @@ function screens(fixture) {
       await target.page.goto(`${target.base}/w/${fixture.workspaceSlug}`, { waitUntil: 'domcontentloaded' })
       await target.page.waitForURL(url => [environment.basePath, `${environment.basePath}/`, `${environment.basePath}/en`, `${environment.basePath}/en/`].includes(url.pathname))
       await go(target)
-      await target.page.getByText('Review the desktop workspace, including conversations, tasks, artifacts and settings.', { exact: true }).waitFor()
+      await coordinatorReady(target.page)
     } },
     ...['details', 'threads', 'prs', 'computer'].map(tab => panel(false, tab)),
     ...['details', 'threads', 'prs', 'computer'].map(tab => panel(true, tab)),
@@ -291,30 +324,45 @@ try {
     assert.equal(report.screens.length, report.requiredScreens.length * report.themes.length)
     passed = true
   } else {
-  const hosted = await launch('hosted')
-  const bundled = await launch('bundled')
-  const targets = [hosted, bundled]
-  // Auth's appearance is compared before the leased session is attached.
-  for (const appearance of report.themes) {
-    for (const target of targets) {
-      await target.page.goto(`${target.base}/en/sign-in`, { waitUntil: 'domcontentloaded' })
-      await theme(target, appearance)
+    const matrix = screens(fixtures.fixture)
+    report.requiredScreens = ['sign-in', ...publicScreens(fixtures.fixture).map(screen => screen.name), ...matrix.map(screen => screen.name), 'offline']
+    report.nativeModeOrder = ['hosted-anonymous', 'bundled-anonymous', 'bundled-authenticated', 'hosted-authenticated']
+    report.nativeProfiles = 1
+    async function captureAnonymous(target) {
+      for (const appearance of report.themes) {
+        await target.page.goto(`${target.base}/en/sign-in`, { waitUntil: 'domcontentloaded' })
+        await theme(target, appearance)
+        await pair('sign-in', appearance, [target], async () => { await target.page.locator('input[type="email"]').waitFor() })
+        for (const screen of publicScreens(fixtures.fixture)) await pair(screen.name, appearance, [target], screen.open)
+      }
     }
-    await pair('sign-in', appearance, targets, async target => { await target.page.locator('input[type="email"]').waitFor() })
-    for (const screen of publicScreens(fixtures.fixture)) await pair(screen.name, appearance, targets, screen.open)
-  }
-  await authenticate(bundled, hosted)
-  const matrix = screens(fixtures.fixture)
-  report.requiredScreens = ['sign-in', ...publicScreens(fixtures.fixture).map(screen => screen.name), ...matrix.map(screen => screen.name), 'offline']
-  for (const appearance of report.themes) {
-    for (const target of targets) await theme(target, appearance)
-    for (const screen of matrix) await pair(screen.name, appearance, targets, screen.open)
-  }
-  await offlinePairs(targets)
-  assert.deepEqual(errors, [], 'The reused renderer must have no uncaught page errors')
-  assert.equal(report.screens.length, report.requiredScreens.length * report.themes.length, 'Every screen must be captured in both themes')
-  assert.equal(report.screens.filter(screen => !screen.passed).length, 0, 'Every screenshot must differ by at most 0.1% with identical dynamic-mask geometry')
-  passed = true
+    async function captureAuthenticated(target) {
+      await nativeDeviceReady(target)
+      for (const appearance of report.themes) {
+        await theme(target, appearance)
+        for (const screen of matrix) await pair(screen.name, appearance, [target], screen.open)
+      }
+      await offlinePairs([target])
+    }
+    // Anonymous screens precede the native vault login. Close only the window
+    // between modes; the shared daemon is drained once, after all captures.
+    const anonymousHosted = await launch('hosted')
+    await captureAnonymous(anonymousHosted)
+    await closeTarget(anonymousHosted)
+    const bundled = await launch('bundled')
+    await captureAnonymous(bundled)
+    await authenticateBundled(bundled)
+    await captureAuthenticated(bundled)
+    await closeTarget(bundled)
+    const hosted = await launch('hosted')
+    await authenticateHosted(hosted)
+    await captureAuthenticated(hosted)
+    await closeTarget(hosted)
+    assert.deepEqual(errors, [], 'The reused renderer must have no uncaught page errors')
+    assert.equal(pendingImages.size, 0, 'Every native screenshot needs its corresponding mode')
+    assert.equal(report.screens.length, report.requiredScreens.length * report.themes.length, 'Every screen must be captured in both themes')
+    assert.equal(report.screens.filter(screen => !screen.passed).length, 0, 'Every screenshot must differ by at most 0.1% with identical dynamic-mask geometry')
+    passed = true
   }
 } finally {
   const failedCleanup = error => { cleanupError ??= error }
@@ -322,7 +370,7 @@ try {
   const failedClose = error => { closed = false; failedCleanup(error) }
   await systemBrowser?.close().catch(failedClose)
   await webBrowser?.close().catch(failedClose)
-  for (const application of applications.reverse()) await closeElectron(application).catch(failedClose)
+  for (const application of [...applications].reverse()) await closeElectron(application).catch(failedClose)
   let drained = profiles.length === 0
   if (closed && profiles.length) {
     try { drained = (await stopLocalDaemons(profiles)).profilesStopped } catch (error) { failedCleanup(error) }
@@ -339,6 +387,7 @@ try {
   if (!cleanupError) for (const profile of profiles) await rm(profile, { recursive: true, force: true })
   report.result = passed && !cleanupError ? 'passed' : 'failed'
   report.cleanup = cleanupError ? 'failed' : cleaned ? 'passed' : 'not-created'
+  if (cleanupError) report.cleanupErrorCode = /^[A-Za-z0-9_]{1,100}$/.test(cleanupError.code ?? '') ? cleanupError.code : cleanupError.name
   report.finishedAt = new Date().toISOString()
   report.pageErrors = errors
   await writeFile(join(output, 'parity.json'), `${JSON.stringify(report, null, 2)}\n`)

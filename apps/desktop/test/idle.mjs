@@ -9,6 +9,7 @@ import { performance } from 'node:perf_hooks'
 import { setTimeout as delay } from 'node:timers/promises'
 import { chromium } from '@playwright/test'
 import { launchElectron } from './electron-launch.mjs'
+import { waitForBundledSession } from './bundled-session.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
@@ -30,6 +31,7 @@ const report = {
   origin: environment.origin, requestedDurationMs: durationMs, acceptanceRun: durationMs >= 3_600_000,
   method: 'simultaneous visible Coordinator screens; separate production Node processes; one isolated database and real live Worker',
   exclusions: ['setup and warmup', 'test-account lease maintenance in the harness process', 'PostgreSQL handshake and TCP/TLS overhead'],
+  nativeBackgroundTraffic: 'included in the bundled backend counters; a one-hour acceptance requires the actual local device to be registered and online',
 }
 let application
 let browser
@@ -66,7 +68,8 @@ try {
     else { try { if (JSON.parse(data).type === 'live_ready') webLive.ready++ } catch { /* not a live control frame */ } }
   }))
   application = await launchElectron({
-    args: [join(root, 'apps/desktop')], cwd: root,
+    ...(process.env.MIKKA_DESKTOP_EXECUTABLE ? { executablePath: process.env.MIKKA_DESKTOP_EXECUTABLE } : {}),
+    args: process.env.MIKKA_DESKTOP_EXECUTABLE ? [] : [join(root, 'apps/desktop')], cwd: root,
     env: { ...process.env, MIKKA_DESKTOP_RENDERER: 'bundled', MIKKA_USER_DATA_DIR: profile }, timeout: 90_000,
   })
   const page = await application.firstWindow({ timeout: 90_000 })
@@ -100,7 +103,7 @@ try {
   await systemBrowser.goto(external, { waitUntil: 'domcontentloaded' })
   await handoff
   await systemBrowser.close()
-  const identity = await page.evaluate(() => window.mikka.bundled.session())
+  const identity = await waitForBundledSession(page, scope.owner.userId)
   assert.equal(identity.user.id, scope.owner.userId)
   await scope.recordResource({ type: 'session', id: identity.session.id, ownerId: scope.owner.userId })
   const webOrigin = new URL(environment.origin)
@@ -119,6 +122,26 @@ try {
   for (const target of [web, page]) {
     await target.locator('textarea[data-chat-composer]').first().waitFor({ state: 'visible', timeout: 60_000 })
     assert.equal(await target.evaluate(() => document.visibilityState), 'visible')
+  }
+  const readNativeService = () => page.evaluate(async () => {
+    const [device, installer] = await Promise.all([window.mikka.device.status(), window.mikka.ssh.state()])
+    return {
+      status: device.status, signedIn: device.signedIn, server: device.server,
+      deviceIdPresent: Boolean(device.deviceId),
+      installer: installer ? { status: installer.status, step: installer.step, retryable: installer.retryable === true } : null,
+    }
+  })
+  const nativeReady = state => state.status === 'online' && state.signedIn && state.server === 'online' && state.deviceIdPresent && !['running', 'fingerprint'].includes(state.installer?.status)
+  report.nativeService = await readNativeService()
+  if (report.acceptanceRun) {
+    // Never accept an artificially quiet hour caused by failed local setup.
+    // This bounded test observation is outside the measured idle interval.
+    const deadline = performance.now() + 180_000
+    while (!nativeReady(report.nativeService) && performance.now() < deadline) {
+      await delay(500)
+      report.nativeService = await readNativeService()
+    }
+    assert.ok(nativeReady(report.nativeService), 'DESKTOP_IDLE_REQUIRES_REGISTERED_ONLINE_NATIVE_DEVICE')
   }
   await delay(35_000)
   assert.ok(webLive.ready > 0 && webLive.pong > 0, 'Web live channel must be healthy before measurement')
@@ -139,6 +162,8 @@ try {
   await delay(durationMs)
   report.elapsedMonotonicMs = performance.now() - start
   await scope.assertActive()
+  report.nativeServiceAtEnd = await readNativeService()
+  if (report.acceptanceRun) assert.ok(nativeReady(report.nativeServiceAtEnd), 'DESKTOP_IDLE_NATIVE_DEVICE_LOST')
   const [bundled, hosted] = await Promise.all([metrics(runtime.bundled.socket), metrics(runtime.hosted.socket)])
   report.finishedAt = new Date().toISOString()
   report.bundled = bundled

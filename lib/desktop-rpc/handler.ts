@@ -11,8 +11,8 @@ function failure(status: number, code: string, version: number = DESKTOP_RPC_VER
   return Response.json({ version, ok: false, error: { code } }, { status, headers: noStore })
 }
 
-/** Authentication deliberately sees no cookies, so even a valid browser login
- * cannot make a missing/invalid/revoked bearer succeed. */
+/** Authentication never sees ambient cookies. The separate native cache header
+ * must still pass Better Auth's signature, bearer-binding and expiry checks. */
 export function desktopBearerHeaders(request: Request): Headers | null {
   const authorization = request.headers.get('authorization')
   if (!authorization || !/^Bearer [A-Za-z0-9_.%~+/-]{32,512}$/.test(authorization) || /^Bearer (?:mkp_|mka_|mkr_)/.test(authorization)) return null
@@ -21,9 +21,9 @@ export function desktopBearerHeaders(request: Request): Headers | null {
   return headers
 }
 
-/** Headers for an existing human-only REST handler. A bearer must still be
- * checked by the real auth API with disableCookieCache; this only rules out
- * delegated credentials and prevents a cookie from rescuing an invalid token. */
+/** Headers for an existing human-only REST handler. Its original freshness
+ * policy still applies. This rules out delegated credentials and prevents a
+ * browser cookie from rescuing an invalid token. */
 export function humanSessionHeaders(request: Request): Headers | null {
   return request.headers.has('authorization') ? desktopBearerHeaders(request) : request.headers.get('cookie') ? request.headers : null
 }

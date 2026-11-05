@@ -8,6 +8,7 @@ import { sha256Hex, verifierMatches } from '@/lib/desktop-auth-server'
 import { withRequestLog } from '@/lib/request-log'
 import { auth } from '@/lib/auth'
 import { safeDesktopSession } from '@/lib/desktop-rpc/session'
+import { DESKTOP_SESSION_CACHE_HEADER, desktopSessionCacheFromHeaders } from '@/lib/desktop-rpc/session-cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,8 +47,9 @@ async function handlePOST(request: Request) {
     try {
       // The same single-use PKCE handoff, redeemed here so only the main process
       // receives a bearer. Never expose the parked token to the local renderer.
-      const session = await auth.api.verifyOneTimeToken({ body: { token: row.token }, headers: new Headers() })
-      return NextResponse.json({ token: session.session.token, ...safeDesktopSession(session) }, { headers: noStore })
+      const { response: session, headers } = await auth.api.verifyOneTimeToken({ body: { token: row.token }, headers: new Headers(), returnHeaders: true })
+      const cache = desktopSessionCacheFromHeaders(headers, (await auth.$context).authCookies.sessionData.name)
+      return NextResponse.json({ token: session.session.token, ...safeDesktopSession(session) }, { headers: { ...noStore, ...(cache !== undefined ? { [DESKTOP_SESSION_CACHE_HEADER]: cache } : {}) } })
     } catch {
       return NextResponse.json({ error: 'exchangeRejected' }, { status: 400, headers: noStore })
     }

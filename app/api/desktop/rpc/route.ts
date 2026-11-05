@@ -4,18 +4,20 @@ import { ActionFailureError } from '@/lib/action-error'
 import { WorkspaceError } from '@/lib/workspace-error'
 import { createDesktopRpc } from '@/lib/desktop-rpc/handler'
 import { desktopActions } from '@/lib/desktop-rpc/registry'
-import { withDesktopSession, withDesktopLocale, desktopRotatedToken } from '@/lib/desktop-rpc/session'
+import { withDesktopLocale, desktopRotatedToken } from '@/lib/desktop-rpc/session'
+import { desktopAuthentication } from '@/lib/desktop-rpc/authentication'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
+const sessions = desktopAuthentication(input => auth.api.getSession(input), async () => (await auth.$context).authCookies.sessionData.name)
 
 export const POST = withRequestLog('/api/desktop/rpc', createDesktopRpc({
   authenticate: async headers => {
-    const session = await auth.api.getSession({ headers, query: { disableCookieCache: true } })
-    if (session) noteLogUser(session.user.id)
-    return session
+    const authenticated = await sessions.authenticate(headers)
+    if (authenticated) noteLogUser(authenticated.session.user.id)
+    return authenticated
   },
-  scope: (session, work, request) => withDesktopLocale(request.headers.get('x-mikka-locale') === 'en' ? 'en' : 'zh-CN', () => withDesktopSession(session, async () => {
+  scope: (session, work, request) => withDesktopLocale(request.headers.get('x-mikka-locale') === 'en' ? 'en' : 'zh-CN', () => sessions.scope(session, async () => {
     const response = await work()
     const token = desktopRotatedToken()
     if (response.ok && token) response.headers.set('x-mikka-session-token', token)
