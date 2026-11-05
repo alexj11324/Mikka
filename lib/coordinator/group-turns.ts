@@ -16,6 +16,7 @@ import { groupListChanged, runListChanged } from '@/lib/live/lists'
 import { groupChatChanged } from '@/lib/live/groups'
 import { runChanged } from '@/lib/live/panels'
 import { GROUP_TURN_STOP_CHANNEL, listenOn, notifyChannel, type Listener } from '@/lib/db/listen'
+import { armDueTimerAfterCommit } from '@/lib/due-timer'
 
 export const GROUP_MAX_ROUNDS = GROUP_MAX_RESPONDERS
 export type GroupAgent = RoutingMember
@@ -92,6 +93,8 @@ export async function hasPendingGroupTurn(client: Pick<PoolClient, 'query'>, con
 
 export async function enqueueGroupTurn(client: PoolClient, conversationId: string, messageId: string, userId: string) {
   await client.query('INSERT INTO group_turns ("messageId","conversationId","userId") VALUES ($1,$2,$3)', [messageId, conversationId, userId])
+  // Its sender drains it at once; the due timer resumes it if that request ends first.
+  armDueTimerAfterCommit(client, 'run-recovery')
 }
 /** One durable root message. A session advisory lock spans model calls, not a long
  * transaction: concurrent workers queue, while membership changes remain possible.
@@ -260,6 +263,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
               // status if the process dies before its finally/recovery path.
               await client.query(`INSERT INTO agent_runs (id,"userId","agentId",kind,status,"startedAt","leaseExpiresAt") VALUES ($1,$2,$3,'group_chat','running',now(),now()+interval '60 seconds')`, [runId, root.createdBy, id])
               await client.query('UPDATE group_turns SET "agentId"=$2,"activeRunId"=$3,"botId"=NULL,"updatedAt"=now() WHERE "messageId"=$1', [messageId, id, runId])
+              armDueTimerAfterCommit(client, 'run-recovery')
             } else {
               await client.query(`UPDATE agent_runs SET status=$2,"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now() WHERE id=(SELECT "activeRunId" FROM group_turns WHERE "messageId"=$1) AND kind='group_chat' AND "userId"=$3 AND status='running'`, [messageId, outcome, root.createdBy])
               await client.query('UPDATE group_turns SET "agentId"=NULL,"activeRunId"=NULL,"botId"=NULL,"updatedAt"=now() WHERE "messageId"=$1', [messageId])
@@ -322,6 +326,8 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       "decisionAttempts"="decisionAttempts"+CASE WHEN $2='group_judgment_pending' THEN 1 ELSE 0 END,
       "nextDecisionAt"=CASE WHEN $2='group_judgment_pending' AND route IS NULL THEN now()+make_interval(secs=>LEAST(900,60*power(2,LEAST("decisionAttempts",4)))::double precision) ELSE NULL END
       WHERE "messageId"=$1 AND status='running'`, [messageId, reason])
+    // A pending judgment is retried at nextDecisionAt by the run-recovery due timer (#1212).
+    if (reason === 'group_judgment_pending') armDueTimerAfterCommit(client, 'run-recovery')
     // Best effort: the invalidation never replaces the failure being reported.
     await groupChatChanged(client, conversationId).catch(() => {})
     await finishGroupDecisionTrace(client, messageId, error instanceof GroupJudgmentPendingError ? 'blocked' : 'failed')

@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg'
 import { afterCommit, hasCommitEffect } from '../db/commit-effects'
 import { liveGatewayConfig, type LiveScope } from './scope'
 import type { LiveInvalidation } from './events'
+import { armDueTimerAfterCommit } from '@/lib/due-timer'
 
 type TaskIdentity = { id: string; userId: string; issueId: string }
 
@@ -72,6 +73,8 @@ async function sender(taskId: string, ownerId: string | null) {
 
 /** Registration adds no SQL or network dependency to a business transaction. */
 export async function factoryChanged(tx: PoolClient, task: TaskIdentity) {
+  // The Factory watchdog's due time moves with every task write (#1212).
+  armDueTimerAfterCommit(tx, 'run-recovery')
   if (!liveGatewayConfig(process.env)) return
   const key = `factory_task:${task.id}`
   if (hasCommitEffect(tx, key)) return

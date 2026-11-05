@@ -34,7 +34,7 @@ async function take(token: string): Promise<{ hook: Hook<unknown> } | null> {
  * and then checks once more, so a write that committed while it was letting go
  * (and found the token still held) is not left for the slow sweep.
  */
-export async function runDueTimer(token: string, deps: DueTimerDeps) {
+export async function runDueTimer(token: string, deps: DueTimerDeps, overdueMs = 1_000) {
   const capAt = Date.now() + DUE_TIMER_LIFETIME_MS
   let held = await take(token)
   if (!held) return
@@ -49,8 +49,10 @@ export async function runDueTimer(token: string, deps: DueTimerDeps) {
       continue
     }
     if (Date.now() >= capAt) { held.hook.dispose(); await deps.handOff(); return }
-    // Never earlier than one second, so a backlog cannot spin.
-    await Promise.race([held.hook, sleep(new Date(Math.max(Math.min(next, capAt), Date.now() + 1_000)))])
+    // Work still due after a pass (a backlog, or an item this pass could not clear) waits `overdueMs`,
+    // so it cannot spin; anything later waits for its own time (at least one second).
+    const at = next <= Date.now() ? Date.now() + overdueMs : Math.max(next, Date.now() + 1_000)
+    await Promise.race([held.hook, sleep(new Date(Math.min(at, capAt)))])
     next = await deps.run()
   }
 }

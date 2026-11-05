@@ -66,3 +66,9 @@ test('a long-lived timer hands over to a fresh run at its lifetime cap', async (
   // The first wait is capped at the lifetime, never past it; then the run hands over.
   assert.deepEqual(trace, [`run->${next}`, `sleep:${T0 + DUE_TIMER_LIFETIME_MS}`, `run->${next}`, 'dispose', 'handOff'])
 })
+
+test('work a pass could not clear waits the job\'s overdue interval, not one second', async () => {
+  mock.timers.enable({ apis: ['Date'], now: T0 })
+  await runDueTimer('due-timer:test', deps([T0 - 1, T0 + 30_000, null]), 60_000)
+  assert.deepEqual(trace.slice(0, 4), [`run->${T0 - 1}`, `sleep:${T0 + 60_000}`, `run->${T0 + 30_000}`, `sleep:${T0 + 30_000}`])
+})
