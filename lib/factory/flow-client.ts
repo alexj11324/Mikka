@@ -17,6 +17,7 @@ export interface FactoryFlow {
   stage: FlowStage
   stages: FlowStage[]
   needsYou?: { kind: NeedsYouKind; since: string }
+  completion?: 'merged' | 'accepted'
   review: { verdict: 'passed' | 'changes_requested' | 'needs_judgment' | null; candidateId: string | null; currentCandidateReviewed: boolean } | null
   acceptance: { artifactId: string; version: number; runId: string; candidateId: string; counts: Partial<Record<'passed' | 'failed' | 'unverified', number>>; media: unknown[] } | null
   pullRequest: { url: string; state: string } | null
@@ -50,6 +51,10 @@ export const pullRequestLink = (flow: Pick<FactoryFlow, 'pullRequest'>) =>
 export const PROFILE_MODEL_DETAILS = ['checking', 'quota', 'expired', 'paused', 'missing', 'removed', 'model_gone', 'key_refused', 'balance', 'provider_unavailable'] as const
 export type ProfileModelDetail = typeof PROFILE_MODEL_DETAILS[number]
 
+/** Decision reasons returned when the host cannot select an executor Profile. */
+const PROFILE_DECISION_DETAILS = ['decision_unavailable', 'no_suitable_profile', 'invalid_profile_answer', 'unknown_profile', 'uncertain_profile', 'invalid_reason'] as const
+type ProfileDecisionDetail = typeof PROFILE_DECISION_DETAILS[number]
+
 /**
  * What an `approve_spec` answer means to the person. Every answer the server
  * actually gave is final for that click: `stale` (the task moved on), the
@@ -80,6 +85,15 @@ export function approveSpecError(code: string | null, status: number | null, det
 
 /** The message key under `FactoryFlow.card.approveError` for a failure. */
 export function approveSpecErrorKey(failure: ApproveSpecFailure): string {
+  if (failure.kind === 'profile') {
+    switch (failure.code) {
+      case 'agentProfileDisabled': return 'profileDisabled'
+      case 'agentProfileArchived': return 'profileArchived'
+      case 'agentProfileVersionConflict': return 'profileVersionConflict'
+      case 'agentProfileDecisionUnavailable':
+        return PROFILE_DECISION_DETAILS.includes(failure.detail as ProfileDecisionDetail) ? 'profileDecision.' + failure.detail : 'profile'
+    }
+  }
   if (failure.kind !== 'profileModel') return failure.kind
   return `profileModel.${PROFILE_MODEL_DETAILS.includes(failure.detail as ProfileModelDetail) ? failure.detail : 'default'}`
 }

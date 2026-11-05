@@ -9,9 +9,13 @@ import { Spinner } from '@/components/ui/spinner'
 import { ShortSha } from './short-sha'
 import { PullRequestIcon } from './pull-request-icon'
 import { acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptance-state'
+import type { FactoryFlow } from '@/lib/factory/flow-client'
+import { FactoryFlowBadge } from './factory-flow'
 
 export type ApprovalBarProps = {
   state: AcceptanceState
+  /** v2 has one task state; `state` only chooses this candidate's available operations. */
+  flow?: FactoryFlow
   isSkill: boolean
   isDeliverable?: boolean
   /** Where it ships, as Figma's chip names it (Preview / Production / 内置技能). */
@@ -62,16 +66,16 @@ function ActionIcon({ icon: Icon, busy }: { icon: LucideIcon; busy: boolean }) {
  * the right. While it waits for you the header's state chip says so, so the
  * bar carries no title; every later state names itself. Purely presentational.
  */
-export function ApprovalBar({ state, isSkill, isDeliverable = false, environment, sha, busy = false, canApprove = true, canPublish = true, reference, superseded, onApprove, onPublish, onRevoke, onReconcile, onReject, onAccept, pullRequestUrl, refusal }: ApprovalBarProps) {
+export function ApprovalBar({ state, flow, isSkill, isDeliverable = false, environment, sha, busy = false, canApprove = true, canPublish = true, reference, superseded, onApprove, onPublish, onRevoke, onReconcile, onReject, onAccept, pullRequestUrl, refusal }: ApprovalBarProps) {
   const t = useTranslations('FactoryAcceptance')
   const refused = state === 'pending' && Boolean(refusal)
-  const icon = StateIcon({ state, refused })
+  const icon = flow ? null : StateIcon({ state, refused })
   // After GitHub refuses, the fix is usually on GitHub, so opening the PR leads and merging again follows.
   const openPullRequest = pullRequestUrl && <Button size="sm" variant={refused ? 'default' : 'secondary'} render={<a href={pullRequestUrl} target="_blank" rel="noopener noreferrer" />}><ExternalLink data-icon="inline-start" aria-hidden="true" />{t('openOnGitHub')}</Button>
-  return <Item variant="muted" data-state={state}>
+  return <Item variant="muted" data-state={flow ? undefined : state} data-stage={flow?.stage} data-needs-you={flow?.needsYou?.kind}>
     {icon && <ItemMedia variant="icon">{icon}</ItemMedia>}
     <ItemContent>
-      {(state !== 'pending' || refused) && <ItemTitle>{refused ? t('cannotMerge') : t(acceptanceStateKey(state, isSkill))}</ItemTitle>}
+      {flow ? <FactoryFlowBadge flow={flow} /> : (state !== 'pending' || refused) && <ItemTitle>{refused ? t('cannotMerge') : t(acceptanceStateKey(state, isSkill))}</ItemTitle>}
       {(sha || superseded || environment || refused) && <div className="flex flex-wrap items-center gap-1">
         {refused && <Badge variant="outline" tone="warning">{t(`mergeRefusal.${refusal}` as 'mergeRefusal.githubUnavailable')}</Badge>}
         {environment && <Badge variant="outline"><Server aria-hidden="true" />{environment}</Badge>}

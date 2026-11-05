@@ -2,9 +2,10 @@ import 'server-only'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { projectDb, projects } from '@/lib/db/projects'
-import { teamProjects } from '@/lib/db/team-schema'
+import { teamIssues, teamProjects, teams } from '@/lib/db/team-schema'
 import { workspaceMembers, workspaces } from '@/lib/db/workspace-schema'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
+import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { actingContext } from '@/lib/activity-actor'
 import { db } from '@/lib/db'
@@ -15,6 +16,8 @@ import { ProjectMapError } from './contracts'
 export type ProjectScope = {
   reader: IssueReader; userId: string; workspaceId: string; projectId: string;
   project: Pick<typeof projects.$inferSelect, 'id' | 'userId' | 'name' | 'revision' | 'issueIds' | 'createdAt'>; issueIds: string[];
+  /** Fresh workspace classification from a map GET's membership read; rechecked after its snapshot. */
+  personalWorkspace?: boolean;
   runId?: string; botId?: string | null;
 }
 type WorkspaceExecutor = Pick<typeof projectDb, 'select'>
@@ -24,6 +27,61 @@ function tokenScope(reader: IssueReader) {
   if (typeof reader !== 'string') return reader[tokenWorkspace]
   const actor = actingContext.getStore()
   return actor?.userId === reader ? actor.tokenWorkspaceId : undefined
+}
+
+/** Map GET authorization in two bounded reads, one per authority database.
+ * Re-run this whole function after reading content; none of its membership or
+ * link facts survive a request. Decision writes retain resolveProjectScope. */
+export async function resolveProjectReadScope(reader: IssueReader, projectId: string, workspaceId: string): Promise<ProjectScope> {
+  if (![projectId, workspaceId].every(id => z.uuid().safeParse(id).success)) throw new ProjectMapError('INVALID_SCOPE')
+  const userId = readerId(reader)
+  if (tokenScope(reader) && tokenScope(reader) !== workspaceId) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
+  const scopedReader: IssueReader = { id: userId, [tokenWorkspace]: workspaceId }
+  const boundedIds = sql<string[] | null>`CASE WHEN jsonb_typeof(${projects.issueIds})='array' AND octet_length(${projects.issueIds}::text)<=4096
+    THEN CASE WHEN jsonb_array_length(${projects.issueIds})<=100 THEN ${projects.issueIds} ELSE NULL END ELSE NULL END`
+  const [row] = await projectDb.select({
+    workspace: { kind: workspaces.kind, userId: workspaces.userId },
+    project: { id: projects.id, userId: projects.userId, name: projects.name, revision: projects.revision, issueIds: boundedIds, createdAt: projects.createdAt },
+    // Keep raw Project links: filtering orphaned/mismatched teams here could hide a scope conflict.
+    links: sql<{ workspaceId: string }[]>`COALESCE((SELECT jsonb_agg(link) FROM (
+      SELECT ${teamProjects.workspaceId} AS "workspaceId" FROM ${teamProjects}
+      WHERE ${teamProjects.projectId}=${projects.id} LIMIT 101) link),'[]'::jsonb)`,
+    issueLinks: sql<{ issueId: string; workspaceId: string; allowed: boolean }[]>`COALESCE((SELECT jsonb_agg(link) FROM (
+      SELECT scope_issues."issueId",scope_issues."workspaceId",
+        scope_teams.id IS NOT NULL AND scope_issues."workspaceId"=${workspaces.id} AS allowed
+      FROM ${teamIssues} scope_issues LEFT JOIN ${teams} scope_teams
+        ON scope_teams.id=scope_issues."teamId" AND scope_teams."workspaceId"=scope_issues."workspaceId"
+      WHERE scope_issues."issueId"=ANY(ARRAY(SELECT CASE
+        WHEN candidate.value ~* '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$' THEN candidate.value::uuid ELSE NULL END
+        FROM jsonb_array_elements_text(COALESCE(${boundedIds},'[]'::jsonb)) candidate(value))) LIMIT 101) link),'[]'::jsonb)`,
+  }).from(workspaces)
+    .innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, workspaces.id), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
+    .innerJoin(projects, eq(projects.id, projectId))
+    .where(eq(workspaces.id, workspaceId)).limit(1)
+  if (!row) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
+  const { workspace, project, links, issueLinks } = row
+  if (links.length > 100 || issueLinks.length > 100) throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
+  const projectWorkspaces = new Set(links.map(link => link.workspaceId))
+  if (links.length && !projectWorkspaces.has(workspaceId)) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
+  if (projectWorkspaces.size > 1) throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
+  const personalWorkspace = workspace.kind === 'personal' && workspace.userId === userId
+  if (!links.length && (project.userId !== userId || !personalWorkspace)) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
+  if (!Array.isArray(project.issueIds)) throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
+  const candidateIds = [...new Set(project.issueIds)].filter(id => z.uuid().safeParse(id).success)
+  const allowedIds = issueLinks.filter(link => link.allowed).map(link => link.issueId)
+  const visibility = issueVisibilityPredicate(userId, { allowedIds })
+  // The base predicate grants only owner access or a valid workspace-team pair.
+  // Raw links are still needed to exclude an owner's task linked to another
+  // tenant, even when that team is invalid or membership there was revoked.
+  const linked = issueLinks.filter(link => link.workspaceId === workspaceId).map(link => link.issueId)
+  const elsewhere = issueLinks.filter(link => link.workspaceId !== workspaceId).map(link => link.issueId)
+  const tenant = personalWorkspace
+    ? elsewhere.length ? sql`not (${issues.scope} = 'workspace' and ${inArray(issues.id, elsewhere)})` : undefined
+    : linked.length ? inArray(issues.id, linked) : sql`false`
+  const visible = candidateIds.length ? await db.select({ id: issues.id }).from(issues)
+    .where(and(inArray(issues.id, candidateIds), visibility, tenant)) : []
+  return { reader: scopedReader, userId, workspaceId, projectId, project: { ...project, issueIds: project.issueIds },
+    issueIds: visible.map(issue => issue.id), personalWorkspace }
 }
 
 /** No name matching, current-workspace cookie, cross-request cache, or cross-database join. */

@@ -500,13 +500,20 @@ test(
             continuationRunId: result.continuationRunId, task: result.task });
           const {rows:[child]}=await pool.query('SELECT * FROM agent_runs WHERE id=$1',[result.continuationRunId]);
           assert.equal(child.agentId,agentId);assert.equal(child.deviceId,f.childDevice);assert.equal(child.deviceRepoId,f.childRepo);assert.equal(child.agentDefinition.definitionDigest,f.definition.definitionDigest);assert.deepEqual(child.agentDefinition.subscription,f.definition.subscription);assert.equal(child.questionContinuation.originSessionId,f.q.originSessionId);assert.equal(child.questionContinuation.requireSessionResume,true);
+          const source = JSON.parse(child.questionContinuation.followUp.split('\n')[0]);
+          const accepted = await f.service.read(userId, f.q.id);
+          assert.deepEqual(source.source, { type: 'answer', id: accepted.id, answerId: accepted.answerId });
+          assert.equal(source.answerSource, accepted.answerSource);assert.equal(source.authorKind, 'human');
+          assert.ok(child.prompt.includes(child.questionContinuation.followUp), 'the queued native prompt carries the committed answer locator');
+          const {rows:[message]}=await pool.query('SELECT text FROM run_messages WHERE id=$1',[answer.answerId]);
+          assert.equal(message.text,answer.text,'host metadata does not change the persisted human answer');
           const {rows:machines}=await pool.query('SELECT * FROM thread_machines WHERE "runId"=ANY($1::uuid[])',[[f.runId,child.id]]);
           const old=machines.find(m=>m.runId===f.runId),current=machines.find(m=>m.runId===child.id);
           const {rows:[grant]}=await pool.query('SELECT "approvedForRun" FROM computer_run_bindings WHERE "runId"=$1',[child.id]);assert.equal(grant.approvedForRun,false);
           const {rows:[publication]}=await pool.query('SELECT "remoteUrl","remoteKey",branch,"baseBranch","pushApproved" FROM run_publications WHERE "runId"=$1',[child.id]);assert.deepEqual(publication,{remoteUrl:'fixture/repo',remoteKey:'/isolated',branch:'frozen-branch',baseBranch:'main',pushApproved:false});
           assert.equal(old.state,'ended');assert.equal(old.sandboxId,null);assert.equal(old.deviceId,f.childDevice);assert.equal(current.state,machineState);assert.equal(current.sandboxId,f.sandboxId);assert.equal(current.deviceId,f.childDevice);assert.equal(current.repoId,f.childRepo);assert.equal(f.fallbackCalls(),0);
           assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1',[f.issueId])).rows[0].n,2);
-          if(machineState==='running') {const claimed=await f.service.claimContinuation(userId,f.childDevice,child.id,new Date(Date.now()+60000).toISOString());assert.equal(claimed.resumeSessionId,f.q.originSessionId);assert.equal(claimed.requireSessionResume,true);}
+          if(machineState==='running') {const claimed=await f.service.claimContinuation(userId,f.childDevice,child.id,new Date(Date.now()+60000).toISOString());assert.equal(claimed.resumeSessionId,f.q.originSessionId);assert.equal(claimed.requireSessionResume,true);assert.equal(claimed.followUp,child.questionContinuation.followUp);}
         });
         await t.test('postcommit handoff sees durable answer; enqueue failure replay targets the same paused run',async()=>{
           let wakes=0;let committedRun:string|undefined;
@@ -1345,6 +1352,11 @@ test(
           assert.equal(await queued(f.issueId), 0);
           const result = await questions.answer(actor, request);
           assert.equal(result.questionId, f.questionId);
+          const { rows: [child] } = await pool.query('SELECT "questionContinuation" FROM agent_runs WHERE id=$1', [result.continuationRunId]);
+          const metadata = JSON.parse(child.questionContinuation.followUp.split('\n')[0]);
+          assert.deepEqual(metadata.source, { type: 'answer', id: f.questionId, answerId: request.answerId });
+          assert.equal(metadata.answerSource, 'human_event');
+          assert.equal(metadata.authorKind, 'human');
           assert.equal(
             (await questions.answer(actor, request)).continuationRunId,
             result.continuationRunId,

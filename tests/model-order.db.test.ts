@@ -472,9 +472,49 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     await pool.query('UPDATE model_order_settings SET "preferredHarness"=\'claude_code\' WHERE "ownerId"=$1', [saved.ownerId])
     await subscribe(untouched, 'codex', ['only-codex'])
     await order.changeOrder(pool, untouched, { kind: 'location', location: 'local' })
-    await pool.query(sql); await pool.query(sql)
-    assert.equal((await order.readOrder(pool, saved)).preferredHarness, 'codex', 'its first row runs on Codex')
-    assert.equal((await order.readOrder(pool, untouched)).preferredHarness, 'claude_code', 'an untouched list keeps its setting')
+
+    // Other files in this package run concurrently on the same database. A
+    // live dispatch preference must survive this historical migration fixture.
+    const concurrent = await person('migration-concurrent-dispatch')
+    const concurrentClaude = await subscribe(concurrent, 'claude', ['parallel-claude'])
+    const concurrentCodex = await subscribe(concurrent, 'codex', ['parallel-codex'])
+    await order.changeOrder(pool, concurrent, { kind: 'add', entries: [
+      { harness: 'claude_code', model: 'parallel-claude', source: { kind: 'subscription', connectionId: concurrentClaude } },
+      { harness: 'codex', model: 'parallel-codex', source: { kind: 'subscription', connectionId: concurrentCodex } },
+    ] })
+    await order.changeOrder(pool, concurrent, { kind: 'preferred', harness: 'codex' })
+    await device(concurrent.ownerId, [
+      { harness: 'claude_code', installed: true, models: ['parallel-claude'] },
+      { harness: 'codex', installed: true, models: ['parallel-codex'] },
+    ])
+    const concurrentBefore = await order.readOrder(pool, concurrent)
+    assert.equal(concurrentBefore.entries[0].harness, 'claude_code')
+    const dispatchConcurrent = () => resolveModelDispatch(pool, { ...concurrent, botId: null }, undefined, 'local')
+    const before = await dispatchConcurrent()
+    assert.equal(before.kind === 'device' && before.model, 'parallel-codex')
+
+    // Replay the unmodified whole-table migration only against this case's
+    // private copies. A transaction alone would still rewrite sibling fixtures.
+    const migration = await pool.connect()
+    try {
+      await migration.query('BEGIN')
+      await migration.query('SET LOCAL search_path=pg_temp,public')
+      await migration.query('CREATE TEMP TABLE model_order_settings (LIKE public.model_order_settings INCLUDING ALL) ON COMMIT DROP')
+      await migration.query('CREATE TEMP TABLE model_order_entries (LIKE public.model_order_entries INCLUDING ALL) ON COMMIT DROP')
+      for (const table of ['model_order_settings', 'model_order_entries']) {
+        await migration.query(`INSERT INTO pg_temp.${table} SELECT * FROM public.${table} WHERE "ownerId"=ANY($1::text[])`, [[saved.ownerId, untouched.ownerId]])
+      }
+      await migration.query(sql); await migration.query(sql)
+      assert.equal((await order.readOrder(migration, saved)).preferredHarness, 'codex', 'its first row runs on Codex')
+      assert.equal((await order.readOrder(migration, untouched)).preferredHarness, 'claude_code', 'an untouched list keeps its setting')
+    } finally {
+      await migration.query('ROLLBACK')
+      migration.release()
+    }
+    assert.equal((await order.readOrder(pool, saved)).preferredHarness, 'claude_code', 'migration replay leaves the shared source rows unchanged')
+    assert.deepEqual(await order.readOrder(pool, concurrent), concurrentBefore, 'the migration fixture cannot overwrite another dispatch scope')
+    const after = await dispatchConcurrent()
+    assert.equal(after.kind === 'device' && after.model, 'parallel-codex')
   })
 
   await t.test('a model the account no longer reports stays listed, marked modelGone; never deleted', async () => {

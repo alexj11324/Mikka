@@ -3,7 +3,7 @@ import * as Clipboard from 'expo-clipboard'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Reanimated, { cancelAnimation, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming, type SharedValue } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
-import { AccessibilityInfo, Image, Platform, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
+import { AccessibilityInfo, Platform, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
 import { Check, CircleAlert, Copy, Ellipsis, Reply } from 'lucide-react-native'
 import { CardButton } from '@/components/cards'
 import { MessageMenu, NATIVE_MESSAGE_MENU } from '@/components/MessageMenu'
@@ -27,39 +27,21 @@ export function BotBubble({ children }: { children: ReactNode }) {
 }
 
 /** The person's words sit in the blue bubble (R-14); photos they sent sit above it, as in Messages. */
-export function MyBubble({ text, photos }: { text: string; photos?: ImageURISource[] }) {
+export function MyBubble({ text, photos, selecting }: { text: string; photos?: ImageURISource[]; selecting?: ReactNode }) {
   const parsed = splitChatFiles(text)
+  const pictures = useImageFiles(parsed.files)
   const { quoted, words } = splitQuoted(parsed.text)
   return (
     <View style={styles.mine}>
-      <ChatFiles files={parsed.files} />
-      {photos?.length ? <Photos photos={photos} /> : null}
+      <ChatFiles files={parsed.files.filter(file => !isImageFile(file))} />
+      <ChatImages images={[...(photos ?? []), ...pictures]} align="right" />
       {text ? (
         <View style={[styles.myBubble, { maxWidth: '100%' }]}>
           {quoted ? <Text numberOfLines={3} style={styles.quoted}>{quoted}</Text> : null}
-          {words ? <Text style={[styles.body, { color: colors.onAccent }]}>{words}</Text> : null}
+          {selecting ?? (words ? <Text style={[styles.body, { color: colors.onAccent }]}>{words}</Text> : null)}
         </View>
       ) : null}
     </View>
-  )
-}
-
-/** Sent photos, each 160 wide at its own aspect, grey while loading. */
-function Photos({ photos }: { photos: ImageURISource[] }) {
-  return (
-    <View style={styles.photos}>
-      {photos.map((source, index) => <Photo key={index} source={source} />)}
-    </View>
-  )
-}
-
-function Photo({ source }: { source: ImageURISource }) {
-  const [ratio, setRatio] = useState(3 / 4)
-  if (!source.uri) return <View style={[styles.photo, { aspectRatio: ratio }]} />
-  return (
-    <Image source={source} accessibilityLabel="照片" resizeMode="cover"
-      onLoad={event => { const { width, height } = event.nativeEvent.source; if (width && height) setRatio(Math.min(Math.max(width / height, 0.5), 2)) }}
-      style={[styles.photo, { aspectRatio: ratio }]} />
   )
 }
 
@@ -83,7 +65,7 @@ export function OutgoingBubble({ text, photos, failed, unconfirmed = false, onRe
   return (
     <Pressable accessibilityRole={failed ? 'button' : undefined} accessibilityHint={failed ? '重试' : undefined} disabled={!failed} onPress={onRetry} style={styles.outgoing}>
       <View style={[{ alignItems: 'flex-end', gap: 4 }, !failed && { opacity: 0.6 }]}>
-        {photos?.length ? <Photos photos={photos.map(uri => ({ uri }))} /> : null}
+        {photos?.length ? <ChatImages images={photos.map(uri => ({ uri }))} align="right" /> : null}
         {text ? (
           <View style={[styles.myBubble, { maxWidth: '100%' }]}>
             <Text style={[styles.body, { color: colors.onAccent }]}>{text}</Text>
@@ -346,8 +328,6 @@ const styles = StyleSheet.create({
   myBubble: { alignSelf: 'flex-end', maxWidth: '78%', backgroundColor: colors.accentFill, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
   quoted: { fontSize: 14, lineHeight: 20, color: 'rgba(255,255,255,0.75)', borderLeftWidth: 2, borderLeftColor: 'rgba(255,255,255,0.6)', paddingLeft: 8, marginBottom: 6 },
   mine: { alignSelf: 'flex-end', alignItems: 'flex-end', maxWidth: '78%', gap: 4 },
-  photos: { alignItems: 'flex-end', gap: 4 },
-  photo: { width: 160, borderRadius: 18, backgroundColor: colors.bubble },
   outgoing: { alignSelf: 'flex-end', alignItems: 'flex-end', maxWidth: '78%', gap: 4 },
   retryRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   retry: { fontSize: 12, color: colors.danger },
@@ -369,3 +349,5 @@ const styles = StyleSheet.create({
 })
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { ChatFiles } from './ChatFiles'
+import { ChatImages } from '@/features/chat/components/chat-images'
+import { isImageFile, useImageFiles } from '@/features/chat/model/chat-image-source'
