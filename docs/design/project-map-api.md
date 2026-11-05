@@ -166,7 +166,11 @@ Medium 4 CPU / 8 GiB、PostgreSQL 17，500/1000 个 run（另有 project/task �
 
 这是新增 GET，main 上没有同名接口的“改前”读量。实现期间 source 从重读整图的 176.766/332.266 KB，收窄到上表的 20.306/20.306 KB。500/1000 fixtures 的 prompt+report 全文分别为 8,199,500/16,399,000 B；这是被排除的合成正文量，不是假称旧版地图 API 实测。
 
-collector 无决定来源时固定 8 个批量查询，有来源的代表项目为 10 个；完整 page/node/path/overview 链路是 38 个 SQL statements（33 SELECT），source 是 35（30 SELECT），所以**不能把“collector ≤12”写成“完整 HTTP ≤12”**。后者仍高于 RFC 的初版往返目标。每路 p95：500 runs 32.78–104.14 ms, 1000 runs 34.54–145.06 ms；这是同机 loopback，不是生产同区或用户端 p95。
+上述初版测量的 collector 无决定来源时为 8 个批量查询，有来源的代表项目为 10 个；完整 page/node/path/overview 链路为 38 个 SQL statements（33 SELECT），source 为 35（30 SELECT）。每路 p95：500 runs 32.78–104.14 ms, 1000 runs 34.54–145.06 ms；这是同机 loopback，不是生产同区或用户端 p95。
+
+2026-11-05 的生产 500 节点测量（固定部署 `86e35a1400cb`）返回正确，但 warmup 1209 ms、后续三次 1276/686/709 ms，未达到 500 ms 目标，也不足以宣称通过 p95。后续优化把 GET 的每次 scope 解析合并为最多两个 authority DB 查询，并保留读前、读后的完整 ACL 重查；metadata 在同一个只读 repeatable-read 事务内分批，collector 无来源 8→2 次、有来源的代表项目 10→4 次，跨批共享 1 MiB 的 SQL 预算。source 的专用来源授权链保持不变。
+
+**collector 往返、完整 HTTP SELECT 数、完整 SQL statements 和生产延迟分别记录。** 新 PG 回归对 page/node/path/overview 设置 ≤12 SELECT 预算，并继续输出所有五路的实际 statements、SELECT、DB/HTTP/gzip 字节与耗时；不能将其解释为所有五路已达到完整 HTTP ≤12 statements。生产修复后的 500/1000 节点结果必须在精确部署版本上实测，并在 #1247 回填。
 
 ### 验收与交接边界
 

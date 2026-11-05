@@ -31,7 +31,7 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
   const { pool } = await import('@/lib/db'), { workspacePool } = await import('@/lib/workspace-db')
   const { createPersonalAccessToken } = await import('@/lib/tokens/store')
   const { recordProjectDecision } = await import('./decisions')
-  const { resolveProjectScope } = await import('./scope')
+  const { resolveProjectScope, resolveProjectReadScope } = await import('./scope')
   const { collectMapFacts } = await import('./read-store')
   const { graphPage, projectGraph } = await import('./graph')
   const { mapQuerySchema } = await import('./read-contracts')
@@ -111,7 +111,7 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
       assert.ok(!JSON.stringify(result.rows).includes(hidden)); return result
     } } as Pick<PoolClient, 'query'>
     const facts = await collectMapFacts(measured, scope, true)
-    assert.equal(calls, 10); assert.ok(bytes < 20 * 1024)
+    assert.ok(calls <= 4, `metadata and source authorization used ${calls} roundtrips`); assert.ok(bytes < 20 * 1024)
     assert.equal(facts.runs[0].modelId, 'gpt-6-luna'); assert.equal(facts.runs[0].outcome, null)
     assert.equal(facts.candidates[0].accepted, false)
     await connection.query(`INSERT INTO factory_merges(id,"taskId","candidateId","userId","eventId","pullRequestUrl",sha,status,source)
@@ -181,6 +181,44 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
     await connection.query('UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [projectId, JSON.stringify(Array.from({ length: 101 }, () => randomUUID()))])
     const response = await get(); assert.equal(response.status, 409); assert.equal((await response.json()).code, 'map_scope_conflict')
     await connection.query('UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [projectId, JSON.stringify([issueId])])
+  })
+  await t.test('batched scope preserves owner, tenant, deleted-task and malformed-link boundaries', async () => {
+    const shared = await seedWorkspace(connection, owner, [{ userId: owner, role: 'admin' }, { userId: peer, role: 'member' }])
+    const team = await seedTeam(connection, shared.id, owner), foreignTeam = await seedTeam(connection, other.id, peer)
+    const unlinked = await seedIssue(connection, owner)
+    // Historical workspace rows use the same isolated fixture pattern as
+    // issue-visibility-narrow.db.test.ts; no promotion guard is disabled.
+    const workspaceIssue = async (workspaceId: string, teamId: string) => {
+      const id = randomUUID()
+      await connection.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope,"linearSyncBlocked")
+        VALUES($1,$2,'Scope fixture','{"type":"doc"}','todo','normal','workspace',true)`, [id, owner])
+      await connection.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [id, teamId, workspaceId, owner])
+      return id
+    }
+    const valid = await workspaceIssue(shared.id, team.id), foreign = await workspaceIssue(other.id, foreignTeam.id)
+    const mismatched = await workspaceIssue(shared.id, foreignTeam.id), orphan = await workspaceIssue(shared.id, randomUUID())
+    const deleted = await workspaceIssue(shared.id, team.id)
+    await connection.query('UPDATE issues SET content=$2 WHERE id=$1', [deleted, JSON.stringify({ type: 'doc', attrs: { mikka: { deletedAt: new Date().toISOString() } } })])
+    const project = await seedProject(connection, owner, [{ teamId: team.id, workspaceId: shared.id }])
+    const candidates = [unlinked, valid, foreign, mismatched, orphan, deleted, valid, 'not-a-uuid', null]
+    await connection.query('UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [project, JSON.stringify(candidates)])
+    for (const [reader, expected] of [[owner, [valid, mismatched, orphan]], [peer, [valid]]] as const) {
+      const original = await resolveProjectScope(reader, project, shared.id)
+      const batched = await resolveProjectReadScope(reader, project, shared.id)
+      assert.deepEqual([...batched.issueIds].sort(), [...expected].sort())
+      assert.deepEqual([...batched.issueIds].sort(), [...original.issueIds].sort())
+      assert.equal(batched.personalWorkspace, false)
+    }
+    const personalProject = await seedProject(connection, owner, [])
+    await connection.query('UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [personalProject, JSON.stringify(candidates)])
+    const personal = await resolveProjectReadScope(owner, personalProject, home.id)
+    assert.deepEqual(personal.issueIds, [unlinked]); assert.equal(personal.personalWorkspace, true)
+    await assert.rejects(resolveProjectReadScope(owner, project, home.id), { code: 'PROJECT_NOT_FOUND', status: 404 })
+    await connection.query("UPDATE mikka_workspace_members SET status='suspended' WHERE \"workspaceId\"=$1 AND \"userId\"=$2", [shared.id, peer])
+    await assert.rejects(resolveProjectReadScope(peer, project, shared.id), { code: 'PROJECT_NOT_FOUND', status: 404 })
+    await connection.query('INSERT INTO mikka_team_projects("projectId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [project, foreignTeam.id, other.id, owner])
+    await assert.rejects(resolveProjectReadScope(owner, project, shared.id), { code: 'PROJECT_SCOPE_CONFLICT', status: 409 })
+    await assert.rejects(resolveProjectReadScope(owner, project, home.id), { code: 'PROJECT_NOT_FOUND', status: 404 })
   })
   await t.test('authorization and cursor errors stay distinct, without leaking cross-workspace existence', async () => {
     const result = await readPage()
@@ -286,6 +324,29 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
       assert.equal((await get()).status, 413)
     } finally { await connection.query('DELETE FROM factory_attempts WHERE "taskId"=$1 AND ordinal>=100', [taskId]) }
   })
+  await t.test('two individually bounded metadata batches cannot exceed the cumulative SQL byte budget', async () => {
+    const { MAP_METADATA_BYTES } = await import('./read-contracts')
+    const originalContent = (await connection.query('SELECT content FROM issues WHERE id=$1', [issueId])).rows[0].content
+    const content = { type: 'doc', attrs: { mikka: { blockedByIds: Array.from({ length: 17_000 }, () => randomUUID()) } } }
+    const batches: { bytes: number; rows: unknown[] | null }[] = []
+    const measured = { query: async (sql: string, values?: unknown[]) => {
+      const result = await connection.query(sql, values); batches.push(result.rows[0]); return result
+    } } as Pick<PoolClient, 'query'>
+    try {
+      await connection.query('UPDATE issues SET content=$2 WHERE id=$1', [issueId, JSON.stringify(content)])
+      await connection.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,reason)
+        SELECT gen_random_uuid(),$1,'review',g,g,'passed',repeat('x',4000) FROM generate_series(100,229) g`, [taskId])
+      await assert.rejects(collectMapFacts(measured, await resolveProjectReadScope(owner, projectId, home.id), true),
+        (error: unknown) => (error as { code: string }).code === 'map_too_large')
+      assert.equal(batches.length, 2)
+      assert.ok(batches.every(batch => Number(batch.bytes) < MAP_METADATA_BYTES))
+      assert.ok(batches.reduce((sum, batch) => sum + Number(batch.bytes), 0) > MAP_METADATA_BYTES)
+      assert.ok(Array.isArray(batches[0].rows)); assert.equal(batches[1].rows, null)
+    } finally {
+      await connection.query('UPDATE issues SET content=$2 WHERE id=$1', [issueId, JSON.stringify(originalContent)])
+      await connection.query('DELETE FROM factory_attempts WHERE "taskId"=$1 AND ordinal>=100', [taskId])
+    }
+  })
   await t.test('500/1000 executions have fixed query count and measured per-read KB', async () => {
     for (const count of [500, 1000]) {
       const project = await seedProject(connection, owner, []), issue = await seedIssue(connection, owner)
@@ -302,7 +363,7 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
         result = graphPage(projectGraph(facts), mapQuerySchema.parse({ workspaceId: home.id }))
         times.push(performance.now() - started)
       }
-      assert.equal(queryCount, 8); assert.equal(result!.nodes.length, 50)
+      assert.ok(queryCount <= 2, `metadata used ${queryCount} roundtrips`); assert.equal(result!.nodes.length, 50)
       const raw = JSON.stringify(result)
       assert.ok(gzipSync(raw).byteLength < 150 * 1024)
       const legacy = (await connection.query('SELECT sum(octet_length(prompt)+octet_length(report::text))::int AS bytes FROM agent_runs WHERE "issueId"=$1', [issue])).rows[0].bytes
@@ -330,7 +391,8 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
           const started = performance.now()
           try {
             const response = await get(suffix, token.token, target), text = await response.text()
-            assert.equal(response.status, 200, text); assert.ok(measurement.selects > 8)
+            assert.equal(response.status, 200, text); assert.ok(measurement.selects > 0)
+            if (operation !== 'source') assert.ok(measurement.selects <= 12, `${operation} used ${measurement.selects} SELECTs`)
             durations.push(performance.now() - started); reads.push(measurement.queries); selects.push(measurement.selects); transfer.push(measurement.bytes)
             httpBytes = Buffer.byteLength(text); gzipBytes = gzipSync(text).byteLength
           } finally { measurement = null; overrideDeploymentSwitch('dbEgressSample', undefined) }
