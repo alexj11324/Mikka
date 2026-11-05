@@ -530,7 +530,9 @@ test(
         try {
           await db.query('UPDATE devices SET "lastSeenAt"=now()-interval \'61 seconds\' WHERE id=$1', [deviceId]);
           const stale = (await db.query('SELECT "lastSeenAt" FROM devices WHERE id=$1', [deviceId])).rows[0].lastSeenAt;
-          await assert.rejects(dispatch("owner", { binding: factoryBinding(pending.task), agentId, deviceRepoId: repoId }),
+          // The normal fixture refreshes presence in its adapter. This refusal
+          // exercises the unwrapped production adapter so it sees the stale row.
+          await assert.rejects(createFactoryDispatch(db, store, queue)("owner", { binding: factoryBinding(pending.task), agentId, deviceRepoId: repoId }),
             (error: unknown) => error instanceof FactoryError && error.code === 'factoryCheckHarnessUnavailable');
           assert.deepEqual(await state(pending.task.id), before, 'failed admission leaves the exact pending check intact');
           assert.deepEqual((await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [pending.task.issueId])).rows,
@@ -2358,6 +2360,7 @@ test(
         },
       );
       await t.test('first-use cloud automatic review and verify use fresh task capabilities without waking or installing a parent', async () => {
+        const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction } = await import('./transaction');
         const names = ['WORKSPACE_SECRETS_KEY', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_BYOS_ENABLED', 'NEXT_PUBLIC_POSTHOG_KEY'] as const;
         const saved = new Map(names.map(name => [name, process.env[name]]));
         process.env.WORKSPACE_SECRETS_KEY = createHash('sha256').update(randomUUID()).digest('hex');
@@ -2425,10 +2428,10 @@ test(
             const selected = await chooseCloudRunModel(db, scope, runtime.agentId, 'codex', undefined, 'task');
             assert.ok(!('error' in selected), JSON.stringify(selected));
             const cloudStore = createFactoryStore(db, authorize, botId, { independent: factoryCheckIndependent, gates: factoryCheckGates });
-            const initialDispatch = createFactoryDispatch(db, cloudStore, (tx, _user, input) => queueCloudRun(db, actor, {
+            const initialDispatch = createFactoryDispatch(db, cloudStore, (tx, _user, input, _bot, context) => queueCloudRun(db, actor, {
               botId, issueId: input.issueId, agentId: runtime.agentId, deviceRepoId: repository.id,
               title: 'Fresh cloud check', body: 'Offline real admission fixture', readOnly: true, ...selected,
-            }, tx));
+            }, tx, context));
             const issueId = randomUUID(), sourceEventId = randomUUID();
             await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Fresh check','{}','todo','normal')`, [issueId, userId]);
             await db.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1::uuid,$2,$3,'user_message',$1::text,'{"text":"Fresh cloud check"}')`, [sourceEventId, userId, botId]);
@@ -2455,18 +2458,18 @@ test(
               const producer = (await db.query('SELECT * FROM agent_runs WHERE id=$1', [execute.runId])).rows[0];
               // These actual dispatch refusals must roll back the whole queue.
               for (const [sql, params, code] of [
-                ['UPDATE devices SET enabled=false WHERE id=$1', [parentId], 'Bot computer task is unavailable'],
-                ['DELETE FROM bot_cloud_runtimes WHERE "botId"=$1 AND harness=\'codex\'', [botId], 'factoryRunMismatch'],
+                ['UPDATE devices SET enabled=false WHERE id=$1', [parentId], 'factoryCheckHarnessUnavailable'],
+                ['DELETE FROM bot_cloud_runtimes WHERE "botId"=$1 AND harness=\'codex\'', [botId], 'factoryCheckHarnessUnavailable'],
                 ['UPDATE factory_candidates SET repository=\'/wrong/repository\' WHERE id=$1', [current.task.candidateId], 'factoryEvidenceMismatch'],
               ] as const) {
                 const tx = await db.connect();
                 try {
-                  await tx.query('BEGIN');
+                  await beginFactoryTransaction(tx);
                   await tx.query('UPDATE factory_tasks SET reason=\'Uncommitted caller change\' WHERE id=$1', [current.task.id]);
                   await tx.query(sql, [...params]);
                   await assert.rejects(automatic(tx, cloudStore, current.task, producer),
-                    (error: unknown) => error instanceof FactoryError ? error.code === code : error instanceof Error && error.message === code);
-                } finally { await tx.query('ROLLBACK'); tx.release(); }
+                    (error: unknown) => error instanceof FactoryError ? error.code === code : error instanceof Error && error.message === code, sql);
+                } finally { await rollbackFactoryTransaction(tx); tx.release(); }
                 assert.deepEqual(await parent(), beforeParent, 'automatic dispatch must not commit the caller\'s disabled parent before rejecting');
                 assert.deepEqual(await cloudStore.read(userId, current.task.id), before);
                 assert.deepEqual((await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [issueId])).rows, beforeRuns);
@@ -2474,7 +2477,7 @@ test(
               const tx = await db.connect();
               let afterCommit: (() => Promise<void>) | void;
               try {
-                await tx.query('BEGIN');
+                await beginFactoryTransaction(tx);
                 afterCommit = await automatic(tx, cloudStore, current.task, producer);
                 assert.equal(typeof afterCommit, 'function', 'the real automatic dispatcher must reach the independent fresh task');
                 const runId = (await tx.query('SELECT "runId" FROM factory_attempts WHERE id=$1', [current.task.attemptId])).rows[0].runId;
@@ -2497,8 +2500,8 @@ test(
                     (error: unknown) => error instanceof FactoryError && error.code === code, sql);
                   await tx.query('ROLLBACK TO SAVEPOINT capability_fence');
                 }
-                await tx.query('COMMIT');
-              } catch (error) { await tx.query('ROLLBACK'); throw error; } finally { tx.release(); }
+                await commitFactoryTransaction(tx);
+              } catch (error) { await rollbackFactoryTransaction(tx); throw error; } finally { tx.release(); }
               await afterCommit!();
               current = await cloudStore.read(userId, current.task.id);
               const attempt = current.attempts.find(item => item.id === current.task.attemptId)!;
