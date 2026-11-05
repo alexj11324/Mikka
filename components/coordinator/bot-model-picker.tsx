@@ -147,7 +147,7 @@ export function BotModelPicker({ botId, running = false }: { botId: string | nul
       className={cn('max-w-56 rounded-full px-2 font-normal', unavailable ? 'text-muted-foreground' : 'text-foreground')}
       title={label} aria-label={unavailable ? t('labelUnavailable', { name: label }) : t('label', { name: label })} />}>
       <span className="flex min-w-0"><OptionLabel t={t} option={current} /></span>
-      {failed && <span className="shrink-0 text-xs text-destructive">{t('notSaved')}</span>}
+      {failed && <span className="shrink-0 text-xs text-destructive-foreground">{t('notSaved')}</span>}
       <ChevronDown className="text-muted-foreground" />
     </DropdownMenuTrigger>
     <DropdownMenuContent side="top" align="start" className="w-80">
@@ -164,7 +164,7 @@ export function BotModelPicker({ botId, running = false }: { botId: string | nul
       </DropdownMenuRadioGroup>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
-        {refreshFailed && <DropdownMenuItem closeOnClick={false} className="text-xs text-destructive" onClick={() => { void refresh() }}>{t('refreshFailed')}</DropdownMenuItem>}
+        {refreshFailed && <DropdownMenuItem closeOnClick={false} className="text-xs text-destructive-foreground" onClick={() => { void refresh() }}>{t('refreshFailed')}</DropdownMenuItem>}
         <div className="flex items-center gap-1">
           <DropdownMenuItem className="flex-1 text-xs text-muted-foreground" render={<Link href={settingsHref('models')} />}>
             {t('manage')}<ChevronRight />

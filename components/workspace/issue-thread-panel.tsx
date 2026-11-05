@@ -140,7 +140,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   // A message to an ended thread runs it again in the same thread (R-81): 重试 is that message, one tap (N2).
   const canRetry = !!failure && !!data?.thread.detail && data.thread.ownedByCurrentUser && !runIsActive(view?.status ?? '')
   const failureLine = failure && !providerExplained && <div className="flex items-start gap-2" data-slot="thread-failure">
-    <p className="line-clamp-2 min-w-0 flex-1 text-xs break-words text-destructive/80" title={failure}>{failure}</p>
+    <p className="line-clamp-2 min-w-0 flex-1 text-xs break-words text-destructive-foreground" title={failure}>{failure}</p>
     {canRetry && <Button variant="outline" size="xs" className="shrink-0 pointer-coarse:h-11" disabled={sending} onClick={() => { void send(t('retry'), true) }}>{t('retry')}</Button>}
   </div>
   useEffect(() => {
@@ -237,7 +237,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
               {item.kind === 'steps' && <ThreadSteps stateKey={`thread:${runId}:steps:${item.id}`} harness={detail?.harness ?? ''} steps={item.steps} />}
               {item.kind === 'error' && <FieldError className="text-xs">{item.text}</FieldError>}
               {item.kind === 'stages' && <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground" data-slot="thread-stages">
-                {item.stages.map((stage, index) => <span key={index} className={cn(!stage.ok && 'text-destructive')}>
+                {item.stages.map((stage, index) => <span key={index} className={cn(!stage.ok && 'text-destructive-foreground')}>
                   {t(`stages.${stage.stage}`)} {t('stages.duration', { seconds: (stage.ms / 1000).toFixed(1) })} {stage.ok ? '✓' : '✗'}
                 </span>)}
               </p>}
@@ -272,7 +272,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
         quote={replyQuote ? <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} /> : undefined}
         sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={working || question === 'resuming'} thread onStop={working && canStop ? () => { void stop() } : undefined} />
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
-      {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
+      {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </div>}
     </>}
     {detail && <SelectionQuote root={rootRef} onQuote={text => { setReplyQuote(text); inputRef.current?.focus() }} />}

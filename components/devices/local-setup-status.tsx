@@ -47,13 +47,13 @@ export function LocalSetupStatus({ onOnline }: { onOnline: () => void }) {
   return <Item variant="outline" role="status" aria-live="polite" className="rounded-xl bg-card px-3.5 py-3">
     <ItemMedia>
       {state.status === 'online' ? <Check aria-hidden="true" className="text-success-foreground" />
-        : state.status === 'failed' ? <X aria-hidden="true" className="text-destructive" />
+        : state.status === 'failed' ? <X aria-hidden="true" className="text-destructive-foreground" />
           : <Loader2 aria-hidden="true" className="animate-spin text-muted-foreground motion-reduce:animate-none" />}
     </ItemMedia>
     <ItemContent className="min-w-0">
       <ItemTitle>{state.status === 'online' ? t('local.online') : state.status === 'failed' ? t('local.failed') : t('local.adding')}</ItemTitle>
       {state.status === 'failed' && state.reason
-        ? <ItemDescription className="truncate text-destructive" title={state.reason}>{state.reason}</ItemDescription>
+        ? <ItemDescription className="truncate text-destructive-foreground" title={state.reason}>{state.reason}</ItemDescription>
         : state.status === 'running' && current && <ItemDescription>{t(`ssh.steps.${current}`)}</ItemDescription>}
     </ItemContent>
     {state.status === 'failed' && <ItemActions><Button size="sm" variant="secondary" disabled={retrying} onClick={() => { void retry() }}>{t('local.retry')}</Button></ItemActions>}

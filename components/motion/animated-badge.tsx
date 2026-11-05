@@ -49,7 +49,7 @@ const STATUS_CLASS: Record<AnimatedBadgeStatus, string> = {
   info: "border-primary/30 bg-muted text-primary",
   success: "border-success/30 bg-success/10 text-success-foreground",
   warning: "border-warning/30 bg-warning/10 text-warning-foreground",
-  danger: "border-destructive/30 bg-destructive/10 text-destructive",
+  danger: "border-destructive/30 bg-destructive/10 text-destructive-foreground",
   loading: "border-primary/30 bg-muted text-primary",
 };
 

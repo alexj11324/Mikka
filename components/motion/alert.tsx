@@ -45,7 +45,7 @@ const VARIANT_CLASS: Record<AlertVariant, string> = {
   info: "bg-primary/5 text-primary",
   success: "bg-emerald-500/5 text-emerald-700 dark:text-emerald-400",
   warning: "bg-amber-500/5 text-amber-800 dark:text-amber-300",
-  destructive: "bg-destructive/5 text-destructive",
+  destructive: "bg-destructive/5 text-destructive-foreground",
 };
 
 const VARIANT_ICON = {

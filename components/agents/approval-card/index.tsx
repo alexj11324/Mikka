@@ -60,7 +60,7 @@ function getStatusClass(status: ApprovalCardStatus) {
   if (status === "approved" || status === "answered") {
     return "text-success-foreground";
   }
-  if (status === "rejected") return "text-destructive";
+  if (status === "rejected") return "text-destructive-foreground";
   if (status === "changes-requested") {
     return "text-warning-foreground";
   }

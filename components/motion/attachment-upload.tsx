@@ -240,7 +240,7 @@ function RowAction({
           <span
             role="status"
             aria-label={`Upload failed for ${label}`}
-            className="grid size-9 shrink-0 place-items-center rounded-xl text-destructive"
+            className="grid size-9 shrink-0 place-items-center rounded-xl text-destructive-foreground"
           >
             <AlertCircle className="size-4" />
           </span>
@@ -256,7 +256,7 @@ function RowAction({
           onClick={onClick}
           whileTap={reduce ? undefined : { scale: 0.92 }}
           transition={SPRING_PRESS}
-          className="grid size-9 shrink-0 place-items-center rounded-xl text-destructive outline-none transition-colors hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring"
+          className="grid size-9 shrink-0 place-items-center rounded-xl text-destructive-foreground outline-none transition-colors hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring"
         >
           <RotateCcw className="size-4" />
         </motion.button>
@@ -649,7 +649,7 @@ function AttachmentRow({
                 {item.name}
               </span>
               {failed ? (
-                <span className="block truncate text-[11px] text-destructive">
+                <span className="block truncate text-[11px] text-destructive-foreground">
                   {item.error ?? "Upload failed"}
                 </span>
               ) : null}

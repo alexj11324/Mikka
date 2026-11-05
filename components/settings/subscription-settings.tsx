@@ -388,7 +388,7 @@ function QuotaMeters({ windows, now }: { windows: SubscriptionUsageView['windows
           <span className="text-foreground">{label}</span>
           <span className="flex items-baseline gap-2 whitespace-nowrap tabular-nums">
             {reset && <span className="text-muted-foreground">{reset}</span>}
-            <span className={cn('font-medium', low ? 'text-destructive' : 'text-foreground')}>{left}</span>
+            <span className={cn('font-medium', low ? 'text-destructive-foreground' : 'text-foreground')}>{left}</span>
           </span>
         </div>
         <Progress value={window.remaining} aria-label={[label, left, reset].filter(Boolean).join(' · ')} className={cn('[&_[data-slot=progress-track]]:h-1.5', low && '[&_[data-slot=progress-indicator]]:bg-destructive')} />

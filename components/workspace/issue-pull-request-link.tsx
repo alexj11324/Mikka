@@ -54,7 +54,7 @@ function ViewerPullRequestLink({ issueId, pr, compact = false, userId, isPending
   // The icon's shape is the PR state (Figma icon/14/pr-*): GitHub's when it answered, else the state saved on the task.
   // Only a state GitHub just confirmed for this viewer gets its colour; a saved or stale one stays grey.
   const Icon = PR_ICONS[state ?? pr.state]
-  const content = <><Icon data-icon="inline-start" className={cn(!state && 'text-muted-foreground', state === 'open' && 'text-success-foreground', state === 'merged' && 'text-info-foreground', state === 'closed' && 'text-destructive')} />#{pr.url.split('/').filter(Boolean).at(-1)}{!compact && <span className="text-muted-foreground">{state ? tState(state) : statusLabel}</span>}</>
+  const content = <><Icon data-icon="inline-start" className={cn(!state && 'text-muted-foreground', state === 'open' && 'text-success-foreground', state === 'merged' && 'text-info-foreground', state === 'closed' && 'text-destructive-foreground')} />#{pr.url.split('/').filter(Boolean).at(-1)}{!compact && <span className="text-muted-foreground">{state ? tState(state) : statusLabel}</span>}</>
   const link = <a href={pr.url} draggable={false} target="_blank" rel="noopener noreferrer" title={title} aria-label={title} />
   return compact
     ? <BoardBadge variant="outline" size="lg" className="h-5 gap-1 border-transparent px-0 text-xs font-normal text-muted-foreground tabular-nums [&_svg]:size-3.5" render={link}>{content}</BoardBadge>

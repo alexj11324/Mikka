@@ -791,12 +791,13 @@ place, not a licence to pick either.
 | `bg/elevated` | `#ffffff` | `--shell-raised`, `--card`, `--popover` | `#ffffff` | |
 | `text/primary` | `#171717` | `--foreground` | `#0a0a0a` | yes |
 | `text/secondary` | `#737373` | `--muted-foreground` | `#606060` | yes (code darker on purpose, less grey) |
-| `text/tertiary` | `#a3a3a3` | `--ink-3` | `--muted-foreground` 85% into `--background` (oklch): 4.53:1 on white, 5.16 on the dark page, 4.57 on a dark card | yes (Figma lighter; code holds 4.5:1, 2026-11-04) |
+| `text/tertiary` | `#a3a3a3` | `--ink-3` | `--muted-foreground` 90% into `--background` (oklch). Text only in the source list's domain (`streaming-text.tsx`), on `--muted` / `--inset`: light 4.62 / 4.74, dark 4.82 / 5.09 | yes (Figma lighter; code holds 4.5:1, [decision](decisions/2026-11-05-0040-ink-3-holds-contrast.md)) |
 | `border/default` | `#00000014` | `--border` | `#e5e5e5` | close |
 | `border/rule` | `#e5e5e5` / dark `#383838` | `--rule` | `oklch(0.922 0 0)` / dark `oklch(0.269 0 0)` | |
 | `accent/default` | `#2f6bff` | `--sidebar-primary` | shadcn blue | yes |
 | `status/*` | StatusBadge set | `--success`, `--warning`, `--destructive` | Tailwind palette (500; red 600 light) | check |
 | `status/*` text | — | `--success-foreground`, `--warning-foreground`, `--destructive-foreground`, `--info-foreground` | light: emerald / yellow / violet 900, red 800; dark: emerald / yellow / violet 400, red 300 | |
+| `status/warning` mark | — | `--warning-ink` | light yellow 900, dark `--card`: the 紧急 square's ! on solid amber (R-87) | |
 | `brand/claude` (R-74 mark) | none yet | `--color-brand-claude` | `#D97757`, both themes | Figma to add |
 
 A status word or icon, on a status tint (a badge) or on its own, takes the
