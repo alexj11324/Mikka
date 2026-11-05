@@ -150,6 +150,7 @@ with what Slack, Notion, Cursor and ChatGPT do.
 - [ ] The same feature behaves the same on the phone and on the web.
 - [ ] A refusal or error matches the person's real state: someone with a
       connected subscription is never told to connect one.
+- [ ] An idle page does not call the server: reads follow the live channel, not a timer; `pnpm test:idle-budget` passes and `tests/idle-request-budget.json` only goes down (#1212).
 
 ## Pull requests
 
