@@ -791,7 +791,7 @@ place, not a licence to pick either.
 | `bg/elevated` | `#ffffff` | `--shell-raised`, `--card`, `--popover` | `#ffffff` | |
 | `text/primary` | `#171717` | `--foreground` | `#0a0a0a` | yes |
 | `text/secondary` | `#737373` | `--muted-foreground` | `#606060` | yes (code darker on purpose, less grey) |
-| `text/tertiary` | `#a3a3a3` | `--ink-3` | `--muted-foreground` 90% into `--background` (oklch). Text only in the source list's domain (`streaming-text.tsx`), on `--muted` / `--inset`: light 4.62 / 4.74, dark 4.82 / 5.09 | yes (Figma lighter; code holds 4.5:1, [decision](decisions/2026-11-05-0040-ink-3-holds-contrast.md)) |
+| `text/tertiary` | `#a3a3a3` | `--ink-3` | `--muted-foreground` 90% into `--background` (oklch). Text only in the source list's domain (`streaming-text.tsx`), on `bg-inset`, hovered `--hover`: light 4.62 / 4.74, dark 4.82 / 5.09 | deliberate (Figma lighter; code holds 4.5:1, [decision](decisions/2026-11-05-0040-ink-3-holds-contrast.md)) |
 | `border/default` | `#00000014` | `--border` | `#e5e5e5` | close |
 | `border/rule` | `#e5e5e5` / dark `#383838` | `--rule` | `oklch(0.922 0 0)` / dark `oklch(0.269 0 0)` | |
 | `accent/default` | `#2f6bff` | `--sidebar-primary` | shadcn blue | yes |

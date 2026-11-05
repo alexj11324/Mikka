@@ -562,7 +562,7 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
                     size="sm"
                     disabled={busy}
                     onClick={onReject}
-                    className="rounded-full text-muted-foreground hover:text-destructive"
+                    className="rounded-full text-muted-foreground hover:text-destructive-foreground"
                   >
                     {agentCopy.reject}</Button>
                 ) : null}

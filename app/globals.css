@@ -193,7 +193,7 @@
   --hover-2: color-mix(in oklch, var(--foreground) 9%, var(--background));
   --ink: var(--foreground);
   --ink-2: var(--muted-foreground);
-  /* Tertiary text (times, 「派出」, 「查看了…」): 85% keeps 4.5:1 on the page and cards in both themes, still a step below --ink-2. */
+  /* Tertiary text: 90%. As text it is only the source list's domain (streaming-text.tsx), 4.5:1 on its row; still a step below --ink-2. */
   --ink-3: color-mix(in oklch, var(--muted-foreground) 90%, var(--background));
   --line: var(--border);
   --line-strong: color-mix(in oklch, var(--border) 80%, var(--foreground));
