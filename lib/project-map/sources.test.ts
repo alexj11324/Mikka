@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { beforeEach, mock, test } from 'node:test'
 import type { DecisionSourceLocator } from './contracts'
 import type { ProjectScope } from './scope'
+import { questionAnswerPrompt } from '../factory/questions/answer-prompt'
 
 const id = { project: randomUUID(), workspace: randomUUID(), issue: randomUUID(), outside: randomUUID(), run: randomUUID(), otherRun: randomUUID(), bot: randomUUID(), otherBot: randomUUID(), chunk: randomUUID(), message: randomUUID(), task: randomUUID(), attempt: randomUUID(), candidate: randomUUID(), question: randomUUID(), artifact: randomUUID(), version: randomUUID(), group: randomUUID(), event: randomUUID(), acceptance: randomUUID(), mailbox: randomUUID() }
 const now = new Date('2026-11-04T10:00:00Z')
@@ -241,7 +242,9 @@ test('only a doubly bound question continuation may cite its original run eviden
   records.currentRun = { ...records.run, id: id.otherRun, questionContinuation: { questionId: id.question, originRunId: id.run } }
   records.question.continuationRunId = id.otherRun
   const continuationScope = { ...scope, runId: id.otherRun }
-  const [source] = await resolve({ type: 'answer', id: id.question, answerId: 'answer-stable-id' }, continuationScope)
+  const followUp = questionAnswerPrompt({ questionId: id.question, question: 'Which path?', answerId: 'answer-stable-id', answerSource: 'human', answerText: 'Use A' })
+  const { source: locator } = JSON.parse(followUp.split('\n')[0])
+  const [source] = await resolve(locator, continuationScope)
   assert.equal(source.authorKind, 'human')
   assert.equal(source.locator.runId, id.run)
   // The exception belongs to this question, not all records in that old run.

@@ -11,7 +11,7 @@ records), and those files win where this one disagrees. The architecture follows
 | --- | --- | --- |
 | Stacks, titles, back, bar buttons, header search | Expo Router native `Stack`, `Stack.Toolbar`, `Stack.SearchBar` | No hand-drawn header. A screen fills the system bar; it never draws one. |
 | Route-level sheets (message actions, attach, forms) | A `formSheet` route with detents and the grabber | Not a JS bottom sheet. |
-| Tabs | `NativeTabs` (`app/(tabs)/_layout.tsx`) | |
+| App frame | `AppDrawer` (`features/shell/components/app-drawer.tsx`): one `Stack` on a surface over a push drawer | No tab bar (decision `2026-11-05-2005-ios-push-drawer`). The chat list is home (`app/index.tsx`). |
 | Menus, pickers, switches, segmented controls, grouped settings forms | `@expo/ui` inside `Host` | `Stack.Toolbar.Menu` for a bar's menu. |
 | Product content: buttons, cards, chips, fields, alerts, text | HeroUI Native and its `Typography` | Themed by `styles/tokens.css`. |
 | AI-specific pieces HeroUI has no part for (tool approval, streamed text) | `components/beui/` | Same palette. A general control is HeroUI's, never a new beUI use. |
@@ -67,6 +67,11 @@ A secondary button is filled and has no outline.
   to scrolling on a vertical one:
   - The bubble swipe to quote starts after about 16 pt sideways and fails after about 12 pt vertical.
   - The left swipe for message times starts after 10 pt sideways, when that is 1.5× the vertical movement.
+- The push drawer opens by a drag to the right on the home screen, or from the home bar's workspace button.
+  - The drag starts after 12 pt to the right and gives way to 10 pt up or down.
+  - It uses a 300 ms spring with damping 0.8 and no overshoot.
+  - It settles open when the drag, carried a fifth of a second on, is past halfway (`features/shell/model/drawer.ts`).
+  - A tap on the dimmed app or a drag back closes it.
 - Holding a bubble for 500 ms opens its actions. After about 120 ms the bubble starts to shrink to 0.96 scale, so the
   hold reads as pressed.
 
