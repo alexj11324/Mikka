@@ -79,7 +79,7 @@ async function removableDevice(online: boolean) {
   await pool.query(`INSERT INTO devices(id,"ownerId","lastSeenAt") VALUES($1,'owner-a',now()-$2::interval)`, [id, online ? '1 second' : '2 minutes'])
   await pool.query(`INSERT INTO device_tokens(id,"userId","tokenHash") VALUES($1,'owner-a',$2)`, [tokenId, hashDeviceToken(credential)])
   await pool.query(`INSERT INTO device_token_devices VALUES($1,$2,'owner-a')`, [tokenId, id])
-  const request = (path: string, method = 'POST') => new Request(`http://localhost/mikka${path}`, { method, headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${credential}` } })
+  const request = (path: string, method = 'POST') => new Request(`http://localhost/mikka${path}`, { method, headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${credential}` } })
   return { id, tokenId, request }
 }
 

@@ -173,7 +173,7 @@ export type HeartbeatRun = z.infer<typeof heartbeatRunSchema>
  * Oldest local daemon the server serves. Older released clients cannot access
  * device business routes or register again, even with a fresh login.
  */
-export const MIN_DAEMON_VERSION = '0.0.375'
+export const MIN_DAEMON_VERSION = '0.0.456'
 /** packages/daemon/package.json's version: a daemon run from source (dev, E2E). Releases are 0.0.<run number>. */
 export const SOURCE_DAEMON_VERSION = '0.0.1'
 const stableVersion = z.string().regex(/^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/)

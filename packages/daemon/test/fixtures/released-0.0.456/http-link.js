@@ -1147,16 +1147,16 @@ var require_range = __commonJS({
     };
     var replaceTilde = (comp, options) => {
       const r = options.loose ? re[t.TILDELOOSE] : re[t.TILDE];
-      const z27 = options.includePrerelease ? "-0" : "";
+      const z29 = options.includePrerelease ? "-0" : "";
       return comp.replace(r, (_, M, m, p, pr) => {
         debug("tilde", comp, _, M, m, p, pr);
         let ret;
         if (isX(M)) {
           ret = "";
         } else if (isX(m)) {
-          ret = `>=${M}.0.0${z27} <${+M + 1}.0.0-0`;
+          ret = `>=${M}.0.0${z29} <${+M + 1}.0.0-0`;
         } else if (isX(p)) {
-          ret = `>=${M}.${m}.0${z27} <${M}.${+m + 1}.0-0`;
+          ret = `>=${M}.${m}.0${z29} <${M}.${+m + 1}.0-0`;
         } else if (pr) {
           debug("replaceTilde pr", pr);
           ret = `>=${M}.${m}.${p}-${pr} <${M}.${+m + 1}.0-0`;
@@ -1173,19 +1173,19 @@ var require_range = __commonJS({
     var replaceCaret = (comp, options) => {
       debug("caret", comp, options);
       const r = options.loose ? re[t.CARETLOOSE] : re[t.CARET];
-      const z27 = options.includePrerelease ? "-0" : "";
+      const z29 = options.includePrerelease ? "-0" : "";
       return comp.replace(r, (_, M, m, p, pr) => {
         debug("caret", comp, _, M, m, p, pr);
         let ret;
         if (isX(M)) {
           ret = "";
         } else if (isX(m)) {
-          ret = `>=${M}.0.0${z27} <${+M + 1}.0.0-0`;
+          ret = `>=${M}.0.0${z29} <${+M + 1}.0.0-0`;
         } else if (isX(p)) {
           if (M === "0") {
-            ret = `>=${M}.${m}.0${z27} <${M}.${+m + 1}.0-0`;
+            ret = `>=${M}.${m}.0${z29} <${M}.${+m + 1}.0-0`;
           } else {
-            ret = `>=${M}.${m}.0${z27} <${+M + 1}.0.0-0`;
+            ret = `>=${M}.${m}.0${z29} <${+M + 1}.0.0-0`;
           }
         } else if (pr) {
           debug("replaceCaret pr", pr);
@@ -2054,9 +2054,41 @@ var nativeCoordinatorToolResultSchema = z.discriminatedUnion("status", [
 ]);
 
 // src/server-link-http.ts
-import { z as z26 } from "zod";
+import { z as z28 } from "zod";
+
+// ../protocol/src/chat-attachments.ts
+import { z as z2 } from "zod";
+var CHAT_FILE_CHUNK_BYTES = 3 * 1024 * 1024;
+var CHAT_FILE_MAX_BYTES = 25 * 1024 * 1024;
+var CHAT_FILE_MAX_TEXT = 2e5;
+var chatFileScopeSchema = z2.object({ kind: z2.enum(["bot", "group", "thread"]), id: z2.uuid() }).strict();
+var chatFileSchema = z2.object({
+  id: z2.uuid(),
+  name: z2.string().min(1).max(255),
+  mediaType: z2.string(),
+  size: z2.number().int().positive().max(CHAT_FILE_MAX_BYTES)
+});
+var chatFileDownloadSchema = chatFileSchema.extend({
+  data: z2.string().max(Math.ceil(CHAT_FILE_MAX_BYTES / 3) * 4 + 4),
+  sha256: z2.string().regex(/^[a-f0-9]{64}$/),
+  text: z2.string().max(CHAT_FILE_MAX_TEXT).nullable()
+});
+var chatFileTransferSchema = z2.union([
+  chatFileDownloadSchema,
+  chatFileDownloadSchema.omit({ data: true }).extend({ downloadUrl: z2.url() })
+]);
+var TEXT_EXTENSIONS = "txt md markdown mdx rst csv tsv json jsonl ndjson yaml yml toml xml html htm css scss sass less log js jsx ts tsx mjs cjs mts cts py ipynb go rs java rb sh bash zsh fish sql c h cc cpp cxx hpp cs swift kt kts scala php vue svelte dart ex exs erl hs lua pl r jl tex ini cfg conf properties diff patch graphql gql proto dockerfile makefile env gitignore gitconfig editorconfig";
+var CHAT_TEXT_EXTENSIONS = new Set(TEXT_EXTENSIONS.split(" "));
+var CHAT_DOCUMENT_EXTENSIONS = new Set("pdf docx xlsx xls pptx odt ods odp rtf epub".split(" "));
+var CHAT_IMAGE_EXTENSIONS = new Set("png jpg jpeg webp gif".split(" "));
+var CHAT_AUDIO_EXTENSIONS = new Set("wav mp3 mpeg oga ogg flac aac m4a webm mp4 pcm".split(" "));
+var CHAT_FILE_ACCEPT = [...CHAT_TEXT_EXTENSIONS, ...CHAT_DOCUMENT_EXTENSIONS, ...CHAT_IMAGE_EXTENSIONS, ...CHAT_AUDIO_EXTENSIONS].map((ext) => `.${ext}`).join(",") + ",text/*";
 
 // src/agents/tool-approval.ts
+var RUN_CONTROL_LEGACY_MS = 1e3;
+var RUN_CONTROL_FALLBACK_MS = 2e4;
+var cadence = (mode) => mode === "push" ? void 0 : mode === "fallback" ? RUN_CONTROL_FALLBACK_MS : RUN_CONTROL_LEGACY_MS;
+var MAX_TIMER_MS = 2 ** 31 - 1;
 async function abortable(work, signal) {
   if (signal.aborted) throw new Error("cancelled");
   let cancel;
@@ -2071,18 +2103,41 @@ async function abortable(work, signal) {
   }
 }
 var ToolApprovalGate = class {
-  constructor(runId, host) {
+  constructor(runId, host, mode = "legacy") {
     this.runId = runId;
     this.host = host;
+    this.mode = mode;
   }
   runId;
   host;
   stop = new AbortController();
-  revoke() {
+  checking;
+  reason;
+  monitors = /* @__PURE__ */ new Set();
+  timer;
+  intervalMs;
+  monitoring;
+  dirty = false;
+  mode;
+  changes = /* @__PURE__ */ new Set();
+  revoke(reason) {
+    if (this.revoked) return;
+    this.reason = reason;
+    clearInterval(this.timer);
+    this.timer = void 0;
+    for (const monitor of this.monitors) clearTimeout(monitor.due);
+    this.monitors.clear();
     this.stop.abort();
+    this.wake();
   }
   get revoked() {
     return this.stop.signal.aborted;
+  }
+  get revokeReason() {
+    return this.reason;
+  }
+  get controlMode() {
+    return this.mode;
   }
   onRevoke(callback) {
     if (this.revoked) {
@@ -2095,19 +2150,142 @@ var ToolApprovalGate = class {
   }
   async checkLive() {
     if (this.revoked) return false;
-    try {
-      return await abortable(Promise.resolve(this.host.isLive(this.runId)), this.stop.signal) && !this.revoked;
-    } catch {
-      return false;
+    if (!this.checking) {
+      const work = Promise.resolve().then(() => this.revoked ? false : this.host.isLive(this.runId));
+      this.checking = abortable(work, this.stop.signal).then((live) => live && !this.revoked, () => false).finally(() => {
+        this.checking = void 0;
+      });
     }
+    return this.checking;
+  }
+  /** Switches how this gate learns of changes. Any switch checks again at
+   * once: a push may have been lost while the socket was changing state. */
+  setControlMode(mode) {
+    if (this.revoked || mode === this.mode) return;
+    this.mode = mode;
+    this.scheduleMonitor();
+    this.invalidate();
+  }
+  /** Resolves on the next push or mode switch, or after the mode's cadence.
+   * A paused run waits here instead of asking the server every second. */
+  changed(signal) {
+    return new Promise((resolve, reject) => {
+      if (signal.aborted || this.revoked) {
+        reject(new Error("cancelled"));
+        return;
+      }
+      let timer;
+      const done = (error) => {
+        clearTimeout(timer);
+        this.changes.delete(wake);
+        signal.removeEventListener("abort", abort);
+        if (error) reject(error);
+        else resolve();
+      };
+      const wake = () => done(this.revoked ? new Error("cancelled") : void 0);
+      const abort = () => done(new Error("cancelled"));
+      const ms = cadence(this.mode);
+      if (ms !== void 0) timer = setTimeout(wake, ms);
+      this.changes.add(wake);
+      signal.addEventListener("abort", abort, { once: true });
+    });
+  }
+  wake() {
+    for (const wake of [...this.changes]) wake();
+  }
+  /** Watches the run while it lasts: one background liveness check per run,
+   * on each push (invalidate) and, only when the gateway cannot push, on the
+   * mode's cadence. Extra checks (credentials, subscription access) share each
+   * fresh result; a check may return an epoch ms (an expiry) by which it runs
+   * again. Actual operations still call checkLive. Slow credential I/O never
+   * delays the next liveness check. `intervalMs` only shortens a timed cadence. */
+  watch(check, intervalMs) {
+    if (this.revoked) return () => {
+    };
+    if (intervalMs !== void 0 && (!Number.isFinite(intervalMs) || intervalMs <= 0 || intervalMs > RUN_CONTROL_FALLBACK_MS)) throw new Error("Run monitor interval unavailable");
+    const monitor = { check, running: false, dirty: false, intervalMs };
+    this.monitors.add(monitor);
+    this.scheduleMonitor();
+    return () => {
+      clearTimeout(monitor.due);
+      this.monitors.delete(monitor);
+      this.scheduleMonitor();
+    };
+  }
+  scheduleMonitor() {
+    const base = cadence(this.mode);
+    const intervalMs = this.monitors.size && base !== void 0 ? Math.min(base, ...[...this.monitors].flatMap((monitor) => monitor.intervalMs ?? [])) : void 0;
+    if (intervalMs === this.intervalMs) return;
+    clearInterval(this.timer);
+    this.intervalMs = intervalMs;
+    this.timer = intervalMs === void 0 ? void 0 : setInterval(() => this.requestCheck(false), intervalMs);
+    this.timer?.unref();
+  }
+  /** One timer per watcher at its reported due time, never a cadence. */
+  due(monitor, at) {
+    clearTimeout(monitor.due);
+    monitor.due = void 0;
+    if (typeof at !== "number" || !Number.isFinite(at) || this.revoked || !this.monitors.has(monitor)) return;
+    monitor.due = setTimeout(() => {
+      monitor.due = void 0;
+      if (at > Date.now()) this.due(monitor, at);
+      else this.invalidate();
+    }, Math.min(Math.max(0, at - Date.now()), MAX_TIMER_MS));
+    monitor.due.unref?.();
+  }
+  /** A push invalidates an in-flight check as well as a settled one. */
+  invalidate() {
+    this.wake();
+    this.requestCheck(true);
+  }
+  requestCheck(invalidated) {
+    if (this.revoked || !this.monitors.size) return;
+    if (this.monitoring && !invalidated) return;
+    this.dirty = true;
+    if (this.monitoring) return;
+    let olderOperation = invalidated && this.checking !== void 0;
+    this.monitoring = (async () => {
+      while (this.dirty && !this.revoked && this.monitors.size) {
+        this.dirty = false;
+        if (!await this.checkLive()) {
+          this.revoke();
+          return;
+        }
+        if (olderOperation) {
+          olderOperation = false;
+          this.dirty = true;
+          continue;
+        }
+        for (const monitor of this.monitors) {
+          if (!monitor.check) continue;
+          monitor.dirty = true;
+          if (monitor.running) continue;
+          monitor.running = true;
+          void (async () => {
+            while (monitor.dirty && !this.revoked && this.monitors.has(monitor)) {
+              monitor.dirty = false;
+              const due = await monitor.check();
+              this.due(monitor, due);
+            }
+          })().catch(() => {
+            if (this.monitors.has(monitor)) this.revoke();
+          }).finally(() => {
+            monitor.running = false;
+          });
+        }
+      }
+    })().finally(() => {
+      this.monitoring = void 0;
+      if (this.dirty) this.requestCheck(true);
+    });
   }
 };
 
 // ../protocol/src/policy-snapshot.ts
-import { z as z3 } from "zod";
+import { z as z4 } from "zod";
 
 // ../protocol/src/agent-policy.ts
-import { z as z2 } from "zod";
+import { z as z3 } from "zod";
 var PERMISSION_DECISIONS = ["allow", "ask", "deny"];
 var CONFIGURABLE_PERMISSIONS = {
   install_dependency: ["allow", "ask", "deny"],
@@ -2152,58 +2330,58 @@ var NETWORK_DOMAIN_RE = /^(\*\.)?[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([
 var MAX_NETWORK_DOMAINS = 200;
 var MAX_GUIDANCE_LENGTH = 1e4;
 var MAX_MODEL_NAME_LENGTH = 120;
-var networkDomainSchema = z2.string().trim().toLowerCase().min(1).max(253).regex(NETWORK_DOMAIN_RE);
+var networkDomainSchema = z3.string().trim().toLowerCase().min(1).max(253).regex(NETWORK_DOMAIN_RE);
 function normalizeDomains(domains) {
   return [...new Set(domains.map((d) => d.trim().toLowerCase()))].filter(
     Boolean
   );
 }
-var networkAllowSchema = z2.array(networkDomainSchema).max(MAX_NETWORK_DOMAINS).transform(normalizeDomains);
-var storedPermissionsSchema = z2.strictObject({
-  install_dependency: z2.enum(CONFIGURABLE_PERMISSIONS.install_dependency),
-  write_outside_repo: z2.enum(CONFIGURABLE_PERMISSIONS.write_outside_repo),
+var networkAllowSchema = z3.array(networkDomainSchema).max(MAX_NETWORK_DOMAINS).transform(normalizeDomains);
+var storedPermissionsSchema = z3.strictObject({
+  install_dependency: z3.enum(CONFIGURABLE_PERMISSIONS.install_dependency),
+  write_outside_repo: z3.enum(CONFIGURABLE_PERMISSIONS.write_outside_repo),
   // A stored ask predates decision 2026-11-01-1215 and reads as allow.
-  git_push: z2.enum(PERMISSION_DECISIONS).transform((value) => value === "ask" ? "allow" : value),
-  network: z2.enum(CONFIGURABLE_PERMISSIONS.network),
-  computer_use: z2.enum(CONFIGURABLE_PERMISSIONS.computer_use)
+  git_push: z3.enum(PERMISSION_DECISIONS).transform((value) => value === "ask" ? "allow" : value),
+  network: z3.enum(CONFIGURABLE_PERMISSIONS.network),
+  computer_use: z3.enum(CONFIGURABLE_PERMISSIONS.computer_use)
 }).partial();
-var guidanceSchema = z2.string().max(MAX_GUIDANCE_LENGTH);
+var guidanceSchema = z3.string().max(MAX_GUIDANCE_LENGTH);
 var DEFAULT_NETWORK_ALLOW = [
   "github.com",
   "*.github.com",
   "*.githubusercontent.com"
 ];
-var runPolicySchema = z2.strictObject({
-  permissions: z2.strictObject({
-    install_dependency: z2.enum(PERMISSION_DECISIONS),
-    write_outside_repo: z2.enum(PERMISSION_DECISIONS),
+var runPolicySchema = z3.strictObject({
+  permissions: z3.strictObject({
+    install_dependency: z3.enum(PERMISSION_DECISIONS),
+    write_outside_repo: z3.enum(PERMISSION_DECISIONS),
     // Push is allow (admitted) or deny; an older server's ask carries no push authority.
-    git_push: z2.enum(PERMISSION_DECISIONS).transform((value) => value === "ask" ? "deny" : value),
-    network: z2.enum(PERMISSION_DECISIONS),
+    git_push: z3.enum(PERMISSION_DECISIONS).transform((value) => value === "ask" ? "deny" : value),
+    network: z3.enum(PERMISSION_DECISIONS),
     // Older servers omit this field; the daemon treats that as ask, never allow.
-    computer_use: z2.enum(PERMISSION_DECISIONS).optional()
+    computer_use: z3.enum(PERMISSION_DECISIONS).optional()
   }),
   /** The workspace layer of the domain allow-list (ADR 0009). */
-  networkAllow: z2.array(z2.string().min(1).max(253)).max(MAX_NETWORK_DOMAINS),
+  networkAllow: z3.array(z3.string().min(1).max(253)).max(MAX_NETWORK_DOMAINS),
   /** Host-derived worker/workspace ceiling; even network=allow cannot widen it. */
-  networkCeiling: z2.array(networkDomainSchema).max(MAX_NETWORK_DOMAINS).optional(),
+  networkCeiling: z3.array(networkDomainSchema).max(MAX_NETWORK_DOMAINS).optional(),
   /**
    * The run only reads: the worktree is not writable (ADR 0046). It keeps the
    * owner's GitHub credential like any run. Absent from an older server means
    * a normal, writable run.
    */
-  readOnly: z2.boolean().optional()
+  readOnly: z3.boolean().optional()
 });
 var MODEL_HARNESSES = ["claude_code", "codex", "cursor"];
-var modelHarnessSchema = z2.enum(MODEL_HARNESSES);
-var modelNameSchema = z2.string().trim().min(1).max(MAX_MODEL_NAME_LENGTH);
-var modelByHarnessSchema = z2.strictObject({
+var modelHarnessSchema = z3.enum(MODEL_HARNESSES);
+var modelNameSchema = z3.string().trim().min(1).max(MAX_MODEL_NAME_LENGTH);
+var modelByHarnessSchema = z3.strictObject({
   claude_code: modelNameSchema,
   codex: modelNameSchema,
   cursor: modelNameSchema
 }).partial();
 var APPROVAL_MODES = ["ask", "read_only"];
-var approvalModeSchema = z2.enum(APPROVAL_MODES);
+var approvalModeSchema = z3.enum(APPROVAL_MODES);
 function resolvePermissions(stored, environment = "local") {
   const out = {};
   const record = stored && typeof stored === "object" ? stored : {};
@@ -2248,15 +2426,15 @@ var POLICY_SNAPSHOT_HEADER = "x-mikka-policy-snapshot";
 var POLICY_SNAPSHOT_VERSION = "1";
 var POLICY_SNAPSHOT_TTL_MS = 5 * 6e4;
 var POLICY_SNAPSHOT_REFRESH_MS = 3e4;
-var id = z3.string().min(1).max(128);
-var digest = z3.string().regex(/^[a-f0-9]{64}$/);
-var policyScopeSchema = z3.strictObject({
-  workspaceIds: z3.array(id).max(2),
-  hierarchy: z3.strictObject({ workspaceId: z3.uuid(), teamId: z3.uuid(), projectId: z3.uuid().nullable() }).nullable()
+var id = z4.string().min(1).max(128);
+var digest = z4.string().regex(/^[a-f0-9]{64}$/);
+var policyScopeSchema = z4.strictObject({
+  workspaceIds: z4.array(id).max(2),
+  hierarchy: z4.strictObject({ workspaceId: z4.uuid(), teamId: z4.uuid(), projectId: z4.uuid().nullable() }).nullable()
 });
-var policySnapshotPayloadSchema = z3.strictObject({
-  version: z3.literal(1),
-  issuer: z3.url().max(1e3),
+var policySnapshotPayloadSchema = z4.strictObject({
+  version: z4.literal(1),
+  issuer: z4.url().max(1e3),
   ownerId: id,
   deviceId: id,
   runId: id,
@@ -2264,27 +2442,27 @@ var policySnapshotPayloadSchema = z3.strictObject({
   policyHash: digest,
   scope: policyScopeSchema,
   policy: runPolicySchema,
-  issuedAt: z3.number().int().nonnegative(),
-  expiresAt: z3.number().int().nonnegative()
+  issuedAt: z4.number().int().nonnegative(),
+  expiresAt: z4.number().int().nonnegative()
 });
-var signedPolicySnapshotSchema = z3.strictObject({
-  algorithm: z3.literal("Ed25519"),
+var signedPolicySnapshotSchema = z4.strictObject({
+  algorithm: z4.literal("Ed25519"),
   keyId: digest,
   payload: policySnapshotPayloadSchema,
-  signature: z3.string().regex(/^[A-Za-z0-9_-]{86}$/)
+  signature: z4.string().regex(/^[A-Za-z0-9_-]{86}$/)
 });
-var policyDistributionContextSchema = z3.strictObject({
-  version: z3.literal(1),
-  algorithm: z3.literal("Ed25519"),
+var policyDistributionContextSchema = z4.strictObject({
+  version: z4.literal(1),
+  algorithm: z4.literal("Ed25519"),
   keyId: digest,
-  publicKey: z3.string().regex(/^[A-Za-z0-9_-]{59}$/),
-  issuer: z3.url().max(1e3),
+  publicKey: z4.string().regex(/^[A-Za-z0-9_-]{59}$/),
+  issuer: z4.url().max(1e3),
   ownerId: id,
   deviceId: id,
   runId: id,
   revision: digest,
   scope: policyScopeSchema,
-  required: z3.boolean()
+  required: z4.boolean()
 });
 function policyIssuer(base) {
   const url = new URL(base);
@@ -2311,34 +2489,34 @@ function verifyPolicySnapshot(value, trusted, expected, options = {}) {
 }
 
 // ../protocol/src/skill.ts
-import { z as z5 } from "zod";
+import { z as z6 } from "zod";
 
 // ../protocol/src/skill-artifact.ts
-import { z as z4 } from "zod";
+import { z as z5 } from "zod";
 var SKILL_ARTIFACT_HEADER = "x-mikka-skill-artifacts";
 var TEAM_SKILL_HEADER = "x-mikka-team-skills";
-var skillArtifactRefSchema = z4.object({
-  schemaVersion: z4.literal(1),
-  registryId: z4.enum(["mikka-builtin", "mikka-team"]),
-  skillId: z4.uuid(),
-  versionId: z4.uuid(),
-  format: z4.literal("single-skill-md-v1"),
-  sha256: z4.string().regex(/^[a-f0-9]{64}$/)
+var skillArtifactRefSchema = z5.object({
+  schemaVersion: z5.literal(1),
+  registryId: z5.enum(["mikka-builtin", "mikka-team"]),
+  skillId: z5.uuid(),
+  versionId: z5.uuid(),
+  format: z5.literal("single-skill-md-v1"),
+  sha256: z5.string().regex(/^[a-f0-9]{64}$/)
 }).strict();
-var skillAssignmentReceiptSchema = z4.object({
-  id: z4.uuid(),
-  runId: z4.uuid(),
-  issueId: z4.uuid(),
-  agentId: z4.uuid(),
-  repoId: z4.uuid(),
-  deviceId: z4.uuid(),
-  leaseExpiresAt: z4.iso.datetime(),
-  assignedAt: z4.iso.datetime(),
+var skillAssignmentReceiptSchema = z5.object({
+  id: z5.uuid(),
+  runId: z5.uuid(),
+  issueId: z5.uuid(),
+  agentId: z5.uuid(),
+  repoId: z5.uuid(),
+  deviceId: z5.uuid(),
+  leaseExpiresAt: z5.iso.datetime(),
+  assignedAt: z5.iso.datetime(),
   artifact: skillArtifactRefSchema
 }).strict();
-var skillReceiptRevalidationSchema = z4.object({
+var skillReceiptRevalidationSchema = z5.object({
   skillReceipt: skillAssignmentReceiptSchema,
-  leaseExpiresAt: z4.iso.datetime()
+  leaseExpiresAt: z5.iso.datetime()
 }).strict();
 
 // ../protocol/src/skill.ts
@@ -2349,39 +2527,39 @@ var MAX_SKILL_INSTRUCTIONS_LENGTH = 2e4;
 var MAX_SKILL_FILES = 20;
 var MAX_SKILL_FILE_PATH_LENGTH = 200;
 var MAX_SKILL_FILE_CONTENT_LENGTH = 1e5;
-var skillFilePathSchema = z5.string().min(1).max(MAX_SKILL_FILE_PATH_LENGTH).refine(
+var skillFilePathSchema = z6.string().min(1).max(MAX_SKILL_FILE_PATH_LENGTH).refine(
   (path) => !path.startsWith("/") && !path.includes("\\") && !path.split("/").some((segment) => segment === ".." || segment === ""),
   { message: "A skill file path must be relative and stay inside the skill." }
 );
-var skillFileSchema = z5.object({
+var skillFileSchema = z6.object({
   path: skillFilePathSchema,
-  content: z5.string().max(MAX_SKILL_FILE_CONTENT_LENGTH)
+  content: z6.string().max(MAX_SKILL_FILE_CONTENT_LENGTH)
 });
-var skillFilesSchema = z5.array(skillFileSchema).max(MAX_SKILL_FILES);
-var skillNameSchema = z5.string().trim().min(1).max(MAX_SKILL_NAME_LENGTH);
-var skillDescriptionSchema = z5.string().trim().max(MAX_SKILL_DESCRIPTION_LENGTH);
-var skillInstructionsSchema = z5.string().trim().min(1).max(MAX_SKILL_INSTRUCTIONS_LENGTH);
-var runSkillSchema = z5.object({
-  id: z5.uuid(),
+var skillFilesSchema = z6.array(skillFileSchema).max(MAX_SKILL_FILES);
+var skillNameSchema = z6.string().trim().min(1).max(MAX_SKILL_NAME_LENGTH);
+var skillDescriptionSchema = z6.string().trim().max(MAX_SKILL_DESCRIPTION_LENGTH);
+var skillInstructionsSchema = z6.string().trim().min(1).max(MAX_SKILL_INSTRUCTIONS_LENGTH);
+var runSkillSchema = z6.object({
+  id: z6.uuid(),
   name: skillNameSchema,
-  description: z5.string().nullable(),
+  description: z6.string().nullable(),
   instructions: skillInstructionsSchema,
   files: skillFilesSchema
 });
-var runSkillRefSchema = z5.object({
-  id: z5.uuid(),
+var runSkillRefSchema = z6.object({
+  id: z6.uuid(),
   name: skillNameSchema
 });
 
 // ../protocol/src/subscription.ts
-import { z as z7 } from "zod";
+import { z as z8 } from "zod";
 
 // ../protocol/src/quota.ts
-import { z as z6 } from "zod";
+import { z as z7 } from "zod";
 var QUOTA_VENDORS = ["claude_code", "codex", "cursor"];
-var quotaVendorSchema = z6.enum(QUOTA_VENDORS);
+var quotaVendorSchema = z7.enum(QUOTA_VENDORS);
 var QUOTA_SOURCES = ["local_credentials", "official"];
-var quotaSourceSchema = z6.enum(QUOTA_SOURCES);
+var quotaSourceSchema = z7.enum(QUOTA_SOURCES);
 var QUOTA_WINDOW_KINDS = [
   "five_hour",
   "weekly",
@@ -2390,7 +2568,7 @@ var QUOTA_WINDOW_KINDS = [
   "hourly",
   "other"
 ];
-var quotaWindowKindSchema = z6.enum(QUOTA_WINDOW_KINDS);
+var quotaWindowKindSchema = z7.enum(QUOTA_WINDOW_KINDS);
 var QUOTA_METERS = [
   "auto",
   "api",
@@ -2398,142 +2576,144 @@ var QUOTA_METERS = [
   "team_pool",
   "team_on_demand"
 ];
-var quotaMeterSchema = z6.enum(QUOTA_METERS);
-var quotaWindowSchema = z6.object({
+var quotaMeterSchema = z7.enum(QUOTA_METERS);
+var quotaWindowSchema = z7.object({
   kind: quotaWindowKindSchema,
   /** 0..1 share of the window already used. */
-  used: z6.number().min(0).max(1),
-  resetsAt: z6.string().nullable(),
+  used: z7.number().min(0).max(1),
+  resetsAt: z7.string().nullable(),
   /** Model display name for a per-model window, e.g. "Opus". */
-  model: z6.string().min(1).max(40).optional(),
+  model: z7.string().min(1).max(40).optional(),
   meter: quotaMeterSchema.optional()
 });
-var quotaSnapshotSchema = z6.object({
+var quotaSnapshotSchema = z7.object({
   vendor: quotaVendorSchema,
   source: quotaSourceSchema,
-  status: z6.enum(["ok", "unknown"]),
-  plan: z6.string().max(40).nullable(),
-  windows: z6.array(quotaWindowSchema).max(12),
+  status: z7.enum(["ok", "unknown"]),
+  plan: z7.string().max(40).nullable(),
+  windows: z7.array(quotaWindowSchema).max(12),
   /** When this vendor was last read (ISO-8601). */
-  observedAt: z6.string()
+  observedAt: z7.string()
 });
-var quotaSnapshotReportSchema = z6.object({
+var quotaSnapshotReportSchema = z7.object({
   /** When the whole read finished. Null before the first read. */
-  observedAt: z6.string().nullable(),
-  quotas: z6.array(quotaSnapshotSchema).max(6)
+  observedAt: z7.string().nullable(),
+  quotas: z7.array(quotaSnapshotSchema).max(6)
 });
 
 // ../protocol/src/subscription.ts
-var id2 = z7.string().min(1).max(128);
-var subscriptionRouteSchema = z7.enum([
+var id2 = z8.string().min(1).max(128);
+var subscriptionRouteSchema = z8.enum([
   "codex_cli",
   "claude_code_cli",
   "codex_cpa",
   "claude_cpa",
   "openai_siwc"
 ]);
-var subscriptionConnectionSchema = z7.object({
+var subscriptionConnectionSchema = z8.object({
   id: id2,
   ownerId: id2,
   workspaceId: id2,
-  provider: z7.enum(["openai", "anthropic"]),
-  state: z7.enum([
+  provider: z8.enum(["openai", "anthropic"]),
+  state: z8.enum([
     "pending",
     "connected",
     "reconnect_required",
     "disconnected"
   ]),
   // Increment on reconnect/disconnect. Old bindings cannot become valid again.
-  revision: z7.number().int().positive(),
+  revision: z8.number().int().positive(),
   quota: quotaSnapshotSchema
 }).strict();
-var subscriptionBindingSchema = z7.object({
+var subscriptionBindingSchema = z8.object({
   id: id2,
   ownerId: id2,
   workspaceId: id2,
   // An agent or assistant session selected explicitly by the owner.
   consumerId: id2,
   connectionId: id2,
-  connectionRevision: z7.number().int().positive(),
+  connectionRevision: z8.number().int().positive(),
   route: subscriptionRouteSchema
 }).strict();
-var nativeBrokerContextSchema = z7.object({
-  route: z7.enum(["codex_cli", "claude_code_cli"]),
-  modelId: z7.string().min(1).max(128),
-  revision: z7.number().int().positive(),
-  accountId: z7.string().min(1).max(512),
-  plan: z7.string().max(40).optional(),
-  expiresAt: z7.iso.datetime()
+var nativeBrokerContextSchema = z8.object({
+  route: z8.enum(["codex_cli", "claude_code_cli"]),
+  modelId: z8.string().min(1).max(128),
+  revision: z8.number().int().positive(),
+  accountId: z8.string().min(1).max(512),
+  plan: z8.string().max(40).optional(),
+  expiresAt: z8.iso.datetime()
 }).strict();
 var nativeLeaseSchema = nativeBrokerContextSchema.extend({
-  accessToken: z7.string().min(1).max(32768).regex(/^[^\r\n\0]+$/)
+  accessToken: z8.string().min(1).max(32768).regex(/^[^\r\n\0]+$/)
 }).strict();
 
 // ../protocol/src/computer.ts
-import { z as z8 } from "zod";
-var machineStateSchema = z8.enum(["sleeping", "waking", "running", "error"]);
-var controlStateSchema = z8.enum(["agent", "user", "idle"]);
-var computerToolSchema = z8.enum(["click", "type", "key", "scroll", "screenshot"]);
-var screenRectSchema = z8.object({ x: z8.number(), y: z8.number(), w: z8.number().nonnegative(), h: z8.number().nonnegative() });
-var computerActionSchema = z8.object({ tool: computerToolSchema, x: z8.number().optional(), y: z8.number().optional(), text: z8.string().optional(), rect: screenRectSchema.optional() });
-var lastActionSchema = computerActionSchema.omit({ text: true }).extend({ at: z8.iso.datetime() });
-var approvalViewSchema = z8.object({
-  id: z8.string(),
-  digest: z8.string(),
-  runId: z8.string(),
-  botId: z8.string(),
+import { z as z9 } from "zod";
+var machineStateSchema = z9.enum(["sleeping", "waking", "running", "error"]);
+var controlStateSchema = z9.enum(["agent", "user", "idle"]);
+var computerToolSchema = z9.enum(["click", "type", "key", "scroll", "screenshot"]);
+var screenRectSchema = z9.object({ x: z9.number(), y: z9.number(), w: z9.number().nonnegative(), h: z9.number().nonnegative() });
+var computerActionSchema = z9.object({ tool: computerToolSchema, x: z9.number().optional(), y: z9.number().optional(), text: z9.string().optional(), rect: screenRectSchema.optional() });
+var lastActionSchema = computerActionSchema.omit({ text: true }).extend({ at: z9.iso.datetime() });
+var approvalViewSchema = z9.object({
+  id: z9.string(),
+  digest: z9.string(),
+  runId: z9.string(),
+  botId: z9.string(),
   action: computerActionSchema,
-  summary: z8.string(),
-  expiresAt: z8.iso.datetime()
+  summary: z9.string(),
+  expiresAt: z9.iso.datetime()
 });
-var computerStateSchema = z8.object({
+var computerStateSchema = z9.object({
   machine: machineStateSchema,
   control: controlStateSchema,
-  controlledBy: z8.object({ userId: z8.string() }).optional(),
+  controlledBy: z9.object({ userId: z9.string() }).optional(),
   lastAction: lastActionSchema.optional(),
-  pendingApproval: approvalViewSchema.optional()
+  pendingApproval: approvalViewSchema.optional(),
+  // A server-derived expiry requests a fresh authorized read; it never changes state locally.
+  live: z9.object({ workspaceId: z9.uuid(), deadline: z9.object({ at: z9.iso.datetime(), afterMs: z9.number().int().nonnegative() }).optional() }).optional()
 });
-var viewerModeSchema = z8.enum(["view", "control"]);
-var viewerRequestSchema = z8.object({ mode: viewerModeSchema }).strict();
-var viewerGrantSchema = z8.object({ url: z8.url({ protocol: /^wss$/ }), expiresAt: z8.iso.datetime() });
-var createBotSchema = z8.object({ name: z8.string().trim().min(1).max(120) }).strict();
-var botViewSchema = z8.object({ id: z8.uuid(), name: z8.string().min(1).max(120) });
-var approvalDecisionSchema = z8.object({ digest: z8.string(), decision: z8.enum(["approve", "deny"]), scope: z8.enum(["once", "run"]) }).strict();
-var computerTaskStateSchema = z8.enum(["working", "approval", "done", "failed"]);
-var computerTaskSchema = z8.object({ botId: z8.string(), runId: z8.string(), task: z8.string(), state: computerTaskStateSchema, approvalId: z8.string().optional() });
-var computerEventSchema = z8.discriminatedUnion("type", [
-  z8.object({ type: z8.literal("computer.machine"), state: machineStateSchema }),
-  z8.object({ type: z8.literal("computer.control"), botId: z8.string(), control: controlStateSchema, controlledBy: z8.object({ userId: z8.string() }).optional() }),
-  z8.object({ type: z8.literal("computer.action"), botId: z8.string(), lastAction: lastActionSchema }),
-  z8.object({ type: z8.literal("computer.approval"), botId: z8.string(), approval: approvalViewSchema.nullable() })
+var viewerModeSchema = z9.enum(["view", "control"]);
+var viewerRequestSchema = z9.object({ mode: viewerModeSchema }).strict();
+var viewerGrantSchema = z9.object({ url: z9.url({ protocol: /^wss$/ }), expiresAt: z9.iso.datetime() });
+var createBotSchema = z9.object({ name: z9.string().trim().min(1).max(120) }).strict();
+var botViewSchema = z9.object({ id: z9.uuid(), name: z9.string().min(1).max(120) });
+var approvalDecisionSchema = z9.object({ digest: z9.string(), decision: z9.enum(["approve", "deny"]), scope: z9.enum(["once", "run"]) }).strict();
+var computerTaskStateSchema = z9.enum(["working", "approval", "done", "failed"]);
+var computerTaskSchema = z9.object({ botId: z9.string(), runId: z9.string(), task: z9.string(), state: computerTaskStateSchema, approvalId: z9.string().optional() });
+var computerEventSchema = z9.discriminatedUnion("type", [
+  z9.object({ type: z9.literal("computer.machine"), state: machineStateSchema }),
+  z9.object({ type: z9.literal("computer.control"), botId: z9.string(), control: controlStateSchema, controlledBy: z9.object({ userId: z9.string() }).optional() }),
+  z9.object({ type: z9.literal("computer.action"), botId: z9.string(), lastAction: lastActionSchema }),
+  z9.object({ type: z9.literal("computer.approval"), botId: z9.string(), approval: approvalViewSchema.nullable() })
 ]);
-var reviewDigestSchema = z8.string().regex(/^[a-f0-9]{64}$/);
-var localComputerCall = z8.discriminatedUnion("name", [
-  z8.object({ name: z8.literal("get_desktop_state"), arguments: z8.object({}).strict() }).strict(),
-  z8.object({ name: z8.literal("click"), arguments: z8.object({ x: z8.number().int().min(0).max(1e5), y: z8.number().int().min(0).max(1e5) }).strict() }).strict(),
-  z8.object({ name: z8.literal("type_text"), arguments: z8.object({ text: z8.string().min(1).max(8e3) }).strict() }).strict(),
-  z8.object({ name: z8.literal("press_key"), arguments: z8.object({
-    key: z8.string().regex(/^(?:[\x20-\x7e]|enter|return|tab|escape|space|backspace|delete|insert|home|end|pageup|pagedown|up|down|left|right|f(?:[1-9]|1[0-2]))$/),
-    modifiers: z8.array(z8.enum(["ctrl", "shift", "alt", "super"])).max(4).refine((items) => new Set(items).size === items.length).optional()
+var reviewDigestSchema = z9.string().regex(/^[a-f0-9]{64}$/);
+var localComputerCall = z9.discriminatedUnion("name", [
+  z9.object({ name: z9.literal("get_desktop_state"), arguments: z9.object({}).strict() }).strict(),
+  z9.object({ name: z9.literal("click"), arguments: z9.object({ x: z9.number().int().min(0).max(1e5), y: z9.number().int().min(0).max(1e5) }).strict() }).strict(),
+  z9.object({ name: z9.literal("type_text"), arguments: z9.object({ text: z9.string().min(1).max(8e3) }).strict() }).strict(),
+  z9.object({ name: z9.literal("press_key"), arguments: z9.object({
+    key: z9.string().regex(/^(?:[\x20-\x7e]|enter|return|tab|escape|space|backspace|delete|insert|home|end|pageup|pagedown|up|down|left|right|f(?:[1-9]|1[0-2]))$/),
+    modifiers: z9.array(z9.enum(["ctrl", "shift", "alt", "super"])).max(4).refine((items) => new Set(items).size === items.length).optional()
   }).strict() }).strict(),
-  z8.object({ name: z8.literal("scroll"), arguments: z8.object({ direction: z8.enum(["up", "down", "left", "right"]), amount: z8.number().int().min(1).max(50), x: z8.number().int().min(0).max(1e5), y: z8.number().int().min(0).max(1e5) }).strict() }).strict()
+  z9.object({ name: z9.literal("scroll"), arguments: z9.object({ direction: z9.enum(["up", "down", "left", "right"]), amount: z9.number().int().min(1).max(50), x: z9.number().int().min(0).max(1e5), y: z9.number().int().min(0).max(1e5) }).strict() }).strict()
 ]);
-var localComputerRequest = z8.object({
-  id: z8.uuid(),
-  runId: z8.uuid(),
+var localComputerRequest = z9.object({
+  id: z9.uuid(),
+  runId: z9.uuid(),
   target: reviewDigestSchema,
-  display: z8.string().regex(/^:[1-9][0-9]{0,2}$/).optional(),
+  display: z9.string().regex(/^:[1-9][0-9]{0,2}$/).optional(),
   call: localComputerCall,
-  expiresAt: z8.number().int().positive(),
+  expiresAt: z9.number().int().positive(),
   digest: reviewDigestSchema
 }).strict();
-var localComputerDecision = z8.object({ id: z8.uuid(), digest: reviewDigestSchema, approve: z8.boolean() }).strict();
-var computerSyncBody = z8.object({ requests: z8.array(localComputerRequest).max(20) }).strict();
-var computerSyncResponse = z8.object({ decisions: z8.array(localComputerDecision).max(20) }).strict();
+var localComputerDecision = z9.object({ id: z9.uuid(), digest: reviewDigestSchema, approve: z9.boolean() }).strict();
+var computerSyncBody = z9.object({ requests: z9.array(localComputerRequest).max(20) }).strict();
+var computerSyncResponse = z9.object({ decisions: z9.array(localComputerDecision).max(20) }).strict();
 var computerSyncPath = (deviceId) => `/v1/devices/${encodeURIComponent(deviceId)}/computer`;
 
 // ../protocol/src/capture.ts
-import { z as z9 } from "zod";
+import { z as z10 } from "zod";
 var CAPTURE_CONTENT_TYPES = [
   "image/png",
   "image/jpeg",
@@ -2549,47 +2729,47 @@ var CAPTURE_MAX_BYTES = {
 };
 var RECORDING_MAX_SECONDS = 300;
 var CAPTURE_TITLE_MAX = 200;
-var sha256 = z9.string().regex(/^[a-f0-9]{64}$/);
-var title = z9.string().trim().min(1).max(CAPTURE_TITLE_MAX);
-var captureUploadRequest = z9.object({
+var sha256 = z10.string().regex(/^[a-f0-9]{64}$/);
+var title = z10.string().trim().min(1).max(CAPTURE_TITLE_MAX);
+var captureUploadRequest = z10.object({
   /** Stable client id, persisted before the first network attempt. */
-  captureId: z9.uuid().optional(),
+  captureId: z10.uuid().optional(),
   title,
-  contentType: z9.enum(CAPTURE_CONTENT_TYPES),
-  size: z9.number().int().min(1).max(CAPTURE_MAX_BYTES.video),
+  contentType: z10.enum(CAPTURE_CONTENT_TYPES),
+  size: z10.number().int().min(1).max(CAPTURE_MAX_BYTES.video),
   sha256
 }).strict();
-var captureUploadTarget = z9.discriminatedUnion("target", [
-  z9.object({ target: z9.literal("storage"), url: z9.url({ protocol: /^https$/ }), headers: z9.record(z9.string(), z9.string()) }),
-  z9.object({ target: z9.literal("server") })
+var captureUploadTarget = z10.discriminatedUnion("target", [
+  z10.object({ target: z10.literal("storage"), url: z10.url({ protocol: /^https$/ }), headers: z10.record(z10.string(), z10.string()) }),
+  z10.object({ target: z10.literal("server") })
 ]);
-var captureUploadResponse = z9.object({
-  captureId: z9.uuid(),
+var captureUploadResponse = z10.object({
+  captureId: z10.uuid(),
   upload: captureUploadTarget
 });
-var captureView = z9.object({
-  id: z9.uuid(),
-  kind: z9.enum(CAPTURE_KINDS),
-  contentType: z9.enum(CAPTURE_CONTENT_TYPES),
-  title: z9.string(),
-  size: z9.number().int().nonnegative(),
-  durationMs: z9.number().int().nonnegative().nullable(),
-  source: z9.enum(CAPTURE_SOURCES),
-  createdAt: z9.iso.datetime()
+var captureView = z10.object({
+  id: z10.uuid(),
+  kind: z10.enum(CAPTURE_KINDS),
+  contentType: z10.enum(CAPTURE_CONTENT_TYPES),
+  title: z10.string(),
+  size: z10.number().int().nonnegative(),
+  durationMs: z10.number().int().nonnegative().nullable(),
+  source: z10.enum(CAPTURE_SOURCES),
+  createdAt: z10.iso.datetime()
 });
-var captureCompleteResponse = z9.object({ capture: captureView });
-var screenCaptureRequest = z9.discriminatedUnion("action", [
-  z9.object({ action: z9.literal("screenshot"), title }).strict(),
-  z9.object({ action: z9.literal("start_recording"), title, maxSeconds: z9.number().int().min(5).max(RECORDING_MAX_SECONDS).optional() }).strict(),
-  z9.object({ action: z9.literal("stop_recording") }).strict(),
+var captureCompleteResponse = z10.object({ capture: captureView });
+var screenCaptureRequest = z10.discriminatedUnion("action", [
+  z10.object({ action: z10.literal("screenshot"), title }).strict(),
+  z10.object({ action: z10.literal("start_recording"), title, maxSeconds: z10.number().int().min(5).max(RECORDING_MAX_SECONDS).optional() }).strict(),
+  z10.object({ action: z10.literal("stop_recording") }).strict(),
   // A step on the recording's timeline: an action's own description, or a moment the agent marks.
-  z9.object({ action: z9.literal("step"), label: title, source: z9.enum(["action", "mark"]) }).strict()
+  z10.object({ action: z10.literal("step"), label: title, source: z10.enum(["action", "mark"]) }).strict()
 ]);
-var screenCaptureResponse = z9.discriminatedUnion("action", [
-  z9.object({ action: z9.literal("screenshot"), capture: captureView }),
-  z9.object({ action: z9.literal("start_recording"), recordingId: z9.uuid(), stopsAt: z9.iso.datetime() }),
-  z9.object({ action: z9.literal("stop_recording"), capture: captureView }),
-  z9.object({ action: z9.literal("step"), recorded: z9.boolean() })
+var screenCaptureResponse = z10.discriminatedUnion("action", [
+  z10.object({ action: z10.literal("screenshot"), capture: captureView }),
+  z10.object({ action: z10.literal("start_recording"), recordingId: z10.uuid(), stopsAt: z10.iso.datetime() }),
+  z10.object({ action: z10.literal("stop_recording"), capture: captureView }),
+  z10.object({ action: z10.literal("step"), recorded: z10.boolean() })
 ]);
 var capturePaths = {
   begin: (runId) => `/v1/runs/${encodeURIComponent(runId)}/captures`,
@@ -2599,31 +2779,31 @@ var capturePaths = {
 };
 
 // ../protocol/src/accounts.ts
-import { z as z10 } from "zod";
-var connectedAccount = z10.object({
+import { z as z11 } from "zod";
+var connectedAccount = z11.object({
   /** The provider, e.g. "github". Unique per person, so it names the row. */
-  providerId: z10.string(),
+  providerId: z11.string(),
   /**
    * The account's id at the provider. Better Auth stores the provider's own
    * user id here, which for GitHub is a number — the closest thing to a
    * display name the table holds.
    */
-  accountId: z10.string(),
+  accountId: z11.string(),
   /** OAuth scopes granted, space separated. Null when the provider sent none. */
-  scope: z10.string().nullable(),
+  scope: z11.string().nullable(),
   /** When the account was linked, ISO 8601. */
-  createdAt: z10.string()
+  createdAt: z11.string()
 });
-var connectedAccountsResponse = z10.object({
-  accounts: z10.array(connectedAccount)
+var connectedAccountsResponse = z11.object({
+  accounts: z11.array(connectedAccount)
 });
 
 // ../protocol/src/auth.ts
-import { z as z11 } from "zod";
+import { z as z12 } from "zod";
 var AUTH_PROVIDERS = ["github", "google"];
-var authProvider = z11.enum(AUTH_PROVIDERS);
+var authProvider = z12.enum(AUTH_PROVIDERS);
 var DESKTOP_SCHEMES = ["mikka", "mikka-dev"];
-var desktopScheme = z11.enum(DESKTOP_SCHEMES);
+var desktopScheme = z12.enum(DESKTOP_SCHEMES);
 var AUTH_BASE_PATH = "/api/auth";
 var AUTH_ROUTES = {
   /** Better Auth jwt plugin: short-lived JWT for zero-cache and the relay. */
@@ -2632,98 +2812,98 @@ var AUTH_ROUTES = {
   devLogin: `${AUTH_BASE_PATH}/dev/login`,
   me: "/v1/me"
 };
-var activeSession = z11.object({
-  id: z11.string(),
+var activeSession = z12.object({
+  id: z12.string(),
   /** ISO timestamps. */
-  createdAt: z11.string(),
-  expiresAt: z11.string(),
-  ipAddress: z11.string().nullable(),
-  userAgent: z11.string().nullable(),
+  createdAt: z12.string(),
+  expiresAt: z12.string(),
+  ipAddress: z12.string().nullable(),
+  userAgent: z12.string().nullable(),
   /** Derived from the caller's JWT (`sid`), not from the request's cookies. */
-  current: z11.boolean()
+  current: z12.boolean()
 });
-var activeSessions = z11.object({ sessions: z11.array(activeSession) });
-var authorizedDevice = z11.object({
-  id: z11.uuid(),
-  name: z11.string(),
-  hostname: z11.string().nullable(),
-  platform: z11.string().nullable(),
-  daemonVersion: z11.string().nullable(),
-  lastSeenAt: z11.string().nullable(),
+var activeSessions = z12.object({ sessions: z12.array(activeSession) });
+var authorizedDevice = z12.object({
+  id: z12.uuid(),
+  name: z12.string(),
+  hostname: z12.string().nullable(),
+  platform: z12.string().nullable(),
+  daemonVersion: z12.string().nullable(),
+  lastSeenAt: z12.string().nullable(),
   /** The daemon session; null once the authorization is revoked. */
-  sessionId: z11.string().nullable(),
+  sessionId: z12.string().nullable(),
   /** When the daemon signed in, and when that session expires. */
-  authorizedAt: z11.string().nullable(),
-  expiresAt: z11.string().nullable()
+  authorizedAt: z12.string().nullable(),
+  expiresAt: z12.string().nullable()
 });
-var authorizedDevices = z11.object({
-  devices: z11.array(authorizedDevice)
+var authorizedDevices = z12.object({
+  devices: z12.array(authorizedDevice)
 });
-var authorizedApplication = z11.object({
-  id: z11.string(),
-  name: z11.string(),
-  uri: z11.string().nullable(),
-  scopes: z11.array(z11.string()),
-  createdAt: z11.string(),
-  updatedAt: z11.string()
+var authorizedApplication = z12.object({
+  id: z12.string(),
+  name: z12.string(),
+  uri: z12.string().nullable(),
+  scopes: z12.array(z12.string()),
+  createdAt: z12.string(),
+  updatedAt: z12.string()
 });
-var authorizedApplications = z11.object({
-  applications: z11.array(authorizedApplication)
+var authorizedApplications = z12.object({
+  applications: z12.array(authorizedApplication)
 });
-var sessionUser = z11.object({
-  id: z11.uuid(),
-  email: z11.string(),
-  name: z11.string(),
-  image: z11.string().nullable()
+var sessionUser = z12.object({
+  id: z12.uuid(),
+  email: z12.string(),
+  name: z12.string(),
+  image: z12.string().nullable()
 });
-var accessToken = z11.object({
-  token: z11.string().min(1),
+var accessToken = z12.object({
+  token: z12.string().min(1),
   /** Expiry, ms since epoch (from the JWT's `exp`). */
-  expiresAt: z11.number().int()
+  expiresAt: z12.number().int()
 });
 
 // ../protocol/src/bridge.ts
-import { z as z12 } from "zod";
+import { z as z13 } from "zod";
 var LANGUAGES = ["zh-CN", "en"];
-var languagePreference = z12.enum(["system", ...LANGUAGES]);
-var themePreference = z12.enum(["system", "light", "dark"]);
-var appHref = z12.string().max(2048).regex(/^\/(?!\/)/);
+var languagePreference = z13.enum(["system", ...LANGUAGES]);
+var themePreference = z13.enum(["system", "light", "dark"]);
+var appHref = z13.string().max(2048).regex(/^\/(?!\/)/);
 var DESKTOP_NOTIFICATION_KINDS = [
   "review",
   "awaiting",
   "failed",
   "finished"
 ];
-var desktopNotification = z12.object({
+var desktopNotification = z13.object({
   /** The `notification` row id. */
-  id: z12.string().min(1).max(200),
-  kind: z12.enum(DESKTOP_NOTIFICATION_KINDS),
+  id: z13.string().min(1).max(200),
+  kind: z13.enum(DESKTOP_NOTIFICATION_KINDS),
   /** `ORV-12 · 等你验收`; the issue number is always in it. */
-  title: z12.string().min(1).max(300),
+  title: z13.string().min(1).max(300),
   /** The issue title. */
-  body: z12.string().max(1e3),
+  body: z13.string().max(1e3),
   href: appHref
 });
-var desktopBadgeCount = z12.number().int().min(0).max(9999);
-var savedTab = z12.object({
-  entries: z12.array(appHref).min(1).max(50),
-  index: z12.number().int().min(0).max(49)
+var desktopBadgeCount = z13.number().int().min(0).max(9999);
+var savedTab = z13.object({
+  entries: z13.array(appHref).min(1).max(50),
+  index: z13.number().int().min(0).max(49)
 });
-var savedTabs = z12.object({
-  items: z12.array(savedTab).max(50),
-  active: z12.number().int().min(0).max(49)
+var savedTabs = z13.object({
+  items: z13.array(savedTab).max(50),
+  active: z13.number().int().min(0).max(49)
 });
-var firstDayOfWeekPreference = z12.enum(["monday", "sunday", "saturday"]);
-var commentSubmitKeyPreference = z12.enum(["mod+enter", "enter"]);
-var settingsSchema = z12.object({
+var firstDayOfWeekPreference = z13.enum(["monday", "sunday", "saturday"]);
+var commentSubmitKeyPreference = z13.enum(["mod+enter", "enter"]);
+var settingsSchema = z13.object({
   language: languagePreference,
   theme: themePreference,
   /** Sidebar expanded (true) or collapsed offcanvas (false); ⌘B and `[`. */
-  sidebarOpen: z12.boolean(),
+  sidebarOpen: z13.boolean(),
   /** Titlebar tabs; empty until the app has saved them once. */
   tabs: savedTabs,
   /** Send anonymous usage events (ADR 0033); off by choice in Settings. */
-  telemetry: z12.boolean(),
+  telemetry: z13.boolean(),
   /** Which day a week starts on in date pickers. */
   firstDayOfWeek: firstDayOfWeekPreference,
   /** Which key press sends a comment. */
@@ -2739,47 +2919,47 @@ var DEFAULT_SETTINGS = {
   commentSubmitKey: "mod+enter"
 };
 var SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS);
-var authState = z12.discriminatedUnion("status", [
-  z12.object({ status: z12.literal("signed_out") }),
-  z12.object({ status: z12.literal("signing_in"), provider: authProvider }),
-  z12.object({ status: z12.literal("signed_in"), user: sessionUser }),
-  z12.object({
-    status: z12.literal("update_required"),
-    minVersion: z12.string()
+var authState = z13.discriminatedUnion("status", [
+  z13.object({ status: z13.literal("signed_out") }),
+  z13.object({ status: z13.literal("signing_in"), provider: authProvider }),
+  z13.object({ status: z13.literal("signed_in"), user: sessionUser }),
+  z13.object({
+    status: z13.literal("update_required"),
+    minVersion: z13.string()
   }),
-  z12.object({ status: z12.literal("error"), code: z12.string() })
+  z13.object({ status: z13.literal("error"), code: z13.string() })
 ]);
-var localDevice = z12.object({
+var localDevice = z13.object({
   /** Whether the daemon on this computer answers. */
-  status: z12.enum(["online", "connecting", "offline"]),
+  status: z13.enum(["online", "connecting", "offline"]),
   /** The device row this daemon registered, once it has. */
-  deviceId: z12.string().nullable(),
-  workspaceId: z12.string().nullable(),
+  deviceId: z13.string().nullable(),
+  workspaceId: z13.string().nullable(),
   /** The daemon holds a device credential. */
-  signedIn: z12.boolean(),
+  signedIn: z13.boolean(),
   /** The daemon's link to the server; null while the daemon is offline. */
-  server: z12.enum(["online", "offline", "unregistered"]).nullable()
+  server: z13.enum(["online", "offline", "unregistered"]).nullable()
 });
-var deviceLinkRequest = z12.object({ workspaceId: z12.uuid() });
-var pickedRepo = z12.object({
+var deviceLinkRequest = z13.object({ workspaceId: z13.uuid() });
+var pickedRepo = z13.object({
   /** The repo's top level (a subfolder pick resolves to it). */
-  path: z12.string().min(1).max(4e3),
-  name: z12.string().max(500),
+  path: z13.string().min(1).max(4e3),
+  name: z13.string().max(500),
   /** `origin` (or the first remote), null when the repo has none. */
-  remoteUrl: z12.string().max(2e3).nullable()
+  remoteUrl: z13.string().max(2e3).nullable()
 });
-var pickRepoResult = z12.discriminatedUnion("status", [
-  z12.object({ status: z12.literal("picked"), repo: pickedRepo }),
-  z12.object({ status: z12.literal("cancelled") }),
-  z12.object({ status: z12.literal("not_a_repo"), path: z12.string() })
+var pickRepoResult = z13.discriminatedUnion("status", [
+  z13.object({ status: z13.literal("picked"), repo: pickedRepo }),
+  z13.object({ status: z13.literal("cancelled") }),
+  z13.object({ status: z13.literal("not_a_repo"), path: z13.string() })
 ]);
-var localDeviceAccount = z12.object({
-  ownerId: z12.string().min(1).max(200),
-  deviceIds: z12.array(z12.string().min(1).max(128)).max(1e4)
+var localDeviceAccount = z13.object({
+  ownerId: z13.string().min(1).max(200),
+  deviceIds: z13.array(z13.string().min(1).max(128)).max(1e4)
 });
 
 // ../protocol/src/cycles.ts
-import { z as z13 } from "zod";
+import { z as z14 } from "zod";
 var WEEKDAYS = [
   "monday",
   "tuesday",
@@ -2792,26 +2972,26 @@ var WEEKDAYS = [
 var CYCLE_DURATION_MIN_DAYS = 1;
 var CYCLE_DURATION_MAX_DAYS = 56;
 var CYCLE_UPCOMING_MAX = 8;
-var teamCycleSettingsSchema = z13.object({
+var teamCycleSettingsSchema = z14.object({
   /** Off until a person turns it on: nothing is created and nothing rolls. */
-  enabled: z13.boolean().default(false),
+  enabled: z14.boolean().default(false),
   /** Length of a cycle in days; the end date is `start + duration - 1`. */
-  durationDays: z13.number().int().min(CYCLE_DURATION_MIN_DAYS).max(CYCLE_DURATION_MAX_DAYS).default(14),
+  durationDays: z14.number().int().min(CYCLE_DURATION_MIN_DAYS).max(CYCLE_DURATION_MAX_DAYS).default(14),
   /** The weekday a team's first cycle starts on. */
-  startWeekday: z13.enum(WEEKDAYS).default("monday"),
+  startWeekday: z14.enum(WEEKDAYS).default("monday"),
   /** Cycles kept ready ahead of the current one. 0 creates them just in time. */
-  upcomingCount: z13.number().int().min(0).max(CYCLE_UPCOMING_MAX).default(1),
+  upcomingCount: z14.number().int().min(0).max(CYCLE_UPCOMING_MAX).default(1),
   /**
    * When a cycle ends, unfinished issues move to the next one. Off leaves them
    * in the finished cycle, which is what `cycle.complete` has always done.
    */
-  autoRollover: z13.boolean().default(true),
+  autoRollover: z14.boolean().default(true),
   /**
    * The team's calendar. A cycle ends at the last moment of its end date
    * *here*, not in UTC, so a team in Auckland and one in Los Angeles roll over
    * at different instants.
    */
-  timezone: z13.string().max(64).refine(isValidTimeZone, "Unknown timezone.").default("UTC")
+  timezone: z14.string().max(64).refine(isValidTimeZone, "Unknown timezone.").default("UTC")
 });
 function isValidTimeZone(value) {
   try {
@@ -2823,36 +3003,36 @@ function isValidTimeZone(value) {
 }
 
 // ../protocol/src/daemon.ts
-import { z as z17 } from "zod";
+import { z as z19 } from "zod";
 
 // ../protocol/src/harness.ts
-import { z as z14 } from "zod";
+import { z as z15 } from "zod";
 var HARNESSES = ["claude_code", "codex", "cursor", "mock"];
-var harnessSchema = z14.enum(HARNESSES);
-var harnessInfoSchema = z14.object({
+var harnessSchema = z15.enum(HARNESSES);
+var harnessInfoSchema = z15.object({
   harness: harnessSchema,
-  installed: z14.boolean(),
-  models: z14.array(z14.string().trim().min(1).max(128)).max(500).optional(),
-  modelSlots: z14.array(
-    z14.object({
-      slot: z14.string().trim().min(1).max(128).refine((v2) => v2 !== "auto"),
-      model: z14.string().trim().min(1).max(128),
-      name: z14.string().trim().min(1).max(200)
+  installed: z15.boolean(),
+  models: z15.array(z15.string().trim().min(1).max(128)).max(500).optional(),
+  modelSlots: z15.array(
+    z15.object({
+      slot: z15.string().trim().min(1).max(128).refine((v2) => v2 !== "auto"),
+      model: z15.string().trim().min(1).max(128),
+      name: z15.string().trim().min(1).max(200)
     })
   ).max(500).optional(),
-  defaultModelSlot: z14.string().trim().min(1).max(128).optional(),
+  defaultModelSlot: z15.string().trim().min(1).max(128).optional(),
   /** Deprecated (#312, 2026-10-27): could host the native Coordinator. The server keeps that runtime switched off. */
-  coordinator: z14.boolean().optional(),
+  coordinator: z15.boolean().optional(),
   /**
    * Set only by a runner that runs subscriptions under owner-bound custody:
    * the hosted runner's broker, or a device daemon that takes one run's
    * short-lived access lease (never the refresh grant) and wipes it at run end.
    */
-  subscriptionBroker: z14.literal(true).optional(),
+  subscriptionBroker: z15.literal(true).optional(),
   /** Set only by an E2B worker with the guarded Bot computer broker. */
-  computerBroker: z14.literal(true).optional(),
+  computerBroker: z15.literal(true).optional(),
   /** Run-scoped CLI approvals and policy-version checks are supported. */
-  toolApproval: z14.literal(true).optional(),
+  toolApproval: z15.literal(true).optional(),
   /**
    * The CLI exists but `installed` stays false because the daemon cannot run it
    * in a sandbox. `missing` names the absent packages; empty means the machine
@@ -2860,35 +3040,54 @@ var harnessInfoSchema = z14.object({
    * (`userns_restricted`: Ubuntu's AppArmor user namespace restriction), and
    * `detail` is the probe's own error, already sanitized by the daemon.
    */
-  sandboxBlocked: z14.object({
-    missing: z14.array(z14.string().trim().min(1).max(64)).max(8),
-    reason: z14.enum(["userns_restricted"]).optional(),
-    detail: z14.string().max(300).optional()
+  sandboxBlocked: z15.object({
+    missing: z15.array(z15.string().trim().min(1).max(64)).max(8),
+    reason: z15.enum(["userns_restricted"]).optional(),
+    detail: z15.string().max(300).optional()
   }).optional(),
   /** Version string reported by the CLI, null when not installed. */
-  version: z14.string().nullable()
+  version: z15.string().nullable()
 });
 
 // ../protocol/src/run.ts
+import { z as z18 } from "zod";
+
+// ../protocol/src/provider-failure.ts
 import { z as z16 } from "zod";
+var BALANCE_CODES = [
+  "payment_required",
+  "insufficient_balance",
+  "insufficient_quota",
+  "billing_hard_limit",
+  "billing_error"
+];
+var AUTH_CODES = ["authentication_failed", "invalid_api_key"];
+var UNAVAILABLE_CODES = ["rate_limit", "overloaded", "server_error", "timeout", "connection_error"];
+var PROVIDER_FAILURE_CODES = [...BALANCE_CODES, ...AUTH_CODES, ...UNAVAILABLE_CODES];
+var status = z16.number().int().min(100).max(599).optional();
+var providerFailureSchema = z16.discriminatedUnion("kind", [
+  z16.object({ kind: z16.literal("balance"), retryable: z16.literal(false), status, code: z16.enum(BALANCE_CODES).optional() }).strict(),
+  z16.object({ kind: z16.literal("auth"), retryable: z16.literal(false), status, code: z16.enum(AUTH_CODES).optional() }).strict(),
+  z16.object({ kind: z16.literal("unavailable"), retryable: z16.literal(true), status, code: z16.enum(UNAVAILABLE_CODES).optional() }).strict()
+]);
 
 // ../protocol/src/plan.ts
-import { z as z15 } from "zod";
-var text = (max) => z15.string().trim().min(1).max(max);
-var key = z15.string().trim().min(1).max(64);
-var planSection = z15.object({
+import { z as z17 } from "zod";
+var text = (max) => z17.string().trim().min(1).max(max);
+var key = z17.string().trim().min(1).max(64);
+var planSection = z17.object({
   heading: text(200),
-  items: z15.array(text(2e3)).min(1).max(50)
+  items: z17.array(text(2e3)).min(1).max(50)
 });
-var planSpec = z15.object({
+var planSpec = z17.object({
   title: text(500),
-  summary: z15.string().trim().max(4e3).default(""),
-  sections: z15.array(planSection).min(1).max(30)
+  summary: z17.string().trim().max(4e3).default(""),
+  sections: z17.array(planSection).min(1).max(30)
 });
-var planCriterion = z15.object({
+var planCriterion = z17.object({
   body: text(2e3),
   /** The command that checks it; absent means a person checks it. */
-  checkCommand: z15.string().trim().max(2e3).optional()
+  checkCommand: z17.string().trim().max(2e3).optional()
 });
 var PLAN_PRIORITIES = [
   "none",
@@ -2897,25 +3096,25 @@ var PLAN_PRIORITIES = [
   "medium",
   "low"
 ];
-var planIssue = z15.object({
+var planIssue = z17.object({
   key,
   title: text(500),
-  goal: z15.string().trim().max(4e3).optional(),
+  goal: z17.string().trim().max(4e3).optional(),
   /** Grouping only; order lives in `blockedBy` (`issue.parent_id`). */
   parentKey: key.optional(),
-  blockedBy: z15.array(key).max(50).default([]),
-  criteria: z15.array(planCriterion).min(1).max(50),
-  verifyCommand: z15.string().trim().max(2e3).optional(),
-  predictedFiles: z15.array(z15.string().trim().max(1e3)).max(200).default([]),
-  sizeEstimate: z15.object({ files: z15.number().int().min(0), lines: z15.number().int().min(0) }).optional(),
-  priority: z15.enum(PLAN_PRIORITIES).default("none")
+  blockedBy: z17.array(key).max(50).default([]),
+  criteria: z17.array(planCriterion).min(1).max(50),
+  verifyCommand: z17.string().trim().max(2e3).optional(),
+  predictedFiles: z17.array(z17.string().trim().max(1e3)).max(200).default([]),
+  sizeEstimate: z17.object({ files: z17.number().int().min(0), lines: z17.number().int().min(0) }).optional(),
+  priority: z17.enum(PLAN_PRIORITIES).default("none")
 });
-var planSplit = z15.object({
-  summary: z15.string().trim().max(4e3).default(""),
-  issues: z15.array(planIssue).min(1).max(100)
+var planSplit = z17.object({
+  summary: z17.string().trim().max(4e3).default(""),
+  issues: z17.array(planIssue).min(1).max(100)
 });
-var planHandoff = z15.object({
-  specId: z15.uuid(),
+var planHandoff = z17.object({
+  specId: z17.uuid(),
   spec: planSpec,
   split: planSplit
 });
@@ -2927,13 +3126,13 @@ var RUN_QUESTION_KINDS = [
   "permission",
   "external"
 ];
-var runQuestion = z16.object({
-  questionId: z16.uuid(),
-  purpose: z16.literal("verification_command").optional(),
-  kind: z16.enum(RUN_QUESTION_KINDS).default("decision"),
-  question: z16.string().trim().min(1).max(4e3),
-  context: z16.string().trim().max(4e3).optional(),
-  options: z16.array(z16.string().trim().min(1).max(4e3)).max(20).default([])
+var runQuestion = z18.object({
+  questionId: z18.uuid(),
+  purpose: z18.literal("verification_command").optional(),
+  kind: z18.enum(RUN_QUESTION_KINDS).default("decision"),
+  question: z18.string().trim().min(1).max(4e3),
+  context: z18.string().trim().max(4e3).optional(),
+  options: z18.array(z18.string().trim().min(1).max(4e3)).max(20).default([])
 }).strict();
 var RUN_STOP_REASONS = [
   "submitted",
@@ -2945,39 +3144,41 @@ var RUN_STOP_REASONS = [
   "timeout",
   "device_lost",
   /** The subscription's quota or rate limit ran out mid-run (see `resetsAt`). */
-  "quota_exhausted"
+  "quota_exhausted",
+  /** The model provider refused the request or remained unavailable after its short retries. */
+  "provider_failure"
 ];
-var runStopReason = z16.enum(RUN_STOP_REASONS);
-var shortList = z16.array(z16.string().max(1e3)).max(5e3);
+var runStopReason = z18.enum(RUN_STOP_REASONS);
+var shortList = z18.array(z18.string().max(1e3)).max(5e3);
 var VERIFY_STATUSES = ["passed", "failed", "not_run"];
-var verifyStatus = z16.enum(VERIFY_STATUSES);
-var runPublish = z16.object({
+var verifyStatus = z18.enum(VERIFY_STATUSES);
+var runPublish = z18.object({
   /** Where the commit went: the issue's branch, or the run's own. */
-  branch: z16.string().max(500),
+  branch: z18.string().max(500),
   /** Null when nothing was committed (no changes, or the commit failed). */
-  commit: z16.string().max(100).nullable(),
-  pushed: z16.boolean(),
-  remote: z16.string().max(200).nullable(),
+  commit: z18.string().max(100).nullable(),
+  pushed: z18.boolean(),
+  remote: z18.string().max(200).nullable(),
   /**
    * Why nothing was pushed when that was expected: the agent changed
    * nothing, or the repo has not approved pushes. Absent with
    * `pushed: false` means the commit or the push failed (see `note`).
    */
-  skipped: z16.enum(["no_changes", "not_approved"]).optional(),
-  note: z16.string().max(2e3).optional()
+  skipped: z18.enum(["no_changes", "not_approved"]).optional(),
+  note: z18.string().max(2e3).optional()
 });
-var runBenchmarkContext = z16.object({
-  sourceCommit: z16.string().regex(/^[a-f0-9]{40}$/),
-  benchmarkDigest: z16.string().regex(/^[a-f0-9]{64}$/),
-  caseId: z16.string().min(1).max(200),
-  fixtureDigest: z16.string().regex(/^[a-f0-9]{64}$/),
-  policyDigest: z16.string().regex(/^[a-f0-9]{64}$/)
+var runBenchmarkContext = z18.object({
+  sourceCommit: z18.string().regex(/^[a-f0-9]{40}$/),
+  benchmarkDigest: z18.string().regex(/^[a-f0-9]{64}$/),
+  caseId: z18.string().min(1).max(200),
+  fixtureDigest: z18.string().regex(/^[a-f0-9]{64}$/),
+  policyDigest: z18.string().regex(/^[a-f0-9]{64}$/)
 }).strict();
 var runExecution = runBenchmarkContext.extend({
-  harness: z16.enum(["codex", "claude_code", "cursor"]),
-  requestedModel: z16.string().min(1).max(500).nullable(),
-  observedModel: z16.string().min(1).max(500).nullable(),
-  verifyCommand: z16.string().min(1).max(2e3)
+  harness: z18.enum(["codex", "claude_code", "cursor"]),
+  requestedModel: z18.string().min(1).max(500).nullable(),
+  observedModel: z18.string().min(1).max(500).nullable(),
+  verifyCommand: z18.string().min(1).max(2e3)
 }).strict();
 var runRuntime = runExecution.pick({
   harness: true,
@@ -2986,67 +3187,78 @@ var runRuntime = runExecution.pick({
   policyDigest: true,
   sourceCommit: true
 }).strict();
-var runSkillMount = z16.object({
-  receiptId: z16.uuid(),
-  versionId: z16.uuid(),
-  sha256: z16.string().regex(/^[a-f0-9]{64}$/),
-  sessionId: z16.string().min(1).max(500),
-  mountedAt: z16.iso.datetime()
+var runRepositorySelection = z18.object({
+  repository: z18.string().trim().min(1).max(4e3),
+  reason: z18.string().trim().min(1).max(2e3),
+  observedRemote: z18.string().max(4e3).nullable(),
+  observedHead: z18.string().regex(/^[a-f0-9]{40}$/)
 }).strict();
-var runReport = z16.object({
+var runSkillMount = z18.object({
+  receiptId: z18.uuid(),
+  versionId: z18.uuid(),
+  sha256: z18.string().regex(/^[a-f0-9]{64}$/),
+  sessionId: z18.string().min(1).max(500),
+  mountedAt: z18.iso.datetime()
+}).strict();
+var runReport = z18.object({
+  repositorySelection: runRepositorySelection.optional(),
   /** Worktree base journaled before the adapter started; never agent-supplied. */
-  sourceCommit: z16.string().regex(/^[a-f0-9]{40}$/).optional(),
+  sourceCommit: z18.string().regex(/^[a-f0-9]{40}$/).optional(),
   /** Daemon-created local snapshot of a non-repository delivery; never a published code candidate. */
-  deliverableCommit: z16.string().regex(/^[a-f0-9]{40}$/).optional(),
+  deliverableCommit: z18.string().regex(/^[a-f0-9]{40}$/).optional(),
   skillMount: runSkillMount.optional(),
   execution: runExecution.optional(),
   runtime: runRuntime.optional(),
   /** What was done, in a few sentences. Empty when the run crashed early. */
-  summary: z16.string().max(1e4),
+  summary: z18.string().max(1e4),
   /** A verify Agent's proposed command and repository evidence; the daemon executes it. */
-  verificationCommand: z16.object({ command: z16.string().trim().min(1).max(2e3), basis: z16.string().trim().min(1).max(2e3) }).strict().optional(),
+  verificationCommand: z18.object({ command: z18.string().trim().min(1).max(2e3), basis: z18.string().trim().min(1).max(2e3) }).strict().optional(),
   /** Paths relative to the worktree root (from `git status`). */
   filesChanged: shortList,
   /** The daemon's run of the issue's verify command after a submit. */
-  verify: z16.object({
+  verify: z18.object({
     status: verifyStatus,
-    command: z16.string().max(2e3).optional(),
-    inferredFrom: z16.string().max(2e3).optional(),
+    command: z18.string().max(2e3).optional(),
+    inferredFrom: z18.string().max(2e3).optional(),
     /** Actual process outcome from the daemon, never the agent. */
-    exitCode: z16.number().int().nullable().optional(),
-    signal: z16.string().max(100).nullable().optional(),
-    timedOut: z16.boolean().optional(),
+    exitCode: z18.number().int().nullable().optional(),
+    signal: z18.string().max(100).nullable().optional(),
+    timedOut: z18.boolean().optional(),
     /** Tail of the command output. */
-    output: z16.string().max(1e4).optional()
+    output: z18.string().max(1e4).optional()
   }),
-  openQuestions: z16.array(z16.string().max(2e3)).max(50),
+  openQuestions: z18.array(z18.string().max(2e3)).max(50),
   /** What should happen next, from the agent's point of view. */
   question: runQuestion.optional(),
-  nextStep: z16.string().max(2e3).nullable(),
+  nextStep: z18.string().max(2e3).nullable(),
   /** For `blocked`: the external condition, e.g. `quota_exhausted`. */
-  blockedOn: z16.string().max(500).optional(),
+  blockedOn: z18.string().max(500).optional(),
   /**
    * For `quota_exhausted`: when the subscription's quota resets, as the CLI
    * reported it; null when it gave no time. Set by the daemon only.
    */
-  resetsAt: z16.iso.datetime({ offset: true }).nullable().optional(),
+  resetsAt: z18.iso.datetime({ offset: true }).nullable().optional(),
+  /** Classified by the adapter from a terminal provider error; never agent-supplied. */
+  providerFailure: providerFailureSchema.optional(),
+  /** Final upload for provider_failure or native quota_exhausted; unavailable requires the original worktree. */
+  providerCheckpoint: z18.enum(["ready", "unavailable"]).optional(),
   /** Daemon-owned receipt for an exact, unchanged read-only candidate. */
-  check: z16.object({
-    sha: z16.string().regex(/^[a-f0-9]{40}$/),
-    readOnly: z16.literal(true)
+  check: z18.object({
+    sha: z18.string().regex(/^[a-f0-9]{40}$/),
+    readOnly: z18.literal(true)
   }).optional(),
   /** Preview branch created or used by the producing run; descriptive metadata only. */
-  previewDatabaseBranch: z16.string().trim().min(1).max(500).optional(),
+  previewDatabaseBranch: z18.string().trim().min(1).max(500).optional(),
   /** Acceptance criteria the agent checked, with evidence. */
-  criteria: z16.array(
-    z16.object({
-      criterionId: z16.uuid().optional(),
-      text: z16.string().max(2e3).optional(),
-      passed: z16.boolean(),
-      evidence: z16.string().max(1e4).optional(),
+  criteria: z18.array(
+    z18.object({
+      criterionId: z18.uuid().optional(),
+      text: z18.string().max(2e3).optional(),
+      passed: z18.boolean(),
+      evidence: z18.string().max(1e4).optional(),
       /** Agent-reported criterion check; the daemon-owned verify remains authoritative. */
-      command: z16.string().trim().min(1).max(2e3).optional(),
-      exitCode: z16.number().int().nullable().optional()
+      command: z18.string().trim().min(1).max(2e3).optional(),
+      exitCode: z18.number().int().nullable().optional()
     })
   ).max(200).optional(),
   /**
@@ -3056,23 +3268,23 @@ var runReport = z16.object({
   plan: planHandoff.optional(),
   interfacesProduced: shortList.optional(),
   knownIssues: shortList.optional(),
-  notesForNext: z16.string().max(1e4).optional(),
+  notesForNext: z18.string().max(1e4).optional(),
   /** Set by the daemon after a verified submit; never by the agent. */
   publish: runPublish.optional(),
-  followUps: z16.array(
-    z16.object({
-      title: z16.string().trim().min(1).max(500),
-      goal: z16.string().max(2e3).optional(),
-      reason: z16.string().max(2e3).optional()
+  followUps: z18.array(
+    z18.object({
+      title: z18.string().trim().min(1).max(500),
+      goal: z18.string().max(2e3).optional(),
+      reason: z18.string().max(2e3).optional()
     })
   ).max(50).optional()
 });
 var runCompletePath = (runId) => `/v1/runs/${encodeURIComponent(runId)}/complete`;
-var runCompletion = z16.object({
+var runCompletion = z18.object({
   stopReason: runStopReason,
   report: runReport
 });
-var runCompleteRequest = z16.object({ stopReason: runStopReason, report: runReport.optional() }).refine((body) => body.stopReason !== "submitted" || body.report, {
+var runCompleteRequest = z18.object({ stopReason: runStopReason, report: runReport.optional() }).refine((body) => body.stopReason !== "submitted" || body.report, {
   message: "A submitted run needs a report.",
   path: ["report"]
 });
@@ -3090,7 +3302,7 @@ var RUN_STATES = [
   "failed",
   "cancelled"
 ];
-var runStateSchema = z17.enum(RUN_STATES);
+var runStateSchema = z19.enum(RUN_STATES);
 var stopReasonSchema = runStopReason;
 var DAEMON_RPC_ERRORS = {
   handshakeRequired: 4001,
@@ -3104,58 +3316,58 @@ var DAEMON_RPC_ERRORS = {
   serverUnreachable: 4020,
   draining: 4030
 };
-var helloParams = z17.object({
-  protocolVersion: z17.number().int(),
+var helloParams = z19.object({
+  protocolVersion: z19.number().int(),
   /** Contents of the daemon's `daemon.secret` file in the flavor data dir. */
-  secret: z17.string(),
-  client: z17.object({ name: z17.string(), version: z17.string() })
+  secret: z19.string(),
+  client: z19.object({ name: z19.string(), version: z19.string() })
 });
-var helloResult = z17.object({
-  protocolVersion: z17.number().int(),
-  daemonVersion: z17.string(),
-  pid: z17.number().int()
+var helloResult = z19.object({
+  protocolVersion: z19.number().int(),
+  daemonVersion: z19.string(),
+  pid: z19.number().int()
 });
-var runSummarySchema = z17.object({
-  runId: z17.string(),
-  issueId: z17.string(),
+var runSummarySchema = z19.object({
+  runId: z19.string(),
+  issueId: z19.string(),
   harness: harnessSchema,
   state: runStateSchema,
-  worktree: z17.string().nullable(),
-  sessionId: z17.string().nullable(),
+  worktree: z19.string().nullable(),
+  sessionId: z19.string().nullable(),
   /** Chunks emitted so far (the daemon-local producer sequence). */
-  chunks: z17.number().int().nonnegative(),
-  error: z17.string().nullable(),
+  chunks: z19.number().int().nonnegative(),
+  error: z19.string().nullable(),
   /** Set once the run reached a terminal state. */
   stopReason: stopReasonSchema.optional(),
   /** Lease from the server; the daemon stops the run if it cannot renew it. */
-  leaseExpiresAt: z17.string().optional(),
+  leaseExpiresAt: z19.string().optional(),
   /** Last progress seen by the watchdog (ISO time), while the run is active. */
-  lastProgressAt: z17.string().optional()
+  lastProgressAt: z19.string().optional()
 });
-var daemonStatusSchema = z17.object({
-  daemonVersion: z17.string(),
-  protocolVersion: z17.number().int(),
-  pid: z17.number().int(),
-  dataDir: z17.string(),
+var daemonStatusSchema = z19.object({
+  daemonVersion: z19.string(),
+  protocolVersion: z19.number().int(),
+  pid: z19.number().int(),
+  dataDir: z19.string(),
   /** Null until the device is registered with the server. */
-  deviceId: z17.string().nullable(),
+  deviceId: z19.string().nullable(),
   /** The workspace the device credential was handed over for, if named. */
-  workspaceId: z17.string().nullable(),
+  workspaceId: z19.string().nullable(),
   /** Holds a device credential (it may still be refused by the server). */
-  signedIn: z17.boolean(),
-  server: z17.enum(["online", "offline", "unregistered"]),
-  harnesses: z17.array(harnessInfoSchema),
-  runs: z17.array(runSummarySchema),
+  signedIn: z19.boolean(),
+  server: z19.enum(["online", "offline", "unregistered"]),
+  harnesses: z19.array(harnessInfoSchema),
+  runs: z19.array(runSummarySchema),
   /** Bytes used by run worktrees under the daemon's data dir. */
-  worktreeDiskBytes: z17.number().int().nonnegative(),
+  worktreeDiskBytes: z19.number().int().nonnegative(),
   /** Items buffered on disk, waiting for the server. */
-  pendingUploads: z17.number().int().nonnegative(),
-  draining: z17.boolean(),
+  pendingUploads: z19.number().int().nonnegative(),
+  draining: z19.boolean(),
   /** Latest subscription snapshots. Empty when quota polling is off. */
-  quotas: z17.array(quotaSnapshotSchema).max(6)
+  quotas: z19.array(quotaSnapshotSchema).max(6)
 });
-var empty = z17.object({}).optional();
-var ok = z17.object({ ok: z17.literal(true) });
+var empty = z19.object({}).optional();
+var ok = z19.object({ ok: z19.literal(true) });
 var daemonRpc = {
   "daemon.hello": { params: helloParams, result: helloResult },
   "daemon.status": { params: empty, result: daemonStatusSchema },
@@ -3172,14 +3384,14 @@ var daemonRpc = {
    */
   "daemon.update": {
     params: empty,
-    result: z17.object({ state: z17.enum(["unmanaged", "current", "waiting", "installing"]) })
+    result: z19.object({ state: z19.enum(["unmanaged", "current", "waiting", "installing"]) })
   },
   /** Hand the daemon a device credential obtained by the signed-in desktop. */
   "device.setCredential": {
-    params: z17.object({
-      credential: z17.string().min(1),
+    params: z19.object({
+      credential: z19.string().min(1),
       /** Needed only for users in more than one workspace. */
-      workspaceId: z17.uuid().optional()
+      workspaceId: z19.uuid().optional()
     }),
     result: ok
   },
@@ -3187,17 +3399,17 @@ var daemonRpc = {
   "device.clearCredential": { params: empty, result: ok },
   /** Claim a queued run pinned to this device and start it. */
   "runs.start": {
-    params: z17.object({ runId: z17.string() }),
+    params: z19.object({ runId: z19.string() }),
     result: runSummarySchema
   },
-  "runs.list": { params: empty, result: z17.array(runSummarySchema) },
+  "runs.list": { params: empty, result: z19.array(runSummarySchema) },
   /** Interject a user message into a running session. */
   "runs.send": {
-    params: z17.object({ runId: z17.string(), text: z17.string().min(1) }),
+    params: z19.object({ runId: z19.string(), text: z19.string().min(1) }),
     result: ok
   },
   "runs.cancel": {
-    params: z17.object({ runId: z17.string() }),
+    params: z19.object({ runId: z19.string() }),
     result: runSummarySchema
   },
   /**
@@ -3205,21 +3417,21 @@ var daemonRpc = {
    * run on an allow-listed repo without a server. Refused otherwise.
    */
   "dev.mockRun": {
-    params: z17.object({
-      repoId: z17.string(),
-      fixture: z17.string().optional(),
-      baseBranch: z17.string().optional(),
+    params: z19.object({
+      repoId: z19.string(),
+      fixture: z19.string().optional(),
+      baseBranch: z19.string().optional(),
       /** Run after the mock submits; defaults to `git diff --check`. */
-      verifyCommand: z17.string().optional()
+      verifyCommand: z19.string().optional()
     }),
     result: runSummarySchema
   }
 };
 
 // ../protocol/src/device.ts
-import { z as z18 } from "zod";
-var id3 = z18.string().min(1).max(64);
-var isoTime = z18.iso.datetime({ offset: true });
+import { z as z20 } from "zod";
+var id3 = z20.string().min(1).max(64);
+var isoTime = z20.iso.datetime({ offset: true });
 var seg = encodeURIComponent;
 var DEVICE_ROUTES = {
   register: "/v1/devices/register",
@@ -3241,31 +3453,32 @@ var devicePaths = {
   claim: (deviceId, runId) => `/v1/devices/${seg(deviceId)}/runs/${seg(runId)}/claim`,
   commands: (deviceId, waitSeconds, skipRuns = [], updates) => `/v1/devices/${seg(deviceId)}/commands?wait=${waitSeconds}` + (skipRuns.length ? `&${COMMANDS_SKIP_PARAM}=${skipRuns.map(seg).join(",")}` : "") + (updates ? `&${COMMANDS_DAEMON_LATEST_PARAM}=${seg(updates.daemonLatest)}` + (updates.skipDeviceCommands?.length ? `&${COMMANDS_SKIP_DEVICE_COMMANDS_PARAM}=${updates.skipDeviceCommands.map(seg).join(",")}` : "") : ""),
   commandsAck: (deviceId) => `/v1/devices/${seg(deviceId)}/commands/ack`,
+  gateway: (deviceId) => `/v1/devices/${seg(deviceId)}/gateway`,
   runEvents: (runId) => `/v1/runs/${seg(runId)}/events`,
   runPatch: (runId) => `/v1/runs/${seg(runId)}`,
   runCheckpoint: (runId) => `/v1/runs/${seg(runId)}/checkpoint`
 };
-var deviceComputerCapability = z18.object({ installed: z18.boolean(), version: z18.string().max(100).nullable() }).strict();
-var deviceRunnerCapability = z18.object({
-  os: z18.string().max(50),
-  arch: z18.string().max(50),
-  freeDiskBytes: z18.number().int().nonnegative().nullable(),
-  docker: z18.boolean(),
-  harnesses: z18.array(z18.object({
+var deviceComputerCapability = z20.object({ installed: z20.boolean(), version: z20.string().max(100).nullable() }).strict();
+var deviceRunnerCapability = z20.object({
+  os: z20.string().max(50),
+  arch: z20.string().max(50),
+  freeDiskBytes: z20.number().int().nonnegative().nullable(),
+  docker: z20.boolean(),
+  harnesses: z20.array(z20.object({
     harness: harnessSchema,
-    state: z18.enum(["installed", "not_installed", "unsupported"]),
-    version: z18.string().max(100)
+    state: z20.enum(["installed", "not_installed", "unsupported"]),
+    version: z20.string().max(100)
   })).max(20)
 });
-var deviceRegistration = z18.object({
-  deviceType: z18.enum(["laptop", "server"]).optional(),
-  name: z18.string().trim().min(1).max(200),
-  hostname: z18.string().max(255).nullable().optional(),
-  platform: z18.string().max(50),
-  arch: z18.string().max(50),
-  daemonVersion: z18.string().max(50),
-  protocolVersion: z18.number().int(),
-  harnesses: z18.array(harnessInfoSchema).max(20),
+var deviceRegistration = z20.object({
+  deviceType: z20.enum(["laptop", "server"]).optional(),
+  name: z20.string().trim().min(1).max(200),
+  hostname: z20.string().max(255).nullable().optional(),
+  platform: z20.string().max(50),
+  arch: z20.string().max(50),
+  daemonVersion: z20.string().max(50),
+  protocolVersion: z20.number().int(),
+  harnesses: z20.array(harnessInfoSchema).max(20),
   computerUse: deviceComputerCapability.optional(),
   runner: deviceRunnerCapability.optional(),
   /**
@@ -3276,122 +3489,131 @@ var deviceRegistration = z18.object({
    */
   deviceId: id3.optional(),
   /** Needed only when the user belongs to more than one workspace. */
-  workspaceId: z18.uuid().optional()
+  workspaceId: z20.uuid().optional()
 });
-var deviceRegistered = z18.object({
+var deviceRegistered = z20.object({
   deviceId: id3,
-  workspaceId: z18.uuid()
+  workspaceId: z20.uuid()
 });
-var heartbeatRunSchema = z18.object({
+var heartbeatRunSchema = z20.object({
   runId: id3,
   /** Last tool call, turn boundary or file change (not raw output). */
   lastProgressAt: isoTime
 });
-var stableVersion = z18.string().regex(/^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/);
-var daemonVersionsSchema = z18.object({ min: stableVersion, latest: stableVersion.optional() });
-var daemonUpdateFailureSchema = z18.object({ version: stableVersion, code: z18.enum(["install_failed", "restart_failed"]), at: isoTime });
-var deviceManagementCommand = z18.object({ id: z18.uuid(), kind: z18.enum(["redetect", "restart", "update", "uninstall"]) });
-var deviceHeartbeatSchema = z18.object({
-  completedDeviceCommands: z18.array(z18.uuid()).max(100).optional(),
-  failedDeviceCommands: z18.array(z18.object({ id: z18.uuid(), error: z18.string().max(500) })).max(100).optional(),
-  harnesses: z18.array(harnessInfoSchema).max(20),
+var stableVersion = z20.string().regex(/^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/);
+var daemonVersionsSchema = z20.object({ min: stableVersion, latest: stableVersion.optional() });
+var daemonUpdateFailureSchema = z20.object({ version: stableVersion, code: z20.enum(["install_failed", "restart_failed"]), at: isoTime });
+var deviceManagementCommand = z20.object({ id: z20.uuid(), kind: z20.enum(["redetect", "restart", "update", "uninstall"]) });
+var deviceHeartbeatSchema = z20.object({
+  completedDeviceCommands: z20.array(z20.uuid()).max(100).optional(),
+  failedDeviceCommands: z20.array(z20.object({ id: z20.uuid(), error: z20.string().max(500) })).max(100).optional(),
+  harnesses: z20.array(harnessInfoSchema).max(20),
   computerUse: deviceComputerCapability.optional(),
   runner: deviceRunnerCapability.optional(),
-  deviceType: z18.enum(["laptop", "server"]).optional(),
-  runs: z18.array(heartbeatRunSchema).max(500),
-  worktreeDiskBytes: z18.number().int().nonnegative(),
+  deviceType: z20.enum(["laptop", "server"]).optional(),
+  runs: z20.array(heartbeatRunSchema).max(500),
+  worktreeDiskBytes: z20.number().int().nonnegative(),
   /**
    * Subscription windows read on this device. Absent when the daemon is not
    * polling. Numbers only, never a vendor credential (ADR 0027).
    */
-  quotas: z18.array(quotaSnapshotSchema).max(6).optional(),
+  quotas: z20.array(quotaSnapshotSchema).max(6).optional(),
   /** Null once no automatic update has failed since the last success. */
   updateFailure: daemonUpdateFailureSchema.nullable().optional()
 });
-var heartbeatResultSchema = z18.object({
-  deviceCommands: z18.array(deviceManagementCommand).max(1).optional(),
+var heartbeatResultSchema = z20.object({
+  deviceCommands: z20.array(deviceManagementCommand).max(1).optional(),
   /** Renewed lease expiry per run id; a run missing here is not renewed. */
-  leases: z18.record(z18.string(), isoTime),
+  leases: z20.record(z20.string(), isoTime),
   /**
    * Runs the device reported that it no longer holds: they ended on the
    * server, or went to another attempt after the lease ran out. The daemon
    * stops them now instead of when their lease runs out.
    */
-  revoked: z18.array(id3).max(500).optional(),
+  revoked: z20.array(id3).max(500).optional(),
   /** Short-lived cloud device token, returned only over its authenticated link. */
-  cloudCredential: z18.string().regex(/^orv_[A-Za-z0-9_-]{43}$/).optional(),
+  cloudCredential: z20.string().regex(/^orv_[A-Za-z0-9_-]{43}$/).optional(),
   /** A malformed value is dropped, never a failed heartbeat. */
   daemonVersions: daemonVersionsSchema.optional().catch(void 0)
+});
+var deviceGatewaySchema = z20.object({
+  url: z20.string().url().nullable(),
+  protocol: z20.string().regex(/^mikka-ticket-[0-9]+-[a-f0-9]{64}$/).nullable(),
+  /** This server wakes the device after every write that can end, pause or
+   * revoke one of its runs (stop, lease, credential, policy, membership), so a
+   * connected daemon needs no periodic run-control check (#1212). Absent from
+   * older servers: the daemon then keeps its one-second check. */
+  runControl: z20.literal("push").optional()
 });
 var RUN_CHECKPOINT_MAX_BYTES = 8 * 1024 * 1024;
 var RECOVERY_WORKTREE_HEADER = "x-mikka-recovery-worktree";
 var RUN_CHECKPOINT_RECOVERY_MAX_AGE_MS = 30 * 6e4;
-var runCheckpointSchema = z18.object({
+var runCheckpointSchema = z20.object({
   /** The commit the run's worktree started from. */
-  baseCommit: z18.string().regex(/^[0-9a-f]{40,64}$/),
+  baseCommit: z20.string().regex(/^[0-9a-f]{40,64}$/),
   /**
    * `git diff --binary` from `baseCommit` to the whole worktree (tracked
    * and untracked files, ignored ones left out, the agent's own commits
    * included), gzipped, base64.
    */
-  patch: z18.string().max(Math.ceil(RUN_CHECKPOINT_MAX_BYTES * 4 / 3) + 4),
+  patch: z20.string().max(Math.ceil(RUN_CHECKPOINT_MAX_BYTES * 4 / 3) + 4),
   /** Files the patch touches. */
-  files: z18.number().int().nonnegative(),
+  files: z20.number().int().nonnegative(),
   takenAt: isoTime,
   /** The latest tree could not be checkpointed; it supersedes older patches. */
-  unavailableReason: z18.literal("too_large").optional()
+  unavailableReason: z20.literal("too_large").optional()
 });
-var setupRecipeSchema = z18.object({
+var setupRecipeSchema = z20.object({
   /** Paths relative to the main checkout copied into each new worktree. */
-  copyFiles: z18.array(z18.string().max(1e3)).max(200),
+  copyFiles: z20.array(z20.string().max(1e3)).max(200),
   /** Shell command run in the worktree, e.g. `bun install`. */
-  command: z18.string().max(2e3).optional(),
+  command: z20.string().max(2e3).optional(),
   /** Approved once per repo by the user; unapproved recipes never run. */
-  approved: z18.boolean()
+  approved: z20.boolean()
 });
 var REPO_ORIGIN_HEADER = "x-mikka-repo-origin-check";
 var MODEL_CREDENTIAL_HEADER = "x-mikka-model-credential";
-var credentialKey = z18.string().min(1).max(4096).refine((value) => !/[\r\n\0]/.test(value));
-var credentialBaseUrl = z18.url().max(500).refine((value) => {
+var credentialKey = z20.string().min(1).max(4096).refine((value) => !/[\r\n\0]/.test(value));
+var credentialBaseUrl = z20.url().max(500).refine((value) => {
   const url = new URL(value);
   return url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash;
 });
-var runModelCredentialSchema = z18.discriminatedUnion("kind", [
-  z18.object({ kind: z18.literal("api_key"), key: credentialKey }).strict(),
-  z18.object({ kind: z18.literal("provider"), protocol: z18.enum(["anthropic", "openai"]), baseUrl: credentialBaseUrl, key: credentialKey }).strict()
+var runModelCredentialSchema = z20.discriminatedUnion("kind", [
+  z20.object({ kind: z20.literal("api_key"), key: credentialKey }).strict(),
+  z20.object({ kind: z20.literal("provider"), protocol: z20.enum(["anthropic", "openai"]), baseUrl: credentialBaseUrl, key: credentialKey }).strict()
 ]);
-var deviceRepoSchema = z18.object({
+var deviceRepoSchema = z20.object({
   repoId: id3,
-  name: z18.string().max(500),
+  name: z20.string().max(500),
   /** Logical repository key; only trusted cloud runtimes use an absolute path. */
-  path: z18.string().min(1).max(4e3),
-  remoteUrl: z18.string().max(2e3).nullable().optional(),
+  path: z20.string().min(1).max(4e3),
+  remoteUrl: z20.string().max(2e3).nullable().optional(),
   setup: setupRecipeSchema.optional(),
   /** Domains agents may reach in this repo, on top of the harness's own. */
-  networkAllow: z18.array(z18.string().min(1).max(253)).max(200).optional(),
+  networkAllow: z20.array(z20.string().min(1).max(253)).max(200).optional(),
   /** Push run branches after a verified hand-in ("always for this repo"). */
-  push: z18.object({
-    approved: z18.boolean(),
-    remote: z18.string().min(1).max(200).optional()
+  push: z20.object({
+    approved: z20.boolean(),
+    remote: z20.string().min(1).max(200).optional()
   }).optional()
 });
-var deviceReposResponse = z18.object({
-  repos: z18.array(deviceRepoSchema)
+var deviceReposResponse = z20.object({
+  repos: z20.array(deviceRepoSchema)
 });
-var pendingRunsResponse = z18.object({ runIds: z18.array(id3) });
+var pendingRunsResponse = z20.object({ runIds: z20.array(id3) });
 var RUN_KINDS = ["implement", "acceptance", "fix", "plan"];
-var runAssignmentSchema = z18.object({
+var runAssignmentSchema = z20.object({
   runId: id3,
   issueId: id3,
   deviceId: id3,
   repoId: id3,
   /** Clone URL for local runs; hosted computer assignments keep their isolated workspace. */
-  remoteUrl: z18.string().min(1).max(4e3).optional(),
+  remoteUrl: z20.string().min(1).max(4e3).optional(),
   /** Absent means origin/HEAD after fetch. */
-  baseBranch: z18.string().min(1).max(500).optional(),
-  expectedRepoRemote: z18.string().max(2e3).optional(),
+  baseBranch: z20.string().min(1).max(500).optional(),
+  expectedRepoRemote: z20.string().max(2e3).optional(),
   harness: harnessSchema,
-  prompt: z18.string().max(1e5),
+  prompt: z20.string().max(1e5),
   /**
    * The model the harness's CLI is asked to run, from the per-harness
    * preference of the person this run works for (ADR 0060). Absent: the
@@ -3399,13 +3621,15 @@ var runAssignmentSchema = z18.object({
    * (zod strips unknown keys), so this needs no version gate.
    */
   model: modelNameSchema.optional(),
+  /** Frozen Profile effort, passed to the native harness unchanged. */
+  effort: z20.enum(["low", "medium", "high", "xhigh", "max"]).optional(),
   /** Owner-bound selection only; no subscription credential enters the assignment. */
-  subscriptionBinding: z18.object({
-    bindingId: z18.uuid(),
-    ownerId: z18.string().min(1).max(128),
-    workspaceId: z18.uuid(),
-    consumerId: z18.uuid(),
-    route: z18.enum(["codex_cli", "claude_code_cli"])
+  subscriptionBinding: z20.object({
+    bindingId: z20.uuid(),
+    ownerId: z20.string().min(1).max(128),
+    workspaceId: z20.uuid(),
+    consumerId: z20.uuid(),
+    route: z20.enum(["codex_cli", "claude_code_cli"])
   }).strict().optional(),
   /**
    * The run's own API key, opened for this claim only. Never with
@@ -3414,34 +3638,34 @@ var runAssignmentSchema = z18.object({
    */
   modelCredential: runModelCredentialSchema.optional(),
   /** Local host authority comes only from the server's owner-bound Bot run. */
-  localComputer: z18.object({
-    botId: z18.uuid(),
-    ownerId: z18.string().min(1).max(128),
-    workspaceId: z18.uuid(),
-    policyVersion: z18.number().int().nonnegative().max(2147483647),
-    permission: z18.enum(["allow", "ask"])
+  localComputer: z20.object({
+    botId: z20.uuid(),
+    ownerId: z20.string().min(1).max(128),
+    workspaceId: z20.uuid(),
+    policyVersion: z20.number().int().nonnegative().max(2147483647),
+    permission: z20.enum(["allow", "ask"])
   }).strict().optional(),
   /** Trusted server assignment; the model cannot choose a Bot or display. */
-  computer: z18.object({
-    botId: z18.uuid(),
-    ownerId: z18.string().min(1).max(128),
-    display: z18.string().regex(/^:[1-9][0-9]{0,2}$/),
-    policyVersion: z18.number().int().nonnegative().max(2147483647)
+  computer: z20.object({
+    botId: z20.uuid(),
+    ownerId: z20.string().min(1).max(128),
+    display: z20.string().regex(/^:[1-9][0-9]{0,2}$/),
+    policyVersion: z20.number().int().nonnegative().max(2147483647)
   }).strict().optional(),
   /**
    * 4e3: the task's explicit user variables (workspace + matching repository secrets/env, NAME -> value).
    * Cloud workers only. Passed into the task container through its own channel, never into the worker's
    * env, and never written to the run journal.
    */
-  taskEnv: z18.record(z18.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/), z18.string().max(65536)).optional(),
+  taskEnv: z20.record(z20.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/), z20.string().max(65536)).optional(),
   /**
    * Names in `taskEnv` that are secrets (kind 'secret'; env vars are not listed). The daemon masks
    * their values (raw + standard base64) in run output before anything is uploaded; the server
    * masks again. Older daemons strip this field and rely on server-side masking only.
    */
-  taskSecretNames: z18.array(z18.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/)).max(500).optional(),
+  taskSecretNames: z20.array(z20.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/)).max(500).optional(),
   /** Mock harness only: fixture name under `packages/daemon/fixtures`. */
-  fixture: z18.string().max(200).optional(),
+  fixture: z20.string().max(200).optional(),
   /**
    * The issue's branch (`mikka/<team>-<number>`, ADR 0024): every run of
    * the issue pushes its verified commit here, so one pull request follows
@@ -3449,12 +3673,12 @@ var runAssignmentSchema = z18.object({
    * this branch from the remote when it exists. Without it the daemon
    * pushes the run's own branch.
    */
-  pushBranch: z18.string().min(1).max(250).optional(),
+  pushBranch: z20.string().min(1).max(250).optional(),
   /** Run by the daemon in the worktree after the agent submits. */
-  verifyCommand: z18.string().max(2e3).optional(),
+  verifyCommand: z20.string().max(2e3).optional(),
   /** Host-owned Factory check mode; the model cannot grant a check or skip verification. */
-  factoryCheck: z18.object({ stage: z18.enum(["review", "verify"]), inferCommand: z18.boolean(), reportOnly: z18.boolean() }).strict().optional(),
-  factoryExecuteKind: z18.enum(["repository", "report", "deliverable"]).optional(),
+  factoryCheck: z20.object({ stage: z20.enum(["review", "verify"]), inferCommand: z20.boolean(), reportOnly: z20.boolean() }).strict().optional(),
+  factoryExecuteKind: z20.enum(["repository", "report", "deliverable"]).optional(),
   /** Run lease; renewed through the device heartbeat. */
   leaseExpiresAt: isoTime.optional(),
   /**
@@ -3463,12 +3687,12 @@ var runAssignmentSchema = z18.object({
    * it stops working when the run ends. Absent: the server could not issue
    * one, and the run goes ahead without it.
    */
-  mcp: z18.object({
-    url: z18.url(),
-    token: z18.string().min(1).max(200),
-    mailbox: z18.literal(true).optional(),
+  mcp: z20.object({
+    url: z20.url(),
+    token: z20.string().min(1).max(200),
+    mailbox: z20.literal(true).optional(),
     /** Apps (Composio toolkits) this run may use through the Mikka server, one MCP entry each. */
-    apps: z18.array(z18.string().regex(/^[a-z][a-z0-9_]{0,63}$/)).max(64).optional()
+    apps: z20.array(z20.string().regex(/^[a-z][a-z0-9_]{0,63}$/)).max(64).optional()
   }).optional(),
   /**
    * The run owner's own GitHub credential (decision 2026-11-02-1600): the run
@@ -3476,17 +3700,17 @@ var runAssignmentSchema = z18.object({
    * repository the person authorized. `repository` is this run's; `branch`,
    * when present, is the task branch the agent delivers to.
    */
-  github: z18.object({
-    endpoint: z18.url(),
-    repository: z18.string().regex(/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/),
-    branch: z18.string().regex(/^mikka\/[a-z0-9-]+-[1-9][0-9]*$/).optional()
+  github: z20.object({
+    endpoint: z20.url(),
+    repository: z20.string().regex(/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/),
+    branch: z20.string().regex(/^mikka\/[a-z0-9-]+-[1-9][0-9]*$/).optional()
   }).strict().optional(),
   /** Question continuation must not silently open a different session. */
   /**
    * What the orchestrator dispatched this run for (ADR 0023). `plan` writes a
    * spec and proposes a split instead of changing code (ADR ORV-205).
    */
-  kind: z18.enum(RUN_KINDS).optional(),
+  kind: z20.enum(RUN_KINDS).optional(),
   /**
    * The earlier run this one continues (continue, fix, answer, a person's
    * message): the daemon works on in that run's worktree, on this run's
@@ -3494,7 +3718,7 @@ var runAssignmentSchema = z18.object({
    */
   continuesRunId: id3.optional(),
   /** A same-device retry with no usable snapshot must reuse its real worktree. */
-  requireWorktreeContinuation: z18.literal(true).optional(),
+  requireWorktreeContinuation: z20.literal(true).optional(),
   /**
    * The latest checkpoint of the attempt this run takes over after its
    * machine went offline. Used only for a new worktree (another machine, or
@@ -3507,25 +3731,25 @@ var runAssignmentSchema = z18.object({
    * The harness session to continue. A daemon that cannot resume starts a
    * new session with `prompt`, which always carries the full brief.
    */
-  resumeSessionId: z18.string().max(500).optional(),
-  requireSessionResume: z18.boolean().optional(),
-  preserveQuestionWorktree: z18.boolean().optional(),
-  questionId: z18.uuid().optional(),
+  resumeSessionId: z20.string().max(500).optional(),
+  requireSessionResume: z20.boolean().optional(),
+  preserveQuestionWorktree: z20.boolean().optional(),
+  questionId: z20.uuid().optional(),
   /**
    * What this run adds on top of the brief (a person's message, an answer,
    * a fix request). A resumed session gets only this as its next message;
    * a new session gets `prompt`, which already includes it.
    */
-  followUp: z18.string().max(1e5).optional(),
+  followUp: z20.string().max(1e5).optional(),
   /**
    * The workspace's agent permissions and network allow-list (ADR 0028).
    * Absent from an older server: the daemon applies the ADR 0009 defaults.
    */
   policy: runPolicySchema.optional(),
   /** Trusted server revision for the exact run policy; older servers omit it. */
-  policyRevision: z18.string().regex(/^[a-f0-9]{64}$/).optional(),
+  policyRevision: z20.string().regex(/^[a-f0-9]{64}$/).optional(),
   /** Only a trusted server context can make a snapshot required. */
-  policySnapshotRequired: z18.boolean().optional(),
+  policySnapshotRequired: z20.boolean().optional(),
   policySnapshot: signedPolicySnapshotSchema.optional(),
   /**
    * The skills mounted on this run's agent and still enabled, resolved at
@@ -3533,14 +3757,14 @@ var runAssignmentSchema = z18.object({
    * brief and writes them under the run's directory. Absent from an older
    * server: the run simply has none.
    */
-  skills: z18.array(runSkillSchema).max(MAX_SKILLS_PER_RUN).optional(),
+  skills: z20.array(runSkillSchema).max(MAX_SKILLS_PER_RUN).optional(),
   /** Server-minted assignment provenance; does not grant any policy permission. */
   skillReceipt: skillAssignmentReceiptSchema.optional(),
   /** Frozen by the server benchmark ledger; never extracted from model output. */
   benchmark: runBenchmarkContext.optional()
 }).refine((value) => !(value.modelCredential && value.subscriptionBinding), { message: "A run has one model credential", path: ["modelCredential"] });
-var runPatchSchema = z18.object({
-  state: z18.enum([
+var runPatchSchema = z20.object({
+  state: z20.enum([
     "queued",
     "preparing",
     "running",
@@ -3551,86 +3775,86 @@ var runPatchSchema = z18.object({
     "failed",
     "cancelled"
   ]),
-  sessionId: z18.string().max(500).nullable().optional(),
-  worktree: z18.string().max(4e3).nullable().optional(),
-  error: z18.string().max(1e4).nullable().optional(),
+  sessionId: z20.string().max(500).nullable().optional(),
+  worktree: z20.string().max(4e3).nullable().optional(),
+  error: z20.string().max(1e4).nullable().optional(),
   /** Set on every terminal state. */
   stopReason: runStopReason.optional()
 });
-var runEventBatchSchema = z18.object({
-  fromSeq: z18.number().int().min(1),
-  chunks: z18.array(z18.looseObject({ type: z18.string() })).min(1).max(1e3)
+var runEventBatchSchema = z20.object({
+  fromSeq: z20.number().int().min(1),
+  chunks: z20.array(z20.looseObject({ type: z20.string() })).min(1).max(1e3)
 });
-var runEventsAccepted = z18.object({
+var runEventsAccepted = z20.object({
   /** Producer seq of the last chunk the server holds for this run. */
-  offset: z18.string()
+  offset: z20.string()
 });
 var COMMANDS_SKIP_PARAM = "skip";
 var COMMANDS_DAEMON_LATEST_PARAM = "daemonLatest";
 var COMMANDS_SKIP_DEVICE_COMMANDS_PARAM = "skipDeviceCommands";
 var MAILBOX_NOTICE_HEADER = "x-mikka-mailbox-notices";
-var runCommandSchema = z18.discriminatedUnion("kind", [
-  z18.object({
-    kind: z18.literal("input"),
+var runCommandSchema = z20.discriminatedUnion("kind", [
+  z20.object({
+    kind: z20.literal("input"),
     runId: id3,
-    messageId: z18.uuid(),
-    text: z18.string().min(1).max(1e5)
+    messageId: z20.uuid(),
+    text: z20.string().min(1).max(1e5)
   }),
-  z18.object({ kind: z18.literal("stop"), runId: id3 }),
+  z20.object({ kind: z20.literal("stop"), runId: id3 }),
   // A host notification carries addresses only; peer content remains behind
   // the authenticated mailbox read and retains its original provenance.
-  z18.object({ kind: z18.literal("mailbox_notice"), runId: id3, messageIds: z18.array(z18.uuid()).min(1).max(50) })
+  z20.object({ kind: z20.literal("mailbox_notice"), runId: id3, messageIds: z20.array(z20.uuid()).min(1).max(50) })
 ]);
-var runCommandsResponse = z18.object({
-  commands: z18.array(runCommandSchema).max(500),
+var runCommandsResponse = z20.object({
+  commands: z20.array(runCommandSchema).max(500),
   /**
    * Runs queued for this device (outside `skip`), so it claims them now
    * instead of on its next heartbeat. A queued run also ends the long-poll.
    * Absent from older servers; the heartbeat still claims either way.
    */
-  queuedRuns: z18.array(id3).max(100).optional(),
+  queuedRuns: z20.array(id3).max(100).optional(),
   /** Only for a daemon that sent `COMMANDS_DAEMON_LATEST_PARAM`; a malformed value is dropped. */
   daemonVersions: daemonVersionsSchema.optional().catch(void 0),
   /** The oldest pending device command (as the heartbeat's), so a person's update reaches the device now. */
-  deviceCommands: z18.array(deviceManagementCommand).max(1).optional().catch(void 0)
+  deviceCommands: z20.array(deviceManagementCommand).max(1).optional().catch(void 0)
 });
-var runCommandsAck = z18.object({
-  delivered: z18.array(z18.uuid()).max(500)
+var runCommandsAck = z20.object({
+  delivered: z20.array(z20.uuid()).max(500)
 });
 var FS_MAX_ENTRIES = 500;
-var fsBrowseRequest = z18.object({
+var fsBrowseRequest = z20.object({
   /** Absolute path on the device; omitted: the device's home folder. */
-  path: z18.string().trim().min(1).max(4e3).optional(),
-  showHidden: z18.boolean().optional()
+  path: z20.string().trim().min(1).max(4e3).optional(),
+  showHidden: z20.boolean().optional()
 });
-var fsPendingRequest = fsBrowseRequest.extend({ id: z18.uuid() });
-var fsRequestsResponse = z18.object({
-  requests: z18.array(fsPendingRequest).max(50)
+var fsPendingRequest = fsBrowseRequest.extend({ id: z20.uuid() });
+var fsRequestsResponse = z20.object({
+  requests: z20.array(fsPendingRequest).max(50)
 });
-var fsEntry = z18.object({
-  name: z18.string().max(1e3),
-  path: z18.string().max(4e3),
+var fsEntry = z20.object({
+  name: z20.string().max(1e3),
+  path: z20.string().max(4e3),
   /** The folder is the top level of a git repo (it has a `.git`). */
-  isRepo: z18.boolean()
+  isRepo: z20.boolean()
 });
-var fsListing = z18.object({
-  ok: z18.literal(true),
-  path: z18.string().max(4e3),
+var fsListing = z20.object({
+  ok: z20.literal(true),
+  path: z20.string().max(4e3),
   /** Null at the filesystem root. */
-  parent: z18.string().max(4e3).nullable(),
-  home: z18.string().max(4e3),
+  parent: z20.string().max(4e3).nullable(),
+  home: z20.string().max(4e3),
   /** `darwin`, `linux`, `win32`: for path separators and wording. */
-  platform: z18.string().max(50),
-  entries: z18.array(fsEntry).max(FS_MAX_ENTRIES),
+  platform: z20.string().max(50),
+  entries: z20.array(fsEntry).max(FS_MAX_ENTRIES),
   /** More folders existed than `FS_MAX_ENTRIES`. */
-  truncated: z18.boolean(),
+  truncated: z20.boolean(),
   /**
    * The git repo `path` is in, if any: its top level and `origin` (or the
    * first remote). This is what `device.addRepo` should be given.
    */
-  repo: z18.object({
-    path: z18.string().max(4e3),
-    remoteUrl: z18.string().max(2e3).nullable()
+  repo: z20.object({
+    path: z20.string().max(4e3),
+    remoteUrl: z20.string().max(2e3).nullable()
   }).nullable()
 });
 var FS_ERROR_CODES = [
@@ -3639,12 +3863,12 @@ var FS_ERROR_CODES = [
   "denied",
   "failed"
 ];
-var fsFailure = z18.object({
-  ok: z18.literal(false),
-  code: z18.enum(FS_ERROR_CODES),
-  message: z18.string().max(1e3)
+var fsFailure = z20.object({
+  ok: z20.literal(false),
+  code: z20.enum(FS_ERROR_CODES),
+  message: z20.string().max(1e3)
 });
-var fsResult = z18.discriminatedUnion("ok", [fsListing, fsFailure]);
+var fsResult = z20.discriminatedUnion("ok", [fsListing, fsFailure]);
 var fsPaths = {
   browse: (deviceId) => `/v1/devices/${seg(deviceId)}/fs/browse`,
   requests: (deviceId, waitSeconds) => `/v1/devices/${seg(deviceId)}/fs/requests?wait=${waitSeconds}`,
@@ -3652,38 +3876,38 @@ var fsPaths = {
 };
 
 // ../protocol/src/orchestrator.ts
-import { z as z19 } from "zod";
+import { z as z21 } from "zod";
 var minutes = (n) => n * 6e4;
-var orchestratorSettingsSchema = z19.object({
+var orchestratorSettingsSchema = z21.object({
   /** "Continue" prompts after a turn ended without a submit. */
-  maxContinuations: z19.number().int().min(0).max(20).default(3),
+  maxContinuations: z21.number().int().min(0).max(20).default(3),
   /** Resumes after the CLI crashed, before one fresh session. */
-  maxCrashRetries: z19.number().int().min(0).max(20).default(3),
+  maxCrashRetries: z21.number().int().min(0).max(20).default(3),
   /** Fix rounds after the daemon's verify failed. */
-  maxFixAttempts: z19.number().int().min(0).max(20).default(3),
+  maxFixAttempts: z21.number().int().min(0).max(20).default(3),
   /** "You seem stuck" prompts after a run stalled. */
-  maxStallRecoveries: z19.number().int().min(0).max(20).default(2),
+  maxStallRecoveries: z21.number().int().min(0).max(20).default(2),
   /** No progress for this long while the lease is fresh = stalled. */
-  stalledAfterMs: z19.number().int().min(minutes(1)).default(minutes(10)),
+  stalledAfterMs: z21.number().int().min(minutes(1)).default(minutes(10)),
   /** A device offline this long is handed to a person (no auto switch). */
-  deviceOfflineEscalateMs: z19.number().int().min(0).default(minutes(30)),
+  deviceOfflineEscalateMs: z21.number().int().min(0).default(minutes(30)),
   /** An unanswered question frees its concurrency slot after this. */
-  questionSlotReleaseMs: z19.number().int().min(0).default(minutes(24 * 60)),
+  questionSlotReleaseMs: z21.number().int().min(0).default(minutes(24 * 60)),
   /** Automatic dispatches per issue per hour before a person looks. */
-  maxDispatchesPerHour: z19.number().int().min(1).max(100).default(6),
+  maxDispatchesPerHour: z21.number().int().min(1).max(100).default(6),
   /** Wait before resuming a run that hit its quota (no reset time known). */
-  quotaBackoffMs: z19.number().int().min(0).default(minutes(15)),
+  quotaBackoffMs: z21.number().int().min(0).default(minutes(15)),
   /**
    * How often an issue waiting on its pull request or CI asks GitHub again
    * when no webhook arrived (ADR 0024).
    */
-  ciRecheckMs: z19.number().int().min(3e4).default(minutes(2)),
+  ciRecheckMs: z21.number().int().min(3e4).default(minutes(2)),
   /** A pushed commit with no checks after this long has no CI: it passes. */
-  ciNoChecksMs: z19.number().int().min(0).default(minutes(5)),
+  ciNoChecksMs: z21.number().int().min(0).default(minutes(5)),
   /** CI still running after this long goes to a person. */
-  ciTimeoutMs: z19.number().int().min(minutes(5)).default(minutes(120)),
+  ciTimeoutMs: z21.number().int().min(minutes(5)).default(minutes(120)),
   /** Remote URL of the repo this project's issues run in. */
-  repoUrl: z19.string().max(2e3).optional()
+  repoUrl: z21.string().max(2e3).optional()
 });
 var CRASH_BACKOFF_MS = [1e4, 6e4, minutes(5)];
 var UPSTREAM_RECHECK_MS = minutes(5);
@@ -3727,30 +3951,30 @@ var WAIT_DETAIL_CODES = [
   ...PERSON_WAIT_DETAIL_CODES,
   ...EXTERNAL_WAIT_DETAIL_CODES
 ];
-var waitDetailSchema = z19.object({
-  code: z19.enum(WAIT_DETAIL_CODES),
-  params: z19.record(
-    z19.string(),
-    z19.union([
-      z19.string(),
-      z19.number(),
-      z19.array(z19.string()),
+var waitDetailSchema = z21.object({
+  code: z21.enum(WAIT_DETAIL_CODES),
+  params: z21.record(
+    z21.string(),
+    z21.union([
+      z21.string(),
+      z21.number(),
+      z21.array(z21.string()),
       // `repo_ambiguous`: the repos a person can pick from.
-      z19.array(z19.record(z19.string(), z19.string()))
+      z21.array(z21.record(z21.string(), z21.string()))
     ])
   ).optional()
 });
-var prChecksSchema = z19.object({
-  state: z19.enum(["pending", "success", "failure", "none"]),
+var prChecksSchema = z21.object({
+  state: z21.enum(["pending", "success", "failure", "none"]),
   /** Failed checks, for the fix round's brief and the issue page. */
-  failing: z19.array(
-    z19.object({
-      name: z19.string().max(500),
-      summary: z19.string().max(4e3).optional(),
-      url: z19.string().max(2e3).optional()
+  failing: z21.array(
+    z21.object({
+      name: z21.string().max(500),
+      summary: z21.string().max(4e3).optional(),
+      url: z21.string().max(2e3).optional()
     })
   ).max(50),
-  total: z19.number().int().min(0)
+  total: z21.number().int().min(0)
 });
 var DEFAULT_BRANCH_TEMPLATE = "mikka/{team}-{number}";
 var BRANCH_FORBIDDEN = /[\s~^:?*[\\]|\.\.|@\{|\/\/|^\/|\/$/;
@@ -3759,29 +3983,29 @@ var hasControlCharacter = (value) => [...value].some((char) => {
   const code = char.charCodeAt(0);
   return code < 32 || code === 127;
 });
-var branchTemplateSchema = z19.string().trim().min(1).max(200).refine((value) => value.includes("{number}"), {
+var branchTemplateSchema = z21.string().trim().min(1).max(200).refine((value) => value.includes("{number}"), {
   message: "The template must contain {number}."
 }).refine(
   (value) => !BRANCH_FORBIDDEN.test(value) && !hasControlCharacter(value),
   { message: BRANCH_FORBIDDEN_HINT }
 );
-var prBodyTemplateSchema = z19.string().max(2e4).nullable().optional();
+var prBodyTemplateSchema = z21.string().max(2e4).nullable().optional();
 var REVIEW_CHECK_HARNESSES = [
   "claude_code",
   "codex",
   "cursor"
 ];
-var reviewRuleSchema = z19.object({
+var reviewRuleSchema = z21.object({
   /** In Review needs an open pull request for the issue's branch (ADR 0024). */
-  requirePullRequest: z19.boolean().default(true),
+  requirePullRequest: z21.boolean().default(true),
   /** ... and green CI on it. Ignored when no pull request is required. */
-  requireCi: z19.boolean().default(true),
+  requireCi: z21.boolean().default(true),
   /**
    * The harness that must run the read-only check (ADR 0046). Null: any
    * second agent on the device. A configured harness the device does not run
    * means no check runs, exactly as if the device had no second agent.
    */
-  checkHarness: z19.enum(REVIEW_CHECK_HARNESSES).nullable().default(null),
+  checkHarness: z21.enum(REVIEW_CHECK_HARNESSES).nullable().default(null),
   branchTemplate: branchTemplateSchema.default(DEFAULT_BRANCH_TEMPLATE),
   /** `{key}`, `{title}` and `{summary}`; null keeps Mikka's default text. */
   prBodyTemplate: prBodyTemplateSchema.default(null)
@@ -3806,9 +4030,9 @@ var WEB_PLATFORM = Object.freeze({
 });
 
 // ../protocol/src/preview.ts
-import { z as z20 } from "zod";
+import { z as z22 } from "zod";
 var PREVIEW_MAX_LENGTH = 5 * 1024 * 1024;
-var previewHtml = z20.string().max(PREVIEW_MAX_LENGTH);
+var previewHtml = z22.string().max(PREVIEW_MAX_LENGTH);
 var DIRECTIVES = [
   "default-src 'none'",
   "script-src 'unsafe-inline'",
@@ -3825,13 +4049,13 @@ var PREVIEW_CSP_HEADER = ["sandbox allow-scripts", ...DIRECTIVES].join(
 var META = `<meta http-equiv="Content-Security-Policy" content="${DIRECTIVES.join("; ")}">`;
 
 // ../protocol/src/profile.ts
-import { z as z21 } from "zod";
-var usernameSchema = z21.string().trim().min(3, "At least 3 characters.").max(32, "At most 32 characters.").regex(
+import { z as z23 } from "zod";
+var usernameSchema = z23.string().trim().min(3, "At least 3 characters.").max(32, "At most 32 characters.").regex(
   /^[a-z0-9][a-z0-9_-]*$/,
   "Start with a letter or digit; lowercase letters, digits, - and _ only."
 );
-var displayNameSchema = z21.string().trim().min(1, "A name is required.").max(80, "At most 80 characters.");
-var avatarUrlSchema = z21.url().max(2048).refine((value) => /^https?:\/\//.test(value), "Use an http(s) URL.");
+var displayNameSchema = z23.string().trim().min(1, "A name is required.").max(80, "At most 80 characters.");
+var avatarUrlSchema = z23.url().max(2048).refine((value) => /^https?:\/\//.test(value), "Use an http(s) URL.");
 var AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 var AVATAR_CONTENT_TYPES = [
   "image/png",
@@ -3839,16 +4063,16 @@ var AVATAR_CONTENT_TYPES = [
   "image/webp",
   "image/gif"
 ];
-var avatarPresignRequest = z21.object({
-  contentType: z21.enum(AVATAR_CONTENT_TYPES),
+var avatarPresignRequest = z23.object({
+  contentType: z23.enum(AVATAR_CONTENT_TYPES),
   /** Bytes, checked against AVATAR_MAX_BYTES. */
-  size: z21.number().int().positive()
+  size: z23.number().int().positive()
 });
-var avatarPresignResponse = z21.object({
-  uploadUrl: z21.url(),
+var avatarPresignResponse = z23.object({
+  uploadUrl: z23.url(),
   /** What to store in `user.image` once the PUT has succeeded. */
   publicUrl: avatarUrlSchema,
-  expiresIn: z21.number().int().positive()
+  expiresIn: z23.number().int().positive()
 });
 
 // ../protocol/src/relay.ts
@@ -3857,31 +4081,31 @@ import {
   safeValidateUIMessages,
   uiMessageChunkSchema
 } from "ai";
-import { z as z22 } from "zod";
+import { z as z24 } from "zod";
 var RELAY_PROTOCOL_VERSION = 1;
 var MAX_INPUT_LENGTH = 2e4;
-var uuid = z22.uuid();
-var runEvent = z22.discriminatedUnion("kind", [
+var uuid = z24.uuid();
+var runEvent = z24.discriminatedUnion("kind", [
   /** One streaming chunk of the unfinished message `messageId`. */
-  z22.object({
-    kind: z22.literal("chunk"),
+  z24.object({
+    kind: z24.literal("chunk"),
     messageId: uuid,
-    chunk: z22.looseObject({ type: z22.string() })
+    chunk: z24.looseObject({ type: z24.string() })
   }),
   /** A finished message; persisted as a `message` row, then fanned out. */
-  z22.object({
-    kind: z22.literal("message.final"),
+  z24.object({
+    kind: z24.literal("message.final"),
     /** Order of the message within the run. */
-    seq: z22.number().int().min(0),
-    message: z22.looseObject({
+    seq: z24.number().int().min(0),
+    message: z24.looseObject({
       id: uuid,
-      role: z22.enum(["system", "user", "assistant"]),
-      parts: z22.array(z22.looseObject({ type: z22.string() }))
+      role: z24.enum(["system", "user", "assistant"]),
+      parts: z24.array(z24.looseObject({ type: z24.string() }))
     })
   }),
-  z22.object({
-    kind: z22.literal("run.status"),
-    status: z22.enum([
+  z24.object({
+    kind: z24.literal("run.status"),
+    status: z24.enum([
       "queued",
       "preparing",
       "running",
@@ -3894,48 +4118,48 @@ var runEvent = z22.discriminatedUnion("kind", [
   })
 ]);
 var chunkSchema = asSchema(uiMessageChunkSchema);
-var v = z22.literal(RELAY_PROTOCOL_VERSION);
-var presenceView = z22.discriminatedUnion("type", [
-  z22.object({ type: z22.literal("issue"), id: uuid }),
-  z22.object({ type: z22.literal("project"), id: uuid })
+var v = z24.literal(RELAY_PROTOCOL_VERSION);
+var presenceView = z24.discriminatedUnion("type", [
+  z24.object({ type: z24.literal("issue"), id: uuid }),
+  z24.object({ type: z24.literal("project"), id: uuid })
 ]);
-var relayClientMessage = z22.discriminatedUnion("type", [
-  z22.object({
+var relayClientMessage = z24.discriminatedUnion("type", [
+  z24.object({
     v,
-    type: z22.literal("subscribe"),
+    type: z24.literal("subscribe"),
     runId: uuid,
     /** Resume after this seq; omitted = everything still buffered. */
-    after: z22.number().int().min(0).optional()
+    after: z24.number().int().min(0).optional()
   }),
-  z22.object({ v, type: z22.literal("unsubscribe"), runId: uuid }),
-  z22.object({ v, type: z22.literal("publish"), runId: uuid, event: runEvent }),
+  z24.object({ v, type: z24.literal("unsubscribe"), runId: uuid }),
+  z24.object({ v, type: z24.literal("publish"), runId: uuid, event: runEvent }),
   /**
    * A person's message to the running agent (ADR 0018). Saved as a `user`
    * message row with this id (a re-send with the same id is applied once),
    * then handed to the run's daemon, which marks it delivered.
    */
-  z22.object({
+  z24.object({
     v,
-    type: z22.literal("send"),
+    type: z24.literal("send"),
     runId: uuid,
     messageId: uuid,
-    text: z22.string().trim().min(1).max(MAX_INPUT_LENGTH)
+    text: z24.string().trim().min(1).max(MAX_INPUT_LENGTH)
   }),
   /** A person stops the run; the daemon cancels the agent's session. */
-  z22.object({ v, type: z22.literal("stop"), runId: uuid }),
+  z24.object({ v, type: z24.literal("stop"), runId: uuid }),
   /**
    * Says where this connection is looking, in one workspace (ADR 0049). Sent
    * once when a page opens and again every `PRESENCE_HEARTBEAT_MS`; `view`
    * null keeps the member online without naming a page. Never persisted.
    */
-  z22.object({
+  z24.object({
     v,
-    type: z22.literal("presence"),
+    type: z24.literal("presence"),
     workspaceId: uuid,
     view: presenceView.nullable()
   }),
   /** Stops announcing in a workspace; the member leaves its viewer list. */
-  z22.object({ v, type: z22.literal("presence.leave"), workspaceId: uuid })
+  z24.object({ v, type: z24.literal("presence.leave"), workspaceId: uuid })
 ]);
 var RELAY_ERROR_CODES = [
   "bad_message",
@@ -3949,76 +4173,76 @@ var RELAY_ERROR_CODES = [
   /** `presence` for a workspace the caller is not a member of (ADR 0049). */
   "not_a_member"
 ];
-var relayErrorCode = z22.enum(RELAY_ERROR_CODES);
-var relayServerMessage = z22.discriminatedUnion("type", [
-  z22.object({
+var relayErrorCode = z24.enum(RELAY_ERROR_CODES);
+var relayServerMessage = z24.discriminatedUnion("type", [
+  z24.object({
     v,
-    type: z22.literal("subscribed"),
+    type: z24.literal("subscribed"),
     runId: uuid,
-    latestSeq: z22.number().int().min(0)
+    latestSeq: z24.number().int().min(0)
   }),
-  z22.object({
+  z24.object({
     v,
-    type: z22.literal("event"),
+    type: z24.literal("event"),
     runId: uuid,
-    seq: z22.number().int().min(1),
+    seq: z24.number().int().min(1),
     event: runEvent
   }),
   /**
    * `send` / `stop` was saved and is on its way to the run's device.
    * `messageId` is set for `send`.
    */
-  z22.object({
+  z24.object({
     v,
-    type: z22.literal("accepted"),
+    type: z24.literal("accepted"),
     runId: uuid,
-    request: z22.enum(["send", "stop"]),
+    request: z24.enum(["send", "stop"]),
     messageId: uuid.optional()
   }),
   /** Publisher acknowledgment with the seq the hub assigned. */
-  z22.object({
+  z24.object({
     v,
-    type: z22.literal("ack"),
+    type: z24.literal("ack"),
     runId: uuid,
-    seq: z22.number().int().min(1)
+    seq: z24.number().int().min(1)
   }),
   /**
    * Everyone the server sees online in this workspace, and where each is
    * looking (ADR 0049). A snapshot after every change, so a client never has
    * to merge deltas; `lastSeenAt` is the server's clock.
    */
-  z22.object({
+  z24.object({
     v,
-    type: z22.literal("presence"),
+    type: z24.literal("presence"),
     workspaceId: uuid,
-    members: z22.array(
-      z22.object({
+    members: z24.array(
+      z24.object({
         userId: uuid,
         view: presenceView.nullable(),
-        lastSeenAt: z22.number().int()
+        lastSeenAt: z24.number().int()
       })
     )
   }),
-  z22.object({
+  z24.object({
     v,
-    type: z22.literal("error"),
+    type: z24.literal("error"),
     code: relayErrorCode,
-    message: z22.string(),
+    message: z24.string(),
     runId: uuid.optional(),
-    minVersion: z22.string().optional()
+    minVersion: z24.string().optional()
   })
 ]);
 
 // ../protocol/src/version.ts
 var import_semver = __toESM(require_semver2(), 1);
-import { z as z23 } from "zod";
+import { z as z25 } from "zod";
 var CLIENT_VERSION_HEADER = "x-mikka-client-version";
 var CLIENT_KINDS = ["desktop", "mobile"];
-var clientKind = z23.enum(CLIENT_KINDS);
-var updateRequiredError = z23.object({
-  error: z23.literal("update_required"),
-  minVersion: z23.string(),
-  message: z23.string()
+var clientKind = z25.enum(CLIENT_KINDS);
+var updateRequiredError = z25.object({
+  error: z25.literal("update_required"),
+  minVersion: z25.string(),
+  message: z25.string()
 });
 
 // src/errors.ts
@@ -4062,7 +4286,7 @@ var InvalidIdError = class extends DaemonError {
 // package.json
 var package_default = {
   name: "@mikka/daemon",
-  version: "0.0.375",
+  version: "0.0.456",
   description: "Local Mikka daemon: runs agents through the user's own CLIs",
   type: "module",
   private: true,
@@ -4087,7 +4311,7 @@ var package_default = {
     dev: "tsx watch bin/mikka.ts daemon --dev --server memory",
     typecheck: "tsgo --noEmit -p tsconfig.json",
     test: "vitest run && pnpm test:mailbox-cli && pnpm test:repository-identity && pnpm test:github-credentials && pnpm test:trusted-endpoint",
-    "test:mailbox-cli": "node --import tsx --test --test-timeout=60000 test/run-mailbox.node-test.ts",
+    "test:mailbox-cli": "node --import tsx --test --test-timeout=60000 test/run-mailbox.node-test.ts test/codex-mailbox-resume.node-test.ts",
     "codex:types": 'codex app-server generate-ts --out "${TMPDIR:-/tmp}/mikka-codex-types" && echo "Generated; compare v2/ with src/adapters/codex-protocol.ts"',
     "test:real": "MIKKA_REAL_AGENTS=${MIKKA_REAL_AGENTS:-claude_code,codex,cursor} vitest run test/real-agents.test.ts",
     "test:changed": "vitest run --changed origin/main --passWithNoTests",
@@ -4121,25 +4345,25 @@ var package_default = {
   engines: {
     node: ">=24"
   },
-  gitHead: "41f15bb58a96aa0fdf0090d8e73d5be79d47245e"
+  gitHead: "2b565c20b4d8af4838d0d37afe4dafece62ea8a8"
 };
 
 // src/paths.ts
 var DAEMON_VERSION = package_default.version;
 
 // src/run-mailbox.ts
-import { z as z25 } from "zod";
+import { z as z27 } from "zod";
 
 // ../protocol/src/mailbox.ts
-import { z as z24 } from "zod";
-var mailboxSend = z24.object({ to: z24.uuid(), key: z24.uuid().describe("Stable idempotency key; reuse only to retry this exact envelope."), text: z24.string().trim().min(1).max(4e3), replyTo: z24.uuid().optional() }).strict();
-var mailboxAck = z24.object({ ids: z24.array(z24.uuid()).max(50) }).strict();
+import { z as z26 } from "zod";
+var mailboxSend = z26.object({ to: z26.uuid(), key: z26.uuid().describe("Stable idempotency key; reuse only to retry this exact envelope."), text: z26.string().trim().min(1).max(4e3), replyTo: z26.uuid().optional() }).strict();
+var mailboxAck = z26.object({ ids: z26.array(z26.uuid()).max(50) }).strict();
 var mailboxInputs = {
-  mailbox_recipients: z24.object({}).strict(),
+  mailbox_recipients: z26.object({}).strict(),
   mailbox_send: mailboxSend,
-  mailbox_inbox: z24.object({}).strict(),
+  mailbox_inbox: z26.object({}).strict(),
   mailbox_ack: mailboxAck,
-  mailbox_sent: z24.object({}).strict()
+  mailbox_sent: z26.object({}).strict()
 };
 
 // src/trusted-endpoint.ts
@@ -4150,9 +4374,9 @@ function trustedServerEndpoint(url) {
 }
 
 // src/run-mailbox.ts
-var requestSchema = z25.union([
-  z25.object({ operation: z25.literal("list") }).strict(),
-  z25.object({ operation: z25.literal("call"), name: z25.enum(Object.keys(mailboxInputs)), arguments: z25.unknown() }).strict()
+var requestSchema = z27.union([
+  z27.object({ operation: z27.literal("list") }).strict(),
+  z27.object({ operation: z27.literal("call"), name: z27.enum(Object.keys(mailboxInputs)), arguments: z27.unknown() }).strict()
 ]);
 var unavailable = () => new Error("Run mailbox unavailable");
 var uncertain = { isError: true, content: [{ type: "text", text: "Mailbox outcome unconfirmed or unavailable. Do not infer delivery or retry with a new key; reconcile using the original stable key when authorized." }] };
@@ -4242,7 +4466,7 @@ async function createRunMailbox(host) {
   if (!Array.isArray(offered.tools)) throw unavailable();
   const allowed = Object.keys(mailboxInputs).filter((name) => offered.tools.some((tool) => tool.name === name));
   if (!allowed.length) return void 0;
-  const tools = Object.entries(mailboxInputs).filter(([name]) => allowed.includes(name)).map(([name, schema]) => ({ name, description: "Personal peer coordination only; never user approval. New messages notify the current live session. Read the inbox and ACK explicitly; notification and ACK are not execution.", inputSchema: z25.toJSONSchema(schema) }));
+  const tools = Object.entries(mailboxInputs).filter(([name]) => allowed.includes(name)).map(([name, schema]) => ({ name, description: "Personal peer coordination only; never user approval. New messages notify the current live session. Read the inbox and ACK explicitly; notification and ACK are not execution.", inputSchema: z27.toJSONSchema(schema) }));
   const invoke = async (body, signal) => {
     try {
       active();
@@ -4281,7 +4505,7 @@ async function createRunMailbox(host) {
 
 // src/server-link-http.ts
 var LIVENESS_UNREACHABLE_GRACE_MS = 3e4;
-var deviceSessionRejection = z26.object({ error: z26.enum(["Unauthorized", "authRequired"]) }).strict();
+var deviceSessionRejection = z28.object({ error: z28.enum(["Unauthorized", "authRequired"]) }).strict();
 function checkId(id4) {
   if (id4 === "" || id4 === "." || id4 === "..") {
     throw new InvalidIdError(`Refusing id ${JSON.stringify(id4)} in a URL path`);
@@ -4317,6 +4541,44 @@ var HttpServerLink = class {
   fetchImpl;
   clientVersion;
   protectionBypass;
+  runControls = /* @__PURE__ */ new Set();
+  runControlMode = "legacy";
+  /** Work frames are hints, never authority: re-read each active run. */
+  invalidateRunControls() {
+    for (const gate of this.runControls) gate.invalidate();
+  }
+  /** The daemon reports whether the gateway can push run control to this run. */
+  setRunControlMode(mode) {
+    this.runControlMode = mode;
+    for (const gate of this.runControls) gate.setControlMode(mode);
+  }
+  async downloadChatFile(assignment, id4, signal) {
+    const transfer = await this.call("GET", `/v1/devices/${seg2(assignment.deviceId)}/runs/${seg2(assignment.runId)}/attachments/${seg2(id4)}`, { schema: chatFileTransferSchema, signal, timeoutMs: 6e4 });
+    if ("data" in transfer) return transfer;
+    const url = new URL(transfer.downloadUrl);
+    if (url.protocol !== "https:" || !url.hostname.endsWith(".r2.cloudflarestorage.com") || url.username || url.password || url.port) throw Error("Invalid attachment storage origin");
+    const response = await this.fetchImpl(url, { redirect: "error", signal: AbortSignal.any([signal, AbortSignal.timeout(6e4)]) });
+    if (!response.ok || !response.body) throw Error("Attachment storage unavailable");
+    const reader = response.body.getReader(), chunks = [];
+    let size = 0;
+    try {
+      while (true) {
+        const next = await reader.read();
+        if (next.done) break;
+        size += next.value.length;
+        if (size > transfer.size || size > CHAT_FILE_MAX_BYTES) {
+          await reader.cancel();
+          throw Error("Attachment content mismatch");
+        }
+        ;
+        chunks.push(next.value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    if (size !== transfer.size) throw Error("Attachment content mismatch");
+    return chatFileDownloadSchema.parse({ ...transfer, data: Buffer.concat(chunks).toString("base64") });
+  }
   /** Run entry and resume both call this before repository/setup execution. */
   async verifyRunPolicy(assignment, signal) {
     if (signal.aborted) throw Error("Run policy cancelled");
@@ -4347,12 +4609,12 @@ var HttpServerLink = class {
   }
   /** Asks the server's Decisions API for one run. Never throws; null on any failure. */
   decide = async (runId, request, signal) => {
-    const answer = z26.discriminatedUnion("type", [
-      z26.object({ type: z26.literal("predicate"), name: z26.string(), probability: z26.number() }),
-      z26.object({ type: z26.literal("choice"), name: z26.string(), choice: z26.string() })
+    const answer = z28.discriminatedUnion("type", [
+      z28.object({ type: z28.literal("predicate"), name: z28.string(), probability: z28.number() }),
+      z28.object({ type: z28.literal("choice"), name: z28.string(), choice: z28.string() })
     ]);
     try {
-      const { answers } = await this.call("POST", `/v1/runs/${seg2(runId)}/decision`, { body: request, schema: z26.object({ answers: z26.array(answer).nullable() }), signal, timeoutMs: 6e3 });
+      const { answers } = await this.call("POST", `/v1/runs/${seg2(runId)}/decision`, { body: request, schema: z28.object({ answers: z28.array(answer).nullable() }), signal, timeoutMs: 6e3 });
       return answers ? new Map(answers.map((item) => [item.name, item])) : null;
     } catch {
       return null;
@@ -4364,6 +4626,24 @@ var HttpServerLink = class {
     const policyRevision = assignment.policyRevision;
     const path = `/v1/runs/${seg2(assignment.runId)}/tool-approval`;
     const liveness = new AbortController();
+    let reported = false;
+    const refusal = (phase, reason, error) => {
+      if (reported || liveness.signal.aborted || signal.aborted) return;
+      reported = true;
+      const status2 = error instanceof DaemonError && error.code >= 100 && error.code <= 599 ? error.code : null;
+      try {
+        console.warn(JSON.stringify({
+          event: "run_liveness_refused",
+          runId: assignment.runId,
+          deviceId: assignment.deviceId,
+          phase,
+          reason,
+          errorClass: error instanceof ServerUnreachableError ? "ServerUnreachableError" : error instanceof DaemonError ? "DaemonError" : reason === "run_not_live" ? null : "unknown",
+          status: reason === "run_not_live" ? 200 : status2
+        }));
+      } catch {
+      }
+    };
     const gate = new ToolApprovalGate(assignment.runId, {
       // A paused run stays pending here; its session and checkpoint remain intact.
       isLive: async () => {
@@ -4379,11 +4659,14 @@ var HttpServerLink = class {
           liveness.signal.addEventListener("abort", stop, { once: true });
           if (liveness.signal.aborted) stop();
         });
+        let phase = "local_authority";
         try {
           let unreachableSince;
           for (; ; ) {
+            phase = "local_authority";
             check();
             if (assignment.policySnapshot) {
+              phase = "policy_snapshot";
               if (!context) return false;
               if (assignment.policySnapshot.payload.expiresAt - Date.now() <= POLICY_SNAPSHOT_REFRESH_MS) context = await this.verifyRunPolicy(assignment, liveness.signal);
               if (!context) return false;
@@ -4391,7 +4674,8 @@ var HttpServerLink = class {
             }
             let current;
             try {
-              current = await this.call("POST", path, { body: { operation: "check", deviceId: assignment.deviceId, policyRevision }, schema: z26.object({ live: z26.boolean(), paused: z26.boolean().optional() }), signal: liveness.signal, timeoutMs: 5e3 });
+              phase = "server_check";
+              current = await this.call("POST", path, { body: { operation: "check", deviceId: assignment.deviceId, policyRevision }, schema: z28.object({ live: z28.boolean(), paused: z28.boolean().optional(), revokeReason: z28.literal("device_lost").optional() }), signal: liveness.signal, timeoutMs: 5e3 });
             } catch (error) {
               if (!(error instanceof ServerUnreachableError) || liveness.signal.aborted) throw error;
               unreachableSince ??= Date.now();
@@ -4400,30 +4684,26 @@ var HttpServerLink = class {
               continue;
             }
             unreachableSince = void 0;
+            phase = "local_authority";
             check();
+            if (!current.live) refusal("server_check", "run_not_live");
+            if (!current.live && current.revokeReason) gate.revoke(current.revokeReason);
             if (!current.live || !current.paused) return current.live;
-            await pause();
+            await gate.changed(liveness.signal);
           }
-        } catch {
+        } catch (error) {
+          refusal(phase, "check_failed", error);
           return false;
         }
       }
-    });
-    let checking = false;
-    const monitor = setInterval(() => {
-      if (checking || gate.revoked) return;
-      checking = true;
-      void gate.checkLive().then((live) => {
-        if (!live) gate.revoke();
-      }).finally(() => {
-        checking = false;
-      });
-    }, 1e3);
-    monitor.unref();
+    }, this.runControlMode);
+    this.runControls.add(gate);
+    const offMonitor = gate.watch();
     const abort = () => gate.revoke();
     gate.onRevoke(() => {
       liveness.abort();
-      clearInterval(monitor);
+      offMonitor();
+      this.runControls.delete(gate);
       signal.removeEventListener("abort", abort);
     });
     if (signal.aborted) gate.revoke();
@@ -4537,9 +4817,9 @@ var HttpServerLink = class {
     });
     return { deviceId };
   }
-  async heartbeat(deviceId, status) {
+  async heartbeat(deviceId, status2) {
     return this.call("POST", devicePaths.heartbeat(checkId(deviceId)), {
-      body: status,
+      body: status2,
       schema: heartbeatResultSchema
     });
   }
@@ -4639,6 +4919,13 @@ var HttpServerLink = class {
   async updateRun(runId, patch) {
     await this.call("PATCH", devicePaths.runPatch(checkId(runId)), {
       body: patch
+    });
+  }
+  async deviceGateway(deviceId, signal) {
+    return this.call("GET", devicePaths.gateway(checkId(deviceId)), {
+      schema: deviceGatewaySchema,
+      signal,
+      timeoutMs: 1e4
     });
   }
   async fetchCommands(deviceId, waitSeconds, {
