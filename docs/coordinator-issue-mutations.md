@@ -73,7 +73,8 @@ Normal UI actions continue scheduling the same work with `after()`.
 
 The dialog, destination selection and submission retry changes are layered
 over the backend-only batch in this PR. They require the issue-tool rollout,
-matching schema, fixed Preview and UI acceptance before release.
+matching schema, a local/Docker production-build check and UI acceptance
+before release.
 
 ## Verification
 

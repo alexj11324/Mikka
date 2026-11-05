@@ -156,7 +156,7 @@ Production 写进 `prod:/aws`，Preview 写进 `staging:/aws`（Infisical 里 Pr
 5. 确认 Vercel 项目已开 OIDC；Infisical 的 `prod:/aws` 和 `staging:/aws` 各有 5 个值，
    并且已同步到 Vercel 对应环境。
 
-「Vercel 部署里用 OIDC 真的换到角色」这一项，留到密码箱 PR 的 Preview 验收时再测，
+「Vercel 部署里用 OIDC 真的换到角色」这一项，留到密码箱 PR 合并后的生产验收时再测（分支没有 Vercel Preview），
 这一步不需要。
 
 ## 9. 回报给 Alex
@@ -173,4 +173,4 @@ Production 写进 `prod:/aws`，Preview 写进 `staging:/aws`（Infisical 里 Pr
 - broker 跑在单独的 Vercel 项目 `mikka-credential-broker` 里。所以 broker 角色的信任策略里，
   `sub` 必须是 `owner:mikka-dev:project:mikka-credential-broker:environment:<production|preview>`；
   app 角色的 `sub` 仍是 `project:mikka`。两个项目都要开 OIDC（Team issuer）。
-- 「用 OIDC 换到角色」的实测留到密码箱 PR 的 Preview 验收。
+- 「用 OIDC 换到角色」的实测留到密码箱 PR 合并后的生产验收（分支没有 Vercel Preview）。

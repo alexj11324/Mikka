@@ -101,7 +101,7 @@ Database tests create/drop only a randomly named schema and refuse non-localhost
 or incorrectly named databases. They need no account/model credentials.
 SDK subprocess and App Server protocol fixtures test real transport boundaries,
 not real model quality or authenticated provider behavior. Complete live Claude
-and Codex validation, current-model OpenUI quality and authenticated Preview
+and Codex validation, current-model OpenUI quality and authenticated
 acceptance if this deprecated backend were ever enabled. The implementation
 does not claim to add new email subscriptions, dinner schedules, push delivery,
 or a settings picker; it routes existing Coordinator events through the selected
