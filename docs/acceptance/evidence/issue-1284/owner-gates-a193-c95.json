@@ -1,0 +1,326 @@
+{
+  "recordedAt": "2026-11-05T04:41:35.981998+00:00",
+  "repository": "alexj11324/Mikka",
+  "actualRoutingAndStaticExecutionCommit": "a193faeb0153640254b412e8c7e2e08dfdc3f394",
+  "actualRoutingAndStaticExecutionTree": "b57beda811396f6e29a318c72a27eeef4d63e124",
+  "sourceCleanBeforeAndAfterRoutingAndStatic": true,
+  "equivalentPublishedCommit": "c95f9a13996ec12515f30a3a89107f013bae4a94",
+  "equivalentPublishedTree": "b57beda811396f6e29a318c72a27eeef4d63e124",
+  "equivalenceVerifiedFromGitObjects": true,
+  "notRelabeledAsPublishedShaRun": true,
+  "files": [
+    "lib/self-improvement/factory-bridge.ts",
+    "lib/self-improvement/evaluations.ts",
+    "lib/self-improvement/wiring-postgres.test.ts",
+    "lib/self-improvement/evaluations-postgres.test.ts",
+    "tests/factory-admission.db.test.ts"
+  ],
+  "sourceFileSha256": {
+    "lib/self-improvement/factory-bridge.ts": "26aa0f4834b2ebcb83a1570f0c6892ee1440897597d3b055ddb20fce12a8099e",
+    "lib/self-improvement/evaluations.ts": "ee534f6edacb76a1eb3bbc59f4dc10b0c38652615c5021f86bd08c74cf1a9e60",
+    "lib/self-improvement/wiring-postgres.test.ts": "3a294e22f39bba8e0ec3c485ec72315babdb8be37fa8a9627103ded9a925bb99",
+    "lib/self-improvement/evaluations-postgres.test.ts": "2113ee852684b9ef0461ee829abb6cb360ae431f6e4c17626f4ba7af61de1b7d",
+    "tests/factory-admission.db.test.ts": "c1df8ad3e57b4397b1532eefe9bb13e1195772d8479eeed8fce1ae4026721b61"
+  },
+  "gates": [
+    {
+      "name": "serial-setup",
+      "command": [
+        "pnpm",
+        "test:e2e:setup"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 2.247,
+      "log": "/tmp/issue1284-owner-serial-setup.log",
+      "counts": {
+        "tests": 0,
+        "pass": 0,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "summarySegments": {
+        "tests": [],
+        "pass": [],
+        "fail": [],
+        "cancelled": [],
+        "skipped": [],
+        "todo": []
+      },
+      "logSha256": "1322ce8e78c57747d927406b10a68f14d4c2030a98e99ca70af804b7df428c37"
+    },
+    {
+      "name": "routing-serial",
+      "command": [
+        "pnpm",
+        "test:factory-routing-db"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 71.165,
+      "log": "/tmp/issue1284-owner-routing-serial.log",
+      "counts": {
+        "tests": 214,
+        "pass": 214,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "summarySegments": {
+        "tests": [
+          209,
+          5
+        ],
+        "pass": [
+          209,
+          5
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "logSha256": "9729e62683bb3a714654c335d450fb5c728efadf805b2757868d0adf49c27fa1"
+    },
+    {
+      "name": "types-final",
+      "command": [
+        "pnpm",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.094,
+      "log": "/tmp/issue1284-owner-types-final.log",
+      "counts": {
+        "tests": 0,
+        "pass": 0,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "summarySegments": {
+        "tests": [],
+        "pass": [],
+        "fail": [],
+        "cancelled": [],
+        "skipped": [],
+        "todo": []
+      },
+      "logSha256": "b596a9bc9e34b58c60cfe208ccde07260bea3b2007d83c0b73f85344f7fcee07"
+    },
+    {
+      "name": "lint-final",
+      "command": [
+        "pnpm",
+        "exec",
+        "oxlint",
+        "--deny-warnings",
+        "lib/self-improvement/factory-bridge.ts",
+        "lib/self-improvement/evaluations.ts",
+        "lib/self-improvement/wiring-postgres.test.ts",
+        "lib/self-improvement/evaluations-postgres.test.ts",
+        "tests/factory-admission.db.test.ts"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.361,
+      "log": "/tmp/issue1284-owner-lint-final.log",
+      "counts": {
+        "tests": 0,
+        "pass": 0,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "summarySegments": {
+        "tests": [],
+        "pass": [],
+        "fail": [],
+        "cancelled": [],
+        "skipped": [],
+        "todo": []
+      },
+      "logSha256": "309f5672b9c582e577929ca2f5f761bde174303b1ea9eaa2169e7e3e878c5a11"
+    },
+    {
+      "name": "diff-final",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "2bb08cda7aa1b8dd9599fb5d2eec3f65a4d39021",
+        "a193faeb0153640254b412e8c7e2e08dfdc3f394",
+        "--",
+        "lib/self-improvement/factory-bridge.ts",
+        "lib/self-improvement/evaluations.ts",
+        "lib/self-improvement/wiring-postgres.test.ts",
+        "lib/self-improvement/evaluations-postgres.test.ts",
+        "tests/factory-admission.db.test.ts"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.004,
+      "log": "/tmp/issue1284-owner-diff-final.log",
+      "counts": {
+        "tests": 0,
+        "pass": 0,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "summarySegments": {
+        "tests": [],
+        "pass": [],
+        "fail": [],
+        "cancelled": [],
+        "skipped": [],
+        "todo": []
+      },
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "selfImprovementUnit": {
+    "command": "pnpm test:self-improvement-unit",
+    "exitCode": 0,
+    "durationSeconds": 2.714,
+    "log": "/tmp/issue1284-owner-unit-final.log",
+    "counts": {
+      "tests": 90,
+      "pass": 90,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "logSha256": "3a3159ebcf4edf3425299b37438092b89a4aa785baaf125ae230cc0004214a18",
+    "executionHead": "2bb08cda7aa1b8dd9599fb5d2eec3f65a4d39021",
+    "executionSourceState": "Frozen five-file changes subsequently committed as a193faeb; run completed before checkpoint commit."
+  },
+  "ownGateCounts": {
+    "routing": 214,
+    "unit": 90,
+    "fail": 0,
+    "skipped": 0,
+    "cancelled": 0
+  },
+  "priorFailedRuns": [
+    {
+      "label": "original-owner-failure",
+      "log": "/tmp/issue1284-owner-before.log",
+      "logSha256": "d9a15108a81a88ed9d5dc89a20de311002dced1a27bc41fbd626da8d19bb9e8a",
+      "status": "failed diagnostic retained",
+      "reason": "Original production owner and manual fixtures lacked Factory transaction registration; genuine rehearse plus the two original CI cases rejected with factoryTransactionNotOwned."
+    },
+    {
+      "label": "new-assertion-correction",
+      "log": "/tmp/issue1284-owner-routing-after.log",
+      "logSha256": "50c1b1a08aec1f15f3121576294671941966214e4521f48f49b2d2893a156d83",
+      "status": "failed diagnostic retained",
+      "reason": "New test incorrectly expected botId in Profile.scope. Corrected to the existing owner/workspace schema and asserted run.botId independently."
+    },
+    {
+      "label": "cleanup-failure",
+      "log": "/tmp/issue1284-owner-routing-final.log",
+      "logSha256": "93d21fd1febd32993fb35d7e1dcf82c94cbf68ed18505599960fe44737f6f86f",
+      "status": "failed diagnostic retained",
+      "reason": "All test assertions passed; repository-selection finally failed DROP DATABASE WITH FORCE with PostgreSQL 42501. The target backend identity was not retained and remains undetermined; no attribution to other agents."
+    }
+  ],
+  "cleanup": {
+    "recordedAt": "2026-11-05T04:39:36.327833+00:00",
+    "databases": [
+      {
+        "database": "mikka1284_owner_2bb08cda_6a95_e2e",
+        "owner": "mikka1284_test",
+        "sessionsBeforeCleanup": 0,
+        "existsAfterCleanup": 0
+      },
+      {
+        "database": "mikka1284_owner_after_2bb08cda_e2e",
+        "owner": "mikka1284_test",
+        "sessionsBeforeCleanup": 0,
+        "existsAfterCleanup": 0
+      },
+      {
+        "database": "mikka1284_owner_final_2bb08cda_e2e",
+        "owner": "mikka1284_test",
+        "sessionsBeforeCleanup": 0,
+        "existsAfterCleanup": 0
+      },
+      {
+        "database": "mikka1284_owner_serial_a193_e2e",
+        "owner": "mikka1284_test",
+        "sessionsBeforeCleanup": 0,
+        "existsAfterCleanup": 0
+      }
+    ],
+    "force": false,
+    "signalBackendCalled": false,
+    "relatedActiveTestProcesses": [],
+    "failedDerivedDatabase": {
+      "database": "repository_selection_b31389a00b9a41fd9d6c47dd5697f665_e2e",
+      "sessionsBefore": 0,
+      "force": false,
+      "existsAtReceipt": 0
+    },
+    "allFiveRecordedDatabasesExistAtReceipt": false
+  },
+  "callerAudit": [
+    {
+      "owner": "createFactoryDispatch / store / reconcile / watchdog",
+      "classification": "Existing registered lifecycle covers fresh direct and automatic Profile selection."
+    },
+    {
+      "owner": "self-improvement/factory-bridge rehearse and handoff",
+      "classification": "Fixed both fresh-selection owners, including replay early commit, rollback, cleanup and existing post-commit notification order."
+    },
+    {
+      "owner": "self-improvement/evaluations transaction / dispatchNext",
+      "classification": "Fixed real queue owner; accepted historical sources without a frozen model keep existing fallback behavior."
+    },
+    {
+      "owner": "task-dispatch actual callers",
+      "classification": "Actual Coordinator, MCP and continuation callers provide a selected nonempty model; no fresh resolver entry in these callers."
+    },
+    {
+      "owner": "repository selection / original-session questions",
+      "classification": "Use a validated frozen source or reject; no fresh Profile selection."
+    },
+    {
+      "owner": "factory-admission manual BEGIN fixtures",
+      "classification": "Adapted the two actual fresh dispatch fixtures to real Factory lifecycle; original rollback and notification assertions retained."
+    },
+    {
+      "owner": "checks/profile-dispatch/manual lock probes and generic queue fixtures",
+      "classification": "Frozen repair, synthetic queue, metadata/claim probes or no existing-client dispatch; retained without mechanical lifecycle edits."
+    },
+    {
+      "owner": "agent-profile unregistered transaction case",
+      "classification": "Intentional rejection test retained."
+    }
+  ],
+  "scopeLimits": {
+    "poolOrTimeoutChanged": false,
+    "registrationGuardRelaxed": false,
+    "rolePermissionsChanged": false,
+    "cleanupHelperChanged": false,
+    "productionDataAccessed": false,
+    "paidModelCalls": false,
+    "secretsIncluded": false
+  },
+  "collaboratorPgAfter": "Requirements reviewer runs the two existing self-improvement PG files separately on published c95; this receipt does not claim those still-running results."
+}

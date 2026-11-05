@@ -1,0 +1,223 @@
+{
+  "kind": "isolated-production-build-http-receipt",
+  "sourceCommit": "c95f9a13996ec12515f30a3a89107f013bae4a94",
+  "sourceTree": "b57beda811396f6e29a318c72a27eeef4d63e124",
+  "sourceDirtyAtBuild": false,
+  "environment": {
+    "provider": "Docker Agentic Platform Cloud Sandbox",
+    "sandbox": "sbx_001m6mcf2kr0phmx737s6js1e0r",
+    "cpus": 8,
+    "memoryGiB": 16,
+    "node": "v24.22.2",
+    "postgres": "17",
+    "database": "mikka1284_fix_c95f9a13_cd39e7c0_e2e",
+    "origin": "http://localhost:3110"
+  },
+  "build": {
+    "command": "pnpm build",
+    "startedAt": "2026-11-05T04:43:12.860Z",
+    "finishedAt": "2026-11-05T04:43:42.792Z",
+    "exitCode": 0
+  },
+  "http": {
+    "kind": "final-normal-http-profile-api",
+    "buildCommand": "pnpm build",
+    "sourceTree": "b57beda811396f6e29a318c72a27eeef4d63e124",
+    "sourceCommit": "c95f9a13996ec12515f30a3a89107f013bae4a94",
+    "sourceDirty": false,
+    "sourceDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "origin": "http://localhost:3110",
+    "startedAt": "2026-11-05T04:44:30.508Z",
+    "checks": [
+      {
+        "name": "strict deployment attestation",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "owner session HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "owner session identity",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "peer session HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "peer session identity",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "owner workspace HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "peer workspace HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "anonymous Profile list refused",
+        "actual": 401,
+        "expected": 401,
+        "passed": true
+      },
+      {
+        "name": "authenticated Profile list",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "Profile response is private",
+        "actual": "private, no-store",
+        "expected": "private, no-store",
+        "passed": true
+      },
+      {
+        "name": "create Profile via authenticated POST",
+        "actual": 201,
+        "expected": 201,
+        "passed": true
+      },
+      {
+        "name": "initial Profile version",
+        "actual": 1,
+        "expected": 1,
+        "passed": true
+      },
+      {
+        "name": "read own Profile",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "saved instructions unchanged",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "peer cannot read owner workspace Profile",
+        "actual": 404,
+        "expected": 404,
+        "passed": true
+      },
+      {
+        "name": "update owned Profile via PATCH",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "updated Profile version",
+        "actual": 2,
+        "expected": 2,
+        "passed": true
+      },
+      {
+        "name": "revision changes digest",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "stale Profile update rejected",
+        "actual": 409,
+        "expected": 409,
+        "passed": true
+      },
+      {
+        "name": "read Profile history",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "immutable revisions retained",
+        "actual": 2,
+        "expected": 2,
+        "passed": true
+      },
+      {
+        "name": "archive owned Profile via DELETE",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "archive recorded",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "list after archive",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "archived Profile absent from active list",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "peer own workspace remains available",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "peer list isolated",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      }
+    ],
+    "passed": true,
+    "leaseReleased": true,
+    "leaseState": "quarantined",
+    "finishedAt": "2026-11-05T04:44:32.724Z",
+    "sourceDigestMeaning": "Controller-recorded working-tree change digest; sourceCommit/sourceTree identify the tested source."
+  },
+  "cleanup": {
+    "at": "2026-11-05T04:45:34.332Z",
+    "activeLeases": 0,
+    "validSessions": 0,
+    "appListenerPresent": false,
+    "controllerPhase": "server-exited",
+    "controllerExited": true
+  },
+  "exclusions": {
+    "deepseekApi": "Excluded by user; no balance or paid API probes",
+    "testLocalLoop": "Not run because it uses the excluded DeepSeek path"
+  },
+  "evidenceAudit": {
+    "files": 5,
+    "archives": 0,
+    "archiveEntries": 0,
+    "decodedBytes": 0,
+    "result": "passed",
+    "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden",
+    "checkedAt": "2026-11-05T04:46:17.893Z",
+    "scope": "Five sanitized JSON receipts; no account identifiers, private headers or browser recordings."
+  }
+}

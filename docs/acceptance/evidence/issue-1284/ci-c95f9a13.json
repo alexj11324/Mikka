@@ -1,0 +1,151 @@
+{
+  "sourceCommit": "c95f9a13996ec12515f30a3a89107f013bae4a94",
+  "sourceTree": "b57beda811396f6e29a318c72a27eeef4d63e124",
+  "runId": 41968882317,
+  "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/41968882317",
+  "completedAt": "2026-11-05T04:42:52Z",
+  "conclusion": "success",
+  "checks": [
+    {
+      "name": "UI policy (strict)",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882317/job/127054137558",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882317/job/127053474329",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "analytics-ssr",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882291/job/127053303548",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "Cloud credential access (OIDC)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882317/job/127052268738",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882317/job/127052266567",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882317/job/127052266552",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882317/job/127052266532",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882317/job/127052266482",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882317/job/127052266427",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "Integration unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882317/job/127052266421",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882317/job/127052266367",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882317/job/127052266366",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "Analytics SSR (full)",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882291/job/127052255098",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882317/job/127052196092",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882291/job/127052195839",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "custody",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882342/job/127052195783",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "Browser tests (before merge)",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/41968882202/job/127052195035",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    },
+    {
+      "name": "GitGuardian Security Checks",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://dashboard.gitguardian.com",
+      "head_sha": "c95f9a13996ec12515f30a3a89107f013bae4a94"
+    }
+  ],
+  "summary": {
+    "success": 17,
+    "skipped": 1,
+    "failure": 0
+  },
+  "expectedSkip": "Cloud credential access (OIDC), according to pull-request conditions",
+  "preMerge": {
+    "base": "caebc8e6b4f6afb5f3fe3a22b833b32da9c1a7c4",
+    "mergeable": true,
+    "state": "clean",
+    "mergeCandidate": "f8607c8c6766193f6907bb1ed2450939db6df589"
+  },
+  "mergePlan": "Existing coordinator batch required while multiple ready PRs exist; this receipt does not claim a merge or deployment.",
+  "productionAcceptance": "pending a deployed fix and actual Owner task acceptance",
+  "deepseekApi": "Excluded by user; not tested"
+}

@@ -77,3 +77,16 @@ The transaction-pool fix was integrated with current main `caebc8e6`, including 
 - [Second CI failure](./ci-second-failure-2bb08cda.json): `test:factory-routing-db` failed in two caller-owned transaction fixtures with `factoryTransactionNotOwned`; the dependent build gate correctly refused to proceed.
 
 The CI failure triggered a complete caller audit, which also found real unregistered transaction owners in self-improvement rehearsal, handoff and legacy evaluation fallback. These are being connected to the existing Factory lifecycle while preserving authorization, replay, rollback and after-commit behavior. The passing local checks above do not override this CI failure. #1313 remains unmerged and #1284 remains open pending a corrected head and real production Profile acceptance.
+
+
+## #1313 corrected owner integration (c95f9a13)
+
+The missing self-improvement transaction owners are now connected to the existing Factory lifecycle. The reviewed five-file patch preserves authorization, replay, immutable assignment, rollback and post-commit notification behavior; it does not change connection-pool limits or database-role permissions.
+
+- [Original full routing suite and source gates](./owner-gates-a193-c95.json): **214/214**, zero failed/skipped/cancelled, plus type/lint/diff success. These ran at local checkpoint `a193faeb`; its Git tree is exactly the published `c95f9a13` tree `b57beda811396f6e29a318c72a27eeef4d63e124`. The actual execution SHA is preserved. Earlier owner, fixture-assertion and cleanup failures remain recorded.
+- [Independent self-improvement red/green receipt](./self-improvement-c95f9a13.json): the same owner-contract assertions fail on 2bb08cda and pass **7/7** on exact published c95f9a13. All owned test roles/databases and processes were cleaned up.
+- [Exact c95f9a13 full build and normal authenticated HTTP](./isolated-c95f9a13.json): `pnpm build` exit 0, **27/27** HTTP assertions, clean source, zero active test leases or valid sessions and no application listener after cleanup. Five sanitized receipts passed the existing evidence audit.
+- [Exact-head CI](./ci-c95f9a13.json): [run 41968882317](https://github.com/alexj11324/Mikka/actions/runs/41968882317) completed successfully at 2026-11-05 04:42:52 UTC; **17 success, 1 expected OIDC skip, 0 failure**. All four database shards and the dependent build gate passed.
+- [UI identity proof for c95f9a13](./ui-reuse-c95f9a13.json): all 11 relevant files still match the nine actual screenshots captured at 8608b63. The screenshot source is not relabeled.
+
+The independent suite counts above are not added together as a count of unique scenarios. DeepSeek API remains excluded and `test:local-loop` remains unrun. This head is ready for the repository's coordinated batch process; no new production Profile acceptance is claimed yet. #1284 remains open until the original zero-config task and the real Claude Code → Codex Profile cases complete on the deployed production build.

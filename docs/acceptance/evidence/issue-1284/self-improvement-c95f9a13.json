@@ -1,0 +1,65 @@
+{
+  "summary": "Caller-owned self-improvement transactions: the same owner-contract assertions fail on the previous source and pass on the corrected published source. Existing HTTP, rollback, immutable assignment, replay, evaluation and authority assertions remain in place.",
+  "before": {
+    "sourceSha": "2bb08cda7aa1b8dd9599fb5d2eec3f65a4d39021",
+    "testFilesFromPublishedFix": true,
+    "command": "node --import ./scripts/server-test.mjs --import tsx --test lib/self-improvement/wiring-postgres.test.ts lib/self-improvement/evaluations-postgres.test.ts",
+    "exitCode": 1,
+    "expectedFailure": "factoryTransactionNotOwned",
+    "counts": {
+      "tests": 7,
+      "passed": 1,
+      "failed": 6,
+      "skipped": 0
+    },
+    "log": "/tmp/issue1284-rr-owner-before.log",
+    "cleanup": {
+      "at": "2026-11-05T04:33:31.732984+00:00",
+      "ownedDatabasesDropped": 3,
+      "ownedRolesDropped": 1,
+      "ownedSessionsBeforeDrop": 0,
+      "remainingOwnedDatabaseOrRole": 0,
+      "temporarySourceRemoved": true,
+      "backendTerminationUsed": false,
+      "beforeSourceSha": "2bb08cda7aa1b8dd9599fb5d2eec3f65a4d39021",
+      "beforeTestExit": 1,
+      "beforeTestCounts": {
+        "tests": 7,
+        "pass": 1,
+        "fail": 6,
+        "skipped": 0
+      },
+      "beforeLog": "/tmp/issue1284-rr-owner-before.log",
+      "afterTestStarted": false
+    }
+  },
+  "after": {
+    "sourceSha": "c95f9a13996ec12515f30a3a89107f013bae4a94",
+    "tree": "b57beda811396f6e29a318c72a27eeef4d63e124",
+    "cleanBeforeAndAfter": true,
+    "workingDirectory": "/workspace/Mikka",
+    "command": "node --import ./scripts/server-test.mjs --import tsx --test lib/self-improvement/wiring-postgres.test.ts lib/self-improvement/evaluations-postgres.test.ts",
+    "requiredDatabase": true,
+    "databaseIsolation": "Dedicated local disposable role and owned databases; no production database",
+    "exitCode": 0,
+    "counts": {
+      "tests": 7,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    "realModelCalls": 0,
+    "log": "/tmp/issue1284-rr-owner-after.log"
+  },
+  "cleanup": {
+    "at": "2026-11-05T04:42:09.211453+00:00",
+    "ownedDatabasesDropped": 3,
+    "ownedRolesDropped": 1,
+    "clientSessionsBeforeDrop": 0,
+    "remainingOwnedDatabaseOrRole": 0,
+    "backendTerminationUsed": false,
+    "forceDropUsed": false,
+    "temporaryOldSourceAlreadyRemoved": true,
+    "activeTestProcesses": 0
+  }
+}
