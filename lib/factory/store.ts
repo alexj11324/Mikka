@@ -1,3 +1,4 @@
+import { factoryEventId } from "./event-id";
 import { factoryNextStage, factoryReviewPerformed } from './flow'
 import { checkFactoryRepairBudget } from './check-recovery-evidence'
 import { assertQuestionExecutionRetry } from './questions/execution-continuation'
@@ -282,6 +283,33 @@ export function createFactoryStore(
       JSON.stringify({ contractVersion: 1, task, attempts, candidates }),
     ) as FactorySnapshot;
   }
+  /** Read-only hint for ordinary Owner retry, never a new execution grant.
+   * The no-run observation is distinct from recovery of a frozen failed Run. */
+  async function checkDispatchRecovery(tx: PoolClient, value: FactorySnapshot) {
+    const { task, attempts, candidates } = value;
+    const attempt = attempts.find(row => row.id === task.attemptId);
+    if (task.status !== 'blocked' || !['review', 'verify'].includes(task.stage) || !task.candidateId ||
+        !attempt || attempt.taskId !== task.id || attempt.stage !== task.stage || attempt.status !== 'blocked' ||
+        attempt.candidateId !== task.candidateId || attempt.runId !== null || attempt.sessionId !== null ||
+        attempt.output?.requestEpoch !== task.sourceEventId || attempt.evidence.length !== 0 ||
+        !isDeepStrictEqual(attempt.output.dispatch, { code: 'agentProfileDecisionUnavailable' }) ||
+        !candidates.some(candidate => candidate.id === task.candidateId && candidate.taskId === task.id)) return undefined;
+    const { rows: [observation] } = await tx.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2',
+      [task.id, factoryEventId('check-dispatch-decision-unavailable', task.attemptId)]);
+    const change = observation?.request?.change;
+    const recorded = observation?.result?.task;
+    if (change?.action !== 'finish' || change.status !== 'blocked' || !isDeepStrictEqual(change.evidence, []) ||
+        !isDeepStrictEqual(change.output, { dispatch: { code: 'agentProfileDecisionUnavailable' } }) ||
+        !recorded || (['id', 'userId', 'botId', 'issueId', 'sourceEventId', 'stage', 'status', 'revision', 'attemptId', 'candidateId'] as const)
+          .some(key => recorded[key] !== task[key])) return undefined;
+    if (task.stage === 'review' && factoryFlowVersion(task) === 2 && await factoryReviewPerformed(tx, task)) return undefined;
+    const { rows: [blocked] } = await tx.query(`SELECT
+      EXISTS(SELECT 1 FROM factory_questions WHERE "taskId"=$1 AND status NOT IN ('resolved','cancelled','expired','superseded')) AS question,
+      EXISTS(SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId"
+        WHERE a."taskId"=$1 AND r.status NOT IN ('succeeded','completed','failed','stopped','cancelled')) AS active`, [task.id]);
+    if (blocked.question || blocked.active) return undefined;
+    return { binding: { taskId: task.id, revision: task.revision } };
+  }
   async function replay(
     tx: PoolClient,
     taskId: string,
@@ -433,13 +461,16 @@ export function createFactoryStore(
       }, existing);
     },
     /** Task-detail GET: read-only, no row locks (BE-16). B8/B9 checks and the B11 header are computed, never stored. */
-    async read(userId: string, taskId: string): Promise<FactorySnapshot & Partial<FactoryTaskDetail> & { completionRecovery?: { binding: { taskId: string; revision: number } } }> {
+    async read(userId: string, taskId: string): Promise<FactorySnapshot & Partial<FactoryTaskDetail> & { completionRecovery?: { binding: { taskId: string; revision: number } }; checkDispatchRecovery?: { binding: { taskId: string; revision: number } } }> {
       return transaction(async (tx) => {
         const task = await owned(tx, userId, taskId, false);
+        const value = await snapshot(tx, task);
+        const dispatchRecovery = await checkDispatchRecovery(tx, value);
         return {
-          ...(await snapshot(tx, task)),
+          ...value,
           ...(await factoryTaskDetail(tx, task)),
           ...((await completedRunForRecovery(tx, task)) || (await retainedDeliverableForRecovery(tx, task)) ? { completionRecovery: { binding: { taskId: task.id, revision: task.revision } } } : {}),
+          ...(dispatchRecovery ? { checkDispatchRecovery: dispatchRecovery } : {}),
         };
       });
     },

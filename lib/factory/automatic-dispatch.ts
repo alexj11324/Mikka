@@ -11,6 +11,7 @@ import { tiptapToText } from '@/lib/tiptap-text'
 import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding } from './dispatch'
 import { configureFactoryCheck } from './checks'
 import { checkFactoryRepairBudget } from './check-recovery-evidence'
+import { observeFactoryProfileDispatch } from './reconcile'
 import { FactoryError } from './contract'
 import { notifyDeviceWork } from '../device-gateway-notify'
 import type { FactoryTask, createFactoryStore } from './store'
@@ -29,7 +30,7 @@ export const factoryAutomaticRuntime = {
 
 /** The host, rather than a model tool call, queues every independent stage. */
 export function automaticFactoryDispatch(pool: Pool) {
-  return async (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, prior: FactoryTask, _run: Record<string, any>) => {
+  return observeFactoryProfileDispatch(async (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, prior: FactoryTask, _run: Record<string, any>) => {
     let task = await store.lockTask(tx, prior.userId, prior.id)
     if (task.status === 'failed' && ['review','verify'].includes(task.stage)) {
       const { rows: [attempt] } = await tx.query('SELECT output FROM factory_attempts WHERE id=$1', [task.attemptId])
@@ -206,5 +207,5 @@ export function automaticFactoryDispatch(pool: Pool) {
       try { await factoryAutomaticRuntime.enqueue(pool, actor, typeof _run.id === 'string' ? _run.id : null, result.runId) }
       catch { await (await import('./cloud-stage-handoff')).failFactoryCloudStage(pool, actor, result.runId, 'Cloud stage handoff could not be queued') }
     }
-  }
+  })
 }
