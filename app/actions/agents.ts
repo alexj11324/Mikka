@@ -270,7 +270,15 @@ async function threadQuestions(threads: readonly IssueThread[], viewerId: string
   }))
   if (!asked.size || !deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return [...threads]
   const byRun = await threadQuestionStates(pool, [...new Set(asked.values())], viewerId)
-  return threads.map(thread => ({ ...thread, question: byRun.get(asked.get(thread.id) ?? '') ?? null }))
+  return Promise.all(threads.map(async thread => {
+    const question = byRun.get(asked.get(thread.id) ?? '') ?? null
+    // The list and detail share the owner's host-confirmed wake projection;
+    // the queued run and its committed answer remain unchanged.
+    const questionWake = thread.ownedByCurrentUser && question === 'resuming' && (thread.continuation?.status ?? thread.status) === 'queued'
+      ? await (await import('@/lib/factory/questions/wake')).questionWakeFailure(pool, viewerId, thread.latestRunId)
+      : null
+    return { ...thread, question, questionWake }
+  }))
 }
 
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
@@ -306,9 +314,7 @@ export async function getIssueThread(issueId: string | null, runId: string, afte
       error = failed?.error ?? null
     }
   }
-  const questionWake = row.userId === user.id && thread.question === 'resuming' && (live?.status ?? row.status) === 'queued'
-    ? await (await import('@/lib/factory/questions/wake')).questionWakeFailure(pool, user.id, thread.latestRunId)
-    : null
+  const questionWake = thread.questionWake ?? null
   if (questionWake) error = questionWake.error
   const quota = row.userId === user.id
     ? await (await import('@/lib/run-quota-view')).threadQuotaView(user.id, chain?.attempts.map(attempt => attempt.runId) ?? [row.id], thread.latestRunId)
