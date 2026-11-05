@@ -486,7 +486,7 @@ export class CodexAdapter implements AgentAdapter {
     // check may inspect its artifact, but cannot select another repository.
     const handInTools = new Set(['submit', 'request_help', 'ask_human', 'report_blocked', 'submit_capture',
       ...(mcp.args.includes('--repository-selection') ? ['switch_repository'] : []),
-      ...(mcp.args.includes('--factory-artifacts') ? ['inspect_artifact'] : []),
+      ...(mcp.args.includes('--factory-artifacts') ? ['inspect_artifact', 'inspect_repository'] : []),
       ...(mcp.args.includes('--factory-verify') ? ['verify_command'] : []),
     ])
     const registeredMcpTool = (server: string, tool: string) =>

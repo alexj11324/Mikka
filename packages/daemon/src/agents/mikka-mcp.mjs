@@ -14,7 +14,7 @@
 //
 // Protocol: MCP over stdio, newline-delimited JSON-RPC 2.0.
 import { createHash, randomUUID } from "node:crypto"
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { closeSync, fstatSync, openSync, readSync, readFileSync, readdirSync, realpathSync, renameSync, writeFileSync, constants } from "node:fs"
@@ -109,7 +109,70 @@ function selectRepository(args) {
   return { content: [{ type: 'text', text: 'Repository selection recorded for host authorization and a new checkout. End your turn now. This checkout is preserved; no delivery has been submitted.' }] }
 }
 const ARTIFACT_TEXT_LIMIT = 64 * 1024
-const ARTIFACT_TOOL = { name: 'inspect_artifact', description: 'Independently read a delivery file in this fixed worktree: byte count, SHA256, Git HEAD, committed file SHA256, Git comparison and complete UTF8 text up to 64 KiB. Optionally compare exact expected UTF8 bytes, including every newline. Binary or larger files return no text. No shell commands, changes, submission or acceptance.', inputSchema: { type: 'object', properties: { path: { type: 'string', description: 'File path relative to this check’s worktree.' }, expectedUtf8: { type: 'string', maxLength: ARTIFACT_TEXT_LIMIT, description: 'Optional exact expected text, including all whitespace and the final newline; at most 64 KiB as UTF8.' } }, required: ['path'], additionalProperties: false } }
+const ARTIFACT_TOOL = { name: 'inspect_artifact', description: 'Read a file in this fixed worktree: byte count, SHA256, Git HEAD, committed file SHA256, Git comparison and complete UTF8 text up to 64 KiB. Optionally compare exact expected UTF8 bytes, including every newline. Binary or larger files return no text. No shell commands, changes, submission or acceptance.', inputSchema: { type: 'object', properties: { path: { type: 'string', description: 'File path relative to this worktree.' }, expectedUtf8: { type: 'string', maxLength: ARTIFACT_TEXT_LIMIT, description: 'Optional exact expected text, including all whitespace and the final newline; at most 64 KiB as UTF8.' } }, required: ['path'], additionalProperties: false } }
+const INSPECT_REPOSITORY_TOOL = { name: 'inspect_repository', description: 'Read this fixed worktree’s actual Git HEAD, sanitized GitHub origin, working-tree status and one directory’s files. Start with path ".", then inspect a listed directory or read a file with inspect_artifact. Directory listings and status are bounded and mark truncation. Symlinks and .git are not listed. No shell commands, changes, repository selection, submission or acceptance.', inputSchema: { type: 'object', properties: { path: { type: 'string', maxLength: 2000, description: 'Directory relative to this worktree; defaults to ".".' } }, additionalProperties: false } }
+
+function inspectRepository(args) {
+  if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).some(key => key !== 'path')) throw new Error('repository_input')
+  const path = args.path ?? '.'
+  if (typeof path !== 'string' || !path || path.length > 2000 || isAbsolute(path) || /[\\\0]/.test(path) ||
+      path.split('/').some(part => part === '..' || part === '.git')) throw new Error('repository_path')
+  const directory = resolve(artifactRoot, path)
+  if ((directory !== artifactRoot && !directory.startsWith(artifactRoot + sep)) || realpathSync(directory) !== directory) throw new Error('repository_path')
+  // Fixed metadata commands only. Ignore the CLI's shadow Git context and
+  // repository hooks, fsmonitor and pagers; status must not refresh the index.
+  const filterOverrides = []
+  const git = argv => execFileSync('git', ['--no-pager', '--no-optional-locks', '-C', artifactRoot,
+    '-c', 'core.fsmonitor=false', '-c', 'core.hooksPath=/dev/null', '-c', 'core.pager=cat',
+    '-c', 'core.untrackedCache=false', '-c', 'status.submoduleSummary=false', '-c', 'submodule.recurse=false', ...filterOverrides, ...argv],
+  { env: metadataGitEnv, timeout: 5000, maxBuffer: 64 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
+  // A stat-dirty tracked file makes `git status` run configured clean/process
+  // filters. Read names only, never values, then disable each bounded driver.
+  let filterKeys = []
+  try { filterKeys = git(['config', '--name-only', '--null', '--get-regexp', '^filter\\..*\\.(clean|process|required)$']).toString('utf8').split('\0').filter(Boolean) }
+  catch (error) { if (error.status !== 1) throw error }
+  if (filterKeys.length > 96 || filterKeys.some(key => !/^filter\.[A-Za-z0-9_.-]{1,200}\.(clean|process|required)$/.test(key))) throw new Error('repository_filters')
+  for (const driver of new Set(filterKeys.map(key => key.slice(0, key.lastIndexOf('.'))))) {
+    filterOverrides.push('-c', `${driver}.clean=`, '-c', `${driver}.process=`, '-c', `${driver}.required=false`)
+  }
+  const head = git(['rev-parse', '--verify', 'HEAD']).toString('utf8').trim()
+  if (!/^[a-f0-9]{40}$/.test(head)) throw new Error('repository_head')
+  let repository = null
+  try {
+    let remote = git(['remote', 'get-url', 'origin']).toString('utf8').trim()
+    // Never return the raw remote: userinfo, query and fragments may carry
+    // credentials. Unsupported/local origins remain unknown, not fabricated.
+    if (remote.includes('://')) {
+      const url = new URL(remote)
+      url.username = ''; url.password = ''; url.search = ''; url.hash = ''
+      // Git's SSH user is a transport name, not repository authority.
+      if (url.protocol === 'ssh:') url.username = 'git'
+      remote = url.toString()
+    }
+    repository = githubRepository(remote)
+  } catch { /* No safe canonical origin is available. */ }
+  const status = git(['status', '--porcelain=v1', '-z', '--untracked-files=normal', '--ignore-submodules=all'])
+  let porcelain = '', statusBytes = 0, statusTruncated = false
+  for (const record of status.toString('utf8').split('\0').filter(Boolean)) {
+    const bytes = Buffer.byteLength(record + '\0')
+    if (statusBytes + bytes > 8192) { statusTruncated = true; break }
+    porcelain += record + '\0'; statusBytes += bytes
+  }
+  const entries = [], directoryEntries = readdirSync(directory, { withFileTypes: true })
+    .filter(entry => entry.name !== '.git' && (entry.isFile() || entry.isDirectory()))
+    .sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
+  let entryBytes = 0
+  for (const entry of directoryEntries) {
+    const value = { name: entry.name, kind: entry.isDirectory() ? 'directory' : 'file' }
+    const bytes = Buffer.byteLength(JSON.stringify(value))
+    if (entries.length >= 200 || entryBytes + bytes > 16 * 1024) break
+    entries.push(value); entryBytes += bytes
+  }
+  return { content: [{ type: 'text', text: JSON.stringify({ path, head, repository,
+    origin: repository ? `https://github.com/${repository}.git` : null,
+    status: { dirty: status.length > 0, porcelain, truncated: statusTruncated },
+    entries, truncated: entries.length < directoryEntries.length }) }] }
+}
 
 function inspectArtifact(args) {
   const path = args.path
@@ -531,7 +594,7 @@ async function handle(message) {
     case "ping":
       return reply(id, {})
     case "tools/list":
-      return reply(id, { tools: [...TOOLS, ...await decisionTools(), ...(repositoryRoot ? [REPOSITORY_TOOL] : []), ...(capturesDir ? [CAPTURE_TOOL] : []), ...(factoryVerify ? [VERIFY_TOOL] : []), ...(artifactRoot ? [ARTIFACT_TOOL] : [])] })
+      return reply(id, { tools: [...TOOLS, ...await decisionTools(), ...(repositoryRoot ? [REPOSITORY_TOOL] : []), ...(capturesDir ? [CAPTURE_TOOL] : []), ...(factoryVerify ? [VERIFY_TOOL] : []), ...(artifactRoot ? [ARTIFACT_TOOL, INSPECT_REPOSITORY_TOOL] : [])] })
     case "tools/call": {
       if (decisionMcpAvailable && params?.name === 'record_decision') return reply(id, await recordDecision(params.arguments ?? {}))
       if (repositoryRoot && params?.name === REPOSITORY_TOOL.name) {
@@ -541,6 +604,10 @@ async function handle(message) {
       if (artifactRoot && params?.name === ARTIFACT_TOOL.name) {
         try { return reply(id, inspectArtifact(params.arguments ?? {})) }
         catch { return reply(id, { isError: true, content: [{ type: 'text', text: 'Artifact inspection refused or unavailable.' }] }) }
+      }
+      if (artifactRoot && params?.name === INSPECT_REPOSITORY_TOOL.name) {
+        try { return reply(id, inspectRepository(params.arguments ?? {})) }
+        catch { return reply(id, { isError: true, content: [{ type: 'text', text: 'Repository inspection refused or unavailable.' }] }) }
       }
       if (factoryVerify && params?.name === VERIFY_TOOL.name) {
         try { return reply(id, verifyCommand(params.arguments ?? {})) }
