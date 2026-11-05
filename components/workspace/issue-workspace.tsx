@@ -2,7 +2,7 @@
 import { useTranslations } from 'next-intl'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import useSWR, { useSWRConfig } from 'swr'
+import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { toast } from 'sonner'
 import { useSearchParams } from 'next/navigation'
 import { usePathname, useRouter } from '@/i18n/navigation'
@@ -35,14 +35,14 @@ import { AllThreadsColumn, AllThreadsToggle, waitingCount } from '@/components/n
 import { BrowserNotesProvider } from '@/components/browser/browser-notes'
 import { BrowserToggle, useBrowserFits } from '@/components/browser/browser-toggle'
 import { ComputerAgentsProvider } from '@/components/computer/computer-agents'
-import { pollThreads, type Thread } from '@/app/actions/task-runs'
-import { listBots, type BotView } from '@/app/actions/bots'
+import type { BotView } from '@/app/actions/bots'
 import { getCoordinatorChat, type CoordinatorChat as CoordinatorChatView } from '@/app/actions/coordinator'
 import { chatPreview } from '@/lib/agent-history'
 import { PanelRight } from 'lucide-react'
 import { ISSUE_STATUSES, type IssueStatus, type IssueView } from './issue-properties'
-import { listIssues, pollIssues } from '@/app/actions/issues'
-import { mergeList } from '@/lib/list-poll'
+import type { listIssues } from '@/app/actions/issues'
+import { useLiveBotRoster, useLiveGroupList, useLiveIssueList, useLiveThreadList } from '@/hooks/use-live-lists'
+import { ListReadScopeError, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { endSession } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -61,7 +61,6 @@ import { PluginsPage } from '@/components/plugins/plugins-view'
 import { SuggestionFeed } from '@/components/suggestions/suggestion-feed'
 import { ArtifactLibrary } from '@/components/artifacts/artifact-library'
 import { backToTaskOrigin, dropQueryKeys, goTo, NAVIGATE_EVENT, openedFromList, openThread, queryMoved, readLocation, sameLocation, sectionFor, taskOrigin, tidyAddress, toggleAllThreads, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
-import { fetchGroups } from '@/lib/group-messages'
 import { pushSettingsHistory, requestShellSearch, takeShellSearchRequest } from '@/lib/settings-navigation'
 import { resolveSettingsSection, type SettingsSectionId } from '@/lib/settings-sections'
 import { bufferTypeAhead, typingOrDialog } from '@/lib/shortcut-guard'
@@ -70,11 +69,10 @@ import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import type { AgentHistory, SavedAgentSession } from '@/lib/agent-history'
 import { useAgentHistory } from '@/hooks/use-agent-history'
 import { useWorkspace } from '@/hooks/use-workspace'
-import { LiveProvider } from '@/hooks/use-live-key'
+import { LiveProvider, useLiveKey } from '@/hooks/use-live-key'
 import { focusChatComposer } from '@/hooks/use-focus-return'
 import { usePresence } from '@/lib/use-presence'
 import { FieldError } from '@/components/ui/field'
-import { LIST_POLL_MS } from '@/components/swr-defaults'
 import { ViewStateProvider, useViewState } from '@/lib/hooks/view-state'
 
 // Start the chunk download during module evaluation, before hydration and its effects.
@@ -102,14 +100,17 @@ const SettingsShell = dynamic(() => import('@/components/settings/settings-shell
 const SettingsFrame = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsFrame), { loading: WorkspaceLoading })
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView), { loading: WorkspaceContentLoading })
 
-export function IssueWorkspace(props: Parameters<typeof IssueWorkspaceContent>[0]) {
-  const { data } = useWorkspace(props.user.email)
-  return <LiveProvider ownerId={props.user.id} workspaceId={data?.workspace.id}><ViewStateProvider scope={`${props.user.id}:${data?.workspace.id ?? 'loading'}`}><IssueWorkspaceContent {...props} /></ViewStateProvider></LiveProvider>
+export function IssueWorkspace({ withinLiveProvider = false, ...props }: Parameters<typeof IssueWorkspaceContent>[0] & { withinLiveProvider?: boolean }) {
+  const { data: read } = useWorkspace(props.user.email)
+  const data = read?.currentUserId === props.user.id ? read : undefined
+  const content = <ViewStateProvider scope={`${props.user.id}:${data?.workspace.id ?? 'loading'}`}><IssueWorkspaceContent {...props} /></ViewStateProvider>
+  return withinLiveProvider ? content : <LiveProvider ownerId={props.user.id} workspaceId={data?.workspace.id}>{content}</LiveProvider>
 }
 
-function IssueWorkspaceContent({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'coordinator', initialSettingsSection, googleEnabled = false, onboarding }: { onboarding?: { computer: OnboardingComputer }; initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations' | 'account'; googleEnabled?: boolean }) {
+function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHistory, initialSection = 'coordinator', initialSettingsSection, googleEnabled = false, onboarding }: { onboarding?: { computer: OnboardingComputer }; initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations' | 'account'; googleEnabled?: boolean }) {
   const i18nText = useTranslations()
-  const { data: workspaceData } = useWorkspace(user.email)
+  const { data: workspaceRead } = useWorkspace(user.email)
+  const workspaceData = workspaceRead?.currentUserId === user.id ? workspaceRead : undefined
   const { data: agentHistory } = useAgentHistory(user.id, initialAgentHistory)
   const t = useTranslations('Workspace')
   const tIssue = useTranslations('Issue')
@@ -117,13 +118,16 @@ function IssueWorkspaceContent({ user, initialIssues, initialSelected = null, in
   const params = useSearchParams()
   const pathname = usePathname()
   const router = useRouter()
-  const { data: workspaceContext } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
+  const { data: workspaceContextRead } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
+  const workspaceContext = workspaceContextRead?.live?.ownerId === user.id ? workspaceContextRead : undefined
+  const workspaceHome = ownerListWorkspace(workspaceContext, user.id)
+  useLiveKey('workspace_settings', workspaceHome ?? UNRESOLVED_LIST_SCOPE, ['/api/workspace/switcher', unstable_serialize(['/api/workspace', user.email]), 'teams', 'project-teams'], workspaceHome, { minIntervalMs: 2_000 })
   const { mutate: clearCache } = useSWRConfig()
   // The group chat in the centre (`group=<id>`): the one just opened, else found among the workspace's group chats (the bot list's own request) after a reload or back.
   const [groupId, setGroupId] = useState<string | null>(() => readLocation(params).group)
   const [openedGroup, setOpenedGroup] = useState<GroupChatRequest | null>(null)
   const groupsWorkspace = workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null
-  const { data: groupList } = useSWR(groupId && openedGroup?.id !== groupId && groupsWorkspace ? ['bot-list-groups', groupsWorkspace] : null, ([, id]: [string, string]) => fetchGroups(id))
+  const { data: groupList } = useLiveGroupList(user.id, groupsWorkspace, Boolean(groupId && openedGroup?.id !== groupId))
   const listedGroup = groupList?.find(group => group.id === groupId)
   const groupRequest: GroupChatRequest | null = !groupId ? null : openedGroup?.id === groupId ? openedGroup : listedGroup ? { id: listedGroup.id, title: listedGroup.title, workspaceId: listedGroup.workspaceId } : null
   const sectionTitles: Record<WorkspaceSection, string> = {
@@ -161,15 +165,18 @@ function IssueWorkspaceContent({ user, initialIssues, initialSelected = null, in
     dropQueryKeys('linear')
   }, [])
   const [boardBusy, setBoardBusy] = useState(false)
-  const taskSnapshot = useRef<{ userId: string; version?: string; items: Awaited<ReturnType<typeof listIssues>> }>({ userId: user.id, items: initialIssues ?? [] })
-  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR(['issues', user.id], async () => {
-    if (taskSnapshot.current.userId !== user.id) taskSnapshot.current = { userId: user.id, items: [] }
-    const next = await pollIssues(taskSnapshot.current.version)
-    const items = mergeList(taskSnapshot.current.items, next)
-    taskSnapshot.current = { userId: user.id, version: next.version, items }
-    return items
-  }, { ...whileSettings, fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy || settingsShown ? 0 : LIST_POLL_MS, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
-  useEffect(() => { taskSnapshot.current.items = tasks }, [tasks])
+  const listWorkspaceId = workspaceData?.workspace.id ?? workspaceContext?.workspace.id
+  const listsPaused = boardBusy || settingsShown
+  const { data: taskList, mutate, error, isLoading: tasksLoading } = useLiveIssueList(user.id, listWorkspaceId, listsPaused)
+  const tasks = taskList?.items ?? []
+  useEffect(() => {
+    if (!(error instanceof ListReadScopeError) || error.kind !== 'workspace') return
+    // Revoked membership may make the normal server context select the home.
+    // Clear the inaccessible list, then resolve that context through its usual
+    // authorized reads; never cache the replacement workspace under the old key.
+    void clearCache('/api/workspace/switcher')
+    void clearCache(['/api/workspace', user.email])
+  }, [error, clearCache, user.email])
   // Keep failed refreshes out of document flow so the board/list never jumps.
   const listErrorMessage = t('listError')
   useEffect(() => {
@@ -181,29 +188,21 @@ function IssueWorkspaceContent({ user, initialIssues, initialSelected = null, in
   const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects, whileSettings)
   const { data: teams = [] } = useSWR('teams', listTeams, whileSettings)
   const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR('project-teams', listProjectTeams, whileSettings)
-  const { data: botList } = useSWR('bots', listBots, { ...whileSettings })
-  const bots = botList ?? []
+  const { data: botList } = useLiveBotRoster(user.id, listWorkspaceId, settingsShown)
+  const bots = botList?.items ?? []
   const [onboardingOpen, setOnboardingOpen] = useState(Boolean(onboarding))
-  const threadSnapshot = useRef<{ userId: string; version?: string; items: Thread[] }>({ userId: user.id, items: [] })
-  const { data: threadsData, error: threadsError, mutate: refreshThreads } = useSWR(['threads', user.id], async () => {
-    if (threadSnapshot.current.userId !== user.id) threadSnapshot.current = { userId: user.id, items: [] }
-    const next = await pollThreads(threadSnapshot.current.version)
-    const items = mergeList(threadSnapshot.current.items, next)
-    threadSnapshot.current = { userId: user.id, version: next.version, items }
-    return items
-  }, { ...whileSettings, refreshInterval: boardBusy || settingsShown ? 0 : LIST_POLL_MS })
-  useEffect(() => { if (threadsData) threadSnapshot.current.items = threadsData }, [threadsData])
-  const threads = useMemo(() => threadsData ?? [], [threadsData])
+  const { data: threadList, error: threadsError, mutate: refreshThreads } = useLiveThreadList(user.id, listsPaused)
+  const threads = useMemo(() => threadList?.items ?? [], [threadList])
   // Not read yet: the thread lists show rows' shapes instead of 还没有线程 (review C7).
-  const threadsLoading = threadsData === undefined && !threadsError
-  const settingsWereShown = useRef(settingsShown)
+  const threadsLoading = threadList === undefined && !threadsError
+  const listsWerePaused = useRef(listsPaused)
   useEffect(() => {
-    if (settingsWereShown.current && !settingsShown) {
+    if (listsWerePaused.current && !listsPaused) {
       void mutate()
       void refreshThreads()
     }
-    settingsWereShown.current = settingsShown
-  }, [settingsShown, mutate, refreshThreads])
+    listsWerePaused.current = listsPaused
+  }, [listsPaused, mutate, refreshThreads])
   const [creatingBot, setCreatingBot] = useState(false)
   const [createdBot, setCreatedBot] = useState<BotView>()
   const { data: coordinatorChat } = useSWR<CoordinatorChatView>('coordinator-chat', () => getCoordinatorChat(), { ...whileSettings })
@@ -381,7 +380,7 @@ function IssueWorkspaceContent({ user, initialIssues, initialSelected = null, in
   // the address rewrites itself to the chat or page shown, with no new entry (R-82).
   useEffect(() => {
     if (settingsShown) return
-    const known = botList && ((id: string) => id === createdBot?.id || botList.some(bot => bot.id === id && !bot.coordinator))
+    const known = botList && ((id: string) => id === createdBot?.id || botList.items.some(bot => bot.id === id && !bot.coordinator))
     if (known && activeBotId && !known(activeBotId)) { setActiveBotId(null); if (lastChat.current.kind === 'bot') lastChat.current = { kind: 'coordinator' } }
     tidyAddress(known || undefined)
   // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new bot list or leaving Settings makes the address stale; the workspace's own moves write it whole
@@ -517,7 +516,7 @@ function IssueWorkspaceContent({ user, initialIssues, initialSelected = null, in
   const conversationSessions = [...savedSessions.values()]
   const lastCoordinatorItem = coordinatorChat?.items.findLast(item => item.from !== 'event')
   const dialogs = <>
-    <NewTaskDialog open={creating} project={creationProject ? scopedProjects.find(project => project.id === creationProject)?.name : null} initialText={typedAhead} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />
+    <NewTaskDialog workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} open={creating} project={creationProject ? scopedProjects.find(project => project.id === creationProject)?.name : null} initialText={typedAhead} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />
     {onboardingOpen && <Onboarding computer={onboarding?.computer} saveKey={saveOnboardingKey} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} onDone={bot => { setOnboardingOpen(false); if (bot) openChat({ kind: 'bot', botId: bot.id }, bot) }} />}
     <NewBotDialog open={creatingBot} onOpenChange={setCreatingBot} onCreated={bot => { setCreatingBot(false); openChat({ kind: 'bot', botId: bot.id }, bot) }} />
     {search.value && <GlobalSearch open={search.open} onOpenChange={setSearchOpen} onOpenChangeComplete={search.onOpenChangeComplete} bots={bots} sessions={conversationSessions} coordinatorLine={lastCoordinatorItem ? chatPreview(lastCoordinatorItem.text) ?? i18nText('Nav.cardPreview') : undefined} issues={tasks} projects={projects} threads={threads} onThread={runId => openThread(runId)} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null}
@@ -537,7 +536,7 @@ function IssueWorkspaceContent({ user, initialIssues, initialSelected = null, in
     {/* An open issue's header carries its own list toggle, so the floating one would sit on top of it; every other page keeps the phone header and its list button. */}
     <AppShellContent scrollKey={`page:${section}:${teamId ?? ""}:${selected ?? projectId ?? activeBot?.id ?? groupId ?? ""}:${params.get("app") ?? ""}:${layout}`} listToggle={!fullPage && !selected} hideHeader={!!selected} parent={section.startsWith('team-') && activeTeam ? activeTeam.name : undefined} title={section === 'coordinator' ? chatTitle : sectionTitles[section]} heading={chatHeading} actions={<>{section === 'plugins' || section === 'suggestions' || section === 'artifacts' ? null : <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText("Workspace.openSearch")} aria-keyshortcuts="Control+k Meta+k" disabled={boardBusy} onClick={() => setSearchOpen(true)} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText("Workspace.search.title")}<ShortcutKeys keys={['mod', 'K']} /></TooltipContent></Tooltip>}{/* The phone's way to 全部线程; the window bar's is hidden there. */}<AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} onToggle={() => toggleAllThreads(!threadsView)} /></>}>
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
-      {selected ? <TaskDetail key={draftKey} id={selected} thread={threadsView ? null : threadId} origin={originLabel} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: pagerIndex, total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={scopedProjects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? activeTeam?.name : undefined} initialTeamId={section === 'team-projects' ? teamId ?? undefined : undefined} issues={tasks} userName={user.name || user.email} onSelect={id => { setProjectId(id); move({ project: id }) }} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={openFromList} onCreateIssue={() => create()} onUpdated={() => { void refreshProjects(); void refreshProjectTeams() }} /> : section === 'team-home' && activeTeam ? <TeamHome key={activeTeam.id} team={activeTeam} projects={scopedProjects} issueCount={counts.all} onIssues={() => navigate('all')} onProjects={() => navigateSection('team-projects')} onProject={id => { void leave(() => { applySelection(null); move({ ...changeSection('team-projects'), issue: null, project: id }); setProjectId(id) }) }} /> : section === 'group' && groupRequest ? <GroupChatView key={groupRequest.id} group={groupRequest} userId={user.id} people={groupPeople} /> : section === 'group' && groupId && !groupList ? <DetailLoading /> :isOverview ? <WorkspaceOverview section={section} teamName={activeTeam?.name} counts={counts} projectCount={scopedProjects.length} tasks={scopedTasks} userId={user.id} initialAgentHistory={initialAgentHistory} agentRequest={agentRequest} onAgentActive={setActiveAgentId} onAgentSessions={setLiveSessions} bot={activeBot} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : section === 'plugins' ? <PluginsPage key={pluginsVisit} /> : section === 'suggestions' ? <SuggestionFeed onOpenIssue={id => { open(id) }} onConnect={() => openRail('plugins')} onSent={() => { if (window.matchMedia('(max-width: 767px)').matches) openChat({ kind: 'coordinator' }) }} /> : section === 'artifacts' ? <ArtifactLibrary /> : tasksLoading ? <DetailLoading /> : layout === 'board' ? <BoardPage stateKey={`board:${section}:${teamId ?? "all"}`} issues={filtered} userId={user.id} onOpen={openFromList} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <>
+      {selected ? <TaskDetail key={draftKey} id={selected} thread={threadsView ? null : threadId} origin={originLabel} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: pagerIndex, total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={scopedProjects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? activeTeam?.name : undefined} initialTeamId={section === 'team-projects' ? teamId ?? undefined : undefined} issues={tasks} userName={user.name || user.email} onSelect={id => { setProjectId(id); move({ project: id }) }} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={openFromList} onCreateIssue={() => create()} onUpdated={() => { void refreshProjects(); void refreshProjectTeams() }} /> : section === 'team-home' && activeTeam ? <TeamHome key={activeTeam.id} team={activeTeam} projects={scopedProjects} issueCount={counts.all} onIssues={() => navigate('all')} onProjects={() => navigateSection('team-projects')} onProject={id => { void leave(() => { applySelection(null); move({ ...changeSection('team-projects'), issue: null, project: id }); setProjectId(id) }) }} /> : section === 'group' && groupRequest ? <GroupChatView key={groupRequest.id} group={groupRequest} userId={user.id} people={groupPeople} /> : section === 'group' && groupId && !groupList ? <DetailLoading /> :isOverview ? <WorkspaceOverview section={section} teamName={activeTeam?.name} counts={counts} projectCount={scopedProjects.length} tasks={scopedTasks} userId={user.id} initialAgentHistory={initialAgentHistory} agentRequest={agentRequest} onAgentActive={setActiveAgentId} onAgentSessions={setLiveSessions} bot={activeBot} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : section === 'plugins' ? <PluginsPage key={pluginsVisit} /> : section === 'suggestions' ? <SuggestionFeed onOpenIssue={id => { open(id) }} onConnect={() => openRail('plugins')} onSent={() => { if (window.matchMedia('(max-width: 767px)').matches) openChat({ kind: 'coordinator' }) }} /> : section === 'artifacts' ? <ArtifactLibrary /> : tasksLoading ? <DetailLoading /> : layout === 'board' ? <BoardPage workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} stateKey={`board:${section}:${teamId ?? "all"}`} issues={filtered} userId={user.id} onOpen={openFromList} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <>
         <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
           <div className="flex flex-wrap items-center gap-2"><h1 className="text-sm font-semibold">{section === 'my-issues' ? i18nText("Workspace.myCreatedTasks") : viewTitle}</h1><Badge variant="secondary">{filtered.length}</Badge>{section !== 'my-issues' && <NativeSelect aria-label={i18nText("Workspace.filterStatus")} value={view} disabled={boardBusy} onChange={event => navigate(event.target.value as IssueView)}><NativeSelectOption value="all">{i18nText("Projects.allStatuses")}</NativeSelectOption><NativeSelectOption value="favorites">{i18nText("Overview.favorites")}</NativeSelectOption><NativeSelectOption value="following">{i18nText("Overview.following")}</NativeSelectOption>{ISSUE_STATUSES.map(status => <NativeSelectOption key={status.value} value={status.value}>{statusLabel(status.value)}</NativeSelectOption>)}</NativeSelect>}</div>
           <div className="flex w-full min-w-0 items-center justify-between gap-3 sm:w-auto"><SearchInput className="min-w-0 sm:w-48" aria-label={i18nText("Workspace.search.title")} placeholder={i18nText("Projects.issuePicker.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} disabled={boardBusy} /><ToggleGroup aria-label={i18nText("Workspace.taskView")} size="sm" variant="segment" spacing={0.5} disabled={boardBusy} value={[layout]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') setLayout(next) }}><ToggleGroupItem value="list" aria-label={i18nText("Workspace.listView")}><List /></ToggleGroupItem><ToggleGroupItem value="board" aria-label={i18nText("Workspace.boardView")}><Columns3 /></ToggleGroupItem></ToggleGroup><Button size="sm" disabled={boardBusy} onClick={() => create()}><Plus data-icon="inline-start" />{i18nText("Nav.newTask")}</Button></div>

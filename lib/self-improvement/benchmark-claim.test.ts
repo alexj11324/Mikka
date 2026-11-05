@@ -18,18 +18,26 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
   const calls:string[]=[]
   const admissionScopes:string[]=[]
   const workspaceIds=['bot-workspace','task-workspace']
-  const run={id:'run',userId:'owner',issueId:'issue',agentId:'agent',deviceRepoId:'repo',deviceId:'device',deviceTokenId:null as string|null,status:'queued',kind:'implement',baseBranch:'frozen-sha',prompt:'frozen task',attempt:1}
+  const run={id:'run',userId:'owner',issueId:'issue',agentId:'agent',deviceRepoId:'repo',deviceId:'device',deviceTokenId:null as string|null,status:'queued',kind:'implement',baseBranch:'frozen-sha',prompt:'frozen task',attempt:1,agentDefinition:undefined as {agentProfile?:unknown}|undefined}
   const agent={id:'agent',userId:'owner',harness:'codex'},repo={id:'repo',userId:'owner',deviceId:'device',repoPath:'v2/github.com/mikka-ci/benchmark-claim',remoteUrl:'https://github.com/mikka-ci/benchmark-claim.git',verifyCommand:'mutable-repo-command'}
   const selections=[run,agent,repo]
+  // This benchmark fixture has no Profile. Real Profile admission and native
+  // continuation use PostgreSQL coverage; never silently admit one here.
+  const assertNoProfile=(definition:{agentProfile?:unknown}|null|undefined)=>{
+    assert.equal(definition?.agentProfile,undefined,'benchmark fixture does not authorize Agent Profiles')
+  }
   class ImprovementError extends Error {constructor(public code:string){super(code)}}
   class FactoryError extends Error {}
-  const db={select:()=>({from:()=>({where:()=>({limit:async()=>[selections.shift()]})})}),update:()=>({set:(values:object)=>({where:async()=>{calls.push('block');Object.assign(run,values)}})})}
+  const db={select:()=>({from:()=>({where:()=>({limit:async()=>[selections.shift()]})})}),update:()=>({set:(values:object)=>({where:()=>({returning:async()=>{calls.push('block');Object.assign(run,values);return [{id:run.id}]}})})})}
   const benchmark={harness:'codex',model:'actual-observed-model',verifyCommand:'git diff --exit-code HEAD --',policy:{readOnly:true,networkAllow:[],permissions:{install_dependency:'deny',write_outside_repo:'deny',git_push:'deny',network:'ask'}},benchmark:{caseId:'case',benchmarkDigest:'digest',sourceCommit:'frozen-sha'}}
   const modules:Record<string,unknown>={
     // This VM owns frozen benchmark composition, not credential admission;
     // the actual route/fence and token revocation have real PostgreSQL tests.
     '@/lib/issue-access':{issueForUser:async(userId:string,id:string)=>{assert.equal(userId,'owner');assert.equal(id,'issue');return issueDenied?null:{id,userId,scope:'personal',content:{type:'doc'}}}},
     '@/lib/device-route':{withDeviceRoute:<T>(handler:T)=>handler},
+    '@/lib/live/lists':{runListChanged:async(executor:unknown,runId:string)=>{
+      assert.equal(executor,db);assert.equal(runId,run.id);assert.equal(run.status,'failed');calls.push('listChanged')
+    }},
     '@/lib/cloud-computer-flag':{cloudComputerTasksEnabled:()=>true},
     'next/server':{after:()=>{calls.push('wakeScheduled')},NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
     'drizzle-orm':{and:(...args:unknown[])=>args,eq:(...args:unknown[])=>args,isNull:(value:unknown)=>value},
@@ -67,10 +75,15 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/thread-continuation':{continuationFollowUp:()=>null},
     '@/lib/run-completion-effects':{afterRunEnded:async()=>{calls.push('runEnded');return 0}},
     '@/lib/factory/checks':{isFactoryCheckRun:async()=>false},
+    '@/lib/factory/profile-admission':{AgentProfileAdmissionError:class extends Error {}},
+    '@/lib/factory/profile-native-session':{profileNativeSessionMatches:(before:{agentProfile?:unknown}|null|undefined,after:{agentProfile?:unknown}|null|undefined)=>{
+      assertNoProfile(before);assertNoProfile(after);return true
+    }},
     '@/lib/factory/runtime':{guardFactoryClaim:async()=>{calls.push('guard');if(stopped)throw new FactoryError('stopped');return {preserveQuestionWorktree:true}}},
     '@mikka/protocol/agent-policy':{defaultRunPolicy},
     '@/lib/computer/local-authority':{localComputerAuthority:async()=>null},
     '@/lib/computer/claim':{claimLocalRun:async(_pool:unknown,_runId:string,_deviceId:string,_lease:Date,_subscription:unknown,guard:(tx:object)=>Promise<boolean>,after:(tx:object)=>Promise<void>)=>{
+      assertNoProfile(run.agentDefinition)
       const tx={query:async(statement:string,args:unknown[])=>{
         assert.ok(statement.startsWith('UPDATE agent_runs SET "deviceTokenId"=$2'))
         assert.deepEqual(Array.from(args),['run','synthetic-device-token','owner'])
@@ -124,7 +137,7 @@ test('actual claim route withholds all assignment bytes when frozen configuratio
   const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,409)
   assert.deepEqual(await response.json(),{error:'runUnavailable'})
-  assert.deepEqual(calls,['preflight','guard','claim','token','receipt','benchmark','block','runEnded'])
+  assert.deepEqual(calls,['preflight','guard','claim','token','receipt','benchmark','block','listChanged','runEnded'])
   assert.equal(run.status,'failed')
 })
 

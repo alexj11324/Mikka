@@ -1,4 +1,5 @@
 'use client'
+import { isBotListKey } from '@/lib/live/list-read'
 
 import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
@@ -40,7 +41,7 @@ export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean;
     setSaving(true)
     try {
       const bot = await createBot({ name: trimmed, color, shape })
-      await mutate('bots')
+      await mutate(isBotListKey)
       created.current = true
       onCreated(bot)
     } catch (error) {

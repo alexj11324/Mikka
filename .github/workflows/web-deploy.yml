@@ -7,17 +7,30 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      runtime-refresh:
+        type: boolean
+        default: false
+      runtime-worker-sha:
+        type: string
+        default: ''
+      runtime-template-models:
+        type: string
+        default: '{}'
 permissions:
   contents: read
-concurrency:
-  # One production upload at a time; a newer push waits and replaces any older queued run.
-  group: web-deploy-production
-  cancel-in-progress: false
 jobs:
   deploy:
     if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    concurrency:
+      # Keep newer main jobs queued even if an older runtime validation finishes
+      # later. Queue order is not commit order; the main guards reject stale jobs.
+      group: web-deploy-production
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
       id-token: write
@@ -39,6 +52,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
+      - name: Refuse an obsolete source before release work
+        run: node scripts/release/web-deploy.mjs main
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Read the Vercel deploy token
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
@@ -55,6 +72,30 @@ jobs:
         run: node scripts/release/web-deploy.mjs skip
         env:
           VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
+          RUNTIME_REFRESH: ${{ inputs.runtime-refresh }}
+      - name: Read the existing Vercel runtime release token
+        if: inputs.runtime-refresh == true
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          include-imports: false
+      - name: Publish the verified official runtime pair inside the deployment queue
+        if: inputs.runtime-refresh == true
+        run: node scripts/e2b/publish-template-env.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DESKTOP_TEMPLATE_ID: desktop
+          CLAUDE_TEMPLATE_ID: claude
+          CODEX_TEMPLATE_ID: codex
+          SOURCE_SHA: ${{ inputs.runtime-worker-sha }}
+          MIKKA_CLOUD_WORKER_SOURCE_COMMIT: ${{ github.sha }}
+          TEMPLATE_MODELS: ${{ inputs.runtime-template-models }}
       # `vercel pull` returns Vercel's sensitive values empty. prod:/vercel is the
       # Infisical source Vercel production is synced from; the next step fills only
       # keys production defines and Vercel withheld. Runtime still reads Vercel's copy.
@@ -88,6 +129,7 @@ jobs:
       - name: Upload the prebuilt output to production
         if: steps.skip.outputs.skip != 'true'
         run: |
+          node scripts/release/web-deploy.mjs main
           message="$(git log -1 --format=%s "$GITHUB_SHA")"
           url="$(npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --archive=tgz --token "$VERCEL_TOKEN" \
             --meta githubDeployment=1 --meta githubOrg=alexj11324 --meta githubRepo=Mikka \
@@ -97,6 +139,7 @@ jobs:
           echo "### Production deployment" >> "$GITHUB_STEP_SUMMARY"
           echo "$url (commit $GITHUB_SHA)" >> "$GITHUB_STEP_SUMMARY"
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
       - name: Verify the public production version before releasing the deployment queue
         if: steps.skip.outputs.skip != 'true'

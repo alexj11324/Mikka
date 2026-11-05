@@ -12,7 +12,7 @@ import { factoryDispatchSchema, type FactoryDispatchInput } from './dispatch-sch
 export { factoryDispatchSchema, type FactoryDispatchInput };
 export type QueueFactoryRun = (tx: PoolClient, userId: string, input: DispatchInput, sourceRunId?: string) => Promise<DispatchResult>;
 export type FactoryQueue = (tx: PoolClient, userId: string, input: {
-  issueId: string; agentId: string; deviceRepoId: string; note?: string;
+  issueId: string; agentId: string; deviceRepoId: string; note?: string; profileId?: string;
 }, botId: string | null, context: { sourceEventId: string; attemptId: string; questionOriginRunId?: string; questionHistoryRunId?: string }) => Promise<{ runId: string }>;
 /** Installed by the owning consumer; no model may select a callback or gate. */
 export interface FactoryDispatchAdapters {
@@ -33,8 +33,13 @@ export const defaultFactoryDispatchAdapters: FactoryDispatchAdapters = {
   freeze: async(tx,task,id)=>{
     const {rows:[run]}=await tx.query('SELECT r.*,a.harness,a.instructions FROM agent_runs r JOIN agents a ON a.id=r."agentId" AND a."userId"=r."userId" WHERE r.id=$1 AND r."userId"=$2 FOR UPDATE OF r FOR SHARE OF a',[id,task.userId]);
     if(!run)throw new FactoryError('factoryRunMismatch');
-    const snapshot=run.agentDefinition?retryWorkerDefinition(run.agentDefinition,run.prompt):freezeWorkerDefinition({harness:run.harness,instructions:run.instructions,prompt:run.prompt,parent:null,executionId:null});
-    await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1',[id,JSON.stringify(snapshot)]);
+    // Stage configuration may replace the task brief. Keep the selected role's
+    // frozen effective instructions in the real prompt delivered to its harness.
+    const profileInstructions=run.agentDefinition?.agentProfile?.instructions;
+    const prompt=profileInstructions && !run.prompt.includes(profileInstructions) ? `${run.prompt}\n\n${profileInstructions}` : run.prompt;
+    if(prompt.length>100000)throw new FactoryError('factoryCheckBindingMismatch');
+    const snapshot=run.agentDefinition?retryWorkerDefinition(run.agentDefinition,prompt):freezeWorkerDefinition({harness:run.harness,instructions:run.instructions,prompt,parent:null,executionId:null});
+    await tx.query('UPDATE agent_runs SET "agentDefinition"=$2,prompt=$3 WHERE id=$1',[id,JSON.stringify(snapshot),prompt]);
   },
 };
 export interface FactoryDispatchResult extends FactorySnapshot {
@@ -81,7 +86,7 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
       if (task.status !== 'pending' || !['spec','execute','review','verify','monitor'].includes(task.stage)) fail('factoryTransition');
       const configure = adapters.configure[task.stage];
       if (!configure) fail('factoryDispatchAdapterRequired');
-      const queued = await queue(tx,userId,{issueId:task.issueId,agentId:input.agentId,deviceRepoId:input.deviceRepoId,note:input.note},task.botId,{sourceEventId:task.sourceEventId,attemptId:task.attemptId,...(questionOriginRunId ? {questionOriginRunId} : {}),...(questionHistoryRunId ? {questionHistoryRunId} : {})});
+      const queued = await queue(tx,userId,{issueId:task.issueId,agentId:input.agentId,deviceRepoId:input.deviceRepoId,note:input.note,...(input.profileId ? {profileId:input.profileId} : {})},task.botId,{sourceEventId:task.sourceEventId,attemptId:task.attemptId,...(questionOriginRunId ? {questionOriginRunId} : {}),...(questionHistoryRunId ? {questionHistoryRunId} : {})});
       await tx.query('UPDATE factory_attempts SET output=output || $2::jsonb WHERE id=$1', [task.attemptId, JSON.stringify({ requestEpoch: task.sourceEventId })]);
       const configured = await configure(tx,task,queued.runId);
       const handoff = await persistFactoryHandoff(tx, task);

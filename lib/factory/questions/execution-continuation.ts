@@ -156,6 +156,37 @@ export async function questionExecutionContinuation(tx: Query, scope: Scope, con
     answerId: answer.answerId, recoveryEventId: row.eventId }
 }
 
+/** Before the child exists, the verified answer and the host retry event
+ * identify the one original execution being queued. No input flag grants a
+ * frozen Profile exception, and the native definition must stay unchanged. */
+export async function questionExecutionQueueSource(tx: Query, input: {
+  userId: string; issueId: string; botId: string | null; sourceRunId: string
+}): Promise<string | null> {
+  const { rows } = await tx.query(`SELECT to_jsonb(q) AS question,to_jsonb(t) AS task,${ownerEvent} AS "ownerEventMatches",
+      r.id AS "runId",r."botId" AS "runBotId",e."eventId",e.request,e.result
+    FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id
+    JOIN factory_questions q ON q."taskId"=t.id AND q."userId"=t."userId" AND q."issueId"=t."issueId"
+    JOIN factory_attempts previous ON previous.id=q."attemptId" AND previous."taskId"=t.id AND previous.position+1=a.position
+    JOIN agent_runs r ON r.id=q."originRunId" AND r.id=previous."runId" AND r."userId"=t."userId" AND r."issueId"=t."issueId"
+    JOIN factory_events e ON e."taskId"=t.id AND e.request->'change'->>'action'='retry' AND e.result->'task'->>'attemptId'=a.id::text
+    WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid AND r.id=$4
+      AND t.stage='execute' AND a.stage='execute' AND t.status='pending' AND a.status='pending' AND a."runId" IS NULL
+      AND q.stage='execute' AND q.status='answered' AND q."candidateId" IS NULL AND t."candidateId" IS NULL
+      AND (q."expiresAt" IS NULL OR q."expiresAt">clock_timestamp())
+      AND r.status='stopped' AND r."stopRequestedAt" IS NULL AND r."startedAt" IS NOT NULL
+      AND NULLIF(r."sessionId",'')=q."originSessionId"
+      AND COALESCE(previous.output->>'requestEpoch',t."sourceEventId"::text)=t."sourceEventId"::text
+    FOR SHARE OF t,a,q,previous,r,e`, [input.userId,input.issueId,input.botId,input.sourceRunId])
+  if (rows.length !== 1) return null
+  const row = rows[0], q = row.question as Question, task = row.task as FactoryTask, saved = row.result?.task
+  if (!verifiedAnswer(q,task,row.ownerEventMatches) || row.eventId !== factoryEventId('question-next-attempt',q.id) ||
+      row.request.binding?.taskId !== task.id || saved?.id !== task.id || saved.userId !== task.userId ||
+      saved.issueId !== task.issueId || saved.botId !== task.botId || saved.sourceEventId !== task.sourceEventId ||
+      saved.attemptId !== task.attemptId || saved.revision !== task.revision || saved.stage !== 'execute' || saved.status !== 'pending' ||
+      !(await factoryRunBotMatches(tx,task,{id:row.runId,botId:row.runBotId}))) return null
+  return row.runId as string
+}
+
 /** Only the answer/recover transaction can reach the transient answered state.
  * Re-read its locked authority before the store creates a continuation attempt;
  * an event ID, reason string or client-provided boolean is never an exemption. */

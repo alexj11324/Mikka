@@ -133,14 +133,14 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const stopPending = stopRequested && !stopFailed
   const items = data ? threadItems(data.chunks, data.messages, runId) : []
   // A failed run says why under the stage that stopped, else at the end of the conversation.
-  const failure = data && view ? runFailureText(view.status, data.thread.error) : null
+  const failure = data && view ? runFailureText(view.status, data.thread.questionWake ? actionError('threadRecoveryUnavailable') : data.thread.error) : null
   const modelFallback = data?.thread.modelFallback?.filter(item => item.state === 'switched' || item.runId === liveRunId) ?? []
   const providerExplained = data?.thread.modelFallbackPending || modelFallback.some(item => item.runId === liveRunId)
   const failedStagesId = failure ? [...items].reverse().find(item => item.kind === 'stages' && item.stages.some(stage => !stage.ok))?.id : undefined
   // A message to an ended thread runs it again in the same thread (R-81): 重试 is that message, one tap (N2).
   const canRetry = !!failure && !!data?.thread.detail && data.thread.ownedByCurrentUser && !runIsActive(view?.status ?? '')
   const failureLine = failure && !providerExplained && <div className="flex items-start gap-2" data-slot="thread-failure">
-    <p className="line-clamp-2 min-w-0 flex-1 text-xs break-words text-destructive/80" title={failure}>{failure}</p>
+    <p className="line-clamp-2 min-w-0 flex-1 text-xs break-words text-destructive-foreground" title={failure}>{failure}</p>
     {canRetry && <Button variant="outline" size="xs" className="shrink-0 pointer-coarse:h-11" disabled={sending} onClick={() => { void send(t('retry'), true) }}>{t('retry')}</Button>}
   </div>
   useEffect(() => {
@@ -156,12 +156,14 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   }, [issueId, view?.status, view?.stopping, question, mutateCache])
   async function send(retry?: string, retryOriginalSession?: true) {
     const text = retry ?? draft.trim()
-    if (!text || sending || stopRequested || question === 'resuming') return
+    const questionWake = retryOriginalSession ? data?.thread.questionWake : null
+    if (!text || sending || stopRequested || (question === 'resuming' && !questionWake)) return
     setSending(true); setSendFailed(false)
     try {
       if (!await checkPageBuildBeforeAction()) return
       const words = retry === undefined ? withReplyQuote(text, replyQuote) : text
-      const request = retryOriginalSession ? { runId: liveRunId, text: words, retryOriginalSession } : prepareThreadReply(submission, liveRunId, words)
+      const request = retryOriginalSession ? { runId: liveRunId, text: words, retryOriginalSession,
+        ...(questionWake ? { questionWakeGeneration: questionWake.generation } : {}) } : prepareThreadReply(submission, liveRunId, words)
       if ('requestId' in request) setSubmission(request)
       const result = await sendIssueThreadReply({ issueId, ...request })
       if (result.error) { setSendFailed(actionError(result.error)); if ('requestId' in request) setSubmission(null); return }
@@ -237,7 +239,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
               {item.kind === 'steps' && <ThreadSteps stateKey={`thread:${runId}:steps:${item.id}`} harness={detail?.harness ?? ''} steps={item.steps} />}
               {item.kind === 'error' && <FieldError className="text-xs">{item.text}</FieldError>}
               {item.kind === 'stages' && <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground" data-slot="thread-stages">
-                {item.stages.map((stage, index) => <span key={index} className={cn(!stage.ok && 'text-destructive')}>
+                {item.stages.map((stage, index) => <span key={index} className={cn(!stage.ok && 'text-destructive-foreground')}>
                   {t(`stages.${stage.stage}`)} {t('stages.duration', { seconds: (stage.ms / 1000).toFixed(1) })} {stage.ok ? '✓' : '✗'}
                 </span>)}
               </p>}
@@ -270,9 +272,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }} attachmentScope={{ kind: 'thread', id: liveRunId }}
         quote={replyQuote ? <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} /> : undefined}
-        sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={working || question === 'resuming'} thread onStop={working && canStop ? () => { void stop() } : undefined} />
+        sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={working || (question === 'resuming' && !data?.thread.questionWake)} thread onStop={working && canStop ? () => { void stop() } : undefined} />
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
-      {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
+      {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </div>}
     </>}
     {detail && <SelectionQuote root={rootRef} onQuote={text => { setReplyQuote(text); inputRef.current?.focus() }} />}

@@ -47,7 +47,7 @@ function RecordingSteps({ steps, current, onSeek }: { steps: { atMs: number; lab
 /** `exit 0` in green, anything else in red. */
 function Exit({ code }: { code: number | null }) {
   if (code === null) return null
-  return <span className={cn('font-mono', code === 0 ? 'text-success' : 'text-destructive')}>exit {code}</span>
+  return <span className={cn('font-mono', code === 0 ? 'text-success-foreground' : 'text-destructive-foreground')}>exit {code}</span>
 }
 
 /** Figma `Factory/EvidenceThumb`: 104×65, a screenshot, a recording with its length, or a terminal tile for text. */
@@ -176,8 +176,8 @@ export function EvidenceViewer({ taskId, items, index, title, passed, sha, envir
       className="flex h-[calc(100svh-2rem)] max-h-[50rem] flex-col gap-0 overflow-hidden p-0 sm:max-w-[70rem] max-sm:h-svh max-sm:max-h-none max-sm:max-w-none max-sm:rounded-none">
       <header className="flex h-14 shrink-0 items-center gap-2 px-4 sm:px-5">
         {title && passed !== null && passed !== undefined && (passed
-          ? <CircleCheck aria-hidden="true" className="size-4 shrink-0 text-success" />
-          : <CircleX aria-hidden="true" className="size-4 shrink-0 text-destructive" />)}
+          ? <CircleCheck aria-hidden="true" className="size-4 shrink-0 text-success-foreground" />
+          : <CircleX aria-hidden="true" className="size-4 shrink-0 text-destructive-foreground" />)}
         <DialogTitle className="min-w-0 truncate text-sm font-medium">{title || name}</DialogTitle>
         <span className="shrink-0 text-xs text-muted-foreground tabular-nums" data-testid="evidence-counter">{t('counter', { index: String(index + 1), total: String(items.length) })}</span>
         <span className="flex-1" />

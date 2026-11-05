@@ -9,6 +9,7 @@ import { initializeGroupDecisionTrace, recordGroupDecisionRoute, type GroupDecis
 import { groupTraceObservation } from './group-decision-eval'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { createFactoryStore } from '../factory/store'
+import { createLegacyFactoryStore } from '../../tests/helpers/factory-legacy'
 import { createFactoryApprovalGates } from '../factory/approval'
 import { createFactoryMerges } from '../factory/merge'
 import type { FactoryBinding, FactoryEvidence } from '../factory/contract'
@@ -175,7 +176,7 @@ test('localized task, producer thread and artifact links use the application nav
   }
 })
 
-for(const kind of ['deliverable','repository'] as const)test(`PG: real Factory ${kind} acceptance publishes one final report with current-epoch artifact and producer thread`, {skip:!url,timeout:120000},async()=>{
+for(const flowVersion of [2,1] as const)for(const kind of ['deliverable','repository'] as const)test(`PG: real Factory flow ${flowVersion} ${kind} acceptance publishes one final report with current-epoch artifact and producer thread`, {skip:!url,timeout:120000},async()=>{
   const outer=new Pool({connectionString:url})
   // pg_trgm is database-scoped; a fresh loopback *_e2e database keeps its
   // extension out of concurrently running schema fixtures.
@@ -198,14 +199,16 @@ for(const kind of ['deliverable','repository'] as const)test(`PG: real Factory $
     await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES($1::uuid,$2,$3,$4,'user_message',$1::uuid::text,'{"text":"Produce the standalone deliverable"}')`,[sourceEventId,userId,botId,issueId])
     const authorize=async(owner:string,issue:string,tx:import('pg').PoolClient)=>(await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2',[issue,owner])).rowCount===1
     const gates=createFactoryApprovalGates()
-    // Only upstream execution/review/verify outputs are fixtures. The store,
+    // Only upstream execution/check outputs are fixtures. The store,
     // owner/source checks, acceptance gate and final reconciliation are real.
-    const store=createFactoryStore(pool,authorize,botId,{independent:async()=>true,gates:{review:async()=>true,verify:async()=>true,approval:gates.approval,publish:gates.publish}})
+    const store=(flowVersion===2?createFactoryStore:createLegacyFactoryStore)(pool,authorize,botId,{independent:async()=>true,gates:{review:async()=>true,verify:async()=>true,approval:gates.approval,publish:gates.publish}})
     const binding=(task:{id:string;issueId:string;attemptId:string;candidateId:string|null;revision:number}):FactoryBinding=>({taskId:task.id,issueId:task.issueId,attemptId:task.attemptId,candidateId:task.candidateId,revision:task.revision})
     let state=await store.route(userId,{issueId,sourceEventId,eventId:randomUUID(),rationale:'Synthetic upstream deliverable fixture',missingInformation:[],missingPermissions:[],needsSpec:false})
     let producerRun=''
     const sha=kind==='repository'?'a'.repeat(40):null
-    for(const stage of ['execute','review','verify'] as const) {
+    assert.equal(state.task.route.flowVersion,flowVersion===2?2:undefined)
+    const stages=flowVersion===2?['execute','review'] as const:['execute','review','verify'] as const
+    for(const stage of stages) {
       const runId=randomUUID(),sessionId=`fixture-${stage}-${randomUUID()}`
       await pool.query(`INSERT INTO agent_runs(id,"userId","botId","issueId","agentId",kind,status,"sessionId","startedAt") VALUES($1,$2,$3,$4,$5,$6,'running',$7,clock_timestamp())`,[runId,userId,botId,issueId,agentId,stage==='execute'?'implement':'acceptance',sessionId])
       state=await store.apply(userId,binding(state.task),randomUUID(),{action:'bind_run',runId})
@@ -217,8 +220,10 @@ for(const kind of ['deliverable','repository'] as const)test(`PG: real Factory $
       const recordedAt=(await pool.query("SELECT clock_timestamp()+interval '1 second' AS at")).rows[0].at.toISOString()
       const evidence:FactoryEvidence={artifact:`run-report:${runId}`,kind:'report',runId,sessionId,candidateId:state.task.candidateId,sha,environment:'fixture-deliverable',recordedAt}
       state=await store.apply(userId,binding(state.task),randomUUID(),{action:'finish',status:'passed',reason:'Synthetic independent upstream evidence',evidence:[evidence],output:{}})
-      state=await store.apply(userId,binding(state.task),randomUUID(),{action:'advance',stage:stage==='execute'?'review':stage==='review'?'verify':'approval',reason:'Proceed through real store'})
+      state=await store.apply(userId,binding(state.task),randomUUID(),{action:'advance',stage:stage==='execute'?'review':stage==='review'&&flowVersion===1?'verify':'approval',reason:'Proceed through real store'})
     }
+    assert.equal(state.attempts.filter(attempt=>attempt.stage==='review').length,1)
+    assert.equal(state.attempts.filter(attempt=>attempt.stage==='verify').length,flowVersion===2?0:1)
     const artifactId=randomUUID(),staleArtifactId=randomUUID(),oldRun=randomUUID(),conversationId=randomUUID(),messageId=randomUUID()
     await pool.query(`INSERT INTO agent_runs(id,"userId","botId","issueId","agentId",status) VALUES($1,$2,$3,$4,$5,'succeeded')`,[oldRun,userId,botId,issueId,agentId])
     // The continuation updates the same artifact created by an earlier run.

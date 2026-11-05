@@ -35,15 +35,14 @@ export const groupRuntime: GroupRuntime = {
     const availability=new Map<string,{available:boolean;reason?:string}>()
     return groupBotCatalog(client,ownerId,workspaceId,ids,async(bot)=>{
       const { pool,withDatabaseClient }=await import('@/lib/db')
-      const { resolveModelDispatch }=await import('@/lib/model-dispatch')
+      const { agentProfileDispatchAvailability }=await import('@/lib/factory/agent-profile')
       return withDatabaseClient(client,async()=>{
         const executionBotId=bot.ownerId===ownerId ? bot.id : await (await import('./coordinator-bot')).chatBotId(ownerId,null,workspaceId)
         const key=JSON.stringify([executionBotId,bot.repository])
         const cached=availability.get(key)
         if (cached) return cached
         if (bot.repository && !await (await import('@/lib/workspace-admin/bots')).repositoryAvailable(workspaceId,bot.repository)) return {available:false,reason:'repositoryNotFound'}
-        const target=await resolveModelDispatch(pool,{ownerId,workspaceId,botId:executionBotId},null,bot.repository?undefined:'cloud',undefined,{cloudPurpose:bot.repository?'task':'desktop'})
-        const result=target.kind==='none' ? {available:false,reason:target.reason} : {available:true}
+        const result=await agentProfileDispatchAvailability(pool,{ownerId,workspaceId,botId:executionBotId},{location:bot.repository?undefined:'cloud',cloudPurpose:bot.repository?'task':'desktop'})
         availability.set(key,result)
         return result
       })

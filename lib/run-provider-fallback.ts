@@ -1,4 +1,5 @@
 import 'server-only'
+import { runListChanged } from './live/lists'
 import { isDeepStrictEqual } from 'node:util'
 import type { Pool, PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
@@ -70,9 +71,10 @@ const standingIdentity = (identity: ExecutionIdentity) => ({ requester: identity
  * newly admitted model, credential, placement and repository receipt. */
 export function providerContinuationDefinition(source: WorkerDefinitionSnapshot, admitted: WorkerDefinitionSnapshot, prompt: string, policyCeiling?: RunPolicy): WorkerDefinitionSnapshot {
   const { apiKey: _key, subscription: _subscription, executionIdentity: _identity, repositoryAdmission: _admission,
-    allowLocalRecovery: _local, ...standing } = structuredClone(source)
+    allowLocalRecovery: _local, profileOriginRunId: _profileOrigin, ...standing } = structuredClone(source)
   const definition: WorkerDefinitionSnapshot = { ...standing, harness: admitted.harness, model: admitted.model,
     modelSource: admitted.modelSource, cliModelSelection: 'explicit', promptDigest: digest(prompt),
+    ...(source.agentProfile && admitted.modelDispatch?.entry ? { agentProfile: { ...structuredClone(source.agentProfile), targetEntry: structuredClone(admitted.modelDispatch.entry) } } : {}),
     ...(policyCeiling ? { policyCeiling: source.policyCeiling ? intersectRunPolicy(policyCeiling, source.policyCeiling) : policyCeiling } : {}),
     modelDispatch: { ...source.modelDispatch!, mode: 'preference', entry: admitted.modelDispatch?.entry },
     ...(admitted.apiKey ? { apiKey: admitted.apiKey } : {}), ...(admitted.subscription ? { subscription: admitted.subscription } : {}),
@@ -217,6 +219,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
       // longer be authorized, and do not emit a model-setup request for it.
       await client.query(`UPDATE agent_runs SET report=report||jsonb_build_object('modelFallback',$3::jsonb),"updatedAt"=now()
         WHERE id=$1 AND "userId"=$2`, [source.id, source.userId, JSON.stringify({ ...prior, state: 'stopped' })])
+      await runListChanged(client, source.id)
       await client.query('COMMIT')
       return null
     }
@@ -239,7 +242,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
           const queued = await queueCloudRun(pool, { userId: source.userId, workspaceId: target.workspaceId }, {
             ...selection, botId: target.botId, issueId: source.issueId, agentId: target.agentId, deviceRepoId: target.deviceRepoId,
             title: issue.title, body: tiptapToText(issue.content), readOnly: source.agentDefinition.readOnly,
-            withoutBot: source.botId === null, idempotencyKey: `provider:${source.id}`, threadRunId: source.id,
+            withoutBot: source.botId === null, idempotencyKey: `provider:${source.id}`,
             allowLocalRecovery: source.agentDefinition.allowLocalRecovery,
             sourceEventId: source.agentDefinition.repositoryAdmission?.requestEventId,
           }, client)
@@ -262,6 +265,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
         continuation = { runId, previousRunId: source.id, deviceId: target.deviceId, cloud: target.cloud, workspaceId: target.workspaceId }
       }
       await client.query(`UPDATE agent_runs SET report=COALESCE(report,'{}'::jsonb)||jsonb_build_object('modelFallback',$3::jsonb),"updatedAt"=now() WHERE id=$1 AND "userId"=$2`, [source.id, source.userId, JSON.stringify(receipt)])
+      await runListChanged(client, source.id)
       if (receipt.state === 'switched' && receipt.retryRunId)
         await (await import('./factory/store')).adoptProviderContinuation(client, source.userId, source.id, receipt.retryRunId)
       const event = receipt.state === 'switched' ? {
@@ -296,7 +300,7 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
   if (initial.state !== 'pending') return null
   const scope = await fallbackScope(pool, source), { entries } = await readOrder(pool, scope)
   const attempted = await attemptedEntries(pool, source, entries)
-  if (source.agentDefinition?.modelDispatch?.mode !== 'preference' || source.questionContinuation)
+  if (source.agentDefinition?.modelDispatch?.mode !== 'preference' || source.questionContinuation || source.agentDefinition?.agentProfile?.definition.model.mode === 'fixed')
     return settle(pool, source, await unavailableRecord(pool, scope, source, attempted))
   const { rows: [origin] } = await pool.query<{ kind: string; remoteUrl: string | null }>(`SELECT d.kind,repo."remoteUrl" FROM devices d
     LEFT JOIN device_repos repo ON repo.id=$3 AND repo."userId"=$2 WHERE d.id=$1 AND d."ownerId"=$2`, [source.deviceId, source.userId, source.deviceRepoId])
@@ -310,7 +314,8 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
   const skipped: SkippedEntry[] = []
   for (let index = 0; index <= entries.length; index++) {
     const selected: ModelDispatch = await resolveModelDispatch(pool, scope, null, location, source.agentDefinition.pinnedDeviceId ?? ((monitor || checkpointUnavailable) && origin.kind === 'local' ? source.deviceId ?? undefined : undefined),
-      { excludeEntryKeys: [...attempted].map(key => decodeURIComponent(key)), cloudPurpose: origin.remoteUrl ? 'task' : 'desktop' })
+      { excludeEntryKeys: [...attempted].map(key => decodeURIComponent(key)), cloudPurpose: origin.remoteUrl ? 'task' : 'desktop',
+        ...(source.agentDefinition.agentProfile?.definition.harness && source.agentDefinition.agentProfile.definition.harness !== 'auto' ? { harness: source.agentDefinition.agentProfile.definition.harness } : {}) })
     if (selected.kind === 'none') return settle(pool, source, await unavailableRecord(pool, scope, source, attempted, [...skipped, ...selected.skipped ?? []]))
     attempted.add(attemptKey(selected.entry))
     let target: Parameters<typeof settle>[3]

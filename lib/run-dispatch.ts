@@ -5,12 +5,14 @@ import { ActionFailureError } from './action-error'
 import type { db } from './db'
 import { agentRuns, type RunStatus } from './db/schema'
 import { notifyDeviceWork } from './device-gateway-notify'
+import { runListChanged } from './live/lists'
 
 /** Reuse this key for retries of one logical dispatch, including after a lost response. */
 export const dispatchRequestKey = z.string().trim().min(1).max(200)
 export const dispatchInput = z.object({
   issueId: z.uuid(), agentId: z.uuid(), deviceRepoId: z.uuid(),
   note: z.string().trim().max(10_000).optional(),
+  profileId: z.uuid().optional(),
   requestKey: dispatchRequestKey.optional(),
 })
 export type DispatchInput = z.infer<typeof dispatchInput>
@@ -25,6 +27,7 @@ export function dispatchFingerprint(input: DispatchInput & DispatchCredential): 
   const identity: unknown[] = [
     input.issueId, input.agentId, input.deviceRepoId, input.note ?? '',
   ]
+  if (input.profileId) identity.push({ profileId: input.profileId })
   if (input.subscriptionBindingId) identity.push({ subscriptionBindingId: input.subscriptionBindingId })
   return createHash('sha256').update(JSON.stringify(identity)).digest('hex')
 }
@@ -58,6 +61,7 @@ export async function insertRunOnce(database: Pick<typeof db, 'transaction'>, us
       deviceRepoId: input.deviceRepoId, status: 'queued', kind: 'implement', baseBranch: brief.baseBranch,
       botId:brief.botId??null, agentDefinition:brief.agentDefinition??null, prompt: brief.prompt, dispatchKey: input.requestKey ?? null, dispatchFingerprint: hash,
     })
+    await runListChanged(tx, runId)
     return { runId, status: 'queued' as const, replayed: false }
   })
   if (!result.replayed) notifyDeviceWork(brief.deviceId)

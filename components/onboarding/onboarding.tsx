@@ -1,4 +1,5 @@
 'use client'
+import { isBotListKey } from '@/lib/live/list-read'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from 'motion/react'
@@ -184,7 +185,7 @@ export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: 
     setBusy(true); setError('')
     try {
       const created = await createBot({ name: trimmed, color, shape })
-      void mutate('bots')
+      void mutate(isBotListKey)
       setBot(created)
       setCard(null)
       reply(t('nameReply', { name: created.name }))

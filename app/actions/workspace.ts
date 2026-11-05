@@ -16,6 +16,7 @@ import { releaseDepartingMember, restoreReturningMember, transferOnSuspend } fro
 import { auditRequestContext } from '@/lib/audit/record'
 import { enqueueWorkspaceAudit } from '@/lib/audit/delivery'
 import { ensurePersonalWorkspace } from '@/lib/personal-workspace'
+import { ownerWorkspaceListsChanged, workspaceListChanged, workspaceListScopesBeforeChange, workspaceListScopeChanged } from '@/lib/live/lists'
 
 const roleSchema = z.enum(['admin', 'member'])
 const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/)
@@ -67,6 +68,8 @@ export async function createWorkspace(input: string | { name: string; slug: stri
       const [created] = await tx.insert(workspaces).values({ id: workspaceId, userId: user.id, name, slug }).onConflictDoNothing({ target: workspaces.slug }).returning({ id: workspaces.id })
       if (!created) throw new WorkspaceError(i18nText('FeatureCopy.c_a56de3c3'))
       await tx.insert(workspaceMembers).values({ workspaceId, userId: user.id, name: user.name, email: user.email.toLowerCase(), role: 'admin' })
+      await workspaceListChanged(tx, workspaceId, ['workspace_settings'])
+      await ownerWorkspaceListsChanged(tx, user.id, ['workspace_settings'])
     })
     await rememberWorkspace(workspaceId)
     return { workspaceId, slug }
@@ -118,6 +121,7 @@ async function createWorkspaceInvitationBody(input: { workspaceId: string; email
         await enqueueWorkspaceAudit(tx, { workspaceId: input.workspaceId, actor: { type: 'user', id: user.id, name: user.name }, action: 'member.invited', target: { type: 'invitation', label: email }, metadata: { role }, ...request })
         links.push({ email, path: `/invite/${token}` })
       }
+      await workspaceListChanged(tx, input.workspaceId, ['workspace_settings'])
       return links
     })
   })
@@ -147,7 +151,9 @@ async function updateWorkspaceMemberBody(input: { workspaceId: string; userId: s
       if (target.role !== role) await enqueueWorkspaceAudit(tx, { ...base, action: 'member.role_changed', metadata: { oldRole: target.role, newRole: role } })
       if (target.status !== status) await enqueueWorkspaceAudit(tx, { ...base, action: status === 'suspended' ? 'member.suspended' : 'member.reactivated' })
       if (input.transferTo !== undefined) await transferOnSuspend(tx, input.workspaceId, input.userId, input.transferTo)
+      const before = await workspaceListScopesBeforeChange(tx, input.workspaceId)
       await tx.update(workspaceMembers).set({ role, status }).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId)))
+      if (target.role !== role || target.status !== status) await workspaceListScopeChanged(tx, input.workspaceId, before)
       return target.status
     })
     // §8.3: a suspended member's share and bots leave with them; reactivation brings their bots back.
@@ -165,6 +171,7 @@ async function revokeWorkspaceInvitationBody(workspaceId: string, invitationId: 
       await requireWorkspace(tx, workspaceId, user.id, true)
       const [revoked] = await tx.update(workspaceInvitations).set({ status: 'revoked' }).where(and(eq(workspaceInvitations.workspaceId, workspaceId), eq(workspaceInvitations.id, invitationId), eq(workspaceInvitations.status, 'pending'))).returning({ id: workspaceInvitations.id })
       if (revoked) await enqueueWorkspaceAudit(tx, { workspaceId, actor: { type: 'user', id: user.id, name: user.name }, action: 'member.invitation_revoked', target: { type: 'invitation', id: revoked.id }, ...request })
+      if (revoked) await workspaceListChanged(tx, workspaceId, ['workspace_settings'])
     })
   })
 }
@@ -189,6 +196,8 @@ async function acceptWorkspaceInvitationBody(token: string) {
         await enqueueWorkspaceAudit(tx, { workspaceId: candidate.workspaceId, actor: { type: 'user', id: user.id, name: user.name }, action: 'member.joined', target: { type: 'member', id: user.id }, metadata: { role: invitation.role }, ...request })
       }
       await tx.update(workspaceInvitations).set({ status: 'accepted' }).where(and(eq(workspaceInvitations.id, invitation.id), eq(workspaceInvitations.workspaceId, candidate.workspaceId), eq(workspaceInvitations.email, user.email.toLowerCase())))
+      await workspaceListChanged(tx, candidate.workspaceId, ['workspace_settings', 'issue_list'])
+      await ownerWorkspaceListsChanged(tx, user.id, ['workspace_settings'])
       return candidate.workspaceId
     })
     await rememberWorkspace(workspaceId)

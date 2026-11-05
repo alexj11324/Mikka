@@ -9,6 +9,13 @@ import type { LiveKind } from '@/lib/live/events'
 
 const LiveContext = createContext<{ channels: LiveChannels; workspaceId?: string } | null>(null)
 
+/** Shared visibility subscription for live transport and local display clocks.
+ * Subscribers decide their own catch-up; this helper never reads application data. */
+export function watchPageVisibility(changed: () => void) {
+  document.addEventListener('visibilitychange', changed)
+  return () => document.removeEventListener('visibilitychange', changed)
+}
+
 function browserRuntime(workspaceId: string | null): LiveRuntime {
   return {
     async ticket(signal) {
@@ -24,9 +31,9 @@ function browserRuntime(workspaceId: string | null): LiveRuntime {
     socket: ticket => new WebSocket(ticket.url, ticket.protocol),
     visible: () => document.visibilityState === 'visible',
     watchVisibility(changed) {
-      document.addEventListener('visibilitychange', changed)
+      const unwatch = watchPageVisibility(changed)
       window.addEventListener('online', changed)
-      return () => { document.removeEventListener('visibilitychange', changed); window.removeEventListener('online', changed) }
+      return () => { unwatch(); window.removeEventListener('online', changed) }
     },
     now: Date.now,
     monotonicNow: () => performance.now(),

@@ -39,6 +39,7 @@ type Dispatch = (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, t
 export type WatchdogDependencies = { runtime(botId: string | null): Runtime; dispatch: Dispatch; wake(userId: string, botId: string | null): Promise<unknown>
   /** Recover outside task locks, then launch only after reconciliation adopts it. */
   recoverProvider?(userId: string, runId: string): Promise<(() => Promise<void>) | undefined>
+  recoverQuestion?(userId: string, runId: string, now: Date): Promise<{ handled: boolean; launched: boolean }>
 }
 
 /** Bounded sweep called by the existing independent run-recovery cron. The
@@ -55,6 +56,10 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
   }
   const counts = { scanned: 0, recovered: 0, blocked: 0, deferred: 0, failed: 0 }
   const { rows: candidates } = await pool.query(`SELECT t.id,t."userId",t."botId",a."runId",
+    (t.status='running' AND t.stage='execute' AND live.status='queued' AND live."stopRequestedAt" IS NULL
+      AND live."questionContinuation"->>'requireSessionResume'='true'
+      AND EXISTS(SELECT 1 FROM factory_questions q WHERE q."taskId"=t.id AND q."continuationRunId"=live.id
+        AND q."userId"=t."userId" AND q.status='resuming' AND (q."expiresAt" IS NULL OR q."expiresAt">clock_timestamp()))) AS "questionPending",
     (t.status='running' AND live."stopRequestedAt" IS NULL AND (
       (live.status='failed' AND live."stopReason"='provider_failure' AND live.report->'modelFallback'->>'state'='pending')
       OR (live.status='queued' AND previous.status='failed' AND previous."stopReason"='provider_failure' AND previous."stopRequestedAt" IS NULL
@@ -79,6 +84,22 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
     if (Date.now() >= deadline) { counts.deferred++; continue }
     counts.scanned++
     const runtime = dependencies.runtime(candidate.botId)
+    if (candidate.questionPending) {
+      // The answer has already committed. Retry only its exact queued child;
+      // generic stall recovery must not stop it or create another attempt.
+      try {
+        const result = dependencies.recoverQuestion
+          ? await dependencies.recoverQuestion(candidate.userId, candidate.runId, now)
+          : await (await import('./questions/wake')).wakeQueuedQuestionContinuation(pool, candidate.userId, candidate.runId, now)
+        if (result.handled) {
+          if (result.launched) counts.recovered++
+          else counts.deferred++
+          continue
+        }
+        // Lost machine/custody/authority is not managed wake work. Leave the
+        // existing stall/stop path responsible instead of deferring forever.
+      } catch { counts.failed++; continue }
+    }
     if (candidate.providerPending) {
       // A crash between completion and handoff must heal even when no worker
       // replays completion. The recovery path re-locks and reauthorizes the

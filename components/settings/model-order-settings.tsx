@@ -257,7 +257,7 @@ function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgen
       </DropdownMenuContent>
     </DropdownMenu>}
     <span className="flex shrink-0 flex-col items-end gap-1.5">
-      <span role="status" className={cn('flex items-center gap-1.5 text-xs', retry ? 'text-destructive' : warn ? 'text-warning-foreground' : 'text-muted-foreground')}>
+      <span role="status" className={cn('flex items-center gap-1.5 text-xs', retry ? 'text-destructive-foreground' : warn ? 'text-warning-foreground' : 'text-muted-foreground')}>
         <span aria-hidden="true" className={cn('size-1.5 rounded-full', retry ? 'bg-destructive' : warn ? 'bg-warning' : checking ? 'bg-muted-foreground' : 'bg-success')} />{status}
       </span>
       {!retry && repair}

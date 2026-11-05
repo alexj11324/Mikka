@@ -148,7 +148,7 @@ export function GroupChatView({ group, userId, people }: {
                       <Bubble variant="secondary" align="end" className={cn('max-w-[min(26rem,80%)] *:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', !item.failed && 'opacity-60')}>
                         <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap"><UserMessageText text={item.body} /></BubbleContent>
                       </Bubble>
-                      {item.failed && <span role="alert" className="flex items-center gap-2 text-xs text-destructive">{t('notSent')}<Button variant="ghost" size="xs" onClick={() => { void deliver(item) }}>{t('retry')}</Button></span>}
+                      {item.failed && <span role="alert" className="flex items-center gap-2 text-xs text-destructive-foreground">{t('notSent')}<Button variant="ghost" size="xs" onClick={() => { void deliver(item) }}>{t('retry')}</Button></span>}
                     </li>)}
                     {first?.agentStatus && <li aria-label={t('answering')} className="flex"><span className="rounded-2xl bg-muted px-4 py-3"><Spinner aria-hidden="true" /></span></li>}
                   </ol>
