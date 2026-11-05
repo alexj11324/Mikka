@@ -196,6 +196,30 @@ describe("mock runs", () => {
     }
   })
 
+  it.each([false, true])('records the actual fixed snapshot of an unsubmitted review without inventing a verdict (dirty: %s)', async dirty => {
+    const { server, dataDir, repo } = await setup()
+    const snapshot = git(repo, 'rev-parse', 'HEAD')
+    const fixturesDir = tempDir()
+    writeFileSync(join(fixturesDir, 'unfinished-review.jsonl'), JSON.stringify({ t: 0,
+      ...(dirty ? { write: { path: 'unexpected.txt', content: 'not the fixed candidate\n' } } : {}),
+      chunk: { type: 'text-delta', id: 'unfinished', delta: 'Inspected the candidate; no result was submitted.' },
+    }) + '\n')
+    const daemon = await boot(server, dataDir, Number.POSITIVE_INFINITY, undefined, fixturesDir)
+    const runId = server.queueRun(DEVICE, { issueId: 'unfinished-review', repoId: 'repo-1', baseBranch: snapshot,
+      harness: 'mock', prompt: 'Independently review the fixed candidate', kind: 'acceptance', fixture: 'unfinished-review',
+      verifyCommand: "node -e 'process.exit(42)'", factoryCheck: { stage: 'review', reportOnly: true, inferCommand: false },
+      policy: { ...runPolicy(undefined), readOnly: true } })
+    const run = await runToEnd(daemon, server, runId)
+    expect(run.state).toBe('stopped')
+    expect(run.stopReason).toBe('turn_ended')
+    const report = server.runs.get(runId)!.completion!.report!
+    expect(report.verify).toEqual({ status: 'not_run' })
+    expect(report.criteria).toBeUndefined()
+    expect(report.check).toEqual(dirty ? undefined : { sha: snapshot, readOnly: true })
+    expect(git(run.worktree!, 'rev-parse', 'HEAD')).toBe(snapshot)
+    expect(stages(server.chunksFor(runId))).toEqual([['repository', true], ['worktree', true], ['agent_start', true]])
+  })
+
   it('retains actual no-repository delivery files for an independent fixed-snapshot check', async () => {
     const { server, dataDir } = await setup()
     const fixturesDir = tempDir()

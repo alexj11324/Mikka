@@ -98,11 +98,17 @@ test('production objects found by id keep their other tags and subscribers', () 
   assert.deepEqual(alertChanges(alert, production, 7), {})
 })
 
-test('any-row alerts stay within the 50 rows PostHog evaluates', () => {
-  for (const alert of ALERTS.filter(item => item.config.evaluation === 'any_row')) {
+test('every alert reads one row: no any_row, and each SQL alert query aggregates to a single row', () => {
+  // PostHog refuses an any_row alert whose query its LIMIT cuts short, and a
+  // first_row alert on a multi-row query would check only one source.
+  for (const alert of ALERTS) {
+    assert.notEqual(alert.config.evaluation, 'any_row', `${alert.key} uses any_row`)
     const query = INSIGHTS.find(item => item.key === alert.insight).query.source.query
-    const limit = Number(/LIMIT (\d+)\s*$/.exec(query)?.[1] ?? (/LIMIT 1\b/.test(query) ? 1 : NaN))
-    assert.ok(limit <= 50, `${alert.key} returns up to ${limit} rows`)
+    const outer = query.slice(Math.max(0, query.lastIndexOf('\nSELECT')))
+    // The outer SELECT groups nothing and either aggregates or reads a one-row CTE (LIMIT 1).
+    const singleRow = !/\bGROUP BY\b/.test(outer) && (/\b(max|argMax|count)\(/.test(outer) || /\bLIMIT 1\b/.test(query))
+    assert.ok(singleRow, `${alert.key} may return more than one row`)
+    assert.doesNotMatch(outer, /\bLIMIT\s+(?!1\b)\d+/, `${alert.key} truncates its rows`)
   }
 })
 

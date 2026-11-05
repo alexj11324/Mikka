@@ -59,17 +59,26 @@ WITH
         LEFT JOIN current_service cs ON s.service_name = cs.service_name
         LEFT JOIN baseline b ON s.service_name = b.service_name AND s.error_code = b.error_code
         LEFT JOIN current_hour c ON s.service_name = c.service_name AND s.error_code = c.error_code
-    )
+    ),
+    per_source AS (
 SELECT
-    if(NOT current_service_observed, NULL, if(covered_hours >= 24 AND current_errors > threshold_errors, 1, 0)) AS value,
+    if(NOT current_service_observed, NULL, if(covered_hours >= 24 AND current_errors > threshold_errors, 1, 0)) AS row_value,
     concat(service_name, ' code=', error_code, ' | UTC hour=', toString(toTimeZone(evaluated_hour, 'UTC')),
         ' | sampled error spans=', if(current_service_observed, toString(current_errors), 'unknown'),
         ' median=', if(covered_hours > 0, toString(round(median_errors, 1)), 'unavailable'),
         ' threshold=', toString(round(threshold_errors, 1)),
         ' | history=', toString(covered_hours), '/168h ', if(NOT current_service_observed, 'NO CURRENT TELEMETRY; evaluation suppressed', if(covered_hours >= 24, 'ready', 'WARMUP no error evaluation')),
         ' | routes (up to 5)=', example_routes,
-        ' | fallback error.type/unknown_error; x10 estimate only at 10% sampling') AS source,
+        ' | fallback error.type/unknown_error; x10 estimate only at 10% sampling') AS row_source,
     service_name, error_code, current_errors, median_errors, threshold_errors, covered_hours, current_service_observed, example_routes, evaluated_hour AS hour_start
 FROM metrics
-ORDER BY value DESC, current_errors DESC, service_name, error_code
-LIMIT 50
+    )
+SELECT
+    max(row_value) AS value,
+    if(countIf(row_value = 1) > 0,
+        concat(toString(countIf(row_value = 1)), ' breaching: ', arrayStringConcat(arraySlice(groupArrayIf(row_source, row_value = 1), 1, 5), ' || ')),
+        concat('no breach | top: ', argMax(row_source, current_errors))) AS source,
+    countIf(row_value = 1) AS breaching_sources,
+    count() AS evaluated_sources,
+    any(hour_start) AS hour_start
+FROM (SELECT * FROM per_source ORDER BY row_value DESC, current_errors DESC, service_name, error_code)

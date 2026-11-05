@@ -17,8 +17,8 @@ export const dueJobs: Record<DueKind, DueJob> = {
     next: async () => (await import('./schedules/runtime')).scheduleNextDue(),
   },
   'run-recovery': {
-    // In a Workflow step the group-turn sweep runs inline: there is no request to run it after.
-    run: async () => { const { recoverRuns } = await import('./run-recovery'); await recoverRuns(work => work()); return (await import('./run-recovery-due')).runRecoveryNextDue() },
+    // Only the sweeps due now run (#1371); a pass with nothing due costs one statement.
+    run: async () => (await import('./run-recovery-due')).runRecoveryPass(),
     next: async () => (await import('./run-recovery-due')).runRecoveryNextDue(),
   },
   'account-deletions': {
@@ -57,6 +57,17 @@ export const dueTimerTransport: { start?: (kind: DueKind) => Promise<unknown> } 
 /** Wakes the job's running timer, or starts one. Best effort: the slow sweep re-arms a lost start. */
 export async function armDueTimer(kind: DueKind): Promise<void> {
   if (!workflowWakesEnabled()) return
+  if (kind === 'run-recovery' && process.env.VERCEL_ENV === 'production') {
+    try { await (await import('./due-timer-owner')).armCurrentRecoveryTimer() }
+    catch (error) {
+      const { CodedError, logCodedError } = await import('@mikka/protocol/coded-error')
+      // A guard has already emitted its closed metadata at the failed check.
+      if (!(error instanceof CodedError && error.code === 'due_timer_owner_unavailable')) {
+        logCodedError(new CodedError('due_timer_owner_unavailable', { detail: 'sdk_operation_failed', cause: error }), { kind, phase: 'arm' })
+      }
+    }
+    return
+  }
   try {
     const resume = wakeTransport.resume ?? (await import('workflow/api')).resumeHook
     await resume(wakeTokens.dueTimer(kind), {})

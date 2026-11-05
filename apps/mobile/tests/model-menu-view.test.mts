@@ -1,11 +1,22 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { groupTitle, modelMenuLabel, modelStatusLine, type ModelMenu } from '../lib/model-menu-view.ts'
+import { groupTitle, modelDisplayName, modelMenuLabel, modelStatusLine, type ModelMenu } from '../lib/model-menu-view.ts'
 
 const current: ModelMenu['current'] = { id: 'fixture', modelId: 'fixture-model', provider: 'claude', kind: 'subscription', chosen: true, available: false, availability: 'checking', credentialLabel: 'owner@example.test' }
 
-test('the collapsed chip names only the model while its allowance is checking', () => {
-  assert.equal(modelMenuLabel(current), 'fixture-model')
+test('the collapsed chip names only the model while its allowance is checking, and nothing sits above the composer', () => {
+  assert.equal(modelMenuLabel(current), 'Fixture Model')
+  assert.equal(modelStatusLine(current), null)
+  assert.equal(modelStatusLine({ ...current, available: true, availability: 'available' }), null)
+})
+test('model ids read as people write them', () => {
+  for (const [id, name] of [['gpt-6-luna', 'GPT-6 Luna'], ['claude-opus-5-5', 'Claude Opus 5.5'], ['claude-haiku-5-5', 'Claude Haiku 5.5'], ['deepseek-flash', 'DeepSeek Flash'],
+    ['kimi-k2', 'Kimi K2'], ['gpt-4o', 'GPT-4o'], ['gpt-5.1-codex', 'GPT-5.1 Codex'], ['claude-sonnet-4-5-20250929', 'Claude Sonnet 4.5'], ['o3', 'o3'], ['Some Model', 'Some Model']]) {
+    assert.equal(modelDisplayName(id), name)
+  }
+})
+test('a model that cannot run says so and offers 换模型', () => {
+  assert.deepEqual(modelStatusLine({ ...current, availability: undefined }), { line: '这个模型现在用不了', change: true })
 })
 test('same-plan accounts and API keys have distinguishable headings', () => {
   const first = groupTitle({ kind: 'subscription', provider: 'claude', plan: 'Max', credentialLabel: 'first@example.test', options: [] })
@@ -15,16 +26,18 @@ test('same-plan accounts and API keys have distinguishable headings', () => {
 })
 test('a quota fallback names the selected key and its metered billing before sending', () => {
   const fallback: ModelMenu['current'] = { ...current, kind: 'apiKey', available: true, availability: 'available', credentialLabel: 'DeepSeek · ••••799e', fallback: 'quota', quota: { subscription: 'claude', plan: 'Max', resetsAt: null, fallback: { keyProvider: 'deepseek', keyName: 'DeepSeek', model: 'deepseek-chat' } } }
-  assert.equal(modelMenuLabel(fallback), 'fixture-model')
-  assert.match(modelStatusLine(fallback) ?? '', /Claude Max.*额度用完.*799e.*API Key.*按 token 计费/)
+  assert.equal(modelMenuLabel(fallback), 'Fixture Model')
+  assert.match(modelStatusLine(fallback)?.line ?? '', /Claude Max.*额度用完.*799e.*API Key.*按 token 计费/)
+  assert.equal(modelStatusLine(fallback)?.change, false)
 })
 test('a preference fallback keeps its credential and metered billing in the notice', () => {
   const fallback: ModelMenu['current'] = { ...current, kind: 'apiKey', available: true, availability: 'available', credentialLabel: 'DeepSeek · ••••799e', fallback: 'preference' }
-  assert.equal(modelMenuLabel(fallback), 'fixture-model')
-  assert.match(modelStatusLine(fallback) ?? '', /下一条使用 fixture-model.*799e.*按量.*已切换/)
+  assert.equal(modelMenuLabel(fallback), 'Fixture Model')
+  assert.match(modelStatusLine(fallback)?.line ?? '', /下一条改用 Fixture Model.*799e.*按量/)
 })
 test('a used-up subscription without a fallback never claims it switched to a paid key', () => {
   const exhausted: ModelMenu['current'] = { ...current, availability: 'exhausted', quota: { subscription: 'claude', plan: 'Max', resetsAt: null, fallback: null } }
-  assert.match(modelStatusLine(exhausted) ?? '', /额度用完/)
-  assert.doesNotMatch(modelStatusLine(exhausted) ?? '', /按 token 计费|改用/)
+  assert.match(modelStatusLine(exhausted)?.line ?? '', /额度用完/)
+  assert.doesNotMatch(modelStatusLine(exhausted)?.line ?? '', /按 token 计费|改用/)
+  assert.equal(modelStatusLine(exhausted)?.change, true)
 })

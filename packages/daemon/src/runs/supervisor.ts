@@ -1024,6 +1024,13 @@ export class RunSupervisor {
       const deliverableCommit = await retainDeliverable(repo.path, worktree, runId)
       this.deps.journal.update(runId, { deliverableCommit })
     }
+    // An unsubmitted fixed check still records what the daemon actually found.
+    // A dirty or unavailable worktree grants no snapshot provenance. Neither
+    // outcome turns this stopped run into a verdict or executes verification.
+    if (stopReason !== 'submitted' && fixedCandidateCheck(assignment)) {
+      const fixed = await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch).catch(() => null)
+      if (fixed) report = { ...report, check: { sha: fixed.sha, readOnly: true } }
+    }
     // A `plan` run writes no code: there is nothing for the issue's verify
     // command to check (ADR ORV-205).
     if (stopReason !== "submitted" || assignment.kind === "plan" || isReadOnlyTask(assignment) || assignment.factoryExecuteKind === 'deliverable')

@@ -1,6 +1,6 @@
 // R-52 against a real PostgreSQL: an ended run is judged once by the decision
-// model; a run it did not answer keeps no outcome and is asked again an hour
-// later. The judge is substituted; no model is called.
+// model; a run it did not answer keeps no outcome and is asked again after as
+// long as it has waited, at least an hour (#1371). The judge is substituted; no model is called.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { dbUrl, seedAgent, seedIssue, seedRun, seedUser } from './support/workspace-admin-db'
@@ -48,6 +48,18 @@ test('ended runs get a judged outcome', { skip: !dbUrl }, async t => {
     await pool.query('update agent_runs set "outcomeAt"=now()-interval \'2 hours\' where id=$1', [id])
     await judgePendingOutcomes(judges('blocked'), 1000)
     assert.deepEqual([(await row(id)).outcome, (await row(id)).outcomeDecidedBy], ['blocked', 'decision'])
+  })
+
+  await t.test('a run the judge never answers backs off: asked again after as long as it already waited', async () => {
+    const id = await run('failed', 'never answered', new Date(Date.now() - 2 * 86_400_000))
+    await pool.query('update agent_runs set "outcomeAt"=now()-interval \'3 hours\' where id=$1', [id])
+    seen.length = 0
+    await judgePendingOutcomes(judges('done'), 1000)
+    assert.ok(!seen.includes('decision:never answered'), 'two days old and last asked 3 hours ago: not yet')
+    await pool.query('update agent_runs set "outcomeAt"=now()-interval \'25 hours\' where id=$1', [id])
+    await judgePendingOutcomes(judges(null), 1000)
+    assert.ok(seen.includes('decision:never answered'), 'last asked a day ago: asked again')
+    assert.equal(await judgeRunOutcome(id, judges('done')), null, 'just asked: the completion hook does not ask again either')
   })
 
   await t.test('a running run is not judged', async () => {
