@@ -25,6 +25,24 @@ export const DRAWER_SPRING = { duration: 300, dampingRatio: 0.8, overshootClampi
 export const ROUNDED_AT = 0.15
 
 /**
+ * How small the open surface is. A full-height slide hides its rounded corners on the phone's own bezel, so the
+ * open surface shrinks just enough for those corners to sit inside the screen. It is not a detached modal.
+ */
+export const OPEN_SCALE = 0.96
+
+/** 1 when closed, `OPEN_SCALE` when open. */
+export function surfaceScale(progress: number): number {
+  'worklet'
+  return 1 - (1 - OPEN_SCALE) * progress
+}
+
+/** Opacity of the `drawerDim` veil: none when closed, the token's own strength when open. */
+export function surfaceDim(progress: number): number {
+  'worklet'
+  return progress
+}
+
+/**
  * Where a released drag settles. `progress` is how far open the drawer is (0–1) and `velocity` the finger's speed
  * in drawer widths per second; the drawer settles where it would be a fifth of a second on, open past halfway.
  */

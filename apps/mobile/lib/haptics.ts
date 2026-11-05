@@ -10,3 +10,8 @@ export function tap() {
 export function press() {
   if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
 }
+
+/** The system's warning: an action that cannot be done, such as a pin past the limit. */
+export function warn() {
+  if (Platform.OS !== 'web') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {})
+}

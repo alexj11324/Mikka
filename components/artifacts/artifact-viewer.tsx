@@ -42,7 +42,7 @@ const versionPath = (id: string, version: number, file: 'frame' | 'download') =>
  * reads and answers in one place. Versions open from the pill by the title;
  * an older version shows its changes against the newest.
  */
-export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quotes, chat, canQuote = true }: {
+export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quotes, chat, decision, canQuote = true }: {
   artifactId: string
   onArtifactChange: (id: string) => void
   onClose: () => void
@@ -51,6 +51,8 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
   /** Every quote sent from artifacts in this chat; this reader underlines its own. */
   quotes: readonly ArtifactQuote[]
   chat: (slot: ArtifactChatSlot) => ReactNode
+  /** Optional decision for the exact report version on screen, above both panes. */
+  decision?: (view: { version: number; latestVersion: number }) => ReactNode
   /** False when the chat beside it cannot take a quote (a thread): no 选择元素, no quoting. */
   canQuote?: boolean
 }) {
@@ -130,6 +132,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
         <Separator orientation="vertical" className="mx-1 data-vertical:h-5 data-vertical:self-center" />
         <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>
       </header>
+      {detail && decision?.({ version, latestVersion: latest })}
       <div className="flex min-h-0 flex-1">
         <main className={cn('flex min-w-0 flex-1 flex-col bg-background', pane === 'chat' && 'hidden md:flex')}>
           {old && info && <div role="status" className="mx-3 mt-1 flex min-h-11 shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-muted px-3 py-1.5 text-sm">

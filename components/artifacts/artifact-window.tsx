@@ -13,6 +13,7 @@ import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
 import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { IssueThreadPanel } from '@/components/workspace/issue-thread-panel'
+import { FactoryArtifactAcceptance } from '@/components/workspace/factory-acceptance'
 import { closeArtifact, navigate, openArtifact, openThread } from '@/components/workspace/workspace-navigation'
 
 const ArtifactViewer = dynamic(() => import('./artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
@@ -65,6 +66,7 @@ export function ArtifactWindow({ artifactId }: { artifactId: string }) {
     bot={{ name: '', avatar: <Skeleton className="size-5 rounded-full" /> }} chat={() => null} />
   if (threadMade) return <ArtifactViewer {...shared} quotes={[]} canQuote={false}
     bot={{ name: thread ? thread.thread.detail?.name ?? tThreads('title') : '', avatar: null }}
+    decision={detail.acceptanceTaskId && issueId ? view => <FactoryArtifactAcceptance taskId={detail.acceptanceTaskId!} issueId={issueId} artifactId={artifactId} {...view} /> : undefined}
     chat={() => <IssueThreadPanel issueId={issueId} runId={runId!} onClose={closeArtifact} onOpenThread={openThread} bare />} />
   // A bot that is gone, or a list that failed, falls back to the Coordinator.
   if (bot) return <ArtifactViewer {...shared} quotes={quotes}

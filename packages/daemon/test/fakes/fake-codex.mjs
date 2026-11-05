@@ -102,12 +102,12 @@ async function runTurn(text) {
     complete()
     return
   }
-  if (['MCP_ELICITATION_TEST', 'MIKKA_ELICITATION_TEST', 'MIKKA_CONTEXT_ELICITATION_TEST', 'MIKKA_UNKNOWN_ELICITATION_TEST', 'MIKKA_REPOSITORY_ELICITATION_TEST', 'MIKKA_ARTIFACT_ELICITATION_TEST'].includes(text)) {
+  if (['MCP_ELICITATION_TEST', 'MIKKA_ELICITATION_TEST', 'MIKKA_CONTEXT_ELICITATION_TEST', 'MIKKA_UNKNOWN_ELICITATION_TEST', 'MIKKA_REPOSITORY_ELICITATION_TEST', 'MIKKA_ARTIFACT_ELICITATION_TEST', 'MIKKA_REPOSITORY_INSPECT_ELICITATION_TEST'].includes(text)) {
     // Synthetic native protocol coverage only. The official-CLI acceptance
     // test separately proves actual MCP execution and the broker transport.
     const handIn = text !== 'MCP_ELICITATION_TEST'
     const server = handIn ? 'mikka' : 'mikka_computer'
-    const call = { type: 'mcpToolCall', id: 'computer-elicitation', server, tool: text === 'MIKKA_CONTEXT_ELICITATION_TEST' ? 'request_help' : text === 'MIKKA_UNKNOWN_ELICITATION_TEST' ? 'arbitrary_tool' : text === 'MIKKA_REPOSITORY_ELICITATION_TEST' ? 'switch_repository' : text === 'MIKKA_ARTIFACT_ELICITATION_TEST' ? 'inspect_artifact' : handIn ? 'submit' : 'get_desktop_state', arguments: {}, status: 'inProgress' }
+    const call = { type: 'mcpToolCall', id: 'computer-elicitation', server, tool: text === 'MIKKA_CONTEXT_ELICITATION_TEST' ? 'request_help' : text === 'MIKKA_UNKNOWN_ELICITATION_TEST' ? 'arbitrary_tool' : text === 'MIKKA_REPOSITORY_ELICITATION_TEST' ? 'switch_repository' : text === 'MIKKA_ARTIFACT_ELICITATION_TEST' ? 'inspect_artifact' : text === 'MIKKA_REPOSITORY_INSPECT_ELICITATION_TEST' ? 'inspect_repository' : handIn ? 'submit' : 'get_desktop_state', arguments: {}, status: 'inProgress' }
     item('started', call)
     const request = (overrides = {}) => new Promise(resolve => {
       const wireId = `elicitation-${randomUUID()}`
@@ -127,7 +127,9 @@ async function runTurn(text) {
     const replay = await request()
     item('completed', { ...call, status: 'completed', result: { content: [] }, error: null })
     const afterCompletion = await request()
-    const output = JSON.stringify({ foreignThread, foreignTurn, unknownServer, first, replay, afterCompletion })
+    const output = JSON.stringify({ foreignThread, foreignTurn, unknownServer, first, replay, afterCompletion,
+      ...(text === 'MIKKA_REPOSITORY_INSPECT_ELICITATION_TEST' ? { shellTool: argv.find(arg => arg.startsWith('features.shell_tool=')) } : {}),
+    })
     item('started', { type: 'agentMessage', id: 'elicitation-output', text: '' })
     notify('item/agentMessage/delta', { threadId, turnId: open, itemId: 'elicitation-output', delta: output })
     item('completed', { type: 'agentMessage', id: 'elicitation-output', text: output })

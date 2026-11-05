@@ -72,6 +72,10 @@ A secondary button is filled and has no outline.
   - It uses a 300 ms spring with damping 0.8 and no overshoot.
   - It settles open when the drag, carried a fifth of a second on, is past halfway (`features/shell/model/drawer.ts`).
   - A tap on the dimmed app or a drag back closes it.
+- On the home list (decision `2026-11-05-2010-ios-home-list-interactions`):
+  - A swipe left shows 置顶 at 88 pt and pins past 144 pt.
+  - Holding 250 ms and then moving drags a chat; a move before the hold scrolls or swipes.
+  - A long press is the system context menu over the chat's preview (`Link.Menu`, `Link.Preview`).
 - Holding a bubble for 500 ms opens its actions. After about 120 ms the bubble starts to shrink to 0.96 scale, so the
   hold reads as pressed.
 

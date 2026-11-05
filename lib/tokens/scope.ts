@@ -129,3 +129,11 @@ export async function botOutsideToken(user: ApiUser, botId: string) {
   const { rows: [bot] } = await pool.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1', [botId])
   return bot ? outside(scope, [bot.workspaceId]) : false
 }
+
+/** A group chat of another workspace than the token's. */
+export async function groupOutsideToken(user: ApiUser, conversationId: string) {
+  const scope = tokenScope(user)
+  if (!scope) return false
+  const { rows: [group] } = await pool.query<{ workspaceId: string | null }>('SELECT "workspaceId" FROM conversations WHERE id=$1::uuid', [conversationId])
+  return group?.workspaceId ? outside(scope, [group.workspaceId]) : false
+}
