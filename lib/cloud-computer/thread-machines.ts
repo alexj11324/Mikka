@@ -65,8 +65,17 @@ async function replaceGoneSandbox(query: Pick<Pool, 'query'>, runId: string, tem
     WHERE "runId"=$1 AND state<>'ended' AND ($3::uuid IS NULL OR "workerLeaseId"=$3) RETURNING *`, [runId, randomUUID(), leaseId ?? null, template])).rows[0]
 }
 
-/** Provider calls of ensureThreadMachine; tests replace them, production uses E2B. */
+// Prepare the owner's key before a stop holds an APP client. The existing key
+// reader may itself need that pool (including legacy-key adoption).
+const threadMachineStopPreparation: { prepareKill?: (ownerId: string) => Promise<(sandboxId: string) => Promise<void>> } = {
+  prepareKill: async (ownerId) => {
+    const preparedOptions = await options(ownerId)
+    return async (sandboxId) => { await Sandbox.kill(sandboxId, preparedOptions) }
+  },
+}
+/** Provider calls of scoped thread operations; tests replace them, production uses E2B. */
 export const threadMachineProvider = {
+  ...threadMachineStopPreparation,
   connect: (sandboxId: string, workspaceId: string, budget?: RuntimeBudget) => connectComputer(workspaceId, sandboxId, undefined, budget),
   create: async (snapshotId: string, operationId: string, metadata: Record<string, string>, ownerId: string) => {
     const base = await options(ownerId)
@@ -86,13 +95,76 @@ export const threadMachineProvider = {
  * returns the sandbox to kill, if any.
  */
 async function endStopRequestedRun(client: PoolClient, actor: Actor, runId: string) {
-  const m = (await client.query('SELECT "sandboxId","workerLeaseId","workerLeaseUntil" FROM thread_machines WHERE "runId"=$1 FOR UPDATE', [runId])).rows[0]
+  const m = (await client.query('SELECT "sandboxId","deviceId","workerLeaseId","workerLeaseUntil" FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE', [runId, actor.userId, actor.workspaceId])).rows[0]
   const pending = Boolean(m && !m.sandboxId && (m.workerLeaseId || m.workerLeaseUntil))
   const stopped = await client.query(`UPDATE agent_runs SET status='stopped',"finishedAt"=COALESCE("finishedAt",now()),"updatedAt"=now() WHERE id=$1 AND "userId"=$2 AND status='queued' RETURNING id`, [runId, actor.userId])
   if (stopped.rowCount) { await runListChanged(client, runId); await runChanged(client, runId) }
   if (m) await client.query('UPDATE thread_machines SET state=\'ended\',"endedAt"=COALESCE("endedAt",now()),"computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL,"workerLeaseId"=NULL,"workerLeaseUntil"=CASE WHEN $2 THEN COALESCE("workerLeaseUntil",now()) ELSE NULL END WHERE "runId"=$1', [runId, pending])
+  if (m && (m.sandboxId || pending)) {
+    await client.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1', [m.deviceId])
+    await client.query('UPDATE devices SET "removedAt"=COALESCE("removedAt",now()) WHERE id=$1 AND "ownerId"=$2 AND kind=\'cloud\'', [m.deviceId, actor.userId])
+  }
   await client.query('COMMIT')
   return (m?.sandboxId as string | null) ?? null
+}
+
+/** A rejected first claim may leave no daemon journal or lifecycle to acknowledge
+ * Stop. This host path handles only a bound, never-claimed run without native
+ * continuity. Its frozen Profile and retry lineage are not proof of a claim.
+ * Keep the original queued binding on an uncertain kill, so ordinary Stop can
+ * retry; only a confirmed kill (including provider not-found) commits the end. */
+export async function acknowledgeQueuedThreadStop(pool: Pool, actor: Actor, runId: string, provider: Pick<typeof threadMachineProvider, 'kill' | 'prepareKill'> = threadMachineProvider): Promise<boolean> {
+  // This read releases its pool client before credential preparation. It is
+  // only a preflight: every authority/native check is repeated under locks.
+  const candidate = await pool.query(`SELECT 1 FROM agent_runs r
+    JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
+    JOIN thread_machines m ON m."runId"=r.id AND m."ownerId"=r."userId" AND m."workspaceId"=b."workspaceId"
+    WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND r.status='queued' AND r."stopRequestedAt" IS NOT NULL
+      AND r."startedAt" IS NULL AND r."sessionId" IS NULL AND r."deviceTokenId" IS NULL AND r."leaseExpiresAt" IS NULL AND r."questionContinuation" IS NULL
+      AND m."sandboxId" IS NOT NULL AND m.state<>'ended' AND m."botId"=b."botId" AND m."issueId" IS NOT DISTINCT FROM r."issueId"
+      AND m."workerLeaseId" IS NULL AND (m."workerLeaseUntil" IS NULL OR m."workerLeaseUntil"<=now())
+      AND NOT EXISTS(SELECT 1 FROM byos_native_runs n WHERE n."runId"=r.id)
+      AND NOT EXISTS(SELECT 1 FROM agent_runs source WHERE source.id<>r.id
+        AND source."userId"=r."userId" AND source."issueId" IS NOT DISTINCT FROM r."issueId" AND source."deviceId"=m."deviceId"
+        AND (source."sessionId" IS NOT NULL OR source."startedAt" IS NOT NULL OR source."deviceTokenId" IS NOT NULL
+          OR EXISTS(SELECT 1 FROM byos_native_runs n WHERE n."runId"=source.id)))`, [runId, actor.userId, actor.workspaceId])
+  if (!candidate.rowCount) return false
+  const kill = provider.prepareKill ? await provider.prepareKill(actor.userId) : (sandboxId: string) => provider.kill(sandboxId, actor.userId)
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`thread-machine:${runId}`])
+    const run = (await client.query(`SELECT r.*,b."botId" AS "runtimeBotId"
+      FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
+      WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
+    if (!run || run.status !== 'queued' || !run.stopRequestedAt || run.startedAt || run.sessionId !== null ||
+      run.deviceTokenId !== null || run.leaseExpiresAt !== null || run.questionContinuation !== null) {
+      await client.query('ROLLBACK'); return false
+    }
+    const machine = (await client.query(`SELECT * FROM thread_machines
+      WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE`, [runId, actor.userId, actor.workspaceId])).rows[0]
+    if (!machine?.sandboxId || machine.state === 'ended' || machine.botId !== run.runtimeBotId || machine.issueId !== run.issueId ||
+      machine.workerLeaseId || (machine.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now())) {
+      await client.query('ROLLBACK'); return false
+    }
+    // A native claim is authoritative even if a stale status says queued.
+    // An adopted machine may retain the same task's native history without
+    // retryOf/continuesRunId. Protect actual history on this task/device; a
+    // frozen Profile or lineage id without a claim is not such history.
+    const native = await client.query(`SELECT 1 FROM byos_native_runs WHERE "runId"=$1
+      UNION ALL SELECT 1 FROM agent_runs source WHERE source.id<>$1
+        AND source."userId"=$2 AND source."issueId" IS NOT DISTINCT FROM $3::uuid
+        AND source."deviceId"=$4 AND (source."sessionId" IS NOT NULL OR source."startedAt" IS NOT NULL
+          OR source."deviceTokenId" IS NOT NULL OR EXISTS(SELECT 1 FROM byos_native_runs n WHERE n."runId"=source.id))
+      LIMIT 1`, [runId, actor.userId, run.issueId, machine.deviceId])
+    if (native.rowCount) { await client.query('ROLLBACK'); return false }
+    // The persisted stop blocks claims; these same run/machine locks fence
+    // adoption and provisioning. No nested transaction or Run write is used.
+    await kill(machine.sandboxId)
+    await endStopRequestedRun(client, actor, runId)
+  } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+  await afterRunEnded(actor.userId, runId)
+  return true
 }
 
 /**

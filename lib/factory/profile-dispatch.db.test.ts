@@ -150,6 +150,8 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       assert.deepEqual([parentBefore.machine.state, parentBefore.machine.sandboxId, parentBefore.machine.runtimeReady, parentBefore.device.lastSeenAt, parentBefore.device.harnesses], ['sleeping', null, false, null, []])
     }
     if (!autoModelRouting) await pool.query('UPDATE model_order_settings SET "autoModelRouting"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [f.ownerId, f.workspaceId])
+    const originalRequest = 'ORIGINAL_IMPLEMENTATION_REQUEST: implement the backend; do not reinterpret this as the current review assignment.'
+    await pool.query('UPDATE issues SET title=$2,content=$3 WHERE id=$1', [f.issueId, 'Build the requested backend deliverable', JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: originalRequest }] }] })])
     const profileId = explicitDefault
       ? await (await import('./profile-request')).requestedAgentProfile(pool, f.scope, f.sourceEventId, f.implement!.id)
       : f.implement?.id
@@ -165,7 +167,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     }, tx))
     const source = await dispatch(f.ownerId, { binding: factoryBinding(f.task), agentId: f.agents.claude_code, deviceRepoId: f.repoId })
     const sha = 'a'.repeat(40), deliverySha = 'b'.repeat(40), nativeSession = `claude-native-${source.runId}`
-    await pool.query(`UPDATE agent_runs SET status='succeeded',"startedAt"=now(),"finishedAt"=now(),"sessionId"=$2,"stopReason"='submitted',report=$3 WHERE id=$1`, [source.runId, nativeSession, JSON.stringify({ sourceCommit: sha, deliverableCommit: deliverySha, summary: 'Synthetic successful implementation and validation report', runtime: { observedModel: model.claude_code } })])
+    await pool.query(`UPDATE agent_runs SET status='succeeded',"startedAt"=now(),"finishedAt"=now(),"sessionId"=$2,"stopReason"='submitted',report=$3 WHERE id=$1`, [source.runId, nativeSession, JSON.stringify({ sourceCommit: sha, deliverableCommit: deliverySha, summary: 'PRIVATE_PRODUCER_REPORT Synthetic successful implementation and validation report', runtime: { observedModel: model.claude_code } })])
     const sourceBefore = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [source.runId])).rows[0]
     if (missingCodex && parentMode === 'prepared') await pool.query(`UPDATE cloud_machines SET state='sleeping' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [f.workspaceId, f.ownerId])
     decisionProfile = f.review?.id ?? ''
@@ -194,6 +196,24 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     if (withProfiles) {
       assert.equal(frozen.profileId, f.review!.id); assert.equal(frozen.version, f.review!.version); assert.equal(frozen.digest, f.review!.digest)
       assert.equal(frozen.source, 'decision'); assert.equal(frozen.effort, 'low')
+      const profileCall = decisionInputs.filter(call => call.purpose === 'factory-agent-profile').at(-1)!
+      const profileInput = JSON.parse(String(profileCall.input))
+      assert.equal(profileInput.currentWork?.stage, 'review', 'the host supplies the current stage before selecting a role')
+      assert.equal(profileInput.currentWork.responsibility, 'independent_review')
+      assert.equal(profileInput.currentWork.readOnly, true)
+      assert.match(profileInput.currentWork.objective, /correctness and regressions/)
+      assert.match(profileInput.currentWork.evidence, /implementation.*validation evidence/)
+      assert.match(profileInput.currentWork.evidence, /single review/)
+      assert.deepEqual(profileInput.currentWork.candidate, { id: candidate.id, kind: candidate.kind, sha: candidate.sha })
+      assert.equal(candidate.sha, null, 'a deliverable is not given a fabricated repository candidate SHA')
+      assert.deepEqual(profileInput.currentWork.producer, { runId: source.runId, harness: 'claude_code', model: model.claude_code,
+        profile: { id: explicitDefault ? 'default' : f.implement!.id, version: sourceBefore.agentDefinition.agentProfile.version } })
+      assert.equal(profileInput.currentWork.taskId, current.id); assert.equal(profileInput.currentWork.attemptId, current.attemptId)
+      assert.equal(profileInput.currentWork.requestEpoch, current.sourceEventId)
+      assert.match(profileInput.acceptanceReference.originalTask.content, /ORIGINAL_IMPLEMENTATION_REQUEST/)
+      assert.ok(!JSON.stringify(profileInput.currentWork).includes(originalRequest), 'original execution text remains background, never current-stage instructions')
+      assert.match(String(profileCall.questions && JSON.stringify(profileCall.questions)), /currentWork/)
+      for (const privateValue of ['PRIVATE_PROFILE_', 'PRIVATE_PRODUCER_REPORT', nativeSession, f.connections.claude_code, f.connections.codex]) assert.ok(!String(profileCall.input).includes(privateValue), privateValue)
       assert.equal(frozen.targetEntry.source.connectionId, f.connections.codex)
       assert.match(run.prompt, /PRIVATE_PROFILE_Review/)
       assert.equal(sourceBefore.agentDefinition.agentProfile.profileId, explicitDefault ? 'default' : f.implement!.id)
@@ -232,6 +252,16 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       { detail: 'no_suitable_profile', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
         ['profile', { name: 'profile', type: 'choice', choice: 'none' }],
       ]) },
+      { detail: 'uncertain_profile', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
+        ['profile', { name: 'profile', type: 'choice', choice: `${f.implement!.id}:stage_fit`, confidence: .42 }],
+      ]) },
+      { detail: 'invalid_profile_answer', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
+        ['profile', { name: 'profile', type: 'choice', choice: `${f.implement!.id}:stage_fit`, confidence: .95 }],
+        ['reason', { name: 'reason', type: 'choice', choice: 'stage_fit' }],
+      ]) },
+      { detail: 'invalid_reason', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
+        ['profile', { name: 'profile', type: 'choice', choice: f.implement!.id, confidence: .95 }],
+      ]) },
       { detail: 'unknown_profile', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
         ['profile', { name: 'profile', type: 'choice', choice: privateAnswer }],
       ]) },
@@ -263,9 +293,12 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
         assert.equal(logged.profileCount, 3); assert.equal(logged.profileDiagnosticsTruncated, false)
         assert.deepEqual(new Set(logged.profileAvailability.split(',')), new Set([`${f.implement!.id}:available`, `${f.review!.id}:checking`, `${disabled.id}:disabled`]))
         assert.equal(logged.decisionExecutionId, response.answers ? execution.executionId : undefined)
+        assert.equal(logged.selectedProfileId, response.detail === 'uncertain_profile' ? f.implement!.id : undefined)
+        assert.equal(logged.decisionConfidence, response.detail === 'uncertain_profile' ? .42 : undefined)
         assert.deepEqual(logged.causes, [])
       }
       assert.equal(warnings.length, responses.length)
+      assert.ok(!warnings.join('\n').includes(`${f.implement!.id}:stage_fit`), 'raw atomic pair answers are not logged')
       for (const forbidden of [privateAnswer, 'PRIVATE_PROFILE_', disabled.name, disabled.description, execution.providerGenerationId, f.ownerId, f.connections.codex, f.connections.claude_code]) assert.ok(!warnings.join('\n').includes(forbidden), forbidden)
       assert.deepEqual((await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [f.ownerId])).rows, beforeBindings)
       assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 0)
@@ -1011,7 +1044,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   // catches transport errors, which must not swallow a privacy assertion.
   for (const call of decisionInputs) {
     const serialized = JSON.stringify(call.input)
-    for (const privateText of ['PRIVATE_PROFILE_', 'connectionId', 'synthetic-subscription-', 'providerSubject']) assert.ok(!serialized.includes(privateText), privateText)
+    for (const privateText of ['PRIVATE_PROFILE_', 'PRIVATE_PRODUCER_REPORT', 'claude-native-', 'connectionId', 'synthetic-subscription-', 'providerSubject']) assert.ok(!serialized.includes(privateText), privateText)
     assert.ok(serialized.includes('review'))
     if (call.purpose === 'factory-agent-profile') assert.ok(JSON.stringify(call.questions).includes(call.profileId))
   }
