@@ -59,11 +59,11 @@ function StageList({ flow }: { flow: FactoryFlow }) {
   const active = flow.stages.indexOf(flow.stage) + 1
   const done = flow.stage === 'completed'
   return <Stepper value={active} role="list" aria-label={t('card.stageList')} indicators={{ completed: <Check aria-hidden="true" /> }}>
-    <StepperNav className="gap-y-2">
-      {flow.stages.map((stage: FlowStage, index) => <StepperItem key={stage} step={index + 1} completed={done} role="listitem" aria-current={index + 1 === active ? 'step' : undefined} className="gap-1.5">
+    <StepperNav className="flex-wrap gap-y-2">
+      {flow.stages.map((stage: FlowStage, index) => <StepperItem key={stage} step={index + 1} completed={done} role="listitem" aria-current={index + 1 === active ? 'step' : undefined} className="gap-1.5 not-last:flex-none">
         <StepperIndicator className="size-4">{index + 1 === active && !done ? <span className="size-1.5 rounded-full bg-current" /> : null}</StepperIndicator>
         <StepperTitle className="text-xs font-normal text-muted-foreground data-[state=active]:font-medium data-[state=active]:text-foreground">{t(`stages.${stage}`)}</StepperTitle>
-        {index < flow.stages.length - 1 && <StepperSeparator className="mx-1.5 min-w-3" />}
+        {index < flow.stages.length - 1 && <StepperSeparator className="mx-1 w-6 group-data-[orientation=horizontal]/stepper-nav:flex-none" />}
       </StepperItem>)}
     </StepperNav>
   </Stepper>
@@ -129,7 +129,7 @@ export function FactoryFlowCard({ task, detail, onOpenThread }: { task: FactoryT
         </div>
         <StageList flow={flow} />
         {(kind === 'blocked' || kind === 'failed') && task.reason && <ItemDescription>{task.reason}</ItemDescription>}
-        {shownError && <p role="alert" className="text-sm text-destructive-foreground">{t(`card.approveError.${shownError}`)}</p>}
+        {shownError && <p role="alert" className="flex items-center gap-1.5 text-sm text-destructive-foreground"><CircleAlert aria-hidden="true" className="size-4 shrink-0" />{t(`card.approveError.${shownError}`)}</p>}
       </ItemContent>
       <ItemActions className="flex-wrap">
         {kind === 'spec_review' && <>
