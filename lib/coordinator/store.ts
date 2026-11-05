@@ -13,6 +13,7 @@ import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray,
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
 import { coordinatorSessionChanged } from '@/lib/live/coordinator-session'
+import { wakeTokens, wakeWorkflowAfterCommit } from '@/lib/workflow-wake'
 import { COORDINATOR_LEASE_CHANNEL } from '@/lib/db/listen'
 import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
@@ -213,6 +214,8 @@ export async function releaseLease(userId: string, holder: string, botId: string
     .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
   if (released.length) await botChatChanged(db, userId, botId)
   if (released.length) await coordinatorSessionChanged(db, userId, botId)
+  // A wake deadline waiting behind this lease rechecks now, not at the lease's old expiry (#1212).
+  if (released.length) wakeWorkflowAfterCommit(db, wakeTokens.coordinatorWake(userId, botId))
   return hasWakingEvents(userId, botId)
 }
 
@@ -353,6 +356,7 @@ export async function failTurn(userId: string, holder: string, error: string, bo
     if (!released.length) return
     await botChatChanged(tx, userId, botId)
     await coordinatorSessionChanged(tx, userId, botId)
+    wakeWorkflowAfterCommit(tx, wakeTokens.coordinatorWake(userId, botId))
     await tx.execute(sql`UPDATE coordinator_messages SET message = message || jsonb_build_object('mikkaFailure', ${reason}::text)
       WHERE "userId"=${userId} AND "botId"=${botId}::uuid AND message->>'role'='user'
         AND position=(SELECT max(position) FROM coordinator_messages WHERE "userId"=${userId} AND "botId"=${botId}::uuid)`)
