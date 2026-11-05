@@ -190,6 +190,7 @@ export type FactoryGates = Partial<
 /** Host-installed callbacks run inside the authorized task transaction. */
 export interface FactoryLifecycle {
   gates?: FactoryGates;
+  onTransition?: (tx: PoolClient, task: FactoryTask) => Promise<void>;
   independent?: (tx: PoolClient, task: FactoryTask, runId: string) => Promise<boolean>;
 }
 const terminal = (task: FactoryTask) =>
@@ -344,6 +345,7 @@ export function createFactoryStore(
       'INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)',
       [task.id, eventId, JSON.stringify(request), JSON.stringify(result)],
     );
+    await lifecycle?.onTransition?.(tx, task);
     await factoryChanged(tx, task);
     return result;
   }
@@ -1113,6 +1115,11 @@ export function createFactoryStore(
             change.stage !== await factoryNextStage(tx, task)
           )
             fail("factoryTransition");
+          if (task.stage === 'spec' && factoryFlowVersion(task) === 2) {
+            const approved = await tx.query('SELECT 1 FROM factory_spec_approvals WHERE "taskId"=$1 AND "attemptId"=$2 AND "sourceEventId"=$3 AND "userId"=$4',
+              [task.id, task.attemptId, task.sourceEventId, task.userId]);
+            if (!approved.rowCount) fail('factory_spec_approval_required');
+          }
           task.reason = change.reason;
           await freshAttempt(tx, task, change.stage, change.reason);
         } else if (change.action === "retry_publication") {

@@ -18,6 +18,7 @@ export function createFactoryHumanStore(pool: Pool, forBot: (botId: string | nul
   }
   return {
     ...base,
+    readTask: async (tx, userId, taskId) => (await taskStore(userId, taskId, tx)).readTask(tx, userId, taskId),
     read: async (userId, taskId) => (await taskStore(userId, taskId)).read(userId, taskId),
     lockTask: async (tx, userId, taskId) => (await taskStore(userId, taskId, tx)).lockTask(tx, userId, taskId),
     apply: async (userId, binding, eventId, change, tx) => {
