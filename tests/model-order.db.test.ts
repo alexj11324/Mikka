@@ -383,6 +383,31 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     assert.notEqual(run.kind === 'device' && run.deviceId, silent.id, 'nor one that did not report the model')
   })
 
+  await t.test('failed subscription startup checks reach default, named-device and picked-model cards as safe human copy', async () => {
+    const scope = await person('order-runtime-check')
+    const model = 'acct-codex-preflight'
+    await subscribe(scope, 'codex', [model])
+    await order.changeOrder(pool, scope, { kind: 'location', location: 'local' })
+    const ctx = { ...scope, botId: null }
+    const machine = await device(scope.ownerId, [{ harness: 'codex', installed: true, models: [model] }])
+    const words = (await import('../messages/zh-CN.json')).default.RunErrors.subscription_local_runtime_unavailable
+    for (const detail of ['env_not_clean', 'cli_missing', 'cli_version_mismatch', 'adapter_start_failed'] as const) {
+      await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [machine.id, JSON.stringify([{ harness: 'codex', installed: detail !== 'cli_missing', subscriptionBroker: true, subscriptionPreflight: detail, models: [model] }])])
+      const reports = [await resolveModelDispatch(pool, ctx), await resolveModelDispatch(pool, ctx, { harness: 'codex', model }), await resolveModelDispatch(pool, ctx, { harness: 'codex', model }, undefined, machine.id)]
+      for (const report of reports) {
+        assert.equal(report.kind, 'none')
+        assert.equal(report.kind === 'none' && report.card.description, words[detail])
+        assert.doesNotMatch(report.kind === 'none' ? report.card.description : '', /subscription_local_runtime_unavailable|env_not_clean|cli_missing|cli_version_mismatch|adapter_start_failed/)
+      }
+      const row = (await order.orderView(pool, scope)).entries[0]
+      assert.equal(row.block?.reason, 'noDevice')
+      assert.equal(row.block?.reason === 'noDevice' && row.block.device.why, 'subscriptionRuntimeUnavailable')
+      assert.equal(row.block?.reason === 'noDevice' && row.block.device.why !== 'none' && row.block.device.detail, detail)
+    }
+    await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [machine.id, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, models: [model] }])])
+    assert.equal((await resolveModelDispatch(pool, ctx)).kind, 'device')
+  })
+
   await t.test('本地: a server before a computer, then the least busy, then the one that joined first; 会先用 names the same device dispatch picks', async () => {
     const scope = await person('order-server-first')
     await subscribe(scope, 'claude', ['acct-opus-s'])

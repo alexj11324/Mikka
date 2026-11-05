@@ -90,6 +90,18 @@ test('no computer can run it: the reason comes from the computer closest to runn
   assert.deepEqual(whyNoDevice([old('a'), old('b'), device('c', { enabled: false })], opus), { why: 'needsUpdate', device: 'a', count: 2 })
 })
 
+test('failed subscription preflight is actionable and overrides a stale broker flag without blocking API-key runs', () => {
+  for (const detail of ['env_not_clean', 'cli_missing', 'cli_version_mismatch', 'adapter_start_failed'] as const) {
+    const failed = device('checked computer', { harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true, subscriptionPreflight: detail, models: [first.model] }] })
+    assert.equal(deviceModel(failed, first), null)
+    assert.deepEqual(whyNoDevice([failed], first), { why: 'subscriptionRuntimeUnavailable', detail, device: 'checked computer', count: 1 })
+    const plan = planDispatch({ entries: [first], location: 'local', devices: [failed], credential: usable, cloudReady: false })
+    assert.equal(plan.kind, 'none')
+    assert.equal(deviceModel(failed, keyed), keyed.model)
+    assert.equal(deviceModel({ ...failed, harnesses: failed.harnesses.map(info => ({ ...info, subscriptionPreflight: undefined })) }, first), first.model)
+  }
+})
+
 test('本地 order: a server before a computer, then the fewest unfinished runs, then the one that joined first; the same input gives the same device', () => {
   const mac = device('mac', { joinedAt: 1 })
   const server = device('server', { server: true, joinedAt: 5 })

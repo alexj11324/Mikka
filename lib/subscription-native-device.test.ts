@@ -32,6 +32,18 @@ test('the hosted broker takes a cloud computer bound to its own token, or an all
   assert.equal(hostedBrokerDevice(null, ids.deviceId, ids.deviceId, ids.deviceId), false)
 })
 
+test('a failed self-test overrides an old broker flag for leases and hosted access', () => {
+  for (const detail of ['env_not_clean', 'cli_missing', 'cli_version_mismatch', 'adapter_start_failed']) {
+    const device = { enabled: true, kind: 'local', harnesses: [{ subscriptionBroker: true, subscriptionPreflight: detail }] }
+    assert.equal(leaseDevice(device), false, detail)
+    assert.equal(hostedBrokerDevice(device, ids.deviceId, undefined, ids.deviceId), false, detail)
+    assert.equal(hostedBrokerDevice({ ...device, kind: 'cloud' }, ids.deviceId, ids.deviceId, ''), false, detail)
+    // This device-wide gate permits a different healthy harness; nativeRun
+    // separately checks the exact harness bound to the authenticated run.
+    assert.equal(leaseDevice({ ...device, harnesses: [...device.harnesses, ...broker] }), true)
+  }
+})
+
 const lease = { route: 'claude_code_cli', modelId: 'm', revision: 1, accountId: 'a', expiresAt: '2026-11-01T01:00:00.000Z', accessToken: 'fixture-access' }
 const service = (fail = false) => () => ({
   nativeRun: async () => ({ ownerId: 'o', workspaceId: 'w', consumerId: 'c', bindingId: 'b', execution: 'native' as const, runId: ids.runId }),

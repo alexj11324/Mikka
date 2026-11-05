@@ -8,9 +8,9 @@
  * bound to the subscription (SubscriptionService.nativeRun).
  */
 export function leaseDevice(
-  device: { enabled: boolean; kind: string; harnesses: { subscriptionBroker?: boolean }[] } | null,
+  device: { enabled: boolean; kind: string; harnesses: { subscriptionBroker?: boolean; subscriptionPreflight?: unknown }[] } | null,
 ): boolean {
-  return Boolean(device?.enabled && device.kind === 'local' && device.harnesses.some(h => h.subscriptionBroker))
+  return Boolean(device?.enabled && device.kind === 'local' && device.harnesses.some(h => h.subscriptionBroker && !h.subscriptionPreflight))
 }
 
 /**
@@ -22,11 +22,11 @@ export function leaseDevice(
  * report the broker capability.
  */
 export function hostedBrokerDevice(
-  device: { enabled: boolean; kind: string; harnesses: { subscriptionBroker?: boolean }[] } | null,
+  device: { enabled: boolean; kind: string; harnesses: { subscriptionBroker?: boolean; subscriptionPreflight?: unknown }[] } | null,
   deviceId: string,
   scopeDeviceId: string | undefined,
   allowList = process.env.MIKKA_BYOS_HOSTED_DEVICE_IDS ?? '',
 ): boolean {
-  if (!device?.enabled || !device.harnesses.some(h => h.subscriptionBroker)) return false
+  if (!device?.enabled || !device.harnesses.some(h => h.subscriptionBroker && !h.subscriptionPreflight)) return false
   return (device.kind === 'cloud' && scopeDeviceId === deviceId) || allowList.split(',').includes(deviceId)
 }

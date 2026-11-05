@@ -1907,12 +1907,22 @@
       "connect": "Connect",
       "connecting": "Connecting",
       "reconnect": "Reconnect",
+      "resume": "Continue",
+      "unfinished": "Previous sign-in is unfinished",
+      "signInExpired": "Sign-in expired",
+      "authorizationEnded": "This {provider} sign-in has ended",
+      "signInPreparing": "Preparing {provider} sign-in",
+      "cancelledNotice": "Sign-in canceled",
+      "cancelFailed": "Could not confirm whether sign-in was canceled",
       "disconnect": "Disconnect",
       "refreshModels": "Refresh models",
       "refreshingModels": "Refreshing models for {label}…",
       "modelsRefreshed": "{label}: {count, plural, one {# model} other {# models}}",
       "modelsRefreshFailed": "Models for {label} could not be refreshed",
       "callbackLabel": "Address after approval",
+      "callbackStepOpen": "Open Claude, sign in and allow access.",
+      "callbackStepCopy": "After the redirect to localhost:54545, copy the full address from your browser's address bar, even if the page cannot be reached.",
+      "callbackStepPaste": "Paste the full address below, then select Complete connection.",
       "finish": "Complete connection",
       "expired": "{provider} sign-in expired",
       "loadFailed": "Could not load subscription settings.",
@@ -3769,6 +3779,7 @@
     "started": "started {time}",
     "steps": "Handed to {harness} · {count, plural, one {# step} other {# steps}}",
     "composer": "Tell {agent} what to do next…",
+    "checkEnded": "This independent check has ended. Handle the result in Acceptance.",
     "sendFailed": "Send outcome unconfirmed. Draft kept",
     "stop": "Stop",
     "stopping": "Stopping…",
@@ -4550,17 +4561,20 @@
     "retry": "Retry",
     "checkState": {
       "review": {
+        "blocked": "Review blocked",
         "failed": "Review not passed",
         "pending": "Review queued",
         "running": "Reviewing"
       },
       "verify": {
+        "blocked": "Verification blocked",
         "failed": "Verification not passed",
         "pending": "Verification queued",
         "running": "Verifying"
       }
     },
     "retryReview": "Retry review",
+    "blocked": "Blocked",
     "retryVerify": "Retry verification",
     "checkRetryUnknown": "Retry unconfirmed",
     "checkRetryFailed": "Retry did not complete",
@@ -4924,7 +4938,9 @@
       "model_mismatch": "The subscription does not offer this thread's model. Please choose another model.",
       "account_changed": "The subscription account changed during the run, so the run stopped",
       "env_not_clean": "This computer's run environment does not meet the subscription requirements. Please update Mikka.",
-      "adapter_start_failed": "The Agent could not start on the subscription"
+      "cli_missing": "The subscription Agent is missing or incomplete on this computer. Restart Mikka to install it, then check the Agent again.",
+      "cli_version_mismatch": "The subscription Agent version on this computer does not match Mikka's required version. Update Mikka and check the Agent again.",
+      "adapter_start_failed": "The subscription Agent could not start on this computer. Restart Mikka and check the Agent again."
     },
     "subscription_hosted_runtime_unavailable": {
       "default": "The run could not start on the cloud computer",

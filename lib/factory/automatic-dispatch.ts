@@ -11,9 +11,11 @@ import { tiptapToText } from '@/lib/tiptap-text'
 import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding } from './dispatch'
 import { configureFactoryCheck } from './checks'
 import { checkFactoryRepairBudget } from './check-recovery-evidence'
+import { observeFactoryProfileDispatch } from './reconcile'
 import { FactoryError } from './contract'
 import { notifyDeviceWork } from '../device-gateway-notify'
 import type { FactoryTask, createFactoryStore } from './store'
+import type { FactoryCheckStartRecovery } from './check-start-recovery'
 
 /** Provider I/O boundary; no model input selects these callbacks. */
 export const factoryAutomaticRuntime = {
@@ -29,7 +31,7 @@ export const factoryAutomaticRuntime = {
 
 /** The host, rather than a model tool call, queues every independent stage. */
 export function automaticFactoryDispatch(pool: Pool) {
-  return async (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, prior: FactoryTask, _run: Record<string, any>) => {
+  return observeFactoryProfileDispatch(async (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, prior: FactoryTask, _run: Record<string, any>, checkStart?: FactoryCheckStartRecovery) => {
     let task = await store.lockTask(tx, prior.userId, prior.id)
     if (task.status === 'failed' && ['review','verify'].includes(task.stage)) {
       const { rows: [attempt] } = await tx.query('SELECT output FROM factory_attempts WHERE id=$1', [task.attemptId])
@@ -52,9 +54,18 @@ export function automaticFactoryDispatch(pool: Pool) {
       WHERE f."taskId"=$1 AND f.stage='execute' ORDER BY f.position DESC LIMIT 1`, [task.id])
     if (!source) throw new FactoryError('factoryRunMismatch')
     const check = task.stage !== 'execute'
-    const inheritedPolicy = source.agentDefinition?.policyCeiling ? { policyCeiling: source.agentDefinition.policyCeiling } : {}
-    let selection: Partial<RunModel> = check ? inheritedPolicy : threadRunModel(source.agentDefinition) ?? inheritedPolicy
-    let profileChoice = check ? await (await import('./agent-profile')).resolveAgentProfileDispatch(pool, {
+    if (checkStart && (!check || checkStart.taskId !== task.id || checkStart.candidateId !== task.candidateId ||
+        checkStart.sourceEventId !== task.sourceEventId || checkStart.attemptId === task.attemptId ||
+        checkStart.run.deviceKind !== source.deviceKind || checkStart.run.agentDefinition.executionIdentity.workspaceId !==
+          (source.workspaceId ?? source.agentDefinition?.executionIdentity?.workspaceId)))
+      throw new FactoryError('factoryCheckBindingMismatch')
+    // The producer still supplies the candidate/runtime admission. A host-only
+    // unstarted retry keeps the failed check's exact role and credential instead
+    // of choosing again from the person's now-current stage preferences.
+    const inheritedPolicy = checkStart ? { policyCeiling: checkStart.selection.policyCeiling }
+      : source.agentDefinition?.policyCeiling ? { policyCeiling: source.agentDefinition.policyCeiling } : {}
+    let selection: Partial<RunModel> = checkStart?.selection ?? (check ? inheritedPolicy : threadRunModel(source.agentDefinition) ?? inheritedPolicy)
+    let profileChoice = check && !checkStart ? await (await import('./agent-profile')).resolveAgentProfileDispatch(pool, {
       ownerId: task.userId, workspaceId: source.workspaceId ?? await (await import('@/lib/execution-settings')).executionWorkspace(task.userId, task.botId), botId: task.botId,
     }, { issueId: task.issueId, stage: task.stage, location: source.deviceKind === 'cloud' ? 'cloud' : 'local',
       defaultHarness: source.harness, cloudPurpose: source.remoteUrl ? 'task' : 'desktop',
@@ -112,7 +123,7 @@ export function automaticFactoryDispatch(pool: Pool) {
       registerFactoryProfile(tx, routingScope,
         queued.profileOriginRunId === source.id ? undefined : profileChoice?.agentProfile)
     }
-    let agentId = source.agentId, deviceId = source.deviceId, deviceRepoId = source.deviceRepoId
+    let agentId = checkStart?.run.agentId ?? source.agentId, deviceId = checkStart?.run.deviceId ?? source.deviceId, deviceRepoId = checkStart?.run.deviceRepoId ?? source.deviceRepoId
     if (recovery && !check && source.deviceKind !== 'cloud') {
       if (recovery.requestEpoch !== task.sourceEventId || recovery.previousRunId !== source.id || !source.remoteUrl)
         throw new FactoryError('factoryRecoveryExecutorUnavailable')
@@ -161,16 +172,20 @@ export function automaticFactoryDispatch(pool: Pool) {
           ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
           ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
       }
-      const dispatch = createFactoryDispatch(pool, store, (client, userId, input, botId, context) => queueFactoryRun(client, userId, input, botId, context, undefined, { ...selection, ...(!check ? { threadRunId: source.id } : {}), pinnedDeviceId: source.agentDefinition?.pinnedDeviceId, readOnly: check || source.agentDefinition?.readOnly }))
+      const dispatch = createFactoryDispatch(pool, store, (client, userId, input, botId, context) => queueFactoryRun(client, userId, input, botId, context, undefined, { ...selection, ...(!check ? { threadRunId: source.id } : {}), pinnedDeviceId: (checkStart?.run ?? source).agentDefinition?.pinnedDeviceId, readOnly: check || source.agentDefinition?.readOnly }),
+        checkStart ? { ...defaultFactoryDispatchAdapters, configure: { ...defaultFactoryDispatchAdapters.configure,
+          review: (client, current, id) => configureFactoryCheck(client, current, id, checkStart.selection.policyCeiling),
+          verify: (client, current, id) => configureFactoryCheck(client, current, id, checkStart.selection.policyCeiling),
+        } } : defaultFactoryDispatchAdapters)
       const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId, deviceRepoId }, tx)
       await registerRoutingAdmission(result.runId)
       if (!check) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
       if (recovery && !check) await tx.query('UPDATE agent_runs SET "retryOf"=$2,attempt=$3 WHERE id=$1', [result.runId, source.id, source.attempt + 1])
       return async () => { notifyDeviceWork(deviceId) }
     }
-    const selectedHarness = profileChoice?.target.kind === 'cloud' ? profileChoice.target.harness : source.harness
+    const selectedHarness = checkStart?.run.agentDefinition.harness ?? (profileChoice?.target.kind === 'cloud' ? profileChoice.target.harness : source.harness)
     const runtime = await ensureRecordedBotHarnessRuntime(tx, { userId: task.userId, workspaceId: source.workspaceId }, source.runtimeBotId, selectedHarness)
-    if (!runtime) throw new FactoryError('factoryCheckHarnessUnavailable')
+    if (!runtime || (checkStart && runtime.agentId !== checkStart.run.agentId)) throw new FactoryError('factoryCheckHarnessUnavailable')
     let model: Partial<RunModel> | { error: string } = selection
     if (profileChoice) {
       const target = profileChoice.target
@@ -180,7 +195,7 @@ export function automaticFactoryDispatch(pool: Pool) {
         modelDispatch: { mode: profileChoice.selectionMode ?? 'preference', location: 'cloud', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
         ...(entry.kind === 'api_key' ? { apiKeyId: entry.keyId } : { subscriptionBindingId: await (await import('@/lib/model-dispatch')).bindAgentToConnection(tx,
           { ownerId: task.userId, workspaceId: source.workspaceId }, runtime.agentId, target.harness, entry.connectionId, target.model) }) }
-    } else if (check) model = await chooseCloudRunModel(pool, { ownerId: task.userId, workspaceId: source.workspaceId, botId: task.botId }, runtime.agentId, source.harness, undefined, source.remoteUrl ? 'task' : 'desktop')
+    } else if (check && !checkStart) model = await chooseCloudRunModel(pool, { ownerId: task.userId, workspaceId: source.workspaceId, botId: task.botId }, runtime.agentId, source.harness, undefined, source.remoteUrl ? 'task' : 'desktop')
     if ('error' in model || !('model' in model) || typeof model.model !== 'string') throw new FactoryError('factoryCheckHarnessUnavailable')
     const cloudModel = model.model
     const repoId = source.remoteUrl ? (await ensureDeviceRepository(task.userId, runtime.deviceId, source.remoteUrl, tx)).id : runtime.repoId
@@ -193,8 +208,8 @@ export function automaticFactoryDispatch(pool: Pool) {
       allowLocalRecovery: source.agentDefinition?.allowLocalRecovery, sourceEventId: context.sourceEventId,
     }, client, factoryStage), { ...defaultFactoryDispatchAdapters, configure: {
       ...defaultFactoryDispatchAdapters.configure,
-      review: (client, current, id) => configureFactoryCheck(client, current, id, undefined, factoryStage),
-      verify: (client, current, id) => configureFactoryCheck(client, current, id, undefined, factoryStage),
+      review: (client, current, id) => configureFactoryCheck(client, current, id, checkStart?.selection.policyCeiling, factoryStage),
+      verify: (client, current, id) => configureFactoryCheck(client, current, id, checkStart?.selection.policyCeiling, factoryStage),
     } })
     const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId: runtime.agentId, deviceRepoId: repoId }, tx)
     await registerRoutingAdmission(result.runId)
@@ -206,5 +221,5 @@ export function automaticFactoryDispatch(pool: Pool) {
       try { await factoryAutomaticRuntime.enqueue(pool, actor, typeof _run.id === 'string' ? _run.id : null, result.runId) }
       catch { await (await import('./cloud-stage-handoff')).failFactoryCloudStage(pool, actor, result.runId, 'Cloud stage handoff could not be queued') }
     }
-  }
+  })
 }

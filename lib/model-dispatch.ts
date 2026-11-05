@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto'
 import { cloudModelSupport } from './cloud-template-models'
 import type { Pool } from 'pg'
 import { defaultAgentCopy } from './agent-copy'
+import messages from '@/messages/zh-CN.json'
+import type { SubscriptionPreflightFailure } from '@mikka/protocol/harness'
 import { cloudReady } from './rule-dispatch'
 import { credentialStates, dispatchOrder, orderCandidates, poolDevices, readOrder, type OrderScope, type RefreshOrderQuota } from './model-order'
 import { deviceSupport, entryKey, planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type OrderEntry, type RunLocation, type SkippedEntry } from './model-order-plan'
@@ -149,7 +151,8 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
     const installed = devices[0].harnesses.some(item => item.harness === wanted.harness && item.installed)
     // Its daemon reported its models and this one is not among them (an older daemon that reported none needs an update).
     const unreported = installed && deviceSupport(devices[0], wanted) === 'modelNotReported'
-    return { kind: 'none', reason: 'namedDevice', card: modelUnavailableCard('namedDevice', { agent: HARNESS_NAMES[wanted.harness], model: wanted.model, installed, unreported }) }
+    const detail = wanted.source.kind === 'subscription' ? devices[0].harnesses.find(info => info.harness === wanted.harness)?.subscriptionPreflight : undefined
+    return { kind: 'none', reason: 'namedDevice', card: modelUnavailableCard('namedDevice', { agent: HARNESS_NAMES[wanted.harness], model: wanted.model, installed, unreported, detail }) }
   }
   if (plan.kind === 'none' && plan.reason === 'noDevice' && !named) {
     // 云端 with a key that should run: the cloud being off is the news, not the computers.
@@ -161,7 +164,7 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   }
   if (plan.kind === 'none' && named && plan.reason !== 'cloudNotConfigured' && plan.reason !== 'checking' && plan.reason !== 'cloudModelsUnknown' && plan.reason !== 'cloudModelNotReported') {
     const reason = plan.reason === 'noDevice' ? 'pickedNoDevice' : 'pickedUnavailable'
-    return { kind: 'none', reason, card: modelUnavailableCard(reason, named) }
+    return { kind: 'none', reason, card: modelUnavailableCard(reason, { ...named, ...(plan.reason === 'noDevice' && picked ? { device: whyNoDevice(devices, picked) } : {}) }) }
   }
   if (plan.kind === 'none') return { kind: 'none', reason: plan.reason, card: modelUnavailableCard(plan.reason), skipped: plan.skipped }
   if (plan.kind === 'cloud') return { kind: 'cloud', harness: plan.entry.harness, model: plan.model, entry: plan.entry, apiKey: plan.entry.source.kind === 'api_key', ...(routing ? { routing } : {}) }
@@ -221,7 +224,7 @@ async function e2bKeyWouldFix(query: Pick<Pool, 'query'>, ownerId: string) {
 const HARNESS_NAMES: Record<OrderEntry['harness'], string> = { claude_code: 'Claude Code', codex: 'Codex' }
 
 /** 没有能跑这个任务的模型: the reason, and the rows that fix it. A model or computer the thread named is named in it. */
-export function modelUnavailableCard(reason: DispatchNothingReason, named?: { agent: string; model: string; installed?: boolean; unreported?: boolean; device?: NoDeviceWhy }, place: { /** 云端 without a cloud that runs: an E2B key would also fix it. */ offerE2B?: boolean } = {}) {
+export function modelUnavailableCard(reason: DispatchNothingReason, named?: { agent: string; model: string; installed?: boolean; unreported?: boolean; device?: NoDeviceWhy; detail?: SubscriptionPreflightFailure }, place: { /** 云端 without a cloud that runs: an E2B key would also fix it. */ offerE2B?: boolean } = {}) {
   const copy = defaultAgentCopy
   const line = {
     noModels: copy.needsModelNoModels, cloudNotConfigured: copy.needsModelCloud, cloudModelsUnknown: copy.needsModelCloudModelsUnknown, cloudModelNotReported: copy.needsModelCloudModelNotReported, cloudTemporarilyUnavailable: copy.needsModelCloudUnavailable, noDevice: noDeviceLine(named?.device), checking: copy.needsModelChecking, unavailable: copy.needsModelUnavailable,
@@ -229,7 +232,9 @@ export function modelUnavailableCard(reason: DispatchNothingReason, named?: { ag
     notOffered: copy.needsModelNotOffered, namedDevice: named?.unreported ? copy.needsModelDeviceModel : named?.installed ? copy.needsModelDeviceUpdate : copy.needsModelDeviceAgent,
     pickedNoDevice: copy.needsModelPickedNoDevice, pickedUnavailable: copy.needsModelPickedUnavailable,
   }[reason]
-  const description = (reason === 'notOffered' && named && !named.model ? copy.needsModelAgentNotOffered : line).replace('{agent}', named?.agent ?? '').replace('{model}', named?.model ?? '')
+  const detail = named?.detail ?? (named?.device?.why === 'subscriptionRuntimeUnavailable' ? named.device.detail : undefined)
+  const description = (detail ? messages.RunErrors.subscription_local_runtime_unavailable[detail]
+    : reason === 'notOffered' && named && !named.model ? copy.needsModelAgentNotOffered : line).replace('{agent}', named?.agent ?? '').replace('{model}', named?.model ?? '')
     .replace('{device}', named?.device && named.device.why !== 'none' ? named.device.device : '')
   const options = reason === 'cloudNotConfigured'
     ? [{ value: 'e2b', label: copy.needsMachineE2B, action: 'e2bKey' as const }, { value: 'models', label: copy.needsModelSettings, action: 'modelSettings' as const }]
@@ -246,6 +251,7 @@ function noDeviceLine(device?: NoDeviceWhy) {
   const copy = defaultAgentCopy
   if (!device) return copy.needsModelNoDevice
   if (device.why === 'none') return copy.needsModelNoComputer
+  if (device.why === 'subscriptionRuntimeUnavailable') return device.detail ? messages.RunErrors.subscription_local_runtime_unavailable[device.detail] : messages.RunErrors.subscription_local_runtime_unavailable.default
   if (device.count !== 1) return copy.needsModelNoDevice
   return { off: copy.needsModelNamedOff, offline: copy.needsModelNamedOffline, notInstalled: copy.needsModelNamedAgent, modelNotReported: copy.needsModelNamedModel, needsUpdate: copy.needsModelNamedUpdate }[device.why]
 }

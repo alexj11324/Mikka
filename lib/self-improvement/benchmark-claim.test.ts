@@ -3,14 +3,17 @@ import { readFile } from 'node:fs/promises'
 import { runInNewContext } from 'node:vm'
 import test from 'node:test'
 import { transpileModule, ModuleKind } from 'typescript'
+import * as codedErrorProtocol from '@mikka/protocol/coded-error'
 import * as daemonProtocol from '@mikka/protocol/daemon'
 import * as deviceProtocol from '@mikka/protocol/device'
+import * as harnessProtocol from '@mikka/protocol/harness'
 import * as policySnapshotProtocol from '@mikka/protocol/policy-snapshot'
 import * as repositoryProtocol from '@mikka/protocol/repository'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { constrainedAssignmentPolicy, intersectRunPolicy } from '../run-assignment-policy'
 import { ModelAdmissionError } from '../model-admission/contract'
 import { deploymentSwitch, type DeploymentSwitch } from '@/lib/deployment-switches'
+import messages from '@/messages/zh-CN.json'
 const fixtureEnv={MIKKA_BYOS_ENABLED:'0',MIKKA_FACTORY_ROUTING_ENABLED:'1',MIKKA_FACTORY_LIFECYCLE_ENABLED:'1'}
 
 // Execute the actual route in memory, with its database/auth boundaries replaced.
@@ -42,10 +45,13 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/background':{afterJob:()=>{calls.push('wakeScheduled')}},
     'next/server':{NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
     'drizzle-orm':{and:(...args:unknown[])=>args,eq:(...args:unknown[])=>args,isNull:(value:unknown)=>value},
+    '@mikka/protocol/coded-error':codedErrorProtocol,
     '@mikka/protocol/device':deviceProtocol,
+    '@mikka/protocol/harness':harnessProtocol,
     '@mikka/protocol/daemon':daemonProtocol,
     '@mikka/protocol/repository':repositoryProtocol,
     '@mikka/protocol/policy-snapshot':policySnapshotProtocol,
+    '@/messages/zh-CN.json':{default:messages},
     // This legacy-capability fixture has no managed organization policy.
     '@/lib/agent-tool-approval/policy-distribution':{},
     '@/lib/agent-tool-approval/local-cloud-issuer':{},
@@ -73,7 +79,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/device-link':{authenticateDevice:async()=>({userId:'owner',tokenId:'synthetic-device-token'}),ownedDevice:async()=>({enabled:true,kind:'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]}),ownedDeviceWithReport:async()=>({enabled:true,kind:'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]})},
     '@/lib/base-path':{withBasePath:(path:string)=>path},'@/lib/mcp/resource':{},
     '@/lib/mcp/worker':{issueRunToken:async()=>{calls.push('token');return {token:'synthetic-test-token'}}},
-    '@/lib/run-leases':{failRunForDaemonUpgrade:async()=>false},'@/lib/daemon-release':{daemonTooOld:()=>false},'@/lib/run-retry':{},
+    '@/lib/run-leases':{failRunForDaemonUpgrade:async()=>false,failQueuedSubscriptionRuntime:async()=>{throw Error('A benchmark without subscriptions must not fail a subscription runtime')}},'@/lib/daemon-release':{daemonTooOld:()=>false},'@/lib/run-retry':{},
     '@/lib/thread-continuation':{continuationFollowUp:()=>null},
     '@/lib/run-completion-effects':{afterRunEnded:async()=>{calls.push('runEnded');return 0}},
     '@/lib/factory/checks':{isFactoryCheckRun:async()=>false},
