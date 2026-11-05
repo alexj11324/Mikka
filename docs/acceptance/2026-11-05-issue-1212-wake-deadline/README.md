@@ -8,6 +8,7 @@ This independent evidence branch contains no application change beyond its paren
 
 - [Validation and limitations](VALIDATION.md)
 - [Independent source review](INDEPENDENT-ROOT-REVIEW.md)
+- [Final exact-head CI completion](CI-9f0529e.md)
 - [Original RED/GREEN and first runtime failure archive](preintegration.tar.gz)
 - [Final integrated gates, successful real timer and cleanup archive](final-export.tar.gz)
 - [Archive hashes](archive-manifest.json)
