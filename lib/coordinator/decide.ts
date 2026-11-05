@@ -2,20 +2,10 @@ import { gatewayCost,gatewayGenerationId } from '@/lib/abuse/policy'
 import 'server-only'
 import { gatewayAuth } from '@/lib/ai-gateway-auth'
 import { createHash, randomUUID } from 'node:crypto'
-import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
 import { validatedAnswers, decisionRequestInput, DECISION_MODEL, DECISIONS_URL, type DecisionInput, type DecisionQuestion, type DecisionAnswer } from './decision'
 
 const DECISION_TIMEOUT_MS = 5000
 const hash = (value: string) => createHash('sha256').update(value).digest('hex')
-type DecisionFailureDetail = 'cancelled' | 'gateway_auth_unavailable' | 'billing_scope_unavailable' | 'response_model_mismatch' | 'provider_receipt_invalid' | 'invalid_answers' | 'request_failed'
-/** Server diagnostics only. Keep the null contract and never retain provider
- * bodies, answers, input or arbitrary upstream error fields in the log. */
-function unavailable(purpose: string, detail: DecisionFailureDetail) {
-  logCodedError(new CodedError('decision_unavailable', { detail }), { purpose: purpose.replace(/[^a-z0-9_-]/gi, '').slice(0, 80) }, {
-    warn: fields => console.error('Decision unavailable', fields),
-  })
-  return null
-}
 /** Issued by this host after a successful, validated provider envelope. Never
  * construct one from model prose, a screenshot label, peer data or a tool arg.
  * Submitted pixels and a provider receipt do not prove visual understanding. */
@@ -32,13 +22,13 @@ export interface DecisionExecution {
 /** Existing gateway/budget only. No alternate provider, program judgment or human-approval fallback. */
 export async function invokeDecision(purpose: string, input: DecisionInput, questions: DecisionQuestion[], signal?: AbortSignal, diagnostics?: {retainInvalidReceipt:true}) {
   'use step'
-  if (signal?.aborted) return unavailable(purpose, 'cancelled')
+  if (signal?.aborted) return null
   // The app's one gateway credential (lib/ai-gateway-auth.ts), the same the Coordinator's model uses.
   const key = (await gatewayAuth())?.token
-  if (!key) return unavailable('no-gateway-auth', 'gateway_auth_unavailable')
+  if (!key) { console.error('Decision unavailable', { purpose: 'no-gateway-auth' }); return null }
   const { hostedBillingScope } = await import('@/lib/abuse/context')
   const scope = hostedBillingScope.getStore()
-  if (!scope) return unavailable(purpose, 'billing_scope_unavailable')
+  if (!scope) return null
   const { assertUnmanagedModelTransport } = await import('@/lib/model-admission/runtime')
   await assertUnmanagedModelTransport(scope, DECISION_MODEL, signal)
   const usage = await import('@/lib/abuse/runtime')
@@ -79,10 +69,8 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
     // These fields come from the response envelope, not an answer or input.
     const metadata = payload as { model?: unknown; provider_metadata?: { gateway?: { generationId?: unknown } } }
     const generation = metadata?.provider_metadata?.gateway?.generationId
-    if (signal?.aborted) return unavailable(purpose, 'cancelled')
-    if (metadata.model !== DECISION_MODEL) return unavailable(purpose, 'response_model_mismatch')
-    if (typeof generation !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(generation)) return unavailable(purpose, 'provider_receipt_invalid')
-    if (!answers && !diagnostics?.retainInvalidReceipt) return unavailable(purpose, 'invalid_answers')
+    if (signal?.aborted || metadata.model !== DECISION_MODEL || typeof generation !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(generation)) return null
+    if (!answers && !diagnostics?.retainInvalidReceipt) return null
     const execution: DecisionExecution = {
       executionId, modelId: DECISION_MODEL, providerGenerationId: generation,
       startedAt, completedAt: new Date().toISOString(), requestDigest: hash(body),
@@ -94,9 +82,9 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
     return { answers: answers ?? new Map<string,Exclude<DecisionAnswer,{type:'refusal'}>>(), execution, ...(answers ? {} : {validationFailure:'invalid_response' as const}) }
   } catch {
     await usage.hostedUsage.settle(callId,requestStarted ? null : 0)
-    // Upstream errors may carry private payloads, even in their code fields.
-    // Preserve the existing null result and log only this host-owned detail.
-    return unavailable(purpose, 'request_failed')
+    // No upstream text, credentials, image bytes or untrusted purpose in logs.
+    console.error('Decision unavailable', { purpose: purpose.replace(/[^a-z0-9_-]/gi, '').slice(0, 80) })
+    return null
   }
 }
 /** Compatibility for callers that need answers only. Use invokeDecision when

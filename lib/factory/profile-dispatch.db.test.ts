@@ -56,7 +56,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     }),
   } })
   let decisionProfile = ''
-  let profileDecisionFailure: 'unavailable' | 'none' | 'missing' | 'foreign' | 'low' | 'reason' | null = null
+  let decisionFailure: 'missing-pair-reason' | 'none' | 'refusal' | null = null
   const decisionInputs: { purpose: string; input: unknown; questions: unknown; profileId: string }[] = []
   const decisionCounts = () => ({
     profile: decisionInputs.filter(call => call.purpose === 'factory-agent-profile').length,
@@ -68,14 +68,10 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       // A legacy Profile may route its inherited model, independently of Profile
       // selection. Exercise its unavailable-decision fallback deliberately.
       if (purpose === 'task-model-routing') return null
-      if (profileDecisionFailure === 'unavailable') return null
       const answers = new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
-        ['profile', { name: 'profile', type: 'choice', choice: profileDecisionFailure === 'none' ? 'none' : profileDecisionFailure === 'foreign' ? 'SYNTHETIC_PRIVATE_PROFILE' : decisionProfile, confidence: profileDecisionFailure === 'low' ? .54 : .95 }],
-        ['reason', { name: 'reason', type: 'choice', choice: profileDecisionFailure === 'reason' ? 'uncertain' : 'stage_fit' }],
+        ['profile', { name: 'profile', type: 'choice', choice: decisionFailure === 'none' ? 'none' : decisionFailure === 'missing-pair-reason' ? decisionProfile : `${decisionProfile}:stage_fit`, confidence: .95 }],
       ])
-      // validatedAnswers deliberately omits refusals; both refusal and a
-      // missing answer reach the selector without a profile entry.
-      if (profileDecisionFailure === 'missing') answers.delete('profile')
+      if (decisionFailure === 'refusal') answers.clear() // The actual adapter omits refused answers.
       return { answers, execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'synthetic-profile-stage', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
     },
   } })
@@ -96,7 +92,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   const model = { claude_code: 'claude-haiku-5-5', codex: 'gpt-6-luna' } as const
   const caps = () => (['claude_code', 'codex'] as const).map(harness => ({ harness, installed: true, models: [model[harness]], subscriptionBroker: true, computerBroker: true }))
   const template = templateModelsFixture(Object.values(model)); t.after(() => template.restore())
-  const fixture = async (withProfiles = true, missingCodex = false, profileId?: 'default') => {
+  const fixture = async (withProfiles = true, missingCodex = false, inherit = false, profileId?: 'default') => {
     const ownerId = await seedUser(pool, 'profile-stage')
     const { id: workspaceId } = await seedWorkspace(pool, ownerId, [{ userId: ownerId, role: 'admin' }])
     await pool.query("UPDATE mikka_workspaces SET kind='personal' WHERE id=$1", [workspaceId])
@@ -125,14 +121,19 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     }
     const profileStore = new profiles.AgentProfileStore(pool)
     const definition = (harness: OrderHarness, role: string) => ({ name: role, description: `${role} public capability`, roles: [role], harness, model: { mode: 'fixed', harness, model: model[harness], source: { kind: 'subscription', connectionId: connections[harness] } }, instructions: `PRIVATE_PROFILE_${role}`, skills: [role === 'Review' ? 'independent-review' : 'systematic-debugging'], effort: 'low' })
-    const implement = withProfiles ? await profileStore.create(scope, definition('claude_code', 'Implement')) : null
+    const implement = withProfiles ? await profileStore.create(scope, inherit ? {
+      name: 'Frontend', description: 'Implement responsive frontend behavior and validate it.', roles: ['execute', 'frontend'],
+      harness: 'claude_code', model: { mode: 'inherit' },
+      instructions: 'PRIVATE_PROFILE_frontend-v1\nImplement the requested UI and report concrete validation.',
+      skills: ['implementation-evidence'],
+    } : definition('claude_code', 'Implement')) : null
     const review = withProfiles ? await profileStore.create(scope, definition('codex', 'Review')) : null
     const store = createFactoryStore(pool, async (userId, id, tx) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [id, userId])).rowCount === 1, botId, { independent: factoryCheckIndependent, gates: factoryCheckGates })
     const routed = await store.route(ownerId, { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Synthetic subscription profile stage fixture' })
     return { scope, actor, ownerId, workspaceId, botId, issueId, sourceEventId, deviceId, repoId, agents, connections, implement, review, store, task: routed.task }
   }
   const exercise = async (withProfiles: boolean, missingCodex: boolean, autoModelRouting = true, explicitDefault = false) => {
-    const f = await fixture(withProfiles, missingCodex, explicitDefault ? 'default' : undefined), beforeDecisions = decisionCounts()
+    const f = await fixture(withProfiles, missingCodex, false, explicitDefault ? 'default' : undefined), beforeDecisions = decisionCounts()
     if (!autoModelRouting) await pool.query('UPDATE model_order_settings SET "autoModelRouting"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [f.ownerId, f.workspaceId])
     const profileId = explicitDefault
       ? await (await import('./profile-request')).requestedAgentProfile(pool, f.scope, f.sourceEventId, f.implement!.id)
@@ -199,6 +200,61 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     if (missingCodex) { assert.notEqual(runtime.agentId, f.agents.codex); assert.equal(runtime.repoId, f.repoId) }
     return { ...f, source, current, attempt, candidate, run }
   }
+  await t.test('Decision rejection retains closed diagnostics and filtered availability without creating a run or binding', async t => {
+    const f = await fixture(), profileStore = new profiles.AgentProfileStore(pool)
+    const disabled = await profileStore.create(f.scope, { name: 'PRIVATE_DISABLED_PROFILE', description: 'PRIVATE_DISABLED_CAPABILITY', enabled: false, harness: 'codex', model: { mode: 'inherit' } })
+    await pool.query('UPDATE byos_connections SET quota=NULL WHERE id=$1', [f.connections.codex])
+    const oldUsageProbe = usageProbe; usageProbe = async () => {}
+    const warnings: string[] = []
+    const warning = t.mock.method(console, 'warn', (line: unknown) => { warnings.push(String(line)) })
+    const beforeBindings = (await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [f.ownerId])).rows
+    const execution = { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions' as const, providerGenerationId: 'PRIVATE_PROVIDER_GENERATION', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' as const }
+    const privateAnswer = 'PRIVATE_RAW_DECISION_RESPONSE'
+    const responses = [
+      { detail: 'decision_unavailable', answers: null },
+      { detail: 'invalid_profile_answer', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>() },
+      { detail: 'no_suitable_profile', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
+        ['profile', { name: 'profile', type: 'choice', choice: 'none' }],
+      ]) },
+      { detail: 'unknown_profile', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
+        ['profile', { name: 'profile', type: 'choice', choice: privateAnswer }],
+      ]) },
+    ]
+    try {
+      for (const response of responses) {
+        let decisions = 0
+        await assert.rejects(profiles.resolveAgentProfileDispatch(pool, f.scope, { issueId: f.issueId, stage: 'review', location: 'cloud', cloudPurpose: 'desktop' }, {
+          decision: async (purpose, input, questions, _signal, diagnostics) => {
+            decisions++
+            assert.equal(purpose, 'factory-agent-profile'); assert.deepEqual(diagnostics, { retainInvalidReceipt: true })
+            assert.ok(!JSON.stringify(input).includes('PRIVATE_PROFILE_Implement'))
+            const choices = questions[0].type === 'choice' ? questions[0].choices.map(item => item.value) : []
+            assert.equal(questions.length, 1)
+            assert.deepEqual(choices, [`${f.implement!.id}:capability_fit`, `${f.implement!.id}:stage_fit`, 'none'])
+            return response.answers ? { answers: response.answers, execution } : null
+          },
+        }), error => {
+          assert.ok(error instanceof profiles.AgentProfileError)
+          assert.equal(error.code, 'agentProfileDecisionUnavailable'); assert.equal(error.message, 'agentProfileDecisionUnavailable')
+          assert.equal(error.status, 409); assert.equal(error.detail, response.detail)
+          return true
+        })
+        assert.equal(decisions, 1)
+        const logged = JSON.parse(warnings.at(-1)!)
+        assert.equal(logged.code, 'agentProfileDecisionUnavailable'); assert.equal(logged.detail, response.detail)
+        assert.equal(logged.issueId, f.issueId); assert.equal(logged.stage, 'review')
+        assert.equal(logged.candidateCount, 1); assert.equal(logged.candidateIds, f.implement!.id)
+        assert.equal(logged.profileCount, 3); assert.equal(logged.profileDiagnosticsTruncated, false)
+        assert.deepEqual(new Set(logged.profileAvailability.split(',')), new Set([`${f.implement!.id}:available`, `${f.review!.id}:checking`, `${disabled.id}:disabled`]))
+        assert.equal(logged.decisionExecutionId, response.answers ? execution.executionId : undefined)
+        assert.deepEqual(logged.causes, [])
+      }
+      assert.equal(warnings.length, responses.length)
+      for (const forbidden of [privateAnswer, 'PRIVATE_PROFILE_', disabled.name, disabled.description, execution.providerGenerationId, f.ownerId, f.connections.codex, f.connections.claude_code]) assert.ok(!warnings.join('\n').includes(forbidden), forbidden)
+      assert.deepEqual((await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [f.ownerId])).rows, beforeBindings)
+      assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 0)
+    } finally { warning.mock.restore(); usageProbe = oldUsageProbe }
+  })
   await t.test('CC implementation selects independent Codex Review with frozen exact Profile and subscription', async () => { await exercise(true, false) })
   await t.test('a prepared sleeping parent gains its missing Codex metadata without provider I/O', async () => { await exercise(true, true) })
   await t.test('no configured Profile retains CC despite Codex being first in model preference', async () => { await exercise(false, false) })
@@ -585,14 +641,22 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   const { claimCloudRun } = await import('../computer/claim')
   const { assertRunProfileClaim, AgentProfileAdmissionError } = await import('./profile-admission')
   const { rebindExecutionDevice } = await import('../execution-identity')
-  const claimFixture = async () => {
-    const f = await fixture()
-    const selected = await profiles.resolveAgentProfileDispatch(pool, f.scope, { issueId: f.issueId, profileId: f.implement!.id, location: 'cloud', cloudPurpose: 'desktop' })
+  const claimFixture = async (inherit = false) => {
+    const f = await fixture(true, false, inherit)
+    if (inherit) decisionProfile = f.implement!.id
+    const selected = await profiles.resolveAgentProfileDispatch(pool, f.scope, { issueId: f.issueId, ...(inherit ? {} : { profileId: f.implement!.id }), location: 'cloud', cloudPurpose: 'desktop' })
+    if (selected.target.kind !== 'cloud') assert.fail(JSON.stringify(selected.target))
     const subscriptionBindingId = await bindAgentToConnection(pool, f.scope, f.agents.claude_code, 'claude_code', f.connections.claude_code, model.claude_code)
-    const { runId } = await queueCloudRun(pool, f.actor, {
+    const queue: typeof queueCloudRun = inherit ? async (db, actor, input) => {
+      const dispatch = createFactoryDispatch(db, f.store, tx => queueCloudRun(db, actor, input, tx))
+      return dispatch(f.ownerId, { binding: factoryBinding(f.task), agentId: f.agents.claude_code, deviceRepoId: f.repoId })
+    } : queueCloudRun
+    const { runId } = await queue(pool, f.actor, {
       botId: f.botId, issueId: f.issueId, agentId: f.agents.claude_code, deviceRepoId: f.repoId,
       title: 'Claim the frozen Profile', body: 'Synthetic freshness boundary', model: model.claude_code,
-      subscriptionBindingId, agentProfile: selected.agentProfile, readOnly: true,
+      ...(inherit ? { sourceEventId: f.sourceEventId } : {}),
+      subscriptionBindingId, agentProfile: selected.agentProfile, readOnly: !inherit,
+      ...(inherit ? { modelDispatch: { mode: selected.selectionMode ?? 'preference', location: 'cloud', entry: selected.target.entry, ...(selected.target.routing ? { routing: selected.target.routing } : {}) } } : {}),
     })
     // The same handoff as provisioning, with no provider or model call.
     const threadDevice = randomUUID()
@@ -600,10 +664,25 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     await pool.query(`UPDATE thread_machines SET state='running',"deviceId"=$2,"sandboxId"=$3 WHERE "runId"=$1`, [runId, threadDevice, `synthetic-thread-${runId}`])
     const source = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0]
     const definition = await rebindExecutionDevice(pool, source, threadDevice, pool)
+    assert.ok(definition)
     await pool.query('UPDATE agent_runs SET "deviceId"=$2,"agentDefinition"=$3 WHERE id=$1', [runId, threadDevice, JSON.stringify(definition)])
-    return { ...f, runId, threadDevice, subscriptionBindingId, definition }
+    if (inherit) {
+      const threadRepo = randomUUID()
+      await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","baseBranch")
+        SELECT $1,$2,"userId","repoPath","baseBranch" FROM device_repos WHERE id=$3`, [threadRepo, threadDevice, f.repoId])
+      await pool.query('UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1', [runId, threadRepo])
+      await pool.query('UPDATE thread_machines SET "repoId"=$2 WHERE "runId"=$1', [runId, threadRepo])
+    }
+    return { ...f, runId, threadDevice, subscriptionBindingId, definition, inherit }
   }
-  const claim = (f: Awaited<ReturnType<typeof claimFixture>>) => claimCloudRun(pool, f.actor, f.runId, f.threadDevice, new Date(Date.now() + 30_000), f.subscriptionBindingId, undefined, undefined, false)
+  const claim = async (f: Awaited<ReturnType<typeof claimFixture>>) => {
+    const lease = new Date(Date.now() + 30_000)
+    const beforeClaim = f.inherit ? async (tx: import('pg').PoolClient) => {
+      const result = await (await import('./runtime')).guardFactoryClaim(tx, f.ownerId, f.threadDevice, f.runId, lease.toISOString())
+      assert.equal(result.preserveQuestionWorktree, true)
+    } : undefined
+    return claimCloudRun(pool, f.actor, f.runId, f.threadDevice, lease, f.subscriptionBindingId, beforeClaim, undefined, false)
+  }
   const refreshQuota = async (connectionId: string, used = .1) => {
     await pool.query(`UPDATE byos_connections SET quota=jsonb_set(jsonb_set(quota,'{observedAt}',$2::jsonb),'{windows,0,used}',$3::jsonb) WHERE id=$1`, [connectionId, JSON.stringify(new Date().toISOString()), JSON.stringify(used)])
   }
@@ -617,7 +696,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     const [{ requestedAgentProfile }, { createFactoryQuestions }, { queueCloudQuestionContinuation }, { createFactoryClaim }, { factoryEventId }] = await Promise.all([
       import('./profile-request'), import('./questions/store'), import('./questions/queue-continuation'), import('./claim'), import('./event-id'),
     ])
-    const f = await fixture(true, false, 'default'), beforeDecisions = decisionCounts()
+    const f = await fixture(true, false, false, 'default'), beforeDecisions = decisionCounts()
     const originalEvent = (await pool.query('SELECT * FROM coordinator_events WHERE id=$1', [f.sourceEventId])).rows[0]
     assert.equal(originalEvent.kind, 'user_message'); assert.equal(originalEvent.payload.profileId, 'default')
     const profileId = await requestedAgentProfile(pool, f.scope, f.sourceEventId, f.review!.id)
@@ -711,80 +790,100 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.deepEqual((await pool.query('SELECT * FROM coordinator_events WHERE id=$1', [f.sourceEventId])).rows[0], originalEvent)
     assert.deepEqual(decisionCounts(), beforeDecisions, 'a named model on Default does not invoke either Decision during first dispatch or same-session answer')
 
-    // Production #1225 reached this boundary: the native child submitted its
-    // work, then independent Review selection rejected. Keep real admission,
-    // candidate creation, transaction rollback and replay behavior in scope.
+    // #1225 production reached a valid native submission, then a Profile/reason
+    // protocol rejection. This is one representative invalid_reason response;
+    // it does not claim which private answer the live Decision returned.
     const deliverySha = 'b'.repeat(40)
     await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"=$2,"finishedAt"=now(),report=$3 WHERE id=$1`, [child.id, nativeSession, JSON.stringify({
-      sourceCommit: 'a'.repeat(40), deliverableCommit: deliverySha, summary: 'SYNTHETIC_PRIVATE_COMPLETED_WORK', runtime: { observedModel: model.codex },
+      sourceCommit: 'a'.repeat(40), deliverableCommit: deliverySha, summary: 'Synthetic completed native deliverable', runtime: { observedModel: model.codex },
     })])
     const producerRows = (await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [f.issueId])).rows
-    const taskBefore = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0]
-    const attemptsBefore = (await pool.query('SELECT * FROM factory_attempts WHERE "taskId"=$1 ORDER BY position', [f.task.id])).rows
-    const handoffsBefore = handoffs.length
-    const completion = createFactoryReconciler(pool, f.store, questions, {}, f.botId, automaticFactoryDispatch(pool))
-    const failures = [
-      ['unavailable', 'no_execution'], ['none', 'no_suitable_profile'], ['missing', 'profile_missing_or_refused'],
-      ['foreign', 'profile_invalid'], ['low', 'low_confidence'], ['reason', 'reason_invalid'],
-    ] as const
-    const rejected: unknown[] = [], logs: unknown[][] = []
-    const warn = t.mock.method(console, 'warn', (...args: unknown[]) => { logs.push(args) })
+    const beforeHandoffs = handoffs.length, completion = createFactoryReconciler(pool, f.store, questions, {}, f.botId, automaticFactoryDispatch(pool))
+    const warnings: string[] = [], warning = t.mock.method(console, 'warn', (line: unknown) => { warnings.push(String(line)) })
     decisionProfile = f.review!.id
     try {
-      for (const [failure] of failures) {
-        profileDecisionFailure = failure
-        await assert.rejects(completion.run(f.ownerId, child.id), error => {
-          assert.ok(error instanceof profiles.AgentProfileError)
-          assert.equal(error.code, 'agentProfileDecisionUnavailable'); assert.equal(error.status, 409)
-          assert.equal(error.message, 'agentProfileDecisionUnavailable', 'the public error contract is unchanged')
-          rejected.push(error)
-          return true
-        })
-        assert.deepEqual((await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0], taskBefore)
-        assert.deepEqual((await pool.query('SELECT * FROM factory_attempts WHERE "taskId"=$1 ORDER BY position', [f.task.id])).rows, attemptsBefore)
-        assert.equal((await pool.query('SELECT 1 FROM factory_candidates WHERE "taskId"=$1', [f.task.id])).rowCount, 0)
-        assert.equal((await pool.query('SELECT 1 FROM factory_attempts WHERE "taskId"=$1 AND stage=\'review\'', [f.task.id])).rowCount, 0)
-        assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [f.issueId])).rows, producerRows)
-        assert.equal(handoffs.length, handoffsBefore, 'an unavailable role never starts a provider or falls back to Default')
-      }
-      profileDecisionFailure = null
+      decisionFailure = 'missing-pair-reason'
       await completion.run(f.ownerId, child.id)
-      const current = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0]
-      assert.equal(current.stage, 'review'); assert.equal(current.status, 'running')
-      const candidate = (await pool.query('SELECT * FROM factory_candidates WHERE id=$1', [current.candidateId])).rows[0]
-      const attempt = (await pool.query('SELECT * FROM factory_attempts WHERE id=$1', [current.attemptId])).rows[0]
-      const review = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [attempt.runId])).rows[0]
-      assert.equal(candidate.runId, child.id); assert.equal(attempt.candidateId, candidate.id)
+      let blocked = await f.store.read(f.ownerId, f.task.id)
+      assert.equal(blocked.task.stage, 'review'); assert.equal(blocked.task.status, 'blocked')
+      assert.ok(blocked.task.candidateId)
+      const candidateId = blocked.task.candidateId
+      const candidate = (await pool.query('SELECT * FROM factory_candidates WHERE id=$1', [candidateId])).rows[0]
+      assert.equal(candidate.runId, child.id)
+      assert.deepEqual(blocked.checkDispatchRecovery, { binding: { taskId: f.task.id, revision: blocked.task.revision } })
+      assert.equal(JSON.parse(warnings.at(-1)!).detail, 'invalid_reason')
+      assert.equal(handoffs.length, beforeHandoffs)
+      const human = humanStore(), { handleFactory } = await import('./http')
+      const request = (revision: number) => ({ userId: f.ownerId, method: 'POST', taskId: f.task.id, origin: 'https://app.example',
+        url: `https://app.example/api/factory/tasks/${f.task.id}`, body: { binding: { taskId: f.task.id, revision }, eventId: randomUUID(), action: 'retry', reason: 'Retry the independent review of the retained candidate.' } })
+      const { sweepFactoryWatchdog } = await import('./watchdog')
+      // Owner retry records a pending attempt. The existing recovery cron then
+      // dispatches it after one minute; the HTTP handler does not dispatch it.
+      // Age only this synthetic task relative to the oldest task in this test
+      // database, so no other fixture enters the real bounded cron query.
+      const sweepAt = new Date((await pool.query('SELECT min("updatedAt") AS value FROM factory_tasks')).rows[0].value)
+      const sweepReview = async () => {
+        const pending = await f.store.read(f.ownerId, f.task.id)
+        assert.equal(pending.task.status, 'pending'); assert.equal(pending.task.stage, 'review')
+        assert.equal(pending.task.candidateId, candidateId)
+        await pool.query('UPDATE factory_tasks SET "updatedAt"=$2 WHERE id=$1', [f.task.id, new Date(sweepAt.getTime() - 60_001)])
+        const observed = await sweepFactoryWatchdog(pool, {
+          runtime: botId => { assert.equal(botId, f.botId); return { store: f.store, reconcile: completion } },
+          dispatch: automaticFactoryDispatch(pool),
+          wake: async () => { assert.fail('a retained candidate retry must use the normal check dispatcher') },
+        }, sweepAt)
+        assert.deepEqual(observed, { scanned: 1, recovered: 1, blocked: 0, deferred: 0, failed: 0 })
+        return f.store.read(f.ownerId, f.task.id)
+      }
+      for (const failure of ['none', 'refusal'] as const) {
+        decisionFailure = failure
+        const retry = request(blocked.task.revision)
+        const response = await handleFactory(human, retry)
+        assert.equal(response.status, 200)
+        const calls = decisionCounts()
+        assert.deepEqual(await handleFactory(human, retry), response, 'the same Owner retry does not repeat a refused Decision')
+        assert.deepEqual(decisionCounts(), calls)
+        blocked = await sweepReview()
+        assert.equal(blocked.task.status, 'blocked'); assert.equal(blocked.task.stage, 'review')
+        assert.equal(blocked.task.candidateId, candidateId)
+        assert.equal((await pool.query('SELECT 1 FROM factory_candidates WHERE "taskId"=$1', [f.task.id])).rowCount, 1)
+        assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [f.issueId])).rows, producerRows)
+        assert.equal(handoffs.length, beforeHandoffs, 'none/refusal never becomes Default or starts another producer')
+        const afterSweep = decisionCounts()
+        assert.deepEqual(await handleFactory(human, retry), response, 'the accepted retry receipt stays idempotent after cron observes the refusal')
+        assert.deepEqual(decisionCounts(), afterSweep)
+      }
+      decisionFailure = null
+      const retry = request(blocked.task.revision)
+      const [response, duplicate] = await Promise.all([handleFactory(human, retry), handleFactory(human, retry)])
+      assert.equal(response.status, 200); assert.deepEqual(duplicate, response)
+      const result = await sweepReview()
+      assert.equal(result.task.status, 'running'); assert.equal(result.task.stage, 'review')
+      assert.equal(result.task.candidateId, candidateId); assert.equal(result.task.sourceEventId, f.sourceEventId)
+      const reviewAttempt = result.attempts.find(attempt => attempt.id === result.task.attemptId)!
+      assert.ok(reviewAttempt.runId)
+      const review = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [reviewAttempt.runId])).rows[0]
       assert.equal(review.baseBranch, deliverySha); assert.equal(review.agentDefinition.readOnly, true)
       assert.equal(review.agentDefinition.agentProfile.profileId, f.review!.id)
+      assert.equal(review.agentDefinition.agentProfile.reason, 'stage_fit', 'the host stores the reason selected in the same constrained pair')
       assert.equal(review.agentDefinition.agentProfile.source, 'decision')
-      assert.equal(review.agentDefinition.agentProfile.version, f.review!.version)
-      assert.equal(review.agentDefinition.agentProfile.digest, f.review!.digest)
-      assert.equal(review.agentDefinition.harness, 'codex'); assert.equal(review.agentDefinition.model, model.codex)
+      assert.equal(review.agentDefinition.agentProfile.version, f.review!.version); assert.equal(review.agentDefinition.agentProfile.digest, f.review!.digest)
+      assert.equal(review.agentDefinition.model, model.codex); assert.equal(review.agentDefinition.harness, 'codex')
       for (const key of ['sessionId', 'continuesRunId', 'retryOf', 'questionContinuation']) assert.equal(review[key], null, key)
       assert.equal(review.agentDefinition.profileOriginRunId, undefined)
       assert.equal(review.agentDefinition.definitionDigest, workerDefinitionDigest(review.agentDefinition))
-      const afterCompletionDecisions = decisionCounts()
+      const afterDecisions = decisionCounts()
       await completion.run(f.ownerId, child.id)
-      assert.deepEqual(decisionCounts(), afterCompletionDecisions, 'completion replay does not select another role')
-      assert.equal(afterCompletionDecisions.profile, beforeDecisions.profile + failures.length + 1)
-      assert.equal(afterCompletionDecisions.model, beforeDecisions.model)
+      assert.deepEqual(await handleFactory(human, retry), response)
+      assert.deepEqual(decisionCounts(), afterDecisions)
+      assert.deepEqual(afterDecisions, { profile: beforeDecisions.profile + 4, model: beforeDecisions.model })
       assert.equal((await pool.query('SELECT 1 FROM factory_candidates WHERE "taskId"=$1', [f.task.id])).rowCount, 1)
-      assert.equal((await pool.query('SELECT 1 FROM factory_attempts WHERE "taskId"=$1 AND stage=\'review\'', [f.task.id])).rowCount, 1)
+      assert.equal((await pool.query('SELECT 1 FROM factory_attempts WHERE "taskId"=$1 AND stage=\'review\' AND "runId" IS NOT NULL', [f.task.id])).rowCount, 1)
       assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 3)
-      assert.equal(handoffs.length, handoffsBefore + 1)
-      assert.deepEqual(handoffs.at(-1), { previous: child.id, runId: review.id })
+      assert.equal(handoffs.length, beforeHandoffs + 1)
       assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE id=ANY($1::uuid[]) ORDER BY id', [[first.runId, child.id]])).rows, producerRows)
-      for (const [index, [, detail]] of failures.entries()) {
-        const cause = (rejected[index] as Error).cause as { code?: unknown; detail?: unknown }
-        assert.equal(cause?.code, 'agent_profile_decision_unavailable')
-        assert.equal(cause.detail, detail)
-      }
-      const diagnostics = logs.map(args => JSON.parse(String(args[0]))).filter(row => row.code === 'agent_profile_decision_unavailable')
-      assert.deepEqual(diagnostics.map(row => row.detail), failures.map(([, detail]) => detail))
-      assert.ok(diagnostics.every(row => row.event === 'coded_error' && row.purpose === 'factory-agent-profile'))
-      for (const privateText of ['SYNTHETIC_PRIVATE_', 'PRIVATE_PROFILE_', f.review!.id, f.connections.codex, nativeSession]) assert.equal(JSON.stringify(logs).includes(privateText), false)
-    } finally { profileDecisionFailure = null; warn.mock.restore() }
+      assert.deepEqual((await pool.query('SELECT * FROM coordinator_events WHERE id=$1', [f.sourceEventId])).rows[0], originalEvent)
+    } finally { decisionFailure = null; warning.mock.restore() }
   })
   await t.test('queue Available crosses 60s before claim; one exact-source usage refresh admits the original run', async t => {
     t.mock.timers.enable({ apis: ['Date'], now: Date.now() })
@@ -833,7 +932,14 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
         if (fault === 'model') await pool.query(`UPDATE byos_bindings SET "modelId"='changed-model' WHERE id=$1`, [f.subscriptionBindingId])
         if (fault === 'stop') await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [f.runId])
       }
-      if (['usage-error', 'still-unknown', 'quota', 'profile'].includes(fault)) await assert.rejects(claim(f), AgentProfileAdmissionError)
+      if (['usage-error', 'still-unknown', 'quota', 'profile'].includes(fault)) await assert.rejects(claim(f), error => {
+        assert.ok(error instanceof AgentProfileAdmissionError)
+        assert.equal(error.code, 'agentProfileUnavailable'); assert.equal(error.detail, 'current_profile')
+        assert.ok(error.cause instanceof profiles.AgentProfileError)
+        assert.equal(error.cause.code, fault === 'profile' ? 'agentProfileVersionConflict' : 'agentProfileModelUnavailable')
+        if (fault !== 'profile') assert.equal(error.cause.detail, fault === 'quota' ? 'quota' : 'checking')
+        return true
+      })
       else assert.equal(await claim(f), null)
       assert.deepEqual(usageCalls.slice(before), [{ ownerId: f.ownerId, connectionId: f.connections.claude_code }])
       await unchangedRun(f)
@@ -841,7 +947,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     })
   }
   assert.deepEqual(decisionInputs.map(call => call.purpose), ['factory-agent-profile', 'factory-agent-profile', 'task-model-routing', 'factory-agent-profile', 'task-model-routing',
-    'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile'])
+    'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile'])
   // Validate captured inputs outside the transport: model routing intentionally
   // catches transport errors, which must not swallow a privacy assertion.
   for (const call of decisionInputs) {
@@ -850,4 +956,40 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.ok(serialized.includes('review'))
     if (call.purpose === 'factory-agent-profile') assert.ok(JSON.stringify(call.questions).includes(call.profileId))
   }
+  await t.test('unchanged inherited frontend Profile survives JSONB, device handoff and expired quota at first cloud claim', async t => {
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() })
+    const before = decisionCounts()
+    const f = await claimFixture(true)
+    const frozen = f.definition.agentProfile!
+    assert.equal(frozen.version, 1)
+    assert.equal(frozen.profileId, f.implement!.id)
+    assert.equal(frozen.digest, f.implement!.digest)
+    assert.equal(frozen.source, 'decision')
+    assert.equal(frozen.definition.model.mode, 'inherit')
+    assert.deepEqual(frozen.definition.skills, ['implementation-evidence'])
+    assert.equal(frozen.effort, undefined)
+    assert.equal(frozen.targetEntry.harness, 'claude_code')
+    assert.equal(frozen.targetEntry.model, model.claude_code)
+    assert.deepEqual(frozen.targetEntry.source, { kind: 'subscription', connectionId: f.connections.claude_code })
+    assert.deepEqual(f.definition.modelDispatch?.entry, frozen.targetEntry, 'the preferred order UUID and full source entry survive freezing and relocation unchanged')
+    await profiles.assertProfileSelection(pool, f.scope, frozen)
+    await assertRunProfileClaim(pool, f.runId)
+    t.mock.timers.tick(60_001)
+    await assert.rejects(assertRunProfileClaim(pool, f.runId), error => {
+      assert.ok(error instanceof AgentProfileAdmissionError)
+      assert.equal(error.detail, 'current_profile')
+      assert.ok(error.cause instanceof profiles.AgentProfileError)
+      assert.equal(error.cause.code, 'agentProfileModelUnavailable'); assert.equal(error.cause.detail, 'checking')
+      return true
+    })
+    const beforeUsage = usageCalls.length
+    usageProbe = async (ownerId, connectionId) => {
+      assert.equal(ownerId, f.ownerId); assert.equal(connectionId, f.connections.claude_code)
+      await refreshQuota(connectionId)
+    }
+    assert.ok(await claim(f))
+    await unchangedRun(f, 'preparing')
+    assert.deepEqual(usageCalls.slice(beforeUsage), [{ ownerId: f.ownerId, connectionId: f.connections.claude_code }])
+    assert.deepEqual(decisionCounts(), { profile: before.profile + 1, model: before.model + 1 })
+  })
 })

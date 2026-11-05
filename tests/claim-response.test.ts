@@ -11,6 +11,8 @@ import { policyDistributionContext } from '../lib/agent-tool-approval/policy-dis
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { POST } from '../app/v1/devices/[deviceId]/runs/[runId]/claim/route'
 import { overrideDeploymentSwitch } from '../lib/deployment-switches'
+import { AgentProfileAdmissionError } from '../lib/factory/profile-admission'
+import { AgentProfileError } from '../lib/factory/agent-profile-definition'
 
 function fixture() {
   const repository = normalizeRepository('https://github.com/synthetic/claim-fixture.git')
@@ -431,4 +433,37 @@ test('Profile model, source or version changes keep ancestry but start a fresh n
       assert.equal(body.resumeSessionId, change === 'same' ? 'old-native-session' : undefined, `${lineage}:${change}`)
     }
   } } finally { overrideDeploymentSwitch('byos', undefined) }
+})
+
+test('Profile claim rejection preserves its cause and safe diagnostic while fencing the queued row', async t => {
+  const lines: string[] = []
+  t.mock.method(console, 'warn', (line: string) => { lines.push(line) })
+  for (const concurrentClaim of [false, true]) {
+    const probe = fixture()
+    const cause = new AgentProfileError('agentProfileModelUnavailable', 409, { detail: 'checking' })
+    cause.message = 'PRIVATE_PROFILE instructions; Bearer synthetic-secret; private Skill content'
+    const error = new AgentProfileAdmissionError({ detail: 'current_profile', cause })
+    assert.equal(error.cause, cause)
+    assert.equal(error.message, 'agentProfileUnavailable')
+    Object.assign(probe, { claimError: error, ...(concurrentClaim ? { beforeUpdate: async () => {
+      probe.run.status = 'preparing'; probe.run.leaseExpiresAt = new Date(Date.now() + 30_000)
+    } } : {}) })
+    const response = await claim(probe, ['skill-preflight', 'policy', 'publication', 'claim-rejected'])
+    assert.equal(response.status, 409)
+    const body = await response.json()
+    assert.equal(body.code, 'agentProfileUnavailable')
+    assert.equal(probe.run.status, concurrentClaim ? 'preparing' : 'failed')
+    assert.equal(probe.run.stopReason, concurrentClaim ? null : 'blocked')
+    assert.deepEqual((probe as typeof probe & { endedRuns?: unknown[] }).endedRuns ?? [], concurrentClaim ? [] : [{ ownerId: 'member', runId: 'run' }])
+    if (!concurrentClaim) assert.equal(probe.run.leaseExpiresAt, null)
+    const logged = JSON.parse(lines.at(-1)!)
+    assert.equal(logged.runId, 'run'); assert.equal(logged.code, 'agentProfileUnavailable'); assert.equal(logged.detail, 'current_profile')
+    assert.deepEqual(logged.causes, [{ name: 'AgentProfileError', code: 'agentProfileModelUnavailable', detail: 'checking' }])
+    for (const secret of ['PRIVATE_PROFILE', 'synthetic-secret', 'private Skill', probe.run.prompt]) {
+      assert.ok(!JSON.stringify(body).includes(secret))
+      assert.ok(!lines.at(-1)!.includes(secret))
+    }
+    for (const field of ['prompt', 'mcp', 'skills', 'skillReceipt', 'modelCredential']) assert.equal(Object.hasOwn(body, field), false)
+  }
+  assert.equal(lines.length, 2)
 })

@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { CodedError, type CodedErrorOptions } from '@mikka/protocol/coded-error'
+import type { ProfileDecisionFailure } from './agent-profile-decision'
 import { digest } from '@/lib/agent-kit/definition'
 import type { OrderEntry } from '@/lib/model-order-plan'
 import type { DecisionExecution } from '@/lib/coordinator/decide'
@@ -47,8 +49,12 @@ export interface AgentProfileSelection {
   targetEntry: OrderEntry
   decision?: DecisionExecution
 }
-export class AgentProfileError extends Error {
-  constructor(readonly code: string, readonly status = 409, options?: ErrorOptions) { super(code, options); this.name = 'AgentProfileError' }
+export type AgentProfileErrorDetail = ProfileDecisionFailure
+  | 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'removed' | 'model_gone' | 'key_refused' | 'balance' | 'provider_unavailable'
+export class AgentProfileError extends CodedError<string, AgentProfileErrorDetail> {
+  constructor(code: string, readonly status = 409, options?: CodedErrorOptions<AgentProfileErrorDetail>) {
+    super(code, options); this.name = 'AgentProfileError'; this.message = code
+  }
 }
 export function parseAgentProfile(input: unknown) {
   if (Buffer.byteLength(JSON.stringify(input) ?? '', 'utf8') > 32_000) throw new AgentProfileError('agentProfileTooLarge', 413)

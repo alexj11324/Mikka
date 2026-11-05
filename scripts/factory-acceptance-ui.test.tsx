@@ -687,3 +687,49 @@ test('a cited pre-question command source shows its localized time and opens tha
     assert.match(container.textContent ?? '', /需要修改/)
   }
 })
+
+test('a host-qualified no-Run dispatch block retries once without claiming a review was performed', async () => {
+  const current = { ...failedCandidate(), status: 'blocked',
+    reason: 'Independent check could not select an Agent Profile. Check the available profiles and retry the check.' }
+  const checkDispatchRecovery = { binding: { taskId: current.id, revision: current.revision } }
+  detail = { task: { ...current, route: { flowVersion: 2 } }, checkDispatchRecovery,
+    checks: [{ stage: 'review', status: 'blocked', attemptId: current.attemptId,
+      candidateId: current.candidateId, candidateSha: 'a'.repeat(40), runId: null, criteria: [], verify: null }] }
+  await pane(current)
+  const retry = button('重新审阅')
+  assert.ok(retry)
+  assert.match(container.textContent ?? '', /受阻/)
+  assert.doesNotMatch(container.textContent ?? '', /需要修改|审阅中|发布失败/)
+  assert.equal(container.querySelector('[data-slot="spinner"]'), null)
+  assert.equal(button('验收并合并'), undefined)
+  const sent: Record<string, unknown>[] = []
+  let finish: (response: Response) => void = () => {}
+  const original = globalThis.fetch
+  globalThis.fetch = (async (url, options) => {
+    assert.equal(String(url).endsWith('/api/factory/tasks/t1'), true)
+    assert.equal(options?.method, 'POST')
+    sent.push(JSON.parse(String(options?.body)))
+    return new Promise<Response>(resolve => { finish = resolve })
+  }) as typeof fetch
+  try {
+    assert.equal(sent.length, 0, 'rendering a blocked task never retries it')
+    await act(async () => { retry.click(); retry.click() })
+    assert.equal(sent.length, 1)
+    assert.equal(retry.disabled, true)
+    assert.deepEqual(Object.keys(sent[0]).sort(), ['action', 'binding', 'eventId', 'reason'])
+    assert.deepEqual(sent[0].binding, checkDispatchRecovery.binding)
+    assert.equal(sent[0].action, 'retry')
+    const receipt = retryReceipt(current)
+    const attempt = { ...receipt.attempts[0], runId: null }
+    detail = { task: receipt.task, checks: [{ stage: 'review', status: 'pending', attemptId: receipt.task.attemptId,
+      candidateId: current.candidateId, candidateSha: 'a'.repeat(40), runId: null, criteria: [], verify: null }] }
+    await act(async () => { finish(Response.json({ ...receipt, attempts: [attempt] })) })
+    assert.equal(detailReloads, 1)
+    assert.equal(ledgerReloads, 1)
+    assert.deepEqual(listReloadKeys, ['/api/factory/tasks?issueId=issue-1'])
+    assert.equal(button('重新审阅'), undefined)
+    assert.equal(button('验收并合并'), undefined)
+    assert.doesNotMatch(container.textContent ?? '', /重试未确认|需要修改|发布失败|已验收/)
+    assert.equal(sent.length, 1, 'the pending transition and refresh cannot dispatch another check')
+  } finally { globalThis.fetch = original }
+})

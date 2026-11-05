@@ -1,7 +1,7 @@
 import 'server-only'
+import { logCodedError } from '@mikka/protocol/coded-error'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
-import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
 import { digest } from '@/lib/agent-kit/definition'
 import { bindAgentToConnection, resolveModelDispatch, type ModelDispatch } from '@/lib/model-dispatch'
 import { credentialStates, orderCandidates, readOrder, poolDevices } from '@/lib/model-order'
@@ -14,7 +14,7 @@ import { BUILTIN_AGENT_PROFILE_ID, BUILTIN_AGENT_PROFILE_VERSION, builtinAgentPr
 import { acquireProfileMembership, profileView, readProfileRow, readProfileRows, validateProfileScope, type ProfileMembership, type ProfileQuery, type ProfileRow } from './agent-profile-store'
 import { agentProfileSkillsCatalog, resolveAgentProfileSkills } from './agent-profile-skills'
 import { maskFactoryNote } from './note-mask'
-import { profileDecisionQuestions, profileDecisionResult, type PublicAgentProfile } from './agent-profile-decision'
+import { profileDecisionDiagnostics, profileDecisionQuestions, profileDecisionSelection, type PublicAgentProfile } from './agent-profile-decision'
 import type { ModelRoutingContext } from '@/lib/model-routing-server'
 
 export * from './agent-profile-definition'
@@ -188,7 +188,11 @@ export async function assertProfileTarget(query: ProfileQuery, scope: AgentProfi
   if (entry.source.kind === 'subscription') await query.query('SELECT id FROM byos_connections WHERE id=$1 FOR SHARE', [entry.source.connectionId])
   else await query.query('SELECT id FROM model_api_keys WHERE id=$1 FOR SHARE', [entry.source.keyId])
   const state = (await credentialStates(query, scope, [entry], candidates, undefined, { probe: false })).get(entry.id)
-  if (!state?.credential.usable) throw new AgentProfileError('agentProfileModelUnavailable')
+  if (!state?.credential.usable) {
+    const details = { checking: 'checking', quota: 'quota', expired: 'expired', paused: 'paused', missing: 'missing', removed: 'removed', modelGone: 'model_gone', keyRefused: 'key_refused', balance: 'balance', providerUnavailable: 'provider_unavailable' } as const
+    const credential = state?.credential
+    throw new AgentProfileError('agentProfileModelUnavailable', 409, { detail: credential?.usable === false ? details[credential.reason] : 'missing' })
+  }
 }
 
 export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchScope, request: AgentProfileDispatchRequest, deps: DispatchDependencies = {}): Promise<AgentProfileDispatchResult> {
@@ -254,15 +258,15 @@ export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchSco
     if (!issue) throw new AgentProfileError('agentProfileScopeNotFound', 404)
     const catalog = eligible.map(item => item.public)
     const input = maskFactoryNote(JSON.stringify({ task: { title: issue.title, content: JSON.stringify(issue.content).slice(0, 12_000), stage: request.stage ?? 'execute', note: request.note?.slice(0, 4000) }, candidates: catalog }))
-    execution = await hostedBillingScope.run({ workspaceId: scope.workspaceId, ownerId: scope.ownerId }, () => (deps.decision ?? invokeDecision)('factory-agent-profile', input, profileDecisionQuestions(catalog)))
-    const result = profileDecisionResult(catalog, execution?.answers ?? null)
-    if (!result.selected) {
-      const cause = new CodedError('agent_profile_decision_unavailable', { detail: result.detail })
-      logCodedError(cause, { purpose: 'factory-agent-profile' })
-      throw new AgentProfileError('agentProfileDecisionUnavailable', 409, { cause })
+    execution = await hostedBillingScope.run({ workspaceId: scope.workspaceId, ownerId: scope.ownerId }, () => (deps.decision ?? invokeDecision)('factory-agent-profile', input, profileDecisionQuestions(catalog), undefined, { retainInvalidReceipt: true }))
+    const result = profileDecisionSelection(catalog, execution?.answers ?? null)
+    if ('unavailable' in result) {
+      const error = new AgentProfileError('agentProfileDecisionUnavailable', 409, { detail: result.unavailable })
+      const stage = ['triage', 'plan', 'spec', 'execute', 'review', 'verify', 'approval', 'publish', 'monitor'].includes(request.stage ?? '') ? request.stage : undefined
+      logCodedError(error, { issueId: request.issueId, stage, ...profileDecisionDiagnostics(catalog, availability), decisionExecutionId: execution?.execution.executionId })
+      throw error
     }
-    const selected = result.selected
-    chosen = eligible.find(item => item.row.id === selected.id); reason = selected.reason
+    chosen = eligible.find(item => item.row.id === result.selected.id); reason = result.selected.reason
   }
   if (!chosen) throw new AgentProfileError('agentProfileSelectionInvalid')
   const definition = parseAgentProfile(chosen.row.definition), skills = resolveAgentProfileSkills(definition.skills)
