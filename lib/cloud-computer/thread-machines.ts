@@ -1,3 +1,4 @@
+import { runChanged } from '../live/panels'
 import 'server-only'
 import { runListChanged } from '../live/lists'
 import { rebindExecutionDevice, revalidateExecutionIdentity } from '../execution-identity'
@@ -116,7 +117,7 @@ async function endStopRequestedRun(client: PoolClient, actor: Actor, runId: stri
   const m = (await client.query('SELECT "sandboxId","workerLeaseId","workerLeaseUntil" FROM thread_machines WHERE "runId"=$1 FOR UPDATE', [runId])).rows[0]
   const pending = Boolean(m && !m.sandboxId && (m.workerLeaseId || m.workerLeaseUntil))
   const stopped = await client.query(`UPDATE agent_runs SET status='stopped',"finishedAt"=COALESCE("finishedAt",now()),"updatedAt"=now() WHERE id=$1 AND "userId"=$2 AND status='queued' RETURNING id`, [runId, actor.userId])
-  if (stopped.rowCount) await runListChanged(client, runId)
+  if (stopped.rowCount) { await runListChanged(client, runId); await runChanged(client, runId) }
   if (m) await client.query('UPDATE thread_machines SET state=\'ended\',"endedAt"=COALESCE("endedAt",now()),"computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL,"workerLeaseId"=NULL,"workerLeaseUntil"=CASE WHEN $2 THEN COALESCE("workerLeaseUntil",now()) ELSE NULL END WHERE "runId"=$1', [runId, pending])
   await client.query('COMMIT')
   return (m?.sandboxId as string | null) ?? null
@@ -741,7 +742,7 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
       creationPending = !sandboxId && Boolean(locked.workerLeaseId || locked.workerLeaseUntil)
       const stopped = await client.query(`UPDATE agent_runs SET status='stopped',"stopRequestedAt"=COALESCE("stopRequestedAt",now()),"finishedAt"=COALESCE("finishedAt",now())
         WHERE id=$1 AND "userId"=$2 AND status NOT IN ('succeeded','failed','stopped','cancelled') RETURNING id`, [runId, actor.userId])
-      if (stopped.rowCount) await runListChanged(client, runId)
+      if (stopped.rowCount) { await runListChanged(client, runId); await runChanged(client, runId) }
       await client.query('UPDATE thread_machines SET state=\'ended\',"endedAt"=COALESCE("endedAt",now()),"computeSeconds"="computeSeconds"+GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,"runningSince"=NULL,"workerLeaseId"=NULL,"workerLeaseUntil"=CASE WHEN $2 THEN COALESCE("workerLeaseUntil",now()) ELSE NULL END WHERE "runId"=$1', [runId, creationPending])
       // An adopted old row has given up its sandbox; its historical device ID
       // belongs to the new stage now. Only the machine still owning a sandbox

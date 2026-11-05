@@ -1,3 +1,4 @@
+import { runChanged } from '../live/panels'
 import 'server-only'
 import { botListChanged, runListChanged } from '../live/lists'
 import { randomUUID } from 'node:crypto'
@@ -65,7 +66,7 @@ export class ComputerStore {
           status=CASE WHEN r.status='queued' THEN 'stopped' ELSE r.status END
           FROM computer_run_bindings b WHERE b."runId"=r.id AND b."workspaceId"=$1
             AND r.status=ANY($2::text[]) RETURNING r.id`, [workspaceId, ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']])
-        for (const { id } of stopped.rows) await runListChanged(client, id)
+        for (const { id } of stopped.rows) { await runListChanged(client, id); await runChanged(client, id) }
       }
       const sync = async () => {
         for (const machine of machines) {
@@ -185,7 +186,7 @@ export class ComputerStore {
         const resumed = await client.query<{ id: string }>(`UPDATE agent_runs r SET status=COALESCE(r."resumeStatus",'running'),"resumeStatus"=NULL,"pauseReason"=NULL,"updatedAt"=now()
           FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3
           AND r."userId"=$3 AND r.status='paused' AND r."pauseReason"='human_control' RETURNING r.id`, [botId, actor.workspaceId, actor.userId])
-        for (const { id } of resumed.rows) await runListChanged(client, id)
+        for (const { id } of resumed.rows) { await runListChanged(client, id); await runChanged(client, id) }
       }
       persistProgress = true
       await this.runtime.syncDesktopLease(sandbox, lease)

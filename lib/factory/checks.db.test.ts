@@ -177,10 +177,16 @@ test(
       const dispatch = createFactoryDispatch(db, store, queue, {
         configure: {
           execute: factoryRepairBrief,
-          review: (tx, task, id) =>
-            configureFactoryCheck(tx, task, id, selectedPolicy),
-          verify: (tx, task, id) =>
-            configureFactoryCheck(tx, task, id, selectedPolicy),
+          // The fixture device is "online" only within the 90 s presence window (lib/device-presence.ts),
+          // and this file runs for minutes: keep its heartbeat current so a slow runner cannot age it out.
+          review: async (tx, task, id) => {
+            await tx.query(`UPDATE devices SET "lastSeenAt"=now() WHERE id=$1`, [deviceId]);
+            return configureFactoryCheck(tx, task, id, selectedPolicy);
+          },
+          verify: async (tx, task, id) => {
+            await tx.query(`UPDATE devices SET "lastSeenAt"=now() WHERE id=$1`, [deviceId]);
+            return configureFactoryCheck(tx, task, id, selectedPolicy);
+          },
         },
         freeze: async (tx, _task, id) => {
           const {

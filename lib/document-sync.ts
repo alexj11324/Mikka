@@ -19,7 +19,7 @@ export class DocumentSync {
   private seed: string
   private version = 0
   private acknowledged = 0
-  /** The stored document's version from the last answer; with no local edits, a poll sends only this. */
+  /** The stored version from the last answer; an invalidation read sends only this. */
   private known: string | undefined
   private flight: Promise<void> | undefined
   private listeners = new Set<() => void>()
@@ -64,7 +64,7 @@ export class DocumentSync {
         if (result.update) Y.applyUpdate(this.doc, decode(result.update), 'server')
         this.known = result.version
         this.acknowledged = sentVersion
-        this.publish({ ready: true, pending: this.version !== this.acknowledged, error: false })
+        this.publish({ ready: true, pending: this.version !== this.acknowledged, error: false, workspaceId: result.workspaceId })
       } catch (error) {
         this.publish({ error: true })
         throw error

@@ -25,6 +25,7 @@ import { runFinishedEvent } from './coordinator-events'
 import { defaultAgentCopy } from './agent-copy'
 import { ActionFailureError } from './action-error'
 import { ComputerError } from './computer/store'
+import { runChanged } from './live/panels'
 
 type Run = typeof agentRuns.$inferSelect
 type Query = Pick<Pool | PoolClient, 'query'>
@@ -220,6 +221,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
       await client.query(`UPDATE agent_runs SET report=report||jsonb_build_object('modelFallback',$3::jsonb),"updatedAt"=now()
         WHERE id=$1 AND "userId"=$2`, [source.id, source.userId, JSON.stringify({ ...prior, state: 'stopped' })])
       await runListChanged(client, source.id)
+      await runChanged(client, source.id)
       await client.query('COMMIT')
       return null
     }
@@ -266,6 +268,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
       }
       await client.query(`UPDATE agent_runs SET report=COALESCE(report,'{}'::jsonb)||jsonb_build_object('modelFallback',$3::jsonb),"updatedAt"=now() WHERE id=$1 AND "userId"=$2`, [source.id, source.userId, JSON.stringify(receipt)])
       await runListChanged(client, source.id)
+      await runChanged(client, source.id)
       if (receipt.state === 'switched' && receipt.retryRunId)
         await (await import('./factory/store')).adoptProviderContinuation(client, source.userId, source.id, receipt.retryRunId)
       const event = receipt.state === 'switched' ? {
