@@ -3857,7 +3857,7 @@
         "decision_unavailable": "Difficulty assessment was unavailable; used model list order",
         "invalid_answer": "Difficulty assessment was invalid; used model list order",
         "no_selection": "No suitable model was selected; used model list order",
-        "escalated": "The lightweight model could not finish the task; retried with a stronger model"
+        "escalated": "The previous model could not finish the task; retried with a stronger model"
       }
     }
   },

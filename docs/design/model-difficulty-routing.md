@@ -47,7 +47,7 @@
 | 难度判断暂不可用，沿用模型列表顺序 | Difficulty assessment was unavailable; used model list order |
 | 难度判断无效，沿用模型列表顺序 | Difficulty assessment was invalid; used model list order |
 | 没有选出合适模型，沿用模型列表顺序 | No suitable model was selected; used model list order |
-| 轻量模型未能完成任务，已升级重试 | The lightweight model could not finish the task; retried with a stronger model |
+| 原模型未能完成任务，已升级重试 | The previous model could not finish the task; retried with a stronger model |
 
 判断结果行格式：`简单 → GPT-6 Luna · 低推理强度` / `Easy → GPT-6 Luna · Low reasoning effort`。模型沿用现有显示名称；没有冻结的推理强度时省略分隔点和强度。
 

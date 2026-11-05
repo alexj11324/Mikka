@@ -3857,7 +3857,7 @@
         "decision_unavailable": "难度判断暂不可用，沿用模型列表顺序",
         "invalid_answer": "难度判断无效，沿用模型列表顺序",
         "no_selection": "没有选出合适模型，沿用模型列表顺序",
-        "escalated": "轻量模型未能完成任务，已升级重试"
+        "escalated": "原模型未能完成任务，已升级重试"
       }
     }
   },
