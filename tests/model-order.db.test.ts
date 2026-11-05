@@ -425,6 +425,22 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
       [['acct-opus-u2', 'acct-sonnet-u2'], [], []], 'haiku was not reported by Mac\'s daemon')
   })
 
+  await t.test('the one-off migration keeps everyone\'s first choice: 优先使用的 Agent becomes the first row\'s Agent', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const sql = await readFile(new URL('../drizzle/20261105041500_preferred_agent_from_first_row.sql', import.meta.url), 'utf8')
+    const saved = await person('migration-first-row'), untouched = await person('migration-untouched')
+    const codex = await subscribe(saved, 'codex', ['first-codex']), claude = await subscribe(saved, 'claude', ['second-claude'])
+    await order.changeOrder(pool, saved, { kind: 'add', entries: [{ harness: 'codex', model: 'first-codex', source: { kind: 'subscription', connectionId: codex } }, { harness: 'claude_code', model: 'second-claude', source: { kind: 'subscription', connectionId: claude } }] })
+    const stored = (await order.readOrder(pool, saved)).entries
+    await order.changeOrder(pool, saved, { kind: 'reorder', ids: [stored.find(row => row.model === 'first-codex')!.id, ...stored.filter(row => row.model !== 'first-codex').map(row => row.id)] })
+    await pool.query('UPDATE model_order_settings SET "preferredHarness"=\'claude_code\' WHERE "ownerId"=$1', [saved.ownerId])
+    await subscribe(untouched, 'codex', ['only-codex'])
+    await order.changeOrder(pool, untouched, { kind: 'location', location: 'local' })
+    await pool.query(sql); await pool.query(sql)
+    assert.equal((await order.readOrder(pool, saved)).preferredHarness, 'codex', 'its first row runs on Codex')
+    assert.equal((await order.readOrder(pool, untouched)).preferredHarness, 'claude_code', 'an untouched list keeps its setting')
+  })
+
   await t.test('a model the account no longer reports stays listed, marked modelGone; never deleted', async () => {
     const scope = await person('order-model-gone')
     const connection = await subscribe(scope, 'claude', ['claude-opus-gone', 'claude-sonnet-kept'])
@@ -435,6 +451,16 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     const gone = view.entries.find(entry => entry.model === 'claude-opus-gone')
     assert.equal(gone?.block?.reason, 'modelGone')
     assert.notEqual(view.entries.find(entry => entry.model === 'claude-sonnet-kept')?.block?.reason, 'modelGone')
+    // An API key too: its provider's /models no longer lists one (重新获取模型); a key listing nothing says nothing more.
+    const key = await keys.addApiKey(pool, scope.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'ds-gone' }, { id: 'ds-kept' }] })) as unknown as typeof fetch })
+    await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: 'claude_code', model: 'ds-gone', source: { kind: 'api_key', keyId: key.id } }] })
+    await pool.query('UPDATE model_api_keys SET models=$2::jsonb WHERE id=$1', [key.id, JSON.stringify(['ds-kept'])])
+    assert.equal((await order.orderView(pool, scope)).entries.find(entry => entry.model === 'ds-gone')?.block?.reason, 'modelGone')
+    await pool.query('UPDATE model_api_keys SET models=\'[]\'::jsonb WHERE id=$1', [key.id])
+    assert.equal((await order.orderView(pool, scope)).entries.find(entry => entry.model === 'ds-gone')?.block?.reason, 'missing')
+    // 移除 the subscription: 已移除, not 未连接或不可用.
+    await pool.query(`UPDATE byos_connections SET state='disconnected',"secretName"=NULL,"secretDigest"=NULL,"removedAt"=now() WHERE id=$1`, [connection])
+    assert.equal((await order.orderView(pool, scope)).entries.find(entry => entry.model === 'claude-sonnet-kept')?.block?.reason, 'removed')
   })
 
   await t.test('优先使用的 Agent and a row\'s Agent: a DeepSeek model both Agents run goes on the preferred one; a row switches; 0 credentials for the empty state', async () => {

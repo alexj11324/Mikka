@@ -13,7 +13,7 @@ import { workerDefinitionDigest } from './agent-kit/worker-digest'
 import { digest } from './agent-kit/definition'
 import { executionIdentitySchema, freezeExecutionIdentity, type ExecutionIdentity } from './execution-identity'
 import { entryKey, type OrderEntry, type SkippedEntry } from './model-order-plan'
-import { credentialStates, orderCandidates, readOrder } from './model-order'
+import { credentialStates, dispatchOrder, orderCandidates, readOrder } from './model-order'
 import { bindAgentToConnection, modelUnavailableCard, resolveModelDispatch, type ModelDispatch } from './model-dispatch'
 import { modelFallbackRecordSchema, type ModelFallbackChoice, type ModelFallbackRecord } from './run-model-fallback-view'
 import { lockFactoryCompletionTasks } from './run-completion-effects'
@@ -301,8 +301,9 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
       ? { runId: next.id, previousRunId: source.id, deviceId: next.deviceId, cloud: next.agentDefinition?.executionIdentity?.billingAccount.runtime.kind === 'e2b', workspaceId: next.agentDefinition?.executionIdentity?.workspaceId ?? '' } : null
   }
   if (initial.state !== 'pending') return null
-  const scope = await fallbackScope(pool, source), { entries } = await readOrder(pool, scope)
-  const attempted = await attemptedEntries(pool, source, entries)
+  // The order dispatch tried (优先使用的 Agent's list first, decision 2026-11-05-0400), so what came before this run is what was tried.
+  const scope = await fallbackScope(pool, source), stored = await readOrder(pool, scope)
+  const attempted = await attemptedEntries(pool, source, dispatchOrder(stored.entries, stored.preferredHarness))
   if (source.agentDefinition?.modelDispatch?.mode !== 'preference' || source.questionContinuation || source.agentDefinition?.agentProfile?.definition.model.mode === 'fixed')
     return settle(pool, source, await unavailableRecord(pool, scope, source, attempted))
   const { rows: [origin] } = await pool.query<{ kind: string; remoteUrl: string | null }>(`SELECT d.kind,repo."remoteUrl" FROM devices d
@@ -315,7 +316,7 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
     WHERE t."userId"=$1 AND a."runId"=$2 AND t.stage='monitor'`, [userId, source.id])).rowCount !== 0
   const checkpointUnavailable = source.report?.providerCheckpoint === 'unavailable'
   const skipped: SkippedEntry[] = []
-  for (let index = 0; index <= entries.length; index++) {
+  for (let index = 0; index <= stored.entries.length; index++) {
     const selected: ModelDispatch = await resolveModelDispatch(pool, scope, null, location, source.agentDefinition.pinnedDeviceId ?? ((monitor || checkpointUnavailable) && origin.kind === 'local' ? source.deviceId ?? undefined : undefined),
       { excludeEntryKeys: [...attempted].map(key => decodeURIComponent(key)), cloudPurpose: origin.remoteUrl ? 'task' : 'desktop',
         ...(source.agentDefinition.agentProfile?.definition.harness && source.agentDefinition.agentProfile.definition.harness !== 'auto' ? { harness: source.agentDefinition.agentProfile.definition.harness } : {}) })

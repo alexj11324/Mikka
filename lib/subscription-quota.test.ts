@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { QUOTA_DISPLAY_MS, shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
+import { QUOTA_DISPLAY_MS, quotaDisplayKey, shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
 
 const now = Date.parse('2026-11-02T18:00:00Z')
 const quota = (windows: unknown[], fields = {}) => ({ vendor: 'claude_code', source: 'official', status: 'ok', plan: null, observedAt: new Date(now).toISOString(), windows, ...fields })
@@ -49,4 +49,17 @@ test('Settings shows the last read allowance for a while; dispatch still wants a
   assert.equal(shownSubscriptionAvailability(quota([usedUp], { observedAt: new Date(now - 5 * 60_000).toISOString() }), 'claude-haiku-5-5', 'claude', now).status, 'checking', 'a used-up window that has since reset needs another read')
   const stillOut = { ...account, used: 1, resetsAt: new Date(now + 60 * 60_000).toISOString() }
   assert.equal(shownSubscriptionAvailability(quota([stillOut], { observedAt: new Date(now - 5 * 60_000).toISOString() }), 'claude-haiku-5-5', 'claude', now).status, 'exhausted')
+})
+
+test('a new reading is pushed only when what Settings shows changes (a meter reads every ~45 s)', () => {
+  const now = Date.parse('2026-11-05T04:00:00Z')
+  const read = (used: number, minutesAgo = 0, resetsAt = '2026-11-05T06:00:00Z') => ({ vendor: 'claude_code', source: 'official', status: 'ok', plan: null, observedAt: new Date(now - minutesAgo * 60_000).toISOString(), windows: [{ kind: 'five_hour', used, resetsAt }] })
+  // The meter moved from 20% to 30%: the page shows 可用 either way.
+  assert.equal(quotaDisplayKey(read(.2, 1), now), quotaDisplayKey(read(.3), now))
+  // Used up, or a used-up window that now resets at another time: shown differently.
+  assert.notEqual(quotaDisplayKey(read(.3, 1), now), quotaDisplayKey(read(1), now))
+  assert.notEqual(quotaDisplayKey(read(1, 1), now), quotaDisplayKey(read(1, 0, '2026-11-05T07:00:00Z'), now))
+  // Nothing read, or too old to show (待检查), then a fresh read.
+  assert.notEqual(quotaDisplayKey(null, now), quotaDisplayKey(read(.2), now))
+  assert.equal(quotaDisplayKey(read(.2, QUOTA_DISPLAY_MS / 60_000 + 1), now), 'checking')
 })

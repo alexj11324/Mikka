@@ -756,6 +756,12 @@ How a design is reviewed:
     2026-10-31); Mikka writes none of its own, so an item without one, and
     GitHub, Linear and Telegram, show icon and name only. Rows in 设置 › 连接
     have none.
+  - A settings switch or choice may carry one short line saying what it does
+    and what happens when it is on or picked (Alex, 2026-11-05, on 模型与订阅:
+    he could not follow 「这个工作区 / 分享给团队成员」 or 「依次用：云端 →
+    服务器 → 电脑」; [0400](decisions/2026-11-05-0400-per-agent-model-lists.md)).
+    In plain words, as short as it can be, and each line still passes the delete
+    test: if removing it loses nothing a newcomer needs, it goes.
 - **R-41** An empty state is one colloquial line plus one button (often
   "send to a bot"). Never "这里是空的" or "Check back later".
 - **R-42** Every visible string lives in `messages/zh-CN.json` and

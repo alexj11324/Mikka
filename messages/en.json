@@ -2625,7 +2625,7 @@
       "orderLocal": "Tasks run on your server first, then on your computer",
       "first": "right now {place} goes first",
       "noKeyFirst": "no E2B key for the cloud yet, so {place} goes first",
-      "nowhere": "right now none of the three is available",
+      "nowhere": "right now the cloud, servers and computers all can’t run it",
       "add": "Add models",
       "addCount": "{count, plural, one {Add # model} other {Add # models}}",
       "empty": "No preferred models yet",
@@ -2645,7 +2645,8 @@
         "quota": "Quota used up",
         "expired": "Needs reconnecting",
         "paused": "Subscription turned off",
-        "missing": "Subscription or API key removed",
+        "missing": "Not connected or unavailable",
+        "removed": "Removed",
         "modelGone": "No longer offered by the account",
         "keyRefused": "Key invalid or revoked",
         "balance": "Insufficient balance",
@@ -2689,7 +2690,6 @@
       "preferredAgent": "Preferred Agent",
       "preferredAgentHint": "Tasks go to it first and pick from its models in order; if it can’t run them, the other Agent takes over",
       "preferredMark": "Preferred",
-      "onlyAgent": "{agent} only",
       "bothAgents": "Both Agents",
       "agentMenu": "Agent for {model}: {agent}",
       "emptyNoCredential": "No subscription or API key yet",
@@ -2705,9 +2705,14 @@
       "openApiKey": "Open API key",
       "openSubscription": "Open subscription",
       "description": "A task takes the first model from the top that can run now",
-      "nowhereLocal": "right now neither is available",
-      "e2bKeyHint": "Needed to start a machine for cloud tasks",
-      "clauseSeparator": "; "
+      "nowhereLocal": "right now servers and computers both can’t run it",
+      "e2bKeyHint": "For cloud tasks",
+      "clauseSeparator": "; ",
+      "emptyUseOther": "{agent} has no models it can use; tasks go to {other}",
+      "switchAgent": "Use {agent}",
+      "backup": "{agent} list as fallback · {count, plural, one {# model} other {# models}}",
+      "backupList": "{agent} fallback list",
+      "billedByProvider": "billed by the provider"
     },
     "loadingPage": "Loading settings",
     "modelScope": {
@@ -2778,7 +2783,12 @@
       "revision": "Version",
       "selectedBy": "Selected by",
       "selectionReason": "Selection reason",
-      "selectionReasons": { "capability_fit": "Capabilities best fit the work", "stage_fit": "Responsibilities best fit this stage", "only_suitable": "The only profile with suitable capabilities", "other": "Chosen by task capabilities" },
+      "selectionReasons": {
+        "capability_fit": "Capabilities best fit the work",
+        "stage_fit": "Responsibilities best fit this stage",
+        "only_suitable": "The only profile with suitable capabilities",
+        "other": "Chosen by task capabilities"
+      },
       "explicitReason": "The profile you specified for this task",
       "defaultReason": "Inherited preferred models",
       "sources": {

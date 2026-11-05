@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { FieldError, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Label } from '@/components/ui/label'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { E2BKeyDialog, useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
 import type { OrderRow, OrderView } from '@/lib/model-order'
@@ -62,8 +63,12 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   // One Agent's list at a time (decision 2026-11-05-0400): 优先使用的 Agent picks it; each keeps its own order.
   const shown = data ? data.entries.filter(entry => entry.harness === data.preferredHarness) : []
   const offered = data ? data.candidates.filter(candidate => candidate.harness === data.preferredHarness) : []
+  // The other Agent's list is the fallback dispatch takes after this one (decision 2026-11-05-0400).
+  const other: OrderHarness = data?.preferredHarness === 'codex' ? 'claude_code' : 'codex'
+  const backup = data ? data.entries.filter(entry => entry.harness === other) : []
+  const offeredOther = data ? data.candidates.filter(candidate => candidate.harness === other) : []
   // A subscription connected, paused or read again elsewhere: this list re-reads (no polling).
-  useLiveKey('workspace_settings', workspaceId, [unstable_serialize(modelOrderKey(workspaceId))], workspaceId, { minIntervalMs: 2_000 })
+  useLiveKey('model_settings', workspaceId, [unstable_serialize(modelOrderKey(workspaceId))], workspaceId, { minIntervalMs: 2_000 })
 
   async function checkQuota(connectionId: string) {
     setPending(true); setFailed(null)
@@ -135,7 +140,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
     if ((reason === 'paused' || reason === 'expired') && row.source.kind === 'subscription') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={`#subscription-${row.source.connectionId}`} />}>{t(reason === 'paused' ? 'enableSubscription' : 'reconnectSubscription')}</Button>
     if (reason === 'keyRefused' && row.source.kind === 'api_key') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={`#api-key-${row.source.keyId}`} />}>{t('openApiKey')}</Button>
     // A removed source may have no row left: its source section retains the recovery control.
-    if (reason === 'missing') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={row.source.kind === 'subscription' ? '#subscriptions-heading' : '#api-keys-heading'} />}>{t(row.source.kind === 'subscription' ? 'openSubscription' : 'openApiKey')}</Button>
+    if (reason === 'missing' || reason === 'removed') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={row.source.kind === 'subscription' ? '#subscriptions-heading' : '#api-keys-heading'} />}>{t(row.source.kind === 'subscription' ? 'openSubscription' : 'openApiKey')}</Button>
     return null
   }
   return <>
@@ -175,6 +180,9 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
           {offered.length > 0
             ? <><p className="text-sm text-muted-foreground">{data.entries.length ? t('emptyAgent', { agent: harnessName(data.preferredHarness) }) : t('empty')}</p>
               <Button type="button" disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button></>
+            // Nothing for this Agent, models for the other: tasks go there; one button makes it the 优先使用的 Agent.
+            : offeredOther.length > 0 ? <><p className="text-sm text-muted-foreground">{t('emptyUseOther', { agent: harnessName(data.preferredHarness), other: harnessName(other) })}</p>
+              <Button type="button" disabled={pending} onClick={() => void save({ kind: 'preferred', harness: other }, { ...data, preferredHarness: other })}>{t('switchAgent', { agent: harnessName(other) })}</Button></>
             : <><p className="text-sm text-muted-foreground">{data.credentials === 0 ? t('emptyNoCredential') : t('emptyNoModels')}</p>
               <span className="flex flex-wrap justify-center gap-2">
                 <Button nativeButton={false} variant="secondary" render={<a href="#subscriptions-heading" />}>{t(data.credentials === 0 ? 'connectSubscription' : 'openSubscription')}</Button>
@@ -183,6 +191,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
         </div>
         : <OrderList rows={shown} pending={pending} unsaved={unsaved} preferred={data.preferredHarness} repair={repair} onMove={move} onRemove={row => { void remove(row) }}
           onAgent={(row, harness) => void save({ kind: 'harness', id: row.id, harness }, { ...data, entries: data.entries.map(entry => entry.id === row.id ? { ...entry, harness } : entry) })} />}
+      {shown.length > 0 && backup.length > 0 && <BackupList agent={other} rows={backup} />}
     </SettingsSection>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={failed.retry} />}
     {adding && <AddModelsDialog candidates={offered} onClose={async picked => {
@@ -192,6 +201,25 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
     {keyDialog.value && e2b.configured !== undefined && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={e2b.configured}
       onClose={changed => { setKeyOpen(false); if (changed) void Promise.all([e2b.mutate(), order.mutate()]) }} />}
   </>
+}
+
+/** The other Agent's list, read-only and folded: dispatch's fallback once this Agent's models cannot run. */
+function BackupList({ agent, rows }: { agent: OrderHarness; rows: OrderRow[] }) {
+  const t = useTranslations('Settings.modelOrder')
+  return <Collapsible className="border-t border-border">
+    <CollapsibleTrigger render={<Button type="button" variant="ghost" className="group h-auto w-full justify-between rounded-none px-5 py-3 text-sm font-normal text-muted-foreground" />}>
+      {t('backup', { agent: harnessName(agent), count: rows.length })}<ChevronDown aria-hidden="true" className="transition-transform group-data-panel-open:rotate-180" />
+    </CollapsibleTrigger>
+    <CollapsibleContent>
+      <ol aria-label={t('backupList', { agent: harnessName(agent) })} className="flex flex-col divide-y divide-border">
+        {rows.map((row, index) => <li key={row.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
+          <span aria-hidden="true" className="w-4 shrink-0 text-center text-xs text-muted-foreground tabular-nums">{index + 1}</span>
+          <span className="min-w-0 flex-1 truncate">{row.model}</span>
+          <span className="shrink-0 text-xs text-muted-foreground">{row.source.kind === 'api_key' ? `${sourceName(t, row)} · ${t('billedByProvider')}` : sourceName(t, row)}</span>
+        </li>)}
+      </ol>
+    </CollapsibleContent>
+  </Collapsible>
 }
 
 function OrderList({ rows, pending, unsaved, preferred, repair, onMove, onRemove, onAgent }: { rows: OrderRow[]; pending: boolean; unsaved: { id: string; to: number } | null; preferred: OrderHarness; repair: (row: OrderRow) => ReactNode; onMove: (from: number, to: number) => void; onRemove: (row: OrderRow) => void; onAgent: (row: OrderRow, harness: OrderHarness) => void }) {
@@ -245,7 +273,8 @@ function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgen
         {row.source.kind === 'api_key' ? <span className="inline-flex min-w-0 items-center gap-1.5"><KeyRound aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" /><span className="truncate">{row.model}</span></span>
           : <ModelLabel model={row.model} source={row.harness} />}
       </span>
-      <span className="truncate text-xs text-muted-foreground">{`${sourceName(t, row)} · ${agentsLine(t, row.agents)}`}</span>
+      {/* Every row here runs on this list's Agent; only a model both Agents run says so (its Agent menu is beside it). */}
+      <span className="truncate text-xs text-muted-foreground">{row.agents.length > 1 ? `${sourceName(t, row)} · ${t('bothAgents')}` : sourceName(t, row)}</span>
     </span>
     {/* The row's controls: beside the model where they fit, on their own line on a phone, so the name is never cut to a letter. */}
     <span className="ml-auto flex shrink-0 items-center gap-3">
@@ -292,10 +321,6 @@ function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgen
 
 type T = ReturnType<typeof useTranslations<'Settings.modelOrder'>>
 /** 「只能用 Claude Code」 or 「两种 Agent 都能跑」: which Agents a credential's model runs on. */
-function agentsLine(t: T, agents: readonly OrderHarness[]) {
-  return agents.length > 1 ? t('bothAgents') : t('onlyAgent', { agent: harnessName(agents[0] ?? 'claude_code') })
-}
-
 /** Which credential a model comes from: the subscription's product, or the key's provider. */
 function sourceName(t: T, item: { source: OrderCandidate['source']; provider: string }) {
   if (item.source.kind === 'subscription') return item.provider === 'codex' ? t('source.codex') : t('source.claude')
@@ -314,7 +339,7 @@ function AddModelsDialog({ candidates, onClose }: { candidates: Candidate[]; onC
       <DialogHeader><DialogTitle>{t('add')}</DialogTitle></DialogHeader>
       <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto">
         {groups.map(group => <FieldSet key={sourceKey(group.head)} className="gap-1">
-          <FieldLegend variant="label" className="text-xs font-normal text-muted-foreground">{`${sourceName(t, group.head)} · ${agentsLine(t, [...new Set(group.items.map(item => item.harness))])}`}</FieldLegend>
+          <FieldLegend variant="label" className="text-xs font-normal text-muted-foreground">{sourceName(t, group.head)}</FieldLegend>
           {group.items.map(item => {
             const key = sourceKey(item)
             return <Label key={key} className={cn('flex items-center gap-2.5 rounded-lg px-2 py-1.5 font-normal', item.added ? 'text-muted-foreground' : 'hover:bg-muted')}>

@@ -50,6 +50,14 @@ async function discardUnstarted(service: SubscriptionService, userId: string, co
 export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
   return async (request: Request): Promise<Response> => {
     const refused: { action?: string; provider?: string } = {}
+    // The connection this request touched and what it looked like before, so any state change the worker made
+    // (including on a refusal partway through, or a refresh that ended in reconnect_required) reaches open pages.
+    let watched: { pool: SubscriptionService['repository']['pool']; repository: SubscriptionService['repository']; userId: string; id: string; seen: string } | null = null
+    const moved = async () => {
+      if (!watched) return false
+      const now = await watched.repository.connection(watched.userId, watched.id).then(row => `${row.state}:${row.paused}`, () => 'gone')
+      return now !== watched.seen
+    }
     try {
       if (request.method !== 'POST' || request.headers.get('sec-fetch-site') === 'cross-site' || (request.headers.has('origin') && request.headers.get('origin') !== new URL(request.url).origin)) return Response.json({ error: 'request_refused' }, { status: 403, headers })
       const session = await deps.session(request)
@@ -78,6 +86,7 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
         const expired = await expireSubscriptionAcquisitions(service.repository.pool, session.userId)
         const { connectionId, created } = await service.repository.acquire(session.userId, body.workspaceId, body.provider)
         const row = await service.repository.connection(session.userId, connectionId)
+        watched = { pool: service.repository.pool, repository: service.repository, userId: session.userId, id: row.id, seen: `${row.state}:${row.paused}` }
         const worker = service.worker(service.repository.scope(row))
         const result = await worker.call<{ authorizationUrl: string; revision: number }>('oauthStart', { revision: Number(row.epoch), sessionId: session.sessionId }, acquisitionSignal())
           .catch(async (failure: unknown) => { if (created) await discardUnstarted(service, session.userId, connectionId, worker); throw failure })
@@ -85,6 +94,7 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
         return Response.json({ connectionId, ...result }, { headers })
       }
       const row = await service.repository.connection(session.userId, body.connectionId)
+      watched = { pool: service.repository.pool, repository: service.repository, userId: session.userId, id: row.id, seen: `${row.state}:${row.paused}` }
       refused.provider = row.provider
       if (session.tokenWorkspaceId && session.tokenWorkspaceId !== row.workspaceId) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
       await deps.workspace(session.userId, row.workspaceId)
@@ -129,9 +139,10 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
       // Connected, paused, removed or signed out: every open 模型与订阅 page re-reads (no polling, no content on the wire).
       // A device sign-in still waiting changed nothing yet.
       const pending = body.action === 'poll' && (result as { pending?: unknown } | null)?.pending === true
-      if (body.action !== 'bind' && body.action !== 'status' && body.action !== 'resume' && !pending) await ownerSettingsChanged(service.repository.pool, session.userId)
+      if ((body.action !== 'bind' && body.action !== 'status' && body.action !== 'resume' && !pending) || await moved()) await ownerSettingsChanged(service.repository.pool, session.userId)
       return Response.json(result, { headers })
     } catch (error) {
+      if (watched && await moved().catch(() => false)) await ownerSettingsChanged(watched.pool, watched.userId)
       const code = refusalCode(error)
       // Never the message, URL, state or body: those can carry provider or secret data.
       try { (deps.log ?? console.warn)(JSON.stringify({ level: 'warn', msg: 'subscription_refused', action: refused.action ?? null, provider: refused.provider ?? null, code, error: error instanceof Error ? error.name : 'unknown' })) } catch { /* logging never breaks a request */ }
