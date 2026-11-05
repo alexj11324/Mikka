@@ -108,7 +108,7 @@ export async function agentProfileDispatchAvailability(pool: Pool, scope: Dispat
       if (explicit || (!request.asked && !request.agentId)) return { available: false, reason: explicit ? result.availability[explicit.id]?.reason ?? 'agentProfileUnavailable' : 'agentProfileUnavailable' }
     }
     const constraints = await requestConstraints(pool, scope, request)
-    const target = await resolveModelDispatch(pool, scope, request.asked, request.location, constraints.deviceId, { harness: constraints.harness ?? request.defaultHarness, cloudPurpose: request.cloudPurpose, withoutCloud: request.withoutCloud, agentId: request.agentId, skipCatalogueRefresh: true, probeQuota: false, bindSubscription: false })
+    const target = await resolveModelDispatch(pool, scope, request.asked?.model ? request.asked : undefined, request.location, constraints.deviceId, { harness: constraints.harness ?? request.defaultHarness, cloudPurpose: request.cloudPurpose, withoutCloud: request.withoutCloud, agentId: request.agentId, skipCatalogueRefresh: true, probeQuota: false, bindSubscription: false })
     await member.check()
     return target.kind === 'none' ? { available: false, reason: target.reason } : { available: true }
   } finally { await member.close() }
@@ -190,7 +190,7 @@ export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchSco
     const rows = await readProfileRows(pool, scope)
     const legacy = async () => {
       const constraints = await requestConstraints(pool, scope, request)
-      const target = await (deps.resolve ?? resolveModelDispatch)(pool, scope, request.asked, request.location, constraints.deviceId, { withoutCloud: request.withoutCloud, cloudPurpose: request.cloudPurpose, harness: constraints.harness ?? request.defaultHarness, agentId: request.agentId })
+      const target = await (deps.resolve ?? resolveModelDispatch)(pool, scope, request.asked?.model ? request.asked : undefined, request.location, constraints.deviceId, { withoutCloud: request.withoutCloud, cloudPurpose: request.cloudPurpose, harness: constraints.harness ?? request.defaultHarness, agentId: request.agentId })
       const agentProfile = target.kind === 'none' ? undefined : builtinAgentProfileSelection(scope, target.entry)
       if (agentProfile) await assertProfileSelection(pool, scope, agentProfile)
       await member.check(); return { target, ...(agentProfile ? { agentProfile } : {}), selectionMode: request.asked?.model ? 'picked' as const : 'preference' as const }
