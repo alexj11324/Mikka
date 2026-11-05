@@ -57,8 +57,9 @@ async function findIssueForUser(reader: IssueReader, id: string, includeDeleted:
 }
 
 /** The issue this user can access; for callers without a session, like the Coordinator.
- * Pass an API route's session user, not its id, so a workspace token keeps its scope. */
-export async function issueForUser(reader: IssueReader, id: string, includeDeleted = false, executor: Pick<typeof db, 'select'> = db) {
-  const result = await findIssueForUser(reader, id, includeDeleted, executor)
+ * Pass an API route's session user, not its id, so a workspace token keeps its scope.
+ * `withoutBody`: `content` holds only its attrs (the metadata), for callers that show a task's name and state. */
+export async function issueForUser(reader: IssueReader, id: string, includeDeleted = false, executor: Pick<typeof db, 'select'> = db, options: { withoutBody?: boolean } = {}) {
+  const result = await findIssueForUser(reader, id, includeDeleted, executor, options.withoutBody)
   return result?.issue ?? null
 }

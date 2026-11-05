@@ -13,13 +13,13 @@ A Profile is a logical configuration owned by the current person in the current 
 
 ## Where it lives
 
-Settings › Models and subscriptions › the current workspace's model defaults › Factory Agent Profiles. The section follows Preferred models. It uses the same section, rows, action menu and explicit edit dialog as nearby settings.
+Settings › Models and subscriptions › the current workspace's model defaults › Agent 配置. Each row's state is a status badge (可运行 / 已停用 / its reason; R-34, R-87); only a toggle's result is announced. The section follows Preferred models. It uses the same section, rows, action menu and explicit edit dialog as nearby settings.
 
-New task has a Profile selector below its existing machine/Bot/title row. Automatic selection omits the explicit Profile ID. A selected Profile is sent as structured `profileId` beside `taskDestination`, through the existing Coordinator submission; the selector does not put a claimed choice into natural-language instructions.
+New task has an Agent 配置 chip in its header row beside the machine and Bot chips, drawn the same way (`h-7 rounded-full`, icon first, R-90); its menu ends with 管理, which opens Settings in a new tab so the task draft stays. A load failure or an unavailable choice shows under the row. Automatic selection omits the explicit Profile ID. A selected Profile is sent as structured `profileId` beside `taskDestination`, through the existing Coordinator submission; the selector does not put a claimed choice into natural-language instructions.
 
 Task availability is requested for the explicitly selected cloud or device destination. A location change invalidates the previous availability result while the host evaluates the new destination; dispatch revalidates it again.
 
-The existing thread execution identity dialog shows the frozen Profile name, version, digest, selection source and reason beside the run's actual Agent, model and credential kind. Opening a thread from a task uses the same dialog. It never reconstructs historical Profile data from the current settings.
+The existing thread execution identity dialog shows the frozen Profile name, version, selection source and reason (stored as a code — `capability_fit`, `stage_fit`, `only_suitable` — and worded in the reader's language; a run frozen before the codes reads as the neutral 按任务能力选择). The configuration digest stays in the snapshot but is not shown beside the run's actual Agent, model and credential kind. Opening a thread from a task uses the same dialog. It never reconstructs historical Profile data from the current settings.
 
 ## Fields and precedents
 

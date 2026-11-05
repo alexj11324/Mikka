@@ -36,7 +36,9 @@ test('bot chat keys reach only the owner home, after the actual writer commits',
     if (!scope) unexpected.push(target.pathname)
     const events: LiveInvalidation[] = JSON.parse(String(options?.body))
     for (const event of events) assert.deepEqual(Object.keys(event).sort(), ['id', 'kind'], 'a key carries a kind and an id, never a message')
-    sent.push({ scope: scope ?? { ownerId: 'unexpected', workspaceId: target.pathname }, events })
+    // The same writers wake an MCP reply wait on the bot's workspace; lib/mcp/reply-live.db.test.ts covers that key.
+    const chatEvents = events.filter(event => event.kind !== 'coordinator_session')
+    if (chatEvents.length) sent.push({ scope: scope ?? { ownerId: 'unexpected', workspaceId: target.pathname }, events: chatEvents })
     return new Response(null, { status: 204 })
   })
   const admin = new Pool({ connectionString: url, max: 1 })

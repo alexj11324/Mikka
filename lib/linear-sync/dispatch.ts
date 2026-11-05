@@ -1,5 +1,5 @@
 import 'server-only'
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { issues, linearIssueLinks, linearTeamSyncs } from '@/lib/db/schema'
@@ -7,14 +7,14 @@ import { processLinearInboxDelivery, processLinearIssueOutbox, processLinearSync
 import { linearSyncEnabled } from './flags'
 
 export function dispatchLinearWork() {
-  after(async () => {
+  afterJob('after:linear-sync-batch', async () => {
     try { await processLinearSyncBatch() }
     catch { console.error('Linear background sync could not start') }
   })
 }
 
 export function dispatchLinearIssueSync(issueId: string) {
-  after(async () => {
+  afterJob('after:linear-issue-sync', async () => {
     try {
       if (!await linearSyncEnabled()) return
       // A delayed callback must recheck the task and its per-task destination.
@@ -27,7 +27,7 @@ export function dispatchLinearIssueSync(issueId: string) {
 }
 
 export function dispatchLinearWebhook(deliveryId: string) {
-  after(async () => {
+  afterJob('after:linear-webhook', async () => {
     try { if (await linearSyncEnabled()) await processLinearInboxDelivery(deliveryId) }
     catch { console.error('Linear background webhook processing could not start') }
   })

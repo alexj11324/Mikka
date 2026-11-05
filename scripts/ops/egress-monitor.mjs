@@ -62,7 +62,8 @@ export function summarize(events, deploymentId, now = Date.now()) {
       }
       if (e.msg !== 'db_sample') continue
       if (!/^[a-f0-9]{12}$/.test(e.statement) || !Number.isSafeInteger(e.bytes) || e.bytes < 0 || !Number.isSafeInteger(e.rows) || e.rows < 0 || !(e.sampleRate > 0 && e.sampleRate <= 1)) { malformed++; continue }
-      const route = typeof e.route === 'string' && /^\/[A-Za-z0-9_/[\].-]+$/.test(e.route) ? e.route : null
+      // A route template, or a background job label (after:…, cron:…, workflow:…; lib/background.ts).
+      const route = typeof e.route === 'string' && /^(?:\/[A-Za-z0-9_/[\].-]+|(?:after|cron|workflow):[A-Za-z0-9_/.-]+)$/.test(e.route) ? e.route : null
       const key = JSON.stringify([route, e.statement]), g = groups.get(key) ?? { route, statement: e.statement, samples: 0, sampledBytes: 0, estimatedBytes: 0, rows: 0 }
       g.samples++; g.sampledBytes += e.bytes; g.estimatedBytes += e.bytes / e.sampleRate; g.rows += e.rows
       groups.set(key, g); samples++; sampledBytes += e.bytes

@@ -16,6 +16,8 @@ const transport = {
     const statement = dialect.sqlToQuery(query)
     // The event's credential check reads through the executor it was given.
     if (/to_regclass\('credential_secrets'\)/.test(statement.sql)) return { rows: [{ present: false }] }
+    // Taking the chat's lease wakes a waiting 停止 (stop-turn.ts); its payload is the Bot ID only.
+    if (statement.sql.startsWith('SELECT pg_notify(')) { assert.deepEqual(statement.params, ['mikka_coordinator_lease', bot]); return [] }
     assert.match(statement.sql, /pg_advisory_xact_lock/)
     assert.ok(statement.params.includes(`bot-chat:${owner}:${bot}`), 'chat lock must bind the owner and Bot')
     return []

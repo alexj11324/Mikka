@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg'
+import { runControlChanged } from '@/lib/device-gateway-notify'
 import { z } from 'zod'
 import { gitPushRestriction, type PermissionDecision } from '@mikka/protocol/agent-policy'
 import { cliPolicyValuesSchema } from '@/lib/agent-tool-approval/policy-store'
@@ -77,6 +78,8 @@ export async function setGitHubPermissions(pool: Pick<Pool, 'connect'>, userId: 
     // Both columns version themselves (triggers), only when they change.
     const { rows: [row] } = await tx.query<Head>(`UPDATE agent_kit_heads SET cli_run_policy=$2, external_write_permissions=$3 WHERE owner_id=$1 AND bot_key=$4
       RETURNING cli_run_policy AS cli, cli_run_policy_version::text AS "cliVersion", external_write_permissions AS external, external_write_policy_version::text AS "externalVersion"`, [userId, cli, external, coordinator.botId])
+    // The CLI policy revision moved: the owner's live runs check it again now.
+    runControlChanged(tx, { userId })
     const { push, pullRequest, version } = view(row)
     return { push, pullRequest, version }
   })

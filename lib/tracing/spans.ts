@@ -1,50 +1,58 @@
-import { AsyncLocalStorage } from 'node:async_hooks'
 import { trace, type Attributes, type Context, type Span as ApiSpan } from '@opentelemetry/api'
 import type { ReadableSpan, Span, SpanProcessor } from '@opentelemetry/sdk-trace-base'
 import type { PgRequestHookInformation, PgResponseHookInformation } from '@opentelemetry/instrumentation-pg'
 import { basePath } from '@/lib/base-path-config.mjs'
+import { routeScope, workflowStepRoute } from './labels'
 import { statementId, statementOperation } from './sanitize'
 
 // What each span says about where it came from (docs/operations/tracing.md):
 // `mikka.route`, the grouping key, and `mikka.client_kind`, who called.
 
-export type ClientKind = 'web' | 'daemon' | 'mobile' | 'cron' | 'worker'
+export type ClientKind = 'web' | 'daemon' | 'mobile' | 'cron' | 'worker' | 'background' | 'workflow'
 
 /**
- * Who calls a route, from its path (with or without the base path). The
- * daemon authenticates with a device credential on /v1 and the run tool
- * routes; mobile uses /api/mobile; Vercel cron and the Cloudflare cron
- * workers call /api/cron; webhooks and Workflow steps are machine callers.
+ * Who calls a route, from its path (with or without the base path) or its
+ * job label. The daemon authenticates with a device credential on /v1 and the
+ * run tool routes; mobile uses /api/mobile; Vercel cron and the Cloudflare
+ * cron workers call /api/cron; webhooks are machine callers; the Workflow
+ * SDK delivers steps on /.well-known/workflow. Background jobs
+ * (lib/background.ts) are labelled `after:…`, `cron:…` or `workflow:…`.
  */
 export function clientKindFor(path: string): ClientKind {
+  if (path.startsWith('after:')) return 'background'
+  if (path.startsWith('cron:')) return 'cron'
+  if (path.startsWith('workflow:')) return 'workflow'
   let route = path.split(/[?#]/, 1)[0]
   if (route === basePath || route.startsWith(`${basePath}/`)) route = route.slice(basePath.length) || '/'
   if (route.startsWith('/v1/') || route.startsWith('/api/runs/mcp/') || route === '/api/runs/github-token') return 'daemon'
   if (route.startsWith('/api/mobile/')) return 'mobile'
   if (route.startsWith('/api/cron/')) return 'cron'
-  if (route.startsWith('/api/webhooks/') || route.startsWith('/.well-known/workflow/')) return 'worker'
+  if (route.startsWith('/.well-known/workflow/')) return 'workflow'
+  if (route.startsWith('/api/webhooks/')) return 'worker'
   return 'web'
 }
-
-/** The route template or Server Action name lib/request-log.ts and withDatabaseOperation run under. */
-const routeScope: AsyncLocalStorage<string> = ((globalThis as Record<symbol, unknown>)[Symbol.for('mikka.requestRoute')] ??= new AsyncLocalStorage<string>()) as AsyncLocalStorage<string>
 
 const text = (value: unknown) => (typeof value === 'string' && value ? value : undefined)
 
 /**
- * Stamps every recording span when it starts. The route comes from the
- * request's label (`withRequestLog('/api/…')`, `withDatabaseOperation('/actions/…')`),
- * else from the parent span, else from Next's own `next.route`. The client
- * kind comes from the incoming path on the root span and is inherited below it.
+ * Stamps every recording span when it starts. The route is a job span's own,
+ * else the label in force (`withRequestLog('/api/…')`,
+ * `withDatabaseOperation('/actions/…')`, a background job's `after:…` /
+ * `cron:…`), else the running Workflow step
+ * (`workflow:<workflow>/<step>`), else the parent span, else Next's own
+ * `next.route`. The client kind is the job's own, else the parent's, else the
+ * step's, else from the incoming path on the root span.
  */
 export class RouteAttributesProcessor implements SpanProcessor {
   onStart(span: Span, parentContext: Context): void {
     try {
       const parent = (trace.getSpan(parentContext) as unknown as { attributes?: Attributes } | undefined)?.attributes
       const own = span.attributes
-      const route = routeScope.getStore() ?? text(parent?.['mikka.route']) ?? text(own['next.route']) ?? text(own['http.route'])
+      const step = workflowStepRoute()
+      const route = text(own['mikka.route']) ?? routeScope.getStore() ?? step ?? text(parent?.['mikka.route']) ?? text(own['next.route']) ?? text(own['http.route'])
       const path = text(own['http.target']) ?? text(own['url.path'])
-      const kind = (path && clientKindFor(path)) ?? text(parent?.['mikka.client_kind']) ?? (route ? clientKindFor(route) : 'web')
+      // A child keeps its parent's kind: an outbound fetch's path says nothing about who called.
+      const kind = text(own['mikka.client_kind']) ?? text(parent?.['mikka.client_kind']) ?? (step ? 'workflow' : undefined) ?? (path && clientKindFor(path)) ?? (route ? clientKindFor(route) : 'web')
       if (route) span.setAttribute('mikka.route', route)
       span.setAttribute('mikka.client_kind', kind)
     } catch { /* attributes never break a request */ }
