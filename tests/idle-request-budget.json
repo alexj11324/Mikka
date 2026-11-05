@@ -5,8 +5,7 @@
       "coordinator.pollCoordinatorChat": { "max": 2, "tracking": "#1212", "why": "the Coordinator sidebar polls its chat every 30 s while quiet" }
     },
     "task-detail": {
-      "collaboration.exchangeDocument": { "max": 20, "tracking": "#1212", "why": "description sync, refreshInterval 1500 ms; SWR's 2 s dedupe makes every other tick a no-op" },
-      "agents.getIssueThread": { "max": 20, "tracking": "#1212", "why": "open thread panel polls a running thread every 2 s; each re-render restarts its timer" },
+      "agents.listIssueThreads": { "max": 12, "tracking": "#1212", "why": "issue thread list, refreshInterval 5 s while a thread is active (runListRefreshInterval); it includes teammates' threads, whose run changes have no live key yet" },
       "collaboration.listMembers": { "max": 6, "tracking": "#1212", "why": "issue members, refreshInterval 10 s" },
       "issue-operations.listIssueConnections": { "max": 6, "tracking": "#1212", "why": "issue relations, refreshInterval 10 s" }
     },
