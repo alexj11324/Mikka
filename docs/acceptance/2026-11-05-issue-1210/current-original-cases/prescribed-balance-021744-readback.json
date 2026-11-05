@@ -1,0 +1,11 @@
+{
+  "observedAt": "2026-11-05T02:17:44.104Z",
+  "model": "deepseek-flash",
+  "modelAssertionExit": 0,
+  "httpStatus": 200,
+  "available": false,
+  "modelCalls": 0,
+  "balanceRequests": 1,
+  "assertedAt": "2026-11-05T02:17:43.652Z",
+  "endpoint": "https://api.deepseek.com/user/balance"
+}

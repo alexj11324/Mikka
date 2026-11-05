@@ -60,3 +60,24 @@ CC 问题的现有截止时间仍为 **2026-11-05 20:15:32.526505 UTC**。后续
 新原件保留明确目标 project `autumn-fire-21908520`、branch `br-autumn-rain-b5leflom`、database `orvilo_mvp`，并按既有 owner 与 task / issue 限定 SELECT。首次 connector 默认数据库尝试报告 `relation factory_tasks does not exist`，没有写入；随后通过只读数据库目录确认目标，显式指定 `orvilo_mvp` 后以相同 SELECT 成功。该过程保留在 CC 原件的 `initialDefaultDatabaseAttempt`，没有将默认数据库选择失败误报为生产任务的新故障。
 
 本段只追加时间点说明与两个 JSON；先前五份数据 / SQL / 余额原件及 README 的原始段落全部保留。
+
+## 新的单次免费余额查询：2026-11-05 02:17 UTC
+
+在上述 02:06–02:08 案例只读复核之后，另做了一次新的余额查询。该查询不改变前述“02:06–02:08 没有复查余额”的历史范围；00:34 的原始余额文件也保持不变。
+
+| 字段 | 本次实际回执 |
+| --- | --- |
+| 模型断言时间 | `2026-11-05T02:17:43.652Z` |
+| 调用前断言 | `node scripts/assert-test-model.mjs deepseek-flash`，exit 0 |
+| 余额回执时间 | `2026-11-05T02:17:44.104Z` |
+| 请求 | 指定既有凭证来源，单次 `GET https://api.deepseek.com/user/balance` |
+| HTTP | 200 |
+| `available` | **false** |
+| 余额请求次数 | 1 |
+| 模型调用次数 | **0** |
+
+[脱敏原始回执](prescribed-balance-021744-readback.json)，SHA-256 `4213ff164c13a20f065f93a5b60a9b05712de5cc194026d34dbbc7ab36569e88`。
+
+此次仅使用本轮已经确认的同一私密凭证页中的既有 key，通过查询进程环境变量传入；没有替换凭证来源，没有重试或生成请求。回执仅保留时间、模型断言退出码、HTTP、可用性与计数，不含 key、余额金额或原始余额明细。没有生产数据库操作，也没有 Owner 会话或任务操作。
+
+该时刻仍为 `available=false`，没有解除 API 验收路径的余额阻塞。此查询仅证明 **02:17:44 UTC** 的可用性；不能据此声称 API 三阶段已经运行或通过。
