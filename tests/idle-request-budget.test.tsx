@@ -111,7 +111,7 @@ before(async () => {
     count(`fetch ${url.pathname}`)
     await network()
     if (url.pathname === '/api/live/ticket') return Response.json({ url: `wss://live.invalid/${url.searchParams.get('workspace')}`, protocol: 'fixture', expiresAt: Date.now() + 3_600_000 })
-    const route = routes[url.pathname] ?? (/^\/api\/conversations\/[^/]+\/read$/.test(url.pathname) ? routes['/api/conversations/:id/read'] : undefined)
+    const route = routes[url.pathname] ?? routes[url.pathname.replace(/^\/api\/conversations\/[^/]+\/(read|messages|members)$/, '/api/conversations/:id/$1')]
     if (route) { const value = route(url); return value instanceof Response ? value : Response.json(value) }
     missing.add(`fetch ${url.pathname}`)
     return new Response('{}', { status: 404 })
@@ -211,6 +211,18 @@ routes['/api/conversations'] = url => ({ conversations: [], viewerId: OWNER, wor
 routes['/api/factory/tasks'] = () => ({ tasks: [], liveWorkspaceId: WORKSPACE })
 routes['/api/conversations/:id/read'] = () => ({ lastReadMessageId: 'm2', lastReadPosition: 2, unreadCount: 0 })
 routes['/api/settings/model-order'] = () => ({ deviceModels: { [DEVICE]: ['claude-sonnet-4-6'] } })
+const GROUP = '90000000-0000-4000-8000-000000000001'
+const groupMessage = (position: number, authorType: 'user' | 'bot', body: string) => ({ id: `90000000-0000-4000-8000-00000000000${position + 1}`, conversationId: GROUP, position: String(position), authorType, authorId: authorType === 'user' ? OWNER : BOT, body, mentions: [], replyToId: null, createdAt: AT })
+// A bot is answering: the case that used to re-read the chat every 2.5 s.
+routes['/api/conversations/:id/messages'] = url => ({ messages: url.searchParams.get('after') ? [] : [groupMessage(2, 'bot', 'Looking into the redirect now.'), groupMessage(1, 'user', 'Who can fix the sign-in redirect?')],
+  nextBefore: null, agentStatus: { status: 'running' }, routingError: null, stopped: false, ...(url.searchParams.get('after') ? { unchanged: true } : {}) })
+routes['/api/conversations/:id/members'] = () => ({ members: [{ id: OWNER, name: 'Ada', memberType: 'user' }, { id: BOT, name: 'Scout', memberType: 'bot', color: 'bleu', shape: 'galet' }] })
+routes['/api/mobile/reactions'] = () => ({ reactions: {} })
+const CONNECTION = 'a0000000-0000-4000-8000-000000000001'
+routes['/api/subscriptions'] = () => ({ enabled: true, providers: [{ provider: 'claude', available: true }, { provider: 'codex', available: true }], connections: [{ id: CONNECTION, provider: 'claude', state: 'connected', revision: 1, account: 'ada@example.invalid', paused: false, bots: [] }] })
+routes['/api/subscriptions/usage'] = () => ({ connections: [{ id: CONNECTION, status: 'ok', account: 'ada@example.invalid', plan: 'Max', windows: [{ kind: 'five_hour', remaining: 72, resetsAt: null }, { kind: 'weekly', remaining: 40, resetsAt: null }], observedAt: AT }] })
+const PULL_REQUEST = 'https://github.com/mikka/app/pull/81'
+routes['/api/github/pull-request-status'] = () => ({ viewerId: OWNER, url: PULL_REQUEST, state: 'open', updatedAt: AT, live: { workspaceId: WORKSPACE } })
 
 const boardIssue = (id: string, title: string, status: string) => ({ id, ownerId: OWNER, ownerName: 'Ada', ownerImage: null, title, status, priority: 'normal', scope: 'workspace' as const, revision: 2,
   createdAt: new Date(AT), updatedAt: new Date(AT), identifier: `MIK-${id.slice(-1)}`, teamId: null, metadata: { ...issue(id, title).metadata, assignee: { kind: 'member' as const, id: OWNER, name: 'Ada', image: null } }, checklist: { total: 0, checked: 0, percentage: 0 } })
@@ -227,6 +239,9 @@ const shows: Record<string, string[]> = {
   devices: ['Ada’s MacBook'],
   'artifact-viewer': ['Release notes', 'Sign-in redirect fixed.'],
   'nav-bot-list': ['Scout'],
+  'group-chat': ['Who can fix the sign-in redirect?', 'Looking into the redirect now.'],
+  'subscription-settings': ['ada@example.invalid'],
+  'pull-request-badge': ['#81'],
 }
 const pages: Record<string, () => Promise<ReactNode>> = {
   board: async () => {
@@ -255,6 +270,20 @@ const pages: Record<string, () => Promise<ReactNode>> = {
   'nav-bot-list': async () => {
     const { BotList } = await import('../components/nav/bot-list')
     return <BotList bots={bots} workspaceId={WORKSPACE} threads={[listedThread]} issues={boardIssues as never} active={{ kind: 'coordinator' }} onOpen={noop} onNewBot={noop} rail={null} onRail={noop} user={user} onSettings={noop} onSignOut={noop} signingOut={false} />
+  },
+  'group-chat': async () => {
+    const { GroupChatView } = await import('../components/workspace/group-chat-view')
+    return <GroupChatView group={{ id: GROUP, title: 'Sign-in', workspaceId: WORKSPACE }} userId={OWNER} people={new Map([[OWNER, 'Ada']])} />
+  },
+  // 设置 › 模型与订阅 with a connected subscription: its meters re-read on push and on a stale focus only.
+  'subscription-settings': async () => {
+    const { SubscriptionSettings } = await import('../components/settings/subscription-settings')
+    return <SubscriptionSettings workspaceId={WORKSPACE} />
+  },
+  // A task's linked PR in its detail properties: GitHub's state through our API.
+  'pull-request-badge': async () => {
+    const { IssuePullRequestLink } = await import('../components/workspace/issue-pull-request-link')
+    return <IssuePullRequestLink issueId={ISSUE} pr={{ url: PULL_REQUEST, state: 'open' }} />
   },
 }
 

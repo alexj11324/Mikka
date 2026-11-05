@@ -1,4 +1,4 @@
-export const LIVE_KINDS = ['thread_list', 'task_run_list', 'bot_chat_list', 'device_list', 'bot_chat', 'issue_list', 'bot_list', 'group_list', 'workspace_settings', 'computer_state', 'approved_writes', 'approved_write', 'pending_actions', 'factory_task', 'factory_issue', 'issue_document', 'artifact', 'issue_members', 'issue_relations', 'issue_threads', 'thread', 'run', 'coordinator_session', 'model_settings', 'group_chat'] as const
+export const LIVE_KINDS = ['thread_list', 'task_run_list', 'bot_chat_list', 'device_list', 'bot_chat', 'issue_list', 'bot_list', 'group_list', 'workspace_settings', 'computer_state', 'approved_writes', 'approved_write', 'pending_actions', 'factory_task', 'factory_issue', 'issue_document', 'artifact', 'issue_members', 'issue_relations', 'issue_threads', 'thread', 'run', 'coordinator_session', 'model_settings', 'group_chat', 'hosted_billing', 'pull_request_status'] as const
 export type LiveKind = typeof LIVE_KINDS[number]
 export type LiveInvalidation = { kind: LiveKind; id: string }
 export const LIVE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

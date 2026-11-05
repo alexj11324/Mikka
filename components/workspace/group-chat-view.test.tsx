@@ -11,8 +11,14 @@ mock.module('next-intl', { namedExports: {
   useMessages: () => ({ AgentCopy: {} }),
   useFormatter: () => ({}),
 } })
-mock.module('swr', { defaultExport: () => ({ data: undefined }) })
-mock.module('swr/infinite', { defaultExport: () => ({ data: pages, size: 1, setSize: async () => {}, mutate: async () => {}, isValidating: false }) })
+const infinite: { config?: Record<string, unknown> } = {}
+const liveKeys: unknown[][] = []
+mock.module('swr', { defaultExport: () => ({ data: undefined }), namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) } })
+mock.module('swr/infinite', {
+  defaultExport: (_key: unknown, _fetcher: unknown, config: Record<string, unknown>) => { infinite.config = config; return { data: pages, size: 1, setSize: async () => {}, mutate: async () => {}, isValidating: false } },
+  namedExports: { unstable_serialize: (getKey: (index: number, previous: null) => unknown) => '$inf$' + JSON.stringify(getKey(0, null)) },
+})
+mock.module(new URL('../../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKey: (...args: unknown[]) => { liveKeys.push(args) } } })
 mock.module(new URL('../../app/actions/agents.ts', import.meta.url).href, { namedExports: { listAgents: async () => [] } })
 mock.module(new URL('../../app/actions/link-preview.ts', import.meta.url).href, { namedExports: { getLinkPreview: async () => null } })
 mock.module(new URL('../../lib/hooks/view-state.tsx', import.meta.url).href, { namedExports: {
@@ -21,7 +27,7 @@ mock.module(new URL('../../lib/hooks/view-state.tsx', import.meta.url).href, { n
 } })
 mock.module(new URL('../coordinator/chat-composer.tsx', import.meta.url).href, { namedExports: { ChatComposer: () => null } })
 mock.module(new URL('../nav/conversation-pill.tsx', import.meta.url).href, { namedExports: { ConversationPill: () => null } })
-mock.module(new URL('../nav/group-avatar.tsx', import.meta.url).href, { namedExports: { GroupAvatar: () => null, useGroupMembers: () => ({ data: [] }) } })
+mock.module(new URL('../nav/group-avatar.tsx', import.meta.url).href, { namedExports: { GroupAvatar: () => null, groupMembersKey: (id: string) => ['group-members', id], useGroupMembers: () => ({ data: [] }) } })
 mock.module(new URL('../nav/letter-avatar.tsx', import.meta.url).href, { namedExports: { LetterAvatar: () => null } })
 mock.module(new URL('../nav/bot-avatar.tsx', import.meta.url).href, { namedExports: { BotAvatar: () => null } })
 mock.module(new URL('./message-reactions.tsx', import.meta.url).href, { namedExports: { MessageReactions: () => null, useMessageReactions: () => ({}) } })
@@ -80,4 +86,16 @@ test('group replies use the existing Markdown HTML and URL protections', async (
   assert.equal(reply.querySelector('script'), null)
   assert.equal(reply.querySelector('a[href^="javascript:"]'), null)
   assert.deepEqual([...reply.querySelectorAll('a[href]')].filter(link => link.getAttribute('href')).map(link => link.getAttribute('href')), [taskHref, threadHref, threadHref])
+})
+
+test('the chat reads its newest page and members on the group key, never on a timer (#1212)', async () => {
+  liveKeys.length = 0
+  pages = [{ messages: [message('user', 1, 'hello')], nextBefore: null, agentStatus: { status: 'running' } }]
+  await act(async () => root.render(<GroupChatView group={{ id: 'group', title: 'Fixture group', workspaceId: 'workspace' }} userId="owner" people={new Map()} />))
+  assert.equal(infinite.config?.refreshInterval, undefined, 'a bot answering is no reason to poll')
+  const [kind, id, keys, workspaceId] = liveKeys.at(-1)!
+  assert.equal(kind, 'group_chat')
+  assert.equal(id, 'group')
+  assert.deepEqual(keys, ['$inf$' + JSON.stringify(['group-messages', 'group', null]), JSON.stringify(['group-members', 'group'])])
+  assert.equal(workspaceId, 'workspace', 'the key arrives on the group workspace channel')
 })

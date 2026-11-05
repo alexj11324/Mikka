@@ -10,7 +10,7 @@ import { useTranslations } from 'next-intl'
 import { pollCoordinatorChat, coordinatorHistory, retryCoordinatorTurn, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import { getBotModelMenu } from '@/app/actions/execution-settings'
 import type { BotModelMenu } from '@/lib/bot-model-menu-view'
-import { knownVersion, mergeChat } from '@/lib/coordinator/chat-poll'
+import { knownVersion, mergeChat, metadataEntities } from '@/lib/coordinator/chat-poll'
 import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
@@ -34,7 +34,7 @@ import { ChatComposer } from './chat-composer'
 import { BotModelPicker, botModelMenuKey, openModelPicker } from './bot-model-picker'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
-import { useLiveKey } from '@/hooks/use-live-key'
+import { useLiveKey, useLiveKeys, watchPageVisibility } from '@/hooks/use-live-key'
 import { listReadDeadline, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { useLiveCitations } from './use-live-citations'
 import type { CoordinatorLiveReply } from '@/lib/coordinator-stream-client'
@@ -158,15 +158,18 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const actionError = useActionError()
   const reconnectStream = useRef<() => void>(() => {})
   // A read names the version it shows; an unchanged chat comes back as its live state only (lib/coordinator/chat-poll.ts).
-  const shown = useRef<{ chat?: ChatRead; fullReadAt: number }>({ fullReadAt: 0 })
+  const shown = useRef<{ chat?: ChatRead; metadataStale: boolean; fullReadAt: number }>({ metadataStale: false, fullReadAt: -Infinity })
   const chatKey = coordinatorChatKey(botId)
   const { data, mutate, error: loadError } = useSWR<ChatRead>(chatKey, async () => {
     const requestedAt = performance.now()
-    const known = knownVersion(shown.current.chat, shown.current.fullReadAt, Date.now())
+    const known = knownVersion(shown.current.chat, shown.current.metadataStale)
     const previous = shown.current.chat
     const continuation = previous?.continuation && { ...previous.continuation, sourceIds: Object.keys(previous.sources).slice(0, 400), artifactIds: Object.keys(previous.artifacts).slice(0, 400) }
-    const next = await pollCoordinatorChat(botId, known, continuation)
-    if (!('unchanged' in next) && (next.metadataRefresh || next.after === undefined)) shown.current.fullReadAt = Date.now()
+    shown.current.metadataStale = false
+    if (!known) shown.current.fullReadAt = requestedAt
+    let next: Awaited<ReturnType<typeof pollCoordinatorChat>>
+    try { next = await pollCoordinatorChat(botId, known, continuation) }
+    catch (error) { if (!known && previous) shown.current.metadataStale = true; throw error }
     const merged = mergeChat(shown.current.chat, next)
     return merged === shown.current.chat ? merged : { ...merged, requestedAt }
   }, {
@@ -180,6 +183,20 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const liveHome = liveOwner ? ownerListWorkspace(data, liveOwner) : null
   useLiveKey('bot_chat', liveHome && data?.botId ? data.botId : UNRESOLVED_LIST_SCOPE, [unstable_serialize(chatKey)], liveHome,
     { minIntervalMs: CHAT_MERGE_MS, deadline: liveOwner ? listReadDeadline(data, liveOwner) : undefined })
+  // Cards and cited names have no chat write (lib/coordinator/chat-poll.ts). An artifact's own key marks them
+  // stale and reads the chat once, in full; the read that catches up after the page was hidden is full too.
+  const metadataKey = useMemo(() => ['coordinator-chat-metadata', botId ?? 'coordinator'] as const, [botId])
+  useSWR(data ? metadataKey : null, async () => {
+    // Catching up, the chat's own read is already full: one read, not two.
+    if (shown.current.metadataStale || performance.now() - shown.current.fullReadAt < 1_000) return true
+    shown.current.metadataStale = true; await mutate(); return true
+  }, {
+    revalidateOnMount: false, revalidateIfStale: false, revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false,
+  })
+  const artifactsShown = data?.artifacts
+  const metadata = useMemo(() => metadataEntities({ artifacts: artifactsShown }), [artifactsShown])
+  useLiveKeys(liveHome ? metadata : [], [unstable_serialize(metadataKey)], liveHome, { minIntervalMs: CHAT_MERGE_MS })
+  useEffect(() => watchPageVisibility(() => { if (document.visibilityState === 'hidden' && shown.current.chat) shown.current.metadataStale = true }), [])
   const [loadingHistory, setLoadingHistory] = useState(false)
   async function loadHistory() {
     if (!data?.historyBefore || loadingHistory) return

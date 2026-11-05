@@ -3,6 +3,7 @@ import type { Pool } from 'pg'
 import { z } from 'zod'
 import { pool } from '@/lib/db'
 import { factoryCommitted } from '@/lib/live/factory'
+import { pullRequestStatusChanged } from '@/lib/live/pull-requests'
 
 const pullRequestEvent = z.object({
   repository: z.object({ full_name: z.string().regex(/^[\w.-]+\/[\w.-]+$/) }),
@@ -53,13 +54,16 @@ export async function refreshPublishedPullRequest(event: string, payload: unknow
   if (pr.html_url !== url) return
   const state = pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open'
   const lines = pr.additions !== undefined && pr.deletions !== undefined ? { additions: pr.additions, deletions: pr.deletions } : null
-  const { rows: tasks } = await database.query<{ id: string }>(`WITH saved AS (
+  const { rows } = await database.query<{ id: string | null; issueId: string | null }>(`WITH saved AS (
       UPDATE run_publications SET "pullRequest"="pullRequest" || $2::jsonb,"updatedAt"=now()
-      WHERE "pullRequest"->>'url'=$1 RETURNING "runId","userId"
-    ) SELECT DISTINCT t.id FROM saved p
-      JOIN factory_candidates c ON c."runId"=p."runId"
-      JOIN factory_tasks t ON t.id=c."taskId" AND t."candidateId"=c.id AND t."userId"=p."userId"`,
+      WHERE "pullRequest"->>'url'=$1 RETURNING "runId","userId","issueId"
+    ) SELECT DISTINCT t.id,p."issueId" FROM saved p
+      LEFT JOIN factory_candidates c ON c."runId"=p."runId"
+      LEFT JOIN factory_tasks t ON t.id=c."taskId" AND t."candidateId"=c.id AND t."userId"=p."userId"`,
     [url, JSON.stringify({ title: pr.title, state, ...lines })])
+  const tasks = [...new Set(rows.flatMap(row => row.id ? [row.id] : []))].map(id => ({ id }))
+  // The PR badge on each task it was delivered on asks GitHub again (#1212); the state itself never crosses.
+  await pullRequestStatusChanged(database, rows.flatMap(row => row.issueId ? [row.issueId] : []))
   try {
     if (lines) await database.query(RECORD_LINE_COUNTS, [url, JSON.stringify(lines)])
   } finally {
