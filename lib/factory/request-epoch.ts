@@ -3,7 +3,7 @@ import { factoryChanged } from '../live/factory'
 import { runControlChanged } from '../device-gateway-notify'
 import type { Pool, PoolClient } from 'pg'
 import { ActionFailureError } from '../action-error'
-import { FactoryError } from './contract'
+import { FactoryError, factoryFlowVersion } from './contract'
 import { factoryEventId } from './event-id'
 import type { FactoryTask } from './store'
 
@@ -63,6 +63,7 @@ export async function advanceFactoryRequest(tx: PoolClient, task: FactoryTask, s
     return task
   }
   if (['cancelled', 'revoked'].includes(task.status)) throw new FactoryError('factoryStopped')
+  if (factoryFlowVersion(task) === 2 && task.stage === 'spec') throw new FactoryError('factoryTransition')
   const { rows: [used] } = await tx.query('SELECT 1 FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, eventId])
   if (used) throw new FactoryError('factoryStale')
   const { rows: [source] } = await tx.query(`SELECT e.payload FROM coordinator_events e
@@ -121,6 +122,9 @@ export async function continueActiveFactoryRequest(pool: Pool, userId: string, r
   try {
     await tx.query('BEGIN')
     const task = await store.lockTask(tx, userId, identity.id)
+    // The caller uses ordinary owner-message delivery for a planner. A plan
+    // clarification must neither acknowledge an unread message nor approve it.
+    if (factoryFlowVersion(task) === 2 && task.stage === 'spec') { await tx.query('COMMIT'); return false }
     const id = sourceEventId ? await factoryContinuationSource(tx, task, sourceEventId, runId) : randomUUID()
     if (!sourceEventId) await tx.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload,tier,"deliveredAt")
       VALUES($1,$2,$3,$4,'user_message',$5,$6,'background',now()) ON CONFLICT DO NOTHING`, [id, userId, task.botId, task.issueId, `thread-continuation:${id}`,

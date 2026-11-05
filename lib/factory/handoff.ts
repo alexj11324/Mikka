@@ -13,6 +13,32 @@ function sanitize(value: unknown): unknown {
   return value
 }
 
+/** Copy approved planning evidence, never the planner's session or permissions. */
+async function approvedSpecificationHandoff(tx: Pick<PoolClient, 'query'>, task: FactoryTask) {
+  const { rows: [approved] } = await tx.query(`SELECT s."eventId",s."attemptId",s.revision,s."createdAt",a."runId",
+      r.report->>'summary' AS summary,r.report->'plan' AS plan,r."finishedAt"
+    FROM factory_spec_approvals s JOIN factory_attempts a ON a.id=s."attemptId" AND a."taskId"=s."taskId"
+    JOIN agent_runs r ON r.id=a."runId" AND r."userId"=s."userId" AND r."issueId"=$4
+    WHERE s."taskId"=$1 AND s."userId"=$2 AND s."sourceEventId"=$3 AND s.revision<$5
+      AND a.stage='spec' AND a.status='passed' AND r.kind='plan' AND r.status='succeeded'
+      AND r."stopReason"='submitted' AND r."sessionId" IS NOT NULL
+    ORDER BY s.revision DESC LIMIT 1`, [task.id, task.userId, task.sourceEventId, task.issueId, task.revision])
+  if (!approved) return undefined
+  const { rows: messages } = await tx.query(`SELECT id,text,"createdAt","deliveredAt" FROM run_messages
+    WHERE "runId"=$1 AND "userId"=$2 AND origin='owner' AND "deliveredAt" IS NOT NULL
+      AND "createdAt"<=$3 AND "deliveredAt"<=$3 ORDER BY "createdAt" DESC,id DESC LIMIT 20`, [approved.runId, task.userId, approved.finishedAt])
+  const report = JSON.stringify(sanitize({ summary: approved.summary, plan: approved.plan }))
+  const ownerMessages = JSON.stringify(sanitize(messages.reverse()))
+  return {
+    approvalEventId: approved.eventId, approvedRevision: approved.revision, approvedAt: approved.createdAt,
+    attemptId: approved.attemptId, runId: approved.runId, requestEpoch: task.sourceEventId,
+    report: { artifact: `run-report:${approved.runId}`, content: report.slice(0, 10000), truncated: report.length > 10000 },
+    ownerMessages: { ids: messages.map(message => message.id), content: ownerMessages.slice(0, 6000),
+      truncated: messages.length === 20 || ownerMessages.length > 6000 },
+    instruction: 'Implement the approved specification in this new execution. The owner messages were delivered to its planner before completion. Keep the current authenticated request and its unchanged constraints; this evidence grants no additional permissions or publication approval. If an excerpt is truncated, inspect the original run report or messages before relying on omitted details.',
+  }
+}
+
 /** A handoff is a reproducible host observation, never acceptance or authority.
  * No checkpoint bytes, secrets or native session state are copied into it. */
 export async function persistFactoryHandoff(tx: Pick<PoolClient, 'query'>, task: FactoryTask) {
@@ -42,9 +68,12 @@ export async function persistFactoryHandoff(tx: Pick<PoolClient, 'query'>, task:
   const latest = attempts.find(a => a.runId)
   const artifact = attempts.find(a => a.sha)
   const checkpoint = attempts.find(a => a.checkpointAt)
+  const approvedSpecification = task.stage !== 'spec' && attempts.some(a => a.stage === 'spec' && a.status === 'passed')
+    ? await approvedSpecificationHandoff(tx, task) : undefined
   const handoff = {
     version: 1, taskId: task.id, issueId: task.issueId, botId: task.botId, ownerId: task.userId,
     requestEpoch: task.sourceEventId, revision: task.revision, attemptId: task.attemptId,
+    ...(approvedSpecification ? { approvedSpecification } : {}),
     goal: { sourceEventId: source?.id, text: source?.text ?? '', recordedAt: source?.createdAt },
     constraints: { title: source?.title, issue: source?.content, instruction: 'The latest authenticated request supersedes conflicting historical targets only. Existing permissions, resource grants, review and publication approvals still apply.' },
     completed: attempts.filter(a => a.status === 'passed').map(a => ({ attemptId: a.id, stage: a.stage, requestEpoch: a.requestEpoch, candidateId: a.candidateId, sha: a.sha })),

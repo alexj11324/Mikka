@@ -13,7 +13,7 @@ import { ComputerError } from '@/lib/computer/store'
 import { latestThreadRunModel } from '@/lib/computer/run-model'
 import { queueFactoryCloudRun } from '@/lib/factory/queue-cloud'
 
-const inputSchema = z.object({ issueId: z.uuid(), harness: z.enum(['codex', 'claude_code']).optional(), profileId: agentProfileReferenceSchema.optional(), note: z.string().trim().max(10_000).optional() }).strict()
+const inputSchema = z.object({ issueId: z.uuid(), harness: z.enum(['codex', 'claude_code']).optional(), profileId: agentProfileReferenceSchema.optional(), note: z.string().trim().max(10_000).optional(), needsSpec: z.boolean().optional() }).strict()
 const headers = { 'Cache-Control': 'private, no-store' }
 
 export async function POST(request: Request, { params }: { params: Promise<{ botId: string }> }) {
@@ -38,6 +38,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
       // A new thread takes 优先使用的模型's first cloud entry for this harness; the thread's next run keeps its own model.
       start: async (previous, note) => {
         const scope = { ownerId: session.user.id, workspaceId: context.workspace.id, botId }
+        const needsSpec = !previous && await (await import('@/lib/factory/task-dispatch')).factoryTaskNeedsSpec(pool, session.user.id, { issueId: issue.id, botId, needsSpec: parsed.data.needsSpec })
         let runModel: import('@/lib/computer/run-model').RunModel
         let harness: 'claude_code' | 'codex'
         if (previous) {
@@ -49,7 +50,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
           harness = previous.harness
         } else {
           const { resolveAgentProfileDispatch } = await import('@/lib/factory/agent-profile')
-          const picked = await resolveAgentProfileDispatch(pool, scope, { issueId: issue.id, stage: 'execute', note,
+          const picked = await resolveAgentProfileDispatch(pool, scope, { issueId: issue.id, stage: needsSpec ? 'spec' : 'execute', note,
             profileId: parsed.data.profileId, location: 'cloud', cloudPurpose: 'desktop',
             ...(parsed.data.harness ? { asked: { harness: parsed.data.harness } } : {}) })
           const target = picked.target
@@ -67,7 +68,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
         const actor = { userId: session.user.id, workspaceId: context.workspace.id }
         await (await import('@/lib/computer/dispatch-runtime')).prepareBotCloudTaskRuntime(pool, actor, { botId, agentId: runtime.agentId, harness, ...runModel, ...(previous?.remoteUrl ? { repo: previous.remoteUrl } : {}) })
         const deviceRepoId = previous?.remoteUrl ? (await (await import('@/lib/device-repositories')).ensureDeviceRepository(session.user.id, runtime.deviceId, previous.remoteUrl)).id : runtime.repoId
-        return queueFactoryCloudRun(pool, actor, { issueId: parsed.data.issueId, note, botId, sourceEventId, agentId: runtime.agentId, deviceRepoId, ...(previous?.botId === null ? {withoutBot:true} : {}), title: issue.title, body: tiptapToText(issue.content), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous ? { idempotencyKey: `thread:${previous.id}:${sourceEventId ?? crypto.randomUUID()}` } : {}), ...runModel, ...(previous ? { threadRunId: previous.id } : {}) })
+        return queueFactoryCloudRun(pool, actor, { issueId: parsed.data.issueId, note, botId, sourceEventId, needsSpec, agentId: runtime.agentId, deviceRepoId, ...(previous?.botId === null ? {withoutBot:true} : {}), title: issue.title, body: tiptapToText(issue.content), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous ? { idempotencyKey: `thread:${previous.id}:${sourceEventId ?? crypto.randomUUID()}` } : {}), ...runModel, ...(previous ? { threadRunId: previous.id } : {}) })
       },
     })
     if ('runId' in result && result.thread !== 'message') await (await import('@/lib/run-leases')).startThreadMachine({ userId: session.user.id, workspaceId: context.workspace.id }, result.runId)
