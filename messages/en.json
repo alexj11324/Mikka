@@ -5038,6 +5038,52 @@
       "candidate": "Candidate",
       "exit": "exit",
       "unrecorded": "unrecorded"
+    },
+    "card": {
+      "needsYou": {
+        "spec_review": "Spec to review",
+        "question": "Asking you",
+        "pr_review": "PR to review",
+        "blocked": "Blocked",
+        "failed": "Failed"
+      },
+      "stageList": "Stages",
+      "counts": {
+        "passed": "{count} verified",
+        "unverified": "{count} unverified",
+        "failed": "{count} failed"
+      },
+      "openSpec": "View spec",
+      "approveSpec": "Approve spec",
+      "openAcceptance": "Open acceptance",
+      "answer": "Answer",
+      "openPullRequest": "Open PR",
+      "loadError": "Task progress failed to load",
+      "retry": "Retry",
+      "approveError": {
+        "stale": "The spec has changed",
+        "transition": "The spec is no longer waiting for review",
+        "evidence": "The spec thread has not submitted its result, so it can't be approved",
+        "signedOut": "Your session has expired. Please refresh the page and try again.",
+        "notFound": "Task not found or not accessible",
+        "unknown": "Approval not confirmed",
+        "profileModel": {
+          "default": "The executor model is unavailable",
+          "checking": "The executor model's subscription is still being checked",
+          "quota": "The executor model's quota is used up",
+          "expired": "The executor model's subscription has expired",
+          "paused": "The executor model's subscription is paused",
+          "missing": "No executor model subscription is available",
+          "removed": "The executor model's subscription was removed",
+          "model_gone": "The executor model is no longer offered",
+          "key_refused": "The executor model's API key was refused",
+          "balance": "The executor model's balance is too low",
+          "provider_unavailable": "The executor model's provider is unavailable"
+        },
+        "profile": "The executor Profile is unavailable",
+        "refused": "Approval refused"
+      },
+      "retryApprove": "Check again"
     }
   }
 }
