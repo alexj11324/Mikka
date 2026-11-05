@@ -122,6 +122,9 @@ old module owners (backend was Codex's).
    goal is met in production, without stopping to wait for anyone (Alex,
    2026-11-05). When Alex grants an owner full permissions on its issue,
    that grant overrides the limits in this document for that issue.
+   Full permissions are for finishing the goal, not for spending: size
+   machines and paid resources to the actual need and stop each one as soon
+   as its step is done.
 2. **No direct pushes.** Nobody pushes to `main`. Every change goes through a
    PR from a branch based on `main`. Each original PR changes one thing;
    ready PRs are integrated as a batch under rule 3.
