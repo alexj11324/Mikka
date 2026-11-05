@@ -17,8 +17,15 @@ The iOS app adopts the architecture of OpenBot's mobile app. The ownership model
 
 Code is laid out feature-first.
 
-This builds on `2026-11-05-1230-ios-native-first`, which stays in force. beUI stays in the repository, on the same
-palette. It is used only for AI-specific pieces that HeroUI has no part for.
+This builds on `2026-11-05-1230-ios-native-first`, which stays in force.
+
+Two defaults, accepted by the coordinator on 2026-11-05; Alex can still change either:
+
+- **HeroUI Native and beUI.** HeroUI Native owns the general content controls. beUI stays in the repository, on the same
+  palette, and is used only for the AI-specific pieces HeroUI has no part for. A general control never becomes a new
+  beUI use.
+- **Folders.** `features/` and `shared/` sit at the root of `apps/mobile`, next to `app/`. They are not moved under
+  `src/`, so the Expo Router root and the `@/` imports stay as they are.
 
 **License.** OpenBot is under PolyForm Noncommercial 1.0.0. We take its architecture, libraries and interaction model
 only. No OpenBot source or document text goes into this repository, and every PR for this work says that it contains no

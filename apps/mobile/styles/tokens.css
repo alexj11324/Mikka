@@ -2,11 +2,13 @@
  * Mikka's palette for Uniwind classes, HeroUI Native and beUI: one set of variables, light and dark.
  * Each value is the token in lib/tokens.ts named in its comment; tests/theme-tokens.test.mts fails
  * when the two drift. HeroUI Native's own styles turn these into its `--color-*` classes.
+ * The background is the grouped colour and surfaces are the white cards on it, as on iOS's grouped
+ * screens; the chat's white page keeps lib/theme.ts `colors.page`.
  */
 @layer theme {
   :root {
     @variant light {
-      --background: #FFFFFF; /* page */
+      --background: #F2F2F7; /* grouped */
       --foreground: #000000; /* ink */
 
       --surface: #FFFFFF; /* surface */
@@ -56,7 +58,7 @@
 
   :root {
     @variant dark {
-      --background: #000000; /* page */
+      --background: #000000; /* grouped */
       --foreground: #FFFFFF; /* ink */
 
       --surface: #1C1C1E; /* surface */
