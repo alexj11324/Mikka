@@ -41,8 +41,7 @@ export async function runSchedule(cron, env, fetcher = fetch, scheduledTime = Da
   const minute = new Date(scheduledTime).getUTCMinutes()
   const endpoints = cron === '* * * * *' ? sweepsAt(minute) : [endpoint]
   if (cron === '* * * * *') {
-    // Account deletion runs on its due timer, with /api/cron/reconcile as its safety net (#1371).
-    if (minute === 0) endpoints.push('/api/cron/audit-retention')
+    // Account deletion and audit retention run on their due timers, with /api/cron/reconcile as their safety net (#1371).
     if (minute % 15 === 0) endpoints.push('/api/cron/ops-monitor')
     // Abandoned subscription sign-ins and their secret artifacts: maintenance with no single event (#1371).
     if (minute === 0) endpoints.push('/api/cron/subscriptions')

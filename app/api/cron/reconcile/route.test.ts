@@ -3,7 +3,7 @@ import { before, beforeEach, mock, test } from 'node:test'
 
 // The single safety-net sweep (#1371): it runs only the jobs the one check says have work due.
 const secret = 'isolated-reconcile-cron-fixture'
-let due = { wakes: false, schedules: false, recovery: false, deletions: false }
+let due = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false }
 const ran: string[] = []
 let wakesThrow = false
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
@@ -15,11 +15,14 @@ stub('../../../../lib/schedules/runtime.ts', { sweepSchedules: async () => { ran
 stub('../../../../lib/run-recovery.ts', { recoverRuns: async (groupTurns: (work: () => Promise<unknown>) => unknown) => { ran.push('recovery'); groupTurns(async () => {}); return { owners: 1 } } })
 stub('../../../../lib/account/deletion-jobs.ts', { sweepAccountDeletions: async () => { ran.push('deletions'); return { scanned: 1, completed: 1, pending: 0 } } })
 stub('../../../../lib/chat-attachments/store.ts', { cleanupChatFiles: async () => { ran.push('files'); return { retired: 0 } } })
+stub('../../../../lib/workspace-db.ts', { workspacePool: {} })
+stub('../../../../lib/audit/delivery.ts', { deliverWorkspaceAudits: async () => { ran.push('delivery'); return { delivered: 1, failed: 0 } } })
+stub('../../../../lib/audit/retention.ts', { sweepAuditRetention: async () => { ran.push('retention'); return { scanned: 1, deleted: 0, pending: 0 } } })
 stub('../../../../lib/due-timer.ts', { armDueTimer: async (kind: string) => { ran.push(`arm:${kind}`) } })
 mock.module('next/server', { namedExports: { after: () => {} } })
 let GET: typeof import('./route')['GET']
 before(async () => { ({ GET } = await import('./route')) })
-beforeEach(() => { process.env.CRON_SECRET = secret; due = { wakes: false, schedules: false, recovery: false, deletions: false }; ran.length = 0; wakesThrow = false })
+beforeEach(() => { process.env.CRON_SECRET = secret; due = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false }; ran.length = 0; wakesThrow = false })
 const call = (token: string | null = secret) => GET(new Request('http://127.0.0.1/mikka/api/cron/reconcile', { headers: token ? { authorization: `Bearer ${token}` } : {} }))
 
 test('only the cron bearer can run it', async () => {
@@ -34,21 +37,25 @@ test('an idle check runs nothing else and arms no timer', async () => {
 })
 
 test('each job with lost work runs, and its due timer is re-armed', async () => {
-  due = { wakes: true, schedules: false, recovery: true, deletions: false }
+  due = { wakes: true, schedules: false, recovery: true, deletions: false, audit: false }
   assert.equal((await call()).status, 200)
   assert.deepEqual(ran, ['check', 'wakes', 'recovery', 'arm:run-recovery'])
   ran.length = 0
-  due = { wakes: false, schedules: true, recovery: false, deletions: false }
+  due = { wakes: false, schedules: true, recovery: false, deletions: false, audit: false }
   await call()
   assert.deepEqual(ran, ['check', 'schedules', 'arm:schedules'])
   ran.length = 0
-  due = { wakes: false, schedules: false, recovery: false, deletions: true }
+  due = { wakes: false, schedules: false, recovery: false, deletions: true, audit: false }
   await call()
   assert.deepEqual(ran, ['check', 'deletions', 'files', 'arm:account-deletions'])
+  ran.length = 0
+  due = { wakes: false, schedules: false, recovery: false, deletions: false, audit: true }
+  await call()
+  assert.deepEqual(ran, ['check', 'delivery', 'retention', 'arm:audit-retention'])
 })
 
 test('a failure answers a bounded error without its text', async () => {
-  due = { wakes: true, schedules: false, recovery: false, deletions: false }
+  due = { wakes: true, schedules: false, recovery: false, deletions: false, audit: false }
   wakesThrow = true
   const response = await call()
   assert.equal(response.status, 502)

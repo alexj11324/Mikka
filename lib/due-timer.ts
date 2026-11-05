@@ -8,7 +8,7 @@ import { wakeTokens, wakeTransport, workflowWakesEnabled } from './workflow-wake
  * it when none runs. The job's cron route stays as a slow reconciliation sweep
  * that only recovers a start lost between COMMIT and here.
  */
-export type DueKind = 'schedules' | 'run-recovery' | 'account-deletions'
+export type DueKind = 'schedules' | 'run-recovery' | 'account-deletions' | 'audit-retention'
 export type DueJob = { run(): Promise<number | null>; next(): Promise<number | null> }
 
 export const dueJobs: Record<DueKind, DueJob> = {
@@ -30,11 +30,25 @@ export const dueJobs: Record<DueKind, DueJob> = {
     },
     next: () => accountDeletionsNextDue(),
   },
+  'audit-retention': {
+    run: async () => {
+      const [{ deliverWorkspaceAudits }, { sweepAuditRetention }] = await Promise.all([import('./audit/delivery'), import('./audit/retention')])
+      await deliverWorkspaceAudits()
+      await sweepAuditRetention()
+      return auditRetentionNextDue()
+    },
+    next: () => auditRetentionNextDue(),
+  },
 }
 
 async function accountDeletionsNextDue() {
   const [{ pool }, { nextAccountDeletionsDue }] = await Promise.all([import('./db'), import('./account-deletions-due')])
   return nextAccountDeletionsDue(pool)
+}
+
+async function auditRetentionNextDue() {
+  const [{ pool }, { workspacePool }, { nextAuditRetentionDue }] = await Promise.all([import('./db'), import('./workspace-db'), import('./audit-retention-due')])
+  return nextAuditRetentionDue(pool, workspacePool)
 }
 
 /** Tests replace `start` here to observe timer starts without a Workflow world. */

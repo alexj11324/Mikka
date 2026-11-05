@@ -11,17 +11,19 @@ const headers = { 'cache-control': 'no-store' }
 
 /**
  * The single safety-net sweep (#1371), called every 15 minutes by the minute
- * Worker. Coordinator wakes, schedules, run recovery and account deletion
- * start from their writes and their durable timers; this recovers only work already due that none of
+ * Worker. Coordinator wakes, schedules, run recovery, account deletion and
+ * audit retention start from their writes and their durable timers; this recovers only work already due that none of
  * them picked up (a start lost between COMMIT and its wake, a timer that
  * failed). Worst case, such work runs 15 minutes after its due time. An idle
- * call costs one statement.
+ * call costs two statements: one on the main database, one on the workspace
+ * database for the audit outbox.
  */
 async function handleGET(request: Request) {
   const refused = await cronUnauthorized(request); if (refused) return refused
   try {
     const { factoryLifecycleEnabled } = await import('@/lib/factory/runtime')
-    const due = await reconcileDue(pool, { factoryLifecycle: factoryLifecycleEnabled() })
+    const { workspacePool } = await import('@/lib/workspace-db')
+    const due = await reconcileDue(pool, { factoryLifecycle: factoryLifecycleEnabled(), workspace: workspacePool })
     const counts: Record<string, unknown> = { ...due }
     if (due.wakes) counts.wakeCounts = await (await import('@/lib/coordinator/wake')).retryCoordinatorWakes()
     if (due.schedules) {
@@ -32,6 +34,11 @@ async function handleGET(request: Request) {
       const [{ sweepAccountDeletions }, { cleanupChatFiles }] = await Promise.all([import('@/lib/account/deletion-jobs'), import('@/lib/chat-attachments/store')])
       counts.deletionCounts = { ...await sweepAccountDeletions(), attachments: await cleanupChatFiles() }
       await armDueTimer('account-deletions')
+    }
+    if (due.audit) {
+      const [{ deliverWorkspaceAudits }, { sweepAuditRetention }] = await Promise.all([import('@/lib/audit/delivery'), import('@/lib/audit/retention')])
+      counts.auditCounts = { delivery: await deliverWorkspaceAudits(), ...await sweepAuditRetention() }
+      await armDueTimer('audit-retention')
     }
     if (due.recovery) {
       counts.recoveryCounts = await (await import('@/lib/run-recovery')).recoverRuns(work => afterJob('cron:reconcile/group-turns', work))
