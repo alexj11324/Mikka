@@ -2,6 +2,7 @@ import 'server-only'
 import type { Pool } from 'pg'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { sandboxGone, threadMachineProvider } from './thread-machines'
+import { armDueTimerAfterCommit } from '@/lib/due-timer'
 
 /** Kills a sandbox on its owner's own E2B key (orchestration § 2). Tests replace threadMachineProvider.kill. */
 export type KillSandbox = (ownerId: string, sandboxId: string) => Promise<void>
@@ -54,6 +55,7 @@ export async function teardownWorkspaceMachines(database: Pool, workspaceId: str
     pending = machines.flatMap(row => row.sandboxId ? [{ sandboxId: row.sandboxId, ownerId: row.ownerId }] : [])
     if (pending.length) await client.query(`INSERT INTO sandbox_kill_retries ("sandboxId","ownerId") SELECT * FROM unnest($1::text[],$2::text[]) ON CONFLICT ("sandboxId") DO NOTHING`,
       [pending.map(row => row.sandboxId), pending.map(row => row.ownerId)])
+    if (pending.length) armDueTimerAfterCommit(client, 'run-recovery')
     await client.query('COMMIT')
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
   const killed = await Promise.all(pending.map(row => attempt(database, options.kill ?? ownerKill, row)))
