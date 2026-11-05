@@ -34,10 +34,16 @@ export const SESSION_OPTIONS = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- better-auth's getSession is overloaded; the wrapper only adds a query flag.
 export function readFreshSessionsInScope(api: { getSession: (context: any) => Promise<unknown> }) {
   const read = api.getSession
-  api.getSession = (context: { query?: Record<string, unknown> } | undefined) => {
+  api.getSession = (context: { headers?: Headers; query?: Record<string, unknown> } | undefined) => {
     // RPC already checked this bearer against the database in this request. Reuse
     // that identity, including for an action which receives ambient browser cookies.
     const desktop = currentDesktopSession()
-    return desktop ? Promise.resolve(desktop) : read(sessionMustBeFresh() ? { ...context, query: { ...context?.query, disableCookieCache: true } } : context)
+    if (desktop) return Promise.resolve(desktop)
+    if (context?.headers?.has('authorization')) {
+      const headers = new Headers(context.headers)
+      headers.delete('cookie')
+      return read({ ...context, headers, query: { ...context.query, disableCookieCache: true } })
+    }
+    return read(sessionMustBeFresh() ? { ...context, query: { ...context?.query, disableCookieCache: true } } : context)
   }
 }

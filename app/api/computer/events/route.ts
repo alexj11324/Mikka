@@ -5,6 +5,7 @@ import { LIVE_ID } from '@/lib/live/events'
 import { computerEventCursor } from '@/lib/computer/event-page'
 import { readComputerEvents } from '@/lib/computer/event-log'
 import { withRequestLog } from '@/lib/request-log'
+import { humanSessionHeaders } from '@/lib/desktop-rpc/handler'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -12,8 +13,9 @@ const headers = { 'cache-control': 'private, no-store' }
 
 /** Browser notifications contain no data; each incremental read authorizes again. */
 async function events(request: Request) {
-  if (request.headers.has('authorization')) return new Response(null, { status: 401, headers })
-  const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
+  const sessionHeaders = humanSessionHeaders(request)
+  if (!sessionHeaders) return new Response(null, { status: 401, headers })
+  const session = await auth.api.getSession({ headers: sessionHeaders, query: { disableCookieCache: true } })
   if (!session?.user) return new Response(null, { status: 401, headers })
   const params = new URL(request.url).searchParams
   const workspaceId = params.get('workspace') ?? ''

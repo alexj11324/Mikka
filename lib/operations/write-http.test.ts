@@ -34,6 +34,25 @@ test('browser authority is checked before operation creation', async () => {
   assert.equal(calls, 0)
 })
 
+test('native session bearer passes the real human session identity and cannot fall back to cookies', async () => {
+  const authorization = `Bearer ${'n'.repeat(32)}`
+  let reads = 0
+  const handler = approvedWriteHandler({ api: { getSession: async ({ headers, query }) => {
+    assert.equal(headers.get('authorization'), authorization)
+    assert.equal(headers.has('cookie'), false)
+    assert.equal(query.disableCookieCache, true)
+    reads++
+    return session
+  } } }, () => ({
+    propose: async (owner, _input, intentId) => { assert.equal(owner, session.user.id); return { status: 'awaiting_approval' as const, actionId: intentId } },
+    decide: async () => { throw Error('unexpected decision') }, view: async () => { throw Error('unexpected view') },
+  }))
+  assert.equal((await handler(request(proposal, { authorization }))).status, 200)
+  assert.equal((await handler(request(proposal, { authorization, origin: 'https://foreign.invalid' }))).status, 403)
+  assert.equal((await handler(request(proposal, { authorization: `Bearer mkp_${'x'.repeat(43)}` }))).status, 401)
+  assert.equal(reads, 1)
+})
+
 test('session and infrastructure failures are sanitized unavailable outcomes, conflicts retain their code', async () => {
   const brokenAuth = approvedWriteHandler({ api: { getSession: async () => { throw Error('private authentication diagnostic') } } }, () => { throw Error('unexpected service') })
   const unavailable = await brokenAuth(request(proposal))

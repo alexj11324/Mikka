@@ -32,7 +32,7 @@ export function actionSignatures(source, filename) {
 
 /** Every application action import is replaced before module loading. The
  * server's separately validated allowlist is the authority for dispatch. */
-function applicationBoundary(actions) {
+export function applicationBoundary(actions) {
   const aliases = new Map([
     ['next/navigation', 'next-navigation.ts'],
     ['next/link', 'next-link.tsx'],
@@ -42,13 +42,17 @@ function applicationBoundary(actions) {
     ['@/components/auth-form', 'auth-form.tsx'],
     ['@/lib/platform/open-settings', 'open-settings.ts'],
     ['@/lib/live/browser-runtime', 'live-runtime.ts'],
+    ['@/lib/computer/request', 'computer-request.ts'],
+    ['@novnc/novnc/lib/rfb.js', 'novnc.ts'],
   ])
   return {
     name: 'mikka-desktop-application-boundary',
     setup(builder) {
-      builder.onResolve({ filter: /^(?:next\/|@\/)/ }, args => {
+      builder.onResolve({ filter: /^(?:next\/|@\/|@novnc\/)/ }, args => {
         const replacement = aliases.get(args.path)
-        if (replacement) return { path: resolve(renderer, replacement) }
+        // These two adapters delegate unchanged non-viewer behavior to the
+        // original module; only their own imports bypass the alias.
+        if (replacement && args.importer !== resolve(renderer, replacement)) return { path: resolve(renderer, replacement) }
         const match = /^@\/app\/actions\/([\w-]+)$/.exec(args.path)
         if (match) return { path: match[1], namespace: 'desktop-action' }
         if (args.path === 'next/headers' || args.path === 'next/server' || args.path.startsWith('next/font/')) {
@@ -150,8 +154,8 @@ async function usedActionImports(inputs) {
   return [...imports].sort()
 }
 
-export async function buildRenderer({ outdir = resolve(desktop, 'dist/renderer') } = {}) {
-  await rm(outdir, { recursive: true, force: true })
+export async function buildRenderer({ outdir = resolve(desktop, 'dist/renderer'), clean = true } = {}) {
+  if (clean) await rm(outdir, { recursive: true, force: true })
   await mkdir(outdir, { recursive: true })
   const actions = new Map()
   const result = await build({

@@ -59,6 +59,7 @@ next-env.d.ts
 /apps/desktop/release-dev/
 /apps/desktop/release-acceptance/
 /.cache/desktop-evidence/
+/.cache/desktop-runtime/
 # Generated standalone credential broker bundles.
 /services/credential-broker/dist/
 /services/credential-broker/public/

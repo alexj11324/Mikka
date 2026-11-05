@@ -1,8 +1,12 @@
 # @mikka/desktop
 
-The Electron shell for Mikka. It renders the **same Next.js UI** as the web
-client and adds the native abilities the web cannot have. There is no second
-renderer and no UI fork.
+The Electron desktop for Mikka. It bundles the **same React components, fonts,
+tokens and Tailwind styles** as the Next.js web client. The main window loads
+`mikka://app/mikka` from the App, so opening the interface does not download or
+server-render a web page. Main forwards authenticated operations to the backend.
+
+Implementation and acceptance evidence:
+[`docs/design/desktop-bundled-renderer.md`](../../docs/design/desktop-bundled-renderer.md).
 
 ## What differs from the web client
 
@@ -17,12 +21,15 @@ desktop capability.
 | `device.localIdentity` — the daemon on this computer | yes |
 | `notifications.system`, `notifications.badge` | yes: 等你/失败 notifications and the waiting-run Dock badge |
 | `quota.snapshot` | yes |
-| `auth`, `settings`, `device.pickRepo`, `preview`, saved tabs | deferred |
+| `bundled` session, browser sign-in and live transport | yes; public identity only, credentials stay in main |
+| `device.pickRepo` | yes; native directory dialog, validated Git repository |
+| General local `settings`, `preview` scheme, saved tabs | deferred |
 
-Sign-in reuses the web session in this window. The `@better-auth/electron`
-keychain/JWT flow, device linking and the `mikka-preview:` scheme need server
-and release work that is not part of this phase; see
-`docs/design/platforms.md`. Updates come from the published GitHub Release via
+The bundled renderer cannot read the session token, authentication cookies or
+live socket ticket. Main stores the session using OS-backed `safeStorage`,
+scoped to the backend and app profile. Insecure Linux `basic_text` storage is
+rejected; macOS uses Keychain. See `docs/design/platforms.md`.
+Updates come from the published GitHub Release via
 `electron-updater`: the app checks on launch and from **Check for Updates…**,
 asks before downloading, and asks before restarting to install.
 
@@ -36,9 +43,11 @@ pnpm dev
 pnpm desktop:dev
 ```
 
-The dev shell loads `http://localhost:3000/mikka` and uses the `Mikka Dev`
-data directory and the `persist:mikka-dev` session, matching the daemon's dev
-flavor. `MIKKA_DESKTOP_APP_URL` overrides the URL.
+The dev shell loads local assets and sends backend requests to
+`http://localhost:3000/mikka`. It uses the separate `Mikka Dev` data directory
+and `persist:mikka-dev` partition, matching the daemon's dev flavor.
+`MIKKA_DESKTOP_APP_URL` selects the backend at build time. Production acceptance
+uses `next build` and `next start`, never first-request development compilation.
 
 ## Build and package
 
@@ -47,6 +56,8 @@ pnpm desktop:build                 # dist/main.cjs, dist/preload.cjs
 pnpm --filter @mikka/desktop package:dir   # unpacked app under release/
 pnpm --filter @mikka/desktop package:mac   # signed Apple Silicon dmg/zip (release)
 pnpm --filter @mikka/desktop package       # local dmg/zip, never publishes
+# Unsigned isolated test package; requires an explicit non-production backend:
+MIKKA_DESKTOP_APP_URL=https://your-test-backend.example/mikka pnpm --filter @mikka/desktop package:dev:mac
 ```
 
 A production build must use an HTTPS app URL. Signing and notarization
@@ -57,10 +68,44 @@ credentials belong to the release pipeline, never the repository.
 Google and GitHub sign-in open in the system browser, never in an embedded
 window. Before opening it, the shell binds a one-shot HTTP listener to
 `127.0.0.1` on a random port. The browser finishes OAuth on the web app, which
-mints a one-minute, single-use token and redirects it to that loopback
-listener; the shell then loads `/api/desktop/finish`, exchanges the token for
-its own session cookie and continues to the requested page. No custom URL
-scheme is registered.
+mints a one-minute exchange code and redirects it to that loopback listener.
+Main redeems the code with its retained PKCE verifier and persists the returned
+session only after the OS keychain encrypts it. Signup stays in the system
+browser with its existing Turnstile protection. The local protocol is for
+packaged assets, not an OAuth callback handler.
+
+## Transition and rollback
+
+Bundled mode is the default. Set `MIKKA_DESKTOP_RENDERER=hosted` when launching
+to select the previous hosted window implementation. Its existing browser
+session and `/api/desktop/finish` exchange remain compatible. Remove the variable
+to return to bundled mode; application data stays on the same backend.
+
+For an isolated profile, `MIKKA_USER_DATA_DIR` accepts an absolute directory.
+Do not point a test run at the production profile. `Mikka Dev` disables all
+production desktop updater checks, launch gates and daemon update attempts.
+
+RPC protocol versions 1 and 0 are accepted. The server's fixed
+`desktop_client_update_required` response stops incompatible calls and offers
+an App update. The old hosted renderer remains supported independently of this
+wire protocol. The generated action manifest and explicit Zod registry are
+checked together; changing a server export cannot silently omit its desktop
+client operation.
+
+## Isolated acceptance
+
+The desktop CI builds the production Next.js backend against an independent
+Postgres and runs Electron with real leased test accounts. Apple Silicon CI
+reuses that compiled backend, then tests an actual packaged App before producing
+the unsigned `Mikka Dev` ZIP. The inspector-enabled acceptance bundle is a
+harness input only; downloadable and release Apps retain the inspector fuse.
+
+`test/environment.mjs` starts the real local live Worker plus production
+backends. `test/db-metrics.cjs` records query counts and PostgreSQL connection
+protocol bytes only, with no SQL, parameters or row data. The one-hour idle
+measurement is separate from the short fake-clock `test:idle-budget` regression.
+Screenshot and performance evidence records its exact revision and isolated
+environment. No Vercel deployment or release workflow is part of #1415.
 
 ## Release
 

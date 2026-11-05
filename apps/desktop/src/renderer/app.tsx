@@ -107,9 +107,10 @@ function Routes({ bootstrap }: { bootstrap: DesktopBootstrap }) {
   const user = bootstrap.user
   const authentication = path === '/sign-in' || path === '/sign-up'
   const invitation = /^\/invite\/([^/]+)$/.exec(path)
-  const browserRoute = path === '/forgot-password' || path === '/reset-password' || path === '/verify-email' || path === '/oauth/consent' || /^\/a\//.test(path)
+  const browserRoute = path === '/forgot-password' || path === '/reset-password' || path === '/verify-email' || path === '/oauth/consent' || path.startsWith('/a/')
   useEffect(() => {
     if (path === '/dashboard') navigate(`/${location.search}`, true, { locale }, true)
+    else if (path === '/devices') navigate('/settings?section=devices', true, { locale }, true)
     else if (user && authentication && query.get('addAccount') !== '1') navigate(safeAuthReturn(query.get('next') ?? undefined), true, { locale }, true)
     else if (!user && !authentication && !invitation && !browserRoute) {
       const next = safeAuthReturn(`${path}${location.search}`)
@@ -121,6 +122,7 @@ function Routes({ bootstrap }: { bootstrap: DesktopBootstrap }) {
   if (authentication || !user) return <AuthForm key={path} mode={path === '/sign-up' ? 'sign-up' : 'sign-in'} addAccount={query.get('addAccount') === '1'} next={query.get('next') ?? undefined} googleEnabled={bootstrap.googleEnabled} githubEnabled={bootstrap.githubEnabled} emailEnabled={bootstrap.emailEnabled} oauthFailed={query.get('oauth') === 'failed' || query.has('error')} />
   if (path === '/device') return <DeviceAuthorization account={user.email} initialCode={query.get('user_code') ?? ''} />
   if (path === '/workspaces/new') return <NewWorkspace email={user.email} />
+  if (path === '/devices') return <WorkspaceLoading />
   if (path !== '/' && path !== '/dashboard' && !['/settings', '/settings/teams', '/settings/members'].includes(path)) return <NotFound />
   return <Suspense fallback={<WorkspaceLoading />}><Workspace user={user} bootstrap={bootstrap} /></Suspense>
 }

@@ -1,5 +1,5 @@
 'use client'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 
 import { useEffect, useState } from 'react'
 import useSWR from 'swr'
@@ -7,6 +7,7 @@ import { Check, ChevronDown, LogOut, Plus, Settings, UserPlus, type LucideIcon }
 import { toast } from 'sonner'
 import { authClient } from '@/lib/auth-client'
 import { withBasePath } from '@/lib/base-path'
+import { getPathname } from '@/i18n/navigation'
 import { fetchSettingsData } from '@/lib/settings-data'
 import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import { switchWorkspace } from '@/app/actions/workspace'
@@ -56,6 +57,7 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
   onBeforeChange?: (action: () => Promise<void>) => void
 }) {
   const i18nText = useTranslations();
+  const locale = useLocale()
   const { setOpenMobile } = useSidebar()
   const { data, error, mutate } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
   const [menuOpen, setMenuOpen] = useState(false)
@@ -103,7 +105,7 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
       try {
         const result = await switchWorkspace({ accountId, workspaceId })
         if (!result.ok) { toast.error(result.error); return }
-        window.location.assign('/')
+        window.location.assign(withBasePath(getPathname({ locale, href: '/' })))
       } catch { toast.error(i18nText("FeatureCopy.c_b8e346ef")) }
       finally { setPending(false) }
     })

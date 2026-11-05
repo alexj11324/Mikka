@@ -7,7 +7,7 @@ export const RENDERER_URL = `${RENDERER_ORIGIN}/mikka`
 export const RENDERER_CSP = [
   "default-src 'none'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:", "font-src 'self' data:", "connect-src 'self'",
-  "media-src 'self' blob:", "frame-src 'self'", "object-src 'none'", "base-uri 'none'",
+  "media-src 'self' blob:", "frame-src 'self' https:", "object-src 'none'", "base-uri 'none'",
   "form-action 'none'", "frame-ancestors 'none'", "worker-src 'none'",
 ].join('; ')
 
@@ -29,6 +29,7 @@ const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [/^\/api\/(self-improvement|mobile\/reactions)$/, ['GET', 'POST']],
   [/^\/api\/factory\/(?:agent-profiles|tasks|tasks\/route|questions)$/, ['GET', 'POST']],
   [/^\/api\/integrations\/(github|github\/permissions|github\/repositories\/verification|github\/connect|github\/connect\/intent|github\/connect\/intent\/confirm|linear\/status|composio|composio\/credentials|composio\/catalog)$/, ['GET', 'POST', 'DELETE']],
+  [/^\/api\/integrations\/composio$/, ['PATCH']],
   [/^\/api\/(subscriptions\/enrollments|subscriptions\/enrollments\/handoff|subscriptions\/enrollments\/bind)$/, ['GET', 'POST']],
   [/^\/api\/(billing\/stripe|account\/deletion)$/, ['GET', 'POST', 'DELETE']],
   [new RegExp(`^/api/(?:bots/${ID}(?:/(?:definition|subagents(?:/${ID}(?:/(?:stop|viewer|credentials(?:/(?:challenge|login))?))?)?|computer(?:/(?:runtimes|subscription|takeover|runs|wake|handback|viewer))?))?|conversations/${ID}(?:/(?:decisions(?:/replay)?|members|stop|read|messages))?|suggestions/${ID}(?:/start)?|threads/${ID}/(?:machine|credentials(?:/(?:challenge|login))?))$`), ['GET', 'POST', 'PATCH', 'DELETE']],
@@ -40,6 +41,7 @@ const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
 
 /** Check before URL construction: WHATWG URL normalization must not erase traversal evidence. */
 export function normalizedRendererPath(value: string): string | null {
+  // oxlint-disable-next-line no-control-regex -- Reject NUL, controls and URL whitespace before parsing.
   if (!value.startsWith('/') || value.startsWith('//') || value.length > 8192 || /[\\\x00-\x20\x7f]/.test(value)) return null
   const raw = value.split(/[?#]/, 1)[0]!
   if (/%(?:2e|2f|5c|00|25)/i.test(raw) || raw.split('/').some(part => part === '.' || part === '..')) return null
@@ -50,6 +52,8 @@ export function normalizedRendererPath(value: string): string | null {
 }
 
 export function allowedApiPath(path: string, method: string): boolean {
+  // Viewer grants are capabilities and must be obtained through owner-bound IPC.
+  if (/^\/api\/bots\/[^/]+\/(?:computer\/(?:viewer|takeover)|subagents\/[^/]+\/viewer)$/.test(path)) return false
   return ROUTES.some(([pattern, methods]) => pattern.test(path) && methods.includes(method === 'HEAD' ? 'GET' : method))
 }
 
@@ -61,6 +65,7 @@ export function rendererAssetPath(root: string, urlPath: string): string | null 
 }
 
 export function safeAppNext(value: unknown): string {
+  // oxlint-disable-next-line no-control-regex -- Return targets cannot contain controls or whitespace.
   if (typeof value !== 'string' || value.length > 2048 || !value.startsWith('/') || value.startsWith('//') || /[\\#\x00-\x20]/.test(value) || /%(?:2f|5c|00)/i.test(value)) return '/'
   return value
 }

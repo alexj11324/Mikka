@@ -3,7 +3,7 @@
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 
-import type { MikkaBridge, SshInstallState, BundledBridge, BundledLiveEvent } from '@mikka/protocol/bridge'
+import type { MikkaBridge, SshInstallState, BundledBridge, BundledLiveEvent, BundledViewerEvent } from '@mikka/protocol/bridge'
 import { IPC, BUNDLED_IPC } from '@mikka/protocol/ipc'
 
 const prefix = '--mikka-app-origin='
@@ -17,7 +17,9 @@ function onNotificationClick(listener: (href: string) => void): () => void {
 
 const localOrigin = `${window.location.protocol}//${window.location.host}`
 const bundled = appOrigin === 'mikka://app'
-const localPage = (window.location.pathname === '/mikka' || window.location.pathname.startsWith('/mikka/')) && !/^\/mikka\/(?:api|assets)(?:\/|$)/.test(window.location.pathname)
+let decodedPath = ''
+try { decodedPath = decodeURIComponent(window.location.pathname) } catch { /* Malformed paths never get native privileges. */ }
+const localPage = (decodedPath === '/mikka' || decodedPath.startsWith('/mikka/')) && !/^\/mikka\/(?:api|assets)(?:\/|$)/.test(decodedPath)
 if (appOrigin && window.top === window && (bundled ? localOrigin === appOrigin && localPage : window.location.origin === appOrigin)) {
   // Lets the page reserve room for the macOS traffic lights and draw its own drag region.
   // The preload runs before <html> exists, so wait for the document.
@@ -105,6 +107,17 @@ if (appOrigin && window.top === window && (bundled ? localOrigin === appOrigin &
         const handler = (_event: IpcRendererEvent, event: BundledLiveEvent) => listener(event)
         ipcRenderer.on(BUNDLED_IPC.liveEvent, handler)
         return () => { ipcRenderer.removeListener(BUNDLED_IPC.liveEvent, handler) }
+      },
+    },
+    viewer: {
+      prepare: input => ipcRenderer.invoke(BUNDLED_IPC.viewerPrepare, input),
+      connect: id => ipcRenderer.invoke(BUNDLED_IPC.viewerConnect, id),
+      send: (id, data) => ipcRenderer.invoke(BUNDLED_IPC.viewerSend, id, data),
+      close: id => ipcRenderer.invoke(BUNDLED_IPC.viewerClose, id),
+      onEvent: listener => {
+        const handler = (_event: IpcRendererEvent, event: BundledViewerEvent) => listener(event)
+        ipcRenderer.on(BUNDLED_IPC.viewerEvent, handler)
+        return () => { ipcRenderer.removeListener(BUNDLED_IPC.viewerEvent, handler) }
       },
     },
   }

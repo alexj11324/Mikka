@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { GitHubAccessError, listAuthorizedRepositories } from '@/lib/github/user-access'
 import { readRepositorySettings, saveRepositoryVerifyCommand } from '@/lib/device-repositories'
 import { withRequestLog } from '@/lib/request-log'
+import { humanSessionHeaders } from '@/lib/desktop-rpc/handler'
 
 const headers = { 'Cache-Control': 'private, no-store' }
 const repositorySchema = z.string().max(201).regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/)
@@ -10,8 +11,9 @@ const repositorySchema = z.string().max(201).regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9
 const updateSchema = z.object({ repository: repositorySchema, verifyCommand: z.string().trim().max(2000).nullable() }).strict()
 
 async function handle(request: Request) {
-  if (!request.headers.get('cookie') || request.headers.has('authorization')) return Response.json({ error: 'authRequired' }, { status: 401, headers })
-  const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
+  const sessionHeaders = humanSessionHeaders(request)
+  if (!sessionHeaders) return Response.json({ error: 'authRequired' }, { status: 401, headers })
+  const session = await auth.api.getSession({ headers: sessionHeaders, query: { disableCookieCache: true } })
   if (!session?.user) return Response.json({ error: 'authRequired' }, { status: 401, headers })
   const viewerId = session.user.id
   if (request.method === 'PATCH' && request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ viewerId, error: 'originNotAllowed' }, { status: 403, headers })
@@ -28,7 +30,7 @@ async function handle(request: Request) {
     repository = parsed.data
   }
   try {
-    const access = await listAuthorizedRepositories(request.headers)
+    const access = await listAuthorizedRepositories(sessionHeaders)
     if (access.userId !== viewerId) throw new GitHubAccessError('authRequired', 401)
     const authorized = access.repositories.find(row => row.fullName.toLowerCase() === repository.toLowerCase())
     if (!authorized) throw new GitHubAccessError('githubRepositoryForbidden', 403)

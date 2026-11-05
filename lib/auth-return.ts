@@ -48,8 +48,18 @@ export function safeAuthReturn(value?: string) {
     if (url.searchParams.get('section') === 'plugins' && app === 'github' && hasOnlyQueryKeys(url, ['section', 'app', 'intent']) && intent && /^ghi_[A-Za-z0-9_-]{43}$/.test(intent)) {
       return `/?section=plugins&app=github&intent=${intent}`
     }
-    const issue = url.searchParams.get('issue')
-    return hasOnlyQueryKeys(url, ['issue']) && issue && uuidPattern.test(issue) ? `/?issue=${issue}` : value === '/' ? '/' : '/'
+    // A cold desktop deep link can open any place the existing workspace
+    // address owns, including a thread beside a bot and an Artifact window.
+    // Values remain local enums or UUIDs; none can become a redirect URL.
+    const idKeys = ['bot', 'group', 'session', 'team', 'project', 'issue', 'thread', 'artifact']
+    const section = url.searchParams.get('section')
+    const threads = url.searchParams.get('threads')
+    const sections = ['coordinator', 'agent', 'plugins', 'suggestions', 'artifacts', 'all-issues', 'projects', 'team-home', 'team-issues', 'team-projects']
+    return hasOnlyQueryKeys(url, ['section', ...idKeys, 'threads']) &&
+      idKeys.every(key => optionalUuid(url, key)) &&
+      (section === null || sections.includes(section)) &&
+      (threads === null || threads === 'all' || uuidPattern.test(threads))
+      ? `${url.pathname}${url.search}` : '/'
   }
 
   if (url.pathname === '/settings') {

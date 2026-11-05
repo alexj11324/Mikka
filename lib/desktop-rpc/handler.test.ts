@@ -7,8 +7,8 @@ import { desktopActionSchemas } from './schemas'
 import { currentDesktopSession, withDesktopSession, safeDesktopSession } from './session'
 import { decode, encode, UPDATE_REQUIRED } from './wire'
 
-const tokenA = 'test_A_12345678901234567890'
-const tokenB = 'test_B_12345678901234567890'
+const tokenA = 'A'.repeat(32)
+const tokenB = 'B'.repeat(32)
 const owner = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const peer = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 const sessions = new Map([[tokenA, { user: { id: owner }, session: { id: 'sessionA' } }], [tokenB, { user: { id: peer }, session: { id: 'sessionB' } }]])
@@ -68,7 +68,11 @@ test('parallel users retain separate request scopes and original tenant checks',
 
 test('current and previous versions work and unsupported versions return the fixed update code', async () => {
   const f = fixture()
-  for (const version of [0, 1]) assert.equal((await f.handle(request('fixture.read', [], {}, version))).status, 200)
+  for (const version of [0, 1]) {
+    const response = await f.handle(request('fixture.read', [], {}, version))
+    assert.equal(response.status, 200)
+    assert.equal((await response.json()).version, version)
+  }
   for (const version of [-1, 2, 99]) {
     const response = await f.handle(request('fixture.read', [], {}, version))
     assert.equal(response.status, 426); assert.equal((await response.json()).error.code, UPDATE_REQUIRED)

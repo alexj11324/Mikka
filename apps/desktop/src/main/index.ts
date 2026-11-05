@@ -26,16 +26,18 @@ import { RENDERER_ORIGIN, RENDERER_URL } from './bundled-policy'
 import { bundledProtocol } from './bundled-protocol'
 import { BundledAuth } from './bundled-auth'
 import { BundledLive } from './bundled-live'
+import { BundledViewer } from './bundled-viewer'
 import { registerBundledBridge } from './bundled-bridge'
 import { SessionVault } from './session-vault'
 import { pickRepo } from './repo-picker'
+import { openBundledWebPage } from './bundled-web'
 
 const APP_URL = __MIKKA_APP_URL__
 const APP_VERSION = __MIKKA_APP_VERSION__
 const FLAVOR = __MIKKA_FLAVOR__
-const PARTITION = FLAVOR === 'dev' ? 'persist:mikka-dev' : 'persist:mikka'
 const APP_ORIGIN = new URL(APP_URL).origin
 const BUNDLED = process.env.MIKKA_DESKTOP_RENDERER !== 'hosted'
+const PARTITION = `${FLAVOR === 'dev' ? 'persist:mikka-dev' : 'persist:mikka'}${BUNDLED ? '-bundled' : ''}`
 const PAGE_URL = BUNDLED ? RENDERER_URL : APP_URL
 const PAGE_ORIGIN = BUNDLED ? RENDERER_ORIGIN : APP_ORIGIN
 
@@ -60,6 +62,7 @@ let authServer: LoopbackAuthServer | null = null
 let authTimer: NodeJS.Timeout | null = null
 let bundledAuth: BundledAuth | null = null
 let bundledLive: BundledLive | null = null
+let bundledViewer: BundledViewer | null = null
 
 function closeAuthServer(): void {
   if (authTimer) { clearTimeout(authTimer); authTimer = null }
@@ -498,8 +501,10 @@ async function start(): Promise<void> {
       openExternal: url => shell.openExternal(url),
       changed: () => {
         bundledLive?.closeAll()
+        bundledViewer?.closeAll()
         for (const contents of webContents.getAllWebContents()) if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), PAGE_URL)) contents.send(BUNDLED_IPC.sessionChanged)
       },
+      scopeChanged: () => { bundledLive?.closeAll(); bundledViewer?.closeAll() },
       returned: next => {
         if (!mainWindow || mainWindow.isDestroyed()) return
         if (mainWindow.isMinimized()) mainWindow.restore()
@@ -513,7 +518,11 @@ async function start(): Promise<void> {
       const contents = webContents.fromId(owner)
       if (contents && !contents.isDestroyed() && isTrustedFrame(contents.getURL(), PAGE_URL)) contents.send(BUNDLED_IPC.liveEvent, event)
     })
-    registerBundledBridge(bundledAuth, bundledLive)
+    bundledViewer = new BundledViewer(bundledAuth, (owner, event) => {
+      const contents = webContents.fromId(owner)
+      if (contents && !contents.isDestroyed() && isTrustedFrame(contents.getURL(), PAGE_URL)) contents.send(BUNDLED_IPC.viewerEvent, event)
+    })
+    registerBundledBridge(bundledAuth, bundledLive, bundledViewer)
     session.fromPartition(PARTITION).protocol.handle('mikka', bundledProtocol(join(__dirname, 'renderer'), bundledAuth))
   }
   registerBridge({
@@ -530,10 +539,11 @@ async function start(): Promise<void> {
       const body = await response.json() as { token: string }
       return body.token
     },
-    openExternal: url => {
+    openExternal: async url => {
       const target = appExternalUrl(url, APP_URL)
       if (!target) throw new Error('openExternal accepts only app-origin HTTP(S) URLs')
-      return shell.openExternal(target)
+      if (bundledAuth && await openBundledWebPage(target, { serverUrl: APP_URL, auth: bundledAuth, openExternal: page => shell.openExternal(page) })) return
+      await shell.openExternal(target)
     },
     prepareAuth: BUNDLED ? async () => { throw new Error('Use main-owned bundled sign-in / 请使用桌面登录') } : prepareAuth,
     prepareReturn,
@@ -581,7 +591,7 @@ if (!app.requestSingleInstanceLock()) {
   })
   app.on('before-quit', closeAuthServer)
   app.on('before-quit', closeReturnListener)
-  app.on('before-quit', () => { bundledAuth?.dispose(); bundledLive?.closeAll() })
+  app.on('before-quit', () => { bundledAuth?.dispose(); bundledLive?.closeAll(); bundledViewer?.closeAll() })
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
   })

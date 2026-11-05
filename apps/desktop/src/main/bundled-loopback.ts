@@ -17,7 +17,7 @@ export async function startBundledLoopback(state: string, received: (code: strin
     const url = new URL(request.url, `http://${expectedHost}`)
     const returned = url.searchParams.get('state') ?? ''
     const code = url.searchParams.get('code') ?? ''
-    if (url.pathname !== '/auth/callback' || url.searchParams.getAll('state').length !== 1 || url.searchParams.getAll('code').length !== 1 || !/^[A-Za-z0-9_-]{32,128}$/.test(code) || returned.length !== state.length || !timingSafeEqual(Buffer.from(returned), Buffer.from(state))) { reject(); return }
+    if (url.pathname !== '/auth/callback' || url.searchParams.getAll('state').length !== 1 || url.searchParams.getAll('code').length !== 1 || !/^[A-Za-z0-9_-]{32,128}$/.test(code) || !/^[A-Za-z0-9_-]{32,128}$/.test(returned) || returned.length !== state.length || !timingSafeEqual(Buffer.from(returned), Buffer.from(state))) { reject(); return }
     used = true
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
     const message = loopbackLocale(request.headers['accept-language']) === 'en' ? 'Returning to Mikka…' : '正在返回 Mikka…'

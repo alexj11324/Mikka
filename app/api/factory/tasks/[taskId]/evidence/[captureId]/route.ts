@@ -15,7 +15,12 @@ export async function GET(
     auth.api.getSession({ headers, query: { disableCookieCache: true } }),
   );
   const { taskId, captureId } = await context.params;
-  return factoryEvidenceMedia(request, { actor, taskId, captureId }, {
+  // The downstream capture handler also rejects delegated authorization. Strip
+  // it only after the real native/browser session above produced a human actor.
+  const mediaHeaders = new Headers(request.headers);
+  if (actor) mediaHeaders.delete('authorization');
+  const mediaRequest = new Request(request, { headers: mediaHeaders });
+  return factoryEvidenceMedia(mediaRequest, { actor, taskId, captureId }, {
     capture: (...args) => factoryApprovals.capture(...args),
     read: readCapture,
   });

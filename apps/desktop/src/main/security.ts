@@ -20,7 +20,8 @@ export function isTrustedFrame(frameUrl: string | undefined, appUrl: string): bo
   const app = originOf(appUrl)
   if (app === null || originOf(frameUrl) !== app) return false
   if (app === 'mikka://app') {
-    const path = new URL(frameUrl).pathname
+    let path: string
+    try { path = decodeURIComponent(new URL(frameUrl).pathname) } catch { return false }
     return (path === '/mikka' || path.startsWith('/mikka/')) && !/^\/mikka\/(?:api|assets)(?:\/|$)/.test(path)
   }
   return true
@@ -42,7 +43,7 @@ export function navigationDecision(
   appUrl: string
 ): NavigationDecision {
   const origin = originOf(candidate)
-  if (origin && origin === originOf(appUrl)) return origin === 'mikka://app' && !isTrustedFrame(candidate, appUrl) ? 'deny' : 'allow'
+  if (origin && origin === originOf(appUrl)) return origin === 'mikka://app' && new URL(candidate).pathname !== '/' && !isTrustedFrame(candidate, appUrl) ? 'deny' : 'allow'
   return externalUrl(candidate) ? 'external' : 'deny'
 }
 

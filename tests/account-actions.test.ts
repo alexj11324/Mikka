@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
+import { withDesktopSession, desktopRotatedToken } from '../lib/desktop-rpc/session'
 
 // Settings › 账户 actions: each one reads the person from the session (never
 // from its input), validates on the server and returns a coded failure.
@@ -203,4 +204,15 @@ test('deletion requires a fresh authoritative sign-in; recent session activity d
   assert.equal((await account.deleteAccount({ email: 'alice@example.com' })).error, 'SESSION_NOT_FRESH')
   assert.equal(calls.deleteAccount.mock.callCount(), 0)
   assert.equal(calls.signOut.mock.callCount(), 0)
+})
+
+test('desktop password rotation stays outside action data and is available only to the current main-process response', async () => {
+  calls.changePassword.mock.mockImplementationOnce(async () => ({ token: 'rotated-private-session-token' }))
+  await withDesktopSession(ALICE, async () => {
+    const result = await account.changePassword({ currentPassword: 'old-password', newPassword: 'new-password', revokeOtherSessions: true })
+    assert.deepEqual(result, { revokedOtherSessions: true })
+    assert.equal(desktopRotatedToken(), 'rotated-private-session-token')
+    assert.equal(JSON.stringify(result).includes('rotated-private-session-token'), false)
+  })
+  assert.equal(desktopRotatedToken(), undefined)
 })

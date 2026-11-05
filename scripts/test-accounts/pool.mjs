@@ -10,6 +10,14 @@ const TABLES = Object.freeze({
   agents: ['agents', 'id'], agent_runs: ['agent_runs', 'id'], run_chunks: ['run_chunks', 'id'],
   run_messages: ['run_messages', 'id'], coordinator_messages: ['coordinator_messages', 'id'],
   conversation_reads: ['conversation_reads', 'conversationId'],
+  // Desktop visual fixtures reserve absent aggregate keys before inserting.
+  // Membership keys cover only rows beneath that newly reserved parent.
+  workspaces: ['mikka_workspaces', 'id'], workspace_members: ['mikka_workspace_members', 'workspaceId'],
+  teams: ['mikka_teams', 'id'], team_members: ['mikka_team_members', 'teamId'], team_issues: ['mikka_team_issues', 'issueId'],
+  coordinator_bots: ['coordinator_bots', 'botId'], coordinator_sessions: ['coordinator_sessions', 'botId'],
+  devices: ['devices', 'id'], conversations: ['conversations', 'id'],
+  conversation_members: ['conversation_members', 'conversationId'], conversation_messages: ['conversation_messages', 'id'],
+  artifacts: ['artifacts', 'id'], artifact_versions: ['artifact_versions', 'id'],
 })
 const quote = name => `"${name.replaceAll('"', '""')}"`
 const digest = value => createHash('sha256').update(value).digest('hex')

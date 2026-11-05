@@ -9,13 +9,18 @@ const secret = 'local-browser-ticket-test-secret'
 let owner: string | null = null
 const memberships = new Set<string>()
 const membershipReads: unknown[][] = []
+let sessionHeaders: Headers | undefined
 let route: typeof import('../../app/api/live/ticket/route')
 const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
 
 before(async () => {
   process.env.DEVICE_GATEWAY_URL = 'https://gateway.test'
   process.env.DEVICE_GATEWAY_PUSH_SECRET = secret
-  mock.module(new URL('../api-auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async () => owner ? { user: { id: owner } } : null } } } })
+  mock.module(new URL('../api-auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async (input: { headers: Headers; query: { disableCookieCache: boolean } }) => {
+    assert.equal(input.query.disableCookieCache, true)
+    sessionHeaders = input.headers
+    return owner ? { user: { id: owner } } : null
+  } } } } })
   mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: { query: async (_sql: string, values: unknown[]) => {
     membershipReads.push(values)
     return { rowCount: memberships.has(`${values[1]}:${values[0]}`) ? 1 : 0, rows: [] }
@@ -61,4 +66,19 @@ test('the route signs the session owner and exact authorized workspace, ignoring
   const other = await (await request(second)).json()
   assert.notEqual(ticket.url, other.url)
   assert.equal(deviceGatewayTicketValid(`live:${channel}`, other.protocol, secret), false)
+})
+
+test('native session bearer uses the same membership boundary without trusting accompanying cookies', async () => {
+  owner = 'native-owner'; memberships.add(`native-owner:${workspace}`)
+  const authorization = `Bearer ${'n'.repeat(32)}`
+  const response = await request(workspace, { authorization, cookie: 'other-account=ignored' })
+  assert.equal(response.status, 200)
+  assert.equal(sessionHeaders?.get('authorization'), authorization)
+  assert.equal(sessionHeaders?.has('cookie'), false)
+  const ticket = await response.json()
+  assert.equal(deviceGatewayTicketValid(`live:${liveChannelId({ ownerId: 'native-owner', workspaceId: workspace })}`, ticket.protocol, secret), true)
+  memberships.delete(`native-owner:${workspace}`)
+  assert.equal((await request(workspace, { authorization })).status, 403)
+  owner = null
+  assert.equal((await request(workspace, { authorization })).status, 401)
 })

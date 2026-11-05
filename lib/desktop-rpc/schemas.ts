@@ -6,6 +6,7 @@ import { taskDestinationSchema } from '@/lib/task-destination'
 import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
 import { API_KEY_PRESETS } from '@/lib/model-api-key-providers'
 import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
+import { setAppPolicyInput } from '@/lib/app-policy/apps'
 
 const uuid = z.uuid()
 const id = z.string().min(1).max(200)
@@ -16,7 +17,7 @@ const count = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)
 const workspace = uuid.optional()
 const bot = uuid.nullable()
 const version = z.string().regex(/^[0-9a-f]{32}$/)
-const tuple = (...items: z.ZodType[]) => z.tuple(items)
+const tuple = (...items: z.ZodType[]): z.ZodType => items.length ? z.tuple(items as [z.ZodType, ...z.ZodType[]]) : z.tuple([])
 const object = z.strictObject
 const oneId = tuple(uuid)
 const none = tuple()
@@ -43,9 +44,9 @@ const note = object({
 const harness = z.enum(['claude_code', 'codex'])
 const orderChange = z.discriminatedUnion('kind', [
   object({ kind: z.literal('add'), entries: z.array(object({ harness, model: text(128).trim().min(1), source: z.discriminatedUnion('kind', [object({ kind: z.literal('subscription'), connectionId: uuid }), object({ kind: z.literal('api_key'), keyId: uuid })]) })).min(1).max(400), at: count.optional() }),
-  object({ kind: z.literal('remove'), id: uuid }), object({ kind: z.literal('reorder'), ids: z.array(uuid).max(400) }),
+  object({ kind: z.literal('remove'), id }), object({ kind: z.literal('reorder'), ids: z.array(id).max(400) }),
   object({ kind: z.literal('location'), location: z.enum(['cloud', 'local']) }), object({ kind: z.literal('autoRouting'), enabled: bool }),
-  object({ kind: z.literal('preferred'), harness }), object({ kind: z.literal('harness'), id: uuid, harness }),
+  object({ kind: z.literal('preferred'), harness }), object({ kind: z.literal('harness'), id, harness }),
 ])
 const apiKey = z.discriminatedUnion('provider', [
   object({ provider: z.enum(API_KEY_PRESETS), apiKey: text(512).trim().min(8) }),
@@ -91,14 +92,14 @@ export const desktopActionSchemas = {
   'agents.findThreadIssue': oneId,
   'agents.getIssueThread': tuple(uuid.nullable(), uuid, object({ chain: text(4000), runId: uuid.nullable(), seq: count, runs: count, count }).nullish()),
   'agents.getThreadChanges': tuple(uuid.nullable(), uuid),
-  'agents.sendIssueThreadReply': tuple(object({ issueId: uuid.nullable(), runId: uuid, text: text(10_000).min(1), requestId: uuid.optional(), retryOriginalSession: z.literal(true).optional(), questionWakeGeneration: id.optional() })),
+  'agents.sendIssueThreadReply': tuple(object({ issueId: uuid.nullable(), runId: uuid, text: text(10_000).min(1), requestId: uuid.optional(), retryOriginalSession: z.literal(true).optional(), questionWakeGeneration: uuid.optional() })),
   'agents.getThreadName': oneId,
   'agents.stopRun': oneId,
   'agents.resumeQuotaPausedRunOnApiKey': oneId,
   'agents.retryQuotaPausedRun': oneId,
   'agents.sendDeviceCommand': tuple(object({ deviceId: uuid, kind: z.enum(['redetect', 'restart', 'update']) })),
   'app-policy.getAppPolicy': inWorkspace,
-  'app-policy.updateAppPolicy': tuple(object({ app: z.enum(['gmail', 'googlecalendar', 'slack', 'notion']), access: z.enum(['allow', 'deny']) }), workspace),
+  'app-policy.updateAppPolicy': tuple(setAppPolicyInput, workspace),
   'artifacts.listArtifacts': none,
   'artifacts.listRunArtifacts': oneId,
   'artifacts.getArtifact': oneId,
@@ -171,7 +172,7 @@ export const desktopActionSchemas = {
   'memory.getMemory': none,
   'memory.setMemory': tuple(bool),
   'memory.removeFact': oneId,
-  'memory.updateFact': tuple(uuid, text(2000).trim().min(1)),
+  'memory.updateFact': tuple(uuid, text(200)),
   'model-api-keys.getApiKeys': inWorkspace,
   'model-api-keys.refetchApiKeyModels': tuple(uuid, workspace),
   'model-api-keys.updateApiKeyAfterQuota': tuple(bool, workspace),

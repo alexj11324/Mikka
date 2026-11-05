@@ -4,7 +4,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { WorkspaceError } from '@/lib/workspace-error'
 import { createDesktopRpc } from '@/lib/desktop-rpc/handler'
 import { desktopActions } from '@/lib/desktop-rpc/registry'
-import { withDesktopSession } from '@/lib/desktop-rpc/session'
+import { withDesktopSession, withDesktopLocale, desktopRotatedToken } from '@/lib/desktop-rpc/session'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -15,7 +15,12 @@ export const POST = withRequestLog('/api/desktop/rpc', createDesktopRpc({
     if (session) noteLogUser(session.user.id)
     return session
   },
-  scope: withDesktopSession,
+  scope: (session, work, request) => withDesktopLocale(request.headers.get('x-mikka-locale') === 'en' ? 'en' : 'zh-CN', () => withDesktopSession(session, async () => {
+    const response = await work()
+    const token = desktopRotatedToken()
+    if (response.ok && token) response.headers.set('x-mikka-session-token', token)
+    return response
+  })),
   actions: desktopActions,
   error: error => {
     if (error instanceof ActionFailureError) return { status: error.code === 'authRequired' ? 401 : 400, code: error.code }

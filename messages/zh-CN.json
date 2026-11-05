@@ -4929,6 +4929,15 @@
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   },
   "RunErrors": {
+    "desktop_client_update_required": { "default": "请更新 Mikka 后继续" },
+    "desktop_session_expired": { "default": "请重新登录 Mikka" },
+    "desktop_backend_unreachable": { "default": "无法连接 Mikka" },
+    "desktop_rpc_request_invalid": { "default": "请检查填写的内容后重试" },
+    "desktop_rpc_action_unknown": { "default": "当前版本的 Mikka 不支持此操作" },
+    "desktop_rpc_failed": { "default": "操作未能完成" },
+    "desktop_rpc_request_rejected": { "default": "Mikka 无法接受此请求" },
+    "desktop_rpc_response_invalid": { "default": "无法读取 Mikka 返回的数据" },
+    "desktop_rpc_value_invalid": { "default": "无法发送此内容" },
     "subscription_local_runtime_unavailable": {
       "default": "本机订阅运行无法启动",
       "assignment_invalid": "线程的订阅设置已失效，请重新选择模型",
@@ -4965,7 +4974,7 @@
     "serverUnavailable": "无法连接 Mikka",
     "networkUnavailable": "没有网络",
     "reconnecting": "正在重新连接…",
-    "offlineHint": "当前对话和未发送的文字已保留。请检查网络后重试。",
+    "offlineHint": "请检查网络后重试。",
     "retry": "立即重试",
     "browserTitle": "在浏览器中继续",
     "browserOpened": "页面已在浏览器打开。完成后可以返回 Mikka。",
@@ -4976,6 +4985,6 @@
     "updateHint": "当前版本已无法连接 Mikka，请检查应用更新。",
     "checkUpdate": "检查更新",
     "renderFailed": "此页面未能打开",
-    "renderHint": "请重试打开页面。已保存的对话仍在。"
+    "renderHint": "请重试打开页面。"
   }
 }

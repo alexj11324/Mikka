@@ -171,9 +171,10 @@ export function useConnectedApps(enabled = true) {
   async function startLink(key: string, body: { toolkit: string } | { accountId: string }) {
     setPending(key); setError('')
     try {
-      // A reconnect keeps the account it replaces in a cookie the callback must
-      // read, so on the desktop it still starts in the browser (#601).
-      if ('accountId' in body) {
+      // A reconnect keeps its replaced account in a callback cookie (#601).
+      // The bundled renderer has no browser auth cookies at all: both kinds
+      // of OAuth link begin through main's account-bound browser handoff.
+      if ('accountId' in body || window.mikka?.bundled) {
         const handoff = await openCurrentPageInBrowser()
         if (handoff === 'desktop') { checkOnReturn(); return }
         if (handoff === 'unsupported') { setError(t('browserUpdateRequired')); return }

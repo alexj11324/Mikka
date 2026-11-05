@@ -18,6 +18,10 @@ export interface BundledLiveEvent {
   data?: string
 }
 
+export interface BundledViewerInput { botId: string; mode: 'view' | 'control'; takeover?: boolean; subagentId?: string }
+export interface BundledViewerEvent { id: string; type: 'open' | 'message' | 'close' | 'error'; data?: Uint8Array }
+export type BundledViewerResult = { status: number; body: { url: string; expiresAt: string } | { error: string } }
+
 export interface BundledBridge {
   session(): Promise<BundledSession | null>
   signIn(input: BundledSignIn): Promise<void>
@@ -33,6 +37,13 @@ export interface BundledBridge {
     close(id: string): Promise<void>
     onEvent(listener: (event: BundledLiveEvent) => void): () => void
   }
+  viewer: {
+    prepare(input: BundledViewerInput): Promise<BundledViewerResult>
+    connect(id: string): Promise<void>
+    send(id: string, data: Uint8Array): Promise<void>
+    close(id: string): Promise<void>
+    onEvent(listener: (event: BundledViewerEvent) => void): () => void
+  }
 }
 
 export const BUNDLED_IPC = {
@@ -41,4 +52,6 @@ export const BUNDLED_IPC = {
   sessionChanged: 'bundled:session-changed', livePrepare: 'bundled:live-prepare',
   liveConnect: 'bundled:live-connect', liveSend: 'bundled:live-send', liveClose: 'bundled:live-close',
   liveEvent: 'bundled:live-event',
+  viewerPrepare: 'bundled:viewer-prepare', viewerConnect: 'bundled:viewer-connect',
+  viewerSend: 'bundled:viewer-send', viewerClose: 'bundled:viewer-close', viewerEvent: 'bundled:viewer-event',
 } as const

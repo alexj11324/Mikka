@@ -7,6 +7,7 @@ export type DesktopSession = {
 }
 export type DesktopSignIn = { provider?: 'google' | 'github'; mode?: 'sign-in' | 'sign-up'; next: string; locale: 'zh-CN' | 'en'; addAccount?: boolean }
 export type DesktopLiveEvent = { id: string; type: 'open' | 'message' | 'close' | 'error'; data?: string }
+export type DesktopViewerEvent = { id: string; type: 'open' | 'message' | 'close' | 'error'; data?: Uint8Array }
 export interface RendererHost {
   session(): Promise<DesktopSession | null>
   signIn(input: DesktopSignIn): Promise<void>
@@ -21,6 +22,13 @@ export interface RendererHost {
     send(id: string, data: string): Promise<void>
     close(id: string): Promise<void>
     onEvent(listener: (event: DesktopLiveEvent) => void): () => void
+  }
+  viewer: {
+    prepare(input: { botId: string; mode: 'view' | 'control'; takeover?: boolean; subagentId?: string }): Promise<{ status: number; body: { url: string; expiresAt: string } | { error: string } }>
+    connect(id: string): Promise<void>
+    send(id: string, data: Uint8Array): Promise<void>
+    close(id: string): Promise<void>
+    onEvent(listener: (event: DesktopViewerEvent) => void): () => void
   }
 }
 

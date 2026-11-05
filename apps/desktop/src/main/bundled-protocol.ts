@@ -10,7 +10,7 @@ const TYPES: Record<string, string> = {
   '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.mp4': 'video/mp4', '.webm': 'video/webm',
 }
 const REQUEST_HEADERS = new Set(['accept', 'content-type', 'range', 'if-none-match', 'if-modified-since', 'x-mikka-stream-key'])
-const RESPONSE_HEADERS = new Set(['content-type', 'content-disposition', 'content-length', 'content-range', 'accept-ranges', 'etag', 'last-modified', 'x-mikka-stream-key', 'retry-after'])
+const RESPONSE_HEADERS = new Set(['content-type', 'content-disposition', 'content-range', 'accept-ranges', 'etag', 'last-modified', 'x-mikka-stream-key', 'retry-after'])
 const MAX_UPLOAD = 32 * 1024 * 1024
 
 function localHeaders(type?: string): Headers {
@@ -44,20 +44,25 @@ export async function boundedRequestBody(request: Request): Promise<ArrayBuffer 
 
 /** Streaming response bodies remain streaming. Only known request/response headers
  * cross the boundary; cookies, auth, redirects and remote policy headers do not. */
-export function bundledProtocol(root: string, auth: Pick<BundledAuth, 'request'>): (request: Request) => Promise<Response> {
+export function bundledProtocol(root: string, auth: Pick<BundledAuth, 'request'> & Partial<Pick<BundledAuth, 'scope'>>): (request: Request) => Promise<Response> {
   return async request => {
     let url: URL
     try { url = new URL(request.url) } catch { return failure(400, 'invalid_url') }
     if (`${url.protocol}//${url.host}` !== RENDERER_ORIGIN || url.username || url.password) return failure(403, 'untrusted_origin')
+    // Shared workspace switching intentionally assigns '/'; mirror the web
+    // deployment's exact root redirect without exposing an out-of-base page.
+    if (url.pathname === '/' && (request.method === 'GET' || request.method === 'HEAD')) return new Response(null, { status: 302, headers: { location: `${RENDERER_ORIGIN}/mikka${url.search}`, 'cache-control': 'no-store' } })
     const path = normalizedRendererPath(url.pathname)
     if (path === null) return failure(400, 'invalid_path')
     if (path.startsWith('/api/')) {
       const origin = request.headers.get('origin')
       // Sandboxed artifact frames have an opaque origin, so cannot act as the app.
-      if ((origin && origin !== RENDERER_ORIGIN) || !allowedApiPath(path, request.method)) return failure(403, 'desktop_route_denied')
+      if ((origin && origin !== RENDERER_ORIGIN) || request.headers.get('sec-fetch-site') === 'cross-site' || !allowedApiPath(path, request.method)) return failure(403, 'desktop_route_denied')
       try {
         const headers = new Headers()
         request.headers.forEach((value, key) => { if (REQUEST_HEADERS.has(key)) headers.set(key, value) })
+        const locale = request.headers.get('x-mikka-locale')
+        if (locale === 'en' || locale === 'zh-CN') headers.set('x-mikka-locale', locale)
         const body = await boundedRequestBody(request)
         const response = await auth.request(`${path}${url.search}`, { method: request.method, headers, body, signal: request.signal })
         if (response.status >= 300 && response.status < 400 && response.status !== 304) return failure(502, 'desktop_redirect_denied')
@@ -67,7 +72,22 @@ export function bundledProtocol(root: string, auth: Pick<BundledAuth, 'request'>
           // Artifact HTML is an opaque sandbox, even if opened as a top-level page.
           output.set('content-security-policy', "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob: https:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors mikka://app")
         }
-        return new Response(request.method === 'HEAD' ? null : response.body, { status: response.status, statusText: response.statusText, headers: output })
+        let stream = response.body
+        if (stream && auth.scope && response.headers.get('content-type')?.includes('text/event-stream')) {
+          const scope = auth.scope()
+          const reader = stream.getReader()
+          stream = new ReadableStream({
+            async pull(controller) {
+              if (scope !== auth.scope?.()) { await reader.cancel(); controller.close(); return }
+              const item = await reader.read()
+              if (scope !== auth.scope?.()) { await reader.cancel(); controller.close() }
+              else if (item.done) controller.close()
+              else controller.enqueue(item.value)
+            },
+            cancel: reason => reader.cancel(reason),
+          })
+        }
+        return new Response(request.method === 'HEAD' ? null : stream, { status: response.status, statusText: response.statusText, headers: output })
       } catch (error) { return failure(error instanceof Error && error.message === 'upload_too_large' ? 413 : 503, 'desktop_backend_unavailable') }
     }
     if (request.method !== 'GET' && request.method !== 'HEAD') return failure(405, 'method_not_allowed')

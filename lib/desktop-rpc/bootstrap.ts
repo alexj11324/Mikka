@@ -5,6 +5,7 @@ import { emailSignInEnabled } from '@/lib/email-sign-in'
 import { onboardingDone } from '@/lib/onboarding'
 import { byoE2BKeyEnabled, getE2BKeyStatus } from '@/lib/secrets/e2b'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
+import { ActionFailureError } from '@/lib/action-error'
 import { safeDesktopSession } from './session'
 import type { DesktopBootstrap, DesktopConfig } from './wire'
 
@@ -19,7 +20,7 @@ export async function desktopSession() {
 
 export async function desktopBootstrap(): Promise<DesktopBootstrap> {
   const session = await desktopSession()
-  if (!session) throw new Error('authRequired')
+  if (!session) throw new ActionFailureError('authRequired')
   const [config, onboarding] = await Promise.all([desktopConfig(), onboardingDone(session.user.id).then(done => !done).catch(() => false)])
   let computer: 'none' | 'ask' = 'none'
   if (onboarding && byoE2BKeyEnabled()) {

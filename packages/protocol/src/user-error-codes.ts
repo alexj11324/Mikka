@@ -8,6 +8,15 @@
 //
 // No imports: the CI guard loads this file directly with Node.
 export const USER_ERROR_CODES = {
+  desktop_client_update_required: [],
+  desktop_session_expired: [],
+  desktop_backend_unreachable: [],
+  desktop_rpc_request_invalid: [],
+  desktop_rpc_action_unknown: [],
+  desktop_rpc_failed: [],
+  desktop_rpc_request_rejected: [],
+  desktop_rpc_response_invalid: [],
+  desktop_rpc_value_invalid: [],
   /** A subscription run on the bot owner's own device (subscription-local-runner.ts). */
   subscription_local_runtime_unavailable: [
     "assignment_invalid",
