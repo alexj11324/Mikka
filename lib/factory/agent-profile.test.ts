@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { AgentProfileError, agentProfileDigest, agentProfileInstructions, parseAgentProfile } from './agent-profile-definition'
 import { agentProfileSkillsCatalog, resolveAgentProfileSkills } from './agent-profile-skills'
-import { profileDecisionDiagnostics, profileDecisionInput, profileDecisionQuestions, profileDecisionSelection, selectedProfileAnswer } from './agent-profile-decision'
+import { DECISION_REASONS, profileDecisionDiagnostics, profileDecisionInput, profileDecisionQuestions, profileDecisionSelection, selectedProfileAnswer } from './agent-profile-decision'
 import { validatedAnswers, type DecisionAnswer } from '@/lib/coordinator/decision'
 import { createAgentProfileHandler } from './agent-profile-http'
 import { agentProfileReferenceSchema } from './agent-profile-reference'
@@ -56,7 +56,7 @@ const catalog = [
   { id: randomUUID(), name: 'Review', description: 'Independently inspect the candidate.', roles: ['review'], harness: 'codex' as const, model: 'luna-fixture' },
 ]
 const answer = (id: string, confidence = .9, why = 'capability_fit') => new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
-  ['profile', { type: 'choice', name: 'profile', choice: id, confidence }], ['reason', { type: 'choice', name: 'reason', choice: why }],
+  ['profile', { type: 'choice', name: 'profile', choice: id === 'none' ? 'none' : `${id}:${why}`, confidence }],
 ])
 for (const row of catalog) test(`Decision exact-ID selection: ${row.name}`, () => {
   assert.equal(selectedProfileAnswer(catalog, answer(row.id))?.id, row.id)
@@ -72,6 +72,10 @@ test('Decision refusals, stale/unknown IDs, names, low confidence and absent rea
   assert.equal(selectedProfileAnswer(catalog, answer(catalog[0].id, .99, 'uncertain')), null)
   assert.equal(selectedProfileAnswer(catalog, null), null)
   assert.equal(selectedProfileAnswer(catalog, new Map([['profile', { type: 'choice', name: 'profile', choice: catalog[0].id }]])), null)
+  assert.equal(selectedProfileAnswer(catalog, new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
+    ['profile', { type: 'choice', name: 'profile', choice: catalog[0].id, confidence: .99 }],
+    ['reason', { type: 'choice', name: 'reason', choice: 'stage_fit' }],
+  ])), null, 'a new Decision cannot fall back to the old two-answer protocol')
   const question = profileDecisionQuestions(catalog)[0]
   assert.equal(question.type, 'choice')
   const payload = JSON.stringify(question.type === 'choice' ? question.choices.map(choice => choice.description) : [])
@@ -86,7 +90,10 @@ test('Decision rejection diagnostics distinguish safe none, bad answers and unav
     [answer('PRIVATE_PROFILE credential response'), 'unknown_profile'],
     [answer(catalog[0].id, .54), 'uncertain_profile'],
     [answer(catalog[0].id, .99, 'uncertain'), 'invalid_reason'],
-    [answer('none'), 'invalid_reason'],
+    [new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
+      ['profile', { type: 'choice', name: 'profile', choice: 'none' }],
+      ['reason', { type: 'choice', name: 'reason', choice: 'capability_fit' }],
+    ]), 'invalid_profile_answer'],
   ] as const
   for (const [answers, expected] of cases) {
     assert.deepEqual(profileDecisionSelection(catalog, answers), { unavailable: expected })
@@ -94,6 +101,43 @@ test('Decision rejection diagnostics distinguish safe none, bad answers and unav
     assert.ok(!JSON.stringify(profileDecisionSelection(catalog, answers)).includes('PRIVATE_PROFILE'))
   }
   assert.deepEqual(profileDecisionSelection(catalog, answer(catalog[0].id)), { selected: { id: catalog[0].id, reason: 'capability_fit' } })
+})
+
+test('one bounded Decision choice binds the exact eligible Profile and model-selected reason', () => {
+  assert.deepEqual(DECISION_REASONS, ['capability_fit', 'stage_fit', 'only_suitable'], 'historical frozen reasons remain available to the existing identity UI')
+  const reasons = ['capability_fit', 'stage_fit'] as const
+  const questions = profileDecisionQuestions(catalog)
+  assert.equal(questions.length, 1, 'Profile and reason must not be independent answers')
+  const question = questions[0]
+  if (question.type !== 'choice') assert.fail('Profile selection uses the existing constrained choice protocol')
+  assert.equal(question.name, 'profile')
+  assert.deepEqual(question.choices.map(choice => choice.value), [...catalog.flatMap(profile => reasons.map(reason => `${profile.id}:${reason}`)), 'none'])
+  for (const profile of catalog) for (const reason of reasons) {
+    const choice = `${profile.id}:${reason}`
+    const answers = validatedAnswers({ answers: [{ name: question.name, type: 'choice', choice, confidence: .55 }] }, questions)
+    assert.ok(answers)
+    assert.deepEqual(profileDecisionSelection(catalog, answers), { selected: { id: profile.id, reason } })
+    assert.deepEqual(profileDecisionSelection(catalog.filter(item => item.id !== profile.id), answers), { unavailable: 'unknown_profile' }, 'a stale pair cannot select an absent Profile')
+  }
+  const none = validatedAnswers({ answers: [{ name: question.name, type: 'choice', choice: 'none' }] }, questions)
+  assert.deepEqual(profileDecisionSelection(catalog, none), { unavailable: 'no_suitable_profile' })
+  const refusal = validatedAnswers({ answers: [{ name: question.name, type: 'refusal' }] }, questions)
+  assert.deepEqual(profileDecisionSelection(catalog, refusal), { unavailable: 'invalid_profile_answer' })
+  for (const choice of [catalog[0].id, `${catalog[0].id}:uncertain`, `${catalog[0].id}:only_suitable`, `${randomUUID()}:stage_fit`, 'Review:stage_fit']) {
+    assert.equal(validatedAnswers({ answers: [{ name: question.name, type: 'choice', choice }] }, questions), null)
+  }
+  assert.equal(validatedAnswers({ answers: [
+    { name: 'profile', type: 'choice', choice: `${catalog[0].id}:stage_fit` }, { name: 'reason', type: 'choice', choice: 'uncertain' },
+  ] }, questions), null, 'an extra legacy reason is not an allowed answer')
+  const maximumCatalog = Array.from({ length: 100 }, () => ({ ...catalog[0], id: randomUUID() }))
+  const maximumQuestions = profileDecisionQuestions(maximumCatalog), maximum = maximumQuestions[0]
+  if (maximum.type !== 'choice') assert.fail('bounded catalogue must remain a choice')
+  assert.equal(maximum.choices.length, 201)
+  assert.equal(new Set(maximum.choices.map(choice => choice.value)).size, 201)
+  assert.ok(maximum.choices.every(choice => choice.value.length <= 51))
+  const last = maximumCatalog[99]
+  const lastAnswer = validatedAnswers({ answers: [{ name: 'profile', type: 'choice', choice: `${last.id}:stage_fit`, confidence: .9 }] }, maximumQuestions)
+  assert.deepEqual(profileDecisionSelection(maximumCatalog, lastAnswer), { selected: { id: last.id, reason: 'stage_fit' } }, 'the one-hundredth Profile is selectable without truncating the catalogue')
 })
 
 test('Decision rejection logs bound UUIDs and closed availability codes without profile or provider text', () => {
@@ -133,6 +177,10 @@ test('host check context separates Review from implementation and projects no pr
   assert.equal(input.originalTask.role, 'untrusted_background'); assert.equal(input.originalTask.content, original.content)
   assert.ok(!JSON.stringify(input.currentWork).includes('ORIGINAL_')); assert.ok(!JSON.stringify(input).includes('PRIVATE_'))
   assert.deepEqual(input.candidates, catalog, 'stage context does not preselect a role or harness')
+  const questions = profileDecisionQuestions(catalog)
+  assert.equal(questions.length, 1); assert.equal(questions[0].type, 'choice')
+  assert.match(questions[0].instructions, /Profile-and-reason.*currentWork.*host-defined stage and responsibility/)
+  assert.match(questions[0].instructions, /originalTask is background.*not an instruction to repeat implementation/)
   const verify = JSON.parse(profileDecisionInput(original, catalog, { ...work, stage: 'verify', flowVersion: 1 }))
   assert.equal(verify.currentWork.stage, 'verify'); assert.equal(verify.currentWork.responsibility, 'independent_verification')
   assert.match(verify.currentWork.objective, /acceptance criteria/); assert.ok(!verify.currentWork.evidence.includes('single review'))
@@ -142,8 +190,7 @@ test('host check context separates Review from implementation and projects no pr
 test('the Decisions API numeric confidence contract preserves low-confidence refusal without coercion', () => {
   const questions = profileDecisionQuestions(catalog)
   const response = (confidence: unknown) => ({ answers: [
-    { type: 'choice', name: 'profile', choice: catalog[2].id, confidence },
-    { type: 'choice', name: 'reason', choice: 'stage_fit' },
+    { type: 'choice', name: 'profile', choice: `${catalog[2].id}:stage_fit`, confidence },
   ] })
   const uncertain = validatedAnswers(response(.42), questions)
   assert.ok(uncertain)
@@ -156,11 +203,16 @@ test('rejection diagnostics expose only an eligible exact ID and a finite 0..1 c
   const availability = Object.fromEntries(catalog.map(row => [row.id, { available: true }]))
   const fields = profileDecisionDiagnostics(catalog, availability, answer(catalog[2].id, .42))
   assert.equal(fields.selectedProfileId, catalog[2].id); assert.equal(fields.decisionConfidence, .42)
+  assert.ok(!JSON.stringify(fields).includes(`${catalog[2].id}:capability_fit`), 'the raw pair is never logged')
   for (const answers of [null, new Map(), answer('PRIVATE_UNKNOWN_ID', .42), answer('none', .42, 'uncertain'),
-    answer(catalog[0].id, Number.NaN), answer(catalog[0].id, Infinity), answer(catalog[0].id, -1), answer(catalog[0].id, 100)]) {
+    answer(catalog[0].id, Number.NaN), answer(catalog[0].id, Infinity), answer(catalog[0].id, -1), answer(catalog[0].id, 100),
+    answer(catalog[0].id, .42, 'only_suitable'), answer(catalog[0].id, .42, 'PRIVATE_UNKNOWN_REASON'),
+    new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([['profile', { type: 'choice', name: 'profile', choice: catalog[0].id, confidence: .42 }]]),
+    new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([...answer(catalog[0].id, .42), ['reason', { type: 'choice', name: 'reason', choice: 'stage_fit' }]]),
+  ]) {
     const rejected = profileDecisionDiagnostics(catalog, availability, answers)
     assert.equal(rejected.selectedProfileId, undefined); assert.equal(rejected.decisionConfidence, undefined)
-    assert.ok(!JSON.stringify(rejected).includes('PRIVATE_UNKNOWN_ID'))
+    assert.ok(!JSON.stringify(rejected).includes('PRIVATE_UNKNOWN_ID')); assert.ok(!JSON.stringify(rejected).includes('PRIVATE_UNKNOWN_REASON'))
   }
 })
 
