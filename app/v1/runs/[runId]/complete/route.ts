@@ -1,5 +1,6 @@
 import { withDeviceRoute } from '@/lib/device-route'
-import { after, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { and, eq } from 'drizzle-orm'
 import { runCompleteRequest } from '@mikka/protocol/run'
 import { authenticateDevice } from '@/lib/device-link'
@@ -48,9 +49,9 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
     catch { return NextResponse.json({ error: 'Result publication is temporarily unavailable.' }, { status: 503, headers: { 'Retry-After': '15' } }) }
   } else {
     await dispatchCompletedIssue(result, dispatchLinearIssueSync)
-    after(() => wakeCoordinator(result.userId))
+    afterJob('after:coordinator-wake', () => wakeCoordinator(result.userId))
     // How it came out, for the right column (R-52); a run still publishing is judged by the minute sweep.
-    after(() => judgeRunOutcome(runId).catch(() => null))
+    afterJob('after:run-outcome-judge', () => judgeRunOutcome(runId).catch(() => null))
   }
   return new NextResponse(null, { status: 204 })
 }

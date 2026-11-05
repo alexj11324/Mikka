@@ -1,6 +1,7 @@
 import { hostedBillingScope } from '@/lib/abuse/context'
 import { groupDirectory } from '@/lib/group-conversations-directory'
-import { after, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { groupsWithPendingTurns, hasPendingGroupTurn, processGroupTurn } from '@/lib/coordinator/group-turns'
 import { groupRuntime } from '@/lib/coordinator/group-runtime'
 import { and, eq, inArray } from 'drizzle-orm'
@@ -68,7 +69,7 @@ export async function respondGroup(request: Request, resource: GroupRequest['res
     // A send starts the worker. A history read (polled while a reply is generating) starts it only
     // when a turn is still pending, instead of taking the group's lock and recovering on every poll.
     const conversationId = id
-    after(async () => {
+    afterJob('after:group-turn', async () => {
       if (request.method === 'GET' && !await hasPendingGroupTurn(pool, conversationId).catch(() => false)) { await reconcileGroupTaskReports(conversationId); return }
       await drainGroupTurns(conversationId, Date.now() + 220000)
     })

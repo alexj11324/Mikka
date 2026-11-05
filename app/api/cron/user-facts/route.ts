@@ -1,4 +1,5 @@
 import { withRequestLog } from '@/lib/request-log'
+import { cronJob } from '@/lib/background'
 import { cronUnauthorized } from '@/lib/cron-auth'
 import { profileEnabled } from '@/lib/profile/flags'
 import { profileEntitled } from '@/lib/profile/entitlement'
@@ -20,4 +21,4 @@ async function handleGET(request: Request) {
   return Response.json(result, { headers: { 'Cache-Control': 'no-store' } })
 }
 
-export const GET = withRequestLog('/api/cron/user-facts', handleGET)
+export const GET = withRequestLog('/api/cron/user-facts', cronJob('user-facts', handleGET))

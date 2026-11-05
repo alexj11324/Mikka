@@ -1,4 +1,5 @@
-import { after, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { auth } from '@/lib/api-auth'
 import { coordinatorRuntimeSchema } from '@mikka/protocol/coordinator'
 import { nativeCoordinatorEnabled, nativeCoordinatorStore } from '@/lib/coordinator/native'
@@ -20,7 +21,7 @@ export async function PUT(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: 'invalidRuntime' }, { status: 400 })
   try {
     await nativeCoordinatorStore.setRuntime(session.user.id, parsed.data)
-    after(() => wakeCoordinator(session.user.id))
+    afterJob('after:coordinator-wake', () => wakeCoordinator(session.user.id))
     return NextResponse.json({ runtime: parsed.data })
   } catch (error) {
     if (error instanceof NativeCoordinatorError) return NextResponse.json({ error: error.message }, { status: error.status })

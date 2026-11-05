@@ -1,6 +1,6 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { and, eq, gt, inArray, isNull, notInArray, or } from 'drizzle-orm'
 import type { AuthInfo } from '@modelcontextprotocol/server'
 import { db, pool } from '@/lib/db'
@@ -93,7 +93,7 @@ export function workerRun(authInfo: AuthInfo | undefined): { id: string; userId:
 
 async function deliver(event: CoordinatorEventInput): Promise<void> {
   await recordCoordinatorEvent(db, event)
-  after(() => wakeCoordinator(event.userId))
+  afterJob('after:coordinator-wake', () => wakeCoordinator(event.userId))
 }
 
 // 4e2 item 4: report/ask/blocked text is agent output persisted as coordinator events; masked with the run's secret set.

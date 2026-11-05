@@ -10,7 +10,7 @@ import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { appOrigin, MCP_SCOPE, mcpResourceURL } from '@/lib/mcp/resource'
 import { authOAuthProxyOptions, authTrustedOrigins } from '@/lib/auth-config'
 import { createAuthEmail, type AuthMailContext } from '@/lib/auth-email'
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { githubVerifiedProfile } from '@/lib/auth-github-profile'
 import { beforeSignup, localSignUpRateRules } from '@/lib/abuse/signup'
 import { newUserAvatar } from '@/lib/default-avatar'
@@ -31,7 +31,7 @@ const email = createAuthEmail({
   origin: authBaseURL ?? 'http://localhost:3000',
   apiKey: () => process.env.RESEND_API_KEY,
   context: async (): Promise<AuthMailContext> => auth.$context,
-  background: task => after(task),
+  background: task => afterJob('after:auth-email', task),
 })
 
 export type DeviceSessionSummary = {
