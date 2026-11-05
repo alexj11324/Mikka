@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { agentsByOffer, defaultOrder, deviceModel, onPreferredAgent, pickDevice, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
+import { agentsByOffer, defaultOrder, deviceModel, dispatchOrder, onPreferredAgent, pickDevice, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
 
 // Model names here are fixtures standing for what a CLI or provider reported.
 const sub = (id: string, harness: OrderEntry['harness'], model: string, connectionId = `conn-${harness}`): OrderEntry => ({ id, harness, model, source: { kind: 'subscription', connectionId } })
@@ -207,4 +207,14 @@ test('a configured cloud without measured template models cannot take a subscrip
   const plan = planDispatch({ entries: [first], location: 'cloudOnly', devices: [], credential: usable, cloudReady: true })
   assert.equal(plan.kind, 'none')
   assert.equal(plan.kind === 'none' && plan.reason, 'cloudModelsUnknown')
+})
+
+test('dispatch order: the 优先使用的 Agent\'s list first, then the other\'s, each keeping its own order (decision 2026-11-05-0400)', () => {
+  const rows = [{ id: 'codex-a', harness: 'codex' as const }, { id: 'claude-x', harness: 'claude_code' as const }, { id: 'codex-b', harness: 'codex' as const }, { id: 'claude-y', harness: 'claude_code' as const }]
+  assert.deepEqual(dispatchOrder(rows, 'claude_code').map(row => row.id), ['claude-x', 'claude-y', 'codex-a', 'codex-b'])
+  assert.deepEqual(dispatchOrder(rows, 'codex').map(row => row.id), ['codex-a', 'codex-b', 'claude-x', 'claude-y'])
+  // One Agent only, or nothing: unchanged; the input is never reordered in place.
+  assert.deepEqual(dispatchOrder(rows.filter(row => row.harness === 'codex'), 'claude_code').map(row => row.id), ['codex-a', 'codex-b'])
+  assert.deepEqual(dispatchOrder([], 'codex'), [])
+  assert.deepEqual(rows.map(row => row.id), ['codex-a', 'claude-x', 'codex-b', 'claude-y'])
 })

@@ -26,7 +26,7 @@ source wins in a conflict is in [`README.md`](README.md).
 - **R-05** 「Bot 本身走我们自己的 AI SDK，跑在 Vercel 上。Bot 需要干活时，通过
   daemon 把任务派给 Claude Code 或 Codex。」 (Alex, 2026-11-01;
   [orchestration.md §3](orchestration.md)). Each allowed model names its Agent
-  (「模型与订阅」, [1400](decisions/2026-11-02-1400-model-order-dispatch.md)). The 新建 Bot dialog has a big live preview, a shape grid,
+  (「模型与订阅」, [1400](decisions/2026-11-02-1400-model-order-dispatch.md)); each Agent keeps its own 优先使用的模型, and dispatch tries the 优先使用的 Agent's list first ([0400](decisions/2026-11-05-0400-per-agent-model-lists.md)). The 新建 Bot dialog has a big live preview, a shape grid,
   colours and a name. It has no machine picker, no Claude Code / Codex picker
   and no 说明 field (instructions are edited in chat). A bot's own chat never
   runs inside Claude Code or Codex: that was an old plan (#312), abandoned.
@@ -756,6 +756,12 @@ How a design is reviewed:
     2026-10-31); Mikka writes none of its own, so an item without one, and
     GitHub, Linear and Telegram, show icon and name only. Rows in 设置 › 连接
     have none.
+  - A settings switch or choice may carry one short line saying what it does
+    and what happens when it is on or picked (Alex, 2026-11-05, on 模型与订阅:
+    he could not follow 「这个工作区 / 分享给团队成员」 or 「依次用：云端 →
+    服务器 → 电脑」; [0400](decisions/2026-11-05-0400-per-agent-model-lists.md)).
+    In plain words, as short as it can be, and each line still passes the delete
+    test: if removing it loses nothing a newcomer needs, it goes.
 - **R-41** An empty state is one colloquial line plus one button (often
   "send to a bot"). Never "这里是空的" or "Check back later".
 - **R-42** Every visible string lives in `messages/zh-CN.json` and

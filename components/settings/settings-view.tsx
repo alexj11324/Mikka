@@ -161,7 +161,7 @@ function ApiAndSubscriptions({ workspaceId, workspaceName, team }: { workspaceId
       <h2 id="workspace-models-scope" className="pl-1 text-sm font-medium text-muted-foreground">{scopeT('workspace', { name: workspaceName ?? scopeT('currentWorkspace') })}</h2>
       <ModelOrderSettings key={`order-${workspaceId}`} workspaceId={workspaceId} />
       <FactoryProfilesSettings key={`profiles-${workspaceId}`} workspaceId={workspaceId} />
-      {team && <SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} />}
+      {team && <SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} workspaceName={workspaceName} />}
     </section>
   </>
 }

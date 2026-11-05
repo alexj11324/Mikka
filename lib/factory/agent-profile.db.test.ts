@@ -431,4 +431,37 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     await assert.rejects(store.list(scope), { code: 'agentProfileScopeNotFound' })
     await assert.rejects(store.create(scope, { name: 'Blocked' }), { code: 'agentProfileScopeNotFound' })
   })
+  // Decision 2026-11-05-0400: a Profile (or the Decision API's choice of one) comes first; the per-Agent lists of
+  // 优先使用的模型 only order what an inheriting Profile, or a dispatch with no Profile, may run.
+  await t.test('per-Agent lists: an inheriting Profile follows 优先使用的 Agent; a fixed-Agent Profile never takes the other list', async () => {
+    const who = await person('profiles-per-agent')
+    const ownClaude = await subscribe(who, 'claude', ['claude-haiku-5-5']), ownCodex = await subscribe(who, 'codex', ['gpt-6-luna'])
+    const machine = randomUUID()
+    await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,\'Per-Agent fixture\',\'local\',true,now(),$3)', [machine, who.ownerId, JSON.stringify([
+      { harness: 'claude_code', installed: true, models: ['claude-haiku-5-5'], subscriptionBroker: true }, { harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true },
+    ])])
+    for (const harness of ['claude_code', 'codex'] as const) await pool.query('INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,$4,$4)', [randomUUID(), who.ownerId, machine, harness])
+    // The stored list puts Claude Code first; 优先使用的 Agent is Codex.
+    await pool.query('UPDATE model_order_settings SET customized=true,"preferredHarness"=\'codex\' WHERE "ownerId"=$1 AND "workspaceId"=$2', [who.ownerId, who.workspaceId])
+    for (const [index, harness, model, connection] of [[0, 'claude_code', 'claude-haiku-5-5', ownClaude], [1, 'codex', 'gpt-6-luna', ownCodex]] as const) await pool.query('INSERT INTO model_order_entries (id,"ownerId","workspaceId",position,harness,model,"sourceKind","sourceId") VALUES ($1,$2,$3,$4,$5,$6,\'subscription\',$7)', [randomUUID(), who.ownerId, who.workspaceId, index, harness, model, connection])
+    const issue = await seedIssue(pool, who.ownerId)
+    const whoStore = new profiles.AgentProfileStore(pool)
+    // Inherit + either Agent: Codex's list first, as 优先使用的 Agent says.
+    const inherit = await whoStore.create(who, { name: 'Inherits order', harness: 'auto', model: { mode: 'inherit' } })
+    const inherited = await profiles.resolveAgentProfileDispatch(pool, who, { issueId: issue, profileId: inherit.id, location: 'local' })
+    assert.equal(inherited.agentProfile!.targetEntry.harness, 'codex')
+    assert.equal(inherited.agentProfile!.targetEntry.model, 'gpt-6-luna')
+    // Its Agent's list empty of runnable models (Codex quota used): the other Agent's list is the fallback.
+    await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [ownCodex, JSON.stringify(quota('codex', 1))])
+    const fallback = await profiles.resolveAgentProfileDispatch(pool, who, { issueId: issue, profileId: inherit.id, location: 'local' })
+    assert.equal(fallback.agentProfile!.targetEntry.harness, 'claude_code')
+    // A fixed-Agent Profile (Codex, inheriting models) never takes Claude Code's list, even with Codex out of quota.
+    const codexOnly = await whoStore.create(who, { name: 'Codex only', harness: 'codex', model: { mode: 'inherit' } })
+    await assert.rejects(profiles.resolveAgentProfileDispatch(pool, who, { issueId: issue, profileId: codexOnly.id, location: 'local' }))
+    await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [ownCodex, JSON.stringify(quota('codex'))])
+    // And a Claude Code Profile runs Claude Code although 优先使用的 Agent is Codex.
+    const claudeOnly = await whoStore.create(who, { name: 'Claude only', harness: 'claude_code', model: { mode: 'inherit' } })
+    const pinned = await profiles.resolveAgentProfileDispatch(pool, who, { issueId: issue, profileId: claudeOnly.id, location: 'local' })
+    assert.equal(pinned.agentProfile!.targetEntry.harness, 'claude_code')
+  })
 })

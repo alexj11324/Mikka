@@ -34,7 +34,7 @@ export interface OrderEntry {
 /** Why a credential cannot run now; `resetsAt` when it comes back on its own. */
 export type CredentialState =
   | { usable: true }
-  | { usable: false; reason: 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'keyRefused' | 'balance' | 'providerUnavailable'; resetsAt?: string | null }
+  | { usable: false; reason: 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'removed' | 'modelGone' | 'keyRefused' | 'balance' | 'providerUnavailable'; resetsAt?: string | null }
 
 export interface PoolDevice {
   id: string
@@ -245,6 +245,17 @@ export function defaultOrder(all: readonly OrderCandidate[], preferred: OrderHar
   return picked
 }
 
+/**
+ * The untouched list: a default for each Agent, kept apart (decision 2026-11-05-0400). 优先使用的 Agent picks which
+ * one the page shows and dispatch tries first; switching it never moves a stored row between them.
+ */
+export function defaultOrderByAgent(all: readonly OrderCandidate[], preferred: OrderHarness = 'claude_code'): OrderCandidate[] {
+  const seen = new Set<string>()
+  // A model both Agents run stays on the 优先使用的 Agent, as before; each Agent's own models fill its list.
+  return (['claude_code', 'codex'] as const).flatMap(harness => defaultOrder(onPreferredAgent(all, preferred).filter(candidate => candidate.harness === harness), harness))
+    .filter(candidate => { const key = entryKey(candidate); if (seen.has(key)) return false; seen.add(key); return true })
+}
+
 /** The model and credential, whatever the Agent. */
 export const offerKey = (entry: Pick<OrderEntry, 'model' | 'source'>) =>
   `${entry.model}\u0000${entry.source.kind === 'subscription' ? entry.source.connectionId : entry.source.keyId}`
@@ -269,3 +280,11 @@ export function onPreferredAgent<T extends Pick<OrderCandidate, 'harness' | 'mod
 /** The same Agent, model and credential: one entry. */
 export const entryKey = (entry: Pick<OrderEntry, 'harness' | 'model' | 'source'>) =>
   `${entry.harness}\u0000${entry.model}\u0000${entry.source.kind === 'subscription' ? entry.source.connectionId : entry.source.keyId}`
+
+/**
+ * The order dispatch tries with no Agent named (decision 2026-11-05-0400): the 优先使用的 Agent's own list first,
+ * then the other Agent's list, each in its own order. The page shows only the first; the second is a fallback.
+ */
+export function dispatchOrder<T extends { harness: OrderHarness }>(entries: readonly T[], preferred: OrderHarness): T[] {
+  return [...entries.filter(entry => entry.harness === preferred), ...entries.filter(entry => entry.harness !== preferred)]
+}
