@@ -7,6 +7,7 @@ import { SubscriptionRefusal, type SubscriptionRoute } from '@mikka/protocol/sub
 import { workspaceDb } from './workspace-db'
 import { requireWorkspace } from './workspace-access'
 import { pool } from './db'
+import { captureDatabaseQuery } from './db/commit-effects'
 import { byosEnabled, byosEnrollmentEnabled } from './cloud-computer-flag'
 import { subscriptionRouteReady } from './subscription-routes'
 import { SubscriptionRepository } from './subscription-repository'
@@ -37,7 +38,7 @@ export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, o
   const databaseUrl = pool.options.connectionString
   // Capture the proxy's bound query while still in this request's DB scope;
   // later stream/tool callbacks must keep that same pool as the Go worker.
-  const database = { query: pool.query }
+  const database = captureDatabaseQuery(pool)
   const infisicalOrigin = process.env.MIKKA_BYOS_INFISICAL_ORIGIN
   const project = process.env.MIKKA_BYOS_INFISICAL_PROJECT
   const environment = process.env.MIKKA_BYOS_INFISICAL_ENVIRONMENT

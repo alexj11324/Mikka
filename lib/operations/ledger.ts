@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { writeTransaction, type WriteRequestContext, type WriteTransactionOptions } from './write-transaction'
 import { OperationError } from './write-error'
 export { OperationError } from './write-error'
+import { approvedWriteChanged } from '../live/approved-writes'
 
 const text = z.string().min(1).max(500)
 const identity = z.object({ operationId: z.uuid(), ownerId: text, workspaceId: text }).strict()
@@ -109,6 +110,7 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
         const beforeSend = async () => { await lease?.check(); await authorize(tx, row.binding, row.runId, 'invoke'); await lease?.check() }
         const receipt = receiptSchema.parse(await execute(row, beforeSend, signal))
         const { rows } = await tx.query<OperationRecord>('UPDATE operation_ledger SET status=\'succeeded\',receipt=$2,"updatedAt"=clock_timestamp() WHERE "operationId"=$1 RETURNING *', [row.operationId, receipt])
+        await approvedWriteChanged(tx, row.operationId, row.ownerId)
         return rows[0]
       })
     },
@@ -126,6 +128,7 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
         await authorize(tx, row.binding, row.runId, 'settle')
         if (row.attemptToken !== attemptToken || row.status !== 'executing') throw new OperationError('operationStaleAttempt')
         const { rows } = await tx.query<OperationRecord>('UPDATE operation_ledger SET status=$2,receipt=$3,"updatedAt"=clock_timestamp() WHERE "operationId"=$1 RETURNING *', [row.operationId, outcome.status, receipt])
+        if (outcome.status === 'succeeded') await approvedWriteChanged(tx, row.operationId, row.ownerId)
         return rows[0]
       })
     },
@@ -151,6 +154,7 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
         if (evidence === null) return row
         const receipt = receiptSchema.parse(evidence)
         const { rows } = await tx.query<OperationRecord>('UPDATE operation_ledger SET status=$2,receipt=$3,"updatedAt"=clock_timestamp() WHERE "operationId"=$1 RETURNING *', [row.operationId, 'succeeded', receipt])
+        await approvedWriteChanged(tx, row.operationId, row.ownerId)
         return rows[0]
       })
     },

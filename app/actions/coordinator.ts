@@ -1,6 +1,7 @@
 'use server'
 
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
+import { ownerListRead } from '@/lib/live/list-read-server'
 
 import { cookies, headers } from 'next/headers'
 import { after } from 'next/server'
@@ -160,6 +161,13 @@ export async function coordinatorReasoning(botId: string | null, positions: read
 /** Each bot's latest line and whether it is answering, for the bot list. */
 export async function botChatSummaries(): Promise<Record<string, BotChatSummary>> {
   return botChats(await getUserId())
+}
+
+/** Same owner-wide summaries, including the actual working-state deadline. */
+export async function pollBotChatSummaries() {
+  const ownerId = await getUserId()
+  const snapshot = await chatStore.botChatSnapshot(ownerId)
+  return { items: snapshot.items, live: await ownerListRead(ownerId, snapshot.expiries, snapshot.observedAt) }
 }
 
 /** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact and notes from the browser in front if given; the reply shows up in the chat. */

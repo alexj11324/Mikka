@@ -1,4 +1,5 @@
 import 'server-only'
+import { pendingActionsChanged } from './live/pending-actions'
 import { and, eq, gt } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { appToolCallSchema, APP_TOOL_ACTION } from '@/lib/app-tools'
@@ -22,6 +23,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     .where(and(eq(pendingActions.id, id), eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
     .returning()
   if (!row || (!isApprovalAction(row.action) && row.action !== 'browser_operation' && row.action !== 'credential_operation' && row.action !== APP_TOOL_ACTION)) throw new ActionFailureError('pendingActionUnavailable')
+  await pendingActionsChanged(db, row.id, userId)
 
   if ((row.action === 'browser_operation' || row.action === 'credential_operation') && Date.now() - row.createdAt.getTime() > 5 * 60_000) {
     await db.update(pendingActions).set({ status: 'failed', error: 'browserActionExpired' }).where(eq(pendingActions.id, row.id))

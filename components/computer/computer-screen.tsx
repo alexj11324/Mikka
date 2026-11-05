@@ -17,9 +17,11 @@ import { cn } from '@/lib/utils'
 type RFBInstance = EventTarget & { viewOnly: boolean; scaleViewport: boolean; resizeSession: boolean; background: string; disconnect: () => void; focus: () => void }
 
 /** Each grant gets its own authorized connection; the last frame survives the handoff. */
-function NoVncView({ url, mode, label }: { url?: string; mode: ViewerMode; label: string }) {
+function NoVncView({ url, mode, label, disconnected: refreshState }: { url?: string; mode: ViewerMode; label: string; disconnected: () => void }) {
   const host = useRef<HTMLDivElement>(null)
   const picture = useRef<HTMLCanvasElement>(null)
+  const changed = useRef(refreshState)
+  changed.current = refreshState
   useEffect(() => {
     const refresh = pageRefreshSignal()
     if (!url || refresh.aborted) return
@@ -34,7 +36,13 @@ function NoVncView({ url, mode, label }: { url?: string; mode: ViewerMode; label
       if (saved.height !== canvas.height) saved.height = canvas.height
       saved.getContext('2d')?.drawImage(canvas, 0, 0)
     }
-    function onDisconnect() { disconnected = true; retainFrame() }
+    function onDisconnect() {
+      if (disconnected) return
+      disconnected = true; retainFrame()
+      // A provider disconnect is an observation, not a reason to guess its state.
+      // Hidden views catch up through LiveChannels when they become visible.
+      if (alive && document.visibilityState === 'visible') changed.current()
+    }
     function stop() {
       alive = false
       retainFrame()
@@ -130,7 +138,7 @@ export function ComputerScreen({ botId, name, mode = 'view', live = true, showTa
   return <div className={cn('@container/screen relative aspect-[16/10] w-full overflow-hidden bg-screen text-screen-foreground', frame === 'rounded' ? 'rounded-lg' : 'rounded-xl')}>
     {running && !unauthorized && (grant?.url === MOCK_SCREEN_URL
       ? <img src={withBasePath('/computer/mock-desktop.svg')} alt={label} draggable={false} className="absolute inset-0 size-full select-none" />
-      : <NoVncView key={botId} url={grant?.url} mode={mode} label={label} />)}
+      : <NoVncView key={botId} url={grant?.url} mode={mode} label={label} disconnected={() => { void mutate() }} />)}
     {running && live && showTarget && target && <TargetRing rect={target} tone={approval ? 'approval' : 'agent'} />}
     {running && live && showTarget && point?.x !== undefined && point.y !== undefined && <Cursor x={point.x} y={point.y} />}
     {state && !running && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-[inherit] bg-screen/80 backdrop-blur-sm">

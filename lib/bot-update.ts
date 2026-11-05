@@ -4,6 +4,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { BOT_COLORS, BOT_NAME_MAX, BOT_SHAPES } from '@/lib/bot-shapes'
 import { db } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
+import { botListChanged } from './live/lists'
 
 const patchSchema = z.object({
   botId: z.uuid(),
@@ -38,5 +39,6 @@ export async function updateOwnedBot(owner: { ownerId: string; workspaceId: stri
     throw error
   }
   if (!row) throw new ActionFailureError('botNotFound')
+  await botListChanged(db, botId)
   return row
 }
