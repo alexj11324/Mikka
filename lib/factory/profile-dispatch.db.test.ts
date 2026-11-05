@@ -132,8 +132,23 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     const routed = await store.route(ownerId, { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Synthetic subscription profile stage fixture' })
     return { scope, actor, ownerId, workspaceId, botId, issueId, sourceEventId, deviceId, repoId, agents, connections, implement, review, store, task: routed.task }
   }
-  const exercise = async (withProfiles: boolean, missingCodex: boolean, autoModelRouting = true, explicitDefault = false) => {
+  const exercise = async (withProfiles: boolean, missingCodex: boolean, autoModelRouting = true, explicitDefault = false, parentMode: 'prepared' | 'metadata-only' = 'prepared') => {
     const f = await fixture(withProfiles, missingCodex, false, explicitDefault ? 'default' : undefined), beforeDecisions = decisionCounts()
+    const readParent = async () => (await pool.query(`
+      SELECT to_jsonb(m) AS machine, to_jsonb(d) AS device
+      FROM cloud_machines m
+      JOIN devices d ON d.id=m."deviceId" AND d."ownerId"=m."ownerId"
+      WHERE m."workspaceId"=$1 AND m."ownerId"=$2 AND m."deviceId"=$3
+    `, [f.workspaceId, f.ownerId, f.deviceId])).rows[0]
+    if (parentMode === 'metadata-only') {
+      await pool.query(`UPDATE devices SET harnesses='[]'::jsonb,"lastSeenAt"=NULL WHERE id=$1 AND "ownerId"=$2`, [f.deviceId, f.ownerId])
+      await pool.query(`UPDATE cloud_machines SET state='sleeping',"sandboxId"=NULL,"runtimeReady"=false WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "deviceId"=$3`, [f.workspaceId, f.ownerId, f.deviceId])
+    }
+    const parentBefore = parentMode === 'metadata-only' ? await readParent() : undefined
+    if (parentMode === 'metadata-only') {
+      assert.ok(parentBefore)
+      assert.deepEqual([parentBefore.machine.state, parentBefore.machine.sandboxId, parentBefore.machine.runtimeReady, parentBefore.device.lastSeenAt, parentBefore.device.harnesses], ['sleeping', null, false, null, []])
+    }
     if (!autoModelRouting) await pool.query('UPDATE model_order_settings SET "autoModelRouting"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [f.ownerId, f.workspaceId])
     const profileId = explicitDefault
       ? await (await import('./profile-request')).requestedAgentProfile(pool, f.scope, f.sourceEventId, f.implement!.id)
@@ -152,7 +167,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     const sha = 'a'.repeat(40), deliverySha = 'b'.repeat(40), nativeSession = `claude-native-${source.runId}`
     await pool.query(`UPDATE agent_runs SET status='succeeded',"startedAt"=now(),"finishedAt"=now(),"sessionId"=$2,"stopReason"='submitted',report=$3 WHERE id=$1`, [source.runId, nativeSession, JSON.stringify({ sourceCommit: sha, deliverableCommit: deliverySha, summary: 'Synthetic successful implementation and validation report', runtime: { observedModel: model.claude_code } })])
     const sourceBefore = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [source.runId])).rows[0]
-    if (missingCodex) await pool.query(`UPDATE cloud_machines SET state='sleeping' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [f.workspaceId, f.ownerId])
+    if (missingCodex && parentMode === 'prepared') await pool.query(`UPDATE cloud_machines SET state='sleeping' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [f.workspaceId, f.ownerId])
     decisionProfile = f.review?.id ?? ''
     const reconciler = createFactoryReconciler(pool, f.store, undefined, {}, f.botId, automaticFactoryDispatch(pool))
     await reconciler.run(f.ownerId, source.runId)
@@ -198,6 +213,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.equal((await pool.query("SELECT 1 FROM factory_attempts WHERE \"taskId\"=$1 AND stage='verify'", [f.task.id])).rowCount, 0)
     assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 2)
     if (missingCodex) { assert.notEqual(runtime.agentId, f.agents.codex); assert.equal(runtime.repoId, f.repoId) }
+    if (parentBefore) assert.deepEqual(await readParent(), parentBefore, 'producer and independent Review must not prepare, wake or change the parent')
     return { ...f, source, current, attempt, candidate, run }
   }
   await t.test('Decision rejection retains closed diagnostics and filtered availability without creating a run or binding', async t => {
@@ -257,6 +273,16 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   })
   await t.test('CC implementation selects independent Codex Review with frozen exact Profile and subscription', async () => { await exercise(true, false) })
   await t.test('a prepared sleeping parent gains its missing Codex metadata without provider I/O', async () => { await exercise(true, true) })
+  await t.test('an unprepared parent admits CC implementation and independent Codex Profile Review without changing the parent', async () => {
+    const before = decisionInputs.length
+    const f = await exercise(true, true, true, false, 'metadata-only')
+    const calls = decisionInputs.slice(before).filter(call => call.purpose === 'factory-agent-profile')
+    assert.equal(calls.length, 1)
+    const input = JSON.parse(calls[0]!.input as string)
+    assert.equal(input.task.kind, 'independent_check'); assert.equal(input.task.stage, 'review'); assert.equal(input.task.readOnly, true)
+    assert.equal(input.task.taskId, f.task.id); assert.equal(input.task.requestEpoch, f.sourceEventId); assert.equal(input.task.candidateId, f.candidate.id)
+    assert.equal(input.task.content, undefined); assert.ok(input.acceptanceReference?.originalTask)
+  })
   await t.test('no configured Profile retains CC despite Codex being first in model preference', async () => { await exercise(false, false) })
   await t.test('an owner Default task still permits the host to choose independent Codex Review for its next stage', async () => {
     const f = await exercise(true, false, true, true)
@@ -979,7 +1005,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       assert.equal((await pool.query('SELECT 1 FROM byos_native_runs WHERE "runId"=$1', [f.runId])).rowCount, 0)
     })
   }
-  assert.deepEqual(decisionInputs.map(call => call.purpose), ['factory-agent-profile', 'factory-agent-profile', 'task-model-routing', 'factory-agent-profile', 'task-model-routing',
+  assert.deepEqual(decisionInputs.map(call => call.purpose), ['factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'task-model-routing', 'factory-agent-profile', 'task-model-routing',
     'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile'])
   // Validate captured inputs outside the transport: model routing intentionally
   // catches transport errors, which must not swallow a privacy assertion.
