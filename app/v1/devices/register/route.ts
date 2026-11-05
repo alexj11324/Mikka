@@ -7,6 +7,7 @@ import { db, pool } from '@/lib/db'
 import { ensureDeviceAgents } from '@/lib/device-agents'
 import { devices } from '@/lib/db/schema'
 import { authenticateDevice, linkDeviceToken, WORKSPACE_ID } from '@/lib/device-link'
+import { daemonTraceSettings } from '@/lib/tracing/config'
 import { ownerListChanged } from '@/lib/live/lists'
 
 export const dynamic = 'force-dynamic'
@@ -28,6 +29,7 @@ async function handlePOST(request: Request) {
   // turn an old client into an admitted device.
   if (daemonRequestTooOld(info.daemonVersion, Boolean(caller.scopeDeviceId && caller.scopeWorkspaceId))) return daemonUpgradeResponse()
   const now = new Date()
+  const tracing = daemonTraceSettings()
   const fields = {
     deviceType: info.deviceType ?? 'laptop',
     hostname: info.hostname ?? null, platform: info.platform, arch: info.arch,
@@ -40,7 +42,7 @@ async function handlePOST(request: Request) {
     await db.update(devices).set({ ...fields, name: sql`CASE WHEN ${devices.nameLocked} THEN ${devices.name} ELSE ${info.name} END` }).where(eq(devices.id, info.deviceId))
     await ensureDeviceAgents(pool, caller.userId, info.deviceId, info.harnesses)
     await ownerListChanged(db, caller.userId, ['device_list'])
-    return NextResponse.json({ deviceId: info.deviceId, workspaceId: caller.scopeWorkspaceId ?? WORKSPACE_ID })
+    return NextResponse.json({ deviceId: info.deviceId, workspaceId: caller.scopeWorkspaceId ?? WORKSPACE_ID, ...(tracing ? { tracing } : {}) })
   }
   if (caller.scopeDeviceId) return NextResponse.json({ error: 'Cloud device is unavailable.' }, { status: 403 })
   const deviceId = crypto.randomUUID()
@@ -48,7 +50,7 @@ async function handlePOST(request: Request) {
   await linkDeviceToken(caller, deviceId)
   await ensureDeviceAgents(pool, caller.userId, deviceId, info.harnesses)
   await ownerListChanged(db, caller.userId, ['device_list'])
-  return NextResponse.json({ deviceId, workspaceId: caller.scopeWorkspaceId ?? WORKSPACE_ID })
+  return NextResponse.json({ deviceId, workspaceId: caller.scopeWorkspaceId ?? WORKSPACE_ID, ...(tracing ? { tracing } : {}) })
 }
 
 export const POST = withDeviceRoute(handlePOST)

@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto'
 import type { Attributes, AttributeValue, Link, SpanStatus } from '@opentelemetry/api'
 import type { ReadableSpan, TimedEvent } from '@opentelemetry/sdk-trace-base'
+import { scrubString } from '@mikka/protocol/tracing'
+
+export { scrubString }
 
 // The last step before a span leaves the process (docs/operations/tracing.md,
 // "Privacy"). Only allowlisted attribute keys survive; SQL keeps its
@@ -10,7 +13,6 @@ import type { ReadableSpan, TimedEvent } from '@opentelemetry/sdk-trace-base'
 
 /** Longest SQL text kept on a span. */
 export const STATEMENT_TEXT_LIMIT = 200
-const STRING_LIMIT = 256
 
 /** Same hash as the `statement` field of the db_sample log line (lib/db/egress-sample.ts). */
 export function statementId(text: string): string {
@@ -32,20 +34,6 @@ export function normalizeStatement(text: string): string {
 export function statementOperation(text: string): string {
   const match = /^\s*(?:\/\*[\s\S]*?\*\/\s*)*([A-Za-z]+)/.exec(text)
   return match ? match[1].toUpperCase() : 'UNKNOWN'
-}
-
-const EMAIL = /[^\s@"'<>(),;:]+@[^\s@"'<>(),;:]+\.[A-Za-z]{2,}/g
-const IPV4 = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g
-const IPV6 = /\b(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}\b|\b(?:[0-9a-f]{1,4}:){1,6}:(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4})*)?\b/gi
-
-/** Removes `?query` and `#hash` from any URL or path inside the string, then masks emails and IPs. */
-export function scrubString(value: string): string {
-  const scrubbed = value
-    .replace(/(\b[a-z][a-z0-9+.-]*:\/\/[^\s?#]*|(?:^|(?<=\s))\/[^\s?#]*)[?#]\S*/gi, '$1')
-    .replace(EMAIL, '[email]')
-    .replace(IPV4, '[ip]')
-    .replace(IPV6, '[ip]')
-  return scrubbed.length > STRING_LIMIT ? scrubbed.slice(0, STRING_LIMIT) : scrubbed
 }
 
 /** Attribute keys that may leave the process, besides any `next.*` or `mikka.*` key. */

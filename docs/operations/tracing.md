@@ -9,10 +9,11 @@ diffing `pg_stat_statements`. This adds to the
 
 ## What is traced
 
-Only Mikka's own Next.js server, Node runtime (`instrumentation.ts` →
-`lib/tracing/node.ts`). Nothing from the daemon, the desktop app, or users' own
-Claude Code or Codex sessions. The mobile app sends trace context, not spans
-(see [Mobile app](#mobile-app)).
+Mikka's own Next.js server, Node runtime (`instrumentation.ts` →
+`lib/tracing/node.ts`), and the daemon's own operations (service
+`mikka-daemon`, see [Daemon](#daemon)). Nothing from the desktop app or users'
+own Claude Code or Codex sessions. The mobile app sends trace context, not
+spans (see [Mobile app](#mobile-app)).
 
 - Next.js request spans: the root `GET /route/[param]` span, route handler,
   render and outbound `fetch` spans.
@@ -60,6 +61,50 @@ the request's span, and child spans inherit them. The headers are attribution
 only, never authentication, and are ignored on machine routes
 (`/api/cron/*`, `/api/webhooks/*`, `/api/runs/*`) and `/v1/*`. Requests to other
 hosts (uploads, OAuth providers) get no headers.
+
+## Daemon
+
+`packages/daemon/src/tracing.ts` traces Mikka's own daemon operations on the
+user's computer, as service `mikka-daemon`:
+
+| Span | What |
+| --- | --- |
+| `daemon.run` | One run, from start to its end; `mikka.outcome` is the run's stop reason (`submitted`, `turn_ended`, `cancelled`, `error` …) |
+| `daemon.run.repository`, `daemon.run.worktree`, `daemon.adapter.start` | The run's start-up stages; `daemon.adapter.start` is where a harness that cannot start fails (`subscription_local_runtime_unavailable`) |
+| `daemon.run.lease` | Claiming a run from the server |
+| `daemon.tool_approval`, `daemon.tool_approval.refused` | Preparing the run's tool-approval gate; a liveness refusal |
+| `daemon.gateway.connect` | Opening the device gateway socket, until it opens or fails |
+| `GET /v1/devices/[id]/…` | Every call to the server, named by route template (ids become `[id]`, no query), with `http.response.status_code` |
+
+Each span has `mikka.client_kind=daemon`, `mikka.run.id_hash` (sha256 prefix
+of the run id, never the id), `mikka.harness`, `mikka.outcome`, and on failure
+`error.type`, `mikka.error.code` and `mikka.error.detail`. Filter the error
+code with `mikka.error.code = subscription_local_runtime_unavailable` to see
+why runs fail on users' computers.
+
+- **Joining the server's trace.** Each `/v1/*` call sends `traceparent`, so
+  the server's request and database spans are children of the daemon span.
+  Both sides head-sample by the same trace-id ratio: at equal rates the
+  server keeps exactly the traces the daemon kept.
+- **Settings.** The server hands them over in the device registration
+  response (`tracing`: endpoint, the public `phc_` project token, sample rate,
+  environment); `daemonTraceSettings()` in `lib/tracing/config.ts` sends them
+  only for the PostHog endpoint and only when server tracing is on. A daemon
+  never gets a personal key.
+- **Sampling and turning it off.** The server's rate (default 10%).
+  `MIKKA_DAEMON_TRACE_SAMPLE_RATE` on the daemon can lower it, never raise it;
+  `0`, or `MIKKA_DAEMON_TRACING=0`, turns daemon tracing off.
+- **Never blocks.** A batch processor exports every 10 s from a queue of 512
+  (then drops). A failed or thrown export drops its spans and pauses exporting
+  for a minute; shutdown waits at most 2 s. Nothing is registered globally,
+  so an agent SDK's own OpenTelemetry is unaffected.
+- **Privacy.** Only an allowlist of attributes leaves the computer; strings
+  go through the same rules as the server (`@mikka/protocol/tracing`
+  `scrubString`), and paths under a home directory become `[home]`. No
+  prompts, file content, paths, environment variables, tokens or emails; no
+  span events or status messages. Tested in `packages/daemon/src/tracing.test.ts`.
+  The daemon traces only its own work, never what the user's Claude Code or
+  Codex does, and passes no trace context to agent CLIs.
 
 ## Background work
 
