@@ -83,8 +83,8 @@ async function readFullChat(botId: string | null): Promise<CoordinatorChat> {
   // Before the chat: a push at this revision or below is already in what follows.
   const begun = await beginOwnerListRead(userId, [], [{ kind: 'bot_chat', id: bot.id }])
   const { chat, expiries, observedAt } = await chatStore.chatViewState(userId, 200, bot.id)
-  // BotList, the workspace and ArtifactWindow share the live chat's SWR key.
-  // Whichever fetcher wins must retain the same authorized home and deadline.
+  // The legacy/mobile full reader retains the same authorized home and
+  // deadline as incremental reads; web sidebars use chat summaries instead.
   const live = await ownerListRead(userId, expiries, observedAt, begun)
   // Without a Coordinator here nothing is coming, so do not show one working.
   return { ...chat, botId: bot.id, enabled, working: enabled && chat.working, live }

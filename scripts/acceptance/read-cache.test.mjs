@@ -40,16 +40,21 @@ test('driver stage evidence retains the original cause and never claims an unobs
 })
 
 test('the request allowlist admits only scoped GETs and published read actions', () => {
-  for (const path of ['/mikka/api/version', '/mikka/api/auth/get-session', '/mikka/api/workspace/switcher', '/mikka/api/settings/issue-prefix', '/mikka/en', '/mikka/en/settings?section=preferences', `/mikka/en?issue=${id(1)}`, '/mikka/_next/static/chunks/read.js?v=2'])
+  for (const path of ['/mikka/api/version', '/mikka/api/auth/get-session', '/mikka/api/workspace/switcher', '/mikka/api/settings/issue-prefix', '/mikka', '/mikka/settings?section=preferences', `/mikka?issue=${id(1)}`, '/mikka/_next/static/chunks/read.js?v=2'])
     assert.equal(requestAllowed(path, {}, environment, refs), true, path)
-  for (const name of READ_ACTIONS) assert.equal(requestAllowed('/mikka/en', actionInit(name), environment, refs), true)
-  for (const path of ['https://other.example/mikka/en', '/api/settings/issue-prefix', '/mikka/api/coordinator/messages', '/mikka/api/mobile/chat', '/mikka/api/bots', '/mikka/api/acceptance', '/mikka/en?acceptance=1', '/mikka/en/settings?section=secrets', '/mikka/_next/static/chunks/%2e%2e/private.js', '/mikka/_next/static/chunks/a%2fb.js'])
+  for (const name of READ_ACTIONS) assert.equal(requestAllowed('/mikka', actionInit(name), environment, refs), true)
+  for (const path of ['https://other.example/mikka', '/api/settings/issue-prefix', '/mikka/api/coordinator/messages', '/mikka/api/mobile/chat', '/mikka/api/bots', '/mikka/api/acceptance', '/mikka?acceptance=1', '/mikka/settings?section=secrets', '/mikka/_next/static/chunks/%2e%2e/private.js', '/mikka/_next/static/chunks/a%2fb.js'])
     assert.equal(requestAllowed(path, {}, environment, refs), false, path)
-  assert.equal(requestAllowed('/mikka/en', { ...actionInit('pollIssue'), method: 'DELETE' }, environment, refs), false)
-  assert.equal(requestAllowed('/mikka/en', { ...actionInit('pollIssue'), headers: { ...actionInit('pollIssue').headers, 'next-action': 'f'.repeat(40) } }, environment, refs), false)
-  assert.equal(requestAllowed('/mikka/en', actionInit('pollIssue'), environment, {}), false)
+  assert.equal(requestAllowed('/mikka', { ...actionInit('pollIssue'), method: 'DELETE' }, environment, refs), false)
+  assert.equal(requestAllowed('/mikka', { ...actionInit('pollIssue'), headers: { ...actionInit('pollIssue').headers, 'next-action': 'f'.repeat(40) } }, environment, refs), false)
+  assert.equal(requestAllowed('/mikka', actionInit('pollIssue'), environment, {}), false)
   assert.equal(requestAllowed('/mikka/api/version', { headers: { cookie: 'private' } }, environment), false)
   assert.equal(requestAllowed('/mikka/api/version', { body: 'data' }, environment), false)
+  // A read must not switch locale and persistently rename the baseline workspace.
+  for (const path of ['/mikka/en', '/mikka/en/settings?section=preferences']) {
+    assert.equal(requestAllowed(path, {}, environment, refs), false)
+    assert.equal(requestAllowed(path, actionInit('pollIssue'), environment, refs), false)
+  }
 })
 
 test('action discovery handles Next dev bracket imports, minified calls and lazy public chunks without evaluating them', async () => {
@@ -64,7 +69,7 @@ test('action discovery handles Next dev bracket imports, minified calls and lazy
   const { refs: found, diagnostics } = await discoverReadActions(async path => {
     calls.push(path)
     assert.equal(requestAllowed(path, {}, environment), true)
-    return new Response(path.startsWith('/mikka/en') ? '<script src="/mikka/_next/static/chunks/page.js"></script>' : chunks[path], { status: 200 })
+    return new Response((path === '/mikka' || path.startsWith('/mikka?') || path.startsWith('/mikka/settings?')) ? '<script src="/mikka/_next/static/chunks/page.js"></script>' : chunks[path], { status: 200 })
   }, environment, id(1))
   assert.deepEqual(found, refs)
   assert.equal(diagnostics.pagesRead, 3)
@@ -80,13 +85,13 @@ test('missing named references fail closed instead of guessing action IDs', asyn
 test('discovery before selecting an existing task uses only the main and settings pages and still requires every read action', async () => {
   const pages = []
   const found = await discoverReadActions(async path => {
-    if (path.startsWith('/mikka/en')) {
+    if (path === '/mikka' || path.startsWith('/mikka?') || path.startsWith('/mikka/settings?')) {
       pages.push(path)
       return new Response('<script src="/mikka/_next/static/chunks/read.js"></script>')
     }
     return new Response(READ_ACTIONS.map(name => `createServerReference("${refs[name]}",callServer,void 0,findSourceMapURL,"${name}")`).join(';'))
   }, environment)
-  assert.deepEqual(pages, ['/mikka/en', '/mikka/en/settings?section=preferences'])
+  assert.deepEqual(pages, ['/mikka', '/mikka/settings?section=preferences'])
   assert.deepEqual(found.refs, refs)
   await assert.rejects(discoverReadActions(async () => new Response('<html></html>'), environment), { code: 'read_action_reference_missing' })
 })
@@ -105,7 +110,8 @@ test('Flight decoder preserves large UTF-8 text rows and resolves only the actio
 test('transport rejects writes before request and reports only byte counts and trace IDs', async () => {
   let calls = 0
   const records = [], privateText = 'sensitive fixture text must stay in memory'
-  const client = createReadClient({ request: async (_path, init) => {
+  const client = createReadClient({ request: async (path, init) => {
+    assert.equal(path, environment.basePath)
     calls++
     assert.match(init.headers.traceparent, /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
     return new Response(`0:{"a":"$@1"}\n1:${JSON.stringify({ issue: { text: privateText } })}\n`, { status: 200 })

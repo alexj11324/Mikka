@@ -80,7 +80,7 @@ function fixture(options = {}) {
       return json(options.noBot ? [] : [{ id: BOT, ownerId: options.foreignBot ? 'other-owner' : OWNER, workspaceId: WORKSPACE, name: PRIVATE }])
     }
     if (url.pathname === '/mikka/api/settings/issue-prefix') return json({ suggested: PRIVATE, teamKeys: [PRIVATE] })
-    if (url.pathname === '/mikka/en' && method === 'POST') {
+    if (url.pathname === '/mikka' && method === 'POST') {
       const name = READ_ACTIONS.find(value => refs[value] === headers.get('next-action'))
       assert.ok(name, 'only a discovered read reference can be invoked')
       const args = JSON.parse(init.body), read = (counts.get(name) ?? 0) + 1
@@ -115,7 +115,7 @@ function fixture(options = {}) {
         ] } } : {}),
         ...(previous ? { after, baseCursor: previous.cursor, metadataRefresh: true } : {}) } })
     }
-    if (url.pathname === '/mikka/en' || url.pathname === '/mikka/en/settings') return new Response('<script src="/mikka/_next/static/chunks/read.js"></script>')
+    if (url.pathname === '/mikka' || url.pathname === '/mikka/settings') return new Response('<script src="/mikka/_next/static/chunks/read.js"></script>')
     if (url.pathname === '/mikka/_next/static/chunks/read.js') return new Response(READ_ACTIONS.map(name =>
       `createServerReference("${refs[name]}",callServer,void 0,findSourceMapURL,"${name}")`).join(';'))
     assert.fail('unexpected request')
@@ -237,12 +237,14 @@ test('wrong or stale proof fails before credentials or application requests', as
 
 test('business allowlist rejects auth writes, data writers, arbitrary actions, redirects and credential overrides', () => {
   const init = { method: 'POST', headers: { 'content-type': 'application/json', accept: 'text/x-component', 'next-action': refs.pollIssue }, body: '[]' }
-  assert.equal(productionRequestAllowed('/mikka/en', init, refs), true)
+  assert.equal(productionRequestAllowed('/mikka', init, refs), true)
   assert.equal(productionRequestAllowed('/mikka/api/bots'), true)
+  assert.equal(productionRequestAllowed('/mikka/en'), false)
+  assert.equal(productionRequestAllowed('/mikka/en', init, refs), false)
   for (const path of ['/mikka/api/auth/sign-in/email', '/mikka/api/auth/sign-out', '/mikka/api/bots', '/mikka/api/coordinator/messages', '/mikka/api/settings/issue-prefix'])
     assert.equal(productionRequestAllowed(path, init, refs), false)
-  assert.equal(productionRequestAllowed('/mikka/en', { ...init, headers: { ...init.headers, 'next-action': 'f'.repeat(40) } }, refs), false)
-  assert.equal(productionRequestAllowed('/mikka/en', init), false)
+  assert.equal(productionRequestAllowed('/mikka', { ...init, headers: { ...init.headers, 'next-action': 'f'.repeat(40) } }, refs), false)
+  assert.equal(productionRequestAllowed('/mikka', init), false)
   for (const path of ['https://foreign.invalid/mikka/api/version', 'https://user@app.aspectlylabs.com/mikka/api/version',
     '/mikka/api/bots?workspace=' + WORKSPACE, '/mikka/_next/static/chunks/%2e%2e/private.js', '/mikka/api/settings/secrets'])
     assert.equal(productionRequestAllowed(path), false)

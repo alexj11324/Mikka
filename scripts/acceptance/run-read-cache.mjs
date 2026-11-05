@@ -212,7 +212,7 @@ export function observeOwnedRequests(environment, now = () => performance.now())
     [`${base}/api/auth/sign-up/email`, 'account-sign-up'], [`${base}/api/auth/sign-in/email`, 'account-sign-in'],
     [`${base}/api/auth/get-session`, 'account-session'], [`${base}/api/workspace`, 'account-workspace'],
     [`${base}/api/conversations/coordinator/read`, 'account-coordinator'], [base, 'account-landing'],
-    [`${base}/en`, 'app-page'], [`${base}/api/version`, 'app-version'], [`${base}/api/workspace/switcher`, 'workspace-switcher'],
+    [`${base}/api/version`, 'app-version'], [`${base}/api/workspace/switcher`, 'workspace-switcher'],
     [`${base}/api/settings/issue-prefix`, 'settings-issue-prefix'],
   ])
   const pending = new WeakMap(), records = [], subscriptions = []
@@ -222,7 +222,7 @@ export function observeOwnedRequests(environment, now = () => performance.now())
   }
   subscribe('create', ({ request }) => {
     if (request?.origin !== environment.origin || !['GET', 'POST'].includes(request.method)) return
-    const route = routes.get(request.path)
+    const route = request.path === base && request.method === 'POST' ? 'app-page' : routes.get(request.path)
     if (!route) return
     const record = { route, method: request.method, state: 'pending', httpStatus: null, networkError: null, started: now(), elapsedMs: null }
     if (records.length === 32) records.shift()

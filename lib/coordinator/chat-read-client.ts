@@ -11,9 +11,9 @@ import { mergeChat } from './chat-poll'
 export type CachedCoordinatorChat = CoordinatorChat & { requestedAt?: number }
 const checked = new WeakMap<object, Set<string>>()
 
-/** Every subscriber of a chat key uses this reader. Otherwise an earlier
- * mounted sidebar fetcher can silently replace the transcript's delta reader
- * with a full getCoordinatorChat request on every refresh. */
+/** Components that fetch a chat key use this reader; summary-only sidebars
+ * never subscribe to it. This keeps another mounted fetcher from replacing
+ * the transcript's delta reader with a full snapshot on every refresh. */
 export async function readCachedCoordinatorChat(cache: Cache, botId: string | null = null, options: { refreshMetadata?: boolean } = {}): Promise<CachedCoordinatorChat> {
   await waitForCacheHydration(cache)
   const key = unstable_serialize(chatKeys.detail(botId))

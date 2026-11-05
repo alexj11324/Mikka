@@ -87,7 +87,7 @@ export function requestAllowed(path, init, environment, refs = {}) {
     if (url.origin !== environment.origin || url.username || url.password || url.hash) return false
     const headers = new Headers(init?.headers)
     if (['authorization', 'cookie', 'host'].some(name => headers.has(name))) return false
-    const base = environment.basePath, page = `${base}/en`
+    const base = environment.basePath, page = base
     if (method === 'POST') return url.pathname === page && !url.search
       && READ_ACTIONS.some(name => referenceId(refs[name]) && headers.get('next-action') === refs[name])
       && headers.get('content-type') === 'application/json' && headers.get('accept') === 'text/x-component'
@@ -119,7 +119,9 @@ export async function discoverReadActions(request, environment, issueId) {
     for (const match of source.matchAll(/(?:src|href)\s*=\s*(["'])([^"']+\.js(?:\?[^"']*)?)\1/g)) add(match[2].replaceAll('&amp;', '&'))
     for (const match of source.matchAll(/(["'])((?:static\/chunks\/|\/mikka\/_next\/static\/chunks\/)[^"'\\\r\n]+\.js(?:\?[^"'\\\r\n]*)?)\1/g)) add(match[2])
   }
-  for (const page of [`${environment.basePath}/en`, ...(issueId ? [`${environment.basePath}/en?issue=${issueId}`] : []), `${environment.basePath}/en/settings?section=preferences`]) {
+  // Match normal account initialization and API reads. Switching to another
+  // locale can rename a generated personal workspace during a page read.
+  for (const page of [environment.basePath, ...(issueId ? [`${environment.basePath}?issue=${issueId}`] : []), `${environment.basePath}/settings?section=preferences`]) {
     const response = await request(page)
     check(response.ok, 'read_page_unavailable'); scan(await response.text()); diagnostics.pagesRead++
   }
@@ -203,7 +205,7 @@ export function createReadClient(account, environment, actor, reads, refs = {}) 
     request,
     action(name, args, surface, scenario) {
       check(READ_ACTIONS.includes(name) && referenceId(refs[name]), 'read_action_forbidden')
-      return read(surface, scenario, name, `${environment.basePath}/en`, {
+      return read(surface, scenario, name, environment.basePath, {
         method: 'POST', headers: { 'content-type': 'application/json', accept: 'text/x-component', 'next-action': refs[name] }, body: JSON.stringify(args),
       }, actionResult)
     },
