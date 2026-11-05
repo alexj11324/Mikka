@@ -5,6 +5,7 @@ import { handleFactoryFlow } from './flow-http';
 import { acceptanceMarkdown } from './acceptance-report';
 import { publicFactoryStage } from './public-flow';
 import { AgentProfileError } from './agent-profile-definition';
+import { publicFactoryReceipt } from './public-receipt';
 
 test('browser flow approval rejects delegated credentials, cross-origin writes and forged actions before touching SQL', async () => {
   const noDatabase = new Proxy({}, { get() { assert.fail('must not touch the database'); } }) as never;
@@ -26,6 +27,25 @@ test('public stages require merge evidence and keep cancellation distinct', () =
   assert.equal(publicFactoryStage('monitor','passed',false),'handoff');
   assert.equal(publicFactoryStage('publish','passed',true),'completed');
   assert.equal(publicFactoryStage('execute','cancelled',false),'cancelled');
+});
+
+test('v2 action receipts keep exact fences and replay metadata without a second task state or a post-commit read', () => {
+  const task = { id: randomUUID(), issueId: randomUUID(), attemptId: randomUUID(), candidateId: randomUUID(), revision: 7, route: { flowVersion: 2 }, stage: 'execute', status: 'running' };
+  const snapshot = { contractVersion: 1, task, attempts: [{ stage: 'verify', runId: null }], candidates: [{ id: task.candidateId }] };
+  const receipt = publicFactoryReceipt(snapshot);
+  assert.deepEqual(receipt, { contractVersion: 2, binding: { taskId: task.id, issueId: task.issueId, attemptId: task.attemptId, candidateId: task.candidateId, revision: 7 },
+    readTask: { tool: 'get_factory_task', input: { taskId: task.id } } });
+  assert.deepEqual(publicFactoryReceipt(structuredClone(snapshot)), receipt, 'an exact action retry presents the same durable receipt');
+  const runId = randomUUID();
+  for (const replayed of [false, true]) {
+    const dispatched = publicFactoryReceipt({ ...snapshot, runId, replayed });
+    assert.deepEqual(dispatched, { ...receipt, runId, replayed });
+    for (const key of ['task','attempts','candidates','status','route','stage']) assert.equal(key in dispatched, false);
+  }
+  const legacy = { ...snapshot, task: { ...task, route: {} } };
+  assert.equal(publicFactoryReceipt(legacy), legacy, 'v1 remains the same object and contract');
+  for (const result of [{ error: 'factoryReplayMismatch' }, { pending: true, reason: 'Evidence unavailable', binding: { taskId: task.id, revision: 7 } }, { proposalId: 'proposal', binding: { taskId: task.id, revision: 7 }, replayed: true, productionEligible: false }])
+    assert.equal(publicFactoryReceipt(result), result, 'non-snapshot outcomes keep their original semantics');
 });
 
 test('acceptance Markdown keeps unverified reasons first, records resolutions without inventing a pass and stays below the artifact byte limit', () => {

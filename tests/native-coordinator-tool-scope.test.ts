@@ -13,6 +13,14 @@ const checks = mock.fn(async () => { if (revoked) throw new NativeCoordinatorErr
 const effect = mock.fn(async () => { if (uncertain) throw new Error('retryable transport failure'); return {ok:true} })
 let runDetail: RunDetail | null = null
 const readRunResult = mock.fn(async (_userId: string, _runId: string) => runDetail)
+const publicTaskView = { contractVersion: 2, task: { version: 2, id: 'task', revision: 99, stage: 'handoff', needsYou: { kind: 'pr_review', since: '2026-11-05T00:00:00Z' } },
+  binding: { taskId: 'task', issueId: 'issue', attemptId: 'attempt', candidateId: 'candidate', revision: 99 }, attempts: [], candidates: [] }
+const readPublicTask = mock.fn(async (..._args: unknown[]) => publicTaskView)
+const legacyFactoryStore = { read: async () => assert.fail('Coordinator must use the public reader') }
+const scopedFactoryStore = { read: async () => assert.fail('scoped Coordinator must use the public reader') }
+const factoryForBot = mock.fn((_botId: string | null) => scopedFactoryStore)
+let bridgeResult: Record<string, unknown> = {}
+const bridge = mock.fn(async (..._args: unknown[]) => bridgeResult)
 let questionReadError: Error | null = null
 let revokeDuringQuestionRead = false
 let revokeDuringEventRead = false
@@ -53,9 +61,10 @@ stub('../lib/pending-action-store.ts',{writeAccountAction:effect,proposeReposito
 stub('../lib/issue-access.ts',{issueForUser:effect})
 stub('../lib/telegram/client.ts',{postTelegramText:effect})
 stub('../lib/attention/store.ts',{recordDecision:effect,settleTurn:effect})
-stub('../lib/factory/server.ts',{dispatchFactoryRun:effect,factoryMonitor:{reconcile:effect},factoryStore:{read:async()=>({contractVersion:1,task:{id:'task',revision:99},attempts:[],candidates:[]})},factoryQuestions:{read:readQuestion,answer:effect,escalate:escalateQuestion,list:async()=>[questionView()],pending:async()=>[questionView()]},reconcileFactoryRuns:effect})
+stub('../lib/factory/server.ts',{dispatchFactoryRun:effect,factoryMonitor:{reconcile:effect},factoryStore:legacyFactoryStore,factoryForBot,factoryQuestions:{read:readQuestion,answer:effect,escalate:escalateQuestion,list:async()=>[questionView()],pending:async()=>[questionView()]},reconcileFactoryRuns:effect})
+stub('../lib/factory/public-task.ts',{readFactoryTaskView:readPublicTask})
 stub('../lib/self-improvement/source.ts',{readCommittedSkill:async()=>{revoked=true;return 'source bytes'}})
-stub('../lib/self-improvement/server.ts',{improvementStore:{},skillAssignments:{},improvementFactory:{},skillEvaluations:{freezeBenchmark:effect,dispatchNext:effect,beginEvaluation:effect,compare:effect},skillRegistry:{
+stub('../lib/self-improvement/server.ts',{improvementStore:{},skillAssignments:{},improvementFactory:{rehearse:bridge,handoff:bridge,status:bridge},skillEvaluations:{freezeBenchmark:effect,dispatchNext:effect,beginEvaluation:effect,compare:effect},skillRegistry:{
   registerCandidate:async(_user:unknown,_input:unknown,readSource:(source:unknown)=>Promise<string>)=>{
     await readSource({repository:'https://github.com/example/public',sha:'a'.repeat(40),baseSha:'b'.repeat(40)})
     return effect()
@@ -81,7 +90,8 @@ beforeEach(()=>{
   projectExecutionActive=true;projectExecutionMissing=false;projectDecisionWrite.mock.resetCalls()
   revoked=false;uncertain=false;runDetail=null;questionReadError=null;revokeDuringQuestionRead=false;revokeDuringEventRead=false
   hostQuestionReference.binding.candidateId=null
-  for (const fn of [checks,effect,readRunResult,readQuestion,escalateQuestion,readUserEvent]) fn.mock.resetCalls()
+  bridgeResult={}
+  for (const fn of [checks,effect,readRunResult,readQuestion,escalateQuestion,readUserEvent,readPublicTask,factoryForBot,bridge]) fn.mock.resetCalls()
 })
 
 const binding={taskId:'task',issueId:'issue',attemptId:'attempt',revision:1,candidateId:null}
@@ -105,6 +115,7 @@ const calls = {
   createIssueFromRequestStep:()=>steps.createIssueFromRequestStep(user,{sourceEventId:'event',title:'Requested task'},scope),
   routeFactoryTask:()=>steps.routeFactoryTask(user,{issueId:'issue',sourceEventId:'event',rationale:'task',missingInformation:[],missingPermissions:[],needsSpec:false},scope),
   getFactoryTask:()=>steps.getFactoryTask(user,{taskId:'task'},scope),
+  readFactoryTask:()=>steps.readFactoryTask(user,'task',scope,COORDINATOR_BOT),
   listFactoryQuestions:()=>steps.listFactoryQuestions(user,{},scope),
   getFactoryQuestion:()=>steps.getFactoryQuestion(user,{questionId:'question'},scope),
   answerFactoryContext:()=>steps.answerFactoryContext(user,{reference,answerId:'answer',facts:[{kind:'issue',quote:'fact'}]},scope),
@@ -147,9 +158,42 @@ for (const [name,call] of Object.entries(calls)) {
     assert.deepEqual(checks.mock.calls.map(call=>call.arguments),[[user,scope.holder,scope.turnId,scope.callId]])
     assert.equal(effect.mock.callCount(),0)
     assert.equal(readRunResult.mock.callCount(),0)
+    assert.equal(readPublicTask.mock.callCount(),0)
     assert.equal(readQuestion.mock.callCount()+escalateQuestion.mock.callCount()+readUserEvent.mock.callCount(),0)
   })
 }
+
+test('both normal Factory task read steps use the shared public reader with their host-owned Bot scope', async () => {
+  assert.deepEqual(await steps.readFactoryTask(user, 'task', scope, COORDINATOR_BOT), publicTaskView)
+  const legacy = await steps.getFactoryTask(user, { taskId: 'task' }, scope)
+  assert.ok('task' in legacy); assert.deepEqual(legacy.task, publicTaskView.task)
+  assert.deepEqual(readPublicTask.mock.calls.map(call => call.arguments), [[null, scopedFactoryStore, user, 'task'], [null, legacyFactoryStore, user, 'task']])
+  assert.deepEqual(factoryForBot.mock.calls.map(call => call.arguments), [[COORDINATOR_BOT]])
+  assert.equal(checks.mock.callCount(), 2)
+  assert.equal('status' in legacy.task, false); assert.equal('route' in legacy.task, false)
+})
+
+test('Factory skill bridge tools preserve their own receipts while projecting only the v2 Factory snapshot', async () => {
+  const snapshot = { contractVersion: 1, task: { id: binding.taskId, issueId: binding.issueId, attemptId: binding.attemptId,
+    candidateId: binding.candidateId, revision: binding.revision, route: { flowVersion: 2 }, stage: 'execute', status: 'running' }, attempts: [], candidates: [] }
+  const receipt = { contractVersion: 2, binding, readTask: { tool: 'get_factory_task', input: { taskId: binding.taskId } } }
+  const selection = { baseline: 'host-selected-baseline' }
+  bridgeResult = { ...snapshot, runId: 'run', replayed: false, selection, productionEligible: false }
+  assert.deepEqual(await steps.dispatchBaselineRehearsal(user, { binding, agentId: 'agent', deviceRepoId: 'repo' }, scope),
+    { ...receipt, runId: 'run', replayed: false, selection, productionEligible: false })
+  bridgeResult = { ...snapshot, runId: 'run', replayed: false, proposalId: 'proposal', productionEligible: false }
+  const input = { proposalId: 'proposal', binding, agentId: 'agent', deviceRepoId: 'repo' }
+  assert.deepEqual(await steps.handoffSkillImprovement(user, input, scope), { ...receipt, runId: 'run', replayed: false, proposalId: 'proposal', productionEligible: false })
+  const replay = { proposalId: 'proposal', taskId: binding.taskId, runId: 'run', request: { binding }, binding, replayed: true, productionEligible: false }
+  bridgeResult = replay
+  assert.deepEqual(await steps.handoffSkillImprovement(user, input, scope), replay, 'the existing bridge replay has no Factory snapshot and keeps its exact result')
+  const link = { proposalId: 'proposal', taskId: binding.taskId, runId: 'run' }
+  bridgeResult = { link, factory: snapshot, productionEligible: false }
+  assert.deepEqual(await steps.getSkillImprovementFactory(user, { proposalId: 'proposal' }, scope), { link, factory: receipt, productionEligible: false })
+  bridgeResult = { ...snapshot, task: { ...snapshot.task, route: {} }, runId: 'legacy-run', replayed: false, selection, productionEligible: false }
+  assert.deepEqual(await steps.dispatchBaselineRehearsal(user, { binding, agentId: 'agent', deviceRepoId: 'repo' }, scope), bridgeResult, 'v1 keeps all previous fields')
+  assert.equal(readPublicTask.mock.callCount(), 0, 'successful actions never acquire a post-commit read dependency')
+})
 const questionActions = {
   context: (reference: {questionId:string;questionRevision:number}) => steps.answerFactoryContext(user,{reference,answerId:'answer',facts:[{kind:'issue',quote:'fact'}]},scope),
   escalation: (reference: {questionId:string;questionRevision:number}) => steps.escalateFactoryQuestion(user,{reference,eventId:'event',reason:'question'},scope),

@@ -1,12 +1,12 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
-import { Pressable, StyleSheet, View } from 'react-native'
+import { Keyboard } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import { ChatMessageList, type ChatListHandle } from '@/features/chat/components/chat-message-list'
 import { chatHistoryPath, chatUpdatePath, mergeChatHistory, mergeChatRead, olderThrough, type ChatHistoryPage, type ChatRead } from '@/features/chat/model/chat-pages'
 import { latestOwnIndex } from '@/features/chat/model/chat-layout'
 import { GestureDetector } from 'react-native-gesture-handler'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Ellipsis } from 'lucide-react-native'
 import { uuid } from 'expo'
 import { Spinner } from '@/components/icons'
 import { runIcon } from '@/lib/thread-icon'
@@ -17,8 +17,7 @@ import { OfflineBanner } from '@/components/OfflineBanner'
 import { OpenUIReply } from '@/components/OpenUI'
 import { PendingActions } from '@/components/PendingActions'
 import { Text } from '@/components/Text'
-import { NavBar, underBar } from '@/components/NavBar'
-import { Capsule, Composer } from '@/components/ui'
+import { Composer } from '@/features/chat/components/chat-composer'
 import { GlassButton } from '@/components/GlassButton'
 import { api } from '@/lib/api'
 import { outgoing, type Attachment } from '@/lib/attachments'
@@ -29,7 +28,14 @@ import { plainText, quotable } from '@/lib/quote'
 import { delivered, inFlight, marked, outgoingKey, queued, sendFailureState, submissionBody, unsettled, type Outgoing } from '@/lib/outbox'
 import { apiCache } from '@/lib/api-cache'
 import { askForPush, usePushState } from '@/lib/push-state'
-import { runName, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
+import { runName, type BotPage, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
+import { ChatHeader } from '@/features/chat/components/chat-header'
+import { menuThreads } from '@/features/chat/model/chat-header-menu'
+import { ChatSelectableText } from '@/features/chat/components/chat-selectable-text'
+import { ChatSelectionBar } from '@/features/chat/components/chat-selection-bar'
+import { ChatQueueCard } from '@/features/chat/components/chat-queue-card'
+import { endsSelection, quotedMessage, selectionQuote, type Rect, type SelectionAction } from '@/features/chat/model/chat-selection'
+import { nextQueueCheck, queuedItems } from '@/features/chat/model/chat-queue'
 import { FailedReply } from '@/components/FailedReply'
 import { eventText, questionCard } from '@/lib/event-line'
 import { waitingLabel } from '@/lib/waiting'
@@ -78,6 +84,8 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
   const serviceUnavailable = data?.enabled === false
   const serviceRefresh = useRefresh(reload)
   // The person's proposals: the web's key (components/coordinator/pending-actions.tsx), on the same home channel.
+  // The title menu's threads: read when the chat opens, again when a thread list changes; never while idle.
+  const botPage = useLiveApi<BotPage>(`/api/mobile/bots/${self}`, () => ({ refs: [listRef('thread_list', home)] }))
   const pending = useLiveApi<PendingAction[]>('/api/pending-actions', items => ({
     refs: [listRef('pending_actions', home)], deadline: pendingActionsDeadline(items),
   }))
@@ -114,8 +122,31 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
 
   useEffect(() => { if (draft) setText(draft) }, [draft])
 
-  const items = data?.items ?? []
+  const allItems = data?.items ?? []
   const sources = data?.sources ?? {}
+  // Queued messages wait above the composer, not in the conversation (#1408 Phase 3). The screen looks again when the
+  // oldest pending message would turn queued: a UI timer, never a read.
+  const sentWhileWorking = useRef(new Set<string>())
+  const [now, setNow] = useState(Date.now)
+  const queueCheck = nextQueueCheck(allItems, Boolean(data?.working), now)
+  useEffect(() => {
+    if (queueCheck === null) return
+    const timer = setTimeout(() => setNow(Date.now()), Math.max(0, queueCheck - Date.now()))
+    return () => clearTimeout(timer)
+  }, [queueCheck])
+  const queue = queuedItems(allItems, Boolean(data?.working), now, sentWhileWorking.current)
+  const items = queue.length ? allItems.filter(item => !queue.includes(item)) : allItems
+  // 选择文本: one message's words are selectable where they are; capsules above the composer act on the selection.
+  const [selection, setSelection] = useState<{ key: number; text: string; selected: string } | null>(null)
+  const selectionRect = useRef<Rect | null>(null)
+  const touch = useRef<{ x: number; y: number; at: number } | null>(null)
+  useEffect(() => { setSelection(null) }, [self, apiContext])
+  const toggleSelection = (key: number, words: string) => {
+    Keyboard.dismiss()
+    selectionRect.current = null
+    setSelection(current => current?.key === key ? null : { key, text: plainText(words), selected: plainText(words) })
+  }
+  const onSelected = useCallback((selected: string) => setSelection(current => current && current.selected !== selected ? { ...current, selected } : current), [])
   // What the chat held when it opened just appears; anything after it rises in (Arrival).
   const opened = useRef<{ chat: string; last: number } | null>(null)
   const chatKey = `${self}:${apiContext}`
@@ -158,18 +189,27 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
     return request
   }
 
-  const send = async (words: string, attachments: Attachment[] = []) => {
+  const send = async (typed: string, attachments: Attachment[] = []) => {
     if (serviceUnavailable) return false
+    // While words are selected, what is typed answers them: it goes out quoting the selection.
+    const words = selection && !quote && typed.trim() ? quotedMessage(selectionQuote(selection.selected, selection.text), typed) : typed
+    setSelection(null)
     // The sent message rises to the top of the chat, blank space under it for the reply (v0).
     setSentHere(true)
     list.current?.toLatest(!reduceMotion)
     const { text: message, images } = outgoing(words, attachments)
+    if (working) sentWhileWorking.current.add(message)
     const context = apiCache.context()
     const targetBotId = data?.botId ?? botId
     const held = unsettled(pendingSends.current, message, images, self, context)
     const item = held ?? queued([], outgoingKey(uuid.v4), message, images, { botId: targetBotId, chatKey: self, context })[0]
     updateOutbox(list => held ? marked(list, item.key, 'sending') : [...list, item])
     return deliver(item)
+  }
+
+  const selectionAction = (action: SelectionAction) => {
+    if (!selection) return
+    void send(quotedMessage(selectionQuote(selection.selected, selection.text), action.instruction))
   }
 
   const retry = async (item: Outgoing) => {
@@ -208,10 +248,11 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
   }
 
   // A long press: reactions, then 回复 · 复制 · 选择文本 in a system sheet (app/message.tsx).
-  const message = (words: string, id?: string): HeldMessage => ({ text: plainText(words), onQuote: () => setQuote(quotable(words)),
+  const message = (words: string, id?: string, key?: number): HeldMessage => ({ text: plainText(words), onQuote: () => setQuote(quotable(words)),
+    ...(key !== undefined ? { onSelect: () => toggleSelection(key, words) } : {}),
     ...(id ? { react: { current: myReaction(reactions[id]), set: emoji => void react(id, emoji) } } : {}) })
-  const actions = (words: string, id?: string) => {
-    holdMessage(message(words, id))
+  const actions = (words: string, id?: string, key?: number) => {
+    holdMessage(message(words, id, key))
     router.push('/message')
   }
   const chips = (id: string | undefined, align?: 'right') => id
@@ -221,18 +262,21 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
   const renderItem = (item: Chat['items'][number], index: number) => {
     const time = clockTime(item.createdAt)
     const question = item.from === 'event' ? questionCard(item.line, sources) : null
+    const selected = selection?.key === item.position ? selection : null
     return (
       <Arrival animate={arrived(item.position)}>
         {question ? <ThreadCard title={question.title} status="waiting" info="在等你回答" action="去回答" onPress={() => router.push(`/thread/${question.runId}`)} />
           : item.from === 'event' ? <EventLine text={eventText(item.line, sources)} /> : null}
-        {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right" onQuote={item.text ? () => setQuote(quotable(item.text)) : undefined} onLongPress={item.text ? () => actions(item.text, item.id) : undefined} menu={item.text ? message(item.text, item.id) : undefined}><MyBubble text={item.text} photos={photos(item.id, item.images)} />{chips(item.id, 'right')}</TimedRow> : null}
+        {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right" onQuote={item.text && !selected ? () => setQuote(quotable(item.text)) : undefined} onLongPress={item.text && !selected ? () => actions(item.text, item.id, item.position) : undefined} menu={item.text ? message(item.text, item.id, item.position) : undefined}><MyBubble text={item.text} photos={photos(item.id, item.images)} selecting={selected ? <ChatSelectableText text={selected.text} color={colors.onAccent} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} /> : undefined} />{chips(item.id, 'right')}</TimedRow> : null}
         {item.from === 'coordinator' && item.text ? (
-          <TimedRow time={time} offset={offset} onQuote={() => setQuote(quotable(item.text))} onLongPress={() => actions(item.text, item.id)} menu={message(item.text, item.id)}>
+          <TimedRow time={time} offset={offset} onQuote={selected ? undefined : () => setQuote(quotable(item.text))} onLongPress={selected ? undefined : () => actions(item.text, item.id, item.position)} menu={message(item.text, item.id, item.position)}>
             {isOpenUI(item.text)
               ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} webPath={webChatPath(data?.botId ?? botId, workspaceId)} sources={sources} onOpen={open} />
-              : <BotBubble><Markdown text={item.text} sources={sources} onOpen={open} /></BotBubble>}
+              : <BotBubble>{selected
+                ? <ChatSelectableText text={selected.text} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} />
+                : <Markdown text={item.text} sources={sources} onOpen={open} />}</BotBubble>}
             {chips(item.id)}
-            {index === latestReply && !working ? <ReplyActions text={plainText(item.text)} onQuote={() => setQuote(quotable(item.text))} onMore={() => actions(item.text, item.id)} /> : null}
+            {index === latestReply && !working ? <ReplyActions text={plainText(item.text)} onQuote={() => setQuote(quotable(item.text))} onMore={() => actions(item.text, item.id, item.position)} /> : null}
           </TimedRow>
         ) : null}
         {item.from === 'coordinator' && item.stopped ? <Text style={styles.stopped}>已停止</Text> : null}
@@ -248,26 +292,18 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
 
   return (
     <View style={styles.screen}>
-      {/* Back is the system's (and its edge swipe); the bot's name opens the bot's page. */}
-      <NavBar material
-        titleView={
-          <Pressable accessibilityRole="button" accessibilityLabel={name ? `${name} 的资料` : '资料'} onPress={() => router.push(`/bots/${self}/info`)}>
-            {/* The name alone, as Messages and ChatGPT title a chat; the bot's mark is on its page (#1386). */}
-            <Capsule>
-              {/* The bot's name is not in yet (opened from a push before 对话 loaded): a spinner, never an empty pill. */}
-              {name ? <Text style={styles.titleText} numberOfLines={1}>{name}</Text> : <Spinner size={14} />}
-            </Capsule>
-          </Pressable>
-        }
-        right={{ icon: 'ellipsis', label: '更多', web: <Ellipsis size={21} color={colors.ink} strokeWidth={2} />, onOpen: () => router.push(`/bots/${self}/info`),
-          items: [
-            { label: '资料', icon: 'person.crop.circle', onPress: () => router.push(`/bots/${self}/info`) },
-            { label: '线程', icon: 'checklist', onPress: () => router.push(`/bots/${self}/threads`) },
-          ] }}
-      />
+      {/* Back is the system's (and its edge swipe); the bot's name opens its menu: its threads and its page. */}
+      <ChatHeader name={name} threads={botPage.data ? menuThreads(botPage.data) : null} onThread={id => router.push(`/thread/${id}`)}
+        onAllThreads={() => router.push(`/bots/${self}/threads`)} onInfo={() => router.push(`/bots/${self}/info`)} />
       {/* The message list comes first, so the iOS bar finds it and blurs what scrolls under (scroll-edge effect). */}
       <GestureDetector gesture={timeReveal}>
-      <View style={{ flex: 1, overflow: 'hidden' }}>
+      <View style={{ flex: 1, overflow: 'hidden' }}
+        // While words are selected, a tap anywhere but on that message ends it; the touch still reaches what is there.
+        onTouchStart={selection ? event => { touch.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY, at: Date.now() } } : undefined}
+        onTouchEnd={selection ? event => {
+          const down = touch.current; touch.current = null
+          if (down && endsSelection(down, { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY, at: Date.now() }, selectionRect.current)) setSelection(null)
+        } : undefined}>
         {/* The system scroll: momentum, and a bounce at both ends even while the chat is shorter than the screen. */}
         <ChatMessageList ref={list} testID="bot-chat-scroll" data={items} scrollEnabled={!scrollLocked} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
           keyOf={item => item.pending ? `pending-${item.position}` : String(item.position)} renderItem={renderItem} anchorIndex={anchorIndex}
@@ -288,8 +324,10 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
       </GestureDetector>
       <ChatScrollToLatest visible={!atLatest} bottom={composerHeight + 12} onPress={() => list.current?.toLatest()} />
       <OfflineBanner top={insets.top + 66} />
-      <Composer value={text} sendDisabled={serviceUnavailable} onChangeText={setText} placeholder={name ? `给 ${name} 发消息` : '发消息'} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
-        quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={<>{serviceUnavailable ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.serviceNotice}><Text style={styles.serviceMessage}>对话服务尚未启用，暂时无法回复。</Text><GlassButton label="重试" busy={serviceRefresh.refreshing} onPress={() => void serviceRefresh.onRefresh()} /></View> : null}{composerNotice}{reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : null}</>} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />
+      <Composer value={text} sendDisabled={serviceUnavailable} onChangeText={setText} placeholder={selection ? '回复选中的文字' : name ? `给 ${name} 发消息` : '发消息'} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
+        quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={<>{serviceUnavailable ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.serviceNotice}><Text style={styles.serviceMessage}>对话服务尚未启用，暂时无法回复。</Text><GlassButton label="重试" busy={serviceRefresh.refreshing} onPress={() => void serviceRefresh.onRefresh()} /></View> : null}{composerNotice}{reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : null}
+          <ChatQueueCard items={queue} busy={stopper.sending} onSendNow={data?.working ? () => void stopper.stop() : undefined} />
+          <ChatSelectionBar visible={Boolean(selection)} disabled={serviceUnavailable} onAction={selectionAction} /></>} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />
     </View>
   )
 }
@@ -323,7 +361,6 @@ const styles = StyleSheet.create({
   serviceMessage: { flex: 1, fontSize: 13, lineHeight: 18, color: colors.secondary },
   reactionNotice: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 8 },
   screen: { flex: 1, backgroundColor: colors.page },
-  titleText: { fontSize: 17, fontWeight: '600' },
   // Space above the composer (适度留白).
   older: { paddingVertical: 12, alignItems: 'center' },
   loading: { paddingTop: 120, alignItems: 'center' },

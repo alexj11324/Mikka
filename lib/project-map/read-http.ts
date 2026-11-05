@@ -5,7 +5,7 @@ import { withBasePath } from '../base-path'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
 import { logCodedError } from '@mikka/protocol/coded-error'
 import { ProjectMapError } from './contracts'
-import { resolveProjectScope } from './scope'
+import { resolveProjectReadScope } from './scope'
 import { readMapFacts } from './read-store'
 import { checkSnapshot, fingerprint, readMapToken, signMapToken, snapshotClaims, type MapClaims } from './cursor'
 import { graphOverview, graphPage, graphPath, projectGraph } from './graph'
@@ -29,15 +29,16 @@ export async function projectMapHttp(request: Request, projectId: string, operat
     const workspace = z.uuid().safeParse(raw.workspaceId)
     if (!workspace.success) throw new MapReadError('map_invalid_request', { detail: 'invalid_query', cause: workspace.error })
     if (!apiWorkspaceAllowed(session, workspace.data)) throw new MapReadError('map_not_found')
-    const scope = await resolveProjectScope(session.user, projectId, workspace.data)
+    const scope = await resolveProjectReadScope(session.user, projectId, workspace.data)
     // Read the committed revision before any content it describes. This is the
     // selected, authorized workspace channel used by projectMapTargets.
     const live = { ownerId: scope.userId, workspaceId: scope.workspaceId,
       revisions: await readRevisions([{ kind: 'project_map', id: projectId }]) }
     if (operation === 'source') {
       const response = await mapSourceHttp(request, scope, target ?? '', raw, live)
-      const current = await resolveProjectScope(session.user, projectId, workspace.data)
+      const current = await resolveProjectReadScope(session.user, projectId, workspace.data)
       if (scope.project.userId !== current.project.userId || scope.project.revision !== current.project.revision
+        || scope.personalWorkspace !== current.personalWorkspace
         || [...scope.issueIds].sort().join(',') !== [...current.issueIds].sort().join(','))
         throw new MapReadError('map_snapshot_changed', { detail: 'source_changed' })
       return response

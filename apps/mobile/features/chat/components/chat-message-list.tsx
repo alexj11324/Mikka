@@ -12,8 +12,9 @@ export { VIRTUALIZED_CHAT_LIST, type ChatListHandle, type ChatListProps }
 
 /**
  * A chat's messages, oldest first, on Legend List (#1408): only the rows near the screen are mounted, the chat opens
- * at its latest message, a new message keeps the reader at the end when they are there, and an older page loading in
- * front leaves the message they are reading where it is. The keyboard lifts the list while the reader is at the end.
+ * at its latest message (a short chat sits against the composer), a new message keeps the reader at the end when they
+ * are there, and an older page loading in front leaves the message they are reading where it is. The keyboard lifts
+ * the list while the reader is at the end.
  */
 function ChatMessageListInner<T>({ data, keyOf, renderItem, header, footer, bottomInset, onStartReached, onAtLatestChange, anchorIndex, scrollEnabled, testID }: ChatListProps<T>, ref: React.Ref<ChatListHandle>) {
   const insets = useSafeAreaInsets()
@@ -64,6 +65,7 @@ function ChatMessageListInner<T>({ data, keyOf, renderItem, header, footer, bott
       estimatedItemSize={CHAT_LIST_ESTIMATED_ROW}
       ItemSeparatorComponent={Separator}
       initialScrollAtEnd
+      alignItemsAtEnd
       // Following the end: a new message, the footer or the screen changing keep the latest in view. A reply growing
       // under the anchored message fills its blank space instead, without scrolling (v0).
       maintainScrollAtEnd={{ animated: false, on: { dataChange: true, itemLayout: anchorIndex === undefined, footerLayout: true, layout: true } }}

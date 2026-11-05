@@ -5084,6 +5084,17 @@
           "provider_unavailable": "执行模型的服务商不可用"
         },
         "profile": "执行 Profile 不可用",
+        "profileDisabled": "执行配置已停用",
+        "profileArchived": "执行配置已归档",
+        "profileVersionConflict": "执行配置已更新，请重新查看后批准。",
+        "profileDecision": {
+          "decision_unavailable": "未取得执行配置的选择结果",
+          "no_suitable_profile": "没有适合此任务的执行配置",
+          "invalid_profile_answer": "执行配置的选择结果格式无效",
+          "unknown_profile": "选中的执行配置不在可用列表中",
+          "uncertain_profile": "无法确定合适的执行配置",
+          "invalid_reason": "执行配置的选择理由无效"
+        },
         "refused": "批准被拒绝"
       },
       "retryApprove": "重新确认"
