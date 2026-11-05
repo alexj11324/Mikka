@@ -1,0 +1,44 @@
+{
+  "fixture": {
+    "files": 19,
+    "archives": 0,
+    "archiveEntries": 0,
+    "decodedBytes": 0,
+    "result": "passed",
+    "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+  },
+  "runner": [
+    {
+      "files": 19,
+      "archives": 0,
+      "archiveEntries": 0,
+      "decodedBytes": 0,
+      "result": "passed",
+      "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+    },
+    {
+      "files": 19,
+      "archives": 0,
+      "archiveEntries": 0,
+      "decodedBytes": 0,
+      "result": "passed",
+      "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+    },
+    {
+      "files": 19,
+      "archives": 0,
+      "archiveEntries": 0,
+      "decodedBytes": 0,
+      "result": "passed",
+      "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+    },
+    {
+      "files": 19,
+      "archives": 0,
+      "archiveEntries": 0,
+      "decodedBytes": 0,
+      "result": "passed",
+      "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+    }
+  ]
+}

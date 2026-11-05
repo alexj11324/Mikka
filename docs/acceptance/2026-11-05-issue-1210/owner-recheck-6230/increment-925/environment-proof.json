@@ -1,0 +1,8 @@
+{
+  "versions.log": "v24.22.2\n10.34.3\npg_ctl (PostgreSQL) 17.11 (Ubuntu 17.11-1.pgdg26.04+2)\n",
+  "bootstrap-time.txt": "started_at=2026-11-05T22:17:57Z\nfinished_at=2026-11-05T22:18:43Z\n",
+  "bootstrap-result.txt": "exit=0\n",
+  "browser-version.txt": "Google Chrome 157.0.8103.38 \n",
+  "browser-install-result.txt": "exit=0\n",
+  "bootstrap-pg-stop.log": "waiting for server to shut down.... done\nserver stopped\n"
+}

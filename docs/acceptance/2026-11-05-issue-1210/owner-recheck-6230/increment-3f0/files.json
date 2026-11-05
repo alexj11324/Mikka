@@ -1,0 +1,54 @@
+[
+  {
+    "file": "approval-light-390-entry.png",
+    "bytes": 56784,
+    "sha256": "6f5e467c4a03ea226fbc3c48aa7bb3157885bdd82164edc6ec41a41fe14490ed",
+    "width": 390,
+    "height": 844
+  },
+  {
+    "file": "approval-light-390-pane.png",
+    "bytes": 43500,
+    "sha256": "343ab04ef4fad049f22e00067e0bce14b0d1e957b744fc6f13a3f86be0e519d3",
+    "width": 390,
+    "height": 844
+  },
+  {
+    "file": "evidence-audit.json",
+    "bytes": 527,
+    "sha256": "74644fa700ee08e68d0a0c926f48fa2da62a2d9c5767517186643fee0e0246a5"
+  },
+  {
+    "file": "expired-light-390-entry.png",
+    "bytes": 59084,
+    "sha256": "6da9ea91dc0256b2ae6b54c2b68c45e09eeba115875788b3b5dbff18023c4a5f",
+    "width": 390,
+    "height": 844
+  },
+  {
+    "file": "expired-light-390-pane.png",
+    "bytes": 27988,
+    "sha256": "c0ebe006dd4efc38cc9578abf8a61298163e2666cf4238266274f16ac6f8c811",
+    "width": 390,
+    "height": 844
+  },
+  {
+    "file": "review.json",
+    "bytes": 1618,
+    "sha256": "3b6c01c7456661daa736ad52c82796548c419a6fe21920462a67f0f9e69b1def"
+  },
+  {
+    "file": "waiting-light-390-entry.png",
+    "bytes": 59032,
+    "sha256": "ab3a488f01136f828d4ca85dde0d5b9ef1227ed9eac4e428d01967a2e8a20c82",
+    "width": 390,
+    "height": 844
+  },
+  {
+    "file": "waiting-light-390-pane.png",
+    "bytes": 27988,
+    "sha256": "c0ebe006dd4efc38cc9578abf8a61298163e2666cf4238266274f16ac6f8c811",
+    "width": 390,
+    "height": 844
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "checkedAt": "2026-11-05T22:51:22.034194+00:00",
+  "path": "raw-evidence.tar.gz",
+  "sha256": "daa256a08a136f70a8fa5b5f4bd357cbde29cc24e6abc8eb0fff7f1120df9749",
+  "files": 33,
+  "bytes": 17597,
+  "checks": [
+    "privateKey",
+    "credentialPrefix",
+    "authorization",
+    "cookieValue",
+    "passwordDSN",
+    "jwt"
+  ],
+  "matches": 0
+}

@@ -1,0 +1,133 @@
+{
+  "buildId": "lrEwhvgNnbrYc6ZHalF2l",
+  "browserVersion": "157.0.8103.38",
+  "commit": "6230e75351a41bfd6c4586166d0718b572380983",
+  "origin": "http://localhost:3107",
+  "fixtures": [
+    {
+      "state": "waiting",
+      "issueId": "bc88ea9d-2713-4a4f-9ae3-107037eb1d0d",
+      "taskId": "dce8f002-e053-4e5f-bde3-e84fb2df24d4"
+    },
+    {
+      "state": "approval",
+      "issueId": "67c8fc5e-6ff6-4c56-818c-075fcc49a0c1",
+      "taskId": "4227f66a-4120-4028-8d12-ae7a0b832423"
+    },
+    {
+      "state": "expired",
+      "issueId": "d00c00d3-7ff2-45da-8b91-b8a1e6a04bef",
+      "taskId": "818acba0-5b13-4b10-945d-ce8007103410"
+    }
+  ],
+  "captures": [
+    {
+      "capturedAt": "2026-11-05T21:56:32.499Z",
+      "state": "waiting",
+      "theme": "light",
+      "width": 1440,
+      "entry": "waiting-light-1440-entry.png",
+      "pane": "waiting-light-1440-pane.png",
+      "layout": {
+        "viewport": 1440,
+        "pageWidth": 1430
+      }
+    },
+    {
+      "capturedAt": "2026-11-05T21:56:34.394Z",
+      "state": "waiting",
+      "theme": "dark",
+      "width": 1440,
+      "entry": "waiting-dark-1440-entry.png",
+      "pane": "waiting-dark-1440-pane.png",
+      "layout": {
+        "viewport": 1440,
+        "pageWidth": 1430
+      }
+    },
+    {
+      "capturedAt": "2026-11-05T21:56:36.040Z",
+      "state": "waiting",
+      "theme": "light",
+      "width": 390,
+      "entry": "waiting-light-390-entry.png",
+      "pane": "waiting-light-390-pane.png",
+      "layout": {
+        "viewport": 390,
+        "pageWidth": 390
+      }
+    },
+    {
+      "capturedAt": "2026-11-05T21:56:37.756Z",
+      "state": "approval",
+      "theme": "light",
+      "width": 1440,
+      "entry": "approval-light-1440-entry.png",
+      "pane": "approval-light-1440-pane.png",
+      "layout": {
+        "viewport": 1440,
+        "pageWidth": 1430
+      }
+    },
+    {
+      "capturedAt": "2026-11-05T21:56:39.478Z",
+      "state": "approval",
+      "theme": "dark",
+      "width": 1440,
+      "entry": "approval-dark-1440-entry.png",
+      "pane": "approval-dark-1440-pane.png",
+      "layout": {
+        "viewport": 1440,
+        "pageWidth": 1430
+      }
+    },
+    {
+      "capturedAt": "2026-11-05T21:56:41.176Z",
+      "state": "approval",
+      "theme": "light",
+      "width": 390,
+      "entry": "approval-light-390-entry.png",
+      "pane": "approval-light-390-pane.png",
+      "layout": {
+        "viewport": 390,
+        "pageWidth": 390
+      }
+    },
+    {
+      "capturedAt": "2026-11-05T21:56:42.989Z",
+      "state": "expired",
+      "theme": "light",
+      "width": 1440,
+      "entry": "expired-light-1440-entry.png",
+      "pane": "expired-light-1440-pane.png",
+      "layout": {
+        "viewport": 1440,
+        "pageWidth": 1430
+      }
+    },
+    {
+      "capturedAt": "2026-11-05T21:56:44.643Z",
+      "state": "expired",
+      "theme": "dark",
+      "width": 1440,
+      "entry": "expired-dark-1440-entry.png",
+      "pane": "expired-dark-1440-pane.png",
+      "layout": {
+        "viewport": 1440,
+        "pageWidth": 1430
+      }
+    },
+    {
+      "capturedAt": "2026-11-05T21:56:46.392Z",
+      "state": "expired",
+      "theme": "light",
+      "width": 390,
+      "entry": "expired-light-390-entry.png",
+      "pane": "expired-light-390-pane.png",
+      "layout": {
+        "viewport": 390,
+        "pageWidth": 390
+      }
+    }
+  ]
+}

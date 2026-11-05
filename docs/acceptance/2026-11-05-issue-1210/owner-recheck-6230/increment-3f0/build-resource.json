@@ -1,0 +1,17 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "next",
+    "build"
+  ],
+  "startedAt": "2026-11-05T22:42:08.728098+00:00",
+  "finishedAt": "2026-11-05T22:44:26.264353+00:00",
+  "exitCode": 0,
+  "seconds": 137.53639841899985,
+  "peakChildRssKiB": 10157500,
+  "metricScope": "maximum child-process resident-set size, not whole-machine usage",
+  "oomKillBefore": 0,
+  "oomKillAfter": 0,
+  "oomKillDelta": 0
+}

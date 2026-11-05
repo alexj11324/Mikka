@@ -1,0 +1,12 @@
+{
+  "observedAt": "2026-11-05T22:18:57.127934+00:00",
+  "resource": "sandboxes/sbx_001m6pr1he81acraxdm3adp4qmn",
+  "status": "stopped",
+  "stopRequestedAfterUI4EvidenceCollection": true,
+  "resumeAttemptBeforeCompletion": {
+    "at": "2026-11-05T22:12:32.387785+00:00",
+    "httpStatus": 409,
+    "code": "failedPrecondition"
+  },
+  "replacementUsedForMainF479IncrementOnly": true
+}

@@ -1,0 +1,193 @@
+{
+  "preparedAt": "2026-11-05T21:27:59.953522+00:00",
+  "sourceCommit": "6230e75351a41bfd6c4586166d0718b572380983",
+  "sourceTree": "f88bdd57e33e703000c9ac1bfccce028c1bb3e14",
+  "worktree": "/workspace/scratch/6b649311982a/Mikka-review-1210-owner-only",
+  "branch": "verify/1210-owner-only-81c",
+  "baseCommit": "81c05e18bc087c6a08e1dd23bb323bd3f6e7cf55",
+  "baseTree": "e0de310a030775aa4f09821ac4e541907cbb12d2",
+  "remotePreviousSourceMerge": "f78801bc69f69a59b59708d8c2f2768ad618810a",
+  "parents": [
+    "f78801bc69f69a59b59708d8c2f2768ad618810a",
+    "81c05e18bc087c6a08e1dd23bb323bd3f6e7cf55"
+  ],
+  "originalPRHead": "d5fec6ebb6b444901ebb3f2f18ceab70fcf66a5e",
+  "rebuiltTree": "f88bdd57e33e703000c9ac1bfccce028c1bb3e14",
+  "ownerBlobCount": 17,
+  "allOwnerBlobsUnchanged": true,
+  "ownerPatchBlobs": [
+    {
+      "path": "components/workspace/factory-acceptance-pane.tsx",
+      "originalOwnerBlob": "1fb691e46a7073d041f0612b9aa3a5623573a30a",
+      "finalBlob": "1fb691e46a7073d041f0612b9aa3a5623573a30a"
+    },
+    {
+      "path": "docs/acceptance.md",
+      "originalOwnerBlob": "1f802db83cfca938a836de9bf6047d5d5d897ac4",
+      "finalBlob": "1f802db83cfca938a836de9bf6047d5d5d897ac4"
+    },
+    {
+      "path": "lib/factory/acceptance-view.test.ts",
+      "originalOwnerBlob": "6318ed58913db4a1346dffde08d5dd09285e3ec7",
+      "finalBlob": "6318ed58913db4a1346dffde08d5dd09285e3ec7"
+    },
+    {
+      "path": "lib/factory/acceptance-view.ts",
+      "originalOwnerBlob": "fa9ad417515ae91f6e0a6ea37fc7580d7d7b678b",
+      "finalBlob": "fa9ad417515ae91f6e0a6ea37fc7580d7d7b678b"
+    },
+    {
+      "path": "lib/factory/agent-profile.ts",
+      "originalOwnerBlob": "a2f5c2bbf09839ec8524bff837ba5eb01737441c",
+      "finalBlob": "a2f5c2bbf09839ec8524bff837ba5eb01737441c"
+    },
+    {
+      "path": "lib/factory/automatic-dispatch.ts",
+      "originalOwnerBlob": "c8dfef7e8938cc8a3f2ad2088ece6b637915038b",
+      "finalBlob": "c8dfef7e8938cc8a3f2ad2088ece6b637915038b"
+    },
+    {
+      "path": "lib/factory/candidate-recheck.ts",
+      "originalOwnerBlob": "573591c61172e5813d372cd96b46a9f694dd957f",
+      "finalBlob": "573591c61172e5813d372cd96b46a9f694dd957f"
+    },
+    {
+      "path": "lib/factory/check-start-recovery.ts",
+      "originalOwnerBlob": "b4ed787b3a0dff0435517333f523e78bd4ad9725",
+      "finalBlob": "b4ed787b3a0dff0435517333f523e78bd4ad9725"
+    },
+    {
+      "path": "lib/factory/checks.ts",
+      "originalOwnerBlob": "269ce29c7dfad4191bf8d5229e00fc7e72108cf9",
+      "finalBlob": "269ce29c7dfad4191bf8d5229e00fc7e72108cf9"
+    },
+    {
+      "path": "lib/factory/contract.test.ts",
+      "originalOwnerBlob": "8f76ce26b7a155d7b6a18176612bd9843ad21c9f",
+      "finalBlob": "8f76ce26b7a155d7b6a18176612bd9843ad21c9f"
+    },
+    {
+      "path": "lib/factory/http.ts",
+      "originalOwnerBlob": "74230b21ba50d3dc647844aa8b2d1f7225dba49c",
+      "finalBlob": "74230b21ba50d3dc647844aa8b2d1f7225dba49c"
+    },
+    {
+      "path": "lib/factory/human-store.ts",
+      "originalOwnerBlob": "eb689ae7cffe2572bf0e9982975f8d63a3a3260c",
+      "finalBlob": "eb689ae7cffe2572bf0e9982975f8d63a3a3260c"
+    },
+    {
+      "path": "lib/factory/profile-dispatch.db.test.ts",
+      "originalOwnerBlob": "bb399cd1ae33c3cfe68d08c649f2bcbd2f5e69cd",
+      "finalBlob": "bb399cd1ae33c3cfe68d08c649f2bcbd2f5e69cd"
+    },
+    {
+      "path": "lib/factory/store.ts",
+      "originalOwnerBlob": "9c5e8e901cff21bcbcb81d2470fea6d8b330b7e9",
+      "finalBlob": "9c5e8e901cff21bcbcb81d2470fea6d8b330b7e9"
+    },
+    {
+      "path": "lib/run-provider-fallback.ts",
+      "originalOwnerBlob": "12992edb988099eed19f530e7ae3974d9ead1297",
+      "finalBlob": "12992edb988099eed19f530e7ae3974d9ead1297"
+    },
+    {
+      "path": "messages/en.json",
+      "originalOwnerBlob": "c3f547ee8885ef9c1fb0c422e6e429fdd01c3408",
+      "finalBlob": "c3f547ee8885ef9c1fb0c422e6e429fdd01c3408"
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "originalOwnerBlob": "dd4cbb4837a0a149e1670c243d5fe9aefd1788e7",
+      "finalBlob": "dd4cbb4837a0a149e1670c243d5fe9aefd1788e7"
+    }
+  ],
+  "mainIncrementBlobCount": 14,
+  "allMainIncrementBlobsPreserved": true,
+  "mainIncrementBlobs": [
+    {
+      "path": "app/api/bots/[botId]/computer/runs/route.ts",
+      "mainBlob": "7a4bd67e87316d9cbc630d4c1f78b309a561f81e",
+      "finalBlob": "7a4bd67e87316d9cbc630d4c1f78b309a561f81e"
+    },
+    {
+      "path": "lib/agent-runs.ts",
+      "mainBlob": "e2b8918f9826272e95ea4d3e3542b36873dbce59",
+      "finalBlob": "e2b8918f9826272e95ea4d3e3542b36873dbce59"
+    },
+    {
+      "path": "lib/coordinator/instructions.ts",
+      "mainBlob": "2086678a3f46ab9a0bb29a8b5faad875bba1172e",
+      "finalBlob": "2086678a3f46ab9a0bb29a8b5faad875bba1172e"
+    },
+    {
+      "path": "lib/factory/dispatch.ts",
+      "mainBlob": "94b6dcd9bc77d62da17e9982a05a5c5407b06b0c",
+      "finalBlob": "94b6dcd9bc77d62da17e9982a05a5c5407b06b0c"
+    },
+    {
+      "path": "lib/factory/handoff.ts",
+      "mainBlob": "deec3ae448aff2301be55da5dbab4960f41917e4",
+      "finalBlob": "deec3ae448aff2301be55da5dbab4960f41917e4"
+    },
+    {
+      "path": "lib/factory/queue-cloud.ts",
+      "mainBlob": "b37420f33f4dac6f6e583bdf4d5d5a4b8aa45818",
+      "finalBlob": "b37420f33f4dac6f6e583bdf4d5d5a4b8aa45818"
+    },
+    {
+      "path": "lib/factory/queue-local.ts",
+      "mainBlob": "7b2909cdde372cca9bb604bc9461eff974e94625",
+      "finalBlob": "7b2909cdde372cca9bb604bc9461eff974e94625"
+    },
+    {
+      "path": "lib/factory/request-epoch.ts",
+      "mainBlob": "7cdb6df4d4d663d0e47f1ee3f8d040c39ae97453",
+      "finalBlob": "7cdb6df4d4d663d0e47f1ee3f8d040c39ae97453"
+    },
+    {
+      "path": "lib/factory/task-dispatch.ts",
+      "mainBlob": "e9948c07b1bee57d4e3de7bd6c226e4c14dd7c67",
+      "finalBlob": "e9948c07b1bee57d4e3de7bd6c226e4c14dd7c67"
+    },
+    {
+      "path": "tests/cloud-dispatch-startup.test.ts",
+      "mainBlob": "741deeb5e12a4b73833e0d0431feada821f04951",
+      "finalBlob": "741deeb5e12a4b73833e0d0431feada821f04951"
+    },
+    {
+      "path": "tests/cloud-runtime-auto.db.test.ts",
+      "mainBlob": "9266ed4df4f723c0557be97c88f986aa9c194ce0",
+      "finalBlob": "9266ed4df4f723c0557be97c88f986aa9c194ce0"
+    },
+    {
+      "path": "tests/factory-all-dispatch.db.test.ts",
+      "mainBlob": "51fd1f08bada5d3ab5a4e16e41bdb2513928f50e",
+      "finalBlob": "51fd1f08bada5d3ab5a4e16e41bdb2513928f50e"
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "mainBlob": "71ca90952d9edbc87592c86d9fe34388f0dcbe39",
+      "finalBlob": "71ca90952d9edbc87592c86d9fe34388f0dcbe39"
+    },
+    {
+      "path": "workflows/coordinator/tools.ts",
+      "mainBlob": "23645dee507e858d90e1b67c3c061c3233bb477c",
+      "finalBlob": "23645dee507e858d90e1b67c3c061c3233bb477c"
+    }
+  ],
+  "ancestors": {
+    "d5fec6ebb6b444901ebb3f2f18ceab70fcf66a5e": true,
+    "f78801bc69f69a59b59708d8c2f2768ad618810a": true,
+    "81c05e18bc087c6a08e1dd23bb323bd3f6e7cf55": true,
+    "bb6245f0e5ba1a111b4a28a417416cd872664a82": false
+  },
+  "worktreeClean": true,
+  "diffCheckExitCode": 0,
+  "cachePatchExcluded": true,
+  "remoteWritesPerformed": false,
+  "integrationReason": "Fresh Owner review/verify invokes createFactoryDispatch -> configureFactoryCheck -> persistFactoryHandoff. #1444 adds approvedSpecification evidence for any non-spec stage with passed spec history; eligible v1 rechecks can reach that branch. ALEX43 has no spec history and does not enter it. needsSpec initial/v2 continuation changes are outside this Owner action.",
+  "runtimeEvidenceBoundary": "Source and Git checks only. Prior process22 PG/typegen/typecheck/lint results remain attached to tree2fae; no later runtime test/build is claimed here. The 17 Owner blobs and UI are identical; new common handoff branch may be checked with existing tests/cloud-runtime-auto.db.test.ts; final production build uses this frozen tree.",
+  "remoteEquivalentSourceCommit": "e8254c39949269d33e7328982392ce4905344e4b",
+  "evidenceOnlyCommitFollowsSourceTree": true
+}

@@ -1,0 +1,122 @@
+{
+  "actualCheckout": "3f0daaf76f7c1da346275585bde806a3abd5a8ee",
+  "sourceTree": "277259bbe1cb177abc6bf9866dffabf64fe51e0f",
+  "localParents": [
+    "925245325fbff83ca1bd0579b819c3fcda397b2e",
+    "3511b3927bc31bf66c52c97545d8ad0d4617c062"
+  ],
+  "remoteEquivalentCommit": "79c3731ca819b3304efea0e8f98c936f4b28cd2b",
+  "remoteEquivalentTree": "277259bbe1cb177abc6bf9866dffabf64fe51e0f",
+  "remoteParents": [
+    "42995b9b1da5c14325fb5c4f7ed04859257e344f",
+    "3511b3927bc31bf66c52c97545d8ad0d4617c062"
+  ],
+  "completeTreesEqual": true,
+  "integratedMain": "3511b3927bc31bf66c52c97545d8ad0d4617c062",
+  "ownerPaths": [
+    {
+      "path": "components/workspace/factory-acceptance-pane.tsx",
+      "previous925Blob": "21100f6789215b534331054b56f89355b9778082",
+      "current3f0Blob": "bc1f3f4663c83f4f3f96df1ae929a85a5742f5f9",
+      "unchanged": false
+    },
+    {
+      "path": "docs/acceptance.md",
+      "previous925Blob": "1f802db83cfca938a836de9bf6047d5d5d897ac4",
+      "current3f0Blob": "1f802db83cfca938a836de9bf6047d5d5d897ac4",
+      "unchanged": true
+    },
+    {
+      "path": "lib/factory/acceptance-view.test.ts",
+      "previous925Blob": "6318ed58913db4a1346dffde08d5dd09285e3ec7",
+      "current3f0Blob": "6318ed58913db4a1346dffde08d5dd09285e3ec7",
+      "unchanged": true
+    },
+    {
+      "path": "lib/factory/acceptance-view.ts",
+      "previous925Blob": "fa9ad417515ae91f6e0a6ea37fc7580d7d7b678b",
+      "current3f0Blob": "fa9ad417515ae91f6e0a6ea37fc7580d7d7b678b",
+      "unchanged": true
+    },
+    {
+      "path": "lib/factory/agent-profile.ts",
+      "previous925Blob": "a2f5c2bbf09839ec8524bff837ba5eb01737441c",
+      "current3f0Blob": "a2f5c2bbf09839ec8524bff837ba5eb01737441c",
+      "unchanged": true
+    },
+    {
+      "path": "lib/factory/automatic-dispatch.ts",
+      "previous925Blob": "c8dfef7e8938cc8a3f2ad2088ece6b637915038b",
+      "current3f0Blob": "c8dfef7e8938cc8a3f2ad2088ece6b637915038b",
+      "unchanged": true
+    },
+    {
+      "path": "lib/factory/candidate-recheck.ts",
+      "previous925Blob": "573591c61172e5813d372cd96b46a9f694dd957f",
+      "current3f0Blob": "573591c61172e5813d372cd96b46a9f694dd957f",
+      "unchanged": true
+    },
+    {
+      "path": "lib/factory/check-start-recovery.ts",
+      "previous925Blob": "b4ed787b3a0dff0435517333f523e78bd4ad9725",
+      "current3f0Blob": "b4ed787b3a0dff0435517333f523e78bd4ad9725",
+      "unchanged": true
+    },
+    {
+      "path": "lib/factory/checks.ts",
+      "previous925Blob": "269ce29c7dfad4191bf8d5229e00fc7e72108cf9",
+      "current3f0Blob": "269ce29c7dfad4191bf8d5229e00fc7e72108cf9",
+      "unchanged": true
+    },
+    {
+      "path": "lib/factory/contract.test.ts",
+      "previous925Blob": "8f76ce26b7a155d7b6a18176612bd9843ad21c9f",
+      "current3f0Blob": "8f76ce26b7a155d7b6a18176612bd9843ad21c9f",
+      "unchanged": true
+    },
+    {
+      "path": "lib/factory/http.ts",
+      "previous925Blob": "74230b21ba50d3dc647844aa8b2d1f7225dba49c",
+      "current3f0Blob": "74230b21ba50d3dc647844aa8b2d1f7225dba49c",
+      "unchanged": true
+    },
+    {
+      "path": "lib/factory/human-store.ts",
+      "previous925Blob": "eb689ae7cffe2572bf0e9982975f8d63a3a3260c",
+      "current3f0Blob": "eb689ae7cffe2572bf0e9982975f8d63a3a3260c",
+      "unchanged": true
+    },
+    {
+      "path": "lib/factory/profile-dispatch.db.test.ts",
+      "previous925Blob": "bb399cd1ae33c3cfe68d08c649f2bcbd2f5e69cd",
+      "current3f0Blob": "bb399cd1ae33c3cfe68d08c649f2bcbd2f5e69cd",
+      "unchanged": true
+    },
+    {
+      "path": "lib/factory/store.ts",
+      "previous925Blob": "849168fccd840782424a1d7bf8206828ecd1e7a9",
+      "current3f0Blob": "849168fccd840782424a1d7bf8206828ecd1e7a9",
+      "unchanged": true
+    },
+    {
+      "path": "lib/run-provider-fallback.ts",
+      "previous925Blob": "12992edb988099eed19f530e7ae3974d9ead1297",
+      "current3f0Blob": "12992edb988099eed19f530e7ae3974d9ead1297",
+      "unchanged": true
+    },
+    {
+      "path": "messages/en.json",
+      "previous925Blob": "9b74158ea36c3be490433d51d1153a21acb6b9fb",
+      "current3f0Blob": "9b74158ea36c3be490433d51d1153a21acb6b9fb",
+      "unchanged": true
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "previous925Blob": "1b2e03f1eae33eef2196d1002619e068160dc4b8",
+      "current3f0Blob": "1b2e03f1eae33eef2196d1002619e068160dc4b8",
+      "unchanged": true
+    }
+  ],
+  "allOther16OwnerBlobsUnchanged": true,
+  "note": "Runtime evidence records the actual local checkout. Remote commit identity is separate; source equality is by complete tree."
+}

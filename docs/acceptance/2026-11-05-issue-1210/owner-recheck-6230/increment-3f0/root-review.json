@@ -1,0 +1,27 @@
+{
+  "reviewer": "root",
+  "reviewedAt": "2026-11-05T22:46:27.717172+00:00",
+  "sourceCommit": "3f0daaf76f7c1da346275585bde806a3abd5a8ee",
+  "sourceTree": "277259bbe1cb177abc6bf9866dffabf64fe51e0f",
+  "remoteEquivalent": "79c3731ca819b3304efea0e8f98c936f4b28cd2b",
+  "images": [
+    "approval-light-390-entry.png",
+    "approval-light-390-pane.png",
+    "expired-light-390-entry.png",
+    "expired-light-390-pane.png",
+    "waiting-light-390-entry.png",
+    "waiting-light-390-pane.png"
+  ],
+  "result": "passed",
+  "findings": [
+    "All six screenshots personally inspected at 390 px; metadata pageWidth equals viewport for all three states.",
+    "Approval pane shows recheck, return-for-changes and accept controls clearly without overlap.",
+    "Waiting and expired panes retain visible recheck control and explanation.",
+    "Fixture expired question retains waiting_user status in screenshot; does not prove new expired-state styling.",
+    "Existing generic thread header fallback and English reconcile text retained as historical observations."
+  ],
+  "limits": [
+    "Synthetic isolated fixture and production build only; no real ALEX43 acceptance proof.",
+    "No actual action click, keyboard-only interaction, POST failure branch or production recovery proven by screenshots."
+  ]
+}

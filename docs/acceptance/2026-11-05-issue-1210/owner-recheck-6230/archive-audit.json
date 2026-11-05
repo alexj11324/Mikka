@@ -1,0 +1,47 @@
+{
+  "checkedAt": "2026-11-05T22:08:06.609065+00:00",
+  "archives": [
+    {
+      "path": "raw-evidence.tar.gz",
+      "sha256": "2f300e32e2005240c147562d3c6f26fb3735865476bb6c6c0adfcffb72f3555b",
+      "files": 115,
+      "checks": [
+        "privateKey",
+        "credentialPrefix",
+        "authorization",
+        "cookieValue",
+        "passwordDSN",
+        "jwt"
+      ],
+      "matches": 0
+    },
+    {
+      "path": "round-e0/raw-evidence.tar.gz",
+      "sha256": "5bc40acba369b8eff23e04a5bc1c9a9fd7d84d7ebfdc07b46a812b9e6a12428f",
+      "files": 39,
+      "checks": [
+        "privateKey",
+        "credentialPrefix",
+        "authorization",
+        "cookieValue",
+        "passwordDSN",
+        "jwt"
+      ],
+      "matches": 0
+    },
+    {
+      "path": "round-6230-build/raw-evidence.tar.gz",
+      "sha256": "90f54e2a43987a94c24ff06fe91524ec6ab69cce51b6ba6fbd57b74c90d63d17",
+      "files": 66,
+      "checks": [
+        "privateKey",
+        "credentialPrefix",
+        "authorization",
+        "cookieValue",
+        "passwordDSN",
+        "jwt"
+      ],
+      "matches": 0
+    }
+  ]
+}

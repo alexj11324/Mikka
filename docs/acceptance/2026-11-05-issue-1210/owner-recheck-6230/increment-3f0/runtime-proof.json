@@ -1,0 +1,53 @@
+{
+  "recordedAt": "2026-11-05T22:51:22.150116+00:00",
+  "process": "processes/proc-1793918511021397480-18",
+  "processState": "exited",
+  "exitCode": 0,
+  "sourceCommit": "3f0daaf76f7c1da346275585bde806a3abd5a8ee",
+  "sourceTree": "277259bbe1cb177abc6bf9866dffabf64fe51e0f",
+  "runtimeSandbox": "sandboxes/sbx_001m6pwjkbkamvhdw0frkgvrbyw",
+  "origin": "http://localhost:3107",
+  "database": "mikka_owner_ui6_e2e",
+  "buildId": "vrJIGEXahx3S4XQF7Ao5C",
+  "browserVersion": "157.0.8103.38",
+  "scriptTimes": [
+    "started_at=2026-11-05T22:41:51Z",
+    "finished_at=2026-11-05T22:44:41Z"
+  ],
+  "acceptanceSourceDomTests": {
+    "tests": 134,
+    "pass": 134,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "typegenExit": 0,
+  "typecheckExit": 0,
+  "httpDiagnostics": {
+    "requests": 14,
+    "allHTTP200": true,
+    "recordedFields": "method, path, status and locationPath only"
+  },
+  "allExpectedStagesExitZero": true,
+  "flowViewRerun": false,
+  "flowViewPriorCheckout": "925245325fbff83ca1bd0579b819c3fcda397b2e",
+  "uiDatabaseCleanupLogEmpty": true,
+  "postgresStopped": true,
+  "sourceBeforeAndAfterDiffEmpty": true,
+  "runtimeCleanup": {
+    "basis": "Root dedicated delete response and follow-up GET receipts copied alongside this record",
+    "deleteResponseFile": "cleanup-delete-response.json",
+    "readbackFile": "cleanup-readback.json",
+    "deletedReadback": "HTTP 404 / Sandbox not found"
+  },
+  "sameImageBytesAsUI5": {
+    "approval-light-390-pane.png": false,
+    "waiting-light-390-pane.png": true,
+    "expired-light-390-entry.png": true,
+    "waiting-light-390-entry.png": true,
+    "expired-light-390-pane.png": true,
+    "approval-light-390-entry.png": true
+  },
+  "ciEvidence": "Current product head 79c final CI is not collected in this artifact; earlier 42995 results remain historical."
+}

@@ -1,0 +1,62 @@
+{
+  "buildId": "vrJIGEXahx3S4XQF7Ao5C",
+  "browserVersion": "157.0.8103.38",
+  "commit": "3f0daaf76f7c1da346275585bde806a3abd5a8ee",
+  "sourceTree": "277259bbe1cb177abc6bf9866dffabf64fe51e0f",
+  "origin": "http://localhost:3107",
+  "fixtures": [
+    {
+      "state": "waiting",
+      "issueId": "c2aea783-44cf-4af9-ad90-1878b3109efd",
+      "taskId": "814ed87d-f328-43f2-8fd5-cb0d535f8ff5"
+    },
+    {
+      "state": "approval",
+      "issueId": "bc993b26-cf34-4a98-a72f-9e9694eb77e4",
+      "taskId": "6c5fea9d-8cd8-4dc2-824f-8eb282b908ca"
+    },
+    {
+      "state": "expired",
+      "issueId": "c7003547-5183-4de8-97fb-8b4c65d150ec",
+      "taskId": "fcf2c8a2-6a6d-4f10-9c3c-04bb5b088454"
+    }
+  ],
+  "captures": [
+    {
+      "capturedAt": "2026-11-05T22:44:37.482Z",
+      "state": "waiting",
+      "theme": "light",
+      "width": 390,
+      "entry": "waiting-light-390-entry.png",
+      "pane": "waiting-light-390-pane.png",
+      "layout": {
+        "viewport": 390,
+        "pageWidth": 390
+      }
+    },
+    {
+      "capturedAt": "2026-11-05T22:44:39.300Z",
+      "state": "approval",
+      "theme": "light",
+      "width": 390,
+      "entry": "approval-light-390-entry.png",
+      "pane": "approval-light-390-pane.png",
+      "layout": {
+        "viewport": 390,
+        "pageWidth": 390
+      }
+    },
+    {
+      "capturedAt": "2026-11-05T22:44:40.948Z",
+      "state": "expired",
+      "theme": "light",
+      "width": 390,
+      "entry": "expired-light-390-entry.png",
+      "pane": "expired-light-390-pane.png",
+      "layout": {
+        "viewport": 390,
+        "pageWidth": 390
+      }
+    }
+  ]
+}

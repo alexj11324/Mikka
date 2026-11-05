@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-11-05T22:30:30.273688+00:00",
+  "fileCount": 33,
+  "checks": [
+    "privateKey",
+    "credentialPrefix",
+    "authorization",
+    "cookieValue",
+    "passwordDSN",
+    "jwt"
+  ],
+  "matches": 0,
+  "archiveSha256": "9b09798e1f7ebebfeb57d1db046db8def1383888dba850bf18b950ab47f0993c"
+}

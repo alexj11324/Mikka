@@ -1,0 +1,89 @@
+{
+  "localSourceCommit": "925245325fbff83ca1bd0579b819c3fcda397b2e",
+  "remoteSourceCommit": "42995b9b1da5c14325fb5c4f7ed04859257e344f",
+  "completeTree": "8c8415051e6da62f5940a4c6606f4e604e257b70",
+  "localParents": [
+    "6230e75351a41bfd6c4586166d0718b572380983",
+    "f479389ae98bd00c9121277542dc53dd50f3bc41"
+  ],
+  "remoteParents": [
+    "e8254c39949269d33e7328982392ce4905344e4b",
+    "f479389ae98bd00c9121277542dc53dd50f3bc41"
+  ],
+  "ownerPatchComparisons": [
+    {
+      "path": "components/workspace/factory-acceptance-pane.tsx",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "docs/acceptance.md",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "lib/factory/acceptance-view.test.ts",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "lib/factory/acceptance-view.ts",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "lib/factory/agent-profile.ts",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "lib/factory/automatic-dispatch.ts",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "lib/factory/candidate-recheck.ts",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "lib/factory/check-start-recovery.ts",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "lib/factory/checks.ts",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "lib/factory/contract.test.ts",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "lib/factory/http.ts",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "lib/factory/human-store.ts",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "lib/factory/profile-dispatch.db.test.ts",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "lib/factory/store.ts",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "lib/run-provider-fallback.ts",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "messages/en.json",
+      "orderedOwnerPatchEqual": true
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "orderedOwnerPatchEqual": true
+    }
+  ],
+  "ciTestedCommit": "f4fd9c09bd3de8c049831d13942ea7b1aa157538",
+  "ciTestedTree": "7f42aa4d11bdc82cc589ca481fcf0023478ac1d7",
+  "ciTestedParents": [
+    "565c7dfb0d753325a782766686ba23a13bb08c54",
+    "42995b9b1da5c14325fb5c4f7ed04859257e344f"
+  ]
+}
