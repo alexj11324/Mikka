@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg'
 import { runChanged } from './live/panels'
 import { runListChanged } from './live/lists'
 import { runControlChanged } from './device-gateway-notify'
+import { armDueTimerAfterCommit } from '@/lib/due-timer'
 
 type Query = Pick<Pool | PoolClient, 'query'>
 
@@ -26,5 +27,7 @@ export async function stopRunsUsingApiKeys(query: Query, scope: { keyId?: string
   [scope.keyId ?? null, scope.ownerId ?? null, scope.workspaceId ?? null, scope.othersOnly ?? false])
   for (const { id } of rows) { await runListChanged(query, id); await runChanged(query, id) }
   runControlChanged(query, { runIds: rows.map(row => row.id) })
+  // Their leases ended now: if the daemon never reports the stop, run recovery reclaims them (#1212).
+  if (rows.length) armDueTimerAfterCommit(query, 'run-recovery')
   return rowCount ?? 0
 }

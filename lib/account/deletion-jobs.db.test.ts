@@ -4,6 +4,8 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { dbUrl, seedAgent, seedRun, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { cancelAccountDeletion, exportAccountDeletionManifest, readAccountDeletion, requestAccountDeletion, resumeAccountDeletion } from './deletion-jobs'
+import { dueTimerTransport } from '../due-timer'
+import { wakeTransport } from '../workflow-wake'
 
 // Only disposable, matching loopback targets pass the shared fixture's guard.
 test('durable deletion stages preserve data until authorization/cleanup and resume after real DB/object failures', { skip: !dbUrl }, async t => {
@@ -19,6 +21,19 @@ test('durable deletion stages preserve data until authorization/cleanup and resu
     tracked.add(requested.id)
     return requested.id
   }
+  await t.test('a requested deletion starts on the account-deletions due timer, not at the next sweep (#1371)', async () => {
+    const started: string[] = []
+    wakeTransport.resume = async () => { throw new Error('no timer holds the token') }
+    dueTimerTransport.start = async kind => { started.push(kind) }
+    try {
+      const subject = await seedUser(main, 'delete-armed')
+      const id = await request(subject)
+      await new Promise(resolve => setTimeout(resolve, 50))
+      assert.deepEqual(started, ['account-deletions'])
+      assert.equal(await cancelAccountDeletion(subject, id, options), true)
+    } finally { delete wakeTransport.resume; delete dueTimerTransport.start }
+  })
+
   await t.test('sole admin refusal changes no account data; a requested deletion can be cancelled only by its owner', async () => {
     const owner = await seedUser(main, 'delete-admin'), peer = await seedUser(main, 'delete-peer')
     const ws = await seedWorkspace(workspace, owner, [{ userId: owner, role: 'admin' }, { userId: peer, role: 'member' }])
