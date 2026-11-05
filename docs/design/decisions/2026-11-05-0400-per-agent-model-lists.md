@@ -22,6 +22,22 @@ in order. The second list is a fallback, not a mix: a computer that only has
 Codex, or a 优先使用的 Agent with an empty list, still gets a run. A thread or
 computer that names an Agent uses only that Agent's list, as before.
 
+**Precedence** (Alex, via the coordinator: Agent and model for a dispatch are
+already set by Agent Profiles and the Decision API, #1284 / #1297). In order:
+
+1. An explicit choice: the model the person picked for the thread, or the
+   Profile they picked (its Agent, and its model when the Profile fixes one).
+2. The Profile the Decision API chose for a Factory task (`lib/factory/agent-profile*.ts`).
+3. Only then the lists above: a Profile that inherits 优先使用的模型 gets them
+   (a Profile with a fixed Agent sees only that Agent's list, never the other's;
+   one on 自动 gets the 优先使用的 Agent's list, then the other's), and so does a
+   dispatch that goes through no Profile (ordinary threads, chat).
+
+This change adds no second way to choose: the per-Agent order is the inherited
+list the Profile path already reads (`resolveModelDispatch`), and a fixed model
+(`exactEntry`) bypasses it. Covered by `lib/factory/agent-profile.db.test.ts`
+("per-Agent lists").
+
 **A model the account dropped** stays in the list, marked
 「账号已不提供这个模型」 and skipped by dispatch, until the person removes it.
 It is never deleted silently.
