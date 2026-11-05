@@ -38,6 +38,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
   const { setCliAgentPolicy } = await import('../lib/agent-tool-approval/policy-settings')
   const { factoryStore, dispatchFactoryRun, factoryQuestions } = await import('../lib/factory/server')
   const { factoryBinding } = await import('../lib/factory/dispatch')
+  const { beginFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('../lib/factory/transaction')
   const { questionReference } = await import('../lib/factory/questions/store')
   const { recordPushGrant } = await import('./support/github-app-stub')
   const { promoteExistingIssueForUser } = await import('../lib/team-issue-promotion')
@@ -309,19 +310,41 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM github_repository_installations WHERE "userId"=$1', [f.userId])).rows[0].n, 0, 'nothing records a grant on the owner\'s behalf')
     })
 
+    await t.test('self-improvement owns real fresh Profile admission and the baseline assignment in one transaction', async () => {
+      const f = await fixture({ destination: 'selected' })
+      const { improvementFactory } = await import('../lib/self-improvement/server')
+      const admitted = await improvementFactory.rehearse(f.userId, {
+        action: 'rehearse', binding: factoryBinding(f.task), agentId: f.agentId, deviceRepoId: f.repoId,
+      })
+      const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [admitted.runId])).rows[0]
+      assert.equal(admitted.replayed, false)
+      assert.equal(run.status, 'queued')
+      assert.equal(run.sessionId, null)
+      assert.equal(run.agentDefinition.agentProfile.source, 'default')
+      assert.deepEqual(run.agentDefinition.agentProfile.targetEntry, run.agentDefinition.modelDispatch.entry)
+      assert.deepEqual(run.agentDefinition.agentProfile.scope, { ownerId: f.userId, workspaceId: f.workspaceId })
+      assert.equal(run.botId, null)
+      assert.equal(admitted.selection.runId, admitted.runId)
+      assert.equal(admitted.selection.status, 'selection_persisted')
+      const selected = (await pool.query('SELECT "versionId" FROM improvement_skill_selections WHERE "runId"=$1 AND "userId"=$2', [admitted.runId, f.userId])).rows[0]
+      assert.equal(selected.versionId, admitted.selection.artifact.versionId)
+      assert.equal((await pool.query('SELECT "runId" FROM factory_attempts WHERE id=$1', [f.task.attemptId])).rows[0].runId, admitted.runId)
+      assert.equal((await rowsFor(f)).publications, 1, 'the real caller commits its queue, assignment and publication together')
+    })
+
     await t.test('caller-owned rollback removes queue, publication, binding and dispatch receipt together', async () => {
       const f = await fixture({ destination: 'selected' })
       const before = await rowsFor(f)
       const tx = await pool.connect()
       let runId: string | undefined
       try {
-        await tx.query('BEGIN')
+        await beginFactoryTransaction(tx)
         const admitted = await dispatch(f, tx)
         runId = admitted.runId
         assert.equal((await tx.query('SELECT count(*)::int AS n FROM agent_runs WHERE id=$1', [runId])).rows[0].n, 1)
         assert.deepEqual(await rowsFor(f), before, 'the host adapter must not commit the caller transaction')
-        await tx.query('ROLLBACK')
-      } finally { await tx.query('ROLLBACK'); tx.release() }
+        await rollbackFactoryTransaction(tx)
+      } finally { try { await rollbackFactoryTransaction(tx) } finally { forgetFactoryTransaction(tx); tx.release() } }
       assert.deepEqual(await rowsFor(f), before)
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE id=$1', [runId])).rows[0].n, 0)
       const committed = await dispatch(f)
@@ -380,11 +403,11 @@ test('real Factory admission preserves host scope, policy and transaction owners
       globals[contextKey] = { get: () => ({ waitUntil: (promise: Promise<unknown>) => pending.push(promise) }) }
       const tx = await pool.connect()
       try {
-        await tx.query('BEGIN')
+        await beginFactoryTransaction(tx)
         await dispatch(f, tx)
         assert.equal(pending.length, 0, 'joining admission must not schedule a premature wake')
         assert.equal((await rowsFor(f)).runs, 0)
-        await tx.query('ROLLBACK')
+        await rollbackFactoryTransaction(tx)
         assert.equal(pending.length, 0, 'rolled-back work produces no wake')
         const result = await dispatch(f)
         await Promise.all(pending)
@@ -398,7 +421,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
         await dispatch(f)
         assert.equal(pending.length, scheduled, 'strict dispatch replay does not duplicate either notification')
       } finally {
-        await tx.query('ROLLBACK'); tx.release()
+        try { await rollbackFactoryTransaction(tx) } finally { forgetFactoryTransaction(tx); tx.release() }
         await Promise.allSettled(pending)
         globals[contextKey] = previousContext
         if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL
