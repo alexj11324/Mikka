@@ -1,0 +1,295 @@
+diff --git a/app/[locale]/preview/1225-default-checking/page.tsx b/app/[locale]/preview/1225-default-checking/page.tsx
+new file mode 100644
+index 0000000..167b889
+--- /dev/null
++++ b/app/[locale]/preview/1225-default-checking/page.tsx
+@@ -0,0 +1,26 @@
++import type { Metadata } from 'next'
++import { notFound } from 'next/navigation'
++import { DefaultCheckingVisualFixture } from './harness'
++
++// Temporary build-only fixture for issue #1225. Do not commit this route.
++// It creates no account, session, database fixture, task, or API permission.
++export const dynamic = 'force-dynamic'
++export const metadata: Metadata = {
++  title: 'Issue 1225 component review',
++  robots: { index: false, follow: false },
++}
++
++type Search = Record<string, string | string[] | undefined>
++
++export default async function DefaultCheckingPreview({ searchParams }: { searchParams: Promise<Search> }) {
++  if (process.env.NODE_ENV !== 'production' || process.env.MIKKA_1225_VISUAL_REVIEW !== '1') notFound()
++  const search = await searchParams
++  const allowed = new Set(['canvas', 'scenario', 'theme', '_rsc'])
++  if (Object.keys(search).some(key => !allowed.has(key) || Array.isArray(search[key]))) notFound()
++  if (search.canvas !== undefined && search.canvas !== '1') notFound()
++  if (search.scenario !== undefined && search.scenario !== 'checking' && search.scenario !== 'noModels') notFound()
++  if (search.theme !== undefined && search.theme !== 'light' && search.theme !== 'dark') notFound()
++  return <DefaultCheckingVisualFixture canvas={search.canvas === '1'}
++    initialScenario={search.scenario === 'noModels' ? 'noModels' : 'checking'}
++    initialTheme={search.theme === 'dark' ? 'dark' : 'light'} />
++}
+diff --git a/app/[locale]/preview/1225-default-checking/harness.tsx b/app/[locale]/preview/1225-default-checking/harness.tsx
+new file mode 100644
+index 0000000..b191f15
+--- /dev/null
++++ b/app/[locale]/preview/1225-default-checking/harness.tsx
+@@ -0,0 +1,138 @@
++'use client'
++
++// Temporary visual data boundary, not a product route or acceptance driver.
++// The imported business components, primitives, translations and submit hook
++// remain byte-for-byte those of the recorded product revision.
++import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
++import { useLocale } from 'next-intl'
++import { useTheme } from 'next-themes'
++import { SWRConfig, useSWRConfig, type Middleware } from 'swr'
++import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
++import type { AgentProfilesView } from '@/components/settings/factory-profiles-data'
++import { Button } from '@/components/ui/button'
++import { withBasePath } from '@/lib/base-path'
++
++type Scenario = 'checking' | 'noModels'
++type Theme = 'light' | 'dark'
++type Props = { canvas: boolean; initialScenario: Scenario; initialTheme: Theme }
++
++const WORKSPACE = '12250000-0000-4000-8000-000000000101'
++const DEVICE = '12250000-0000-4000-8000-000000000102'
++const CUSTOM = '12250000-0000-4000-8000-000000000103'
++const CREATED = '2026-11-05T00:00:00.000Z'
++const PREVIEW_PATH = '/preview/1225-default-checking'
++
++function profiles(scenario: Scenario): AgentProfilesView {
++  return {
++    profiles: [{
++      id: CUSTOM, name: 'Synthetic review profile', description: 'Visual fixture only', roles: ['Review'],
++      enabled: true, harness: 'claude_code', model: { mode: 'inherit' }, instructions: '', skills: [],
++      version: 1, digest: 'a'.repeat(64), createdAt: CREATED, updatedAt: CREATED, archivedAt: null,
++    }],
++    catalog: { models: [], skills: [] },
++    availability: { [CUSTOM]: { available: false, reason: 'checking' } },
++    // This stays false. Only the product's intent-selection helper permits
++    // Default/checking; custom checking and noModels retain their real guards.
++    defaultAvailability: { available: false, reason: scenario },
++  }
++}
++
++function sameKey(key: unknown, expected: readonly unknown[]) {
++  return Array.isArray(key) && key.length === expected.length && expected.every((value, index) => key[index] === value)
++}
++
++function readFixture(key: unknown, scenario: Scenario): unknown {
++  if (key === 'issue-creation-available') return true
++  if (key === 'bots') return []
++  if (key === 'devices') return [{
++    id: DEVICE, name: 'Synthetic local computer', deviceType: 'desktop', hostname: 'visual-fixture',
++    platform: 'linux', arch: 'x64', harnesses: [], lastSeenAt: CREATED, enabled: true, online: true, repos: [],
++  }]
++  if (sameKey(key, ['settings:e2b-key', 'current'])) return { configured: false, canEdit: false }
++  if (sameKey(key, ['settings:model-order', 'current'])) return {
++    location: 'local', first: { kind: 'device', id: DEVICE }, entries: [], readyDeviceIds: [DEVICE],
++    preferredHarness: 'claude_code', autoModelRouting: false,
++  }
++  if (sameKey(key, ['factory-agent-profiles', WORKSPACE]) ||
++      sameKey(key, ['factory-agent-profiles', WORKSPACE, 'local', DEVICE])) return profiles(scenario)
++  // Never invoke a component's real fetcher as a fallback. This fixture has
++  // neither an authenticated user nor an authorized application data source.
++  throw new Error('VISUAL_FIXTURE_READ_NOT_ALLOWLISTED')
++}
++
++function readBoundary(currentScenario: () => Scenario): Middleware {
++  return useSWRNext => (key, _fetcher, config) => {
++    // The closed fixture supplies this key's data shape; retain the caller's
++    // generic fetcher contract without invoking its real data source.
++    const fixtureFetcher = (async () => readFixture(key, currentScenario())) as typeof _fetcher
++    return useSWRNext(key, fixtureFetcher, {
++      ...config, revalidateOnFocus: false, revalidateOnReconnect: false,
++      refreshInterval: 0, shouldRetryOnError: false,
++    })
++  }
++}
++
++function Canvas({ scenario, theme }: { scenario: Scenario; theme: Theme }) {
++  const current = useRef(scenario)
++  const config = useMemo(() => ({ provider: () => new Map(), use: [readBoundary(() => current.current)] }), [])
++  return <SWRConfig value={config}><CanvasBody current={current} theme={theme} /></SWRConfig>
++}
++
++function CanvasBody({ current, theme }: { current: MutableRefObject<Scenario>; theme: Theme }) {
++  const [open, setOpen] = useState(true)
++  const [scenario, setScenario] = useState(current.current)
++  const { setTheme } = useTheme()
++  const { mutate } = useSWRConfig()
++  useEffect(() => { setTheme(theme) }, [setTheme, theme])
++  async function changeAvailability(next: Scenario) {
++    current.current = next
++    setScenario(next)
++    await Promise.all([
++      mutate(['factory-agent-profiles', WORKSPACE], profiles(next), { revalidate: false }),
++      mutate(['factory-agent-profiles', WORKSPACE, 'local', DEVICE], profiles(next), { revalidate: false }),
++    ])
++    setOpen(true)
++  }
++  return <main className="min-h-screen bg-background p-4 text-foreground" data-visual-fixture="1225-default-checking" data-scenario={scenario}>
++    <p className="mb-3 text-xs text-muted-foreground">Synthetic component review · no account · do not submit</p>
++    <div className="flex flex-wrap gap-2" aria-label="In-frame fixture controls">
++      <Button type="button" variant="outline" onClick={() => setOpen(true)}>Open New task</Button>
++      <Button type="button" variant="outline" onClick={() => { void changeAvailability('checking') }}>Set checking and reopen</Button>
++      <Button type="button" variant="outline" onClick={() => { void changeAvailability('noModels') }}>Set unavailable and reopen</Button>
++    </div>
++    <NewTaskDialog open={open} onOpenChange={setOpen} workspaceId={WORKSPACE}
++      initialText="Visual review fixture only. Do not submit this text." />
++  </main>
++}
++
++export function DefaultCheckingVisualFixture({ canvas, initialScenario, initialTheme }: Props) {
++  const locale = useLocale()
++  const { setTheme } = useTheme()
++  const [scenario, setScenario] = useState<Scenario>(initialScenario)
++  const [theme, selectTheme] = useState<Theme>(initialTheme)
++  const [narrow, setNarrow] = useState(false)
++  useEffect(() => { setTheme(theme) }, [setTheme, theme])
++  if (canvas) return <Canvas scenario={initialScenario} theme={initialTheme} />
++  const viewport = narrow ? { width: 390, height: 844 } : { width: 1024, height: 768 }
++  const query = new URLSearchParams({ canvas: '1', scenario, theme })
++  const src = withBasePath(`/${locale}${PREVIEW_PATH}?${query.toString()}`)
++  return <main className="min-h-screen bg-background p-4 text-foreground" data-visual-review="1225">
++    <h1 className="text-lg font-medium">Issue 1225 · component visual review</h1>
++    <p className="mt-1 text-sm text-muted-foreground">Synthetic read data only. No account, task, model call or production acceptance. Do not click Create task.</p>
++    <div className="my-4 flex flex-wrap gap-2" aria-label="Visual fixture controls">
++      <Button type="button" variant={scenario === 'checking' ? 'default' : 'outline'} onClick={() => setScenario('checking')}>Default checking</Button>
++      <Button type="button" variant={scenario === 'noModels' ? 'default' : 'outline'} onClick={() => setScenario('noModels')}>Confirmed unavailable control</Button>
++      <Button type="button" variant={theme === 'light' ? 'default' : 'outline'} onClick={() => selectTheme('light')}>Light</Button>
++      <Button type="button" variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => selectTheme('dark')}>Dark</Button>
++      <Button type="button" variant={!narrow ? 'default' : 'outline'} onClick={() => setNarrow(false)}>1024 px desktop</Button>
++      <Button type="button" variant={narrow ? 'default' : 'outline'} onClick={() => setNarrow(true)}>390 px mobile</Button>
++    </div>
++    <p className="mb-2 text-xs text-muted-foreground">Actual iframe viewport: {viewport.width} × {viewport.height}; initial scenario: false/{scenario}. In-frame controls can change that scenario while retaining the selection. Custom checking remains disabled.</p>
++    <div className="overflow-auto rounded-lg border bg-muted/20 p-2">
++      <iframe key={`${scenario}:${theme}:${narrow}`} src={src}
++        title={`Default ${scenario}, ${theme}, ${viewport.width} px visual fixture`}
++        width={viewport.width} height={viewport.height}
++        className="block max-w-none border-0 bg-background" />
++    </div>
++  </main>
++}
+diff --git a/visual-gateway.mjs b/visual-gateway.mjs
+new file mode 100644
+index 0000000..1845d1b
+--- /dev/null
++++ b/visual-gateway.mjs
+@@ -0,0 +1,113 @@
++// Temporary, read-only publication boundary for the #1225 component fixture.
++// It is not an application route, authentication adapter, or deployment proxy.
++import http from 'node:http'
++import { normalize } from 'node:path/posix'
++
++function port(name, fallback) {
++  const value = process.env[name] ?? String(fallback)
++  if (!/^[0-9]{1,5}$/.test(value) || Number(value) < 1024 || Number(value) > 65535) throw new Error('VISUAL_GATEWAY_INVALID_PORT')
++  return Number(value)
++}
++
++if (process.env.MIKKA_1225_VISUAL_REVIEW !== '1') throw new Error('VISUAL_GATEWAY_OPT_IN_REQUIRED')
++const upstreamPort = port('MIKKA_VISUAL_UPSTREAM_PORT', 3110)
++const listenPort = port('MIKKA_VISUAL_GATEWAY_PORT', 3111)
++if (upstreamPort === listenPort) throw new Error('VISUAL_GATEWAY_PORT_COLLISION')
++
++const pages = new Set([
++  '/mikka/en/preview/1225-default-checking',
++  '/mikka/zh-CN/preview/1225-default-checking',
++])
++const assetSuffix = /\.(?:js|css|woff2?|ttf|otf|png|jpe?g|webp|avif|svg|ico)$/
++const security = {
++  'cache-control': 'no-store, max-age=0',
++  'x-content-type-options': 'nosniff',
++  'referrer-policy': 'no-referrer',
++  'x-robots-tag': 'noindex, nofollow, noarchive',
++  'x-frame-options': 'SAMEORIGIN',
++  'content-security-policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'none'",
++}
++
++function target(raw) {
++  if (typeof raw !== 'string' || raw.length > 4096 || !raw.startsWith('/') || raw.startsWith('//') || /[\\#\u0000-\u0020\u007f]/.test(raw)) return null
++  const index = raw.indexOf('?')
++  const rawPath = index < 0 ? raw : raw.slice(0, index)
++  const query = index < 0 ? '' : raw.slice(index + 1)
++  let path
++  try { path = decodeURIComponent(rawPath) } catch { return null }
++  // Check decoded segments before URL/path normalization. In particular,
++  // encoded traversal, separators, double encoding and backslashes fail closed.
++  if (!path.startsWith('/') || path.startsWith('//') || /[%\\?#\u0000-\u0020\u007f]/.test(path)) return null
++  const segments = path.slice(1).split('/')
++  if (segments.some(segment => segment === '' || segment === '.' || segment === '..')) return null
++  if (normalize(path) !== path) return null
++  if (/%(?:2f|5c)/i.test(rawPath)) return null
++  if (query.length > 512 || /%(?![0-9a-f]{2})/i.test(query)) return null
++  const params = new URLSearchParams(query)
++  const seen = new Set()
++  for (const [key, value] of params) {
++    if (seen.has(key) || /[%\\#\u0000-\u0020\u007f]/.test(key + value)) return null
++    seen.add(key)
++    if (pages.has(path)) {
++      if (!((key === 'canvas' && value === '1') || (key === 'scenario' && ['checking', 'noModels'].includes(value)) ||
++          (key === 'theme' && ['light', 'dark'].includes(value)) || (key === '_rsc' && /^[a-zA-Z0-9_-]{1,100}$/.test(value)))) return null
++    } else if (!(['v', 'dpl'].includes(key) && /^[a-zA-Z0-9._-]{1,100}$/.test(value))) return null
++  }
++  const page = pages.has(path)
++  const asset = path.startsWith('/mikka/_next/static/') && assetSuffix.test(path)
++  const version = path === '/mikka/api/version' && query === ''
++  const icon = path === '/mikka/favicon.ico' && query === ''
++  if (!page && !asset && !version && !icon) return null
++  return rawPath + (query ? `?${query}` : '')
++}
++
++function reject(response, status, code) {
++  response.writeHead(status, { ...security, 'content-type': 'text/plain; charset=utf-8' })
++  response.end(code)
++}
++
++const requestHeaders = ['accept', 'accept-encoding', 'accept-language', 'user-agent', 'cache-control', 'range', 'if-none-match', 'if-modified-since', 'host', 'origin']
++const responseHeaders = ['content-type', 'content-length', 'content-encoding', 'etag', 'last-modified', 'vary', 'accept-ranges', 'content-range']
++const server = http.createServer((request, response) => {
++  if (request.method !== 'GET' && request.method !== 'HEAD') { reject(response, 405, 'VISUAL_GATEWAY_READ_ONLY'); request.resume(); return }
++  if (request.headers['transfer-encoding'] !== undefined || (request.headers['content-length'] !== undefined && request.headers['content-length'] !== '0')) { reject(response, 400, 'VISUAL_GATEWAY_BODY_REFUSED'); request.resume(); return }
++  const path = target(request.url)
++  if (!path) { reject(response, 404, 'VISUAL_GATEWAY_PATH_REFUSED'); return }
++  const host = request.headers.host
++  if (typeof host !== 'string' || host.length > 255 || /[\s/\\?#@,]/.test(host)) { reject(response, 400, 'VISUAL_GATEWAY_HOST_REFUSED'); return }
++  // Preserve actual Host and Origin; do not fabricate an authenticated local
++  // origin. No cookie, bearer, forwarded identity, or Server Action header is
++  // sent upstream. Only this fixed loopback process can receive the request.
++  const headers = Object.fromEntries(requestHeaders.flatMap(name => request.headers[name] === undefined ? [] : [[name, request.headers[name]]]))
++  const upstream = http.request({ hostname: '127.0.0.1', port: upstreamPort, method: request.method, path, headers, timeout: 15_000 }, incoming => {
++    const status = incoming.statusCode ?? 502
++    if (status >= 300 && status < 400 && status !== 304) {
++      incoming.resume(); reject(response, 502, 'VISUAL_GATEWAY_REDIRECT_REFUSED'); return
++    }
++    const selected = Object.fromEntries(responseHeaders.flatMap(name => incoming.headers[name] === undefined ? [] : [[name, incoming.headers[name]]]))
++    // Never issue a browser cookie through this account-free fixture gateway.
++    response.writeHead(status, { ...selected, ...security })
++    incoming.on('error', () => response.destroy())
++    incoming.pipe(response)
++  })
++  upstream.on('timeout', () => upstream.destroy(new Error('VISUAL_GATEWAY_UPSTREAM_TIMEOUT')))
++  upstream.on('error', () => {
++    if (!response.headersSent) reject(response, 502, 'VISUAL_GATEWAY_UPSTREAM_UNAVAILABLE')
++    else response.destroy()
++  })
++  response.on('close', () => { if (!response.writableEnded) upstream.destroy() })
++  upstream.end()
++})
++server.requestTimeout = 20_000
++server.headersTimeout = 10_000
++server.keepAliveTimeout = 5_000
++server.on('upgrade', (_request, socket) => socket.destroy())
++server.on('clientError', (_error, socket) => { socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n') })
++server.listen(listenPort, '0.0.0.0', () => {
++  console.log(JSON.stringify({ event: 'visual_gateway_ready', port: listenPort, upstream: 'loopback', methods: ['GET', 'HEAD'], scope: 'synthetic_component_review_only' }))
++})
++for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => {
++  server.close(() => { process.exitCode = 0 })
++  server.closeIdleConnections()
++  setTimeout(() => { server.closeAllConnections(); process.exitCode = 0 }, 1000).unref()
++})

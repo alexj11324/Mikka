@@ -1,0 +1,146 @@
+{
+  "productHead": "8bb281f74aebb99cd8b9606ee7c03e7d6cede3b2",
+  "productTree": "c5842a306e503689313b34cf211367fca0e75464",
+  "build": {
+    "id": "26lUik0zKaSVYH9sISTy7",
+    "buildIdSha256": "0f3ca2797397deb9f2ba3c5a5bacb263ba931bdee572f799ceb1547269da60e1",
+    "mtime": "2026-11-05T12:18:41.229009+00:00",
+    "compiledPublicSourceSha": "8bb281f74aebb99cd8b9606ee7c03e7d6cede3b2"
+  },
+  "actualOverlayTree": "b48007f7cf9af76573bf13faa5699bd4e29a4263",
+  "fullProductionBuildExitCode": 0,
+  "buildFinishedAt": "2026-11-05T12:18:56.649912+00:00",
+  "protectedProductHashes": {
+    "components/settings/factory-profiles-data.ts": "96d50f11d3dec04ddbacc07af9fc1f42d6286eea29caac9e0f840b96433b01c3",
+    "components/coordinator/task-profile-picker.tsx": "b2dfaf92387d70c6c57ba687609f66ac0cf3ebc4ca003810da300f390e9dc0b3",
+    "components/coordinator/new-task-dialog.tsx": "b7ac1cc6a56dcfb13d2df3f2ad27532455e4e552831dbca95319737183b384dc"
+  },
+  "all11ProductHashesUnchanged": true,
+  "fixtureManifestSha256": "d4233acb47cfdfe256f9bbaf4147bfbdec15d36745aa0a8afb80d485836620b8",
+  "actualOverlayDiffSha256": "8af673f63efa2c5aab5fef7754f74e7511194a362599859bf383175c17c87b32",
+  "temporaryOverlay": true,
+  "screenshots": [
+    {
+      "file": "dark-selected.jpg",
+      "sourceFile": "mikka1225-1376-dark-selected-1793881446238.jpg",
+      "state": "selected-default-checking-create-enabled",
+      "theme": "dark",
+      "iframeViewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "capturedAt": "2026-11-05T12:24:06.704Z",
+      "bytes": 50110,
+      "sha256": "63378ab5ba49e53fbc3ef21583999af0af779b0dd50c8c339a83f86dd83d82aa",
+      "gitBlob": "e1e79d1d8a7fdf05e9daec1648bd089f4a5dc093",
+      "imageDimensions": [
+        1353,
+        960
+      ],
+      "capture": "Original Cua JPEG; mobile capture uses actual iframe document bounds; no image editing"
+    },
+    {
+      "file": "light-unavailable.jpg",
+      "sourceFile": "mikka1225-1376-light-unavailable-1793881378042.jpg",
+      "state": "same-selected-default-unavailable-create-disabled",
+      "theme": "light",
+      "iframeViewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "capturedAt": "2026-11-05T12:23:00.125Z",
+      "bytes": 53952,
+      "sha256": "74819ce0f2a91225502bd3659bb1bc12a3565600c0eb6eac61a4a0f40c868da5",
+      "gitBlob": "539e1f517e56f421de7b0e33baa063d4ae8235f4",
+      "imageDimensions": [
+        1353,
+        960
+      ],
+      "capture": "Original Cua JPEG; mobile capture uses actual iframe document bounds; no image editing"
+    },
+    {
+      "file": "dark-unavailable.jpg",
+      "sourceFile": "mikka1225-1376-dark-unavailable-1793881466799.jpg",
+      "state": "same-selected-default-unavailable-create-disabled",
+      "theme": "dark",
+      "iframeViewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "capturedAt": "2026-11-05T12:24:28.179Z",
+      "bytes": 49767,
+      "sha256": "051841958ee4b29bdc002b8def901f1f72d6264aff533de6ecff838f110ed2c0",
+      "gitBlob": "c31554bd81880a7d12019b5408ed6a67384c22e8",
+      "imageDimensions": [
+        1353,
+        960
+      ],
+      "capture": "Original Cua JPEG; mobile capture uses actual iframe document bounds; no image editing"
+    },
+    {
+      "file": "dark-mobile-selected.jpg",
+      "sourceFile": "mikka1225-1376-dark-mobile-selected-1793881597888.jpg",
+      "state": "selected-default-checking-create-enabled",
+      "theme": "dark",
+      "iframeViewport": {
+        "width": 390,
+        "height": 844
+      },
+      "capturedAt": "2026-11-05T12:26:38.222Z",
+      "bytes": 17196,
+      "sha256": "b6f1fd24a0fd2925de45cd414d3a585152a0cd4c45fe121147b207b70da6b46b",
+      "gitBlob": "5673133e28e8b263d8f76298de27b2dd0cd5f9fd",
+      "imageDimensions": [
+        390,
+        844
+      ],
+      "capture": "Original Cua JPEG; mobile capture uses actual iframe document bounds; no image editing"
+    }
+  ],
+  "review": {
+    "defaultCheckingSelectable": true,
+    "checkingCopyPreserved": true,
+    "selectedCheckingCreateEnabled": true,
+    "customCheckingDisabled": true,
+    "sameSelectedDefaultNoModelsCreateDisabled": true,
+    "lightDarkAnd390PxReviewed": true,
+    "method": "Owning agent manually operated the real components through Cua; no browser test",
+    "keyboard": {
+      "Enter": "opens actual selector",
+      "Escape": "closes selector; aria-expanded=false and listbox absent after transition",
+      "selectionPreserved": true
+    }
+  },
+  "gatewayBoundary": {
+    "exitCode": 0,
+    "checks": 16,
+    "scope": "GET/HEAD synthetic preview/static/version only; no authenticated headers, cookies or writes"
+  },
+  "noAccountOrSessionUsed": true,
+  "createTaskClicked": false,
+  "realProviderCalls": false,
+  "ci": {
+    "run": 42023303423,
+    "sourceHead": "8bb281f74aebb99cd8b9606ee7c03e7d6cede3b2",
+    "checkout": "3f3d1c7245e0aa05e0218280eadbdb3ec315dbab",
+    "checkoutTree": "c5842a306e503689313b34cf211367fca0e75464",
+    "sixWorkflows": "success",
+    "checks": {
+      "success": 21,
+      "conditionalSkip": 5,
+      "failure": 0
+    }
+  },
+  "limitations": [
+    "Synthetic read inputs prove visual and intent-selection behavior only, not real dispatch or production acceptance.",
+    "The actual build contains only the two declared temporary page/harness files on top of the product source; gateway is outside the source tree.",
+    "Four original screenshots were successfully retained in the shared workspace. Other observed captures did not survive browser file synchronization and are not linked or claimed as attached.",
+    "The narrow screenshot is the browser screenshot clip at the real 390 x 844 iframe bounds, with original bytes unchanged."
+  ],
+  "independentVisualReview": {
+    "result": "pass",
+    "scope": "four retained raw JPEG images only",
+    "findings": "pending and error copy readable, no visible white hairlines, 390px content/buttons remain inside dialog",
+    "limits": "Menu choices and actual disabled behavior independently supported by owning-agent Cua observation, not inferred from these four images"
+  }
+}
