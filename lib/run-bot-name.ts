@@ -38,3 +38,13 @@ export const runAgentName = sql<string>`case ${agents.harness} when 'claude_code
  * names a thread from this instead of reading whole prompts.
  */
 export const threadNamePrompt = sql<string>`left(ltrim(${agentRuns.prompt}, E' \\t\\r\\n'), 400)`
+/**
+ * A run's prompt up to the end of its first line with a letter, in a query
+ * that joins other tables (explicit `agent_runs`). `threadName` names a thread
+ * by the first line `plainLine` leaves non-empty; it strips only markers and
+ * emphasis, so a line with a letter is never empty and no later line is read.
+ * The lines before it are kept, so the name equals the whole prompt's name.
+ */
+export const threadNameLines = sql<string | null>`substring(ltrim(agent_runs.prompt, E' \\t\\r\\n') from E'^(?:[^[:alpha:]\\n]*\\n)*[^\\n]*')`
+/** `threadNameLines` within `threadNamePrompt`'s 400 characters: the same name as `threadNamePrompt` gives. */
+export const threadNameHead = sql<string | null>`left(${threadNameLines}, 400)`

@@ -109,7 +109,10 @@ export function citedIds(texts: readonly string[]): { issueIds: string[]; runIds
  * OpenUI Lang (`name = Component(…)`) comes back as it is: its ids are
  * arguments, and the preview reads its prose from the quoted strings.
  */
-export function namedCitations(text: string, sources: Readonly<Record<string, CitationSource>>): string {
+/** What `namedCitations` reads of a source. */
+export type CitationName = { kind: 'issue'; title: string } | { kind: 'run'; name: string }
+
+export function namedCitations(text: string, sources: Readonly<Record<string, CitationName>>): string {
   if (/^\w+\s*=/.test(text.trimStart())) return text
   return splitCitations(text).map(part => {
     if (part.type === 'text') return part.text

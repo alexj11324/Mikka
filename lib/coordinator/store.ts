@@ -20,7 +20,7 @@ import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions,
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
-import { citedIds, namedCitations, type CitationSource } from '@/lib/coordinator/citations'
+import { citedIds, namedCitations, type CitationName, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { threadGroup, type ThreadOutcome } from '@/lib/thread-groups'
@@ -29,7 +29,7 @@ import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
 import { runSummaryText } from '@/lib/issue-run-conversation'
 import { threadName } from '@/lib/issue-threads'
 import { coordinatorChatState } from './chat-state'
-import { compactChatMessage, compactChatToolMetadata } from './chat-projection'
+import { compactChatMessage, compactChatToolMetadata, summaryChatMessage } from './chat-projection'
 import type { ChatToolMetadata, ChatToolMetadataRow } from './chat-tool-metadata'
 import { coordinatorLeaseActive } from './lease'
 import { readPreferences } from '@/lib/preferences'
@@ -515,6 +515,31 @@ export async function citationSources(userId: string, texts: readonly string[], 
   return sources
 }
 
+/**
+ * What `namedCitations` writes for each cited task and thread: a task's title
+ * and a thread's name, under the same visibility as `citationSources` and
+ * nothing more (no identifiers, reports, steps or pull requests). The bot
+ * list's preview line reads this on every poll.
+ */
+export async function citationNames(userId: string, texts: readonly string[]): Promise<Record<string, CitationName>> {
+  const { issueIds, runIds } = citedIds(texts)
+  const names: Record<string, CitationName> = {}
+  if (!issueIds.length && !runIds.length) return names
+  const teams = await (await import('@/lib/team-access')).accessibleTeamScopes(userId)
+  const [tasks, runs] = await Promise.all([
+    issueIds.length ? (async () => db.selectDistinct({ id: issues.id, title: issues.title }).from(issues)
+      .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
+      .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds, teams })).predicate,
+        sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)))() : [],
+    // Loaded here: unit tests stub agent-runs with the names the store's other callers use.
+    runIds.length ? import('@/lib/agent-runs').then(runs => runs.visibleRunNames(userId, [...new Set(runIds)], teams)) : [],
+  ])
+  for (const task of tasks) names[task.id] = { kind: 'issue', title: task.title }
+  // A teammate's thread is named by its harness, as its bare projection (workspaceRunView) is.
+  for (const run of runs) names[run.id] = { kind: 'run', name: run.own ? threadName(run.promptHead ?? '', run.agentName) : threadName('', run.harness) }
+  return names
+}
+
 /** A waiting message as the chat shows it: its words, and a stand-in per photo so the chat can count them. */
 function withImages(text: string, images: unknown): ModelMessage['content'] {
   if (!Array.isArray(images) || !images.length) return text
@@ -683,7 +708,7 @@ export async function botChats(userId: string): Promise<Record<string, BotChatSu
 /** The same summaries plus actual lease expiries that can change working
  * without another persistent write. This never renews a turn or wake lease. */
 export async function botChatSnapshot(userId: string) {
-  const latest = await db.selectDistinctOn([coordinatorMessages.botId], { botId: coordinatorMessages.botId, message: compactChatMessage, createdAt: coordinatorMessages.createdAt })
+  const latest = await db.selectDistinctOn([coordinatorMessages.botId], { botId: coordinatorMessages.botId, message: summaryChatMessage, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), isNotNull(coordinatorMessages.botId), sql`${coordinatorMessages.message}->>'role' <> 'tool'`))
     .orderBy(coordinatorMessages.botId, desc(coordinatorMessages.position))
   const sessions = await db.select({ botId: coordinatorSessions.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), isNotNull(coordinatorSessions.botId)))
@@ -711,7 +736,7 @@ export async function botChatSnapshot(userId: string) {
     return [{ botId: row.botId, text: item?.from === 'event' ? null : item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
   })
   // A reply cites threads and tasks by id; the preview names them as the chat's chips do (R-15).
-  const sources = await citationSources(userId, lines.flatMap(line => line.from === 'coordinator' && line.text ? [line.text] : []))
+  const sources = await citationNames(userId, lines.flatMap(line => line.from === 'coordinator' && line.text ? [line.text] : []))
   for (const line of lines) {
     const text = line.text && line.from === 'coordinator' ? namedCitations(line.text, sources) : line.text
     result[line.botId] = { ...(result[line.botId] ?? { working: false }), line: text || null, at: line.at }
