@@ -5,14 +5,14 @@ import { previewFields, toolDetail } from './tool-detail'
 const RUN = '2b2ff606-ecb7-4b11-a211-0000000000c3'
 const TASK = '0a5c49d1-0d4d-489c-8f9e-0000000000a1'
 
-test('a dispatch is its note as a quote, its thread and its task; never an id as text', () => {
+test('a dispatch is its thread, then its note as a quote, then its task; never an id as text', () => {
   const lines = toolDetail({ name: 'dispatch_run', input: JSON.stringify({ issueId: TASK, botId: 'b1', note: 'Fix the redirect' }), output: JSON.stringify({ runId: RUN, status: 'queued' }) })
-  assert.deepEqual(lines, [{ kind: 'quote', text: 'Fix the redirect' }, { kind: 'object', id: RUN }, { kind: 'object', id: TASK }])
+  assert.deepEqual(lines, [{ kind: 'object', id: RUN }, { kind: 'quote', text: 'Fix the redirect' }, { kind: 'object', id: TASK }])
 })
 
 test('a dispatch with no thread yet says the answer\'s status', () => {
   assert.deepEqual(toolDetail({ name: 'dispatch_run', input: '{"prompt": "Go"}', output: '{"status": "queued"}' }),
-    [{ kind: 'quote', text: 'Go' }, { kind: 'field', label: 'status', value: 'queued' }])
+    [{ kind: 'field', label: 'status', value: 'queued' }, { kind: 'quote', text: 'Go' }])
 })
 
 test('a search says what it looked for and how many came back', () => {

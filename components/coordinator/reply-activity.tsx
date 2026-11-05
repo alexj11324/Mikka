@@ -136,7 +136,7 @@ function ToolDetailRow({ line, dispatch }: { line: ToolDetailLine; dispatch: boo
   const source = useAgentCitations()?.sources[line.kind === 'object' ? line.id : '']
   const [whole, setWhole] = useState(false)
   if (line.kind === 'quote') return <Button variant="ghost" data-activity-quote="" aria-expanded={whole} onClick={() => setWhole(!whole)}
-    className="h-auto justify-start rounded-none border-l-2 py-0 pr-0 pl-2.5 text-left font-normal whitespace-pre-wrap text-muted-foreground">
+    className="h-auto justify-start rounded-none border-0 border-l-2 border-l-muted-foreground/30 py-0 pr-0 pl-2.5 text-left font-normal whitespace-pre-wrap text-muted-foreground">
     <span className={cn('min-w-0', !whole && 'line-clamp-3')}>{line.text}</span>
   </Button>
   if (line.kind === 'object') {

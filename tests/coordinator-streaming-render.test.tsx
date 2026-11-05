@@ -268,7 +268,7 @@ test('an opened dispatch reads 「Handed to」 its agent, the thread chip with i
     await settle(() => Boolean(view.container.querySelector('[data-activity-detail]')))
     const detail = view.container.querySelector('[data-activity-detail]')
     const words = detail?.textContent ?? ''
-    assert.match(words, /Handed to Worker/)
+    assert.match(words, /^Handed to Worker/, 'who it went to comes first, the note under it')
     const chip = detail?.querySelector('[data-activity-thread] [data-slot="inline-citation-trigger"]')
     assert.match(chip?.textContent ?? '', /Fix sign-in redirect/, 'the thread as its chip')
     // Its state as the thread list groups it (R-52): a queued thread is in 「Running」.

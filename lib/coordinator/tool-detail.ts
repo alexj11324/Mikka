@@ -68,10 +68,11 @@ export function toolDetail(tool: Pick<ChatTool, 'name' | 'input' | 'output'>): T
     case 'dispatch':
     case 'dispatchFactory':
     case 'wake':
-      quote(firstText(input, ['note', 'prompt', 'instruction', 'message', 'request', 'text']))
+      // Who it went to and the thread it made first, its note under them (R-83).
       object(id(output, ['runId', 'threadId', 'thread']) ?? id(input, ['runId']))
       // The thread's chip carries its state; without a thread the answer's own status is all there is.
       if (!lines.some(line => line.kind === 'object')) field('status', firstText(output, ['status']))
+      quote(firstText(input, ['note', 'prompt', 'instruction', 'message', 'request', 'text']))
       object(id(output, ['issueId', 'taskId']) ?? id(input, ['issueId', 'taskId']))
       break
     case 'messageThread':
