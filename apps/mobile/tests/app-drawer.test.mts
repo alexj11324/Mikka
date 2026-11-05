@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { dragProgress, drawerWidth, settlesOpen, surfaceRadius } from '../features/shell/model/drawer.ts'
+import { dragProgress, drawerWidth, OPEN_SCALE, settlesOpen, surfaceDim, surfaceRadius, surfaceScale } from '../features/shell/model/drawer.ts'
+import { TOKENS } from '../lib/tokens.ts'
 import { dragSlot, moveTo, moveWorkspace, orderWorkspaces, parseWorkspaceOrder } from '../features/shell/model/workspace-order.ts'
 
 test('the drawer is the screen less 52 points, between 280 and 360', () => {
@@ -12,6 +13,21 @@ test('the drawer is the screen less 52 points, between 280 and 360', () => {
 test('the surface rounds to the screen corners, at least 34 points', () => {
   assert.equal(surfaceRadius({ top: 0, bottom: 0 }), 34)
   assert.equal(surfaceRadius({ top: 59, bottom: 34 }), 59)
+})
+
+test('the open surface shrinks just enough to show its corners, under a veil lighter than a modal', () => {
+  assert.equal(surfaceScale(0), 1)
+  assert.equal(surfaceScale(1), OPEN_SCALE)
+  assert.ok(OPEN_SCALE >= 0.94, 'still the app, not a small card')
+  assert.equal(surfaceDim(0), 0)
+  assert.equal(surfaceDim(1), 1)
+  const alpha = (color: string) => Number(color.match(/[\d.]+(?=\))/)?.[0])
+  assert.ok(alpha(TOKENS.drawerDim.light) < alpha(TOKENS.scrim.light))
+  assert.ok(alpha(TOKENS.drawerDim.dark) < alpha(TOKENS.scrim.dark))
+  assert.equal(TOKENS.drawer.ios, 'secondarySystemBackground')
+  assert.equal(TOKENS.drawerRow.ios, 'tertiarySystemBackground')
+  assert.notEqual(TOKENS.drawer.light, TOKENS.page.light)
+  assert.notEqual(TOKENS.drawer.dark, TOKENS.page.dark)
 })
 
 test('a released drag settles open past halfway, a flick carrying it either way', () => {
