@@ -119,6 +119,14 @@ jobs:
       - name: Fill build-time values
         if: steps.skip.outputs.skip != 'true'
         run: node scripts/release/web-deploy.mjs env .vercel/.env.production.local
+      # Skew Protection: a unique Next.js deploymentId per run attempt
+      # (lib/deployment-id.mjs), so a re-run of a commit is a new deployment.
+      - name: Choose the deployment id
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          id="$(node lib/deployment-id.mjs)"
+          echo "Deployment id $id"
+          echo "MIKKA_DEPLOYMENT_ID=$id" >> "$GITHUB_ENV"
       - name: Build (runs migrations last, as the Vercel build did)
         if: steps.skip.outputs.skip != 'true'
         run: npx --yes "$VERCEL_CLI" build --prod --token "$VERCEL_TOKEN"

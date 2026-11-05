@@ -51,6 +51,29 @@ The workflow uploads build output only.
 `vercel.json` keeps `git.deploymentEnabled.main` off, so Vercel does not also
 build each push.
 
+## Skew Protection
+
+A page left open across a deploy keeps calling its own build's Server Actions.
+Without Skew Protection the new deployment answers them with "action not
+found", and `watchRemovedActions` in `lib/app-build.ts` reloads the page.
+
+A prebuilt upload has no Vercel deployment id at build time, so the workflow's
+**Choose the deployment id** step sets `MIKKA_DEPLOYMENT_ID` from
+`lib/deployment-id.mjs`: `<first 12 of the sha>-<run id>-<run attempt>`, at
+most 32 characters, never starting with `dpl_`. Each run attempt gets a new id,
+because Vercel fails a deploy that reuses one. `next.config.mjs` sets
+`deploymentId` from it, and `experimental.runtimeServerDeploymentId: false`
+so pages keep this id instead of the runtime `dpl_` id
+([vercel/next.js#94734](https://github.com/vercel/next.js/issues/94734)).
+Next.js 16 then sends it as `x-deployment-id` on Server Action and RSC
+requests. Local builds and CI checks leave it unset.
+
+The id does nothing until Skew Protection is on for the Vercel project. Turn it
+on in the dashboard: Project Settings → Advanced → Skew Protection. The API
+returned "Skew Protection not found" for this project, so the dashboard toggle
+comes first, and it may need the Pro plan. `watchRemovedActions` stays as the
+fallback for pages older than the Skew Protection window.
+
 ## Official runtime configuration
 
 The official runtime workflow keeps its existing disposable-instance validation,
