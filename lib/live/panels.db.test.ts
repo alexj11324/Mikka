@@ -26,7 +26,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
   // those keys. Here count task/thread panel keys only.
   const lists = await import('./lists')
   const listMock = mock.module(new URL('./lists.ts', import.meta.url).href, { namedExports: Object.fromEntries(Object.entries(lists).map(([name, value]) =>
-    [name, /ScopesBeforeChange$/.test(name) ? async () => [] : /Changed$/.test(name) ? async () => {} : value])) })
+    [name, name.endsWith('ScopesBeforeChange') ? async () => [] : name.endsWith('Changed') ? async () => {} : value])) })
   const channelScopes = new Map<string, LiveScope>(), unexpectedPaths: string[] = []
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   process.env.DEVICE_GATEWAY_URL = 'https://gateway.example.invalid'

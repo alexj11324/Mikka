@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { readFile, readdir } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { after, mock, test } from 'node:test'
+import { after, before, mock, test } from 'node:test'
 import { Pool } from 'pg'
 import { sql } from 'drizzle-orm'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
@@ -21,9 +21,11 @@ const scheduled: (() => Promise<void>)[] = []
 mock.module('next/server', { namedExports: { after: (work: () => Promise<void>) => { scheduled.push(work) } } })
 // The same writers also wake task/thread detail panels with their run, thread
 // or document IDs; panels.db.test.ts covers those keys. Here count list keys only.
-const panels = await import('./panels')
-mock.module(new URL('./panels.ts', import.meta.url).href, { namedExports: Object.fromEntries(Object.entries(panels).map(([name, value]) =>
-  [name, /ScopesBeforeChange$/.test(name) ? async () => [] : /Changed$/.test(name) ? async () => {} : value])) })
+before(async () => {
+  const panels = await import('./panels')
+  mock.module(new URL('./panels.ts', import.meta.url).href, { namedExports: Object.fromEntries(Object.entries(panels).map(([name, value]) =>
+    [name, name.endsWith('ScopesBeforeChange') ? async () => [] : name.endsWith('Changed') ? async () => {} : value])) })
+})
 after(() => mock.restoreAll())
 
 test('real PG: lists retain their reader scope and publish only the originating committed writes', { skip: !url, timeout: 180_000 }, async t => {
