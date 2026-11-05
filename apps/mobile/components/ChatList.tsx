@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { BotAvatar, Spinner } from '@/components/icons'
 import { Symbol } from '@/components/Symbol'
@@ -33,27 +34,32 @@ export function useChatRows(needle = '') {
 
 export const rowKey = (row: ChatRow) => row.kind === 'bot' ? row.bot.id : row.group.id
 
-/** A bot (avatar, name, last line, when) or a group chat (a people symbol, its last message, a dot while unread), as a messaging app's list. */
-export function ChatRowView({ row, onPress }: { row: ChatRow; onPress: () => void }) {
+/** A bot (avatar, name, last line, when) or a group chat (a people symbol, its last message). `badge` sits on the avatar's corner. */
+export function ChatRowView({ row, onPress, badge }: { row: ChatRow; onPress?: () => void; badge?: ReactNode }) {
   const bot = row.kind === 'bot' ? row.bot : null
   const group = row.kind === 'group' ? row.group : null
   const line = chatLine(bot ? { bot } : { group: group! })
-  return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
-      {bot ? <BotAvatar color={bot.color} shape={bot.shape} size={54} />
-        : <View style={styles.groupIcon}><Symbol name="person.2.fill" size={22} color={colors.secondary} web={<Text style={styles.groupGlyph}>群</Text>} /></View>}
+  const rowStyle = [styles.row]
+  const body = (
+    <>
+      <View>
+        {bot ? <BotAvatar color={bot.color} shape={bot.shape} size={54} />
+          : <View style={styles.groupIcon}><Symbol name="person.2.fill" size={22} color={colors.secondary} web={<Text style={styles.groupGlyph}>群</Text>} /></View>}
+        {badge}
+      </View>
       <View style={styles.body}>
         <View style={styles.top}>
           <Text style={styles.name} numberOfLines={1}>{bot ? bot.name : group!.title}</Text>
           {bot?.working ? <Spinner size={13} /> : row.at ? <Text style={styles.when}>{shortWhen(row.at)}</Text> : null}
         </View>
-        {line || (group && Number(group.unreadCount) > 0) ? (
-          <View style={styles.top}>
-            <Text style={[styles.line, { flex: 1 }]} numberOfLines={1}>{line ?? ''}</Text>
-            {group && Number(group.unreadCount) > 0 ? <View style={styles.unread} /> : null}
-          </View>
-        ) : null}
+        {line ? <Text style={styles.line} numberOfLines={1}>{line}</Text> : null}
       </View>
+    </>
+  )
+  if (!onPress) return <View style={rowStyle}>{body}</View>
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
+      {body}
     </Pressable>
   )
 }
@@ -67,5 +73,4 @@ const styles = StyleSheet.create({
   line: { fontSize: 14, lineHeight: 19, color: colors.secondary },
   groupIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
   groupGlyph: { fontSize: 18, color: colors.secondary },
-  unread: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent },
 })

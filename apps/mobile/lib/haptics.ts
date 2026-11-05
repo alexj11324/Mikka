@@ -10,3 +10,8 @@ export function tap() {
 export function press() {
   if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
 }
+
+/** A warning, such as a pin the list cannot take. */
+export function warn() {
+  if (Platform.OS !== 'web') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {})
+}

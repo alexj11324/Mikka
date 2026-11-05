@@ -7,7 +7,25 @@ export type ThreadStatus = 'running' | 'waiting' | 'paused' | 'failed' | 'done' 
 export interface Person { id: string; name: string; email: string; image: string | null }
 export interface Workspace { id: string; name: string }
 
-export interface HomeBot { id: string; name: string; color: string; shape: string; /** Plain text; an empty string is a card with no words. */ line: string | null; at: string | null; working: boolean; pinned?: boolean; /** The person's Coordinator: the app draws it pinned on top, not as a row. */ coordinator?: boolean }
+export type WaitingMark = 'question' | 'approval' | 'takeover'
+
+export interface HomeBot {
+  id: string
+  name: string
+  color: string
+  shape: string
+  /** Plain text; an empty string is a card with no words. */
+  line: string | null
+  at: string | null
+  working: boolean
+  pinned?: boolean
+  /** The person's Coordinator: the app draws it pinned on top, not as a row. */
+  coordinator?: boolean
+  /** A thread waiting on the person, an approval, or the person holding the computer. Absent from a server older than it. */
+  waiting?: WaitingMark | null
+  /** Replies after the read position. Absent from a server older than it. */
+  unread?: number
+}
 
 export interface Home {
   user: Person

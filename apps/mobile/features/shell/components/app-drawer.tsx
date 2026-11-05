@@ -15,6 +15,8 @@ type AppDrawerValue = {
   close: () => void
   /** Closes the drawer, then pushes `href` once the app is back in place. */
   go: (href: Href) => void
+  /** While a home-list drag holds the screen, a trailing swipe must not open the drawer. */
+  hold: (blocked: boolean) => void
 }
 
 const AppDrawerContext = createContext<AppDrawerValue | null>(null)
@@ -34,6 +36,7 @@ export function AppDrawer({ children }: { children: ReactNode }) {
   const width = drawerWidth(screen)
   const radius = surfaceRadius(insets)
   const progress = useSharedValue(0)
+  const blockOpen = useSharedValue(false)
   // The same as `shown`, on the UI thread: the drags read it as they start, so a render never rebuilds them mid-drag.
   const shownOnUI = useSharedValue(false)
   // Open from the moment it starts to open until it has closed: VoiceOver reads the drawer, not the app, meanwhile.
@@ -64,11 +67,12 @@ export function AppDrawer({ children }: { children: ReactNode }) {
   const open = useCallback(() => { starting(); settle(true) }, [settle, starting])
   const close = useCallback(() => { closing(); settle(false) }, [closing, settle])
   const go = useCallback((href: Href) => { pending.current = href; close() }, [close])
+  const hold = useCallback((blocked: boolean) => { blockOpen.set(blocked) }, [blockOpen])
 
   // Only the home screen opens the drawer by a drag: elsewhere a drag to the right is the system's back swipe.
   const openPan = useMemo(() => Gesture.Pan()
     .enabled(home)
-    .onTouchesDown((_event, manager) => { if (shownOnUI.get()) manager.fail() })
+    .onTouchesDown((_event, manager) => { if (shownOnUI.get() || blockOpen.get()) manager.fail() })
     .activeOffsetX(OPEN_PAN.activeX)
     .failOffsetX(OPEN_PAN.failX)
     .failOffsetY([-OPEN_PAN.failY, OPEN_PAN.failY])
@@ -79,7 +83,7 @@ export function AppDrawer({ children }: { children: ReactNode }) {
       const open = settlesOpen(progress.get(), velocity)
       if (open) scheduleOnRN(tap)
       settle(open, velocity)
-    }), [home, progress, settle, shownOnUI, width])
+    }), [blockOpen, home, progress, settle, shownOnUI, width])
   const closePan = useMemo(() => Gesture.Pan()
     .onTouchesDown((_event, manager) => { if (!shownOnUI.get()) manager.fail() })
     .activeOffsetX(CLOSE_PAN.activeX)
@@ -109,7 +113,7 @@ export function AppDrawer({ children }: { children: ReactNode }) {
   }))
   const dim = useAnimatedStyle(() => ({ opacity: progress.get() }))
 
-  const value = useMemo(() => ({ open, close, go }), [close, go, open])
+  const value = useMemo(() => ({ open, close, go, hold }), [close, go, hold, open])
   return (
     <AppDrawerContext.Provider value={value}>
       <View style={styles.frame}>

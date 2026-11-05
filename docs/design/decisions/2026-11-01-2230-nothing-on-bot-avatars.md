@@ -19,6 +19,7 @@ brings any of this back.
   coloured trail) are not used. The idle montage keeps idle, egg, wink,
   hexagon and wide; the first-run guide plays `wide` where it played `comet`
   and nothing where it played `orbit`.
+- Superseded in part for the mobile home list by [2026-11-05-2103-mobile-list-badges](2026-11-05-2103-mobile-list-badges.md): that list draws an unread count or a waiting mark on the avatar corner. The web bloub and every other avatar stay bare.
 - No dots. bloub's `notify` pose draws a badge at the avatar's upper right, so
   a bot with a thread waiting on you no longer takes that pose; its face
   stays idle. The bot list's status dot at the avatar's lower right (green

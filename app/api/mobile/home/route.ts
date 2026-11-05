@@ -12,6 +12,7 @@ import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 import { runsOutsideToken } from '@/lib/tokens/scope'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { ownerListRead } from '@/lib/live/list-read-server'
+import { homeChatSignals } from '@/lib/mobile-home-signals'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,7 +38,7 @@ async function handleGET(request: Request) {
   // A workspace token counts the threads of its workspace only.
   const outside = user[tokenWorkspace] ? [...await runsOutsideToken(user, (await db.select({ id: agentRuns.id }).from(agentRuns)
     .where(and(recent, inArray(agentRuns.status, [...RUNNING, 'waiting_input'])))).map(row => row.id))] : []
-  const [botRows, chats, suggestions, [counts], preferences, live] = await Promise.all([
+  const [botRows, chats, suggestions, [counts], preferences, live, signals] = await Promise.all([
     // The Coordinator first, marked `coordinator` (lib/coordinator/coordinator-bot.ts listOwnerBots).
     listOwnerBots(user.id, context.workspace.id),
     botChats(user.id),
@@ -48,12 +49,21 @@ async function handleGET(request: Request) {
     }).from(agentRuns).where(and(recent, outside.length ? notInArray(agentRuns.id, outside) : undefined)),
     chatPreferences(user.id),
     ownerListRead(user.id),
+    homeChatSignals(user.id, context.workspace.id),
   ])
   return json({
     user: { id: user.id, name: user.name, email: user.email, image: user.image ?? null },
     workspace: context.workspace,
     workspaces: context.choices,
-    bots: botRows.map(bot => ({ ...bot, line: homeLine(chats[bot.id]?.line), at: chats[bot.id]?.at ?? null, working: chats[bot.id]?.working ?? false, pinned: preferences[bot.id]?.pinned ?? bot.coordinator })),
+    bots: botRows.map(bot => ({
+      ...bot,
+      line: homeLine(chats[bot.id]?.line),
+      at: chats[bot.id]?.at ?? null,
+      working: chats[bot.id]?.working ?? false,
+      pinned: preferences[bot.id]?.pinned ?? bot.coordinator,
+      waiting: signals.get(bot.id)?.waiting ?? null,
+      unread: signals.get(bot.id)?.unread ?? 0,
+    })),
     threads: { running: Number(counts?.running ?? 0), waiting: Number(counts?.waiting ?? 0) },
     suggestions: suggestions.length,
     live: { ownerId: live.ownerId, workspaceId: live.workspaceId },
