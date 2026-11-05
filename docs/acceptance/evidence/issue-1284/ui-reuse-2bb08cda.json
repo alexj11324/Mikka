@@ -1,0 +1,77 @@
+{
+  "screenshotSourceCommit": "8608b63f522e6bbb8db8fc0caac7f606f17cf218",
+  "validatedIndexTree": "d320f657ea99d8dc1af0046dd9f9da1d964538e9",
+  "allUiFilesMatch": true,
+  "files": [
+    {
+      "path": "components/coordinator/new-task-dialog.tsx",
+      "expectedSha256": "9eb91b10991d3880001dc8dc0a5b409b83276bd012bcc3ac20de1b024b5b6c2c",
+      "actualSha256": "9eb91b10991d3880001dc8dc0a5b409b83276bd012bcc3ac20de1b024b5b6c2c",
+      "matches": true
+    },
+    {
+      "path": "components/coordinator/task-profile-picker.tsx",
+      "expectedSha256": "39fde1614e269e25f09a45b1f585ee6492654b8407629c14d99304841eee8615",
+      "actualSha256": "39fde1614e269e25f09a45b1f585ee6492654b8407629c14d99304841eee8615",
+      "matches": true
+    },
+    {
+      "path": "components/settings/factory-profiles-settings.tsx",
+      "expectedSha256": "d9f9b13d4fb01aff944bf4f8f9f7049199cf2ca65fae2058d1d2644aa415136e",
+      "actualSha256": "d9f9b13d4fb01aff944bf4f8f9f7049199cf2ca65fae2058d1d2644aa415136e",
+      "matches": true
+    },
+    {
+      "path": "components/settings/factory-profiles-data.ts",
+      "expectedSha256": "adaf9852b7bdfaeda3d2b68510e93f4fd1a607004a4ab054119c767ccd41452f",
+      "actualSha256": "adaf9852b7bdfaeda3d2b68510e93f4fd1a607004a4ab054119c767ccd41452f",
+      "matches": true
+    },
+    {
+      "path": "components/workspace/thread-execution-identity.tsx",
+      "expectedSha256": "b003c008afdf787f1faacdded487a1aab150f22ac53a3b705b31e8ad8c71e972",
+      "actualSha256": "b003c008afdf787f1faacdded487a1aab150f22ac53a3b705b31e8ad8c71e972",
+      "matches": true
+    },
+    {
+      "path": "lib/factory/agent-profile-decision.ts",
+      "expectedSha256": "834a175af3dffa09dd94f33ece58e6cb50b72917cde356b7bf99d8a6af59d23d",
+      "actualSha256": "834a175af3dffa09dd94f33ece58e6cb50b72917cde356b7bf99d8a6af59d23d",
+      "matches": true
+    },
+    {
+      "path": "lib/thread-execution-identity-view.ts",
+      "expectedSha256": "e76a523f06de06e73cf10c60045f7ad395dda7721025ea22d596d6b4b6ea9e39",
+      "actualSha256": "e76a523f06de06e73cf10c60045f7ad395dda7721025ea22d596d6b4b6ea9e39",
+      "matches": true
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "expectedSha256": "df177fd58c1c30178bf29727c8c887c7f628b030a328ee11bb9bc1232564cc98",
+      "actualSha256": "df177fd58c1c30178bf29727c8c887c7f628b030a328ee11bb9bc1232564cc98",
+      "matches": true
+    },
+    {
+      "path": "app/globals.css",
+      "expectedSha256": "00ccc3f687f114aa3852579cf436944b76dc6a28995370306039b1313243136d",
+      "actualSha256": "00ccc3f687f114aa3852579cf436944b76dc6a28995370306039b1313243136d",
+      "matches": true
+    },
+    {
+      "path": "messages/en.json",
+      "expectedSha256": "aef8ad02c779d1ae7fe1135701889b5e6fca97fff539cd84826ad17f6e680dfc",
+      "actualSha256": "aef8ad02c779d1ae7fe1135701889b5e6fca97fff539cd84826ad17f6e680dfc",
+      "matches": true
+    },
+    {
+      "path": "lib/factory/agent-profile-definition.ts",
+      "expectedSha256": "60b8b053e680bd6a0d2584a09887fecda9d50e96142b1e2d82b026be117c5ae5",
+      "actualSha256": "60b8b053e680bd6a0d2584a09887fecda9d50e96142b1e2d82b026be117c5ae5",
+      "matches": true
+    }
+  ],
+  "scope": "Reuse the 8608b63 component-layout evidence only; backend/API/production acceptance remain separate.",
+  "integratedLocalCommit": "0d5b28a959e5755354f35338bf51394b54577a04",
+  "validatedGitHubCommit": "2bb08cda7aa1b8dd9599fb5d2eec3f65a4d39021",
+  "githubTreeMatchesValidatedIndex": true
+}

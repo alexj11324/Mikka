@@ -64,3 +64,16 @@ CI for `8608b63` is not green: the real ten-way dispatch test exposed an additio
 - [CI failure and independently reproduced connection-pool timeout](./ci-first-failure-8608b63f.json)
 
 These passing local checks do not override the failing CI concurrency suite. The same ten-way suite is the required regression for the fix-forward; later source and final CI evidence will be recorded separately. The original sandbox was resumed on 2026-11-05 after its configured one-hour deadline completed stopping; no substitute platform or new sandbox was used.
+
+
+## #1313 second integrated verification (2bb08cda)
+
+The transaction-pool fix was integrated with current main `caebc8e6`, including #1314 and #1326. GitHub and Docker shared the exact tree `d320f657ea99d8dc1af0046dd9f9da1d964538e9`. The source was clean before and after the isolated gates.
+
+- [Pre-integration transaction checkpoint](./transaction-cb647188.json): original concurrency group 2/2, Profile PG 36/36, automatic dispatch 5/5 and continuity/watchdog 8/8.
+- [Exact 2bb08cda targeted PG gates](./gates-2bb08cda.json): concurrency 2/2, Profile 36/36, automatic dispatch 12/12, continuity 8/8, shared subscriptions 34/34; zero failed or skipped. Typecheck, lint and diff checks passed. The suite counts overlap in purpose and are not a count of unique scenarios.
+- [Exact 2bb08cda full build and normal HTTP acceptance](./isolated-2bb08cda.json): full `pnpm build` exit 0, 27/27 normal authenticated HTTP checks; no active test leases, valid sessions or app listener after cleanup. The existing evidence audit passed.
+- [UI source identity proof](./ui-reuse-2bb08cda.json): all 11 relevant files match the actual 8608b63 screenshots. The image capture source remains unchanged.
+- [Second CI failure](./ci-second-failure-2bb08cda.json): `test:factory-routing-db` failed in two caller-owned transaction fixtures with `factoryTransactionNotOwned`; the dependent build gate correctly refused to proceed.
+
+The CI failure triggered a complete caller audit, which also found real unregistered transaction owners in self-improvement rehearsal, handoff and legacy evaluation fallback. These are being connected to the existing Factory lifecycle while preserving authorization, replay, rollback and after-commit behavior. The passing local checks above do not override this CI failure. #1313 remains unmerged and #1284 remains open pending a corrected head and real production Profile acceptance.

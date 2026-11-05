@@ -1,0 +1,235 @@
+{
+  "recordedAt": "2026-11-05T04:13:53.433949+00:00",
+  "repository": "alexj11324/Mikka",
+  "commit": "2bb08cda7aa1b8dd9599fb5d2eec3f65a4d39021",
+  "tree": "d320f657ea99d8dc1af0046dd9f9da1d964538e9",
+  "database": "mikka1284_final_2bb08cda_39f17_e2e",
+  "sourceCleanBefore": true,
+  "gates": [
+    {
+      "name": "setup",
+      "command": [
+        "pnpm",
+        "test:e2e:setup"
+      ],
+      "cwd": "/workspace/Mikka",
+      "exitCode": 0,
+      "durationSeconds": 3.831,
+      "log": "/tmp/issue1284-final-2bb08cda-setup.log",
+      "logSha256": "1322ce8e78c57747d927406b10a68f14d4c2030a98e99ca70af804b7df428c37"
+    },
+    {
+      "name": "concurrent",
+      "command": [
+        "pnpm",
+        "test:coordinator-issue-tools-db"
+      ],
+      "cwd": "/workspace/Mikka",
+      "exitCode": 0,
+      "durationSeconds": 5.336,
+      "log": "/tmp/issue1284-final-2bb08cda-concurrent.log",
+      "logSha256": "7eb78dec9f55160b539afa059cfba4a61b59a1c49b5f33421b70a0dfd8cca066",
+      "counts": {
+        "tests": 2,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "expectedTests": 2
+    },
+    {
+      "name": "profile",
+      "command": [
+        "node",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/factory/agent-profile.db.test.ts"
+      ],
+      "cwd": "/workspace/Mikka",
+      "exitCode": 0,
+      "durationSeconds": 48.103,
+      "log": "/tmp/issue1284-final-2bb08cda-profile.log",
+      "logSha256": "833781951ed1bdd45807d47686c506f12accfc9498b3d79f047cc40e6236db94",
+      "counts": {
+        "tests": 36,
+        "pass": 36,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "expectedTests": 36
+    },
+    {
+      "name": "automatic",
+      "command": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/factory/profile-dispatch.db.test.ts"
+      ],
+      "cwd": "/workspace/Mikka",
+      "exitCode": 0,
+      "durationSeconds": 10.378,
+      "log": "/tmp/issue1284-final-2bb08cda-automatic.log",
+      "logSha256": "86e23057a524a93d46186280fc1e1ed499da9e5485ca258e12cf4790b8b5c0a4",
+      "counts": {
+        "tests": 12,
+        "pass": 12,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "expectedTests": "all discovered tests; no skips"
+    },
+    {
+      "name": "continuity",
+      "command": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/factory/continuity.db.test.ts"
+      ],
+      "cwd": "/workspace/Mikka",
+      "exitCode": 0,
+      "durationSeconds": 3.264,
+      "log": "/tmp/issue1284-final-2bb08cda-continuity.log",
+      "logSha256": "a9df05e16f14f522d662effb5c2754659536885e982f485cf7a4bed91a15b158",
+      "counts": {
+        "tests": 8,
+        "pass": 8,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "expectedTests": 8
+    },
+    {
+      "name": "shared",
+      "command": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--test-force-exit",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "tests/shared-subscription-runs.db.test.ts"
+      ],
+      "cwd": "/workspace/Mikka",
+      "exitCode": 0,
+      "durationSeconds": 9.109,
+      "log": "/tmp/issue1284-final-2bb08cda-shared.log",
+      "logSha256": "8b15bce0e66f4f623c2c9aaf214b66c1c8b31e7bfebb7111fb8e1bad182068af",
+      "counts": {
+        "tests": 34,
+        "pass": 34,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "expectedTests": "all discovered tests; no skips"
+    },
+    {
+      "name": "types",
+      "command": [
+        "pnpm",
+        "typecheck"
+      ],
+      "cwd": "/workspace/Mikka",
+      "exitCode": 0,
+      "durationSeconds": 4.589,
+      "log": "/tmp/issue1284-final-2bb08cda-types.log",
+      "logSha256": "b596a9bc9e34b58c60cfe208ccde07260bea3b2007d83c0b73f85344f7fcee07"
+    },
+    {
+      "name": "lint",
+      "command": [
+        "pnpm",
+        "exec",
+        "oxlint",
+        "--deny-warnings",
+        "lib/agent-runs.ts",
+        "lib/factory/agent-profile.db.test.ts",
+        "lib/factory/agent-profile.ts",
+        "lib/factory/automatic-dispatch.ts",
+        "lib/factory/continuity.db.test.ts",
+        "lib/factory/dispatch.ts",
+        "lib/factory/reconcile.ts",
+        "lib/factory/store.ts",
+        "lib/factory/transaction.ts",
+        "lib/factory/watchdog.ts",
+        "tests/issue-tool-calls.db.test.ts"
+      ],
+      "cwd": "/workspace/Mikka",
+      "exitCode": 0,
+      "durationSeconds": 0.348,
+      "log": "/tmp/issue1284-final-2bb08cda-lint.log",
+      "logSha256": "806f1c1ec2a8ef9eaf7177b7c659939f21a7da591c0c4bb6cd531a970dc6be67"
+    },
+    {
+      "name": "diff",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "8608b63f522e6bbb8db8fc0caac7f606f17cf218",
+        "2bb08cda7aa1b8dd9599fb5d2eec3f65a4d39021",
+        "--",
+        "lib/agent-runs.ts",
+        "lib/factory/agent-profile.db.test.ts",
+        "lib/factory/agent-profile.ts",
+        "lib/factory/automatic-dispatch.ts",
+        "lib/factory/continuity.db.test.ts",
+        "lib/factory/dispatch.ts",
+        "lib/factory/reconcile.ts",
+        "lib/factory/store.ts",
+        "lib/factory/transaction.ts",
+        "lib/factory/watchdog.ts",
+        "tests/issue-tool-calls.db.test.ts"
+      ],
+      "cwd": "/workspace/Mikka",
+      "exitCode": 0,
+      "durationSeconds": 0.007,
+      "log": "/tmp/issue1284-final-2bb08cda-diff.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "secretsIncluded": false,
+  "environment": {
+    "CI": true,
+    "REQUIRE_DB": true,
+    "RUN_DISPATCH_DB_TESTS": true,
+    "CREDENTIAL_TEST_RETAIN_RESOURCES": true,
+    "allDatabaseResources": "synthetic owned loopback e2e database",
+    "providerCalls": false
+  },
+  "status": "passed",
+  "sourceCleanAfter": true,
+  "totalDbTests": 92,
+  "totalDbSkipped": 0,
+  "completedAt": "2026-11-05T04:15:19.106879+00:00",
+  "cleanup": {
+    "allGateCommandsExited": true,
+    "databaseClientsBeforeCleanup": 0,
+    "databaseDropped": true,
+    "databaseExistsAfterCleanup": 0
+  }
+}

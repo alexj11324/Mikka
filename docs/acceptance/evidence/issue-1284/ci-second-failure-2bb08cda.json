@@ -1,0 +1,104 @@
+{
+  "kind": "ci-failure-followed-by-production-owner-audit",
+  "sourceCommit": "2bb08cda7aa1b8dd9599fb5d2eec3f65a4d39021",
+  "sourceTree": "d320f657ea99d8dc1af0046dd9f9da1d964538e9",
+  "runId": 41966297618,
+  "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/41966297618",
+  "jobs": [
+    {
+      "id": 127043971545,
+      "name": "Changed files",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 127044055477,
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 127044055491,
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 127044055515,
+      "name": "Integration unit checks",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 127044055527,
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 127044055551,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 127044055556,
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 127044055558,
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 127044055585,
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 127044057615,
+      "name": "Cloud credential access (OIDC)",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 127045256570,
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 127046017118,
+      "name": "UI policy (strict)",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "failingDatabaseJob": 127044055556,
+  "suite": "pnpm test:factory-routing-db",
+  "failures": [
+    {
+      "file": "tests/factory-admission.db.test.ts",
+      "test": "caller-owned rollback removes queue, publication, binding and dispatch receipt together",
+      "error": "factoryTransactionNotOwned"
+    },
+    {
+      "file": "tests/factory-admission.db.test.ts",
+      "test": "gateway wake belongs to the outer commit, including a host that starts lifecycle work immediately",
+      "error": "factoryTransactionNotOwned"
+    }
+  ],
+  "dependentBuildGate": {
+    "jobId": 127045256570,
+    "reason": "Required full suite failed before the build ran."
+  },
+  "diagnosis": "Both existing tests manually began an outer transaction without registering its Factory lifecycle. The resulting audit also found real unregistered owners in self-improvement factory-bridge.rehearse, factory-bridge.handoff and evaluations.transaction when a historical source has no frozen model.",
+  "correctiveScope": "Use the existing Factory transaction lifecycle at those actual owners and adapt the two caller-owned fixtures without weakening authorization, rollback, replay, concurrency or after-commit behavior.",
+  "localPassesDoNotOverrideCi": true,
+  "productionProfileAcceptance": "not passed; original zero-config task awaits a deployed fix",
+  "excludedPath": "DeepSeek API excluded by the user; no balance probe or paid execution."
+}

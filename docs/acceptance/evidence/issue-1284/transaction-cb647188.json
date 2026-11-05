@@ -1,0 +1,191 @@
+{
+  "recordedAt": "2026-11-05T03:58:25.591247+00:00",
+  "repository": "alexj11324/Mikka",
+  "baseCommit": "8608b63f522e6bbb8db8fc0caac7f606f17cf218",
+  "validatedCommit": "cb647188bd63ac759571610ee85ad0fe7416c285",
+  "validatedTree": "c2ee9307be02a034fe5331c42498cff85775a8ed",
+  "workingTreeCleanImmediatelyAfterCommit": true,
+  "testProcessesAtCompletion": [],
+  "validationScope": "Source working tree validated and committed as the checkpoint above; later main integration requires its own exact-head gate.",
+  "files": [
+    "lib/agent-runs.ts",
+    "lib/factory/agent-profile.db.test.ts",
+    "lib/factory/agent-profile.ts",
+    "lib/factory/automatic-dispatch.ts",
+    "lib/factory/continuity.db.test.ts",
+    "lib/factory/dispatch.ts",
+    "lib/factory/reconcile.ts",
+    "lib/factory/store.ts",
+    "lib/factory/transaction.ts",
+    "lib/factory/watchdog.ts",
+    "tests/issue-tool-calls.db.test.ts"
+  ],
+  "dbGates": [
+    {
+      "command": "pnpm test:coordinator-issue-tools-db",
+      "cwd": "/workspace/Mikka",
+      "database": "mikka1284_issue_tools_04233661_e2e",
+      "exitCode": 0,
+      "counts": {
+        "tests": 2,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "log": "/tmp/issue1284-ci-factory-transaction-final.log",
+      "logSha256": "7094e9b045bd3a85641108e47ac318d5bdb1cf554857d0ab069b7fd43f812c21"
+    },
+    {
+      "command": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/agent-profile.db.test.ts",
+      "cwd": "/workspace/Mikka",
+      "database": "mikka1284_issue_tools_04233661_e2e",
+      "exitCode": 0,
+      "counts": {
+        "tests": 36,
+        "pass": 36,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "log": "/tmp/issue1284-ci-factory-transaction-profile.log",
+      "logSha256": "c12971735524dbf438912c8b804122321d60ca8beb4661d82ca727c433f64390"
+    },
+    {
+      "command": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/profile-dispatch.db.test.ts",
+      "cwd": "/workspace/Mikka",
+      "database": "mikka1284_issue_tools_04233661_e2e",
+      "exitCode": 0,
+      "counts": {
+        "tests": 5,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "log": "/tmp/issue1284-ci-factory-transaction-automatic.log",
+      "logSha256": "6740b837fa961705888d8d10bd2832d8a28fdca7aaef59946579270d2f812ce9"
+    },
+    {
+      "command": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/continuity.db.test.ts",
+      "cwd": "/workspace/Mikka",
+      "database": "mikka1284_rr_watchdog_commit_e2e",
+      "exitCode": 0,
+      "counts": {
+        "tests": 8,
+        "pass": 8,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "log": "/tmp/issue1284-watchdog-commit-after.log",
+      "logSha256": "2783ecab1cf7b00930abcae9d66e7a059fc9fcd7b8db9b546aeb707ac936f57f"
+    }
+  ],
+  "totalDbTests": 51,
+  "staticGates": [
+    {
+      "name": "types",
+      "command": [
+        "pnpm",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.93,
+      "log": "/tmp/issue1284-ci-factory-transaction-final-types.log",
+      "logSha256": "b596a9bc9e34b58c60cfe208ccde07260bea3b2007d83c0b73f85344f7fcee07"
+    },
+    {
+      "name": "lint",
+      "command": [
+        "pnpm",
+        "exec",
+        "oxlint",
+        "--deny-warnings",
+        "lib/agent-runs.ts",
+        "lib/factory/agent-profile.db.test.ts",
+        "lib/factory/agent-profile.ts",
+        "lib/factory/automatic-dispatch.ts",
+        "lib/factory/continuity.db.test.ts",
+        "lib/factory/dispatch.ts",
+        "lib/factory/reconcile.ts",
+        "lib/factory/store.ts",
+        "lib/factory/transaction.ts",
+        "lib/factory/watchdog.ts",
+        "tests/issue-tool-calls.db.test.ts"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.37,
+      "log": "/tmp/issue1284-ci-factory-transaction-final-lint.log",
+      "logSha256": "c793ceda9ad79911fc3c9f4112e21f3c5dbd14f3bdeef2e84989963bc9e8d27e"
+    },
+    {
+      "name": "diff",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "lib/agent-runs.ts",
+        "lib/factory/agent-profile.db.test.ts",
+        "lib/factory/agent-profile.ts",
+        "lib/factory/automatic-dispatch.ts",
+        "lib/factory/continuity.db.test.ts",
+        "lib/factory/dispatch.ts",
+        "lib/factory/reconcile.ts",
+        "lib/factory/store.ts",
+        "lib/factory/transaction.ts",
+        "lib/factory/watchdog.ts",
+        "tests/issue-tool-calls.db.test.ts"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.01,
+      "log": "/tmp/issue1284-ci-factory-transaction-final-diff.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "redEvidence": {
+    "command": "pnpm test:coordinator-issue-tools-db",
+    "baseCommit": "8608b63f522e6bbb8db8fc0caac7f606f17cf218",
+    "log": "/tmp/issue1284-ci-issue-tools-before.log",
+    "counts": {
+      "tests": 2,
+      "pass": 1,
+      "fail": 1,
+      "skipped": 0
+    },
+    "rootCause": "Default Profile finalization checked out an additional APP connection while the caller already held one; five connections plus ten concurrent dispatches caused checkout timeout and cleanup races."
+  },
+  "environment": {
+    "databaseEngine": "PostgreSQL 17",
+    "allDatabaseResources": "Synthetic isolated loopback e2e fixtures",
+    "originalCiSuiteContext": {
+      "CI": "true",
+      "REQUIRE_DB": "1",
+      "RUN_DISPATCH_DB_TESTS": "1",
+      "CREDENTIAL_TEST_RETAIN_RESOURCES": "1",
+      "CONVERSATION_READS_REQUIRE_DB": "1",
+      "NEXT_TELEMETRY_DISABLED": "1"
+    },
+    "providerCalls": false,
+    "secretsIncluded": false
+  },
+  "cleanup": {
+    "watchdogDatabaseDropped": true,
+    "watchdogCleanupLog": "/tmp/issue1284-watchdog-commit-cleanup.log"
+  },
+  "invariants": [
+    "Pool limit remains five and timeout remains ten seconds.",
+    "Ten concurrent dispatches and original permission/idempotency assertions are preserved.",
+    "Borrowed finalization has no nested checkout, BEGIN, COMMIT, or release.",
+    "Real Factory owners validate frozen Profile/source and hold fresh workspace membership through the actual COMMIT.",
+    "Rollback and savepoint restoration cannot retain stale authorization registration.",
+    "Watchdog rollback launches no child and does not report a recovered task.",
+    "Confirmed COMMIT is not reclassified by a later membership cleanup failure.",
+    "Existing catalogue and Decision billing independent transaction semantics are unchanged."
+  ]
+}
