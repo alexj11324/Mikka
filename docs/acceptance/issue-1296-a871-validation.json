@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-11-05T09:37:45.394167+00:00",
+  "recorded_at": "2026-11-05 09:50:46 UTC",
   "repository": "alexj11324/Mikka",
   "pr": 1359,
   "head": "a871356a227543f3e662d0841359e4dcfdbe3713",
@@ -25,7 +25,9 @@
     "database": "isolated-loopback-pg17:55499/mikka_e2e",
     "source_clean_after_build": true,
     "fake_cli_mode": "100755",
-    "fake_cli_blob": "fe43181a79fa5c1bb537484d4618ae495a5d1d3f"
+    "fake_cli_blob": "fe43181a79fa5c1bb537484d4618ae495a5d1d3f",
+    "final_status": "stopped",
+    "final_status_observed_at": "2026-11-05 09:49:05 UTC"
   },
   "validation": {
     "fresh_setup": "passed",
@@ -141,5 +143,189 @@
       "sha256": "c497710a0b176cac18cd097bb178c8e3214216aa7885a41817f5475ed851e392",
       "bytes": 19077
     }
-  ]
+  ],
+  "merge": {
+    "sha": "9cc753c660f31a95598998c43545ea030240e9e2",
+    "tree": "134bc11816b0dbfcf225f00c1a0ac5e7b9dae4fe",
+    "parents": [
+      "9727fcfcfc16724e1cfcd915dc28d59b52d69481",
+      "a871356a227543f3e662d0841359e4dcfdbe3713"
+    ],
+    "merged_at": "2026-11-05T09:38:58Z",
+    "tree_matches_tested": true
+  },
+  "main_ci": {
+    "run_id": 42004112823,
+    "status": "completed",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "id": 127166425859,
+        "name": "Changed files",
+        "conclusion": "success"
+      },
+      {
+        "id": 127166516459,
+        "name": "Source checks",
+        "conclusion": "success"
+      },
+      {
+        "id": 127166516498,
+        "name": "Cloud credential access (OIDC)",
+        "conclusion": "success"
+      },
+      {
+        "id": 127166516538,
+        "name": "Integration unit checks",
+        "conclusion": "success"
+      },
+      {
+        "id": 127166516656,
+        "name": "Database checks (3/4)",
+        "conclusion": "success"
+      },
+      {
+        "id": 127166516666,
+        "name": "Core unit checks",
+        "conclusion": "success"
+      },
+      {
+        "id": 127166516716,
+        "name": "Daemon checks",
+        "conclusion": "success"
+      },
+      {
+        "id": 127166516792,
+        "name": "Database checks (4/4)",
+        "conclusion": "success"
+      },
+      {
+        "id": 127166516830,
+        "name": "Database checks (1/4)",
+        "conclusion": "success"
+      },
+      {
+        "id": 127166516871,
+        "name": "Database checks (2/4)",
+        "conclusion": "success"
+      },
+      {
+        "id": 127168379485,
+        "name": "Production build and browser interactions",
+        "conclusion": "success"
+      },
+      {
+        "id": 127169356250,
+        "name": "UI policy (strict)",
+        "conclusion": "success"
+      }
+    ],
+    "completed_at": "2026-11-05T09:45:28Z"
+  },
+  "production": {
+    "web_run": 42004112987,
+    "web_conclusion": "success",
+    "deployment_id": "dpl_9KVFQS2Gwncgwof6HmsDyhr8Svg6",
+    "ready_state": "READY",
+    "ready_at": "2026-11-05T09:43:14.768Z",
+    "version": {
+      "recorded_at": "2026-11-05 09:44:25 UTC",
+      "url": "https://app.aspectlylabs.com/mikka/api/version",
+      "build": "9cc753c660f31a95598998c43545ea030240e9e2",
+      "observation": "Actual browser tab 33 after reload, AX version JSON"
+    },
+    "ui": {
+      "recorded_at": "2026-11-05 09:45:00 UTC",
+      "source": "9cc753c660f31a95598998c43545ea030240e9e2",
+      "task": "ALEX-60",
+      "issue": "1899ee3b-518b-43db-840a-7969a9e8ff55",
+      "after_deployment_reload": true,
+      "new_accept_or_model_execution": false,
+      "issue_status": "Done",
+      "factory": "Accepted",
+      "current_producer": "Resolved",
+      "current_review": "Resolved",
+      "historical_review": "Blocked",
+      "activity": "acme Changed status to Done · 11/5, 08:07 AM",
+      "screenshot": "docs/acceptance/issue-1296-evidence/sync-production-9cc-after.jpg",
+      "thread_panel": "Resolved / Accepted",
+      "thread_panel_url": "https://app.aspectlylabs.com/mikka/en?bot=d6bf6e81-2ff8-4f2d-ad94-003d94b934bb&issue=1899ee3b-518b-43db-840a-7969a9e8ff55&thread=f9231e85-ae2d-415c-8e68-493582dafac6"
+    },
+    "screenshots": [
+      {
+        "path": "issue-1296-evidence/sync-production-9cc-after.jpg",
+        "bytes": 118995,
+        "sha256": "a4a283b0921a4fce2621603dbe83226d70f92783107967ef4f4aa4ebd587793e"
+      },
+      {
+        "path": "issue-1296-evidence/sync-production-9cc-thread.jpg",
+        "bytes": 190643,
+        "sha256": "9a8477943550d81071c1dc28ea8d792571e79c20d5714ca88a9aea3e027f187f"
+      }
+    ]
+  },
+  "mobile_ota": {
+    "triggered_for_9cc": false,
+    "reason": "No changed path under apps/mobile/** or packages/protocol/**",
+    "latest_run": 41990588486,
+    "source": "7cae54d3b16c8b3a06b931980fff5b7b2071698b",
+    "runtime": "0ec11b32ade9dcb4bcf87a751626ec5ba9acaa2d",
+    "group": "0a7a2061-2f5a-4244-83df-3c292c31e65a",
+    "update": "01a1aab6-3a6c-724e-bbf5-3aff50ef9cbb"
+  },
+  "related_workflows": [
+    {
+      "id": 42004711595,
+      "name": "Project decisions production acceptance",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 42004711425,
+      "name": "Issue 1225 model provider acceptance",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 42004413085,
+      "name": "Production smoke",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42004112938,
+      "name": "Desktop release",
+      "status": "in_progress",
+      "conclusion": null
+    },
+    {
+      "id": 42004112987,
+      "name": "Web deploy",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42004112823,
+      "name": "CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42004113017,
+      "name": "E2B official instance runtime",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42004112856,
+      "name": "Publish daemon",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "remaining": {
+    "native_submission": "Existing finished iOS binary re-submission blocked on GitHub browser authentication; connector has no dispatch tool",
+    "native_device_checks": "not performed",
+    "api": "deepseek-flash Insufficient Balance; no additional paid retries"
+  }
 }

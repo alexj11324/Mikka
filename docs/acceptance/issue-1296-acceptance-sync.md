@@ -1,10 +1,10 @@
 # Issue #1296：验收完成状态同步与 SIGTERM 测试夹具跟进
 
-日期：2026-11-05；时间均为 UTC。待发布组合为 `a871356a`，其精确 CI 已于 09:22 核对通过；a871 在新 PG7 的 setup、91 UI、81 真 PG 回归与完整 production build 均已通过；9aae 的原页面证据保持原版本标签。旧 PG6 隔离环境已按 owning harness 生命周期销毁；新正式页面、实际合并及生产部署结果继续分别补入。
+日期：2026-11-05；时间均为 UTC。PR #1359 已合并为 `9cc753c660f31a95598998c43545ea030240e9e2`，实际 tree 与最终通过 CI、Docker UI91、真 PG81、production build 及正常浏览器 Accept 的 `a871356a` 完全一致。合并后的主 CI、Web 部署、Vercel READY 与生产公开 version 已核对成功；真实 ALEX-60 的生产状态复验通过。09:49:05 管理 API 确认 Docker Sandbox 已 stopped。9aae 与 a871 的原页面证据保持各自版本标签。
 
 关联：[Issue #1296](https://github.com/alexj11324/Mikka/issues/1296)、[PR #1359](https://github.com/alexj11324/Mikka/pull/1359)。
 
-**当前结论：生产 `7cae54d3` 上，ALEX-60 已真实完成恢复后的 Claude 独立 review 和 Owner Accept；正常操作暴露的两个 UI 状态同步缺口已修复。`9aae0ca` 的 CI、Docker production build 和真实浏览器验收已通过：正常 Accept 后原组件无刷新显示 Done、producer Resolved、Factory Accepted 和更新后的 Activity，历史 Blocked 保留；标题草稿在短暂保存错误后自动保存且未丢失。375 深色页面也已截图复核。PR #1359 当前最终组合为 `a871356a`，正常整合主线 `9727fcfc`，精确 CI 为 23 success + 5 条件 skip；该组合在新隔离 PG7 的 UI91、真PG81、完整 production build 已通过。旧 PG6 的过期 lease 已正常 quarantine，随后整个自有环境和私密状态已销毁，未伪称 fixture 逐项 cleanup 成功。新 PG7 已正常清理 fixture / 释放租约并销毁私密环境；合并、生产部署与修复后的生产 UI 复验仍待回执。**
+**当前结论：生产 `7cae54d3` 上，ALEX-60 已真实完成恢复后的 Claude 独立 review 和 Owner Accept；正常操作暴露的两个 UI 状态同步缺口已修复。`9aae0ca` 的 CI、Docker production build 和真实浏览器验收已通过：正常 Accept 后原组件无刷新显示 Done、producer Resolved、Factory Accepted 和更新后的 Activity，历史 Blocked 保留；标题草稿在短暂保存错误后自动保存且未丢失。375 深色页面也已截图复核。PR #1359 当前最终组合为 `a871356a`，正常整合主线 `9727fcfc`，精确 CI 为 23 success + 5 条件 skip；该组合在新隔离 PG7 的 UI91、真PG81、完整 production build 已通过。旧 PG6 的过期 lease 已正常 quarantine，随后整个自有环境和私密状态已销毁，未伪称 fixture 逐项 cleanup 成功。新 PG7 已正常清理 fixture / 释放租约并销毁私密环境。PR #1359 已于 09:38:58 合并，主 CI42004112823 的 12 个 jobs 全部成功；Web42004112987 成功，部署 dpl_9KVFQS2Gwncgwof6HmsDyhr8Svg6 READY，公开 version 为精确 9cc。修复后的真实生产任务显示 Done / Factory Accepted，当前 producer 在列表和详情均 Resolved，历史失败仍 Blocked。Docker 已 stopped。原生提交与真机验收、API 余额不足仍按实际边界保留。**
 
 本文只补充本轮结果，不将既有全部 UI、三模型路径或原生设备验收重新宣告完成。生产模型证据与下面的隔离合成报告 fixture 分开记录。
 
@@ -16,7 +16,7 @@
 | 本轮 UI/fixture 回归源码 | 基于 `7cae54d3` 的 10 文件组合；Docker 已验证 tree `eb01b003cc1d34f69884e5240343e140be78daa2`。具体回归见第 4 节 |
 | 最终组合 PR | [#1359](https://github.com/alexj11324/Mikka/pull/1359)，head `a871356a227543f3e662d0841359e4dcfdbe3713` |
 | 最终组合 tree / parents | tree `134bc11816b0dbfcf225f00c1a0ac5e7b9dae4fe`；正常合并 parents 为 `9aae0cabe1c44696f92ff5055844634e32e18e5c`、`9727fcfcfc16724e1cfcd915dc28d59b52d69481` |
-| 新组合精确 head CI | [主 CI42000504545](https://github.com/alexj11324/Mikka/actions/runs/42000504545) 全部成功；root 于 **09:22** fresh 核对精确 `a871356a` 的 **28 checks = 23 success + 5 条件 skip**。这是 PR 精确 head 的 CI，不是尚未发生的 main 合并后执行 |
+| 新组合精确 head CI | [主 CI42000504545](https://github.com/alexj11324/Mikka/actions/runs/42000504545) 全部成功；root 于 **09:22** fresh 核对精确 `a871356a` 的 **28 checks = 23 success + 5 条件 skip**。这是 PR 精确 head 的 CI；实际 main 合并后执行另见第 8 节 |
 | 新组合 Docker 身份 / 构建 | Docker 读回 `a871356a`，实际 git merge-tree 与 `134bc11816b0dbfcf225f00c1a0ac5e7b9dae4fe` 一致，fake mode `100755`；新 setup / 正常 bootstrap、Factory UI91、真实 PG81 与完整 `pnpm build` exit0 均已完成 |
 | 新隔离环境 PG7 | 独立 PG17 v7 已新建，loopback `55499` / `mikka_e2e`；owner marker `e2ab31c1-e629-4314-bd66-9602845f83cd`，创建回执 PID `28973`。正常 fresh setup、Factory UI91/真实DB81与 `pnpm build` 已通过；新环境租约与正式页面 smoke 独立记录 |
 | 主线整合范围 | 原基线 `536d2f0cd85a698e9c401f8e1dea8039fb50bdf4` 保留已上线 #1355；现正常整合 `9727fcfc`（#1358）。本次主线 19 文件与本轮 10 文件无路径交集，未改变 dependency、lockfile、Next config 或 migration；`fake-claude.mjs` 仍为 `100755` |
@@ -65,8 +65,8 @@
 
 | 用户任务 | 生产观察到的 before | 最小修复与复用组件 | after 的已验证层次 / 待验证层次 |
 | --- | --- | --- | --- |
-| 接受当前候选后，留在原任务页确认完成 | Factory 已 `approval/passed/rev12`，后端 Issue 已完成；已挂载的 TaskForm 仍显示 **In Review**，重新加载才显示 Done 和新 Activity | 复用现有 `issue_document` live event、SWR `issue`/`versions` key 与 TaskForm。一次文档事件同时刷新正文、任务字段和历史；仅用较新服务端快照更新未编辑字段，保留标题/正文草稿和现有 Y.Doc。保存时固定 revision；若 flush 期间收到新 revision，则重新取快照，避免把新 revision 与旧 Review 状态混用 | Docker 三条目标行为回归 GREEN；9aae 实际浏览器同组件无刷新更新 Done、Factory Accepted 与 Activity，标题草稿保留且随后 Autosaved。**部署后的生产复验仍待完成** |
-| 在列表和线程页确认刚接受的 producer 已解决 | 原 producer `f923…` 已 succeeded，但仍显示 **Waiting**；当前 review 显示 Resolved，历史失败显示 Blocked，语义不一致 | 复用 `useAcceptanceTasks` 的同一 SWR 缓存与 `factory_issue` live event，及现有 `ThreadStatus` / `ThreadStatusIcon`。纯展示 helper 只对 exact issue、当前已接受非 skill candidate、candidateRunId = latestRunId = 当前 view run、成功终态且无 question/wake/stopping 的 producer 投影为 Resolved | 四个目标正例由 RED 转 GREEN；9aae 实际页面 producer 显示 Resolved、历史线程保持 Blocked；375 深色截图已复核。旧候选、continuation、active、waiting/resuming/wake/stopping 等反例仍保留原状态。**部署后的生产复验仍待完成** |
+| 接受当前候选后，留在原任务页确认完成 | Factory 已 `approval/passed/rev12`，后端 Issue 已完成；已挂载的 TaskForm 仍显示 **In Review**，重新加载才显示 Done 和新 Activity | 复用现有 `issue_document` live event、SWR `issue`/`versions` key 与 TaskForm。一次文档事件同时刷新正文、任务字段和历史；仅用较新服务端快照更新未编辑字段，保留标题/正文草稿和现有 Y.Doc。保存时固定 revision；若 flush 期间收到新 revision，则重新取快照，避免把新 revision 与旧 Review 状态混用 | Docker 三条目标行为回归 GREEN；9aae 实际浏览器同组件无刷新更新 Done、Factory Accepted 与 Activity，标题草稿保留且随后 Autosaved。**9cc 生产复验通过**：正常重新加载原 ALEX-60 后已确认对应展示。此次没有新建生产 Accept；同组件无刷新 Accept 由精确 a871 的实际隔离页面证明 |
+| 在列表和线程页确认刚接受的 producer 已解决 | 原 producer `f923…` 已 succeeded，但仍显示 **Waiting**；当前 review 显示 Resolved，历史失败显示 Blocked，语义不一致 | 复用 `useAcceptanceTasks` 的同一 SWR 缓存与 `factory_issue` live event，及现有 `ThreadStatus` / `ThreadStatusIcon`。纯展示 helper 只对 exact issue、当前已接受非 skill candidate、candidateRunId = latestRunId = 当前 view run、成功终态且无 question/wake/stopping 的 producer 投影为 Resolved | 四个目标正例由 RED 转 GREEN；9aae 实际页面 producer 显示 Resolved、历史线程保持 Blocked；375 深色截图已复核。旧候选、continuation、active、waiting/resuming/wake/stopping 等反例仍保留原状态。**9cc 生产复验通过**：正常重新加载原 ALEX-60 后已确认对应展示。此次没有新建生产 Accept；同组件无刷新 Accept 由精确 a871 的实际隔离页面证明 |
 
 对应源码：[TaskDetail](https://github.com/alexj11324/Mikka/blob/9aae0cabe1c44696f92ff5055844634e32e18e5c/components/workspace/task-detail.tsx)、[共享 acceptance hook](https://github.com/alexj11324/Mikka/blob/9aae0cabe1c44696f92ff5055844634e32e18e5c/components/workspace/factory-acceptance.tsx)、[展示 helper](https://github.com/alexj11324/Mikka/blob/9aae0cabe1c44696f92ff5055844634e32e18e5c/lib/issue-threads.ts)、[线程列表](https://github.com/alexj11324/Mikka/blob/9aae0cabe1c44696f92ff5055844634e32e18e5c/components/workspace/issue-threads.tsx)、[线程面板](https://github.com/alexj11324/Mikka/blob/9aae0cabe1c44696f92ff5055844634e32e18e5c/components/workspace/issue-thread-panel.tsx)。
 
@@ -90,7 +90,7 @@
 | 类型 / lint | **通过，exit 0** | root 的 Docker 命令回执；最终精确 PR CI 仍单独核对 |
 | 已验证 9aae 完整构建 | **`pnpm build` exit 0** | 正常隔离 test setup 后的 production build；真实 Next 页面与真实 DO 推送验收完成 |
 | 已验证 9aae CI | **28 checks：23 success、5 条件 skip** | 主 CI 与所有八个 workflow 均成功；Cloud backend 原失败组独立通过 4/4 |
-| 最终组合 a871 CI | **28 checks：23 success、5 条件 skip** | 主 CI42000504545 全部成功；09:22 精确 head fresh 核对。新 PG7 的 Docker setup、邻接回归与完整构建另待回执 |
+| 最终组合 a871 CI | **28 checks：23 success、5 条件 skip** | 主 CI42000504545 全部成功；09:22 精确 head fresh 核对。新 PG7 的正常 setup、UI91、真实 PG81、完整 build 与正式页面均已通过，见第 7 节 |
 
 主要新增测试：[TaskDetail live](https://github.com/alexj11324/Mikka/blob/9aae0cabe1c44696f92ff5055844634e32e18e5c/scripts/task-detail-live.test.tsx)、[producer 列表](https://github.com/alexj11324/Mikka/blob/9aae0cabe1c44696f92ff5055844634e32e18e5c/scripts/issue-thread-acceptance.test.tsx)、[thread composer](https://github.com/alexj11324/Mikka/blob/9aae0cabe1c44696f92ff5055844634e32e18e5c/scripts/thread-composer.test.tsx)。组件测试不替代浏览器截图、真实模型调用或原生设备验收。
 
@@ -167,7 +167,7 @@
 - Profile dispatch + completion reconcile 真实 PostgreSQL 回归：**81/81**、0 fail / 0 skip。
 - 首次直接执行 DB 文件时，UI runtime 的 `DEVICE_GATEWAY_URL/PUSH_SECRET` 被带入 raw-Pool fixture，造成 32 个 `observed database client` 前置错误和 1 个父测试汇总断言，33/0/33；完整首轮失败日志保留。原因是该单测子进程与既有 CI 的环境不一致。
 - 仅这两个 DB 测试的子进程移除上述两项 UI gateway 配置，按既有 CI 环境重跑原命令后 81/81；没有改产品、断言、fixture 或事务守卫。UI 服务及随后完整 build 继续保留真实 gateway 配置。首次已成功的 91 UI / setup / bootstrap 未重复运行。
-- 精确 a871 的完整 `pnpm build` **exit 0**（含 worker / OpenUI 生成、Next production build、typecheck 与正常迁移入口），09:30 读回退出码；新的正式服务与窄页面 smoke 继续执行。
+- 精确 a871 的完整 `pnpm build` **exit 0**（含 worker / OpenUI 生成、Next production build、typecheck 与正常迁移入口），09:30 读回退出码；随后正式服务与窄页面 smoke 已完成，见下文。
 - 新出现的 #1360 虽非 Draft，但 mergeable=false，正文明确 GREEN/type/lint 与新 head CI 待完成并暂停整合。它不属于已就绪批次；本次不纳入、不修改。
 
 ### a871 精确正式页面复验
@@ -180,22 +180,61 @@ owning agent 与独立视觉 reviewer 均已审阅以下精确 a871 截图：无
 
 原文件 `mikka-1296-a871-accepted-1793871187115.jpg`，1363×936，86,342 bytes；SHA-256 `96e91b77f3720f90f6710037cae9a7807c8841d048cd1967d505540924c68cd4`。
 
-新两组 fixture 已通过正常 scope cleanup（`cleaned:true`）；原 holder 正常 dirty release 后为 `quarantined`，读回 **activeLeases=0、validSessions=0**。自有服务、PG7 均已核身份停止，整个专用目录与对应 private state 已销毁。Docker Sandbox stop 状态另待管理 API 回执。
+新两组 fixture 已通过正常 scope cleanup（`cleaned:true`）；原 holder 正常 dirty release 后为 `quarantined`，读回 **activeLeases=0、validSessions=0**。自有服务、PG7 均已核身份停止，整个专用目录与对应 private state 已销毁。Docker Sandbox 管理 API 于 **09:49:05** 明确返回 **stopped**。
 
 [机器可读验证摘要](issue-1296-a871-validation.json) 包含精确 SHA、CI、构建、截图摘要、首轮准备失败与两次环境清理回执。
 
-## 8. 发布与清理状态
+## 8. 实际合并、生产发布与复验
 
-- [x] 已验证 head `9aae0ca` 的 CI、全部实际 workflow/check 结论；保留 c78 失败和后续修复证据。
-- [x] `9aae0ca` 本地 production build 的实际 clean/draft/历史状态与 375 深色截图，owning agent 已复核；未更改截图版本标签。
-- [x] 正常整合主线 `9727fcfc`，发布 PR #1359 新 head `a871356a` / tree `134bc118`；本轮文件、构建依赖与 migration 无新增交集，fake 执行位保留。
-- [x] 新组合 `a871356a` 精确 CI 门禁：主 CI42000504545 全部成功，09:22 fresh 核对 23 success + 5 条件 skip。
-- [x] 原 9aae/PG6 过期 scope 受守卫拒绝，原请求正常 quarantine；已核身份停止并销毁整个专用环境及私密状态，未假标 fixture cleaned。
-- [x] 新 PG7 独立创建；Docker 精确 a871 tree 与 fake `100755` 已读回。
-- [x] 新 PG7 正常 fresh setup、Factory UI91、真实 DB81 及精确 `a871356a` 完整 `pnpm build` exit0；保留首次 DB 子进程环境准备错误。
-- [x] 核对当前主线972的 READY/公开 version 与待合PR；#1360不满足ready条件。本批按merge commit合入，实际 merge SHA/tree 待补。
-- [ ] 实际 Web deploy / Vercel READY、公开 version 与 merge SHA 一致；**当前尚未填写成功**。
-- [ ] 修复上线后，在正常 Owner UI 复验任务无刷新完成、producer 展示与历史 blocked 保留；不靠直接改生产数据库。
-- [ ] 新 PG7 后续验收产生的 fixture、lease、进程与云沙盒最终清理/停止回执；不将 PG6 已完成的处置结果沿用到新环境。
+| 项目 | 最终已取得的证据 |
+| --- | --- |
+| 实际合并 | [PR #1359](https://github.com/alexj11324/Mikka/pull/1359) 于 **09:38:58** merged；[提交 9cc753c](https://github.com/alexj11324/Mikka/commit/9cc753c660f31a95598998c43545ea030240e9e2) |
+| 合并身份 | tree `134bc11816b0dbfcf225f00c1a0ac5e7b9dae4fe` 与通过最终验收的 a871、绿色 CI 合成 checkout 984ad99 完全一致；parents 为 9727fcfc 与 a871356a，保留此前主线 ancestry |
+| 合并后主 CI | [42004112823](https://github.com/alexj11324/Mikka/actions/runs/42004112823) **success**，09:45:28 完成；**12/12 jobs success**，含 Source、Core、Integration、Daemon、DB 1–4 与 UI policy(strict) |
+| 构建证据边界 | CI 名为 Production build and browser interactions 的 job 是既有 DB 汇总门槛；正式构建和真实浏览器证据来自上文 Docker 精确 a871 的 pnpm build / next start 与逐张截图审阅，未混用名称作为证明 |
+| Web 部署 | [42004112987](https://github.com/alexj11324/Mikka/actions/runs/42004112987) **success**，09:43:20 完成 |
+| Vercel / 域名 | `dpl_9KVFQS2Gwncgwof6HmsDyhr8Svg6` **READY** 于 09:43:14.768，meta githubCommitSha 为完整 9cc；alias 包含 app.aspectlylabs.com |
+| 公开 serving 版本 | 09:44 记录的浏览器 fresh reload：[公开 version](https://app.aspectlylabs.com/mikka/api/version) 返回完整 `9cc753c660f31a95598998c43545ea030240e9e2` |
+| 生产真实任务 | [ALEX-60](https://app.aspectlylabs.com/mikka/en?bot=d6bf6e81-2ff8-4f2d-ad94-003d94b934bb&issue=1899ee3b-518b-43db-840a-7969a9e8ff55) 正常重载后：**Done、Factory Accepted、当前 producer / review 均 Resolved、历史 failed review 仍 Blocked**。Activity 保留 08:07 的 Changed status to Done |
+| 生产线程详情 | 正常打开原 producer f9231e85 的线程面板，实际显示 **Accepted + Resolved**；返回任务总览后状态一致。没有新模型调用、追加 prompt、修改 DB 或新建 Accept |
+| 生产 smoke | [42004413085](https://github.com/alexj11324/Mikka/actions/runs/42004413085) success；该运行早于本次 Web READY，单独列回执，不把它代替上面的 9cc 生产域名/页面验收 |
+| Daemon 发布 | [42004112856](https://github.com/alexj11324/Mikka/actions/runs/42004112856) success，09:47:59 |
+| E2B runtime 发布 | [42004113017](https://github.com/alexj11324/Mikka/actions/runs/42004113017) success，09:48:02 |
+| Desktop 发布 | [42004112938](https://github.com/alexj11324/Mikka/actions/runs/42004112938) 在 09:49 核对时仍 in_progress；未提前填写成功 |
+| Docker 最终停止 | `sbx_001m6mjh8at15tpaxcxdmscetmz`，8 vCPU / 16 GiB；完成服务、lease、session、PG6/PG7 清理后已请求 stop，管理 API **09:49:05 读回 stopped**；停止后未访问会自动唤醒的 endpoint |
 
-最终结果补齐前，本文只能证明已列出的生产模型事实、缺陷复现、源码修复和分层回归，不能将本轮发布闭环记为完成。
+### 生产最终截图
+
+以下两张由真实生产 9cc 页面直接捕获。总览图显示 Done、当前两个 Resolved、历史 Blocked 与 Factory Accepted；详情图显示同一个 producer 的 Accepted / Resolved。Activity 的完整历史来自 AX 观察，不因图片只露出标题就声称整段历史可见。此次复验是已在 08:07 接受的真实任务在新版本上的只读检查；不是新一轮生产 live Accept。
+
+![9cc 生产：任务 Done、当前 Resolved、历史 Blocked 和 Factory Accepted](issue-1296-evidence/sync-production-9cc-after.jpg)
+
+![9cc 生产：原 producer 详情显示 Accepted 与 Resolved](issue-1296-evidence/sync-production-9cc-thread.jpg)
+
+| 证据 | 原始文件与摘要 |
+| --- | --- |
+| 生产总览 | `mikka-1296-prod-9cc-overview-1793872081544.jpg`，1363×936，118995 bytes；SHA-256 `a4a283b0921a4fce2621603dbe83226d70f92783107967ef4f4aa4ebd587793e` |
+| 生产线程详情 | `mikka-1296-prod-9cc-thread-1793871969407.jpg`，1363×936，190643 bytes；SHA-256 `9a8477943550d81071c1dc28ea8d792571e79c20d5714ca88a9aea3e027f187f` |
+
+### OTA 与原生边界
+
+- 精确 [9cc 的 mobile-update.yml](https://github.com/alexj11324/Mikka/blob/9cc753c660f31a95598998c43545ea030240e9e2/.github/workflows/mobile-update.yml) 只对 main push 的 apps/mobile/** 或 packages/protocol/** 触发；本次十个变更路径不命中，因此没有新的 9cc OTA 工作流。
+- 最近生产 OTA 仍为 [41990588486](https://github.com/alexj11324/Mikka/actions/runs/41990588486/job/127121612092)，源 7ca，07:57:12 Published；production / iOS，runtime `0ec11b32ade9dcb4bcf87a751626ec5ba9acaa2d`，group `0a7a2061-2f5a-4244-83df-3c292c31e65a`，update `01a1aab6-3a6c-724e-bbf5-3aff50ef9cbb`。
+- 已有 iOS build 8：`a9b373b6-da29-43f0-9176-25a60eae1985` 为 FINISHED，来源 ec9c2860。Apple 提交所需 secret 配置修复已在 main；重新提交现有 binary 仍需通过既有 mobile-native workflow_dispatch。当前连接器不提供 dispatch，浏览器在 GitHub 登录页，尚未声称已提交或 TestFlight 可安装。
+- 没有 iOS 真机或 simulator，因此 VoiceOver、Dynamic Type、系统 Reduce Motion、haptics、真机安装与原生完整流程仍未验证；Expo Web 的实际截图/回归不替代这些项目。
+- API 路径保留原 deepseek-flash 的 Insufficient Balance，未换模型、来源、账户，也未追加付费重试。Claude/Codex 的真实生产接受证据仍按各自原记录保存。
+
+## 9. 完成状态
+
+- [x] 已验证源码回归、可信 RED/GREEN、原 SIGTERM 集成用例与全套 daemon；保留首次失败证据。
+- [x] 精确 a871 的 CI 23 success + 5 条件 skip、Docker UI91、真实 PG81、完整 production build 与真实推送/正常 UI Accept。
+- [x] 实际页面逐张视觉复核并在合并前附入 PR；9aae / a871 截图不改版本标签。
+- [x] 正常 merge commit 合入并独立核对实际 tree / parents；主线 CI12/12、Web success、Vercel READY、公开 exact SHA。
+- [x] 9cc 的原生产任务及线程详情复验通过；生产真实模型记录与隔离合成 fixture 不混淆。
+- [x] PG6 按过期 scope 守卫进入 quarantine 后销毁整个自有环境；PG7 正常清理 fixture / 释放租约，activeLeases=0、validSessions=0，随后销毁整个环境。
+- [x] Docker Sandbox 管理 API 已确认 stopped。
+- [ ] 既有 iOS binary 的 App Store Connect / TestFlight 重新提交和实际可安装状态。
+- [ ] 原生设备专属可用性与 motion 验收。
+- [ ] API 供应商余额恢复后的原模型路径；本轮保留余额不足，不执行额外付费重试。
+
+Issue #1296 保持 open，以免将上述认证、设备和余额阻塞项目写成已通过。已经完成的 UI 修复、Web 发布与生产复验闭环有独立版本、CI 和图像证据。
