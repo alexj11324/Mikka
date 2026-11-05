@@ -56,7 +56,7 @@ export async function readFactoryFlowStates(tx: Pick<PoolClient, 'query'>, tasks
 /** Caller has performed the canonical owner/Bot/source/issue check. No report, transcript or run prompt is read. */
 export async function readFactoryFlow(tx: Pick<PoolClient, 'query'>, task: FactoryTask): Promise<FactoryFlowView> {
   const { rows: [row] } = await tx.query(`SELECT current."createdAt",current."finishedAt",
-    q."updatedAt" AS "questionSince", report."artifactId",report."candidateId" AS "reportCandidateId",report."runId" AS "reportRunId",report.counts,report.media,a."latestVersion",
+    q."updatedAt" AS "questionSince", report."artifactId",report."candidateId" AS "reportCandidateId",report."runId" AS "reportRunId",report.counts,report.media,report_version.version AS "latestVersion",
     review."candidateId" AS "reviewCandidateId",review.output->'completion'->>'reviewVerdict' AS verdict,
     CASE WHEN publication."pullRequest" IS NULL THEN NULL ELSE jsonb_build_object('url',left(publication."pullRequest"->>'url',2000),'state',publication."pullRequest"->>'state') END AS "pullRequest",
     EXISTS(SELECT 1 FROM factory_merges m WHERE m."taskId"=$1 AND m."candidateId"=$3 AND m."userId"=$2 AND m.status='merged' AND candidate.kind='repository') AS merged,
@@ -65,6 +65,7 @@ export async function readFactoryFlow(tx: Pick<PoolClient, 'query'>, task: Facto
     LEFT JOIN LATERAL (SELECT "updatedAt" FROM factory_questions WHERE "taskId"=$1 AND "userId"=$2 AND status='waiting_user' ORDER BY "updatedAt",id LIMIT 1) q ON true
     LEFT JOIN factory_acceptance_artifacts report ON report."taskId"=$1 AND report."candidateId"=$3
     LEFT JOIN artifacts a ON a.id=report."artifactId" AND a."userId"=$2
+    LEFT JOIN artifact_versions report_version ON report_version."artifactId"=a.id AND report_version.version=a."latestVersion" AND report_version.sha256=report.sha256
     LEFT JOIN LATERAL (SELECT "candidateId",output FROM factory_attempts WHERE "taskId"=$1 AND stage='review' AND "runId" IS NOT NULL AND status IN ('passed','failed','blocked','waiting') ORDER BY position DESC LIMIT 1) review ON true
     LEFT JOIN factory_candidates candidate ON candidate.id=$3 AND candidate."taskId"=$1
     LEFT JOIN run_publications publication ON publication."runId"=candidate."runId" AND publication."userId"=$2

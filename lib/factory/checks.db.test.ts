@@ -33,6 +33,8 @@ import { freezeWorkerDefinition } from "../agent-kit/worker";
 import { claimLocalRun } from "../computer/claim";
 import { FactoryError } from "./contract";
 import { approvalEvidence } from "./evidence";
+import { createFactoryApprovalGates } from './approval';
+import { createFactoryMerges } from './merge';
 import { createFactoryStore, type FactoryTask } from "./store";
 import {
   createFactoryDispatch,
@@ -620,6 +622,47 @@ test(
           await currentEvidence(pending.task.id);
         } finally { await db.query('UPDATE device_repos SET "verifyCommand"=$2 WHERE id=$1', [repoId, command]); }
       });
+      for (const kind of ['report', 'deliverable'] as const) await t.test(`${kind} human acceptance completes the public flow through its real receipt without changing the review verdict`, async () => {
+        const pending = await pendingReview(kind, false);
+        const review = await start(pending.task);
+        await terminal(review.runId, `accepted-${pending.task.id}`, false, report => {
+          report.verify = { status: 'not_run' }; report.reviewVerdict = 'needs_judgment';
+          report.criteria = [{ text: 'Document accuracy', passed: false, status: 'unverified', reason: 'Requires the person to judge the document.' }];
+        });
+        await reconcile.run('owner', review.runId);
+        const ready = await state(pending.task.id);
+        const before = await readFactoryFlow(db, ready.task);
+        assert.equal(before.stage, 'handoff'); assert.equal(before.needsYou?.kind, 'pr_review');
+        assert.equal(before.review?.verdict, 'needs_judgment');
+        const actor = { userId: 'owner', sessionId: randomUUID() }, eventId = randomUUID();
+        await db.query(`INSERT INTO "session"(id,"userId",token,"expiresAt","createdAt","updatedAt") VALUES($1,'owner',$2,now()+interval '1 hour',now(),now())`, [actor.sessionId, randomUUID()]);
+        await db.query(`UPDATE issues SET status='review' WHERE id=$1`, [ready.task.issueId]);
+        const acceptanceStore = createFactoryStore(db, authorize, coordinatorBot, { gates: createFactoryApprovalGates() });
+        const merges = createFactoryMerges(db, authorize, acceptanceStore, {
+          pullRequest: async () => assert.fail('a report has no GitHub pull request'),
+          mergeMethods: async () => assert.fail('a report has no GitHub merge method'),
+          merge: async () => assert.fail('a report must not merge on GitHub'),
+        });
+        const input = { binding: factoryBinding(ready.task), eventId };
+        const result = await merges.accept(actor, input, null);
+        assert.equal(result.status, 'accepted');
+        if (result.status !== 'accepted') assert.fail('expected a deliverable acceptance receipt');
+        const accepted = await state(pending.task.id);
+        assert.equal(accepted.task.stage, 'approval'); assert.equal(accepted.task.status, 'passed');
+        assert.equal(accepted.attempts.find(attempt => attempt.id === accepted.task.attemptId)?.output.deliverableAcceptanceId, result.acceptanceId);
+        assert.deepEqual((await db.query('SELECT id,"candidateId","userId","sessionId" FROM factory_deliverable_acceptances WHERE "taskId"=$1', [accepted.task.id])).rows,
+          [{ id: result.acceptanceId, candidateId: accepted.task.candidateId, userId: actor.userId, sessionId: actor.sessionId }]);
+        assert.equal((await db.query('SELECT status FROM issues WHERE id=$1', [accepted.task.issueId])).rows[0].status, 'done');
+        const flow = await readFactoryFlow(db, accepted.task);
+        assert.equal(flow.stage, 'completed'); assert.equal(flow.completion, 'accepted'); assert.equal(flow.needsYou, undefined);
+        assert.deepEqual(flow.review, before.review, 'human acceptance does not rewrite an independent needs_judgment verdict');
+        const summary = (await store.listPublicForIssue('owner', accepted.task.issueId)).tasks[0];
+        assert.equal(summary.stage, 'completed'); assert.equal('completion' in summary && summary.completion, 'accepted');
+        assert.equal('needsYou' in summary, false, 'the public issue list does not keep asking for acceptance');
+        assert.deepEqual(await merges.accept(actor, input, null), result, 'a replay returns the same durable acceptance');
+        assert.equal((await readFactoryFlow(db, (await state(accepted.task.id)).task)).completion, 'accepted');
+      });
+
       await t.test('public flow, same Artifact versions and one Bot comment per visited stage use real persisted provenance', async () => {
         emitPresentation = true;
         try {
@@ -661,6 +704,13 @@ test(
           assert.deepEqual(flow.acceptance.counts,{passed:1,failed:0,unverified:1});
           assert.equal(flow.acceptance.media[0].captureId,captureId); assert.equal(flow.acceptance.media[0].criterion,'criterion-2');
           assert.equal(flow.acceptance.version,2);
+          const { readArtifact } = await import('../artifacts/store');
+          const [ownedArtifact, foreignArtifact] = await modelDatabase!.run(() => Promise.all([
+            readArtifact('owner',flow.acceptance!.artifactId),readArtifact('other',flow.acceptance!.artifactId),
+          ]));
+          assert.equal(ownedArtifact?.acceptanceTaskId,state.task.id,'the owner can find the report task independently of its initial run');
+          assert.equal(ownedArtifact?.media?.[0].captureId,captureId);
+          assert.equal(foreignArtifact,null,'the task hint is not available to another artifact reader');
           const document = (await db.query('SELECT "inlineContent" FROM artifact_versions WHERE "artifactId"=$1 AND version=2',[flow.acceptance.artifactId])).rows[0].inlineContent;
           assert.ok(document.indexOf('未验证') < document.indexOf('已验证')); assert.match(document,/No executable test command exists/);
           assert.ok(document.includes(captureId)); assert.match(document,/!\[/);
@@ -682,6 +732,13 @@ test(
           const beforeBytes = Buffer.byteLength(JSON.stringify(state)), afterBytes = Buffer.byteLength(JSON.stringify(flow));
           t.diagnostic(`Factory flow fixture: full snapshot ${beforeBytes} bytes; public flow ${afterBytes} bytes; projected DB rows ${flowReadBytes.join(" + ")} bytes; acceptance Markdown ${Buffer.byteLength(document)} bytes.`);
           assert.ok(afterBytes < beforeBytes);
+          // A normal owner edit may append a version to an Artifact, but it
+          // cannot become the host's acceptance report for this candidate.
+          await db.query(`INSERT INTO artifact_versions (id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName")
+            SELECT $1,id,"latestVersion"+1,'synthetic-owner-edit','# Unrelated owner edit',$2,22,'Owner' FROM artifacts WHERE id=$3`,
+            [randomUUID(),'f'.repeat(64),flow.acceptance.artifactId]);
+          await db.query('UPDATE artifacts SET "latestVersion"="latestVersion"+1 WHERE id=$1',[flow.acceptance.artifactId]);
+          assert.equal((await readFactoryFlow(db,state.task)).acceptance,null,'the decision projection must match the host report hash at the latest version');
           await db.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey","pullRequest")
             VALUES($1,'owner',$2,'https://github.com/example/fixture.git','github.com/example/fixture',$3)`,[producerRun,state.task.issueId,JSON.stringify({url:'https://github.com/example/fixture/pull/1',state:'closed'})]);
           assert.equal((await readFactoryFlow(db,state.task)).stage,'handoff','closed without merge is never completed');
