@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
 import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
@@ -22,8 +23,8 @@ export function SecuritySettings() {
   const t = useTranslations('Settings.security')
   const actionError = useActionError()
   const locale = useLocale()
-  const password = useSWR('account:password', () => settingsRead<Awaited<ReturnType<typeof getPasswordStatus>>>('password'))
-  const sessions = useSWR('account:sessions', () => settingsRead<Awaited<ReturnType<typeof listSessions>>>('sessions'))
+  const password = useSWR(settingsKeys.password(), () => settingsRead<Awaited<ReturnType<typeof getPasswordStatus>>>('password'))
+  const sessions = useSWR(settingsKeys.sessions(), () => settingsRead<Awaited<ReturnType<typeof listSessions>>>('sessions'))
   const [editing, setEditing] = useState(false)
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')

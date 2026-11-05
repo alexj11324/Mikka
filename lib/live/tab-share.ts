@@ -3,8 +3,9 @@
  * re-reads the same SWR key at the same moment; here one tab reads and the
  * others take its result.
  *
- * The channel is named by user and workspace scope and every message names its
- * key, so nothing crosses users, workspaces or keys. The provider closes it on
+ * The channel is named by the authenticated read-cache namespace and transport
+ * scope. Every message names its key, so nothing crosses users, workspaces,
+ * builds, roles or keys. The provider closes it on
  * sign-out or a user switch. A tab that hears no result in time reads itself.
  */
 export type TabChannel = Pick<BroadcastChannel, 'postMessage' | 'close'> & { onmessage: ((event: MessageEvent) => void) | null }
@@ -17,6 +18,8 @@ type Message =
 export const CLAIM_WINDOW_MS = 30
 /** A claim without a result after this is abandoned: read yourself. */
 export const RESULT_TIMEOUT_MS = 8_000
+
+export const tabShareChannelName = (namespace: string, scope: string | null) => `mikka-live-read:${JSON.stringify([namespace, scope])}`
 
 type Waiter = { resolve: (value: { data: unknown; age: number | null } | null) => void }
 export type TabShareClock = { now(): number; later(callback: () => void, ms: number): unknown; cancel(timer: unknown): void }

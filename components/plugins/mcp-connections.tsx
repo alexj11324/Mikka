@@ -5,6 +5,8 @@ import useSWR, { type SWRResponse } from 'swr'
 import { useTranslations } from 'next-intl'
 import { UserRound } from 'lucide-react'
 import { withBasePath } from '@/lib/base-path'
+import { settingsKeys } from '@/lib/swr/keys'
+import { ReadResponseError } from '@/lib/swr/retry'
 import type { McpWorkspacePage, McpWorkspaceServerView } from '@/lib/plugins/contracts'
 import { AppTile } from '@/components/plugins/connected-apps'
 import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
@@ -13,10 +15,10 @@ import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 
-export const mcpConnectionsKey = (workspaceId: string) => ['settings:mcp-connections', workspaceId] as const
+export const mcpConnectionsKey = settingsKeys.mcpConnections
 
 async function pageFrom(response: Response, workspaceId: string): Promise<McpWorkspacePage> {
-  if (!response.ok) throw new Error('MCP connection state unavailable')
+  if (!response.ok) throw new ReadResponseError(response.status)
   const page = await response.json() as McpWorkspacePage
   if (page.workspaceId !== workspaceId || !Array.isArray(page.servers)) throw new Error('MCP workspace response mismatch')
   return page

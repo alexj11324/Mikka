@@ -1,5 +1,6 @@
 'use client'
 
+import { ReadResponseError } from '@/lib/swr/retry'
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
@@ -38,7 +39,7 @@ export const storeCatalogKey = withBasePath('/api/integrations/composio/catalog'
 
 export async function readStoreCatalog(): Promise<StoreCatalogView> {
   const response = await fetch(storeCatalogKey)
-  if (!response.ok) throw new Error(String(response.status))
+  if (!response.ok) throw new ReadResponseError(response.status)
   return await response.json() as StoreCatalogView
 }
 
@@ -51,7 +52,7 @@ export function useStoreCatalog(enabled = true) {
 export function useAppDetail(app: string | null) {
   return useSWR(app ? `${storeCatalogKey}/${encodeURIComponent(app)}` : null, async (key: string) => {
     const response = await fetch(key)
-    if (!response.ok) throw new Error(String(response.status))
+    if (!response.ok) throw new ReadResponseError(response.status)
     return await response.json() as AppDetail
   }, { revalidateOnFocus: false, shouldRetryOnError: false })
 }
@@ -86,7 +87,7 @@ export const connectedAppsKey = integrationPath
 
 export async function readConnectedApps(): Promise<IntegrationState> {
   const response = await fetch(integrationPath, { cache: 'no-store' })
-  if (!response.ok) throw new Error(String(response.status))
+  if (!response.ok) throw new ReadResponseError(response.status)
   return await response.json() as IntegrationState
 }
 

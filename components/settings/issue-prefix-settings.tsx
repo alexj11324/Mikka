@@ -8,6 +8,8 @@ import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from '@
 import { SettingsSection } from '@/components/settings/primitives'
 import { cn } from '@/lib/utils'
 import { getIssuePrefixState, saveIssuePrefix } from '@/app/actions/issue-prefix'
+import { settingsRead } from '@/lib/settings-read'
+import { settingsKeys } from '@/lib/swr/keys'
 
 type PrefixState = Awaited<ReturnType<typeof getIssuePrefixState>>
 
@@ -15,7 +17,7 @@ type PrefixState = Awaited<ReturnType<typeof getIssuePrefixState>>
 export function IssuePrefixSettings() {
   const t = useTranslations('Settings.issuePrefix')
   // Cached: a return to 偏好 shows the saved prefix at once and re-reads it behind.
-  const read = useSWR('settings:issue-prefix', getIssuePrefixState)
+  const read = useSWR(settingsKeys.issuePrefix(), () => settingsRead<PrefixState>('issue-prefix'))
   const state: PrefixState | null = read.data ?? null
   const shown = (next: PrefixState | null) => next?.prefix ?? next?.saved ?? next?.suggested ?? ''
   /** What the person typed; null shows the saved prefix. */

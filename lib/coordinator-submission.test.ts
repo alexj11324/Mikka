@@ -347,7 +347,7 @@ test('action checks actual Bot ownership before new submissions and duplicate re
   current = fixture(); callbacks.length = 0; userId = 'owner'
   const botId = 'b4000000-0000-4000-8000-000000000002'
   current.botRows.set(botId, { id: botId, name: 'Synthetic Bot', ownerId: 'foreign' })
-  assert.deepEqual(await sendCoordinatorMessage('hello', null, botId, submissionId), { error: 'validationGeneric', params: undefined })
+  assert.deepEqual(await sendCoordinatorMessage('hello', null, botId, submissionId), { error: 'botNotFound', params: undefined })
   assert.equal(current.rows.size, 0); assert.equal(callbacks.length, 0)
   current.botRows.get(botId)!.ownerId = 'owner'
   assert.deepEqual(await sendCoordinatorMessage('hello', null, botId, submissionId), { queued: true })
@@ -355,7 +355,7 @@ test('action checks actual Bot ownership before new submissions and duplicate re
   assert.equal((await POST(request({ text: 'hello', submissionId }))).status, 202)
   assert.equal(current.rows.size, 2, 'Bot and Coordinator are separate chats')
   current.botRows.get(botId)!.ownerId = 'foreign'
-  assert.deepEqual(await sendCoordinatorMessage('hello', null, botId, submissionId), { error: 'validationGeneric', params: undefined })
+  assert.deepEqual(await sendCoordinatorMessage('hello', null, botId, submissionId), { error: 'botNotFound', params: undefined })
   assert.equal(current.rows.size, 2); assert.equal(callbacks.length, 2)
 })
 

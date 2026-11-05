@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { Camera } from 'lucide-react'
 import { deleteAccount, uploadAvatar } from '@/app/actions/account'
+import { clearPersistentReadCaches } from '@/lib/swr/persistent-cache'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -60,6 +61,7 @@ export function AccountSettings({ user, onSignOut, signingOut }: {
     try {
       const result = await deleteAccount({ email: typed.trim() })
       if (result.error) { setDeleteError(actionError(result.error)); return }
+      await clearPersistentReadCaches()
       window.location.assign(withBasePath('/sign-in'))
     } catch {
       setDeleteError(actionError())

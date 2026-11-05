@@ -1,18 +1,20 @@
 import assert from 'node:assert/strict'
 import { after, mock, test } from 'node:test'
-import type { ReactNode } from 'react'
+import { Children, isValidElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { NextRequest } from 'next/server'
 
 const origin = 'https://app.example'
 const callback = 'http://127.0.0.1:49152/auth/callback'
 const state = 'abcdefghijklmnop1234'
+let currentSearchParams = new URLSearchParams()
+const router = { refresh: mock.fn() }
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 mock.module('next/headers', { namedExports: { headers: async () => new Headers() } })
-mock.module('next/navigation', { namedExports: { redirect: (url: string) => { throw new Error(`redirect:${url}`) } } })
+mock.module('next/navigation', { namedExports: { redirect: (url: string) => { throw new Error(`redirect:${url}`) }, useSearchParams: () => currentSearchParams } })
 mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => (key: string) => key } })
 mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string) => key } })
-stub('../i18n/navigation.ts', { getPathname: ({ href }: { href: string }) => `/en${href}`, redirect: () => { throw new Error('unexpected locale redirect') } })
+stub('../i18n/navigation.ts', { getPathname: ({ href }: { href: string }) => `/en${href}`, redirect: () => { throw new Error('unexpected locale redirect') }, useRouter: () => router })
 stub('../lib/auth.ts', { auth: { api: { getSession: async () => null } }, oauthCallbackBaseURL: origin, googleEnabled: true, githubEnabled: true })
 stub('../lib/email-sign-in.ts', { emailSignInEnabled: async () => false })
 stub('../lib/acceptance.ts', { isAcceptanceEnabled: () => false })
@@ -40,9 +42,13 @@ test('the desktop callback survives the sign-in page and Google callback', async
   const response = proxy(request)
   assert.equal(response.status, 200)
   const localizedURL = new URL(response.headers.get('x-middleware-rewrite') ?? request.url)
+  currentSearchParams = localizedURL.searchParams
   const { default: SignInPage } = await import('../app/[locale]/sign-in/page')
+  const { AuthForm } = await import('../components/auth-form')
   const page = await SignInPage({ searchParams: Promise.resolve(Object.fromEntries(localizedURL.searchParams)) })
-  assert.deepEqual(page.props.desktopFlow, { state, next: '/', callback })
+  const form = Children.toArray(page.props.children).find(child => isValidElement(child) && child.type === AuthForm)
+  assert.ok(isValidElement<{ desktopFlow: unknown }>(form))
+  assert.deepEqual(form.props.desktopFlow, { state, next: '/', callback })
 
   let destination: string | undefined
   const browser = { location: { origin, href: request.url, assign: (url: string) => { destination = url } } }

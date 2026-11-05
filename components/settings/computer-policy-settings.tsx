@@ -1,5 +1,7 @@
 'use client'
 
+import { ReadResponseError } from '@/lib/swr/retry'
+import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -17,10 +19,10 @@ const stateSchema = z.discriminatedUnion('enabled', [
 type State = z.infer<typeof stateSchema>
 
 const policyPath = (workspaceId: string) => withBasePath(`/api/workspaces/${encodeURIComponent(workspaceId)}/computer-policy`)
-export const computerPolicyKey = (workspaceId: string) => ['settings:computer-policy', workspaceId] as const
+export const computerPolicyKey = settingsKeys.computerPolicy
 export async function readComputerPolicy(workspaceId: string): Promise<State> {
   const response = await fetch(policyPath(workspaceId), { cache: 'no-store', credentials: 'same-origin' })
-  if (!response.ok) throw new Error('Computer policy unavailable')
+  if (!response.ok) throw new ReadResponseError(response.status)
   return stateSchema.parse(await response.json())
 }
 
@@ -37,7 +39,7 @@ export function ComputerPolicySettings({ workspaceId }: { workspaceId: string })
     setPending(true); setChangeError(false)
     try {
       const response = await fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ permission }) })
-      if (!response.ok) throw new Error('Computer policy unavailable')
+      if (!response.ok) throw new ReadResponseError(response.status)
       await refresh()
     } catch { setChangeError(true); await refresh().catch(() => undefined) } finally { setPending(false) }
   }
