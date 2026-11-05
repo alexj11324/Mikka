@@ -2,12 +2,9 @@
 
 import { useViewScroll } from '@/lib/hooks/view-state'
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
-import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { Bot, PanelLeft, Plus, Users } from 'lucide-react'
-import { getCoordinatorChat, type CoordinatorChat } from '@/app/actions/coordinator'
 import { useLiveBotChatList, useLiveGroupList } from '@/hooks/use-live-lists'
-import { observeListRead } from '@/lib/live/list-read'
 import type { BotView } from '@/app/actions/bots'
 import type { Thread } from '@/app/actions/task-runs'
 import type { listIssues } from '@/app/actions/issues'
@@ -23,7 +20,6 @@ import { cn } from '@/lib/utils'
 import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { ResizeHandle } from '@/components/ui/resizable-pane'
 import { chatPreview } from '@/lib/agent-history'
-import { namedCitations } from '@/lib/coordinator/citations'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
 import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
 
@@ -120,8 +116,8 @@ export function BotList({ phoneOnly = false, ...props }: ListProps) {
 function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: Omit<ListProps, 'phoneOnly'>) {
   const i18nText = useTranslations()
   const { toggleSidebar, setOpenMobile, open, openMobile, isMobile } = useSidebar()
-  const { data: coordinator } = useSWR<CoordinatorChat>('coordinator-chat', () => observeListRead(() => getCoordinatorChat()))
-  // Each bot's latest line gives its row the preview and its place in the list.
+  // Each bot's latest line gives its row the preview and its place in the list. The
+  // Coordinator is one of these bots: its row reads the same summary, never its whole chat.
   const { data: chatList } = useLiveBotChatList(user.id)
   const chats = chatList?.items ?? {}
   // Group chats sit among the bots (R-01), ordered by their latest message.
@@ -131,13 +127,13 @@ function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNew
   // The Coordinator's bot row is the entry pinned on top; the rest are the person's other bots.
   const rows = [...bots.filter(bot => !bot.coordinator).map(bot => ({ kind: 'bot' as const, bot, at: chats[bot.id]?.at ?? '' })), ...groups.map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt }))]
     .sort((a, b) => b.at.localeCompare(a.at) || (a.kind === 'bot' ? a.bot.name : a.group.title).localeCompare(b.kind === 'bot' ? b.bot.name : b.group.title))
-  const lastReply = coordinator?.items.findLast(item => item.from !== 'event')
   const latest: Record<string, string> = {}
-  // The Coordinator's row is read as 'coordinator', from its chat's latest reply below.
+  // The Coordinator's row is read as 'coordinator', from its bot's summary below.
   const coordinatorId = bots.find(bot => bot.coordinator)?.id
+  const coordinator = coordinatorId ? chats[coordinatorId] : undefined
   for (const [botId, chat] of Object.entries(chats)) if (chat.at && botId !== coordinatorId) latest[botId] = chat.at
   for (const group of groups) if (group.lastMessage) latest[group.id] = group.lastMessage.createdAt
-  if (lastReply?.from === 'coordinator') latest.coordinator = lastReply.createdAt
+  if (coordinator?.at) latest.coordinator = coordinator.at
   const activeId = active?.kind === 'coordinator' ? 'coordinator' : active?.kind === 'bot' ? active.botId : active?.kind === 'group' ? active.id : null
   /** One plain line of a message; a card that shows no words reads as the card placeholder. */
   const previewOf = (text: string | null | undefined) => {
@@ -189,7 +185,7 @@ function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNew
       <SidebarGroup className="px-2 pt-1"><SidebarMenu aria-label={i18nText('Nav.bots')} className="gap-0.5">
         <Row name={i18nText('Nav.coordinator')} label={coordinator?.working ? i18nText('Nav.coordinatorWorking') : i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
           avatar={<CoordinatorAvatar mood={coordinator?.working ? 'thinking' : 'idle'} />}
-          preview={previewOf(lastReply?.from === 'coordinator' ? namedCitations(lastReply.text, coordinator?.sources ?? {}) : lastReply?.text)} />
+          preview={previewOf(coordinator?.line)} />
         {rows.map(row => {
           if (row.kind === 'group') {
             const { group } = row
