@@ -1,0 +1,22 @@
+{
+  "kind": "owned-acceptance-resources-cleanup",
+  "sourceCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+  "sourceTree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+  "observedAt": "2026-11-05T13:32:49.100922+00:00",
+  "controllerStopped": true,
+  "appStopped": true,
+  "port3110Closed": true,
+  "role": "mikka1284_http_7f8cd93e",
+  "databases": [
+    "mikka1284_http_7f8cd93e_e2e"
+  ],
+  "connectionsBeforeDrop": 0,
+  "activeLeasesBeforeDrop": 0,
+  "validSessionsBeforeDrop": 0,
+  "remainingDatabases": 0,
+  "remainingRole": 0,
+  "normalDrop": true,
+  "forceOrTerminateUsed": false,
+  "privateAuditContextRetained": true,
+  "privateContextsExported": false
+}

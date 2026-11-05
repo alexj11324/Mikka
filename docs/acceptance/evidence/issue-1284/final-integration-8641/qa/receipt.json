@@ -1,0 +1,105 @@
+{
+  "kind": "exact-source-local-production-acceptance",
+  "sourceCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+  "sourceTree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+  "worktreeCleanAfterAcceptance": true,
+  "origin": "http://localhost:3110",
+  "build": {
+    "command": "pnpm build",
+    "startedAt": "2026-11-05T13:26:30.221Z",
+    "finishedAt": "2026-11-05T13:29:43.471Z",
+    "exitCode": 0,
+    "logSha256": "f62186673cf2dc472333128b0c15b6450c242349f01544b218840a77650e44f4"
+  },
+  "runtime": {
+    "readyAt": "2026-11-05T13:29:47.143Z",
+    "strictAttestation": true,
+    "sourceDirty": false
+  },
+  "http": {
+    "passed": true,
+    "assertions": 61,
+    "passedAssertions": 61,
+    "finishedAt": "2026-11-05T13:30:26.627Z",
+    "leaseReleased": true,
+    "leaseState": "quarantined",
+    "validSessions": 0,
+    "fixtureCleanup": [
+      {
+        "purpose": "http-contract",
+        "taskId": "21e3a3a4-68cb-495e-984a-c3d5d147245f",
+        "issueId": "5eca6fe0-e822-417a-9ed3-1a5e7f941b16",
+        "remainingIssues": 0,
+        "remainingTasks": 0,
+        "remainingRuns": 0,
+        "at": "2026-11-05T13:30:22.901Z"
+      },
+      {
+        "purpose": "visual-only",
+        "taskId": "cd01741e-7fdd-49d1-9fde-6a51c19db4c2",
+        "issueId": "2014798e-0dc7-4388-8cd1-83b551dd0296",
+        "remainingIssues": 0,
+        "remainingTasks": 0,
+        "remainingRuns": 0,
+        "at": "2026-11-05T13:30:25.559Z"
+      }
+    ],
+    "pickerCleanup": {
+      "connections": 0,
+      "bindings": 0,
+      "devices": 0,
+      "at": "2026-11-05T13:30:26.573Z"
+    },
+    "archivedPickerProfiles": [
+      "d4a22964-7ee3-4153-9f79-88395aa5be79",
+      "45367ea4-51ea-4408-8730-ad4ae37c5b0f",
+      "76d83047-4fd7-45ae-a167-5be8752cb1ca"
+    ],
+    "resultSha256": "0bfef02ec9b2b11f4ee8e859797a4f2cb473bf8ae7d05dc81ad8ee1f1d524d6d"
+  },
+  "visual": {
+    "actualScreenshotCount": 8,
+    "reusedScreenshotCount": 0,
+    "sourceCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+    "sourceTree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+    "startedAt": "2026-11-05T13:30:01.281Z",
+    "finishedAt": "2026-11-05T13:30:19.149Z",
+    "browserClosed": true,
+    "contextsClosed": true,
+    "captureReceiptSha256": "2cbaec76681c227e954053ef5591ede7c7ec66a5bb0ef500aeef4b3943db21bb"
+  },
+  "cleanup": {
+    "kind": "owned-acceptance-resources-cleanup",
+    "sourceCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+    "sourceTree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+    "observedAt": "2026-11-05T13:32:49.100922+00:00",
+    "controllerStopped": true,
+    "appStopped": true,
+    "port3110Closed": true,
+    "role": "mikka1284_http_7f8cd93e",
+    "databases": [
+      "mikka1284_http_7f8cd93e_e2e"
+    ],
+    "connectionsBeforeDrop": 0,
+    "activeLeasesBeforeDrop": 0,
+    "validSessionsBeforeDrop": 0,
+    "remainingDatabases": 0,
+    "remainingRole": 0,
+    "normalDrop": true,
+    "forceOrTerminateUsed": false,
+    "privateAuditContextRetained": true,
+    "privateContextsExported": false
+  },
+  "helpers": {
+    "sequence": "e50eac41e63c1d39e32ea690e7bde2d4a5128343096395c0706e431f88ecfea9",
+    "http": "638fab20dca867b272a4d50737bdf5dfdb617fef6ea37a89d3e5f15c8197f233",
+    "capture": "fad65cd4f48c90870eb29869a935b75a54942fc2bacfb6faf71407037c63c4d9"
+  },
+  "limitations": [
+    "Normal TestAccountPool signup/signin and real localhost HTTP; synthetic isolated data, not production subscription acceptance.",
+    "Screenshots record actual New Task UI at this exact source; DOM state assertions and independent visual reviews have separate provenance.",
+    "No task Create/Send/Retry was clicked during capture. The separate HTTP recovery task used the real normal Owner retry handler; its pending/noRun response does not prove a native review completed.",
+    "The unfunded DeepSeek coding API path remains excluded. No real external provider/native-model execution was performed by this isolated acceptance.",
+    "Production CC/Codex review, Owner acceptance, frontend native execution and explicit/version-freeze observations remain separately tracked."
+  ]
+}

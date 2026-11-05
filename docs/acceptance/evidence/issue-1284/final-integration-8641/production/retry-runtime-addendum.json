@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "kind": "root-assistant-production-runtime-diagnostic-addendum",
+  "recordedAt": "2026-11-05 13:26:55 UTC",
+  "originalObservation": {
+    "path": "issue1284-production-backend-retry64-result.json",
+    "sha256": "3be6259a607418bc33a27749544047bcc95d97f34de8b3469783cd358d9d0e3c"
+  },
+  "taskId": "b5785091-2c95-4f55-821d-fce51e027b0e",
+  "attemptId": "40355b88-ed4d-49e1-b659-5f7028d6989e",
+  "publicUiCommit": "64dbdd7dc735ddc37cb13e38127409f35dbb5909",
+  "actualDecisionWorker": {
+    "deploymentId": "dpl_4J9UEyuj7abQ55EpWr6vSjpkxm1D",
+    "commit": "08b11f0d9c5a9273312267b6b21cb1b56d0624cc",
+    "loggedAt": "2026-11-05T13:12:48.410Z",
+    "requestPath": "/mikka/.well-known/workflow/v1/flow",
+    "requestId": "fl9bh-1793884364312-a2f3a658fe68"
+  },
+  "diagnostic": {
+    "level": "warn",
+    "msg": "agentProfileDecisionUnavailable",
+    "event": "coded_error",
+    "code": "agentProfileDecisionUnavailable",
+    "detail": "uncertain_profile",
+    "causes": [],
+    "issueId": "6cda8149-144c-49cc-bdcb-a85ff14cb144",
+    "stage": "review",
+    "candidateCount": 3,
+    "candidateIds": "55e1952f-0129-43c6-9690-2f1b9d99e6b2,923c75f2-cecb-4bb2-b812-646d057e8a22,1880144e-4005-4d72-b3e3-6f362fbe8bd8",
+    "profileCount": 3,
+    "profileAvailability": "55e1952f-0129-43c6-9690-2f1b9d99e6b2:available,923c75f2-cecb-4bb2-b812-646d057e8a22:available,1880144e-4005-4d72-b3e3-6f362fbe8bd8:available",
+    "profileDiagnosticsTruncated": false,
+    "decisionExecutionId": "acc61cac-774b-46ff-ba76-c9fcdc605bd1"
+  },
+  "interpretation": {
+    "current64DecisionSourceExercised": false,
+    "oldWorkflowProcessedCheck": true,
+    "reasonDetail": "uncertain_profile",
+    "allThreeProfilesReportedAvailable": true,
+    "rawDecisionIdAndConfidence": "not exposed by this old deployment",
+    "nativeCodexRunStarted": false,
+    "independentReviewPassed": false,
+    "ownerAccepted": false,
+    "correction": "The original observation identifies the UI deployment; the correlated runtime log establishes that an older existing Workflow actually processed the new check attempt."
+  }
+}

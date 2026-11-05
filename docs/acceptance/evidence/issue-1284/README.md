@@ -244,3 +244,11 @@ This group does not include the pending queued-Stop increment, final merged buil
 
 本组是隔离环境和合并前验证。生产的CC/Codex原生执行、同Task独立Review、Owner Accept与运行中配置冻结仍需单独记录；不据此关闭#1284。DeepSeek编码API按Alex指示排除，没有余额探测或测试请求；内置Decision选择不在这项排除之内。
 
+
+## 864113b 当前批次的新增证据
+
+[864113b 新增22文件与8张实际页面截图](final-integration-8641/README.md)记录本版本完整构建、正常TestAccountPool HTTP61/61、同tree207/207定向门禁和31项终态CI（26 success、5条件skip）。两份独立assistant视觉复核均保留；这些不是Alex人工生产验收。
+
+[冻结manifest](final-integration-8641-manifest.json) SHA256 `19e878b1bacbb1605f8fa0d283c849b8a116e9e0d31e934a1d2176f75d3f32fd`；[本轮fresh-context官方审计](final-integration-8641-audit.json)通过22文件且审计前后字节一致。既有37件历史包保持不动。
+
+ALEX67最新Retry的UI为64，但运行时日志将真正Decision绑定到旧08b dueTimer，结果仍为无Run的uncertain_profile；原始观察及归因补充一并保留。8641可按已完成门禁发布daemon/Stop/Profile修复，timer切换另行fix-forward。#1284保持open，真实CC/Codex Review、Owner Accept及版本冻结尚未宣称完成。

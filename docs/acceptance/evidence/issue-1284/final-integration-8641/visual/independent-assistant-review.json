@@ -1,0 +1,170 @@
+{
+  "kind": "assistant-visual-review",
+  "reviewer": {
+    "agent": "/root/ui_impl",
+    "role": "Independent assistant visual reviewer",
+    "humanAcceptance": false,
+    "note": "This is not Alex human acceptance or production Owner acceptance."
+  },
+  "reviewedAt": "2026-11-05T13:40:07.270507Z",
+  "sourceCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+  "sourceTree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+  "buildId": "cqTlhtnRmsqAzDARPEoJA",
+  "captureWindow": {
+    "startedAt": "2026-11-05T13:30:01.281Z",
+    "finishedAt": "2026-11-05T13:30:19.149Z"
+  },
+  "inputs": [
+    {
+      "path": "visual-manifest.json",
+      "bytes": 2626,
+      "sha256": "32c5dccd450d2afd11153377e57340a35651e6ca0a02d39228a4c37f186ab364"
+    },
+    {
+      "path": "capture-receipt.json",
+      "bytes": 10101,
+      "sha256": "2cbaec76681c227e954053ef5591ede7c7ec66a5bb0ef500aeef4b3943db21bb"
+    }
+  ],
+  "method": "Each of the eight original PNG files was opened individually with view_image and visually inspected. File bytes, SHA256 and PNG dimensions were independently matched to the manifest. No image editing, browser action, Docker operation or product mutation was performed for this review.",
+  "result": "pass_for_the_captured_visual_scope",
+  "blockingFindings": [],
+  "reviewedImageCount": 8,
+  "images": [
+    {
+      "path": "864113bdb9a6-profile-picker-selected-light-1440.png",
+      "bytes": 95232,
+      "sha256": "d53d05c2ae7aef6f46752267dc654d29b6b42fee968d3ce5d4c6aebe990e87cf",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "state": "selected",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_layout_defect_observed",
+      "observation": "桌面弹窗居中，顶部运行位置、Profile 和新建任务标识排列清楚；关闭、附件与蓝色创建任务按钮均完整可见。“模型额度待检查”为中性灰色提示，没有错误色或阻断遮罩。"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-menu-light-1440.png",
+      "bytes": 118437,
+      "sha256": "b06aa30785ae10b0b94a0fa17d5317eb13b5a35efcb5b27e67696e35f95c2781",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "state": "menu",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_layout_defect_observed",
+      "observation": "桌面菜单锚定 Profile 控件，全部选项、选中勾选、不可用原因和管理入口完整可见，没有被弹窗边界截断。待检查项为正常可读的选中样式；已停用与暂无模型来源项文字明显变淡，原因分别显示已停用及没有可用的优先模型。"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-selected-dark-1440.png",
+      "bytes": 95527,
+      "sha256": "201eb45a290a983692f2071685bad94e07c58c74066130b823bb6912fd44d666",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "state": "selected",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_layout_defect_observed",
+      "observation": "桌面弹窗居中，顶部运行位置、Profile 和新建任务标识排列清楚；关闭、附件与蓝色创建任务按钮均完整可见。“模型额度待检查”为中性灰色提示，没有错误色或阻断遮罩。"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-menu-dark-1440.png",
+      "bytes": 117931,
+      "sha256": "c0335ce00748290dcc19d72cc6d3d6581e1d5d257a17db4bed866321890935a2",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "state": "menu",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_layout_defect_observed",
+      "observation": "桌面菜单锚定 Profile 控件，全部选项、选中勾选、不可用原因和管理入口完整可见，没有被弹窗边界截断。待检查项为正常可读的选中样式；已停用与暂无模型来源项文字明显变淡，原因分别显示已停用及没有可用的优先模型。"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-selected-light-390.png",
+      "bytes": 46348,
+      "sha256": "91dd0467960f3f35ecced3e8701fe2d28d5fa02e31bb9d5b1854668e65e6bbb8",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "selected",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_layout_defect_observed",
+      "observation": "390px 弹窗左右留白完整；运行位置和 Profile 控件分行，草稿自然换行；关闭、附件、蓝色创建任务按钮均完整可见。“模型额度待检查”为中性灰色提示，没有错误色或阻断遮罩。"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-menu-light-390.png",
+      "bytes": 58130,
+      "sha256": "fa1f2a91a502d26624aa068aff9cae4b5cef56a19c350e75354157cb3e23aeac",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "menu",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_layout_defect_observed",
+      "observation": "390px 菜单完整落在视口内，选中项勾选、两条不可用原因和管理入口均可见；浮层遮住部分底层草稿及创建按钮是打开菜单时的覆盖，配对收起图中按钮完整。待检查项为正常可读的选中样式；已停用与暂无模型来源项文字明显变淡，原因分别显示已停用及没有可用的优先模型。"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-selected-dark-390.png",
+      "bytes": 46504,
+      "sha256": "5348b05609ee65907e92d6d54dc4ebf73f0cf949f336f7959e8053c33985da90",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "selected",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_layout_defect_observed",
+      "observation": "390px 弹窗左右留白完整；运行位置和 Profile 控件分行，草稿自然换行；关闭、附件、蓝色创建任务按钮均完整可见。“模型额度待检查”为中性灰色提示，没有错误色或阻断遮罩。"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-menu-dark-390.png",
+      "bytes": 57629,
+      "sha256": "4acd6b50bea0ec67a6f9263cd18695f9c2f20f23c208e45c30da627ed0c29dfc",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "menu",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_layout_defect_observed",
+      "observation": "390px 菜单完整落在视口内，选中项勾选、两条不可用原因和管理入口均可见；浮层遮住部分底层草稿及创建按钮是打开菜单时的覆盖，配对收起图中按钮完整。待检查项为正常可读的选中样式；已停用与暂无模型来源项文字明显变淡，原因分别显示已停用及没有可用的优先模型。"
+    }
+  ],
+  "domEvidence": {
+    "provenance": "Reported by the separately hashed capture-receipt.json, not inferred from screenshot pixels or independently re-executed in this review.",
+    "allFourSelectedStates": {
+      "notice": "模型额度待检查",
+      "createButtonDisabled": false
+    },
+    "allFourMenuStates": {
+      "checkingAriaDisabled": null,
+      "confirmedUnavailableAriaDisabled": "true"
+    },
+    "documentWidths": {
+      "desktopViewport1440": 1430,
+      "mobileViewport390": 390
+    }
+  },
+  "scopeAndLimits": [
+    "These are actual local production-build pages with isolated synthetic catalogue data and normal TestAccountPool authentication, according to the capture receipt. They are not real subscription or production account acceptance.",
+    "The images show the selected checking state and open availability menu at 1440x1000 and 390x844 in light and dark themes. No clipping or horizontal overflow is visually apparent within those captured states; document-width measurements belong to the separate DOM record.",
+    "Visible blue button styling and muted options do not alone prove enabled or disabled semantics. Those attributes are separately attributed to the capture receipt.",
+    "No Create or Send action, server dispatch, native model execution, live-push delivery, Retry transition, or API acceptance is established by this visual review. The separate HTTP and unit-test evidence retain their own source/version and provenance.",
+    "No quantitative contrast, screen-reader, keyboard navigation or additional viewport audit was performed.",
+    "All eight images retain actual source 864113bdb9a62dcff633c9ce7bc0fd59d93a6641. A later source may only reuse them with separate dependency/byte equivalence evidence; this receipt does not relabel them."
+  ]
+}

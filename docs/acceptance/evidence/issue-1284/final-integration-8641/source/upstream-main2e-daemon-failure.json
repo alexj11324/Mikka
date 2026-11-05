@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "kind": "observed-incoming-main-runtime-publication-failure",
+  "recordedAt": "2026-11-05 13:01:56 UTC",
+  "repository": "alexj11324/Mikka",
+  "mainCommit": "2e69933a0c5cf6e458bdeac988d59940e59fc4b9",
+  "mainTree": "ae4bfa689c4230ec12555d3a783dc5e8f10d98f0",
+  "pullRequest": 1390,
+  "workflow": {
+    "name": "Publish daemon",
+    "id": 42029436379,
+    "conclusion": "failure",
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42029436379"
+  },
+  "job": {
+    "id": 127251791338,
+    "step": "Pin and inventory the released runtime dependency graph",
+    "failedAtFromLog": "2026-11-05T12:45:11.6704823Z",
+    "exitCode": 1
+  },
+  "diagnostic": {
+    "source": "GitHub workflow job log; only closed package/version/error fields retained",
+    "code": "ERESOLVE",
+    "rootPackage": "@aspectlylabs/mikka@0.0.468",
+    "declaredApi": "@opentelemetry/api@1.10.0",
+    "sdk": "@opentelemetry/core@2.12.0",
+    "requiredPeer": ">=1.0.0 <1.10.0"
+  },
+  "webRelease": {
+    "deployment": "dpl_HRas9ZrDVkUgdQjbWEAJRxf6Tprz",
+    "state": "READY",
+    "publicBuild": "2e69933a0c5cf6e458bdeac988d59940e59fc4b9",
+    "normalOwnerBrowserObservedAt": "2026-11-05T12:50:07.527Z"
+  },
+  "response": "Reproduce the actual dependency-resolution failure in the existing Docker Large sandbox, fix exact compatible dependency declarations, and verify the same release command without force, legacy-peer-deps or disabled gates.",
+  "productionAcceptance": "not_completed"
+}

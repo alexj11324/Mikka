@@ -1,0 +1,139 @@
+{
+  "schema": 1,
+  "kind": "root-assistant-visual-review",
+  "reviewedAt": "2026-11-05 13:34:52 UTC",
+  "sourceCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+  "sourceTree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+  "reviewer": "root assistant",
+  "humanAcceptance": false,
+  "method": "Individually opened and visually inspected all eight original PNGs with view_image; inspected original normal capture receipt separately.",
+  "images": [
+    {
+      "path": "864113bdb9a6-profile-picker-selected-light-1440.png",
+      "bytes": 95232,
+      "sha256": "d53d05c2ae7aef6f46752267dc654d29b6b42fee968d3ce5d4c6aebe990e87cf",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "state": "selected",
+      "reviewed": true,
+      "result": "no visual blocker"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-menu-light-1440.png",
+      "bytes": 118437,
+      "sha256": "b06aa30785ae10b0b94a0fa17d5317eb13b5a35efcb5b27e67696e35f95c2781",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "state": "menu",
+      "reviewed": true,
+      "result": "no visual blocker"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-selected-dark-1440.png",
+      "bytes": 95527,
+      "sha256": "201eb45a290a983692f2071685bad94e07c58c74066130b823bb6912fd44d666",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "state": "selected",
+      "reviewed": true,
+      "result": "no visual blocker"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-menu-dark-1440.png",
+      "bytes": 117931,
+      "sha256": "c0335ce00748290dcc19d72cc6d3d6581e1d5d257a17db4bed866321890935a2",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "state": "menu",
+      "reviewed": true,
+      "result": "no visual blocker"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-selected-light-390.png",
+      "bytes": 46348,
+      "sha256": "91dd0467960f3f35ecced3e8701fe2d28d5fa02e31bb9d5b1854668e65e6bbb8",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "selected",
+      "reviewed": true,
+      "result": "no visual blocker"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-menu-light-390.png",
+      "bytes": 58130,
+      "sha256": "fa1f2a91a502d26624aa068aff9cae4b5cef56a19c350e75354157cb3e23aeac",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "menu",
+      "reviewed": true,
+      "result": "no visual blocker"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-selected-dark-390.png",
+      "bytes": 46504,
+      "sha256": "5348b05609ee65907e92d6d54dc4ebf73f0cf949f336f7959e8053c33985da90",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "selected",
+      "reviewed": true,
+      "result": "no visual blocker"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-menu-dark-390.png",
+      "bytes": 57629,
+      "sha256": "4acd6b50bea0ec67a6f9263cd18695f9c2f20f23c208e45c30da627ed0c29dfc",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "menu",
+      "reviewed": true,
+      "result": "no visual blocker"
+    }
+  ],
+  "findings": [
+    "Desktop 1440x1000 light and dark dialogs retain clear Profile selection, neutral checking notice, task body, attachment control and visible Create action.",
+    "Mobile 390x844 light and dark dialogs wrap execution target and Profile controls onto separate lines; text wraps within the modal, and the selected closed-menu frames retain the Create action within the viewport.",
+    "Open menus show the chosen checking Profile with a checkmark; disabled and no-model-source entries are visually distinct and carry their reasons. Menus stay within the viewport.",
+    "Open-menu mobile frames normally overlay some body/Create content; paired closed-menu frames show the complete action. This is not clipping or an out-of-viewport control.",
+    "Both themes keep readable active text and distinct selected state. Background blur is the normal modal treatment, not post-processing."
+  ],
+  "captureReceiptObservations": {
+    "source": "captures/capture-receipt.json",
+    "actualScreenshotCount": 8,
+    "captureWindow": "2026-11-05T13:30:01.281Z–2026-11-05T13:30:19.149Z",
+    "checkingCanSelect": true,
+    "createButtonDisabled": false,
+    "unavailableAriaDisabled": "true",
+    "documentWidthAtMobile": 390,
+    "viewportWidthAtMobile": 390
+  },
+  "boundaries": [
+    "This is assistant review of Docker-isolated production-build images, not Alex's human production acceptance.",
+    "Fixture labels and availability are synthetic isolated catalogue metadata; images do not prove a paid subscription, actual Decision dispatch, native Run, independent Review or Owner Accept.",
+    "No Create/Send action was performed for these screenshots.",
+    "Screenshots belong to exact864113b and will not be relabeled if a later timer-only source fix is introduced."
+  ]
+}

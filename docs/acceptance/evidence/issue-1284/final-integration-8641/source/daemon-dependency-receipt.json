@@ -1,0 +1,340 @@
+{
+  "kind": "daemon-runtime-peer-dependency-fix",
+  "recordedAt": "2026-11-05T13:08:38.934321+00:00",
+  "source": {
+    "localCheckpoint": "c9322d10332002a7cf2f697fdd4c96241f80050b",
+    "tree": "3cf49902778ea49242cd68cb796ca1540cb0ed5b",
+    "parents": [
+      "2e69933a0c5cf6e458bdeac988d59940e59fc4b9"
+    ],
+    "cleanAtCheckpoint": true,
+    "changedFiles": [
+      {
+        "path": "packages/daemon/package.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha256": "5794e8826c468f5634fd68bc30458c7cf20381dc059591977ef42008402b42fb",
+        "gitBlobSha": "71657c0b2a57441f25e0154410b4bfcb74204b4f",
+        "bytes": 2686,
+        "contentPath": "files/packages/daemon/package.json"
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha256": "8d79aebc9c8b93340d4bcd688860a8828bdfd740a6053a6fb8fcda07700ee26d",
+        "gitBlobSha": "20f4b88b963b3c22a26da627af25366c434dea8b",
+        "bytes": 937852,
+        "contentPath": "files/pnpm-lock.yaml"
+      }
+    ],
+    "exportManifest": {
+      "path": "export/manifest.json",
+      "sha256": "5d86db45d9959f3cf00efe9c898a30021b82ff42205942fced432ba100636afa"
+    }
+  },
+  "failure": {
+    "upstreamRunUrl": "https://github.com/alexj11324/Mikka/actions/runs/42029436379",
+    "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42029436379/job/127251791338",
+    "upstreamSource": "2e69933a0c5cf6e458bdeac988d59940e59fc4b9",
+    "step": "Pin and inventory the released runtime dependency graph",
+    "code": "ERESOLVE",
+    "reason": "The daemon directly pinned OpenTelemetry API 1.10.0 while core/resources/sdk-trace-base 2.12.0 require an API below 1.10.0.",
+    "risk": {
+      "occurrence": 10,
+      "impact": 6,
+      "product": 60,
+      "basis": "The exact current release inventory command deterministically fails before publication; the local unfixed candidate reproduced the same peer rejection."
+    }
+  },
+  "fix": {
+    "daemonApiExactVersion": "1.9.0",
+    "compatiblePeerIntersection": ">=1.3.0 <1.10.0",
+    "coreVersion": "2.12.0",
+    "dependencyDeclaration": "exact string; not a floating range",
+    "generatedManifestDependencyChanges": {
+      "@opentelemetry/api": {
+        "before": "1.10.0",
+        "after": "1.9.0"
+      }
+    },
+    "registryMetadata": {
+      "path": "evidence/official-registry-metadata.json",
+      "sha256": "8676d9b3dc30dd255ca0de893cfd14da51683d275a5da88b2417f3d39e4e9e79"
+    }
+  },
+  "verification": {
+    "environment": {
+      "kind": "existing-isolated-Docker-Large",
+      "node": "v24.22.2",
+      "npm": "11.19.0",
+      "pnpm": "10.34.3"
+    },
+    "red": {
+      "source": "2e69933a0c5cf6e458bdeac988d59940e59fc4b9",
+      "sourceClean": true,
+      "startedAt": "2026-11-05T12:58:28.806Z",
+      "finishedAt": "2026-11-05T12:58:30.207Z",
+      "buildExit": 0,
+      "pinRuntimeExit": 0,
+      "npmInstallExit": 1,
+      "errorCode": "ERESOLVE",
+      "receipt": "evidence/red-graph-receipt.json"
+    },
+    "green": {
+      "testedBaseHead": "2e69933a0c5cf6e458bdeac988d59940e59fc4b9",
+      "testedWorkingTree": "The exact two-file working tree later committed as the local checkpoint; targeted-check source hashes match both exported blobs.",
+      "startedAt": "2026-11-05T13:00:13.358Z",
+      "finishedAt": "2026-11-05T13:00:17.250Z",
+      "steps": [
+        {
+          "name": "build",
+          "command": [
+            "pnpm",
+            "--filter",
+            "@mikka/daemon",
+            "build"
+          ],
+          "exitCode": 0
+        },
+        {
+          "name": "pin-runtime",
+          "command": [
+            "node",
+            "scripts/release/evidence.mjs",
+            "pin-runtime",
+            "/workspace/Mikka-1284-daemon-deps/packages/daemon/.retained-build-ccfp4b"
+          ],
+          "exitCode": 0
+        },
+        {
+          "name": "install-runtime",
+          "command": [
+            "npm",
+            "--prefix",
+            "/workspace/Mikka-1284-daemon-deps/packages/daemon/.retained-build-ccfp4b",
+            "install",
+            "--package-lock-only",
+            "--ignore-scripts",
+            "--omit=dev",
+            "--workspaces=false",
+            "--no-audit",
+            "--no-fund"
+          ],
+          "exitCode": 0
+        },
+        {
+          "name": "shrinkwrap",
+          "command": [
+            "npm",
+            "--prefix",
+            "/workspace/Mikka-1284-daemon-deps/packages/daemon/.retained-build-ccfp4b",
+            "shrinkwrap",
+            "--ignore-scripts",
+            "--workspaces=false"
+          ],
+          "exitCode": 0
+        },
+        {
+          "name": "sbom",
+          "command": [
+            "npm",
+            "--prefix",
+            "/workspace/Mikka-1284-daemon-deps/packages/daemon/.retained-build-ccfp4b",
+            "sbom",
+            "--sbom-format=cyclonedx",
+            "--omit=dev",
+            "--package-lock-only"
+          ],
+          "exitCode": 0
+        },
+        {
+          "name": "audit",
+          "command": [
+            "npm",
+            "--prefix",
+            "/workspace/Mikka-1284-daemon-deps/packages/daemon/.retained-build-ccfp4b",
+            "audit",
+            "--omit=dev",
+            "--package-lock-only",
+            "--json",
+            "--workspaces=false"
+          ],
+          "exitCode": 0
+        },
+        {
+          "name": "audit-policy",
+          "command": [
+            "node",
+            "scripts/release/audit-policy.mjs",
+            "/tmp/issue1284-daemon-deps/green-release-audit.json",
+            "config/release-security.json",
+            "/workspace/Mikka-1284-daemon-deps/packages/daemon/.retained-build-ccfp4b/npm-shrinkwrap.json"
+          ],
+          "exitCode": 0
+        }
+      ],
+      "distManifestApi": "1.9.0",
+      "shrinkwrapApi": "1.9.0",
+      "receipt": "evidence/green-graph-receipt.json"
+    },
+    "targeted": {
+      "daemonTypecheckExit": 0,
+      "daemonTracing": {
+        "passed": 8,
+        "failed": 0
+      },
+      "releaseContracts": {
+        "passed": 15,
+        "failed": 0
+      },
+      "diffCheckExit": 0,
+      "receipt": "evidence/targeted-checks.json"
+    }
+  },
+  "independentReview": {
+    "reviewer": "requirements_review assistant",
+    "kind": "source-and-contract review; no independent test execution",
+    "result": "No remaining blocker in exact pin, daemon peer snapshots, generated manifest or installed-version pinning."
+  },
+  "boundaries": [
+    "Local generated package version was 0.0.1; it was not the release-version-stamped upstream candidate 0.0.468. The inventory commands and dependency inputs reproduce the failure.",
+    "No npm publish, GitHub Actions dispatch, deployment, production mutation, database activity or coding-provider/model calls were performed.",
+    "No force, legacy-peer-deps, omitted peer check or weakened release/audit gate was used.",
+    "The graph and targeted checks ran before the local checkpoint; the exact source file hashes bind them to its tree. A later remote commit may have different metadata with the same tree.",
+    "This does not assert a production daemon release or production UI acceptance; those remain part of the final batch release."
+  ],
+  "preparationNotes": [
+    {
+      "step": "local checkpoint commit",
+      "exitCode": 128,
+      "cause": "No local Git author identity configured",
+      "resolution": "Retried only the commit with command-scoped Mikka Agent identity; shared global Git configuration and tested source bytes were not changed."
+    }
+  ],
+  "resources": {
+    "databaseOrRoleCreated": false,
+    "appServerStarted": false,
+    "browserStarted": false,
+    "testProcessesCompleted": true,
+    "worktreeAndTemporaryReleaseArtifacts": "Retained for integration and evidence; no shared service or sandbox lifecycle action taken.",
+    "codingProviderModelCalls": 0
+  },
+  "evidenceFiles": [
+    {
+      "path": "evidence/daemon-tracing.log",
+      "bytes": 459,
+      "sha256": "f79d7d0cfee94105e31d679dec880ee496ce971c695e96f55a97320bf080b6c6"
+    },
+    {
+      "path": "evidence/daemon-types.log",
+      "bytes": 117,
+      "sha256": "cea6cff7164392976f2b71d191df66a67892e44ab1d81b5e1a9be891120c08cb"
+    },
+    {
+      "path": "evidence/diff-check.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/green-artifact/npm-shrinkwrap.json",
+      "bytes": 83109,
+      "sha256": "6abd7b63d7ad91904eb0cc8a5e1646ca8f227443be35d166e3aec31370c8723d"
+    },
+    {
+      "path": "evidence/green-artifact/package.json",
+      "bytes": 1361,
+      "sha256": "6d5cdc3a4ce3e24a9d17c16c197167676bde25f558ab52f6fe39151db35f7c13"
+    },
+    {
+      "path": "evidence/green-artifact/sbom.cdx.json",
+      "bytes": 151802,
+      "sha256": "8cbca472fb8951ec27e49452d08e39f61989f8653930ea16c4e598394f39e429"
+    },
+    {
+      "path": "evidence/green-audit-policy.log",
+      "bytes": 111,
+      "sha256": "8e4ff77f6fe92d78660b18d73e83537c1d24b29ecf3fa25bbf276c92e95bf714"
+    },
+    {
+      "path": "evidence/green-audit.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/green-build.log",
+      "bytes": 312,
+      "sha256": "b4cffcbbf249ae0a2556772bff65418459825eb3161a415d68fee75b83b6ebe1"
+    },
+    {
+      "path": "evidence/green-graph-receipt.json",
+      "bytes": 6759,
+      "sha256": "57c9f6e56b9906708a7bac606b8f7d6860193860240561a3a83bc0053afcffc1"
+    },
+    {
+      "path": "evidence/green-install-runtime.log",
+      "bytes": 18,
+      "sha256": "ce7bf91f54adc7390cff6bf1c2572fd00ce9cfbd0611637e273059c4710a80c9"
+    },
+    {
+      "path": "evidence/green-pin-runtime.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/green-release-audit.json",
+      "bytes": 362,
+      "sha256": "f076147c6faceafb3d4708acc4ccc7f4faa1ae7b6ca85711624644449f68d9c4"
+    },
+    {
+      "path": "evidence/green-sbom.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/green-shrinkwrap.log",
+      "bytes": 69,
+      "sha256": "f48171672d5df60abaabb5da2d83c786daf0d75f33baf6f1c95c500d43185bb0"
+    },
+    {
+      "path": "evidence/official-registry-metadata.json",
+      "bytes": 2461,
+      "sha256": "8676d9b3dc30dd255ca0de893cfd14da51683d275a5da88b2417f3d39e4e9e79"
+    },
+    {
+      "path": "evidence/red-build.log",
+      "bytes": 312,
+      "sha256": "97d4477dd454d23be41c6efe6934e080f402f458611896e5297254287137b70a"
+    },
+    {
+      "path": "evidence/red-graph-receipt.json",
+      "bytes": 3883,
+      "sha256": "51eca94e481ded8ae493e82765b32d8d5a11bb4b56a524cdd9130406f458f38e"
+    },
+    {
+      "path": "evidence/red-install-runtime.log",
+      "bytes": 946,
+      "sha256": "e5d1391f61cc2ebec37cdb9a0201babbacca860ad4cc49d9b2e28c8549408a6a"
+    },
+    {
+      "path": "evidence/red-pin-runtime.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/release-contracts.log",
+      "bytes": 1552,
+      "sha256": "cbe46a39a04a99d37d16992bff2319f7d2cce959c1d29561549f3b4a7e550a3b"
+    },
+    {
+      "path": "evidence/targeted-checks.json",
+      "bytes": 2256,
+      "sha256": "ef3313aad61864ccbc2c72d51302282a1e38795efa4e1d3e4cd3410655c200cc"
+    },
+    {
+      "path": "evidence/verify-release-graph.mjs",
+      "bytes": 3797,
+      "sha256": "e9ea665b5ec684ef28133cce7488e080ba87af666f662b651e3014b294d5f216"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "kind": "official-test-account-evidence-audit",
+  "files": 22,
+  "archives": 0,
+  "archiveEntries": 0,
+  "decodedBytes": 0,
+  "result": "passed",
+  "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden",
+  "startedAt": "2026-11-05T13:41:53.853Z",
+  "finishedAt": "2026-11-05T13:41:53.879Z",
+  "runnerSourceCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+  "runnerSourceTree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+  "candidateProductSourceCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+  "candidateProductSourceTree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+  "manifestSha256": "19e878b1bacbb1605f8fa0d283c849b8a116e9e0d31e934a1d2176f75d3f32fd",
+  "candidateBytes": 723524,
+  "candidateByteIntegrityBeforeAndAfter": true,
+  "privateContextsExported": false,
+  "databaseOrServerRequired": false,
+  "helper": "scripts/test-accounts/session.mjs auditEvidence; only this fresh runner context is used"
+}

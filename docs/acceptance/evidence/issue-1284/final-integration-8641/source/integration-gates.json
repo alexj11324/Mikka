@@ -1,0 +1,394 @@
+{
+  "schema": 1,
+  "source": {
+    "actualTestCommit": "1a0ad661f4a0508773682641b8905b8a267dcddf",
+    "actualTestTree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+    "sameTreePublishedCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+    "orderedPublicParents": [
+      "93aa4b738bd23bd3a051c1a7a620d85bb0c5b942",
+      "d3fa7a685a43a21334d345f9338295ec0a6e7c81"
+    ],
+    "sourceDirtyBefore": false,
+    "sourceDirtyAfter": false,
+    "sameTreeMappingDoesNotChangeActualExecutionCommit": true
+  },
+  "environment": {
+    "location": "Docker Cloud Sandbox",
+    "class": "Large 8 CPU / 16 GiB",
+    "database": "PostgreSQL 17, isolated loopback role and databases",
+    "CI": "true",
+    "REQUIRE_DB": "1"
+  },
+  "startedAt": "2026-11-05T13:25:02.871009+00:00",
+  "finishedAt": "2026-11-05T13:27:45.243017+00:00",
+  "complete": true,
+  "commands": [
+    {
+      "name": "install",
+      "argv": [
+        "pnpm",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "startedAt": "2026-11-05T13:25:02.871232+00:00",
+      "logPath": "/tmp/issue1284-main64-gates-install.log",
+      "finishedAt": "2026-11-05T13:25:09.078406+00:00",
+      "exitCode": 0,
+      "logBytes": 5349,
+      "logSha256": "a14c613f3a2aa06455daf78f7a37b0383f7e53afdf59aff2223c30542087342c"
+    },
+    {
+      "name": "types",
+      "argv": [
+        "pnpm",
+        "typecheck"
+      ],
+      "startedAt": "2026-11-05T13:25:09.079687+00:00",
+      "logPath": "/tmp/issue1284-main64-gates-types.log",
+      "finishedAt": "2026-11-05T13:25:12.640954+00:00",
+      "exitCode": 0,
+      "logBytes": 74,
+      "logSha256": "c140df3a296b0becb5b9deb02bd599dd00718f2b847a1bb8e7b8fe81565389a5"
+    },
+    {
+      "name": "lint-ui",
+      "argv": [
+        "pnpm",
+        "lint:ui"
+      ],
+      "startedAt": "2026-11-05T13:25:12.641174+00:00",
+      "logPath": "/tmp/issue1284-main64-gates-lint-ui.log",
+      "finishedAt": "2026-11-05T13:25:20.694810+00:00",
+      "exitCode": 0,
+      "logBytes": 295,
+      "logSha256": "9e6ef4cf5f50dc684bcb42dc99812222f84adb0e859755ac6c31f02a49575f7d"
+    },
+    {
+      "name": "target-lint",
+      "argv": [
+        "pnpm",
+        "exec",
+        "oxlint",
+        "--deny-warnings",
+        "components/coordinator/new-task-dialog.tsx",
+        "components/coordinator/task-profile-picker.tsx",
+        "components/coordinator/task-profile-picker.test.tsx",
+        "components/coordinator/task-profile-submit.test.tsx",
+        "components/settings/factory-profiles-data.ts",
+        "lib/factory/agent-profile-decision.ts",
+        "lib/factory/agent-profile.ts",
+        "lib/factory/automatic-dispatch.ts",
+        "lib/factory/agent-profile.test.ts",
+        "lib/factory/agent-profile.db.test.ts",
+        "lib/factory/profile-dispatch.db.test.ts"
+      ],
+      "startedAt": "2026-11-05T13:25:20.695368+00:00",
+      "logPath": "/tmp/issue1284-main64-gates-target-lint.log",
+      "finishedAt": "2026-11-05T13:25:21.096761+00:00",
+      "exitCode": 0,
+      "logBytes": 91,
+      "logSha256": "857fd585f657569e81a20b5efb7926e8c487f7f58d65d186141c7a602032e712"
+    },
+    {
+      "name": "diff",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "startedAt": "2026-11-05T13:25:21.097035+00:00",
+      "logPath": "/tmp/issue1284-main64-gates-diff.log",
+      "finishedAt": "2026-11-05T13:25:21.103311+00:00",
+      "exitCode": 0,
+      "logBytes": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "schema",
+      "argv": [
+        "pnpm",
+        "test:e2e:setup"
+      ],
+      "startedAt": "2026-11-05T13:25:21.273853+00:00",
+      "logPath": "/tmp/issue1284-main64-gates-schema.log",
+      "finishedAt": "2026-11-05T13:25:23.518525+00:00",
+      "exitCode": 0,
+      "logBytes": 18766,
+      "logSha256": "edc74d7f2db6a55083064660927036cbbc1a03266c0dd7d80c3c10788f2ff635"
+    },
+    {
+      "name": "profile-unit",
+      "argv": [
+        "node",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/factory/agent-profile.test.ts"
+      ],
+      "startedAt": "2026-11-05T13:25:23.519200+00:00",
+      "logPath": "/tmp/issue1284-main64-gates-profile-unit.log",
+      "finishedAt": "2026-11-05T13:25:24.097784+00:00",
+      "exitCode": 0,
+      "logBytes": 1584,
+      "logSha256": "c3d983b649ac16a56e4dec60a6cf34bf3e31fc739c327e7fbb273dd2b6fde01a",
+      "counts": {
+        "tests": 15,
+        "suites": 0,
+        "pass": 15,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "validationKind": "node_unit"
+    },
+    {
+      "name": "profile-picker-submit",
+      "argv": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "components/coordinator/task-profile-picker.test.tsx",
+        "components/coordinator/task-profile-submit.test.tsx"
+      ],
+      "startedAt": "2026-11-05T13:25:24.099610+00:00",
+      "logPath": "/tmp/issue1284-main64-gates-profile-picker-submit.log",
+      "finishedAt": "2026-11-05T13:25:25.725325+00:00",
+      "exitCode": 0,
+      "logBytes": 2042,
+      "logSha256": "a64777b8445463223b7f72e9a8c6d54d2375e4d7ed7af6f42b9d8c3e56211a89",
+      "counts": {
+        "tests": 11,
+        "suites": 0,
+        "pass": 11,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "validationKind": "react_component_happy_dom_not_live_browser"
+    },
+    {
+      "name": "agent-profile-pg",
+      "argv": [
+        "node",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/factory/agent-profile.db.test.ts"
+      ],
+      "startedAt": "2026-11-05T13:25:25.725828+00:00",
+      "logPath": "/tmp/issue1284-main64-gates-agent-profile-pg.log",
+      "finishedAt": "2026-11-05T13:26:14.458145+00:00",
+      "exitCode": 0,
+      "logBytes": 7614,
+      "logSha256": "9127d1615651a4f3696e56cba1f84b0aae370e4c529bc33cd82c178f3a453086",
+      "counts": {
+        "tests": 50,
+        "suites": 0,
+        "pass": 50,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "validationKind": "real_postgresql"
+    },
+    {
+      "name": "profile-dispatch-pg",
+      "argv": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/factory/profile-dispatch.db.test.ts"
+      ],
+      "startedAt": "2026-11-05T13:26:14.459163+00:00",
+      "logPath": "/tmp/issue1284-main64-gates-profile-dispatch-pg.log",
+      "finishedAt": "2026-11-05T13:26:28.185831+00:00",
+      "exitCode": 0,
+      "logBytes": 4805,
+      "logSha256": "8a3b2c5073b4bb4f87a127efed5f2f77370b22deda194788afc08e7c9407f157",
+      "counts": {
+        "tests": 48,
+        "suites": 0,
+        "pass": 48,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "validationKind": "real_postgresql"
+    },
+    {
+      "name": "thread-controls",
+      "argv": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/run-control-actions.test.ts",
+        "tests/thread-question-wake-actions.test.ts"
+      ],
+      "startedAt": "2026-11-05T13:26:28.186526+00:00",
+      "logPath": "/tmp/issue1284-main64-gates-thread-controls.log",
+      "finishedAt": "2026-11-05T13:26:49.901954+00:00",
+      "exitCode": 0,
+      "logBytes": 4760,
+      "logSha256": "a1405006f3cf7ce5657e73aa3f7d8e213f32db476275fcb9ef48ef2f78b61259",
+      "counts": {
+        "tests": 33,
+        "suites": 0,
+        "pass": 33,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "validationKind": "strict_vm_contract"
+    },
+    {
+      "name": "thread-controls-factory",
+      "argv": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/run-control-actions.test.ts"
+      ],
+      "startedAt": "2026-11-05T13:26:49.902957+00:00",
+      "logPath": "/tmp/issue1284-main64-gates-thread-controls-factory.log",
+      "finishedAt": "2026-11-05T13:27:12.771450+00:00",
+      "exitCode": 0,
+      "logBytes": 2857,
+      "logSha256": "049959c22b4c84f60ef285ba5b60ab671a87ded54e33deb44342ee891d677e0e",
+      "environmentOverrides": {
+        "MIKKA_FACTORY_ROUTING_ENABLED": "1",
+        "MIKKA_FACTORY_LIFECYCLE_ENABLED": "1"
+      },
+      "counts": {
+        "tests": 23,
+        "suites": 0,
+        "pass": 23,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "validationKind": "strict_vm_contract_factory_enabled"
+    },
+    {
+      "name": "live-revision-pg",
+      "argv": [
+        "node",
+        "--import",
+        "tsx",
+        "--import",
+        "./tests/fixtures/activity-runtime.mjs",
+        "--test",
+        "tests/live-revision-reads.db.test.ts"
+      ],
+      "startedAt": "2026-11-05T13:27:12.772537+00:00",
+      "logPath": "/tmp/issue1284-main64-gates-live-revision-pg.log",
+      "finishedAt": "2026-11-05T13:27:34.782208+00:00",
+      "exitCode": 0,
+      "logBytes": 1047,
+      "logSha256": "5cdbd9311b40c64dbaf9f6b3d3738ace60451df57f4e520372f14c0a2457abd0",
+      "counts": {
+        "tests": 2,
+        "suites": 0,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "validationKind": "real_postgresql_virtual_live_channel_not_browser"
+    },
+    {
+      "name": "queued-stop-pg",
+      "argv": [
+        "node",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/cloud-computer/thread-machine-stop.db.test.ts"
+      ],
+      "startedAt": "2026-11-05T13:27:34.783972+00:00",
+      "logPath": "/tmp/issue1284-main64-gates-queued-stop-pg.log",
+      "finishedAt": "2026-11-05T13:27:44.855112+00:00",
+      "exitCode": 0,
+      "logBytes": 3304,
+      "logSha256": "173c864a8ea2789deb4520761f8d991ece974b4c8c4b36ef1c5627815eea76e7",
+      "counts": {
+        "tests": 25,
+        "suites": 0,
+        "pass": 25,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "validationKind": "real_postgresql"
+    }
+  ],
+  "totals": {
+    "tests": 207,
+    "pass": 207,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "cleanup": {
+    "checkedAt": "2026-11-05T13:27:45.002562+00:00",
+    "sessionsBefore": 0,
+    "force": false,
+    "terminate": false,
+    "completedAt": "2026-11-05T13:27:45.131231+00:00",
+    "remainingDatabases": 0,
+    "remainingRole": 0,
+    "privateFileDeleted": true,
+    "ownedDatabaseCount": 1,
+    "independentReadback": {
+      "roles": 0,
+      "anchorDatabases": 0,
+      "sessions": 0
+    },
+    "readbackAt": "2026-11-05T13:28:42.302131+00:00"
+  },
+  "scope": {
+    "providerCalls": 0,
+    "productionCalls": 0,
+    "browserAcceptanceIncluded": false,
+    "fullProductionBuildIncluded": false,
+    "notes": [
+      "Main64 direct-overlap Profile and picker tests retain both source assertions. Both component files are registered in test:subscription-usability.",
+      "The independently verified d3fa daemon release graph was not rerun or relabelled as this merge test.",
+      "Final full production build, normal authenticated HTTP, screenshots, CI and production acceptance are separate evidence."
+    ]
+  },
+  "durableInput": {
+    "path": "/tmp/issue1284-main64-gates.json",
+    "sha256": "a572548f3f8cd03499c3fa0e8432e83a4fa181a9f822a4871176ca761168cdd4"
+  }
+}

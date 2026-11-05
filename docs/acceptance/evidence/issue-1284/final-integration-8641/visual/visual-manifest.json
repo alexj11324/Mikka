@@ -1,0 +1,95 @@
+{
+  "sourceCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+  "sourceTree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+  "actualScreenshotCount": 8,
+  "files": [
+    {
+      "path": "864113bdb9a6-profile-picker-selected-light-1440.png",
+      "bytes": 95232,
+      "sha256": "d53d05c2ae7aef6f46752267dc654d29b6b42fee968d3ce5d4c6aebe990e87cf",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "state": "selected"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-menu-light-1440.png",
+      "bytes": 118437,
+      "sha256": "b06aa30785ae10b0b94a0fa17d5317eb13b5a35efcb5b27e67696e35f95c2781",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "state": "menu"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-selected-dark-1440.png",
+      "bytes": 95527,
+      "sha256": "201eb45a290a983692f2071685bad94e07c58c74066130b823bb6912fd44d666",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "state": "selected"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-menu-dark-1440.png",
+      "bytes": 117931,
+      "sha256": "c0335ce00748290dcc19d72cc6d3d6581e1d5d257a17db4bed866321890935a2",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "state": "menu"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-selected-light-390.png",
+      "bytes": 46348,
+      "sha256": "91dd0467960f3f35ecced3e8701fe2d28d5fa02e31bb9d5b1854668e65e6bbb8",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "selected"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-menu-light-390.png",
+      "bytes": 58130,
+      "sha256": "fa1f2a91a502d26624aa068aff9cae4b5cef56a19c350e75354157cb3e23aeac",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "menu"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-selected-dark-390.png",
+      "bytes": 46504,
+      "sha256": "5348b05609ee65907e92d6d54dc4ebf73f0cf949f336f7959e8053c33985da90",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "selected"
+    },
+    {
+      "path": "864113bdb9a6-profile-picker-menu-dark-390.png",
+      "bytes": 57629,
+      "sha256": "4acd6b50bea0ec67a6f9263cd18695f9c2f20f23c208e45c30da627ed0c29dfc",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "menu"
+    }
+  ]
+}

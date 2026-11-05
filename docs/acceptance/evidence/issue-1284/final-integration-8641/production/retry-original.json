@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "kind": "root-assistant-production-observation",
+  "observedAt": "2026-11-05T13:15:41.517Z",
+  "deployment": {
+    "publicCommit": "64dbdd7dc735ddc37cb13e38127409f35dbb5909",
+    "versionObservedAt": "2026-11-05T13:10:44.949Z",
+    "vercelDeployment": "dpl_HSJ8KVAq6JtHT1CGnoz8Ew2fN2Z5"
+  },
+  "task": {
+    "issueId": "6cda8149-144c-49cc-bdcb-a85ff14cb144",
+    "taskId": "b5785091-2c95-4f55-821d-fce51e027b0e",
+    "stage": "review",
+    "status": "blocked",
+    "revision": 11
+  },
+  "action": {
+    "method": "Normal authenticated Owner UI Retry review",
+    "count": 1,
+    "clickedAt": "2026-11-05T13:11:42.996Z"
+  },
+  "attempt": {
+    "id": "40355b88-ed4d-49e1-b659-5f7028d6989e",
+    "createdAt": "2026-11-05T13:11:43.644Z",
+    "finishedAt": "2026-11-05T13:12:48.727Z",
+    "status": "blocked",
+    "runId": null,
+    "dispatchCode": "agentProfileDecisionUnavailable"
+  },
+  "candidate": {
+    "id": "816513cf-503e-4ccc-b708-4bbd565206f3",
+    "kind": "deliverable",
+    "sha": null,
+    "count": 1,
+    "producerRunId": "52c25088-3cbf-4e3f-882f-d7b3296637a4",
+    "preserved": true
+  },
+  "reason": "Independent check could not select an Agent Profile. Check the available profiles and retry the check.",
+  "interpretation": {
+    "exactDecisionProviderCause": "unknown; not exposed by normal Task response",
+    "codexRunStarted": false,
+    "independentReviewPassed": false,
+    "ownerAccepted": false,
+    "doNotInfer": [
+      "uncertain_profile",
+      "Codex subscription refusal",
+      "provider quota failure"
+    ]
+  },
+  "source": "Normal Owner UI action and authenticated GET /mikka/api/factory/tasks/b5785091-2c95-4f55-821d-fce51e027b0e; no production SQL or direct setting changes"
+}
