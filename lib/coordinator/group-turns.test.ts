@@ -632,6 +632,28 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
       } finally { barrier.release(); await work.catch(() => {}); barrier.restore() }
     })
 
+    await t.test('a committed Stop reaches the generating worker by NOTIFY, not a per-second read (#1212)', async () => {
+      const group = await create(), root = await send(group, 'stop while generating', [a])
+      const generating = Promise.withResolvers<void>()
+      let abortedAt = 0
+      const work = processGroupTurn(scoped, group, { ...runtime, async generate(_agent, input) {
+        generating.resolve()
+        return new Promise((_resolve, reject) => input.signal!.addEventListener('abort', () => { abortedAt = performance.now(); reject(input.signal!.reason) }, { once: true }))
+      } })
+      try {
+        await generating.promise
+        const stoppedAt = performance.now()
+        const stop = await handleGroup(scoped, directory, { ...base, resource: 'stop', id: group }, true)
+        assert.equal(stop.status, 200); assert.deepEqual(stop.body, { stopped: 1 })
+        assert.equal(await work, true)
+        const latency = abortedAt - stoppedAt
+        console.log(JSON.stringify({ case: 'stop-push', latencyMs: Math.round(latency) }))
+        assert.ok(abortedAt > 0 && latency < 900, `the push aborts the generation before any timed check would (${latency} ms)`)
+        assert.equal((await scoped.query('SELECT error FROM group_turns WHERE "messageId"=$1', [root])).rows[0].error, 'stopped')
+        assert.deepEqual((await scoped.query('SELECT body FROM conversation_messages WHERE "replyToId"=$1', [root])).rows, [])
+      } finally { await work.catch(() => {}) }
+    })
+
     await t.test('a committed Stop fences private publication and preserves earlier exchanges', async t => {
       const group = await create()
       await send(group, 'prior private exchange', [a])
@@ -682,12 +704,26 @@ test('停止 ends the rounds: no further reply is generated once the turn is sto
   })
   assert.deepEqual(calls, [a])
 })
-test('停止 aborts a reply in flight once the poll sees it, and leaves a finished one alone', async () => {
+test('停止 aborts a reply in flight once the fallback check sees it, and leaves a finished one alone', async () => {
   let stop = false
-  const pending = untilStopped(async () => stop, signal => new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true })), 5)
+  const pending = untilStopped(async () => stop, { every: 5 }, signal => new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true })))
   stop = true
   await assert.rejects(pending, /stopped/)
-  assert.equal(await untilStopped(async () => false, async () => 'done', 5), 'done')
+  assert.equal(await untilStopped(async () => false, { every: 5 }, async () => 'done'), 'done')
+})
+test('停止 aborts a reply in flight on the stop push, with no per-second check (#1212)', async () => {
+  let stop = false, checks = 0, wake: (() => void) | undefined, subscribed = 0
+  const pending = untilStopped(async () => { checks++; return stop }, {
+    subscribe: callback => { subscribed++; wake = callback; return () => { wake = undefined } },
+  }, signal => new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true })))
+  await new Promise(resolve => setTimeout(resolve, 1_100))
+  assert.equal(checks, 0, 'no check runs while nothing was pushed')
+  stop = true
+  wake!()
+  await assert.rejects(pending, /stopped/)
+  assert.equal(checks, 1)
+  assert.equal(subscribed, 1)
+  assert.equal(wake, undefined, 'the push subscription ends with the generation')
 })
 test('expired execution budget cancels before generation/status publication', async () => {
   await assert.rejects(runGroupRounds({by:'mention',responders:[a]},message,{
