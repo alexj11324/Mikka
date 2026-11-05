@@ -336,7 +336,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
       await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [f.workspaceId])
       const pending: Promise<unknown>[] = []
       const received: string[] = []
-      const browserReceived: unknown[] = []
+      const browserReceived: { kind: string; id: string }[][] = []
       const contextKey = Symbol.for('@vercel/request-context')
       const globals = globalThis as unknown as Record<symbol, unknown>
       const previousContext = globals[contextKey]
@@ -389,7 +389,11 @@ test('real Factory admission preserves host scope, policy and transaction owners
         const result = await dispatch(f)
         await Promise.all(pending)
         assert.deepEqual(received, [result.runId], 'the transaction owner wakes the daemon exactly once after commit')
-        assert.deepEqual(browserReceived, [[{ kind: 'factory_task', id: f.task.id }, { kind: 'factory_issue', id: f.issueId }]], 'the browser receives only committed invalidation keys')
+        const keyOrder = (a: { kind: string; id: string }, b: { kind: string; id: string }) => a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id)
+        assert.deepEqual(browserReceived.flat().toSorted(keyOrder), [
+          { kind: 'factory_task', id: f.task.id }, { kind: 'factory_issue', id: f.issueId },
+          { kind: 'thread_list', id: f.workspaceId }, { kind: 'task_run_list', id: f.workspaceId },
+        ].toSorted(keyOrder), 'the browser receives each exact committed entity/list invalidation once, regardless of HTTP delivery order')
         const scheduled = pending.length
         await dispatch(f)
         assert.equal(pending.length, scheduled, 'strict dispatch replay does not duplicate either notification')

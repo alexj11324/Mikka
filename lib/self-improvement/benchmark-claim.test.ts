@@ -23,13 +23,16 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
   const selections=[run,agent,repo]
   class ImprovementError extends Error {constructor(public code:string){super(code)}}
   class FactoryError extends Error {}
-  const db={select:()=>({from:()=>({where:()=>({limit:async()=>[selections.shift()]})})}),update:()=>({set:(values:object)=>({where:async()=>{calls.push('block');Object.assign(run,values)}})})}
+  const db={select:()=>({from:()=>({where:()=>({limit:async()=>[selections.shift()]})})}),update:()=>({set:(values:object)=>({where:()=>({returning:async()=>{calls.push('block');Object.assign(run,values);return [{id:run.id}]}})})})}
   const benchmark={harness:'codex',model:'actual-observed-model',verifyCommand:'git diff --exit-code HEAD --',policy:{readOnly:true,networkAllow:[],permissions:{install_dependency:'deny',write_outside_repo:'deny',git_push:'deny',network:'ask'}},benchmark:{caseId:'case',benchmarkDigest:'digest',sourceCommit:'frozen-sha'}}
   const modules:Record<string,unknown>={
     // This VM owns frozen benchmark composition, not credential admission;
     // the actual route/fence and token revocation have real PostgreSQL tests.
     '@/lib/issue-access':{issueForUser:async(userId:string,id:string)=>{assert.equal(userId,'owner');assert.equal(id,'issue');return issueDenied?null:{id,userId,scope:'personal',content:{type:'doc'}}}},
     '@/lib/device-route':{withDeviceRoute:<T>(handler:T)=>handler},
+    '@/lib/live/lists':{runListChanged:async(executor:unknown,runId:string)=>{
+      assert.equal(executor,db);assert.equal(runId,run.id);assert.equal(run.status,'failed');calls.push('listChanged')
+    }},
     '@/lib/cloud-computer-flag':{cloudComputerTasksEnabled:()=>true},
     'next/server':{after:()=>{calls.push('wakeScheduled')},NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
     'drizzle-orm':{and:(...args:unknown[])=>args,eq:(...args:unknown[])=>args,isNull:(value:unknown)=>value},
@@ -124,7 +127,7 @@ test('actual claim route withholds all assignment bytes when frozen configuratio
   const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,409)
   assert.deepEqual(await response.json(),{error:'runUnavailable'})
-  assert.deepEqual(calls,['preflight','guard','claim','token','receipt','benchmark','block','runEnded'])
+  assert.deepEqual(calls,['preflight','guard','claim','token','receipt','benchmark','block','listChanged','runEnded'])
   assert.equal(run.status,'failed')
 })
 

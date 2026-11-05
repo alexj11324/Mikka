@@ -202,6 +202,7 @@ jobs:
       - name: Authentication email integration tests (isolated Postgres)
         run: node scripts/test-auth-email.mjs
       - run: pnpm test:groups
+      - run: pnpm test:live-lists
       - run: pnpm test:group-turns
       - run: pnpm test:integrations
       - run: pnpm test:github

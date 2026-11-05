@@ -1,4 +1,5 @@
 import { factoryRunBotMatches } from './run-scope'
+import { runListChanged } from '../live/lists'
 import type { FactoryCloudStageAdmission } from './cloud-stage-admission'
 import type { Pool, PoolClient } from "pg";
 import { isDeepStrictEqual } from 'node:util';
@@ -691,6 +692,7 @@ export function createFactoryCheckClaim(pool:Pool,authorize:import('./store').Fa
    await onClaim?.(tx);
    const updated=await tx.query('UPDATE agent_runs SET status=\'preparing\',"startedAt"=now(),"leaseExpiresAt"=$2,"updatedAt"=now() WHERE id=$1 AND status=\'queued\' AND "stopRequestedAt" IS NULL RETURNING id',[runId,leaseExpiresAt]);
    if(updated.rowCount!==1)throw new FactoryError('factoryRunMismatch');
+    await runListChanged(tx,runId);
    const policy = runPolicySchema.parse(result.policy);
    await tx.query('COMMIT');return {...result,policy,baseBranch:z.string().parse(result.baseBranch)};
   }catch(error){await tx.query('ROLLBACK');throw error}finally{tx.release()}

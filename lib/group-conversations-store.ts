@@ -5,6 +5,7 @@ import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { enqueueGroupTurn, GROUP_TURN_STOPPED, stopGroupTurns } from './coordinator/group-turns'
 import { groupParticipants, type GroupParticipant } from './group-participants'
+import { groupListChanged, groupListReadChanged } from './live/lists'
 
 const member = z.object({ memberType: z.enum(['user', 'agent', 'bot']), memberId: z.string().min(1).max(256) }).strict()
 const create = z.object({ workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]), leadAgentId: z.uuid().nullable().optional(), leadBotId: z.uuid().nullable().optional() }).strict().refine(input => !input.leadAgentId || !input.leadBotId)
@@ -59,6 +60,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       for (const m of input.members) await q('INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,$2,$3,\'member\') ON CONFLICT DO NOTHING', [id, m.memberType, m.memberId])
       if (queueAgents && input.leadAgentId) await q('UPDATE conversations SET "leadAgentId"=$2 WHERE id=$1', [id, input.leadAgentId])
       if (queueAgents && input.leadBotId) await q('UPDATE conversations SET "leadBotId"=$2 WHERE id=$1', [id, input.leadBotId])
+      await groupListChanged(client, id)
       result = { id, title: input.title, ...(queueAgents ? { leadAgentId: input.leadAgentId ?? null, leadBotId: input.leadBotId ?? null } : {}) }; status = 201
     } else if (req.resource === 'conversations' && req.method === 'GET') {
       if (req.workspaceId && (!z.uuid().safeParse(req.workspaceId).success || !await directory(req.workspaceId, userId, []))) return fail(404)
@@ -71,7 +73,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         WHERE c.kind='group' AND ($2::uuid IS NULL OR c."workspaceId"=$2) ORDER BY c."createdAt" DESC,c.id DESC`, [userId, req.workspaceId ?? null])
       const accessible = []
       for (const row of rows) if (await directory(row.workspaceId, userId, [])) accessible.push(row)
-      result = { conversations: accessible }
+      result = { conversations: accessible, viewerId: userId, workspaceId: req.workspaceId ?? null }
     } else {
       // A link is a bounded view granted by its source group, never membership
       // in the private DM. Locate the group before taking the normal group lock.
@@ -113,11 +115,13 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
           const { rows: messages } = await q(`SELECT id,position FROM conversation_messages WHERE "conversationId"=$1 AND ${byId ? 'id=$2::uuid' : 'position=$2::bigint'}`, [req.id, value])
           const selected = messages[0]
           if (!selected || BigInt(selected.position) > BigInt(2147483647)) return fail(422)
-          await q(`INSERT INTO conversation_reads AS r ("userId","conversationId","lastReadPosition","lastReadMessageId","updatedAt") VALUES ($1,$2,$3,$4,now())
+          const advanced = await q(`INSERT INTO conversation_reads AS r ("userId","conversationId","lastReadPosition","lastReadMessageId","updatedAt") VALUES ($1,$2,$3,$4,now())
             ON CONFLICT ("userId","conversationId") DO UPDATE SET
               "lastReadPosition"=GREATEST(r."lastReadPosition",EXCLUDED."lastReadPosition"),
               "lastReadMessageId"=CASE WHEN EXCLUDED."lastReadPosition">r."lastReadPosition" THEN EXCLUDED."lastReadMessageId" ELSE r."lastReadMessageId" END,
-              "updatedAt"=CASE WHEN EXCLUDED."lastReadPosition">r."lastReadPosition" THEN EXCLUDED."updatedAt" ELSE r."updatedAt" END`, [userId, req.id, selected.position, selected.id])
+              "updatedAt"=CASE WHEN EXCLUDED."lastReadPosition">r."lastReadPosition" THEN EXCLUDED."updatedAt" ELSE r."updatedAt" END
+            WHERE EXCLUDED."lastReadPosition">r."lastReadPosition" RETURNING "conversationId"`, [userId, req.id, selected.position, selected.id])
+          if (advanced.rowCount) await groupListReadChanged(client, group.id, userId)
         }
         const { rows: [state] } = await q(`SELECT "lastReadPosition","lastReadMessageId" FROM conversation_reads WHERE "userId"=$1 AND "conversationId"=$2`, [userId, req.id])
         const { rows: [unread] } = await q(`SELECT count(*)::text AS n FROM conversation_messages WHERE "conversationId"=$1 AND position>$2 AND NOT ("authorType"='user' AND "authorId"=$3)`, [req.id, state?.lastReadPosition ?? 0, userId])
@@ -134,6 +138,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
           if (!rowCount) return fail(422)
         }
         await q('UPDATE conversations SET "leadAgentId"=$2,"leadBotId"=$3 WHERE id=$1', [req.id, bot ? null : id, bot ? id : null])
+        await groupListChanged(client, group.id)
         result = { id: req.id, leadAgentId: bot ? null : id, leadBotId: bot ? id : null }
       } else if (req.resource === 'stop' && req.method === 'POST') {
         // 停止: any member may stop the reply the group is waiting on; what was already posted stays.
@@ -202,6 +207,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         const { rows: positions } = await q('UPDATE conversations SET "lastPosition"="lastPosition"+1 WHERE id=$1 RETURNING "lastPosition"::text AS position', [req.id])
         const id = randomUUID(), position = positions[0].position
         const { rows } = await q('INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body,mentions,"replyToId") VALUES ($1,$2,$3,\'user\',$4,$5,$6,$7) RETURNING *', [id, req.id, position, userId, input.body, JSON.stringify(input.mentions), input.replyToId ?? null])
+        await groupListChanged(client, group.id)
         if (queueAgents) await enqueueGroupTurn(client, req.id!, id, userId)
         result = rows[0]; status = 201
       } else if (req.resource === 'members' && req.method === 'GET') {
@@ -227,6 +233,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
           if (queueAgents && input.memberType === 'bot') await q('UPDATE conversations SET "leadBotId"=NULL WHERE id=$1 AND "leadBotId"=$2', [req.id, input.memberId])
           await q('UPDATE conversation_members SET "leftAt"=now() WHERE "conversationId"=$1 AND "memberType"=$2 AND "memberId"=$3', [req.id, input.memberType, input.memberId])
         }
+        await groupListChanged(client, group.id, req.method === 'DELETE' && input.memberType === 'user' ? input.memberId : null)
         result = { ok: true }
       } else return fail(405)
     }

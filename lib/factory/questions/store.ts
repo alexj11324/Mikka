@@ -1,4 +1,5 @@
 import { remoteKey } from "@mikka/protocol/repository";
+import { runListChanged } from '../../live/lists';
 import { notifyQueuedLocalRun } from '../../device-gateway-notify';
 import { factoryCheckAssignment, factoryReportQuestionAssignment } from "../checks";
 import { factoryMonitorDispatchAssignment } from "../monitor-dispatch";
@@ -901,6 +902,7 @@ export function createFactoryQuestions(
             : {};
         if (!existing) {
           await tx.query('UPDATE agent_runs SET status=\'preparing\',"startedAt"=now(),"leaseExpiresAt"=$2,"updatedAt"=now() WHERE id=$1',[runId,leaseExpiresAt]);
+          await runListChanged(tx,runId);
           if (typeof existingOrClaim === "function") await existingOrClaim(tx);
         }
         return {
