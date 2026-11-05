@@ -6,9 +6,10 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, Select
 import { HarnessLabel } from '@/components/labels/entity-labels'
 import { InlineLoadError } from '@/components/load-error'
 import { withBasePath } from '@/lib/base-path'
+import { cn } from '@/lib/utils'
 import { settingsHref } from '@/lib/settings-sections'
 import { BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-reference'
-import { profileAvailabilityKey, type AgentProfilesView } from '@/components/settings/factory-profiles-data'
+import { profileAvailabilityKey, taskProfileChoiceAllowed, type AgentProfilesView } from '@/components/settings/factory-profiles-data'
 
 const MANAGE = '__manage'
 
@@ -32,7 +33,7 @@ export function TaskProfilePicker({ workspaceId, value, onChange, data, disabled
     <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-64 max-w-[calc(100vw-3rem)]">
       <SelectGroup>
         <SelectItem value="auto">{t('automatic')}</SelectItem>
-        <SelectItem value={BUILTIN_AGENT_PROFILE_ID} disabled={!data?.defaultAvailability?.available}>
+        <SelectItem value={BUILTIN_AGENT_PROFILE_ID} disabled={!taskProfileChoiceAllowed(BUILTIN_AGENT_PROFILE_ID, data?.defaultAvailability)}>
           <span className="flex min-w-0 flex-col gap-0.5 py-1">
             <span className="truncate">{t('defaultName')}</span>
             <span className="text-xs text-muted-foreground">{data?.defaultAvailability?.available ? t('inherit') : t(`reasons.${profileAvailabilityKey(data?.defaultAvailability?.reason)}`)}</span>
@@ -56,7 +57,7 @@ export function TaskProfilePicker({ workspaceId, value, onChange, data, disabled
   </Select>
 }
 
-/** Why the chosen Agent 配置 cannot run, or that the list did not load; shown under the dialog's header row. */
+/** The chosen Agent 配置's unresolved or unavailable state, or a failed list read. */
 export function TaskProfileNotice({ value, data, error, onRetry }: { value: string | null; data?: AgentProfilesView; error?: unknown; onRetry: () => void }) {
   const t = useTranslations('Settings.agentProfiles')
   const common = useTranslations('Common')
@@ -64,6 +65,9 @@ export function TaskProfileNotice({ value, data, error, onRetry }: { value: stri
   const availability = value === BUILTIN_AGENT_PROFILE_ID ? data?.defaultAvailability : selected && data?.availability[selected.id]
   const unavailable = value && !availability?.available
   if (error) return <InlineLoadError message={t('loadFailed')} retryLabel={common('retry')} onRetry={onRetry} />
-  if (unavailable) return <p role="alert" className="text-sm text-destructive-foreground">{t(`reasons.${profileAvailabilityKey(availability?.reason)}`)}</p>
+  if (unavailable) {
+    const pending = taskProfileChoiceAllowed(value, availability)
+    return <p role={pending ? 'status' : 'alert'} className={cn('text-sm', pending ? 'text-muted-foreground' : 'text-destructive-foreground')}>{t(`reasons.${profileAvailabilityKey(availability?.reason)}`)}</p>
+  }
   return null
 }
