@@ -1,0 +1,374 @@
+{
+  "total_count": 4,
+  "jobs": [
+    {
+      "id": 126973648202,
+      "run_id": 41944628574,
+      "workflow_name": "E2B official instance runtime",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/41944628574",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVRYxA88AAAAdkDgdSg",
+      "head_sha": "efef5b5a5a8a55deb3c504b05fb736d4003e942c",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/126973648202",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/41944628574/job/126973648202",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-05T00:53:14Z",
+      "started_at": "2026-11-05T00:53:16Z",
+      "completed_at": "2026-11-05T00:53:26Z",
+      "name": "test",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-05T00:53:17Z",
+          "completed_at": "2026-11-05T00:53:18Z"
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-05T00:53:18Z",
+          "completed_at": "2026-11-05T00:53:21Z"
+        },
+        {
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-05T00:53:21Z",
+          "completed_at": "2026-11-05T00:53:21Z"
+        },
+        {
+          "name": "Run node --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-05T00:53:21Z",
+          "completed_at": "2026-11-05T00:53:22Z"
+        },
+        {
+          "name": "Run python3 -m py_compile scripts/e2b/validate-official-instances.py",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-05T00:53:22Z",
+          "completed_at": "2026-11-05T00:53:22Z"
+        },
+        {
+          "name": "Run bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-05T00:53:22Z",
+          "completed_at": "2026-11-05T00:53:22Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-11-05T00:53:22Z",
+          "completed_at": "2026-11-05T00:53:22Z"
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-11-05T00:53:22Z",
+          "completed_at": "2026-11-05T00:53:22Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-11-05T00:53:22Z",
+          "completed_at": "2026-11-05T00:53:22Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/126973648202",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000197276,
+      "runner_name": "GitHub Actions 1000197276",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 126973726953,
+      "run_id": 41944628574,
+      "workflow_name": "E2B official instance runtime",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/41944628574",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVRYxA88AAAAdkDlQ6Q",
+      "head_sha": "efef5b5a5a8a55deb3c504b05fb736d4003e942c",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/126973726953",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/41944628574/job/126973726953",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-05T00:53:26Z",
+      "started_at": "2026-11-05T00:53:41Z",
+      "completed_at": "2026-11-05T00:53:49Z",
+      "name": "check",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-05T00:53:42Z",
+          "completed_at": "2026-11-05T00:53:43Z"
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-05T00:53:43Z",
+          "completed_at": "2026-11-05T00:53:45Z"
+        },
+        {
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-05T00:53:45Z",
+          "completed_at": "2026-11-05T00:53:46Z"
+        },
+        {
+          "name": "Read the Vercel team token through Infisical workload identity",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-05T00:53:46Z",
+          "completed_at": "2026-11-05T00:53:47Z"
+        },
+        {
+          "name": "Compare the worker hash with production",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-05T00:53:47Z",
+          "completed_at": "2026-11-05T00:53:47Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-05T00:53:47Z",
+          "completed_at": "2026-11-05T00:53:47Z"
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-11-05T00:53:47Z",
+          "completed_at": "2026-11-05T00:53:48Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-11-05T00:53:48Z",
+          "completed_at": "2026-11-05T00:53:48Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/126973726953",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000197288,
+      "runner_name": "GitHub Actions 1000197288",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 126973885531,
+      "run_id": 41944628574,
+      "workflow_name": "E2B official instance runtime",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/41944628574",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVRYxA88AAAAdkDu8Ww",
+      "head_sha": "efef5b5a5a8a55deb3c504b05fb736d4003e942c",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/126973885531",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/41944628574/job/126973885531",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-05T00:53:50Z",
+      "started_at": "2026-11-05T00:53:52Z",
+      "completed_at": "2026-11-05T00:57:02Z",
+      "name": "validate",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-05T00:53:53Z",
+          "completed_at": "2026-11-05T00:53:54Z"
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-05T00:53:54Z",
+          "completed_at": "2026-11-05T00:53:56Z"
+        },
+        {
+          "name": "Install the pinned E2B SDK",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-05T00:53:56Z",
+          "completed_at": "2026-11-05T00:54:03Z"
+        },
+        {
+          "name": "Read the existing E2B validation key",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-05T00:54:03Z",
+          "completed_at": "2026-11-05T00:54:04Z"
+        },
+        {
+          "name": "Validate new official instances without template mutation",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-05T00:54:04Z",
+          "completed_at": "2026-11-05T00:56:59Z"
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-11-05T00:56:59Z",
+          "completed_at": "2026-11-05T00:56:59Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-11-05T00:56:59Z",
+          "completed_at": "2026-11-05T00:56:59Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/126973885531",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000197290,
+      "runner_name": "GitHub Actions 1000197290",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 126975166613,
+      "run_id": 41944628574,
+      "workflow_name": "E2B official instance runtime",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/41944628574",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVRYxA88AAAAdkE9IlQ",
+      "head_sha": "efef5b5a5a8a55deb3c504b05fb736d4003e942c",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/126975166613",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/41944628574/job/126975166613",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-05T00:57:02Z",
+      "started_at": "2026-11-05T00:57:04Z",
+      "completed_at": "2026-11-05T00:58:17Z",
+      "name": "publish",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-05T00:57:05Z",
+          "completed_at": "2026-11-05T00:57:06Z"
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-05T00:57:06Z",
+          "completed_at": "2026-11-05T00:57:08Z"
+        },
+        {
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-05T00:57:08Z",
+          "completed_at": "2026-11-05T00:57:09Z"
+        },
+        {
+          "name": "Read the existing Vercel release token",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-05T00:57:09Z",
+          "completed_at": "2026-11-05T00:57:09Z"
+        },
+        {
+          "name": "Publish the verified official runtime pair",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-05T00:57:09Z",
+          "completed_at": "2026-11-05T00:58:15Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-05T00:58:15Z",
+          "completed_at": "2026-11-05T00:58:15Z"
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-11-05T00:58:15Z",
+          "completed_at": "2026-11-05T00:58:15Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-11-05T00:58:15Z",
+          "completed_at": "2026-11-05T00:58:15Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/126975166613",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000197293,
+      "runner_name": "GitHub Actions 1000197293",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}
+
