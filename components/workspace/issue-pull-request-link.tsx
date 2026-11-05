@@ -1,6 +1,6 @@
 'use client'
 
-import useSWR from 'swr'
+import useSWR, { unstable_serialize } from 'swr'
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from 'lucide-react'
@@ -8,10 +8,19 @@ import { authClient } from '@/lib/auth-client'
 import { withBasePath } from '@/lib/base-path'
 import type { IssuePullRequest } from '@/lib/issue-metadata'
 import { cn } from '@/lib/utils'
+import { useLiveKey } from '@/hooks/use-live-key'
+import { LIVE_ID } from '@/lib/live/events'
 import { Badge } from '@/components/ui/badge'
 import { Badge as BoardBadge } from '@/components/reui/badge'
 
-type Status = { state: IssuePullRequest['state']; checkedAt: number } | { error: string }
+type Status = { state: IssuePullRequest['state']; checkedAt: number; liveWorkspaceId: string | null } | { error: string }
+
+/**
+ * GitHub's answer for a PR with no webhook of ours (one linked by hand, or in a repository without the app)
+ * is re-read at most this often, while the page is visible. A PR a run delivered also re-reads when the
+ * webhook commits its state (`pull_request_status`, #1212).
+ */
+const UNHOOKED_RECHECK_MS = 5 * 60_000
 
 async function fetchStatus([, userId, issueId, url]: readonly string[]): Promise<Status> {
   try {
@@ -21,7 +30,7 @@ async function fetchStatus([, userId, issueId, url]: readonly string[]): Promise
     })
     const result = await response.json()
     if (response.ok && result.viewerId !== userId) return { error: 'authRequired' }
-    if (response.ok && ['open', 'closed', 'merged'].includes(result.state)) return { state: result.state, checkedAt: performance.now() }
+    if (response.ok && ['open', 'closed', 'merged'].includes(result.state)) return { state: result.state, checkedAt: performance.now(), liveWorkspaceId: typeof result.live?.workspaceId === 'string' && LIVE_ID.test(result.live.workspaceId) ? result.live.workspaceId : null }
     return { error: typeof result.error === 'string' ? result.error : 'githubUnavailable' }
   } catch { return { error: 'githubUnavailable' } }
 }
@@ -40,10 +49,14 @@ function ViewerPullRequestLink({ issueId, pr, compact = false, userId, isPending
   const tState = useTranslations('Metadata.prState')
   const tSync = useTranslations('Metadata.prSync')
   const [mountedAt] = useState(() => performance.now())
-  const { data, isValidating } = useSWR(userId ? ['github-pr-status', userId, issueId, pr.url] : null, fetchStatus, {
-    // A GitHub status check: on mount and on its own poll, never on focus.
-    refreshInterval: compact ? 0 : 60_000, revalidateOnFocus: false, revalidateOnMount: true, dedupingInterval: 0,
+  const key = userId ? ['github-pr-status', userId, issueId, pr.url] as const : null
+  const { data, isValidating } = useSWR(key, fetchStatus, {
+    // A GitHub status check: on mount, on the task's live key, and on the slow recheck below; never on focus.
+    refreshInterval: compact ? 0 : UNHOOKED_RECHECK_MS, refreshWhenHidden: false, revalidateOnFocus: false, revalidateOnMount: true, dedupingInterval: 0,
   })
+  // Only the task's own channel, once a read has named it: an unknown channel would read on the 60 s fallback.
+  const liveWorkspaceId = !compact && data && 'state' in data ? data.liveWorkspaceId : null
+  useLiveKey('pull_request_status', liveWorkspaceId && key ? issueId : null, key ? [unstable_serialize(key)] : [], liveWorkspaceId, { minIntervalMs: 2_000 })
   // A refresh rechecks permission; the previous response is not proof of current access.
   const state = userId && !isValidating && data && 'state' in data && data.checkedAt >= mountedAt ? data.state : undefined
   const error = data && 'error' in data ? data.error : undefined

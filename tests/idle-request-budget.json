@@ -10,6 +10,7 @@
     "artifact-viewer": {},
     "nav-bot-list": {},
     "group-chat": {},
-    "subscription-settings": {}
+    "subscription-settings": {},
+    "pull-request-badge": {}
   }
 }

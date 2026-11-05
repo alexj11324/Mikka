@@ -5,16 +5,18 @@ import { renderToStaticMarkup } from 'react-dom/server'
 const url = 'https://github.com/private/repo/pull/81'
 let userId: string | null = 'viewer'
 let pending = false
-let data: { state: string; checkedAt: number } | { error: string } | undefined
+let data: { state: string; checkedAt: number; liveWorkspaceId?: string | null } | { error: string } | undefined
 let validating = false
 let swrKey: unknown
-let swrOptions: { refreshInterval: number; revalidateOnFocus?: boolean; revalidateOnMount: boolean; dedupingInterval: number }
+let swrOptions: { refreshInterval: number; refreshWhenHidden?: boolean; revalidateOnFocus?: boolean; revalidateOnMount: boolean; dedupingInterval: number }
+const liveKeys: unknown[][] = []
 let fetchStatus: (key: readonly string[]) => Promise<unknown>
 mock.module(new URL('../../lib/auth-client.ts', import.meta.url).href, { namedExports: { authClient: { useSession: () => ({ data: userId ? { user: { id: userId } } : null, isPending: pending }) } } })
 mock.module('swr', { defaultExport: (key: unknown, fetcher: typeof fetchStatus, options: typeof swrOptions) => {
   swrKey = key; fetchStatus = fetcher; swrOptions = options
   return { data, isValidating: validating }
-} })
+}, namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) } })
+mock.module(new URL('../../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKey: (...args: unknown[]) => { liveKeys.push(args) } } })
 mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string, args?: { state?: string }) => {
   if (namespace === 'Metadata.prState') return key
   if (key === 'manual') return `Manual: ${args?.state}`
@@ -26,10 +28,11 @@ before(async () => { ({ IssuePullRequestLink } = await import('./issue-pull-requ
 beforeEach(() => { userId = 'viewer'; pending = false; data = undefined; validating = false })
 const render = (compact = false) => renderToStaticMarkup(<IssuePullRequestLink issueId="issue-1" pr={{ url, state: 'open' }} compact={compact} />)
 
-test('requests are viewer scoped and refresh on mount and every minute, never on focus', () => {
+test('requests are viewer scoped and refresh on mount, on push and every 5 minutes while visible, never on focus', () => {
   render()
   assert.deepEqual(swrKey, ['github-pr-status', 'viewer', 'issue-1', url])
-  assert.equal(swrOptions.refreshInterval, 60_000)
+  assert.equal(swrOptions.refreshInterval, 5 * 60_000)
+  assert.equal(swrOptions.refreshWhenHidden, false)
   assert.notEqual(swrOptions.revalidateOnFocus, true)
   assert.equal(swrOptions.revalidateOnMount, true)
   assert.equal(swrOptions.dedupingInterval, 0)
@@ -127,4 +130,21 @@ test('a cookie switch from A to B cannot write B state into the still-visible A 
     assert.ok(!markup.includes('GitHub: merged'))
     assert.ok(!markup.includes('text-info-foreground'))
   } finally { globalThis.fetch = originalFetch }
+})
+
+test('the detail badge listens on the task key only once a read named its channel (#1212)', async () => {
+  const task = '00000000-0000-4000-8000-000000000001', channel = '00000000-0000-4000-8000-0000000000aa'
+  const draw = (compact = false) => renderToStaticMarkup(<IssuePullRequestLink issueId={task} pr={{ url, state: 'open' }} compact={compact} />)
+  liveKeys.length = 0
+  draw()
+  assert.equal(liveKeys.at(-1)![1], null, 'no guessed channel before the first answer')
+  const originalFetch = globalThis.fetch
+  try {
+    globalThis.fetch = async () => Response.json({ viewerId: 'viewer', state: 'merged', live: { workspaceId: channel } })
+    data = { ...await fetchStatus(swrKey as readonly string[]) as { state: string; checkedAt: number; liveWorkspaceId: string | null }, checkedAt: Number.POSITIVE_INFINITY }
+  } finally { globalThis.fetch = originalFetch }
+  draw()
+  assert.deepEqual(liveKeys.at(-1)!.slice(0, 4), ['pull_request_status', task, [JSON.stringify(['github-pr-status', 'viewer', task, url])], channel])
+  draw(true)
+  assert.equal(liveKeys.at(-1)![1], null, 'board cards read on mount only')
 })

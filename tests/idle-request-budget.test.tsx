@@ -221,6 +221,8 @@ routes['/api/mobile/reactions'] = () => ({ reactions: {} })
 const CONNECTION = 'a0000000-0000-4000-8000-000000000001'
 routes['/api/subscriptions'] = () => ({ enabled: true, providers: [{ provider: 'claude', available: true }, { provider: 'codex', available: true }], connections: [{ id: CONNECTION, provider: 'claude', state: 'connected', revision: 1, account: 'ada@example.invalid', paused: false, bots: [] }] })
 routes['/api/subscriptions/usage'] = () => ({ connections: [{ id: CONNECTION, status: 'ok', account: 'ada@example.invalid', plan: 'Max', windows: [{ kind: 'five_hour', remaining: 72, resetsAt: null }, { kind: 'weekly', remaining: 40, resetsAt: null }], observedAt: AT }] })
+const PULL_REQUEST = 'https://github.com/mikka/app/pull/81'
+routes['/api/github/pull-request-status'] = () => ({ viewerId: OWNER, url: PULL_REQUEST, state: 'open', updatedAt: AT, live: { workspaceId: WORKSPACE } })
 
 const boardIssue = (id: string, title: string, status: string) => ({ id, ownerId: OWNER, ownerName: 'Ada', ownerImage: null, title, status, priority: 'normal', scope: 'workspace' as const, revision: 2,
   createdAt: new Date(AT), updatedAt: new Date(AT), identifier: `MIK-${id.slice(-1)}`, teamId: null, metadata: { ...issue(id, title).metadata, assignee: { kind: 'member' as const, id: OWNER, name: 'Ada', image: null } }, checklist: { total: 0, checked: 0, percentage: 0 } })
@@ -239,6 +241,7 @@ const shows: Record<string, string[]> = {
   'nav-bot-list': ['Scout'],
   'group-chat': ['Who can fix the sign-in redirect?', 'Looking into the redirect now.'],
   'subscription-settings': ['ada@example.invalid'],
+  'pull-request-badge': ['#81'],
 }
 const pages: Record<string, () => Promise<ReactNode>> = {
   board: async () => {
@@ -276,6 +279,11 @@ const pages: Record<string, () => Promise<ReactNode>> = {
   'subscription-settings': async () => {
     const { SubscriptionSettings } = await import('../components/settings/subscription-settings')
     return <SubscriptionSettings workspaceId={WORKSPACE} />
+  },
+  // A task's linked PR in its detail properties: GitHub's state through our API.
+  'pull-request-badge': async () => {
+    const { IssuePullRequestLink } = await import('../components/workspace/issue-pull-request-link')
+    return <IssuePullRequestLink issueId={ISSUE} pr={{ url: PULL_REQUEST, state: 'open' }} />
   },
 }
 

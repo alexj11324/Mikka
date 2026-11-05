@@ -29,8 +29,7 @@ const local = (reason, hits) => ({ kind: 'local', reason, hits })
  */
 export const pollingAllowlist = {
   // Web: SWR polling that reads our database.
-  'components/workspace/issue-pull-request-link.tsx': db(web, 'linked pull request status re-read every 60 s through our API', 1),
-  'hooks/use-computer.ts': db(web, 'computer grant re-read before it expires (at least every 5 s)', 1),
+  'components/workspace/issue-pull-request-link.tsx': db(web, 'a PR with no webhook of ours (linked by hand, or a repository without the app) is re-checked with GitHub every 5 min while visible; a run-delivered PR also re-reads on pull_request_status', 1),
   // Server: loops that re-query our database.
   'app/api/computer/events/route.ts': db(server, 'the "SSE" route re-queries subagent_events in a loop', 1),
   'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll fallback timer only: with the gateway configured it waits on LISTEN for the device (re-check per NOTIFY, one final check at the deadline); every 5 s without push or if LISTEN drops', 1),
