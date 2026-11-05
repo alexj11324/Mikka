@@ -2,7 +2,7 @@
 // and E2B are not called: a shared subscription remains owned by its lender throughout the run.
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
-import { mock, test } from 'node:test'
+import { mock, test, type TestContext } from 'node:test'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
 import { normalizeRepository } from '@mikka/protocol/repository'
@@ -73,7 +73,7 @@ test('shared subscriptions reach local and cloud claims with current membership 
     await pool.query('DELETE FROM devices WHERE "ownerId"=ANY($1)', [users])
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
-  const seed = async (provider: 'claude' | 'codex', cloud: boolean) => {
+  const seed = async (provider: 'claude' | 'codex', cloud: boolean, withProfile = false) => {
     const ownerId = await seedUser(pool, 'shared-lender'), userId = await seedUser(pool, 'shared-runner')
     users.push(ownerId, userId)
     const workspace = await seedWorkspace(pool, userId, [{ userId, role: 'admin' }, { userId: ownerId, role: 'member' }])
@@ -109,18 +109,133 @@ test('shared subscriptions reach local and cloud claims with current membership 
       assert.equal(dispatch.kind === 'device' && dispatch.agentId, agentId)
       assert.equal(dispatch.kind === 'device' && dispatch.entry.source.kind, 'subscription')
     }
+    const entry = { id: randomUUID(), harness: harness as 'claude_code' | 'codex', model, source: { kind: 'subscription' as const, connectionId } }
+    const selection = withProfile ? {
+      agentProfile: (await import('../lib/factory/agent-profile')).builtinAgentProfileSelection(scope, entry),
+      modelDispatch: { mode: 'picked' as const, location: cloud ? 'cloud' as const : 'local' as const, entry },
+    } : {}
     const queued = cloud
-      ? await queueCloudRun(pool, { userId, workspaceId }, { botId, issueId, agentId, deviceRepoId: repoId, title: 'Read', body: '', model, readOnly: true })
-      : await queueRun(userId, { issueId, agentId, repo: remote, model, readOnly: true }, botId)
+      ? await queueCloudRun(pool, { userId, workspaceId }, { botId, issueId, agentId, deviceRepoId: repoId, title: 'Read', body: '', model, readOnly: true, ...selection })
+      : await queueRun(userId, { issueId, agentId, repo: remote, model, readOnly: true, ...selection }, botId)
     const definition = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [queued.runId])).rows[0].agentDefinition
     assert.equal(definition.modelSource, 'subscription')
     assert.equal(definition.apiKey, undefined, 'apiKeyAfterQuota=false also forbids an unintended paid-key substitution')
     const frozen = await repository.nativeBinding(userId, agentId, harness, definition.subscription.bindingId, workspaceId)
     assert.equal(frozen?.ownerId, ownerId, 'the lender remains the credential owner')
     const worker = cloud ? await threadMachines.start({ userId, workspaceId }, queued.runId) : { deviceId, token }
-    const claim = () => claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${worker.deviceId}/runs/${queued.runId}/claim`, { method: 'POST', headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${worker.token}`, [REPO_ORIGIN_HEADER]: '1' } }), { params: Promise.resolve({ deviceId: worker.deviceId, runId: queued.runId }) })
-    return { ownerId, userId, workspaceId, botId, agentId, harness, connectionId, model, scope, worker, runId: queued.runId, repoId, claim }
+    const claim = (runId = queued.runId) => claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${worker.deviceId}/runs/${runId}/claim`, { method: 'POST', headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${worker.token}`, [REPO_ORIGIN_HEADER]: '1' } }), { params: Promise.resolve({ deviceId: worker.deviceId, runId }) })
+    return { ownerId, userId, workspaceId, botId, agentId, harness, connectionId, model, scope, worker, runId: queued.runId, repoId, issueId, remote, claim }
   }
+  const staleProfileQuota = async (p: Awaited<ReturnType<typeof seed>>) => {
+    await pool.query('UPDATE byos_connections SET quota=jsonb_set(quota,\'{observedAt}\',to_jsonb($2::text)) WHERE id=$1',
+      [p.connectionId, new Date(Date.now() - 60_001).toISOString()])
+    const { quota } = (await pool.query('SELECT quota FROM byos_connections WHERE id=$1', [p.connectionId])).rows[0]
+    assert.equal((await import('../lib/subscription-quota')).subscriptionAvailability(quota, p.model, 'codex').status, 'checking')
+  }
+  const quotaReader = async (context: TestContext, p: Awaited<ReturnType<typeof seed>>, runId = p.runId,
+    fault?: 'share' | 'revision' | 'stop' | 'unavailable') => {
+    const { SubscriptionWorkerClient } = await import('../packages/daemon/src/subscription-worker-client')
+    const syntheticRuntime = {
+      MIKKA_BYOS_INFISICAL_ORIGIN: 'http://127.0.0.1:1', MIKKA_BYOS_INFISICAL_PROJECT: 'synthetic-claim-quota',
+      MIKKA_BYOS_INFISICAL_ENVIRONMENT: 'test', MIKKA_BYOS_INFISICAL_PATH: '/synthetic-custody',
+      MIKKA_BYOS_ACCESS_INFISICAL_PATH: '/synthetic-access', MIKKA_BYOS_INFISICAL_TOKEN: 'synthetic-custody-token',
+      MIKKA_BYOS_ACCESS_INFISICAL_TOKEN: 'synthetic-distinct-access-token', MIKKA_BYOS_SHARED_CUSTODY_IDENTITY: '0',
+    }
+    const saved = Object.fromEntries(Object.keys(syntheticRuntime).map(key => [key, process.env[key]]))
+    Object.assign(process.env, syntheticRuntime)
+    context.after(() => { for (const [key, value] of Object.entries(saved)) if (value === undefined) delete process.env[key]; else process.env[key] = value })
+    let reads = 0
+    context.mock.method(SubscriptionWorkerClient.prototype, 'call', async function<T>(this: InstanceType<typeof SubscriptionWorkerClient>, method: string, input: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
+      assert.equal(method, 'usage'); assert.equal(input.revision, 1); assert.ok(signal)
+      const config = Reflect.get(this, 'config') as { scope: { ownerId: string; connectionId: string } }
+      assert.equal(config.scope.ownerId, p.ownerId, 'the authorized lender, never the run principal, owns the quota read')
+      assert.equal(config.scope.connectionId, p.connectionId, 'the preflight reads only the exact frozen connection')
+      reads++
+      const run = (await pool.query('SELECT status,"startedAt" FROM agent_runs WHERE id=$1', [runId])).rows[0]
+      assert.equal(run.status, 'queued'); assert.equal(run.startedAt, null)
+      const probe = await pool.connect()
+      try {
+        await probe.query('BEGIN')
+        await probe.query('SELECT 1 FROM byos_connections WHERE id=$1 FOR UPDATE NOWAIT', [p.connectionId])
+        await probe.query('SELECT 1 FROM agent_runs WHERE id=$1 FOR UPDATE NOWAIT', [runId])
+      } finally { await probe.query('ROLLBACK'); probe.release() }
+      if (fault === 'share') await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [p.ownerId, p.workspaceId])
+      if (fault === 'revision') await pool.query('UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1', [p.connectionId])
+      if (fault === 'stop') await pool.query('UPDATE agent_runs SET "stopRequestedAt"=clock_timestamp() WHERE id=$1', [runId])
+      return (fault === 'unavailable' ? { status: 503, body: {} } : {
+        status: 200, body: { plan_type: 'plus', credits: { has_credits: false, unlimited: false },
+          rate_limit: { primary_window: { used_percent: 10, limit_window_seconds: 18_000, reset_at: Math.floor(Date.now() / 1000) + 3600 } } },
+      }) as T
+    })
+    return () => reads
+  }
+  for (const cloud of [false, true]) await t.test('default Profile real ' + (cloud ? 'cloud' : 'local') + ' claim refreshes only its frozen shared quota after a delayed queue', async context => {
+    const p = await seed('codex', cloud, true)
+    const before = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [p.runId])).rows[0].agentDefinition
+    await staleProfileQuota(p)
+    await assert.rejects((await import('../lib/factory/profile-admission')).assertRunProfileClaim(pool, p.runId), { message: 'agentProfileUnavailable' })
+    const reads = await quotaReader(context, p)
+    const response = await p.claim()
+    assert.equal(response.status, 200, JSON.stringify(await response.clone().json()))
+    const body = await response.json(), after = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [p.runId])).rows[0]
+    assert.equal(reads(), 1); assert.equal(after.status, 'preparing'); assert.ok(after.startedAt)
+    assert.equal(after.sessionId, null)
+    assert.equal(after.agentDefinition.model, before.model)
+    assert.deepEqual(after.agentDefinition.agentProfile, before.agentProfile)
+    assert.deepEqual(after.agentDefinition.subscription, before.subscription)
+    assert.equal(after.agentDefinition.apiKey, undefined)
+    assert.equal(body.subscriptionBinding.bindingId, before.subscription.bindingId)
+    assert.equal(body.subscriptionBinding.ownerId, p.ownerId)
+    assert.equal((await pool.query('SELECT 1 FROM byos_native_runs WHERE "runId"=$1 AND "bindingId"=$2', [p.runId, before.subscription.bindingId])).rowCount, 1)
+  })
+  for (const fault of ['share', 'revision', 'stop'] as const) await t.test('a ' + fault + ' change during the Profile quota read still prevents the real cloud claim', async context => {
+    const p = await seed('codex', true, true)
+    const before = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [p.runId])).rows[0].agentDefinition
+    await staleProfileQuota(p)
+    const reads = await quotaReader(context, p, p.runId, fault)
+    const response = await p.claim()
+    assert.equal(response.status, 409, JSON.stringify(await response.clone().json()))
+    const after = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [p.runId])).rows[0]
+    assert.equal(reads(), 1); assert.equal(after.startedAt, null); assert.equal(after.sessionId, null)
+    assert.equal((await pool.query('SELECT 1 FROM byos_native_runs WHERE "runId"=$1', [p.runId])).rowCount, 0)
+    assert.deepEqual(after.agentDefinition, before)
+    if (fault === 'stop') assert.ok(after.stopRequestedAt)
+    else assert.equal(await (await import('../lib/computer/native-run-binding')).nativeRunBinding(pool, p.userId, p.agentId, p.harness, p.workspaceId, before.subscription.bindingId), null)
+  })
+  await t.test('a failed quota refresh does not revoke a started native Profile continuation at the real claim boundary', async context => {
+    const p = await seed('codex', false, true)
+    assert.equal((await p.claim()).status, 200)
+    const original = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [p.runId])).rows[0]
+    const sessionId = 'synthetic-profile-session-' + randomUUID()
+    // The real HTTP claim above established the lease. This synthetic completion
+    // supplies native execution evidence without making a model/provider call.
+    await pool.query('UPDATE agent_runs SET status=\'succeeded\',"sessionId"=$2,"finishedAt"=clock_timestamp(),"leaseExpiresAt"=NULL WHERE id=$1', [p.runId, sessionId])
+    await staleProfileQuota(p)
+    const { dispatchToTask } = await import('../lib/thread-dispatch')
+    const continued = await dispatchToTask(p.userId, p.issueId, { note: 'Continue the same native session.',
+      start: async (previous, note) => {
+        assert.equal(previous?.id, p.runId)
+        return queueRun(p.userId, { issueId: p.issueId, agentId: p.agentId, repo: p.remote, model: p.model, note, readOnly: true,
+          subscriptionBindingId: original.agentDefinition.subscription.bindingId,
+          agentProfile: original.agentDefinition.agentProfile, modelDispatch: original.agentDefinition.modelDispatch, threadRunId: p.runId }, p.botId)
+      },
+    })
+    if ('error' in continued) assert.fail(continued.error)
+    assert.equal(continued.thread, 'continued')
+    const queued = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [continued.runId])).rows[0]
+    assert.equal(queued.agentDefinition.profileOriginRunId, p.runId); assert.equal(queued.continuesRunId, p.runId)
+    await assert.rejects((await import('../lib/factory/agent-profile')).assertProfileSelection(pool, p.scope, queued.agentDefinition.agentProfile), { code: 'agentProfileModelUnavailable' })
+    await (await import('../lib/factory/profile-admission')).assertRunProfileClaim(pool, queued.id)
+    const reads = await quotaReader(context, p, queued.id, 'unavailable')
+    const response = await p.claim(queued.id)
+    assert.equal(response.status, 200, JSON.stringify(await response.clone().json()))
+    const body = await response.json(), claimed = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [queued.id])).rows[0]
+    assert.equal(reads(), 1); assert.equal(claimed.status, 'preparing'); assert.equal(claimed.sessionId, null)
+    assert.equal(body.resumeSessionId, sessionId)
+    assert.equal(body.continuesRunId, p.runId)
+    assert.deepEqual(claimed.agentDefinition.agentProfile, original.agentDefinition.agentProfile)
+    assert.deepEqual(claimed.agentDefinition.subscription, original.agentDefinition.subscription)
+  })
   await t.test('unknown shared quota refresh uses the lender owner, not the task owner', async () => {
     const p = await seed('codex', false)
     await pool.query('UPDATE byos_connections SET quota=NULL WHERE id=$1', [p.connectionId])

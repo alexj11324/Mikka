@@ -1,5 +1,5 @@
 import 'server-only'
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { digest } from '@/lib/agent-kit/definition'
 import { bindAgentToConnection, resolveModelDispatch, type ModelDispatch } from '@/lib/model-dispatch'
@@ -41,6 +41,8 @@ export interface AgentProfileDispatchResult {
 }
 type DispatchScope = AgentProfileScope & { botId: string | null }
 type DispatchDependencies = {
+  /** Host-owned Factory client; its real COMMIT acquires the final lease. */
+  transaction?: PoolClient
   membership?: (scope: AgentProfileScope) => Promise<ProfileMembership>
   resolve?: typeof resolveModelDispatch
   decision?: typeof invokeDecision
@@ -185,6 +187,7 @@ export async function assertProfileTarget(query: ProfileQuery, scope: AgentProfi
 
 export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchScope, request: AgentProfileDispatchRequest, deps: DispatchDependencies = {}): Promise<AgentProfileDispatchResult> {
   validateProfileScope(scope)
+  if (deps.transaction) (await import('./transaction')).assertFactoryTransaction(deps.transaction)
   const membership = deps.membership ?? acquireProfileMembership
   const initialMember = await membership(scope)
   let rows: ProfileRow[]
@@ -194,22 +197,25 @@ export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchSco
   // membership lease. Plan without holding that lease or writing a binding,
   // then acquire current authority again for the short admission transaction.
   const finalize = async (target: ModelDispatch, agentProfile: AgentProfileSelection | undefined, selectionMode: 'picked' | 'preference'): Promise<AgentProfileDispatchResult> => {
-    const client = await pool.connect()
+    const client = deps.transaction ?? await pool.connect()
     let member: ProfileMembership | undefined
     try {
-      await client.query('BEGIN')
+      if (!deps.transaction) await client.query('BEGIN')
       if (agentProfile) await assertProfileTarget(client, scope, agentProfile)
       if (target.kind === 'device' && target.entry.source.kind === 'subscription') target = { ...target, subscriptionBindingId: await bindAgentToConnection(client, scope, target.agentId, target.entry.harness, target.entry.source.connectionId, target.entry.model) }
       // Finish shared-source authorization before taking the Profile lock.
       // Binding effects remain uncommitted until the current Profile and
       // fresh membership checks both pass.
       if (agentProfile) await assertProfileSelection(client, scope, agentProfile)
-      member = await membership(scope)
-      await member.check()
-      await client.query('COMMIT')
+      if (deps.transaction) (await import('./transaction')).registerFactoryProfile(client, scope, agentProfile)
+      else {
+        member = await membership(scope)
+        await member.check()
+        await client.query('COMMIT')
+      }
       return { target, ...(agentProfile ? { agentProfile } : {}), selectionMode }
-    } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error }
-    finally { await member?.close(); client.release() }
+    } catch (error) { if (!deps.transaction) await client.query('ROLLBACK').catch(() => {}); throw error }
+    finally { if (!deps.transaction) { await member?.close(); client.release() } }
   }
   const legacy = async () => {
     const constraints = await requestConstraints(pool, scope, request)

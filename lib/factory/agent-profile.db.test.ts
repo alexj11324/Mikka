@@ -146,6 +146,144 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.equal(binding.modelId, selected.target.model)
   })
 
+  const factoryBoundary = await import('./transaction')
+  const outerFixture = async (name: string, custom = false) => {
+    const who = await person(`profiles-outer-${name}`), sourceId = await subscribe(who, 'codex', ['gpt-6-luna'])
+    const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId)
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Outer transaction','local',true,now(),$3)`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
+    await pool.query(`INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,'Outer transaction','codex')`, [agentId, who.ownerId, device])
+    const profile = custom ? await store.create(who, definition('Outer role', 'codex', sourceId, 'gpt-6-luna')) : undefined
+    const select = (tx: import('pg').PoolClient) => profiles.resolveAgentProfileDispatch(new Proxy(pool, { get(target, key) {
+      if (key === 'connect') return () => assert.fail('borrowed Profile finalization must not check out a second APP connection')
+      const value = Reflect.get(target, key, target)
+      return typeof value === 'function' ? value.bind(target) : value
+    } }), who, { issueId: taskIssue, location: 'local', profileId: profile?.id }, { transaction: tx })
+    const bindings = async () => (await pool.query('SELECT 1 FROM byos_bindings WHERE "consumerId"=$1', [agentId])).rowCount
+    const runs = async () => (await pool.query('SELECT 1 FROM agent_runs WHERE "userId"=$1', [who.ownerId])).rowCount
+    const queueMarker = async (tx: import('pg').PoolClient, selected: Awaited<ReturnType<typeof select>>) => {
+      assert.equal(selected.target.kind, 'device')
+      if (selected.target.kind !== 'device') assert.fail('authorized local target required')
+      // A synthetic caller write proves that finalization cannot commit either
+      // the source binding or its enclosing run before the real owner commits.
+      await tx.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId","issueId",status,prompt,"agentDefinition") VALUES ($1,$2,$3,$4,$5,'queued','Outer transaction fixture',$6)`, [randomUUID(), who.ownerId, agentId, device, taskIssue, JSON.stringify({ agentProfile: selected.agentProfile })])
+    }
+    return { who, sourceId, profile, select, bindings, runs, queueMarker }
+  }
+
+  for (const kind of ['default', 'custom'] as const) await t.test(`Factory ${kind} finalization shares the outer transaction and pins membership through its real COMMIT`, async () => {
+    const f = await outerFixture(kind, kind === 'custom'), raw = await pool.connect(), writer = await pool.connect()
+    let commitObserved = false, committed = false
+    const tx = new Proxy(raw, { get(target, key) {
+      if (key === 'query') return async (...args: unknown[]) => {
+        if (args[0] === 'COMMIT') {
+          await writer.query('BEGIN')
+          try {
+            await assert.rejects(writer.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 FOR UPDATE NOWAIT', [f.who.workspaceId, f.who.ownerId]), { code: '55P03' })
+            commitObserved = true
+          } finally { await writer.query('ROLLBACK') }
+        }
+        return Reflect.apply(target.query, target, args)
+      }
+      const value = Reflect.get(target, key, target)
+      return typeof value === 'function' ? value.bind(target) : value
+    } })
+    try {
+      await factoryBoundary.beginFactoryTransaction(tx)
+      const before = (await tx.query('SELECT txid_current()::text AS id')).rows[0].id
+      const selected = await f.select(tx)
+      await f.queueMarker(tx, selected)
+      assert.equal((await tx.query('SELECT txid_current()::text AS id')).rows[0].id, before)
+      assert.equal(await f.bindings(), 0); assert.equal(await f.runs(), 0)
+      await factoryBoundary.commitFactoryTransaction(tx); committed = true
+      assert.equal(commitObserved, true)
+      assert.equal(await f.bindings(), 1); assert.equal(await f.runs(), 1)
+      assert.throws(() => factoryBoundary.assertFactoryTransaction(tx), /factoryTransactionNotOwned/)
+      await writer.query('BEGIN')
+      try { await writer.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 FOR UPDATE NOWAIT', [f.who.workspaceId, f.who.ownerId]) }
+      finally { await writer.query('ROLLBACK') }
+    } finally {
+      if (!committed) await factoryBoundary.rollbackFactoryTransaction(tx)
+      factoryBoundary.forgetFactoryTransaction(tx); raw.release(); writer.release()
+    }
+  })
+
+  await t.test('membership cleanup failure cannot reclassify a confirmed Factory COMMIT', async () => {
+    const f = await outerFixture('cleanup'), tx = await pool.connect()
+    let committed = false, startCalls = 0
+    const diagnostics: unknown[][] = []
+    const warning = t.mock.method(console, 'warn', (...args: unknown[]) => { diagnostics.push(args) })
+    let checkout: ReturnType<typeof t.mock.method> | undefined
+    try {
+      await factoryBoundary.beginFactoryTransaction(tx)
+      await f.queueMarker(tx, await f.select(tx))
+      const connect = workspacePool.connect.bind(workspacePool)
+      checkout = t.mock.method(workspacePool, 'connect', ((callback?: Parameters<typeof workspacePool.connect>[0]) => {
+        if (callback) return connect(callback)
+        return connect().then(client => new Proxy(client, { get(target, key) {
+          if (key === 'release') return (...args: unknown[]) => {
+            Reflect.apply(target.release, target, args)
+            throw new Error('synthetic membership cleanup failure')
+          }
+          const value = Reflect.get(target, key, target)
+          return typeof value === 'function' ? value.bind(target) : value
+        } }))
+      }) as typeof workspacePool.connect)
+      await factoryBoundary.commitFactoryTransaction(tx); committed = true
+      startCalls++
+      assert.equal(startCalls, 1)
+      assert.equal(await f.bindings(), 1); assert.equal(await f.runs(), 1)
+      assert.ok(diagnostics.some(args => args[0] === JSON.stringify({ msg: 'factory_profile_membership_cleanup_failed', committed: true })))
+      assert.throws(() => factoryBoundary.assertFactoryTransaction(tx), /factoryTransactionNotOwned/)
+    } finally {
+      checkout?.mock.restore(); warning.mock.restore()
+      if (!committed) await factoryBoundary.rollbackFactoryTransaction(tx)
+      factoryBoundary.forgetFactoryTransaction(tx); tx.release()
+    }
+  })
+
+  await t.test('Factory final membership revocation rolls back its selected binding and caller run', async () => {
+    const f = await outerFixture('revoked', true), tx = await pool.connect()
+    try {
+      await factoryBoundary.beginFactoryTransaction(tx)
+      await f.queueMarker(tx, await f.select(tx))
+      await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [f.who.workspaceId, f.who.ownerId])
+      await assert.rejects(factoryBoundary.commitFactoryTransaction(tx), { code: 'agentProfileScopeNotFound' })
+      await factoryBoundary.rollbackFactoryTransaction(tx)
+      assert.equal(await f.bindings(), 0); assert.equal(await f.runs(), 0)
+      assert.throws(() => factoryBoundary.assertFactoryTransaction(tx), /factoryTransactionNotOwned/)
+    } finally { await factoryBoundary.rollbackFactoryTransaction(tx); tx.release() }
+  })
+
+  await t.test('Factory savepoint rollback discards only its uncommitted Profile authority', async () => {
+    const f = await outerFixture('savepoint'), tx = await pool.connect()
+    let committed = false
+    try {
+      await factoryBoundary.beginFactoryTransaction(tx)
+      const restore = factoryBoundary.factoryAuthorizationCheckpoint(tx)
+      await tx.query('SAVEPOINT profile_selection')
+      await f.queueMarker(tx, await f.select(tx))
+      await tx.query('ROLLBACK TO SAVEPOINT profile_selection'); restore()
+      await tx.query('RELEASE SAVEPOINT profile_selection')
+      await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [f.who.workspaceId, f.who.ownerId])
+      await factoryBoundary.commitFactoryTransaction(tx); committed = true
+      assert.equal(await f.bindings(), 0); assert.equal(await f.runs(), 0)
+      await factoryBoundary.beginFactoryTransaction(tx)
+      await factoryBoundary.commitFactoryTransaction(tx)
+    } finally {
+      if (!committed) await factoryBoundary.rollbackFactoryTransaction(tx)
+      factoryBoundary.forgetFactoryTransaction(tx); tx.release()
+    }
+  })
+
+  await t.test('an unregistered APP client cannot borrow Profile finalization authority', async () => {
+    const f = await outerFixture('unregistered'), tx = await pool.connect()
+    try {
+      await tx.query('BEGIN')
+      await assert.rejects(f.select(tx), /factoryTransactionNotOwned/)
+      assert.equal(await f.bindings(), 0); assert.equal(await f.runs(), 0)
+    } finally { await tx.query('ROLLBACK'); tx.release() }
+  })
+
   for (const change of ['default-member', 'custom-member', 'default-source', 'custom-source', 'disabled', 'edited'] as const) await t.test(`planning ${change} change leaves no committed binding or run`, async () => {
     const who = await person(`profiles-planning-${change}`)
     const sourceId = await subscribe(who, 'codex', ['gpt-6-luna'])

@@ -1,4 +1,5 @@
 import { cronUnauthorized } from '@/lib/cron-auth'
+import { cronJob } from '@/lib/background'
 import { withRequestLog } from '@/lib/request-log'
 import { pool } from '@/lib/db'
 import { collectOperationalSignals } from '@/lib/ops/monitor'
@@ -19,4 +20,4 @@ async function handleGET(request: Request) {
     return Response.json({ ...result, egress }, { status: result.databaseAvailable && result.notificationStatus !== 'failed' && egress.status !== 'failed' ? 200 : 503, headers })
   } catch { return Response.json({ error: 'opsMonitorUnavailable', persisted: false }, { status: 503, headers }) }
 }
-export const GET = withRequestLog('/api/cron/ops-monitor', handleGET)
+export const GET = withRequestLog('/api/cron/ops-monitor', cronJob('ops-monitor', handleGET))

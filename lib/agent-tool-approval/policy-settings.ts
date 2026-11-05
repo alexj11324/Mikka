@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { writeTransaction } from '@/lib/operations/write-transaction'
+import { runControlChanged } from '@/lib/device-gateway-notify'
 import { cliPolicyGuard, cliAgentPolicyGuard, cliPolicyLayerSchema, cliPolicyValuesSchema, lockCliRunPolicy, lockCliAgentPolicy, realCliMembershipGuard, type CliMembershipGuard } from './policy-store'
 
 async function auditSharedPolicy(tx: PoolClient, ownerId: string, scope: 'workspace' | 'team' | 'project', current: Awaited<ReturnType<typeof lockCliAgentPolicy>>) {
@@ -10,6 +11,12 @@ async function auditSharedPolicy(tx: PoolClient, ownerId: string, scope: 'worksp
   const { recordAudit } = await import('@/lib/audit/record')
   await recordAudit(drizzle(tx), { workspaceId, actor: { type: 'user', id: ownerId, name: ownerId }, action: 'agent.policy_changed',
     target: { type: scope, id: scopeId, label: scope }, metadata: { scope, revision: current.revision } })
+}
+
+/** A changed revision ends the live runs it covers: wake their daemons (#1212). */
+function policyChanged(tx: PoolClient, ownerId: string, workspaceId: string | null | undefined) {
+  runControlChanged(tx, { userId: ownerId })
+  if (workspaceId) runControlChanged(tx, { workspaceId })
 }
 
 /** Own CLI fields only; external-write/computer choices are never changed. */
@@ -36,6 +43,7 @@ export async function setCliPolicy(pool: Pick<Pool, 'connect'>, ownerId: string,
     }
     const next = await lockCliRunPolicy(tx,runId,ownerId)
     if (target === 'workspace' || target === 'team' || target === 'project') await auditSharedPolicy(tx, ownerId, target, next)
+    policyChanged(tx, ownerId, target === 'agent' || target === 'worker' ? null : target === 'workspace' ? current.workspaceId : current.hierarchy?.workspaceId)
     return next
   }, { guard: async (tx,signal) => {
     const lease = await guard(tx,signal)
@@ -67,6 +75,7 @@ export async function setCliAgentPolicy(pool: Pick<Pool, 'connect'>, ownerId: st
     }
     const next = await lockCliAgentPolicy(tx,ownerId,agentId,botId)
     if (target === 'workspace') await auditSharedPolicy(tx, ownerId, target, next)
+    policyChanged(tx, ownerId, target === 'workspace' ? current.workspaceId : null)
     return next
   }, { guard: async (tx,signal) => {
     const lease = await guard(tx,signal)

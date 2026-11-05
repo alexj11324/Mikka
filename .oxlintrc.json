@@ -12,5 +12,14 @@
     "user_read_only_context/**",
     "v0_memories/**",
     ".claude/**"
-  ]
+  ],
+  "rules": {
+    "no-restricted-imports": ["error", {
+      "paths": [{
+        "name": "next/server",
+        "importNames": ["after"],
+        "message": "Use afterJob from @/lib/background, so the deferred work is traced and labelled as its own job (docs/operations/tracing.md)."
+      }]
+    }]
+  }
 }

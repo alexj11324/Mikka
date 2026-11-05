@@ -1,4 +1,5 @@
 import { withRequestLog } from '@/lib/request-log'
+import { cronJob } from '@/lib/background'
 import { cronUnauthorized } from '@/lib/cron-auth'
 import { reconcileSuggestions } from '@/lib/suggestions/reconcile'
 import { runFactoryMonitorCron } from '@/lib/factory/monitor-cron'
@@ -40,4 +41,4 @@ async function handleGET(request: Request) {
   })
 }
 
-export const GET = withRequestLog('/api/cron/suggestions-reconcile', handleGET)
+export const GET = withRequestLog('/api/cron/suggestions-reconcile', cronJob('suggestions-reconcile', handleGET))

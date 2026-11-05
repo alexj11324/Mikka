@@ -28,7 +28,7 @@ test('the task list and a task\'s relations read metadata and checklist counts, 
   const { pool } = await import('../lib/db')
   const { actAs } = await import('../lib/acting-user')
   const { saveIssue, listIssues, pollIssues } = await import('../app/actions/issues')
-  const { listIssueConnections } = await import('../app/actions/issue-operations')
+  const { listIssueConnections, updateIssueRelation } = await import('../app/actions/issue-operations')
   const { updateIssueMetadata } = await import('../app/actions/issue-metadata')
   const { issueChecklist } = await import('../lib/issue-checklist')
   const owner = `issue-list-${randomUUID()}`
@@ -78,15 +78,42 @@ test('the task list and a task\'s relations read metadata and checklist counts, 
     assert.deepEqual(foreign.items, [], 'another identity cannot reuse an owner snapshot to obtain private tasks')
     assert.notEqual(foreign.version, changed.version)
 
-    const relations = await measured(() => actAs(owner, () => listIssueConnections(ids[1])))
-    assert.equal(relations.value.length, 30)
+    // ids[10]: parent ids[0], blocked by ids[12], related to ids[13], duplicate of ids[16]; ids[14] is its child, it blocks ids[15].
+    const relate = async (id: string, targetId: string, kind: 'parent' | 'blockedBy' | 'related' | 'duplicate') => {
+      const revision = (await pool.query('select revision from issues where id=$1', [id])).rows[0].revision
+      const result = await actAs(owner, () => updateIssueRelation({ id, revision, targetId, kind }))
+      assert.ok('issue' in result, JSON.stringify(result))
+    }
+    await relate(ids[10], ids[0], 'parent')
+    await relate(ids[10], ids[12], 'blockedBy')
+    await relate(ids[10], ids[13], 'related')
+    await relate(ids[10], ids[16], 'duplicate')
+    await relate(ids[14], ids[10], 'parent')
+    await relate(ids[15], ids[10], 'blockedBy')
+    await relate(ids[17], ids[18], 'related')
+    const relations = await measured(() => actAs(owner, () => listIssueConnections(ids[10])))
+    // The rows the relations panel and subtasks use, picked from every task the owner has (listIssues reads them all).
+    const everything = await actAs(owner, () => listIssues())
+    const current = everything.find(row => row.id === ids[10])!.metadata
+    const linked = everything.filter(row => row.id === ids[10] || row.id === current.parentId || row.id === current.duplicateOfId || current.blockedByIds.includes(row.id) || current.relatedIds.includes(row.id)
+      || row.metadata.parentId === ids[10] || row.metadata.blockedByIds.includes(ids[10]) || row.metadata.relatedIds.includes(ids[10]))
+    assert.deepEqual(relations.value.map(row => row.id).sort(), [ids[0], ids[10], ids[12], ids[13], ids[14], ids[15], ids[16]].sort())
+    assert.deepEqual(relations.value.map(row => row.id).sort(), linked.map(row => row.id).sort(), 'exactly the tasks the panel shows')
+    for (const row of relations.value) {
+      const listed = everything.find(item => item.id === row.id)!
+      assert.deepEqual({ metadata: row.metadata, identifier: row.identifier, title: row.title, status: row.status }, { metadata: listed.metadata, identifier: listed.identifier, title: listed.title, status: listed.status })
+    }
     assert.equal(relations.value.find(row => row.id === ids[0])?.metadata.estimate, 5)
+    const unrelated = await actAs(owner, () => listIssueConnections(ids[19]))
+    assert.deepEqual(unrelated.map(row => row.id), [ids[19]], 'a task with no links reads only itself')
 
     const bodies = (await pool.query('select sum(length(content::text))::int n from issues where "userId"=$1', [owner])).rows[0].n
     t.diagnostic(JSON.stringify({ tasks: 30, bodyBytes: bodies, listIssuesDbBytes: list.bytes, listIssueConnectionsDbBytes: relations.bytes }))
     // Reading every body would cost at least `bodies` bytes.
     assert.ok(list.bytes < bodies / 5, `listIssues read ${list.bytes} B for ${bodies} B of bodies`)
     assert.ok(relations.bytes < bodies / 5, `listIssueConnections read ${relations.bytes} B for ${bodies} B of bodies`)
+    // 7 of the owner's 30 tasks: well under the whole list's metadata.
+    assert.ok(relations.bytes < list.bytes, `listIssueConnections read ${relations.bytes} B, the whole list ${list.bytes} B`)
     const { withActivitySession } = await import('./fixtures/activity-runtime.mjs')
     const { promoteExistingIssueForUser } = await import('../lib/team-issue-promotion')
     await pool.query('insert into mikka_workspaces(id,"userId",name) values($1,$2,$3)', [workspaceId, owner, 'Egress visibility fixture'])

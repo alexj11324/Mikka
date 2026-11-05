@@ -9,7 +9,8 @@ export type RequestLogOutcome = 'empty' | 'work' | 'ignored'
 type Store = { userId?: string; outcome?: RequestLogOutcome }
 const requestScope = new AsyncLocalStorage<Store>()
 // The route template of the request being handled, read by the database sample
-// (lib/db/egress-sample.ts) through this global key, so neither module imports the other.
+// and the tracer (lib/tracing/labels.ts) through this global key. Kept local:
+// scripts/ops load this file with plain Node, without the @/ alias.
 const routeScope: AsyncLocalStorage<string> = ((globalThis as Record<symbol, unknown>)[Symbol.for('mikka.requestRoute')] ??= new AsyncLocalStorage<string>()) as AsyncLocalStorage<string>
 
 /** Records the signed-in user for the current request's log line. */

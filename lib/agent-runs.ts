@@ -84,6 +84,18 @@ export const runViewColumns = {
 }
 
 /**
+ * `runViewColumns` for list reads (citations, the inbox): no provenance, the
+ * report holds only its `summary` and the error only its first non-blank line,
+ * exactly what `runSummaryText` reads from them.
+ */
+const { agentProfile: _profile, model: _model, modelSource: _modelSource, executionIdentity: _identity, ...runBriefColumns } = runViewColumns
+const runBriefViewColumns = {
+  ...runBriefColumns,
+  report: sql<Record<string, unknown> | null>`case when jsonb_typeof(${agentRuns.report}) = 'object' then jsonb_build_object('summary', ${agentRuns.report}->'summary') end`,
+  error: sql<string | null>`substring(${agentRuns.error} from '[^\\n]*\\S[^\\n]*')`,
+}
+
+/**
  * Queues one run of one agent against one issue. The daemon picks it up on its
  * next poll, claims it, and reports back through `/v1/runs/:runId/complete`.
  * `note` is extra direction for this run only, after the issue.
@@ -145,7 +157,7 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
     // else 优先使用的模型 for this computer's Agent. A Factory run is never queued without one.
     const { execution, ...chosen } = selection
     const runModel = await factoryRunModel(userId, botId, parsed.data.agentId, chosen, sourceRunId
-      ? (await executor.select({ agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, sourceRunId), eq(agentRuns.userId, userId))).limit(1))[0]?.agentDefinition : null, parsed.data.profileId, profileStage, parsed.data.issueId)
+      ? (await executor.select({ agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, sourceRunId), eq(agentRuns.userId, userId))).limit(1))[0]?.agentDefinition : null, parsed.data.profileId, profileStage, parsed.data.issueId, tx)
     const result = await queueAdmittedRun(userId, { ...parsed.data, ...runModel, threadRunId: selection.threadRunId ?? sourceRunId, ...(chosen.pinnedDeviceId ? { pinnedDeviceId: chosen.pinnedDeviceId } : {}), ...(chosen.readOnly ? { readOnly: true } : {}), repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, execution, requestEventId, null, { executor, repo, client: tx, sourceRunId, factoryContext: context })
     const [run] = await executor.select({ status: agentRuns.status }).from(agentRuns).where(and(eq(agentRuns.id, result.runId), eq(agentRuns.userId, userId))).limit(1)
     if (!run) throw new ActionFailureError('runInvalid')
@@ -268,7 +280,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
 
 /** A Factory run's model: the host's choice; else a rerun's source run's own; else 优先使用的模型 for the Agent's computer. */
 async function factoryRunModel(userId: string, botId: string | null, agentId: string, chosen: Omit<FactoryRunSelection, 'execution' | 'pinnedDeviceId' | 'readOnly'>,
-  source: Parameters<typeof import('@/lib/computer/run-model').threadRunModel>[0], profileId?: string, stage: string = 'execute', issueId?: string) {
+  source: Parameters<typeof import('@/lib/computer/run-model').threadRunModel>[0], profileId?: string, stage: string = 'execute', issueId?: string, transaction?: import('pg').PoolClient) {
   const { threadRunModel } = await import('@/lib/computer/run-model')
   if (profileId && chosen.model && chosen.agentProfile?.profileId !== profileId) throw new ActionFailureError('runInvalid')
   if (chosen.model?.trim()) return { model: chosen.model, ...(chosen.subscriptionBindingId ? { subscriptionBindingId: chosen.subscriptionBindingId } : {}), ...(chosen.apiKeyId ? { apiKeyId: chosen.apiKeyId } : {}), ...(chosen.modelDispatch ? { modelDispatch: chosen.modelDispatch } : {}), ...(chosen.agentProfile ? { agentProfile: chosen.agentProfile } : {}), ...(chosen.policyCeiling ? { policyCeiling: chosen.policyCeiling } : {}) }
@@ -283,7 +295,7 @@ async function factoryRunModel(userId: string, botId: string | null, agentId: st
   const workspaceId = await executionWorkspace(userId, botId).catch(() => null)
   if (!workspaceId) throw new ActionFailureError('runModelMissing')
   const { target, agentProfile, selectionMode } = await (await import('@/lib/factory/agent-profile')).resolveAgentProfileDispatch(pool,
-    { ownerId: userId, workspaceId, botId }, { issueId: issueId!, stage, profileId, agentId: agent.id, deviceId: agent.deviceId, location: 'local', asked: { harness: agent.harness } })
+    { ownerId: userId, workspaceId, botId }, { issueId: issueId!, stage, profileId, agentId: agent.id, deviceId: agent.deviceId, location: 'local', asked: { harness: agent.harness } }, { transaction })
   if (target.kind !== 'device' || target.agentId !== agent.id) throw new ActionFailureError('runModelMissing')
   return { model: target.model, agentProfile,
     modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry },
@@ -301,8 +313,9 @@ async function localRunCredential<S extends { id: string; ownerId: string; conne
 }
 
 /** Every surface uses this gate. Workspace membership never grants run control,
- * personal agent/session access, or raw transcript access. */
-export async function visibleRuns(userId: string, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number } = {}): Promise<RunView[]> {
+ * personal agent/session access, or raw transcript access.
+ * `brief`: the list projection (`runBriefViewColumns`), for callers that show a run's name, state and summary only. */
+export async function visibleRuns(userId: string, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number; brief?: boolean } = {}): Promise<RunView[]> {
   if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
   // Asked about one task or known runs: only their tasks' team links are read.
@@ -311,7 +324,7 @@ export async function visibleRuns(userId: string, input: { issueId?: string; run
     : undefined
   const visibility = await issueVisibility(userId, false, undefined, db, { onlyIssueIds })
   const shared = visibility.allowedIds.length ? and(eq(issues.scope, 'workspace'), inArray(issues.id, visibility.allowedIds)) : sql`false`
-  const rows = await db.select({ ...runViewColumns, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
+  const rows = await db.select({ ...(input.brief ? runBriefViewColumns : runViewColumns), ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))
     .where(and(
       or(and(eq(agentRuns.userId, userId), or(isNull(agentRuns.issueId), visibility.predicate)), and(visibility.predicate, shared)),
