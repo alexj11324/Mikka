@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { stopLocalDaemons } from './native-cleanup.mjs'
+import { readNativeDaemonMetadata } from './native-metadata.mjs'
 
 async function daemon(t) {
   // Keep the Unix socket below macOS's path length limit.
@@ -55,6 +56,27 @@ test('a wrong profile secret cannot drain or authorize cleanup', async t => {
   assert.equal(child.exitCode, null)
   await writeFile(path, secret)
   assert.deepEqual(await stopLocalDaemons([profile]), { profilesStopped: true })
+})
+
+test('metadata reads only the actual authenticated hello and never leaks secrets or stops the daemon', async t => {
+  const { profile, child } = await daemon(t)
+  const path = join(profile, 'daemon.secret')
+  const secret = await readFile(path)
+  const observed = await readNativeDaemonMetadata(profile)
+  assert.equal(observed.source, 'local_daemon_hello')
+  assert.equal(observed.status, 'connected')
+  assert.equal(observed.daemonVersion, '0.0.0-acceptance-fixture')
+  assert.ok(Number.isSafeInteger(observed.protocolVersion) && observed.protocolVersion > 0)
+  assert.deepEqual(Object.keys(observed).sort(), ['daemonVersion', 'protocolVersion', 'source', 'status'])
+  assert.equal(JSON.stringify(observed).includes(secret.toString()), false)
+  assert.equal(child.exitCode, null)
+  await writeFile(path, 'wrong-secret')
+  assert.deepEqual(await readNativeDaemonMetadata(profile), { source: 'local_daemon_hello', status: 'unavailable', reason: 'handshake_failed' })
+  assert.equal(child.exitCode, null, 'metadata must never drain or repair a service')
+  await writeFile(path, secret)
+  await stopLocalDaemons([profile])
+  assert.equal((await readNativeDaemonMetadata(profile)).status, 'unavailable')
+  await assert.rejects(readNativeDaemonMetadata('relative-profile'), /NATIVE_METADATA_REQUIRES_EXACT_PROFILE/)
 })
 
 test('an already closed socket still waits for the recorded daemon process to finish', async t => {

@@ -183,7 +183,7 @@ async function authenticateBundled(bundled) {
     globalThis.__mikkaParityExternal = null
     shell.openExternal = async url => { globalThis.__mikkaParityExternal = url }
   })
-  const handoff = bundled.page.evaluate(() => window.mikka.bundled.signIn({ provider: 'google', next: '/settings?section=account', locale: 'en' }))
+  const handoff = bundled.page.evaluate(() => window.mikka.bundled.signIn({ provider: 'google', next: '/', locale: 'en' }))
   let handoffError
   handoff.catch(error => { handoffError = error })
   let external
@@ -206,8 +206,7 @@ async function authenticateBundled(bundled) {
 }
 
 async function selectFixtureWorkspace(target) {
-  // Select the fixture before mounting a personal conversation or its reads.
-  await go(target, '/settings?section=account')
+  await go(target)
   await target.page.getByRole('button', { name: messages.Nav.workspaceMenu, exact: true }).first().click()
   await target.page.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: false }).click()
   await target.page.waitForURL(url => url.pathname === `${environment.basePath}/en` || url.pathname === `${environment.basePath}/en/`)

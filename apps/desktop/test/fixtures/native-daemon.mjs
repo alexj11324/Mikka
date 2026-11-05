@@ -16,7 +16,7 @@ const finish = () => setTimeout(async () => {
 }, 250)
 const server = new RpcServer({
   socketPath: join(directory, 'daemon.sock'), secret,
-  hello: () => ({ protocolVersion: DAEMON_PROTOCOL_VERSION, daemonVersion: 'acceptance-fixture', pid: process.pid }),
+  hello: () => ({ protocolVersion: DAEMON_PROTOCOL_VERSION, daemonVersion: '0.0.0-acceptance-fixture', pid: process.pid }),
   handlers: { 'daemon.drain': () => {
     setTimeout(async () => {
       await server.close()

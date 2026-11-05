@@ -10,6 +10,7 @@
 | [工作区旧链接与公开 Artifact](desktop-links-db-154a6efa.json) | `154a6efa` 加记录中的测试连接绑定修正；实际原始 reader、权限和数据库 | 6 通过、0 失败、0 跳过。旧 slug 两端 250 B；公开 Artifact 两端 956 B。 |
 | [有界审批元数据读取](rpc-db-8e81c003.json) | `8e81c003`；真实数据库和 HTTP 边界；身份 fixture 的模拟范围已单独注明 | 16 通过、0 失败、0 跳过。完整文档 1,200,377 B，所需元数据投影 283 B。 |
 | [原 Next 构建测量](baseline-build-a1b633178.json) | main `a1b633178`；Large 8 CPU / 16 GiB；`/usr/bin/time -v` | 245.21 秒，峰值 RSS 11,168,596 KiB，退出码 0。不是第二阶段最终对照版本。 |
+| [真实 Electron 登录冒烟](smoke-wait-diagnostic.json) / [版本与测试增量](smoke-wait-diagnostic-provenance.json) | `9fa8be5d` 产品和后端，Linux Electron 45.1.0；仅修正测试等待器并增加安全诊断 | 7 项通过，退出码 0，精确资源清理成功。系统浏览器已有的租赁会话完成真实 loopback/PKCE；不声称完成外部 provider challenge。 |
 
 字节值是已预热 PostgreSQL 连接的 socket `bytesRead` 差值，范围以各 JSON 为准。上述每次读取的比较不能替代完整一小时空闲测量，也不能推广为所有路由已经验收。
 
@@ -17,7 +18,7 @@
 
 ## 原生诊断状态
 
-`9fa8be5d` 的真实 Linux Electron 已验证未登录窗口使用本地 `mikka://app`、renderer 无 Node、CSP 阻断外部 fetch。另一个独立的启动器诊断实际完成了 `gnome_libsecret` 加解密，且 Chromium sandbox 开启；它使用 `9fa8be5d` 启动器和此前的应用构建，不代表最终 App 已完整验收。登录交接诊断发现 Playwright 的 `waitForFunction` 在此版本会把返回的 Promise 当作已满足条件；测试须在 Node 端等待真实会话值，修正后重跑。此处不计为登录通过、登录后的凭证隔离通过或 macOS 通过。
+`9fa8be5d` 的真实 Linux Electron 已验证本地 `mikka://app`、renderer 无 Node、CSP 阻断外部 fetch，以及登录后 renderer 可访问状态不包含浏览器凭据。另一个独立的启动器诊断实际完成了 `gnome_libsecret` 加解密，且 Chromium sandbox 开启；它使用 `9fa8be5d` 启动器和此前的应用构建，不代表最终 App 已完整验收。登录交接曾因 Playwright 的 `waitForFunction` 把 Promise 当作已满足条件而过早读取空会话；改为在 Node 端等待实际 IPC 会话值后，真实冒烟通过。该短测试没有注册本机 daemon，不能当作设备在线、一小时空闲或 macOS 打包通过。
 
 环境启动器的失败记录也已定位：编译时的版本必须与 checkout 一致，Next 请求规范化后的 `localhost` 必须与环境登记 origin 一致。所有改动保持原来的版本、数据库身份和租赁校验；原本绑定其他 origin 的数据库没有重新绑定或被接管。
 

@@ -17,6 +17,7 @@ import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
+import { readNativeDaemonMetadata } from './native-metadata.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 const environment = await loadEnvironment()
@@ -34,10 +35,14 @@ const menuNames = Object.fromEntries(await Promise.all(['zh-CN', 'en'].map(async
 const evidence = {
   version: 1, revision,
   environmentId: environment.id, origin: environment.origin, database: environment.database.name,
+  renderers: {
+    bundled: { revision, mode: 'bundled', url: 'mikka://app/mikka', backend: environment.origin },
+    hosted: { revision, mode: 'hosted', url: `${environment.origin}/mikka`, backend: environment.origin },
+  },
   startedAt: new Date().toISOString(), viewport, checks: [], samples: [], nativeStates: [],
   measurement: {
     clock: 'Node performance.now, immediately before Electron launch to visible seeded message and enabled composer accepting a draft',
-    process: 'fresh Electron process for every sample; existing authenticated profile; same backend/account/workspace',
+    process: 'same compiled shell/backend, bundled vs preserved hosted loading path; fresh Electron process for every sample, existing authenticated profile, same account/workspace',
     cache: 'normal profile/OS caches; no OS cache purge, artificial network delay or renderer response substitution',
     pairing: 'alternating bundled-first and hosted-first order',
     daemon: 'after every sample, cancel installers, close Electron and prove that exact profile daemon exited before launching the next process; drain time is outside readiness timing',
@@ -86,7 +91,7 @@ async function recordNativeState(page, phase, mode) {
       installer: installer ? { status: installer.status, step: installer.step, retryable: installer.retryable ?? false } : null,
     }
   })
-  evidence.nativeStates.push({ phase, mode, ...state })
+  evidence.nativeStates.push({ phase, mode, ...state, daemon: await readNativeDaemonMetadata(profiles[mode]) })
   return state
 }
 

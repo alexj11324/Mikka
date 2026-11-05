@@ -11,6 +11,7 @@ import { chromium } from '@playwright/test'
 import { launchElectron } from './electron-launch.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
+import { readNativeDaemonMetadata } from './native-metadata.mjs'
 import { captureNativeResources } from './native-resources.mjs'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
@@ -102,8 +103,8 @@ try {
   const systemBrowser = await context.newPage()
   await systemBrowser.goto(external, { waitUntil: 'domcontentloaded' })
   await handoff
-  await systemBrowser.close()
   const identity = await waitForBundledSession(page, scope.owner.userId)
+  await systemBrowser.close()
   assert.equal(identity.user.id, scope.owner.userId)
   await scope.recordResource({ type: 'session', id: identity.session.id, ownerId: scope.owner.userId })
   const webOrigin = new URL(environment.origin)
@@ -143,6 +144,7 @@ try {
     }
     assert.ok(nativeReady(report.nativeService), 'DESKTOP_IDLE_REQUIRES_REGISTERED_ONLINE_NATIVE_DEVICE')
   }
+  report.nativeDaemon = await readNativeDaemonMetadata(profile)
   await delay(35_000)
   assert.ok(webLive.ready > 0 && webLive.pong > 0, 'Web live channel must be healthy before measurement')
   const nativeLive = await page.evaluate(() => window.__mikkaIdleLive)
@@ -180,6 +182,7 @@ try {
   report.finishedAt = new Date().toISOString()
   report.bundled = bundled
   report.web = hosted
+  report.nativeDaemonAtEnd = await readNativeDaemonMetadata(profile)
   report.live = { bundled: await page.evaluate(() => window.__mikkaIdleLive), web: webLive }
   for (const target of [web, page]) assert.equal(await target.evaluate(() => document.visibilityState), 'visible')
   assert.equal(bundled.unknownReadings, 0)
