@@ -1,0 +1,255 @@
+[
+  {
+    "observation": {
+      "tasks": [
+        {
+          "id": "6e413ef7-7179-442d-ad0e-b9492cf76145",
+          "runs": [
+            {
+              "id": "d19adfcb-6fd3-4301-8fc9-8ac59900d82d",
+              "kind": "implement",
+              "model": "deepseek-flash",
+              "status": "failed",
+              "liveLease": false,
+              "startedAt": "2026-11-04T14:22:31.358315+00:00",
+              "finishedAt": "2026-11-04T14:22:51.336663+00:00",
+              "stopReason": "error"
+            },
+            {
+              "id": "a5e393bc-30e7-4dcf-8b65-a660673275ae",
+              "kind": "implement",
+              "model": "deepseek-flash",
+              "status": "failed",
+              "liveLease": false,
+              "startedAt": "2026-11-04T14:23:11.858524+00:00",
+              "finishedAt": "2026-11-04T14:23:28.331823+00:00",
+              "stopReason": "error"
+            },
+            {
+              "id": "1c4e59fe-fe78-4df6-8b6b-f434c3bd053c",
+              "kind": "implement",
+              "model": "deepseek-flash",
+              "status": "failed",
+              "liveLease": false,
+              "startedAt": "2026-11-04T14:23:57.96232+00:00",
+              "finishedAt": "2026-11-04T14:24:16.111736+00:00",
+              "stopReason": "error"
+            },
+            {
+              "id": "910f04bf-ce7a-4a79-8d13-0f74f9d62722",
+              "kind": "implement",
+              "model": "deepseek-flash",
+              "status": "failed",
+              "liveLease": false,
+              "startedAt": "2026-11-04T14:24:37.382616+00:00",
+              "finishedAt": "2026-11-04T14:24:55.666421+00:00",
+              "stopReason": "error"
+            }
+          ],
+          "botId": "b56e7f61-59dd-4d7e-a114-b9dddf821a84",
+          "stage": "execute",
+          "status": "failed",
+          "issueId": "9809bb6a-fdb8-4a00-926f-768c303a084f",
+          "ownerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+          "revision": 12,
+          "updatedAt": "2026-11-04T14:24:55.84416+00:00",
+          "candidateId": null
+        },
+        {
+          "id": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+          "runs": [
+            {
+              "id": "e2cc22fa-5644-4fad-8d98-070472e609d2",
+              "kind": "implement",
+              "model": "gpt-5.6-luna",
+              "status": "succeeded",
+              "liveLease": false,
+              "startedAt": "2026-11-03T17:22:59.880221+00:00",
+              "finishedAt": "2026-11-03T17:25:36.325282+00:00",
+              "stopReason": "submitted"
+            },
+            {
+              "id": "51e2aeb7-498d-4713-86c4-00871c4eb653",
+              "kind": "acceptance",
+              "model": "gpt-5.6-luna",
+              "status": "succeeded",
+              "liveLease": false,
+              "startedAt": "2026-11-03T17:26:07.037605+00:00",
+              "finishedAt": "2026-11-03T17:27:57.918134+00:00",
+              "stopReason": "submitted"
+            },
+            {
+              "id": "a7223186-487c-4acc-8141-7f5e812e18fa",
+              "kind": "acceptance",
+              "model": "gpt-5.6-luna",
+              "status": "succeeded",
+              "liveLease": false,
+              "startedAt": "2026-11-03T17:28:28.596284+00:00",
+              "finishedAt": "2026-11-03T17:30:08.591051+00:00",
+              "stopReason": "submitted"
+            },
+            {
+              "id": "182ebd2e-566d-46ad-8b7d-6977b71d9860",
+              "kind": "implement",
+              "model": "gpt-5.6-luna",
+              "status": "succeeded",
+              "liveLease": false,
+              "startedAt": "2026-11-03T17:35:32.632894+00:00",
+              "finishedAt": "2026-11-03T17:38:26.608606+00:00",
+              "stopReason": "submitted"
+            },
+            {
+              "id": "2fe52073-76ac-45c0-8f96-6e8e18965d36",
+              "kind": "acceptance",
+              "model": "gpt-5.6-luna",
+              "status": "succeeded",
+              "liveLease": false,
+              "startedAt": "2026-11-03T17:38:49.642622+00:00",
+              "finishedAt": "2026-11-03T17:40:16.349117+00:00",
+              "stopReason": "submitted"
+            },
+            {
+              "id": "f197de37-a7c5-4a38-818c-3f3620beb2b5",
+              "kind": "implement",
+              "model": "gpt-5.6-luna",
+              "status": "succeeded",
+              "liveLease": false,
+              "startedAt": "2026-11-03T17:40:47.24006+00:00",
+              "finishedAt": "2026-11-03T17:43:21.275008+00:00",
+              "stopReason": "submitted"
+            },
+            {
+              "id": "fa6884e2-11bd-4fa2-80d7-8013dbf17e40",
+              "kind": "acceptance",
+              "model": "gpt-5.6-luna",
+              "status": "succeeded",
+              "liveLease": false,
+              "startedAt": "2026-11-03T17:43:32.542247+00:00",
+              "finishedAt": "2026-11-03T17:45:14.089831+00:00",
+              "stopReason": "submitted"
+            },
+            {
+              "id": "87fe63f0-05db-4d6b-862f-bcae5956def5",
+              "kind": "implement",
+              "model": "gpt-5.6-luna",
+              "status": "cancelled",
+              "liveLease": false,
+              "startedAt": "2026-11-03T17:45:35.431157+00:00",
+              "finishedAt": "2026-11-03T17:46:35.989259+00:00",
+              "stopReason": "cancelled"
+            },
+            {
+              "id": "0c2a9f64-5853-4c3a-8b59-95609e618909",
+              "kind": "implement",
+              "model": "gpt-5.6-luna",
+              "status": "succeeded",
+              "liveLease": false,
+              "startedAt": "2026-11-03T18:16:12.092622+00:00",
+              "finishedAt": "2026-11-03T18:19:08.222031+00:00",
+              "stopReason": "submitted"
+            },
+            {
+              "id": "634b8d95-e520-4169-87e1-bda633b3422a",
+              "kind": "acceptance",
+              "model": "gpt-5.6-luna",
+              "status": "succeeded",
+              "liveLease": false,
+              "startedAt": "2026-11-03T18:19:40.115139+00:00",
+              "finishedAt": "2026-11-03T18:21:19.785859+00:00",
+              "stopReason": "submitted"
+            },
+            {
+              "id": "c7bdd043-22fa-4ea3-8705-dcdc372262f3",
+              "kind": "implement",
+              "model": "gpt-5.6-luna",
+              "status": "stopped",
+              "liveLease": false,
+              "startedAt": "2026-11-03T18:21:30.201556+00:00",
+              "finishedAt": "2026-11-03T18:22:58.563426+00:00",
+              "stopReason": "blocked"
+            },
+            {
+              "id": "e57a6d03-510e-496f-bd88-97375318cd9e",
+              "kind": "implement",
+              "model": "gpt-5.6-luna",
+              "status": "failed",
+              "liveLease": false,
+              "startedAt": "2026-11-03T20:36:29.26945+00:00",
+              "finishedAt": "2026-11-03T20:38:42.615234+00:00",
+              "stopReason": "error"
+            },
+            {
+              "id": "390deeb4-5e5b-487a-acb9-c2e53dc3f8e9",
+              "kind": "implement",
+              "model": "gpt-5.6-luna",
+              "status": "succeeded",
+              "liveLease": false,
+              "startedAt": "2026-11-04T00:20:10.942616+00:00",
+              "finishedAt": "2026-11-04T00:21:45.348254+00:00",
+              "stopReason": "submitted"
+            },
+            {
+              "id": "87942171-5709-42c8-876f-8469e6174a45",
+              "kind": "acceptance",
+              "model": "gpt-5.6-luna",
+              "status": "stopped",
+              "liveLease": false,
+              "startedAt": "2026-11-04T02:47:20.856147+00:00",
+              "finishedAt": "2026-11-04T02:48:47.802909+00:00",
+              "stopReason": "blocked"
+            },
+            {
+              "id": "d646fc7d-3154-491a-86e0-d27be6b77549",
+              "kind": "acceptance",
+              "model": "gpt-5.6-luna",
+              "status": "succeeded",
+              "liveLease": false,
+              "startedAt": "2026-11-04T05:19:59.955879+00:00",
+              "finishedAt": "2026-11-04T05:21:43.084487+00:00",
+              "stopReason": "submitted"
+            },
+            {
+              "id": "485343a1-1086-4c06-8ce5-250219ea0bf6",
+              "kind": "acceptance",
+              "model": "gpt-6-luna",
+              "status": "succeeded",
+              "liveLease": false,
+              "startedAt": "2026-11-04T13:49:49.997528+00:00",
+              "finishedAt": "2026-11-04T13:51:28.214019+00:00",
+              "stopReason": "submitted"
+            },
+            {
+              "id": "4545fb6d-745f-4997-8785-5d263a67de96",
+              "kind": "acceptance",
+              "model": "gpt-6-luna",
+              "status": "succeeded",
+              "liveLease": false,
+              "startedAt": "2026-11-04T19:14:56.825606+00:00",
+              "finishedAt": "2026-11-04T19:16:35.589798+00:00",
+              "stopReason": "submitted"
+            },
+            {
+              "id": "03e5559f-c67d-455b-813f-d64b085a7907",
+              "kind": "acceptance",
+              "model": "gpt-6-luna",
+              "status": "succeeded",
+              "liveLease": false,
+              "startedAt": "2026-11-04T19:16:47.839681+00:00",
+              "finishedAt": "2026-11-04T19:18:38.455146+00:00",
+              "stopReason": "submitted"
+            }
+          ],
+          "botId": "0c2865c3-7d69-49d2-a3fd-02c484621958",
+          "stage": "approval",
+          "status": "passed",
+          "issueId": "65e92e1e-4d75-4531-b1bd-a2a68d7689c7",
+          "ownerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+          "revision": 35,
+          "updatedAt": "2026-11-04T19:19:39.832346+00:00",
+          "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1"
+        }
+      ],
+      "observedAt": "2026-11-05T00:33:50.804327+00:00"
+    }
+  }
+]

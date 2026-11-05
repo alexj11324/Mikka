@@ -1,0 +1,8 @@
+{
+  "observedAt": "2026-11-05T00:34:59.641Z",
+  "model": "deepseek-flash",
+  "modelAssertionExit": 0,
+  "httpStatus": 200,
+  "available": false,
+  "modelCalls": 0
+}
