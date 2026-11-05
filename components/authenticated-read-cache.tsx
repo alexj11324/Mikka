@@ -57,9 +57,7 @@ export function HydrateReadCache() {
     void cache.hydrate((key, data) => mutate(key, data, { revalidate: false })).then(() => {
       // Middleware pauses reads before SWR records their start time. Start one
       // validation after all hydration mutations, including keys absent on disk.
-      if (mounted && cache.isEnabled) for (const key of cache.hydrationReadKeys) {
-        if (!cache.hasFreshData(key)) void mutate(key)
-      }
+      if (mounted) cache.resumeHydrationReads()
     })
     return () => { mounted = false }
   }, [cache, mutate])

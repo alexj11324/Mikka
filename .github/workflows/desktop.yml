@@ -11,6 +11,7 @@ on:
       - 'apps/desktop/**'
       - 'packages/protocol/**'
       - 'lib/platform/**'
+      - 'lib/swr/**'
       - 'components/**'
       - 'hooks/**'
       - 'app/actions/**'

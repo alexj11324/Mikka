@@ -32,10 +32,6 @@ export const staleOnFocus: Middleware = useSWRNext => (key, fetcher, config) => 
   // SWR passes the merged config, cache included, to every middleware.
   const cache = (config as { cache?: object }).cache ?? fetchedAt
   const resumeAfterHydration = Boolean(fetcher) && config.revalidateOnMount !== false
-  useEffect(() => {
-    if (!id || !resumeAfterHydration || !(cache instanceof PersistentReadCache)) return
-    return cache.trackHydrationRead(id)
-  }, [cache, id, resumeAfterHydration])
   const stamped = fetcher && id
     ? async (...args: unknown[]) => {
       await waitForCacheHydration(cache)
@@ -67,7 +63,12 @@ export const staleOnFocus: Middleware = useSWRNext => (key, fetcher, config) => 
     // SWR reads this when the focus event fires.
     get: focusAllowed,
   })
-  return useSWRNext(key, stamped as typeof fetcher, gated)
+  const result = useSWRNext(key, stamped as typeof fetcher, gated)
+  useEffect(() => {
+    if (!key || !resumeAfterHydration || !(cache instanceof PersistentReadCache)) return
+    return cache.trackHydrationRead(id, result.mutate)
+  }, [cache, id, key, resumeAfterHydration, result.mutate])
+  return result
 }
 
 export const swrDefaults = {

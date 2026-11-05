@@ -1,14 +1,16 @@
+import './offline-transport.mjs'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import https from 'node:https'
+import net from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { Readable } from 'node:stream'
 import test from 'node:test'
-import { Pool } from 'pg'
+import { Client, Pool } from 'pg'
 import { bootstrapDockerEnvironment } from './bootstrap.mjs'
 import { assertDatabaseIdentity, dockerDescriptorSignature, environmentFingerprint, loadEnvironment, validateEnvironment } from './environment.mjs'
 import { consumeDockerOwnership, verifyDockerOwnership } from './docker-ownership.mjs'
@@ -80,6 +82,20 @@ async function temporaryOutput(t) {
   t.after(() => rm(directory, { recursive: true, force: true }))
   return join(directory, 'environment.json')
 }
+
+test('offline adapter guard rejects real pg and management transport without mocks', async () => {
+  const forbidden = { code: 'OFFLINE_TRANSPORT_FORBIDDEN' }
+  // Without the guard these argument-less calls fail before any connection;
+  // prove both entry points are guarded before exercising the locked driver.
+  assert.throws(() => net.connect(), forbidden)
+  const socket = new net.Socket()
+  try { assert.throws(() => socket.connect(), forbidden) } finally { socket.destroy() }
+  assert.throws(() => https.request(), forbidden)
+  const client = new Client({ connectionString, connectionTimeoutMillis: 0 })
+  try { await assert.rejects(client.connect(), forbidden) }
+  finally { client.connection.stream.destroy() }
+  await assert.rejects(verifyDockerOwnership(request), forbidden)
+})
 
 test('live ownership requires two exact authenticated GETs and returns an opaque one-use binding', async t => {
   const calls = management(t)

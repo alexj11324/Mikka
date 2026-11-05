@@ -16,6 +16,7 @@ import { waitForBundledSession } from './bundled-session.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
 import { assertNativeViewport, assertViewportPng, setNativeViewport } from './native-viewport.mjs'
+import { authDiagnosticRoute, nativeDiagnosticFailure, readNativeAuthDiagnostics, startNativeAuthDiagnostics, stopNativeAuthDiagnostics } from './native-auth-diagnostics.mjs'
 
 // A real production backend and one leased dataset serve both modes. These
 // screenshots exercise application routes, components and RPCs; there are no
@@ -30,9 +31,10 @@ const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encodin
 const messages = JSON.parse(await readFile(join(root, 'messages/en.json'), 'utf8'))
 const report = {
   version: 1, mode, appRevision: environment.deploymentSha, harnessRevision: revision,
-  harnessSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).update(await readFile(new URL('./parity-fixtures.mjs', import.meta.url))).update(await readFile(new URL('./parity-images.mjs', import.meta.url))).update(await readFile(new URL('./native-viewport.mjs', import.meta.url))).digest('hex'),
+  harnessSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).update(await readFile(new URL('./parity-fixtures.mjs', import.meta.url))).update(await readFile(new URL('./parity-images.mjs', import.meta.url))).update(await readFile(new URL('./native-viewport.mjs', import.meta.url))).update(await readFile(new URL('./native-auth-diagnostics.mjs', import.meta.url))).update(await readFile(new URL('./parity-reader-defaults.mjs', import.meta.url))).digest('hex'),
   environmentId: environment.id, database: environment.database.name, origin: environment.origin,
   viewport: { width: 1440, height: 900 }, colorThreshold: 0, maximumChangedRatio: 0.001,
+  timeZone: 'UTC',
   nativeViewports: [],
   themes: ['light', 'dark'], masksAllowed: ['avatars', 'timestamps'], startedAt: new Date(started).toISOString(), screens: [],
 }
@@ -43,14 +45,17 @@ let nativeResources
 let systemBrowser
 let webBrowser
 const applications = new Set()
+const nativeTimeZoneSessions = new Map()
 const profiles = []
 const pendingImages = new Map()
 const errors = []
 let passed = false
 let cleaned = false
 let cleanupError
+let stage = 'prepare'
 
 async function launch(mode) {
+  stage = `launch-${mode}`
   // Both modes use the same real local daemon/device. Their Chromium session
   // partitions remain separate, and only one app owns this profile at a time.
   const profile = profiles[0] ?? join(tmpdir(), `mikka-parity-${process.pid}-${started}`)
@@ -64,8 +69,17 @@ async function launch(mode) {
   })
   applications.add(application)
   const page = await application.firstWindow({ timeout: 90_000 })
+  stage = `viewport-${mode}`
   const nativeViewport = await setNativeViewport(application, page, report.viewport)
-  report.nativeViewports.push({ mode, ...nativeViewport })
+  // Keep the public CDP session attached until this app closes. The same UTC
+  // reader defaults are exercised by the ordinary web comparison context.
+  const timeZoneSession = await page.context().newCDPSession(page)
+  await timeZoneSession.send('Emulation.setTimezoneOverride', { timezoneId: report.timeZone })
+  nativeTimeZoneSessions.set(application, timeZoneSession)
+  const actualTimeZone = await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
+  assert.equal(actualTimeZone, report.timeZone)
+  report.nativeViewports.push({ mode, ...nativeViewport, timeZone: { method: 'cdp_timezone_override', actual: actualTimeZone } })
+  stage = `renderer-ready-${mode}`
   page.setDefaultTimeout(45_000)
   await page.emulateMedia({ reducedMotion: 'reduce' })
   page.on('pageerror', error => errors.push({ mode, name: error.name }))
@@ -78,8 +92,10 @@ async function launch(mode) {
 }
 
 async function closeTarget(target) {
+  stage = `close-${target.mode}`
   await closeElectron(target.application)
   applications.delete(target.application)
+  nativeTimeZoneSessions.delete(target.application)
 }
 
 async function go(target, suffix = '/') {
@@ -97,14 +113,17 @@ async function theme(target, value) {
   await target.page.waitForFunction(value => document.documentElement.classList.contains(value), value)
 }
 
-async function pair(name, appearance, targets, open) {
+async function pair(name, appearance, targets, open, check) {
   const key = `${appearance}/${name}`
   const images = pendingImages.get(key) ?? new Map()
   for (const target of targets) {
+    stage = `capture-${target.mode}-${name}`
     await open(target)
     assert.ok(!images.has(target.mode), 'Each native mode is captured once per screen')
     await assertNativeViewport(target.page, report.viewport)
+    assert.equal(await target.page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone), report.timeZone)
     const captured = await screenshot(target.page, join(output, `${appearance}-${name}-${target.mode}.png`))
+    await check?.(target)
     assertViewportPng(captured.bytes, report.viewport)
     images.set(target.mode, captured)
   }
@@ -177,32 +196,52 @@ async function authenticateHosted(hosted) {
 }
 
 async function authenticateBundled(bundled) {
+  stage = 'bundled-auth-browser'
   systemBrowser = await chromium.launch({ headless: true })
   const context = await systemBrowser.newContext({ storageState: scope.owner.storageStatePath })
   const page = await context.newPage()
-  await bundled.application.evaluate(({ shell }) => {
-    globalThis.__mikkaParityExternal = null
-    shell.openExternal = async url => { globalThis.__mikkaParityExternal = url }
-  })
-  const handoff = bundled.page.evaluate(() => window.mikka.bundled.signIn({ provider: 'google', next: '/', locale: 'en' }))
-  let handoffError
-  handoff.catch(error => { handoffError = error })
-  let external
-  for (let attempt = 0; attempt < 150; attempt++) {
-    if (handoffError) throw new Error('Desktop browser handoff failed', { cause: handoffError })
-    external = await bundled.application.evaluate(() => globalThis.__mikkaParityExternal)
-    if (external) break
-    await new Promise(resolve => setTimeout(resolve, 100))
+  const browserResponses = []
+  const observeResponse = response => {
+    if (browserResponses.length < 200) browserResponses.push({ at: Date.now(), route: authDiagnosticRoute(response.url()), status: response.status() })
   }
-  assert.ok(external, 'Main must open the real sign-in continuation')
-  assert.equal(new URL(external).origin, environment.origin)
-  await page.goto(external, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-  await handoff
-  const identity = await waitForBundledSession(bundled.page, scope.owner.userId)
-  assert.equal(identity.user.id, scope.owner.userId)
-  assert.deepEqual(Object.keys(identity.session), ['id'])
-  await scope.recordResource({ type: 'session', id: identity.session.id, ownerId: scope.owner.userId })
+  await startNativeAuthDiagnostics(bundled.application, { profile: profiles[0], ownerId: scope.owner.userId, serverUrl: environment.origin + environment.basePath })
+  page.on('response', observeResponse)
+  try {
+    await bundled.application.evaluate(({ shell }) => {
+      globalThis.__mikkaParityExternal = null
+      shell.openExternal = async url => { globalThis.__mikkaParityExternal = url }
+    })
+    stage = 'bundled-auth-open'
+    const handoff = bundled.page.evaluate(() => window.mikka.bundled.signIn({ provider: 'google', next: '/', locale: 'en' }))
+    let handoffError
+    handoff.catch(error => { handoffError = error })
+    let external
+    for (let attempt = 0; attempt < 150; attempt++) {
+      if (handoffError) throw new Error('Desktop browser handoff failed', { cause: handoffError })
+      external = await bundled.application.evaluate(() => globalThis.__mikkaParityExternal)
+      if (external) break
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    assert.ok(external, 'Main must open the real sign-in continuation')
+    assert.equal(new URL(external).origin, environment.origin)
+    stage = 'bundled-auth-handoff'
+    await page.goto(external, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await handoff
+    stage = 'bundled-auth-session'
+    const identity = await waitForBundledSession(bundled.page, scope.owner.userId)
+    assert.equal(identity.user.id, scope.owner.userId)
+    assert.deepEqual(Object.keys(identity.session), ['id'])
+    await scope.recordResource({ type: 'session', id: identity.session.id, ownerId: scope.owner.userId })
+  } catch (error) {
+    report.authFailure = { stage, error: nativeDiagnosticFailure(error), browserResponses,
+      main: await readNativeAuthDiagnostics(bundled.application).catch(() => ({ available: false })) }
+    throw error
+  } finally {
+    page.off('response', observeResponse)
+    await stopNativeAuthDiagnostics(bundled.application)
+  }
   await systemBrowser.close(); systemBrowser = undefined
+  stage = 'bundled-auth-workspace'
   await selectFixtureWorkspace(bundled)
 }
 
@@ -237,11 +276,27 @@ function screens(fixture) {
     name: `${bot ? 'bot' : 'coordinator'}-${tab}`,
     open: async target => {
       await go(target, bot ? `/?bot=${fixture.bot}` : '/')
+      // SSR exposes the default tab before the saved view state is restored.
+      // Base UI links the active panel only after its client registration.
+      await target.page.getByRole('tablist', { name: messages.Shell.panel.tabs, exact: true }).locator('[role="tab"][aria-selected="true"][aria-controls]').waitFor()
       await target.page.getByRole('tab', { name: messages.Shell.panel[tab], exact: true }).click()
-      await target.page.getByRole('tab', { name: messages.Shell.panel[tab], exact: true }).getAttribute('aria-selected').then(value => assert.equal(value, 'true'))
+      await target.page.getByRole('tab', { name: messages.Shell.panel[tab], exact: true, selected: true }).waitFor()
+      await target.page.getByRole('tabpanel', { name: messages.Shell.panel[tab], exact: true }).waitFor()
     },
+    check: async target => assert.equal(await target.page.getByRole('tab', { name: messages.Shell.panel[tab], exact: true }).getAttribute('aria-selected'), 'true', 'Captured panel must still be the requested tab'),
   })
-  return [
+  const taskView = view => ({
+    name: view,
+    open: async target => {
+      await go(target, '/?section=all-issues')
+      const label = messages.Shell.board[view === 'board' ? 'viewBoard' : 'viewList']
+      await target.page.getByRole('button', { name: label, exact: true }).click()
+      await target.page.getByRole('button', { name: label, exact: true, pressed: true }).waitFor()
+      await target.page.getByText(fixture.issueTitle, { exact: true }).first().waitFor()
+    },
+    check: async target => assert.equal(await target.page.getByRole('button', { name: messages.Shell.board[view === 'board' ? 'viewBoard' : 'viewList'], exact: true }).getAttribute('aria-pressed'), 'true', 'Captured task layout must still be the requested view'),
+  })
+  const matrix = [
     { name: 'workspace-link', open: async target => {
       // The web's slug entry is intentionally outside its locale segment.
       await target.page.goto(`${target.base}/w/${fixture.workspaceSlug}`, { waitUntil: 'domcontentloaded' })
@@ -255,10 +310,10 @@ function screens(fixture) {
     route('task', `/?issue=${fixture.issue}`, page => page.getByRole('region', { name: fixture.issueTitle, exact: true }).waitFor()),
     route('task-thread', `/?issue=${fixture.issue}&thread=${fixture.run}`, text('The review is complete. Conversations, task details and artifacts are ready.')),
     route('all-threads', '/?threads=all'),
-    route('bot-threads', `/?bot=${fixture.bot}&threads=${fixture.bot}`),
+    route('bot-thread-list', `/?bot=${fixture.bot}&threads=${fixture.bot}`),
     route('thread', `/?bot=${fixture.bot}&thread=${fixture.run}`, text('The review is complete. Conversations, task details and artifacts are ready.')),
-    { name: 'board', open: async target => { await go(target, '/?section=all-issues'); await target.page.getByLabel(messages.Shell.board.viewBoard, { exact: true }).click(); await target.page.getByText(fixture.issueTitle, { exact: true }).first().waitFor() } },
-    { name: 'list', open: async target => { await go(target, '/?section=all-issues'); await target.page.getByLabel(messages.Shell.board.viewList, { exact: true }).click(); await target.page.getByText(fixture.issueTitle, { exact: true }).first().waitFor() } },
+    taskView('board'),
+    taskView('list'),
     route('projects', '/?section=projects'),
     route('team-home', `/?team=${fixture.team}`),
     route('team-tasks', `/?section=team-issues&team=${fixture.team}`, text(fixture.issueTitle)),
@@ -268,9 +323,28 @@ function screens(fixture) {
     route('artifact-library', '/?section=artifacts', text(fixture.artifactTitle)),
     route('artifact-markdown', `/?artifact=${fixture.markdown}`, page => page.getByRole('dialog').getByText('Desktop review', { exact: true }).waitFor()),
     route('artifact-html', `/?artifact=${fixture.html}`, page => page.getByRole('dialog').locator('iframe').waitFor()),
-    { name: 'new-task', open: async target => { await go(target); await target.page.getByRole('button', { name: messages.Nav.newTask, exact: true }).first().click(); await target.page.getByRole('dialog', { name: messages.Shell.newTaskDialog.title, exact: true }).waitFor() } },
-    ...Object.entries(messages.Settings.sections).filter(([id]) => id !== 'developer').map(([id, section]) => route(`settings-${id}`, ['members', 'teams'].includes(id) ? `/settings/${id}?workspace=${fixture.workspace}` : `/settings?workspace=${fixture.workspace}&section=${id}`, page => page.getByRole('heading', { name: section.title, exact: true }).first().waitFor())),
+    { name: 'new-task', open: async target => {
+      await go(target)
+      await target.page.getByRole('button', { name: messages.Shell.searchLabel, exact: true }).click()
+      await target.page.getByRole('dialog', { name: messages.Shell.searchLabel, exact: true }).getByRole('option', { name: messages.Shell.newTask, exact: true }).click()
+      await target.page.getByRole('dialog', { name: messages.Shell.newTaskDialog.title, exact: true }).waitFor()
+    } },
+    ...Object.entries(messages.Settings.sections).filter(([id]) => id !== 'developer').map(([id, section]) => ({
+      name: `settings-${id}`,
+      open: async target => {
+        if (id === 'audit') {
+          // Exercise the ordinary in-Settings navigation in both builds. The
+          // unmodified web baseline predates the cold infinite-read repair.
+          await go(target, `/settings?workspace=${fixture.workspace}&section=general`)
+          await target.page.getByRole('textbox', { name: messages.Settings.workspaceForm.name, exact: true }).waitFor()
+          await target.page.getByRole('link', { name: section.title, exact: true }).click()
+        } else await go(target, ['members', 'teams'].includes(id) ? `/settings/${id}?workspace=${fixture.workspace}` : `/settings?workspace=${fixture.workspace}&section=${id}`)
+        await target.page.getByRole('heading', { name: section.title, exact: true }).first().waitFor()
+      },
+    })),
   ]
+  assert.equal(new Set(matrix.map(screen => screen.name)).size, matrix.length, 'Every parity screen needs a unique evidence name')
+  return matrix
 }
 
 function publicScreens(fixture) {
@@ -288,8 +362,11 @@ function publicScreens(fixture) {
 }
 
 try {
+  stage = 'acquire-lease'
   scope = await acquireTestAccounts({ runId: `parity-${started}`, workerId: 'desktop-parity', requestId: `parity-${started}`, ttlMs: 300_000 })
+  stage = 'create-fixtures'
   fixtures = await createParityFixtures(scope)
+  stage = 'capture-native-baseline'
   if (mode === 'desktop') nativeResources = await captureNativeResources(scope)
   if (mode === 'web-capture') {
     webBrowser = await chromium.launch({ headless: true })
@@ -298,10 +375,13 @@ try {
     page.setDefaultTimeout(45_000)
     page.on('pageerror', error => errors.push({ mode: 'web', name: error.name }))
     const target = { mode: 'web', page, base: `${environment.origin}${environment.basePath}` }
-    async function capture(name, appearance, open) {
+    async function capture(name, appearance, open, check) {
+      stage = `capture-web-${name}`
       await open(target)
+      assert.equal(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone), report.timeZone)
       const filename = `${appearance}-${name}-web.png`
       const result = await screenshot(page, join(output, filename), { identities: fixtures.fixture.dynamicIdentityEmails })
+      await check?.(target)
       assertViewportPng(result.bytes, report.viewport)
       report.screens.push({ name, theme: appearance, filename, masks: result.masks, sha256: createHash('sha256').update(result.bytes).digest('hex') })
       await writeFile(join(output, 'parity.json'), `${JSON.stringify(report, null, 2)}\n`)
@@ -319,7 +399,7 @@ try {
     report.requiredScreens = ['sign-in', ...publicScreens(fixtures.fixture).map(screen => screen.name), ...matrix.map(screen => screen.name)]
     for (const appearance of report.themes) {
       await theme(target, appearance)
-      for (const screen of matrix) await capture(screen.name, appearance, screen.open)
+      for (const screen of matrix) await capture(screen.name, appearance, screen.open, screen.check)
     }
     assert.deepEqual(errors, [], 'Web capture must have no uncaught page errors')
     assert.equal(report.screens.length, report.requiredScreens.length * report.themes.length)
@@ -341,7 +421,7 @@ try {
       await nativeDeviceReady(target)
       for (const appearance of report.themes) {
         await theme(target, appearance)
-        for (const screen of matrix) await pair(screen.name, appearance, [target], screen.open)
+        for (const screen of matrix) await pair(screen.name, appearance, [target], screen.open, screen.check)
       }
       await offlinePairs([target])
     }
@@ -365,30 +445,44 @@ try {
     assert.equal(report.screens.filter(screen => !screen.passed).length, 0, 'Every screenshot must differ by at most 0.1% with identical dynamic-mask geometry')
     passed = true
   }
+} catch (error) {
+  report.failure = { stage, error: nativeDiagnosticFailure(error) }
+  throw error
 } finally {
-  const failedCleanup = error => { cleanupError ??= error }
+  const failedCleanup = error => {
+    cleanupError ??= error
+    report.cleanupFailures ??= []
+    if (report.cleanupFailures.length < 8) report.cleanupFailures.push({ stage, error: nativeDiagnosticFailure(error) })
+  }
   let closed = true
   const failedClose = error => { closed = false; failedCleanup(error) }
+  stage = 'close-browser'
   await systemBrowser?.close().catch(failedClose)
   await webBrowser?.close().catch(failedClose)
+  stage = 'close-applications'
   for (const application of [...applications].reverse()) await closeElectron(application).catch(failedClose)
+  nativeTimeZoneSessions.clear()
   let drained = profiles.length === 0
   if (closed && profiles.length) {
+    stage = 'drain-profiles'
     try { drained = (await stopLocalDaemons(profiles)).profilesStopped } catch (error) { failedCleanup(error) }
   }
   if (closed && drained) {
     try {
+      stage = 'cleanup-native-resources'
       if (nativeResources) report.nativeCleanup = await nativeResources.cleanup({ drained: true })
+      stage = 'cleanup-fixtures'
       if (fixtures) { await fixtures.cleanup(); cleaned = true }
     } catch (error) { failedCleanup(error) }
   }
   // The pool re-fingerprints both users. A visual mismatch can release a clean
   // pair only after exact cleanup; unknown or leftover writes quarantine it.
+  stage = 'release-lease'
   try { if (scope) await scope.release({ outcome: cleaned && !cleanupError ? 'clean' : 'dirty' }) } catch (error) { failedCleanup(error) }
   if (!cleanupError) for (const profile of profiles) await rm(profile, { recursive: true, force: true })
   report.result = passed && !cleanupError ? 'passed' : 'failed'
   report.cleanup = cleanupError ? 'failed' : cleaned ? 'passed' : 'not-created'
-  if (cleanupError) report.cleanupErrorCode = /^[A-Za-z0-9_]{1,100}$/.test(cleanupError.code ?? '') ? cleanupError.code : cleanupError.name
+  if (cleanupError) report.cleanupError = nativeDiagnosticFailure(cleanupError)
   report.finishedAt = new Date().toISOString()
   report.pageErrors = errors
   await writeFile(join(output, 'parity.json'), `${JSON.stringify(report, null, 2)}\n`)

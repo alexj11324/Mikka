@@ -141,9 +141,10 @@ export const BROWSER_SUITES = [
   { file: 'tests/mvp/coordinator-streaming.spec.ts', config: 'playwright.mvp.config.ts', script: 'test:e2e:mvp' },
   { file: 'tests/mvp/core-loop.spec.ts', config: 'playwright.mvp.config.ts', script: 'test:e2e:mvp' },
 ]
-// These import the locked driver to check its API, with native transport and
-// filesystem destruction denied. They run in the existing pure scope gate.
+// These import the locked driver with real native transport denied. Every
+// exact suite needs its source guard and the same guard on its pure script step.
 export const OFFLINE_GUARDED = [
+  {file:'scripts/test-accounts/docker-environment.test.mjs',script:'test:test-accounts',guard:'scripts/test-accounts/offline-transport.mjs',reason:'mocked pg Pool and Docker ownership responses; native transport denied while private temporary descriptor files remain real'},
   {file:'scripts/scope-native-offline.test.mjs',script:'test:scope-acceptance-guard',guard:'scripts/credential-diagnostics-offline.mjs',reason:'real pg/Drizzle API and denied-startup tests; no server SQL'},
   {file:'lib/personal-mailbox-runtime-off.test.ts',script:'test:personal-mailbox-core',guard:'scripts/credential-diagnostics-offline.mjs',reason:'spies on pg Pool/Client to assert the mailbox-off path submits no SQL; transport denied'},
   {file:'scripts/scope-fresh.test.mjs',script:'test:scope-acceptance-guard',guard:'scripts/credential-diagnostics-offline.mjs',reason:'fresh target models and native connection rejection; no server SQL'},

@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { recordAuthenticationSecrets } from '../../../scripts/test-accounts/session.mjs'
 import { TestAccountError } from '../../../scripts/test-accounts/pool.mjs'
 import { captureParityReadReceipts, parityBotReadKeys } from './parity-reads.mjs'
+import { captureParityReaderDefaults } from './parity-reader-defaults.mjs'
 
 const AT = '2026-01-15T12:00:00.000Z'
 const quote = value => `"${value.replaceAll('"', '""')}"`
@@ -64,12 +65,14 @@ export async function createParityFixtures(scope) {
     }
   }
   let cleanupReads
+  let cleanupDefaults
   async function cleanup() {
     // Each predicate is a fresh fixture identifier reserved above. Existing
     // user/account rows and personal workspaces are never cleanup targets.
     await transaction(async client => {
       const remove = (table, key, values) => client.query(`DELETE FROM public.${quote(table)} WHERE ${quote(key)}::text = ANY($1::text[])`, [values])
       await cleanupReads?.(client)
+      await cleanupDefaults?.(client)
       for (const [table, key, values] of [
         ['conversation_messages', 'conversationId', [ids.group]], ['conversation_members', 'conversationId', [ids.group]], ['conversations', 'id', [ids.group]],
         ['artifact_shares', 'id', [ids.markdownShare, ids.htmlShare]], ['artifact_versions', 'artifactId', [ids.markdown, ids.html]], ['artifacts', 'id', [ids.markdown, ids.html]],
@@ -87,8 +90,13 @@ export async function createParityFixtures(scope) {
     await transaction(async client => {
       const owner = scope.owner.userId
       cleanupReads = await captureParityReadReceipts(client, owner, ids)
+      cleanupDefaults = await captureParityReaderDefaults(client, owner)
       const users = (await client.query('SELECT id,name,email FROM public."user" WHERE id=ANY($1::text[])', [[owner, scope.peer.userId]])).rows
       if (users.length !== 2) throw new Error('PARITY_LEASE_USERS_MISSING')
+      // The real board defaults to Assignee=Me. Its task must be assigned to
+      // this leased member; merely creating an unassigned task is not "Me".
+      const assignee = users.find(user => user.id === owner)
+      content.attrs.mikka.assignee = { kind: 'member', id: owner, name: assignee.name, image: null }
       fixture.dynamicIdentityEmails = users.map(user => user.email)
       await insert(client, 'mikka_workspaces', { id: ids.workspace, userId: owner, name: fixture.workspaceName, slug: fixture.workspaceSlug, kind: 'team', createdAt: AT })
       for (const user of users) await insert(client, 'mikka_workspace_members', { workspaceId: ids.workspace, userId: user.id, name: user.name, email: user.email, role: user.id === owner ? 'admin' : 'member', status: 'active', createdAt: AT })

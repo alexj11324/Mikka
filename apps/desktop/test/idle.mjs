@@ -89,7 +89,10 @@ try {
     globalThis.__mikkaIdleBrowser = null
     shell.openExternal = async url => { globalThis.__mikkaIdleBrowser = url }
   })
-  const handoff = page.evaluate(() => window.mikka.bundled.signIn({ provider: 'google', locale: 'en', next: '/' }))
+  // The reusable account baseline is initialized through the default zh-CN
+  // landing page. Keep that locale: opening /en legitimately renames its
+  // generated personal workspace, which would leave the account dirty.
+  const handoff = page.evaluate(() => window.mikka.bundled.signIn({ provider: 'google', locale: 'zh-CN', next: '/' }))
   let handoffError
   handoff.catch(error => { handoffError = error })
   let external
@@ -109,8 +112,8 @@ try {
   await scope.recordResource({ type: 'session', id: identity.session.id, ownerId: scope.owner.userId })
   const webOrigin = new URL(environment.origin)
   webOrigin.port = String(runtime.hosted.port)
-  await web.goto(`${webOrigin.origin}/mikka/en`, { waitUntil: 'domcontentloaded' })
-  await page.goto('mikka://app/mikka/en', { waitUntil: 'domcontentloaded' })
+  await web.goto(`${webOrigin.origin}/mikka`, { waitUntil: 'domcontentloaded' })
+  await page.goto('mikka://app/mikka', { waitUntil: 'domcontentloaded' })
   // Reinstall the observer after navigation; its only output is control-frame counts.
   await page.evaluate(() => {
     window.__mikkaIdleLive = { ready: 0, pong: 0 }

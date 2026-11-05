@@ -6,6 +6,7 @@ export type ReadCacheScope = { userId: string; workspaceId: string; build: strin
 export type ReadCacheState = State<unknown, unknown> & { _k?: unknown }
 export const readCacheNamespace = (scope: ReadCacheScope) => JSON.stringify([1, scope.userId, scope.workspaceId, scope.build, scope.role])
 type Restore = (key: string, data: unknown) => Promise<unknown>
+type RevalidateHydratedRead = () => Promise<unknown>
 const activeCaches = new Set<PersistentReadCache>()
 const issueResourceId = (key: unknown): string | undefined => Array.isArray(key) && ['issue', 'issue-activity-versions', 'versions'].includes(key[0]) && typeof key[1] === 'string' ? key[1] : undefined
 
@@ -34,7 +35,7 @@ export class PersistentReadCache extends Map<string, ReadCacheState> {
   private revisions = new Map<string, number>()
   private removedIssues = new Set<string>()
   private freshData = new Set<string>()
-  private startupReads = new Map<string, number>()
+  private startupReads = new Map<string | RevalidateHydratedRead, Set<RevalidateHydratedRead>>()
   private pending: Promise<unknown> = Promise.resolve()
   private invalidated?: () => void
   private channel?: BroadcastChannel
@@ -48,15 +49,27 @@ export class PersistentReadCache extends Map<string, ReadCacheState> {
 
   get isHydrated() { return this.hydrationComplete }
   get isEnabled() { return this.enabled }
-  get hydrationReadKeys() { return [...this.startupReads.keys()] }
   hasFreshData(key: string) { return this.freshData.has(key) }
 
-  trackHydrationRead(key: string) {
-    this.startupReads.set(key, (this.startupReads.get(key) ?? 0) + 1)
+  trackHydrationRead(key: string, revalidate: RevalidateHydratedRead) {
+    const registration = key || revalidate
+    const readers = this.startupReads.get(registration) ?? new Set<RevalidateHydratedRead>()
+    readers.add(revalidate)
+    this.startupReads.set(registration, readers)
     return () => {
-      const count = (this.startupReads.get(key) ?? 1) - 1
-      if (count > 0) this.startupReads.set(key, count)
-      else this.startupReads.delete(key)
+      readers.delete(revalidate)
+      if (!readers.size) this.startupReads.delete(registration)
+    }
+  }
+
+  resumeHydrationReads() {
+    if (!this.hydrationComplete || !this.enabled) return
+    for (const [key, readers] of this.startupReads) {
+      if (typeof key === 'string' && this.hasFreshData(key)) continue
+      // The bound hook knows its actual SWR key. In particular, an infinite
+      // hook revalidates its aggregate key rather than an ordinary page key.
+      const revalidate = readers.values().next().value
+      if (revalidate) void revalidate().catch(() => undefined)
     }
   }
 

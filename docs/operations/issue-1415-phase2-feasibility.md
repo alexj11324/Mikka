@@ -2,6 +2,8 @@
 
 Research checkpoint, 2026-11-05. Source baseline: `c6261eae42e15ac83bbeab2c19ffda41ea6c649d`, including main `a1b633178`. This document records preparation for [Alex's second-phase instruction](https://github.com/alexj11324/Mikka/issues/1415#issuecomment-6664526271). It does not mark the first-phase acceptance complete or start the migration. No deployment, production configuration, provider configuration, new cloud identity or new resource was changed during this research.
 
+Authorization update: [Alex's later decision](https://github.com/alexj11324/Mikka/issues/1415#issuecomment-6667238449) permits the necessary merge, production cutover and acceptance decisions, with [resources used only as needed and stopped promptly](https://github.com/alexj11324/Mikka/issues/1415#issuecomment-6667340920). References below to a separate production approval describe the earlier research boundary; the technical verification and rollback obligations remain applicable.
+
 ## Supported architecture
 
 Use one Vite frontend for web and desktop, retaining the existing components, styles, fonts, translations and live invalidation keys. Keep platform differences in the existing host adapters. The current first-phase renderer builder uses **esbuild**; moving it to Vite is additional second-phase work.
