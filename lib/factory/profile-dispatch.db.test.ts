@@ -92,7 +92,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   const model = { claude_code: 'claude-haiku-5-5', codex: 'gpt-6-luna' } as const
   const caps = () => (['claude_code', 'codex'] as const).map(harness => ({ harness, installed: true, models: [model[harness]], subscriptionBroker: true, computerBroker: true }))
   const template = templateModelsFixture(Object.values(model)); t.after(() => template.restore())
-  const fixture = async (withProfiles = true, missingCodex = false, inherit = false, profileId?: 'default') => {
+  const fixture = async (withProfiles = true, missingCodex = false, inherit = false, profileId?: 'default', needsSpec = false) => {
     const ownerId = await seedUser(pool, 'profile-stage')
     const { id: workspaceId } = await seedWorkspace(pool, ownerId, [{ userId: ownerId, role: 'admin' }])
     await pool.query("UPDATE mikka_workspaces SET kind='personal' WHERE id=$1", [workspaceId])
@@ -129,7 +129,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     } : definition('claude_code', 'Implement')) : null
     const review = withProfiles ? await profileStore.create(scope, definition('codex', 'Review')) : null
     const store = createFactoryStore(pool, async (userId, id, tx) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [id, userId])).rowCount === 1, botId, { independent: factoryCheckIndependent, gates: factoryCheckGates })
-    const routed = await store.route(ownerId, { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Synthetic subscription profile stage fixture' })
+    const routed = await store.route(ownerId, { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Synthetic subscription profile stage fixture', needsSpec })
     return { scope, actor, ownerId, workspaceId, botId, issueId, sourceEventId, deviceId, repoId, agents, connections, implement, review, store, task: routed.task }
   }
   for (const withProfile of [false, true]) await t.test(`group intent preserves stale allowance without admission or refresh (${withProfile ? 'fixed Profile' : 'Default'})`, async () => {
@@ -1339,6 +1339,260 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.equal(rows[0].id, f.runId); assert.equal(rows[0].status, status)
     assert.deepEqual(rows[0].agentDefinition, f.definition, 'the exact Profile, model and credential remain frozen')
   }
+  const planQuestionFixture = async () => {
+    const [{ createFactoryQuestions }, { queueCloudQuestionContinuation }, { createFactoryClaim }, { factoryEventId }] = await Promise.all([
+      import('./questions/store'), import('./questions/queue-continuation'), import('./claim'), import('./event-id'),
+    ])
+    const f = await fixture(true, false, false, undefined, true)
+    assert.equal(f.task.stage, 'spec'); assert.equal(f.task.candidateId, null)
+    // The fixture's named Codex Profile is explicitly picked; role discovery
+    // and Decision transport are not part of an already admitted native resume.
+    const selected = await profiles.resolveAgentProfileDispatch(pool, f.scope, {
+      issueId: f.issueId, stage: 'spec', profileId: f.review!.id, location: 'cloud', cloudPurpose: 'desktop',
+    })
+    const target = selected.target
+    if (target.kind !== 'cloud') assert.fail('the plan requires its recorded cloud Codex destination')
+    assert.equal(target.harness, 'codex'); assert.equal(target.model, model.codex)
+    const subscriptionBindingId = await bindAgentToConnection(pool, f.scope, f.agents.codex, 'codex', f.connections.codex, model.codex)
+    const queued: string[] = [], preparations: { ownerId: string; runId: string; workspaceId: string }[] = []
+    const dispatch = createFactoryDispatch(pool, f.store, async (tx, owner, input, bot, context) => {
+      assert.equal(context.stage, 'spec'); assert.equal(context.sourceEventId, f.sourceEventId)
+      if (context.questionOriginRunId) {
+        const continued = await queueCloudQuestionContinuation(tx, owner, input, bot, context)
+        assert.ok(continued, 'a plan answer must use the strict original-session queue')
+        queued.push(continued.runId)
+        return continued
+      }
+      return queueCloudRun(pool, f.actor, {
+        botId: f.botId, issueId: f.issueId, agentId: f.agents.codex, deviceRepoId: f.repoId,
+        title: 'Read-only plan before implementation', body: 'Inspect the repository, then submit a plan for human approval.',
+        model: model.codex, subscriptionBindingId, agentProfile: selected.agentProfile, readOnly: true,
+        modelDispatch: { mode: 'picked', location: 'cloud', entry: target.entry },
+        idempotencyKey: `factory:${context.attemptId}`, sourceEventId: context.sourceEventId,
+      }, tx)
+    })
+    const authorize = async (owner: string, issue: string, tx: import('pg').PoolClient) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [issue, owner])).rowCount === 1
+    const questions = createFactoryQuestions(pool, authorize, f.store, dispatch, undefined, undefined, undefined, async (ownerId, scope) => {
+      // Observe only the existing provider boundary. No VM or model is called.
+      assert.equal(ownerId, f.ownerId); assert.equal(scope.workspaceId, f.workspaceId)
+      preparations.push({ ownerId, ...scope })
+    })
+    const factoryClaim = createFactoryClaim(f.store, questions)
+    let metadata: Record<string, unknown> = {}
+    const claimRun = (runId: string) => {
+      const lease = new Date(Date.now() + 30_000)
+      return claimCloudRun(pool, f.actor, runId, f.deviceId, lease, subscriptionBindingId,
+        async tx => { metadata = await factoryClaim(tx, f.ownerId, f.deviceId, runId, lease.toISOString()) }, undefined, false)
+    }
+    const first = await dispatch(f.ownerId, { binding: factoryBinding(f.task), agentId: f.agents.codex, deviceRepoId: f.repoId, profileId: f.review!.id })
+    const sandboxId = `synthetic-plan-thread-${first.runId}`
+    await pool.query(`UPDATE thread_machines SET state='running',"deviceId"=$2,"issueId"=$3,"repoId"=$4,"sandboxId"=$5,"snapshotId"='synthetic-codex' WHERE "runId"=$1`, [first.runId, f.deviceId, f.issueId, f.repoId, sandboxId])
+    assert.equal((await claimRun(first.runId))?.ownerId, f.ownerId)
+    const nativeSession = `synthetic-plan-native-${first.runId}`, questionId = randomUUID()
+    await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='blocked',"sessionId"=$2,"leaseExpiresAt"=NULL,"finishedAt"=now(),report=$3 WHERE id=$1`, [first.runId, nativeSession, JSON.stringify({
+      summary: 'Synthetic read-only inspection blocker', question: { questionId, kind: 'external', question: 'Read-only repository inspection is unavailable.' },
+    })])
+    const origin = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [first.runId])).rows[0]
+    assert.equal(origin.kind, 'plan'); assert.ok(origin.startedAt); assert.equal(origin.agentDefinition.readOnly, true)
+    const question = await questions.record(f.ownerId, first.runId)
+    const humanSessionId = randomUUID()
+    await pool.query(`INSERT INTO "session" (id,"userId",token,"expiresAt","createdAt","updatedAt") VALUES ($1,$2,$3,now()+interval '1 hour',now(),now())`, [humanSessionId, f.ownerId, `fixture-${randomUUID()}`])
+    const human = { source: 'human' as const, userId: f.ownerId, sessionId: humanSessionId }
+    const answer = { reference: question.reference, answerId: randomUUID(), text: 'Use the restored read-only repository tools, then submit the plan for approval.' }
+    const resumed = await questions.answer(human, answer)
+    assert.equal((await questions.answer(human, answer)).continuationRunId, resumed.continuationRunId)
+    assert.equal(queued.length, 1, 'answer replay never queues a second native continuation')
+    const child = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [resumed.continuationRunId])).rows[0]
+    assert.equal(child.kind, 'plan'); assert.equal(child.status, 'queued')
+    assert.equal(child.startedAt, null); assert.equal(child.sessionId, null); assert.equal(child.leaseExpiresAt, null)
+    assert.equal(child.agentDefinition.readOnly, true)
+    assert.deepEqual(child.agentDefinition.agentProfile, origin.agentDefinition.agentProfile)
+    assert.deepEqual(child.agentDefinition.subscription, origin.agentDefinition.subscription)
+    assert.equal(child.questionContinuation.originSessionId, nativeSession)
+    assert.equal(child.questionContinuation.requiredSandboxId, sandboxId)
+    const receiptId = factoryEventId('question-resume', answer.answerId)
+    const expireQuota = () => pool.query(`UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',$2::jsonb) WHERE id=$1`, [f.connections.codex, JSON.stringify(new Date(Date.now() - 61_000).toISOString())])
+    const failBeforeClaim = async (runId = child.id) => {
+      // The actual Profile refusal rolls back claim before this completion is
+      // persisted: no startedAt, lease, SID, native binding or provider output.
+      await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='blocked',error='Synthetic preclaim refusal',report=$2,"finishedAt"=now() WHERE id=$1`, [runId, JSON.stringify({ summary: 'Synthetic preclaim refusal', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null })])
+      await questions.settle(f.ownerId, runId)
+      const current = await questions.read(f.ownerId, questionId)
+      assert.ok(current.recoverReference)
+      return { requestId: randomUUID(), ...current.recoverReference }
+    }
+    const rows = async () => ({
+      task: (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [f.task.id])).rows,
+      attempts: (await pool.query('SELECT * FROM factory_attempts WHERE "taskId"=$1 ORDER BY position', [f.task.id])).rows,
+      runs: (await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [f.issueId])).rows,
+      questions: (await pool.query('SELECT * FROM factory_questions WHERE "taskId"=$1 ORDER BY id', [f.task.id])).rows,
+      receipts: (await pool.query('SELECT * FROM factory_events WHERE "taskId"=$1 ORDER BY "eventId"', [f.task.id])).rows,
+      machines: (await pool.query('SELECT * FROM thread_machines WHERE "issueId"=$1 ORDER BY "runId"', [f.issueId])).rows,
+      messages: (await pool.query('SELECT m.* FROM run_messages m JOIN agent_runs r ON r.id=m."runId" WHERE r."issueId"=$1 ORDER BY m.id', [f.issueId])).rows,
+      native: (await pool.query('SELECT n.* FROM byos_native_runs n JOIN agent_runs r ON r.id=n."runId" WHERE r."issueId"=$1 ORDER BY n."runId"', [f.issueId])).rows,
+    })
+    return { ...f, selected, subscriptionBindingId, first, origin, child, questions, human, answer, resumed, nativeSession, sandboxId,
+      receiptId, queued, preparations, claimRun, claimMetadata: () => metadata, expireQuota, failBeforeClaim, rows }
+  }
+  await t.test('spec question claim keeps the frozen read-only Codex Profile after the quota observation becomes checking', async () => {
+    const before = decisionCounts(), f = await planQuestionFixture(), beforeUsage = usageCalls.length
+    const { questionExecutionContinuation, questionPlanContinuation } = await import('./questions/execution-continuation')
+    await f.expireQuota()
+    await assert.rejects(profiles.assertProfileSelection(pool, f.scope, f.selected.agentProfile!), { code: 'agentProfileModelUnavailable', detail: 'checking' }, 'a fresh selection still cannot use the stale observation')
+    assert.equal(await questionExecutionContinuation(pool, f.resumed.task, f.resumed.task.attemptId), null, 'a plan receipt is not implementation evidence')
+    assert.equal((await questionPlanContinuation(pool, f.resumed.task, f.resumed.task.attemptId))?.questionOriginRunId, f.first.runId)
+    await assertRunProfileClaim(pool, f.child.id)
+    assert.equal((await f.claimRun(f.child.id))?.ownerId, f.ownerId)
+    const claimed = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [f.child.id])).rows[0]
+    assert.equal(claimed.status, 'preparing'); assert.ok(claimed.startedAt)
+    assert.deepEqual(claimed.agentDefinition, f.child.agentDefinition)
+    assert.equal(f.claimMetadata().resumeSessionId, f.nativeSession)
+    assert.equal(f.claimMetadata().continuesRunId, f.first.runId)
+    assert.equal(f.claimMetadata().requireSessionResume, true); assert.equal(f.claimMetadata().preserveQuestionWorktree, true)
+    assert.equal((await pool.query('SELECT "bindingId" FROM byos_native_runs WHERE "runId"=$1', [f.child.id])).rows[0].bindingId, f.subscriptionBindingId)
+    assert.equal(usageCalls.length, beforeUsage, 'an existing native session is not a fresh quota/model selection')
+    assert.deepEqual(decisionCounts(), before)
+  })
+  await t.test('spec question resume preserves its admitted role after a Profile edit while a fresh selection remains fenced', async () => {
+    const f = await planQuestionFixture()
+    await pool.query('UPDATE factory_agent_profiles SET version=version+1 WHERE id=$1', [f.review!.id])
+    await assert.rejects(profiles.assertProfileSelection(pool, f.scope, f.selected.agentProfile!), { code: 'agentProfileVersionConflict' })
+    assert.equal((await f.claimRun(f.child.id))?.ownerId, f.ownerId)
+    assert.deepEqual((await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [f.child.id])).rows[0].agentDefinition, f.child.agentDefinition)
+  })
+  await t.test('spec question claim rejects missing receipts, stale epochs, changed targets and revoked subscriptions without consuming the run', async t => {
+    const f = await planQuestionFixture()
+    await f.expireQuota()
+    const receipt = (await pool.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, f.receiptId])).rows[0]
+    const attempt = (await pool.query('SELECT output FROM factory_attempts WHERE id=$1', [f.resumed.task.attemptId])).rows[0]
+    const change = (sql: string, values: unknown[], undo: string, previous: unknown[]) => async () => {
+      await pool.query(sql, values)
+      return async () => { await pool.query(undo, previous) }
+    }
+    const faults: [string, () => Promise<() => Promise<void>>][] = [
+      ['missing host receipt', change('DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, f.receiptId], 'INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)', [f.task.id, f.receiptId, JSON.stringify(receipt.request), JSON.stringify(receipt.result)])],
+      ['receipt owner mismatch', change('UPDATE factory_events SET result=$3 WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, f.receiptId, JSON.stringify({ ...receipt.result, task: { ...receipt.result.task, userId: 'foreign-owner' } })], 'UPDATE factory_events SET result=$3 WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, f.receiptId, JSON.stringify(receipt.result)])],
+      ['stale request epoch', change('UPDATE factory_attempts SET output=$2 WHERE id=$1', [f.resumed.task.attemptId, JSON.stringify({ ...attempt.output, requestEpoch: randomUUID() })], 'UPDATE factory_attempts SET output=$2 WHERE id=$1', [f.resumed.task.attemptId, JSON.stringify(attempt.output)])],
+      ['different question origin', change('UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1', [f.child.id, JSON.stringify({ ...f.child.questionContinuation, originRunId: randomUUID() })], 'UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1', [f.child.id, JSON.stringify(f.child.questionContinuation)])],
+      ['writable plan', change('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.child.id, JSON.stringify({ ...f.child.agentDefinition, readOnly: false })], 'UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.child.id, JSON.stringify(f.child.agentDefinition)])],
+      ['different model', change('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.child.id, JSON.stringify({ ...f.child.agentDefinition, model: 'changed-model' })], 'UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.child.id, JSON.stringify(f.child.agentDefinition)])],
+      ['different Profile snapshot', change('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.child.id, JSON.stringify({ ...f.child.agentDefinition, agentProfile: { ...f.child.agentDefinition.agentProfile, digest: 'changed-role' } })], 'UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.child.id, JSON.stringify(f.child.agentDefinition)])],
+      ['paused subscription', change('UPDATE byos_connections SET paused=true WHERE id=$1', [f.connections.codex], 'UPDATE byos_connections SET paused=false WHERE id=$1', [f.connections.codex])],
+      ['disconnected subscription', change("UPDATE byos_connections SET state='disconnected' WHERE id=$1", [f.connections.codex], "UPDATE byos_connections SET state='connected' WHERE id=$1", [f.connections.codex])],
+      ['revoked connection epoch', change('UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1', [f.connections.codex], 'UPDATE byos_connections SET epoch=epoch-1 WHERE id=$1', [f.connections.codex])],
+    ]
+    for (const [name, mutate] of faults) await t.test(name, async () => {
+      const restore = await mutate(), before = await f.rows()
+      try {
+        try { assert.equal(await f.claimRun(f.child.id), null) }
+        catch (error) { assert.ok(error && typeof error === 'object' && 'code' in error && ['agentProfileUnavailable', 'factoryQuestionContinuationUnavailable'].includes(String(error.code)), `unexpected rejection for ${name}`) }
+        assert.deepEqual(await f.rows(), before, 'denied claim cannot consume a receipt, advance the task or allocate a native binding')
+      } finally { await restore() }
+    })
+    assert.equal((await f.claimRun(f.child.id))?.ownerId, f.ownerId, 'restoring the actual authorization makes this same queued run claimable')
+  })
+  await t.test('spec question recovery resumes the original SID after an unclaimed failed child and never duplicates the answer or recovery', async () => {
+    const before = decisionCounts(), f = await planQuestionFixture(), beforeUsage = usageCalls.length
+    await f.expireQuota()
+    const request = await f.failBeforeClaim(), beforeRecovery = await f.rows()
+    const failed = beforeRecovery.runs.find(run => run.id === f.child.id)
+    assert.ok(failed); assert.equal(failed.status, 'failed'); assert.equal(failed.startedAt, null); assert.equal(failed.sessionId, null)
+    assert.equal(beforeRecovery.native.some(run => run.runId === failed.id), false)
+    const recovered = await f.questions.recover(f.human, request)
+    assert.notEqual(recovered.continuationRunId, failed.id)
+    assert.equal(recovered.task.stage, 'spec'); assert.equal(recovered.task.sourceEventId, f.sourceEventId)
+    assert.equal(recovered.task.candidateId, null)
+    const replay = await f.questions.recover(f.human, request)
+    assert.equal(replay.replayed, true); assert.equal(replay.continuationRunId, recovered.continuationRunId)
+    assert.deepEqual(f.queued, [f.child.id, recovered.continuationRunId])
+    assert.deepEqual(f.preparations, [{ ownerId: f.ownerId, runId: failed.id, workspaceId: f.workspaceId }])
+    const next = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [recovered.continuationRunId])).rows[0]
+    assert.equal(next.continuesRunId, failed.id, 'the immutable failed-child audit edge is retained')
+    assert.equal(next.status, 'queued'); assert.equal(next.startedAt, null); assert.equal(next.sessionId, null)
+    assert.deepEqual(next.agentDefinition.agentProfile, f.origin.agentDefinition.agentProfile)
+    assert.deepEqual(next.agentDefinition.subscription, f.origin.agentDefinition.subscription)
+    assert.equal(next.agentDefinition.readOnly, true); assert.equal(next.agentDefinition.model, model.codex)
+    assert.equal((await f.claimRun(next.id))?.ownerId, f.ownerId)
+    assert.equal(f.claimMetadata().continuesRunId, f.first.runId, 'resume native history from the original run, not the child that never started')
+    assert.equal(f.claimMetadata().resumeSessionId, f.nativeSession)
+    assert.equal(f.claimMetadata().requireSessionResume, true); assert.equal(f.claimMetadata().preserveQuestionWorktree, true)
+    assert.ok(String(f.claimMetadata().followUp).includes(f.answer.text), 'the never-delivered answer still reaches its original native session')
+    assert.ok(String(f.claimMetadata().followUp).includes(f.answer.answerId), 'the existing authenticated answer source is preserved')
+    const after = await f.rows()
+    assert.deepEqual(after.runs.find(run => run.id === failed.id), failed, 'recovery never rewrites the original failure as a success')
+    assert.deepEqual(after.messages, beforeRecovery.messages); assert.equal(after.messages.filter(message => message.id === f.answer.answerId).length, 1)
+    assert.equal(after.runs.length, 3); assert.deepEqual(after.attempts.map(attempt => attempt.stage), ['spec', 'spec', 'spec'])
+    assert.equal(after.native.filter(run => run.runId === next.id && run.bindingId === f.subscriptionBindingId).length, 1)
+    assert.equal(after.native.some(run => run.runId === failed.id), false)
+    assert.equal(usageCalls.length, beforeUsage); assert.deepEqual(decisionCounts(), before)
+    const secondReplay = await f.questions.recover(f.human, request)
+    assert.equal(secondReplay.continuationRunId, next.id); assert.equal(secondReplay.replayed, true)
+    assert.deepEqual(await f.rows(), after, 'replaying recovery after claim also leaves all durable state untouched')
+  })
+  await t.test('spec question recovery skips unclaimed gaps but keeps the latest claimed history without redelivering an answered message', async () => {
+    const f = await planQuestionFixture()
+    assert.equal((await f.claimRun(f.child.id))?.ownerId, f.ownerId)
+    const beforeUsage = usageCalls.length
+    await f.expireQuota()
+    // B really crossed the SQL claim boundary and obtained its native binding;
+    // the following same-SID failure is synthetic provider completion data.
+    await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='error',"sessionId"=$2,"leaseExpiresAt"=NULL,error='Synthetic claimed continuation failure',"finishedAt"=now() WHERE id=$1`, [f.child.id, f.nativeSession])
+    await f.questions.settle(f.ownerId, f.child.id)
+    const view = await f.questions.read(f.ownerId, f.answer.reference.questionId)
+    assert.ok(view.recoverReference)
+    const firstRecovery = await f.questions.recover(f.human, { requestId: randomUUID(), ...view.recoverReference })
+    const gap = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [firstRecovery.continuationRunId])).rows[0]
+    assert.equal(gap.startedAt, null); assert.equal(gap.sessionId, null); assert.equal(gap.continuesRunId, f.child.id)
+    const secondRequest = await f.failBeforeClaim(gap.id), before = await f.rows()
+    const secondRecovery = await f.questions.recover(f.human, secondRequest)
+    const next = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [secondRecovery.continuationRunId])).rows[0]
+    assert.equal(next.continuesRunId, gap.id, 'the database retains the immediate failed-child audit edge')
+    assert.equal((await f.claimRun(next.id))?.ownerId, f.ownerId)
+    assert.equal(f.claimMetadata().continuesRunId, f.child.id, 'the native history is B, beyond the unclaimed C gap, rather than the original A')
+    assert.equal(f.claimMetadata().resumeSessionId, f.nativeSession)
+    assert.equal(f.claimMetadata().requireSessionResume, true)
+    assert.equal(String(f.claimMetadata().followUp).includes(f.answer.text), false, 'B already received the accepted answer; D must not deliver it again')
+    const after = await f.rows()
+    for (const id of [f.child.id, gap.id]) assert.deepEqual(after.runs.find(run => run.id === id), before.runs.find(run => run.id === id), 'both failures stay unchanged')
+    assert.deepEqual(after.messages, before.messages); assert.equal(after.messages.filter(message => message.id === f.answer.answerId).length, 1)
+    assert.equal(after.runs.length, 4); assert.deepEqual(after.attempts.map(attempt => attempt.stage), ['spec', 'spec', 'spec', 'spec'])
+    assert.equal(after.native.some(run => run.runId === gap.id), false)
+    assert.equal(after.native.filter(run => run.runId === next.id && run.bindingId === f.subscriptionBindingId).length, 1)
+    assert.deepEqual(f.queued, [f.child.id, gap.id, next.id]); assert.equal(f.preparations.length, 2)
+    assert.equal(usageCalls.length, beforeUsage)
+  })
+  await t.test('spec question unclaimed recovery refuses execution evidence, stale receipts and lost custody before provider preparation', async t => {
+    const f = await planQuestionFixture(), request = await f.failBeforeClaim()
+    const receipt = (await pool.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, f.receiptId])).rows[0]
+    const attempt = (await pool.query('SELECT output FROM factory_attempts WHERE id=$1', [f.resumed.task.attemptId])).rows[0]
+    const change = (sql: string, values: unknown[], undo: string, previous: unknown[]) => async () => {
+      await pool.query(sql, values)
+      return async () => { await pool.query(undo, previous) }
+    }
+    const chunkId = randomUUID()
+    const faults: [string, () => Promise<() => Promise<void>>][] = [
+      ['already started child', change('UPDATE agent_runs SET "startedAt"=now() WHERE id=$1', [f.child.id], 'UPDATE agent_runs SET "startedAt"=NULL WHERE id=$1', [f.child.id])],
+      ['wrong native SID', change("UPDATE agent_runs SET \"sessionId\"='different-session' WHERE id=$1", [f.child.id], 'UPDATE agent_runs SET "sessionId"=NULL WHERE id=$1', [f.child.id])],
+      ['existing native binding', change('INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)', [f.child.id, f.subscriptionBindingId], 'DELETE FROM byos_native_runs WHERE "runId"=$1', [f.child.id])],
+      ['existing native output', change('INSERT INTO run_chunks (id,"runId",seq,chunk) VALUES ($1,$2,1,$3)', [chunkId, f.child.id, JSON.stringify({ type: 'text', text: 'Synthetic execution observation' })], 'DELETE FROM run_chunks WHERE id=$1', [chunkId])],
+      ['missing answer receipt', change('DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, f.receiptId], 'INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)', [f.task.id, f.receiptId, JSON.stringify(receipt.request), JSON.stringify(receipt.result)])],
+      ['stale attempt epoch', change('UPDATE factory_attempts SET output=$2 WHERE id=$1', [f.resumed.task.attemptId, JSON.stringify({ ...attempt.output, requestEpoch: randomUUID() })], 'UPDATE factory_attempts SET output=$2 WHERE id=$1', [f.resumed.task.attemptId, JSON.stringify(attempt.output)])],
+      ['changed original SID', change("UPDATE agent_runs SET \"sessionId\"='different-origin' WHERE id=$1", [f.first.runId], 'UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1', [f.first.runId, f.nativeSession])],
+      ['lost sandbox custody', change("UPDATE thread_machines SET \"sandboxId\"='different-sandbox' WHERE \"runId\"=$1", [f.child.id], 'UPDATE thread_machines SET "sandboxId"=$2 WHERE "runId"=$1', [f.child.id, f.sandboxId])],
+      ['active worker lease', change('UPDATE thread_machines SET "workerLeaseUntil"=now()+interval \'1 hour\' WHERE "runId"=$1', [f.child.id], 'UPDATE thread_machines SET "workerLeaseUntil"=NULL WHERE "runId"=$1', [f.child.id])],
+      ['paused subscription', change('UPDATE byos_connections SET paused=true WHERE id=$1', [f.connections.codex], 'UPDATE byos_connections SET paused=false WHERE id=$1', [f.connections.codex])],
+      ['revoked connection epoch', change('UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1', [f.connections.codex], 'UPDATE byos_connections SET epoch=epoch-1 WHERE id=$1', [f.connections.codex])],
+    ]
+    for (const [name, mutate] of faults) await t.test(name, async () => {
+      const restore = await mutate(), before = await f.rows()
+      try {
+        await assert.rejects(f.questions.recover(f.human, request), { code: 'factoryQuestionContinuationUnavailable' }, name)
+        assert.equal(f.preparations.length, 0, 'invalid custody or execution history is refused before provider preparation')
+        assert.deepEqual(await f.rows(), before, 'refused recovery does not consume the answer or create another run')
+      } finally { await restore() }
+    })
+    assert.equal(f.queued.length, 1)
+  })
   await t.test('task-form Default reaches real queue and claim, then the owner answer resumes the same frozen native Profile', async () => {
     const [{ requestedAgentProfile }, { createFactoryQuestions }, { queueCloudQuestionContinuation }, { createFactoryClaim }, { factoryEventId }] = await Promise.all([
       import('./profile-request'), import('./questions/store'), import('./questions/queue-continuation'), import('./claim'), import('./event-id'),

@@ -5,6 +5,8 @@ import { retryWorkerDefinition } from '../../agent-kit/worker';
 import { FactoryError } from '../contract';
 import type { FactoryQueue } from '../dispatch';
 import { factoryRunBotMatches } from '../run-scope';
+import type { FactoryTask } from '../store';
+import { unclaimedPlanQuestionContinuation } from './execution-continuation';
 
 /** A question resumes its server-bound executor, not the Bot's local queue.
  * The answer holds computer policy -> task -> origin locks. No provider call,
@@ -41,7 +43,7 @@ export async function admitCloudQuestionContinuation(
       AND c.provider=CASE a.harness WHEN 'codex' THEN 'codex' WHEN 'claude_code' THEN 'claude' END
     WHERE r.id=$1 AND r."userId"=$2 AND r."issueId"=$3 AND r."agentId"=$4 AND r."deviceRepoId"=$5
       AND b."workspaceId"=$7
-      AND r.status=CASE WHEN $10::uuid IS NULL THEN 'stopped' ELSE 'failed' END AND r."stopRequestedAt" IS NULL AND r."sessionId" IS NOT NULL
+      AND r.status=CASE WHEN $10::uuid IS NULL THEN 'stopped' ELSE 'failed' END AND r."stopRequestedAt" IS NULL
       AND (r."agentDefinition"->'apiKey' IS NULL OR r."agentDefinition"->'apiKey'='null'::jsonb)
       AND (m.state IN ('running','paused') OR ($12='blocked' AND m.state='error')) AND m."sandboxId" IS NOT NULL
       AND ($10::uuid IS NULL OR r."questionContinuation"->>'requiredSandboxId'=m."sandboxId")
@@ -49,10 +51,23 @@ export async function admitCloudQuestionContinuation(
       AND (repo."remoteUrl" IS NOT NULL OR NOT EXISTS(SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny'))
       AND NOT EXISTS(SELECT 1 FROM agent_runs active WHERE active."deviceId"=r."deviceId" AND active.status NOT IN ('succeeded','completed','failed','stopped','cancelled'))
       AND EXISTS(SELECT 1 FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=q."userId"
-        WHERE q."originRunId"=$11 AND (CASE WHEN $10::uuid IS NULL THEN q."originRunId" ELSE q."continuationRunId" END)=r.id AND q."originSessionId"=r."sessionId" AND q."userId"=r."userId" AND q.status=$12
+        WHERE q."originRunId"=$11 AND (CASE WHEN $10::uuid IS NULL THEN q."originRunId" ELSE q."continuationRunId" END)=r.id
+          AND (q."originSessionId"=r."sessionId" OR ($10::uuid IS NOT NULL AND q.stage='spec' AND r.kind='plan' AND r."sessionId" IS NULL))
+          AND q."userId"=r."userId" AND q.status=$12
           AND t."issueId"=r."issueId" AND t."attemptId"=$8 AND t."sourceEventId"=$9 AND t."botId" IS NOT DISTINCT FROM $6::uuid)
     FOR UPDATE OF r,m FOR SHARE OF b,bot,a,d,repo,credential,c`, [originId,userId,input.issueId,input.agentId,input.deviceRepoId,botId,binding.workspaceId,context.attemptId,context.sourceEventId,context.questionHistoryRunId ?? null,questionOriginId,questionStatus]);
-  if (!origin?.agentDefinition || !origin.sessionId || !(await factoryRunBotMatches(tx, { userId, botId }, origin))) return fail();
+  if (!origin?.agentDefinition || !(await factoryRunBotMatches(tx, { userId, botId }, origin))) return fail();
+  if (!origin.sessionId) {
+    // A failed claim owns the retained machine but has no native history. Only
+    // the exact accepted question's host receipt may bridge that missing SID.
+    const { rows: [task] } = await tx.query<FactoryTask>(`SELECT * FROM factory_tasks
+      WHERE "userId"=$1 AND "issueId"=$2 AND "attemptId"=$3 AND "sourceEventId"=$4
+        AND "botId" IS NOT DISTINCT FROM $5::uuid AND stage='spec' FOR SHARE`,
+      [userId,input.issueId,context.attemptId,context.sourceEventId,botId]);
+    const edge = task && context.questionHistoryRunId === origin.id
+      ? await unclaimedPlanQuestionContinuation(tx,task,origin.id) : null;
+    if (!edge || edge.questionOriginRunId !== questionOriginId) return fail();
+  }
   return { origin, binding };
 }
 

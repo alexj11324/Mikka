@@ -13,6 +13,7 @@ import { deviceIsOnline } from "../../device-presence";
 import { FactoryError, type FactoryBinding } from "../contract";
 import { factoryEventId } from "../event-id";
 import { admitCloudQuestionContinuation } from "./queue-continuation";
+import { questionPlanContinuation, unclaimedPlanQuestionContinuation } from "./execution-continuation";
 import { questionAnswerPrompt } from "./answer-prompt";
 import type {
   createFactoryStore,
@@ -114,6 +115,18 @@ export const questionReference = (q: FactoryQuestion): QuestionReference => ({
   originRunId: q.originRunId,
   originSessionId: q.originSessionId,
 });
+
+/** Called only after the immutable question receipt proves the accepted
+ * answer was never delivered to a native session. No new answer is recorded. */
+function undeliveredQuestionAnswerPrompt(q: FactoryQuestion): string {
+  const source = q.answerSource;
+  if (source !== "human" && source !== "human_event" && source !== "orchestrator") fail("factoryQuestionContinuationUnavailable");
+  const input = (q.answer as { input?: unknown } | null)?.input;
+  const answer = source === "orchestrator" ? parse(contextQuestionAnswerSchema, input) : parse(humanQuestionAnswerSchema, input);
+  const text = "text" in answer ? answer.text : answer.facts.map(fact => fact.quote).join("\n");
+  return questionAnswerPrompt({ questionId: q.id, question: q.question, answerId: answer.answerId, answerSource: source,
+    answerText: personalRunMessageText(answer.answerId, text, source === "orchestrator" ? "peer" : "user") });
+}
 
 /** Existing Factory/run/event transactions; a question is domain state, not a new queue. */
 export function createFactoryQuestions(
@@ -765,8 +778,9 @@ export function createFactoryQuestions(
         const origin=runs.find(r=>r.id===q.originRunId),failed=runs.find(r=>r.id===input.expectedFailedRunId);
         const {rows:[attempt]}=await tx.query('SELECT "runId" FROM factory_attempts WHERE id=$1 AND "taskId"=$2',[task.attemptId,task.id]);
         const c=failed?.questionContinuation;
+        const unclaimed = failed?.sessionId === null ? await unclaimedPlanQuestionContinuation(tx,task,failed.id) : null;
         if(!origin || !failed || attempt?.runId!==failed.id || failed.status!=='failed' || failed.stopRequestedAt || origin.stopRequestedAt ||
-          failed.sessionId!==q.originSessionId || origin.sessionId!==q.originSessionId ||
+          (failed.sessionId!==q.originSessionId && !unclaimed) || origin.sessionId!==q.originSessionId ||
           c?.questionId!==q.id || c.originRunId!==q.originRunId || c.originSessionId!==q.originSessionId || c.requireSessionResume!==true ||
           ['deviceId','deviceRepoId','agentId','baseBranch'].some(k=>failed[k]!==origin[k]) ||
           !origin.agentDefinition || !failed.agentDefinition || origin.agentDefinition.definitionDigest!==failed.agentDefinition.definitionDigest ||
@@ -780,7 +794,9 @@ export function createFactoryQuestions(
           {issueId:q.issueId,agentId:failed.agentId,deviceRepoId:failed.deviceRepoId},task.botId,
           {attemptId:task.attemptId,sourceEventId:task.sourceEventId,questionOriginRunId:q.originRunId,questionHistoryRunId:failed.id},'blocked');
         if(!admitted) fail('factoryQuestionContinuationUnavailable');
-        return { kind:'admitted' as const, task,q,failed,c,scope:{runId:failed.id as string,workspaceId:admitted.binding.workspaceId as string} };
+        return { kind:'admitted' as const, task,q,failed,c,
+          undeliveredAnswer: unclaimed?.historyRunId === q.originRunId ? undeliveredQuestionAnswerPrompt(q) : null,
+          scope:{runId:failed.id as string,workspaceId:admitted.binding.workspaceId as string} };
       };
       // Validate before provider I/O, then release all transaction locks. The
       // same admission runs again before dispatch; an old receipt never touches
@@ -799,7 +815,9 @@ export function createFactoryQuestions(
             'The owner requested recovery of the failed original-session continuation.', q.id, tx)
           : await store.apply(actor.userId, binding(task), factoryEventId('question-recover-attempt', input.requestId),
             { action: 'retry', reason: 'The owner requested recovery of the failed original-session continuation.' }, tx);
-        const followUp='Recover the failed continuation of the original task. Preserve all existing constraints. Freshly inspect the retained artifact and actual current repository state before continuing; record these current observations for independent review and verification. Keep completed side effects, and do not repeat the original answer or completed external writes or publication. The answer is already in the original session history. This message only requests explicit recovery of that task and grants no new permission.';
+        const followUp=checked.undeliveredAnswer
+          ? `${checked.undeliveredAnswer}\n\nRecover the original task after its continuation failed before starting. The accepted answer above has not yet reached the original session. Preserve all existing constraints, inspect the actual current repository state, and do not repeat completed external writes or publication.`
+          : 'Recover the failed continuation of the original task. Preserve all existing constraints. Freshly inspect the retained artifact and actual current repository state before continuing; record these current observations for independent review and verification. Keep completed side effects, and do not repeat the original answer or completed external writes or publication. The answer is already in the original session history. This message only requests explicit recovery of that task and grants no new permission.';
         const queued=await dispatch(actor.userId,{binding:binding(next.task),agentId:failed.agentId,deviceRepoId:failed.deviceRepoId,note:followUp},tx,q.originRunId,failed.id);
         const {rows:[run]}=await tx.query('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE',[queued.runId,actor.userId]);
         if(!run || run.status!=='queued' || run.stopRequestedAt || ['deviceId','deviceRepoId','agentId','baseBranch'].some(k=>run[k]!==failed[k]) ||
@@ -893,7 +911,8 @@ export function createFactoryQuestions(
             fail('factoryQuestionContinuationUnavailable');
           const {rows:[source]}=await tx.query('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "issueId"=$3 FOR SHARE',[run.continuesRunId,userId,q.issueId]);
           const link=source?.questionContinuation;
-          if(!source || source.status!=='failed' || source.stopRequestedAt || source.sessionId!==q.originSessionId ||
+          const unclaimed = source?.sessionId === null ? await unclaimedPlanQuestionContinuation(tx,task,source.id) : null;
+          if(!source || source.status!=='failed' || source.stopRequestedAt || (source.sessionId!==q.originSessionId && !unclaimed) ||
             ['deviceId','deviceRepoId','agentId','baseBranch'].some(k=>source[k]!==run[k]) ||
             source.agentDefinition?.definitionDigest!==run.agentDefinition?.definitionDigest ||
             questionFingerprint(source.agentDefinition?.subscription ?? null)!==questionFingerprint(run.agentDefinition?.subscription ?? null) ||
@@ -904,7 +923,13 @@ export function createFactoryQuestions(
               AND current."workspaceId"=old."workspaceId" AND current."botId"=old."botId"
             WHERE old."runId"=$1 AND old."ownerId"=$3`,[source.id,run.id,userId]);
           if(run.deviceKind==='cloud' && !scope) fail('factoryQuestionContinuationUnavailable');
-          historyRunId=source.id;
+          if (unclaimed) {
+            const edge = await questionPlanContinuation(tx,task,task.attemptId);
+            if (!edge || edge.sourceRunId !== source.id || edge.questionId !== q.id ||
+              edge.continuationRunId !== run.id || edge.historyRunId !== unclaimed.historyRunId)
+              fail('factoryQuestionContinuationUnavailable');
+            historyRunId=edge.historyRunId;
+          } else historyRunId=source.id;
         }
         const check =
           run.kind === "acceptance"
