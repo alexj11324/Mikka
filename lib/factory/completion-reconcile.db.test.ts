@@ -404,14 +404,23 @@ test("run completion enters review without the Coordinator; replays do not advan
       assert.equal((await handleFactoryApproval(approvals, { ...request, url: request.url + '?view=ledger' })).status, 200);
       const evidenceReply = await handleFactoryApproval(approvals, request);
       assert.equal(evidenceReply.status, 200, JSON.stringify(evidenceReply.body));
-      assert.ok('manifest' in evidenceReply.body);
-      const manifest = evidenceReply.body.manifest;
+      const evidenceBody = evidenceReply.body;
+      assert.ok(evidenceBody && typeof evidenceBody === 'object' && 'manifest' in evidenceBody && 'binding' in evidenceBody);
+      const manifest = evidenceBody.manifest;
+      assert.ok(manifest && typeof manifest === 'object' && 'candidateId' in manifest && 'candidate' in manifest && 'artifacts' in manifest);
       assert.equal(manifest.candidateId, after.task.candidateId);
+      assert.ok(manifest.candidate && typeof manifest.candidate === 'object' && 'sha' in manifest.candidate);
       assert.equal(manifest.candidate.sha, null);
-      assert.deepEqual(manifest.artifacts.map(item => item.stage), ['execute', 'review']);
-      assert.deepEqual(manifest.artifacts.map(item => item.runId), [exhausted.runId, reviewer.runId]);
-      assert.equal(manifest.artifacts[0].completionRecoveryEventId, ownerRequest.body.eventId);
-      assert.equal(new Set(manifest.artifacts.map(item => item.sessionId)).size, 2);
+      assert.ok(Array.isArray(manifest.artifacts));
+      const artifacts = manifest.artifacts.map((item: unknown) => {
+        assert.ok(item && typeof item === 'object' && 'stage' in item && 'runId' in item && 'sessionId' in item);
+        return item;
+      });
+      assert.deepEqual(artifacts.map(item => item.stage), ['execute', 'review']);
+      assert.deepEqual(artifacts.map(item => item.runId), [exhausted.runId, reviewer.runId]);
+      assert.ok('completionRecoveryEventId' in artifacts[0]);
+      assert.equal(artifacts[0].completionRecoveryEventId, ownerRequest.body.eventId);
+      assert.equal(new Set(artifacts.map(item => item.sessionId)).size, 2);
       assert.deepEqual(await receiptRows(), savedReceipts, 'displaying evidence never rewrites either successful completion or Owner recovery receipt');
       assert.deepEqual(await preservedHistory(), oldHistory);
 
@@ -442,10 +451,10 @@ test("run completion enters review without the Coordinator; replays do not advan
       const noGitHub = async () => { githubCalls++; throw new Error('Deliverable acceptance must not call GitHub'); };
       const merges = createFactoryMerges(pool, authorize, currentStore, { pullRequest: noGitHub, mergeMethods: noGitHub, merge: noGitHub });
       const acceptRequest = { ...request, method: 'POST', origin: 'https://fixture.invalid',
-        body: { operation: 'accept', input: { binding: evidenceReply.body.binding, eventId: randomUUID() } } };
+        body: { operation: 'accept', input: { binding: evidenceBody.binding, eventId: randomUUID() } } };
       const accepted = await handleFactoryApproval(approvals, acceptRequest, merges);
       assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
-      assert.ok('status' in accepted.body);
+      assert.ok(accepted.body && typeof accepted.body === 'object' && 'status' in accepted.body);
       assert.equal(accepted.body.status, 'accepted');
       const acceptedTask = (await currentStore.read('owner', old.task.id)).task;
       assert.equal(acceptedTask.stage, 'approval');
