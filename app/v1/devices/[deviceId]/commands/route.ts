@@ -3,19 +3,20 @@ import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { COMMANDS_DAEMON_LATEST_PARAM, COMMANDS_MAX_SKIP, COMMANDS_MAX_SKIP_DEVICE_COMMANDS, COMMANDS_MAX_WAIT_SECONDS, COMMANDS_SKIP_DEVICE_COMMANDS_PARAM, COMMANDS_SKIP_PARAM, MAILBOX_NOTICE_HEADER } from '@mikka/protocol/device'
 import { cachedDaemonVersions, daemonVersions, newerDaemonRelease, daemonRequestTooOld } from '@/lib/daemon-release'
-import { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, longPollIdleCheck, ownsDevice, sleep, waitSeconds } from '@/lib/device-link'
+import { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, deviceWorkSubscription, longPollIdleCheck, ownsDevice, sleep, waitSeconds } from '@/lib/device-link'
 import { noteLogOutcome, withRequestLog } from '@/lib/request-log'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * How often a waiting long-poll looks for new work (longPollIdleCheck.ms, 5 s).
- * This is only the fallback for an old daemon or a gateway that is down: a
- * daemon on the push socket does not call this route while it is idle. Each
- * check is a Neon query, so the fallback is throttled to one every 5s (it was
- * 2s, about 30 queries a minute per idle device). New work reaches a fallback
- * daemon within 5s, and a revoked credential fails the next check inside the
- * bound in lib/device-revocation.db.test.ts.
+ * A daemon on the push socket does not call this route while it is idle; this
+ * long poll is the fallback for an old daemon or a gateway that is down. It
+ * waits on LISTEN (deviceWorkSubscription): every write that gives the device
+ * work, revokes its credential or removes it NOTIFYs, and the poll re-checks
+ * only then, plus once at its deadline, which also covers a lost notification
+ * (#1212). Without push (no gateway configured, or LISTEN unavailable) it
+ * re-checks every longPollIdleCheck.ms (5 s), as before; a revoked credential
+ * fails the next check inside the bound in lib/device-revocation.db.test.ts.
  */
 
 /**
@@ -41,30 +42,36 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
   // Read once per poll from the five-minute registry cache; idle checks below only peek at it.
   let releases = knownRelease || obsolete ? await daemonVersions() : undefined
   const deadline = Date.now() + wait * 1000
-  while (!request.signal.aborted) {
-    // A device with scheduling off gets no work (as GET .../runs).
-    const options = { mailboxNotices: request.headers.get(MAILBOX_NOTICE_HEADER) === '1', queued: device.enabled }
-    // The cheap check also ends the poll for a revoked credential; the full read hands over work.
-    const check = obsolete
-      ? { work: false, deviceCommand: await deviceUpdateNotice(deviceId) }
-      : await deviceMayHaveWork(deviceId, skip, knownRelease ? { ...options, skipDeviceCommands: list(COMMANDS_SKIP_DEVICE_COMMANDS_PARAM, COMMANDS_MAX_SKIP_DEVICE_COMMANDS) } : options)
-    const { commands, queuedRuns: queued } = check.work ? await deviceWork(deviceId, skip, options) : { commands: [], queuedRuns: [] }
-    if (request.signal.aborted) break
-    // Memory only: a release published mid-poll ends it once this instance's cache has it.
-    if (knownRelease) releases = cachedDaemonVersions() ?? releases
-    const news = check.deviceCommand !== null || (knownRelease !== null && newerDaemonRelease(releases, knownRelease))
-    if (commands.length > 0 || queued.length > 0 || news || Date.now() >= deadline) {
-      noteLogOutcome(commands.length > 0 || queued.length > 0 || news ? 'work' : 'empty')
-      return NextResponse.json({
-        commands,
-        ...(queued.length > 0 ? { queuedRuns: queued } : {}),
-        ...(check.deviceCommand ? { deviceCommands: [check.deviceCommand] } : {}),
-        ...(releases ? { daemonVersions: releases } : {}),
-      })
+  // Listen before the first read: a write committed during any read wakes the next wait at once.
+  const push = wait > 0 ? await deviceWorkSubscription(deviceId, caller.tokenId) : null
+  try {
+    while (!request.signal.aborted) {
+      push?.reset()
+      // A device with scheduling off gets no work (as GET .../runs).
+      const options = { mailboxNotices: request.headers.get(MAILBOX_NOTICE_HEADER) === '1', queued: device.enabled }
+      // The cheap check also ends the poll for a revoked credential; the full read hands over work.
+      const check = obsolete
+        ? { work: false, deviceCommand: await deviceUpdateNotice(deviceId) }
+        : await deviceMayHaveWork(deviceId, skip, knownRelease ? { ...options, skipDeviceCommands: list(COMMANDS_SKIP_DEVICE_COMMANDS_PARAM, COMMANDS_MAX_SKIP_DEVICE_COMMANDS) } : options)
+      const { commands, queuedRuns: queued } = check.work ? await deviceWork(deviceId, skip, options) : { commands: [], queuedRuns: [] }
+      if (request.signal.aborted) break
+      // Memory only: a release published mid-poll ends it once this instance's cache has it.
+      if (knownRelease) releases = cachedDaemonVersions() ?? releases
+      const news = check.deviceCommand !== null || (knownRelease !== null && newerDaemonRelease(releases, knownRelease))
+      if (commands.length > 0 || queued.length > 0 || news || Date.now() >= deadline) {
+        noteLogOutcome(commands.length > 0 || queued.length > 0 || news ? 'work' : 'empty')
+        return NextResponse.json({
+          commands,
+          ...(queued.length > 0 ? { queuedRuns: queued } : {}),
+          ...(check.deviceCommand ? { deviceCommands: [check.deviceCommand] } : {}),
+          ...(releases ? { daemonVersions: releases } : {}),
+        })
+      }
+      // One unlocked read per wait. It does not take the credential lock; a revoked credential fails that read before any message text is loaded (lib/device-revocation.db.test.ts).
+      if (push && !push.lost) await push.next(Math.max(50, deadline - Date.now()), request.signal)
+      else await sleep(Math.min(longPollIdleCheck.ms, Math.max(50, deadline - Date.now())), request.signal)
     }
-    // One unlocked read per wait. It does not take the credential lock; a revoked credential fails that read before any message text is loaded (lib/device-revocation.db.test.ts).
-    await sleep(Math.min(longPollIdleCheck.ms, Math.max(50, deadline - Date.now())), request.signal)
-  }
+  } finally { push?.close() }
   noteLogOutcome('ignored')
   return new NextResponse(null, { status: 204 })
 }

@@ -5,6 +5,8 @@ import { readFile } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { SubagentStore } from './subagents'
+import { wakeTokens, wakeTransport } from '@/lib/workflow-wake'
+import { setTimeout as delay } from 'node:timers/promises'
 import { startSuggestion } from './suggestions'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { claimCloudRun } from '@/lib/computer/claim'
@@ -92,6 +94,24 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     assert.equal(events.length, 1)
     assert.equal(events[0].event.type, 'data-subagent')
     assert.equal(JSON.stringify(events).includes('targetId'), false)
+    // #1212: a task's workflow waits on its row instead of a 30 s tick. A change from
+    // outside (a stop) wakes it; an ended task wakes the owner's queued ones; the
+    // task's own workflow (wakeSelf: false) does not wake itself.
+    const woken: string[] = []
+    wakeTransport.resume = async token => { woken.push(token) }
+    try {
+      const first = await store.create(alice, botA, 'Wake check, first')
+      const queued = await store.create(alice, botA, 'Wake check, queued behind it')
+      await store.stop(alice, botA, first.id)
+      await delay(50)
+      assert.ok(woken.includes(wakeTokens.subagent(first.id)), 'the stopped task\'s workflow is woken to report at once')
+      assert.ok(woken.includes(wakeTokens.subagent(queued.id)), 'a freed slot wakes the owner\'s queued task')
+      assert.ok(!woken.includes(wakeTokens.subagent(own.id)), 'another owner\'s task is left alone')
+      woken.length = 0
+      await new SubagentStore(pool, { wakeSelf: false }).stop(alice, botA, queued.id)
+      await delay(50)
+      assert.ok(!woken.includes(wakeTokens.subagent(queued.id)), 'the task\'s own workflow re-reads without a wake')
+    } finally { wakeTransport.resume = undefined }
     const runA = randomUUID(), runB = randomUUID(), deviceA = randomUUID(), deviceB = randomUUID(), botDevice = randomUUID(), agentId = randomUUID(), bindingId = randomUUID()
     await pool.query(`INSERT INTO agents(id,"userId",harness) VALUES ($1,'alice','codex')`, [agentId])
     for (const device of [deviceA, deviceB, botDevice]) await pool.query('INSERT INTO devices(id,"ownerId",kind) VALUES ($1,\'alice\',\'cloud\')', [device])

@@ -9,6 +9,7 @@ import { ensureCloudMachine } from './provision'
 import { computerPermission, type ComputerPermission } from './permission'
 import { computerChanged, computerWorkspaceChanged, machineChanged } from '@/lib/live/computer-state'
 import { computerLiveState } from './state-deadline'
+import { wakeTokens, wakeWorkflowSoon, workflowWakesEnabled } from '@/lib/workflow-wake'
 
 export class ComputerError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -89,6 +90,13 @@ export class ComputerStore {
       await sync()
       if (previous !== permission) await computerWorkspaceChanged(client, this.pool, workspaceId)
       await client.query('COMMIT')
+      // Web tasks waiting on a person or a slot re-check the policy at once and fail (#1212).
+      if (permission === 'deny' && workflowWakesEnabled()) {
+        try {
+          const tasks = await this.pool.query<{ id: string }>(`SELECT id FROM bot_subagents WHERE "workspaceId"=$1 AND status IN ('queued','running','needs_you')`, [workspaceId])
+          for (const { id } of tasks.rows) wakeWorkflowSoon(wakeTokens.subagent(id))
+        } catch { /* their 2-minute re-check still sees the denial */ }
+      }
       return { permission }
     } catch (error) {
       await client.query('ROLLBACK')
