@@ -1,17 +1,24 @@
 'use client'
 
 import { useEffect } from 'react'
-import useSWR from 'swr'
-import { computerApi, isMockedComputer, subscribeComputerEvents } from '@/lib/computer/client'
-import type { ComputerState, ViewerGrant, ViewerMode } from '@/lib/computer/types'
+import useSWR, { unstable_serialize } from 'swr'
+import { useLiveKey } from '@/hooks/use-live-key'
+import { computerApi, isMockedComputer, subscribeComputerEvents, type ComputerRead } from '@/lib/computer/client'
+import { computerReadDeadline } from '@/lib/computer/state-deadline'
+import type { ViewerGrant, ViewerMode } from '@/lib/computer/types'
 
 /**
- * One bot's computer: polled every 2s (patched by the mock's pushes in
- * development), so the details page, the chat card and the viewer all show
- * the same state.
+ * One bot's computer, refreshed by committed changes and observed expiries.
+ * The details page, chat card and viewer share the same authorized state.
  */
 export function useComputer(botId: string | null | undefined) {
-  const swr = useSWR<ComputerState>(botId ? ['computer', botId] : null, ([, id]: [string, string]) => computerApi.state(id), { refreshInterval: 2000 })
+  const key = botId ? ['computer', botId] : null
+  const swr = useSWR<ComputerRead>(key, ([, id]: [string, string]) => computerApi.state(id), {
+    refreshInterval: 0, revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false,
+  })
+  useLiveKey('computer_state', botId && !isMockedComputer(botId) ? botId : null, key ? [unstable_serialize(key)] : [], swr.data?.live?.workspaceId ?? null, {
+    minIntervalMs: 500, deadline: computerReadDeadline(swr.data),
+  })
   const { mutate } = swr
   useEffect(() => {
     if (!botId) return
