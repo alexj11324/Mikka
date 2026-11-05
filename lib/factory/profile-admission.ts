@@ -3,6 +3,8 @@ import { isDeepStrictEqual } from 'node:util'
 import type { Pool, PoolClient } from 'pg'
 import type { WorkerDefinitionSnapshot } from '@/lib/agent-kit/worker'
 import { MODEL_ROUTING_TIERS, modelTier } from '@/lib/model-routing'
+import { credentialStates, orderCandidates } from '@/lib/model-order'
+import { executionIdentityForRun, ExecutionIdentityError } from '@/lib/execution-identity'
 import { assertProfileTarget, assertProfileSelection, BUILTIN_AGENT_PROFILE_ID, isBuiltinAgentProfileSelection, type AgentProfileSelection } from './agent-profile'
 
 import { watchdogProfileAdmission, watchdogProfileClaimContext, type ProfileFactoryContext } from './profile-watchdog'
@@ -10,6 +12,28 @@ import { watchdogProfileAdmission, watchdogProfileClaimContext, type ProfileFact
 type Query = Pick<Pool | PoolClient, 'query'>
 export class AgentProfileAdmissionError extends Error {
   constructor() { super('agentProfileUnavailable'); this.name = 'AgentProfileAdmissionError' }
+}
+
+/** Runtime startup can outlive the queue's quota snapshot. Refresh only this
+ * queued run's frozen subscription before taking claim/source locks. This is
+ * not admission: the original locked checks still decide, even after failure.
+ * Existing native-session grants and API-key runs need no new usage probe. */
+export async function refreshCloudRunProfileClaim(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, subscriptionBindingId: string | null): Promise<void> {
+  if (!subscriptionBindingId) return
+  const { rows: [run] } = await pool.query<typeof import('@/lib/db/schema').agentRuns.$inferSelect>(
+    `SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3 AND status='queued' AND "stopRequestedAt" IS NULL
+      AND "agentDefinition"->'executionIdentity'->>'workspaceId'=$4`, [runId, actor.userId, deviceId, actor.workspaceId])
+  const definition = run?.agentDefinition, selection = definition?.agentProfile, entry = selection?.targetEntry
+  if (!run || !definition || !selection || !entry || entry.source.kind !== 'subscription' || definition.profileOriginRunId || run.questionContinuation) return
+  if (selection.scope.ownerId !== actor.userId || selection.scope.workspaceId !== actor.workspaceId || entry.harness !== definition.harness || entry.model !== definition.model || definition.apiKey || definition.subscription?.bindingId !== subscriptionBindingId) return
+  try { await executionIdentityForRun(pool, runId, actor.userId) }
+  catch (error) { if (error instanceof ExecutionIdentityError) return; throw error }
+  const bound = await pool.query('SELECT 1 FROM byos_bindings WHERE id=$1 AND "connectionId"=$2 AND "modelId"=$3 AND "workspaceId"=$4',
+    [subscriptionBindingId, entry.source.connectionId, entry.model, actor.workspaceId])
+  if (!bound.rowCount) return
+  const scope = { ownerId: actor.userId, workspaceId: actor.workspaceId }
+  const candidates = await orderCandidates(pool, scope)
+  await credentialStates(pool, scope, [entry], candidates, undefined, { probe: 'always' })
 }
 
 /** Runtime/publication preparation can outlive a quota observation. Refresh
@@ -26,7 +50,6 @@ export async function refreshProfileQuota(pool: Pool, input: {
   const { nativeRunBinding } = await import('@/lib/computer/native-run-binding')
   const binding = await nativeRunBinding(pool, input.ownerId, input.agentId, entry.harness, input.workspaceId, input.subscriptionBindingId)
   if (!binding || binding.connectionId !== entry.source.connectionId || binding.modelId !== entry.model) return
-  const { credentialStates, orderCandidates } = await import('@/lib/model-order')
   const scope = { ownerId: input.ownerId, workspaceId: input.workspaceId }
   await credentialStates(pool, scope, [entry], await orderCandidates(pool, scope))
 }

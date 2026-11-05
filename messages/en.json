@@ -3212,6 +3212,7 @@
     },
     "loadError": "Could not load the conversation. Retrying.",
     "failedTitle": "Reply failed",
+    "apiBalance": "Insufficient API balance",
     "subscriptionRefusal": {
       "unavailable": "Chosen subscription unavailable",
       "reconnect": "Subscription needs reconnecting",

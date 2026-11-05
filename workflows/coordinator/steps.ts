@@ -860,7 +860,7 @@ export async function dispatchComputerTask(userId: string, input: { sourceEventI
     const { RunModelMissingError } = await import('@/lib/computer/run-model')
     // Nothing was queued: the run named no model, or the thread's own model and account no longer serve it.
     if (error instanceof RunModelMissingError) return { error: 'runModelMissing' as const, runId: error.runId, threadRunId: error.threadId }
-    if (error instanceof AgentProfileError || error instanceof AgentProfileAdmissionError) return { error: error instanceof AgentProfileError ? error.code : 'agentProfileUnavailable' }
+    if (error instanceof AgentProfileError || error instanceof AgentProfileAdmissionError) return asToolResult(() => Promise.reject(error))
     const { FactoryError } = await import('@/lib/factory/contract')
     if (error instanceof FactoryError) return { error: error.code }
     const { ComputerError } = await import('@/lib/computer/store')

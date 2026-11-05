@@ -36,6 +36,24 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   const migrations = new URL('../../drizzle/', import.meta.url)
   for (const file of orderMigrations((await readdir(migrations)).filter(f => f.endsWith('.sql')))) await pool.query(await readFile(new URL(file, migrations), 'utf8'))
 
+  const subscriptionModule = await import('../subscription-runtime')
+  let usageProbe: (ownerId: string, connectionId: string, signal: AbortSignal) => Promise<void> = async () => { throw new Error('Unexpected subscription usage probe') }
+  let useServiceUsage = false
+  const usageCalls: { ownerId: string; connectionId: string }[] = []
+  // Only existing provider usage I/O is replaced. Membership, authorization,
+  // queue admission, frozen definitions and the final claim use real SQL.
+  t.mock.module(new URL('../subscription-runtime.ts', import.meta.url).href, { namedExports: {
+    ...subscriptionModule,
+    subscriptionRuntime: () => useServiceUsage ? subscriptionModule.subscriptionRuntime() : ({
+      member: subscriptionModule.authorizeSubscriptionWorkspace,
+      workspace: subscriptionModule.authorizeSubscriptionWorkspace,
+      usage: async (ownerId: string, connectionId: string, signal: AbortSignal) => {
+        usageCalls.push({ ownerId, connectionId })
+        assert.equal(signal.aborted, false)
+        await usageProbe(ownerId, connectionId, signal)
+      },
+    }),
+  } })
   let decisionProfile = ''
   const decisionInputs: { purpose: string; input: unknown; questions: unknown; profileId: string }[] = []
   const decisionCounts = () => ({
@@ -237,6 +255,10 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       await assert.rejects(profiles.assertProfileSelection(pool, f.scope, selected.agentProfile!), { code: 'agentProfileModelUnavailable' })
     }
     const { queueFactoryCloudRun } = await import('./queue-cloud')
+    // These queue cases replace worker I/O above; retain the real service's
+    // quota parser and revision-fenced save without the final-claim stub.
+    useServiceUsage = true
+    t.after(() => { useServiceUsage = false })
     const resultPending = queueFactoryCloudRun(pool, f.actor, {
       botId: f.botId, factoryBotId: chatBotId, issueId, agentId: f.agents.codex, deviceRepoId: f.repoId,
       title: 'Synthetic default Codex task', body: 'Validate original default Profile admission without provider I/O.',
@@ -292,6 +314,91 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.equal(await invoke(), null)
     assert.equal((await pool.query("SELECT 1 FROM bot_cloud_runtimes WHERE \"botId\"=$1 AND harness='codex'", [f.botId])).rowCount, 0)
   })
+  const { claimCloudRun } = await import('../computer/claim')
+  const { assertRunProfileClaim, AgentProfileAdmissionError } = await import('./profile-admission')
+  const { rebindExecutionDevice } = await import('../execution-identity')
+  const claimFixture = async () => {
+    const f = await fixture()
+    const selected = await profiles.resolveAgentProfileDispatch(pool, f.scope, { issueId: f.issueId, profileId: f.implement!.id, location: 'cloud', cloudPurpose: 'desktop' })
+    const subscriptionBindingId = await bindAgentToConnection(pool, f.scope, f.agents.claude_code, 'claude_code', f.connections.claude_code, model.claude_code)
+    const { runId } = await queueCloudRun(pool, f.actor, {
+      botId: f.botId, issueId: f.issueId, agentId: f.agents.claude_code, deviceRepoId: f.repoId,
+      title: 'Claim the frozen Profile', body: 'Synthetic freshness boundary', model: model.claude_code,
+      subscriptionBindingId, agentProfile: selected.agentProfile, readOnly: true,
+    })
+    // The same handoff as provisioning, with no provider or model call.
+    const threadDevice = randomUUID()
+    await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled) VALUES ($1,$2,'Prepared thread fixture','cloud',true)`, [threadDevice, f.ownerId])
+    await pool.query(`UPDATE thread_machines SET state='running',"deviceId"=$2,"sandboxId"=$3 WHERE "runId"=$1`, [runId, threadDevice, `synthetic-thread-${runId}`])
+    const source = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0]
+    const definition = await rebindExecutionDevice(pool, source, threadDevice, pool)
+    await pool.query('UPDATE agent_runs SET "deviceId"=$2,"agentDefinition"=$3 WHERE id=$1', [runId, threadDevice, JSON.stringify(definition)])
+    return { ...f, runId, threadDevice, subscriptionBindingId, definition }
+  }
+  const claim = (f: Awaited<ReturnType<typeof claimFixture>>) => claimCloudRun(pool, f.actor, f.runId, f.threadDevice, new Date(Date.now() + 30_000), f.subscriptionBindingId, undefined, undefined, false)
+  const refreshQuota = async (connectionId: string, used = .1) => {
+    await pool.query(`UPDATE byos_connections SET quota=jsonb_set(jsonb_set(quota,'{observedAt}',$2::jsonb),'{windows,0,used}',$3::jsonb) WHERE id=$1`, [connectionId, JSON.stringify(new Date().toISOString()), JSON.stringify(used)])
+  }
+  const unchangedRun = async (f: Awaited<ReturnType<typeof claimFixture>>, status = 'queued') => {
+    const rows = (await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rows
+    assert.equal(rows.length, 1, 'freshness does not dispatch a replacement run')
+    assert.equal(rows[0].id, f.runId); assert.equal(rows[0].status, status)
+    assert.deepEqual(rows[0].agentDefinition, f.definition, 'the exact Profile, model and credential remain frozen')
+  }
+  await t.test('queue Available crosses 60s before claim; one exact-source usage refresh admits the original run', async t => {
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() })
+    const f = await claimFixture(), before = usageCalls.length
+    await assertRunProfileClaim(pool, f.runId)
+    t.mock.timers.tick(60_000)
+    await assertRunProfileClaim(pool, f.runId)
+    t.mock.timers.tick(1)
+    await assert.rejects(assertRunProfileClaim(pool, f.runId), AgentProfileAdmissionError, 'the unchanged final gate rejects the expired snapshot')
+    usageProbe = async (ownerId, connectionId) => {
+      assert.equal(ownerId, f.ownerId); assert.equal(connectionId, f.connections.claude_code)
+      // An independent connection must be able to write: no claim/source row
+      // share lock may surround the asynchronous provider refresh.
+      await refreshQuota(connectionId)
+    }
+    assert.ok(await claim(f))
+    assert.deepEqual(usageCalls.slice(before), [{ ownerId: f.ownerId, connectionId: f.connections.claude_code }])
+    await unchangedRun(f, 'preparing')
+    assert.equal((await pool.query('SELECT "bindingId" FROM byos_native_runs WHERE "runId"=$1', [f.runId])).rows[0].bindingId, f.subscriptionBindingId)
+  })
+  await t.test('a failed final refresh preserves a still-fresh legal snapshot', async t => {
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() })
+    const f = await claimFixture(), before = usageCalls.length
+    t.mock.timers.tick(59_000)
+    const quota = (await pool.query('SELECT quota FROM byos_connections WHERE id=$1', [f.connections.claude_code])).rows[0].quota
+    usageProbe = async () => { throw new Error('Synthetic usage unavailable') }
+    assert.ok(await claim(f))
+    assert.equal(usageCalls.length - before, 1)
+    assert.deepEqual((await pool.query('SELECT quota FROM byos_connections WHERE id=$1', [f.connections.claude_code])).rows[0].quota, quota)
+    await unchangedRun(f, 'preparing')
+  })
+  for (const fault of ['usage-error', 'still-unknown', 'quota', 'disconnect', 'pause', 'epoch', 'profile', 'model', 'stop'] as const) {
+    await t.test(`final Profile claim still refuses ${fault} after its one usage probe`, async t => {
+      t.mock.timers.enable({ apis: ['Date'], now: Date.now() })
+      const f = await claimFixture(), before = usageCalls.length
+      t.mock.timers.tick(60_001)
+      usageProbe = async (ownerId, connectionId) => {
+        assert.equal(ownerId, f.ownerId); assert.equal(connectionId, f.connections.claude_code)
+        if (fault === 'usage-error') throw new Error('Synthetic usage unavailable')
+        if (fault === 'still-unknown') return
+        await refreshQuota(connectionId, fault === 'quota' ? 1 : .1)
+        if (fault === 'disconnect') await pool.query(`UPDATE byos_connections SET state='disconnected' WHERE id=$1`, [connectionId])
+        if (fault === 'pause') await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [connectionId])
+        if (fault === 'epoch') await pool.query('UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1', [connectionId])
+        if (fault === 'profile') await pool.query('UPDATE factory_agent_profiles SET version=version+1 WHERE id=$1', [f.implement!.id])
+        if (fault === 'model') await pool.query(`UPDATE byos_bindings SET "modelId"='changed-model' WHERE id=$1`, [f.subscriptionBindingId])
+        if (fault === 'stop') await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [f.runId])
+      }
+      if (['usage-error', 'still-unknown', 'quota', 'profile'].includes(fault)) await assert.rejects(claim(f), AgentProfileAdmissionError)
+      else assert.equal(await claim(f), null)
+      assert.deepEqual(usageCalls.slice(before), [{ ownerId: f.ownerId, connectionId: f.connections.claude_code }])
+      await unchangedRun(f)
+      assert.equal((await pool.query('SELECT 1 FROM byos_native_runs WHERE "runId"=$1', [f.runId])).rowCount, 0)
+    })
+  }
   assert.deepEqual(decisionInputs.map(call => call.purpose), ['factory-agent-profile', 'factory-agent-profile', 'task-model-routing'])
   // Validate captured inputs outside the transport: model routing intentionally
   // catches transport errors, which must not swallow a privacy assertion.

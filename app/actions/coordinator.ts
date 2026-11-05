@@ -72,9 +72,12 @@ export async function getCoordinatorChat(botId: string | null = null): Promise<C
   const userId = user.id
   const bot = await ownBot(user, botId)
   const enabled = coordinatorEnabled()
-  const chat = await chatView(userId, 200, bot.id)
+  const { chat, expiries, observedAt } = await chatStore.chatViewState(userId, 200, bot.id)
+  // BotList, the workspace and ArtifactWindow share the live chat's SWR key.
+  // Whichever fetcher wins must retain the same authorized home and deadline.
+  const live = await ownerListRead(userId, expiries, observedAt)
   // Without a Coordinator here nothing is coming, so do not show one working.
-  return { ...chat, botId: bot.id, enabled, working: enabled && chat.working }
+  return { ...chat, botId: bot.id, enabled, working: enabled && chat.working, live }
 }
 
 const versionSchema = z.string().regex(/^[0-9a-f]{32}$/).optional()
