@@ -1,0 +1,442 @@
+{
+  "schemaVersion": 1,
+  "evidenceVersion": "a233747",
+  "claim": "Completed local production-build acceptance; not production or live-provider acceptance",
+  "source": {
+    "repository": "alexj11324/Mikka",
+    "pullRequest": 1439,
+    "sha": "a233747ca8de4be2963380a5130d1e83dee0b0e9",
+    "tree": "f2593b18a046eba23b9d010d79cb40407377f9eb",
+    "parents": [
+      "f0852128308a084f21af294c2bce746ced0bf6b7",
+      "2e4e8380e0387b43c5c844756ade7801f0afdca1"
+    ],
+    "buildId": "Wh63fF4fa0AKPz-QIIx9L"
+  },
+  "build": {
+    "started": "2026-11-05T21:00:10.494299+00:00",
+    "finished": "2026-11-05T21:02:41.271408+00:00",
+    "durationSeconds": 150.777,
+    "exitCode": 0,
+    "bakedSourceSha": "a233747ca8de4be2963380a5130d1e83dee0b0e9",
+    "nodeVersion": "v24.22.2",
+    "pnpmVersion": "10.34.3",
+    "nextVersion": "16.4.1",
+    "oomDelta": {
+      "cgroup": null,
+      "vmstat": {
+        "oom_kill": 0
+      }
+    }
+  },
+  "ci": [
+    {
+      "name": "CI",
+      "id": 42107964743,
+      "sourceSha": "a233747ca8de4be2963380a5130d1e83dee0b0e9",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42107964743"
+    },
+    {
+      "name": "Analytics SSR",
+      "id": 42107964752,
+      "sourceSha": "a233747ca8de4be2963380a5130d1e83dee0b0e9",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42107964752"
+    },
+    {
+      "name": "Browser gate",
+      "id": 42107964813,
+      "sourceSha": "a233747ca8de4be2963380a5130d1e83dee0b0e9",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42107964813"
+    }
+  ],
+  "http": {
+    "runId": "88199dfd-e8c6-40f8-8324-1a24acaf12d0",
+    "started": "2026-11-05T21:02:44.333Z",
+    "finished": "2026-11-05T21:02:54.609Z",
+    "passed": true,
+    "leaseState": "released",
+    "lost": false,
+    "evidenceAudit": "passed",
+    "ownerBaselinePreserved": true,
+    "ownerFootprintPreserved": true,
+    "ownerCounterRestored": true,
+    "ownerIssueIdsPreserved": true,
+    "fixtureRemaining": {
+      "workspaces": 0,
+      "members": 0,
+      "bots": 0,
+      "issues": 0,
+      "devices": 0,
+      "repositories": 0,
+      "agents": 0,
+      "runs": 0,
+      "publications": 0,
+      "tasks": 0,
+      "attempts": 0,
+      "factoryevents": 0,
+      "approvals": 0,
+      "stageupdates": 0,
+      "sourceevents": 0,
+      "chatmessages": 0,
+      "documents": 0,
+      "connections": 0,
+      "bindings": 0,
+      "nativeruns": 0,
+      "modelsettings": 0,
+      "modelentries": 0,
+      "customprofiles": 0
+    },
+    "factoryRequestCount": 16,
+    "serverActionCount": 4,
+    "requests": [
+      {
+        "role": "owner",
+        "operation": "owner-read",
+        "method": "GET",
+        "status": 200,
+        "decodedResponseBytes": 319,
+        "cacheControl": "private, no-store"
+      },
+      {
+        "role": "peer",
+        "operation": "peer-read",
+        "method": "GET",
+        "status": 404,
+        "decodedResponseBytes": 27,
+        "cacheControl": "private, no-store",
+        "code": "factoryNotFound"
+      },
+      {
+        "role": "anonymous",
+        "operation": "anonymous-read",
+        "method": "GET",
+        "status": 401,
+        "decodedResponseBytes": 32,
+        "cacheControl": "private, no-store",
+        "code": "factoryHumanRequired"
+      },
+      {
+        "role": "anonymous",
+        "operation": "anonymous-write",
+        "method": "POST",
+        "status": 401,
+        "decodedResponseBytes": 32,
+        "cacheControl": "private, no-store",
+        "code": "factoryHumanRequired"
+      },
+      {
+        "role": "peer",
+        "operation": "peer-write",
+        "method": "POST",
+        "status": 404,
+        "decodedResponseBytes": 27,
+        "cacheControl": "private, no-store",
+        "code": "factoryNotFound"
+      },
+      {
+        "role": "leased-context",
+        "operation": "cross-origin-write",
+        "method": "POST",
+        "status": 403,
+        "decodedResponseBytes": 26,
+        "cacheControl": "private, no-store",
+        "code": "originRejected"
+      },
+      {
+        "role": "leased-context",
+        "operation": "missing-origin-write",
+        "method": "POST",
+        "status": 403,
+        "decodedResponseBytes": 26,
+        "cacheControl": "private, no-store",
+        "code": "originRejected"
+      },
+      {
+        "role": "leased-context",
+        "operation": "delegated-authorization-write",
+        "method": "POST",
+        "status": 401,
+        "decodedResponseBytes": 32,
+        "cacheControl": "private, no-store",
+        "code": "factoryHumanRequired"
+      },
+      {
+        "role": "owner",
+        "operation": "invalid-operation",
+        "method": "POST",
+        "status": 422,
+        "decodedResponseBytes": 26,
+        "cacheControl": "private, no-store",
+        "code": "factoryInvalid"
+      },
+      {
+        "role": "owner",
+        "operation": "stale-revision",
+        "method": "POST",
+        "status": 409,
+        "decodedResponseBytes": 24,
+        "cacheControl": "private, no-store",
+        "code": "factoryStale"
+      },
+      {
+        "role": "owner",
+        "operation": "repeat-stale-revision",
+        "method": "POST",
+        "status": 409,
+        "decodedResponseBytes": 24,
+        "cacheControl": "private, no-store",
+        "code": "factoryStale"
+      },
+      {
+        "role": "owner",
+        "operation": "read-after-rejections",
+        "method": "GET",
+        "status": 200,
+        "decodedResponseBytes": 319,
+        "cacheControl": "private, no-store"
+      },
+      {
+        "role": "owner",
+        "operation": "approve-spec-success",
+        "method": "POST",
+        "status": 200,
+        "decodedResponseBytes": 230,
+        "cacheControl": "private, no-store"
+      },
+      {
+        "role": "owner",
+        "operation": "read-queued-implementation",
+        "method": "GET",
+        "status": 200,
+        "decodedResponseBytes": 267,
+        "cacheControl": "private, no-store"
+      },
+      {
+        "role": "owner",
+        "operation": "repeat-same-approval-event",
+        "method": "POST",
+        "status": 200,
+        "decodedResponseBytes": 229,
+        "cacheControl": "private, no-store"
+      },
+      {
+        "role": "owner",
+        "operation": "old-revision-after-success",
+        "method": "POST",
+        "status": 409,
+        "decodedResponseBytes": 24,
+        "cacheControl": "private, no-store",
+        "code": "factoryStale"
+      }
+    ],
+    "actions": [
+      {
+        "action": "findThreadIssue",
+        "role": "owner",
+        "requestPath": "/mikka",
+        "status": 200,
+        "mediaType": "text/x-component",
+        "decodedResponseBytes": 112,
+        "decodedActionValueBytes": 50,
+        "flightRecordKinds": [
+          "model"
+        ],
+        "result": "expected-value"
+      },
+      {
+        "action": "findThreadIssue",
+        "role": "peer",
+        "requestPath": "/mikka",
+        "status": 200,
+        "mediaType": "text/x-component",
+        "decodedResponseBytes": 66,
+        "decodedActionValueBytes": 4,
+        "flightRecordKinds": [
+          "model"
+        ],
+        "result": "inaccessible-null"
+      },
+      {
+        "action": "getThreadChanges",
+        "role": "owner",
+        "requestPath": "/mikka",
+        "status": 200,
+        "mediaType": "text/x-component",
+        "decodedResponseBytes": 78,
+        "decodedActionValueBytes": 16,
+        "flightRecordKinds": [
+          "model"
+        ],
+        "result": "expected-value"
+      },
+      {
+        "action": "getThreadChanges",
+        "role": "peer",
+        "requestPath": "/mikka",
+        "status": 500,
+        "mediaType": "text/x-component",
+        "decodedResponseBytes": 86,
+        "flightRecordKinds": [
+          "model",
+          "error"
+        ],
+        "result": "rejected-by-action-error",
+        "exactCause": "masked by production Next; issueNotFound/runNotFound authority is separately covered by the fixed-source PG tests"
+      }
+    ],
+    "responseByteMeaning": "Decoded HTTP/Flight body bytes; not PostgreSQL read bytes or provider billing",
+    "dispatchScope": "Real normal Owner POST creates a new local queued implementation, Default profile and native binding from an explicitly synthetic subscription catalogue and completed planner; no live provider execution claim",
+    "initialCloudNeedsSpecCovered": false
+  },
+  "ui": {
+    "runId": "f6814370-d531-4317-85e5-2a396c92e1d0",
+    "started": "2026-11-05T21:02:57.111Z",
+    "finished": "2026-11-05T21:03:17.504Z",
+    "passed": true,
+    "leaseState": "released",
+    "lost": false,
+    "evidenceAudit": "passed",
+    "ownerBaselinePreserved": true,
+    "ownerFootprintPreserved": true,
+    "ownerCounterRestored": true,
+    "ownerIssueIdsPreserved": true,
+    "fixtureRemaining": {
+      "workspaces": 0,
+      "members": 0,
+      "bots": 0,
+      "issues": 0,
+      "devices": 0,
+      "repositories": 0,
+      "agents": 0,
+      "runs": 0,
+      "publications": 0,
+      "tasks": 0,
+      "attempts": 0,
+      "factoryevents": 0,
+      "approvals": 0,
+      "stageupdates": 0,
+      "sourceevents": 0,
+      "chatmessages": 0,
+      "documents": 0,
+      "connections": 0,
+      "bindings": 0,
+      "nativeruns": 0,
+      "modelsettings": 0,
+      "modelentries": 0,
+      "customprofiles": 0
+    },
+    "screenshotCount": 28,
+    "presentationInjectionCount": 26,
+    "browserTestSuiteRuns": 0,
+    "realBackendApprovalCallsDuringPresentation": 0,
+    "pageErrors": [],
+    "factorySnapshotUnchanged": true,
+    "normalLocaleRestoration": {
+      "normalOwnerCookieJarUnchanged": true,
+      "workspaceReadStatus": 200,
+      "workspaceIdNameKindRestored": true
+    },
+    "injectionScope": "Exact same-origin fixture flow POST with approve_spec and matching task/revision; explicit 409 presentation payload. Real GET, normal session, real production component event logic."
+  },
+  "cleanup": {
+    "observedAt": "2026-11-05T21:03:18.094737+00:00",
+    "pgStop": 0,
+    "remainingHttpListener": false,
+    "remainingPgListener": false,
+    "ownedNodePidsSignalled": [],
+    "oldWorktreesAndClustersUntouched": true
+  },
+  "beforeAfter": {
+    "sourceBefore": "59e58a4d5c69593187d3fd2c672250d11a8b0cb6",
+    "sourceAfter": "a233747ca8de4be2963380a5130d1e83dee0b0e9",
+    "case": "en / 390 / light / profile-version-conflict",
+    "before": {
+      "alertClientWidth": 86,
+      "alertScrollWidth": 88,
+      "cardHeight": 244,
+      "viewportImage": {
+        "path": "assets/59e-before/en-390-light-profile-version-conflict-viewport.png",
+        "bytes": 35352,
+        "sha256": "6f39d334d64294b04956aab6063d968a397a150cdae464cf361e6cd1345ec961",
+        "gitBlobSha1": "753900b04705782c22d30175db5ca8354de4cab8",
+        "width": 390,
+        "height": 844
+      }
+    },
+    "after": {
+      "alertClientWidth": 314,
+      "alertScrollWidth": 314,
+      "cardHeight": 182,
+      "viewportImage": {
+        "path": "assets/a233/viewports/en-390-light-profile-version-conflict-viewport.png",
+        "bytes": 34580,
+        "sha256": "e019fd6bd21991daa565b8cb12343431ca06a77cd413e4570463e29c637e37c3",
+        "gitBlobSha1": "1968d7e9b31c4483293c508caf150ff87d16efff",
+        "width": 390,
+        "height": 844
+      }
+    },
+    "allEightNarrowAlertWidths": [
+      [
+        314,
+        314
+      ],
+      [
+        314,
+        314
+      ],
+      [
+        314,
+        314
+      ],
+      [
+        314,
+        314
+      ],
+      [
+        314,
+        314
+      ],
+      [
+        314,
+        314
+      ],
+      [
+        314,
+        314
+      ],
+      [
+        314,
+        314
+      ]
+    ]
+  },
+  "manualVisualReview": {
+    "version": "a233747",
+    "reviewLead": "root",
+    "independentReviewer": "project_map_reads",
+    "leadScope": "three contact sheets and narrow full viewport screenshots",
+    "independentScope": "all eight 390px original viewport images, old English failing viewport, image/manifest hashes and cleanup receipts",
+    "severity3Or4Findings": 0,
+    "decision": "No remaining severity 3/4 finding in the reviewed scope; old narrow-layout failure was retained and fixed."
+  },
+  "figma": {
+    "newDesignChange": false,
+    "basis": "Existing shipped components reused; local wrapping correction and specific cause copy only",
+    "providedFrame": false,
+    "frameComparisonClaimed": false
+  },
+  "privacy": {
+    "sessionStateIncluded": false,
+    "credentialsIncluded": false,
+    "accountEmailIncluded": false,
+    "privateLogsIncluded": false,
+    "originalArtifactsModified": false
+  }
+}

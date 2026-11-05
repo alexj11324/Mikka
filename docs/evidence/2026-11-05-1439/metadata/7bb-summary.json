@@ -1,0 +1,627 @@
+{
+  "schemaVersion": 1,
+  "evidenceVersion": "7bb2266",
+  "claim": "Completed local production-build acceptance; not production or live-provider acceptance",
+  "source": {
+    "repository": "alexj11324/Mikka",
+    "pullRequest": 1439,
+    "sha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+    "tree": "d5a158e0478e5f4f659f92bfdd99f8dc6eae2356",
+    "parents": [
+      "a233747ca8de4be2963380a5130d1e83dee0b0e9",
+      "81c05e18bc087c6a08e1dd23bb323bd3f6e7cf55"
+    ],
+    "baseMain": "81c05e18bc087c6a08e1dd23bb323bd3f6e7cf55",
+    "buildId": "P-PoxUD-NSrT9WHqQUgdo"
+  },
+  "build": {
+    "started": "2026-11-05T21:26:30.148881+00:00",
+    "finished": "2026-11-05T21:29:06.124863+00:00",
+    "durationSeconds": 155.976,
+    "exitCode": 0,
+    "bakedSourceSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+    "nodeVersion": "v24.22.2",
+    "pnpmVersion": "10.34.3",
+    "nextVersion": "16.4.1",
+    "oomDelta": {
+      "cgroup": null,
+      "vmstat": {
+        "oom_kill": 0
+      }
+    }
+  },
+  "ci": [
+    {
+      "name": "Browser gate",
+      "id": 42110968210,
+      "sourceSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42110968210"
+    },
+    {
+      "name": "CI",
+      "id": 42110967952,
+      "sourceSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42110967952"
+    },
+    {
+      "name": "Analytics SSR",
+      "id": 42110968009,
+      "sourceSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42110968009"
+    }
+  ],
+  "http": {
+    "runId": "477db554-50c3-4d7b-a6a8-abf13a2a4e28",
+    "started": "2026-11-05T21:29:09.454Z",
+    "finished": "2026-11-05T21:29:19.810Z",
+    "passed": true,
+    "leaseState": "released",
+    "lost": false,
+    "evidenceAudit": "passed",
+    "ownerBaselinePreserved": true,
+    "ownerFootprintPreserved": true,
+    "ownerCounterRestored": true,
+    "ownerIssueIdsPreserved": true,
+    "fixtureRemaining": {
+      "workspaces": 0,
+      "members": 0,
+      "bots": 0,
+      "issues": 0,
+      "devices": 0,
+      "repositories": 0,
+      "agents": 0,
+      "runs": 0,
+      "publications": 0,
+      "tasks": 0,
+      "attempts": 0,
+      "factoryevents": 0,
+      "approvals": 0,
+      "stageupdates": 0,
+      "sourceevents": 0,
+      "chatmessages": 0,
+      "documents": 0,
+      "connections": 0,
+      "bindings": 0,
+      "nativeruns": 0,
+      "modelsettings": 0,
+      "modelentries": 0,
+      "customprofiles": 0
+    },
+    "factoryRequestCount": 16,
+    "serverActionCount": 4,
+    "requests": [
+      {
+        "role": "owner",
+        "operation": "owner-read",
+        "method": "GET",
+        "status": 200,
+        "decodedResponseBytes": 319,
+        "cacheControl": "private, no-store"
+      },
+      {
+        "role": "peer",
+        "operation": "peer-read",
+        "method": "GET",
+        "status": 404,
+        "decodedResponseBytes": 27,
+        "cacheControl": "private, no-store",
+        "code": "factoryNotFound"
+      },
+      {
+        "role": "anonymous",
+        "operation": "anonymous-read",
+        "method": "GET",
+        "status": 401,
+        "decodedResponseBytes": 32,
+        "cacheControl": "private, no-store",
+        "code": "factoryHumanRequired"
+      },
+      {
+        "role": "anonymous",
+        "operation": "anonymous-write",
+        "method": "POST",
+        "status": 401,
+        "decodedResponseBytes": 32,
+        "cacheControl": "private, no-store",
+        "code": "factoryHumanRequired"
+      },
+      {
+        "role": "peer",
+        "operation": "peer-write",
+        "method": "POST",
+        "status": 404,
+        "decodedResponseBytes": 27,
+        "cacheControl": "private, no-store",
+        "code": "factoryNotFound"
+      },
+      {
+        "role": "leased-context",
+        "operation": "cross-origin-write",
+        "method": "POST",
+        "status": 403,
+        "decodedResponseBytes": 26,
+        "cacheControl": "private, no-store",
+        "code": "originRejected"
+      },
+      {
+        "role": "leased-context",
+        "operation": "missing-origin-write",
+        "method": "POST",
+        "status": 403,
+        "decodedResponseBytes": 26,
+        "cacheControl": "private, no-store",
+        "code": "originRejected"
+      },
+      {
+        "role": "leased-context",
+        "operation": "delegated-authorization-write",
+        "method": "POST",
+        "status": 401,
+        "decodedResponseBytes": 32,
+        "cacheControl": "private, no-store",
+        "code": "factoryHumanRequired"
+      },
+      {
+        "role": "owner",
+        "operation": "invalid-operation",
+        "method": "POST",
+        "status": 422,
+        "decodedResponseBytes": 26,
+        "cacheControl": "private, no-store",
+        "code": "factoryInvalid"
+      },
+      {
+        "role": "owner",
+        "operation": "stale-revision",
+        "method": "POST",
+        "status": 409,
+        "decodedResponseBytes": 24,
+        "cacheControl": "private, no-store",
+        "code": "factoryStale"
+      },
+      {
+        "role": "owner",
+        "operation": "repeat-stale-revision",
+        "method": "POST",
+        "status": 409,
+        "decodedResponseBytes": 24,
+        "cacheControl": "private, no-store",
+        "code": "factoryStale"
+      },
+      {
+        "role": "owner",
+        "operation": "read-after-rejections",
+        "method": "GET",
+        "status": 200,
+        "decodedResponseBytes": 319,
+        "cacheControl": "private, no-store"
+      },
+      {
+        "role": "owner",
+        "operation": "approve-spec-success",
+        "method": "POST",
+        "status": 200,
+        "decodedResponseBytes": 230,
+        "cacheControl": "private, no-store"
+      },
+      {
+        "role": "owner",
+        "operation": "read-queued-implementation",
+        "method": "GET",
+        "status": 200,
+        "decodedResponseBytes": 267,
+        "cacheControl": "private, no-store"
+      },
+      {
+        "role": "owner",
+        "operation": "repeat-same-approval-event",
+        "method": "POST",
+        "status": 200,
+        "decodedResponseBytes": 229,
+        "cacheControl": "private, no-store"
+      },
+      {
+        "role": "owner",
+        "operation": "old-revision-after-success",
+        "method": "POST",
+        "status": 409,
+        "decodedResponseBytes": 24,
+        "cacheControl": "private, no-store",
+        "code": "factoryStale"
+      }
+    ],
+    "actions": [
+      {
+        "action": "findThreadIssue",
+        "role": "owner",
+        "requestPath": "/mikka",
+        "status": 200,
+        "mediaType": "text/x-component",
+        "decodedResponseBytes": 112,
+        "decodedActionValueBytes": 50,
+        "flightRecordKinds": [
+          "model"
+        ],
+        "result": "expected-value"
+      },
+      {
+        "action": "findThreadIssue",
+        "role": "peer",
+        "requestPath": "/mikka",
+        "status": 200,
+        "mediaType": "text/x-component",
+        "decodedResponseBytes": 66,
+        "decodedActionValueBytes": 4,
+        "flightRecordKinds": [
+          "model"
+        ],
+        "result": "inaccessible-null"
+      },
+      {
+        "action": "getThreadChanges",
+        "role": "owner",
+        "requestPath": "/mikka",
+        "status": 200,
+        "mediaType": "text/x-component",
+        "decodedResponseBytes": 78,
+        "decodedActionValueBytes": 16,
+        "flightRecordKinds": [
+          "model"
+        ],
+        "result": "expected-value"
+      },
+      {
+        "action": "getThreadChanges",
+        "role": "peer",
+        "requestPath": "/mikka",
+        "status": 500,
+        "mediaType": "text/x-component",
+        "decodedResponseBytes": 86,
+        "flightRecordKinds": [
+          "model",
+          "error"
+        ],
+        "result": "rejected-by-action-error",
+        "exactCause": "masked by production Next; issueNotFound/runNotFound authority is separately covered by the fixed-source PG tests"
+      }
+    ],
+    "responseByteMeaning": "Decoded HTTP/Flight body bytes; not PostgreSQL read bytes or provider billing",
+    "dispatchScope": "Real normal Owner POST creates a new local queued implementation, Default profile and native binding from an explicitly synthetic subscription catalogue and completed planner; no live provider execution claim",
+    "initialCloudNeedsSpecCovered": false
+  },
+  "ui": {
+    "runId": "a36781c1-f37d-4498-9c24-20bf63ff6e45",
+    "started": "2026-11-05T21:29:22.089Z",
+    "finished": "2026-11-05T21:29:40.838Z",
+    "passed": true,
+    "leaseState": "released",
+    "lost": false,
+    "evidenceAudit": "passed",
+    "ownerBaselinePreserved": true,
+    "ownerFootprintPreserved": true,
+    "ownerCounterRestored": true,
+    "ownerIssueIdsPreserved": true,
+    "fixtureRemaining": {
+      "workspaces": 0,
+      "members": 0,
+      "bots": 0,
+      "issues": 0,
+      "devices": 0,
+      "repositories": 0,
+      "agents": 0,
+      "runs": 0,
+      "publications": 0,
+      "tasks": 0,
+      "attempts": 0,
+      "factoryevents": 0,
+      "approvals": 0,
+      "stageupdates": 0,
+      "sourceevents": 0,
+      "chatmessages": 0,
+      "documents": 0,
+      "connections": 0,
+      "bindings": 0,
+      "nativeruns": 0,
+      "modelsettings": 0,
+      "modelentries": 0,
+      "customprofiles": 0
+    },
+    "screenshotCount": 28,
+    "presentationInjectionCount": 26,
+    "browserTestSuiteRuns": 0,
+    "realBackendApprovalCallsDuringPresentation": 0,
+    "pageErrors": [],
+    "factorySnapshotUnchanged": true,
+    "normalLocaleRestoration": {
+      "normalOwnerCookieJarUnchanged": true,
+      "workspaceReadStatus": 200,
+      "workspaceIdNameKindRestored": true
+    },
+    "injectionScope": "Exact same-origin fixture flow POST with approve_spec and matching task/revision; explicit 409 presentation payload. Real GET, normal session, real production component event logic."
+  },
+  "cleanup": {
+    "observedAt": "2026-11-05T21:29:41.407571+00:00",
+    "pgStop": 0,
+    "remainingHttpListener": false,
+    "remainingPgListener": false,
+    "ownedNodePidsSignalled": [],
+    "oldWorktreesAndClustersUntouched": true
+  },
+  "beforeAfter": {
+    "sourceBefore": "59e58a4d5c69593187d3fd2c672250d11a8b0cb6",
+    "sourceAfter": "7bb22666c4f58d0474a409523e3bad2fce927351",
+    "case": "en / 390 / light / profile-version-conflict",
+    "before": {
+      "alertClientWidth": 86,
+      "alertScrollWidth": 88,
+      "cardHeight": 244,
+      "viewportImage": {
+        "path": "assets/59e-before/en-390-light-profile-version-conflict-viewport.png",
+        "bytes": 35352,
+        "sha256": "6f39d334d64294b04956aab6063d968a397a150cdae464cf361e6cd1345ec961",
+        "gitBlobSha1": "753900b04705782c22d30175db5ca8354de4cab8",
+        "width": 390,
+        "height": 844
+      }
+    },
+    "after": {
+      "alertClientWidth": 314,
+      "alertScrollWidth": 314,
+      "cardHeight": 182,
+      "viewportImage": {
+        "path": "assets/7bb/viewports/en-390-light-profile-version-conflict-viewport.png",
+        "bytes": 34494,
+        "sha256": "9fdecb159c836d70ed128413985cc75b07326a056454ba9b130eed3cccacc6c6",
+        "gitBlobSha1": "9de82d8263fbb0913fb16b1259e1e69cf9fbb4f3",
+        "width": 390,
+        "height": 844
+      }
+    },
+    "allEightNarrowAlertWidths": [
+      [
+        314,
+        314
+      ],
+      [
+        314,
+        314
+      ],
+      [
+        314,
+        314
+      ],
+      [
+        314,
+        314
+      ],
+      [
+        314,
+        314
+      ],
+      [
+        314,
+        314
+      ],
+      [
+        314,
+        314
+      ],
+      [
+        314,
+        314
+      ]
+    ]
+  },
+  "manualVisualReview": {
+    "version": "7bb2266",
+    "reviewLead": "root",
+    "independentReviewer": "project_map_reads",
+    "leadScope": "three screenshot overviews plus original English 390px light version-conflict and dark unknown-profile full viewport screenshots",
+    "independentScope": "all eight original 390px viewport screenshots; all archive/extracted file hashes; image hashes and normal lease/cleanup receipts",
+    "severity3Or4Findings": 0,
+    "decision": "No remaining severity 3/4 finding in the reviewed scope; current gallery uses actual 7bb image bytes."
+  },
+  "figma": {
+    "newDesignChange": false,
+    "basis": "Existing shipped components reused; local wrapping correction and specific cause copy only",
+    "providedFrame": false,
+    "frameComparisonClaimed": false
+  },
+  "privacy": {
+    "sessionStateIncluded": false,
+    "credentialsIncluded": false,
+    "accountEmailIncluded": false,
+    "privateLogsIncluded": false,
+    "originalArtifactsModified": false
+  },
+  "ciChecks": [
+    {
+      "name": "UI policy (strict)",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110967952/job/127541609170"
+    },
+    {
+      "name": "analytics-ssr",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110968009/job/127540488154"
+    },
+    {
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110967952/job/127540458539"
+    },
+    {
+      "name": "Cloud credential access (OIDC)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110967952/job/127538213688"
+    },
+    {
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110967952/job/127538211517"
+    },
+    {
+      "name": "Integration unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110967952/job/127538211346"
+    },
+    {
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110967952/job/127538211280"
+    },
+    {
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110967952/job/127538211253"
+    },
+    {
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110967952/job/127538211244"
+    },
+    {
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110967952/job/127538211229"
+    },
+    {
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110967952/job/127538211222"
+    },
+    {
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110967952/job/127538211183"
+    },
+    {
+      "name": "Analytics SSR (full)",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110968009/job/127538194328"
+    },
+    {
+      "name": "Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110967952/job/127538087931"
+    },
+    {
+      "name": "Browser tests (before merge)",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110968210/job/127538087860"
+    },
+    {
+      "name": "Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 15368,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42110968009/job/127538087654"
+    },
+    {
+      "name": "GitGuardian Security Checks",
+      "status": "completed",
+      "conclusion": "success",
+      "appId": 46505,
+      "headSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+      "detailsUrl": "https://dashboard.gitguardian.com"
+    }
+  ],
+  "ciRequiredChecks": [
+    {
+      "name": "UI policy (strict)",
+      "appId": 15368,
+      "verifiedSuccessOnSourceSha": "7bb22666c4f58d0474a409523e3bad2fce927351"
+    },
+    {
+      "name": "Production build and browser interactions",
+      "appId": 15368,
+      "verifiedSuccessOnSourceSha": "7bb22666c4f58d0474a409523e3bad2fce927351"
+    },
+    {
+      "name": "Browser tests (before merge)",
+      "appId": 15368,
+      "verifiedSuccessOnSourceSha": "7bb22666c4f58d0474a409523e3bad2fce927351"
+    },
+    {
+      "name": "GitGuardian Security Checks",
+      "appId": 46505,
+      "verifiedSuccessOnSourceSha": "7bb22666c4f58d0474a409523e3bad2fce927351"
+    }
+  ],
+  "ciNote": "Three workflow conclusions are success. The conditional Cloud credential access (OIDC) job is skipped and is not counted as executed acceptance.",
+  "finalRunner": {
+    "finished": "2026-11-05T21:29:41.421465+00:00",
+    "sourceSha": "7bb22666c4f58d0474a409523e3bad2fce927351",
+    "sourceTree": "d5a158e0478e5f4f659f92bfdd99f8dc6eae2356",
+    "exitCode": 0
+  },
+  "archive": {
+    "filename": "7bb2266-evidence.zip",
+    "bytes": 1289094,
+    "sha256": "8d52b658b2e9542eda99226acca739dd28a3addc672ad6217375182101797c3d",
+    "filesVerified": 101
+  },
+  "history": {
+    "previousEvidenceSourceSha": "a233747ca8de4be2963380a5130d1e83dee0b0e9",
+    "previousSafeSummary": "metadata/a233-summary.json",
+    "previousImagesInCurrentGallery": false
+  },
+  "laterMainBoundary": {
+    "prefix": "ca256",
+    "scope": "Subsequent independent mobile and project-map performance changes reported by the integration owner",
+    "coveredByThisTree": false,
+    "integration": "Root preserves these changes in the final normal merge; results here remain bound to 7bb."
+  }
+}
