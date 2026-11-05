@@ -6,19 +6,23 @@ import { withBasePath } from '@/lib/base-path'
 import { type LiveRuntime, type LiveTicket, type LiveSubscriptionOptions, type LiveSubscription } from '@/lib/live/channel'
 import { LiveChannels } from '@/lib/live/channels'
 import { TabShare } from '@/lib/live/tab-share'
+import { APP_BUILD } from '@/lib/app-build'
 import type { LiveKind } from '@/lib/live/events'
 
-const LiveContext = createContext<{ channels: LiveChannels; workspaceId?: string; share: (scope: string | null) => TabShare } | null>(null)
+const LiveContext = createContext<{ channels: LiveChannels; workspaceId?: string; share: (scope: string | null) => TabShare | null } | null>(null)
 
 /** Live reads opt in to taking another tab's result (lib/live/tab-share.ts). */
 export type LiveKeyOptions = LiveSubscriptionOptions & { shareAcrossTabs?: boolean }
 
-/** One tab-share channel per signed-in person and workspace scope; all closed on sign-out or a user switch. */
+/** One tab-share channel per signed-in person, workspace scope and app build; all closed on
+ * sign-out or a user switch. A tab left open across a deploy never adopts the other build's
+ * data shape, and a key whose scope is not yet resolved reads on its own. */
 function tabShares(ownerId: string) {
   const shares = new Map<string, TabShare>()
   return {
-    share(scope: string | null) {
-      const name = `mikka-live-read:${ownerId}:${scope ?? 'none'}`
+    share(scope: string | null): TabShare | null {
+      if (!scope) return null
+      const name = `mikka-live-read:${APP_BUILD || 'unbuilt'}:${ownerId}:${scope}`
       let share = shares.get(name)
       if (!share) shares.set(name, share = new TabShare(name))
       return share
@@ -105,7 +109,8 @@ export function useLiveKeys(entities: readonly LiveEntity[], keys: readonly stri
     const subscriptions = (JSON.parse(references) as LiveEntity[]).map(({ kind, id, workspaceId: entityScope }, index) => {
       const channelScope = entityScope === undefined ? scope : entityScope
       // Another tab of this person reading the same key in the same scope serves this one too.
-      const refresh = share ? (key: string) => share(channelScope).run(key, () => mutate(key), data => mutate(key, data, { revalidate: false })) : (key: string) => mutate(key)
+      const tabs = share?.(channelScope ?? null)
+      const refresh = tabs ? (key: string) => tabs.run(key, () => mutate(key), data => mutate(key, data, { revalidate: false })) : (key: string) => mutate(key)
       return channels.subscribe(channelScope, kind, id, JSON.parse(serialized) as string[], refresh, optionsFor(index))
     })
     active.current = subscriptions
