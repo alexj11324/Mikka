@@ -80,7 +80,7 @@ dbTest('the chat reads compact parts and shows exactly what the full messages sh
     assert.match(calls[1].inputPreview, /^\{"query": "login login/, 'the input preview is the start of the input as JSON text')
     assert.deepEqual(compact[1], { role: 'assistant', mikkaStreamId: 'stream-1', content: [
       { type: 'reasoning', chars: thinking.length },
-      { type: 'tool-call', toolCallId: 'call-1', toolName: 'list_issues', inputPreview: calls[1].inputPreview },
+      { type: 'tool-call', toolCallId: 'call-1', toolName: 'list_issues', inputPreview: calls[1].inputPreview, target: 'login '.repeat(100).trim().slice(0, 161) },
       { type: 'tool-call', toolCallId: 'call-2', toolName: 'dispatch_run', inputPreview: calls[2].inputPreview, quotePreview: note.slice(0, QUOTE_PREVIEW_CHARS + 1) },
     ] })
     assert.ok(calls[2].inputPreview.startsWith('{"note": '), 'the note leads the cut input preview; the quote carries it apart')
@@ -105,5 +105,72 @@ dbTest('the chat reads compact parts and shows exactly what the full messages sh
     assert.ok((bytes.compact - quoteBytes) * 10 < bytes.full, `compact ${bytes.compact} bytes (${quoteBytes} of them quotes), full ${bytes.full}`)
     const longest = Math.max(...quoted.map(quote => quote.length))
     assert.ok(longest <= QUOTE_PREVIEW_CHARS + 1, `a quote is capped: ${longest} characters`)
+  })
+})
+
+
+dbTest('real tool failures and bounded full-input metadata survive the database projection', async t => {
+  const [{ createRequestDatabaseScope, db }, schema, { createCoordinatorRegistry }, { chatItems }, { compactChatMessage }, { asc, eq, and, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('../../workflows/coordinator/tools'), import('./context'), import('./chat-projection'), import('drizzle-orm'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = `test-tool-metadata-${randomUUID()}`, botId = randomUUID()
+  t.after(async () => {
+    await scope.run(async () => {
+      await db.delete(schema.coordinatorMessages).where(eq(schema.coordinatorMessages.userId, owner))
+      await db.delete(schema.bots).where(eq(schema.bots.id, botId))
+      await db.execute(sql`delete from "user" where id = ${owner}`)
+    })
+    await scope.close()
+  })
+  await scope.run(async () => {
+    await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Tool metadata fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Metadata bot' })
+    // Execute the actual registered read tool against this isolated PostgreSQL,
+    // then pass its receipt through the persisted chat contract. No provider stub.
+    const registry = createCoordinatorRegistry(owner, botId, undefined, { switches: { issueTools: true, factoryRouting: true, factoryLifecycle: true } })
+    const execute = registry.get_factory_task.execute as unknown as (input: { taskId: string }, options: { toolCallId: string; messages: [] }) => Promise<unknown>
+    const failure = await execute({ taskId: randomUUID() }, { toolCallId: 'factory', messages: [] })
+    assert.deepEqual(failure, { error: 'factoryNotFound' })
+    const padding = 'p'.repeat(350)
+    const cases = [
+      { name: 'get_factory_task', input: { a: padding, title: 'ALEX-45' }, value: { a: padding, ...(failure as object) }, code: 'factoryNotFound', target: 'ALEX-45' },
+      { name: 'dispatch_run', input: {}, value: { a: padding, ok: false, code: 'worker_spawn_failed', detail: 'cli_not_installed' }, code: 'worker_spawn_failed', detail: 'cli_not_installed' },
+      { name: 'github_call', input: { name: 'pull_request_read', arguments: { a: padding, owner: 'alexj11324', repo: 'Mikka' } }, value: { isError: true, structuredContent: { error: 'repositoryNotFound', detail: 'not_visible_to_token' } }, code: 'repositoryNotFound', detail: 'not_visible_to_token', target: 'alexj11324/Mikka', displayName: 'GitHub · Pull request read' },
+      { name: 'call_personal_mcp_tool', input: { name: 'search_pages', arguments: { a: padding, query: ' \n  决定🗺️ '.repeat(50) } }, value: { rows: [] }, target: Array.from('决定🗺️ '.repeat(50).trim()).slice(0, 159).join('') + '…', displayName: 'MCP · Search pages' },
+      { name: 'call_app_tool', input: { tool: 'GMAIL_SEARCH_MESSAGES', arguments: { q: ' \t from:alex@example.invalid \n' } }, value: {}, target: 'from:alex@example.invalid', displayName: 'Gmail search messages' },
+      { name: 'list_issues', input: {}, value: { items: [{ error: 'notFound', ok: false }] } },
+      { name: 'list_issues', input: {}, value: { error: '' } },
+      { name: 'list_issues', input: {}, value: { error: false } },
+      { name: 'list_issues', input: {}, value: { error: null } },
+      { name: 'dispatch_run', input: {}, value: 'worker_spawn_failed (cli_not_installed)', type: 'error-text', code: 'worker_spawn_failed', detail: 'cli_not_installed' },
+      // Unknown provider prose stays a failure without inventing an error code.
+      { name: 'read_file', input: {}, value: 'The provider could not read the file.', type: 'error-text', failed: true },
+      { name: 'read_file', input: {}, value: { error: 'notFound\n' }, failed: true },
+      { name: 'read_file', input: {}, value: { error: { code: 'permissionDenied', detail: 'repository_scope' } }, code: 'permissionDenied', detail: 'repository_scope' },
+    ]
+    const messages = [
+      { role: 'assistant', content: cases.map((entry, index) => ({ type: 'tool-call', toolCallId: `call-${index}`, toolName: entry.name, input: entry.input })) },
+      { role: 'tool', content: cases.map((entry, index) => ({ type: 'tool-result', toolCallId: `call-${index}`, toolName: entry.name, output: { type: entry.type ?? 'json', value: entry.value } })) },
+    ]
+    await db.insert(schema.coordinatorMessages).values(messages.map((message, index) => ({ id: randomUUID(), userId: owner, botId, position: index + 1, message })))
+    const mine = and(eq(schema.coordinatorMessages.userId, owner), eq(schema.coordinatorMessages.botId, botId))
+    const selected = { position: schema.coordinatorMessages.position, createdAt: schema.coordinatorMessages.createdAt }
+    const full = await db.select({ ...selected, message: schema.coordinatorMessages.message }).from(schema.coordinatorMessages).where(mine).orderBy(asc(schema.coordinatorMessages.position))
+    const compact = await db.select({ ...selected, message: compactChatMessage }).from(schema.coordinatorMessages).where(mine).orderBy(asc(schema.coordinatorMessages.position))
+    const tools = chatItems(compact as never)[0].activity!.tools
+    assert.deepEqual(tools, chatItems(full as never)[0].activity!.tools, 'full and SQL-projected messages expose identical tool metadata')
+    for (const [index, entry] of cases.entries()) {
+      assert.equal(tools[index].state, entry.code || entry.failed ? 'error' : 'done', `case ${index} state`)
+      assert.equal(tools[index].errorCode, entry.code, `case ${index} code`)
+      assert.equal(tools[index].errorDetail, entry.detail, `case ${index} detail`)
+      assert.equal(tools[index].target, entry.target, `case ${index} target`)
+      if (entry.displayName) assert.equal(tools[index].displayName, entry.displayName)
+      if (tools[index].target) assert.ok(Array.from(tools[index].target!).length <= 160)
+      assert.ok(Array.from(tools[index].displayName!).length <= 128)
+    }
+    assert.equal(tools[0].output!.includes('factoryNotFound'), false, 'classification reads the complete receipt before the 200-character preview')
+    assert.equal(tools[0].input!.includes('ALEX-45'), false, 'the target comes from the full input')
+    t.diagnostic(JSON.stringify({ event: 'chat_tool_metadata', realTool: 'get_factory_task', errorCode: tools[0].errorCode, cases: cases.length, failed: tools.filter(tool => tool.state === 'error').length }))
   })
 })

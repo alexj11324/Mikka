@@ -3,6 +3,8 @@ import { PluginError, type PersonalPluginSnapshot } from './contracts'
 import type { PersonalPluginStore } from './store'
 import { publicMcpFetch } from './public-fetch'
 import { abortable } from '@/lib/search/url-policy'
+import { catalogueToolDisplayName } from '@/lib/coordinator/tool-metadata'
+import { credentialMasker, maskDeep } from '@/lib/secrets/mask'
 
 export type McpCommand = { cursor?: string } | { name: string; arguments: Record<string, unknown> }
 export type PersonalMcpCommand = { serverId: string } & McpCommand
@@ -47,7 +49,8 @@ export async function runMcpCommand(target: () => Promise<McpTarget>, command: M
     }
     const result = await abortable(() => client!.listTools({ params: { cursor: command.cursor }, options: { signal } }), signal)
     // Server descriptions/schemas are untrusted tool evidence, never system instructions.
-    return redact({ tools: result.tools, nextCursor: result.nextCursor ?? null }, connection.secrets)
+    const listed = maskDeep(redact({ tools: result.tools, nextCursor: result.nextCursor ?? null }, connection.secrets), credentialMasker)
+    return { ...listed, tools: listed.tools.map(entry => ({ ...entry, displayName: catalogueToolDisplayName(entry) })) }
   } catch (error) {
     if (dispatched) return { error: 'mcpOutcomeUnknown' }
     const code = hooks.code?.(error)
