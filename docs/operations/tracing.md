@@ -10,8 +10,9 @@ diffing `pg_stat_statements`. This adds to the
 ## What is traced
 
 Only Mikka's own Next.js server, Node runtime (`instrumentation.ts` →
-`lib/tracing/node.ts`). Nothing from the daemon, the desktop or mobile apps, or
-users' own Claude Code or Codex sessions.
+`lib/tracing/node.ts`). Nothing from the daemon, the desktop app, or users' own
+Claude Code or Codex sessions. The mobile app sends trace context, not spans
+(see [Mobile app](#mobile-app)).
 
 - Next.js request spans: the root `GET /route/[param]` span, route handler,
   render and outbound `fetch` spans.
@@ -28,7 +29,9 @@ Every span has `service.name=mikka-web` and `deployment.environment`
 | Attribute | Meaning |
 | --- | --- |
 | `mikka.route` | Grouping key: the `withRequestLog('/api/…')` route, the `withDatabaseOperation('/actions/…')` action, a background job (`after:<job>`, `cron:<name>`, `workflow:<workflow>/<step>`), or Next's route template |
-| `mikka.client_kind` | `daemon` (`/v1/*`, `/api/runs/mcp/*`, `/api/runs/github-token`), `mobile` (`/api/mobile/*`), `cron` (`/api/cron/*`, `cron:` jobs), `workflow` (Workflow steps, `/.well-known/workflow/*`), `background` (`after:` jobs), `worker` (`/api/webhooks/*`) or `web` |
+| `mikka.client_kind` | `daemon` (`/v1/*`, `/api/runs/mcp/*`, `/api/runs/github-token`), `mobile` (`/api/mobile/*`, or any other `/api/*` request the iOS app sends; see [Mobile app](#mobile-app)), `cron` (`/api/cron/*`, `cron:` jobs), `workflow` (Workflow steps, `/.well-known/workflow/*`), `background` (`after:` jobs), `worker` (`/api/webhooks/*`) or `web` |
+| `mikka.app.version` | The iOS app's version (`1.2.3`), on `mobile` spans only |
+| `error.type`, `mikka.error.code`, `mikka.error.detail` | On a failed request or job: the error's class name, and the code and detail of the first coded error in its cause chain (`@mikka/protocol/tracing`). Never the message |
 
 Database spans also have:
 
@@ -39,6 +42,24 @@ Database spans also have:
 | `db.query.text` | Parameterized SQL, literals replaced by `?`, cut to 200 characters |
 | `db.response.returned_rows` | Rows returned or affected |
 | `mikka.db.response_bytes_approx` | Result JSON size, estimated from the first 50 rows (not wire bytes) |
+
+## Mobile app
+
+The iOS app exports no spans of its own. Every request it sends to Mikka's
+`/api/*` (`apps/mobile/lib/tracing.ts`, from `@mikka/protocol/trace-context`)
+carries:
+
+- `traceparent`: a fresh W3C trace context per request, flagged not sampled.
+  The server's sampler decides as for any caller, so the app cannot force a
+  trace to be kept. The server's spans join that trace id.
+- `x-mikka-client-kind: mobile` and `x-mikka-app-version` (only a numeric
+  `x.y.z` version; anything else is left out).
+
+`withRequestLog` stamps `mikka.client_kind=mobile` and `mikka.app.version` on
+the request's span, and child spans inherit them. The headers are attribution
+only, never authentication, and are ignored on machine routes
+(`/api/cron/*`, `/api/webhooks/*`, `/api/runs/*`) and `/v1/*`. Requests to other
+hosts (uploads, OAuth providers) get no headers.
 
 ## Background work
 
