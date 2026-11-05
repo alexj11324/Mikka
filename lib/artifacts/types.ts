@@ -30,6 +30,8 @@ export interface ArtifactDetail extends ArtifactSummary {
   shared?: boolean
   /** A Factory acceptance report's captures (#1276); its recording links play in place. Only the owner's reads say. */
   media?: ArtifactMedia[]
+  /** Owner-only navigation hint. Factory reads and actions still authorize this task independently. */
+  acceptanceTaskId?: string | null
 }
 
 /** One screenshot or recording an acceptance report links to, served by `/api/captures/<captureId>`. */

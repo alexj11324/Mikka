@@ -468,6 +468,9 @@ export function createFactoryApprovals(
           publications,
           rejections,
           merges,
+          // Availability only: reject still rechecks the live human, revision,
+          // exact candidate and repair budget inside its locked transaction.
+          capabilities: { reject: Boolean(task.candidateId) && task.stage === 'approval' && ['pending', 'waiting'].includes(task.status) },
         };
       });
     },

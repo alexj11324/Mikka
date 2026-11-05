@@ -15,6 +15,8 @@ import { acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptan
 import { visibleAcceptance } from '@/lib/factory/acceptance-view'
 import { FactoryAcceptancePane, request, useAcceptance, type FactoryTask } from './factory-acceptance-pane'
 import { FactoryFlowBadge, FactoryFlowCard, isFlowV2, useFactoryTaskDetail } from './factory-flow'
+import { flowKey, readFlow } from '@/lib/factory/flow-client'
+import { InlineLoadError } from '@/components/load-error'
 
 export type { FactoryTask } from './factory-acceptance-pane'
 
@@ -36,6 +38,32 @@ export function useAcceptanceTasks(issueId: string | null) {
 /** The acceptance task whose candidate this thread produced, if any: its header then offers 验收 (frame 06). */
 export function useThreadAcceptance(issueId: string | null, runId: string) {
   return useAcceptanceTasks(issueId).tasks.find(task => task.candidateRunId === runId)
+}
+
+/** The v2 report's decision uses the existing pane actions, bound to its current candidate and version. */
+function ArtifactDecision({ task, artifactId, version, latestVersion }: { task: FactoryTask; artifactId: string; version: number; latestVersion: number }) {
+  const t = useTranslations('FactoryAcceptance')
+  const { data: detail } = useFactoryTaskDetail(task.id)
+  const key = flowKey(task.id)
+  const { data, error, mutate, isValidating } = useSWR(key, request)
+  useLiveKey('factory_task', task.id, [key], detail?.liveWorkspaceId ?? null)
+  const flow = readFlow(data), report = flow?.acceptance
+  if (error) return <div className="shrink-0 px-4 pb-3"><InlineLoadError message={t('loadError')} retryLabel={t('retry')} onRetry={() => { if (!isValidating) void mutate() }} /></div>
+  // The Artifact keeps its initial runId across repairs. Its current report,
+  // not that historical run, binds this version to the candidate being judged.
+  if (!flow || !report || flow.id !== task.id || flow.issueId !== task.issueId || flow.revision !== task.revision ||
+      report.artifactId !== artifactId || version !== latestVersion || report.version !== version ||
+      report.candidateId !== task.candidateId || report.runId !== task.candidateRunId) return null
+  return <FactoryAcceptancePane key={`${task.id}:${report.candidateId}:${version}`} task={task}
+    artifactBinding={{ candidateId: report.candidateId, revision: flow.revision }} />
+}
+
+/** Ordinary artifacts have no task hint; every hinted task still goes through the normal authorized list and flow. */
+export function FactoryArtifactAcceptance({ taskId, issueId, ...view }: { taskId: string; issueId: string; artifactId: string; version: number; latestVersion: number }) {
+  const { allTasks, error, isValidating, mutate } = useAcceptanceTasks(issueId)
+  const task = allTasks.find(row => row.id === taskId)
+  if (error) return <div className="shrink-0 px-4 pb-3"><FactoryListError retrying={isValidating} onRetry={() => { if (!isValidating) void mutate() }} /></div>
+  return task ? <ArtifactDecision task={task} {...view} /> : null
 }
 
 /** The state chip next to a thread's name (等你验收, 已批准 …), from the same ledger as the pane. */

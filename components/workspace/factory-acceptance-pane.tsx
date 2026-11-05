@@ -183,7 +183,7 @@ function ResultLine({ row, onOpenThread }: { row: ResultRow; onOpenThread?: (run
  * the decision bar pinned to the bottom. Approve, publish, reconcile, revoke
  * and send-back are the A1/A2 operations on the approval route.
  */
-export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTask; onOpenThread?: (runId: string) => void }) {
+export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding }: { task: FactoryTask; onOpenThread?: (runId: string) => void; artifactBinding?: { candidateId: string; revision: number } }) {
   const t = useTranslations('FactoryAcceptance')
   const { mutate: mutateCache } = useSWRConfig()
   const { ledger, reload, ledgerError, derived: acceptance, check, current: currentTask, detailLoaded, detailError, v2, flow, flowError, reloadFlow } = useAcceptance(task)
@@ -199,6 +199,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       void reloadDetail().catch(() => {})
   }, [task.revision, detailRevision, reloadDetail])
   const [busy, setBusy] = useState(false)
+  const deciding = useRef(false)
   const retrying = useRef(false)
   const completionRequest = useRef<{ revision: number; eventId: string } | null>(null)
   const [checkRequest, setCheckRequest] = useViewState<{ key: string; eventId: string; reason: string } | null>(`factory:${task.id}:check-retry`, null)
@@ -225,6 +226,18 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   const pullRequestUrl = detail?.delivery?.pullRequest?.url ?? null
   const refusal = state === 'pending' ? refused ?? derived.refusal ?? null : null
   const retryCheck = candidateCheckRetry(task, detail, ledger?.binding)
+  // A late ledger or evidence response must never attach new decision power
+  // to the report version the person was reading before a repair.
+  const reportCurrent = !artifactBinding || (detail?.task?.id === task.id && detail.task.issueId === task.issueId &&
+    detail.task.candidateId === artifactBinding.candidateId && detail.task.revision === artifactBinding.revision &&
+    [ledger?.binding, evidence?.binding].every(binding => binding?.taskId === task.id && binding.issueId === task.issueId &&
+      binding.candidateId === artifactBinding.candidateId && binding.revision === artifactBinding.revision) &&
+    ledger?.binding.attemptId === evidence?.binding.attemptId && ledger?.binding.attemptId === detail.task.attemptId)
+
+  async function reloadDecision() {
+    await Promise.allSettled([reload(), reloadDetail(), mutateCache(`/api/factory/tasks/${task.id}/approval`), mutateCache(`/api/factory/tasks?issueId=${encodeURIComponent(task.issueId)}`),
+      ...(v2 ? [reloadFlow()] : [])])
+  }
 
   async function run(operation: 'approve' | 'publish' | 'reconcile' | 'revoke', input: Record<string, unknown>) {
     setBusy(true); setError(null)
@@ -276,7 +289,8 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
 
   /** 验收并合并 (#528): the server merges the PR as this person, bound to the candidate commit. */
   async function accept() {
-    if (!ledger) return
+    if (!ledger || !reportCurrent || deciding.current) return
+    deciding.current = true
     setBusy(true); setError(null); setRefused(null)
     try {
       await request(`/api/factory/tasks/${task.id}/approval`, { operation: 'accept', input: { binding: ledger.binding, eventId: crypto.randomUUID() } })
@@ -286,7 +300,8 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       else setError(code)
     } finally {
       // The candidate card's PR reads merged once the merge lands.
-      await Promise.all([reload().catch(() => {}), reloadDetail().catch(() => {}), ...(v2 ? [reloadFlow().catch(() => {})] : [])])
+      await reloadDecision()
+      deciding.current = false
       setBusy(false)
     }
   }
@@ -318,13 +333,14 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   }
 
   async function sendBack() {
-    if (!ledger || reject.phase === 'submitting') return
+    if (!ledger?.binding.candidateId || !reportCurrent || deciding.current || reject.phase === 'submitting') return
+    deciding.current = true
     dispatchReject({ type: 'submit' })
     try {
-      await request(`/api/factory/tasks/${task.id}/approval`, { operation: 'reject', input: { binding: ledger.binding, eventId: crypto.randomUUID(), note: reject.note.trim() } })
+      await request(`/api/factory/tasks/${task.id}/approval`, { operation: 'reject', input: { binding: ledger.binding, eventId: crypto.randomUUID(), candidateId: ledger.binding.candidateId, note: reject.note.trim() } })
       dispatchReject({ type: 'succeed' })
-      await Promise.all([reload(), ...(v2 ? [reloadFlow()] : [])])
     } catch { dispatchReject({ type: 'fail' }) }
+    finally { await reloadDecision(); deciding.current = false }
   }
 
   const readText = useCallback(async (name: string) => {
@@ -339,8 +355,9 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
 
   if (ledgerError || evidenceError || detailError || (v2 && flowError)) return <FieldError className="px-6 py-6 text-xs">{t('loadError')}</FieldError>
   if (!detailLoaded || !ledger || (v2 && !flow) || ((v2 ? needsEvidence : task.stage === 'approval' || superseded) && !evidence)) return <div className="flex flex-1 items-center justify-center py-10"><Spinner /></div>
-  return <div className="flex min-h-0 flex-1 flex-col">
-    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pt-3 pb-4 sm:px-6">
+  if (!reportCurrent) return null
+  return <div className={cn(artifactBinding ? 'shrink-0' : 'flex min-h-0 flex-1 flex-col')}>
+    {!artifactBinding && <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pt-3 pb-4 sm:px-6">
       <CandidateCard candidate={candidate} detail={detail} environment={envChip} isSkill={task.isSkillCandidate} />
       {evidence && <section aria-label={criteria.length ? t('criteria') : t('evidence')} className="flex flex-col gap-1">
         <h4 className="flex gap-1.5 pl-3 text-xs">
@@ -359,11 +376,12 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       {!check && state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
       {error && <FieldError className="text-xs">{t(ERROR_KEYS[error] ?? 'error')}</FieldError>}
       {retryCheck && checkError?.key === retryCheck.key && <FieldError className="text-xs">{t(checkError.unknown ? 'checkRetryUnknown' : 'checkRetryFailed')}</FieldError>}
-    </div>
-    {detail?.completionRecovery && <footer className="shrink-0 px-4 pb-4 sm:px-5">
+    </div>}
+    {artifactBinding && error && <FieldError className="px-4 pb-2 text-xs">{t(ERROR_KEYS[error] ?? 'error')}</FieldError>}
+    {!artifactBinding && detail?.completionRecovery && <footer className="shrink-0 px-4 pb-4 sm:px-5">
       <Button size="sm" disabled={busy} aria-busy={busy} onClick={() => { void retryCompletion() }}>{busy ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{t('retry')}</Button>
     </footer>}
-    {retryCheck && <footer className="shrink-0 px-4 pb-4 sm:px-5">
+    {!artifactBinding && retryCheck && <footer className="shrink-0 px-4 pb-4 sm:px-5">
       <Button size="sm" disabled={busy} aria-busy={busy} onClick={() => { void retryCandidateCheck() }}>{busy ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{t(retryCheck.stage === 'review' ? 'retryReview' : 'retryVerify')}</Button>
     </footer>}
     {(v2 && flow || !detail?.completionRecovery && !check && state !== 'unavailable') && <footer className="shrink-0 px-4 pb-4 sm:px-5">
