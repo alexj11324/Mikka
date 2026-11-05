@@ -33,8 +33,14 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
     process.env.MIKKA_DATABASE_URL = process.env.DATABASE_URL = target.toString();
     const db = await import("../db");
     appPool = db.pool;
-    const { ensureThreadMachine, threadMachineProvider } = await import("./thread-machines");
+    const { acknowledgeQueuedThreadStop, ensureThreadMachine, threadMachineProvider } = await import("./thread-machines");
     const { stopOwnedRun } = await import("../run-control");
+    // The normal API path still runs the real host acknowledgement. Only the
+    // provider credential/HTTP boundary is synthetic; no real key is read.
+    if ("prepareKill" in threadMachineProvider) {
+      const runtime = threadMachineProvider as typeof threadMachineProvider & { prepareKill: (ownerId: string) => Promise<(sandboxId: string) => Promise<void>> };
+      t.mock.method(runtime, "prepareKill", async (ownerId: string) => async (sandboxId: string) => { await threadMachineProvider.kill(sandboxId, ownerId); });
+    }
 
     const owner = "owner", workspaceId = randomUUID(), botId = randomUUID(), botDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID();
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Fixture','thr-stop@example.invalid',true,now(),now())`, [owner]);
@@ -64,6 +70,202 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
       run: (await pool.query('SELECT status,"stopRequestedAt" IS NOT NULL AS stop,"finishedAt" IS NOT NULL AS finished FROM agent_runs WHERE id=$1', [runId])).rows[0],
       machine: (await pool.query('SELECT state,"sandboxId","workerLeaseId","deviceId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0],
       tokens: (await pool.query('SELECT count(*)::int AS n FROM device_tokens t JOIN thread_machines m ON m."deviceId"=t."boundDeviceId" WHERE m."runId"=$1', [runId])).rows[0].n,
+    });
+
+    const retainedUnclaimedRun = async () => {
+      const runId = await queuedRun();
+      const deviceId = randomUUID(), machineRepoId = randomUUID();
+      await pool.query(`INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,'unclaimed task','cloud')`, [deviceId, owner]);
+      await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,'/fixture/task')`, [machineRepoId, deviceId, owner]);
+      await pool.query(`UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3 WHERE id=$1`, [runId, deviceId, machineRepoId]);
+      await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId","repoId")
+        VALUES ($1,$2,$3,$4,$5,'snapshot-fixture',$6,'error',$7,$8)`, [runId, workspaceId, owner, botId, `sandbox-stop-${runId}`, randomUUID(), deviceId, machineRepoId]);
+      return runId;
+    };
+
+    await t.test("normal Owner Stop acknowledges an unclaimed bound run even when startup never created a lifecycle", async (t) => {
+      const runId = await retainedUnclaimedRun();
+      const kills: string[] = [];
+      t.mock.method(threadMachineProvider, "kill", async (sandboxId: string, userId: string) => {
+        assert.equal(userId, owner); kills.push(sandboxId);
+      });
+      const { requestRunStop } = await import("../agent-runs");
+      assert.deepEqual(await requestRunStop(owner, runId), { stoppedRunIds: [runId] });
+      const current = await state(runId);
+      assert.deepEqual(current.run, { status: "stopped", stop: true, finished: true });
+      assert.equal(current.machine.state, "ended");
+      assert.deepEqual(kills, [`sandbox-stop-${runId}`]);
+    });
+
+    await t.test("the existing maintenance pass acknowledges a host stop on an unclaimed bound run", async (t) => {
+      const runId = await retainedUnclaimedRun();
+      assert.equal(await stopOwnedRun(db.db, owner, runId), false);
+      const kills: string[] = [];
+      t.mock.method(threadMachineProvider, "kill", async (sandboxId: string) => { kills.push(sandboxId); });
+      const { maintainThreadMachine } = await import("../../workflows/thread-machine/steps");
+      assert.equal(await maintainThreadMachine(actor, runId), false);
+      assert.deepEqual((await state(runId)).run, { status: "stopped", stop: true, finished: true });
+      assert.deepEqual(kills, [`sandbox-stop-${runId}`]);
+    });
+
+    await t.test("a frozen Profile and ordinary retry lineage do not count as an actual native claim", async (t) => {
+      const runId = await retainedUnclaimedRun(), source = await queuedRun();
+      const deviceId = (await state(runId)).machine.deviceId;
+      await pool.query(`UPDATE agent_runs SET status='failed',"deviceId"=$2,"finishedAt"=now() WHERE id=$1`, [source, deviceId]);
+      const { executionIdentitySchema } = await import("../execution-identity");
+      const { parseAgentProfile, agentProfileDigest } = await import("../factory/agent-profile-definition");
+      const connectionId = randomUUID(), bindingId = randomUUID();
+      const targetEntry = { harness: "codex", model: "gpt-6-luna", source: { kind: "subscription", connectionId } };
+      const profile = parseAgentProfile({ name: "Fixture executor", roles: ["frontend"], harness: "codex", model: { mode: "fixed", ...targetEntry }, instructions: "Fixture task" });
+      const definition = { harness: "codex", model: "gpt-6-luna", subscription: { bindingId, route: "codex_cli", modelId: "gpt-6-luna" },
+        agentProfile: { profileId: randomUUID(), name: profile.name, version: 1, digest: agentProfileDigest(profile, []), source: "decision", reason: "capability_fit",
+          scope: { ownerId: owner, workspaceId }, definition: profile, skills: [], instructions: profile.instructions, targetEntry },
+        executionIdentity: executionIdentitySchema.parse({ version: 1, requester: owner, botId, botOwner: owner, executionPrincipal: owner, workspaceId, outputOwner: owner,
+          resourceBindings: [{ kind: "device", id: deviceId, ownerId: owner, access: "owner" }, { kind: "subscription", id: bindingId, ownerId: owner, access: "owner" }],
+          billingAccount: { model: { kind: "subscription", ownerId: owner, resourceId: bindingId, amount: "provider_unknown" }, runtime: { kind: "e2b", ownerId: owner, resourceId: owner, amount: "provider_unknown" } }, personalResourcePolicy: "requester_only" }) };
+      await pool.query(`UPDATE agent_runs SET "retryOf"=$2,"agentDefinition"=$3::jsonb WHERE id=$1`, [runId, source, JSON.stringify(definition)]);
+      const kills: string[] = [];
+      t.mock.method(threadMachineProvider, "kill", async (id: string) => { kills.push(id); });
+      const { requestRunStop } = await import("../agent-runs");
+      await requestRunStop(owner, runId);
+      assert.equal((await state(runId)).run.status, "stopped");
+      assert.deepEqual((await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0].agentDefinition, definition);
+      assert.deepEqual(kills, [`sandbox-stop-${runId}`]);
+    });
+
+    await t.test("an uncertain provider kill preserves the queued binding for the same normal Stop to retry", async (t) => {
+      const runId = await retainedUnclaimedRun();
+      const before = (await state(runId)).machine;
+      const refusal = new Error("Fixture provider unavailable");
+      const kill = t.mock.method(threadMachineProvider, "kill", async () => { throw refusal; });
+      const { requestRunStop } = await import("../agent-runs");
+      await assert.rejects(requestRunStop(owner, runId), (error) => error === refusal);
+      const failed = await state(runId);
+      assert.deepEqual(failed.run, { status: "queued", stop: true, finished: false });
+      assert.deepEqual(failed.machine, before);
+      const requestedAt = (await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [runId])).rows[0].stopRequestedAt;
+      assert.equal((await pool.query('SELECT "removedAt" FROM devices WHERE id=$1', [before.deviceId])).rows[0].removedAt, null);
+      kill.mock.mockImplementation(async () => {});
+      assert.deepEqual(await requestRunStop(owner, runId), { stoppedRunIds: [runId] });
+      assert.deepEqual((await state(runId)).run, { status: "stopped", stop: true, finished: true });
+      assert.deepEqual((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [runId])).rows[0].stopRequestedAt, requestedAt);
+      assert.ok((await pool.query('SELECT "removedAt" FROM devices WHERE id=$1', [before.deviceId])).rows[0].removedAt);
+      assert.equal(kill.mock.callCount(), 2);
+    });
+
+    for (const [name, update] of [
+      ["no stop requested", ""],
+      ["already started", '"startedAt"=now()'],
+      ["native session", '"sessionId"=\'fixture-native-session\''],
+      ["claim token", '"deviceTokenId"=gen_random_uuid()'],
+      ["claim lease", '"leaseExpiresAt"=now()+interval \'90 seconds\''],
+      ["running run", "status='running'"],
+      ["paused run", "status='paused',\"pauseReason\"='human_control'"],
+      ["question continuation", '"questionContinuation"=\'{"requireSessionResume":true,"originSessionId":"fixture-origin-session"}\'::jsonb'],
+    ] as const) await t.test(`host acknowledgement preserves ${name}`, async () => {
+      const runId = await retainedUnclaimedRun();
+      if (update) await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=now(),${update} WHERE id=$1`, [runId]);
+      const before = await state(runId);
+      const { calls, provider } = fake();
+      assert.equal(await acknowledgeQueuedThreadStop(pool, actor, runId, provider), false);
+      assert.deepEqual(await state(runId), before);
+      assert.deepEqual(calls, []);
+    });
+
+    await t.test("host acknowledgement preserves foreign ownership/workspace and an in-flight provision", async () => {
+      const runId = await retainedUnclaimedRun();
+      await stopOwnedRun(db.db, owner, runId);
+      const before = await state(runId), { calls, provider } = fake();
+      assert.equal(await acknowledgeQueuedThreadStop(pool, { ...actor, userId: "peer" }, runId, provider), false);
+      assert.equal(await acknowledgeQueuedThreadStop(pool, { ...actor, workspaceId: randomUUID() }, runId, provider), false);
+      assert.deepEqual(await state(runId), before);
+      await pool.query('UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval \'2 minutes\' WHERE "runId"=$1', [runId, randomUUID()]);
+      const provision = await state(runId);
+      assert.equal(await acknowledgeQueuedThreadStop(pool, actor, runId, provider), false);
+      assert.deepEqual(await state(runId), provision);
+      assert.deepEqual(calls, []);
+    });
+
+    await t.test("a recorded native claim is preserved even with queued status and no reported SID", async () => {
+      const runId = await retainedUnclaimedRun(), connectionId = randomUUID(), bindingId = randomUUID();
+      await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider) VALUES($1,$2,$3,'codex')`, [connectionId, owner, workspaceId]);
+      await pool.query(`INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES($1,$2,$3,$4,$5,1,'codex_cli','gpt-6-luna')`, [bindingId, owner, workspaceId, agentId, connectionId]);
+      await pool.query('INSERT INTO byos_native_runs ("runId","bindingId") VALUES($1,$2)', [runId, bindingId]);
+      await stopOwnedRun(db.db, owner, runId);
+      const before = await state(runId), { calls, provider } = fake();
+      assert.equal(await acknowledgeQueuedThreadStop(pool, actor, runId, provider), false);
+      assert.deepEqual(await state(runId), before);
+      assert.deepEqual(calls, []);
+    });
+
+    for (const field of ["retryOf", "continuesRunId"] as const) await t.test(`${field} retains existing native history on the same machine`, async () => {
+      const runId = await retainedUnclaimedRun(), source = await queuedRun();
+      const deviceId = (await state(runId)).machine.deviceId;
+      await pool.query(`UPDATE agent_runs SET status='failed',"deviceId"=$2,"sessionId"='fixture-source-session',"finishedAt"=now() WHERE id=$1`, [source, deviceId]);
+      await pool.query(`UPDATE agent_runs SET "${field}"=$2,"stopRequestedAt"=now() WHERE id=$1`, [runId, source]);
+      const before = await state(runId), { calls, provider } = fake();
+      assert.equal(await acknowledgeQueuedThreadStop(pool, actor, runId, provider), false);
+      assert.deepEqual(await state(runId), before);
+      assert.deepEqual(calls, []);
+    });
+
+    await t.test("an adopted task machine preserves native history without a retry or continuation link", async () => {
+      const runId = await retainedUnclaimedRun(), source = await queuedRun(), issueId = randomUUID();
+      const machine = (await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
+      await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Adopted task fixture','{"type":"doc","content":[]}'::jsonb,'todo','normal')`, [issueId, owner]);
+      await pool.query(`UPDATE agent_runs SET "issueId"=$2 WHERE id=$1`, [runId, issueId]);
+      await pool.query(`UPDATE thread_machines SET "issueId"=$2 WHERE "runId"=$1`, [runId, issueId]);
+      await pool.query(`UPDATE agent_runs SET "issueId"=$2,"deviceId"=$3,"deviceRepoId"=$4,status='succeeded',"sessionId"='fixture-adopted-session',"startedAt"=now(),"finishedAt"=now() WHERE id=$1`, [source, issueId, machine.deviceId, machine.repoId]);
+      // adoptTaskMachine transfers the sandbox/device to the new row and ends
+      // the old row without linking the new run through retryOf/continuesRunId.
+      await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","sandboxId","snapshotId","operationId",state,"deviceId","repoId","endedAt")
+        VALUES ($1,$2,$3,$4,$5,NULL,'snapshot-fixture',$6,'ended',$7,$8,now())`, [source, workspaceId, owner, botId, issueId, randomUUID(), machine.deviceId, machine.repoId]);
+      assert.deepEqual((await pool.query('SELECT "retryOf","continuesRunId" FROM agent_runs WHERE id=$1', [runId])).rows[0], { retryOf: null, continuesRunId: null });
+      await stopOwnedRun(db.db, owner, runId);
+      const before = await state(runId), { calls, provider } = fake();
+      assert.equal(await acknowledgeQueuedThreadStop(pool, actor, runId, provider), false);
+      assert.deepEqual(await state(runId), before);
+      assert.deepEqual(calls, []);
+    });
+
+    await t.test("provider preparation uses a one-connection pool before the locked acknowledgement", { timeout: 10_000 }, async () => {
+      const runId = await retainedUnclaimedRun();
+      await stopOwnedRun(db.db, owner, runId);
+      const one = new Pool({ connectionString: target.toString(), max: 1, connectionTimeoutMillis: 200 });
+      const calls: string[] = [];
+      const provider = {
+        // The old path reads provider credentials only after checking out the
+        // sole client, reproducing a real pool checkout timeout.
+        kill: async () => { await one.query('SELECT 1'); },
+        prepareKill: async (ownerId: string) => {
+          assert.equal((await one.query('SELECT $1::text AS owner', [ownerId])).rows[0].owner, owner);
+          calls.push("prepared");
+          return async (sandboxId: string) => { calls.push(`kill:${sandboxId}`); };
+        },
+      };
+      try {
+        assert.equal(await acknowledgeQueuedThreadStop(one, actor, runId, provider), true);
+        assert.deepEqual((await state(runId)).run, { status: "stopped", stop: true, finished: true });
+        assert.deepEqual(calls, ["prepared", `kill:sandbox-stop-${runId}`]);
+      } finally { await one.end(); }
+    });
+
+    await t.test("provider preparation cannot authorize a binding changed before the final lock", async () => {
+      const runId = await retainedUnclaimedRun();
+      await stopOwnedRun(db.db, owner, runId);
+      let prepared = false, killed = false;
+      const provider = {
+        kill: async () => { killed = true; },
+        prepareKill: async () => {
+          prepared = true;
+          await pool.query('UPDATE thread_machines SET "workspaceId"=$2 WHERE "runId"=$1', [runId, randomUUID()]);
+          return async () => { killed = true; };
+        },
+      };
+      assert.equal(await acknowledgeQueuedThreadStop(pool, actor, runId, provider), false);
+      assert.equal(prepared, true);
+      assert.equal(killed, false);
+      assert.deepEqual((await state(runId)).run, { status: "queued", stop: true, finished: false });
     });
 
     await t.test("check 1: a bound queued run stopped before provisioning ends, its old sandbox is killed, nothing is created", async () => {
