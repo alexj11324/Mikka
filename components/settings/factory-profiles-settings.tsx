@@ -83,7 +83,7 @@ export function FactoryProfilesSettings({ workspaceId }: { workspaceId: string }
         : <>
           <SettingRow title={t('defaultName')} icon={<SlidersHorizontal aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />}
             description={<span className="flex flex-col gap-1"><span>{t('inherit')}</span>
-              {data.defaultAvailability && <span>{data.defaultAvailability.available ? t('available') : t(`reasons.${profileAvailabilityKey(data.defaultAvailability.reason)}`)}</span>}</span>}>
+              {data.defaultAvailability && <ProfileState available={data.defaultAvailability.available} enabled label={data.defaultAvailability.available ? t('available') : t(`reasons.${profileAvailabilityKey(data.defaultAvailability.reason)}`)} />}</span>}>
             <span className="text-muted-foreground">{t('builtIn')}</span>
           </SettingRow>
           {data.profiles.length === 0 && <p className="px-5 py-4 text-sm text-muted-foreground">{t('empty')}</p>}

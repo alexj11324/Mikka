@@ -193,8 +193,9 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
           </SelectContent>
         </Select>}
         <TaskProfilePicker workspaceId={workspaceId} value={profileId ?? null} onChange={id => setProfilePick(id && workspaceId ? { workspaceId, id } : null)} data={profiles.data} disabled={sending} />
-        <ChevronRight aria-hidden="true" className="size-3.5 text-muted-foreground" />
-        <DialogTitle className="text-sm font-medium">{t('title')}</DialogTitle>
+        {/* The chevron and the title wrap together, so the chevron never ends a line on its own. */}
+        <span className="flex items-center gap-2 whitespace-nowrap"><ChevronRight aria-hidden="true" className="size-3.5 text-muted-foreground" />
+        <DialogTitle className="text-sm font-medium">{t('title')}</DialogTitle></span>
         {project && <span className="flex h-7 max-w-40 items-center rounded-full bg-control px-2.5 text-xs text-muted-foreground"><span className="truncate">{project}</span></span>}
       </div>
       <DialogDescription className="sr-only">{t('description')}</DialogDescription>
