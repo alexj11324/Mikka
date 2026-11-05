@@ -1,3 +1,5 @@
+import { syncFactoryPresentation } from './stage-progress';
+import { createFactorySpecApproval } from './spec-approval';
 import { prepareCloudQuestionRecovery, queueCloudQuestionContinuation, wakeCloudQuestionContinuation } from './questions/queue-continuation';
 import { queueLocalQuestionContinuation } from './questions/queue-local-continuation';
 import "server-only";
@@ -42,8 +44,8 @@ const humanGates = {
   publish: publishGate,
   monitor: monitorGate,
 };
-export const factoryStore = createFactoryStore(pool, authorize, humanGates);
-const humanStoreForBot = (botId: string | null) => createFactoryStore(pool, authorize, botId, { independent: factoryCheckIndependent, gates: humanGates });
+export const factoryStore = createFactoryStore(pool, authorize, humanGates, { onTransition: syncFactoryPresentation });
+const humanStoreForBot = (botId: string | null) => createFactoryStore(pool, authorize, botId, { independent: factoryCheckIndependent, gates: humanGates, onTransition: syncFactoryPresentation });
 export const factoryHumanStore = createFactoryHumanStore(pool, humanStoreForBot, automaticFactoryDispatch(pool),
   createRetainedDeliverableObserver(pool, (tx, scope) => humanStoreForBot(scope.botId).lockTask(tx, scope.ownerId, scope.taskId)));
 // #528: a code candidate is accepted by the person's merge of its PR
@@ -67,6 +69,7 @@ export const factoryApprovals = createFactoryApprovals(
   ],
   { codeCandidatesMerge: true },
 );
+export const factorySpecApproval = createFactorySpecApproval(pool, factoryHumanStore, automaticFactoryDispatch(pool));
 export const factoryMerges = createFactoryMerges(pool, authorize, factoryHumanStore, githubMergeApi());
 export const claimFactoryCheckRun = createFactoryCheckClaim(pool, authorize);
 export const factoryMonitorWorkspaceKey: Parameters<typeof createFactoryMonitor>[3] = async (userId, issueId, tx) => {
@@ -181,6 +184,7 @@ export function factoryForBot(botId: string | null) {
     async (owner, issue, tx) =>
       withDatabaseClient(tx, async () => Boolean(await issueForUser(owner, issue))),
     botId,
+    { onTransition: syncFactoryPresentation },
   );
 }
 /** References are host records, never model-supplied provenance or approval. */

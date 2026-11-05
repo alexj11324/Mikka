@@ -4993,6 +4993,97 @@
     },
     "map_auth_required": {
       "default": "登录后查看这个地图。"
+    },
+    "factory_spec_approval_required": {
+      "default": "请先审阅并批准方案，再开始实现。"
+    }
+  },
+  "FactoryFlow": {
+    "acceptance": "验收",
+    "stages": {
+      "triage": "分诊",
+      "spec": "方案",
+      "implement": "实现",
+      "review": "审阅",
+      "handoff": "交给你",
+      "completed": "已合并",
+      "cancelled": "已取消"
+    },
+    "specReady": "方案待审。",
+    "questionReady": "有问题需要你回答。",
+    "blocked": "阻塞: {reason}",
+    "failed": "失败: {reason}",
+    "acceptanceCounts": "{passed} 项已验证，{unverified} 项未验证。",
+    "failedCount": "{failed} 项失败。",
+    "report": {
+      "observations": "验收观察",
+      "missingObservations": "实现未记录逐项验收观察。",
+      "recording": "录屏",
+      "status": {
+        "passed": "已验证",
+        "failed": "失败",
+        "unverified": "未验证"
+      },
+      "reviewObservation": "审阅观察：{status}。",
+      "implementationObservation": "实现记录为{status}。",
+      "implementationResolution": "实现记录的处理",
+      "review": "审阅",
+      "priorReview": "审阅针对先前候选。修复由实现记录，没有再次审阅。",
+      "resolutionMissing": "未记录处理结果，需要你判断。",
+      "additionalObservations": "其他观察",
+      "changes": "改动",
+      "lineCountsMissing": "未记录行数统计。",
+      "prDiff": "PR 改动",
+      "run": "线程",
+      "candidate": "候选",
+      "exit": "退出码",
+      "unrecorded": "未记录"
+    },
+    "card": {
+      "needsYou": {
+        "spec_review": "方案待审",
+        "question": "在问你",
+        "pr_review": "PR 待审",
+        "blocked": "阻塞",
+        "failed": "失败"
+      },
+      "stageList": "阶段",
+      "counts": {
+        "passed": "{count} 项已验证",
+        "unverified": "{count} 项未验证",
+        "failed": "{count} 项失败"
+      },
+      "openSpec": "查看方案",
+      "approveSpec": "批准方案",
+      "openAcceptance": "打开验收页",
+      "answer": "去回答",
+      "openPullRequest": "打开 PR",
+      "loadError": "任务进展加载失败",
+      "retry": "重试",
+      "approveError": {
+        "stale": "方案已更新",
+        "transition": "方案已不在待审状态",
+        "evidence": "方案线程未提交结果，无法批准",
+        "signedOut": "登录已失效，请刷新页面后重试。",
+        "notFound": "任务不存在或无权访问",
+        "unknown": "批准未确认",
+        "profileModel": {
+          "default": "执行模型不可用",
+          "checking": "执行模型的订阅仍在检查",
+          "quota": "执行模型的额度已用完",
+          "expired": "执行模型的订阅已过期",
+          "paused": "执行模型的订阅已暂停",
+          "missing": "没有可用的执行模型订阅",
+          "removed": "执行模型的订阅已移除",
+          "model_gone": "执行模型已下线",
+          "key_refused": "执行模型的 API Key 被拒绝",
+          "balance": "执行模型的余额不足",
+          "provider_unavailable": "执行模型的服务商不可用"
+        },
+        "profile": "执行 Profile 不可用",
+        "refused": "批准被拒绝"
+      },
+      "retryApprove": "重新确认"
     }
   }
 }

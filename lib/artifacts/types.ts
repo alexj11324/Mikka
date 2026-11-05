@@ -28,7 +28,12 @@ export interface ArtifactDetail extends ArtifactSummary {
   botId?: string | null
   /** A share link is live. Only the owner's reads say; tokens are stored hashed, so a link can't be shown again. */
   shared?: boolean
+  /** A Factory acceptance report's captures (#1276); its recording links play in place. Only the owner's reads say. */
+  media?: ArtifactMedia[]
 }
+
+/** One screenshot or recording an acceptance report links to, served by `/api/captures/<captureId>`. */
+export interface ArtifactMedia { captureId: string; kind: 'image' | 'video'; title: string }
 
 /** A row on the Artifact page: what it is, where it came from, when it last changed. */
 export interface ArtifactListItem extends ArtifactSummary {

@@ -14,6 +14,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptance-state'
 import { visibleAcceptance } from '@/lib/factory/acceptance-view'
 import { FactoryAcceptancePane, request, useAcceptance, type FactoryTask } from './factory-acceptance-pane'
+import { FactoryFlowCard, isFlowV2, useFactoryTaskDetail } from './factory-flow'
 
 export type { FactoryTask } from './factory-acceptance-pane'
 
@@ -74,14 +75,28 @@ function FactoryAcceptanceRow({ task, onOpen }: { task: FactoryTask; onOpen: () 
   </div>
 }
 
+/** A v2 task's block (decision 2026-11-04-2200); nothing until its snapshot says it follows that flow. */
+function FactoryFlowEntry({ task, onOpenThread }: { task: FactoryTask; onOpenThread?: (runId: string) => void }) {
+  const { data: detail } = useFactoryTaskDetail(task.id)
+  return isFlowV2(detail) ? <FactoryFlowCard task={task} detail={detail} onOpenThread={runId => onOpenThread?.(runId)} /> : null
+}
+
+/** An older task's acceptance row; a v2 task has its own block instead. */
+function LegacyAcceptanceEntry({ task, onOpen }: { task: FactoryTask; onOpen: () => void }) {
+  const { data: detail } = useFactoryTaskDetail(task.id)
+  return isFlowV2(detail) ? null : <FactoryAcceptanceRow task={task} onOpen={onOpen} />
+}
+
 /**
- * The issue page's way into acceptance: one row per task waiting for you.
- * Opening one opens the thread that produced the candidate on its 验收 tab
- * (Figma 357:4750, frame 06), or the acceptance alone when no thread is known.
+ * The issue page's Factory block, under the description (R-89). A v2 task
+ * shows its stage, what it needs from you and the one action for it. An older
+ * task keeps its acceptance row while it waits for you; opening one opens the
+ * thread that produced the candidate on its 验收 tab (Figma 357:4750, frame
+ * 06), or the acceptance alone when no thread is known.
  */
-export function FactoryAcceptance({ issueId, onOpen }: { issueId: string; onOpen?: (task: FactoryTask) => void }) {
+export function FactoryAcceptance({ issueId, onOpen, onOpenThread }: { issueId: string; onOpen?: (task: FactoryTask) => void; onOpenThread?: (runId: string) => void }) {
   const t = useTranslations('FactoryAcceptance')
-  const { data, error, isLoading, mutate, tasks } = useAcceptanceTasks(issueId)
+  const { data, error, isLoading, mutate, tasks, allTasks } = useAcceptanceTasks(issueId)
   const [retrying, setRetrying] = useState(false)
   const retryingRef = useRef(false)
   const focusAfterRetry = useRef(false)
@@ -109,11 +124,14 @@ export function FactoryAcceptance({ issueId, onOpen }: { issueId: string; onOpen
     {heading}
     <div className="h-16 w-full max-w-[26.25rem] overflow-hidden rounded-xl"><Skeleton data-testid="factory-acceptance-loading" className="size-full" /></div>
   </section>
-  if (!tasks.length) return null
-  return <section className="flex flex-col gap-2">
-    {heading}
-    {tasks.map(task => <FactoryAcceptanceRow key={task.id} task={task} onOpen={() => onOpen?.(task)} />)}
-  </section>
+  return <>
+    {allTasks.map(task => <FactoryFlowEntry key={task.id} task={task} onOpenThread={onOpenThread} />)}
+    {/* A heading over rows that all turned out to be v2 would stand alone, so it hides with them. */}
+    {tasks.length > 0 && <section className="flex flex-col gap-2 [&:not(:has([data-slot=item]))]:hidden">
+      {heading}
+      {tasks.map(task => <LegacyAcceptanceEntry key={task.id} task={task} onOpen={() => onOpen?.(task)} />)}
+    </section>}
+  </>
 }
 
 /** Acceptance for a task with no known thread: the same pane under its own header. */
