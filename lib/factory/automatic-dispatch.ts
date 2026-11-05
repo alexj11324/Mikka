@@ -52,11 +52,16 @@ export function automaticFactoryDispatch(pool: Pool) {
       JOIN agents a ON a.id=r."agentId" JOIN devices d ON d.id=r."deviceId"
       JOIN device_repos repo ON repo.id=r."deviceRepoId"
       LEFT JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
-      WHERE f."taskId"=$1 AND f.stage='execute' ORDER BY f.position DESC LIMIT 1`, [task.id])
+      WHERE f."taskId"=$1 AND f.stage IN ('execute','spec') ORDER BY f.position DESC LIMIT 1`, [task.id])
     if (!source) throw new FactoryError('factoryRunMismatch')
     const check = task.stage !== 'execute'
     const checkStage = task.stage === 'review' || task.stage === 'verify' ? task.stage : undefined
     const candidateId = task.candidateId
+    // A newly approved specification starts an executor, not a continuation of
+    // the planner's role, credential, read-only grant or native session.
+    const firstImplementation = !check && source.kind === 'plan'
+    const selectStageProfile = check || firstImplementation
+    const continueImplementation = !check && !firstImplementation
     if (checkStart && (!check || checkStart.taskId !== task.id || checkStart.candidateId !== task.candidateId ||
         checkStart.sourceEventId !== task.sourceEventId || checkStart.attemptId === task.attemptId ||
         checkStart.run.deviceKind !== source.deviceKind || checkStart.run.agentDefinition.executionIdentity.workspaceId !==
@@ -67,7 +72,7 @@ export function automaticFactoryDispatch(pool: Pool) {
     // of choosing again from the person's now-current stage preferences.
     const inheritedPolicy = checkStart ? { policyCeiling: checkStart.selection.policyCeiling }
       : source.agentDefinition?.policyCeiling ? { policyCeiling: source.agentDefinition.policyCeiling } : {}
-    let selection: Partial<RunModel> = checkStart?.selection ?? (check ? inheritedPolicy : threadRunModel(source.agentDefinition) ?? inheritedPolicy)
+    let selection: Partial<RunModel> = checkStart?.selection ?? (selectStageProfile ? inheritedPolicy : threadRunModel(source.agentDefinition) ?? inheritedPolicy)
     let checkWork: ProfileCheckWork | undefined
     if (check && !checkStart) {
       // Select the current check's role from its actual candidate, not from the
@@ -89,7 +94,7 @@ export function automaticFactoryDispatch(pool: Pool) {
             ? { profile: { id: candidate.profileId, version: candidate.profileVersion! } } : {}) },
       }
     }
-    let profileChoice = check && !checkStart ? await (await import('./agent-profile')).resolveAgentProfileDispatch(pool, {
+    let profileChoice = selectStageProfile && !checkStart ? await (await import('./agent-profile')).resolveAgentProfileDispatch(pool, {
       ownerId: task.userId, workspaceId: source.workspaceId ?? await (await import('@/lib/execution-settings')).executionWorkspace(task.userId, task.botId), botId: task.botId,
     }, { issueId: task.issueId, stage: task.stage, location: source.deviceKind === 'cloud' ? 'cloud' : 'local',
       defaultHarness: source.harness, cloudPurpose: source.remoteUrl ? 'task' : 'desktop',
@@ -106,7 +111,7 @@ export function automaticFactoryDispatch(pool: Pool) {
     const previousRouting = source.agentDefinition?.modelDispatch?.routing
     const frozenProfile = source.agentDefinition?.agentProfile
     let routingScope: { ownerId: string; workspaceId: string } | undefined
-    if (!check && !recovery && previousRouting && source.agentDefinition.modelDispatch.mode === 'preference' && frozenProfile?.definition.model.mode !== 'fixed') {
+    if (continueImplementation && !recovery && previousRouting && source.agentDefinition.modelDispatch.mode === 'preference' && frozenProfile?.definition.model.mode !== 'fixed') {
       // Only the adjacent, persisted failed attempt in this request can raise
       // a model. A repeated dispatch or a watchdog migration is not a failure.
       const { rows: [failed] } = await tx.query(`SELECT a.stage,a.output,a."runId" FROM factory_attempts a
@@ -201,14 +206,14 @@ export function automaticFactoryDispatch(pool: Pool) {
           ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
           ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
       }
-      const dispatch = createFactoryDispatch(pool, store, (client, userId, input, botId, context) => queueFactoryRun(client, userId, input, botId, context, undefined, { ...selection, ...(!check ? { threadRunId: source.id } : {}), pinnedDeviceId: (checkStart?.run ?? source).agentDefinition?.pinnedDeviceId, readOnly: check || source.agentDefinition?.readOnly }),
+      const dispatch = createFactoryDispatch(pool, store, (client, userId, input, botId, context) => queueFactoryRun(client, userId, input, botId, context, undefined, { ...selection, ...(continueImplementation ? { threadRunId: source.id } : {}), pinnedDeviceId: (checkStart?.run ?? source).agentDefinition?.pinnedDeviceId, readOnly: check || (continueImplementation && source.agentDefinition?.readOnly) }),
         checkStart ? { ...defaultFactoryDispatchAdapters, configure: { ...defaultFactoryDispatchAdapters.configure,
           review: (client, current, id) => configureFactoryCheck(client, current, id, checkStart.selection.policyCeiling),
           verify: (client, current, id) => configureFactoryCheck(client, current, id, checkStart.selection.policyCeiling),
         } } : defaultFactoryDispatchAdapters)
       const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId, deviceRepoId }, tx)
       await registerRoutingAdmission(result.runId)
-      if (!check) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
+      if (continueImplementation) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
       if (recovery && !check) await tx.query('UPDATE agent_runs SET "retryOf"=$2,attempt=$3 WHERE id=$1', [result.runId, source.id, source.attempt + 1])
       return async () => { notifyDeviceWork(deviceId) }
     }
@@ -224,7 +229,7 @@ export function automaticFactoryDispatch(pool: Pool) {
         modelDispatch: { mode: profileChoice.selectionMode ?? 'preference', location: 'cloud', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
         ...(entry.kind === 'api_key' ? { apiKeyId: entry.keyId } : { subscriptionBindingId: await (await import('@/lib/model-dispatch')).bindAgentToConnection(tx,
           { ownerId: task.userId, workspaceId: source.workspaceId }, runtime.agentId, target.harness, entry.connectionId, target.model) }) }
-    } else if (check && !checkStart) model = await chooseCloudRunModel(pool, { ownerId: task.userId, workspaceId: source.workspaceId, botId: task.botId }, runtime.agentId, source.harness, undefined, source.remoteUrl ? 'task' : 'desktop')
+    } else if (selectStageProfile && !checkStart) model = await chooseCloudRunModel(pool, { ownerId: task.userId, workspaceId: source.workspaceId, botId: task.botId }, runtime.agentId, source.harness, undefined, source.remoteUrl ? 'task' : 'desktop')
     if ('error' in model || !('model' in model) || typeof model.model !== 'string') throw new FactoryError('factoryCheckHarnessUnavailable')
     const cloudModel = model.model
     const repoId = source.remoteUrl ? (await ensureDeviceRepository(task.userId, runtime.deviceId, source.remoteUrl, tx)).id : runtime.repoId
@@ -232,7 +237,7 @@ export function automaticFactoryDispatch(pool: Pool) {
     const actor = { userId: task.userId, workspaceId: source.workspaceId as string }
     const dispatch = createFactoryDispatch(pool, store, (client, _owner, _input, _bot, context) => queueCloudRun(pool, actor, {
       botId: source.runtimeBotId, issueId: task.issueId, agentId: runtime.agentId, deviceRepoId: repoId, title: issue.title, body: tiptapToText(issue.content), ...model, model: cloudModel, ...inheritedPolicy,
-      withoutBot: task.botId === null, ...(!check ? { threadRunId: source.id } : {}), readOnly: check || source.agentDefinition?.readOnly, idempotencyKey: `factory:${context.attemptId}`,
+      withoutBot: task.botId === null, ...(continueImplementation ? { threadRunId: source.id } : {}), readOnly: check || (continueImplementation && source.agentDefinition?.readOnly), idempotencyKey: `factory:${context.attemptId}`,
       allowLocalRecovery: source.agentDefinition?.allowLocalRecovery, sourceEventId: context.sourceEventId,
     }, client, context), { ...defaultFactoryDispatchAdapters, configure: {
       ...defaultFactoryDispatchAdapters.configure,
@@ -241,7 +246,7 @@ export function automaticFactoryDispatch(pool: Pool) {
     } })
     const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId: runtime.agentId, deviceRepoId: repoId }, tx)
     await registerRoutingAdmission(result.runId)
-    if (!check) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
+    if (continueImplementation) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
     return async () => {
       // A host workflow owns the handoff. Parking revokes the completed
       // worker's device token; its request must not perform the next stage's

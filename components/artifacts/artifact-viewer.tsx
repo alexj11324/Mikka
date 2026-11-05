@@ -146,7 +146,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
             : markdown ? <ArtifactDocument key={`${artifactId}:${version}`} title={detail.title} markdown={text ?? ''} compareWith={old && showDiff ? latestText ?? null : null}
                 author={info ?? { authorName: '', authorColor: null, authorShape: null }} meta={info ? t(old ? 'versionMeta' : 'updated', { author: info.authorName, time: when(info.createdAt) }) : ''}
                 quoted={mine.filter(item => item.kind === 'text').map(item => item.text)} quoting={quote?.kind === 'text' && quote.artifactId === artifactId && quote.version === version ? quote.text : null}
-                onQuote={canQuote ? quoteText : undefined} />
+                onQuote={canQuote ? quoteText : undefined} media={detail.media} />
             : <ArtifactFrame src={versionPath(artifactId, version, 'frame')} title={t('frameTitle', { title: detail.title })} selecting={selecting}
                 marked={[...mine.flatMap(item => item.selector ? [item.selector] : []), ...(quote?.selector && quote.artifactId === artifactId && quote.version === version ? [quote.selector] : [])]}
                 onSelectOff={() => setSelecting(false)}

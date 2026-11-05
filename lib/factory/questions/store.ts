@@ -4,7 +4,7 @@ import { runChanged } from "../../live/panels";
 import { runListChanged } from '../../live/lists';
 import { wakeCoordinatorAfterCommit } from '../../coordinator/wake-after-commit';
 import { notifyQueuedLocalRun } from '../../device-gateway-notify';
-import { factoryCheckAssignment, factoryReportQuestionAssignment } from "../checks";
+import { appendFactoryCheckContinuationContext, factoryCheckAssignment, factoryReportQuestionAssignment } from "../checks";
 import { factoryMonitorDispatchAssignment } from "../monitor-dispatch";
 import { personalRunMessageText } from "../../personal-run-message";
 import type { Pool, PoolClient } from "pg";
@@ -696,7 +696,7 @@ export function createFactoryQuestions(
           questionId: q.id,
           originRunId: q.originRunId,
           originSessionId: q.originSessionId,
-          followUp,
+          followUp: await appendFactoryCheckContinuationContext(tx, run.task, run.runId, followUp),
           requireSessionResume: true,
         };
         await tx.query(
@@ -802,7 +802,8 @@ export function createFactoryQuestions(
         const {rows:[run]}=await tx.query('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE',[queued.runId,actor.userId]);
         if(!run || run.status!=='queued' || run.stopRequestedAt || ['deviceId','deviceRepoId','agentId','baseBranch'].some(k=>run[k]!==failed[k]) ||
           run.agentDefinition?.definitionDigest!==failed.agentDefinition.definitionDigest) fail('factoryQuestionContinuationUnavailable');
-        await tx.query('UPDATE agent_runs SET "continuesRunId"=$2,"questionContinuation"=$3 WHERE id=$1',[run.id,failed.id,JSON.stringify({...c,followUp})]);
+        const continuationFollowUp = await appendFactoryCheckContinuationContext(tx, queued.task, run.id, followUp);
+        await tx.query('UPDATE agent_runs SET "continuesRunId"=$2,"questionContinuation"=$3 WHERE id=$1',[run.id,failed.id,JSON.stringify({...c,followUp:continuationFollowUp})]);
         await tx.query(`UPDATE factory_questions SET status='resuming',"continuationRunId"=$2,revision=revision+1,"updatedAt"=now() WHERE id=$1`,[q.id,run.id]);
         await skills?.continueQuestion(actor.userId,run.id,tx);
         const recovered={questionId:q.id,continuationRunId:run.id,task:queued.task,replayed:false,historyRunId:failed.id,originRunId:q.originRunId,originSessionId:q.originSessionId};

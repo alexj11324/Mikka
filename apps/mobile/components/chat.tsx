@@ -1,7 +1,7 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import * as Clipboard from 'expo-clipboard'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import Reanimated, { cancelAnimation, FadeInDown, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated'
+import Reanimated, { cancelAnimation, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
 import { AccessibilityInfo, Image, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
 import { Check, CircleAlert, Copy, Ellipsis, Reply } from 'lucide-react-native'
@@ -127,16 +127,19 @@ export function ThreadCard({ title, status, info, onPress, action }: { title: st
   )
 }
 
-const ARRIVE = FadeInDown.springify().mass(ENTER.mass).stiffness(ENTER.stiffness).damping(ENTER.damping)
-  .withInitialValues({ opacity: 0, transform: [{ translateY: 8 }] })
-
 /**
  * A message that arrived while the chat was open rises into place on a light spring (lib/springs.ts ENTER); what
- * was there when it opened, and everything under Reduce Motion, just appears.
+ * was there when it opened, and everything under Reduce Motion, just appears. It animates its own style rather than
+ * a layout (`entering`) animation: inside the virtualized chat list a layout animation could leave the new row
+ * invisible.
  */
 export function Arrival({ animate, children }: { animate: boolean; children: ReactNode }) {
   const reduceMotion = useReducedMotionPreference()
-  return <Reanimated.View style={styles.arrival} entering={animate && !reduceMotion ? ARRIVE : undefined}>{children}</Reanimated.View>
+  const [rises] = useState(() => animate && !reduceMotion)
+  const progress = useSharedValue(rises ? 0 : 1)
+  useEffect(() => { if (rises) progress.set(withSpring(1, ENTER)) }, [progress, rises])
+  const style = useAnimatedStyle(() => ({ opacity: Math.min(1, progress.get()), transform: [{ translateY: (1 - progress.get()) * 8 }] }))
+  return <Reanimated.View style={[styles.arrival, style]}>{children}</Reanimated.View>
 }
 
 /** Mikka's own event lines (a run ended, an artifact arrived), small and grey between messages. */

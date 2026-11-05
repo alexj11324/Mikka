@@ -33,7 +33,7 @@ export async function groupBotCatalog(client: Pick<PoolClient,'query'>, actorId:
       description: [row.publicRole,...skills.map(skill=>`${skill.name}: ${skill.description}`)].filter(Boolean).join('\n').slice(0,2000) || 'No public role or skill description is configured.',
       capabilities:capabilityNames, executionAvailable:canExecute,
       chatAvailable:row.ownerId===actorId,
-      executionReason:!configured ? 'task_tool_disabled' : !canExecute ? execution?.reason ?? 'execution_unavailable' : undefined,
+      executionReason:!configured ? 'task_tool_disabled' : !canExecute ? execution?.reason ?? 'execution_unavailable' : execution?.reason==='quota_check_required' ? execution.reason : undefined,
     })
   }
   return result

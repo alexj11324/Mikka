@@ -1,3 +1,5 @@
+import { criterionVerificationStatus } from '@mikka/protocol/run';
+import { factoryReviewVerdict } from './validation';
 import { factoryDecisionWarnings } from "../project-decision-warnings";
 import type { PoolClient } from "pg";
 import type { RunReport } from "@mikka/protocol/run";
@@ -80,7 +82,10 @@ export async function reconcileFactoryCheck(
           },
         ]
       : [];
+  const singleReview = task.stage === "review" && factoryFlowVersion(task) === 2;
+  const reviewVerdict = singleReview && run.report ? factoryReviewVerdict(run.report) : undefined;
   const output = {
+    ...(reviewVerdict ? { reviewVerdict } : {}),
     runId: run.id,
     decisionWarnings: await factoryDecisionWarnings(tx, task),
     stopReason: run.stopReason,
@@ -147,11 +152,16 @@ export async function reconcileFactoryCheck(
   } else if (
     run.status !== "succeeded" ||
     run.report.verify?.status === "failed" ||
-    run.report.criteria?.some((c: { passed: boolean }) => c.passed === false)
+    (singleReview ? reviewVerdict === "changes_requested" : run.report.criteria?.some(c => c.passed === false))
   ) {
     status = "failed";
     reason = `Independent ${task.stage} failed: ${run.error ?? run.report.criteria?.find((c) => !c.passed)?.text ?? run.report.verify?.output ?? run.stopReason}`;
   }
+  if (status === "passed" && singleReview) reason = reviewVerdict === 'needs_judgment'
+    ? 'Single review completed; the person must judge its ambiguous findings'
+    : run.report?.criteria?.some(c => criterionVerificationStatus(c) === 'unverified')
+      ? 'Single review completed with unverified observations and their reasons'
+      : 'Single review passed on the fixed candidate';
   // Failed results must be bound to the same independent session/candidate too.
   // Missing auth, old daemons or corrupted provenance need recovery, not an automatic repair.
   if (status === "failed" || status === "blocked") {

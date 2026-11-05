@@ -132,6 +132,59 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     const routed = await store.route(ownerId, { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Synthetic subscription profile stage fixture' })
     return { scope, actor, ownerId, workspaceId, botId, issueId, sourceEventId, deviceId, repoId, agents, connections, implement, review, store, task: routed.task }
   }
+  for (const withProfile of [false, true]) await t.test(`group intent preserves stale allowance without admission or refresh (${withProfile ? 'fixed Profile' : 'Default'})`, async () => {
+    const f = await fixture(withProfile)
+    const now = Date.now(), request = { location: 'cloud' as const, cloudPurpose: 'desktop' as const, ...(f.implement ? { profileId: f.implement.id } : {}) }
+    await pool.query('UPDATE model_order_settings SET "preferredHarness"=\'claude_code\' WHERE "ownerId"=$1 AND "workspaceId"=$2', [f.ownerId, f.workspaceId])
+    const storedQuota = (age: number, used = .1) => ({ vendor: 'claude_code', source: 'official', status: 'ok', plan: null, observedAt: new Date(now - age).toISOString(), windows: [{ kind: 'five_hour', used, resetsAt: new Date(now + 3_600_000).toISOString() }] })
+    await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [f.connections.claude_code, JSON.stringify(storedQuota(94_000))])
+    await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [f.connections.codex, JSON.stringify({ ...storedQuota(23_000), vendor: 'codex' })])
+    const before = (await pool.query('SELECT id,epoch,state,paused,quota FROM byos_connections WHERE "ownerId"=$1 ORDER BY id', [f.ownerId])).rows
+    const bindings = (await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [f.ownerId])).rows
+    const beforeUsage = usageCalls.length
+    assert.deepEqual(await profiles.agentProfileDispatchAvailability(pool, f.scope, request), { available: false, reason: 'checking' })
+    assert.deepEqual(await profiles.agentProfileDispatchAvailability(pool, f.scope, request, { deferStaleQuota: true }), { available: true, reason: 'quota_check_required' })
+    const target = await modules[3].resolveModelDispatch(pool, f.scope, undefined, 'cloud', undefined, {
+      cloudPurpose: 'desktop', skipCatalogueRefresh: true, probeQuota: false, bindSubscription: false, deferStaleQuota: true,
+    })
+    assert.equal(target.kind, 'cloud')
+    if (target.kind !== 'cloud') assert.fail('The authorized cloud destination remains available for admission')
+    assert.equal(target.entry.source.kind, 'subscription'); assert.equal(target.harness, 'claude_code')
+    assert.equal(target.model, model.claude_code); assert.equal(target.quotaCheckPending, true)
+    assert.deepEqual(target.entry.source, { kind: 'subscription', connectionId: f.connections.claude_code }, 'a fresh later Codex entry cannot displace the unchecked preferred Claude entry')
+    const strict = await modules[3].resolveModelDispatch(pool, f.scope, undefined, 'cloud', undefined, {
+      cloudPurpose: 'desktop', skipCatalogueRefresh: true, probeQuota: false, deferStaleQuota: true,
+    })
+    assert.equal(strict.kind, 'none', 'omitting the no-binding fence cannot enable the group-only preview')
+    assert.equal(usageCalls.length, beforeUsage)
+    assert.deepEqual((await pool.query('SELECT id,epoch,state,paused,quota FROM byos_connections WHERE "ownerId"=$1 ORDER BY id', [f.ownerId])).rows, before)
+    assert.deepEqual((await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [f.ownerId])).rows, bindings)
+    assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 0)
+    const unsupported = templateModelsFixture([model.codex])
+    try {
+      assert.equal((await profiles.agentProfileDispatchAvailability(pool, f.scope, request, { deferStaleQuota: true })).available, false, 'a pending preferred allowance cannot be skipped for a later supported source')
+    } finally { unsupported.restore() }
+    const pinned = { ...request, asked: { harness: 'claude_code' as const, model: model.claude_code } }
+    for (const quota of [null, {}, { ...storedQuota(94_000), status: 'unknown' }, { ...storedQuota(94_000), source: 'local_credentials' }, storedQuota(94_000, 1)]) {
+      await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [f.connections.claude_code, JSON.stringify(quota)])
+      assert.equal((await profiles.agentProfileDispatchAvailability(pool, f.scope, pinned, { deferStaleQuota: true })).available, false)
+    }
+    await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [f.connections.claude_code, JSON.stringify(storedQuota(94_000))])
+    for (const state of ['paused', 'removed', 'disconnected'] as const) {
+      await pool.query('UPDATE byos_connections SET paused=$2,"removedAt"=CASE WHEN $3 THEN now() END,state=$4 WHERE id=$1', [f.connections.claude_code, state === 'paused', state === 'removed', state === 'paused' ? 'connected' : 'disconnected'])
+      assert.equal((await profiles.agentProfileDispatchAvailability(pool, f.scope, pinned, { deferStaleQuota: true })).available, false, state)
+    }
+    await pool.query('UPDATE byos_connections SET paused=false,"removedAt"=NULL,state=\'connected\' WHERE id=$1', [f.connections.claude_code])
+    await pool.query('UPDATE user_e2b_keys SET "lastErrorCode"=\'invalid\' WHERE "userId"=$1', [f.ownerId])
+    assert.equal((await profiles.agentProfileDispatchAvailability(pool, f.scope, pinned, { deferStaleQuota: true })).available, false, 'no cloud destination remains a real denial')
+    await pool.query('UPDATE user_e2b_keys SET "lastErrorCode"=NULL WHERE "userId"=$1', [f.ownerId])
+    const bindingId = await bindAgentToConnection(pool, f.scope, f.agents.claude_code, 'claude_code', f.connections.claude_code, model.claude_code)
+    await pool.query(`INSERT INTO agent_runs (id,"userId","botId","issueId","agentId","deviceId",status,"stopReason",prompt,"agentDefinition",report,"startedAt","finishedAt")
+      VALUES ($1,$2,$3,$4,$5,$6,'failed','provider_failure','Synthetic provider failure',$7,$8,now()-interval '1 second',now())`,
+    [randomUUID(), f.ownerId, f.botId, f.issueId, f.agents.claude_code, f.deviceId, JSON.stringify({ harness: 'claude_code', model: model.claude_code, subscription: { bindingId, modelId: model.claude_code }, executionIdentity: { workspaceId: f.workspaceId } }), JSON.stringify({ providerFailure: { kind: 'auth', retryable: false, status: 401, code: 'authentication_failed' } })])
+    assert.equal((await profiles.agentProfileDispatchAvailability(pool, f.scope, pinned, { deferStaleQuota: true })).available, false, 'provider failure memory wins over a positive old allowance')
+    assert.equal(usageCalls.length, beforeUsage)
+  })
   const exercise = async (withProfiles: boolean, missingCodex: boolean, autoModelRouting = true, explicitDefault = false, parentMode: 'prepared' | 'metadata-only' = 'prepared') => {
     const f = await fixture(withProfiles, missingCodex, false, explicitDefault ? 'default' : undefined), beforeDecisions = decisionCounts()
     const readParent = async () => (await pool.query(`
@@ -809,6 +862,10 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       await pool.query(`UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',to_jsonb($2::text)) WHERE id=$1`, [f.connections.codex, observedAt])
       const { quota } = (await pool.query('SELECT quota FROM byos_connections WHERE id=$1', [f.connections.codex])).rows[0]
       assert.equal((await import('../subscription-quota')).subscriptionAvailability(quota, model.codex, 'codex').status, 'checking')
+      assert.deepEqual(await profiles.agentProfileDispatchAvailability(pool, f.scope, {
+        profileId: 'default', location: 'cloud', cloudPurpose: 'desktop', asked: { harness: 'codex', model: model.codex },
+      }, { deferStaleQuota: true }), { available: true, reason: 'quota_check_required' })
+      assert.equal(quotaReads, 0, 'group intent never refreshes or admits a subscription')
       await assert.rejects(profiles.assertProfileSelection(pool, f.scope, selected.agentProfile!), { code: 'agentProfileModelUnavailable' })
     }
     const { queueFactoryCloudRun } = await import('./queue-cloud')

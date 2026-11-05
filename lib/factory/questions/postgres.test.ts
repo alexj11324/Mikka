@@ -311,6 +311,8 @@ test(
             assert.equal(claimed.requireSessionResume, true);
             assert.equal(claimed.questionId, f.q.id);
             assert.equal(Object.hasOwn(claimed, 'factoryCheck'), false);
+            assert.doesNotMatch(claimed.followUp as string, /Current host-recorded command evidence|Persisted producer command observations/,
+              'execution answer/recovery does not receive independent-check instructions');
             assert.deepEqual((await tx.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=ANY($1::uuid[]) ORDER BY id', [historyIds])).rows, before);
             assert.deepEqual((await tx.query('SELECT to_jsonb(q) AS question FROM factory_questions q WHERE id=$1', [f.q.id])).rows, questionBefore);
           } finally { await tx.query('ROLLBACK'); tx.release(); }

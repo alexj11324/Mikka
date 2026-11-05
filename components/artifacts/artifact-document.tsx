@@ -6,7 +6,8 @@ import remarkGfm from 'remark-gfm'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { markdownDiff, remarkDiff } from '@/lib/artifacts/diff'
 import { remarkMarks, type TextMark } from '@/lib/artifacts/marks'
-import type { ArtifactVersionInfo } from '@/lib/artifacts/types'
+import type { ArtifactMedia, ArtifactVersionInfo } from '@/lib/artifacts/types'
+import { withBasePath } from '@/lib/base-path'
 import { ArtifactAuthorAvatar } from './artifact-card'
 import { SelectionActions } from './selection-actions'
 
@@ -22,7 +23,26 @@ function plain(children: ReactNode): string {
   return Children.toArray(children).map(child => typeof child === 'string' || typeof child === 'number' ? String(child) : isValidElement<{ children?: ReactNode }>(child) ? plain(child.props.children) : '').join('')
 }
 
-const components = (title: string): Components => ({
+const CAPTURE_PATH = /\/api\/captures\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i
+
+/**
+ * A report's own capture (#1276): a link or image to this app's capture route
+ * whose id the artifact's media lists. It is served from this origin's path,
+ * never the stored absolute URL, so a recording link plays in place.
+ */
+export function ownCapture(href: unknown, media: readonly ArtifactMedia[], origin: string): ArtifactMedia | null {
+  if (typeof href !== 'string' || !media.length) return null
+  let url: URL
+  try { url = new URL(href, origin) } catch { return null }
+  if (url.origin !== origin || url.search || url.hash) return null
+  const id = CAPTURE_PATH.exec(url.pathname)?.[1]?.toLowerCase()
+  return id ? media.find(item => item.captureId.toLowerCase() === id) ?? null : null
+}
+const capturePath = (capture: ArtifactMedia) => withBasePath(`/api/captures/${capture.captureId}`)
+const NO_MEDIA: readonly ArtifactMedia[] = []
+const pageOrigin = () => typeof window === 'undefined' ? 'http://localhost' : window.location.origin
+
+const components = (title: string, media: readonly ArtifactMedia[]): Components => ({
   // The page already shows the title; a first heading repeating it is dropped.
   h1: ({ children }) => plain(children).trim() === title.trim() ? null : <h2 className="mt-8 mb-2 text-lg font-semibold text-foreground">{children}</h2>,
   h2: ({ children }) => <h2 className="mt-8 mb-2 text-lg font-semibold text-foreground">{children}</h2>,
@@ -34,8 +54,16 @@ const components = (title: string): Components => ({
   blockquote: ({ children }) => <blockquote className="my-3 rounded-lg bg-muted/50 px-3 py-1 text-muted-foreground">{children}</blockquote>,
   // No rules across the page (R-31): a break is space.
   hr: () => <div role="separator" className="h-6" />,
-  a: ({ href, children }) => href && SAFE_URL.test(href) ? <a href={href} target={href.startsWith('#') ? undefined : '_blank'} rel="noopener noreferrer nofollow" className="text-sidebar-primary underline-offset-4 hover:underline">{children}</a> : <span>{children}</span>,
-  img: ({ src, alt }) => typeof src === 'string' && SAFE_IMAGE.test(src) ? <img src={src} alt={alt ?? ''} referrerPolicy="no-referrer" loading="lazy" className="my-3 max-w-full rounded-xl" /> : null,
+  a: ({ href, children }) => {
+    const capture = ownCapture(href, media, pageOrigin())
+    if (capture?.kind === 'video') return <video src={capturePath(capture)} controls playsInline preload="metadata" aria-label={plain(children) || capture.title} className="my-3 block max-h-[28rem] w-full rounded-xl bg-muted" />
+    return href && SAFE_URL.test(href) ? <a href={href} target={href.startsWith('#') ? undefined : '_blank'} rel="noopener noreferrer nofollow" className="text-sidebar-primary underline-offset-4 hover:underline">{children}</a> : <span>{children}</span>
+  },
+  img: ({ src, alt }) => {
+    const capture = ownCapture(src, media, pageOrigin())
+    if (capture?.kind === 'image') return <img src={capturePath(capture)} alt={alt ?? ''} loading="lazy" className="my-3 max-w-full rounded-xl" />
+    return typeof src === 'string' && SAFE_IMAGE.test(src) ? <img src={src} alt={alt ?? ''} referrerPolicy="no-referrer" loading="lazy" className="my-3 max-w-full rounded-xl" /> : null
+  },
   code: ({ className, children }) => className ? <code>{children}</code> : <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs">{children}</code>,
   pre: ({ children }) => <pre className="my-3 overflow-x-auto rounded-xl bg-muted p-4 font-mono text-xs leading-5 [&_code]:bg-transparent [&_code]:p-0">{children}</pre>,
   table: ({ children }) => <div className="my-3 overflow-hidden rounded-xl bg-muted/40"><Table className="text-sm">{children}</Table></div>,
@@ -57,7 +85,7 @@ const components = (title: string): Components => ({
 /** Where the selection sits on screen, read when the toolbar positions itself. */
 
 
-export function ArtifactDocument({ title, markdown, compareWith, author, meta, quoted, quoting, onQuote }: {
+export function ArtifactDocument({ title, markdown, compareWith, author, meta, quoted, quoting, onQuote, media = NO_MEDIA }: {
   title: string
   markdown: string
   /** The newer version's text: when given, its changes are marked into this one. */
@@ -71,11 +99,13 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
   quoting: string | null
   /** Without it (the share page) selecting text offers nothing. */
   onQuote?: (text: string) => void
+  /** A Factory acceptance report's captures: its recording links play in place. */
+  media?: readonly ArtifactMedia[]
 }) {
   const articleRef = useRef<HTMLDivElement>(null)
   const [selection, setSelection] = useState<{ text: string; range: Range } | null>(null)
   const source = useMemo(() => compareWith != null ? markdownDiff(markdown, compareWith) : markdown, [markdown, compareWith])
-  const parts = useMemo(() => components(title), [title])
+  const parts = useMemo(() => components(title, media), [title, media])
   const plugins = useMemo<NonNullable<ComponentProps<typeof Markdown>['remarkPlugins']>>(() => {
     const marks: TextMark[] = [...quoted.map(text => ({ text, kind: 'quoted' as const })), ...(quoting ? [{ text: quoting, kind: 'quoting' as const }] : [])]
     return [remarkGfm, ...(compareWith != null ? [remarkDiff] : []), [remarkMarks, marks]]

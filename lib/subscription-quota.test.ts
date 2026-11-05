@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { QUOTA_DISPLAY_MS, quotaDisplayKey, shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
+import { hasStaleOfficialAllowance, QUOTA_DISPLAY_MS, quotaDisplayKey, shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
 
 const now = Date.parse('2026-11-02T18:00:00Z')
 const quota = (windows: unknown[], fields = {}) => ({ vendor: 'claude_code', source: 'official', status: 'ok', plan: null, observedAt: new Date(now).toISOString(), windows, ...fields })
@@ -11,6 +11,21 @@ test('availability distinguishes fresh allowance from unknown and stale observat
   assert.equal(subscriptionAvailability(quota([account], { observedAt: new Date(now - 60_001).toISOString() }), 'claude-haiku-5-5', 'claude', now).status, 'checking')
   assert.equal(subscriptionAvailability(quota([account]), 'claude-haiku-5-5', 'claude', now).status, 'available')
   assert.equal(subscriptionAvailability(quota([account]), 'gpt-6.1-sol', 'codex', now).status, 'checking')
+})
+
+test('group intent can defer only an official allowance that became checking solely through age', () => {
+  const stale = { observedAt: new Date(now - 94_000).toISOString() }
+  assert.equal(hasStaleOfficialAllowance(quota([account], stale), 'claude-haiku-5-5', 'claude', now), true)
+  assert.equal(subscriptionAvailability(quota([account], stale), 'claude-haiku-5-5', 'claude', now).status, 'checking', 'the execution gate remains strict')
+  assert.equal(hasStaleOfficialAllowance(quota([account], { observedAt: new Date(now - 23_000).toISOString() }), 'claude-haiku-5-5', 'claude', now), false)
+  for (const value of [
+    null, {}, quota([account], { ...stale, status: 'unknown' }), quota([], stale),
+    quota([account], { ...stale, source: 'local_credentials' }), quota([account], { ...stale, vendor: 'codex' }),
+    quota([account], { observedAt: new Date(now + 1000).toISOString() }), quota([account], { observedAt: 'invalid' }),
+    quota([{ ...account, used: 1 }], stale), quota([{ ...account, used: 2 }], stale),
+    quota([{ ...account, meter: 'on_demand' }], stale), quota([{ ...account, model: 'unknown scope', used: 1 }], stale),
+    quota([{ ...account, used: 1, resetsAt: new Date(now - 1000).toISOString() }], stale),
+  ]) assert.equal(hasStaleOfficialAllowance(value, 'claude-haiku-5-5', 'claude', now), false, JSON.stringify(value))
 })
 
 test('an exhausted Opus allowance does not exhaust Haiku or Sonnet', () => {

@@ -8,12 +8,13 @@ import { orderMigrations } from '../../../scripts/migration-order.mjs'
 import { dropTestDatabase } from '../../../tests/support/drop-test-database'
 import { createFactoryStore } from '../store'
 import { observePoolCommits } from '../../db/commit-effects'
-import { factoryBinding } from '../dispatch'
+import { createFactoryDispatch, factoryBinding } from '../dispatch'
 import { factoryEventId } from '../event-id'
 import { questionFingerprint } from './contract'
 import { questionExecutionContinuation } from './execution-continuation'
 import { checkFactoryRepairBudget } from '../check-recovery-evidence'
-import { producerCommandObservations } from '../checks'
+import { appendFactoryCheckContinuationContext, producerCommandObservations } from '../checks'
+import { freezeWorkerDefinition } from '../../agent-kit/worker'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) {
@@ -500,6 +501,47 @@ test('real PG: question receipts preserve one execution without opening a repair
         const result = JSON.parse(await producerCommandObservations(tx, task, candidate))
         assert.deepEqual(result.inheritedRecords, [], label)
         assert.equal(result.inheritedRecordsOmitted, omitted, label)
+      }, true)
+
+      // The continuation message uses this same receipt-bound reader and the
+      // citation sources frozen by real check dispatch, not the old empty prompt.
+      const checkDevice = randomUUID(), checkAgent = randomUUID(), checkRepo = randomUUID()
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses) VALUES($1,'owner','Independent check','cloud',now(),$2)`,
+        [checkDevice, JSON.stringify([{ harness, installed: true }])])
+      await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,'owner',$2,$3,$4)`, [checkAgent, checkDevice, harness, `Independent checker ${checkAgent}`])
+      await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner','/tmp/fixture')`, [checkRepo, checkDevice])
+      const dispatch = createFactoryDispatch(pool, f.store, async (tx, owner, input, botId) => {
+        const runId = randomUUID(), prompt = 'Original criteria stay frozen; no new command permission.'
+        const definition = freezeWorkerDefinition({ harness, model: f.definition.model, readOnly: true,
+          instructions: 'Independent read-only check', prompt, parent: null, executionId: null })
+        await tx.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,prompt,"agentDefinition")
+          VALUES($1,$2,$3,$4,$5,$6,$7,'queued',$8,$9)`,
+          [runId, owner, input.issueId, checkAgent, checkDevice, checkRepo, botId, prompt, JSON.stringify(definition)])
+        await tx.query(`INSERT INTO computer_run_bindings("runId","ownerId","workspaceId","botId") VALUES($1,$2,$3,$4)`,
+          [runId, owner, f.workspaceId, f.runtimeBotId])
+        await tx.query(`INSERT INTO thread_machines("runId","ownerId","workspaceId","botId","issueId","deviceId","repoId",state,"sandboxId","snapshotId","operationId")
+          VALUES($1,$2,$3,$4,$5,$6,$7,'running',$8,$9,$10)`,
+          [runId, owner, f.workspaceId, f.runtimeBotId, input.issueId, checkDevice, checkRepo, `independent-${runId}`, harness === 'codex' ? 'codex' : 'claude', randomUUID()])
+        return { runId }
+      })
+      const checking = await dispatch('owner', { binding: factoryBinding(task), agentId: checkAgent, deviceRepoId: checkRepo })
+      const originalFollowUp = 'Continue only this original independent check.'
+      const beforeFollowUp = await snapshot()
+      const followUp = await appendFactoryCheckContinuationContext(pool, checking.task, checking.runId, originalFollowUp)
+      assert.ok(followUp.startsWith(originalFollowUp + '\n\n'))
+      const delivered = JSON.parse(followUp.split('\n').at(-1)!)
+      assert.deepEqual(delivered, observations, 'the delivered evidence retains the original stopped source and immutable resume receipt')
+      assert.match(followUp, /run-chunk:<outputChunkId>/)
+      assert.doesNotMatch(followUp, /fixture-value|Original issue and standing instructions/)
+      assert.deepEqual(await snapshot(), beforeFollowUp, 'building the native message cannot rewrite frozen evidence or verdicts')
+      for (const [label, sql, args] of [
+        ['missing immutable receipt', 'DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, child.eventId]],
+        ['different original SID', 'UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1', [f.originRunId, 'different-native-session']],
+        ['changed fixed candidate', `UPDATE agent_runs SET report=jsonb_set(report,'{deliverableCommit}',to_jsonb($2::text)) WHERE id=$1`, [child.runId, 'c'.repeat(40)]],
+      ] as [string, string, unknown[]][]) await transaction(async tx => {
+        await tx.query(sql, args)
+        await assert.rejects(appendFactoryCheckContinuationContext(tx, checking.task, checking.runId, originalFollowUp),
+          { code: 'factoryCheckBindingMismatch' }, label)
       }, true)
     })
 
