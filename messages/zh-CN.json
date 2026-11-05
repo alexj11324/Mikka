@@ -1907,12 +1907,22 @@
       "connect": "连接",
       "connecting": "连接中",
       "reconnect": "重新连接",
+      "resume": "继续",
+      "unfinished": "上次连接还没完成",
+      "signInExpired": "授权已过期",
+      "authorizationEnded": "{provider} 的这次授权已结束",
+      "signInPreparing": "{provider} 授权正在准备",
+      "cancelledNotice": "已取消连接",
+      "cancelFailed": "暂时无法确认是否已取消连接",
       "disconnect": "断开连接",
       "refreshModels": "刷新模型",
       "refreshingModels": "正在刷新 {label} 的模型…",
       "modelsRefreshed": "{label}：{count, plural, other {# 个模型}}",
       "modelsRefreshFailed": "{label} 的模型未能刷新",
       "callbackLabel": "授权后的地址",
+      "callbackStepOpen": "打开 Claude，登录并允许授权。",
+      "callbackStepCopy": "跳转到 localhost:54545 后，即使页面显示无法访问，也从浏览器地址栏复制完整地址。",
+      "callbackStepPaste": "把完整地址粘贴到下方，点击「完成连接」。",
       "finish": "完成连接",
       "expired": "{provider} 授权已过期",
       "loadFailed": "无法加载订阅设置。",
@@ -4550,17 +4560,20 @@
     "retry": "重试",
     "checkState": {
       "review": {
+        "blocked": "审阅受阻",
         "failed": "审阅未通过",
         "pending": "等待审阅",
         "running": "审阅中"
       },
       "verify": {
+        "blocked": "验证受阻",
         "failed": "验证未通过",
         "pending": "等待验证",
         "running": "验证中"
       }
     },
     "retryReview": "重新审阅",
+    "blocked": "受阻",
     "retryVerify": "重新验证",
     "checkRetryUnknown": "重试未确认",
     "checkRetryFailed": "重试未完成",
@@ -4924,7 +4937,9 @@
       "model_mismatch": "订阅不提供线程所选的模型，请换一个模型",
       "account_changed": "订阅账号在运行中已切换，运行已停止",
       "env_not_clean": "本机运行环境不符合订阅运行要求，请更新 Mikka",
-      "adapter_start_failed": "Agent 无法用订阅启动"
+      "cli_missing": "本机订阅 Agent 尚未安装或安装不完整，请重启 Mikka 以安装后重新检测 Agent",
+      "cli_version_mismatch": "本机订阅 Agent 的版本与 Mikka 要求不符，请更新 Mikka 后重新检测 Agent",
+      "adapter_start_failed": "本机订阅 Agent 启动失败，请重启 Mikka 后重新检测 Agent"
     },
     "subscription_hosted_runtime_unavailable": {
       "default": "云电脑上的运行无法启动",

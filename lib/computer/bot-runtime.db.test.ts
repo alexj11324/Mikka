@@ -11,6 +11,7 @@ import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { ensureBotRuntime } from './bot-runtime'
+import { ensureRecordedBotHarnessRuntime } from './bot-runtime-records'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) {
@@ -44,9 +45,24 @@ test('a bot runtime follows its computer to a new device and survives an unbound
     const actor = { userId: owner, workspaceId }
     const agents = async () => (await pool.query(`SELECT x.harness,x."agentId",x."repoId",a."deviceId",repo."deviceId" AS "repoDevice" FROM bot_cloud_runtimes x JOIN agents a ON a.id=x."agentId" JOIN device_repos repo ON repo.id=x."repoId" WHERE x."botId"=$1 ORDER BY x.harness`, [botId])).rows
 
+    const reports = JSON.parse(harnesses)
+    await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [first, JSON.stringify(reports.map((info: object) => ({ ...info, subscriptionPreflight: 'env_not_clean' })))])
+    await assert.rejects(ensureBotRuntime(pool, actor, botId, sandbox, first), /Bot runtime unavailable/)
+    assert.equal((await agents()).length, 0, 'a failed self-test cannot provision an executor from an old broker flag')
+    await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [first, JSON.stringify(reports.map((info: { harness: string }) => ({ ...info, ...(info.harness === 'claude_code' ? { subscriptionPreflight: 'env_not_clean' } : {}) })))])
+    assert.deepEqual((await ensureBotRuntime(pool, actor, botId, sandbox, first)).map(r => r.harness), ['codex'], 'the other provider still provisions normally')
+    await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [first, harnesses])
     const created = await ensureBotRuntime(pool, actor, botId, sandbox, first)
     assert.deepEqual(created.map(r => r.harness), ['claude_code', 'codex'])
     const before = await agents()
+
+    for (const detail of ['env_not_clean', 'cli_missing', 'cli_version_mismatch', 'adapter_start_failed']) {
+      await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [first, JSON.stringify(reports.map((info: { harness: string }) => ({ ...info, ...(info.harness === 'claude_code' ? { subscriptionPreflight: detail } : {}) })))])
+      assert.deepEqual((await ensureBotRuntime(pool, actor, botId, sandbox, first)).map(r => r.harness), ['codex'], 'a recorded executor is not usable after its self-test fails')
+      assert.equal(await ensureRecordedBotHarnessRuntime(pool, actor, botId, 'claude_code'), null, detail)
+      assert.ok(await ensureRecordedBotHarnessRuntime(pool, actor, botId, 'codex'), 'a different healthy target remains available')
+    }
+    await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [first, harnesses])
 
     // A device removal unbinds every agent on it, the bot's hidden ones included.
     await pool.query('UPDATE agents SET "deviceId"=NULL WHERE "deviceId"=$1', [first])

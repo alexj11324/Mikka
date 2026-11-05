@@ -101,8 +101,15 @@ func TestCodexDeviceCPAProtocolOwnerSessionIntervalPKCEOneUseAndExpiry(t *testin
 	if _, err = w.PollOAuth(ctx, "other", start.State); err != ErrStale {
 		t.Fatal("session changed")
 	}
-	if _, err = w.PollOAuth(ctx, "session", start.State); err != ErrStale || polls.Load() != 0 {
+	if result, err := w.PollOAuth(ctx, "session", start.State); err != nil || result.(map[string]any)["pending"] != true || polls.Load() != 0 {
 		t.Fatal("poll interval bypassed")
+	}
+	restart := func(previous OAuthStart) (OAuthStart, error) {
+		disconnected, err := w.Disconnect(ctx, previous.Revision)
+		if err != nil {
+			return OAuthStart{}, err
+		}
+		return w.StartOAuth(ctx, disconnected.Revision, "session")
 	}
 	ready := func() {
 		t.Helper()
@@ -117,7 +124,7 @@ func TestCodexDeviceCPAProtocolOwnerSessionIntervalPKCEOneUseAndExpiry(t *testin
 	if err != nil || result.(map[string]any)["pending"] != true {
 		t.Fatal("pending response mishandled", err)
 	}
-	if _, err = w.PollOAuth(ctx, "session", start.State); err != ErrStale || polls.Load() != 1 {
+	if result, err := w.PollOAuth(ctx, "session", start.State); err != nil || result.(map[string]any)["pending"] != true || polls.Load() != 1 {
 		t.Fatal("repeat poll too fast")
 	}
 	pending.Store(false)
@@ -138,7 +145,7 @@ func TestCodexDeviceCPAProtocolOwnerSessionIntervalPKCEOneUseAndExpiry(t *testin
 	if _, err = w.PollOAuth(ctx, "session", next.State); err != ErrStale || exchanges.Load() != 1 {
 		t.Fatal("expired grant used")
 	}
-	next, err = w.StartOAuth(ctx, next.Revision, "session")
+	next, err = restart(next)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,10 +169,10 @@ func TestCodexDeviceCPAProtocolOwnerSessionIntervalPKCEOneUseAndExpiry(t *testin
 		t.Fatal("poll did not start")
 	}
 	// A second process cannot poll concurrently even if nextPollAt is in the past.
-	if _, err = w.PollOAuth(ctx, "session", next.State); err != ErrStale {
+	if result, err := w.PollOAuth(ctx, "session", next.State); err != nil || result.(map[string]any)["pending"] != true {
 		t.Fatal("concurrent poll entered provider")
 	}
-	replacement, err := w.StartOAuth(ctx, next.Revision, "session")
+	replacement, err := restart(next)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,10 +185,10 @@ func TestCodexDeviceCPAProtocolOwnerSessionIntervalPKCEOneUseAndExpiry(t *testin
 	// Simulate an owned worker dying after its durable claim but before response.
 	_, _ = w.Repo.DB.Exec(`update byos_oauth_attempts set polling=true where "stateHash"=$1`, hashText(replacement.State))
 	before := polls.Load()
-	if _, err = w.PollOAuth(ctx, "session", replacement.State); err != ErrStale || polls.Load() != before {
+	if result, err := w.PollOAuth(ctx, "session", replacement.State); err != nil || result.(map[string]any)["pending"] != true || polls.Load() != before {
 		t.Fatal("uncertain grant was retried")
 	}
-	newer, err := w.StartOAuth(ctx, replacement.Revision, "session")
+	newer, err := restart(replacement)
 	if err != nil {
 		t.Fatal(err)
 	}

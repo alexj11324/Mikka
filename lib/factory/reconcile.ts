@@ -227,8 +227,7 @@ export function createFactoryReconciler(
         if (task.status !== "running") { await commitFactoryTransaction(tx); continue; }
         const eventId = factoryEventId("run-completion", run.id);
         if (
-          !
-          run.stopRequestedAt &&
+          run.status === 'stopped' && !run.stopRequestedAt &&
           ["asked_human", "blocked"].includes(run.stopReason)
         ) {
           if (questions) {
