@@ -14,6 +14,7 @@ import { acquireProfileMembership, profileView, readProfileRow, readProfileRows,
 import { agentProfileSkillsCatalog, resolveAgentProfileSkills } from './agent-profile-skills'
 import { maskFactoryNote } from './note-mask'
 import { profileDecisionQuestions, selectedProfileAnswer, type PublicAgentProfile } from './agent-profile-decision'
+import type { ModelRoutingContext } from '@/lib/model-routing-server'
 
 export * from './agent-profile-definition'
 export { AgentProfileStore } from './agent-profile-store'
@@ -33,6 +34,8 @@ export interface AgentProfileDispatchRequest {
   defaultHarness?: OrderHarness
   /** Host-only continuation of a default/legacy thread; never reselect its role. */
   defaultOnly?: boolean
+  /** Existing retry/repair host context; never a client-supplied model choice. */
+  routing?: Pick<ModelRoutingContext, 'previous' | 'escalate'>
 }
 export interface AgentProfileDispatchResult {
   target: ModelDispatch
@@ -46,6 +49,7 @@ type DispatchDependencies = {
   membership?: (scope: AgentProfileScope) => Promise<ProfileMembership>
   resolve?: typeof resolveModelDispatch
   decision?: typeof invokeDecision
+  modelDecision?: typeof invokeDecision
 }
 type Eligible = { row: ProfileRow; target: Exclude<ModelDispatch, { kind: 'none' }>; public: PublicAgentProfile }
 const requestConstraints = async (pool: Pool, scope: AgentProfileScope, request: Partial<AgentProfileDispatchRequest>) => {
@@ -219,7 +223,8 @@ export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchSco
   }
   const legacy = async () => {
     const constraints = await requestConstraints(pool, scope, request)
-    const target = await (deps.resolve ?? resolveModelDispatch)(pool, scope, request.asked?.model ? request.asked : undefined, request.location, constraints.deviceId, { withoutCloud: request.withoutCloud, cloudPurpose: request.cloudPurpose, harness: constraints.harness ?? request.defaultHarness, agentId: request.agentId, bindSubscription: false })
+    const target = await (deps.resolve ?? resolveModelDispatch)(pool, scope, request.asked?.model ? request.asked : undefined, request.location, constraints.deviceId, { withoutCloud: request.withoutCloud, cloudPurpose: request.cloudPurpose, harness: constraints.harness ?? request.defaultHarness, agentId: request.agentId, bindSubscription: false,
+      routing: { issueId: request.issueId, stage: request.stage, note: request.note, ...request.routing }, decision: deps.modelDecision })
     const agentProfile = target.kind === 'none' ? undefined : builtinAgentProfileSelection(scope, target.entry)
     return finalize(target, agentProfile, request.asked?.model ? 'picked' : 'preference')
   }
@@ -252,6 +257,18 @@ export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchSco
   }
   if (!chosen) throw new AgentProfileError('agentProfileSelectionInvalid')
   const definition = parseAgentProfile(chosen.row.definition), skills = resolveAgentProfileSkills(definition.skills)
+  // Role selection happens first. Its fixed model and a person's explicit
+  // model are never replaced; only an inherited model list is routed.
+  if (definition.model.mode !== 'fixed' && !request.asked?.model) {
+    const constraints = await requestConstraints(pool, scope, request)
+    const routed = await (deps.resolve ?? resolveModelDispatch)(pool, scope, request.asked, request.location, constraints.deviceId, {
+      harness: definition.harness === 'auto' ? constraints.harness : definition.harness,
+      agentId: request.agentId, withoutCloud: request.withoutCloud, cloudPurpose: request.cloudPurpose, bindSubscription: false,
+      routing: { issueId: request.issueId, stage: request.stage, note: request.note, effort: definition.effort, ...request.routing }, decision: deps.modelDecision,
+    })
+    if (routed.kind === 'none') throw new AgentProfileError('agentProfileModelUnavailable')
+    chosen = { ...chosen, target: routed }
+  }
   const selection: AgentProfileSelection = {
     profileId: chosen.row.id, version: chosen.row.version, digest: chosen.row.digest, name: definition.name,
     source: request.profileId ? 'explicit' : 'decision', reason, scope: { ownerId: scope.ownerId, workspaceId: scope.workspaceId }, definition, skills,

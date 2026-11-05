@@ -13,6 +13,7 @@ import { ModelLabel, harnessName } from '@/components/labels/entity-labels'
 import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { FieldError, FieldLegend, FieldSet } from '@/components/ui/field'
@@ -89,15 +90,20 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   async function save(change: Change, optimistic?: OrderView, onFail?: () => void) {
     setPending(true); setFailed(null); setUnsaved(null)
     const fail = (error?: string) => onFail ? onFail() : setFailed({ message: actionError(error), retry: () => void save(change, optimistic) })
+    const restore = async () => {
+      if (optimistic && data) await order.mutate(data, { revalidate: false })
+      // Keep the last saved value visible even if an offline reread also fails.
+      await order.mutate().catch(() => undefined)
+    }
     try {
       if (optimistic) await order.mutate(optimistic, { revalidate: false })
       const result = await changeModelOrder(change, workspaceId)
-      if (result.error) { fail(result.error); await order.mutate(); return false }
+      if (result.error) { fail(result.error); await restore(); return false }
       await order.mutate(result, { revalidate: false })
       return true
     } catch {
       fail()
-      await order.mutate()
+      await restore()
       return false
     } finally { setPending(false) }
   }
@@ -173,6 +179,10 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
           <ToggleGroupItem value="claude_code">{harnessName('claude_code')}</ToggleGroupItem>
           <ToggleGroupItem value="codex">{harnessName('codex')}</ToggleGroupItem>
         </ToggleGroup>
+      </SettingRow>
+      <SettingRow title={t('autoRouting')}>
+        <Switch aria-label={t('autoRouting')} checked={data.autoModelRouting} disabled={pending}
+          onCheckedChange={enabled => { void save({ kind: 'autoRouting', enabled }, { ...data, autoModelRouting: enabled }) }} />
       </SettingRow>
       {shown.length === 0
         ? <div className="flex flex-col items-center gap-3 px-5 py-7">

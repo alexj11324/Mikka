@@ -126,25 +126,36 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     await assert.rejects(order.checkOrderQuota(pool, scope, foreign, async () => { throw new Error('foreign retry reached quota probe') }), { code: 'executionAccountUnavailable' })
   })
 
-  await t.test('an untouched list: opus, then the first Codex model reported, else the first model anything reported; nothing is stored', async () => {
+  await t.test('an untouched routing list keeps its default prefix and includes the same credentials\' reported models; nothing is stored', async () => {
     const scope = await person('order-default')
     const claude = await subscribe(scope, 'claude', ['acct-sonnet-a', 'acct-opus-a'])
     await subscribe(scope, 'codex', ['acct-codex-top', 'acct-codex-next'])
     const view = await order.orderView(pool, scope)
     assert.equal(view.customized, false)
-    assert.deepEqual(view.entries.map(entry => [entry.harness, entry.model]), [['claude_code', 'acct-opus-a'], ['codex', 'acct-codex-top']])
+    assert.deepEqual(view.entries.map(entry => [entry.harness, entry.model]), [['claude_code', 'acct-opus-a'], ['codex', 'acct-codex-top'], ['claude_code', 'acct-sonnet-a'], ['codex', 'acct-codex-next']])
     assert.deepEqual(view.entries[0].source, { kind: 'subscription', connectionId: claude })
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM model_order_entries WHERE "ownerId"=$1', [scope.ownerId])).rows[0].n, 0)
     assert.equal(view.candidates.length, 4)
+    await order.changeOrder(pool, scope, { kind: 'autoRouting', enabled: false })
+    assert.deepEqual((await order.readOrder(pool, scope)).entries.map(entry => [entry.harness, entry.model]), [['claude_code', 'acct-opus-a'], ['codex', 'acct-codex-top']], 'off restores each Agent\'s default list')
+    await order.changeOrder(pool, scope, { kind: 'autoRouting', enabled: true })
+    assert.deepEqual((await order.readOrder(pool, scope)).entries, view.entries.map(({ id, harness, model, source }) => ({ id, harness, model, source })), 'on restores the same expanded entries and IDs')
+    // Each Agent still gets its own default when Claude reports no Opus model.
+    const noOpus = await person('order-default-per-agent')
+    await subscribe(noOpus, 'claude', ['acct-sonnet-only', 'acct-haiku-only'])
+    await subscribe(noOpus, 'codex', ['acct-codex-only'])
+    assert.deepEqual((await order.readOrder(pool, noOpus)).entries.map(entry => [entry.harness, entry.model]), [['claude_code', 'acct-sonnet-only'], ['codex', 'acct-codex-only'], ['claude_code', 'acct-haiku-only']])
+    await order.changeOrder(pool, noOpus, { kind: 'autoRouting', enabled: false })
+    assert.deepEqual((await order.readOrder(pool, noOpus)).entries.map(entry => [entry.harness, entry.model]), [['claude_code', 'acct-sonnet-only'], ['codex', 'acct-codex-only']])
     // Only a ChatGPT subscription: its Codex model.
     const chatgptOnly = await person('order-default-chatgpt')
     await subscribe(chatgptOnly, 'codex', ['acct-codex-top', 'acct-codex-next'])
-    assert.deepEqual((await order.orderView(pool, chatgptOnly)).entries.map(entry => [entry.harness, entry.model]), [['codex', 'acct-codex-top']])
+    assert.deepEqual((await order.orderView(pool, chatgptOnly)).entries.map(entry => [entry.harness, entry.model]), [['codex', 'acct-codex-top'], ['codex', 'acct-codex-next']])
     // Only a DeepSeek key: DeepSeek's first reported model, on the key.
     const deepseekOnly = await person('order-default-deepseek')
     const key = await keys.addApiKey(pool, deepseekOnly.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'key-deepseek-first' }, { id: 'key-deepseek-second' }] })) as unknown as typeof fetch })
     const deepseekView = await order.orderView(pool, deepseekOnly)
-    assert.deepEqual(deepseekView.entries.map(entry => [entry.model, entry.source]), [['key-deepseek-first', { kind: 'api_key', keyId: key.id }]])
+    assert.deepEqual(deepseekView.entries.map(entry => [entry.model, entry.source]), [['key-deepseek-first', { kind: 'api_key', keyId: key.id }], ['key-deepseek-second', { kind: 'api_key', keyId: key.id }]])
   })
 
   await t.test('no points for Mikka 默认: the next allowed model a chat can run on, in the person\'s order', async () => {
@@ -476,7 +487,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     // An untouched list follows the preferred Agent at read time: Codex has the DeepSeek model now.
     await order.changeOrder(pool, scope, { kind: 'preferred', harness: 'codex' })
     view = await order.orderView(pool, scope)
-    assert.deepEqual([view.preferredHarness, view.customized, view.entries.map(entry => [entry.model, entry.harness])], ['codex', false, [['acct-opus-p', 'claude_code'], ['ds-a', 'codex']]])
+    assert.deepEqual([view.preferredHarness, view.customized, view.entries.map(entry => [entry.model, entry.harness])], ['codex', false, [['acct-opus-p', 'claude_code'], ['ds-a', 'codex'], ['ds-b', 'codex']]])
     // A stored list: each Agent keeps its own rows; switching 优先使用的 Agent moves none (decision 2026-11-05-0400).
     await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: 'codex', model: 'ds-b', source: key }] })
     await order.changeOrder(pool, scope, { kind: 'preferred', harness: 'claude_code' })

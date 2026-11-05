@@ -2,6 +2,7 @@ import 'server-only'
 import { isDeepStrictEqual } from 'node:util'
 import type { Pool, PoolClient } from 'pg'
 import type { WorkerDefinitionSnapshot } from '@/lib/agent-kit/worker'
+import { MODEL_ROUTING_TIERS, modelTier } from '@/lib/model-routing'
 import { credentialStates, orderCandidates } from '@/lib/model-order'
 import { executionIdentityForRun, ExecutionIdentityError } from '@/lib/execution-identity'
 import { assertProfileTarget, assertProfileSelection, BUILTIN_AGENT_PROFILE_ID, isBuiltinAgentProfileSelection, type AgentProfileSelection } from './agent-profile'
@@ -98,11 +99,40 @@ export async function admitProfileSelection(query: Query, input: {
       const unclaimedStartup = input.selection && source.status === 'failed' && source.stopReason === 'device_lost' &&
         !source.startedAt && !source.sessionId && !source.stopRequestedAt &&
         isDeepStrictEqual({ ...source.agentDefinition.agentProfile, targetEntry: undefined }, { ...input.selection, targetEntry: undefined })
-      if (!same && !unclaimedStartup && (!input.selection || !isBuiltinAgentProfileSelection(input.selection) || !isBuiltinAgentProfileSelection(source.agentDefinition.agentProfile))) throw new AgentProfileAdmissionError()
+      const previous = source.agentDefinition.modelDispatch?.routing
+      // A new execute attempt after a persisted failure may choose a higher
+      // model while retaining a current inherited role. The locked Factory
+      // chain, not a copied JSON flag, establishes this fresh admission.
+      let routingRepair = false
+      if (!same && input.selection && input.factoryContext && !input.factoryContext.runId && previous &&
+          source.agentDefinition.modelDispatch?.mode === 'preference' &&
+          source.agentDefinition.agentProfile.definition.model.mode === 'inherit' &&
+          !source.stopRequestedAt && ['succeeded', 'failed', 'stopped'].includes(source.status) && input.model &&
+          MODEL_ROUTING_TIERS.indexOf(modelTier(input.model)) > MODEL_ROUTING_TIERS.indexOf(previous.tier) &&
+          isDeepStrictEqual({ ...source.agentDefinition.agentProfile, targetEntry: undefined }, { ...input.selection, targetEntry: undefined })) {
+        const admitted = await query.query(`SELECT 1 FROM factory_tasks t
+          JOIN factory_attempts pending ON pending.id=t."attemptId" AND pending."taskId"=t.id
+          JOIN factory_attempts failed ON failed."taskId"=t.id AND failed.position=pending.position-1
+          JOIN factory_attempts origin ON origin."taskId"=t.id AND origin."runId"=$5 AND origin.stage='execute'
+          WHERE t."userId"=$1 AND t."issueId"=$2 AND t."sourceEventId"=$3 AND pending.id=$4
+            AND t.stage='execute' AND t.status='pending' AND pending.stage='execute' AND pending.status='pending' AND pending."runId" IS NULL
+            AND COALESCE(pending.output->>'requestEpoch',$3::text)=$3::text
+            AND COALESCE(failed.output->>'requestEpoch',$3::text)=$3::text AND failed.status='failed'
+            AND ((failed.stage IN ('review','verify') AND failed.output->'completion'->'trustedFailureProvenance'='true'::jsonb)
+              OR (failed.stage='execute' AND failed."runId"=$5 AND failed.output->>'reasonCode'='run_failed'))
+            AND origin.position<pending.position
+            AND NOT EXISTS (SELECT 1 FROM factory_attempts newer WHERE newer."taskId"=t.id AND newer.stage='execute'
+              AND newer.position>origin.position AND newer.position<pending.position)
+          FOR SHARE OF t,pending,failed,origin`, [input.ownerId, input.issueId, input.factoryContext.sourceEventId, input.factoryContext.attemptId, input.sourceRunId])
+        routingRepair = Boolean(admitted.rowCount)
+      }
+      if (!same && !unclaimedStartup && !routingRepair && (!input.selection || !isBuiltinAgentProfileSelection(input.selection) || !isBuiltinAgentProfileSelection(source.agentDefinition.agentProfile))) throw new AgentProfileAdmissionError()
       // An unclaimed failed startup may retry the same role on a newly
       // authorized target. This is fresh admission, not a native continuation.
       // A legacy/default thread can make a fresh authorized model selection.
       // A changed model or source never inherits the old native-session grant.
+      // Routing repairs still pass assertProfileSelection below and again at
+      // claim: editing/archiving the profile can revoke the new execution.
       if (same && source.startedAt && source.sessionId) return input.sourceRunId
     }
   }

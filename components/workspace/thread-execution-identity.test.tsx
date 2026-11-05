@@ -33,3 +33,35 @@ test('the frozen Agent 配置 words its selection reason in the reader\'s langua
   assert.match(legacy,/selectionSources\.decision/)
   assert.doesNotMatch(legacy,/Declared capabilities/)
 })
+
+test('the frozen difficulty, selected model, effort and reason are visible independently of the run model', () => {
+  const html = renderToStaticMarkup(<Content evidence={{ ...evidence, modelRouting: {
+    version: 1, difficulty: 'easy', model: 'gpt-6-luna', harness: 'codex', tier: 'light', effort: 'low', reason: 'difficulty_fit',
+  } }} />)
+  for (const value of ['modelRouting', 'routingDifficulty.easy', 'gpt-6-luna', 'routingEffort.low', 'routingReasons.difficulty_fit', 'data-model-routing="difficulty_fit"']) assert.ok(html.includes(value), value)
+  assert.doesNotMatch(html, /previousModel/)
+})
+
+test('routing fallback and escalation reasons are localized and unsupported effort is never invented', () => {
+  const reasons = ['list_order', 'low_confidence', 'decision_unavailable', 'invalid_answer', 'no_selection', 'escalated'] as const
+  for (const reason of reasons) {
+    const html = renderToStaticMarkup(<Content evidence={{ ...evidence, modelRouting: {
+      version: 1, difficulty: 'unknown', model: 'gpt-6.1-sol', harness: 'codex', tier: 'strongest', reason,
+      ...(reason === 'escalated' ? { previousModel: 'gpt-6-luna' } : {}),
+    } }} />)
+    assert.match(html, /routingDifficulty.unknown/)
+    assert.ok(html.includes(`routingReasons.${reason}`))
+    assert.doesNotMatch(html, /routingEffort\./)
+    if (reason === 'escalated') {
+      assert.match(html, /previousModel/)
+      assert.match(html, /gpt-6-luna/)
+    }
+  }
+})
+
+test('legacy evidence never shows a made-up routing decision', () => {
+  for (const modelRouting of [undefined, null]) {
+    const html = renderToStaticMarkup(<Content evidence={{ ...evidence, modelRouting }} />)
+    assert.doesNotMatch(html, /data-model-routing|routingDifficulty|routingEffort|routingReason/)
+  }
+})

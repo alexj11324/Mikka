@@ -633,7 +633,7 @@ async function dispatchByRules(userId: string, input: { threadRunId?: string; is
     const { resolveAgentProfileDispatch } = await import('@/lib/factory/agent-profile')
     const { target, agentProfile, selectionMode } = await resolveAgentProfileDispatch(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, { issueId: input.issueId, stage: 'execute', note: input.note, profileId: input.profileId, asked: input.model, location: 'local', deviceId: device.deviceId, agentId: input.agentId, defaultOnly: Boolean(input.threadRunId) })
     if (target.kind !== 'device') return { error: 'machineUnavailable' as const, issueId: input.issueId, ...(target.kind === 'none' ? { reason: target.reason, card: target.card } : {}) }
-    const modelDispatch: WorkerModelDispatch = { mode: selectionMode ?? (input.model ? 'picked' : 'preference'), location: 'local', entry: target.entry }
+    const modelDispatch: WorkerModelDispatch = { mode: selectionMode ?? (input.model ? 'picked' : 'preference'), location: 'local', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) }
     const result = await queueTaskRun(userId, { ...input, agentId: target.agentId, model: target.model, modelDispatch, agentProfile, pinnedDeviceId: target.deviceId, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}), ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId)
     return { ...result, status: 'queued' as const }
   }
@@ -661,7 +661,7 @@ async function dispatchByRules(userId: string, input: { threadRunId?: string; is
     const onDevice = async (device: Extract<typeof target, { kind: 'device' }>, threadRunId = input.threadRunId) => {
       // Automatic placement selects the initial worker, not an owner-pinned
       // destination. Only the named-device branch above freezes that constraint.
-      const modelDispatch: WorkerModelDispatch = { mode: selectionMode ?? (input.model ? 'picked' : 'preference'), entry: device.entry }
+      const modelDispatch: WorkerModelDispatch = { mode: selectionMode ?? (input.model ? 'picked' : 'preference'), entry: device.entry, ...(device.routing ? { routing: device.routing } : {}) }
       const selectedProfile = agentProfile?.source === 'default' ? builtinAgentProfileSelection(agentProfile.scope, device.entry)
         : agentProfile ? { ...structuredClone(agentProfile), targetEntry: structuredClone(device.entry) } : undefined
       const result = await queueTaskRun(userId, { ...input, threadRunId, agentId: device.agentId, model: device.model, modelDispatch, agentProfile: selectedProfile, ...(device.subscriptionBindingId ? { subscriptionBindingId: device.subscriptionBindingId } : {}), ...(device.entry.source.kind === 'api_key' ? { apiKeyId: device.entry.source.keyId } : {}) }, botId, execution, requestEventId)
@@ -680,7 +680,7 @@ async function dispatchByRules(userId: string, input: { threadRunId?: string; is
     const { bindAgentToConnection } = await import('@/lib/model-dispatch')
     const source = target.entry.source
     const subscriptionBindingId = runtime && source.kind === 'subscription' ? await timedPhase('bindAgentToConnection', () => bindAgentToConnection(pool, { ownerId: userId, workspaceId }, runtime.agentId, target.harness, source.connectionId, target.model)) : undefined
-    const modelDispatch: WorkerModelDispatch = { mode: selectionMode ?? (input.model ? 'picked' : 'preference'), ...(place === 'cloud' ? { location: 'cloud' as const } : {}), entry: target.entry }
+    const modelDispatch: WorkerModelDispatch = { mode: selectionMode ?? (input.model ? 'picked' : 'preference'), ...(place === 'cloud' ? { location: 'cloud' as const } : {}), entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) }
     const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,modelDispatch,agentProfile,repo:input.repo,threadRunId:input.threadRunId,sourceEventId:requestEventId,factoryBotId:botId,...(subscriptionBindingId ? {subscriptionBindingId} : {}),...(target.entry.source.kind === 'api_key' ? {apiKeyId:target.entry.source.keyId} : {}),...(input.readOnly ? {readOnly:true} : {})},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution,place !== 'cloud' ? true : undefined) : { error: 'cloudComputerUnavailable' as const }
     if (!('error' in cloud) || cloud.error !== 'cloudComputerUnavailable') return cloud
     // 云端 could not start it (the key refused, a limit, the template, E2B down, the worker never came up;
@@ -690,6 +690,7 @@ async function dispatchByRules(userId: string, input: { threadRunId?: string; is
       const profileHarness = agentProfile?.definition.harness
       const fallback = await resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, undefined, undefined, {
         withoutCloud: true, agentId: input.agentId,
+        routing: { issueId: input.issueId, stage: 'execute', note: input.note, effort: agentProfile?.effort },
         ...(exact ? { exactEntry: target.entry, harness: target.entry.harness } : profileHarness && profileHarness !== 'auto' ? { harness: profileHarness } : {}),
       })
       // An admitted but unclaimed startup failure is the same Factory intent.
@@ -807,7 +808,7 @@ export async function dispatchComputerThread(userId: string, input: { botId: str
         const subscriptionBindingId = source.kind === 'subscription' ? await (await import('@/lib/model-dispatch')).bindAgentToConnection(pool,
           { ownerId: userId, workspaceId: bot.workspaceId }, runtime.agentId, target.harness, source.connectionId, target.model) : undefined
         harness = target.harness
-        runModel = { model: target.model, agentProfile, modelDispatch: { mode: selectionMode ?? (request.harness ? 'picked' : 'preference'), location: 'cloud', entry: target.entry },
+        runModel = { model: target.model, agentProfile, modelDispatch: { mode: selectionMode ?? (request.harness ? 'picked' : 'preference'), location: 'cloud', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
           ...(subscriptionBindingId ? { subscriptionBindingId } : {}), ...(source.kind === 'api_key' ? { apiKeyId: source.keyId } : {}) }
       }
       return dispatchComputerTask(userId, { ...request, harness, factoryBotId: chatBotId ?? request.botId, sourceEventId, note, ...runModel, ...(previous ? { threadRunId: previous.id } : {}), ...(request.readOnly || previous?.readOnly ? { readOnly: true } : {}) }, previous ? `thread:${previous.id}:${toolCallId}` : toolCallId, scope, execution)

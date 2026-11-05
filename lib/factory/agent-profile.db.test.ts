@@ -70,6 +70,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
 
   await t.test('default dispatch survives a 21-second catalogue wait before final membership admission', { timeout: 45_000 }, async () => {
     const selected = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' }, {
+      modelDecision: async () => null,
       resolve: async (...args) => {
         await new Promise(resolve => setTimeout(resolve, 21_000))
         // The real daemon keeps reporting presence while catalogue work waits.
@@ -81,7 +82,10 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.ok(selected.agentProfile)
     if (selected.target.kind !== 'device') assert.fail('the delayed default still selects its authorized local device')
     assert.equal(selected.target.agentId, agents[selected.target.entry.harness])
-    assert.deepEqual(selected.target, await resolveModelDispatch(pool, scope, undefined, 'local'))
+    const { routing, ...target } = selected.target
+    assert.deepEqual(target, await resolveModelDispatch(pool, scope, undefined, 'local'))
+    assert.deepEqual(routing, { version: 1, difficulty: 'unknown', model: 'claude-haiku-5-5',
+      harness: 'claude_code', tier: 'light', reason: 'decision_unavailable' })
     assert.deepEqual(selected.agentProfile.targetEntry, selected.target.entry)
     const binding = (await pool.query('SELECT "consumerId","connectionId","modelId" FROM byos_bindings WHERE id=$1', [selected.target.subscriptionBindingId])).rows[0]
     assert.equal(binding.consumerId, selected.target.agentId)
@@ -91,9 +95,23 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   })
 
   await t.test('zero configuration preserves the existing model resolver', async () => {
-    const actual = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' })
+    const decisionPurposes: string[] = []
+    const unavailableDecision = async (purpose: string) => { decisionPurposes.push(purpose); return null }
+    const actual = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' }, { modelDecision: unavailableDecision })
     const expected = await resolveModelDispatch(pool, scope, undefined, 'local')
-    assert.deepEqual(actual.target, expected)
+    if (actual.target.kind !== 'device') assert.fail('local default must select the fixture device')
+    const { routing, ...target } = actual.target
+    assert.deepEqual(target, expected, 'an unavailable routing Decision preserves every original execution target field')
+    assert.deepEqual(routing, { version: 1, difficulty: 'unknown', model: 'claude-haiku-5-5',
+      harness: 'claude_code', tier: 'light', reason: 'decision_unavailable' })
+    assert.deepEqual(decisionPurposes, ['task-model-routing'])
+    const { changeOrder } = await import('@/lib/model-order')
+    await changeOrder(pool, scope, { kind: 'autoRouting', enabled: false })
+    try {
+      const disabled = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' }, { modelDecision: unavailableDecision })
+      assert.deepEqual(disabled, { target: expected, agentProfile: actual.agentProfile, selectionMode: 'preference' }, 'routing off returns the complete legacy result without a routing snapshot')
+      assert.deepEqual(decisionPurposes, ['task-model-routing'], 'routing off never calls the judge')
+    } finally { await changeOrder(pool, scope, { kind: 'autoRouting', enabled: true }) }
     assert.equal(actual.agentProfile?.profileId, 'default'); assert.equal(actual.agentProfile?.source, 'default')
     assert.equal(actual.agentProfile?.version, 1); assert.equal(actual.agentProfile?.instructions, '')
     assert.deepEqual(actual.agentProfile?.skills, []); assert.deepEqual(actual.agentProfile?.definition.roles, [])
@@ -109,7 +127,6 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     }
     assert.equal((await pool.query('SELECT 1 FROM factory_agent_profiles WHERE "ownerId"=$1 AND "workspaceId"=$2', [scope.ownerId, scope.workspaceId])).rowCount, 0)
     const { admitProfileSelection } = await import('./profile-admission')
-    if (actual.target.kind !== 'device') assert.fail('local default must select the fixture device')
     const sourceRunId = randomUUID()
     const snapshot = { harness: actual.target.entry.harness, model: actual.target.model, agentProfile: actual.agentProfile!, subscription: { bindingId: actual.target.subscriptionBindingId! }, executionIdentity: { workspaceId: scope.workspaceId } }
     await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId","issueId",status,prompt,"startedAt","sessionId","agentDefinition") VALUES ($1,$2,$3,$4,$5,'succeeded','fixture',now(),'default-native-session',$6)`, [sourceRunId, scope.ownerId, actual.target.agentId, deviceId, issueId, JSON.stringify(snapshot)])

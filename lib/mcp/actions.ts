@@ -220,7 +220,7 @@ async function mcpRunModel(userId: string, input: { issueId: string; agentId: st
     { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId },
     { issueId: input.issueId, stage: 'execute', location: 'local', agentId: agent.id, deviceId: agent.deviceId, asked: { harness: agent.harness } })
   if (target.kind !== 'device' || target.agentId !== agent.id) throw new ActionFailureError('runModelMissing')
-  return { model: target.model, agentProfile, modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry },
+  return { model: target.model, agentProfile, modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
     ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
     ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
 }

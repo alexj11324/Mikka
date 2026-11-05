@@ -54,15 +54,18 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       },
     }),
   } })
-  let decisionProfile = '', decisionCalls = 0
-  const decisionInputs: unknown[] = []
+  let decisionProfile = ''
+  const decisionInputs: { purpose: string; input: unknown; questions: unknown; profileId: string }[] = []
+  const decisionCounts = () => ({
+    profile: decisionInputs.filter(call => call.purpose === 'factory-agent-profile').length,
+    model: decisionInputs.filter(call => call.purpose === 'task-model-routing').length,
+  })
   t.mock.module(new URL('../coordinator/decide.ts', import.meta.url).href, { namedExports: {
-    invokeDecision: async (_purpose: string, input: unknown, questions: unknown) => {
-      decisionCalls++; decisionInputs.push(input)
-      const serialized = JSON.stringify(input)
-      for (const privateText of ['PRIVATE_PROFILE_', 'connectionId', 'synthetic-subscription-', 'providerSubject']) assert.ok(!serialized.includes(privateText), privateText)
-      assert.ok(serialized.includes('review'))
-      assert.ok(JSON.stringify(questions).includes(decisionProfile))
+    invokeDecision: async (purpose: string, input: unknown, questions: unknown) => {
+      decisionInputs.push({ purpose, input, questions, profileId: decisionProfile })
+      // A legacy Profile may route its inherited model, independently of Profile
+      // selection. Exercise its unavailable-decision fallback deliberately.
+      if (purpose === 'task-model-routing') return null
       return { answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
         ['profile', { name: 'profile', type: 'choice', choice: decisionProfile, confidence: .95 }],
         ['reason', { name: 'reason', type: 'choice', choice: 'stage_fit' }],
@@ -120,7 +123,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     return { scope, actor, ownerId, workspaceId, botId, issueId, sourceEventId, deviceId, repoId, agents, connections, implement, review, store, task: routed.task }
   }
   const exercise = async (withProfiles: boolean, missingCodex: boolean) => {
-    const f = await fixture(withProfiles, missingCodex), beforeDecisions = decisionCalls
+    const f = await fixture(withProfiles, missingCodex), beforeDecisions = decisionCounts()
     const selected = withProfiles ? await profiles.resolveAgentProfileDispatch(pool, f.scope, { issueId: f.issueId, profileId: f.implement!.id, location: 'cloud', cloudPurpose: 'desktop' }) : null
     assert.equal(selected?.target.kind ?? 'cloud', 'cloud')
     const subscriptionBindingId = await bindAgentToConnection(pool, f.scope, f.agents.claude_code, 'claude_code', f.connections.claude_code, model.claude_code)
@@ -164,14 +167,17 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       assert.equal(frozen.targetEntry.source.connectionId, f.connections.codex)
       assert.match(run.prompt, /PRIVATE_PROFILE_Review/)
       assert.equal(sourceBefore.agentDefinition.agentProfile.profileId, f.implement!.id)
-      assert.equal(decisionCalls, beforeDecisions + 1)
+      assert.deepEqual(decisionCounts(), { profile: beforeDecisions.profile + 1, model: beforeDecisions.model }, 'a fixed Profile selects its role once without model routing')
     } else {
       assert.equal(frozen.profileId, 'default'); assert.equal(frozen.source, 'default')
-      assert.equal(decisionCalls, beforeDecisions, 'legacy same-Harness fallback does not invoke Decision')
+      assert.deepEqual(decisionCounts(), { profile: beforeDecisions.profile, model: beforeDecisions.model + 1 }, 'legacy same-Harness fallback routes its model once without Profile selection')
+      assert.equal(run.agentDefinition.modelDispatch.routing.reason, 'decision_unavailable')
     }
     assert.deepEqual(handoffs.at(-1), { previous: source.runId, runId: run.id })
     assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE id=$1', [source.runId])).rows[0], sourceBefore)
+    const afterDecisions = decisionCounts()
     await reconciler.run(f.ownerId, source.runId)
+    assert.deepEqual(decisionCounts(), afterDecisions, 'reconciling the same source again does not repeat either Decision')
     assert.equal((await pool.query("SELECT 1 FROM factory_attempts WHERE \"taskId\"=$1 AND stage='review'", [f.task.id])).rowCount, 1)
     assert.equal((await pool.query("SELECT 1 FROM factory_attempts WHERE \"taskId\"=$1 AND stage='verify'", [f.task.id])).rowCount, 0)
     assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 2)
@@ -190,7 +196,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     epoch: 'a new connection revision during allowance refresh cannot refresh or reuse the old binding',
   }[quotaResult], async t => {
     const slowPreparation = quotaResult !== 'fresh'
-    const f = await fixture(false, false), beforeDecisions = decisionCalls
+    const f = await fixture(false, false), beforeDecisions = decisionCounts()
     const chatBotId = await seedBot(pool, f.workspaceId, f.ownerId), issueId = await seedIssue(pool, f.ownerId), sourceEventId = randomUUID()
     await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1::uuid,$2,$3,$4,'user_message',$1::text,'{"text":"Run the explicit Codex task"}')`, [sourceEventId, f.ownerId, chatBotId, issueId])
     await pool.query('UPDATE model_order_settings SET "preferredHarness"=\'claude_code\' WHERE "ownerId"=$1 AND "workspaceId"=$2', [f.ownerId, f.workspaceId])
@@ -270,7 +276,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
         const { quota } = (await pool.query('SELECT quota FROM byos_connections WHERE id=$1', [f.connections.codex])).rows[0]
         assert.equal((await import('../subscription-quota')).subscriptionAvailability(quota, model.codex, 'codex').status, 'checking', 'the old-revision provider response cannot save a new quota observation')
       }
-      assert.equal(decisionCalls, beforeDecisions)
+      assert.deepEqual(decisionCounts(), beforeDecisions)
       return
     }
     const result = await resultPending
@@ -285,7 +291,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     await (await import('./profile-admission')).assertRunProfileClaim(pool, result.runId)
     assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [issueId])).rowCount, 1)
     assert.equal((await pool.query('SELECT 1 FROM factory_tasks WHERE "issueId"=$1 AND "botId"=$2', [issueId, chatBotId])).rowCount, 1)
-    assert.equal(decisionCalls, beforeDecisions, 'The zero-configuration named model requires no Profile Decision')
+    assert.deepEqual(decisionCounts(), beforeDecisions, 'The zero-configuration named model requires neither Profile nor model Decision')
     assert.equal(quotaReads, slowPreparation ? 1 : 0, 'only the selected stale subscription needs one real service refresh')
     assert.equal(preflightUnlocked, slowPreparation, 'no source row is locked across the provider usage read')
   })
@@ -393,5 +399,13 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       assert.equal((await pool.query('SELECT 1 FROM byos_native_runs WHERE "runId"=$1', [f.runId])).rowCount, 0)
     })
   }
-  assert.equal(decisionInputs.length, 2)
+  assert.deepEqual(decisionInputs.map(call => call.purpose), ['factory-agent-profile', 'factory-agent-profile', 'task-model-routing'])
+  // Validate captured inputs outside the transport: model routing intentionally
+  // catches transport errors, which must not swallow a privacy assertion.
+  for (const call of decisionInputs) {
+    const serialized = JSON.stringify(call.input)
+    for (const privateText of ['PRIVATE_PROFILE_', 'connectionId', 'synthetic-subscription-', 'providerSubject']) assert.ok(!serialized.includes(privateText), privateText)
+    assert.ok(serialized.includes('review'))
+    if (call.purpose === 'factory-agent-profile') assert.ok(JSON.stringify(call.questions).includes(call.profileId))
+  }
 })

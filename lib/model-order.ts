@@ -10,7 +10,7 @@ import { apiKeyHarnesses } from './model-api-key-providers'
 import { shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
 import { providerHealthStates, providerSourceKey } from './model-provider-health'
 import {
-  agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, offerKey, planDispatch, whyNoDevice,
+  agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, offerKey, onPreferredAgent, planDispatch, whyNoDevice,
   type CredentialState, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
 } from './model-order-plan'
 
@@ -20,7 +20,7 @@ import {
  * the page shows and edits. Candidates are only what the person actually
  * has here: each connected subscription's catalogue (the models its account
  * reported) and each usable API key's /models list. An untouched list is the
- * default preference over those candidates (`defaultOrder`), never stored
+ * default preference over those candidates (`defaultOrderByAgent`), never stored
  * until the person changes it.
  */
 type Query = Pick<Pool | PoolClient, 'query'>
@@ -41,7 +41,8 @@ export interface OrderRow extends OrderEntry {
 export interface OrderView {
   location: RunLocation
   customized: boolean
-  /** 优先使用的 Agent: where a model both Agents run goes by default. */
+  autoModelRouting: boolean
+  /** 优先使用的 Agent: which Agent's own list is shown and tried first. */
   preferredHarness: OrderHarness
   /** Connected subscriptions and usable API keys here: none means 优先使用的模型 says to connect one (C8). */
   credentials: number
@@ -107,16 +108,24 @@ export async function orderCandidates(query: Query, scope: OrderScope): Promise<
 }
 
 async function settingsRow(query: Query, scope: OrderScope) {
-  const { rows: [row] } = await query.query<{ location: RunLocation; customized: boolean; preferredHarness: OrderHarness }>(
-    'SELECT location,customized,"preferredHarness" FROM model_order_settings WHERE "ownerId"=$1 AND "workspaceId"=$2', [scope.ownerId, scope.workspaceId])
-  return row ?? { location: 'cloud' as RunLocation, customized: false, preferredHarness: 'claude_code' as OrderHarness }
+  const { rows: [row] } = await query.query<{ location: RunLocation; customized: boolean; preferredHarness: OrderHarness; autoModelRouting: boolean }>(
+    'SELECT location,customized,"preferredHarness","autoModelRouting" FROM model_order_settings WHERE "ownerId"=$1 AND "workspaceId"=$2', [scope.ownerId, scope.workspaceId])
+  return row ?? { location: 'cloud' as RunLocation, customized: false, preferredHarness: 'claude_code' as OrderHarness, autoModelRouting: true }
 }
 
 /** The allowed models in order: the stored list, or for an untouched list the default preference (ids are stable per entry). */
-export async function readOrder(query: Query, scope: OrderScope, candidates?: (OrderCandidate & { provider: string })[]): Promise<{ location: RunLocation; customized: boolean; preferredHarness: OrderHarness; entries: OrderEntry[] }> {
+export async function readOrder(query: Query, scope: OrderScope, candidates?: (OrderCandidate & { provider: string })[]): Promise<{ location: RunLocation; customized: boolean; preferredHarness: OrderHarness; autoModelRouting: boolean; entries: OrderEntry[] }> {
   const settings = await settingsRow(query, scope)
   if (!settings.customized) {
-    const list = defaultOrderByAgent(candidates ?? await orderCandidates(query, scope), settings.preferredHarness)
+    const available = candidates ?? await orderCandidates(query, scope)
+    const defaults = defaultOrderByAgent(available, settings.preferredHarness)
+    // Include lighter reported models from the default credentials without
+    // silently adding a different paid key. Turning routing off restores each
+    // Agent's default list; saved lists remain exactly as set.
+    const sources = new Set(defaults.map(item => `${item.source.kind}:${sourceId(item)}`))
+    const extra = settings.autoModelRouting ? onPreferredAgent(available, settings.preferredHarness)
+      .filter(item => sources.has(`${item.source.kind}:${sourceId(item)}`)) : []
+    const list = [...new Map([...defaults, ...extra].map(item => [entryKey(item), item])).values()]
     // The entry is also frozen in a run's JSONB definition. Keep the NUL-separated
     // identity key in memory, but give its opaque row id a stable JSONB-safe form.
     return { ...settings, entries: list.map(item => ({ id: `default:${encodeURIComponent(entryKey(item))}`, harness: item.harness, model: item.model, source: item.source })) }
@@ -277,6 +286,7 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
   return {
     location: order.location,
     customized: order.customized,
+    autoModelRouting: order.autoModelRouting,
     preferredHarness: order.preferredHarness,
     credentials,
     devices: devices.filter(device => device.enabled).length,
@@ -312,6 +322,7 @@ export type OrderChange =
   /** The whole list, or one Agent's rows in their new order. */
   | { kind: 'reorder'; ids: string[] }
   | { kind: 'location'; location: RunLocation }
+  | { kind: 'autoRouting'; enabled: boolean }
   /** 优先使用的 Agent: which Agent's list the page shows and dispatch runs; no row moves. */
   | { kind: 'preferred'; harness: OrderHarness }
   /** One row's Agent, for a model both Agents run. */
@@ -331,6 +342,13 @@ export async function changeOrder(pool: Pool, scope: OrderScope, change: OrderCh
       const location = z.enum(['cloud', 'local']).parse(change.location)
       await client.query(`INSERT INTO model_order_settings ("ownerId","workspaceId",location) VALUES ($1,$2,$3)
         ON CONFLICT ("ownerId","workspaceId") DO UPDATE SET location=EXCLUDED.location,"updatedAt"=now()`, [scope.ownerId, scope.workspaceId, location])
+      await client.query('COMMIT')
+      return
+    }
+    if (change.kind === 'autoRouting') {
+      const enabled = z.boolean().parse(change.enabled)
+      await client.query(`INSERT INTO model_order_settings ("ownerId","workspaceId","autoModelRouting") VALUES ($1,$2,$3)
+        ON CONFLICT ("ownerId","workspaceId") DO UPDATE SET "autoModelRouting"=EXCLUDED."autoModelRouting","updatedAt"=now()`, [scope.ownerId, scope.workspaceId, enabled])
       await client.query('COMMIT')
       return
     }

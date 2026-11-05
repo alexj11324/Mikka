@@ -15,6 +15,7 @@ import { executionIdentitySchema, freezeExecutionIdentity, type ExecutionIdentit
 import { entryKey, type OrderEntry, type SkippedEntry } from './model-order-plan'
 import { credentialStates, dispatchOrder, orderCandidates, readOrder } from './model-order'
 import { bindAgentToConnection, modelUnavailableCard, resolveModelDispatch, type ModelDispatch } from './model-dispatch'
+import type { ModelRoutingSnapshot } from './model-routing'
 import { modelFallbackRecordSchema, type ModelFallbackChoice, type ModelFallbackRecord } from './run-model-fallback-view'
 import { lockFactoryCompletionTasks } from './run-completion-effects'
 import { lockCliAgentPolicy, lockCliTaskScope, providerContinuationPolicy } from './agent-tool-approval/policy-store'
@@ -73,11 +74,13 @@ const standingIdentity = (identity: ExecutionIdentity) => ({ requester: identity
 export function providerContinuationDefinition(source: WorkerDefinitionSnapshot, admitted: WorkerDefinitionSnapshot, prompt: string, policyCeiling?: RunPolicy): WorkerDefinitionSnapshot {
   const { apiKey: _key, subscription: _subscription, executionIdentity: _identity, repositoryAdmission: _admission,
     allowLocalRecovery: _local, profileOriginRunId: _profileOrigin, ...standing } = structuredClone(source)
+  const { routing: _previousRouting, ...dispatch } = source.modelDispatch!
   const definition: WorkerDefinitionSnapshot = { ...standing, harness: admitted.harness, model: admitted.model,
     modelSource: admitted.modelSource, cliModelSelection: 'explicit', promptDigest: digest(prompt),
     ...(source.agentProfile && admitted.modelDispatch?.entry ? { agentProfile: { ...structuredClone(source.agentProfile), targetEntry: structuredClone(admitted.modelDispatch.entry) } } : {}),
     ...(policyCeiling ? { policyCeiling: source.policyCeiling ? intersectRunPolicy(policyCeiling, source.policyCeiling) : policyCeiling } : {}),
-    modelDispatch: { ...source.modelDispatch!, mode: 'preference', entry: admitted.modelDispatch?.entry },
+    modelDispatch: { ...dispatch, mode: 'preference', entry: admitted.modelDispatch?.entry,
+      ...(admitted.modelDispatch?.routing ? { routing: structuredClone(admitted.modelDispatch.routing) } : {}) },
     ...(admitted.apiKey ? { apiKey: admitted.apiKey } : {}), ...(admitted.subscription ? { subscription: admitted.subscription } : {}),
     ...(admitted.repositoryAdmission ? { repositoryAdmission: admitted.repositoryAdmission } : {}),
     ...(source.allowLocalRecovery && admitted.allowLocalRecovery ? { allowLocalRecovery: true } : {}) }
@@ -137,7 +140,7 @@ async function fallbackScope(query: Query, run: Run): Promise<Scope> {
   return { ownerId: run.userId, workspaceId: scope?.workspaceId ?? await (await import('./execution-settings')).executionWorkspace(run.userId, run.botId), botId: scope?.botId ?? run.botId }
 }
 
-async function attemptedEntries(query: Query, run: Run, entries: OrderEntry[]): Promise<Set<string>> {
+async function attemptedEntries(query: Query, run: Run, entries: OrderEntry[], smartRouting: boolean): Promise<Set<string>> {
   // A bounded recursive chain is owner/task scoped and contains only earlier
   // provider continuations; old tasks cannot exhaust this task's order.
   const { rows } = await query.query<{ report: unknown; entry: OrderEntry | null }>(`WITH RECURSIVE chain AS (
@@ -154,7 +157,10 @@ async function attemptedEntries(query: Query, run: Run, entries: OrderEntry[]): 
   }
   const current = run.agentDefinition?.modelDispatch?.entry
   const index = current ? entries.findIndex(entry => attemptKey(entry) === attemptKey(current)) : -1
-  for (const entry of entries.slice(0, index + 1)) attempted.add(attemptKey(entry))
+  // Difficulty routing may deliberately start later in the preference list.
+  // Earlier, stronger entries have not been attempted by that run.
+  if (!smartRouting || !run.agentDefinition?.modelDispatch?.routing)
+    for (const entry of entries.slice(0, index + 1)) attempted.add(attemptKey(entry))
   return attempted
 }
 
@@ -192,6 +198,7 @@ async function unavailableRecord(pool: Pool, scope: Scope, run: Run, attempted: 
  * as admission/Factory. A worker replay can safely finish an interrupted handoff. */
 async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, target?: {
   agentId: string; deviceId: string; deviceRepoId: string; model: string; entry: OrderEntry;
+  routing?: ModelRoutingSnapshot;
   subscriptionBindingId?: string; cloud: boolean; botId: string | null; workspaceId: string;
 }): Promise<Continuation | null> {
   const client = await pool.connect()
@@ -234,7 +241,9 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
     await withDatabaseClient(client, async () => {
       if (target && source.agentDefinition && source.issueId) {
         const policyCeiling = await providerContinuationPolicy(client, source.userId, source.id)
-        const modelDispatch = { ...source.agentDefinition.modelDispatch!, mode: 'preference' as const, entry: target.entry }
+        const { routing: _previousRouting, ...dispatch } = source.agentDefinition.modelDispatch!
+        const modelDispatch = { ...dispatch, mode: 'preference' as const, entry: target.entry,
+          ...(target.routing ? { routing: target.routing } : {}) }
         const selection = { model: target.model, modelDispatch, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
           ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
         let runId: string
@@ -288,7 +297,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
 }
 
 /** The existing dispatcher retains all owner, workspace, location and device
- * constraints. Only entries after this task's failed entries are eligible. */
+ * constraints. Attempted entries cannot re-enter the same recovery chain. */
 export async function recoverProviderFailure(pool: Pool, userId: string, runId: string): Promise<Continuation | null> {
   const source = await readSource(pool, userId, runId)
   if (!source || source.stopReason !== 'provider_failure' || source.status !== 'failed') return null
@@ -303,7 +312,8 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
   if (initial.state !== 'pending') return null
   // The order dispatch tried (优先使用的 Agent's list first, decision 2026-11-05-0400), so what came before this run is what was tried.
   const scope = await fallbackScope(pool, source), stored = await readOrder(pool, scope)
-  const attempted = await attemptedEntries(pool, source, dispatchOrder(stored.entries, stored.preferredHarness))
+  const { autoModelRouting } = stored
+  const attempted = await attemptedEntries(pool, source, dispatchOrder(stored.entries, stored.preferredHarness), autoModelRouting)
   if (source.agentDefinition?.modelDispatch?.mode !== 'preference' || source.questionContinuation || source.agentDefinition?.agentProfile?.definition.model.mode === 'fixed')
     return settle(pool, source, await unavailableRecord(pool, scope, source, attempted))
   const { rows: [origin] } = await pool.query<{ kind: string; remoteUrl: string | null }>(`SELECT d.kind,repo."remoteUrl" FROM devices d
@@ -319,6 +329,8 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
   for (let index = 0; index <= stored.entries.length; index++) {
     const selected: ModelDispatch = await resolveModelDispatch(pool, scope, null, location, source.agentDefinition.pinnedDeviceId ?? ((monitor || checkpointUnavailable) && origin.kind === 'local' ? source.deviceId ?? undefined : undefined),
       { excludeEntryKeys: [...attempted].map(key => decodeURIComponent(key)), cloudPurpose: origin.remoteUrl ? 'task' : 'desktop',
+        ...(autoModelRouting && source.agentDefinition.modelDispatch.routing ? { routing: { issueId: source.issueId ?? undefined,
+          previous: source.agentDefinition.modelDispatch.routing, escalate: true, effort: source.agentDefinition.agentProfile?.effort } } : {}),
         ...(source.agentDefinition.agentProfile?.definition.harness && source.agentDefinition.agentProfile.definition.harness !== 'auto' ? { harness: source.agentDefinition.agentProfile.definition.harness } : {}) })
     if (selected.kind === 'none') return settle(pool, source, await unavailableRecord(pool, scope, source, attempted, [...skipped, ...selected.skipped ?? []]))
     attempted.add(attemptKey(selected.entry))
@@ -349,6 +361,7 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
           if (!current) { skipped.push({ entry: selected.entry, block: { usable: false, reason: 'noDevice' } }); continue }
           const repoId = origin.remoteUrl ? (await (await import('./device-repositories')).ensureDeviceRepository(userId, current.deviceId, origin.remoteUrl)).id : current.repoId
           target = { agentId: ready.agentId, deviceId: current.deviceId, deviceRepoId: repoId, model: selected.model, entry: selected.entry,
+            ...(selected.routing ? { routing: selected.routing } : {}),
             ...(binding ? { subscriptionBindingId: binding } : {}), cloud: true, botId, workspaceId: scope.workspaceId }
         }
       }

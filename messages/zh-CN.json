@@ -2694,7 +2694,8 @@
       "reconnectSubscription": "重新连接",
       "openApiKey": "查看 API Key",
       "openSubscription": "查看订阅",
-      "description": "任务从上往下选第一个现在能用的模型",
+      "description": "派发给 Agent 的任务从这里选模型",
+      "autoRouting": "按任务难度自动选模型",
       "nowhereLocal": "服务器和电脑现在都跑不了",
       "e2bKeyHint": "云端跑任务用",
       "clauseSeparator": "；",
@@ -3856,6 +3857,31 @@
         "provider_unknown": "外部费用未知",
         "metered": "Mikka 按量计费",
         "not_applicable": "不适用"
+      },
+      "modelRouting": "模型选择",
+      "routingReason": "选择原因",
+      "previousModel": "升级前的模型",
+      "routingDifficulty": {
+        "easy": "简单",
+        "medium": "中等",
+        "hard": "困难",
+        "unknown": "难度未判断"
+      },
+      "routingEffort": {
+        "low": "低推理强度",
+        "medium": "中等推理强度",
+        "high": "高推理强度",
+        "xhigh": "极高推理强度",
+        "max": "最高推理强度"
+      },
+      "routingReasons": {
+        "difficulty_fit": "按任务难度选择",
+        "list_order": "按模型列表顺序选择",
+        "low_confidence": "难度判断不确定，沿用模型列表顺序",
+        "decision_unavailable": "难度判断暂不可用，沿用模型列表顺序",
+        "invalid_answer": "难度判断无效，沿用模型列表顺序",
+        "no_selection": "没有选出合适模型，沿用模型列表顺序",
+        "escalated": "原模型未能完成任务，已升级重试"
       }
     },
     "errorDetails": "详情"

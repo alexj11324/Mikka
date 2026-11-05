@@ -9,7 +9,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { mock, test } from 'node:test'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
-import { MIN_DAEMON_VERSION } from '@mikka/protocol/device'
+import { MIN_DAEMON_VERSION, runAssignmentSchema } from '@mikka/protocol/device'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { recordPushGrant } from './support/github-app-stub'
@@ -70,6 +70,7 @@ test(`daemon ${MIN_DAEMON_VERSION} as released works against today's device rout
   const token = `synthetic-${randomUUID()}`
   await pool.query('INSERT INTO device_tokens (id,"userId","tokenHash") VALUES ($1,$2,$3)', [randomUUID(), owner, hashDeviceToken(token)])
 
+  let claimPayload: unknown
   /** Today's route handlers behind the released client's fetch. */
   const serve = (async (input: string | URL, init?: RequestInit) => {
     const request = new Request(input, init)
@@ -80,7 +81,11 @@ test(`daemon ${MIN_DAEMON_VERSION} as released works against today's device rout
     if ((found = match(/^\/v1\/devices\/([^/]+)\/heartbeat$/))) return routes.heartbeat.POST(request, { params: Promise.resolve({ deviceId: found[0]! }) })
     if ((found = match(/^\/v1\/devices\/([^/]+)\/repos$/))) return routes.repos.GET(request, { params: Promise.resolve({ deviceId: found[0]! }) })
     if ((found = match(/^\/v1\/devices\/([^/]+)\/runs$/))) return routes.runs.GET(request, { params: Promise.resolve({ deviceId: found[0]! }) })
-    if ((found = match(/^\/v1\/devices\/([^/]+)\/runs\/([^/]+)\/claim$/))) return routes.claim.POST(request, { params: Promise.resolve({ deviceId: found[0]!, runId: found[1]! }) })
+    if ((found = match(/^\/v1\/devices\/([^/]+)\/runs\/([^/]+)\/claim$/))) {
+      const response = await routes.claim.POST(request, { params: Promise.resolve({ deviceId: found[0]!, runId: found[1]! }) })
+      if (response.ok) claimPayload = await response.clone().json()
+      return response
+    }
     throw new Error(`The contract test does not serve ${request.method} ${path}`)
   }) as typeof fetch
   const link = new HttpServerLink('http://127.0.0.1', serve, MIN_DAEMON_VERSION)
@@ -90,11 +95,15 @@ test(`daemon ${MIN_DAEMON_VERSION} as released works against today's device rout
   assert.deepEqual((await link.heartbeat(deviceId, { harnesses, runs: [], worktreeDiskBytes: 0 })).leases, {})
   assert.ok((await link.listRepos(deviceId)).some(repo => repo.repoId === repoId))
 
-  const { runId } = await queueRun(owner, { issueId, agentId, repo: remote, model: 'fixture-model' }, botId)
+  const { runId } = await queueRun(owner, { issueId, agentId, repo: remote, model: 'fixture-model',
+    modelDispatch: { mode: 'preference', routing: { version: 1, difficulty: 'hard', model: 'fixture-model', harness: 'claude_code', tier: 'standard', effort: 'high', reason: 'difficulty_fit' } } }, botId)
   assert.deepEqual(await link.pendingRuns(deviceId), [runId])
   const assignment = await link.claimRun(deviceId, runId)
   assert.equal(assignment.runId, runId)
   assert.equal(assignment.remoteUrl, remote)
+  // The oldest supported client strips additive fields; current clients keep
+  // the exact effort on the same wire response without breaking that client.
+  assert.equal(runAssignmentSchema.parse(claimPayload).effort, 'high', 'the current protocol retains the host-frozen routing effort')
   const leased = await link.heartbeat(deviceId, { harnesses, runs: [{ runId, lastProgressAt: new Date().toISOString() }], worktreeDiskBytes: 0 })
   assert.ok(leased.leases[runId], 'the claimed run\'s lease is renewed')
 })

@@ -129,12 +129,12 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
   })
 })
 
-test('an untouched list is defaultOrder over what was connected, dispatched only where a daemon reported it; nothing connected is noModels', { skip: !dbUrl }, async t => {
+test('an untouched list keeps each Agent\'s default order over connected models, dispatched only where a daemon reported it; nothing connected is noModels', { skip: !dbUrl }, async t => {
   process.env.MIKKA_BYOS_ENABLED = '1'
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const order = await import('../lib/model-order')
-  const { defaultOrder } = await import('../lib/model-order-plan')
+  const { defaultOrderByAgent, dispatchOrder } = await import('../lib/model-order-plan')
   const { resolveModelDispatch } = await import('../lib/model-dispatch')
   const { executionContextParts } = await import('../lib/coordinator/execution-context')
   const { pool: appPool } = await import('../lib/db')
@@ -168,21 +168,23 @@ test('an untouched list is defaultOrder over what was connected, dispatched only
   }
   const promptList = async (scope: { ownerId: string; botId: string }) => (await executionContextParts(scope.ownerId, scope.botId)).models
 
-  await t.test('untouched: Claude Code\'s opus, then Codex\'s first model; the prompt and dispatch use that same list', async () => {
+  await t.test('untouched: each Agent\'s default prefix and expanded models; the prompt and dispatch use the preferred Agent\'s list first', async () => {
     const p = await person('default-list')
     await subscribe(p, 'claude', ['fx-sonnet', 'fx-opus'])
     await subscribe(p, 'codex', ['fx-codex-top', 'fx-codex-mini'])
-    const expected = defaultOrder(await order.orderCandidates(pool, p)).map(item => `${item.harness}:${item.model}`)
-    assert.deepEqual(expected, ['claude_code:fx-opus', 'codex:fx-codex-top'])
+    const prefix = defaultOrderByAgent(await order.orderCandidates(pool, p)).map(item => `${item.harness}:${item.model}`)
+    assert.deepEqual(prefix, ['claude_code:fx-opus', 'codex:fx-codex-top'])
+    const expected = [...prefix, 'claude_code:fx-sonnet', 'codex:fx-codex-mini']
     const stored = await order.readOrder(pool, p)
     assert.equal(stored.customized, false)
     assert.deepEqual(stored.entries.map(entry => `${entry.harness}:${entry.model}`), expected)
     const lines = (await promptList(p)).split('\n').slice(1)
-    assert.deepEqual(lines.map(line => line.replace(/^\d+\. \S+(?: \S+)? \((\w+)\) (\S+) .*$/, '$1:$2')), expected)
-    // Only Codex's model was reported, on the one computer: opus runs nowhere, so the run takes Codex's, on that computer.
+    assert.deepEqual(lines.map(line => line.replace(/^\d+\. \S+(?: \S+)? \((\w+)\) (\S+) .*$/, '$1:$2')),
+      dispatchOrder(stored.entries, stored.preferredHarness).map(entry => `${entry.harness}:${entry.model}`))
+    // Opus runs nowhere, but this computer reports the same Agent's next model.
     const mac = await computer(p.ownerId, 'Mac', [{ harness: 'claude_code', installed: true, subscriptionBroker: true, models: ['fx-sonnet'] }, { harness: 'codex', installed: true, subscriptionBroker: true, models: ['fx-codex-top'] }])
     const target = await resolveModelDispatch(pool, p)
-    assert.deepEqual(target.kind === 'device' && [target.deviceId, target.model], [mac, 'fx-codex-top'])
+    assert.deepEqual(target.kind === 'device' && [target.deviceId, target.model], [mac, 'fx-sonnet'])
   })
 
   await t.test('nothing connected: the list is empty and dispatch refuses with noModels', async () => {
