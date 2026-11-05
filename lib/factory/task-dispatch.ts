@@ -1,4 +1,5 @@
 import 'server-only'
+import { wakeCoordinatorAfterCommit } from '../coordinator/wake-after-commit'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { FactoryError } from './contract'
@@ -39,6 +40,7 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
     if (!sourceEventId) {
       sourceEventId = factoryEventId('dispatch-source', `${userId}:${key}`)
       await tx.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1,$2,$3,$4,'user_message',$5,$6) ON CONFLICT DO NOTHING`, [sourceEventId, userId, input.botId, input.issueId, `factory-dispatch:${key}`, JSON.stringify({ text: input.note?.trim() || 'Run this task.', source: 'host_dispatch' })])
+      wakeCoordinatorAfterCommit(tx, userId)
     }
     // A direct owner follow-up is a new request epoch. Automatic repairs
     // reuse the task/source and must never replace their acceptance target.

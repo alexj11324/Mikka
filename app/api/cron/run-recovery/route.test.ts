@@ -32,11 +32,14 @@ mock.module(new URL('../../../../lib/factory/watchdog.ts', import.meta.url).href
 mock.module(new URL('../../../../lib/group-conversations-route.ts', import.meta.url).href, { namedExports: {
   resumePendingGroupTurns: async (deadline: number) => { swept.push(deadline); return { groups: 1 } },
 } })
+let nextDue: number | null = null, armed = 0
+mock.module(new URL('../../../../lib/run-recovery-due.ts', import.meta.url).href, { namedExports: { runRecoveryNextDue: async () => nextDue } })
+mock.module(new URL('../../../../lib/due-timer.ts', import.meta.url).href, { namedExports: { armDueTimer: async (kind: string) => { assert.equal(kind, 'run-recovery'); armed++ } } })
 const later: (() => unknown)[] = []
 mock.module('next/server', { namedExports: { after: (work: () => unknown) => { later.push(work) } } })
 let GET: typeof import('./route')['GET']
 before(async () => { ({ GET } = await import('./route')) })
-beforeEach(() => { process.env.CRON_SECRET = secret; calls = 0; fail = false })
+beforeEach(() => { process.env.CRON_SECRET = secret; calls = 0; fail = false; nextDue = null; armed = 0 })
 const call = (token: string | null = secret) => GET(new Request('http://127.0.0.1/mikka/api/cron/run-recovery', {
   headers: token ? { authorization: `Bearer ${token}` } : {},
 }))
@@ -77,4 +80,20 @@ test('lost runs are reclaimed by this sweep only, not by the task-run poll or ea
   for (const file of ['../../../actions/task-runs.ts', '../../../v1/devices/[deviceId]/heartbeat/route.ts']) {
     assert.doesNotMatch(await readFile(new URL(file, import.meta.url), 'utf8'), /reclaimLostRuns/, file)
   }
+})
+
+test('the slow sweep re-arms the run-recovery due timer when work is due later, recovering a lost start', async () => {
+  nextDue = Date.now() + 90_000
+  assert.equal((await call()).status, 200)
+  assert.equal(armed, 1)
+  later.length = 0
+})
+
+test('with nothing due the sweep starts no timer, and refused callers arm nothing', async () => {
+  assert.equal((await call()).status, 200)
+  assert.equal(armed, 0)
+  nextDue = Date.now()
+  assert.equal((await call('incorrect')).status, 401)
+  assert.equal(armed, 0)
+  later.length = 0
 })

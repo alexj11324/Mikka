@@ -6,6 +6,7 @@ import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { WorkspaceError } from '@/lib/workspace-access'
 import { recordAudit } from './record'
+import { armDueTimerSoon } from '@/lib/due-timer'
 
 export const auditRetentionInput = z.object({ retentionDays: z.number().int().min(1).max(36500).nullable(), legalHold: z.boolean() }).strict()
 export type AuditRetentionInput = z.infer<typeof auditRetentionInput>
@@ -37,7 +38,10 @@ export async function configureAuditRetention(actorId: string, workspaceId: stri
       ON CONFLICT("workspaceId") DO UPDATE SET "retentionDays"=excluded."retentionDays","legalHold"=excluded."legalHold","configuredBy"=excluded."configuredBy",revision=workspace_audit_retention.revision+1,"updatedAt"=now()
       RETURNING "retentionDays","legalHold",revision,"updatedAt"`, [workspaceId, value.retentionDays, value.legalHold, actorId])).rows[0]
     await recordAudit(drizzle(app), { workspaceId, actor: { type: 'user', id: actorId, name: actor.name }, action: 'audit.retention_changed', metadata: value })
-    await app.query('COMMIT'); await ws.query('COMMIT'); return policy
+    await app.query('COMMIT'); await ws.query('COMMIT')
+    // A new period can make events due now (#1371).
+    armDueTimerSoon('audit-retention')
+    return policy
   } catch (error) { await Promise.allSettled([app.query('ROLLBACK'), ws.query('ROLLBACK')]); throw error }
   finally { app.release(); ws.release() }
 }
