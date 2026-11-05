@@ -17,7 +17,7 @@ export const focusListenerAllowlist = {
   'hooks/use-live-key.tsx': 'closes scoped live channels while hidden; on show reconnects and catches up changes missed while disconnected (#1212), with no plain focus listener',
   'apps/mobile/lib/push.ts': 'refreshes the push token registration; the screen is not re-read',
   'apps/mobile/lib/updates.ts': 'prefetches an OTA bundle in the background; the screen is not re-read',
-  'lib/computer/event-stream.ts': 'closes the computer event stream while hidden; on show it resumes after the last event received, never re-reading what it has',
+  'hooks/use-subagent-updates.ts': 'cancels the scoped event read while hidden; on show it catches up after the last cursor (#1212), never re-reading prior events or listening to plain focus',
   'apps/mobile/lib/useApi.ts': 'pauses polling in the background; on return one silent read only past FRESH_FOR_MS',
 }
 

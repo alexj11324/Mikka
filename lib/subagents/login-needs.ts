@@ -1,6 +1,5 @@
 import { subagentEventSchema } from '@mikka/protocol/subagent'
 import { withBasePath } from '@/lib/base-path'
-import { listenComputerStream } from '@/lib/computer/event-stream'
 
 export type SubagentUpdate = ReturnType<typeof subagentEventSchema.shape.data.parse>
 export type LoginNeed = { subagentId: string; botId: string; origin: string; name: string; prefix: string }
@@ -30,16 +29,4 @@ export function loginNeeds(state: ReadonlyMap<string, SubagentUpdate>, botId: st
     needs.push({ subagentId: update.subagentId, botId, ...site, prefix: withBasePath(`/api/bots/${botId}/subagents/${update.subagentId}/credentials`) })
   }
   return needs
-}
-
-/** Shares the tab's one /api/computer/events stream. It sends `event: data-subagent` with the event's `data` as the payload. */
-export function subscribeSubagentUpdates(listener: (update: SubagentUpdate) => void): () => void {
-  return listenComputerStream('data-subagent', data => {
-    const parsed = subagentEventSchema.shape.data.safeParse(safeJson(data))
-    if (parsed.success) listener(parsed.data)
-  })
-}
-
-function safeJson(text: string): unknown {
-  try { return JSON.parse(text) } catch { return null }
 }

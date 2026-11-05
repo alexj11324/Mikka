@@ -1,4 +1,5 @@
 import 'server-only'
+import { lockSubagentEvents, notifySubagentEvents } from '@/lib/computer/event-log'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { ensureCloudMachine } from '@/lib/computer/provision'
@@ -31,9 +32,10 @@ export class SubagentStore {
     if (row.task !== task) throw new ComputerError(409, 'Web task request changed')
     return row
   }
-  private async publish(client: Pool | PoolClient, row: Subagent) {
+  private async publish(client: PoolClient, row: Subagent) {
     // 4e2 item 4: subagent_events are persisted and streamed; mask step/needs/task with the workspace's secret set.
     const event = await maskFor({ workspaceId: row.workspaceId, ownerId: row.ownerId }, subagentEventSchema.parse({ type: 'data-subagent', data: { botId: row.botId, subagentId: row.id, task: row.task, state: row.status, step: row.step, needs: row.needs } }))
+    await lockSubagentEvents(client, { ownerId: row.ownerId, workspaceId: row.workspaceId })
     await client.query('INSERT INTO subagent_events ("ownerId","workspaceId","botId","subagentId",event) VALUES ($1,$2,$3,$4,$5)', [row.ownerId, row.workspaceId, row.botId, row.id, JSON.stringify(event)])
     // Its workflow waits on this change instead of re-reading every 30 s (#1212).
     if (this.options.wakeSelf !== false) wakeWorkflowAfterCommit(client, wakeTokens.subagent(row.id))
@@ -55,6 +57,7 @@ export class SubagentStore {
         const denied=(await client.query<Subagent>(`UPDATE bot_subagents SET status='failed',step='Computer use is denied',"endedAt"=now(),"startLeaseId"=NULL,"startLeaseUntil"=NULL WHERE id=$1 AND status='queued' RETURNING *`,[id])).rows[0]
         if(denied) await this.publish(client,denied)
         await client.query('COMMIT')
+        if (denied) notifySubagentEvents({ ownerId: actor.userId, workspaceId: actor.workspaceId })
         return denied ?? await this.get(actor,botId,id,client)
       }
       const count = Number((await client.query(`SELECT count(*) AS n FROM bot_subagents WHERE "workspaceId"=$1 AND "ownerId"=$2 AND (status IN ('running','needs_you') OR (status='queued' AND "startLeaseUntil">now()))`, [actor.workspaceId,actor.userId])).rows[0].n)
@@ -79,6 +82,7 @@ export class SubagentStore {
         changed = (await tx.query<Subagent>(`UPDATE bot_subagents SET status='running',"targetId"=$2,step='running',"startLeaseId"=NULL,"startLeaseUntil"=NULL WHERE id=$1 AND status='queued' AND "startLeaseId"=$3 RETURNING *`, [id, result.targetId,leaseId])).rows[0]
         if (changed) await this.publish(tx, changed)
         await tx.query('COMMIT')
+        if (changed) notifySubagentEvents({ ownerId: actor.userId, workspaceId: actor.workspaceId })
       } catch(error) {await tx.query('ROLLBACK');throw error} finally {tx.release()}
       if (!changed) {
         const current=await this.get(actor,botId,id)
@@ -102,11 +106,12 @@ export class SubagentStore {
       const row = (await client.query<Subagent>(`UPDATE bot_subagents SET status=$5,step=$6,needs=$7,"activeActionId"=CASE WHEN $5 IN ('running','done','failed','stopped') THEN NULL ELSE "activeActionId" END,"endedAt"=CASE WHEN $5 IN ('done','failed','stopped') THEN now() ELSE NULL END
         WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4 AND (status IN ('running','needs_you') OR (status='queued' AND $5 IN ('failed','stopped'))) RETURNING *`, [id, actor.userId, actor.workspaceId, botId, status, step.slice(0, 500), needs ? JSON.stringify(needs) : null])).rows[0]
       if (row) {
-        await this.publish(client, row)
         if (['done', 'failed', 'stopped'].includes(status)) await client.query(`UPDATE suggestion_executions SET status=$2,"endedAt"=now() WHERE "subagentId"=$1`, [id, status])
+        await this.publish(client, row)
       }
       await client.query('COMMIT')
       changed = row
+      if (changed) notifySubagentEvents({ ownerId: actor.userId, workspaceId: actor.workspaceId })
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
     if (['done', 'failed', 'stopped'].includes(status)) await this.cleanup(actor, botId, id)
     return changed ?? await this.get(actor, botId, id)
@@ -132,8 +137,14 @@ export class SubagentStore {
     const row = await this.get(actor, botId, id)
     if (['done', 'failed', 'stopped'].includes(row.status)) return row
     if (row.status === 'queued') {
-      const stopped = (await this.pool.query<Subagent>(`UPDATE bot_subagents SET status='stopped',step='stopped',"endedAt"=now() WHERE id=$1 AND status='queued' RETURNING *`, [id])).rows[0]
-      if (stopped) { await this.publish(this.pool, stopped); return stopped }
+      const client = await this.pool.connect()
+      try {
+        await client.query('BEGIN')
+        const stopped = (await client.query<Subagent>(`UPDATE bot_subagents SET status='stopped',step='stopped',"endedAt"=now() WHERE id=$1 AND status='queued' RETURNING *`, [id])).rows[0]
+        if (stopped) await this.publish(client, stopped)
+        await client.query('COMMIT')
+        if (stopped) { notifySubagentEvents({ ownerId: actor.userId, workspaceId: actor.workspaceId }); return stopped }
+      } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
     }
     const machine = await this.machine(actor, botId, id)
     // Cleanup first; failures remain retryable and must not claim a stop succeeded.

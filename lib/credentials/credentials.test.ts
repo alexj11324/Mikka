@@ -194,7 +194,8 @@ test('broker reports mechanical session application or submission without judgin
     assert.equal(result.status, forcePassword ? 'guarded' : 'session_applied')
     assert.equal(calls.includes('insertAtObservedInput'), forcePassword)
     assert.equal(calls.includes('Page.reload'), !forcePassword)
-    assert.deepEqual(locks, ['computer-policy:workspace', `credentials:${owner.userId}:${owner.origin}`])
+    assert.deepEqual(locks, ['computer-policy:workspace', `credentials:${owner.userId}:${owner.origin}`,
+      ...(forcePassword ? [] : [`subagent-events:${owner.userId}:workspace`])])
     assert.equal(guardEnded, !forcePassword)
     assert(calls.includes('close'))
     if (forcePassword) {

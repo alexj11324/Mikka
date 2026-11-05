@@ -1,4 +1,5 @@
 import 'server-only'
+import { lockSubagentEvents, notifySubagentEvents } from '@/lib/computer/event-log'
 import { pendingActionsChanged } from '../live/pending-actions'
 import { randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
@@ -42,10 +43,12 @@ export async function proposeCredentialOperation(pool: Pool, caller: BrowserCall
     await client.query(`INSERT INTO pending_actions(id,"userId","botId",action,input) VALUES($1,$2,$4,'credential_operation',$3)`, [plan.actionId, caller.userId, JSON.stringify({ ...plan, digest: credentialPlanDigest(caller.userId, plan) }), plan.botId])
     if(operation==='login') await client.query("UPDATE pending_actions SET status='running' WHERE id=$1",[plan.actionId])
     const needs = JSON.stringify({ kind: 'approval', actionId: plan.actionId, summary: plan.summary })
+    await lockSubagentEvents(client, { ownerId: caller.userId, workspaceId: caller.workspaceId })
     await client.query(`WITH changed AS (UPDATE bot_subagents SET status=$6,step=$7,needs=$5,"activeActionId"=$8 WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4 RETURNING *) INSERT INTO subagent_events("ownerId","workspaceId","botId","subagentId",event) SELECT "ownerId","workspaceId","botId",id,jsonb_build_object('type','data-subagent','data',jsonb_build_object('botId',"botId",'subagentId',id,'task',task,'state',status,'step',step,'needs',needs)) FROM changed`, [plan.subagentId, caller.userId, plan.workspaceId, plan.botId, operation==='login'?null:needs,operation==='login'?'running':'needs_you',operation==='login'?'Signing in':'Credential approval',operation==='login'?plan.actionId:null])
     if(operation==='login') await client.query(`UPDATE bot_subagents SET status='running',step='Signing in',needs=NULL,"activeActionId"=$2 WHERE id=$1`,[plan.subagentId,plan.actionId])
     if (operation !== 'login') await pendingActionsChanged(client, plan.actionId, caller.userId)
     await client.query('COMMIT')
+    notifySubagentEvents({ ownerId: caller.userId, workspaceId: caller.workspaceId })
     if(operation!=='login') return { status: 'needs_approval' as const, origin: target.origin }
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
   const raw={...plan,digest:credentialPlanDigest(caller.userId,plan)}
@@ -105,7 +108,7 @@ async function executeCredential(pool: Pool, userId: string, raw: unknown, appro
         return { data: { status: 'needs_login' } }
       }
       // Broker itself holds policy+credential locks and rechecks exact version.
-      const result = await executeCredentialLease(lease.lease, plan.origin)
+      const result = await executeCredentialLease(lease.lease, plan.origin, { ownerId: caller.userId, workspaceId: caller.workspaceId })
       if (result.status !== 'guarded') {
         await store.update(actor,plan.botId,plan.subagentId,'running','Observe login outcome')
         if(plan.operation==='login') await pool.query(`UPDATE pending_actions SET status='done',result=$2 WHERE id=$1`,[plan.actionId,{status:result.status}])
