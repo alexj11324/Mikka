@@ -1,5 +1,6 @@
 import 'server-only'
 import type { Pool } from 'pg'
+import { machineCommitted } from '@/lib/live/computer-state'
 
 type Probe = (workspaceId: string, sandboxId: string) => Promise<'running' | 'sleeping'>
 
@@ -30,6 +31,7 @@ export async function reconcileCloudMachines(pool: Pick<Pool, 'query'>, probe?: 
     const updated = await pool.query(`UPDATE cloud_machines SET state='sleeping'${state === 'gone' ? ',"sandboxId"=NULL,"runtimeReady"=false' : ''}
       WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "sandboxId"=$3 AND state IN ('running','waking')`, [row.workspaceId, row.ownerId, row.sandboxId])
     changed += updated.rowCount ?? 0
+    if (updated.rowCount) await machineCommitted(pool, row.ownerId, row.workspaceId)
   }
   return changed
 }

@@ -8,7 +8,11 @@ import { toast } from 'sonner'
 import { decidePendingAction } from '@/app/actions/pending-actions'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
-import { withBasePath } from '@/lib/base-path'
+import { authClient } from '@/lib/auth-client'
+import { useLiveKey } from '@/hooks/use-live-key'
+import { usePersonalApprovalScope } from '@/hooks/use-approval-live'
+import { UNRESOLVED_APPROVAL_SCOPE } from '@/lib/live/approval-cache'
+import { loadPendingActionPage, nextPendingActionDeadline, pendingActionExpired, pendingActionsLiveKeys, pendingActionsPageKey } from '@/lib/live/pending-action-cache'
 import type { PendingActionView } from '@/lib/pending-action-view'
 import { useActionError } from '@/lib/use-action-error'
 import { InlineLoadError } from '@/components/load-error'
@@ -30,12 +34,6 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   return <div className="flex gap-3 text-xs"><dt className="w-14 shrink-0 text-muted-foreground">{label}</dt><dd className="min-w-0 break-words">{children}</dd></div>
 }
 
-async function fetchPendingActions(): Promise<PendingActionView[]> {
-  const response = await fetch(withBasePath('/api/pending-actions'), { cache: 'no-store' })
-  if (!response.ok) throw new Error(String(response.status))
-  return response.json() as Promise<PendingActionView[]>
-}
-
 /**
  * What the person's agents want to do in their accounts, one card
  * each, above the composer. Nothing runs until the person approves.
@@ -44,7 +42,13 @@ export function PendingActions() {
   const t = useTranslations('Coordinator.pendingActions')
   const tCommon = useTranslations('Common')
   const actionError = useActionError()
-  const { data, error, mutate } = useSWR('pending-actions', fetchPendingActions, { refreshInterval: 10000 })
+  const { data: session, isPending } = authClient.useSession()
+  const viewer = !isPending ? session?.user.id : undefined
+  const sessionId = !isPending ? session?.session.id : undefined
+  const workspaceId = usePersonalApprovalScope(viewer)
+  const { data, error, mutate } = useSWR(pendingActionsPageKey(viewer, sessionId), () => loadPendingActionPage(viewer!), { refreshInterval: 0, shouldRetryOnError: false })
+  useLiveKey('pending_actions', viewer ? workspaceId ?? UNRESOLVED_APPROVAL_SCOPE : null, pendingActionsLiveKeys(viewer, sessionId), workspaceId,
+    { deadline: nextPendingActionDeadline(data) })
   const [busy, setBusy] = useState<string | null>(null)
 
   async function decide(item: PendingActionView, approve: boolean) {
@@ -61,7 +65,7 @@ export function PendingActions() {
   return <ul aria-label={t('label')} className="flex max-h-[50vh] flex-col gap-2 overflow-y-auto empty:hidden">
     {/* A failed load says so instead of looking like nothing waits on the person, or that the list is current. */}
     {error && <li className="px-4 py-2"><InlineLoadError message={t('approvalLoadFailed')} retryLabel={tCommon('retry')} onRetry={() => { void mutate() }} /></li>}
-    {data?.map(item => {
+    {data?.items.filter(item => !pendingActionExpired(item, data)).map(item => {
       const input = item.input
       const email = item.action === 'send_email'
       const browser = item.action === 'browser_operation' || item.action === 'credential_operation'

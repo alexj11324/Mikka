@@ -31,7 +31,7 @@ export function approvedWriteHandler(auth: { api: { getSession: (args: { headers
       const body = parsed.data
       if (body.op === 'list') {
         if (!discovery) return json({ error: 'approvedWriteDiscoveryUnavailable' }, 503)
-        return json({ ...await discovery.list({ userId: session.user.id, sessionId: session.session.id }, { cursor: body.cursor, limit: body.limit, unresolvedOnly: body.unresolvedOnly }, { signal: request.signal }), viewerId: session.user.id })
+        return json({ ...await discovery.list({ userId: session.user.id, sessionId: session.session.id }, { cursor: body.cursor, limit: body.limit, unresolvedOnly: body.unresolvedOnly }, { signal: request.signal }), viewerId: session.user.id, observedAt: new Date().toISOString() })
       }
       const input = body.op === 'propose' ? parseWriteInput(body.action, body.input) : null
       if (body.op === 'propose' && !input) return json({ error: 'invalidIntegrationInput' }, 400)
@@ -41,7 +41,7 @@ export function approvedWriteHandler(auth: { api: { getSession: (args: { headers
         : body.op === 'view'
           ? await service.view({ userId: session.user.id, sessionId: session.session.id }, body.id)
           : await service.decide({ userId: session.user.id, sessionId: session.session.id }, body.id, body.approve)
-      return json(result)
+      return json(body.op === 'view' ? { ...result, observedAt: new Date().toISOString() } : result)
     } catch (error) {
       if (error instanceof MailboxError) return json({ error: error.commitState === 'unconfirmed' ? 'writeCommitUnconfirmed' : error.commitState === 'committed' ? 'writeCommitFinalizationFailed' : error.message === 'writeTransactionCleanupUncertain' ? 'writeTransactionCleanupUncertain' : 'writeTransactionCancelled', ...(error.commitState ? { commitState: error.commitState } : {}) }, error.status)
       if (error instanceof OperationError) return json({ error: error.message }, 409)
