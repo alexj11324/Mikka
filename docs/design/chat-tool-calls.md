@@ -31,7 +31,7 @@
 6. **失败判定**：`state === 'error'`，**或** 输出预览是带 `error` / `ok:false` 键的 JSON（前端解析，见 §6 的后端建议）。
    - 失败行：红色图标 + 标题后跟原因，「运行 Factory · 没有找到 Factory」。
    - 原因：已知错误码映射成中文（`factoryNotFound` → 没有找到 Factory，`notFound`、`forbidden`、`rateLimited`、`timeout`…，表放 `messages/*.json` `Coordinator.activity.errors`）；未知码显示码本身（等宽字体），不显示整段 JSON。
-7. **原始 JSON 只在单条展开后显示**：单条行可再点开，显示输入/输出 `CodeBlock`（现有组件，失败用 destructive 变体）。组展开 ≠ 单条展开。
+7. **单条展开先说人话，原始 JSON 再折一层**：单条行点开，先是 `toolDetail`（`lib/coordinator/tool-detail.ts`）给出的几行，一律不显示 id：派发线程是「交给 {agent}」+ 线程 chip + 线程状态（`ThreadStatus`，按线程列表的分组），下面引用样式放派发说明（最多 3 行，点开看全文）；其他已登记工具写对象、查询、数量、状态；没登记的工具列它自己的字段（跳过 id 和嵌套对象，值截到 80 字，最多 6 行）。最下面是「原始数据」折叠项，默认收起，里面才是输入/输出 `CodeBlock`（失败用 destructive 变体）。组展开 ≠ 单条展开。
 8. **全部展开 / 全部收起**：
    - 放在每个工具组摘要行的末尾（Coordinator 允许「对话顶部或这组旁边」，选了组旁边，这样不用改 shell 的 header）：图标按钮 `ChevronsUpDown`，tooltip 是「全部展开」/「全部收起」。电脑和触屏上都常驻显示（独立审阅 2026-11-04：Alex 专门要过这个按钮，不能藏起来）。
    - 作用于当前已加载的所有组（展开组，不展开单条 JSON）。读者对单个组的操作之后仍可覆盖。

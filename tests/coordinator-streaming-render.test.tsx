@@ -163,10 +163,17 @@ test('a reply draws its thinking and its tools as shadcn Trace rows: several cal
     assert.deepEqual(rows(), [['done', 'Create taskFix login', null], ['running', 'Start thread', 'running'], ['error', 'Dispatch Factory task· Factory task not found', 'error']],
       'verb and object; an answered error is a failure with its reason')
     assert.doesNotMatch(text(), /dispatch_factory_task|i1|factoryNotFound/, 'raw input and output start closed')
-    await act(async () => { (view.container.querySelector('[data-activity-tool="done"] button') as HTMLButtonElement).click() })
+    // Opened, a call says what it did in words first; its raw data is one more click away, under 「Raw data」.
+    const click = (selector: string) => act(async () => { (view.container.querySelector(selector) as HTMLButtonElement).click() })
+    await click('[data-activity-tool="done"] button')
+    await settle(() => Boolean(view.container.querySelector('[data-activity-tool="done"] [data-activity-detail]')))
+    assert.equal(view.container.querySelector('[data-activity-tool="done"] [data-activity-detail]')?.textContent, 'TitleFix login')
+    assert.doesNotMatch(text(), /i1/, 'the raw output starts folded')
+    await click('[data-activity-tool="done"] [data-activity-raw] button')
     await settle(() => /i1/.test(text()))
     assert.equal(view.container.querySelectorAll('[data-activity-tool="done"] [data-slot="code-block"]')[1]?.textContent, '{"id":"i1"}', 'the output in a code block, after the input')
-    await act(async () => { (view.container.querySelector('[data-activity-tool="error"] button') as HTMLButtonElement).click() })
+    await click('[data-activity-tool="error"] button')
+    await click('[data-activity-tool="error"] [data-activity-raw] button')
     await settle(() => /factoryNotFound/.test(text()))
     assert.equal(view.container.querySelector('[data-activity-tool="error"] [data-slot="code-block"]')?.getAttribute('data-variant'), 'destructive')
 
@@ -243,6 +250,39 @@ test('readable reasoning opens under 「思考了 N 秒」, live and stored alik
       await plain.unmount()
     }
   } finally { try { await view.unmount() } catch { /* already unmounted */ } }
+})
+
+test('an opened dispatch reads 「Handed to」 its agent, the thread chip with its state and the note as a quote, never ids or JSON (R-83)', async () => {
+  const { ReplyActivity } = await import('../components/coordinator/reply-activity')
+  const { AgentCitationsContext } = await import('../components/workspace/agent-citations')
+  const view = await mount()
+  const settle = async (done: () => boolean) => { for (let tries = 0; tries < 100 && !done(); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20))) }
+  const note = 'Reproduce the redirect loop on sign-in.\nCheck the callback URL.\nFix it and add a test.\nOpen a PR.'
+  const dispatch = { call: 'd1', name: 'dispatch_run', state: 'done' as const,
+    input: JSON.stringify({ issueId: TASK, botId: '3c3aa707-0000-4c22-b322-0000000000d4', note }),
+    output: JSON.stringify({ runId: THREAD, status: 'queued' }) }
+  const citations = { ...base, sources: { ...known, [THREAD]: { ...thread, status: 'queued' } satisfies CitationSource } }
+  try {
+    await view.render(<AgentCitationsContext value={citations}><ReplyActivity tools={[dispatch]} /></AgentCitationsContext>)
+    await act(async () => { (view.container.querySelector('[data-activity-tool] button') as HTMLButtonElement).click() })
+    await settle(() => Boolean(view.container.querySelector('[data-activity-detail]')))
+    const detail = view.container.querySelector('[data-activity-detail]')
+    const words = detail?.textContent ?? ''
+    assert.match(words, /Handed to Worker/)
+    const chip = detail?.querySelector('[data-activity-thread] [data-slot="inline-citation-trigger"]')
+    assert.match(chip?.textContent ?? '', /Fix sign-in redirect/, 'the thread as its chip')
+    // Its state as the thread list groups it (R-52): a queued thread is in 「Running」.
+    assert.match(detail?.querySelector('[data-activity-thread]')?.textContent ?? '', /Running$/, 'with its state')
+    const quote = detail?.querySelector('[data-activity-quote]')
+    assert.equal(quote?.textContent, note, 'the note, whole in the page, three lines until opened')
+    assert.match(quote?.firstElementChild?.className ?? '', /line-clamp-3/)
+    await act(async () => { (quote as HTMLButtonElement).click() })
+    assert.doesNotMatch(view.container.querySelector('[data-activity-quote] > span')?.className ?? '', /line-clamp-3/, 'opened, the whole note')
+    const shown = view.container.textContent ?? ''
+    assert.doesNotMatch(shown, /"runId"|\{/, 'no raw JSON until 「Raw data」 is opened')
+    assert.doesNotMatch(shown, MARKUP, 'no ids')
+    assert.ok(view.container.querySelector('[data-activity-raw]'), 'the raw data is there, folded')
+  } finally { await view.unmount() }
 })
 
 test('a task and its thread in one reply: only the thread is a chip, the task is its number or nothing (R-15)', async () => {

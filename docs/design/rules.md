@@ -432,8 +432,12 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   reply streams it shows the call running now. Opened, each call is a row: its
   kind's icon, then verb and object (「查看任务 ALEX-45」); never a bare
   「使用工具」 (`check-copy`). A call that failed, thrown or answered
-  `{"error": …}`, is red and names its reason in words. Raw input and output
-  open only from that call's row. 全部展开 / 全部收起, always shown beside every
+  `{"error": …}`, is red and names its reason in words. An opened call says
+  what it did in words first, ids never shown: a dispatch is 「交给 {agent}」,
+  its thread's chip and state, and its note as a quote (three lines until
+  clicked); other known tools name their object, query, count or status; an
+  unknown tool lists its own fields, cut short. Raw input and output sit last,
+  under 「原始数据」, folded. 全部展开 / 全部收起, always shown beside every
   group, opens or closes every group in the chat. Under a reply, 复制 and 「N 个来源」 (web pages
   only; tasks and threads are already chips) share one line that shows while the
   reply is hovered, focused or tapped; the latest reply keeps it on a touch screen.

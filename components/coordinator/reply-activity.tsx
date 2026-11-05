@@ -15,7 +15,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { GitHubIcon } from '@/components/icons/brand-icons'
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from '@/components/ui/trace'
 import { toolAction, toolFailure, toolObjectId, toolSummary, toolTarget, type ToolAction } from '@/lib/coordinator/tool-activity'
-import { useAgentCitations } from '@/components/workspace/agent-citations'
+import { CitationChip, useAgentCitations } from '@/components/workspace/agent-citations'
+import { ThreadStatus } from '@/components/workspace/thread-status-icon'
+import { toolDetail, type ToolDetailLine } from '@/lib/coordinator/tool-detail'
 import { runThreadName } from '@/lib/coordinator/citations'
 import type { ChatTool } from '@/lib/coordinator/context'
 import { cn } from '@/lib/utils'
@@ -107,10 +109,62 @@ function ToolRow({ tool, live }: { tool: ChatTool; live: boolean }) {
       {why && <span className="ml-1.5">· {why}</span>}
     </TraceTitle>
   </TraceLine>
-  const detail = [tool.input, tool.output].filter(Boolean)
-  if (!detail.length || running) return <div data-activity-tool={running ? 'running' : failed ? 'error' : 'done'}>{line}</div>
+  if (!(tool.input || tool.output) || running) return <div data-activity-tool={running ? 'running' : failed ? 'error' : 'done'}>{line}</div>
   return <TraceCollapsible data-activity-tool={failed ? 'error' : 'done'}>
     <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
+    <TraceCollapsibleContent className="flex flex-col gap-2">
+      <ToolDetail tool={tool} />
+      <RawData tool={tool} failed={failed} />
+    </TraceCollapsibleContent>
+  </TraceCollapsible>
+}
+
+/**
+ * An opened call in words (R-83): what it was asked, what it acted on or made, what came back. A dispatch reads
+ * 「交给 Claude Code」, its thread's chip and state, and its note as a quote. Ids never show.
+ */
+function ToolDetail({ tool }: { tool: ChatTool }) {
+  const lines = toolDetail(tool)
+  if (!lines.length) return null
+  return <div data-activity-detail="" className="flex flex-col gap-1.5 text-sm text-foreground">
+    {lines.map((line, index) => <ToolDetailRow key={index} line={line} dispatch={/^(dispatch|dispatchFactory|wake)$/.test(toolAction(tool.name))} />)}
+  </div>
+}
+
+function ToolDetailRow({ line, dispatch }: { line: ToolDetailLine; dispatch: boolean }) {
+  const t = useTranslations('Coordinator.activity.detail')
+  const source = useAgentCitations()?.sources[line.kind === 'object' ? line.id : '']
+  const [whole, setWhole] = useState(false)
+  if (line.kind === 'quote') return <Button variant="ghost" data-activity-quote="" aria-expanded={whole} onClick={() => setWhole(!whole)}
+    className="h-auto justify-start rounded-none border-l-2 py-0 pr-0 pl-2.5 text-left font-normal whitespace-pre-wrap text-muted-foreground">
+    <span className={cn('min-w-0', !whole && 'line-clamp-3')}>{line.text}</span>
+  </Button>
+  if (line.kind === 'object') {
+    if (!source) return null
+    if (source.kind === 'issue') return <span className="flex min-w-0 flex-wrap items-center gap-1.5"><CitationChip id={line.id} kind="issue" /></span>
+    return <span data-activity-thread="" className="flex min-w-0 flex-wrap items-center gap-1.5">
+      {dispatch && <span className="text-muted-foreground">{t('handedTo', { agent: source.agentName })}</span>}
+      <CitationChip id={line.id} kind="run" />
+      <ThreadStatus status={source.status} outcome={source.outcome} icon={false} />
+    </span>
+  }
+  if (line.kind === 'field') return <span className="flex min-w-0 gap-2">
+    <span className="shrink-0 text-muted-foreground">{t(line.label as never)}</span>
+    <span className="min-w-0 truncate">{line.label === 'count' ? t('countValue', { count: Number(line.value) }) : line.label === 'status' ? statusWord(String(line.value), t) : line.value}</span>
+  </span>
+  return <span className="flex min-w-0 gap-2"><span className="shrink-0 text-muted-foreground">{line.key}</span><span className="min-w-0 truncate">{line.value}</span></span>
+}
+
+/** A run status word from the answer (queued, running…), in the person's language; any other value as it is. */
+function statusWord(value: string, t: ReturnType<typeof useTranslations>) {
+  return t.has(`states.${value}` as never) ? t(`states.${value}` as never) : value
+}
+
+/** The call's raw input and output, folded under 「原始数据」, one more click away (R-83). */
+function RawData({ tool, failed }: { tool: ChatTool; failed: boolean }) {
+  const t = useTranslations('Coordinator.activity.detail')
+  return <TraceCollapsible data-activity-raw="">
+    <TraceCollapsibleTrigger><TraceLine><TraceTitle>{t('raw')}</TraceTitle></TraceLine></TraceCollapsibleTrigger>
     <TraceCollapsibleContent className="flex flex-col gap-2">
       {tool.input && <CodeBlock size="sm"><CodeBlockContent wrap className="max-h-40">{tool.input}</CodeBlockContent></CodeBlock>}
       {tool.output && <CodeBlock size="sm" {...(failed ? { variant: 'destructive' as const } : {})}><CodeBlockContent wrap className="max-h-64">{tool.output}</CodeBlockContent></CodeBlock>}
