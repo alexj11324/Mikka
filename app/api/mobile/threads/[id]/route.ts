@@ -12,6 +12,8 @@ import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@
 import { mobileThread } from '@/lib/mobile-threads'
 import { runOutsideToken } from '@/lib/tokens/scope'
 import { threadQuotaView } from '@/lib/run-quota-view'
+import { threadLiveReferences } from '@/lib/live/panels'
+import { workspacePool } from '@/lib/workspace-db'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,8 +45,12 @@ async function handleGET(request: Request, { params }: Params) {
   )
   // A run paused on its subscription's quota: when it resets and whether a key can take over (the web's ThreadQuotaPausedCard).
   const liveRunId = chain?.latestRunId ?? detail.run.id
-  const { paused } = live === 'paused' ? await threadQuotaView(user.id, [liveRunId], liveRunId) : { paused: null }
-  return json({ thread, active: runIsActive(live), working: runIsWorking(live), paused, summary: detail.run.report && typeof detail.run.report.summary === 'string' ? detail.run.report.summary : null, error: detail.run.error, items })
+  const [{ paused }, runs] = await Promise.all([
+    live === 'paused' ? threadQuotaView(user.id, [liveRunId], liveRunId) : { paused: null },
+    // Where each run's thread and run keys arrive (the web's thread panel listens to the same).
+    threadLiveReferences(pool, workspacePool, runIds, user.id),
+  ])
+  return json({ live: { runs }, thread, active: runIsActive(live), working: runIsWorking(live), paused, summary: detail.run.report && typeof detail.run.report.summary === 'string' ? detail.run.report.summary : null, error: detail.run.error, items })
 }
 
 /** `POST /api/mobile/threads/:id` with `{ text }`: a message to the thread; the daemon delivers it, or an ended thread runs again. */

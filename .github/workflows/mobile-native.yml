@@ -16,6 +16,14 @@ on:
         description: Submit this exact completed build to TestFlight
         type: boolean
         default: true
+      existing_build_id:
+        description: Existing completed EAS build to submit without rebuilding (requires expected_commit)
+        type: string
+        default: ''
+      expected_commit:
+        description: Exact 40-character main commit of the existing build
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -49,41 +57,52 @@ jobs:
         run: node -e "if (!process.env.EXPO_TOKEN) { console.error('EXPO_TOKEN is missing; no native release was published.'); process.exit(1) }"
       - run: pnpm install --frozen-lockfile --filter @mikka/mobile...
       - run: pnpm --filter @mikka/mobile typecheck
-      - name: Require successful checks for this exact main commit
+      - name: Require successful checks for the workflow and binary source commits
+        id: source
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/release/ci-gate.mjs
+          EXISTING_BUILD_ID: ${{ inputs.existing_build_id }}
+          EXPECTED_BUILD_COMMIT: ${{ inputs.expected_commit }}
+        run: node scripts/release/mobile-native.mjs source
+      - name: Require the existing App Store Connect credential inputs
+        if: github.event_name == 'push' || inputs.submit
+        env:
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: node scripts/release/mobile-native.mjs credentials
       - name: Build iOS with existing signing credentials
+        if: steps.source.outputs.build_id == ''
         working-directory: apps/mobile
         run: npx -y eas-cli@27.2.0 build --platform ios --profile production --non-interactive --freeze-credentials --wait --json > "$RUNNER_TEMP/mikka-native-build.json"
+      - name: Read the existing completed build without rebuilding
+        if: steps.source.outputs.build_id != ''
+        working-directory: apps/mobile
+        env:
+          EXISTING_BUILD_ID: ${{ steps.source.outputs.build_id }}
+        run: npx -y eas-cli@27.2.0 build:view "$EXISTING_BUILD_ID" --json > "$RUNNER_TEMP/mikka-native-build.json"
       - name: Verify the completed build and commit
         id: build
-        run: |
-          node --input-type=module <<'JS'
-          import { readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs'
-          const parsed = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/mikka-native-build.json`, 'utf8'))
-          const builds = Array.isArray(parsed) ? parsed : [parsed]
-          const build = builds.find(item => item.platform === 'IOS')
-          if (!build?.id || build.status !== 'FINISHED' || build.gitCommitHash !== process.env.GITHUB_SHA) {
-            throw new Error('Native build completion or exact commit could not be verified; submission stopped.')
-          }
-          const fields = ['id', 'platform', 'status', 'gitCommitHash', 'appVersion', 'appBuildVersion', 'buildProfile', 'createdAt', 'completedAt']
-          const report = { ...Object.fromEntries(fields.map(key => [key, build[key] ?? null])),
-            runtimeVersion: build.runtime?.version ?? null, fingerprint: build.fingerprint?.hash ?? null }
-          mkdirSync('mobile-native-report', { recursive: true })
-          writeFileSync('mobile-native-report/build.json', JSON.stringify(report, null, 2) + '\n')
-          appendFileSync(process.env.GITHUB_OUTPUT, `id=${build.id}\n`)
-          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Completed iOS build\n\nBuild: ${build.id}\n\nCommit: ${build.gitCommitHash}\n\nThis confirms the binary build. TestFlight processing and device installation are separate.\n`)
-          JS
+        env:
+          NATIVE_SOURCE_SHA: ${{ steps.source.outputs.commit }}
+          EXISTING_BUILD_ID: ${{ steps.source.outputs.build_id }}
+        run: node scripts/release/mobile-native.mjs verify
       - name: Submit this build to TestFlight
         if: github.event_name == 'push' || inputs.submit
-        working-directory: apps/mobile
-        run: npx -y eas-cli@27.2.0 submit --platform ios --profile production --id "${{ steps.build.outputs.id }}" --non-interactive --wait
+        env:
+          NATIVE_BUILD_ID: ${{ steps.build.outputs.id }}
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: node scripts/release/mobile-native.mjs submit
+      - name: Remove temporary App Store Connect key
+        if: always()
+        run: node scripts/release/mobile-native.mjs cleanup
       - name: Preserve non-secret build evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: mobile-native-${{ github.sha }}
-          path: mobile-native-report/build.json
+          path: mobile-native-report/*.json
           if-no-files-found: ignore
           retention-days: 14

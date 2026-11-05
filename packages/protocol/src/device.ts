@@ -232,6 +232,14 @@ export const deviceGatewaySchema = z.object({
    * connected daemon needs no periodic run-control check (#1212). Absent from
    * older servers: the daemon then keeps its one-second check. */
   runControl: z.literal('push').optional(),
+  /** This server wakes the device when a person decides a computer review in
+   * the web, so a connected daemon syncs pending reviews only on a change or a
+   * push, plus a presence refresh (#1212). Absent from older servers: the
+   * daemon then keeps syncing every second while a review is pending. */
+  computerReviews: z.literal('push').optional(),
+  /** This server wakes the device when it writes a native Coordinator tool
+   * result, so the waiting tool asks once per push, not every 500 ms. */
+  coordinatorResults: z.literal('push').optional(),
 })
 export type DeviceGatewayTicket = z.infer<typeof deviceGatewaySchema>
 

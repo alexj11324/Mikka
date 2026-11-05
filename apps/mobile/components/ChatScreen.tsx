@@ -29,7 +29,9 @@ import { runTitle, type Chat, type CitationSource, type PendingAction } from '@/
 import { FailedReply } from '@/components/FailedReply'
 import { eventText } from '@/lib/event-line'
 import { waitingLabel } from '@/lib/waiting'
-import { useApi, useRefresh } from '@/lib/useApi'
+import { useLiveApi, useRefresh } from '@/lib/useApi'
+import { listRef, UNRESOLVED_LIVE_ID } from '@/lib/live'
+import { pendingActionsDeadline } from '@/lib/live-client'
 import { useStop } from '@/lib/useStop'
 import { StopFailed } from '@/components/StopFailed'
 import { ReadNotice } from '@/components/ReadNotice'
@@ -44,8 +46,8 @@ import { colors } from '@/lib/theme'
 
 /**
  * A chat with a bot; the Coordinator is one (R-06): the bot's name in a pill,
- * the threads behind the right button, the composer at the bottom. Polls while
- * a reply is coming. Below the messages sit the proposals waiting for the
+ * the threads behind the right button, the composer at the bottom. Reads again
+ * when the server pushes the chat's key (a message, a turn, a run it cites). Below the messages sit the proposals waiting for the
  * person (approve or decline, as on the web); `focus` marks the one a push
  * was about. OpenUI cards are drawn natively (components/OpenUI.tsx).
  */
@@ -61,11 +63,19 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   // The composer floats over the end of the list; the list leaves room for it.
   const [composerHeight, setComposerHeight] = useState(90)
   const path = `/api/mobile/chat${botId ? `?bot=${botId}` : ''}`
-  const [fast, setFast] = useState(false)
-  const { data, error, reload, setData } = useApi<Chat>(path, fast ? 3750 : 45000)
+  const home = useHome().data?.live?.workspaceId
+  // The web's chat key (components/coordinator/coordinator-chat.tsx) on the person's home channel; a turn's lease
+  // running out has no write, so the server names it as a deadline.
+  const { data, error, reload, setData } = useLiveApi<Chat>(path, chat => ({
+    refs: [{ kind: 'bot_chat', id: chat?.botId && chat.live?.workspaceId ? chat.botId : UNRESOLVED_LIVE_ID, scope: chat?.live?.workspaceId ?? null }],
+    minIntervalMs: 2_000, deadline: chat?.live?.deadline,
+  }))
   const serviceUnavailable = data?.enabled === false
   const serviceRefresh = useRefresh(reload)
-  const pending = useApi<PendingAction[]>('/api/pending-actions', 10000)
+  // The person's proposals: the web's key (components/coordinator/pending-actions.tsx), on the same home channel.
+  const pending = useLiveApi<PendingAction[]>('/api/pending-actions', items => ({
+    refs: [listRef('pending_actions', home)], deadline: pendingActionsDeadline(items),
+  }))
   const [outbox, setOutbox] = useState<Outgoing[]>([])
   const pendingSends = useRef<Outgoing[]>([])
   const delivering = useRef(new Map<string, Promise<boolean>>())
@@ -92,7 +102,6 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   }
   useEffect(() => { setPinned(false) }, [focus])
 
-  useEffect(() => { setFast(working) }, [working])
   useEffect(() => { if (draft) setText(draft) }, [draft])
 
   const items = data?.items ?? []

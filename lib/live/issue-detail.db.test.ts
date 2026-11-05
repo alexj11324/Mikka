@@ -98,6 +98,23 @@ test('issue members and relations keys reach only the task audience, after the a
       assert.ok(fromParent.includes(child), 'a task that names the changed one is found from the other direction')
     })
 
+    await t.test('a duplicate target change reaches the referencing task, including legacy metadata and deletion', async () => {
+      const target = await issue(team)
+      const duplicate = await issue(null, { duplicateOfId: target })
+      const legacyDuplicate = await issue(team)
+      await database.query(`UPDATE issues SET content=$2 WHERE id=$1`, [legacyDuplicate,
+        JSON.stringify({ type: 'doc', attrs: { orvilo: { duplicateOfId: target } }, content: [] })])
+      const expected = [`owner@${home}:${duplicate}`, `owner@${team}:${legacyDuplicate}`, `peer@${team}:${legacyDuplicate}`].sort()
+      const references = async () => (await issueRelationTargets(database, database, [target]))
+        .flatMap(value => value.events.filter(event => event.id !== target).map(event => `${value.scope.ownerId}@${value.scope.workspaceId}:${event.id}`)).sort()
+      await database.query(`UPDATE issues SET title='Renamed duplicate target',status='done' WHERE id=$1`, [target])
+      assert.deepEqual(await references(), expected, 'each duplicate panel is notified on its own authorized channel')
+      await database.query(`UPDATE issues SET content=$2 WHERE id=$1`, [target,
+        JSON.stringify({ type: 'doc', attrs: { mikka: { deletedAt: new Date().toISOString() } }, content: [] })])
+      assert.deepEqual(await references(), expected, 'removing the target still refreshes the surviving duplicate panels')
+      assert.ok((await issueRelationTargets(database, database, [target])).every(value => value.events.every(event => event.id !== target)), 'the deleted task gets no body-channel notification')
+    })
+
     await t.test('the actual relation writer publishes after COMMIT, nothing on rollback, and reaches a disconnected parent', async () => {
       const { actAs } = await import('../acting-user')
       const { updateIssueRelation } = await import('../../app/actions/issue-operations')
