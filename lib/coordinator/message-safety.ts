@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
 import { MAX_USER_IMAGES, normalizeUserImages, userImageContent, type StoredUserImage } from './user-attachments'
 import { createHmac, timingSafeEqual } from 'node:crypto'
