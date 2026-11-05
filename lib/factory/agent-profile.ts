@@ -1,6 +1,7 @@
 import 'server-only'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
+import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
 import { digest } from '@/lib/agent-kit/definition'
 import { bindAgentToConnection, resolveModelDispatch, type ModelDispatch } from '@/lib/model-dispatch'
 import { credentialStates, orderCandidates, readOrder, poolDevices } from '@/lib/model-order'
@@ -13,7 +14,7 @@ import { BUILTIN_AGENT_PROFILE_ID, BUILTIN_AGENT_PROFILE_VERSION, builtinAgentPr
 import { acquireProfileMembership, profileView, readProfileRow, readProfileRows, validateProfileScope, type ProfileMembership, type ProfileQuery, type ProfileRow } from './agent-profile-store'
 import { agentProfileSkillsCatalog, resolveAgentProfileSkills } from './agent-profile-skills'
 import { maskFactoryNote } from './note-mask'
-import { profileDecisionQuestions, selectedProfileAnswer, type PublicAgentProfile } from './agent-profile-decision'
+import { profileDecisionQuestions, profileDecisionResult, type PublicAgentProfile } from './agent-profile-decision'
 import type { ModelRoutingContext } from '@/lib/model-routing-server'
 
 export * from './agent-profile-definition'
@@ -254,8 +255,13 @@ export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchSco
     const catalog = eligible.map(item => item.public)
     const input = maskFactoryNote(JSON.stringify({ task: { title: issue.title, content: JSON.stringify(issue.content).slice(0, 12_000), stage: request.stage ?? 'execute', note: request.note?.slice(0, 4000) }, candidates: catalog }))
     execution = await hostedBillingScope.run({ workspaceId: scope.workspaceId, ownerId: scope.ownerId }, () => (deps.decision ?? invokeDecision)('factory-agent-profile', input, profileDecisionQuestions(catalog)))
-    const selected = selectedProfileAnswer(catalog, execution?.answers ?? null)
-    if (!selected) throw new AgentProfileError('agentProfileDecisionUnavailable')
+    const result = profileDecisionResult(catalog, execution?.answers ?? null)
+    if (!result.selected) {
+      const cause = new CodedError('agent_profile_decision_unavailable', { detail: result.detail })
+      logCodedError(cause, { purpose: 'factory-agent-profile' })
+      throw new AgentProfileError('agentProfileDecisionUnavailable', 409, { cause })
+    }
+    const selected = result.selected
     chosen = eligible.find(item => item.row.id === selected.id); reason = selected.reason
   }
   if (!chosen) throw new AgentProfileError('agentProfileSelectionInvalid')

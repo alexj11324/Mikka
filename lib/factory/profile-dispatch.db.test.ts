@@ -56,6 +56,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     }),
   } })
   let decisionProfile = ''
+  let profileDecisionFailure: 'unavailable' | 'none' | 'missing' | 'foreign' | 'low' | 'reason' | null = null
   const decisionInputs: { purpose: string; input: unknown; questions: unknown; profileId: string }[] = []
   const decisionCounts = () => ({
     profile: decisionInputs.filter(call => call.purpose === 'factory-agent-profile').length,
@@ -67,10 +68,15 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       // A legacy Profile may route its inherited model, independently of Profile
       // selection. Exercise its unavailable-decision fallback deliberately.
       if (purpose === 'task-model-routing') return null
-      return { answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
-        ['profile', { name: 'profile', type: 'choice', choice: decisionProfile, confidence: .95 }],
-        ['reason', { name: 'reason', type: 'choice', choice: 'stage_fit' }],
-      ]), execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'synthetic-profile-stage', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
+      if (profileDecisionFailure === 'unavailable') return null
+      const answers = new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
+        ['profile', { name: 'profile', type: 'choice', choice: profileDecisionFailure === 'none' ? 'none' : profileDecisionFailure === 'foreign' ? 'SYNTHETIC_PRIVATE_PROFILE' : decisionProfile, confidence: profileDecisionFailure === 'low' ? .54 : .95 }],
+        ['reason', { name: 'reason', type: 'choice', choice: profileDecisionFailure === 'reason' ? 'uncertain' : 'stage_fit' }],
+      ])
+      // validatedAnswers deliberately omits refusals; both refusal and a
+      // missing answer reach the selector without a profile entry.
+      if (profileDecisionFailure === 'missing') answers.delete('profile')
+      return { answers, execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'synthetic-profile-stage', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
     },
   } })
   const modules = await Promise.all([
@@ -704,6 +710,81 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 2)
     assert.deepEqual((await pool.query('SELECT * FROM coordinator_events WHERE id=$1', [f.sourceEventId])).rows[0], originalEvent)
     assert.deepEqual(decisionCounts(), beforeDecisions, 'a named model on Default does not invoke either Decision during first dispatch or same-session answer')
+
+    // Production #1225 reached this boundary: the native child submitted its
+    // work, then independent Review selection rejected. Keep real admission,
+    // candidate creation, transaction rollback and replay behavior in scope.
+    const deliverySha = 'b'.repeat(40)
+    await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"=$2,"finishedAt"=now(),report=$3 WHERE id=$1`, [child.id, nativeSession, JSON.stringify({
+      sourceCommit: 'a'.repeat(40), deliverableCommit: deliverySha, summary: 'SYNTHETIC_PRIVATE_COMPLETED_WORK', runtime: { observedModel: model.codex },
+    })])
+    const producerRows = (await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [f.issueId])).rows
+    const taskBefore = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0]
+    const attemptsBefore = (await pool.query('SELECT * FROM factory_attempts WHERE "taskId"=$1 ORDER BY position', [f.task.id])).rows
+    const handoffsBefore = handoffs.length
+    const completion = createFactoryReconciler(pool, f.store, questions, {}, f.botId, automaticFactoryDispatch(pool))
+    const failures = [
+      ['unavailable', 'no_execution'], ['none', 'no_suitable_profile'], ['missing', 'profile_missing_or_refused'],
+      ['foreign', 'profile_invalid'], ['low', 'low_confidence'], ['reason', 'reason_invalid'],
+    ] as const
+    const rejected: unknown[] = [], logs: unknown[][] = []
+    const warn = t.mock.method(console, 'warn', (...args: unknown[]) => { logs.push(args) })
+    decisionProfile = f.review!.id
+    try {
+      for (const [failure] of failures) {
+        profileDecisionFailure = failure
+        await assert.rejects(completion.run(f.ownerId, child.id), error => {
+          assert.ok(error instanceof profiles.AgentProfileError)
+          assert.equal(error.code, 'agentProfileDecisionUnavailable'); assert.equal(error.status, 409)
+          assert.equal(error.message, 'agentProfileDecisionUnavailable', 'the public error contract is unchanged')
+          rejected.push(error)
+          return true
+        })
+        assert.deepEqual((await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0], taskBefore)
+        assert.deepEqual((await pool.query('SELECT * FROM factory_attempts WHERE "taskId"=$1 ORDER BY position', [f.task.id])).rows, attemptsBefore)
+        assert.equal((await pool.query('SELECT 1 FROM factory_candidates WHERE "taskId"=$1', [f.task.id])).rowCount, 0)
+        assert.equal((await pool.query('SELECT 1 FROM factory_attempts WHERE "taskId"=$1 AND stage=\'review\'', [f.task.id])).rowCount, 0)
+        assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [f.issueId])).rows, producerRows)
+        assert.equal(handoffs.length, handoffsBefore, 'an unavailable role never starts a provider or falls back to Default')
+      }
+      profileDecisionFailure = null
+      await completion.run(f.ownerId, child.id)
+      const current = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0]
+      assert.equal(current.stage, 'review'); assert.equal(current.status, 'running')
+      const candidate = (await pool.query('SELECT * FROM factory_candidates WHERE id=$1', [current.candidateId])).rows[0]
+      const attempt = (await pool.query('SELECT * FROM factory_attempts WHERE id=$1', [current.attemptId])).rows[0]
+      const review = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [attempt.runId])).rows[0]
+      assert.equal(candidate.runId, child.id); assert.equal(attempt.candidateId, candidate.id)
+      assert.equal(review.baseBranch, deliverySha); assert.equal(review.agentDefinition.readOnly, true)
+      assert.equal(review.agentDefinition.agentProfile.profileId, f.review!.id)
+      assert.equal(review.agentDefinition.agentProfile.source, 'decision')
+      assert.equal(review.agentDefinition.agentProfile.version, f.review!.version)
+      assert.equal(review.agentDefinition.agentProfile.digest, f.review!.digest)
+      assert.equal(review.agentDefinition.harness, 'codex'); assert.equal(review.agentDefinition.model, model.codex)
+      for (const key of ['sessionId', 'continuesRunId', 'retryOf', 'questionContinuation']) assert.equal(review[key], null, key)
+      assert.equal(review.agentDefinition.profileOriginRunId, undefined)
+      assert.equal(review.agentDefinition.definitionDigest, workerDefinitionDigest(review.agentDefinition))
+      const afterCompletionDecisions = decisionCounts()
+      await completion.run(f.ownerId, child.id)
+      assert.deepEqual(decisionCounts(), afterCompletionDecisions, 'completion replay does not select another role')
+      assert.equal(afterCompletionDecisions.profile, beforeDecisions.profile + failures.length + 1)
+      assert.equal(afterCompletionDecisions.model, beforeDecisions.model)
+      assert.equal((await pool.query('SELECT 1 FROM factory_candidates WHERE "taskId"=$1', [f.task.id])).rowCount, 1)
+      assert.equal((await pool.query('SELECT 1 FROM factory_attempts WHERE "taskId"=$1 AND stage=\'review\'', [f.task.id])).rowCount, 1)
+      assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 3)
+      assert.equal(handoffs.length, handoffsBefore + 1)
+      assert.deepEqual(handoffs.at(-1), { previous: child.id, runId: review.id })
+      assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE id=ANY($1::uuid[]) ORDER BY id', [[first.runId, child.id]])).rows, producerRows)
+      for (const [index, [, detail]] of failures.entries()) {
+        const cause = (rejected[index] as Error).cause as { code?: unknown; detail?: unknown }
+        assert.equal(cause?.code, 'agent_profile_decision_unavailable')
+        assert.equal(cause.detail, detail)
+      }
+      const diagnostics = logs.map(args => JSON.parse(String(args[0]))).filter(row => row.code === 'agent_profile_decision_unavailable')
+      assert.deepEqual(diagnostics.map(row => row.detail), failures.map(([, detail]) => detail))
+      assert.ok(diagnostics.every(row => row.event === 'coded_error' && row.purpose === 'factory-agent-profile'))
+      for (const privateText of ['SYNTHETIC_PRIVATE_', 'PRIVATE_PROFILE_', f.review!.id, f.connections.codex, nativeSession]) assert.equal(JSON.stringify(logs).includes(privateText), false)
+    } finally { profileDecisionFailure = null; warn.mock.restore() }
   })
   await t.test('queue Available crosses 60s before claim; one exact-source usage refresh admits the original run', async t => {
     t.mock.timers.enable({ apis: ['Date'], now: Date.now() })
@@ -759,7 +840,8 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       assert.equal((await pool.query('SELECT 1 FROM byos_native_runs WHERE "runId"=$1', [f.runId])).rowCount, 0)
     })
   }
-  assert.deepEqual(decisionInputs.map(call => call.purpose), ['factory-agent-profile', 'factory-agent-profile', 'task-model-routing', 'factory-agent-profile', 'task-model-routing'])
+  assert.deepEqual(decisionInputs.map(call => call.purpose), ['factory-agent-profile', 'factory-agent-profile', 'task-model-routing', 'factory-agent-profile', 'task-model-routing',
+    'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile'])
   // Validate captured inputs outside the transport: model routing intentionally
   // catches transport errors, which must not swallow a privacy assertion.
   for (const call of decisionInputs) {

@@ -10,13 +10,14 @@ let events: Array<{id:string;kind:'run_finished'|'run_question'|'run_blocked'|'i
 let starts=0
 const requests: Array<Record<string,unknown>>=[]
 let response:unknown
+let hasBillingScope=true
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
 stub('../execution-settings.ts',{executionWorkspace:async()=> 'fixture-workspace'})
 stub('../abuse/runtime.ts',{canUseMikkaPaid:async()=>({verified:true,free:1000000,purchased:0}),hostedUsage:{reserve:async()=>{},settle:async()=>{}}})
 stub('../abuse/alerts.ts',{checkAbuseAlerts:async()=>{}})
 stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:async()=>{}})
 stub('../abuse/context.ts',{hostedBillingScope:{
- getStore:()=>({workspaceId:'fixture-workspace',ownerId:'synthetic'}),
+ getStore:()=>hasBillingScope?{workspaceId:'fixture-workspace',ownerId:'synthetic'}:undefined,
  run:(scope:unknown,work:()=>unknown)=>{assert.deepEqual(scope,{workspaceId:'fixture-workspace',ownerId:'synthetic'});return work()},
 }})
 stub('./store.ts',{
@@ -45,7 +46,7 @@ before(async()=>{
  globalThis.fetch=async(input,init)=>{assert.equal(String(input),'https://ai-gateway.vercel.sh/v1/decisions');requests.push(JSON.parse(String(init?.body)));return Response.json({model:DECISION_MODEL,provider_metadata:{gateway:{generationId:"synthetic-generation"}},...(response as object)})}
  wake=await import('./wake');group=await import('./route-group');transport=await import('./decide')
 })
-beforeEach(()=>{process.env.VERCEL='1';process.env.AI_GATEWAY_API_KEY='synthetic-no-provider';events=[];starts=0;requests.length=0;response={answers:[{type:'choice',name:'tier',choice:'result'}]}})
+beforeEach(()=>{process.env.VERCEL='1';process.env.AI_GATEWAY_API_KEY='synthetic-no-provider';hasBillingScope=true;events=[];starts=0;requests.length=0;response={answers:[{type:'choice',name:'tier',choice:'result'}]}})
 after(()=>{if(priorVercel===undefined)delete process.env.VERCEL;else process.env.VERCEL=priorVercel;globalThis.fetch=priorFetch;console.error=priorConsole;if(priorKey===undefined)delete process.env.AI_GATEWAY_API_KEY;else process.env.AI_GATEWAY_API_KEY=priorKey})
 test('every runtime event reaches the actual model adapter instead of failed/blocked heuristics',async()=>{
  events=['run_finished','run_question','run_blocked','issue_done'].map((kind,i)=>({id:String(i),kind:kind as 'run_finished',payload:{status:'failed',reason:'already recoverable'},tier:null}))
@@ -158,5 +159,50 @@ test('the Decisions call uses the app\'s one gateway credential: AI_GATEWAY_API_
  const logged: unknown[] = []; console.error = (...args: unknown[]) => { logged.push(args) }
  assert.equal(await transport.decide('test', 'x', [{ type: 'predicate', name: 'p', instructions: 'p' }]), null)
  assert.equal(requests.length, 0)
- assert.deepEqual(logged.at(-1), ['Decision unavailable', { purpose: 'no-gateway-auth' }])
+ assert.deepEqual(logged.at(-1), ['Decision unavailable', { event:'coded_error',code:'decision_unavailable',detail:'gateway_auth_unavailable',causes:[],purpose:'no-gateway-auth' }])
+})
+
+test('Decision null diagnostics distinguish cancelled and missing billing context without invoking the provider', async () => {
+ const priorError=console.error,logged:unknown[]=[]
+ console.error=(...args:unknown[])=>{logged.push(args)}
+ const questions=[{type:'choice' as const,name:'tier',instructions:'Observe',choices:[{value:'result'}]}]
+ try{
+  const controller=new AbortController();controller.abort()
+  assert.equal(await transport.invokeDecision('factory-agent-profile','SYNTHETIC_PRIVATE_TASK',questions,controller.signal),null)
+  hasBillingScope=false
+  assert.equal(await transport.invokeDecision('factory-agent-profile','SYNTHETIC_PRIVATE_TASK',questions),null)
+  assert.equal(requests.length,0)
+  assert.deepEqual(logged,[
+   ['Decision unavailable',{event:'coded_error',code:'decision_unavailable',detail:'cancelled',causes:[],purpose:'factory-agent-profile'}],
+   ['Decision unavailable',{event:'coded_error',code:'decision_unavailable',detail:'billing_scope_unavailable',causes:[],purpose:'factory-agent-profile'}],
+  ])
+ }finally{console.error=priorError;hasBillingScope=true}
+})
+
+for(const [detail,body] of [
+ ['response_model_mismatch',{model:'SYNTHETIC_PRIVATE_MODEL',answers:[]}],
+ ['provider_receipt_invalid',{provider_metadata:{gateway:{generationId:'SYNTHETIC_PRIVATE_RECEIPT / invalid'}},answers:[]}],
+ ['provider_receipt_invalid',{provider_metadata:{gateway:{}},answers:[]}],
+ ['invalid_answers',{answers:[{type:'choice',name:'tier',choice:'SYNTHETIC_PRIVATE_ANSWER'}]}],
+] as const) test(`Decision paid null preserves the ${detail} reason without recording response content`,async()=>{
+ const priorError=console.error,logged:unknown[]=[]
+ console.error=(...args:unknown[])=>{logged.push(args)}
+ try{
+  response=body
+  assert.equal(await transport.invokeDecision('factory-agent-profile','SYNTHETIC_PRIVATE_TASK',[{type:'choice',name:'tier',instructions:'Observe',choices:[{value:'result'}]}]),null)
+  assert.equal(requests.length,1)
+  assert.deepEqual(logged,[['Decision unavailable',{event:'coded_error',code:'decision_unavailable',detail,causes:[],purpose:'factory-agent-profile'}]])
+  assert.equal(JSON.stringify(logged).includes('SYNTHETIC_PRIVATE_'),false)
+ }finally{console.error=priorError}
+})
+
+test('Decision request failures retain null and log only a closed reason, never the provider error',async()=>{
+ const priorError=console.error,originalFetch=globalThis.fetch,logged:unknown[]=[]
+ console.error=(...args:unknown[])=>{logged.push(args)}
+ globalThis.fetch=async()=>{throw Object.assign(new Error('SYNTHETIC_PRIVATE_PROVIDER_BODY'),{code:'SYNTHETIC_PRIVATE_TOKEN'})}
+ try{
+  assert.equal(await transport.invokeDecision('factory-agent-profile','SYNTHETIC_PRIVATE_TASK',[{type:'predicate',name:'ok',instructions:'Observe'}]),null)
+  assert.deepEqual(logged,[['Decision unavailable',{event:'coded_error',code:'decision_unavailable',detail:'request_failed',causes:[],purpose:'factory-agent-profile'}]])
+  assert.equal(JSON.stringify(logged).includes('SYNTHETIC_PRIVATE_'),false)
+ }finally{console.error=priorError;globalThis.fetch=originalFetch}
 })

@@ -17,10 +17,22 @@ export function profileDecisionQuestions(catalog: readonly PublicAgentProfile[])
 /** Why the Decision chose a Profile, stored as a code the run's detail words in the reader's language. */
 export const DECISION_REASONS = ['capability_fit', 'stage_fit', 'only_suitable'] as const
 export type DecisionReason = typeof DECISION_REASONS[number]
+export type ProfileDecisionFailure = 'no_execution' | 'no_suitable_profile' | 'profile_missing_or_refused' | 'profile_invalid' | 'low_confidence' | 'reason_invalid'
 /** Exact IDs only. No fuzzy name, phase keyword, first-item, or stale-catalog fallback. */
+export function profileDecisionResult(catalog: readonly PublicAgentProfile[], answers: Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>> | null):
+  | { selected: { id: string; reason: DecisionReason }; detail?: never }
+  | { selected: null; detail: ProfileDecisionFailure } {
+  if (!answers) return { selected: null, detail: 'no_execution' }
+  const answer = answers.get('profile'), reason = answers.get('reason')
+  if (!answer) return { selected: null, detail: 'profile_missing_or_refused' }
+  if (answer.type !== 'choice') return { selected: null, detail: 'profile_invalid' }
+  if (answer.choice === 'none') return { selected: null, detail: 'no_suitable_profile' }
+  if (!catalog.some(profile => profile.id === answer.choice) || (answer.confidence !== undefined && (!Number.isFinite(answer.confidence) || answer.confidence < 0 || answer.confidence > 1))) return { selected: null, detail: 'profile_invalid' }
+  if (answer.confidence !== undefined && answer.confidence < 0.55) return { selected: null, detail: 'low_confidence' }
+  if (reason?.type !== 'choice' || !(DECISION_REASONS as readonly string[]).includes(reason.choice)) return { selected: null, detail: 'reason_invalid' }
+  return { selected: { id: answer.choice, reason: reason.choice as DecisionReason } }
+}
+/** Compatibility for answer-only callers; diagnostics never become a choice. */
 export function selectedProfileAnswer(catalog: readonly PublicAgentProfile[], answers: Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>> | null) {
-  const answer = answers?.get('profile'), reason = answers?.get('reason')
-  if (answer?.type !== 'choice' || answer.choice === 'none' || !catalog.some(profile => profile.id === answer.choice) || (answer.confidence !== undefined && (!Number.isFinite(answer.confidence) || answer.confidence < 0.55 || answer.confidence > 1))) return null
-  if (reason?.type !== 'choice' || !(DECISION_REASONS as readonly string[]).includes(reason.choice)) return null
-  return { id: answer.choice, reason: reason.choice as DecisionReason }
+  return profileDecisionResult(catalog, answers).selected
 }

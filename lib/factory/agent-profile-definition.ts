@@ -48,7 +48,7 @@ export interface AgentProfileSelection {
   decision?: DecisionExecution
 }
 export class AgentProfileError extends Error {
-  constructor(readonly code: string, readonly status = 409) { super(code); this.name = 'AgentProfileError' }
+  constructor(readonly code: string, readonly status = 409, options?: ErrorOptions) { super(code, options); this.name = 'AgentProfileError' }
 }
 export function parseAgentProfile(input: unknown) {
   if (Buffer.byteLength(JSON.stringify(input) ?? '', 'utf8') > 32_000) throw new AgentProfileError('agentProfileTooLarge', 413)
