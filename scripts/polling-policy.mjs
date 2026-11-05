@@ -44,7 +44,7 @@ export const pollingAllowlist = {
   'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll fallback timer only: with the gateway configured it waits on LISTEN for the device (re-check per NOTIFY, one final check at the deadline); every 5 s without push or if LISTEN drops', 1),
   'lib/coordinator/group-turns.ts': db(server, 'untilStopped fallback timer only: 15 s while the worker LISTENs for the stop push, 1 s if LISTEN is unavailable', 1),
   'workflows/coordinator/native-turn.ts': db(server, 'native coordinator turn re-reads its state every second (up to 180 times)', 1),
-  'workflows/run-publication/workflow.ts': db(server, 'publish and fail results retried every 30 s until done', 2),
+  'workflows/run-publication/workflow.ts': db(server, 'untilDone: publish and fail results retried with exponential backoff, 30 s doubling to a 10 min cap, until done (GitHub outage or another worker\'s lease; nothing to push)', 1),
   // Daemon: loops that call our server, which reads the database.
   'packages/daemon/src/agents/tool-approval.ts': db(daemon, 'ToolApprovalGate fallback timer only: none while the device gateway pushes run control, every 20 s while it is down, 1 s against a server older than run-control push', 1),
   'packages/daemon/src/server-link-http.ts': db(daemon, 'isLive retries an unanswered liveness check (timeout, 5xx) every second for at most 30 s; no periodic check', 1),
