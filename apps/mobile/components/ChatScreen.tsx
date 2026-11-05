@@ -25,7 +25,7 @@ import { plainText, quotable } from '@/lib/quote'
 import { delivered, inFlight, marked, outgoingKey, queued, sendFailureState, submissionBody, unsettled, type Outgoing } from '@/lib/outbox'
 import { apiCache } from '@/lib/api-cache'
 import { askForPush, usePushState } from '@/lib/push-state'
-import { runTitle, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
+import { runName, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
 import { FailedReply } from '@/components/FailedReply'
 import { eventText, questionCard } from '@/lib/event-line'
 import { waitingLabel } from '@/lib/waiting'
@@ -246,7 +246,7 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
                 {item.threads.map(id => {
                   const run = sources[id]
                   return run?.kind === 'run'
-                    ? <TimedRow key={id} time={time} offset={offset}><ThreadCard title={runTitle(run)} status={runIcon(run)} info={runInfoLine(run.info)} onPress={() => router.push(`/thread/${id}`)} /></TimedRow>
+                    ? <TimedRow key={id} time={time} offset={offset}><ThreadCard title={runName(run)} status={runIcon(run)} info={runInfoLine(run.info)} onPress={() => router.push(`/thread/${id}`)} /></TimedRow>
                     : null
                 })}
               </Arrival>

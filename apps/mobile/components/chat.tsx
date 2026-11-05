@@ -102,14 +102,25 @@ export function OutgoingBubble({ text, photos, failed, unconfirmed = false, onRe
  * waiting for the person carries its action (去回答, #1386); a long name is cut here and read in full on its page.
  */
 export function ThreadCard({ title, status, info, onPress, action }: { title: string; status: ThreadStatus; info?: string | null; onPress: () => void; action?: string }) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={[title, info].filter(Boolean).join('，')} accessibilityHint={action} onPress={onPress} style={({ pressed }) => [styles.threadCard, pressed && { backgroundColor: colors.pressed }]}>
+  const body = (
+    <>
       <StatusIcon status={status} size={20} />
       <View style={{ flex: 1 }}>
         <Text style={styles.threadTitle} numberOfLines={1}>{title}</Text>
         {info ? <Text style={styles.threadInfo} numberOfLines={1}>{info}</Text> : null}
       </View>
-      {action ? <CardButton label={action} primary onPress={onPress} /> : null}
+    </>
+  )
+  // With an action the card holds two buttons side by side (a button never sits inside another).
+  if (action) return (
+    <View style={[styles.threadCard, { paddingRight: 8 }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={[title, info].filter(Boolean).join('，')} onPress={onPress} style={({ pressed }) => [styles.threadOpen, pressed && { opacity: 0.6 }]}>{body}</Pressable>
+      <CardButton label={action} primary onPress={onPress} />
+    </View>
+  )
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={[title, info].filter(Boolean).join('，')} onPress={onPress} style={({ pressed }) => [styles.threadCard, pressed && { backgroundColor: colors.pressed }]}>
+      {body}
     </Pressable>
   )
 }
@@ -123,7 +134,7 @@ const ARRIVE = FadeInDown.springify().mass(ENTER.mass).stiffness(ENTER.stiffness
  */
 export function Arrival({ animate, children }: { animate: boolean; children: ReactNode }) {
   const reduceMotion = useReducedMotionPreference()
-  return <Reanimated.View entering={animate && !reduceMotion ? ARRIVE : undefined}>{children}</Reanimated.View>
+  return <Reanimated.View style={styles.arrival} entering={animate && !reduceMotion ? ARRIVE : undefined}>{children}</Reanimated.View>
 }
 
 /** Mikka's own event lines (a run ended, an artifact arrived), small and grey between messages. */
@@ -305,6 +316,9 @@ const styles = StyleSheet.create({
   retryRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   retry: { fontSize: 12, color: colors.danger },
   threadCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.bubble, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 8, minHeight: 52 },
+  // The list's 12-point gap between a message and the cards that follow it.
+  arrival: { gap: 12 },
+  threadOpen: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44 },
   threadTitle: { fontSize: 16, fontWeight: '500' },
   threadInfo: { fontSize: 12, lineHeight: 16, color: colors.secondary },
   event: { alignSelf: 'center', textAlign: 'center', fontSize: 12, lineHeight: 17, color: colors.secondary, marginHorizontal: 24 },
