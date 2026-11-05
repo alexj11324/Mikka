@@ -1,6 +1,6 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { executionIdentityForRun } from '@/lib/execution-identity'
@@ -82,7 +82,7 @@ export async function submitArtifact(submitter: ArtifactSubmitter, input: { titl
     return submitted
   })
   if ('error' in result) return result
-  after(() => wakeCoordinator(submitter.userId))
+  afterJob('after:coordinator-wake', () => wakeCoordinator(submitter.userId))
   return result
 }
 

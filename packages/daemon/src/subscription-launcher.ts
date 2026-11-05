@@ -61,7 +61,8 @@ export async function launchHostedSubscription(use: SubscriptionUse, options: St
         subscriptionAuth: { accountId, verify: async () => { await check() }, token: async () => { const value = await next(); return { accountId: value.accountId ?? '', accessToken: value.accessToken, expiresAt: value.expiresAt ?? '' } } } })
   })
   let ended = false
-  const offMonitor = gate.monitor(async () => {
+  // Re-checked on each run-control push (gate.watch), not on a timer.
+  const offMonitor = gate.watch(async () => {
       if (ended || gate.revoked) return
       const access = await host.access()
       if (gate.revoked) throw new Error('Run tool approval unavailable')
@@ -72,7 +73,7 @@ export async function launchHostedSubscription(use: SubscriptionUse, options: St
       if (credentialCalls > 0 && access.credentialTransition && access.connection?.revision === revision) {
         authorizeSubscriptionUse({ ...use, execution: 'native' }, { ...access, connection: { ...access.connection, state: 'connected' } })
       } else authorizeSubscriptionUse({ ...use, execution: 'native' }, access)
-  }, host.revocationPollMs ?? 1000)
+  }, host.revocationPollMs)
   const off = gate.onRevoke(() => { void session.cancel().catch(() => undefined).finally(cleanup) })
   function cleanup() { ended = true; offMonitor(); off(); gate.revoke() }
   return {

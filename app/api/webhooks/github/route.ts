@@ -1,4 +1,4 @@
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { verifyGitHubSignature } from '@/lib/suggestions/github-webhook'
 import { githubCandidateIds } from '@/lib/suggestions/notification'
 import { noteLogOutcome, withRequestLog } from '@/lib/request-log'
@@ -36,7 +36,7 @@ async function handlePOST(request: Request) {
     return new Response(null, { status: 204, headers: noStore })
   }
   const merged = mergedPullRequest(event, payload)
-  after(async () => {
+  afterJob('after:github-webhook', async () => {
     if (merged) {
       try { await (await import('@/lib/factory/server')).factoryMerges.pullRequestMerged(merged) }
       catch (error) { console.error('Factory merge completion failed', error instanceof Error ? error.message : error) }

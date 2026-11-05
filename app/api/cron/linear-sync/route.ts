@@ -1,4 +1,5 @@
 import { withRequestLog } from '@/lib/request-log'
+import { cronJob } from '@/lib/background'
 import { cronUnauthorized } from '@/lib/cron-auth'
 import { processLinearSyncBatch } from '@/lib/linear-sync/worker'
 
@@ -10,4 +11,4 @@ async function handleGET(request: Request) {
   return Response.json(await processLinearSyncBatch())
 }
 
-export const GET = withRequestLog('/api/cron/linear-sync', handleGET)
+export const GET = withRequestLog('/api/cron/linear-sync', cronJob('linear-sync', handleGET))

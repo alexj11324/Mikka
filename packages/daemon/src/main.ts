@@ -251,6 +251,8 @@ export class Daemon {
   private commandsAbort = new AbortController()
   /** The push socket is open. An idle device does not heartbeat the database. */
   private gatewayLive = false
+  /** The server's last gateway ticket said it pushes run control (#1212). */
+  private runControlPush = false
   /** The server said it has no gateway. Do not ask again on every long-poll. */
   private gatewayUnavailable = false
   private gatewayFailures = 0
@@ -768,6 +770,10 @@ export class Daemon {
     if (signal.aborted) connection.abort()
     try {
       const ticket = await mint.call(this.options.link, deviceId, connection.signal)
+      // Only a server that pushes every run-control write lets live runs drop
+      // their periodic check; an older one keeps the one-second check.
+      this.runControlPush = ticket.runControl === 'push'
+      this.options.link.setRunControlMode?.(this.runControlPush ? 'fallback' : 'legacy')
       if (!ticket.url || !ticket.protocol) { this.gatewayUnavailable = true; return false }
       if (signal.aborted) return false
       const socket = openDeviceGateway(ticket.url, ticket.protocol)
@@ -776,6 +782,7 @@ export class Daemon {
         onOpen: () => {
           openedAt = performance.now()
           this.gatewayLive = true
+          if (this.runControlPush) this.options.link.setRunControlMode?.('push')
         },
         onWorkAvailable: () => this.options.link.invalidateRunControls?.(),
         onWork: async () => {
@@ -800,6 +807,7 @@ export class Daemon {
       connection.abort()
       signal.removeEventListener("abort", abort)
       this.gatewayLive = false
+      this.options.link.setRunControlMode?.(this.runControlPush ? 'fallback' : 'legacy')
       this.options.link.invalidateRunControls?.()
       if (!this.stopped && !signal.aborted && !this.gatewayUnavailable) {
         // Merely opening is not recovery: a flapping server must not reset

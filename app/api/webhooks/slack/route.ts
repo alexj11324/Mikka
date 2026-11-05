@@ -1,3 +1,4 @@
+// oxlint-disable-next-line no-restricted-imports -- the chat SDK hands over a task that is already running under this webhook's label
 import { after } from 'next/server'
 import { getSlackBot } from '@/lib/slack/bot'
 import { slackConfig, slackOwner } from '@/lib/slack/config'

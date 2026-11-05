@@ -1,5 +1,6 @@
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
-import { after, NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { auth, authBaseURL } from '@/lib/auth'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { getComposio, readComposioAccountEmail, renameComposioAccount, retireComposioAccount } from '@/lib/composio'
@@ -91,7 +92,7 @@ async function handleGET(request: NextRequest) {
     }
     // Subscribe the new account's triggers and write the first briefing from what is there now.
     const timeZone = request.headers.get('x-vercel-ip-timezone')
-    after(() => bootstrapSuggestions(userId, 'composio', timeZone))
+    afterJob('after:suggestions-bootstrap', () => bootstrapSuggestions(userId, 'composio', timeZone))
     const response = integrationRedirect(request, reconnectComplete ? 'connected' : 'callback-failed')
     clearSessionCookie(request, response)
     response.headers.set('Cache-Control', noStore['Cache-Control'])

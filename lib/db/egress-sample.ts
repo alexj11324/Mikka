@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { PoolClient, QueryResult } from 'pg'
-import { AsyncLocalStorage } from 'node:async_hooks'
 import { deploymentSwitch } from '@/lib/deployment-switches'
+import { currentRoute, routeScope } from '@/lib/tracing/labels'
 
 // JSON-result diagnostics, separate from Neon's actual billed wire transfer.
 // A sampled query writes one JSON line: the request's route
@@ -43,8 +43,6 @@ export function describeSample(text: string, result: QueryResult | QueryResult[]
 
 const instrumented = new WeakSet<PoolClient>()
 
-/** The route template lib/request-log.ts runs a request under (shared through a global key). */
-const routeScope: AsyncLocalStorage<string> = ((globalThis as Record<symbol, unknown>)[Symbol.for('mikka.requestRoute')] ??= new AsyncLocalStorage<string>()) as AsyncLocalStorage<string>
 
 /** Fixed Server Action names only; never include arguments or user IDs. */
 export function withDatabaseOperation<T>(operation: string, read: () => T): T {
@@ -61,7 +59,7 @@ export function sampleClient(client: PoolClient, on: () => boolean = sampling, r
     const text = typeof first === 'string' ? first : (first as { text?: unknown } | null)?.text
     if (typeof text !== 'string' || !on()) return query(...args)
     const selected = random() < SAMPLE_RATE
-    const route = routeScope.getStore() ?? null
+    const route = currentRoute() ?? null
     const record = (result: unknown) => {
       try {
         const bytes = resultBytes(result as QueryResult)

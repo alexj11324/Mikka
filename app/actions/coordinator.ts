@@ -4,7 +4,7 @@ import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { ownerListRead } from '@/lib/live/list-read-server'
 
 import { cookies, headers } from 'next/headers'
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
@@ -229,7 +229,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
       throw error
     }
-    after(() => wakeCoordinator(userId))
+    afterJob('after:coordinator-wake', () => wakeCoordinator(userId))
     return { queued: true as const }
   })
 }
@@ -249,7 +249,7 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
     if (chat.items.length || chat.working || chat.error) return { queued: false }
     const locale = (await cookies()).get('NEXT_LOCALE')?.value ?? 'zh-CN'
     await recordCoordinatorEvent(db, userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot.coordinator ? undefined : bot.name), { botId: bot.id }))
-    after(() => wakeCoordinator(session.user.id))
+    afterJob('after:coordinator-wake', () => wakeCoordinator(session.user.id))
     return { queued: true }
   })
 }
@@ -273,7 +273,7 @@ export async function retryCoordinatorTurn(botId: string | null = null): Promise
     if (!coordinatorEnabled()) return { queued: false as const, reason: 'unavailable' as const }
     const queued = await retryFailedTurn(session.user.id, bot.id)
     if (queued) {
-      after(() => wakeCoordinator(session.user.id))
+      afterJob('after:coordinator-wake', () => wakeCoordinator(session.user.id))
       return { queued: true as const }
     }
     const current = await chatView(session.user.id, 1, bot.id)
@@ -309,7 +309,7 @@ export async function sendSuggestion(suggestionId: string): Promise<ActionResult
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
       throw error
     }
-    after(() => wakeCoordinator(userId))
+    afterJob('after:coordinator-wake', () => wakeCoordinator(userId))
     return { queued: true as const }
   })
 }

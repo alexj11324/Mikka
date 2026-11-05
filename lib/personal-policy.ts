@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { runChanged } from './live/panels'
 import { runListChanged } from './live/lists'
+import { runControlChanged } from './device-gateway-notify'
 
 /**
  * Decision 2026-11-01-2240: a person's own subscriptions and API keys always run
@@ -69,6 +70,7 @@ export async function stopRunsUsingSubscriptions(query: Query, scope: { ownerId?
       AND ($3::uuid IS NULL OR c.id=$3) AND (NOT $4::boolean OR r."userId"<>c."ownerId") RETURNING r.id`,
     [scope.ownerId ?? null, scope.workspaceId ?? null, scope.connectionId ?? null, scope.othersOnly ?? false])
   for (const { id } of rows) { await runListChanged(query, id); await runChanged(query, id) }
+  runControlChanged(query, { runIds: rows.map(row => row.id) })
   return rowCount ?? 0
 }
 
