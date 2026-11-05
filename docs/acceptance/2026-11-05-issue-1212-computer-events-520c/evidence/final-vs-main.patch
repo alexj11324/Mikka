@@ -1,0 +1,1726 @@
+diff --git a/app/[locale]/preview/subagent-login/page.tsx b/app/[locale]/preview/subagent-login/page.tsx
+index 04c0e2ef8..cd18917ef 100644
+--- a/app/[locale]/preview/subagent-login/page.tsx
++++ b/app/[locale]/preview/subagent-login/page.tsx
+@@ -1,17 +1,23 @@
+ import type { Metadata } from 'next'
+ import { notFound } from 'next/navigation'
+ import { SubagentLoginNeeds } from '@/components/coordinator/subagent-login-needs'
++import { LiveProvider } from '@/hooks/use-live-key'
+ 
+ export const dynamic = 'force-dynamic'
+ export const metadata: Metadata = { robots: { index: false, follow: false } }
+ 
+ // Test harness for the chat's sub-agent login card. Off unless the e2e server opts in;
+-// the browser test intercepts the event stream and the credential API.
++// the browser fixture intercepts scoped JSON event pages and the credential API.
++// Fixed render identities do not authorize reads: the real event route still
++// requires its own fresh session and active workspace membership.
+ const BOT = '00000000-0000-4000-8000-0000000000b0'
++const WORKSPACE = '00000000-0000-4000-8000-0000000000c0'
+ 
+ export default function SubagentLoginPreview() {
+   if (process.env.MIKKA_CREDENTIAL_HARNESS !== '1') notFound()
+-  return <main className="mx-auto flex max-w-3xl flex-col gap-4 p-6">
+-    <SubagentLoginNeeds botId={BOT} />
+-  </main>
++  return <LiveProvider ownerId="subagent-login-preview" workspaceId={WORKSPACE}>
++    <main className="mx-auto flex max-w-3xl flex-col gap-4 p-6">
++      <SubagentLoginNeeds botId={BOT} />
++    </main>
++  </LiveProvider>
+ }
+diff --git a/app/api/computer/events/route.ts b/app/api/computer/events/route.ts
+index 07085ee3d..20f464b41 100644
+--- a/app/api/computer/events/route.ts
++++ b/app/api/computer/events/route.ts
+@@ -1,29 +1,31 @@
+ import { auth } from '@/lib/api-auth'
+-import { computerEventPollDelay } from '@/lib/computer/event-poll'
+ import { pool } from '@/lib/db'
+-import { loadWorkspaceContext } from '@/lib/workspace-access'
++import { workspacePool } from '@/lib/workspace-db'
++import { LIVE_ID } from '@/lib/live/events'
++import { computerEventCursor } from '@/lib/computer/event-page'
++import { readComputerEvents } from '@/lib/computer/event-log'
++import { withRequestLog } from '@/lib/request-log'
++
+ export const runtime = 'nodejs'
+-export const maxDuration = 300
+-/** Owner/workspace-filtered resumable events; never carries CDP targets or tokens. */
+-export async function GET(request: Request) {
+-  const session = await auth.api.getSession({ headers: request.headers })
+-  if (!session?.user) return new Response(null, { status: 401 })
+-  const context = await loadWorkspaceContext(undefined, session.user)
+-  const previous = request.headers.get('last-event-id') ?? new URL(request.url).searchParams.get('after') ?? '0'
+-  if (!/^\d{1,16}$/.test(previous)) return new Response(null, { status: 400 })
+-  let cursor = previous
+-  const encoder = new TextEncoder()
+-  const stream = new ReadableStream({ async start(controller) {
+-    const until = Date.now() + 240_000
+-    try {
+-      while (!request.signal.aborted && Date.now() < until) {
+-        const { rows } = await pool.query('SELECT seq,event FROM subagent_events WHERE "ownerId"=$1 AND "workspaceId"=$2 AND seq>$3 ORDER BY seq LIMIT 100', [session.user.id, context.workspace.id, cursor])
+-        for (const row of rows) { cursor = String(row.seq); controller.enqueue(encoder.encode(`id: ${cursor}\nevent: data-subagent\ndata: ${JSON.stringify(row.event.data)}\n\n`)) }
+-        if (!rows.length) controller.enqueue(encoder.encode(': keepalive\n\n'))
+-        await new Promise(resolve => setTimeout(resolve, computerEventPollDelay(rows.length)))
+-      }
+-    } catch { /* Client disconnect and database failures close the stream. */ }
+-    finally { try { controller.close() } catch { /* Already cancelled. */ } }
+-  } })
+-  return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'private, no-store', 'X-Accel-Buffering': 'no' } })
++export const dynamic = 'force-dynamic'
++const headers = { 'cache-control': 'private, no-store' }
++
++/** Browser notifications contain no data; each incremental read authorizes again. */
++async function events(request: Request) {
++  if (request.headers.has('authorization')) return new Response(null, { status: 401, headers })
++  const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
++  if (!session?.user) return new Response(null, { status: 401, headers })
++  const params = new URL(request.url).searchParams
++  const workspaceId = params.get('workspace') ?? ''
++  const cursor = computerEventCursor(params.get('after') ?? '0')
++  if (!LIVE_ID.test(workspaceId) || cursor === null) return new Response(null, { status: 400, headers })
++  const member = await workspacePool.query(
++    `SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active'`,
++    [workspaceId, session.user.id],
++  )
++  if (!member.rowCount) return new Response(null, { status: 403, headers })
++  const page = await readComputerEvents(pool, { ownerId: session.user.id, workspaceId }, cursor)
++  return Response.json(page, { headers })
+ }
++
++export const GET = withRequestLog('/api/computer/events', events)
+diff --git a/components/coordinator/subagent-login-needs.tsx b/components/coordinator/subagent-login-needs.tsx
+index 74e027f80..b11a6c264 100644
+--- a/components/coordinator/subagent-login-needs.tsx
++++ b/components/coordinator/subagent-login-needs.tsx
+@@ -1,13 +1,13 @@
+ 'use client'
+ 
+-import { useEffect, useState } from 'react'
++import { useState } from 'react'
++import { useSubagentUpdates } from '@/hooks/use-subagent-updates'
+ import { CredentialLoginCard } from '@/components/credentials/credential-login-card'
+-import { applySubagentUpdate, loginNeeds, subscribeSubagentUpdates, type SubagentUpdate } from '@/lib/subagents/login-needs'
++import { loginNeeds } from '@/lib/subagents/login-needs'
+ 
+ /** A sub-agent of this bot is waiting on a site login: offer the secure login card in the chat. */
+ export function SubagentLoginNeeds({ botId }: { botId: string }) {
+-  const [updates, setUpdates] = useState<ReadonlyMap<string, SubagentUpdate>>(() => new Map())
+-  useEffect(() => subscribeSubagentUpdates(update => setUpdates(state => applySubagentUpdate(state, update))), [])
++  const updates = useSubagentUpdates()
+   // Sub-agents whose login went through: the card stays on 已登录 until the sub-agent moves on.
+   const [signedIn, setSignedIn] = useState<ReadonlySet<string>>(() => new Set())
+   const needs = loginNeeds(updates, botId)
+diff --git a/docs/acceptance/2026-11-04-issue-1212/computer-events-checkpoint.md b/docs/acceptance/2026-11-04-issue-1212/computer-events-checkpoint.md
+new file mode 100644
+index 000000000..61b38f5f1
+--- /dev/null
++++ b/docs/acceptance/2026-11-04-issue-1212/computer-events-checkpoint.md
+@@ -0,0 +1,9 @@
++# Computer events WIP checkpoint
++
++Saved before leaving the temporary Vercel test environment. This is not a production acceptance result.
++
++Base: a4f64527970e124b9e4d597fd528baa3c6c34c78 (Factory live channel PR #1220).
++
++The 15 source/test files were compared with the actually tested environment by SHA-256; all matched. Seven new unit/real-PostgreSQL cases passed with zero skips. Typecheck and lint exited 0. The existing backend database case passed. The unattended regression invocation exited 1 because it omitted Node's required --experimental-test-module-mocks flag; it must be rerun with the correct invocation. No unattended pass is claimed.
++
++Pending before review/merge: actual revoked-session/membership route regression, writer post-commit/rollback integration coverage, preview fixture adaptation, CI test inventory wiring, local production-build screenshots, latest CI, required one-hour before/after production measurements, Web deploy and production acceptance. No production merge or model call was made for this checkpoint.
+diff --git a/hooks/use-live-key.tsx b/hooks/use-live-key.tsx
+index 8170d2612..baf10f62f 100644
+--- a/hooks/use-live-key.tsx
++++ b/hooks/use-live-key.tsx
+@@ -49,6 +49,8 @@ export function LiveProvider({ ownerId, workspaceId, children }: { ownerId: stri
+   return <LiveContext value={value}>{children}</LiveContext>
+ }
+ 
++export function useLiveScope() { return useContext(LiveContext) }
++
+ /** Register the SWR keys invalidated by a committed entity change. */
+ export function useLiveKey(kind: LiveKind, id: string | null | undefined, keys: readonly string[], workspaceId?: string | null, options?: LiveSubscriptionOptions) {
+   useLiveKeys(id ? [{ kind, id }] : [], keys, workspaceId, options)
+diff --git a/hooks/use-subagent-updates.ts b/hooks/use-subagent-updates.ts
+new file mode 100644
+index 000000000..27c2d3b69
+--- /dev/null
++++ b/hooks/use-subagent-updates.ts
+@@ -0,0 +1,50 @@
++'use client'
++
++import { useMemo, useSyncExternalStore } from 'react'
++import { withBasePath } from '@/lib/base-path'
++import { pageRefreshSignal } from '@/lib/app-build'
++import { ComputerEventFeed } from '@/lib/computer/event-stream'
++import type { LiveChannels } from '@/lib/live/channels'
++import type { SubagentUpdate } from '@/lib/subagents/login-needs'
++import { useLiveScope } from './use-live-key'
++
++const feeds = new WeakMap<LiveChannels, Map<string, ComputerEventFeed>>()
++const empty: ReadonlyMap<string, SubagentUpdate> = new Map()
++const emptySnapshot = () => empty
++const noSubscribe = () => () => {}
++
++function sharedFeed(channels: LiveChannels, workspaceId: string) {
++  let scoped = feeds.get(channels)
++  if (!scoped) { scoped = new Map(); feeds.set(channels, scoped) }
++  let feed = scoped.get(workspaceId)
++  if (!feed) {
++    feed = new ComputerEventFeed({
++      async page(cursor, signal) {
++        const response = await fetch(withBasePath(`/api/computer/events?workspace=${encodeURIComponent(workspaceId)}&after=${encodeURIComponent(cursor)}`), {
++          cache: 'no-store', signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
++        })
++        if (!response.ok) throw new Error('Computer events unavailable')
++        return response.json()
++      },
++      visible: () => document.visibilityState === 'visible',
++      watchVisibility(changed) {
++        document.addEventListener('visibilitychange', changed)
++        return () => document.removeEventListener('visibilitychange', changed)
++      },
++      invalidations: refresh => channels.subscribe(workspaceId, 'subagent_events', workspaceId, [`computer-events:${workspaceId}`], refresh),
++      stopped: pageRefreshSignal(),
++      later: (callback, milliseconds) => setTimeout(callback, milliseconds),
++      cancel: timer => clearTimeout(timer as ReturnType<typeof setTimeout>),
++    })
++    scoped.set(workspaceId, feed)
++  }
++  return feed
++}
++
++/** Channel identity changes with the owner; workspace changes select a separate cursor/cache. */
++export function useSubagentUpdates() {
++  const context = useLiveScope()
++  const channels = context?.channels, workspaceId = context?.workspaceId
++  const feed = useMemo(() => channels && workspaceId ? sharedFeed(channels, workspaceId) : null, [channels, workspaceId])
++  return useSyncExternalStore(feed?.subscribe ?? noSubscribe, feed?.getSnapshot ?? emptySnapshot, emptySnapshot)
++}
+diff --git a/lib/cloud-computer/action-reviews.ts b/lib/cloud-computer/action-reviews.ts
+index eead1dfb6..9a87602db 100644
+--- a/lib/cloud-computer/action-reviews.ts
++++ b/lib/cloud-computer/action-reviews.ts
+@@ -1,4 +1,5 @@
+ import 'server-only'
++import { lockSubagentEvents, notifySubagentEvents } from '@/lib/computer/event-log'
+ import { pendingActionsChanged } from '../live/pending-actions'
+ import { createHash, randomUUID } from 'node:crypto'
+ import type { Pool } from 'pg'
+@@ -54,8 +55,10 @@ export async function browserAction(pool:Pool,actor:Actor,botId:string,id:string
+     const body={version:2 as const,actionId:randomUUID(),workspaceId:actor.workspaceId,botId,subagentId:id,epoch:current.row.epoch,loaderId:observation.loaderId,origin:observation.origin,observationId:observation.observationId,observedAt:observation.observedAt,mutation:browserMutationSchema.parse(mutation),summary:summary.slice(0,500),effect:judgment.effect,policyRevision:current.revision,judgment:{executionId:judgment.execution.executionId,requestDigest:judgment.execution.requestDigest,imageDigest:observationMetadata(observation).imageDigest}}
+     input=approvedSchema.parse({...body,digest:hash([actor.userId,body])})
+     await client.query(`INSERT INTO pending_actions(id,"userId","botId",action,input,status) VALUES($1,$2,$4,'browser_operation',$3,'running')`,[input.actionId,actor.userId,input,botId])
++    await lockSubagentEvents(client, { ownerId: actor.userId, workspaceId: actor.workspaceId })
+     await client.query(`WITH changed AS (UPDATE bot_subagents SET status='running',needs=NULL,step='Executing authorized action',"activeActionId"=$2 WHERE id=$1 RETURNING *) INSERT INTO subagent_events("ownerId","workspaceId","botId","subagentId",event) SELECT "ownerId","workspaceId","botId",id,jsonb_build_object('type','data-subagent','data',jsonb_build_object('botId',"botId",'subagentId',id,'task',task,'state',status,'step',step,'needs',needs)) FROM changed`,[id,input.actionId])
+     await client.query('COMMIT')
++    notifySubagentEvents({ ownerId: actor.userId, workspaceId: actor.workspaceId })
+   } catch(error) {await client.query('ROLLBACK');throw error} finally {client.release()}
+   const result=await executeApprovedBrowserAction(pool,actor.userId,input,true)
+   if ('error' in result) throw new ComputerError(409,result.error)
+diff --git a/lib/cloud-computer/credential-reviews.ts b/lib/cloud-computer/credential-reviews.ts
+index 85bdc7dad..70c5fa19b 100644
+--- a/lib/cloud-computer/credential-reviews.ts
++++ b/lib/cloud-computer/credential-reviews.ts
+@@ -1,4 +1,5 @@
+ import 'server-only'
++import { lockSubagentEvents, notifySubagentEvents } from '@/lib/computer/event-log'
+ import { pendingActionsChanged } from '../live/pending-actions'
+ import { randomUUID } from 'node:crypto'
+ import type { Pool } from 'pg'
+@@ -41,10 +42,12 @@ export async function proposeCredentialOperation(pool: Pool, caller: BrowserCall
+     await client.query(`INSERT INTO pending_actions(id,"userId","botId",action,input) VALUES($1,$2,$4,'credential_operation',$3)`, [plan.actionId, caller.userId, JSON.stringify({ ...plan, digest: credentialPlanDigest(caller.userId, plan) }), plan.botId])
+     if(operation==='login') await client.query("UPDATE pending_actions SET status='running' WHERE id=$1",[plan.actionId])
+     const needs = JSON.stringify({ kind: 'approval', actionId: plan.actionId, summary: plan.summary })
++    await lockSubagentEvents(client, { ownerId: caller.userId, workspaceId: caller.workspaceId })
+     await client.query(`WITH changed AS (UPDATE bot_subagents SET status=$6,step=$7,needs=$5,"activeActionId"=$8 WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4 RETURNING *) INSERT INTO subagent_events("ownerId","workspaceId","botId","subagentId",event) SELECT "ownerId","workspaceId","botId",id,jsonb_build_object('type','data-subagent','data',jsonb_build_object('botId',"botId",'subagentId',id,'task',task,'state',status,'step',step,'needs',needs)) FROM changed`, [plan.subagentId, caller.userId, plan.workspaceId, plan.botId, operation==='login'?null:needs,operation==='login'?'running':'needs_you',operation==='login'?'Signing in':'Credential approval',operation==='login'?plan.actionId:null])
+     if(operation==='login') await client.query(`UPDATE bot_subagents SET status='running',step='Signing in',needs=NULL,"activeActionId"=$2 WHERE id=$1`,[plan.subagentId,plan.actionId])
+     if (operation !== 'login') await pendingActionsChanged(client, plan.actionId, caller.userId)
+     await client.query('COMMIT')
++    notifySubagentEvents({ ownerId: caller.userId, workspaceId: caller.workspaceId })
+     if(operation!=='login') return { status: 'needs_approval' as const, origin: target.origin }
+   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+   const raw={...plan,digest:credentialPlanDigest(caller.userId,plan)}
+@@ -96,7 +99,7 @@ export async function executeCredentialOperation(pool: Pool, userId: string, raw
+         return { data: { status: 'needs_login' } }
+       }
+       // Broker itself holds policy+credential locks and rechecks exact version.
+-      const result = await executeCredentialLease(lease.lease, plan.origin)
++      const result = await executeCredentialLease(lease.lease, plan.origin, { ownerId: caller.userId, workspaceId: caller.workspaceId })
+       if (result.status !== 'guarded') {
+         await store.update(actor,plan.botId,plan.subagentId,'running','Observe login outcome')
+         if(plan.operation==='login') await pool.query(`UPDATE pending_actions SET status='done',result=$2 WHERE id=$1`,[plan.actionId,{status:result.status}])
+diff --git a/lib/cloud-computer/subagents.ts b/lib/cloud-computer/subagents.ts
+index bfb7b87b2..bf6f51d1c 100644
+--- a/lib/cloud-computer/subagents.ts
++++ b/lib/cloud-computer/subagents.ts
+@@ -1,4 +1,5 @@
+ import 'server-only'
++import { lockSubagentEvents, notifySubagentEvents } from '@/lib/computer/event-log'
+ import { randomUUID } from 'node:crypto'
+ import type { Pool, PoolClient } from 'pg'
+ import { ensureCloudMachine } from '@/lib/computer/provision'
+@@ -24,9 +25,10 @@ export class SubagentStore {
+     if (row.task !== task) throw new ComputerError(409, 'Web task request changed')
+     return row
+   }
+-  private async publish(client: Pool | PoolClient, row: Subagent) {
++  private async publish(client: PoolClient, row: Subagent) {
+     // 4e2 item 4: subagent_events are persisted and streamed; mask step/needs/task with the workspace's secret set.
+     const event = await maskFor({ workspaceId: row.workspaceId, ownerId: row.ownerId }, subagentEventSchema.parse({ type: 'data-subagent', data: { botId: row.botId, subagentId: row.id, task: row.task, state: row.status, step: row.step, needs: row.needs } }))
++    await lockSubagentEvents(client, { ownerId: row.ownerId, workspaceId: row.workspaceId })
+     await client.query('INSERT INTO subagent_events ("ownerId","workspaceId","botId","subagentId",event) VALUES ($1,$2,$3,$4,$5)', [row.ownerId, row.workspaceId, row.botId, row.id, JSON.stringify(event)])
+     return event
+   }
+@@ -44,6 +46,7 @@ export class SubagentStore {
+         const denied=(await client.query<Subagent>(`UPDATE bot_subagents SET status='failed',step='Computer use is denied',"endedAt"=now(),"startLeaseId"=NULL,"startLeaseUntil"=NULL WHERE id=$1 AND status='queued' RETURNING *`,[id])).rows[0]
+         if(denied) await this.publish(client,denied)
+         await client.query('COMMIT')
++        if (denied) notifySubagentEvents({ ownerId: actor.userId, workspaceId: actor.workspaceId })
+         return denied ?? await this.get(actor,botId,id,client)
+       }
+       const count = Number((await client.query(`SELECT count(*) AS n FROM bot_subagents WHERE "workspaceId"=$1 AND "ownerId"=$2 AND (status IN ('running','needs_you') OR (status='queued' AND "startLeaseUntil">now()))`, [actor.workspaceId,actor.userId])).rows[0].n)
+@@ -68,6 +71,7 @@ export class SubagentStore {
+         changed = (await tx.query<Subagent>(`UPDATE bot_subagents SET status='running',"targetId"=$2,step='running',"startLeaseId"=NULL,"startLeaseUntil"=NULL WHERE id=$1 AND status='queued' AND "startLeaseId"=$3 RETURNING *`, [id, result.targetId,leaseId])).rows[0]
+         if (changed) await this.publish(tx, changed)
+         await tx.query('COMMIT')
++        if (changed) notifySubagentEvents({ ownerId: actor.userId, workspaceId: actor.workspaceId })
+       } catch(error) {await tx.query('ROLLBACK');throw error} finally {tx.release()}
+       if (!changed) {
+         const current=await this.get(actor,botId,id)
+@@ -91,11 +95,12 @@ export class SubagentStore {
+       const row = (await client.query<Subagent>(`UPDATE bot_subagents SET status=$5,step=$6,needs=$7,"activeActionId"=CASE WHEN $5 IN ('running','done','failed','stopped') THEN NULL ELSE "activeActionId" END,"endedAt"=CASE WHEN $5 IN ('done','failed','stopped') THEN now() ELSE NULL END
+         WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4 AND (status IN ('running','needs_you') OR (status='queued' AND $5 IN ('failed','stopped'))) RETURNING *`, [id, actor.userId, actor.workspaceId, botId, status, step.slice(0, 500), needs ? JSON.stringify(needs) : null])).rows[0]
+       if (row) {
+-        await this.publish(client, row)
+         if (['done', 'failed', 'stopped'].includes(status)) await client.query(`UPDATE suggestion_executions SET status=$2,"endedAt"=now() WHERE "subagentId"=$1`, [id, status])
++        await this.publish(client, row)
+       }
+       await client.query('COMMIT')
+       changed = row
++      if (changed) notifySubagentEvents({ ownerId: actor.userId, workspaceId: actor.workspaceId })
+     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+     if (['done', 'failed', 'stopped'].includes(status)) await this.cleanup(actor, botId, id)
+     return changed ?? await this.get(actor, botId, id)
+@@ -121,8 +126,14 @@ export class SubagentStore {
+     const row = await this.get(actor, botId, id)
+     if (['done', 'failed', 'stopped'].includes(row.status)) return row
+     if (row.status === 'queued') {
+-      const stopped = (await this.pool.query<Subagent>(`UPDATE bot_subagents SET status='stopped',step='stopped',"endedAt"=now() WHERE id=$1 AND status='queued' RETURNING *`, [id])).rows[0]
+-      if (stopped) { await this.publish(this.pool, stopped); return stopped }
++      const client = await this.pool.connect()
++      try {
++        await client.query('BEGIN')
++        const stopped = (await client.query<Subagent>(`UPDATE bot_subagents SET status='stopped',step='stopped',"endedAt"=now() WHERE id=$1 AND status='queued' RETURNING *`, [id])).rows[0]
++        if (stopped) await this.publish(client, stopped)
++        await client.query('COMMIT')
++        if (stopped) { notifySubagentEvents({ ownerId: actor.userId, workspaceId: actor.workspaceId }); return stopped }
++      } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+     }
+     const machine = await this.machine(actor, botId, id)
+     // Cleanup first; failures remain retryable and must not claim a stop succeeded.
+diff --git a/lib/computer/event-broker.db.test.ts b/lib/computer/event-broker.db.test.ts
+new file mode 100644
+index 000000000..f1d36b224
+--- /dev/null
++++ b/lib/computer/event-broker.db.test.ts
+@@ -0,0 +1,269 @@
++import assert from 'node:assert/strict'
++import { randomBytes, randomUUID } from 'node:crypto'
++import { readFile } from 'node:fs/promises'
++import test, { mock } from 'node:test'
++import { Pool } from 'pg'
++import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
++import { CredentialStore, hashNonce, type BrowserTarget } from '../credentials/store'
++import { CredentialError, type EncryptionContext } from '../credentials/contracts'
++import { credentialFailure } from '../credentials/http'
++import { sealSession, type Kms } from '../credentials/kms'
++import type { Cdp, BrowserGuard } from '../credentials/browser'
++import type { LiveScope } from '../live/scope'
++import type { LiveInvalidation } from '../live/events'
++
++const url = process.env.E2E_DATABASE_URL
++if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs PostgreSQL')
++if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
++
++/** Every statement and result is real PostgreSQL. Recording only completed
++ * transaction statements makes an early notification fail deterministically,
++ * even if an asynchronous reader would otherwise happen to arrive after COMMIT. */
++function observeTransactions(pool: Pool, completed: string[]): Pool {
++  return {
++    query: (sql: string, values?: unknown[]) => pool.query(sql, values),
++    async connect() {
++      const client = await pool.connect()
++      return {
++        async query(sql: string, values?: unknown[]) {
++          const result = await client.query(sql, values)
++          if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql)) completed.push(sql)
++          return result
++        },
++        release: () => client.release(),
++      }
++    },
++  } as unknown as Pool
++}
++
++test('credential broker publishes only the committed session-resume event and cannot replay a consumed lease', { skip: !url, timeout: 120_000 }, async t => {
++  const schema = `computer_broker_${randomUUID().replaceAll('-', '')}`
++  const admin = new Pool({ connectionString: url })
++  await admin.query(`CREATE SCHEMA ${schema}`)
++  const pool = new Pool({ connectionString: url, options: `-c search_path=${schema}`, max: 4 })
++  const reader = new Pool({ connectionString: url, options: `-c search_path=${schema}`, max: 2 })
++  const previousSecret = process.env.BETTER_AUTH_SECRET
++  const previousBroker = process.env.CREDENTIAL_BROKER_URL
++  process.env.CREDENTIAL_BROKER_URL = 'https://fixture-broker.vercel.app'
++  process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex')
++  const keys = new Map<string, { key: Buffer; context: EncryptionContext }>()
++  let decrypts = 0
++  const kms: Kms = {
++    async generate(context) {
++      const key = randomBytes(32), wrapped = `synthetic-${randomUUID()}`
++      keys.set(wrapped, { key, context: { ...context } })
++      return { plaintext: Buffer.from(key), wrapped }
++    },
++    async decrypt(wrapped, context) {
++      const saved = keys.get(wrapped)
++      assert.ok(saved)
++      assert.deepEqual(context, saved.context, 'the fake KMS still checks the real envelope context')
++      decrypts++
++      return Buffer.from(saved.key)
++    },
++  }
++  let onNotify: (scope: LiveScope, events: LiveInvalidation[]) => void = () => { assert.fail('unexpected notification') }
++  const boundary = mock.module(new URL('../live/notify.ts', import.meta.url).href, {
++    namedExports: { notifyLive: (scope: LiveScope, events: LiveInvalidation[]) => onNotify(scope, events) },
++  })
++  const runtimeBoundaries = [
++    mock.module('@vercel/oidc', { namedExports: { getVercelOidcToken: async () => 'synthetic-oidc' } }),
++    mock.module(new URL('../api-auth.ts', import.meta.url).href, { namedExports: { auth: {} } }),
++    mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool } }),
++    mock.module(new URL('../workspace-access.ts', import.meta.url).href, { namedExports: { loadWorkspaceContext: () => { throw Error('unexpected actor lookup') } } }),
++    mock.module(new URL('../cloud-computer/subagent-browser.ts', import.meta.url).href, {
++      namedExports: {
++        resolveSubagentBrowserTarget: () => { throw Error('unexpected target lookup') },
++        resolveThreadBrowserTarget: () => { throw Error('unexpected target lookup') },
++      },
++    }),
++  ]
++  let brokerReply: (lease: string) => Promise<Response> = async () => { throw Error('unexpected broker request') }
++  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
++    assert.equal(String(input), 'https://fixture-broker.vercel.app/api/fill')
++    assert.equal(init?.method, 'POST')
++    assert.equal(init?.redirect, 'error')
++    assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer synthetic-oidc')
++    const payload = JSON.parse(String(init?.body))
++    assert.deepEqual(Object.keys(payload), ['lease'])
++    return brokerReply(payload.lease)
++  })
++  try {
++    const { fillCredential } = await import('../credentials/broker')
++    const { executeCredentialLease } = await import('../credentials/runtime')
++    await pool.query(`
++      CREATE TABLE "user"(id text PRIMARY KEY);
++      CREATE TABLE bots(id uuid PRIMARY KEY,"ownerId" text NOT NULL,"workspaceId" uuid NOT NULL);
++      CREATE TABLE bot_subagents(id uuid PRIMARY KEY,"ownerId" text NOT NULL,"workspaceId" uuid NOT NULL,"botId" uuid NOT NULL,
++        task text NOT NULL,status text NOT NULL,needs jsonb,step text NOT NULL,"targetId" text,epoch integer NOT NULL);
++      CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY,permission text NOT NULL,version integer NOT NULL);
++      CREATE TABLE subagent_events(seq bigserial PRIMARY KEY,"ownerId" text NOT NULL,"workspaceId" uuid NOT NULL,
++        "botId" uuid NOT NULL,"subagentId" uuid NOT NULL REFERENCES bot_subagents(id),event jsonb NOT NULL);
++    `)
++    for (const migration of ['20261029012027_account_credential_vault.sql', '20261030204833_workspace_audit_events.sql']) {
++      await pool.query(await readFile(new URL(`../../drizzle/${migration}`, import.meta.url), 'utf8'))
++    }
++    const fixture = async () => {
++      const actor = { userId: `broker-${randomUUID()}`, workspaceId: randomUUID(), botId: randomUUID(), subagentId: randomUUID() }
++      const origin = 'https://example.com', needs = { kind: 'login', origin }
++      await pool.query('INSERT INTO "user" VALUES($1)', [actor.userId])
++      await pool.query('INSERT INTO bots VALUES($1,$2,$3)', [actor.botId, actor.userId, actor.workspaceId])
++      await pool.query(`INSERT INTO bot_subagents VALUES($1,$2,$3,$4,'Read fixture source','needs_you',$5,'Waiting for fixture','fixture-target',1)`,
++        [actor.subagentId, actor.userId, actor.workspaceId, actor.botId, needs])
++      await pool.query(`INSERT INTO workspace_computer_policies VALUES($1,'allow',1)`, [actor.workspaceId])
++      const store = new CredentialStore(pool, kms)
++      const challenge = await store.challenge(actor, origin)
++      await store.save(actor, { nonce: challenge.nonce, origin, username: 'fixture-user', password: randomBytes(24).toString('base64url') })
++      const credential = (await pool.query(`SELECT c.id,s.wrapped_dek,s.nonce FROM credentials c
++        JOIN credential_secrets s ON s.credential_id=c.id WHERE c.user_id=$1`, [actor.userId])).rows[0]
++      const state = { cookies: [{ name: 'fixture', value: 'synthetic-session', domain: 'example.com', path: '/' }], localStorage: [['fixture', 'synthetic-value']] }
++      const plaintext = Buffer.from(JSON.stringify(state))
++      const envelope = await sealSession(kms, { userId: actor.userId, credentialId: credential.id, origin }, credential.wrapped_dek, plaintext)
++      assert.ok(plaintext.every(byte => byte === 0), 'real encryption clears its input buffer')
++      assert.notEqual(envelope.nonce, credential.nonce, 'session encryption has a fresh nonce')
++      assert.equal(envelope.ciphertext.includes('synthetic-session'), false)
++      await pool.query(`INSERT INTO browser_sessions(credential_id,wrapped_dek,nonce,ciphertext,expires_at)
++        VALUES($1,$2,$3,$4,now()+interval '1 hour')`, [credential.id, envelope.wrappedDek, envelope.nonce, envelope.ciphertext])
++      const target: BrowserTarget = {
++        targetId: 'fixture-target', origin, endpoint: 'https://fixture.e2b.app/', expiresAt: Date.now() + 60_000,
++        observedInput: { loaderId: 'fixture-loader', backendNodeId: 7, credentialRole: 'password', epoch: 1, permissionVersion: 1 },
++      }
++      const lease = await store.lease(actor, origin, target)
++      assert.equal(lease.status, 'ready')
++      if (lease.status !== 'ready') throw new Error('fixture lease missing')
++      const completed: string[] = [], calls: string[] = []
++      const snapshot = async () => ({
++        row: (await reader.query('SELECT status,needs,step FROM bot_subagents WHERE id=$1', [actor.subagentId])).rows[0],
++        events: (await reader.query('SELECT event FROM subagent_events WHERE "subagentId"=$1 ORDER BY seq', [actor.subagentId])).rows.map(row => row.event),
++      })
++      const cdp = {
++        async attach(id: string) { assert.equal(id, target.targetId); calls.push('attach') },
++        async origin(value: string) { assert.equal(value, origin) },
++        async safeToResume() { calls.push('safeToResume'); return true },
++        async insertAtObservedInput() { assert.fail('a saved session must not fall back to password insertion') },
++        async call(method: string, params?: Record<string, unknown>) {
++          calls.push(method)
++          if (method === 'Page.getFrameTree') return { frameTree: { frame: { url: origin, loaderId: 'fixture-loader' } } }
++          if (method === 'Network.setCookies') { assert.deepEqual(params?.cookies, state.cookies); return {} }
++          if (method === 'Runtime.evaluate') return { result: { objectId: 'fixture-root' } }
++          if (method === 'Runtime.callFunctionOn') { assert.deepEqual(params?.arguments, [{ value: state.localStorage }]); return {} }
++          if (method === 'Page.reload') return {}
++          throw new Error(`Unexpected CDP fixture call: ${method}`)
++        },
++        close() { calls.push('close') },
++      }
++      const guard: BrowserGuard = {
++        async begin() {
++          const claim = (await reader.query('SELECT consumed_at,input_envelope FROM credential_fill_leases WHERE nonce_hash=$1', [hashNonce(lease.lease)])).rows[0]
++          assert.ok(claim.consumed_at, 'external effects start only after durable consumption')
++          assert.equal(claim.input_envelope, null)
++          calls.push('guard.begin')
++          return { cdpUrl: 'wss://fixture.e2b.app/', targetId: target.targetId, guardToken: 'synthetic-guard' }
++        },
++        async end() {
++          assert.deepEqual(completed, ['BEGIN', 'COMMIT'], 'the first transaction commits before ending the guard')
++          assert.deepEqual(await snapshot(), { row: { status: 'needs_you', needs, step: 'Waiting for fixture' }, events: [] })
++          calls.push('guard.end')
++        },
++      }
++      const options = { kms, guard, connect: (async () => cdp) as unknown as typeof Cdp.connect }
++      return { actor, origin, needs, credentialId: credential.id, lease: lease.lease, calls, completed, options, snapshot }
++    }
++
++    await t.test('a session application publishes once after both real transactions commit', async () => {
++      const item = await fixture()
++      const observations: Promise<Awaited<ReturnType<typeof item.snapshot>>>[] = []
++      onNotify = (scope, events) => {
++        assert.deepEqual(item.completed, ['BEGIN', 'COMMIT', 'BEGIN', 'COMMIT'])
++        assert.deepEqual(scope, { ownerId: item.actor.userId, workspaceId: item.actor.workspaceId })
++        assert.deepEqual(events, [{ kind: 'subagent_events', id: item.actor.workspaceId }])
++        observations.push(item.snapshot())
++      }
++      brokerReply = async lease => Response.json(await fillCredential(observeTransactions(pool, item.completed), lease, item.options))
++      assert.deepEqual(await executeCredentialLease(item.lease, item.origin, { ownerId: item.actor.userId, workspaceId: item.actor.workspaceId }), { status: 'session_applied', origin: item.origin })
++      assert.equal(observations.length, 1)
++      const expected = { botId: item.actor.botId, subagentId: item.actor.subagentId, task: 'Read fixture source', state: 'running', step: 'running', needs: null }
++      assert.deepEqual(await observations[0], { row: { status: 'running', needs: null, step: 'running' }, events: [{ type: 'data-subagent', data: expected }] })
++      assert.equal(item.calls.filter(call => call === 'Network.setCookies').length, 1)
++      assert.equal(item.calls.filter(call => call === 'Page.reload').length, 1)
++      assert.ok(item.calls.includes('guard.end'))
++      assert.equal(item.calls.at(-1), 'close')
++      const beforeReplay = { calls: item.calls.length, decrypts }
++      await assert.rejects(fillCredential(pool, item.lease, item.options), (error: unknown) => error instanceof CredentialError && error.code === 'credential_denied' && error.status === 404)
++      assert.deepEqual({ calls: item.calls.length, decrypts }, beforeReplay)
++      assert.equal(observations.length, 1)
++    })
++    await t.test('failed event insertion rolls back only the second transaction and never notifies or replays', async () => {
++      const item = await fixture()
++      let notifications = 0
++      onNotify = () => { notifications++ }
++      await pool.query(`CREATE FUNCTION reject_broker_event() RETURNS trigger LANGUAGE plpgsql AS $$
++        BEGIN RAISE EXCEPTION 'fixture rejects event'; END; $$;
++        CREATE TRIGGER reject_broker_event BEFORE INSERT ON subagent_events FOR EACH ROW EXECUTE FUNCTION reject_broker_event();`)
++      brokerReply = async lease => {
++        try { return Response.json(await fillCredential(observeTransactions(pool, item.completed), lease, item.options)) }
++        catch (error) { return credentialFailure(error) }
++      }
++      await assert.rejects(executeCredentialLease(item.lease, item.origin, { ownerId: item.actor.userId, workspaceId: item.actor.workspaceId }),
++        (error: unknown) => error instanceof CredentialError && error.code === 'credential_outcome_unknown' && error.status === 409)
++      assert.deepEqual(item.completed, ['BEGIN', 'COMMIT', 'BEGIN', 'ROLLBACK'])
++      assert.deepEqual(await item.snapshot(), { row: { status: 'needs_you', needs: item.needs, step: 'Waiting for fixture' }, events: [] })
++      assert.equal(notifications, 0)
++      const persisted = (await reader.query(`SELECT l.consumed_at,c.last_used_at FROM credential_fill_leases l
++        JOIN credentials c ON c.id=l.credential_id WHERE l.nonce_hash=$1`, [hashNonce(item.lease)])).rows[0]
++      assert.ok(persisted.consumed_at, 'the one-use lease remains durably consumed')
++      assert.ok(persisted.last_used_at, 'the first transaction remains committed')
++      const decisions = (await reader.query('SELECT decision FROM credential_access_events WHERE user_id=$1 ORDER BY id', [item.actor.userId])).rows.map(row => row.decision)
++      assert.deepEqual(decisions, ['session_applied', 'denied_or_failed'])
++      assert.equal(item.calls.filter(call => call === 'Network.setCookies').length, 1)
++      assert.ok(item.calls.includes('guard.end'), 'the synthetic browser boundary already completed before the database failure')
++      const beforeReplay = { calls: item.calls.length, decrypts }
++      await assert.rejects(fillCredential(pool, item.lease, item.options), (error: unknown) => error instanceof CredentialError && error.code === 'credential_denied' && error.status === 404)
++      assert.deepEqual({ calls: item.calls.length, decrypts }, beforeReplay)
++      assert.equal(notifications, 0)
++    })
++    for (const failure of ['wrong-origin', 'lost-response'] as const) {
++      await t.test(`a committed event with ${failure} keeps its durable state without an unvalidated app notification`, async () => {
++        // The earlier rollback fixture's trigger is deliberately removed only in this disposable schema.
++        await pool.query('DROP TRIGGER IF EXISTS reject_broker_event ON subagent_events')
++        const item = await fixture()
++        let notifications = 0
++        onNotify = () => { notifications++ }
++        brokerReply = async lease => {
++          const result = await fillCredential(observeTransactions(pool, item.completed), lease, item.options)
++          if (failure === 'lost-response') throw Error('synthetic response loss')
++          return Response.json({ ...result, origin: 'https://different.example' })
++        }
++        await assert.rejects(executeCredentialLease(item.lease, item.origin, { ownerId: item.actor.userId, workspaceId: item.actor.workspaceId }),
++          (error: unknown) => error instanceof CredentialError && error.code === 'credential_outcome_unknown' && error.status === 409)
++        assert.deepEqual(item.completed, ['BEGIN', 'COMMIT', 'BEGIN', 'COMMIT'])
++        const persisted = await item.snapshot()
++        assert.equal(persisted.row.status, 'running')
++        assert.equal(persisted.events.length, 1, 'reconnect can still read the committed event')
++        assert.equal(notifications, 0, 'an app invalidation requires the validated broker acknowledgement')
++        const beforeReplay = { calls: item.calls.length, decrypts }
++        await assert.rejects(fillCredential(pool, item.lease, item.options), (error: unknown) => error instanceof CredentialError && error.code === 'credential_denied')
++        assert.deepEqual({ calls: item.calls.length, decrypts }, beforeReplay)
++      })
++    }
++    await t.test('guarded broker responses do not announce resumed subagents', async () => {
++      const item = await fixture()
++      let notifications = 0
++      onNotify = () => { notifications++ }
++      brokerReply = async () => Response.json({ status: 'guarded', origin: item.origin })
++      assert.deepEqual(await executeCredentialLease(item.lease, item.origin, { ownerId: item.actor.userId, workspaceId: item.actor.workspaceId }),
++        { status: 'guarded', origin: item.origin })
++      assert.equal(notifications, 0)
++      assert.equal((await item.snapshot()).events.length, 0)
++    })
++  } finally {
++    for (const mocked of runtimeBoundaries.reverse()) mocked.restore()
++    boundary.restore()
++    if (previousBroker === undefined) delete process.env.CREDENTIAL_BROKER_URL; else process.env.CREDENTIAL_BROKER_URL = previousBroker
++    if (previousSecret === undefined) delete process.env.BETTER_AUTH_SECRET; else process.env.BETTER_AUTH_SECRET = previousSecret
++    for (const { key } of keys.values()) key.fill(0)
++    await reader.end(); await pool.end()
++    await admin.query(`DROP SCHEMA ${schema} CASCADE`)
++    await admin.end()
++  }
++})
+diff --git a/lib/computer/event-lock.ts b/lib/computer/event-lock.ts
+new file mode 100644
+index 000000000..9807b793c
+--- /dev/null
++++ b/lib/computer/event-lock.ts
+@@ -0,0 +1,8 @@
++import type { PoolClient } from 'pg'
++import type { LiveScope } from '@/lib/live/scope'
++
++/** Take after the writer's business-row locks and hold until COMMIT. Serializing
++ * sequence allocation per stream prevents a later commit being skipped by after. */
++export async function lockSubagentEvents(client: PoolClient, scope: LiveScope) {
++  await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`subagent-events:${scope.ownerId}:${scope.workspaceId}`])
++}
+diff --git a/lib/computer/event-log.db.test.ts b/lib/computer/event-log.db.test.ts
+new file mode 100644
+index 000000000..c0bdd7424
+--- /dev/null
++++ b/lib/computer/event-log.db.test.ts
+@@ -0,0 +1,76 @@
++import assert from 'node:assert/strict'
++import { randomUUID } from 'node:crypto'
++import { test } from 'node:test'
++import { Pool } from 'pg'
++import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
++import { lockSubagentEvents, readComputerEvents } from './event-log'
++
++const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
++if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Computer event database URL required')
++if (databaseURL && !isE2eTarget(databaseURL)) throw new Error('Computer event tests require an isolated loopback e2e database')
++
++test('real PostgreSQL: bounded cursor pages, owner/workspace isolation and commit-ordered sequence allocation', { skip: !databaseURL }, async () => {
++  const schema = `computer_events_${randomUUID().replaceAll('-', '')}`
++  const admin = new Pool({ connectionString: databaseURL })
++  await admin.query(`CREATE SCHEMA ${schema}`)
++  const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}`, max: 4 })
++  const a = { ownerId: 'alice', workspaceId: randomUUID() }
++  const b = { ownerId: 'bob', workspaceId: a.workspaceId }
++  const other = { ...a, workspaceId: randomUUID() }
++  const insert = async (client: Pick<Pool, 'query'>, scope: typeof a, value: string) => (await client.query(
++    'INSERT INTO subagent_events("ownerId","workspaceId",event) VALUES($1,$2,$3) RETURNING seq',
++    [scope.ownerId, scope.workspaceId, { type: 'data-subagent', data: { value } }],
++  )).rows[0].seq as string
++  try {
++    await pool.query('CREATE TABLE subagent_events(seq bigserial PRIMARY KEY,"ownerId" text NOT NULL,"workspaceId" uuid NOT NULL,event jsonb NOT NULL)')
++    await insert(pool, b, 'other owner'); await insert(pool, other, 'other workspace')
++    for (let i = 0; i < 102; i++) await insert(pool, a, String(i))
++    const first = await readComputerEvents(pool, a, '0')
++    assert.equal(first.events.length, 100)
++    assert.equal(first.hasMore, true)
++    assert.equal(first.events[0].data && (first.events[0].data as { value: string }).value, '0')
++    const second = await readComputerEvents(pool, a, first.cursor)
++    assert.equal(second.events.length, 2)
++    assert.equal(second.hasMore, false)
++    assert.equal((await readComputerEvents(pool, b, '0')).events.length, 1)
++    assert.equal((await readComputerEvents(pool, other, '0')).events.length, 1)
++    await assert.rejects(readComputerEvents(pool, a, '9223372036854775808'), /Invalid/)
++
++    const one = await pool.connect(), two = await pool.connect()
++    try {
++      await one.query('BEGIN'); await lockSubagentEvents(one, a)
++      const seq1 = await insert(one, a, 'uncommitted one')
++      assert.equal((await readComputerEvents(pool, a, second.cursor)).events.length, 0, 'uncommitted content cannot be fetched')
++      await two.query('BEGIN')
++      const key = `subagent-events:${a.ownerId}:${a.workspaceId}`
++      assert.equal((await two.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS acquired', [key])).rows[0].acquired, false)
++      const otherKey = `subagent-events:${b.ownerId}:${b.workspaceId}`
++      assert.equal((await two.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS acquired', [otherKey])).rows[0].acquired, true, 'other owners do not contend')
++      const waiting = lockSubagentEvents(two, a)
++      await one.query('COMMIT')
++      await waiting
++      const seq2 = await insert(two, a, 'later transaction')
++      assert.ok(BigInt(seq2) > BigInt(seq1))
++      const committedFirst = await readComputerEvents(pool, a, second.cursor)
++      assert.deepEqual(committedFirst.events.map(e => e.id), [seq1])
++      await two.query('COMMIT')
++      assert.deepEqual((await readComputerEvents(pool, a, committedFirst.cursor)).events.map(e => e.id), [seq2], 'after the first commit cannot skip the second writer')
++
++      await one.query('BEGIN'); await lockSubagentEvents(one, a)
++      await insert(one, a, 'rolled back')
++      await one.query('ROLLBACK')
++      assert.deepEqual(await readComputerEvents(pool, a, seq2), { events: [], cursor: seq2, hasMore: false })
++      await pool.query("SELECT setval(pg_get_serial_sequence('subagent_events','seq'),9007199254740993)")
++      const precise = await insert(pool, a, 'large cursor')
++      assert.equal(precise, '9007199254740994')
++      assert.equal((await readComputerEvents(pool, a, seq2)).cursor, precise)
++    } finally {
++      await one.query('ROLLBACK').catch(() => {}); await two.query('ROLLBACK').catch(() => {})
++      one.release(); two.release()
++    }
++  } finally {
++    await pool.end()
++    await admin.query(`DROP SCHEMA ${schema} CASCADE`)
++    await admin.end()
++  }
++})
+diff --git a/lib/computer/event-log.ts b/lib/computer/event-log.ts
+new file mode 100644
+index 000000000..9d94a103c
+--- /dev/null
++++ b/lib/computer/event-log.ts
+@@ -0,0 +1,22 @@
++import type { Pool } from 'pg'
++import { notifyLive } from '@/lib/live/notify'
++import type { LiveScope } from '@/lib/live/scope'
++import { COMPUTER_EVENT_PAGE_SIZE, computerEventCursor, type ComputerEventPage } from './event-page'
++
++export { lockSubagentEvents } from './event-lock'
++
++/** Called only after a transaction which actually appended an event committed. */
++export function notifySubagentEvents(scope: LiveScope) {
++  notifyLive(scope, [{ kind: 'subagent_events', id: scope.workspaceId }])
++}
++
++/** One bounded query; no held connection, server timer or long-lived response. */
++export async function readComputerEvents(pool: Pool, scope: LiveScope, cursor: string): Promise<ComputerEventPage> {
++  if (computerEventCursor(cursor) === null) throw new Error('Invalid computer event cursor')
++  const { rows } = await pool.query<{ seq: string; event: { data: unknown } }>(
++    'SELECT seq,event FROM subagent_events WHERE "ownerId"=$1 AND "workspaceId"=$2 AND seq>$3 ORDER BY seq LIMIT $4',
++    [scope.ownerId, scope.workspaceId, cursor, COMPUTER_EVENT_PAGE_SIZE + 1],
++  )
++  const events = rows.slice(0, COMPUTER_EVENT_PAGE_SIZE).map(row => ({ id: String(row.seq), data: row.event.data }))
++  return { events, cursor: events.at(-1)?.id ?? cursor, hasMore: rows.length > COMPUTER_EVENT_PAGE_SIZE }
++}
+diff --git a/lib/computer/event-page.ts b/lib/computer/event-page.ts
+new file mode 100644
+index 000000000..6351ef38b
+--- /dev/null
++++ b/lib/computer/event-page.ts
+@@ -0,0 +1,19 @@
++export const COMPUTER_EVENT_PAGE_SIZE = 100
++export type ComputerEventPage = { events: { id: string; data: unknown }[]; cursor: string; hasMore: boolean }
++
++/** PostgreSQL bigint cursors stay strings, including beyond JS's safe integer range. */
++export function computerEventCursor(value: unknown): string | null {
++  return typeof value === 'string' && /^(0|[1-9]\d{0,18})$/.test(value) && BigInt(value) <= BigInt('9223372036854775807') ? value : null
++}
++
++export function computerEventPage(value: unknown, after: string): ComputerEventPage | null {
++  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
++  const page = value as ComputerEventPage
++  if (!Array.isArray(page.events) || page.events.length > COMPUTER_EVENT_PAGE_SIZE || typeof page.hasMore !== 'boolean' || !computerEventCursor(page.cursor)) return null
++  let previous = after
++  for (const event of page.events) {
++    if (!event || !computerEventCursor(event.id) || BigInt(event.id) <= BigInt(previous)) return null
++    previous = event.id
++  }
++  return page.cursor === previous && (!page.hasMore || page.events.length > 0) ? page : null
++}
+diff --git a/lib/computer/event-session.db.test.ts b/lib/computer/event-session.db.test.ts
+new file mode 100644
+index 000000000..6fdd48494
+--- /dev/null
++++ b/lib/computer/event-session.db.test.ts
+@@ -0,0 +1,148 @@
++import assert from 'node:assert/strict'
++import { randomBytes, randomUUID } from 'node:crypto'
++import test, { mock } from 'node:test'
++import { Pool } from 'pg'
++import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
++import type { ComputerEventPage } from './event-page'
++
++const url = process.env.E2E_DATABASE_URL
++if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs PostgreSQL')
++if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
++
++test('computer events authorize real sessions and read bounded owner/workspace pages from PostgreSQL', { skip: !url, timeout: 120_000 }, async t => {
++  const database = new Pool({ connectionString: url, max: 4 })
++  const workspaceId = randomUUID(), otherWorkspaceId = randomUUID(), restrictedWorkspaceId = randomUUID()
++  const workspaceIds = [workspaceId, otherWorkspaceId, restrictedWorkspaceId]
++  const userIds: string[] = []
++  const mocks: { restore(): void }[] = []
++  const origin = 'http://127.0.0.1:3030'
++  try {
++    const [{ betterAuth }, fresh] = await Promise.all([import('better-auth'), import('../fresh-session')])
++    const auth = betterAuth({
++      baseURL: origin, basePath: '/mikka/api/auth', database, secret: randomBytes(32).toString('hex'),
++      emailAndPassword: { enabled: true }, trustedOrigins: [origin], logger: { disabled: true }, session: fresh.SESSION_OPTIONS,
++    })
++    fresh.readFreshSessionsInScope(auth.api)
++    // Only inject the isolated dependencies. Session verification, signed cache
++    // cookies, membership SQL and event reads all use their real implementations.
++    mocks.push(mock.module(new URL('../api-auth.ts', import.meta.url).href, { namedExports: { auth } }))
++    mocks.push(mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool: database } }))
++    mocks.push(mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: database } }))
++    mocks.push(mock.module(new URL('../request-log.ts', import.meta.url).href, {
++      namedExports: { withRequestLog: (_name: string, route: (request: Request) => Promise<Response>) => route },
++    }))
++    const { GET } = await import('../../app/api/computer/events/route')
++
++    const register = async (name: string) => {
++      const email = `computer-events-${randomUUID()}@example.invalid`
++      const password = `fixture-${randomBytes(24).toString('hex')}`
++      const post = (path: string, body: object) => auth.handler(new Request(`${origin}/mikka/api/auth/${path}`, {
++        method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify(body),
++      }))
++      const signup = await post('sign-up/email', { name, email, password })
++      assert.equal(signup.status, 200)
++      const id = (await signup.json()).user.id as string
++      userIds.push(id)
++      const signin = await post('sign-in/email', { email, password })
++      assert.equal(signin.status, 200)
++      const cookies = signin.headers.getSetCookie()
++      assert.ok(cookies.some(cookie => cookie.split('=')[0].endsWith('session_data')), 'real signed session cache cookie issued')
++      return { id, email, headers: { cookie: cookies.map(cookie => cookie.split(';')[0]).join('; ') } }
++    }
++    const alice = await register('Computer Events Alice'), bob = await register('Computer Events Bob')
++    await database.query(`INSERT INTO mikka_workspaces(id,"userId",name) VALUES
++      ($1,$4,'Computer events fixture'),($2,$4,'Other workspace fixture'),($3,$5,'Restricted fixture')`,
++    [workspaceId, otherWorkspaceId, restrictedWorkspaceId, alice.id, bob.id])
++    const addMember = (space: string, person: typeof alice) => database.query(
++      `INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,'Event fixture',$3,'admin','active')`,
++      [space, person.id, person.email],
++    )
++    await addMember(workspaceId, alice); await addMember(workspaceId, bob)
++    await addMember(otherWorkspaceId, alice); await addMember(restrictedWorkspaceId, bob)
++
++    const stream = async (space: string, ownerId: string) => {
++      const botId = randomUUID(), subagentId = randomUUID()
++      await database.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,\'Event fixture\')', [botId, space, ownerId])
++      await database.query(`INSERT INTO bot_subagents(id,"workspaceId","ownerId","botId",task,status)
++        VALUES($1,$2,$3,$4,'Read fixture source','needs_you')`, [subagentId, space, ownerId, botId])
++      return async (label: string) => {
++        const data = { botId, subagentId, task: label, state: 'needs_you', step: 'Review fixture', needs: null }
++        const result = await database.query(`INSERT INTO subagent_events("ownerId","workspaceId","botId","subagentId",event)
++          VALUES($1,$2,$3,$4,$5) RETURNING seq`, [ownerId, space, botId, subagentId, { type: 'data-subagent', data }])
++        return { id: String(result.rows[0].seq), data }
++      }
++    }
++    const own = await stream(workspaceId, alice.id), peer = await stream(workspaceId, bob.id), elsewhere = await stream(otherWorkspaceId, alice.id)
++    const expected: ComputerEventPage['events'] = []
++    for (let index = 0; index < 50; index++) expected.push(await own(`Alice event ${index}`))
++    const peerEvent = await peer('Bob private event'), elsewhereEvent = await elsewhere('Other workspace event')
++    for (let index = 50; index < 103; index++) expected.push(await own(`Alice event ${index}`))
++
++    const request = (person: typeof alice | undefined, space: string = workspaceId, after = '0', extraHeaders = {}) => GET(new Request(
++      `${origin}/mikka/api/computer/events?${new URLSearchParams({ workspace: space, after })}`,
++      { headers: { ...person?.headers, ...extraHeaders } },
++    ))
++    const denied = async (response: Response, status: number) => {
++      assert.equal(response.status, status)
++      assert.equal(response.headers.get('cache-control'), 'private, no-store')
++      assert.equal(await response.text(), '', 'a rejected read discloses no event body')
++    }
++    const page = async (response: Response) => {
++      assert.equal(response.status, 200)
++      assert.equal(response.headers.get('cache-control'), 'private, no-store')
++      assert.match(response.headers.get('content-type') ?? '', /application\/json/)
++      return await response.json() as ComputerEventPage
++    }
++
++    await t.test('missing session is rejected', async () => {
++      await denied(await request(undefined), 401)
++    })
++    await t.test('Bearer plus a valid cookie is rejected instead of changing authority', async () => {
++      await denied(await request(alice, workspaceId, '0', { authorization: 'Bearer fixture-invalid' }), 401)
++      await denied(await request(alice, workspaceId, '0', { authorization: '' }), 401)
++    })
++    await t.test('invalid cursor and workspace fail before any event page is exposed', async () => {
++      for (const cursor of ['', '-1', '01', '1.5', '1e3', ' 1', '9223372036854775808']) {
++        await denied(await request(alice, workspaceId, cursor), 400)
++      }
++      await denied(await request(alice, ''), 400)
++      await denied(await request(alice, 'not-a-workspace'), 400)
++      const upper = await page(await request(alice, workspaceId, '9223372036854775807'))
++      assert.deepEqual(upper, { events: [], cursor: '9223372036854775807', hasMore: false })
++    })
++    await t.test('a valid session cannot read a workspace without membership', async () => {
++      await denied(await request(alice, restrictedWorkspaceId), 403)
++    })
++    await t.test('deleting a membership immediately revokes the same cached session read', async () => {
++      await database.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, alice.id])
++      try { await denied(await request(alice), 403) } finally { await addMember(workspaceId, alice) }
++    })
++    await t.test('same-workspace owners and the same owner in another workspace remain isolated', async () => {
++      assert.deepEqual((await page(await request(bob))).events, [peerEvent])
++      assert.deepEqual((await page(await request(alice, otherWorkspaceId))).events, [elsewhereEvent])
++      assert.deepEqual((await page(await request(alice))).events, expected.slice(0, 100))
++    })
++    await t.test('100-row pages resume exclusively after the last visible event without losing global-sequence gaps', async () => {
++      const first = await page(await request(alice))
++      assert.deepEqual(first, { events: expected.slice(0, 100), cursor: expected[99].id, hasMore: true })
++      const second = await page(await request(alice, workspaceId, first.cursor))
++      assert.deepEqual(second, { events: expected.slice(100), cursor: expected[102].id, hasMore: false })
++      assert.deepEqual(await page(await request(alice, workspaceId, second.cursor)), { events: [], cursor: second.cursor, hasMore: false })
++    })
++    await t.test('revoked database sessions cannot read through a still-valid signed cache cookie', async () => {
++      await database.query('DELETE FROM session WHERE "userId"=$1', [alice.id])
++      const cached = await auth.handler(new Request(`${origin}/mikka/api/auth/get-session`, { headers: alice.headers }))
++      assert.equal(cached.status, 200)
++      assert.equal((await cached.json()).user.id, alice.id, 'ordinary cached reads still accept the real signed cookie')
++      await denied(await request(alice), 401)
++      assert.deepEqual((await page(await request(bob))).events, [peerEvent], 'revoking Alice does not revoke another owner')
++    })
++  } finally {
++    for (const item of mocks) item.restore()
++    await database.query('DELETE FROM bots WHERE "workspaceId"=ANY($1::uuid[])', [workspaceIds])
++    await database.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=ANY($1::uuid[])', [workspaceIds])
++    await database.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [workspaceIds])
++    if (userIds.length) await database.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [userIds])
++    await database.end()
++  }
++})
+diff --git a/lib/computer/event-stream.test.ts b/lib/computer/event-stream.test.ts
+index b4faf65ed..071bdaef8 100644
+--- a/lib/computer/event-stream.test.ts
++++ b/lib/computer/event-stream.test.ts
+@@ -1,76 +1,143 @@
+ import assert from 'node:assert/strict'
+-import { afterEach, before, test } from 'node:test'
++import { test } from 'node:test'
++import { ComputerEventFeed, type ComputerEventRuntime } from './event-stream'
++import { computerEventCursor, computerEventPage, type ComputerEventPage } from './event-page'
+ 
+-class FakeSource {
+-  static CLOSED = 2
+-  static opened: FakeSource[] = []
+-  readyState = 1
+-  listeners = new Map<string, Set<(event: Event) => void>>()
+-  onerror: (() => void) | null = null
+-  constructor(readonly url: string) { FakeSource.opened.push(this) }
+-  addEventListener(type: string, handler: (event: Event) => void) { (this.listeners.get(type) ?? this.listeners.set(type, new Set()).get(type)!).add(handler) }
+-  removeEventListener(type: string, handler: (event: Event) => void) { this.listeners.get(type)?.delete(handler) }
+-  close() { this.readyState = FakeSource.CLOSED }
+-  emit(type: string, data: string, lastEventId: string) { for (const handler of this.listeners.get(type) ?? []) handler({ data, lastEventId } as unknown as Event) }
++const tick = () => new Promise<void>(resolve => setImmediate(resolve))
++const botId = '11111111-1111-4111-8111-111111111111'
++const subagentId = '22222222-2222-4222-8222-222222222222'
++const update = (step: string) => ({ botId, subagentId, task: 'Read the public page', state: 'needs_you', step, needs: { kind: 'login', site: 'example.org' } })
++const page = (id: string, step: string, hasMore = false): ComputerEventPage => ({ events: [{ id, data: update(step) }], cursor: id, hasMore })
++function fixture() {
++  let visible = true, handler: ComputerEventRuntime['page'] = async cursor => ({ events: [], cursor, hasMore: false })
++  const calls: { cursor: string; signal: AbortSignal }[] = []
++  const visibility = new Set<() => void>(), invalidations = new Set<() => void>()
++  const timers = new Map<object, { callback: () => void; delay: number }>()
++  const stopped = new AbortController()
++  const feed = new ComputerEventFeed({
++    page: async (cursor, signal) => { calls.push({ cursor, signal }); return handler(cursor, signal) },
++    visible: () => visible,
++    watchVisibility: callback => { visibility.add(callback); return () => { visibility.delete(callback) } },
++    invalidations: callback => { invalidations.add(callback); return () => { invalidations.delete(callback) } },
++    stopped: stopped.signal,
++    later: (callback, delay) => { const id = {}; timers.set(id, { callback, delay }); return id },
++    cancel: id => { timers.delete(id as object) },
++  })
++  return { feed, calls, timers, stopped, visibility, invalidations,
++    handle(value: ComputerEventRuntime['page']) { handler = value },
++    visible(value: boolean) { visible = value; for (const callback of visibility) callback() },
++    invalidate() { for (const callback of invalidations) callback() },
++    retry() { const jobs = [...timers.values()]; timers.clear(); for (const job of jobs) job.callback() },
++  }
+ }
+-let visibility: 'visible' | 'hidden' = 'visible'
+-const visibilityListeners = new Set<() => void>()
+-Object.assign(globalThis, {
+-  EventSource: FakeSource,
+-  document: {
+-    get visibilityState() { return visibility },
+-    addEventListener: (_: string, listener: () => void) => visibilityListeners.add(listener),
+-    removeEventListener: (_: string, listener: () => void) => visibilityListeners.delete(listener),
+-  },
+-})
+-const setVisibility = (next: typeof visibility) => { visibility = next; for (const listener of visibilityListeners) listener() }
+-let listenComputerStream: typeof import('./event-stream')['listenComputerStream']
+-before(async () => { ({ listenComputerStream } = await import('./event-stream')) })
+-
+-afterEach(() => { FakeSource.opened.length = 0; visibility = 'visible' })
+ 
+-test('a hidden tab closes the stream and a visible one resumes after the last event', () => {
+-  const received: string[] = []
+-  const stop = listenComputerStream('data-subagent', data => { received.push(data) })
+-  assert.equal(FakeSource.opened.length, 1)
+-  assert.match(FakeSource.opened[0].url, /\/api\/computer\/events$/)
+-  FakeSource.opened[0].emit('data-subagent', 'first', '41')
++test('cursor pages preserve bigint precision and reject regressions, non-progressing continuations and oversized batches', () => {
++  for (const value of ['0', '9007199254740993', '9223372036854775807']) assert.equal(computerEventCursor(value), value)
++  for (const value of ['', '-1', '01', '1.2', '9223372036854775808', '1e3', null, 1]) assert.equal(computerEventCursor(value), null)
++  const valid = page('9007199254740994', 'fresh')
++  assert.equal(computerEventPage(valid, '9007199254740993'), valid)
++  for (const invalid of [
++    { ...valid, cursor: '9007199254740993' },
++    { ...valid, events: [valid.events[0], valid.events[0]] },
++    { events: [], cursor: '9007199254740993', hasMore: true },
++    { ...valid, events: Array(101).fill(valid.events[0]) },
++  ]) assert.equal(computerEventPage(invalid, '9007199254740993'), null)
++})
+ 
+-  setVisibility('hidden')
+-  assert.equal(FakeSource.opened[0].readyState, FakeSource.CLOSED, 'no stream, and so no polling query, while hidden')
++test('one shared feed drains bounded pages, then reads only after invalidation and resumes its cursor on remount', async () => {
++  const f = fixture()
++  f.handle(async cursor => cursor === '0' ? page('41', 'first', true) : cursor === '41' ? page('42', 'second') : page('43', 'third'))
++  const stop = f.feed.subscribe(() => {})
++  await tick()
++  assert.deepEqual(f.calls.map(c => c.cursor), ['0', '41'])
++  assert.equal(f.feed.getSnapshot().get(subagentId)?.step, 'second')
++  const second = f.feed.subscribe(() => {})
++  await tick()
++  assert.equal(f.calls.length, 2, 'another consumer shares the cache and channel')
++  assert.equal(f.invalidations.size, 1)
++  assert.equal(f.timers.size, 0, 'a healthy read starts no polling timer')
++  second(); stop()
++  assert.equal(f.invalidations.size, 0)
++  const remount = f.feed.subscribe(() => {})
++  await tick()
++  assert.equal(f.calls.at(-1)?.cursor, '42')
++  assert.equal(f.feed.getSnapshot().get(subagentId)?.step, 'third')
++  remount()
++})
+ 
+-  setVisibility('visible')
+-  assert.equal(FakeSource.opened.length, 2)
+-  assert.match(FakeSource.opened[1].url, /\/api\/computer\/events\?after=41$/)
+-  FakeSource.opened[1].emit('data-subagent', 'second', '42')
+-  assert.deepEqual(received, ['first', 'second'], 'subscribers carry over to the reopened stream')
++test('a burst during an in-flight read coalesces into one catch-up and never fetches concurrently', async () => {
++  const f = fixture()
++  let resolveFirst!: (value: unknown) => void
++  f.handle(async cursor => cursor === '0' ? new Promise(resolve => { resolveFirst = resolve }) : page('2', 'caught up'))
++  const stop = f.feed.subscribe(() => {})
++  for (let i = 0; i < 20; i++) f.invalidate()
++  assert.equal(f.calls.length, 1)
++  resolveFirst(page('1', 'first'))
++  await tick()
++  assert.deepEqual(f.calls.map(c => c.cursor), ['0', '1'])
++  assert.equal(f.feed.getSnapshot().get(subagentId)?.step, 'caught up')
++  stop()
++})
+ 
++test('hidden tabs fetch nothing, abort an active read and ignore its late result before foreground catch-up', async () => {
++  const f = fixture()
++  f.visible(false)
++  let resolveFirst!: (value: unknown) => void
++  f.handle(async () => new Promise(resolve => { resolveFirst = resolve }))
++  const stop = f.feed.subscribe(() => {})
++  assert.equal(f.calls.length, 0)
++  f.visible(true)
++  assert.equal(f.calls.length, 1)
++  f.visible(false)
++  assert.equal(f.calls[0].signal.aborted, true)
++  resolveFirst(page('8', 'late old request'))
++  await tick()
++  assert.equal(f.feed.getSnapshot().size, 0)
++  f.handle(async () => page('9', 'foreground'))
++  f.visible(true)
++  await tick()
++  assert.equal(f.calls.at(-1)?.cursor, '0', 'aborted responses cannot advance a cursor')
++  assert.equal(f.feed.getSnapshot().get(subagentId)?.step, 'foreground')
+   stop()
+-  assert.equal(FakeSource.opened[1].readyState, FakeSource.CLOSED)
+-  assert.equal(visibilityListeners.size, 0)
++  assert.equal(f.visibility.size, 0)
+ })
+ 
+-test('subscribing while hidden opens nothing until the tab is shown', () => {
+-  visibility = 'hidden'
+-  const stop = listenComputerStream('data-subagent', () => {})
+-  assert.equal(FakeSource.opened.length, 0)
+-  setVisibility('visible')
+-  assert.equal(FakeSource.opened.length, 1)
+-  const second = listenComputerStream('computer', () => {})
+-  assert.equal(FakeSource.opened.length, 1, 'one stream per tab')
+-  second()
++test('failed reads retry at 60 seconds, a notification fetches sooner, and hiding cancels retry', async () => {
++  const f = fixture()
++  f.handle(async () => { throw new Error('temporary outage') })
++  const stop = f.feed.subscribe(() => {})
++  await tick()
++  assert.deepEqual([...f.timers.values()].map(t => t.delay), [60_000])
++  f.handle(async () => page('1', 'recovered'))
++  f.invalidate()
++  await tick()
++  assert.equal(f.timers.size, 0)
++  assert.equal(f.feed.getSnapshot().get(subagentId)?.step, 'recovered')
++  f.handle(async () => ({ events: [], cursor: '0', hasMore: true }))
++  f.invalidate()
++  await tick()
++  assert.equal(f.timers.size, 1)
++  f.visible(false)
++  assert.equal(f.timers.size, 0)
++  f.retry(); f.invalidate()
++  assert.equal(f.calls.length, 3, 'no retry or notification fetch while hidden')
++  f.handle(async cursor => ({ events: [], cursor, hasMore: false }))
++  f.visible(true)
++  await tick()
++  assert.equal(f.calls.at(-1)?.cursor, '1', 'malformed pages never reset a cursor')
+   stop()
+ })
+ 
+-test('a required update closes the EventSource and visibility cannot reconnect it', async () => {
+-  const stop = listenComputerStream('data-subagent', () => {})
+-  assert.equal(FakeSource.opened.length, 1)
+-  const { markPageNeedsRefresh } = await import('../app-build')
+-  markPageNeedsRefresh()
+-  assert.equal(FakeSource.opened[0].readyState, FakeSource.CLOSED)
+-  setVisibility('hidden'); setVisibility('visible')
+-  const stopAgain = listenComputerStream('data-subagent', () => {})
+-  assert.equal(FakeSource.opened.length, 1)
+-  stopAgain(); stop()
+-  assert.equal(visibilityListeners.size, 0)
++test('a required page refresh aborts data reads and visibility or new subscribers cannot restart them', async () => {
++  const f = fixture()
++  f.handle(async () => page('1', 'before refresh'))
++  const stop = f.feed.subscribe(() => {})
++  await tick()
++  f.stopped.abort()
++  f.visible(false); f.visible(true); f.invalidate()
++  const second = f.feed.subscribe(() => {})
++  await tick()
++  assert.equal(f.calls.length, 1)
++  assert.equal(f.timers.size, 0)
++  second(); stop()
+ })
+diff --git a/lib/computer/event-stream.ts b/lib/computer/event-stream.ts
+index 3937dd25a..20f57c424 100644
+--- a/lib/computer/event-stream.ts
++++ b/lib/computer/event-stream.ts
+@@ -1,61 +1,100 @@
+-import { pageNeedsRefresh, pageRefreshSignal } from '@/lib/app-build'
+-import { withBasePath } from '@/lib/base-path'
++import { subagentEventSchema } from '@mikka/protocol/subagent'
++import { computerEventPage, type ComputerEventPage } from './event-page'
++import type { SubagentUpdate } from '@/lib/subagents/login-needs'
+ 
+-type Subscription = { type: string; handler: (message: Event) => void }
+-type Shared = { source: EventSource | null; subscriptions: Set<Subscription>; lastId: string; onVisibility: () => void; onRefresh: () => void }
+-
+-let shared: Shared | null = null
+-
+-const hidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden'
+-
+-function open(state: Shared) {
+-  if (pageNeedsRefresh()) return
+-  // A reopened stream resumes after the last event this tab received.
+-  const source = new EventSource(withBasePath(`/api/computer/events${state.lastId ? `?after=${encodeURIComponent(state.lastId)}` : ''}`), { withCredentials: true })
+-  source.onerror = () => { if (source.readyState === EventSource.CLOSED) source.close() }
+-  for (const { type, handler } of state.subscriptions) source.addEventListener(type, handler)
+-  state.source = source
++export type ComputerEventRuntime = {
++  page(cursor: string, signal: AbortSignal): Promise<unknown>
++  visible(): boolean
++  watchVisibility(changed: () => void): () => void
++  invalidations(refresh: () => void): () => void
++  stopped: AbortSignal
++  later(callback: () => void, milliseconds: number): unknown
++  cancel(timer: unknown): void
+ }
+ 
+-function close(state: Shared) {
+-  state.source?.close()
+-  state.source = null
+-}
++/** Shared by the existing owner/workspace live channel. Only a notification,
++ * reconnect, foreground transition or failed-read retry fetches another page. */
++export class ComputerEventFeed {
++  private cursor = '0'
++  private snapshot: ReadonlyMap<string, SubagentUpdate> = new Map()
++  private listeners = new Set<() => void>()
++  private detach: (() => void) | null = null
++  private request: AbortController | null = null
++  private draining: Promise<void> | null = null
++  private retry: unknown = null
++  private pending = false
++  private generation = 0
++  constructor(private runtime: ComputerEventRuntime) {}
++
++  getSnapshot = () => this.snapshot
++  subscribe = (listener: () => void) => {
++    this.listeners.add(listener)
++    if (!this.detach && !this.runtime.stopped.aborted) {
++      const unwatch = this.runtime.watchVisibility(() => {
++        if (this.runtime.visible()) void this.refresh()
++        else this.cancelRead()
++      })
++      const unsubscribe = this.runtime.invalidations(() => { void this.refresh() })
++      const stop = () => this.cancelRead()
++      this.runtime.stopped.addEventListener('abort', stop, { once: true })
++      this.detach = () => { unwatch(); unsubscribe(); this.runtime.stopped.removeEventListener('abort', stop) }
++      void this.refresh()
++    }
++    return () => {
++      this.listeners.delete(listener)
++      if (!this.listeners.size) { this.detach?.(); this.detach = null; this.cancelRead() }
++    }
++  }
+ 
+-/**
+- * One EventSource on /api/computer/events per tab, shared by every subscriber
+- * (computer pushes, sub-agent updates). Closed when the last one leaves, and
+- * while the tab is hidden: the server checks for events every second for as
+- * long as a stream is open.
+- */
+-export function listenComputerStream(type: string, listener: (data: string) => void): () => void {
+-  if (pageNeedsRefresh() || typeof EventSource === 'undefined') return () => {}
+-  if (!shared) {
+-    const state: Shared = { source: null, subscriptions: new Set(), lastId: '', onVisibility: () => {
+-      if (hidden() || pageNeedsRefresh()) close(state)
+-      else if (!state.source || state.source.readyState === EventSource.CLOSED) open(state)
+-    }, onRefresh: () => close(state) }
+-    pageRefreshSignal().addEventListener('abort', state.onRefresh, { once: true })
+-    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', state.onVisibility)
+-    shared = state
++  private active() { return this.listeners.size > 0 && this.runtime.visible() && !this.runtime.stopped.aborted }
++  private cancelRetry() { if (this.retry !== null) this.runtime.cancel(this.retry); this.retry = null }
++  private cancelRead() {
++    this.generation++
++    this.request?.abort(); this.request = null; this.draining = null
++    this.pending = false; this.cancelRetry()
+   }
+-  const current = shared
+-  const subscription: Subscription = { type, handler: message => {
+-    const { data, lastEventId } = message as MessageEvent<string>
+-    if (lastEventId) current.lastId = lastEventId
+-    listener(data)
+-  } }
+-  current.subscriptions.add(subscription)
+-  if (current.source && current.source.readyState !== EventSource.CLOSED) current.source.addEventListener(type, subscription.handler)
+-  else if (!hidden()) open(current)
+-  return () => {
+-    current.source?.removeEventListener(type, subscription.handler)
+-    current.subscriptions.delete(subscription)
+-    if (current.subscriptions.size === 0) {
+-      close(current)
+-      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', current.onVisibility)
+-      pageRefreshSignal().removeEventListener('abort', current.onRefresh)
+-      if (shared === current) shared = null
++  private accept(page: ComputerEventPage) {
++    const next = new Map(this.snapshot)
++    let changed = false
++    for (const event of page.events) {
++      const parsed = subagentEventSchema.shape.data.safeParse(event.data)
++      if (parsed.success) { next.set(parsed.data.subagentId, parsed.data); changed = true }
+     }
++    this.cursor = page.cursor
++    if (changed) { this.snapshot = next; for (const listener of this.listeners) listener() }
++  }
++
++  refresh(): Promise<void> {
++    if (!this.active()) return Promise.resolve()
++    this.cancelRetry()
++    this.pending = true
++    if (this.draining) return this.draining
++    const generation = this.generation
++    const request = new AbortController()
++    this.request = request
++    const current = () => generation === this.generation && !request.signal.aborted && this.active()
++    this.draining = (async () => {
++      while (this.pending && current()) {
++        this.pending = false
++        let hasMore = true
++        while (hasMore && current()) {
++          const value = await this.runtime.page(this.cursor, request.signal)
++          if (!current()) return
++          const page = computerEventPage(value, this.cursor)
++          if (!page) throw new Error('Invalid computer event page')
++          this.accept(page)
++          hasMore = page.hasMore
++        }
++      }
++    })().catch(() => {
++      if (!current()) return
++      // A live socket cannot repair a failed HTTP read. Retry slowly and only
++      // while visible; a notification cancels this timer and fetches sooner.
++      this.retry = this.runtime.later(() => { this.retry = null; void this.refresh() }, 60_000)
++    }).finally(() => {
++      if (generation !== this.generation) return
++      this.request = null; this.draining = null
++    })
++    return this.draining
+   }
+ }
+diff --git a/lib/computer/event-writers.db.test.ts b/lib/computer/event-writers.db.test.ts
+new file mode 100644
+index 000000000..7b076f67d
+--- /dev/null
++++ b/lib/computer/event-writers.db.test.ts
+@@ -0,0 +1,197 @@
++import assert from 'node:assert/strict'
++import { createHash, randomUUID } from 'node:crypto'
++import { readFile } from 'node:fs/promises'
++import { after, before, beforeEach, mock, test } from 'node:test'
++import { Pool } from 'pg'
++import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
++import type { LiveScope } from '../live/scope'
++import type { LiveInvalidation } from '../live/events'
++import type { ComputerEventPage } from './event-page'
++import type { VisualObservation } from '../cloud-computer/visual-contract'
++import type { judgeVisualBrowserAction } from '../cloud-computer/visual-model'
++
++const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
++if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Computer event writer database required')
++if (databaseURL && !isE2eTarget(databaseURL)) throw new Error('Computer event writer tests require an isolated loopback e2e database')
++const schema = `event_writers_${randomUUID().replaceAll('-', '')}`
++const actor = { userId: 'event-writer-owner', workspaceId: randomUUID() }
++const botId = randomUUID()
++let admin: Pool, pool: Pool, observer: Pool
++let store: InstanceType<typeof import('../cloud-computer/subagents').SubagentStore>
++let browserAction: typeof import('../cloud-computer/action-reviews').browserAction
++let proposeCredentialOperation: typeof import('../cloud-computer/credential-reviews').proposeCredentialOperation
++let readComputerEvents: typeof import('./event-log').readComputerEvents
++type Notice = { scope: LiveScope; events: LiveInvalidation[]; page: ComputerEventPage }
++let notices: Notice[] = []
++let probes: Promise<void>[] = []
++let runtimeCalls = 0
++const target = {
++  targetId: 'fixture-target', origin: 'https://example.invalid', endpoint: 'https://fixture.invalid', expiresAt: Date.now() + 600_000,
++  observedInputs: [{ backendNodeId: 12, credentialRole: 'password' as const, loaderId: 'fixture-document', epoch: 1, permissionVersion: 0 }],
++}
++
++before(async () => {
++  if (!databaseURL) return
++  admin = new Pool({ connectionString: databaseURL })
++  await admin.query(`CREATE SCHEMA ${schema}`)
++  pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}`, max: 6 })
++  observer = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}`, max: 2 })
++  // The observer is a different real PostgreSQL connection. Holding COMMIT until
++  // already-issued probes settle makes a mistakenly early notification reliably
++  // observe the old committed snapshot, rather than occasionally winning a race.
++  pool.on('connect', client => {
++    const query = client.query
++    client.query = ((...args: unknown[]) => args[0] === 'COMMIT'
++      ? Promise.all(probes).then(() => Reflect.apply(query, client, args))
++      : Reflect.apply(query, client, args)) as typeof client.query
++  })
++  await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY); CREATE TABLE agent_runs(id uuid PRIMARY KEY);
++    CREATE TABLE devices(id uuid PRIMARY KEY); CREATE TABLE suggestions(id uuid PRIMARY KEY,"botId" uuid);
++    CREATE TABLE device_repos(id uuid PRIMARY KEY)`)
++  await pool.query('INSERT INTO "user" VALUES ($1)', [actor.userId])
++  for (const name of ['20261027164501_cloud_computers.sql', '20261029011635_subagents_thread_machines.sql', '20261029080000_unattended_browser_runtime.sql', '20261029080001_owner_cloud_machines.sql']) {
++    await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
++  }
++  await pool.query(`CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY,permission text DEFAULT 'allow',version bigint DEFAULT 0,external_write_permissions jsonb DEFAULT '{}',external_write_policy_version bigint DEFAULT 0);
++    CREATE TABLE agent_kit_heads(owner_id text,bot_id uuid,workspace_id uuid,external_write_permissions jsonb DEFAULT '{}',external_write_policy_version bigint DEFAULT 0);
++    CREATE TABLE pending_actions(id uuid PRIMARY KEY,"botId" uuid,"userId" text NOT NULL,action text NOT NULL,input jsonb NOT NULL,status text DEFAULT 'pending',"createdAt" timestamptz DEFAULT now(),"decidedAt" timestamptz,result jsonb,error text);
++    CREATE FUNCTION reject_fixture_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
++      IF NEW.event->'data'->>'task'='event-write-must-rollback' THEN RAISE EXCEPTION 'fixture event write rejected'; END IF;
++      RETURN NEW; END $$;
++    CREATE TRIGGER reject_fixture_event BEFORE INSERT ON subagent_events FOR EACH ROW EXECUTE FUNCTION reject_fixture_event()`)
++  await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,$4)', [botId, actor.userId, actor.workspaceId, 'Fixture'])
++  await pool.query('INSERT INTO agent_kit_heads(owner_id,bot_id,workspace_id) VALUES($1,$2,$3)', [actor.userId, botId, actor.workspaceId])
++  await pool.query('INSERT INTO workspace_computer_policies("workspaceId") VALUES($1)', [actor.workspaceId])
++  await pool.query('INSERT INTO cloud_machines("workspaceId","ownerId","operationId","sandboxId",state,"runtimeReady") VALUES($1,$2,$3,$4,$5,true)', [actor.workspaceId, actor.userId, randomUUID(), 'fixture-machine', 'running'])
++  mock.module('@/lib/live/notify', { namedExports: {
++    notifyLive(scope: LiveScope, events: LiveInvalidation[]) {
++      const probe = readComputerEvents(observer, scope, '0').then(page => { notices.push({ scope, events, page }) })
++      probes.push(probe)
++    },
++  } })
++  // Only external compute/runtime and subscription service boundaries are fixtures.
++  // The actual four writer methods, permission/row locks, event inserts and COMMIT run.
++  mock.module('@/lib/computer/provision', { namedExports: { ensureCloudMachine: async () => ({ sandboxId: 'fixture-machine' }) } })
++  mock.module('@/lib/subscription-runtime', { namedExports: {
++    authorizeSubscriptionWorkspace: async (owner: string, workspace: string) => {
++      assert.equal(owner, actor.userId); assert.equal(workspace, actor.workspaceId)
++    },
++  } })
++  mock.module('@/lib/cloud-computer/runtime', { namedExports: {
++    installSubagentRuntime: async () => undefined,
++    runtimeRequest: async (_sandbox: string, _row: unknown, path: string, body: { actionId?: string }) => {
++      runtimeCalls++
++      if (path === '/start') return { targetId: target.targetId }
++      if (path === '/action') return { accepted: true, actionId: body.actionId }
++      if (path === '/stop') return {}
++      throw new Error('Unexpected external runtime request')
++    },
++    grant: async () => { throw new Error('Unexpected credential continuation') },
++    endpointPath: (endpoint: string, path: string) => endpoint + path,
++  } })
++  readComputerEvents = (await import('./event-log')).readComputerEvents
++  store = new (await import('../cloud-computer/subagents')).SubagentStore(pool)
++  browserAction = (await import('../cloud-computer/action-reviews')).browserAction
++  proposeCredentialOperation = (await import('../cloud-computer/credential-reviews')).proposeCredentialOperation
++})
++
++beforeEach(async () => {
++  if (!databaseURL) return
++  await Promise.all(probes); probes = []; notices = []; runtimeCalls = 0
++  await pool.query(`TRUNCATE bot_subagents CASCADE; DELETE FROM pending_actions;
++    UPDATE workspace_computer_policies SET permission='allow',version=0,external_write_permissions='{}'`)
++})
++
++after(async () => {
++  if (!databaseURL) return
++  await Promise.all(probes)
++  await observer.end(); await pool.end()
++  await admin.query(`DROP SCHEMA ${schema} CASCADE`)
++  await admin.end()
++})
++
++async function task(status = 'queued', title = 'Read public documentation') {
++  const row = await store.create(actor, botId, title)
++  if (status !== 'queued') await pool.query('UPDATE bot_subagents SET status=$2,"targetId"=$3 WHERE id=$1', [row.id, status, target.targetId])
++  return row.id
++}
++async function notice(expectedCount: number, expectedState: string) {
++  await Promise.all(probes)
++  assert.equal(notices.length, expectedCount)
++  const latest = notices.at(-1)!
++  assert.deepEqual(latest.scope, { ownerId: actor.userId, workspaceId: actor.workspaceId })
++  assert.deepEqual(latest.events, [{ kind: 'subagent_events', id: actor.workspaceId }], 'push carries no business content')
++  assert.equal(latest.page.events.length, expectedCount, 'every notification observes its committed append on another connection')
++  assert.equal((latest.page.events.at(-1)!.data as { state: string }).state, expectedState)
++}
++
++test('actual SubagentStore publishes queued stop, denied start and runtime start only after commit', { skip: !databaseURL }, async () => {
++  const stopped = await task()
++  assert.equal((await store.stop(actor, botId, stopped)).status, 'stopped')
++  await notice(1, 'stopped')
++  await store.stop(actor, botId, stopped)
++  await Promise.all(probes); assert.equal(notices.length, 1, 'terminal replay does not append or notify')
++  await assert.rejects(store.stop({ ...actor, userId: 'other-owner' }, botId, stopped), { status: 404 })
++  const denied = await task()
++  await pool.query("UPDATE workspace_computer_policies SET permission='deny'")
++  assert.equal((await store.start(actor, botId, denied)).status, 'failed')
++  await notice(2, 'failed'); assert.equal(runtimeCalls, 0, 'denied work never provisions or starts runtime')
++  await pool.query("UPDATE workspace_computer_policies SET permission='allow'")
++  const started = await task()
++  assert.equal((await store.start(actor, botId, started)).status, 'running')
++  await notice(3, 'running'); assert.equal(runtimeCalls, 1)
++})
++
++test('actual SubagentStore commits terminal suggestion updates with the event; failed event rolls both back', { skip: !databaseURL }, async () => {
++  const id = await task('running')
++  const suggestionId = randomUUID()
++  await pool.query('INSERT INTO suggestions(id,"botId") VALUES($1,$2)', [suggestionId, botId])
++  await pool.query('INSERT INTO suggestion_executions("suggestionId","ownerId","workspaceId",instruction,status,"subagentId") VALUES($1,$2,$3,$4,$5,$6)', [suggestionId, actor.userId, actor.workspaceId, 'Fixture', 'running', id])
++  await store.update(actor, botId, id, 'done', 'Reviewed documentation')
++  await notice(1, 'done')
++  assert.equal((await observer.query('SELECT status FROM suggestion_executions WHERE "suggestionId"=$1', [suggestionId])).rows[0].status, 'done')
++  const failed = await task('running', 'event-write-must-rollback')
++  const rejectedSuggestion = randomUUID()
++  await pool.query('INSERT INTO suggestions(id,"botId") VALUES($1,$2)', [rejectedSuggestion, botId])
++  await pool.query('INSERT INTO suggestion_executions("suggestionId","ownerId","workspaceId",instruction,status,"subagentId") VALUES($1,$2,$3,$4,$5,$6)', [rejectedSuggestion, actor.userId, actor.workspaceId, 'Fixture', 'running', failed])
++  await assert.rejects(store.update(actor, botId, failed, 'done', 'Must not publish'), /fixture event write rejected/)
++  assert.equal((await store.get(actor, botId, failed)).status, 'running')
++  assert.equal((await observer.query('SELECT status FROM suggestion_executions WHERE "suggestionId"=$1', [rejectedSuggestion])).rows[0].status, 'running')
++  await Promise.all(probes); assert.equal(notices.length, 1)
++})
++
++test('actual queued stop rolls back its state and sends no notification when event insertion fails', { skip: !databaseURL }, async () => {
++  const id = await task('queued', 'event-write-must-rollback')
++  await assert.rejects(store.stop(actor, botId, id), /fixture event write rejected/)
++  assert.equal((await store.get(actor, botId, id)).status, 'queued')
++  await Promise.all(probes); assert.equal(notices.length, 0)
++  assert.equal((await readComputerEvents(observer, { ownerId: actor.userId, workspaceId: actor.workspaceId }, '0')).events.length, 0)
++})
++
++test('actual credential proposal commits approval and event together; rollback leaves neither', { skip: !databaseURL }, async () => {
++  const id = await task('running')
++  assert.equal((await proposeCredentialOperation(pool, { ...actor, botId, subagentId: id }, target, 'fill')).status, 'needs_approval')
++  await notice(1, 'needs_you')
++  assert.equal((await observer.query('SELECT count(*)::int AS count FROM pending_actions')).rows[0].count, 1)
++  const rejected = await task('running', 'event-write-must-rollback')
++  await assert.rejects(proposeCredentialOperation(pool, { ...actor, botId, subagentId: rejected }, target, 'fill'), /fixture event write rejected/)
++  assert.equal((await store.get(actor, botId, rejected)).status, 'running')
++  assert.equal((await observer.query('SELECT count(*)::int AS count FROM pending_actions')).rows[0].count, 1)
++  await Promise.all(probes); assert.equal(notices.length, 1)
++})
++
++test('actual browser action commits its event before notification and external action; rollback prevents action', { skip: !databaseURL }, async () => {
++  const bytes = Buffer.from([0xff, 0xd8, 0xff, ...Array.from({ length: 40 }, () => 0), 0xff, 0xd9])
++  const imageDigest = createHash('sha256').update(bytes).digest('hex')
++  const observation: VisualObservation = { observationId: 'a'.repeat(32), loaderId: target.observedInputs[0].loaderId, origin: target.origin, observedAt: Date.now(), screenshot: 'data:image/jpeg;base64,' + bytes.toString('base64'), width: 1280, height: 800, observation: { url: target.origin, title: 'Fixture', text: 'Fixture', elements: [], needsLogin: false } }
++  const judgment: Awaited<ReturnType<typeof judgeVisualBrowserAction>> = { scope: 'within_task', effect: 'browse', execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'synthetic-provider', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'b'.repeat(64), imageDigests: [imageDigest], vision: 'image-input-submitted' } }
++  const perform = (id: string) => browserAction(pool, actor, botId, id, { action: 'click', x: 20, y: 40 }, 'Open documentation', observation, judgment)
++  assert.equal((await perform(await task('running'))).state, 'running')
++  await notice(1, 'running'); assert.equal(runtimeCalls, 1)
++  const rejected = await task('running', 'event-write-must-rollback')
++  await assert.rejects(perform(rejected), /fixture event write rejected/)
++  const row = await store.get(actor, botId, rejected)
++  assert.equal(row.status, 'running'); assert.equal(row.activeActionId, null)
++  assert.equal((await observer.query('SELECT count(*)::int AS count FROM pending_actions')).rows[0].count, 1)
++  await Promise.all(probes); assert.equal(notices.length, 1); assert.equal(runtimeCalls, 1)
++})
+diff --git a/lib/credentials/broker.ts b/lib/credentials/broker.ts
+index f600d9ea6..c83dfb7e6 100644
+--- a/lib/credentials/broker.ts
++++ b/lib/credentials/broker.ts
+@@ -1,3 +1,4 @@
++import { lockSubagentEvents } from '@/lib/computer/event-lock'
+ import type { Pool } from 'pg'
+ import { CredentialError } from './contracts'
+ import { awsKms, open, type Kms } from './kms'
+@@ -114,12 +115,17 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
+     if (caller.subagentId) {
+       // Resume the caller to observe the page after the guard ends. The
+       // broker does not decide whether login succeeded or MFA is required.
+-      await pool.query(`WITH changed AS (
++      await client.query('BEGIN'); completed = false
++      // Keep the shared event lock last: business row first, then sequence allocation.
++      await client.query('SELECT id FROM bot_subagents WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4 FOR UPDATE', [caller.subagentId, caller.userId, caller.workspaceId, caller.botId])
++      await lockSubagentEvents(client, { ownerId: caller.userId, workspaceId: caller.workspaceId })
++      await client.query(`WITH changed AS (
+         UPDATE bot_subagents SET status=$5,needs=$6,step=$7
+         WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4 AND status IN ('running','needs_you') RETURNING *
+       ) INSERT INTO subagent_events("ownerId","workspaceId","botId","subagentId",event)
+       SELECT "ownerId","workspaceId","botId",id,jsonb_build_object('type','data-subagent','data',jsonb_build_object('botId',"botId",'subagentId',id,'task',task,'state',status,'step',step,'needs',needs)) FROM changed`,
+       [caller.subagentId, caller.userId, caller.workspaceId, caller.botId, 'running', null, 'running'])
++      await client.query('COMMIT'); completed = true
+     }
+     return { status: sessionApplied ? 'session_applied' as const : 'submitted' as const, origin: context.origin }
+   } catch (error) {
+diff --git a/lib/credentials/credentials.test.ts b/lib/credentials/credentials.test.ts
+index 4390f219a..9cc5f0249 100644
+--- a/lib/credentials/credentials.test.ts
++++ b/lib/credentials/credentials.test.ts
+@@ -194,7 +194,8 @@ test('broker reports mechanical session application or submission without judgin
+     assert.equal(result.status, forcePassword ? 'guarded' : 'session_applied')
+     assert.equal(calls.includes('insertAtObservedInput'), forcePassword)
+     assert.equal(calls.includes('Page.reload'), !forcePassword)
+-    assert.deepEqual(locks, ['computer-policy:workspace', `credentials:${owner.userId}:${owner.origin}`])
++    assert.deepEqual(locks, ['computer-policy:workspace', `credentials:${owner.userId}:${owner.origin}`,
++      ...(forcePassword ? [] : [`subagent-events:${owner.userId}:workspace`])])
+     assert.equal(guardEnded, !forcePassword)
+     assert(calls.includes('close'))
+     if (forcePassword) {
+diff --git a/lib/credentials/route.ts b/lib/credentials/route.ts
+index b604576ae..d46919237 100644
+--- a/lib/credentials/route.ts
++++ b/lib/credentials/route.ts
+@@ -33,7 +33,7 @@ async function browserCredentialRoute(request: Request, identity: { botId: strin
+       if ('code' in parsed.data) {
+         let lease: string
+         try { lease = await credentialStore.otpLease(caller, parsed.data, target) } finally { parsed.data.code = '' }
+-        return Response.json(await executeCredentialLease(lease, target.origin), { headers: privateHeaders })
++        return Response.json(await executeCredentialLease(lease, target.origin, { ownerId: caller.userId, workspaceId: caller.workspaceId }), { headers: privateHeaders })
+       }
+       try { await credentialStore.save(caller, parsed.data) } finally { parsed.data.password = '' }
+       const result = await login(caller, target.origin, parsed.data.username)
+diff --git a/lib/credentials/runtime.ts b/lib/credentials/runtime.ts
+index 51480251e..a7f651d06 100644
+--- a/lib/credentials/runtime.ts
++++ b/lib/credentials/runtime.ts
+@@ -1,4 +1,6 @@
+ import 'server-only'
++import { notifySubagentEvents } from '@/lib/computer/event-log'
++import type { LiveScope } from '@/lib/live/scope'
+ import { getVercelOidcToken } from '@vercel/oidc'
+ import { auth } from '@/lib/api-auth'
+ import { pool } from '@/lib/db'
+@@ -55,7 +57,7 @@ async function brokerErrorCode(response: Response): Promise<unknown> {
+   } catch { return null } finally { reader.releaseLock() }
+ }
+ 
+-export async function executeCredentialLease(lease: string, origin: string) {
++export async function executeCredentialLease(lease: string, origin: string, scope: LiveScope) {
+   const broker = new URL(process.env.CREDENTIAL_BROKER_URL ?? '')
+   if (broker.protocol !== 'https:' || !broker.hostname.endsWith('.vercel.app') || broker.pathname !== '/' || broker.username || broker.password || broker.search || broker.hash) throw new CredentialError()
+   let dispatched = false, responseReceived = false
+@@ -77,6 +79,9 @@ export async function executeCredentialLease(lease: string, origin: string) {
+     // Do not forward arbitrary responses from another process to the model.
+     const result = await response.json().catch(() => null)
+     if (!result || !['submitted', 'session_applied', 'guarded'].includes(result.status) || result.origin !== origin) throw new CredentialError('credential_outcome_unknown', 409)
++    // The broker's success response follows its event COMMIT. Keep the gateway
++    // credential and Next lifecycle in the app; the isolated broker needs neither.
++    if (result.status !== 'guarded') notifySubagentEvents(scope)
+     return { status: result.status as 'submitted' | 'session_applied' | 'guarded', origin }
+   } catch (error) {
+     if (error instanceof CredentialError && error.code === 'credential_outcome_unknown') throw error
+diff --git a/lib/live/events.ts b/lib/live/events.ts
+index f8d546e37..ff58c1445 100644
+--- a/lib/live/events.ts
++++ b/lib/live/events.ts
+@@ -1,4 +1,4 @@
+-export const LIVE_KINDS = ['thread_list', 'task_run_list', 'bot_chat_list', 'issue_list', 'bot_list', 'group_list', 'workspace_settings', 'computer_state', 'approved_writes', 'approved_write', 'pending_actions', 'factory_task', 'factory_issue', 'thread', 'run'] as const
++export const LIVE_KINDS = ['thread_list', 'task_run_list', 'bot_chat_list', 'issue_list', 'bot_list', 'group_list', 'workspace_settings', 'computer_state', 'approved_writes', 'approved_write', 'pending_actions', 'factory_task', 'factory_issue', 'thread', 'run', 'subagent_events'] as const
+ export type LiveKind = typeof LIVE_KINDS[number]
+ export type LiveInvalidation = { kind: LiveKind; id: string }
+ export const LIVE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+diff --git a/lib/live/pending-actions.db.test.ts b/lib/live/pending-actions.db.test.ts
+index 1d4485310..1b40dd61d 100644
+--- a/lib/live/pending-actions.db.test.ts
++++ b/lib/live/pending-actions.db.test.ts
+@@ -167,16 +167,19 @@ test('legacy pending producers invalidate only their committed owner-personal li
+       const subagentId = await subagent('Pending approval fixture'), caller = { userId: owner, workspaceId, botId, subagentId }
+       const before = sent.length
+       assert.equal((await proposeCredentialOperation(database, caller, target, 'fill')).status, 'needs_approval')
+-      await drain(); assert.deepEqual(sent.slice(before), [expected(owner)])
++      const subagentEvents = { path: expected(owner).path, events: [{ kind: 'subagent_events', id: workspaceId }] }
++      const byKind = (items: typeof sent) => [...items].sort((a, b) => JSON.stringify(a.events).localeCompare(JSON.stringify(b.events)))
++      // One committed credential proposal changes both the pending list and its subagent event stream.
++      await drain(); assert.deepEqual(byKind(sent.slice(before)), byKind([expected(owner), subagentEvents]))
+       assert.equal((await proposeCredentialOperation(database, caller, target, 'fill')).status, 'needs_approval')
+-      await drain(); assert.equal(sent.length, before + 1)
++      await drain(); assert.equal(sent.length, before + 2)
+       await database.query(`CREATE FUNCTION reject_pending_live_fixture() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+         IF NEW.event->'data'->>'task'='pending-live-must-rollback' THEN RAISE EXCEPTION 'fixture event write rejected'; END IF; RETURN NEW; END $$;
+         CREATE TRIGGER reject_pending_live_fixture BEFORE INSERT ON subagent_events FOR EACH ROW EXECUTE FUNCTION reject_pending_live_fixture()`)
+       const rejected = await subagent('pending-live-must-rollback')
+       const count = (await database.query('SELECT count(*) FROM pending_actions')).rows[0].count
+       await assert.rejects(proposeCredentialOperation(database, { ...caller, subagentId: rejected }, target, 'fill'), /fixture event write rejected/)
+-      await drain(); assert.equal(sent.length, before + 1)
++      await drain(); assert.equal(sent.length, before + 2)
+       assert.equal((await database.query('SELECT count(*) FROM pending_actions')).rows[0].count, count)
+       assert.equal((await database.query('SELECT status FROM bot_subagents WHERE id=$1', [rejected])).rows[0].status, 'running')
+     })
+diff --git a/lib/subagents/login-needs.ts b/lib/subagents/login-needs.ts
+index 7992e7240..58df81144 100644
+--- a/lib/subagents/login-needs.ts
++++ b/lib/subagents/login-needs.ts
+@@ -1,6 +1,5 @@
+ import { subagentEventSchema } from '@mikka/protocol/subagent'
+ import { withBasePath } from '@/lib/base-path'
+-import { listenComputerStream } from '@/lib/computer/event-stream'
+ 
+ export type SubagentUpdate = ReturnType<typeof subagentEventSchema.shape.data.parse>
+ export type LoginNeed = { subagentId: string; botId: string; origin: string; name: string; prefix: string }
+@@ -31,15 +30,3 @@ export function loginNeeds(state: ReadonlyMap<string, SubagentUpdate>, botId: st
+   }
+   return needs
+ }
+-
+-/** Shares the tab's one /api/computer/events stream. It sends `event: data-subagent` with the event's `data` as the payload. */
+-export function subscribeSubagentUpdates(listener: (update: SubagentUpdate) => void): () => void {
+-  return listenComputerStream('data-subagent', data => {
+-    const parsed = subagentEventSchema.shape.data.safeParse(safeJson(data))
+-    if (parsed.success) listener(parsed.data)
+-  })
+-}
+-
+-function safeJson(text: string): unknown {
+-  try { return JSON.parse(text) } catch { return null }
+-}
+diff --git a/package.json b/package.json
+index 713f58af7..0f85230bb 100644
+--- a/package.json
++++ b/package.json
+@@ -204,7 +204,7 @@
+     "test:view-state": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/hooks/view-state.test.tsx components/nav/thread-view-state.test.tsx",
+     "test:device-gateway": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/device-presence.test.ts lib/device-gateway-notify.test.ts lib/live/ticket.test.ts && node --import tsx --test lib/device-gateway-ticket.test.ts lib/live/scope.test.ts lib/live/channel.test.ts lib/db/commit-effects.test.ts cloudflare/device-gateway/src/route.test.ts cloudflare/device-gateway/src/live-route.test.ts && node --test cloudflare/device-gateway/test/runtime.test.mjs",
+     "test:live-lists": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/use-live-lists.live.test.tsx",
+-    "test:live-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/live/factory.db.test.ts lib/live/store.db.test.ts lib/live/ticket-session.db.test.ts lib/db/request-scope-live.db.test.ts lib/live/notification-context.db.test.ts lib/live/computer-state.db.test.ts lib/live/approved-writes.db.test.ts lib/live/pending-actions.db.test.ts lib/live/lists.db.test.ts",
++    "test:live-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/live/factory.db.test.ts lib/live/store.db.test.ts lib/live/ticket-session.db.test.ts lib/db/request-scope-live.db.test.ts lib/live/notification-context.db.test.ts lib/live/computer-state.db.test.ts lib/live/approved-writes.db.test.ts lib/live/pending-actions.db.test.ts lib/live/lists.db.test.ts lib/computer/event-log.db.test.ts lib/computer/event-writers.db.test.ts lib/computer/event-session.db.test.ts lib/computer/event-broker.db.test.ts",
+     "test:project-decisions-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/project-map/decisions.db.test.ts lib/project-map/http.db.test.ts lib/project-map/sources.db.test.ts",
+     "test:project-decisions": "node --test scripts/acceptance/project-decisions.test.mjs && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/project-map/sources.test.ts",
+     "test:pending-actions-live": "node --import tsx --test lib/live/pending-action-cache.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/pending-actions.live.test.tsx app/api/pending-actions/route.test.ts"
+diff --git a/scripts/focus-refetch-policy.mjs b/scripts/focus-refetch-policy.mjs
+index 7b8371923..1b064d94c 100644
+--- a/scripts/focus-refetch-policy.mjs
++++ b/scripts/focus-refetch-policy.mjs
+@@ -17,7 +17,7 @@ export const focusListenerAllowlist = {
+   'hooks/use-live-key.tsx': 'closes scoped live channels while hidden; on show reconnects and catches up changes missed while disconnected (#1212), with no plain focus listener',
+   'apps/mobile/lib/push.ts': 'refreshes the push token registration; the screen is not re-read',
+   'apps/mobile/lib/updates.ts': 'prefetches an OTA bundle in the background; the screen is not re-read',
+-  'lib/computer/event-stream.ts': 'closes the computer event stream while hidden; on show it resumes after the last event received, never re-reading what it has',
++  'hooks/use-subagent-updates.ts': 'cancels the scoped event read while hidden; on show it catches up after the last cursor (#1212), never re-reading prior events or listening to plain focus',
+   'apps/mobile/lib/useApi.ts': 'pauses polling in the background; on return one silent read only past FRESH_FOR_MS',
+ }
+ 
+diff --git a/scripts/run-db-tests.mjs b/scripts/run-db-tests.mjs
+index de2753b1c..c27bca4ed 100644
+--- a/scripts/run-db-tests.mjs
++++ b/scripts/run-db-tests.mjs
+@@ -62,6 +62,10 @@ export const REQUIRED_SUITES = [
+   { marker: 'lib/agent-kit/store.ts', file: 'lib/agent-kit/store.db.test.ts', script: 'test:agent-kit-db' },
+   { marker: 'lib/computer/store.ts', file: 'lib/computer/store.db.test.ts', script: 'test:computer-db' },
+   { marker: 'lib/computer/reconcile.ts', file: 'lib/computer/reconcile.db.test.ts', script: 'test:computer-db' },
++  { marker: 'lib/computer/event-log.ts', file: 'lib/computer/event-log.db.test.ts', script: 'test:live-db' },
++  { marker: 'lib/cloud-computer/subagents.ts', file: 'lib/computer/event-writers.db.test.ts', script: 'test:live-db' },
++  { marker: 'lib/computer/event-page.ts', file: 'lib/computer/event-session.db.test.ts', script: 'test:live-db' },
++  { marker: 'lib/credentials/broker.ts', file: 'lib/computer/event-broker.db.test.ts', script: 'test:live-db' },
+   { marker: 'lib/captures/store.ts', file: 'lib/captures/store.db.test.ts', script: 'test:captures-db' },
+   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-conversations.test.ts', script: 'test:groups' },
+   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-reads.db.test.ts', script: 'test:conversation-reads' },
+diff --git a/tests/e2e/subagent-login-needs.spec.ts b/tests/e2e/subagent-login-needs.spec.ts
+index 0cceb9dde..22b1166c8 100644
+--- a/tests/e2e/subagent-login-needs.spec.ts
++++ b/tests/e2e/subagent-login-needs.spec.ts
+@@ -1,6 +1,7 @@
+ import { expect, test, type Page } from '@playwright/test'
+ 
+ const BOT = '00000000-0000-4000-8000-0000000000b0'
++const WORKSPACE = '00000000-0000-4000-8000-0000000000c0'
+ const SUB = '00000000-0000-4000-8000-0000000000a1'
+ const OTHER = '00000000-0000-4000-8000-0000000000a2'
+ const PREFIX = `/mikka/api/bots/${BOT}/subagents/${SUB}/credentials`
+@@ -9,16 +10,28 @@ const SECRET = 'hunter2-secret'
+ type Update = { subagentId?: string; botId?: string; state?: string; needs?: unknown }
+ const update = (over: Update) => ({ botId: BOT, subagentId: SUB, task: '查 Cloudflare 账单', state: 'needs_you', step: '需要登录', needs: { kind: 'login', site: 'dash.cloudflare.com' }, ...over })
+ 
+-/** Serves a fixed SSE batch; EventSource reconnects and replays it, which the latest-per-sub-agent reducer absorbs. */
+-async function stream(page: Page, updates: Update[]) {
+-  await page.route('**/mikka/api/computer/events*', route => route.fulfill({
+-    headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-store' },
+-    body: `retry: 60000\n\n${updates.map((data, index) => `id: ${index + 1}\nevent: data-subagent\ndata: ${JSON.stringify(update(data))}\n\n`).join('')}`,
+-  }))
++/** Serves bounded cursor pages through the same scope used by the live provider. */
++async function computerEvents(page: Page, updates: Update[]) {
++  const events = updates.map((data, index) => ({ id: String(index + 1), data: update(data) }))
++  // This isolated rendering fixture has no gateway. An unavailable ticket uses
++  // the normal slow fallback; the test never opens a real remote WebSocket.
++  await page.route('**/mikka/api/live/ticket*', route => route.fulfill({ status: 503, json: { error: 'fixtureGatewayUnavailable' } }))
++  await page.route('**/mikka/api/computer/events*', route => {
++    const url = new URL(route.request().url())
++    expect(url.searchParams.get('workspace')).toBe(WORKSPACE)
++    const after = url.searchParams.get('after') ?? '0'
++    expect(after).toMatch(/^(0|[1-9][0-9]*)$/)
++    const remaining = events.filter(event => BigInt(event.id) > BigInt(after))
++    const batch = remaining.slice(0, 100)
++    return route.fulfill({
++      headers: { 'cache-control': 'no-store' },
++      json: { events: batch, cursor: batch.at(-1)?.id ?? after, hasMore: remaining.length > batch.length },
++    })
++  })
+ }
+ 
+ test('a sub-agent login need renders the card against its own credential API', async ({ page }) => {
+-  await stream(page, [
++  await computerEvents(page, [
+     {},
+     {},
+     { subagentId: '00000000-0000-4000-8000-0000000000a5', state: 'running' },
+@@ -51,7 +64,7 @@ test('a sub-agent login need renders the card against its own credential API', a
+ })
+ 
+ test('the card goes away once the sub-agent moves on', async ({ page }) => {
+-  await stream(page, [{}, { state: 'running', needs: null }])
++  await computerEvents(page, [{}, { state: 'running', needs: null }])
+   await page.goto('/mikka/zh-CN/preview/subagent-login')
+   await expect(page.getByRole('main')).toBeVisible()
+   await page.waitForTimeout(500)
+@@ -59,7 +72,7 @@ test('the card goes away once the sub-agent moves on', async ({ page }) => {
+ })
+ 
+ test('a BE-17 rejection from the sub-agent route shows its reason', async ({ page }) => {
+-  await stream(page, [{}])
++  await computerEvents(page, [{}])
+   await page.route(`**${PREFIX}/challenge`, route => route.fulfill({ json: { nonce: 'n'.repeat(43), origin: 'https://dash.cloudflare.com', expiresIn: 300 } }))
+   await page.route(`**${PREFIX}`, route => route.fulfill({ json: { attemptId: '11111111-1111-4111-8111-111111111111', status: 'rejected', reason: 'invalidCredentials', origin: 'https://dash.cloudflare.com' } }))
+   await page.goto('/mikka/zh-CN/preview/subagent-login')

@@ -1,0 +1,36 @@
+(node:56787) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:56787) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ real PG: lists retain their reader scope and publish only the originating committed writes
+  ✔ owner-wide lists use the real home, not the selected team or another personal member (4.60312ms)
+  ✔ workspace lists use active members; a private group does not notify unrelated members (4.957047ms)
+  ✔ issue lists retain personal/unlinked visibility; body saves do not invalidate unrelated chat/run summaries (4.814181ms)
+  ✔ a committed scope change clears old list keys and former members own previews without disclosing the issue (59.954974ms)
+  ✔ a held client publishes after COMMIT even when commit and delivery run in another database context (7.272885ms)
+  ✔ outer rollback and rolled-back nested savepoints never publish a list key (5.110862ms)
+  ✔ actual stream batches notify on a completed preview, not tokens or duplicate outbox delivery (36.536268ms)
+  ✔ the actual Owner stop writer publishes once after commit, and an enclosing rollback or foreign Owner publishes nothing (95.125624ms)
+  ✔ an actual unclaimed startup failure publishes its terminal lists once even when the completion event is already present (1972.642444ms)
+  ✔ actual private group message, read receipt and member removal update only their authorized list audiences (35.356276ms)
+  ✔ the actual workspace member removal rolls back without notification and clears only previously known scopes after commit (37.967923ms)
+✔ real PG: lists retain their reader scope and publish only the originating committed writes (3567.363311ms)
+(node:56788) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:56788) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ legacy pending producers invalidate only their committed owner-personal list
+  ✔ actual Drizzle proposal waits for the held outer COMMIT and reads are silent (40.765082ms)
+  ✔ the actual Drizzle nested savepoint rollback discards only its notification; outer rollback discards all (10.072375ms)
+  ✔ actual account proposal and owner decline invalidate; repeated/foreign decisions execute nothing (23.478293ms)
+  ✔ another owner gets only its personal key and membership is rechecked after scheduling (8.971337ms)
+  ✔ delayed scheduling and COMMIT outside a request keep the source DB even for the same UUID (10.109375ms)
+  ✔ actual credential proposal commits once, replay is silent, and a later failed event rolls everything back (18.40196ms)
+  ✔ the historical browser pending sweep invalidates only rows that actually leave pending (4.505817ms)
+✔ legacy pending producers invalidate only their committed owner-personal list (2499.31122ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 23760.640937

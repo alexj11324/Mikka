@@ -1,0 +1,246 @@
+{
+  "base": "3adee90c742b045e0eebd5854eecc6ade1c84aae",
+  "baseTree": "4a291d12049d0e9fc04d82ed1061cdae570229a8",
+  "tree": "c342a69139192ce077a7738707aec788579c51e1",
+  "parents": [
+    "b12750d5b7006c6dbc7c7b5bec7acf8ace1b51ed",
+    "3adee90c742b045e0eebd5854eecc6ade1c84aae"
+  ],
+  "entries": [
+    {
+      "path": "app/[locale]/preview/subagent-login/page.tsx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cd18917ef588874e261fdf28625c5daadd177212",
+      "bytes": 1089,
+      "sha256": "2e3c4a79c5e3ef7e5da550a04b7d855375be8747257bf38531f52741ec518332"
+    },
+    {
+      "path": "app/api/computer/events/route.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "20f464b41ffc7e965484a0c292df13700210e8ff",
+      "bytes": 1626,
+      "sha256": "1641678eeb5739b17f617fb5a0160566a9f26d1cea4f65291c7b7c448a3215a9"
+    },
+    {
+      "path": "components/coordinator/subagent-login-needs.tsx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b11a6c264e5781500001b6b5a366729262aac6de",
+      "bytes": 1070,
+      "sha256": "54287a7396bafa014cca31658a1cd90bb07ae7dcd8a8f22abc70457dfa8515fe"
+    },
+    {
+      "path": "docs/acceptance/2026-11-04-issue-1212/computer-events-checkpoint.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "61b38f5f10bd6a6f0a3317b21d573068dd34d415",
+      "bytes": 1042,
+      "sha256": "cd1add702486ba2e1d29d12f2764350cd47400266eb029628cd1552d4966ea80"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "baf10f62f612505d7ce0e5d1c81bd9c3c11143a3",
+      "bytes": 4948,
+      "sha256": "0ce697a2ea8ba00cf47c06b8695ec71c358227a4baf97a52488acc5bb899af0f"
+    },
+    {
+      "path": "hooks/use-subagent-updates.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "27c2d3b69a1a25bc0415f7b66b9aaf08fdd73a09",
+      "bytes": 2390,
+      "sha256": "b22ae54e6be4e18c64df5fd6aa1844a10151ff0274caf38b855cc86c831a9279"
+    },
+    {
+      "path": "lib/cloud-computer/action-reviews.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9a87602dbeb79eedcc8f0aaa2941413d2aab75c1",
+      "bytes": 12501,
+      "sha256": "f1920b98bdc1e727e38022cc8090c636f91cf03bfe45a71791ba74bf1f29b24a"
+    },
+    {
+      "path": "lib/cloud-computer/credential-reviews.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "70c5fa19b3ca85c6201f3e82ab05840df37b9cc5",
+      "bytes": 16039,
+      "sha256": "5811f3219aabdfa52aa91770d322f2467fcaca7be476c56fb9de829fc80a222c"
+    },
+    {
+      "path": "lib/cloud-computer/subagents.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bf6f51d1c064484369dd53d31dcd48275a8e44fe",
+      "bytes": 11329,
+      "sha256": "c0ac6d9e5277f6694703afdb2fa4365c4d22d8eb31881318dbedce35b54175d7"
+    },
+    {
+      "path": "lib/computer/event-broker.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f1d36b224dd5f12ee8310068d88ba02a89af7679",
+      "bytes": 18580,
+      "sha256": "df20de46330dad9e9695480348c503889adc7af38c6efdfdf8c77f8ec3c30de7"
+    },
+    {
+      "path": "lib/computer/event-lock.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9807b793c38a541e95bc1ece5b9ddf5ba6a7d161",
+      "bytes": 474,
+      "sha256": "ebfef451f38446c2939cec7a1be6517cb8bf669812fe361f702c3a74f21c7a4e"
+    },
+    {
+      "path": "lib/computer/event-log.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c0bdd742480893f38763e547d1287495a4bb1644",
+      "bytes": 4650,
+      "sha256": "9de36edff2f6c6abd18194dfce497cdfb5cabc003f569f2c22fb1811a0bc7e36"
+    },
+    {
+      "path": "lib/computer/event-log.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9d94a103c8510c5f92efc4e2a7fc593925823870",
+      "bytes": 1296,
+      "sha256": "205188c5fbdb7fb845fe79006aa545a525420a2f0bae194c2ab80a95fa5285ab"
+    },
+    {
+      "path": "lib/computer/event-page.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6351ef38b2408ade50187342b7a721bf6b348517",
+      "bytes": 1122,
+      "sha256": "19df15ded443a6cb110a9b6be5a25aa56acc0f099c1c878c744590c9bc7b6ea9"
+    },
+    {
+      "path": "lib/computer/event-session.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6fdd48494f07d12bfecba8da7b336bbabe3584ce",
+      "bytes": 10053,
+      "sha256": "83c3e24bdd5afe6ee8873c74fd9cf63e62d22944f6d55b8e52dd3ff99f1e070f"
+    },
+    {
+      "path": "lib/computer/event-stream.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "071bdaef82c43625fa1fec05757f3075185a7716",
+      "bytes": 6909,
+      "sha256": "289807e72ef2122a5d34715dfaf7723e39927ca996783b79a399d5fdd6454345"
+    },
+    {
+      "path": "lib/computer/event-stream.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "20f57c424ea7f4ef9793997c0a1e3af44a794c3c",
+      "bytes": 4139,
+      "sha256": "cb7f8686938918c2cb713bdbc9b5081df064e64ee2f0676ff0a184480f9b5f3a"
+    },
+    {
+      "path": "lib/computer/event-writers.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7b076f67d9ee252b083a1f4af25f7cfb0d760c6c",
+      "bytes": 14441,
+      "sha256": "c7dc73705f5298df5bae643649fb71d1a97209d688aea361fdcfcb75843c19d1"
+    },
+    {
+      "path": "lib/credentials/broker.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c83dfb7e6897293ad3f62145dbba28626534f6e8",
+      "bytes": 11838,
+      "sha256": "8d8470c65fb9ae64885fed07a37773481e77b79455767872476697739df21970"
+    },
+    {
+      "path": "lib/credentials/credentials.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9cc5f024937d1781eb467404467d8fb9ebdebdd3",
+      "bytes": 29202,
+      "sha256": "ae49a206ed2fee32871e10aae5f1a753b7ff2bbe150c4c6ead1e12c5f7fcfff4"
+    },
+    {
+      "path": "lib/credentials/route.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d46919237f88827bcabad478e37f116044bf1538",
+      "bytes": 4316,
+      "sha256": "4e34c8be1da27f4da3d2c00317ddb0ed508f530fb3df0401bbc0a3402101ea21"
+    },
+    {
+      "path": "lib/credentials/runtime.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a7f651d0615505895e17f57d2f7b4810b2e2d1e3",
+      "bytes": 5292,
+      "sha256": "781f5d686667a85df3ea0fcbc0bb91d4c9d3c513f927a5a73312cd9ba555863a"
+    },
+    {
+      "path": "lib/live/events.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ff58c14458b69098ba8768727b4f43628153886a",
+      "bytes": 2219,
+      "sha256": "96665a9b3cd2d4d634ca939283c6e0936f68daa571986bd5c0c5a359c28f25a8"
+    },
+    {
+      "path": "lib/live/pending-actions.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1b40dd61dd6f6e5e19b004821130b66861d66ff0",
+      "bytes": 15646,
+      "sha256": "5c636e92ca31c0825ac0eb579cf123a2a43be7adbf991812226f8c82f369e15c"
+    },
+    {
+      "path": "lib/subagents/login-needs.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "58df811449dca4c1577c6fc6d2331ba21fbd84e8",
+      "bytes": 1633,
+      "sha256": "b14ad077fb39a61cff8c8a138bb65cbf31da3fd116c5eda02e3e48d21745ebd5"
+    },
+    {
+      "path": "package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0f85230bbdf3651a91c4851defe18d10a76d0a07",
+      "bytes": 63307,
+      "sha256": "efec103f531b3e95c2170657fbf1dcb1ca1f6e00dff11862db0b37a155e4acc9"
+    },
+    {
+      "path": "scripts/focus-refetch-policy.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1b064d94c976391a3c4fb266c680ee668636b60b",
+      "bytes": 5117,
+      "sha256": "ae0b267194bec0bcc00f65e709db91148257ccc8bb5b979d79fde025bbdad2dc"
+    },
+    {
+      "path": "scripts/run-db-tests.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c27bca4ed14eeaa582e7bf007e18e38b008dfa4a",
+      "bytes": 32890,
+      "sha256": "457e19dd6e41f45cf40677d2f28a9e207d5cd5b4a613e8d8730c80d2976f232f"
+    },
+    {
+      "path": "tests/e2e/subagent-login-needs.spec.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "22b1166c8a9fd9a32899c796da179817155ea612",
+      "bytes": 5537,
+      "sha256": "f933f9bad82cfab024bf8639befafa352d6085ff87a3d8d32bd0914f3ebcc02b"
+    }
+  ],
+  "sourceCount": 29,
+  "evidenceCount": 35,
+  "diffCheck": 0
+}

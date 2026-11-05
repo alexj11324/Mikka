@@ -1,0 +1,11 @@
+Auto-merging hooks/use-live-key.tsx
+Auto-merging lib/cloud-computer/action-reviews.ts
+CONFLICT (content): Merge conflict in lib/cloud-computer/action-reviews.ts
+Auto-merging lib/cloud-computer/credential-reviews.ts
+CONFLICT (content): Merge conflict in lib/cloud-computer/credential-reviews.ts
+Auto-merging lib/live/events.ts
+CONFLICT (content): Merge conflict in lib/live/events.ts
+Auto-merging package.json
+CONFLICT (content): Merge conflict in package.json
+Auto-merging scripts/run-db-tests.mjs
+Automatic merge failed; fix conflicts and then commit the result.

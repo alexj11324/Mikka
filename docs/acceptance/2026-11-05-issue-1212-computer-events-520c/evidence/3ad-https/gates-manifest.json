@@ -1,0 +1,35 @@
+{
+  "tree": "c342a69139192ce077a7738707aec788579c51e1",
+  "base": "3adee90c742b045e0eebd5854eecc6ade1c84aae",
+  "database": "mikka_root_c_b22be0ec4f50_e2e",
+  "environment": "isolated loopback PostgreSQL; HTTPS auth origin; CI and local-mode flags absent; existing local bootstrap role; no grants changed",
+  "startedAt": "2026-11-05T01:05:30.983Z",
+  "commands": [
+    {
+      "name": "setup",
+      "startedAt": "2026-11-05T01:05:31.008Z",
+      "finishedAt": "2026-11-05T01:05:32.689Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-https-root-evidence/setup.log"
+    },
+    {
+      "name": "affected-live-db",
+      "startedAt": "2026-11-05T01:05:32.690Z",
+      "finishedAt": "2026-11-05T01:05:56.484Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-https-root-evidence/affected-live-db.log"
+    }
+  ],
+  "cleanup": {
+    "database": "mikka_root_c_b22be0ec4f50_e2e",
+    "databaseAbsent": true,
+    "at": "2026-11-05T01:05:56.521Z",
+    "grantsChanged": false
+  },
+  "preDropConnections": [],
+  "finishedAt": "2026-11-05T01:05:56.521Z"
+}

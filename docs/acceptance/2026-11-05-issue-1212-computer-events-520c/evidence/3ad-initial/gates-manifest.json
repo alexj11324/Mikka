@@ -1,0 +1,98 @@
+{
+  "tree": "41b663ff82d2514bae5a2511666c3c118df05cbe",
+  "base": "3adee90c742b045e0eebd5854eecc6ade1c84aae",
+  "database": "mikka_root_c_1bb9c2aa8d78_e2e",
+  "environment": "isolated loopback PostgreSQL, existing local bootstrap role; no grants changed",
+  "startedAt": "2026-11-05T00:58:53.245Z",
+  "commands": [
+    {
+      "name": "setup",
+      "startedAt": "2026-11-05T00:58:53.274Z",
+      "finishedAt": "2026-11-05T00:58:55.385Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-root-evidence/setup.log"
+    },
+    {
+      "name": "live-db",
+      "startedAt": "2026-11-05T00:58:55.386Z",
+      "finishedAt": "2026-11-05T00:59:11.965Z",
+      "exitCode": 1,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-root-evidence/live-db.log"
+    },
+    {
+      "name": "credentials",
+      "startedAt": "2026-11-05T00:59:11.966Z",
+      "finishedAt": "2026-11-05T00:59:20.084Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-root-evidence/credentials.log"
+    },
+    {
+      "name": "gateway",
+      "startedAt": "2026-11-05T00:59:20.085Z",
+      "finishedAt": "2026-11-05T00:59:29.117Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-root-evidence/gateway.log"
+    },
+    {
+      "name": "event-stream",
+      "startedAt": "2026-11-05T00:59:29.118Z",
+      "finishedAt": "2026-11-05T00:59:29.406Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-root-evidence/event-stream.log"
+    },
+    {
+      "name": "typegen",
+      "startedAt": "2026-11-05T00:59:29.406Z",
+      "finishedAt": "2026-11-05T00:59:38.581Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-root-evidence/typegen.log"
+    },
+    {
+      "name": "typecheck",
+      "startedAt": "2026-11-05T00:59:38.582Z",
+      "finishedAt": "2026-11-05T00:59:47.560Z",
+      "exitCode": 2,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-root-evidence/typecheck.log"
+    },
+    {
+      "name": "lint",
+      "startedAt": "2026-11-05T00:59:47.561Z",
+      "finishedAt": "2026-11-05T01:00:04.298Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-root-evidence/lint.log"
+    },
+    {
+      "name": "diff-check",
+      "startedAt": "2026-11-05T01:00:04.298Z",
+      "finishedAt": "2026-11-05T01:00:04.305Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-root-evidence/diff-check.log"
+    }
+  ],
+  "cleanup": {
+    "database": "mikka_root_c_1bb9c2aa8d78_e2e",
+    "databaseAbsent": true,
+    "at": "2026-11-05T01:00:04.357Z",
+    "grantsChanged": false
+  },
+  "preDropConnections": [],
+  "finishedAt": "2026-11-05T01:00:04.357Z"
+}

@@ -1,0 +1,62 @@
+{
+  "tree": "c342a69139192ce077a7738707aec788579c51e1",
+  "base": "3adee90c742b045e0eebd5854eecc6ade1c84aae",
+  "database": "mikka_root_c_469be1828f3a_e2e",
+  "environment": "isolated loopback PostgreSQL; CI=true; existing local bootstrap role; no grants changed",
+  "startedAt": "2026-11-05T01:03:47.851Z",
+  "commands": [
+    {
+      "name": "setup",
+      "startedAt": "2026-11-05T01:03:47.878Z",
+      "finishedAt": "2026-11-05T01:03:49.763Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-final-root-evidence/setup.log"
+    },
+    {
+      "name": "affected-live-db",
+      "startedAt": "2026-11-05T01:03:49.764Z",
+      "finishedAt": "2026-11-05T01:04:13.849Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-final-root-evidence/affected-live-db.log"
+    },
+    {
+      "name": "typecheck",
+      "startedAt": "2026-11-05T01:04:13.849Z",
+      "finishedAt": "2026-11-05T01:04:19.623Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-final-root-evidence/typecheck.log"
+    },
+    {
+      "name": "lint",
+      "startedAt": "2026-11-05T01:04:19.624Z",
+      "finishedAt": "2026-11-05T01:04:34.997Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-final-root-evidence/lint.log"
+    },
+    {
+      "name": "diff-check",
+      "startedAt": "2026-11-05T01:04:34.997Z",
+      "finishedAt": "2026-11-05T01:04:35.003Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "log": "/vercel/sandbox/mikka-computer-events-3ad-final-root-evidence/diff-check.log"
+    }
+  ],
+  "cleanup": {
+    "database": "mikka_root_c_469be1828f3a_e2e",
+    "databaseAbsent": true,
+    "at": "2026-11-05T01:04:35.090Z",
+    "grantsChanged": false
+  },
+  "preDropConnections": [],
+  "finishedAt": "2026-11-05T01:04:35.090Z"
+}

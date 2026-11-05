@@ -1,0 +1,99 @@
+
+> next-app@0.0.1 lint /vercel/sandbox/mikka-computer-events-main-a18-root
+> pnpm lint:code && pnpm lint:ui
+
+
+> next-app@0.0.1 lint:code /vercel/sandbox/mikka-computer-events-main-a18-root
+> oxlint --deny-warnings && pnpm check:migrations && pnpm test:migrations && pnpm check:factory
+
+Found 0 warnings and 0 errors.
+Finished in 89ms on 3012 files with 96 rules using 8 threads.
+
+> next-app@0.0.1 check:migrations /vercel/sandbox/mikka-computer-events-main-a18-root
+> node scripts/check-migrations.mjs
+
+migrations: 228 个迁移文件检查通过
+
+> next-app@0.0.1 test:migrations /vercel/sandbox/mikka-computer-events-main-a18-root
+> node --test scripts/activity-actor-validation.test.mjs scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs scripts/migration-guard.test.mjs scripts/migration-steps.test.mjs scripts/migration-targets.test.mjs scripts/scope-migration-history.test.mjs scripts/integration-migration-history.test.mjs
+
+✔ actor checks are validated independently in replay-safe standalone files (3.551007ms)
+✔ 历史重号在白名单内通过 (1.849243ms)
+✔ 新的 NNNN_ 文件被拒绝 (0.354466ms)
+✔ 修改旧迁移被拒绝 (0.369871ms)
+✔ 删除旧迁移被拒绝 (1.415449ms)
+✔ 非法时间戳被拒绝 (0.292266ms)
+✔ 不晚于 main 最新迁移被拒绝 (0.160845ms)
+✔ 晚于 main 最新迁移通过 (0.218269ms)
+✔ 时间戳重复被拒绝 (0.149782ms)
+✔ 拿不到 main 时只跳过顺序检查 (0.568241ms)
+✔ consolidated migration aliases preserve immutable SQL and refuse ambiguous old receipts (4.534479ms)
+Retained test fixture: /tmp/migration-mode-pAVA5z
+Retained test fixture: /tmp/migration-preview-target-A3GfQT
+Retained test fixture: /tmp/code-only-build-vf3BnG
+Retained test fixture: /tmp/migration-preflight-eJXGNv
+✔ explicit MIGRATE=0 exits before filesystem or database work in production (209.822989ms)
+✔ explicit Preview migration never connects to the global application target (39.267121ms)
+✔ the build runs migrations only after compilation and type checking succeed (10.601595ms)
+✔ all files preflight before a database connection, even if an earlier file is valid (36.361205ms)
+✔ Vercel production migrates only from main (1.878903ms)
+✔ outside Vercel MIGRATE=1 reaches only loopback databases unless --allow-remote (0.592597ms)
+✔ Vercel preview keeps its own preview database target (1.126543ms)
+✔ loopback detection (0.500996ms)
+✔ migrates unasked only in Vercel production or when every target is loopback off Vercel (0.271251ms)
+✔ only the explicit baseline precedes legacy migrations, without changing their IDs (4.479646ms)
+✔ missing baseline fails before connecting to any database (0.566393ms)
+✔ known legacy artifact compatibility runs before mainline artifact creation (0.209471ms)
+✔ BYOS migration aliases recognize both recorded branch histories without replay (6.603057ms)
+✔ Agent Kit migration alias requires its original exact SQL (0.396156ms)
+✔ local repository defaults only accepts the exact SQL under its historical name (0.365819ms)
+✔ device authorization recognizes its historical name only for identical SQL (0.322828ms)
+✔ publication migration keeps the exact historical SQL receipt (0.349168ms)
+✔ credential vault migration recognizes the exact previously applied Preview SQL (0.37358ms)
+✔ a normal file is sent whole, in one transaction (2.360712ms)
+✔ directives count only in the header (leading comment / blank lines) (0.471734ms)
+✔ no-transaction: exactly one statement, trailing semicolon optional, comments ignored (0.849972ms)
+✔ no-transaction rejects a second statement (QA: files used to be split on ;) (2.462672ms)
+✔ no-transaction rejects any $ quoting (0.261915ms)
+✔ no-transaction rejects BEGIN / COMMIT / END / ROLLBACK (0.311121ms)
+✔ empty files and misplaced CONCURRENTLY are rejected (0.191636ms)
+✔ assertIndexValid passes a valid index and fails a missing or INVALID one (0.416759ms)
+✔ index names are looked up the way Postgres stores them (0.243601ms)
+✔ QA string forms: the raw file is executed, never the stripped text (0.304022ms)
+✔ no-transaction: the ; count must survive comment stripping (0.219303ms)
+✔ all tracked SQL preflights without altering historical migration bytes (7.342939ms)
+✔ concurrent index plans carry their table and schema (1.029623ms)
+✔ dropInvalidIndex drops only an INVALID index on the expected table, concurrently and schema-qualified (0.762147ms)
+✔ Preview migration routes both targets to its configured branch, never the global application URL (2.004319ms)
+✔ production and local migration targets retain their separate configured URLs (0.191093ms)
+✔ scope aliases pin identical SQL and keep the two-body historical name ambiguous (5.528673ms)
+✔ all partial and mixed ledger models either preserve ordered progress or fail closed (176.2326ms)
+✔ a later recorded gate cannot prove which older verified-target body ran (0.508787ms)
+✔ actual runner model skips old DDL, applies only missing suffixes, and replays nothing on retry (7.110091ms)
+✔ renamed scope sources preserve the complete previous ledger without DDL or replacement entries (2.003895ms)
+✔ mixed previous and oldest unambiguous prefixes execute only the missing suffix (5.068342ms)
+✔ actual runner model refuses ambiguous, gapped or changed history before pending DDL (7.509219ms)
+✔ actual runner model rolls back DDL when the ledger write fails (1.557666ms)
+✔ an unrelated AgentKit ledger addition from 79 to 80 neither authorizes nor aliases scope DDL (4.200637ms)
+✔ actual runner model retains both DDL and ledger after lost COMMIT response; retry does not repeat it (3.389813ms)
+ℹ tests 55
+ℹ suites 0
+ℹ pass 55
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 355.371768
+
+> next-app@0.0.1 check:factory /vercel/sandbox/mikka-computer-events-main-a18-root
+> node scripts/check-factory.mjs
+
+factory: mikka (1 repositories, 1 runners, digest 5d6471b07f847683d43313aa54bc48d3ee9ac02fdf9cc2a10142cac7f962743f)
+
+> next-app@0.0.1 lint:ui /vercel/sandbox/mikka-computer-events-main-a18-root
+> node scripts/lint-ui.mjs
+
+
+UI policy: 2470 business files, 0 errors; 286 component-library files excluded (no source verification).
+Interaction policy: 460 files, including downloaded business blocks; only UI/ReUI primitives excluded.
+{}

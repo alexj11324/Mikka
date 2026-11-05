@@ -1,0 +1,14 @@
+✔ cursor pages preserve bigint precision and reject regressions, non-progressing continuations and oversized batches (1.062948ms)
+✔ one shared feed drains bounded pages, then reads only after invalidation and resumes its cursor on remount (10.609197ms)
+✔ a burst during an in-flight read coalesces into one catch-up and never fetches concurrently (3.568906ms)
+✔ hidden tabs fetch nothing, abort an active read and ignore its late result before foreground catch-up (1.41191ms)
+✔ failed reads retry at 60 seconds, a notification fetches sooner, and hiding cancels retry (1.716572ms)
+✔ a required page refresh aborts data reads and visibility or new subscribers cannot restart them (0.940154ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 288.661825

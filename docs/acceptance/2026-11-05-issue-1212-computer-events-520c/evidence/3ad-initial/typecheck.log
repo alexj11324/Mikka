@@ -1,0 +1,7 @@
+
+> next-app@0.0.1 typecheck /vercel/sandbox/mikka-computer-events-main-a18-root
+> tsrs --noEmit
+
+lib/live/pending-actions.db.test.ts(171,72): error TS18046: 'a.events' is of type 'unknown'.
+lib/live/pending-actions.db.test.ts(171,103): error TS18046: 'b.events' is of type 'unknown'.
+ ELIFECYCLE  Command failed with exit code 2.
