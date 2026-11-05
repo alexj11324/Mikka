@@ -312,6 +312,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const dispatch = createFactoryDispatch(pool, factory, (tx, owner, input, bot, context) => queueFactoryRun(tx, owner, input, bot, context))
     // Source-pin admission is independent of the existing difficulty-routing toggle.
     await order.changeOrder(pool, scope, { kind: 'autoRouting', enabled: false })
+    let taskNumber = 1225
     try {
       for (const [pin, offered, expected] of [
         ['default', undefined, 'default'], ['default', review.id, 'default'],
@@ -319,6 +320,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
         [undefined, 'default', null],
       ] as const) {
         const taskIssue = await seedIssue(pool, scope.ownerId)
+        await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [taskIssue, JSON.stringify({ type: 'doc', attrs: { mikka: { number: taskNumber++ } }, content: [] })])
         const receipt = await recordPersonalSubmission(db, scope.ownerId, 'Run this task with the default Profile.', { botId, submissionId: randomUUID(), ...(pin ? { profileId: pin } : {}) })
         const routed = await factory.route(scope.ownerId, { issueId: taskIssue, sourceEventId: receipt.eventId, eventId: randomUUID(), rationale: 'Task-form Profile admission fixture' })
         const input = { binding: factoryBinding(routed.task), agentId: agents.codex, deviceRepoId: repoId, ...(offered ? { profileId: offered } : {}) }
