@@ -1,11 +1,11 @@
-export const LIVE_KINDS = ['thread_list', 'task_run_list', 'bot_chat_list', 'device_list', 'bot_chat', 'issue_list', 'bot_list', 'group_list', 'workspace_settings', 'computer_state', 'approved_writes', 'approved_write', 'pending_actions', 'factory_task', 'factory_issue', 'issue_document', 'artifact', 'issue_members', 'issue_relations', 'issue_threads', 'thread', 'run', 'coordinator_session', 'model_settings', 'group_chat', 'hosted_billing', 'pull_request_status', 'subagent_events'] as const
+export const LIVE_KINDS = ['thread_list', 'task_run_list', 'bot_chat_list', 'device_list', 'bot_chat', 'issue_list', 'bot_list', 'group_list', 'workspace_settings', 'computer_state', 'approved_writes', 'approved_write', 'pending_actions', 'factory_task', 'factory_issue', 'issue_document', 'artifact', 'issue_members', 'issue_relations', 'issue_threads', 'thread', 'run', 'coordinator_session', 'model_settings', 'group_chat', 'hosted_billing', 'pull_request_status', 'subagent_events', 'project_map'] as const
 export type LiveKind = typeof LIVE_KINDS[number]
 /** `rev` is a post-commit counter of this key (lib/live/revisions.ts), never content. */
 export type LiveInvalidation = { kind: LiveKind; id: string; rev?: number }
 export const LIVE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export const LIVE_CHANNEL = /^[a-f0-9]{64}$/
 /** Kinds whose pushes carry a revision. A reader of one returns the same counter. */
-export const LIVE_REVISION_KINDS = ['bot_chat', 'bot_chat_list', 'issue_list', 'thread', 'run', 'task_run_list', 'group_chat', 'thread_list'] as const satisfies readonly LiveKind[]
+export const LIVE_REVISION_KINDS = ['bot_chat', 'bot_chat_list', 'issue_list', 'thread', 'run', 'task_run_list', 'group_chat', 'thread_list', 'project_map'] as const satisfies readonly LiveKind[]
 export type LiveRevisionKind = typeof LIVE_REVISION_KINDS[number]
 export const isLiveRevisionKind = (kind: LiveKind): kind is LiveRevisionKind => (LIVE_REVISION_KINDS as readonly LiveKind[]).includes(kind)
 /** Version 2 sockets ask with this query parameter; version 1 sockets get only `{kind, id}`. */

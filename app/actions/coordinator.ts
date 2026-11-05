@@ -72,6 +72,10 @@ async function ownBot(user: Parameters<typeof openChatBotId>[0], botId: string |
 
 /** The person's chat with their Coordinator, or with one of their bots: every bot runs on the same harness. */
 export async function getCoordinatorChat(botId: string | null = null): Promise<CoordinatorChat> {
+  return withDatabaseOperation('/actions/coordinator/chat', () => readFullChat(botId))
+}
+
+async function readFullChat(botId: string | null): Promise<CoordinatorChat> {
   const user = await getUser()
   const userId = user.id
   const bot = await ownBot(user, botId)
@@ -146,9 +150,11 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
 /** A bounded older page overlaps the first rendered item, preserving multi-step reply grouping. */
 export async function coordinatorHistory(botId: string | null, through: number): Promise<ChatView> {
   z.number().int().min(0).parse(through)
-  const user = await getUser()
-  const bot = await ownBot(user, botId)
-  return chatView(user.id, 200, bot.id, { through })
+  return withDatabaseOperation('/actions/coordinator/history', async () => {
+    const user = await getUser()
+    const bot = await ownBot(user, botId)
+    return chatView(user.id, 200, bot.id, { through })
+  })
 }
 
 const quoteSchema = z.object({
@@ -198,6 +204,10 @@ export async function botChatSummaries(): Promise<Record<string, BotChatSummary>
 
 /** Same owner-wide summaries, including the actual working-state deadline. */
 export async function pollBotChatSummaries() {
+  return withDatabaseOperation('/actions/coordinator/summaries', readBotChatSummaries)
+}
+
+async function readBotChatSummaries() {
   const ownerId = await getUserId()
   const begun = await beginOwnerListRead(ownerId, ['bot_chat_list'])
   const snapshot = await chatStore.botChatSnapshot(ownerId)

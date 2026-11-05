@@ -2,13 +2,13 @@
 
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
-import useSWR, { useSWRConfig } from 'swr'
+import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { getIssueThread } from '@/app/actions/agents'
 import { getArtifact } from '@/app/actions/artifacts'
 import { listBots } from '@/app/actions/bots'
-import { readCachedCoordinatorChat } from '@/lib/coordinator/chat-read-client'
 import { botKeys, chatKeys, threadKeys } from '@/lib/swr/keys'
+import type { CoordinatorChat as CoordinatorChatView } from '@/app/actions/coordinator'
 import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
 import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -37,7 +37,6 @@ const openIssue = (id: string) => navigate({ issue: id })
  * OAuth agent, a Coordinator run) opens beside the Coordinator chat.
  */
 export function ArtifactWindow({ artifactId }: { artifactId: string }) {
-  const { cache } = useSWRConfig()
   const tNav = useTranslations('Nav')
   const tThreads = useTranslations('IssueThreads')
   const openThreadId = useSearchParams().get('thread')
@@ -56,7 +55,9 @@ export function ArtifactWindow({ artifactId }: { artifactId: string }) {
   const bot = botId ? bots?.find(item => item.id === botId && !item.coordinator) : undefined
   // The chat beside it underlines what it already quoted; the same key as that chat, so one request.
   const chatBotId = bot?.id ?? null
-  const { data: chat } = useSWR(detail && !threadMade ? chatKeys.detail(chatBotId) : null, () => readCachedCoordinatorChat(cache, chatBotId))
+  // Read only from the cache: the CoordinatorChat embedded below reads this key with its own
+  // incremental fetcher (a first page, then only what changed). This window never reads the chat itself.
+  const { data: chat } = useSWR<CoordinatorChatView>(detail && !threadMade ? chatKeys.detail(chatBotId) : null, null)
   const quotes = chat?.items.flatMap(item => item.quote ? [item.quote] : []) ?? []
   const shared = { artifactId, onArtifactChange: openArtifact, onClose: closeArtifact }
   // Until the artifact says where it came from (or when it is not the person's), the reader shows its own loading or error.

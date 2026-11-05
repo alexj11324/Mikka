@@ -9,8 +9,9 @@ not create product roles or a separate authentication system.
 
 The adapter supports one disposable loopback PostgreSQL database, in CI or in
 local test-account mode (below). Application, workspace and pool metadata must
-all address that exact database. A multi-database or deployed Preview adapter
+all address that exact database. A multi-database or deployed-origin adapter
 needs independent registration and approval; the current adapter rejects it.
+Mikka's branches have no Vercel Preview to point it at.
 A production deployment is not supported.
 
 The owning harness creates the disposable resource and initializes the normal

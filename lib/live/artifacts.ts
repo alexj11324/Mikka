@@ -20,6 +20,7 @@ export async function artifactTargets(database: Database, workspaceDatabase: Dat
 /** A new version, a title, a share link or deletion. Sent after COMMIT; a rollback sends nothing. */
 export async function artifactChanged(executor: object, ownerId: string, artifactId: string) {
   if (!liveGatewayConfig(process.env)) return
+  await (await import('./project-map')).projectMapArtifactChanged(executor, artifactId)
   const { scheduleLive, sendLiveInvalidations } = await import('./notify')
   afterDatabaseCommit(executor, `artifact:${artifactId}`, () => scheduleLive(async () => {
     const { pool, withoutDatabaseClient } = await import('../db/request-scope')

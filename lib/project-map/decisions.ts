@@ -206,6 +206,7 @@ export async function recordProjectDecision(actor: DecisionActor, raw: RecordDec
         locator: source.locator, relation: input.provenance === 'inferred' ? 'inferred' as const : source.relation,
         normalizedKey: source.normalizedKey, verifiedAt: now, createdAt: now,
       })))
+      await (await import('@/lib/live/project-map')).projectMapChanged(tx, scope.projectId)
       return { decisionId: id, duplicate: false, recordedAt: now.toISOString(), projectId: scope.projectId, workspaceId }
     })
     return result

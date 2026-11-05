@@ -63,9 +63,9 @@ const EDGE_FADE = 24;
 const REVEAL_MARGIN = EDGE_FADE + 8;
 // The color behind each variant's tabs, which the edge fades blend into.
 const fadeColors: Record<TabsVariant, string> = {
-  pill: "bg-surface",
-  segment: "bg-surface",
-  underline: "bg-background",
+  pill: "bg-default",
+  segment: "bg-default",
+  underline: "bg-surface",
 };
 
 /** The same color at zero alpha, so a gradient fades without graying. */
@@ -91,8 +91,8 @@ function fadeStyle(color: string, toward: "left" | "right") {
 }
 
 const surfaces: Record<TabsVariant, string> = {
-  pill: "rounded-full bg-surface",
-  segment: "rounded-lg bg-surface",
+  pill: "rounded-full bg-default",
+  segment: "rounded-lg bg-default",
   underline: "",
 };
 const lists: Record<TabsVariant, string> = {

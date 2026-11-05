@@ -469,6 +469,35 @@ test('host-qualified blocked review retries once and adopts the bound running at
   } finally { globalThis.fetch = original }
 })
 
+test('unsubmitted review confirms its Owner response when list props omit the detailed route', async () => {
+  const current = blockedCandidate()
+  assert.equal('route' in current, false, 'the production task-list summary deliberately omits route')
+  detail = { ...(detail as object), task: { ...current, route: { flowVersion: 2 } },
+    checkSubmissionRecovery: { binding: { taskId: current.id, revision: current.revision } } }
+  await pane(current)
+  const retry = button('重新审阅')
+  assert.ok(retry)
+  // Keep the original summary/detail visible after the successful POST. This
+  // exposes a false unconfirmed result instead of hiding it behind fresh props.
+  refreshFails = true
+  const sent: Record<string, unknown>[] = []
+  const original = globalThis.fetch
+  globalThis.fetch = (async (url, options) => {
+    assert.equal(String(url).endsWith('/api/factory/tasks/t1'), true)
+    assert.equal(options?.method, 'POST')
+    sent.push(JSON.parse(String(options?.body)))
+    return Response.json(startRecoveryReceipt(current))
+  }) as typeof fetch
+  try {
+    await act(async () => { retry.click(); retry.click() })
+    assert.equal(sent.length, 1)
+    assert.deepEqual(sent[0].binding, { taskId: current.id, revision: current.revision })
+    assert.equal(sent[0].action, 'retry')
+    assert.equal(detailReloads, 1); assert.equal(ledgerReloads, 1)
+    assert.doesNotMatch(container.textContent ?? '', /重试未确认|重试未完成|已验收/)
+  } finally { globalThis.fetch = original }
+})
+
 test('an unknown start recovery preserves its event across remounts and waits for an explicit retry', async () => {
   const current = qualifiedBlockedCandidate()
   const scope = `check-start-retry-${crypto.randomUUID()}`

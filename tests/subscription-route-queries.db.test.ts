@@ -65,7 +65,7 @@ test('a cloud run\'s subscription context read stays within its statement budget
     for (const table of ['computer_run_bindings', 'thread_machines']) await pool.query(`DELETE FROM ${table} WHERE "ownerId"=$1`, [userId])
     await pool.query('DELETE FROM agent_runs WHERE "userId"=$1', [userId])
     await pool.query('DELETE FROM user_e2b_keys WHERE "userId"=$1', [userId])
-    for (const table of ['byos_bindings', 'byos_connections', 'bot_desktops', 'cloud_machines']) await pool.query(`DELETE FROM ${table} WHERE "ownerId"=$1`, [userId])
+    for (const table of ['byos_bindings', 'byos_connections', 'bot_cloud_runtimes', 'bot_desktops', 'cloud_machines']) await pool.query(`DELETE FROM ${table} WHERE "ownerId"=$1`, [userId])
     for (const table of ['device_tokens', 'agents', 'device_repos']) await pool.query(`DELETE FROM ${table} WHERE "userId"=$1`, [userId])
     await pool.query('DELETE FROM devices WHERE "ownerId"=$1', [userId])
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
@@ -86,6 +86,8 @@ test('a cloud run\'s subscription context read stays within its statement budget
   await pool.query('INSERT INTO user_e2b_keys("userId",ciphertext,iv,"keyVersion",last4) VALUES($1,$2,$3,$4,\'test\')', [userId, sealed.ciphertext, sealed.iv, sealed.keyVersion])
   await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,'running',true)`, [workspaceId, userId, randomUUID(), `synthetic-${randomUUID()}`, deviceId])
   await pool.query('INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)', [botId, workspaceId, userId])
+  // Ordinary fresh tasks use the Bot's recorded executor identity; a parent Agent alone is not a grant.
+  await pool.query('INSERT INTO bot_cloud_runtimes ("botId","workspaceId","ownerId",harness,"agentId","repoId") VALUES ($1,$2,$3,$4,$5,$6)', [botId, workspaceId, userId, 'claude_code', agentId, repoId])
   await bindAgentToConnection(pool, { ownerId: userId, workspaceId }, agentId, 'claude_code', connectionId, model)
   const queued = await queueCloudRun(pool, { userId, workspaceId }, { botId, issueId, agentId, deviceRepoId: repoId, title: 'Read', body: '', model, readOnly: true })
   const worker = await threadMachines.start({ userId, workspaceId }, queued.runId)

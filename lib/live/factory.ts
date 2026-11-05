@@ -78,6 +78,7 @@ export async function factoryChanged(tx: PoolClient, task: TaskIdentity) {
   if (!liveGatewayConfig(process.env)) return
   const key = `factory_task:${task.id}`
   if (hasCommitEffect(tx, key)) return
+  await (await import('./project-map')).projectMapIssueChanged(tx, task.issueId)
   afterCommit(tx, key, await sender(task.id, task.userId))
 }
 
@@ -85,4 +86,6 @@ export async function factoryChanged(tx: PoolClient, task: TaskIdentity) {
 export async function factoryCommitted(taskId: string) {
   if (!liveGatewayConfig(process.env)) return
   ;(await sender(taskId, null))()
+  const { pool } = await import('../db/request-scope')
+  await (await import('./project-map')).projectMapTaskChanged(pool, taskId)
 }

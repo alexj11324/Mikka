@@ -143,7 +143,7 @@ export function AgentActivity({
   const offset = useSharedValue(0);
   const turn = useSharedValue(expanded ? 1 : 0);
   const { color: muted } = useResolveClassNames("text-muted");
-  const { backgroundColor: page } = useResolveClassNames("bg-background");
+  const { backgroundColor: page } = useResolveClassNames("bg-surface");
 
   const setOpen = (next: boolean) => {
     if (controlledOpen === undefined) setInternalOpen(next);

@@ -132,4 +132,4 @@ There is no new login method or approval UI in this backend delivery.
 No migration was executed against a developer, Preview or production database.
 The R-66 card follows the review frame linked in `design/decisions.md`, which is
 still **待 Alex 确认**. `RunSource.pullRequests` supplies owner-filtered output data.
-Real fixed-Preview screenshots and acceptance remain part of item 6.
+Real screenshots (local production build) and acceptance remain part of item 6.

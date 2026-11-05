@@ -186,6 +186,8 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
           CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,"userId" text,kind text);
           CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,status text);
           CREATE TABLE mikka_team_issues ("issueId" uuid,"workspaceId" uuid);
+          CREATE TABLE workspace_projects (id uuid PRIMARY KEY,"userId" text NOT NULL,"issueIds" jsonb NOT NULL DEFAULT '[]'::jsonb);
+          CREATE TABLE mikka_team_projects ("projectId" uuid NOT NULL,"workspaceId" uuid NOT NULL,PRIMARY KEY("projectId","workspaceId"));
         `);
         const home = randomUUID();
         await pool.query(`INSERT INTO mikka_workspaces VALUES ($1,$2,'personal')`, [home, actor.userId]);

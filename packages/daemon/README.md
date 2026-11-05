@@ -27,7 +27,7 @@ mikka daemon
 
 Login prints a browser confirmation link and a short code. The daemon
 saves a device credential, never the browser session. The default server is
-`https://app.aspectlylabs.com/mikka`. For a Preview or self-hosted server, use
+`https://app.aspectlylabs.com/mikka`. For a local or self-hosted server, use
 the full application URL (including its base path) in both commands:
 
 ```sh

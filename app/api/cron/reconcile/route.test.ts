@@ -18,7 +18,7 @@ stub('../../../../lib/chat-attachments/store.ts', { cleanupChatFiles: async () =
 stub('../../../../lib/workspace-db.ts', { workspacePool: {} })
 stub('../../../../lib/audit/delivery.ts', { deliverWorkspaceAudits: async () => { ran.push('delivery'); return { delivered: 1, failed: 0 } } })
 stub('../../../../lib/audit/retention.ts', { sweepAuditRetention: async () => { ran.push('retention'); return { scanned: 1, deleted: 0, pending: 0 } } })
-stub('../../../../lib/due-timer.ts', { armDueTimer: async (kind: string) => { ran.push(`arm:${kind}`) } })
+stub('../../../../lib/due-timer.ts', { armDueTimer: async (kind: string) => { ran.push(`arm:${kind}`) }, replaceStaleDueTimers: async () => {} })
 mock.module('next/server', { namedExports: { after: () => {} } })
 let GET: typeof import('./route')['GET']
 before(async () => { ({ GET } = await import('./route')) })

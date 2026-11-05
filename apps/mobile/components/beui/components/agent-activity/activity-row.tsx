@@ -143,7 +143,7 @@ function ResultRow({
           accessibilityRole="link"
           onPress={() => onOpenResult(result)}
           style={styles.resultRow}
-          className="rounded-md px-1.5 py-1 active:bg-surface"
+          className="rounded-md px-1.5 py-1 active:bg-default"
         >
           {content}
         </Pressable>
@@ -206,7 +206,7 @@ function Chip({ children, grow }: { children: ReactNode; grow?: boolean }) {
   return (
     <View
       style={grow ? styles.flex : styles.shrink}
-      className="rounded-lg bg-surface px-2.5 py-1"
+      className="rounded-lg bg-default px-2.5 py-1"
     >
       {textOf(children, "font-mono text-xs text-muted", 1)}
     </View>

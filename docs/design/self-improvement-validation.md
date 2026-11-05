@@ -20,7 +20,7 @@ automatically synchronized and read back as [Linear MIK-103](https://linear.app/
 | Static lint | Targeted oxlint with denied warnings; diff whitespace check | Source hygiene |
 | Remote CI | PR exact-head checks | Full typecheck/build/browser regression plus dedicated PG17 suite |
 | Independent review | Read-only reviewer of this candidate | Source correctness; not Harness acceptance |
-| Fixed Preview, real OAuth/Harness | Pending parent integration | Required before system acceptance |
+| Pre-merge production build, real OAuth/Harness | Pending parent integration | Required before system acceptance |
 | Production user flow and PR video | Pending parent release coordination | Required before user-facing completion |
 
 PG/HTTP checks exercise ten concurrent identical feedback submissions, conflicting

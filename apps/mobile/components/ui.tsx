@@ -202,13 +202,13 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
             {accessory}
             <View style={{ flex: 1 }} />
             {onStop && empty && !sending ? (
-              <Pressable accessibilityRole="button" accessibilityLabel="停止" onPress={() => { tap(); onStop() }} style={styles.send}>
-                <Square size={14} color={colors.onAccent} fill={colors.onAccent} strokeWidth={2.4} />
+              <Pressable accessibilityRole="button" accessibilityLabel="停止" hitSlop={4} onPress={() => { tap(); onStop() }} style={styles.send}>
+                <Square size={12} color={colors.onAccent} fill={colors.onAccent} strokeWidth={2.4} />
               </Pressable>
             ) : (
-              <Pressable accessibilityRole="button" accessibilityLabel="发送" accessibilityState={{ disabled: sendBlocked, busy: sending }} aria-disabled={Platform.OS === 'web' ? sendBlocked : undefined} aria-busy={Platform.OS === 'web' ? sending : undefined} onPress={() => void send()} disabled={sendBlocked}
+              <Pressable accessibilityRole="button" accessibilityLabel="发送" hitSlop={4} accessibilityState={{ disabled: sendBlocked, busy: sending }} aria-disabled={Platform.OS === 'web' ? sendBlocked : undefined} aria-busy={Platform.OS === 'web' ? sending : undefined} onPress={() => void send()} disabled={sendBlocked}
                 style={[styles.send, sendBlocked && { backgroundColor: colors.tertiary }]}>
-                <ArrowUp size={20} color={colors.onAccent} strokeWidth={2.4} />
+                <ArrowUp size={17} color={colors.onAccent} strokeWidth={2.4} />
               </Pressable>
             )}
           </View>
@@ -286,7 +286,8 @@ const styles = StyleSheet.create({
   removeMark: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   attachmentAction: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   problem: { fontSize: 13, color: colors.danger },
-  send: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accentFill, alignItems: 'center', justifyContent: 'center' },
+  // 36 points, as the Claude and ChatGPT apps' send button; its hitSlop keeps the 44-point target.
+  send: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.accentFill, alignItems: 'center', justifyContent: 'center', margin: 4 },
   groupLabel: { fontSize: 13, color: colors.secondary, marginLeft: 16, marginBottom: 7 },
   group: { backgroundColor: colors.surface, borderRadius: 14, overflow: 'hidden' },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginLeft: 16 },

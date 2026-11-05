@@ -5,6 +5,7 @@
   through a GitHub issue to one agent, which owns it end to end and never
   pushes directly to main.
 - Rule: — (process, not product)
+- Superseded in part by: [2026-11-05-1632](2026-11-05-1632-no-vercel-preview.md) (no Vercel Preview; verify before merge in CI or a local/Docker production build with an isolated database)
 - Replaces:
   - [2026-11-01-2225-api-cli-acceptance-and-backend-owner](2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)
     item 3, "Backend owner. Backend changes (server, API, database, daemon)
