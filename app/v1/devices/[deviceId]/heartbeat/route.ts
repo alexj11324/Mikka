@@ -16,6 +16,7 @@ import { factoryLifecycleEnabled } from '@/lib/factory/runtime'
 import { factoryDispatchRecovery } from '@/lib/factory/dispatch-recovery-server'
 import { factoryDeviceOnline } from '@/lib/factory/dispatch-recovery'
 import { daemonVersions, daemonRequestTooOld } from '@/lib/daemon-release'
+import { ownerListChanged } from '@/lib/live/lists'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,6 +74,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   // device comes back online (registration checks them too), not on every beat.
   if (prior && (prior.harnessesChanged || !isDeviceOnline(prior.lastSeenAt, now.getTime()))) await ensureDeviceAgents(pool, caller.userId, deviceId, harnesses, { reported: true })
   if (prior?.harnessesChanged) await db.execute(sql`UPDATE devices SET harnesses=${JSON.stringify(harnesses)}::jsonb WHERE id=${deviceId}`)
+  // The device list shows presence and harnesses: an ordinary beat changes neither, coming back online or a new harness does.
+  if (prior && (prior.harnessesChanged || !isDeviceOnline(prior.lastSeenAt, now.getTime()))) await ownerListChanged(db, caller.userId, ['device_list'])
   const runIds = parsed.data.runs.map(run => run.runId)
   // An idle device holds no leases: nothing to renew or revoke.
   const selected = runIds.length

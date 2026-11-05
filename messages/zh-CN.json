@@ -1908,6 +1908,10 @@
       "connecting": "连接中",
       "reconnect": "重新连接",
       "disconnect": "断开连接",
+      "refreshModels": "刷新模型",
+      "refreshingModels": "正在刷新 {label} 的模型…",
+      "modelsRefreshed": "{label}：{count, plural, other {# 个模型}}",
+      "modelsRefreshFailed": "{label} 的模型未能刷新",
       "callbackLabel": "授权后的地址",
       "finish": "完成连接",
       "expired": "{provider} 授权已过期",
@@ -2415,25 +2419,29 @@
       }
     },
     "subscriptionShare": {
-      "heading": "这个工作区",
-      "blocked": "管理员已关闭",
-      "others": "分享给团队成员",
+      "heading": "团队共享",
+      "blocked": "管理员不允许分享订阅",
+      "others": "分享我的订阅给团队成员",
       "othersTitle": "分享 {name} 给团队成员？",
       "othersUsage": "团队成员可以用它跑自己的 Bot，用量算在你的订阅额度上。",
       "othersRuntime": "任务运行时，凭据会临时放到跑任务的那台电脑上，可能是成员自己的电脑；任务结束后删除。",
       "othersTrust": "只分享给你信任的人。部分服务商的条款不允许共享账号，请自行确认。",
       "othersConfirm": "分享",
-      "othersOn": "已分享给团队成员 · 运行时凭据会临时放到成员的电脑上",
+      "othersOn": "已分享 {names} 订阅 · 成员跑任务时凭据会临时放到他们的电脑上",
       "subscriptionName": "{provider} 订阅",
       "ownFallback": "我的订阅",
       "listSeparator": "、",
       "cancel": "取消",
-      "available": "{name} 的 {provider} 订阅",
-      "availableState": "可用",
+      "available": "{name} 分享的 {provider} 订阅",
+      "availableState": "你的任务也能用",
       "provider": {
         "claude": "Claude",
         "codex": "ChatGPT"
-      }
+      },
+      "othersHint": "{workspace}的成员也能用你的 {names} 订阅跑任务，用量算在你的额度上",
+      "othersHintAny": "{workspace}的成员也能用你的订阅跑任务，用量算在你的额度上",
+      "othersOnAny": "已分享你的订阅 · 成员跑任务时凭据会临时放到他们的电脑上",
+      "thisWorkspace": "这个工作区"
     },
     "archivedBots": {
       "heading": "已暂停的 Bot",
@@ -2578,7 +2586,7 @@
       "removeTitle": "删除 {name}？",
       "othersUsage": "团队成员可以用它跑自己的 Bot，用量算在你的 API 账单上。",
       "afterQuota": "订阅额度用完后，自动改用 API Key",
-      "afterQuotaBilling": "会按 API 服务商的价格计费",
+      "afterQuotaBilling": "同一个模型改用你的 API Key 继续跑，按服务商的价格付费",
       "sectionTitle": "API Key",
       "none": "还没有 API Key",
       "loading": "正在读取 API Key…",
@@ -2603,14 +2611,15 @@
       "location": "运行位置",
       "local": "本地",
       "cloud": "云端",
-      "orderCloud": "依次用：云端 → 服务器 → 电脑",
-      "orderLocal": "依次用：服务器 → 电脑",
-      "first": "会先用 {place}",
-      "noKeyFirst": "没有 E2B Key，会先用 {place}",
-      "nowhere": "没有能跑的位置",
+      "orderCloud": "任务先在云端跑，云端不行就换服务器，再不行用你的电脑",
+      "orderLocal": "任务先在你的服务器跑，没有服务器就用你的电脑",
+      "first": "现在会先用 {place}",
+      "noKeyFirst": "云端还没填 E2B Key，现在会先用 {place}",
+      "nowhere": "云端、服务器和电脑现在都跑不了",
       "add": "添加模型",
       "addCount": "添加 {count} 个",
       "empty": "还没有优先使用的模型",
+      "emptyAgent": "{agent} 还没有优先使用的模型",
       "remove": "移出列表",
       "ready": "可用",
       "quotaUntil": "额度用完 · {time} 恢复",
@@ -2626,7 +2635,9 @@
         "quota": "额度用完",
         "expired": "需要重新连接",
         "paused": "订阅已停用",
-        "missing": "已不可用",
+        "missing": "未连接或不可用",
+        "removed": "已移除",
+        "modelGone": "账号已不提供这个模型",
         "keyRefused": "Key 无效或已被撤销",
         "balance": "余额不足",
         "providerUnavailable": "服务商暂时不可用",
@@ -2667,9 +2678,8 @@
       "e2bKeyReplace": "更换",
       "agentSection": "Agent",
       "preferredAgent": "优先使用的 Agent",
-      "preferredAgentHint": "两种 Agent 都能跑的模型先用它",
+      "preferredAgentHint": "任务先交给它，按它的模型顺序选；它跑不了就换另一个",
       "preferredMark": "优先",
-      "onlyAgent": "只能用 {agent}",
       "bothAgents": "两种 Agent 都能跑",
       "agentMenu": "{model} 的 Agent：{agent}",
       "emptyNoCredential": "还没有订阅或 API Key",
@@ -2685,7 +2695,15 @@
       "openApiKey": "查看 API Key",
       "openSubscription": "查看订阅",
       "description": "派发给 Agent 的任务从这里选模型",
-      "autoRouting": "按任务难度自动选模型"
+      "autoRouting": "按任务难度自动选模型",
+      "nowhereLocal": "服务器和电脑现在都跑不了",
+      "e2bKeyHint": "云端跑任务用",
+      "clauseSeparator": "；",
+      "emptyUseOther": "{agent} 没有能用的模型，任务会交给 {other}",
+      "switchAgent": "改用 {agent}",
+      "backup": "{agent} 列表作为后备 · {count, plural, other {# 个模型}}",
+      "backupList": "{agent} 后备列表",
+      "billedByProvider": "按服务商计费"
     },
     "loadingPage": "正在加载设置",
     "modelScope": {
@@ -2756,7 +2774,12 @@
       "revision": "版本",
       "selectedBy": "选择方式",
       "selectionReason": "选择原因",
-      "selectionReasons": { "capability_fit": "能力最匹配这项工作", "stage_fit": "职责最匹配这个阶段", "only_suitable": "唯一能力合适的 Agent 配置", "other": "按任务能力选择" },
+      "selectionReasons": {
+        "capability_fit": "能力最匹配这项工作",
+        "stage_fit": "职责最匹配这个阶段",
+        "only_suitable": "唯一能力合适的 Agent 配置",
+        "other": "按任务能力选择"
+      },
       "explicitReason": "使用你为这次任务指定的 Agent 配置",
       "defaultReason": "继承优先使用的模型",
       "sources": {
@@ -3859,7 +3882,8 @@
         "no_selection": "没有选出合适模型，沿用模型列表顺序",
         "escalated": "原模型未能完成任务，已升级重试"
       }
-    }
+    },
+    "errorDetails": "详情"
   },
   "Computer": {
     "status": {
@@ -4888,5 +4912,36 @@
     "continued": "新的要求已交给同一任务；Factory 将按最新要求执行、独立审查并验证。",
     "created": "任务已交给 Factory，后续由我统一汇报执行、独立审查和验证结果。",
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
+  },
+  "RunErrors": {
+    "subscription_local_runtime_unavailable": {
+      "default": "本机订阅运行无法启动",
+      "assignment_invalid": "线程的订阅设置已失效，请重新选择模型",
+      "run_closed": "线程已停止，订阅运行未启动",
+      "lease_refused": "服务器拒绝了订阅授权，请在「模型与订阅」中检查订阅连接",
+      "lease_invalid": "订阅授权已过期或与线程不匹配",
+      "model_mismatch": "订阅不提供线程所选的模型，请换一个模型",
+      "account_changed": "订阅账号在运行中已切换，运行已停止",
+      "env_not_clean": "本机运行环境不符合订阅运行要求，请更新 Mikka",
+      "adapter_start_failed": "Agent 无法用订阅启动"
+    },
+    "subscription_hosted_runtime_unavailable": {
+      "default": "云电脑上的运行无法启动",
+      "runner_missing": "这台电脑不支持订阅运行，请更新 Mikka",
+      "host_unsupported": "云电脑环境不支持此运行",
+      "cli_missing": "云电脑上没有所需的 Agent",
+      "assignment_invalid": "线程的模型或订阅设置已失效，请重新选择模型",
+      "resume_mismatch": "原会话无法继续",
+      "run_closed": "线程已停止，运行未启动",
+      "context_changed": "订阅在启动期间已变化，运行已停止",
+      "workspace_invalid": "云电脑上的工作区无效",
+      "ledger_mismatch": "原会话记录与线程不匹配",
+      "computer_unavailable": "此运行无法操作电脑",
+      "env_not_clean": "云电脑运行环境含有不允许的变量",
+      "credential_mismatch": "模型凭据与运行不匹配",
+      "session_mismatch": "Agent 没有回到原会话",
+      "adapter_start_failed": "Agent 无法在云电脑上启动",
+      "cleanup_failed": "Agent 未启动，清理也未完成"
+    }
   }
 }

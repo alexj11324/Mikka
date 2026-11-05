@@ -1,19 +1,31 @@
 'use client'
 
-import useSWR from 'swr'
+import useSWR, { unstable_serialize } from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { ChevronRight } from 'lucide-react'
-import { listIssueThreads } from '@/app/actions/agents'
+import { pollIssueThreads } from '@/app/actions/agents'
 import { threadQuestionView, threadTime, type IssueThread } from '@/lib/issue-threads'
-import { runListRefreshInterval } from '@/lib/issue-run-conversation'
+import { useLiveKey } from '@/hooks/use-live-key'
+import { UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { BotAvatar, COORDINATOR_AVATAR, colorFor } from '@/components/nav/bot-avatar'
 import { Button } from '@/components/ui/button'
 import { ThreadStatus, ThreadStatusIcon } from './thread-status-icon'
 import { cn } from '@/lib/utils'
 import { InlineLoadError } from '@/components/load-error'
+import { useRunErrorText } from './run-error-text'
 
+/** The SWR key of an issue's thread list; it holds `{ threads, live }`. */
+export const issueThreadsKey = (issueId: string) => ['issue-threads', issueId] as const
+export type IssueThreadsRead = Awaited<ReturnType<typeof pollIssueThreads>>
+
+/** No timer reads the list (#1212): a run change on this issue, a teammate's included, pushes
+ * `issue_threads` to every member who can see it. While the channel is down it is read once a minute. */
 export function useIssueThreads(issueId: string) {
-  return useSWR(['issue-threads', issueId], () => listIssueThreads(issueId), { refreshInterval: threads => runListRefreshInterval(threads?.map(threadQuestionView)), revalidateOnReconnect: true })
+  const key = issueThreadsKey(issueId)
+  const result = useSWR(key, () => pollIssueThreads(issueId), { revalidateOnReconnect: true })
+  const scope = result.data?.live.workspaceId ?? null
+  useLiveKey('issue_threads', scope ? issueId : UNRESOLVED_LIST_SCOPE, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
+  return { ...result, data: result.data?.threads }
 }
 
 export function harnessLabel(harness: string) {
@@ -25,6 +37,7 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
   const t = useTranslations('IssueThreads')
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
+  const runErrorText = useRunErrorText()
   const { data, error, mutate } = useIssueThreads(issueId)
   if (error) return <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
   if (!data?.length) return null
@@ -34,7 +47,8 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
       {data.map(thread => {
         const name = thread.detail?.name ?? (thread.ownerName ? t('ownerThread', { name: thread.ownerName }) : t('hidden'))
         // The bot runs the thread; the coding agent it hands work to is a step inside it, not the runner (R-05).
-        const meta = thread.detail?.summary ?? null
+        // A known failure code shows its words; the code itself stays in the thread's 详情.
+        const meta = runErrorText(thread.detail?.summary ?? null).message
         const view = threadQuestionView(thread)
         const body = <>
           <ThreadStatusIcon status={view.status} outcome={view.outcome} waiting={view.waiting} />

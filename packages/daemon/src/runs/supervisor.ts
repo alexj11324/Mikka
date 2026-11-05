@@ -42,6 +42,7 @@ import { createRunMasker, type RunMasker } from "../secret-mask"
 import { SKILLS_DIR, SKILL_BODY_FILE, skillSlug } from "@mikka/protocol/skill"
 import { runQuestion, runSkillMount, runExecution, runRuntime } from "@mikka/protocol/run"
 import { ProviderFailureError, providerFailureSchema, type ProviderFailure } from "@mikka/protocol/provider-failure"
+import { CodedError } from "@mikka/protocol/coded-error"
 import { runPolicyDigestInput } from "@mikka/protocol/agent-policy"
 import { createHash, randomUUID } from "node:crypto"
 import { join, resolve } from "node:path"
@@ -1481,7 +1482,7 @@ export class RunSupervisor {
             return this.deps.startSubscription!(assignment, { ...options, prompt,
               ...(assignment.requireSessionResume && continueSession ? { continueSession } : {}) })
           })()
-        : (()=>{throw new Error('subscription_hosted_runtime_unavailable')})()
+        : (()=>{throw new CodedError('subscription_hosted_runtime_unavailable', { detail: 'runner_missing' })})()
       : resuming
       ? await adapter.resume(entry.sessionId as string, options)
       : await (async () => {

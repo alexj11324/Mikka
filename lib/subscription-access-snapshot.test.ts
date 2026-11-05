@@ -23,6 +23,22 @@ test('rejects mismatched, hidden, or wrong-version projections without exposing 
   for (const secret of [{secretKey:'other',version:1,secretValue:'private'}, {secretKey:name,version:2,secretValue:'private'}, {secretKey:name,version:1,secretValueHidden:true,secretValue:'private'}]) {
     let calls = 0
     const fetcher: typeof fetch = async () => new Response(JSON.stringify(++calls === 1 ? {accessToken:'workload-token'} : {secret}), {status:200})
-    await assert.rejects(subscriptionAccessSnapshot({...config,fetcher}), /^Error: subscription_access_unavailable$/)
+    // The detail says which check failed; the projection's value never reaches the error.
+    await assert.rejects(subscriptionAccessSnapshot({...config,fetcher}), /^CodedError: subscription_access_unavailable \(secret_invalid\)$/)
+  }
+})
+
+test('says which step failed and keeps the cause by name, never the response body', async () => {
+  const cases: Array<[typeof fetch, string]> = [
+    [async () => { throw new TypeError('fetch failed') }, 'identity_failed'],
+    [(() => { let calls = 0; return async () => ++calls === 1 ? new Response(JSON.stringify({accessToken:'workload-token'}), {status:200}) : new Response('private-body', {status:403}) })(), 'http_refused'],
+    [(() => { let calls = 0; return async () => ++calls === 1 ? new Response(JSON.stringify({accessToken:'workload-token'}), {status:200}) : new Response('private-body', {status:200}) })(), 'body_invalid'],
+  ]
+  for (const [fetcher, detail] of cases) {
+    const error = await subscriptionAccessSnapshot({...config,fetcher}).then(() => null, (failure: unknown) => failure as Error & {code?: string; detail?: string})
+    assert.equal(error?.code, 'subscription_access_unavailable')
+    assert.equal(error?.detail, detail)
+    assert.doesNotMatch(String(error), /private/)
+    if (detail === 'body_invalid') assert.equal(error?.cause, undefined)
   }
 })

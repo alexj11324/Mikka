@@ -18,7 +18,7 @@ mock.module('swr', {
   namedExports: { useSWRConfig: () => ({ mutate: () => {}, cache: new Map() }), unstable_serialize: (key: unknown) => JSON.stringify(key) },
 })
 mock.module('next/dynamic', { defaultExport: () => () => null })
-mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, getIssueThread: async () => null, getThreadChanges: async () => ({ state: 'none' }), sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async () => ({ sent: true }), stopRun: async () => ({}) } })
+mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, pollIssueThreads: async () => null, getIssueThread: async () => null, getThreadChanges: async () => ({ state: 'none' }), sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async () => ({ sent: true }), stopRun: async () => ({}) } })
 mock.module(at('app/actions/artifacts.ts'), { namedExports: { listRunArtifacts: async () => [] } })
 mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: { useThreadAcceptance: () => null, AcceptanceStateBadge: () => null } })
 mock.module(at('components/workspace/factory-acceptance-pane.tsx'), { namedExports: { FactoryAcceptancePane: () => null } })

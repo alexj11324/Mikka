@@ -15,6 +15,7 @@ import type { ArtifactDetail, ArtifactListItem, ArtifactSummary } from '@/lib/ar
 import { issueVisibility } from '@/lib/issue-visibility'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { artifactStorage, getArtifactObject, putArtifactObject } from '@/lib/artifacts/storage'
+import { artifactChanged } from '@/lib/live/artifacts'
 
 // Artifacts in Neon (who, which version, share links) with their files in R2.
 // Every read is scoped to the owner, or to a live share token.
@@ -79,6 +80,7 @@ export async function submitArtifact(submitter: ArtifactSubmitter, input: { titl
     // Version provenance must commit with its bytes and latest pointer. A
     // response interruption must not leave a visible version without its run.
     await recordCoordinatorEvent(tx, artifactSubmittedEvent(submitter, submitted))
+    await artifactChanged(tx, submitter.userId, artifactId)
     return submitted
   })
   if ('error' in result) return result
@@ -210,6 +212,7 @@ export async function createShare(userId: string, artifactId: string): Promise<{
   if (!row) return null
   const token = `${SHARE_PREFIX}${randomBytes(24).toString('base64url')}`
   await db.insert(artifactShares).values({ id: crypto.randomUUID(), artifactId, tokenHash: sha256(token), createdBy: userId })
+  await artifactChanged(db, userId, artifactId)
   return { token }
 }
 
@@ -218,6 +221,7 @@ export async function revokeShares(userId: string, artifactId: string): Promise<
   const revoked = await db.update(artifactShares).set({ revokedAt: new Date() })
     .where(and(eq(artifactShares.artifactId, artifactId), isNull(artifactShares.revokedAt), sql`exists (select 1 from ${artifacts} where ${artifacts.id} = ${artifactShares.artifactId} and ${artifacts.userId} = ${userId})`))
     .returning({ id: artifactShares.id })
+  if (revoked.length) await artifactChanged(db, userId, artifactId)
   return revoked.length
 }
 

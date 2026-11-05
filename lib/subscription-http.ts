@@ -5,6 +5,7 @@ import { WorkerRefusal } from '../packages/daemon/src/subscription-worker-client
 import { noteLogUser } from './request-log'
 import { accountLabel, failedUsage, usageCache } from './subscription-usage'
 import { stopRunsUsingSubscriptions } from './personal-policy'
+import { ownerSettingsChanged } from './live/lists'
 
 const id = z.uuid()
 const input = z.discriminatedUnion('action', [
@@ -27,6 +28,7 @@ export interface SubscriptionHTTPDependencies {
 }
 /** The refusal code a client may see. Worker codes are a fixed snake_case set
  * (packages/subscription-worker/errors.go); anything else stays generic. */
+
 export function refusalCode(error: unknown) {
   if (error instanceof SubscriptionRefusal) return error.code
   if (error instanceof WorkerRefusal && /^[a-z_]{1,64}$/.test(error.code)) return error.code
@@ -43,6 +45,14 @@ async function discardUnstarted(service: SubscriptionService, userId: string, co
 export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
   return async (request: Request): Promise<Response> => {
     const refused: { action?: string; provider?: string } = {}
+    // The connection this request touched and what it looked like before, so any state change the worker made
+    // (including on a refusal partway through, or a refresh that ended in reconnect_required) reaches open pages.
+    let watched: { pool: SubscriptionService['repository']['pool']; repository: SubscriptionService['repository']; userId: string; id: string; seen: string } | null = null
+    const moved = async () => {
+      if (!watched) return false
+      const now = await watched.repository.connection(watched.userId, watched.id).then(row => `${row.state}:${row.paused}`, () => 'gone')
+      return now !== watched.seen
+    }
     try {
       if (request.method !== 'POST' || request.headers.get('sec-fetch-site') === 'cross-site' || (request.headers.has('origin') && request.headers.get('origin') !== new URL(request.url).origin)) return Response.json({ error: 'request_refused' }, { status: 403, headers })
       const session = await deps.session(request)
@@ -66,12 +76,15 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
         if (!service.capabilities.oauth?.[body.provider]) throw new SubscriptionRefusal('backend_unavailable')
         const connectionId = await service.repository.create(session.userId, body.workspaceId, body.provider)
         const row = await service.repository.connection(session.userId, connectionId)
+        watched = { pool: service.repository.pool, repository: service.repository, userId: session.userId, id: row.id, seen: `${row.state}:${row.paused}` }
         const worker = service.worker(service.repository.scope(row))
         const result = await worker.call<{ authorizationUrl: string; revision: number }>('oauthStart', { revision: Number(row.epoch), sessionId: session.sessionId }, request.signal)
           .catch(async (failure: unknown) => { await discardUnstarted(service, session.userId, connectionId, worker); throw failure })
+        await ownerSettingsChanged(service.repository.pool, session.userId)
         return Response.json({ connectionId, ...result }, { headers })
       }
       const row = await service.repository.connection(session.userId, body.connectionId)
+      watched = { pool: service.repository.pool, repository: service.repository, userId: session.userId, id: row.id, seen: `${row.state}:${row.paused}` }
       refused.provider = row.provider
       if (session.tokenWorkspaceId && session.tokenWorkspaceId !== row.workspaceId) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
       await deps.workspace(session.userId, row.workspaceId)
@@ -96,8 +109,13 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
       else { await worker.call(body.action, { revision: body.revision }, request.signal); result = await service.status(session.userId, row.id, request.signal) }
       // 断开连接 / 移除: runs using this connection stop now, wherever they run.
       if (body.action === 'disconnect' || body.action === 'remove') await stopRunsUsingSubscriptions(service.repository.pool, { ownerId: session.userId, connectionId: row.id })
+      // Connected, paused, removed or signed out: every open 模型与订阅 page re-reads (no polling, no content on the wire).
+      // A device sign-in still waiting changed nothing yet.
+      const pending = body.action === 'poll' && (result as { pending?: unknown } | null)?.pending === true
+      if ((body.action !== 'bind' && body.action !== 'status' && !pending) || await moved()) await ownerSettingsChanged(service.repository.pool, session.userId)
       return Response.json(result, { headers })
     } catch (error) {
+      if (watched && await moved().catch(() => false)) await ownerSettingsChanged(watched.pool, watched.userId)
       const code = refusalCode(error)
       // Never the message, URL, state or body: those can carry provider or secret data.
       try { (deps.log ?? console.warn)(JSON.stringify({ level: 'warn', msg: 'subscription_refused', action: refused.action ?? null, provider: refused.provider ?? null, code, error: error instanceof Error ? error.name : 'unknown' })) } catch { /* logging never breaks a request */ }

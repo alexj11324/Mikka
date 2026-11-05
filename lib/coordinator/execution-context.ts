@@ -46,7 +46,7 @@ const source: ExecutionContextSource = {
     return (await poolDevices(pool, userId)).map(device => ({ name: device.name, online: device.online, enabled: device.enabled, agents: device.harnesses.filter(item => item.installed).map(item => agentName(item.harness)) }))
   },
   order: async (userId, botId) => {
-    const [{ pool }, { orderView, poolDevices }] = await Promise.all([import('@/lib/db'), import('@/lib/model-order')])
+    const [{ pool }, { dispatchOrder, orderView, poolDevices }] = await Promise.all([import('@/lib/db'), import('@/lib/model-order')])
     const [view, devices] = await Promise.all([orderView(pool, await scopeFor(userId, botId)), poolDevices(pool, userId)])
     const credentials = new Map(view.candidates.map(candidate => [`${candidate.source.kind}:${candidate.provider}`, { kind: candidate.source.kind, provider: candidate.provider }]))
     // Where each model can run: the person's own E2B cloud when it takes runs, and each server or computer whose daemon
@@ -58,7 +58,8 @@ const source: ExecutionContextSource = {
     const unsupported = (entry: (typeof view.entries)[number]) => support(entry).filter(item => item.stage !== 'ready').map(item => `${label(item.device)}: ${WHY[item.stage]}`).sort()
     return {
       location: view.location,
-      entries: view.entries.map(entry => ({ harness: entry.harness, agent: agentName(entry.harness), model: entry.model, source: entry.source.kind, provider: entry.provider, places: places(entry), unsupported: unsupported(entry), block: entry.block?.reason ?? null })),
+      // In the order a new thread tries them: the 优先使用的 Agent's list, then the other's (decision 2026-11-05-0400).
+      entries: dispatchOrder(view.entries, view.preferredHarness).map(entry => ({ harness: entry.harness, agent: agentName(entry.harness), model: entry.model, source: entry.source.kind, provider: entry.provider, places: places(entry), unsupported: unsupported(entry), block: entry.block?.reason ?? null })),
       credentials: [...credentials.values()],
     }
   },

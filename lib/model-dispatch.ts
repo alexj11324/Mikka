@@ -4,7 +4,7 @@ import { cloudModelSupport } from './cloud-template-models'
 import type { Pool } from 'pg'
 import { defaultAgentCopy } from './agent-copy'
 import { cloudReady } from './rule-dispatch'
-import { credentialStates, orderCandidates, poolDevices, readOrder, type OrderScope, type RefreshOrderQuota } from './model-order'
+import { credentialStates, dispatchOrder, orderCandidates, poolDevices, readOrder, type OrderScope, type RefreshOrderQuota } from './model-order'
 import { deviceSupport, entryKey, planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type OrderEntry, type RunLocation, type SkippedEntry } from './model-order-plan'
 import { modelTier, supportedModelEfforts, type ModelRoutingSnapshot } from './model-routing'
 import { routeModelCandidates, type ModelRoutingContext } from './model-routing-server'
@@ -77,7 +77,8 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   const excluded = new Set(dependencies.excludeEntryKeys)
   const allowedAgent = (entry: Pick<OrderEntry, 'harness'>) => (!dependencies.harness || entry.harness === dependencies.harness)
     && (!asked?.harness || entry.harness === asked.harness)
-  const order = { ...stored, entries: stored.entries.filter(entry => allowedAgent(entry) && !excluded.has(entryKey(entry))), location: places }
+  // With no Agent named, the 优先使用的 Agent's own list first, then the other's (decision 2026-11-05-0400).
+  const order = { ...stored, entries: dispatchOrder(stored.entries, stored.preferredHarness).filter(entry => allowedAgent(entry) && !excluded.has(entryKey(entry))), location: places }
   // A model the thread named: the first credential that offers it on that Agent (its own entry if it is listed).
   const exact = dependencies.exactEntry
   if (exact && (!allowedAgent(exact) || (explicit && (explicit.harness !== exact.harness || explicit.model !== exact.model)) || !candidates.some(candidate => entryKey(candidate) === entryKey(exact)))) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', { agent: HARNESS_NAMES[exact.harness], model: exact.model }) }

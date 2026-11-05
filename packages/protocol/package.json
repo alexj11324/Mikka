@@ -36,6 +36,8 @@
     "./preview": "./src/preview.ts",
     "./profile": "./src/profile.ts",
     "./provider-failure": "./src/provider-failure.ts",
+    "./coded-error": "./src/coded-error.ts",
+    "./user-error-codes": "./src/user-error-codes.ts",
     "./quota": "./src/quota.ts",
     "./agent-policy": "./src/agent-policy.ts",
     "./policy-snapshot": "./src/policy-snapshot.ts",

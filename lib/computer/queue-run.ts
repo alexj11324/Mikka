@@ -14,6 +14,7 @@ import { RunModelMissingError } from './run-model'
 import { runCredentialSource, type RunApiKey } from '@/lib/run-credential-source'
 import { sleepingFactoryCloudTarget, type FactoryCloudStageAdmission } from '@/lib/factory/cloud-stage-admission'
 import { runListChanged } from '@/lib/live/lists'
+import { runChanged } from '@/lib/live/panels'
 
 /** Issue access is checked by the caller. Queue and Bot binding are committed
  * together so the cloud worker never observes an unbound queued run. The
@@ -121,6 +122,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     await client.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [runId, input.botId, actor.workspaceId, actor.userId])
     await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'pending',$5,'starting') ON CONFLICT DO NOTHING`, [runId, actor.workspaceId, actor.userId, input.botId, randomUUID()])
     await runListChanged(client, runId)
+    await runChanged(client, runId)
     if (!existing) await client.query('COMMIT')
     return { runId }
   } catch (error) { if (!existing) await client.query('ROLLBACK'); if (error instanceof ExecutionIdentityError) throw new ComputerError(409, 'Execution identity or resource unavailable'); throw error } finally { if (!existing) client.release() }

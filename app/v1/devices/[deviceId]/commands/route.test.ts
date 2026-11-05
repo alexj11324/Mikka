@@ -69,7 +69,7 @@ beforeEach(() => {
 
 function request(signal?: AbortSignal, wait = 25, skip = '', mailboxNotices = false, updates = '') {
   return new Request(`https://preview.example.test/mikka/v1/devices/device-1/commands?wait=${wait}${skip ? `&skip=${skip}` : ''}${updates}`, { signal,
-    headers: { 'x-mikka-client-version': '0.0.375', ...(mailboxNotices ? { [MAILBOX_NOTICE_HEADER]: '1' } : {}) } })
+    headers: { 'x-mikka-client-version': '0.0.456', ...(mailboxNotices ? { [MAILBOX_NOTICE_HEADER]: '1' } : {}) } })
 }
 const params = { params: Promise.resolve({ deviceId: 'device-1' }) }
 
