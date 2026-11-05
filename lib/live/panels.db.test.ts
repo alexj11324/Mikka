@@ -140,7 +140,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
           assert.equal(pending.length, 1)
           await drain()
           assert.equal((await databasePool.query('SELECT status FROM agent_runs WHERE id=$1', [privateRun])).rows[0].status, 'waiting_input')
-          assert.deepEqual(sent.splice(0), [{ scope: { ownerId: 'owner', workspaceId: personal }, events: [{ kind: 'run', id: privateRun }] }])
+          assert.deepEqual(sent.splice(0), [{ scope: { ownerId: 'owner', workspaceId: personal }, events: [{ kind: 'run', id: privateRun }, { kind: 'issue_threads', id: personalIssue }] }])
         } finally { tx.release() }
       })
     })
@@ -160,7 +160,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
         await tx.query('COMMIT')
         assert.equal(pending.length, 1)
         await drain()
-        assert.deepEqual(sent.splice(0), [{ scope: { ownerId: 'owner', workspaceId: personal }, events: [{ kind: 'run', id: privateRun }] }])
+        assert.deepEqual(sent.splice(0), [{ scope: { ownerId: 'owner', workspaceId: personal }, events: [{ kind: 'run', id: privateRun }, { kind: 'issue_threads', id: personalIssue }] }])
         assert.equal((await databasePool.query('SELECT status FROM agent_runs WHERE id=$1', [privateRun])).rows[0].status, 'running')
       } finally { tx.release() }
     })
@@ -214,7 +214,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
         await stopOwnedRun(db, 'owner', privateRun)
         assert.equal(pending.length, 1)
         await drain()
-        assert.deepEqual(sent.splice(0), [{ scope: { ownerId: 'owner', workspaceId: personal }, events: [{ kind: 'run', id: privateRun }] }])
+        assert.deepEqual(sent.splice(0), [{ scope: { ownerId: 'owner', workspaceId: personal }, events: [{ kind: 'run', id: privateRun }, { kind: 'issue_threads', id: personalIssue }] }])
       })
     })
 

@@ -6,6 +6,7 @@ import type { db } from './db'
 import { agentRuns, type RunStatus } from './db/schema'
 import { notifyDeviceWork } from './device-gateway-notify'
 import { runListChanged } from './live/lists'
+import { runChanged } from './live/panels'
 
 /** Reuse this key for retries of one logical dispatch, including after a lost response. */
 export const dispatchRequestKey = z.string().trim().min(1).max(200)
@@ -62,6 +63,7 @@ export async function insertRunOnce(database: Pick<typeof db, 'transaction'>, us
       botId:brief.botId??null, agentDefinition:brief.agentDefinition??null, prompt: brief.prompt, dispatchKey: input.requestKey ?? null, dispatchFingerprint: hash,
     })
     await runListChanged(tx, runId)
+    await runChanged(tx, runId)
     return { runId, status: 'queued' as const, replayed: false }
   })
   if (!result.replayed) notifyDeviceWork(brief.deviceId)

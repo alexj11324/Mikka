@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { chainChunks, runFailureText, runIsActive, runIsWorking, runListRefreshInterval, runStopTimeoutRemaining, runSummaryText, threadItems } from './issue-run-conversation'
+import { chainChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, runSummaryText, threadItems } from './issue-run-conversation'
 
 test('only active run states offer messages; completed history stays readable', () => {
   for (const state of ['queued', 'preparing', 'running', 'waiting_input', 'finishing']) assert.equal(runIsActive(state), true)
@@ -17,11 +17,11 @@ test('a run row shows the report summary, else the first error line, else nothin
   assert.equal(runSummaryText({ report: null, error: null }), null)
 })
 
-test('idle and historical lists do not poll; active runs keep supported refresh', () => {
-  assert.equal(runListRefreshInterval(undefined), 0)
-  assert.equal(runListRefreshInterval([]), 0)
-  assert.equal(runListRefreshInterval([{ status: 'succeeded' }]), 0)
-  assert.equal(runListRefreshInterval([{ status: 'succeeded' }, { status: 'running' }]), 5000)
+test('the issue thread list reads on its live key, never on a timer', async () => {
+  const { readFileSync } = await import('node:fs')
+  const source = readFileSync('components/workspace/issue-threads.tsx', 'utf8')
+  assert.match(source, /useLiveKey\('issue_threads',/)
+  assert.doesNotMatch(source, /refreshInterval/)
 })
 
 test('stop acknowledgement has a bounded deadline through polling, reload and retry', () => {

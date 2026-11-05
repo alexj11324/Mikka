@@ -9,6 +9,7 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
 import { issueListChanged, runListChanged } from './live/lists'
+import { runChanged } from './live/panels'
 
 const LIVE_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing'] as const
 type Issue = typeof issues.$inferSelect
@@ -47,6 +48,7 @@ async function completeRunTransaction(userId: string, hint: { id: string; issueI
       .where(and(eq(agentRuns.id, hint.id), inArray(agentRuns.status, [...LIVE_STATUSES]))).returning({ id: agentRuns.id })
     if (!ended) return null
     await runListChanged(tx, ended.id)
+    await runChanged(tx, ended.id)
     await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, ended.id), isNull(runTokens.revokedAt)))
     await recordCoordinatorEvent(tx, runFinishedEvent({ ...run.run, status, stopReason, report }))
     const review = issue && reachesReview(stopReason, report)
