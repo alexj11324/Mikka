@@ -1,6 +1,7 @@
 'use server'
 
 import { pool } from '@/lib/db'
+import { readOnce } from '@/lib/db/read-once'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { currentRoute } from '@/lib/tracing/labels'
 import { ExecutionSettings } from '@/lib/execution-settings'
@@ -28,7 +29,8 @@ async function readModelOrder(workspaceId?: string): Promise<SettingsActionResul
     const target = await scope(workspaceId)
     // A subscription never asked for its models has no candidates yet: ask it before reading the list.
     await new ExecutionSettings(pool).ensureCatalogues(target)
-    return orderView(pool, target)
+    // After that write: the view's repeated key, policy and device reads run once.
+    return orderView(readOnce(pool), target)
   })
 }
 

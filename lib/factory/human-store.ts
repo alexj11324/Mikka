@@ -35,13 +35,7 @@ export function createFactoryHumanStore(pool: Pool, forBot: (botId: string | nul
       }
       return store.apply(userId, binding, eventId, change, tx)
     },
-    async listForIssue(userId, issueId) {
-      const empty = await base.listForIssue(userId, issueId)
-      const { rows } = await pool.query('SELECT id,"botId" FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2 ORDER BY "updatedAt" DESC,id DESC LIMIT 50', [userId, issueId])
-      const tasks = [...empty.tasks]
-      for (const botId of new Set<string>(rows.map(row => row.botId).filter(Boolean))) tasks.push(...(await forBot(botId).listForIssue(userId, issueId)).tasks)
-      const byId = new Map(tasks.map(task => [task.id, task]))
-      return { ...empty, tasks: rows.flatMap(row => byId.has(row.id) ? [byId.get(row.id)!] : []) }
-    },
+    // Every Bot's tasks of the issue in one transaction: one issue lock and access check, not one per Bot.
+    listForIssue: (userId, issueId) => base.listForIssue(userId, issueId, { anyBot: true }),
   }
 }
