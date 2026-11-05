@@ -462,6 +462,12 @@ export async function requestRunStop(userId: string, runId: string): Promise<{ s
   for (const runId of target.runIds) {
     try {
       if (await stopOwnedRun(db, userId, runId)) await afterRunEnded(userId, runId)
+      else {
+        // A refused startup may have no lifecycle/daemon to acknowledge this
+        // stop. Reuse the scoped host acknowledgement after the stop commits.
+        const binding = (await pool.query('SELECT "workspaceId" FROM computer_run_bindings WHERE "runId"=$1 AND "ownerId"=$2', [runId, userId])).rows[0]
+        if (binding) await (await import('@/lib/cloud-computer/thread-machines')).acknowledgeQueuedThreadStop(pool, { userId, workspaceId: binding.workspaceId }, runId)
+      }
       stoppedRunIds.push(runId)
     } catch (error) {
       if (!(error instanceof ActionFailureError && error.code === 'runNotFound')) throw error
