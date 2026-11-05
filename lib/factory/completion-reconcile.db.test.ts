@@ -9,6 +9,7 @@ import { Pool, type PoolClient } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { adoptProviderContinuation, createFactoryStore as createCurrentFactoryStore } from "./store";
 import { freezeWorkerDefinition } from "../agent-kit/worker";
+import { runReport } from '@mikka/protocol/run';
 import type { ExecutionIdentity } from "../execution-identity";
 import { providerContinuationDefinition, providerContinuationLaunchMatches, providerContinuationMatches, recoverProviderFailure } from "../run-provider-fallback";
 import { providerContinuationPrompt } from "../run-retry";
@@ -20,10 +21,14 @@ import { handleFactory } from './http';
 import { factoryWatchdogDecision, sweepFactoryWatchdog } from './watchdog';
 import { currentFactoryRequest, factoryCheckAssignment, factoryCheckGates } from './checks';
 import { approvalEvidence } from './evidence';
+import { createFactoryApprovalGates, createFactoryApprovals } from './approval';
+import { handleFactoryApproval } from './approval-http';
+import { createFactoryMerges } from './merge';
 import { factoryEventId } from './event-id';
 import { questionFingerprint, humanQuestionAnswerSchema } from './questions/contract';
 import { createFactoryQuestions } from "./questions/store";
 import { createFactoryReconciler, observeFactoryProfileDispatch } from "./reconcile";
+import { reconcileFactoryCheck } from './reconcile-check';
 import { AgentProfileError } from "./agent-profile-definition";
 import { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction, registerFactoryProfile } from "./transaction";
 import { factoryCheckIndependent } from "./check-independence";
@@ -173,10 +178,16 @@ test("run completion enters review without the Coordinator; replays do not advan
     process.env.MIKKA_FACTORY_ROUTING_ENABLED = "1"; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = "1";
 
     await t.test('Profile Decision refusal preserves the submitted candidate, isolates Coordinator sweeps and retries only the unstarted check', async () => {
-      const currentStore = createCurrentFactoryStore(pool, authorize, null, { independent: factoryCheckIndependent });
+      const currentStore = createCurrentFactoryStore(pool, authorize, null, { independent: factoryCheckIndependent,
+        gates: { ...factoryCheckGates, ...createFactoryApprovalGates() } });
       const execute = createFactoryDispatch(pool, currentStore, queue, { configure: { execute: async () => {} },
         freeze: async (tx, _task, id) => { await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [id, JSON.stringify({ schemaVersion: 1, definitionDigest: 'fixture', harness: 'codex' })]); } });
-      const review = createFactoryDispatch(pool, currentStore, queue, defaultFactoryDispatchAdapters);
+      const review = createFactoryDispatch(pool, currentStore, queue, { ...defaultFactoryDispatchAdapters,
+        freeze: async (tx, _task, id) => {
+          const { rows: [run] } = await tx.query('SELECT prompt FROM agent_runs WHERE id=$1', [id]);
+          await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [id,
+            JSON.stringify(freezeWorkerDefinition({ harness: 'codex', instructions: 'Fixture', prompt: run.prompt, parent: null, executionId: null, readOnly: true }))]);
+        } });
       const completed = async () => {
         const issue = randomUUID(), source = randomUUID();
         await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Profile Decision fixture','{"type":"doc","content":[]}','todo','normal')`, [issue]);
@@ -187,6 +198,7 @@ test("run completion enters review without the Coordinator; replays do not advan
         return { task: result.task, runId: result.runId };
       };
       const refusals = new Map<string, Error>();
+      const reviewRepos = new Map<string, string>();
       const decisions = new Map<string, number>();
       const rolledBackRuns: string[] = [];
       let starts = 0;
@@ -205,10 +217,11 @@ test("run completion enters review without the Coordinator; replays do not advan
           }
           throw refusal;
         }
-        await review(current.userId, { binding: factoryBinding(current), agentId, deviceRepoId: repoId }, tx);
+        await review(current.userId, { binding: factoryBinding(current), agentId, deviceRepoId: reviewRepos.get(current.id) ?? repoId }, tx);
         return async () => { starts++; };
       });
-      const reconcile = createFactoryReconciler(pool, currentStore, undefined, {}, null, next);
+      const reconcile = createFactoryReconciler(pool, currentStore, undefined,
+        { review: reconcileFactoryCheck, verify: reconcileFactoryCheck }, null, next);
       const failed = await completed(), healthy = await completed();
       const originalRun = (await pool.query('SELECT to_jsonb(r) AS value FROM agent_runs r WHERE id=$1', [failed.runId])).rows[0].value;
       refusals.set(failed.task.id, new AgentProfileError('agentProfileDecisionUnavailable'));
@@ -283,6 +296,11 @@ test("run completion enters review without the Coordinator; replays do not advan
       // ALEX67 already reached this older watchdog state before the fix. Owner
       // recovery must consume its submitted run, never re-run the producer.
       const exhausted = await completed();
+      const deliverableRepo = randomUUID();
+      reviewRepos.set(exhausted.task.id, deliverableRepo);
+      await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner','/home/user/.mikka/bot-workspaces/recovered-approval')`, [deliverableRepo, deviceId]);
+      await pool.query(`UPDATE agent_runs SET "deviceRepoId"=$2,report=$3 WHERE id=$1`, [exhausted.runId, deliverableRepo,
+        JSON.stringify({ sourceCommit: 'a'.repeat(40), deliverableCommit: 'b'.repeat(40), verify: { status: 'not_run' }, summary: 'Submitted delivery' })]);
       const clock = Date.now();
       for (const minutes of [0, 3, 8, 17]) await sweepFactoryWatchdog(pool, {
         runtime: () => ({ store: currentStore, reconcile: { run: async () => { throw new AgentProfileError('agentProfileDecisionUnavailable'); } } }),
@@ -311,6 +329,144 @@ test("run completion enters review without the Coordinator; replays do not advan
       assert.equal(after.completionRecovery, undefined);
       assert.deepEqual((after as unknown as { checkDispatchRecovery?: unknown }).checkDispatchRecovery,
         { binding: { taskId: after.task.id, revision: after.task.revision } });
+
+      // Completion was consumed before the next-stage Decision refused. Its
+      // immutable receipt remains Review blocked after a later Review passes.
+      const preservedHistory = async () => {
+        const current = await history(old.task.id, exhausted.runId, old.task.attemptId);
+        return { ...current, watchdog: current.watchdog.filter(receipt => receipt.request.attemptId === old.task.attemptId) };
+      };
+      const receiptRows = async () => (await pool.query(`SELECT to_jsonb(e) AS value FROM factory_events e
+        WHERE "taskId"=$1 AND "eventId"=ANY($2::uuid[]) ORDER BY "eventId"`,
+      [old.task.id, [ownerRequest.body.eventId, factoryEventId('run-completion', exhausted.runId)]])).rows;
+      const savedReceipts = await receiptRows();
+      assert.equal(savedReceipts.length, 2);
+      const ownerReceipt = savedReceipts.find(row => row.value.eventId === ownerRequest.body.eventId)!.value;
+      assert.equal(ownerReceipt.request.kind, 'owner_completion_recovery');
+      assert.equal(ownerReceipt.result.task.stage, 'review');
+      assert.equal(ownerReceipt.result.task.status, 'blocked');
+      assert.equal(after.candidates[0].kind, 'deliverable');
+      assert.equal(after.candidates[0].sha, null, 'the delivery HEAD is not the candidate.sha field');
+
+      refusals.delete(old.task.id);
+      const reviewRetry = await handleFactory(human, { ...ownerRequest,
+        body: { ...ownerRequest.body, binding: { taskId: after.task.id, revision: after.task.revision }, eventId: randomUUID(), reason: 'Retry the independent review' } });
+      assert.equal(reviewRetry.status, 200);
+      const pendingReview = await currentStore.read('owner', old.task.id);
+      assert.equal(pendingReview.task.stage, 'review');
+      assert.equal(pendingReview.task.status, 'pending');
+      // Only this disposable task enters the existing cron observation window.
+      const observedAt = new Date(Date.now() - 30_000);
+      await pool.query('UPDATE factory_tasks SET "updatedAt"=$2 WHERE id=$1', [old.task.id, new Date(observedAt.getTime() - 61_000)]);
+      await sweepFactoryWatchdog(pool, { runtime: () => ({ store: currentStore, reconcile }), dispatch: next, wake: async () => {} }, observedAt);
+      const runningReview = await currentStore.read('owner', old.task.id);
+      assert.equal(runningReview.task.status, 'running');
+      assert.equal(runningReview.task.candidateId, after.task.candidateId);
+      const reviewer = runningReview.attempts.find(attempt => attempt.id === runningReview.task.attemptId)!;
+      assert.ok(reviewer.runId);
+      assert.notEqual(reviewer.runId, exhausted.runId);
+      const watchdogHistory = (await history(old.task.id, exhausted.runId, old.task.attemptId)).watchdog;
+      assert.equal(watchdogHistory.length, oldHistory.watchdog.length + 1, 'the real cron appends only its new Review attempt receipt');
+      assert.equal(watchdogHistory.filter(receipt => receipt.request.attemptId === reviewer.id).length, 1);
+      const assigned = await factoryCheckAssignment(pool, 'owner', reviewer.runId);
+      assert.equal(assigned.baseBranch, 'b'.repeat(40), 'the independent check uses the actual submitted delivery HEAD');
+      const reviewSession = 'independent-recovered-review';
+      await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"startedAt"=now() WHERE id=$1`, [reviewer.runId, reviewSession]);
+      // Use the real completion transaction: it projects the successful report
+      // to issue Review, which human acceptance may then move to Done. A
+      // manually reopened Todo issue is deliberately not closed by acceptance.
+      const { createRequestDatabaseScope } = await import('../db');
+      const { persistRunCompletion } = await import('../run-publications');
+      const completionScope = createRequestDatabaseScope(target.toString());
+      try {
+        const completed = await completionScope.run(() => persistRunCompletion('owner', reviewer.runId!, {
+          stopReason: 'submitted', report: runReport.parse({ summary: 'Independent synthetic delivery check',
+            check: { sha: assigned.baseBranch, readOnly: true }, verify: { status: 'not_run' }, filesChanged: [],
+            openQuestions: [], nextStep: null, criteria: [{ text: 'Submitted delivery', passed: true, evidence: 'Synthetic isolated PG check' }] }),
+        }, deviceId));
+        assert.equal(completed?.review?.id, old.task.issueId);
+        assert.equal((await pool.query('SELECT status FROM issues WHERE id=$1', [old.task.issueId])).rows[0].status, 'review');
+      } finally { await completionScope.close(); }
+      await reconcile.run('owner', reviewer.runId);
+      const ready = await currentStore.read('owner', old.task.id);
+      assert.equal(ready.task.stage, 'approval');
+      assert.equal(ready.task.status, 'pending');
+      assert.equal(ready.task.route.flowVersion, 2);
+      assert.equal(ready.attempts.find(attempt => attempt.id === reviewer.id)!.status, 'passed');
+      assert.equal(ready.attempts.filter(attempt => attempt.stage === 'verify').length, 0);
+
+      const sessionId = randomUUID();
+      await pool.query(`INSERT INTO "session"(id,"userId",token,"expiresAt","createdAt","updatedAt")
+        VALUES($1,'owner',$2,now()+interval '1 hour',now(),now())`, [sessionId, randomUUID()]);
+      const approvals = createFactoryApprovals(pool, authorize, currentStore);
+      const request = { actor: { userId: 'owner', sessionId }, authorization: null, method: 'GET', taskId: old.task.id,
+        origin: null, url: 'https://fixture.invalid/api/factory/tasks/' + old.task.id + '/approval' };
+      assert.equal((await handleFactoryApproval(approvals, { ...request, url: request.url + '?view=ledger' })).status, 200);
+      const evidenceReply = await handleFactoryApproval(approvals, request);
+      assert.equal(evidenceReply.status, 200, JSON.stringify(evidenceReply.body));
+      const evidenceBody = evidenceReply.body;
+      assert.ok(evidenceBody && typeof evidenceBody === 'object' && 'manifest' in evidenceBody && 'binding' in evidenceBody);
+      const manifest = evidenceBody.manifest;
+      assert.ok(manifest && typeof manifest === 'object' && 'candidateId' in manifest && 'candidate' in manifest && 'artifacts' in manifest);
+      assert.equal(manifest.candidateId, after.task.candidateId);
+      assert.ok(manifest.candidate && typeof manifest.candidate === 'object' && 'sha' in manifest.candidate);
+      assert.equal(manifest.candidate.sha, null);
+      assert.ok(Array.isArray(manifest.artifacts));
+      const artifacts = manifest.artifacts.map((item: unknown) => {
+        assert.ok(item && typeof item === 'object' && 'stage' in item && 'runId' in item && 'sessionId' in item);
+        return item;
+      });
+      assert.deepEqual(artifacts.map(item => item.stage), ['execute', 'review']);
+      assert.deepEqual(artifacts.map(item => item.runId), [exhausted.runId, reviewer.runId]);
+      assert.ok('completionRecoveryEventId' in artifacts[0]);
+      assert.equal(artifacts[0].completionRecoveryEventId, ownerRequest.body.eventId);
+      assert.equal(new Set(artifacts.map(item => item.sessionId)).size, 2);
+      assert.deepEqual(await receiptRows(), savedReceipts, 'displaying evidence never rewrites either successful completion or Owner recovery receipt');
+      assert.deepEqual(await preservedHistory(), oldHistory);
+
+      const corruptions: [string, unknown[]][] = [
+        [`UPDATE agent_runs SET status='failed' WHERE id=$1`, [exhausted.runId]],
+        [`UPDATE factory_events SET request=jsonb_set(request,'{sourceEventId}',to_jsonb($3::text)) WHERE "taskId"=$1 AND "eventId"=$2`, [old.task.id, ownerRequest.body.eventId, randomUUID()]],
+        [`UPDATE factory_events SET result=jsonb_set(result,'{task,candidateId}',to_jsonb($3::text)) WHERE "taskId"=$1 AND "eventId"=$2`, [old.task.id, ownerRequest.body.eventId, randomUUID()]],
+        [`UPDATE factory_events SET result=jsonb_set(result,'{task,status}','"failed"') WHERE "taskId"=$1 AND "eventId"=$2`, [old.task.id, ownerRequest.body.eventId]],
+        [`UPDATE factory_events SET result=jsonb_set(result,'{task,stage}','"approval"') WHERE "taskId"=$1 AND "eventId"=$2`, [old.task.id, ownerRequest.body.eventId]],
+        [`UPDATE factory_events SET request=jsonb_set(request,'{change,status}','"failed"') WHERE "taskId"=$1 AND "eventId"=$2`, [old.task.id, factoryEventId('run-completion', exhausted.runId)]],
+        [`UPDATE factory_attempts SET "sessionId"='s1' WHERE id=$1`, [reviewer.id]],
+        ['DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [old.task.id, ownerRequest.body.eventId]],
+      ];
+      const evidenceTx = await pool.connect();
+      try {
+        for (const [sql, values] of corruptions) {
+          await evidenceTx.query('BEGIN');
+          try {
+            await evidenceTx.query(sql, values);
+            await assert.rejects(approvalEvidence(evidenceTx, ready.task), /factoryIndependentEvidenceRequired|factoryEvidenceMismatch/);
+          } finally { await evidenceTx.query('ROLLBACK'); }
+        }
+      } finally { evidenceTx.release(); }
+      assert.deepEqual(await receiptRows(), savedReceipts);
+      assert.deepEqual(await preservedHistory(), oldHistory);
+
+      let githubCalls = 0;
+      const noGitHub = async () => { githubCalls++; throw new Error('Deliverable acceptance must not call GitHub'); };
+      const merges = createFactoryMerges(pool, authorize, currentStore, { pullRequest: noGitHub, mergeMethods: noGitHub, merge: noGitHub });
+      const acceptRequest = { ...request, method: 'POST', origin: 'https://fixture.invalid',
+        body: { operation: 'accept', input: { binding: evidenceBody.binding, eventId: randomUUID() } } };
+      const accepted = await handleFactoryApproval(approvals, acceptRequest, merges);
+      assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
+      assert.ok(accepted.body && typeof accepted.body === 'object' && 'status' in accepted.body);
+      assert.equal(accepted.body.status, 'accepted');
+      const acceptedTask = (await currentStore.read('owner', old.task.id)).task;
+      assert.equal(acceptedTask.stage, 'approval');
+      assert.equal(acceptedTask.status, 'passed');
+      assert.equal(acceptedTask.candidateId, after.task.candidateId);
+      assert.equal((await pool.query('SELECT status FROM issues WHERE id=$1', [old.task.issueId])).rows[0].status, 'done');
+      assert.deepEqual(await handleFactoryApproval(approvals, acceptRequest, merges), accepted, 'the normal acceptance replays its one durable receipt');
+      assert.equal((await pool.query('SELECT 1 FROM factory_deliverable_acceptances WHERE "taskId"=$1 AND "candidateId"=$2',
+        [old.task.id, after.task.candidateId])).rowCount, 1);
+      assert.equal(githubCalls, 0);
+      assert.deepEqual(await receiptRows(), savedReceipts);
+      assert.deepEqual(await preservedHistory(), oldHistory);
 
       for (const refusal of [new Error('Unexpected dispatch error'), Object.assign(new Error('Untrusted Decision code'), { code: 'agentProfileDecisionUnavailable' }), new AgentProfileError('agentProfileScopeNotFound', 404)]) {
         const denied = await completed();

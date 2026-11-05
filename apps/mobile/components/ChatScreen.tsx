@@ -1,6 +1,7 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react'
-import { Pressable, StyleSheet, View, type ScrollViewInstance } from 'react-native'
-import { ChatScrollView } from '@/components/ChatScrollView'
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { ChatMessageList, type ChatListHandle } from '@/features/chat/components/chat-message-list'
+import { chatHistoryPath, chatUpdatePath, mergeChatHistory, mergeChatRead, olderThrough, type ChatHistoryPage, type ChatRead } from '@/features/chat/model/chat-pages'
 import { GestureDetector } from 'react-native-gesture-handler'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -38,7 +39,6 @@ import { useStop } from '@/lib/useStop'
 import { StopFailed } from '@/components/StopFailed'
 import { ReadNotice } from '@/components/ReadNotice'
 import { ChatScrollToLatest } from '@/components/ChatScrollToLatest'
-import { useChatScroll } from '@/lib/useChatScroll'
 import { useReducedMotionPreference } from '@/lib/reduced-motion'
 import { runInfoLine } from '@/lib/run-info'
 import { webChatPath } from '@/lib/web'
@@ -57,7 +57,8 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
   const self = botId ?? 'coordinator'
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const scroll = useRef<ScrollViewInstance>(null)
+  const list = useRef<ChatListHandle>(null)
+  const [atLatest, setAtLatest] = useState(true)
   const { offset, gesture: timeReveal, scrollLocked } = useTimeReveal()
   const photos = useChatPhotos()
   const workspaceId = useHome().data?.workspace.id
@@ -67,10 +68,12 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
   const home = useHome().data?.live?.workspaceId
   // The web's chat key (components/coordinator/coordinator-chat.tsx) on the person's home channel; a turn's lease
   // running out has no write, so the server names it as a deadline.
-  const { data, error, reload, setData } = useLiveApi<Chat>(path, chat => ({
+  // A push reads only what is new since the last read, and merges it into what is shown (#1408).
+  const readChat = useCallback(async (at: string) => mergeChatRead(apiCache.get<ChatRead>(at), await api<ChatRead>(chatUpdatePath(at, apiCache.get<ChatRead>(at)))), [])
+  const { data, error, reload, setData } = useLiveApi<ChatRead>(path, chat => ({
     refs: [{ kind: 'bot_chat', id: chat?.botId && chat.live?.workspaceId ? chat.botId : UNRESOLVED_LIVE_ID, scope: chat?.live?.workspaceId ?? null }],
     minIntervalMs: 2_000, deadline: chat?.live?.deadline,
-  }))
+  }), readChat)
   const serviceUnavailable = data?.enabled === false
   const serviceRefresh = useRefresh(reload)
   // The person's proposals: the web's key (components/coordinator/pending-actions.tsx), on the same home channel.
@@ -89,19 +92,24 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
   const [text, setText] = useState(draft ?? '')
   const working = Boolean(data?.working) || inFlight(outbox)
   const push = usePushState()
-  // Opened from a push about a proposal: its card is scrolled into view once, instead of the chat's end.
-  const pendingTop = useRef(0)
-  const [pinned, setPinned] = useState(false)
-  const chatScroll = useChatScroll(scroll, `${self}:${apiContext}`, pinned)
   const reduceMotion = useReducedMotionPreference()
-  const showFocus = (y: number) => {
-    if (pinned) return
-    setPinned(true)
-    chatScroll.pause()
-    // After this frame's layout, so the list's own offset (measured after its children) is known.
-    setTimeout(() => scroll.current?.scrollTo({ y: Math.max(0, pendingTop.current + y - insets.top - 84), animated: !reduceMotion }), 0)
+  // Opened from a push about a proposal: its card sits at the end of the chat, which is where the chat opens.
+  const showFocus = () => list.current?.toLatest(!reduceMotion)
+  // Scrolling to the top loads the page before, a page at a time.
+  const olderRequest = useRef<object | null>(null)
+  const [loadingOlder, setLoadingOlder] = useState(false)
+  useEffect(() => { olderRequest.current = null; setLoadingOlder(false) }, [path, apiContext])
+  const loadOlder = async () => {
+    const through = olderThrough(data)
+    if (through === null || olderRequest.current) return
+    const request = {}; olderRequest.current = request
+    setLoadingOlder(true)
+    try {
+      const page = await api<ChatHistoryPage>(chatHistoryPath(path, through))
+      apiCache.commit(apiContext, () => { if (olderRequest.current === request) setData(current => current && mergeChatHistory(current, page, through)) })
+    } catch { /* the next scroll to the top tries again */ }
+    finally { if (olderRequest.current === request) { olderRequest.current = null; setLoadingOlder(false) } }
   }
-  useEffect(() => { setPinned(false) }, [focus])
 
   useEffect(() => { if (draft) setText(draft) }, [draft])
 
@@ -147,8 +155,7 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
 
   const send = async (words: string, attachments: Attachment[] = []) => {
     if (serviceUnavailable) return false
-    setPinned(false)
-    chatScroll.toLatest()
+    list.current?.toLatest()
     const { text: message, images } = outgoing(words, attachments)
     const context = apiCache.context()
     const targetBotId = data?.botId ?? botId
@@ -204,6 +211,34 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
     ? <Reactions reactions={reactions[id]} align={align} onToggle={emoji => void react(id, toggled(reactions[id], emoji))} />
     : null
 
+  const renderItem = (item: Chat['items'][number], index: number) => {
+    const time = clockTime(item.createdAt)
+    const question = item.from === 'event' ? questionCard(item.line, sources) : null
+    return (
+      <Arrival animate={arrived(item.position)}>
+        {question ? <ThreadCard title={question.title} status="waiting" info="在等你回答" action="去回答" onPress={() => router.push(`/thread/${question.runId}`)} />
+          : item.from === 'event' ? <EventLine text={eventText(item.line, sources)} /> : null}
+        {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right" onQuote={item.text ? () => setQuote(quotable(item.text)) : undefined} onLongPress={item.text ? () => actions(item.text, item.id) : undefined} menu={item.text ? message(item.text, item.id) : undefined}><MyBubble text={item.text} photos={photos(item.id, item.images)} />{chips(item.id, 'right')}</TimedRow> : null}
+        {item.from === 'coordinator' && item.text ? (
+          <TimedRow time={time} offset={offset} onQuote={() => setQuote(quotable(item.text))} onLongPress={() => actions(item.text, item.id)} menu={message(item.text, item.id)}>
+            {isOpenUI(item.text)
+              ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} webPath={webChatPath(data?.botId ?? botId, workspaceId)} sources={sources} onOpen={open} />
+              : <BotBubble><Markdown text={item.text} sources={sources} onOpen={open} /></BotBubble>}
+            {chips(item.id)}
+            {index === latestReply && !working ? <ReplyActions text={plainText(item.text)} onQuote={() => setQuote(quotable(item.text))} onMore={() => actions(item.text, item.id)} /> : null}
+          </TimedRow>
+        ) : null}
+        {item.from === 'coordinator' && item.stopped ? <Text style={styles.stopped}>已停止</Text> : null}
+        {item.threads.map(id => {
+          const run = sources[id]
+          return run?.kind === 'run'
+            ? <TimedRow key={id} time={time} offset={offset}><ThreadCard title={runName(run)} status={runIcon(run)} info={runInfoLine(run.info)} onPress={() => router.push(`/thread/${id}`)} /></TimedRow>
+            : null
+        })}
+      </Arrival>
+    )
+  }
+
   return (
     <View style={styles.screen}>
       {/* Back is the system's (and its edge swipe); the bot's name opens the bot's page. */}
@@ -227,51 +262,24 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
       <GestureDetector gesture={timeReveal}>
       <View style={{ flex: 1, overflow: 'hidden' }}>
         {/* The system scroll: momentum, and a bounce at both ends even while the chat is shorter than the screen. */}
-        <ChatScrollView scrollEnabled={!scrollLocked} ref={scroll} testID="bot-chat-scroll" bounces alwaysBounceVertical {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={[styles.list, { paddingBottom: composerHeight + 16 }]} onScroll={event => { if (chatScroll.onScroll(event)) setPinned(false) }} scrollEventThrottle={16} onContentSizeChange={chatScroll.onContentSizeChange}>
-          {items.map((item, index) => {
-            const time = clockTime(item.createdAt)
-            const question = item.from === 'event' ? questionCard(item.line, sources) : null
-            return (
-              <Arrival key={item.pending ? `pending-${item.position}` : item.position} animate={arrived(item.position)}>
-                {question ? <ThreadCard title={question.title} status="waiting" info="在等你回答" action="去回答" onPress={() => router.push(`/thread/${question.runId}`)} />
-                  : item.from === 'event' ? <EventLine text={eventText(item.line, sources)} /> : null}
-                {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right" onQuote={item.text ? () => setQuote(quotable(item.text)) : undefined} onLongPress={item.text ? () => actions(item.text, item.id) : undefined} menu={item.text ? message(item.text, item.id) : undefined}><MyBubble text={item.text} photos={photos(item.id, item.images)} />{chips(item.id, 'right')}</TimedRow> : null}
-                {item.from === 'coordinator' && item.text ? (
-                  <TimedRow time={time} offset={offset} onQuote={() => setQuote(quotable(item.text))} onLongPress={() => actions(item.text, item.id)} menu={message(item.text, item.id)}>
-                    {isOpenUI(item.text)
-                      ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} webPath={webChatPath(data?.botId ?? botId, workspaceId)} sources={sources} onOpen={open} />
-                      : <BotBubble><Markdown text={item.text} sources={sources} onOpen={open} /></BotBubble>}
-                    {chips(item.id)}
-                    {index === latestReply && !working ? <ReplyActions text={plainText(item.text)} onQuote={() => setQuote(quotable(item.text))} onMore={() => actions(item.text, item.id)} /> : null}
-                  </TimedRow>
-                ) : null}
-                {item.from === 'coordinator' && item.stopped ? <Text style={styles.stopped}>已停止</Text> : null}
-                {item.threads.map(id => {
-                  const run = sources[id]
-                  return run?.kind === 'run'
-                    ? <TimedRow key={id} time={time} offset={offset}><ThreadCard title={runName(run)} status={runIcon(run)} info={runInfoLine(run.info)} onPress={() => router.push(`/thread/${id}`)} /></TimedRow>
-                    : null
-                })}
-              </Arrival>
-            )
-          })}
-          {outbox.map(item => <OutgoingBubble key={item.key} text={item.text} photos={item.images.map(image => image.uri)} failed={item.state !== 'sending'} unconfirmed={item.state === 'unconfirmed'} onRetry={() => void retry(item)} />)}
-          {working ? <WaitingLine since={outbox.length ? null : waitingSince(items)} /> : null}
-          {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
-          {!data && !error ? <View style={styles.loading}><Spinner /></View> : null}
-          {data && data.enabled !== false && !items.length && !working ? <Text style={styles.empty}>有什么要我做的，直接说。</Text> : null}
-          <ReadNotice error={error} hasData={Boolean(data)} label="对话" onRetry={reload} />
-          <ReadNotice error={pending.error} hasData={Boolean(pending.data)} label="待处理事项" onRetry={pending.reload} />
-          {data?.failure && !working ? <FailedReply key={`${botId}:${JSON.stringify(data.failure)}`} failure={data.failure} botId={botId} onQueued={reload} modelChoice={typeof composerAccessory === 'function' ? composerAccessory(false) : composerAccessory} /> : null}
-          {pending.data ? (
-            <View onLayout={event => { pendingTop.current = event.nativeEvent.layout.y }}>
-              <PendingActions items={pending.data} focus={focus} reload={pending.reload} onFocusLayout={focus ? showFocus : undefined} />
-            </View>
-          ) : null}
-        </ChatScrollView>
+        <ChatMessageList ref={list} testID="bot-chat-scroll" data={items} scrollEnabled={!scrollLocked} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
+          keyOf={item => item.pending ? `pending-${item.position}` : String(item.position)} renderItem={renderItem}
+          onStartReached={data?.historyBefore ? () => void loadOlder() : undefined}
+          header={loadingOlder ? <View style={styles.older}><Spinner size={16} /></View> : null}
+          footer={<>
+        {outbox.map(item => <OutgoingBubble key={item.key} text={item.text} photos={item.images.map(image => image.uri)} failed={item.state !== 'sending'} unconfirmed={item.state === 'unconfirmed'} onRetry={() => void retry(item)} />)}
+        {working ? <WaitingLine since={outbox.length ? null : waitingSince(items)} /> : null}
+        {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
+        {!data && !error ? <View style={styles.loading}><Spinner /></View> : null}
+        {data && data.enabled !== false && !items.length && !working ? <Text style={styles.empty}>有什么要我做的，直接说。</Text> : null}
+        <ReadNotice error={error} hasData={Boolean(data)} label="对话" onRetry={reload} />
+        <ReadNotice error={pending.error} hasData={Boolean(pending.data)} label="待处理事项" onRetry={pending.reload} />
+        {data?.failure && !working ? <FailedReply key={`${botId}:${JSON.stringify(data.failure)}`} failure={data.failure} botId={botId} onQueued={reload} modelChoice={typeof composerAccessory === 'function' ? composerAccessory(false) : composerAccessory} /> : null}
+        {pending.data ? <PendingActions items={pending.data} focus={focus} reload={pending.reload} onFocusLayout={focus ? showFocus : undefined} /> : null}
+          </>} />
       </View>
       </GestureDetector>
-      <ChatScrollToLatest visible={!chatScroll.atEnd} bottom={composerHeight + 12} onPress={() => { setPinned(false); chatScroll.toLatest() }} />
+      <ChatScrollToLatest visible={!atLatest} bottom={composerHeight + 12} onPress={() => list.current?.toLatest()} />
       <OfflineBanner top={insets.top + 66} />
       <Composer value={text} sendDisabled={serviceUnavailable} onChangeText={setText} placeholder={name ? `给 ${name} 发消息` : '发消息'} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
         quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={<>{serviceUnavailable ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.serviceNotice}><Text style={styles.serviceMessage}>对话服务尚未启用，暂时无法回复。</Text><GlassButton label="重试" busy={serviceRefresh.refreshing} onPress={() => void serviceRefresh.onRefresh()} /></View> : null}{composerNotice}{reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : null}</>} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />
@@ -310,7 +318,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
   titleText: { fontSize: 17, fontWeight: '600' },
   // Space above the composer (适度留白).
-  list: { paddingHorizontal: 16, gap: 12 },
+  older: { paddingVertical: 12, alignItems: 'center' },
   loading: { paddingTop: 120, alignItems: 'center' },
   stopped: { alignSelf: 'flex-start', fontSize: 12, lineHeight: 17, color: colors.secondary, marginLeft: 4, marginTop: -6 },
   working: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },

@@ -128,3 +128,9 @@ test('explicit schemas and function map have exactly matching action names', () 
   const registered = [...registry.matchAll(/^  '([^']+)':/gm)].map(match => match[1]).sort()
   assert.deepEqual(registered, Object.keys(desktopActionSchemas).sort())
 })
+
+test('Coordinator history keeps the current bounded page size and previous two-argument calls', () => {
+  const schema = desktopActionSchemas['coordinator.coordinatorHistory']
+  for (const args of [[null, 0], [owner, 20, undefined], [null, 50, 1], [owner, 500, 200]]) assert.equal(schema.safeParse(args).success, true)
+  for (const args of [[null, 20, 0], [null, 20, 201], [null, 20, 1.5], [null, 20, '20'], [null, -1, 20], [null, 20, 20, peer]]) assert.equal(schema.safeParse(args).success, false)
+})

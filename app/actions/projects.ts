@@ -5,6 +5,7 @@ import { and, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { currentUser } from '@/lib/acting-user'
+import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { projectDb, projects, projectEvents } from '@/lib/db/projects'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { updateIssueMetadata } from '@/app/actions/issue-metadata'
@@ -21,8 +22,10 @@ async function userId() {
   return user.id
 }
 export async function listProjects() {
-  const context = await loadWorkspaceContext()
-  return (await accessibleProjects(context.currentUserId, projectDb, context.workspace.id)).toSorted((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+  return withDatabaseOperation('/actions/projects/list', async () => {
+    const context = await loadWorkspaceContext()
+    return (await accessibleProjects(context.currentUserId, projectDb, context.workspace.id)).toSorted((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+  })
 }
 async function persistProject(owner: string, input: unknown, partial: boolean) {
   const i18nText = await getTranslations();
