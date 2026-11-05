@@ -51,6 +51,12 @@ function fixture(options = {}) {
     if (changed && read === 2) return { version: current, delta: true, items: [row(ids[0]), row(id(9))],
       positions: [position(ids[0], V2), position(id(9), V2)], live: live() }
     if (changed && read === 4) return { version: current, delta: true, items: [], positions: [position(ids[0], V2)], live: live() }
+    if (args[offset] == null && Array.isArray(args[offset + 1])) {
+      const positions = (changed ? [ids[0]] : ids).map(value => position(value, current))
+      const previous = new Map(args[offset + 1].map(value => [value.id, value.version]))
+      return { version: current, delta: true, positions,
+        items: positions.filter(value => previous.get(value.id) !== value.version).map(value => row(value.id)), live: live() }
+    }
     return { version: current, unchanged: true, live: live() }
   }
   const fetchImpl = async (input, init = {}) => {
@@ -250,7 +256,7 @@ test('stable production cursors cover four HTTP scenarios with only a normal own
   assert.equal(report.normalSessionObserved, true)
   assert.equal(report.sessionClosed, true)
   assert.equal(report.browserCacheVerified, false)
-  assert.equal(report.reads.length, 24)
+  assert.equal(report.reads.length, 27)
   assert.equal(report.businessMutationRequests, 0)
   assert.equal(report.modelCalls, 0)
   assert.equal(report.fixturesCreated, 0)
@@ -263,16 +269,34 @@ test('stable production cursors cover four HTTP scenarios with only a normal own
   for (const name of ['syncIssueList', 'syncThreadList']) {
     const reads = f.actions.filter(action => action.name === name)
     assert.deepEqual(reads[0].args, [])
-    for (const read of reads.slice(1)) { assert.equal(read.args[0], V1); assert.equal(read.args[1].length, 2) }
+    for (const read of reads.slice(1, 4)) { assert.equal(read.args[0], V1); assert.equal(read.args[1].length, 2) }
   }
   const chats = f.actions.filter(action => action.name === 'syncCoordinatorChat')
   assert.equal(chats[1].args[1], V1)
-  for (const read of chats.slice(2)) { assert.equal(read.args[1], null); assert.equal(read.args[2].cursor, 2) }
+  for (const read of chats.slice(2, 4)) { assert.equal(read.args[1], null); assert.equal(read.args[2].cursor, 2) }
   assert.equal(f.calls.filter(call => call.path === '/mikka/api/auth/sign-out').length, 1)
-  assert.equal(f.calls.filter(call => call.method === 'POST').length, 22)
+  assert.equal(f.calls.filter(call => call.method === 'POST').length, 25)
   const evidence = JSON.stringify(report)
   for (const secret of [EMAIL, PASSWORD, COOKIE, PRIVATE, OWNER, WORKSPACE, BOT, TASK, refs.pollIssue]) assert.equal(evidence.includes(secret), false)
   assert.deepEqual(publicFailure(new Error(PASSWORD + COOKIE)), { status: 'fail', code: 'acceptance_failed' })
+})
+
+test('one-item repairs drop only client-held data and reuse genuine row and chat prefix proofs', async () => {
+  const f = fixture(), report = await f.run()
+  assert.equal(report.status, 'pass')
+  assert.equal(report.cacheMissProbe, 'discard-one-held-item-with-server-issued-proofs')
+  const repairs = report.reads.filter(read => read.scenario === 'one-item-cache-miss')
+  assert.deepEqual(repairs.map(read => [read.action, read.responseMode, read.receivedItems]), [
+    ['syncIssueList', 'delta', 1], ['syncThreadList', 'delta', 1], ['syncCoordinatorChat', 'delta', 1],
+  ])
+  for (const name of ['syncIssueList', 'syncThreadList']) {
+    const reads = f.actions.filter(action => action.name === name)
+    assert.deepEqual(reads[4].args, [null, reads[3].args[1].slice(0, 1)])
+  }
+  const chats = f.actions.filter(action => action.name === 'syncCoordinatorChat')
+  assert.deepEqual(chats[4].args, [BOT, null, { after: 1, cursor: 1, prefix: PREFIX, sourceIds: [], artifactIds: [] }])
+  assert.equal(report.businessMutationRequests, 0)
+  assert.equal(report.fixturesCreated, 0)
 })
 
 test('live deltas update restored proofs, remove absent rows and do not require every warm response to be unchanged', async () => {

@@ -81,6 +81,8 @@ jobs:
       - run: pnpm test:e2e:setup
       - name: Bind the isolated database and application to this checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      - name: Build this isolated application for production-mode acceptance
+        run: pnpm exec next build
       - name: Accept real incremental Server Actions and Settings GET
         run: node scripts/acceptance/run-read-cache.mjs
       - name: Check the public evidence for authentication material

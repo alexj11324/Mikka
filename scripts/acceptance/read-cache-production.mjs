@@ -26,6 +26,7 @@ const restoreRead = (key, data) => {
 }
 const blocked = new Set(['trigger_rejected', 'attestation_required', 'account_required', 'build_mismatch', 'sign_in_failed',
   'session_missing', 'session_identity', 'session_close_failed', 'existing_bot_missing', 'existing_task_missing',
+  'existing_thread_missing', 'existing_chat_tail_missing',
   'scope_changed', 'read_access_changed', 'request_failed', 'http_refused', 'acceptance_timeout', 'action_discovery_failed',
   'deployment_proof', 'web_deploy', 'issue_proof'])
 const failures = new Set(['request_denied', 'redirect_refused', 'response_invalid', 'list_merge_invalid', 'chat_merge_invalid', 'acceptance_failed'])
@@ -194,7 +195,8 @@ export async function runProductionReadCache({ env = process.env, event, attesta
   const measurements = [], refs = {}, deadline = now() + 300_000
   const report = { version: 1, issue: 1372, purpose: 'production-read-cache', ...guard, webDeployRunId: attestation.webDeployRunId,
     status: 'running', startedAt: now(), normalSessionObserved: false, sessionClosed: false,
-    browserCacheVerified: false, businessMutationRequests: 0, modelCalls: 0, fixturesCreated: 0, backendMaintenanceWritesMeasured: false, reads: [] }
+    browserCacheVerified: false, businessMutationRequests: 0, modelCalls: 0, fixturesCreated: 0, backendMaintenanceWritesMeasured: false,
+    cacheMissProbe: 'discard-one-held-item-with-server-issued-proofs', reads: [] }
   let cookie = '', ownerId, workspaceId
   const fetchBound = async (path, init, logout = false) => {
     check(logout || now() < deadline, 'acceptance_timeout')
@@ -310,6 +312,33 @@ export async function runProductionReadCache({ env = process.env, event, attesta
         && prefix.teamKeys.every(key => typeof key === 'string'), 'response_invalid')
       held.prefix = prefix
     }
+    // Exercise a one-item incremental repair without changing production data.
+    // Discard one actually held row and its proof; every retained proof still
+    // came from the server. A concurrent edit/deletion may return more rows or
+    // a full chat reset, so record the actual mode/count instead of calling it
+    // an observed production mutation or requiring an idle workspace.
+    for (const [name, surface, key, limit, missing] of [
+      ['syncIssueList', 'task-list', 'issues', 100, 'existing_task_missing'],
+      ['syncThreadList', 'thread-list', 'threads', 200, 'existing_thread_missing'],
+    ]) {
+      const current = held[key]
+      check(current?.items.length > 0, missing)
+      const removedId = current.items.at(-1).id
+      const partial = { ...current, version: undefined,
+        items: current.items.filter(item => item.id !== removedId),
+        positions: current.positions.filter(row => row.id !== removedId) }
+      const next = (await action(name, listArguments(partial), surface, 'one-item-cache-miss')).snapshot
+      listScope(next, key === 'issues'); measureResult(next)
+      held[key] = mergeReadList(partial, next, limit)
+    }
+    const proof = held.chat?.continuation
+    check(proof && held.chat.items.some(item => !item.pending && item.position > proof.after), 'existing_chat_tail_missing')
+    const partialChat = { ...held.chat, version: undefined, cursor: proof.after,
+      items: held.chat.items.filter(item => !item.pending && item.position <= proof.after),
+      continuation: { ...proof, cursor: proof.after } }
+    const repairedChat = (await action('syncCoordinatorChat', [botId, undefined, chatProof(partialChat)], 'bot-chat', 'one-item-cache-miss')).chat
+    check(repairedChat?.botId === botId, 'scope_changed'); listScope(repairedChat); measureResult(repairedChat)
+    held.chat = mergeReadChat(partialChat, repairedChat)
     await session(); await pin()
     report.status = 'pass'
   } catch (error) { Object.assign(report, publicFailure(error)) }

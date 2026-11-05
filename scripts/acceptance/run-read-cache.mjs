@@ -265,13 +265,12 @@ export function observeOwnedRequests(environment, now = () => performance.now())
   }
 }
 
-// This runner owns one development server on the attested disposable origin.
+// This runner owns one production server built from this attested checkout.
 // It never attaches to a production process or prints raw application output.
 export async function prepareAttestationRoute(environment, fetchImpl = fetch) {
-  // Next's Ready event means the listener exists, not that the first route is
-  // compiled. One anonymous request prepares that route before the unchanged
-  // ten-second HMAC check. No challenge or credential is sent here, so the
-  // published route must refuse it; this cannot establish an identity proof.
+  // One anonymous probe must still be refused before the unchanged ten-second
+  // HMAC check. It sends no challenge or credential and cannot establish an
+  // identity proof. next build has already compiled this route.
   let response
   try {
     response = await fetchImpl(`${environment.origin}${environment.basePath}/api/test-environment`, {
@@ -283,11 +282,10 @@ export async function prepareAttestationRoute(environment, fetchImpl = fetch) {
 }
 
 export async function prepareLandingRoute(environment, fetchImpl = fetch) {
-  // The observed first authenticated landing timed out at 30,001 ms while
-  // next dev was compiling its large page graph. Compile that same route
-  // once before leasing accounts; retain the session client's 30-second limit.
-  // In development an anonymous page can redirect to the guest-creation API.
-  // Never follow it: this request is compilation preparation, not a login.
+  // Probe the built landing before leasing accounts. Keep the existing request
+  // budget and the session client's 30-second limit; compilation happens in
+  // next build, never during this request. Do not follow a guest-creation
+  // redirect: this anonymous document probe is not a login.
   let response
   try {
     response = await fetchImpl(`${environment.origin}${environment.basePath}`, {
@@ -327,8 +325,8 @@ export async function runOwnedReadCacheAcceptance() {
   process.once('SIGTERM', cancel)
   try {
     const next = fileURLToPath(import.meta.resolve('next/dist/bin/next'))
-    server = spawn(process.execPath, [next, 'dev', '--webpack', '--hostname', origin.hostname.replaceAll(/[[\]]/g, ''), '--port', origin.port || '80'], {
-      env: process.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
+    server = spawn(process.execPath, [next, 'start', '--hostname', origin.hostname.replaceAll(/[[\]]/g, ''), '--port', origin.port || '80'], {
+      env: { ...process.env, NODE_ENV: 'production' }, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
     })
     await new Promise((resolve, reject) => {
       let recent = ''
@@ -348,18 +346,18 @@ export async function runOwnedReadCacheAcceptance() {
     runtime.phase('attestation-prepare')
     const preparingAt = Date.now()
     await prepareAttestationRoute(environment)
-    const initialRouteCompileMs = Date.now() - preparingAt
+    const attestationProbeMs = Date.now() - preparingAt
     runtime.phase('attestation')
     await assertDeploymentIdentity(environment)
     runtime.phase('landing-prepare')
     const landingPreparingAt = Date.now()
     await prepareLandingRoute(environment)
-    const initialLandingCompileMs = Date.now() - landingPreparingAt
+    const landingProbeMs = Date.now() - landingPreparingAt
     runtime.phase('accounts-and-reads')
     const result = await runReadCacheAcceptance()
     runtime.phase('evidence')
     const ownedRuntime = await runtime.finish(server)
-    const summary = { ...result, initialRouteCompileMs, initialLandingCompileMs, serverStdoutBytes, serverStderrBytes, ownedRuntime }
+    const summary = { ...result, serverMode: 'production', attestationProbeMs, landingProbeMs, serverStdoutBytes, serverStderrBytes, ownedRuntime }
     await mkdir('.cache/e2e', { recursive: true, mode: 0o700 })
     await writeFile('.cache/e2e/http-acceptance-summary.json', `${JSON.stringify(summary, null, 2)}\n`, { mode: 0o600 })
     return summary
