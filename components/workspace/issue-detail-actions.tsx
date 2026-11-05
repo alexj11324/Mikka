@@ -1,5 +1,6 @@
 'use client'
 
+import { issueKeys } from '@/lib/swr/keys'
 import { useEffect, useRef, useState } from 'react'
 import { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
@@ -88,7 +89,7 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
       if (!result.issue) throw new Error(actionError(result.error ?? 'generic'))
       if (mode === 'current') onSaved(result.issue)
       // 'current' saves go through onSaved, whose saved() in issue-workspace already refetches the viewer's board.
-      await Promise.all([mutate(['issue-connections', task.id]), mode === 'current' ? undefined : mutate(key => isIssueListKey(key, userId))])
+      await Promise.all([mutate(issueKeys.connections(task.id)), mode === 'current' ? undefined : mutate(key => isIssueListKey(key, userId))])
       if (mode === 'duplicate') onOpen(result.issue.id)
       if (mode === 'delete') {
         onDeleted()

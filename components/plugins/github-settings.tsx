@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input'
 import { InlineLoadError } from '@/components/load-error'
 import { SearchInput } from '@/components/ui/search-input'
 import { withBasePath } from '@/lib/base-path'
-import { authClient } from '@/lib/auth-client'
+import { authClient, endSession } from '@/lib/auth-client'
 import { openPathInBrowser } from '@/lib/platform/open-settings'
 import { useCheckOnReturn, useChecksUntilDone } from '@/lib/hooks/use-check-on-return'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
@@ -212,7 +212,7 @@ function ViewerGitHubSettings({ userId, email, isPending }: { userId: string | u
 
   /** The browser is signed in as another account: sign out here and back in as the app's, then go on with the same link. */
   async function switchAccount(token: string) {
-    await authClient.signOut().catch(() => {})
+    await endSession().catch(() => {})
     window.location.assign(withBasePath(`/sign-in?next=${encodeURIComponent(`/?section=plugins&app=github&intent=${token}`)}`))
   }
   const browserView = browserIntent?.view

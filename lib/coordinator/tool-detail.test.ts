@@ -1,5 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { fileURLToPath } from 'node:url'
+import { build } from 'esbuild'
 import { jsonbText } from './context'
 import { isIdKey, previewFields, toolDetail, withoutIds } from './tool-detail'
 
@@ -9,6 +11,17 @@ const BOT = '3c3aa707-0000-4c22-b322-0000000000d4'
 /** A preview as the chat gets it: jsonb's key order (shorter keys first), cut at 200 characters. */
 const cut = (value: unknown) => jsonbText(value).slice(0, 200)
 const NOTE = 'Upgrade axios in ledger-web to 1.7.4 to fix CVE-2024-39338, then run pnpm test and pnpm build and check that the request interceptors still work. If follow-redirects needs a bump too, stop and ask first.'
+
+test('tool details bundle for the browser without importing server message signing', async () => {
+  const result = await build({
+    absWorkingDir: fileURLToPath(new URL('../../', import.meta.url)),
+    entryPoints: [fileURLToPath(new URL('./tool-detail.ts', import.meta.url))],
+    bundle: true, platform: 'browser', format: 'esm', treeShaking: false,
+    write: false, metafile: true, logLevel: 'silent',
+  })
+  assert.ok(result.outputFiles[0].text.length > 0)
+  assert.doesNotMatch(Object.keys(result.metafile.inputs).join('\n'), /coordinator\/(?:context|message-safety)\.ts/)
+})
 
 test('a dispatch is who it went to and its thread, then its note as a quote; it never draws the task (R-15)', () => {
   const lines = toolDetail({ name: 'dispatch_run', input: cut({ issueId: TASK, botId: BOT, note: 'Fix the redirect' }), output: cut({ runId: RUN, status: 'queued', harness: 'codex' }) })

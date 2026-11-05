@@ -3,6 +3,7 @@ import { createAuthClient } from 'better-auth/react'
 import { multiSessionClient } from 'better-auth/client/plugins'
 import { withBasePath } from '@/lib/base-path'
 import { clearChatDrafts } from '@/lib/chat-drafts'
+import { clearPersistentReadCaches } from '@/lib/swr/persistent-cache'
 export const authClient = createAuthClient({ basePath: withBasePath('/api/auth'), plugins: [multiSessionClient()] })
 
 /**
@@ -11,6 +12,6 @@ export const authClient = createAuthClient({ basePath: withBasePath('/api/auth')
  */
 export async function endSession() {
   const result = await authClient.signOut()
-  if (!result.error) clearChatDrafts()
+  if (!result.error) { clearChatDrafts(); await clearPersistentReadCaches() }
   return result
 }

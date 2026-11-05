@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
@@ -34,7 +35,7 @@ export function UsageSettings({ workspaceId, personal = false }: { workspaceId: 
   const [view, setView] = useState<View>('bots')
   const downloadRef = useRef<HTMLAnchorElement>(null)
   const [downloadUrl, setDownloadUrl] = useState<string | undefined>()
-  const usage = useSWR(['settings:usage', workspaceId, month], () => settingsRead<Awaited<ReturnType<typeof getUsage>>>('usage', { month, workspace: workspaceId }), { keepPreviousData: true })
+  const usage = useSWR(settingsKeys.usage(workspaceId, month), () => settingsRead<Awaited<ReturnType<typeof getUsage>>>('usage', { month, workspace: workspaceId }), { keepPreviousData: true })
   const data = usage.data && !usage.data.error ? usage.data : null
   // 余额 in points, the card-verification $1 included (#559, Figma ALW-4 `709:28418`). Admins only, as 计费 is.
   const credits = useSWR(creditBillingKey(workspaceId), () => getCreditBilling(workspaceId))

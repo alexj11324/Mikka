@@ -20,6 +20,7 @@ const translationsFor = (namespace = '') => {
   return translate
 }
 type Swr = { data?: unknown; error?: unknown; isLoading: boolean; mutate: () => Promise<unknown> }
+const cache = new Map()
 let list: Swr
 let ledger: unknown
 let evidence: unknown
@@ -35,7 +36,7 @@ mock.module('swr', { defaultExport: (key: string | null) => {
   if (key.includes('view=ledger')) return { data: ledger, mutate: async () => { ledgerReloads++; if (refreshFails) throw new Error('ledger unavailable'); return ledger } }
   if (key.includes('/approval')) return { data: evidence }
   return list
-}, namedExports: { useSWRConfig: () => ({ mutate: async (key: string) => {
+}, namedExports: { useSWRConfig: () => ({ cache, mutate: async (key: string) => {
   listReloadKeys.push(key)
   if (refreshFails) throw new Error('list unavailable')
   return list?.data
@@ -74,6 +75,7 @@ before(async () => {
   ;({ FactoryAcceptancePane, CandidateMachine } = await import('../components/workspace/factory-acceptance-pane'))
 })
 beforeEach(() => {
+  cache.clear()
   detailTaskId = 't1'
   ledger = { binding: {}, approvals: [], publications: [], merges: [] }; evidence = undefined; detail = undefined
   detailReloads = 0; ledgerReloads = 0; listReloadKeys = []; refreshFails = false

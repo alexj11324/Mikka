@@ -1,12 +1,14 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useEffect, useRef } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import useSWR from 'swr'
 
 import { listDevices } from '@/app/actions/agents'
 import { localSetupAction } from '@/lib/local-device-setup'
-import { getPreferences } from '@/app/actions/preferences'
+import type { getPreferences } from '@/app/actions/preferences'
+import { settingsRead } from '@/lib/settings-read'
 import { chooseDesktopNotifications } from '@/app/actions/desktop-notifications'
 import { desktopRunUpdate, type DesktopRun } from '@/lib/platform/desktop-notifications'
 import { pushAllowed } from '@/lib/push-allowed'
@@ -34,7 +36,7 @@ export function DesktopIntegration({ userId }: { userId: string }) {
   const runs = useLiveTaskRunList(userId, desktop)
   const data = runs.data?.items
   // Same key as Settings › 通知, so a change there applies here at once.
-  const { data: preferences } = useSWR(desktop ? 'preferences' : null, getPreferences, { shouldRetryOnError: false })
+  const { data: preferences } = useSWR(desktop ? settingsKeys.preferences() : null, () => settingsRead<Awaited<ReturnType<typeof getPreferences>>>('preferences'), { shouldRetryOnError: false })
   const finished = preferences !== undefined && pushAllowed(preferences, ['finished'])
   const previous = useRef<Map<string, DesktopRun['status']> | null>(null)
 

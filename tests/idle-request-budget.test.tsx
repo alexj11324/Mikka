@@ -178,6 +178,8 @@ const person = { id: OWNER, name: 'Ada', email: 'ada@example.invalid', image: nu
 const user = { id: OWNER, name: 'Ada', email: 'ada@example.invalid' }
 Object.assign(fixtures, {
   'issues.getIssue': (id: unknown) => ({ issue: issue(String(id), 'Fix sign-in redirect') }),
+  'issues.pollIssue': (id: unknown, known: unknown) => known === CHAT_VERSION ? { viewerId: OWNER, unchanged: true, version: CHAT_VERSION } : { viewerId: OWNER, issue: issue(String(id), 'Fix sign-in redirect'), version: CHAT_VERSION },
+  'issues.pollIssueVersionSummaries': () => ({ viewerId: OWNER, snapshot: { version: CHAT_VERSION, items: [], positions: [] } }),
   'issues.listIssueVersions': () => [],
   'issue-operations.getDeletedIssue': () => null,
   'issue-operations.listIssueConnections': () => [],
@@ -199,6 +201,7 @@ Object.assign(fixtures, {
   'execution-settings.getBotModelMenu': () => ({ groups: [{ kind: 'subscription', provider: 'claude', plan: 'Max', credentialLabel: 'ada@example.invalid', options: [{ id: 'binding-1', modelId: 'claude-sonnet-4-6', provider: 'claude' }] }],
     current: { id: 'binding-1', modelId: 'claude-sonnet-4-6', provider: 'claude', kind: 'subscription', chosen: false, available: true } }),
   'coordinator.pollCoordinatorChat': (_bot: unknown, known: unknown) => known === CHAT_VERSION ? { unchanged: true, version: CHAT_VERSION, cursor: 2, working: false, error: null, botId: BOT, enabled: true, live } : chat,
+  'coordinator.syncCoordinatorChat': (_bot: unknown, known: unknown) => ({ chat: known === CHAT_VERSION ? { unchanged: true, version: CHAT_VERSION, cursor: 2, working: false, error: null, botId: BOT, enabled: true, live } : chat }),
   'coordinator.getCoordinatorChat': () => chat,
   'coordinator.pollBotChatSummaries': () => ({ items: { [BOT]: { at: AT, text: 'Done: the redirect is fixed.' } }, live }),
   'artifacts.getArtifactText': () => '# Release notes\n\nSign-in redirect fixed.',

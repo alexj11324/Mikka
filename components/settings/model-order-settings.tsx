@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -30,7 +31,7 @@ import { usePresence } from '@/lib/use-presence'
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
 
-export const modelOrderKey = (workspaceId: string) => ['settings:model-order', workspaceId] as const
+export const modelOrderKey = settingsKeys.modelOrder
 export const readModelOrder = (workspaceId: string) => settingsRead<Awaited<ReturnType<typeof getModelOrder>>>('model-order', { workspace: workspaceId })
 
 type Change = Parameters<typeof changeModelOrder>[0]

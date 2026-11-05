@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -27,7 +28,7 @@ export function SubscriptionShareSettings({ workspaceId, workspaceName }: { work
   const t = useTranslations('Settings.subscriptionShare')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const share = useSWR(['settings:subscription-share', workspaceId], () => getSubscriptionShare(workspaceId))
+  const share = useSWR(settingsKeys.subscriptionShare(workspaceId), () => getSubscriptionShare(workspaceId))
   const [pending, setPending] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [failed, setFailed] = useState<{ change: Change; message: string } | null>(null)
