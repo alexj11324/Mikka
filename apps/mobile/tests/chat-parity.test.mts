@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { endsSelection, quotedMessage, selectedPart, selectionQuote, SELECTION_ACTIONS } from '../features/chat/model/chat-selection.ts'
 import { nextQueueCheck, QUEUED_AFTER_MS, queuedItems, queuePreview } from '../features/chat/model/chat-queue.ts'
 import { cardAnchor, cardHeight, rowWindow } from '../features/chat/model/chat-attachment-card.ts'
-import { dismisses, fittedRect, frameSize, galleryRows, layerPose, pageTurn, stackCard, throwsCard } from '../features/chat/model/chat-image-geometry.ts'
+import { dismisses, fittedRect, frameSize, galleryRows, layerPose, loadedAspect, pageTurn, stackCard, throwsCard } from '../features/chat/model/chat-image-geometry.ts'
 import { menuThreads } from '../features/chat/model/chat-header-menu.ts'
 import type { ChatItem, Thread } from '../lib/types.ts'
 
@@ -64,6 +64,13 @@ test('pictures: one sits uncropped at its shape, several stack and fan out', () 
   assert.equal(throwsCard(50, 0, 196), true)
   assert.equal(throwsCard(20, 0, 196), false)
   assert.equal(throwsCard(5, 900, 196), true)
+})
+
+test('a loaded picture reports its shape from either platform', () => {
+  assert.equal(loadedAspect({ nativeEvent: { source: { width: 800, height: 600 } } }), 800 / 600)
+  assert.equal(loadedAspect({ nativeEvent: { target: { naturalWidth: 600, naturalHeight: 800 } } }), 600 / 800)
+  assert.equal(loadedAspect({ nativeEvent: {} }), null)
+  assert.equal(loadedAspect({}), null)
 })
 
 test('the viewer fits, pages, closes and grids', () => {

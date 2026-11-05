@@ -92,6 +92,17 @@ export function pageTurn(translation: number, velocity: number, step: number, in
   return Math.max(0, Math.min(count - 1, next))
 }
 
+/**
+ * The picture's shape after it loads. iOS reports `source`; the web build reports the image element on the load
+ * event and has no `source`. Missing sizes yield null so a load that does not say the size leaves the frame alone.
+ */
+export function loadedAspect(event: { nativeEvent?: { source?: { width?: number; height?: number }; target?: { naturalWidth?: number; naturalHeight?: number } } }): number | null {
+  const native = event.nativeEvent
+  const width = native?.source?.width || native?.target?.naturalWidth || 0
+  const height = native?.source?.height || native?.target?.naturalHeight || 0
+  return width > 0 && height > 0 ? width / height : null
+}
+
 /** The gallery's grid: two square columns; an odd count starts with one picture across the width. */
 export function galleryRows(count: number): number[][] {
   const rows: number[][] = []

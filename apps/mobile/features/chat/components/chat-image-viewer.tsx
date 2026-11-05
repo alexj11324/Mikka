@@ -11,7 +11,7 @@ import { Text } from '@/components/Text'
 import { tap } from '@/lib/haptics'
 import { useReducedMotionPreference } from '@/lib/reduced-motion'
 import { colors } from '@/lib/theme'
-import { clampZoom, dismisses, DOUBLE_TAP_ZOOM, fittedRect, galleryRows, MAX_ZOOM, PAGE_GAP, pageTurn, panBounds, type Rect } from '@/features/chat/model/chat-image-geometry'
+import { clampZoom, dismisses, DOUBLE_TAP_ZOOM, fittedRect, galleryRows, loadedAspect, MAX_ZOOM, PAGE_GAP, pageTurn, panBounds, type Rect } from '@/features/chat/model/chat-image-geometry'
 import { ChatGlass } from './chat-glass-capsule'
 
 const OPEN = { damping: 30, stiffness: 260, mass: 1 }
@@ -223,7 +223,11 @@ function ViewerPage({ index, step, source, rect, active, progress, origin, radiu
   return (
     <Reanimated.View style={[styles.page, style]}>
       <Image source={source} resizeMode="cover" style={styles.fill} accessibilityIgnoresInvertColors
-        onLoad={event => { const { width, height } = event.nativeEvent.source; if (width && height) onAspect(width / height) }} />
+        onLoad={event => {
+          const aspect = loadedAspect(event)
+          if (aspect) onAspect(aspect)
+          else if (source.uri) Image.getSize(source.uri, (width, height) => { if (width && height) onAspect(width / height) }, () => {})
+        }} />
     </Reanimated.View>
   )
 }

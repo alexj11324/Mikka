@@ -10,7 +10,7 @@ import { tap } from '@/lib/haptics'
 import { SNAP_BACK } from '@/lib/springs'
 import { useReducedMotionPreference } from '@/lib/reduced-motion'
 import { colors } from '@/lib/theme'
-import { FRAME_RADIUS, frameSize, layerPose, STACK_LIFT, STACK_SPREAD, stackCard, throwsCard } from '@/features/chat/model/chat-image-geometry'
+import { FRAME_RADIUS, frameSize, layerPose, loadedAspect, STACK_LIFT, STACK_SPREAD, stackCard, throwsCard } from '@/features/chat/model/chat-image-geometry'
 import { ChatImageViewer, type ViewerRequest } from './chat-image-viewer'
 
 const THROW = { damping: 30, stiffness: 260, mass: 1, overshootClamping: true }
@@ -43,7 +43,12 @@ function Frame({ source, onOpen }: { source: ImageURISource; onOpen: (request: V
       onPress={() => box.current?.measureInWindow((x, y, width, height) => onOpen({ index: 0, origin: { x, y, width, height }, radius: FRAME_RADIUS }))}
       style={({ pressed }) => [styles.frame, size, pressed && { opacity: 0.85 }]}>
       {source.uri ? <Image source={source} resizeMode="cover" style={styles.fill}
-        onLoad={event => { const { width, height } = event.nativeEvent.source; if (width && height) setAspect(width / height) }} /> : null}
+        onLoad={event => {
+          const aspect = loadedAspect(event)
+          if (aspect) setAspect(aspect)
+          // The web load event does not carry the image's size. Read it from the file.
+          else if (source.uri) Image.getSize(source.uri, (width, height) => { if (width && height) setAspect(width / height) }, () => {})
+        }} /> : null}
     </Pressable>
   )
 }
