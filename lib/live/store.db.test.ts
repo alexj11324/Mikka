@@ -92,13 +92,14 @@ test('the real Factory store schedules one invalidation only after its outer tra
           await refreshPublishedPullRequest('pull_request', { repository: { full_name: 'fixture/repo' }, pull_request: {
             number: 7, html_url: url, title, state: state === 'closed' ? 'closed' : 'open', draft: state === 'draft', merged_at: null,
           } }, pool)
-          assert.equal(pending.length, before + index + 1, 'each committed PR edit invalidates its current Factory task')
+          // Its Factory task, and the PR badge on the task it was delivered on (pull_request_status).
+          assert.equal(pending.length, before + 2 * (index + 1), 'each committed PR edit invalidates its current Factory task and PR badge')
           await visible
         }
         await refreshPublishedPullRequest('pull_request', { repository: { full_name: 'other/repo' }, pull_request: {
           number: 7, html_url: url, title: 'Mismatched repository', state: 'closed', draft: false, merged_at: null,
         } }, pool)
-        assert.equal(pending.length, before + 3, 'an invalid webhook target sends nothing')
+        assert.equal(pending.length, before + 6, 'an invalid webhook target sends nothing')
       } finally { onSchedule = () => {}; reader.release() }
     })
   } finally {

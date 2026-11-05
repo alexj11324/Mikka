@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
@@ -19,7 +19,8 @@ import { botModelMenuKey } from '@/components/coordinator/bot-model-picker'
 import { subscriptionName } from '@/components/coordinator/quota-notice'
 import { getHostedUsage, type HostedRefusal } from '@/lib/billing/verification-client'
 import { ownSubscriptionOption, type BotModelMenu } from '@/lib/bot-model-menu-view'
-import { balancePoints, pollUntil, refusalOffer } from '@/lib/billing/hosted-usage'
+import { balancePoints, refusalOffer } from '@/lib/billing/hosted-usage'
+import { useLiveWait } from '@/hooks/use-live-wait'
 import { ConnectSubscriptionButton } from '@/components/billing/connect-subscription-dialog'
 import { TopUpInPlace } from '@/components/billing/top-up-in-place'
 import { dropQueryKeys } from '@/components/workspace/workspace-navigation'
@@ -45,10 +46,12 @@ export function HostedRefusalNotice({ code, botId, retry, onQueued }: { code: Ho
   // The free messages are used up (no card yet): 绑定订阅 and 验证银行卡 side by side (decision 2026-11-02-1450).
   const trialUsed = code === 'verification_required' && read?.trialLeft === 0
   const actionError = useActionError()
-  // Paid: once the webhook has credited the points, the refused turn runs again.
+  // Paid: once the webhook has credited the points, the refused turn runs again. The webhook's commit pushes
+  // this workspace's hosted_billing key (#1212); no timer reads the balance.
+  const credited = useCallback((value: NonNullable<typeof usage.data>) => !value.error && balancePoints(value.balance) > 0, [])
+  const waitForPoints = useLiveWait(usage, 'hosted_billing', read?.workspaceId, ['hosted-usage'], credited)
   async function afterPayment() {
-    await pollUntil(() => getHostedUsage(), read => !read.error && balancePoints(read.balance) > 0)
-    await usage.mutate()
+    await waitForPoints()
     const result = botId ? await retryCoordinatorTurn(botId) : await retryCoordinatorTurn()
     if (result.error) toast.error(actionError(result.error))
     else await onQueued()

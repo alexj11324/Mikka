@@ -10,7 +10,9 @@ test('the chat reads on its live key, never on a timer', async () => {
 
 test('migrated lists use shared invalidation while the fallback interval remains one minute', async () => {
   const { readFileSync } = await import('node:fs')
-  assert.match(readFileSync('components/swr-defaults.tsx', 'utf8'), /export const LIST_POLL_MS = 60_000/)
+  // Lists read on push only; the one-minute read is the live layer's fallback while its socket is down.
+  assert.match(readFileSync('lib/live/channel.ts', 'utf8'), /export const LIVE_FALLBACK_MS = 60_000/)
+  assert.doesNotMatch(readFileSync('components/swr-defaults.tsx', 'utf8'), /POLL_MS|refreshInterval/)
   // Actual React + SWR tests in scripts/use-live-lists.live.test.tsx cover
   // healthy silence beyond 60 s, push, foreground catch-up and owner changes.
   for (const [file, hooks] of [
