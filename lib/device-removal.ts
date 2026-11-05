@@ -37,7 +37,7 @@ export async function renameOwnedDevice(userId: string, id: unknown, name: unkno
   const { rows } = await pool.query(`UPDATE devices SET name=$3,"nameLocked"=true,"updatedAt"=now()
     WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL RETURNING id,name`, [target, userId, value])
   if (!rows[0]) throw new ActionFailureError('deviceNotFound')
-  await ownerListChanged(pool, userId, ['thread_list'])
+  await ownerListChanged(pool, userId, ['thread_list', 'device_list'])
   return { id: rows[0].id, name: rows[0].name }
 }
 
@@ -79,7 +79,7 @@ export async function removeOwnedDevice(userId: string, id: unknown): Promise<{ 
     ) SELECT id FROM changed`, [target, userId, Boolean(online), new Date(Date.now() + DEVICE_UNINSTALL_GRACE_MS)])
     await client.query(`UPDATE agents SET "deviceId"=NULL,"updatedAt"=now() WHERE "deviceId"=$1 AND "userId"=$2`, [target, userId])
     await client.query(`UPDATE devices SET "removedAt"=now(),enabled=false,"updatedAt"=now() WHERE id=$1`, [target])
-    await ownerListChanged(client, userId, ['thread_list'])
+    await ownerListChanged(client, userId, ['thread_list', 'device_list'])
     await client.query('COMMIT')
     if (online) notifyDeviceWork(target)
     return { id: target, revokedTokens: online ? 0 : revoked.rowCount ?? 0, uninstall: online ? 'queued' : 'not_possible' }
