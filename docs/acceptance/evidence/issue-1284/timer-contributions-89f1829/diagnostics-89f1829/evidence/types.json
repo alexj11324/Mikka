@@ -1,0 +1,12 @@
+{
+  "name": "types",
+  "command": [
+    "pnpm",
+    "typecheck"
+  ],
+  "startedAt": "2026-11-05T15:22:10.071093+00:00",
+  "finishedAt": "2026-11-05T15:22:14.439221+00:00",
+  "exitCode": 0,
+  "log": "/tmp/issue1284-peer1403-diagnostic-evidence/types.log",
+  "logSha256": "959d5fbbef0c4388e2357dcdb292e33e7a97b572fff86857c2b58681520c88e7"
+}

@@ -1,0 +1,68 @@
+{
+  "kind": "official-test-account-evidence-audit",
+  "files": 43,
+  "archives": 0,
+  "archiveEntries": 0,
+  "decodedBytes": 0,
+  "result": "passed",
+  "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden",
+  "startedAt": "2026-11-05T15:38:34.503Z",
+  "finishedAt": "2026-11-05T15:38:34.531Z",
+  "evidenceSet": "issue1284-timer-contributions",
+  "runnerSourceCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+  "runnerSourceTree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+  "evidenceSourceBindings": [
+    {
+      "kind": "authoritative-peer-base",
+      "commit": "a6b0a0e06061d6250ee2aff69d2de0a04355d101",
+      "tree": "4cd12c56bed507e8cc47ae679e6605b2d54c6aca"
+    },
+    {
+      "kind": "handoff-focused-contribution",
+      "actualLocalCheckpoint": "92e6ba077282bd4dcac358b56c0233c65a89a06e",
+      "publishedCommit": "d3ea4c2f8229dd7fb22ddf00e1e33ca1c59b3d19",
+      "tree": "6b32408cbdad681d1d9b319c230e3d5c6a87f50c",
+      "parent": "a6b0a0e06061d6250ee2aff69d2de0a04355d101",
+      "sameTreeMappingDoesNotChangeActualExecutionVersion": true
+    },
+    {
+      "kind": "closed-diagnostic-contribution",
+      "actualLocalCheckpoint": "24aa29397d8eb6b01067ad1c6a019724ff7c75ff",
+      "publishedCommit": "89f1829e9620c5f59013781adc107228a666413c",
+      "tree": "16773655c04717b1d0c629a66f450b69da184d50",
+      "parent": "d3ea4c2f8229dd7fb22ddf00e1e33ca1c59b3d19",
+      "sameTreeMappingDoesNotChangeActualExecutionVersion": true
+    },
+    {
+      "kind": "historical-production-page-and-task-observation",
+      "publicPageCommit": "f200ad9ccad8ad56a69adea49358529c7af9d9d2",
+      "observedAt": "2026-11-05T15:08:19.777Z",
+      "notProofOfDurableWorkflowDeployment": true
+    }
+  ],
+  "manifestSha256": "4d987c3153a4e36155b6c1aefa8972c18487f9d450cf3e059bb111304b0d6b68",
+  "candidateBytes": 243847,
+  "candidateByteIntegrityBeforeAndAfter": true,
+  "helperBindings": [
+    {
+      "path": "scripts/test-accounts/session.mjs",
+      "gitBlobSha1": "36a314187b7580b718c3987d84d0db830eb019a4",
+      "sha256": "0af2d324bdfbfda64c8e4ba791f5668afa943d978b08472eeee78ad30ea5d699"
+    },
+    {
+      "path": "scripts/test-accounts/environment.mjs",
+      "gitBlobSha1": "908a22f0086decf3c654b13558d5b5b715d7894e",
+      "sha256": "967eec59d8c641440eaf03d04a89f6d493930cf824ee1eeaa2c59e3f2dbb426c"
+    }
+  ],
+  "privateContextsExported": false,
+  "databaseOrServerRequired": false,
+  "productionCalls": 0,
+  "modelOrProviderCalls": 0,
+  "helper": "scripts/test-accounts/session.mjs auditEvidence, with retained 8641 environment and secret ledger",
+  "limitations": [
+    "This is a new exact-file audit; prior audit pass reports are not reused.",
+    "The official helper checks known credentials/cookies from its retained isolated test-account context; it does not assert knowledge of unrelated production secrets.",
+    "The evidence records two version-bound source contributions and a historical production baseline; it does not assert that the peer PR adopted, tested, or deployed either contribution."
+  ]
+}

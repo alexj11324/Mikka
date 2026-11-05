@@ -263,3 +263,13 @@ ALEX66 的原 Review failed 和原生 Chrome SIGABRT 保持原样；补充检查
 [Manifest](production-20261105-1436-manifest.json) · [实际审计 PASS](production-20261105-1436-audit.json) · [审计清理收据](production-20261105-1436-cleanup.json)。49 文件共 392,136 bytes，审计前后字节与 SHA 不变；新增元数据报告单独保存。
 
 此增量仍不表示 #1284 全部完成：ALEX67 原候选的正常重试还需要权威修复 [#1403](https://github.com/alexj11324/Mikka/pull/1403) 发布后验收。包内 `a2c52809` 是保留的本地交接检查点，不是另一个生产实现；已另行提供与 #1403 同一实现的 [三文件定点贡献](https://github.com/alexj11324/Mikka/commit/d3ea4c2f8229dd7fb22ddf00e1e33ca1c59b3d19)。
+
+
+## #1403 的接力、SDK 父运行与闭集诊断贡献
+
+[43 文件定点贡献证据](timer-contributions-89f1829/README.md)保留 a6→d3ea→89f1829 的完整源码与两轮真实 RED/GREEN。接力与父运行回归在原 a6 为20 pass/2 fail，d3ea同树22/22；诊断断言在原d3ea为14 pass/8 fail，89f1829同树22/22。两组22项重叠，不合计为44个独立场景。root与独立reviewer已审阅；实际 error-cause auditRepository() 与 staleAllowlistEntries() 均为空。
+
+[新manifest](timer-contributions-89f1829-manifest.json) SHA256 `4d987c3153a4e36155b6c1aefa8972c18487f9d450cf3e059bb111304b0d6b68`；[官方静态审计](timer-contributions-89f1829-audit.json)在15:38:34 UTC实际扫描43文件、243847 bytes并通过，前后字节一致；[审计清理](timer-contributions-89f1829-cleanup.json)另列。历史生产基线只读快照保持原时间，不能据此声称timer已迁移。
+
+公开源码提交 [89f1829](https://github.com/alexj11324/Mikka/commit/89f1829e9620c5f59013781adc107228a666413c) 的tree精确等于实际Docker checkpoint24aa。该贡献已纳入#1403当前head；最终整合构建/CI、Web/worker发布及ALEX67原候选恢复仍需后续生产证据。API coding路径继续按Alex要求排除。
+

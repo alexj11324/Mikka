@@ -1,0 +1,62 @@
+{
+  "repository": "alexj11324/Mikka",
+  "purpose": "focused contribution for peer PR1403; not a competing timer design",
+  "baseCommit": "a6b0a0e06061d6250ee2aff69d2de0a04355d101",
+  "baseTree": "4cd12c56bed507e8cc47ae679e6605b2d54c6aca",
+  "commit": "92e6ba077282bd4dcac358b56c0233c65a89a06e",
+  "tree": "6b32408cbdad681d1d9b319c230e3d5c6a87f50c",
+  "parents": [
+    "a6b0a0e06061d6250ee2aff69d2de0a04355d101"
+  ],
+  "message": "fix: release recovery election before waking its successor",
+  "author": {
+    "name": "Mikka Agent",
+    "email": "mikka-agent@users.noreply.github.com",
+    "date": "2026-11-05T14:53:57+00:00"
+  },
+  "files": [
+    {
+      "path": "lib/due-timer-owner.ts",
+      "mode": "100644",
+      "type": "blob",
+      "baseBlob": "e968f13857a74535f6c1e567f7de8a11f59d7c20",
+      "baseSha256": "a87ad5dc96950065aa0c26c9bfce565888c606616cfc65220b350c69781d0cc8",
+      "blob": "722cdea1b711f45084132ac7dcf17f4c5e18ae6e",
+      "sha256": "b6e5848ea24bf92b936aee3ba88842b9d64dfaeaada1c47a111dbc6af91277f0",
+      "bytes": 11200,
+      "contentPath": "source/lib/due-timer-owner.ts"
+    },
+    {
+      "path": "workflows/due-timer/loop.ts",
+      "mode": "100644",
+      "type": "blob",
+      "baseBlob": "45629b2ff0f93882b3287d1364da87396e9fc251",
+      "baseSha256": "ae44af7b1e6fcb0c16224429dc31286b9dbbd371fa1209d4b7048c53113ce1ad",
+      "blob": "29e14682093fa868a1014b59706b7d9eb1b0e78d",
+      "sha256": "62ddeac7861d2842d68b625461dfa842dd5817ede76406799db6b6b7c9a38024",
+      "bytes": 6191,
+      "contentPath": "source/workflows/due-timer/loop.ts"
+    },
+    {
+      "path": "workflows/due-timer/current.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "baseBlob": "94b6cf78263d7e64be6f2d5cd6b89c15a5534db7",
+      "baseSha256": "2cab47504772676ae26fac6bb3736d004e1a5ea76dd64ba8be5f0ea57e686080",
+      "blob": "b1197208cec02da8851c35d05383df58145c2224",
+      "sha256": "f9a02e6a6f9bcefa61a14c35d25896fabeebc9d222455b8b6fe50a69ccbc4556",
+      "bytes": 23068,
+      "contentPath": "source/workflows/due-timer/current.test.ts"
+    }
+  ],
+  "diff": {
+    "path": "change.diff",
+    "sha256": "03f3b914dc00277ef7586029e9e9d364366af86217f87bb850e6c8d58f57911c"
+  },
+  "validation": {
+    "path": "validation.json",
+    "sha256": "870018e0a178d0d532942c2e60db83fe5f240cdbff2cfd97f9818f53407ede36"
+  },
+  "worktree": "/workspace/Mikka-1284-peer1403-review-a6",
+  "pushed": false
+}

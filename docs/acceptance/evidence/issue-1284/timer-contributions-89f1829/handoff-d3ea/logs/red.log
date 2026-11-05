@@ -1,0 +1,67 @@
+(node:23900) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23900) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ normal production arm replaces the old deployment timer before the next recovery pass (87.433521ms)
+✔ concurrent same-deployment candidates elect one owner and cancel only the legacy timer (11.9017ms)
+✔ idle ownership has no query or sleep and absorbs a cancelled old step late arm (15.862993ms)
+✔ same-deployment lifetime handoff keeps global ownership and admits one exact successor (33.252257ms)
+✔ failed lifetime handoff keeps the global hook and retries only on a real later wake (29.586894ms)
+✖ a yielding candidate releases election before its wake starts the lifetime successor (25.791031ms)
+✖ a lifetime predecessor argument without the matching SDK parent cannot force the incumbent (11.008559ms)
+✔ late or premature same-deployment successors cannot force a fresh winner (8.812287ms)
+✔ a real wake after a deployment change transfers without releasing the global token (23.672019ms)
+✔ stale candidate never force-claims or cancels the current deployment (8.659777ms)
+▶ unsupported, foreign and unknown owners are never force-claimed or cancelled
+  ✔ preview (3.282003ms)
+  ✔ project (3.121572ms)
+  ✔ owner (3.160263ms)
+  ✔ workflow (3.709143ms)
+  ✔ spec (3.701183ms)
+✔ unsupported, foreign and unknown owners are never force-claimed or cancelled (17.758314ms)
+✔ a changed claimedFrom victim cannot authorize cancelling a native child (6.370725ms)
+✔ a captured predecessor that finishes before force needs no cancellation receipt (9.529767ms)
+✔ loss after force never cancels the new winner or runs stale work (6.895986ms)
+✔ unknown lookup and missing latest capability do not become no-owner starts (3.314633ms)
+✔ cancel failure prevents due work and never touches the native task (7.603587ms)
+✔ preview run-recovery keeps the existing non-force lifecycle (2.962002ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 20
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 606.687229
+
+✖ failing tests:
+
+test at workflows/due-timer/current.test.ts:1:12565
+✖ a yielding candidate releases election before its wake starts the lifetime successor (25.791031ms)
+  AssertionError [ERR_ASSERTION]: the real wake must not lose the only lifetime successor
+      at TestContext.<anonymous> (/workspace/Mikka-1284-peer1403-review-a6/workflows/due-timer/current.test.ts:291:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'one',
+    expected: 'one',
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at workflows/due-timer/current.test.ts:1:13696
+✖ a lifetime predecessor argument without the matching SDK parent cannot force the incumbent (11.008559ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (/workspace/Mikka-1284-peer1403-review-a6/workflows/due-timer/current.test.ts:304:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,17 @@
+{
+  "name": "lint",
+  "command": [
+    "pnpm",
+    "exec",
+    "oxlint",
+    "lib/due-timer-owner.ts",
+    "lib/due-timer.ts",
+    "workflows/due-timer/steps.ts",
+    "workflows/due-timer/current.test.ts"
+  ],
+  "startedAt": "2026-11-05T15:22:10.071392+00:00",
+  "finishedAt": "2026-11-05T15:22:10.837027+00:00",
+  "exitCode": 0,
+  "log": "/tmp/issue1284-peer1403-diagnostic-evidence/lint.log",
+  "logSha256": "d78cc6399467428d89b825f87def2b64bb38ed21f8a9be6de88c22a2aed5bb69"
+}

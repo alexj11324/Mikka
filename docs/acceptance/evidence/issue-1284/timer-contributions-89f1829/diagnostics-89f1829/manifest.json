@@ -1,0 +1,66 @@
+{
+  "repository": "alexj11324/Mikka",
+  "baseCommit": "d3ea4c2f8229dd7fb22ddf00e1e33ca1c59b3d19",
+  "baseTree": "6b32408cbdad681d1d9b319c230e3d5c6a87f50c",
+  "commit": "24aa29397d8eb6b01067ad1c6a019724ff7c75ff",
+  "tree": "16773655c04717b1d0c629a66f450b69da184d50",
+  "parents": [
+    "d3ea4c2f8229dd7fb22ddf00e1e33ca1c59b3d19"
+  ],
+  "message": "fix(workflow): retain safe due-timer ownership diagnostics",
+  "author": {
+    "name": "Mikka Agent",
+    "email": "mikka-agent@users.noreply.github.com",
+    "date": "2026-11-05T15:27:51+00:00"
+  },
+  "committer": {
+    "name": "Mikka Agent",
+    "email": "mikka-agent@users.noreply.github.com",
+    "date": "2026-11-05T15:27:51+00:00"
+  },
+  "files": [
+    {
+      "path": "lib/due-timer-owner.ts",
+      "mode": "100644",
+      "type": "blob",
+      "blobSha": "83190a239c5bda29f83c850b47456ca3081d1cb8",
+      "baseBlobSha": "722cdea1b711f45084132ac7dcf17f4c5e18ae6e",
+      "sha256": "371db9652ec2c8f82733711b7f844ec728f7407cfd0ce0e90c1922b409bc05f0",
+      "bytes": 13504,
+      "contentPath": "source/lib/due-timer-owner.ts"
+    },
+    {
+      "path": "lib/due-timer.ts",
+      "mode": "100644",
+      "type": "blob",
+      "blobSha": "c3546c4f2542df59c4df51f873a91fbd15fa33d5",
+      "baseBlobSha": "7e4dda57d97d4b6e5dc2d6a7b9452514ff5c0df3",
+      "sha256": "645c4c59c93ef95f030e2c972a4350baafc6e1987c2291ac31db00f826c90047",
+      "bytes": 4865,
+      "contentPath": "source/lib/due-timer.ts"
+    },
+    {
+      "path": "workflows/due-timer/steps.ts",
+      "mode": "100644",
+      "type": "blob",
+      "blobSha": "0e33545655df6f3dcec35a9bea54ecccdd9427cb",
+      "baseBlobSha": "3d9d5a63f7754ef2984d8043b10e5e147e56209d",
+      "sha256": "c5d7df0f0e45398f7245d7903850d9ec94348e1b710d0001f91564c3eefd461e",
+      "bytes": 2981,
+      "contentPath": "source/workflows/due-timer/steps.ts"
+    },
+    {
+      "path": "workflows/due-timer/current.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "blobSha": "d418eb67f8d37493faa6a6079b4ba6df16b98564",
+      "baseBlobSha": "b1197208cec02da8851c35d05383df58145c2224",
+      "sha256": "a798dc4f1c6da1b43b66b2b3010aeb717e3ccc05e33b02db1415c46086da9b8b",
+      "bytes": 26063,
+      "contentPath": "source/workflows/due-timer/current.test.ts"
+    }
+  ],
+  "diffPath": "change.diff",
+  "validationPath": "validation.json",
+  "finishedAt": "2026-11-05T15:27:51.499573+00:00"
+}

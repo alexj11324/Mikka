@@ -1,0 +1,30 @@
+{
+  "name": "diagnostic-red",
+  "baseHead": "d3ea4c2f8229dd7fb22ddf00e1e33ca1c59b3d19",
+  "command": [
+    "node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./tests/support/server-only.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "workflows/due-timer/current.test.ts"
+  ],
+  "environment": {
+    "CI": "true"
+  },
+  "startedAt": "2026-11-05T15:19:42.739797+00:00",
+  "finishedAt": "2026-11-05T15:19:44.218459+00:00",
+  "exitCode": 1,
+  "counts": {
+    "tests": 22,
+    "pass": 14,
+    "fail": 8,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "log": "/tmp/issue1284-peer1403-diagnostic-evidence/red.log",
+  "logSha256": "16216709b16f5907e479e284aeedf9a91de9a5025bdae882da34078e4741bf5c",
+  "testSha256": "a798dc4f1c6da1b43b66b2b3010aeb717e3ccc05e33b02db1415c46086da9b8b"
+}

@@ -1,0 +1,61 @@
+{
+  "baseHead": "d3ea4c2f8229dd7fb22ddf00e1e33ca1c59b3d19",
+  "checks": [
+    {
+      "name": "types",
+      "command": [
+        "pnpm",
+        "typecheck"
+      ],
+      "startedAt": "2026-11-05T15:22:10.071093+00:00",
+      "finishedAt": "2026-11-05T15:22:14.439221+00:00",
+      "exitCode": 0,
+      "log": "/tmp/issue1284-peer1403-diagnostic-evidence/types.log",
+      "logSha256": "959d5fbbef0c4388e2357dcdb292e33e7a97b572fff86857c2b58681520c88e7"
+    },
+    {
+      "name": "lint",
+      "command": [
+        "pnpm",
+        "exec",
+        "oxlint",
+        "lib/due-timer-owner.ts",
+        "lib/due-timer.ts",
+        "workflows/due-timer/steps.ts",
+        "workflows/due-timer/current.test.ts"
+      ],
+      "startedAt": "2026-11-05T15:22:10.071392+00:00",
+      "finishedAt": "2026-11-05T15:22:10.837027+00:00",
+      "exitCode": 0,
+      "log": "/tmp/issue1284-peer1403-diagnostic-evidence/lint.log",
+      "logSha256": "d78cc6399467428d89b825f87def2b64bb38ed21f8a9be6de88c22a2aed5bb69"
+    },
+    {
+      "name": "error-cause-policy",
+      "command": [
+        "node",
+        "--input-type=module",
+        "-e",
+        "import { auditRepository, staleAllowlistEntries } from './scripts/error-cause-policy.mjs'; const diagnostics=auditRepository(); const stale=staleAllowlistEntries(); console.log(JSON.stringify({diagnostics,stale})); if(diagnostics.length||stale.length)process.exit(1);"
+      ],
+      "startedAt": "2026-11-05T15:22:10.071833+00:00",
+      "finishedAt": "2026-11-05T15:22:10.256838+00:00",
+      "exitCode": 0,
+      "log": "/tmp/issue1284-peer1403-diagnostic-evidence/error-cause-policy.log",
+      "logSha256": "3e1024e927a35cb2c66bdcfc46c6b2af7924c2e1e14eb8f2bff32e86b5cabb83"
+    },
+    {
+      "name": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "startedAt": "2026-11-05T15:22:10.072310+00:00",
+      "finishedAt": "2026-11-05T15:22:10.090428+00:00",
+      "exitCode": 0,
+      "log": "/tmp/issue1284-peer1403-diagnostic-evidence/diff-check.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

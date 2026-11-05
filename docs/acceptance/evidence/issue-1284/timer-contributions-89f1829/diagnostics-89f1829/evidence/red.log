@@ -1,0 +1,170 @@
+(node:24415) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:24415) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ normal production arm replaces the old deployment timer before the next recovery pass (75.794321ms)
+✔ concurrent same-deployment candidates elect one owner and cancel only the legacy timer (17.240353ms)
+✔ idle ownership has no query or sleep and absorbs a cancelled old step late arm (17.877555ms)
+✔ same-deployment lifetime handoff keeps global ownership and admits one exact successor (40.296602ms)
+✔ failed lifetime handoff keeps the global hook and retries only on a real later wake (38.983072ms)
+✔ a yielding candidate releases election before its wake starts the lifetime successor (53.061232ms)
+✔ a lifetime predecessor argument without the matching SDK parent cannot force the incumbent (11.191338ms)
+✔ late or premature same-deployment successors cannot force a fresh winner (9.754667ms)
+✔ a real wake after a deployment change transfers without releasing the global token (34.098828ms)
+✔ stale candidate never force-claims or cancels the current deployment (9.406287ms)
+▶ unsupported, foreign and unknown owners are never force-claimed or cancelled
+  ✖ preview (7.421766ms)
+  ✖ project (4.259833ms)
+  ✖ owner (4.024393ms)
+  ✖ workflow (4.407853ms)
+  ✖ spec (6.724166ms)
+✖ unsupported, foreign and unknown owners are never force-claimed or cancelled (27.710933ms)
+✔ a changed claimedFrom victim cannot authorize cancelling a native child (6.265845ms)
+✔ a captured predecessor that finishes before force needs no cancellation receipt (10.360148ms)
+✔ loss after force never cancels the new winner or runs stale work (6.142465ms)
+✖ unknown lookup and missing latest capability do not become no-owner starts (3.915913ms)
+✖ cancel failure prevents due work and never touches the native task (7.666666ms)
+✔ preview run-recovery keeps the existing non-force lifecycle (2.745052ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 14
+ℹ fail 8
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 908.041581
+
+✖ failing tests:
+
+test at workflows/due-timer/current.test.ts:1:16657
+✖ preview (7.421766ms)
+  AssertionError [ERR_ASSERTION]: one structured refusal, without a duplicate generic error
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (/workspace/Mikka-1284-peer1403-review-a6/workflows/due-timer/current.test.ts:367:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-1284-peer1403-review-a6/workflows/due-timer/current.test.ts:355:87)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at workflows/due-timer/current.test.ts:1:16657
+✖ project (4.259833ms)
+  AssertionError [ERR_ASSERTION]: one structured refusal, without a duplicate generic error
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (/workspace/Mikka-1284-peer1403-review-a6/workflows/due-timer/current.test.ts:367:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-1284-peer1403-review-a6/workflows/due-timer/current.test.ts:355:87)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at workflows/due-timer/current.test.ts:1:16657
+✖ owner (4.024393ms)
+  AssertionError [ERR_ASSERTION]: one structured refusal, without a duplicate generic error
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (/workspace/Mikka-1284-peer1403-review-a6/workflows/due-timer/current.test.ts:367:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-1284-peer1403-review-a6/workflows/due-timer/current.test.ts:355:87)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at workflows/due-timer/current.test.ts:1:16657
+✖ workflow (4.407853ms)
+  AssertionError [ERR_ASSERTION]: one structured refusal, without a duplicate generic error
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (/workspace/Mikka-1284-peer1403-review-a6/workflows/due-timer/current.test.ts:367:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-1284-peer1403-review-a6/workflows/due-timer/current.test.ts:355:87)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at workflows/due-timer/current.test.ts:1:16657
+✖ spec (6.724166ms)
+  AssertionError [ERR_ASSERTION]: one structured refusal, without a duplicate generic error
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (/workspace/Mikka-1284-peer1403-review-a6/workflows/due-timer/current.test.ts:367:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-1284-peer1403-review-a6/workflows/due-timer/current.test.ts:355:87)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at workflows/due-timer/current.test.ts:1:19431
+✖ unknown lookup and missing latest capability do not become no-owner starts (3.915913ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   'sdk_operation_failed',
+  -   'runtime_unavailable'
+  - ]
+  
+      at TestContext.<anonymous> (/workspace/Mikka-1284-peer1403-review-a6/workflows/due-timer/current.test.ts:422:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ 'sdk_operation_failed', 'runtime_unavailable' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at workflows/due-timer/current.test.ts:1:20339
+✖ cancel failure prevents due work and never touches the native task (7.666666ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (/workspace/Mikka-1284-peer1403-review-a6/workflows/due-timer/current.test.ts:434:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,48 @@
+{
+  "name": "diagnostic-green",
+  "baseHead": "d3ea4c2f8229dd7fb22ddf00e1e33ca1c59b3d19",
+  "command": [
+    "node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./tests/support/server-only.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "workflows/due-timer/current.test.ts"
+  ],
+  "environment": {
+    "CI": "true"
+  },
+  "startedAt": "2026-11-05T15:21:12.482655+00:00",
+  "finishedAt": "2026-11-05T15:21:13.192493+00:00",
+  "exitCode": 0,
+  "counts": {
+    "tests": 22,
+    "pass": 22,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "log": "/tmp/issue1284-peer1403-diagnostic-evidence/green.log",
+  "logSha256": "aaa441ef865a408029f18d2533ba49e44384603abccfcc1bc27d5f12fef412b7",
+  "testSha256": "a798dc4f1c6da1b43b66b2b3010aeb717e3ccc05e33b02db1415c46086da9b8b",
+  "files": [
+    {
+      "path": "lib/due-timer-owner.ts",
+      "sha256": "371db9652ec2c8f82733711b7f844ec728f7407cfd0ce0e90c1922b409bc05f0"
+    },
+    {
+      "path": "lib/due-timer.ts",
+      "sha256": "645c4c59c93ef95f030e2c972a4350baafc6e1987c2291ac31db00f826c90047"
+    },
+    {
+      "path": "workflows/due-timer/steps.ts",
+      "sha256": "c5d7df0f0e45398f7245d7903850d9ec94348e1b710d0001f91564c3eefd461e"
+    },
+    {
+      "path": "workflows/due-timer/current.test.ts",
+      "sha256": "a798dc4f1c6da1b43b66b2b3010aeb717e3ccc05e33b02db1415c46086da9b8b"
+    }
+  ]
+}

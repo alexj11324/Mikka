@@ -1,0 +1,186 @@
+{
+  "sourceCommit": "92e6ba077282bd4dcac358b56c0233c65a89a06e",
+  "sourceTree": "6b32408cbdad681d1d9b319c230e3d5c6a87f50c",
+  "base": {
+    "head": "a6b0a0e06061d6250ee2aff69d2de0a04355d101",
+    "tree": "4cd12c56bed507e8cc47ae679e6605b2d54c6aca",
+    "files": [
+      {
+        "path": "lib/due-timer-owner.ts",
+        "blob": "e968f13857a74535f6c1e567f7de8a11f59d7c20",
+        "sha256": "a87ad5dc96950065aa0c26c9bfce565888c606616cfc65220b350c69781d0cc8"
+      },
+      {
+        "path": "workflows/due-timer/loop.ts",
+        "blob": "45629b2ff0f93882b3287d1364da87396e9fc251",
+        "sha256": "ae44af7b1e6fcb0c16224429dc31286b9dbbd371fa1209d4b7048c53113ce1ad"
+      },
+      {
+        "path": "workflows/due-timer/current.test.ts",
+        "blob": "94b6cf78263d7e64be6f2d5cd6b89c15a5534db7",
+        "sha256": "2cab47504772676ae26fac6bb3736d004e1a5ea76dd64ba8be5f0ea57e686080"
+      }
+    ]
+  },
+  "validationType": "actual peer source with real arm/workflow/steps/owner modules and mocked Workflow SDK transport; no deployed Vercel world or production migration",
+  "checks": [
+    {
+      "name": "peer-a6-regression-before-product-fix",
+      "head": "a6b0a0e06061d6250ee2aff69d2de0a04355d101",
+      "sourceBoundary": "exact peer a6 product; only the two added regressions and SDK recorder metadata changed",
+      "command": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "workflows/due-timer/current.test.ts"
+      ],
+      "environment": {
+        "CI": "true"
+      },
+      "startedAt": "2026-11-05T14:50:54.246052+00:00",
+      "finishedAt": "2026-11-05T14:50:54.898988+00:00",
+      "exitCode": 1,
+      "log": "logs/red.log",
+      "logSha256": "4b8fb9fa45fbd03fcf40dc5b33f0245eaadbdefebfa7fb50f9d7c14e4fa41a91",
+      "counts": {
+        "tests": 22,
+        "pass": 20,
+        "fail": 2,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "testedCommit": "a6b0a0e06061d6250ee2aff69d2de0a04355d101",
+      "testedTreeBoundary": "peer base plus test-only changes"
+    },
+    {
+      "name": "peer-a6-focused-after-fix",
+      "baseHead": "a6b0a0e06061d6250ee2aff69d2de0a04355d101",
+      "sourceBoundary": "actual full peer a6 tree plus exactly three focused files",
+      "command": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "workflows/due-timer/current.test.ts"
+      ],
+      "environment": {
+        "CI": "true"
+      },
+      "startedAt": "2026-11-05T14:51:39.813693+00:00",
+      "finishedAt": "2026-11-05T14:51:40.506894+00:00",
+      "exitCode": 0,
+      "log": "logs/green.log",
+      "logSha256": "7e75ad9f4e9938072a96c77975f1041133028cf40f2a75bd04e8ef8c7038aee9",
+      "files": [
+        {
+          "path": "lib/due-timer-owner.ts",
+          "sha256": "b6e5848ea24bf92b936aee3ba88842b9d64dfaeaada1c47a111dbc6af91277f0"
+        },
+        {
+          "path": "workflows/due-timer/loop.ts",
+          "sha256": "62ddeac7861d2842d68b625461dfa842dd5817ede76406799db6b6b7c9a38024"
+        },
+        {
+          "path": "workflows/due-timer/current.test.ts",
+          "sha256": "f9a02e6a6f9bcefa61a14c35d25896fabeebc9d222455b8b6fe50a69ccbc4556"
+        }
+      ],
+      "counts": {
+        "tests": 22,
+        "pass": 22,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "testedCommit": "a6b0a0e06061d6250ee2aff69d2de0a04355d101",
+      "testedTreeBoundary": "exact committed contribution content before commit metadata was written"
+    },
+    {
+      "name": "types",
+      "command": [
+        "pnpm",
+        "typecheck"
+      ],
+      "startedAt": "2026-11-05T14:52:16.312758+00:00",
+      "finishedAt": "2026-11-05T14:52:21.485371+00:00",
+      "exitCode": 0,
+      "log": "logs/types.log",
+      "logSha256": "959d5fbbef0c4388e2357dcdb292e33e7a97b572fff86857c2b58681520c88e7",
+      "testedCommit": "a6b0a0e06061d6250ee2aff69d2de0a04355d101",
+      "testedTreeBoundary": "exact committed contribution content before commit metadata was written"
+    },
+    {
+      "name": "lint",
+      "command": [
+        "pnpm",
+        "exec",
+        "oxlint",
+        "lib/due-timer-owner.ts",
+        "workflows/due-timer/loop.ts",
+        "workflows/due-timer/current.test.ts"
+      ],
+      "startedAt": "2026-11-05T14:52:16.313352+00:00",
+      "finishedAt": "2026-11-05T14:52:16.770971+00:00",
+      "exitCode": 0,
+      "log": "logs/lint.log",
+      "logSha256": "f7a1370c36481b13e97de7acd96e8abde9bcd8baf1f69bb466f28c4184395bdc",
+      "testedCommit": "a6b0a0e06061d6250ee2aff69d2de0a04355d101",
+      "testedTreeBoundary": "exact committed contribution content before commit metadata was written"
+    },
+    {
+      "name": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "startedAt": "2026-11-05T14:52:16.313802+00:00",
+      "finishedAt": "2026-11-05T14:52:16.326981+00:00",
+      "exitCode": 0,
+      "log": "logs/diff-check.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "testedCommit": "a6b0a0e06061d6250ee2aff69d2de0a04355d101",
+      "testedTreeBoundary": "exact committed contribution content before commit metadata was written"
+    }
+  ],
+  "redAssertions": [
+    "a yielded wake lost the sole lifetime successor while election remained held",
+    "predecessor argument without SDK parent still forced an aged same-deployment holder"
+  ],
+  "sameTestBytesInRedAndGreen": true,
+  "originalPeerTestCasesRetained": 20,
+  "newTestCases": 2,
+  "limits": [
+    "No full build, PG, provider/model, production API or deployed migration run",
+    "No changes to peer closed logger or Factory interrupted-review recovery",
+    "SDK cancellation does not roll back an already-running business step"
+  ],
+  "cleanup": {
+    "checkedAt": "2026-11-05T14:53:57.940025+00:00",
+    "activeOwnTestProcesses": [],
+    "pgResourcesCreated": false,
+    "appServicesCreated": false,
+    "worktreeClean": true
+  },
+  "riskTriage": [
+    {
+      "finding": "election held across nudge can strand capped holder",
+      "occurrence": 4,
+      "impact": 6,
+      "score": 24
+    },
+    {
+      "finding": "same-deployment replacement lacks SDK parent proof",
+      "occurrence": 3,
+      "impact": 6,
+      "score": 18
+    }
+  ]
+}

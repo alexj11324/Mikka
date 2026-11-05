@@ -1,0 +1,14 @@
+{
+  "name": "error-cause-policy",
+  "command": [
+    "node",
+    "--input-type=module",
+    "-e",
+    "import { auditRepository, staleAllowlistEntries } from './scripts/error-cause-policy.mjs'; const diagnostics=auditRepository(); const stale=staleAllowlistEntries(); console.log(JSON.stringify({diagnostics,stale})); if(diagnostics.length||stale.length)process.exit(1);"
+  ],
+  "startedAt": "2026-11-05T15:22:10.071833+00:00",
+  "finishedAt": "2026-11-05T15:22:10.256838+00:00",
+  "exitCode": 0,
+  "log": "/tmp/issue1284-peer1403-diagnostic-evidence/error-cause-policy.log",
+  "logSha256": "3e1024e927a35cb2c66bdcfc46c6b2af7924c2e1e14eb8f2bff32e86b5cabb83"
+}

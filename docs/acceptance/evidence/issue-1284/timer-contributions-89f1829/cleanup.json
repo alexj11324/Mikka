@@ -1,0 +1,34 @@
+{
+  "kind": "static-evidence-audit-cleanup",
+  "observedAt": "2026-11-05T15:40:41.565600+00:00",
+  "evidenceSet": "issue1284-timer-contributions",
+  "manifestSha256": "4d987c3153a4e36155b6c1aefa8972c18487f9d450cf3e059bb111304b0d6b68",
+  "auditSha256": "ffce5f729e97e94c695f0e3833f4f304982f70180f2549dca53c0b9da89967ad",
+  "auditProcessExitCode": 0,
+  "auditFiles": 43,
+  "candidateBytes": 243847,
+  "candidateRoundtripAllFilesVerified": true,
+  "resourcesCreatedByThisAudit": {
+    "applicationServers": 0,
+    "databaseServers": 0,
+    "databaseRoles": 0,
+    "databases": 0,
+    "testAccountLeases": 0,
+    "browserProcesses": 0,
+    "nativeOrModelRuns": 0
+  },
+  "productionOrProviderCalls": 0,
+  "sourceFilesChanged": 0,
+  "remoteTransportArchivesRemoved": [
+    "issue1284-timer-contributions-public-transport.tar.gz",
+    "issue1284-timer-contributions-public-export.tar.gz"
+  ],
+  "localPublicTransportArchiveRemoved": true,
+  "publicCandidateAndReportsRetainedForEvidence": true,
+  "auditWrapperRetainedForReproducibility": true,
+  "privateRunnerContextRetained": true,
+  "privateContextWrittenOrExported": false,
+  "otherAgentResourcesUntouched": true,
+  "dockerLifecycleActions": 0,
+  "boundary": "This records only this static evidence-packaging/audit task. The root owns sandbox shutdown; no shared service status is inferred."
+}

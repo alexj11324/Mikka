@@ -1,0 +1,57 @@
+[
+  {
+    "path": "change.diff",
+    "bytes": 11560,
+    "sha256": "03f3b914dc00277ef7586029e9e9d364366af86217f87bb850e6c8d58f57911c"
+  },
+  {
+    "path": "logs/diff-check.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "logs/green.log",
+    "bytes": 2237,
+    "sha256": "7e75ad9f4e9938072a96c77975f1041133028cf40f2a75bd04e8ef8c7038aee9"
+  },
+  {
+    "path": "logs/lint.log",
+    "bytes": 90,
+    "sha256": "f7a1370c36481b13e97de7acd96e8abde9bcd8baf1f69bb466f28c4184395bdc"
+  },
+  {
+    "path": "logs/red.log",
+    "bytes": 3575,
+    "sha256": "4b8fb9fa45fbd03fcf40dc5b33f0245eaadbdefebfa7fb50f9d7c14e4fa41a91"
+  },
+  {
+    "path": "logs/types.log",
+    "bytes": 86,
+    "sha256": "959d5fbbef0c4388e2357dcdb292e33e7a97b572fff86857c2b58681520c88e7"
+  },
+  {
+    "path": "manifest.json",
+    "bytes": 2418,
+    "sha256": "c91503e0945a0b447f74152a23c431558a8d64d45bddd24e862c74ee39589268"
+  },
+  {
+    "path": "source/lib/due-timer-owner.ts",
+    "bytes": 11200,
+    "sha256": "b6e5848ea24bf92b936aee3ba88842b9d64dfaeaada1c47a111dbc6af91277f0"
+  },
+  {
+    "path": "source/workflows/due-timer/current.test.ts",
+    "bytes": 23068,
+    "sha256": "f9a02e6a6f9bcefa61a14c35d25896fabeebc9d222455b8b6fe50a69ccbc4556"
+  },
+  {
+    "path": "source/workflows/due-timer/loop.ts",
+    "bytes": 6191,
+    "sha256": "62ddeac7861d2842d68b625461dfa842dd5817ede76406799db6b6b7c9a38024"
+  },
+  {
+    "path": "validation.json",
+    "bytes": 6471,
+    "sha256": "870018e0a178d0d532942c2e60db83fe5f240cdbff2cfd97f9818f53407ede36"
+  }
+]

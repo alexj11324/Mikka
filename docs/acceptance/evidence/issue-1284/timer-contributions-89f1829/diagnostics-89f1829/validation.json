@@ -1,0 +1,199 @@
+{
+  "scope": "Focused closed diagnostics contribution for authoritative peer PR #1403; no migration authorization or scheduling behavior changes.",
+  "base": {
+    "commit": "d3ea4c2f8229dd7fb22ddf00e1e33ca1c59b3d19",
+    "tree": "6b32408cbdad681d1d9b319c230e3d5c6a87f50c",
+    "peerHead": "a6b0a0e06061d6250ee2aff69d2de0a04355d101"
+  },
+  "testedVersion": {
+    "baseHead": "d3ea4c2f8229dd7fb22ddf00e1e33ca1c59b3d19",
+    "worktree": "/workspace/Mikka-1284-peer1403-review-a6",
+    "sourceFiles": [
+      {
+        "path": "lib/due-timer-owner.ts",
+        "sha256": "371db9652ec2c8f82733711b7f844ec728f7407cfd0ce0e90c1922b409bc05f0"
+      },
+      {
+        "path": "lib/due-timer.ts",
+        "sha256": "645c4c59c93ef95f030e2c972a4350baafc6e1987c2291ac31db00f826c90047"
+      },
+      {
+        "path": "workflows/due-timer/steps.ts",
+        "sha256": "c5d7df0f0e45398f7245d7903850d9ec94348e1b710d0001f91564c3eefd461e"
+      },
+      {
+        "path": "workflows/due-timer/current.test.ts",
+        "sha256": "a798dc4f1c6da1b43b66b2b3010aeb717e3ccc05e33b02db1415c46086da9b8b"
+      }
+    ],
+    "note": "Tests ran on the exact full peer+d3 tree with these four working-tree changes before checkpoint; source file hashes verified unchanged at commit."
+  },
+  "checkpoint": {
+    "commit": "24aa29397d8eb6b01067ad1c6a019724ff7c75ff",
+    "tree": "16773655c04717b1d0c629a66f450b69da184d50",
+    "parents": [
+      "d3ea4c2f8229dd7fb22ddf00e1e33ca1c59b3d19"
+    ],
+    "clean": true
+  },
+  "red": {
+    "name": "diagnostic-red",
+    "baseHead": "d3ea4c2f8229dd7fb22ddf00e1e33ca1c59b3d19",
+    "command": [
+      "node",
+      "--experimental-test-module-mocks",
+      "--import",
+      "./tests/support/server-only.mjs",
+      "--import",
+      "tsx",
+      "--test",
+      "workflows/due-timer/current.test.ts"
+    ],
+    "environment": {
+      "CI": "true"
+    },
+    "startedAt": "2026-11-05T15:19:42.739797+00:00",
+    "finishedAt": "2026-11-05T15:19:44.218459+00:00",
+    "exitCode": 1,
+    "counts": {
+      "tests": 22,
+      "pass": 14,
+      "fail": 8,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "log": "/tmp/issue1284-peer1403-diagnostic-evidence/red.log",
+    "logSha256": "16216709b16f5907e479e284aeedf9a91de9a5025bdae882da34078e4741bf5c",
+    "testSha256": "a798dc4f1c6da1b43b66b2b3010aeb717e3ccc05e33b02db1415c46086da9b8b"
+  },
+  "green": {
+    "name": "diagnostic-green",
+    "baseHead": "d3ea4c2f8229dd7fb22ddf00e1e33ca1c59b3d19",
+    "command": [
+      "node",
+      "--experimental-test-module-mocks",
+      "--import",
+      "./tests/support/server-only.mjs",
+      "--import",
+      "tsx",
+      "--test",
+      "workflows/due-timer/current.test.ts"
+    ],
+    "environment": {
+      "CI": "true"
+    },
+    "startedAt": "2026-11-05T15:21:12.482655+00:00",
+    "finishedAt": "2026-11-05T15:21:13.192493+00:00",
+    "exitCode": 0,
+    "counts": {
+      "tests": 22,
+      "pass": 22,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "log": "/tmp/issue1284-peer1403-diagnostic-evidence/green.log",
+    "logSha256": "aaa441ef865a408029f18d2533ba49e44384603abccfcc1bc27d5f12fef412b7",
+    "testSha256": "a798dc4f1c6da1b43b66b2b3010aeb717e3ccc05e33b02db1415c46086da9b8b",
+    "files": [
+      {
+        "path": "lib/due-timer-owner.ts",
+        "sha256": "371db9652ec2c8f82733711b7f844ec728f7407cfd0ce0e90c1922b409bc05f0"
+      },
+      {
+        "path": "lib/due-timer.ts",
+        "sha256": "645c4c59c93ef95f030e2c972a4350baafc6e1987c2291ac31db00f826c90047"
+      },
+      {
+        "path": "workflows/due-timer/steps.ts",
+        "sha256": "c5d7df0f0e45398f7245d7903850d9ec94348e1b710d0001f91564c3eefd461e"
+      },
+      {
+        "path": "workflows/due-timer/current.test.ts",
+        "sha256": "a798dc4f1c6da1b43b66b2b3010aeb717e3ccc05e33b02db1415c46086da9b8b"
+      }
+    ]
+  },
+  "sameTestBytes": true,
+  "static": {
+    "baseHead": "d3ea4c2f8229dd7fb22ddf00e1e33ca1c59b3d19",
+    "checks": [
+      {
+        "name": "types",
+        "command": [
+          "pnpm",
+          "typecheck"
+        ],
+        "startedAt": "2026-11-05T15:22:10.071093+00:00",
+        "finishedAt": "2026-11-05T15:22:14.439221+00:00",
+        "exitCode": 0,
+        "log": "/tmp/issue1284-peer1403-diagnostic-evidence/types.log",
+        "logSha256": "959d5fbbef0c4388e2357dcdb292e33e7a97b572fff86857c2b58681520c88e7"
+      },
+      {
+        "name": "lint",
+        "command": [
+          "pnpm",
+          "exec",
+          "oxlint",
+          "lib/due-timer-owner.ts",
+          "lib/due-timer.ts",
+          "workflows/due-timer/steps.ts",
+          "workflows/due-timer/current.test.ts"
+        ],
+        "startedAt": "2026-11-05T15:22:10.071392+00:00",
+        "finishedAt": "2026-11-05T15:22:10.837027+00:00",
+        "exitCode": 0,
+        "log": "/tmp/issue1284-peer1403-diagnostic-evidence/lint.log",
+        "logSha256": "d78cc6399467428d89b825f87def2b64bb38ed21f8a9be6de88c22a2aed5bb69"
+      },
+      {
+        "name": "error-cause-policy",
+        "command": [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import { auditRepository, staleAllowlistEntries } from './scripts/error-cause-policy.mjs'; const diagnostics=auditRepository(); const stale=staleAllowlistEntries(); console.log(JSON.stringify({diagnostics,stale})); if(diagnostics.length||stale.length)process.exit(1);"
+        ],
+        "startedAt": "2026-11-05T15:22:10.071833+00:00",
+        "finishedAt": "2026-11-05T15:22:10.256838+00:00",
+        "exitCode": 0,
+        "log": "/tmp/issue1284-peer1403-diagnostic-evidence/error-cause-policy.log",
+        "logSha256": "3e1024e927a35cb2c66bdcfc46c6b2af7924c2e1e14eb8f2bff32e86b5cabb83"
+      },
+      {
+        "name": "diff-check",
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "startedAt": "2026-11-05T15:22:10.072310+00:00",
+        "finishedAt": "2026-11-05T15:22:10.090428+00:00",
+        "exitCode": 0,
+        "log": "/tmp/issue1284-peer1403-diagnostic-evidence/diff-check.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "policyResult": {
+    "diagnostics": [],
+    "stale": []
+  },
+  "boundaries": {
+    "fullBuildRun": false,
+    "pgRun": false,
+    "providerOrModelCalls": false,
+    "productionCallsOrChanges": false,
+    "peerBranchMutated": false,
+    "workflowPersistedError": "Unchanged fixed RetryableError message and retryAfter; no raw SDK cause attached.",
+    "logs": "Only isolated SDK boundary tests; no production payloads or credentials."
+  },
+  "cleanup": {
+    "recordedAt": "2026-11-05T15:27:51.499573+00:00",
+    "ownRunningNodeProcesses": [],
+    "pgResourcesCreated": false,
+    "applicationOrBrowserServicesCreated": false,
+    "sourceClean": true
+  }
+}

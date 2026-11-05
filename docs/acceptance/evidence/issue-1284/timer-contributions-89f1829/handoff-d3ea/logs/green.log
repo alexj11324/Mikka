@@ -1,0 +1,34 @@
+(node:23948) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23948) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ normal production arm replaces the old deployment timer before the next recovery pass (85.591659ms)
+✔ concurrent same-deployment candidates elect one owner and cancel only the legacy timer (13.661991ms)
+✔ idle ownership has no query or sleep and absorbs a cancelled old step late arm (17.550435ms)
+✔ same-deployment lifetime handoff keeps global ownership and admits one exact successor (38.471621ms)
+✔ failed lifetime handoff keeps the global hook and retries only on a real later wake (31.036455ms)
+✔ a yielding candidate releases election before its wake starts the lifetime successor (34.519727ms)
+✔ a lifetime predecessor argument without the matching SDK parent cannot force the incumbent (10.520218ms)
+✔ late or premature same-deployment successors cannot force a fresh winner (8.454467ms)
+✔ a real wake after a deployment change transfers without releasing the global token (33.335087ms)
+✔ stale candidate never force-claims or cancels the current deployment (8.914497ms)
+▶ unsupported, foreign and unknown owners are never force-claimed or cancelled
+  ✔ preview (3.624913ms)
+  ✔ project (3.659983ms)
+  ✔ owner (3.490823ms)
+  ✔ workflow (3.464373ms)
+  ✔ spec (3.401843ms)
+✔ unsupported, foreign and unknown owners are never force-claimed or cancelled (18.420135ms)
+✔ a changed claimedFrom victim cannot authorize cancelling a native child (7.392536ms)
+✔ a captured predecessor that finishes before force needs no cancellation receipt (9.141157ms)
+✔ loss after force never cancels the new winner or runs stale work (5.785635ms)
+✔ unknown lookup and missing latest capability do not become no-owner starts (3.042892ms)
+✔ cancel failure prevents due work and never touches the native task (7.069755ms)
+✔ preview run-recovery keeps the existing non-force lifecycle (2.610382ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 654.379847

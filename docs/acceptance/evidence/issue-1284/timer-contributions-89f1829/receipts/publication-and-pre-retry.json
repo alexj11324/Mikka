@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-05T15:10:54.503Z",
+  "publication": {
+    "commit": "0acf65ab2f79ee049bf280aefca7d5d5510d3411",
+    "tree": "059b250d592fe6484a6648be5ab1de5f59414a85",
+    "groupTree": "7b655d35225996648a2f6357ed19817fb5197e4d",
+    "truncated": false,
+    "expectedFiles": 49,
+    "observedFiles": 49,
+    "mismatches": [],
+    "metadataAndIndexFiles": 4,
+    "metadataAndIndexMismatches": [],
+    "verifiedAt": "2026-11-05T15:10:19.931Z"
+  },
+  "issueUpdate": {
+    "issue": 1284,
+    "commentId": 6661402831,
+    "status": "open",
+    "remaining": "ALEX67 original-candidate Review retry after authoritative timer repair deployment"
+  },
+  "docker": {
+    "sandbox": "sandboxes/sbx_001m6n9e6xhnqqg09ct1swwakwm",
+    "state": "stopped",
+    "recordedAt": "2026-11-05T15:06:16.752Z",
+    "postgres": "17/main stopped before sandbox stop",
+    "portCheck": "ss unavailable; no successful ss port-check claim",
+    "agentOwnedAppsAndBrowsers": "closed in prior scoped cleanup receipts"
+  },
+  "productionPreRetry": {
+    "observedAt": "2026-11-05T15:07:35.096Z",
+    "taskId": "b5785091-2c95-4f55-821d-fce51e027b0e",
+    "stage": "review",
+    "status": "blocked",
+    "revision": 11,
+    "candidateId": "816513cf-503e-4ccc-b708-4bbd565206f3",
+    "candidateSha": null,
+    "latestAttemptId": "40355b88-ed4d-49e1-b659-5f7028d6989e",
+    "latestAttemptRunId": null,
+    "latestAttemptCreatedAt": "2026-11-05T13:11:43.644Z",
+    "retryPerformed": false
+  },
+  "publicVersion": {
+    "observedAt": "2026-11-05T15:08:19.777Z",
+    "build": "f200ad9ccad8ad56a69adea49358529c7af9d9d2"
+  },
+  "apiCodingPath": {
+    "tested": false,
+    "balanceProbed": false,
+    "reason": "Excluded by Alex's current instruction; built-in Decision remains in scope."
+  }
+}
