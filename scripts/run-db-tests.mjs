@@ -39,7 +39,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/artifacts/delete.ts', file: 'tests/artifact-delete.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/run-publications.ts', file: 'tests/run-publications.db.test.ts', script: 'test:run-publication-db' },
   { marker: 'lib/github/publication-webhook.ts', file: 'lib/github/publication-webhook.db.test.ts', script: 'test:run-publication-db' },
-  { marker: 'app/api/webhooks/github/route.ts', file: 'app/api/webhooks/github/statements.db.test.ts', script: 'test:run-publication-db' },
+  { marker: 'lib/github/publication-webhook-actions.ts', file: 'tests/github-webhook-statements.db.test.ts', script: 'test:run-publication-db' },
   { marker: 'lib/cloud-computer/browser-authority.ts', file: 'lib/cloud-computer/unattended.db.test.ts', script: 'test:cloud-backend-db' },
   { marker: 'lib/credentials/store.ts', file: 'lib/credentials/store.db.test.ts', script: 'test:credentials-db' },
   { marker: 'lib/cloud-computer/subagents.ts', file: 'lib/cloud-computer/backend.db.test.ts', script: 'test:cloud-backend-db' },

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import { createHmac, randomUUID } from 'node:crypto'
 import { before, mock, test } from 'node:test'
 import pg from 'pg'
-import { isE2eTarget } from '../../../../tests/helpers/e2e-target.mjs'
+import { isE2eTarget } from './helpers/e2e-target.mjs'
 
 const target = process.env.E2E_DATABASE_URL
 const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL && target === process.env.DATABASE_URL
@@ -17,7 +17,7 @@ if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('GitHub webhook st
 const secret = 'statement-count-webhook-secret'
 const callbacks: Array<() => unknown> = []
 mock.module('next/server', { namedExports: { after: (callback: () => unknown) => { callbacks.push(callback) } } })
-mock.module(new URL('../../../../lib/coordinator/decide.ts', import.meta.url).href, { namedExports: {
+mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, { namedExports: {
   decide: async () => null, invokeDecision: async () => null, callDecisionRequest: async () => { throw new Error('no model in this test') },
 } })
 
@@ -45,13 +45,13 @@ pg.Client.prototype.query = function (this: unknown, ...args: unknown[]) {
   return (query as (...a: unknown[]) => unknown).apply(this, args)
 } as typeof query
 
-let POST: typeof import('./route')['POST']
+let POST: typeof import('../app/api/webhooks/github/route')['POST']
 let pool: pg.Pool
 before(async () => {
   if (!valid) return
   process.env.GITHUB_WEBHOOK_SECRET = secret
-  ;({ POST } = await import('./route'))
-  ;({ pool } = await import('../../../../lib/db'))
+  ;({ POST } = await import('../app/api/webhooks/github/route'))
+  ;({ pool } = await import('../lib/db'))
 })
 
 /** Runs one signed delivery and its background work; returns the statements it sent. */
