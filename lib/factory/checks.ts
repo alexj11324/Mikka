@@ -367,11 +367,16 @@ export function factoryReportQuestionAssignment(
   return readFactoryCheckAssignment(tx, userId, runId, "waiting");
 }
 
+/** Host-only read for an unstarted check recovery; never admits a claim. */
+export function factoryBlockedCheckAssignment(tx: Pick<PoolClient, "query">, userId: string, runId: string) {
+  return readFactoryCheckAssignment(tx, userId, runId, "blocked");
+}
+
 async function readFactoryCheckAssignment(
   tx: Pick<PoolClient, "query">,
   userId: string,
   runId: string,
-  status: "running" | "waiting",
+  status: "running" | "waiting" | "blocked",
 ) {
   const {
     rows: [row],

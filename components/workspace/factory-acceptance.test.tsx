@@ -3,11 +3,20 @@ import { readFileSync } from 'node:fs'
 import { before, beforeEach, mock, test } from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-const zh = JSON.parse(readFileSync(new URL('../../messages/zh-CN.json', import.meta.url), 'utf8')).FactoryAcceptance
+const zh = JSON.parse(readFileSync(new URL('../../messages/zh-CN.json', import.meta.url), 'utf8'))
 const lookup = (key: string, args?: Record<string, string>) => {
   const value = key.split('.').reduce((node, part) => node?.[part], zh)
-  assert.equal(typeof value, 'string', `missing FactoryAcceptance.${key}`)
+  assert.equal(typeof value, 'string', `missing ${key}`)
   return (value as string).replace(/\{(\w+)\}/g, (_, name) => args?.[name] ?? '')
+}
+const translators = new Map<string, typeof lookup>()
+const translationsFor = (namespace = '') => {
+  let translate = translators.get(namespace)
+  if (!translate) {
+    translate = (key, args) => lookup(namespace ? `${namespace}.${key}` : key, args)
+    translators.set(namespace, translate)
+  }
+  return translate
 }
 let swr: { data?: unknown; error?: unknown; isLoading: boolean; mutate: () => void }
 let ledger: unknown
@@ -15,7 +24,7 @@ let taskDetail: unknown
 mock.module('swr', { defaultExport: (key: string) => String(key).includes('view=ledger')
   ? { data: ledger, mutate: () => {} }
   : key === '/api/factory/tasks/t1' && taskDetail !== undefined ? { data: taskDetail, mutate: () => {} } : swr, namedExports: { useSWRConfig: () => ({ mutate: async () => undefined }) } })
-mock.module('next-intl', { namedExports: { useTranslations: () => lookup, useFormatter: () => ({ dateTime: () => '' }) } })
+mock.module('next-intl', { namedExports: { useTranslations: translationsFor, useFormatter: () => ({ dateTime: () => '' }) } })
 mock.module(new URL('./issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 
 let FactoryAcceptance: typeof import('./factory-acceptance')['FactoryAcceptance']
@@ -254,4 +263,25 @@ test('the same producer thread keeps its acceptance tab through retry states', (
     assert.equal(renderToStaticMarkup(<Header runId="producer" />), '<span>t1</span>')
     assert.equal(renderToStaticMarkup(<Header runId="another-thread" />), '')
   }
+})
+
+test('blocked fixed-candidate review and verification remain visible as blocked, not a failed verdict', () => {
+  for (const stage of ['review', 'verify'] as const) {
+    swr.data = { tasks: [task({ stage, status: 'blocked', candidateRunId: 'producer',
+      reason: 'Question recovery blocked: factoryQuestionRunMismatch' })] }
+    const html = list()
+    assert.match(html, /aria-label="Factory 验收"/)
+    assert.match(html, /受阻/)
+    assert.doesNotMatch(html, /审阅未通过|验证未通过|需要修改|进行中|发布失败|待你确认|不可批准/)
+  }
+})
+
+test('a blocked check keeps only its producer thread acceptance entry', () => {
+  function Header({ runId }: { runId: string }) {
+    const acceptance = useThreadAcceptance('issue-1', runId)
+    return acceptance ? <span>{acceptance.id}</span> : null
+  }
+  swr.data = { tasks: [task({ stage: 'review', status: 'blocked', candidateRunId: 'producer' })] }
+  assert.equal(renderToStaticMarkup(<Header runId="producer" />), '<span>t1</span>')
+  assert.equal(renderToStaticMarkup(<Header runId="another-thread" />), '')
 })

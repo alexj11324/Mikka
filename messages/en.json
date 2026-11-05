@@ -4524,17 +4524,20 @@
     "retry": "Retry",
     "checkState": {
       "review": {
+        "blocked": "Review blocked",
         "failed": "Review not passed",
         "pending": "Review queued",
         "running": "Reviewing"
       },
       "verify": {
+        "blocked": "Verification blocked",
         "failed": "Verification not passed",
         "pending": "Verification queued",
         "running": "Verifying"
       }
     },
     "retryReview": "Retry review",
+    "blocked": "Blocked",
     "retryVerify": "Retry verification",
     "checkRetryUnknown": "Retry unconfirmed",
     "checkRetryFailed": "Retry did not complete",

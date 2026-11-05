@@ -8,8 +8,17 @@ import { ViewStateProvider } from '../lib/hooks/view-state'
 import type { LiveSocket } from '../lib/live/channel'
 
 // Interactive checks: retry re-entry, focus after retry, and the 验收 pane's decision gate.
-const zh = JSON.parse(readFileSync(new URL('../messages/zh-CN.json', import.meta.url), 'utf8')).FactoryAcceptance
+const zh = JSON.parse(readFileSync(new URL('../messages/zh-CN.json', import.meta.url), 'utf8'))
 const lookup = (key: string, args?: Record<string, string>) => String(key.split('.').reduce((node, part) => node?.[part], zh) ?? key).replace(/\{(\w+)\}/g, (_, name) => args?.[name] ?? '')
+const translators = new Map<string, typeof lookup>()
+const translationsFor = (namespace = '') => {
+  let translate = translators.get(namespace)
+  if (!translate) {
+    translate = (key, args) => lookup(namespace ? `${namespace}.${key}` : key, args)
+    translators.set(namespace, translate)
+  }
+  return translate
+}
 type Swr = { data?: unknown; error?: unknown; isLoading: boolean; mutate: () => Promise<unknown> }
 let list: Swr
 let ledger: unknown
@@ -31,7 +40,7 @@ mock.module('swr', { defaultExport: (key: string | null) => {
   if (refreshFails) throw new Error('list unavailable')
   return list?.data
 } }) } })
-mock.module('next-intl', { namedExports: { useTranslations: () => lookup, useFormatter: () => ({
+mock.module('next-intl', { namedExports: { useTranslations: translationsFor, useFormatter: () => ({
   dateTime: (value: Date, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', ...options }).format(value),
 }) } })
 mock.module(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
@@ -40,6 +49,10 @@ mock.module(new URL('../components/ui/dialog.tsx', import.meta.url).href, { name
 mock.module(new URL('../components/workspace/factory-reject-note.tsx', import.meta.url).href, { namedExports: { RejectNote: () => null } })
 
 const browser = new Window({ url: 'https://mikka.example/zh-CN' })
+const originalFrames = {
+  requestAnimationFrame: Object.getOwnPropertyDescriptor(globalThis, 'requestAnimationFrame'),
+  cancelAnimationFrame: Object.getOwnPropertyDescriptor(globalThis, 'cancelAnimationFrame'),
+}
 let container: HTMLDivElement
 let root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
@@ -52,6 +65,8 @@ before(async () => {
   Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
   Object.defineProperty(globalThis, 'document', { configurable: true, value: browser.document })
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: browser.navigator })
+  Object.defineProperty(globalThis, 'requestAnimationFrame', { configurable: true, value: browser.requestAnimationFrame.bind(browser) })
+  Object.defineProperty(globalThis, 'cancelAnimationFrame', { configurable: true, value: browser.cancelAnimationFrame.bind(browser) })
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, HTMLElement: browser.HTMLElement, Element: browser.Element })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ LiveProvider } = await import('../hooks/use-live-key'))
@@ -67,7 +82,14 @@ beforeEach(() => {
   root = createRoot(container)
 })
 afterEach(async () => { await act(async () => root.unmount()); (container as unknown as { remove(): void }).remove() })
-after(() => browser.happyDOM.close())
+after(async () => {
+  await browser.happyDOM.close()
+  for (const key of ['requestAnimationFrame', 'cancelAnimationFrame'] as const) {
+    const descriptor = originalFrames[key]
+    if (descriptor) Object.defineProperty(globalThis, key, descriptor)
+    else Reflect.deleteProperty(globalThis, key)
+  }
+})
 
 const task = (patch: Record<string, unknown> = {}) => ({ id: 't1', issueId: 'issue-1', stage: 'approval', status: 'pending', reason: '独立检查通过', candidateId: 'c1', candidateRunId: null, isSkillCandidate: false, ...patch })
 const render = async () => { await act(async () => root.render(<FactoryAcceptance issueId="issue-1" />)) }
@@ -320,6 +342,157 @@ function retryReceipt(current: ReturnType<typeof failedCandidate>) {
     attempts: [{ id: pending.attemptId, taskId: pending.id, candidateId: pending.candidateId, stage: pending.stage, status: pending.status }],
     candidates: [{ id: pending.candidateId, taskId: pending.id }] }
 }
+
+test('single-review failure keeps its result without an impossible generic retry, while legacy and verify remain actionable', async () => {
+  const current = failedCandidate()
+  detail = { ...(detail as object), task: { ...current, route: { flowVersion: 2 } } }
+  await pane(current)
+  assert.equal(Boolean(button('重新审阅')), false, 'the normal retry endpoint rejects a completed flow v2 review')
+  assert.match(container.textContent ?? '', /需要修改/)
+  assert.equal(Boolean(button('验收并合并')), false)
+  for (const route of [undefined, { flowVersion: 1 }]) {
+    const legacy = failedCandidate()
+    detail = { ...(detail as object), task: { ...legacy, route } }
+    await pane(legacy)
+    assert.ok(button('重新审阅'))
+  }
+  const verify = failedCandidate('verify')
+  detail = { ...(detail as object), task: { ...verify, route: { flowVersion: 2 } } }
+  await pane(verify)
+  assert.ok(button('重新验证'))
+})
+
+function blockedCandidate(stage: 'review' | 'verify' = 'review') {
+  const current = { ...failedCandidate(stage), status: 'blocked', reason: 'Question recovery blocked: factoryQuestionRunMismatch' }
+  detail = { task: current, completionRecovery: null, delivery: { ...delivery, candidateSha: 'a'.repeat(40), pullRequest: null },
+    checks: [{ stage, status: 'blocked', attemptId: current.attemptId, candidateId: current.candidateId,
+      candidateSha: 'a'.repeat(40), runId: 'blocked-check-run', criteria: [], verify: null }] }
+  return current
+}
+
+test('blocked independent results are static and keep the fixed candidate', async () => {
+  for (const stage of ['review', 'verify'] as const) {
+    await pane(blockedCandidate(stage))
+    const results = container.querySelector('section[aria-label="独立结果"]')
+    assert.ok(results)
+    assert.equal(Boolean(results.querySelector('[data-slot="spinner"]')), false, 'a blocked check is not running')
+    assert.match(results.textContent ?? '', /受阻/)
+    assert.doesNotMatch(results.textContent ?? '', /进行中|需要修改|未通过/)
+    assert.ok(container.querySelector('section[aria-label="候选版本"] [data-sha="' + 'a'.repeat(40) + '"]'))
+  }
+})
+
+test('blocked acceptance exposes the current factory reason in existing details without repeating the run failure', async () => {
+  const current = blockedCandidate()
+  await pane(current)
+  const details = button('详情')
+  assert.ok(details, 'the current Factory recovery failure must remain inspectable')
+  assert.equal(details.getAttribute('aria-expanded'), 'false')
+  await act(async () => { details.click() })
+  assert.equal(details.getAttribute('aria-expanded'), 'true')
+  assert.match(container.textContent ?? '', /Question recovery blocked: factoryQuestionRunMismatch/)
+  assert.doesNotMatch(container.textContent ?? '', /ProfileUnavailable|agentProfileUnavailable/)
+})
+
+test('an unqualified blocked candidate offers only read access and never posts a retry or approval', async () => {
+  const current = blockedCandidate()
+  const opened: string[] = []
+  const sent: string[] = []
+  const original = globalThis.fetch
+  globalThis.fetch = (async (url, options) => {
+    sent.push(`${options?.method ?? 'GET'} ${url}`)
+    throw new Error('read-only blocked acceptance must not send an action')
+  }) as typeof fetch
+  try {
+    await act(async () => root.render(<FactoryAcceptancePane task={current} onOpenThread={runId => opened.push(runId)} />))
+    for (const label of ['重新审阅', '重新验证', '重试', '验收', '验收并合并', '批准并发布', '发布'])
+      assert.equal(button(label), undefined, `blocked alone must not expose ${label}`)
+    const open = button('独立审阅')
+    assert.ok(open)
+    await act(async () => { open.click() })
+    assert.deepEqual(opened, ['blocked-check-run'])
+    assert.equal(sent.length, 0, 'inspection does not restart model work')
+  } finally { globalThis.fetch = original }
+})
+
+function qualifiedBlockedCandidate() {
+  const current = blockedCandidate()
+  detail = { ...(detail as object), checkStartRecovery: { binding: { taskId: current.id, revision: current.revision } } }
+  return current
+}
+
+function startRecoveryReceipt(current: ReturnType<typeof qualifiedBlockedCandidate>) {
+  const running = { ...current, status: 'running', revision: current.revision + 2, attemptId: `check-${current.revision + 2}` }
+  return { contractVersion: 1, task: running,
+    attempts: [{ id: running.attemptId, taskId: running.id, candidateId: running.candidateId,
+      stage: running.stage, status: 'running', runId: 'new-check-run' }],
+    candidates: [{ id: running.candidateId, taskId: running.id }] }
+}
+
+test('host-qualified blocked review retries once and adopts the bound running attempt', async () => {
+  const current = qualifiedBlockedCandidate()
+  await pane(current)
+  const retry = button('重新审阅')
+  assert.ok(retry)
+  const sent: Record<string, unknown>[] = []
+  let finish: (response: Response) => void = () => {}
+  const original = globalThis.fetch
+  globalThis.fetch = (async (url, options) => {
+    assert.equal(String(url).endsWith('/api/factory/tasks/t1'), true)
+    assert.equal(options?.method, 'POST')
+    sent.push(JSON.parse(String(options?.body)))
+    return new Promise<Response>(resolve => { finish = resolve })
+  }) as typeof fetch
+  try {
+    await act(async () => { retry.click(); retry.click(); retry.dispatchEvent(new browser.MouseEvent('click', { bubbles: true }) as unknown as Event) })
+    assert.equal(sent.length, 1)
+    assert.equal(retry.disabled, true)
+    assert.equal(retry.getAttribute('aria-busy'), 'true')
+    assert.deepEqual(Object.keys(sent[0]).sort(), ['action', 'binding', 'eventId', 'reason'])
+    assert.deepEqual(sent[0].binding, { taskId: 't1', revision: 24 })
+    assert.equal(sent[0].action, 'retry')
+    const receipt = startRecoveryReceipt(current)
+    detail = { task: receipt.task, checks: [{ stage: 'review', status: 'running', attemptId: receipt.task.attemptId,
+      candidateId: 'c1', candidateSha: 'a'.repeat(40), runId: 'new-check-run', criteria: [], verify: null }] }
+    await act(async () => { finish(new Response(JSON.stringify(receipt), { status: 200 })) })
+    assert.equal(detailReloads, 1)
+    assert.equal(ledgerReloads, 1)
+    assert.deepEqual(listReloadKeys, ['/api/factory/tasks?issueId=issue-1'])
+    assert.equal(button('重新审阅'), undefined)
+    assert.equal(button('验收并合并'), undefined)
+    assert.doesNotMatch(container.textContent ?? '', /重试未确认|发布失败|已验收/)
+    assert.equal(sent.length, 1, 'refresh never dispatches another check')
+  } finally { globalThis.fetch = original }
+})
+
+test('an unknown start recovery preserves its event across remounts and waits for an explicit retry', async () => {
+  const current = qualifiedBlockedCandidate()
+  const scope = `check-start-retry-${crypto.randomUUID()}`
+  const open = async (key: string) => {
+    await act(async () => root.render(<ViewStateProvider scope={scope}><FactoryAcceptancePane key={key} task={current} /></ViewStateProvider>))
+  }
+  await open('first')
+  const sent: Record<string, unknown>[] = []
+  const original = globalThis.fetch
+  globalThis.fetch = (async (_url, options) => {
+    sent.push(JSON.parse(String(options?.body)))
+    if (sent.length === 1) throw new TypeError('connection lost')
+    return new Response(JSON.stringify(startRecoveryReceipt(current)), { status: 200 })
+  }) as typeof fetch
+  try {
+    await act(async () => { button('重新审阅')!.click() })
+    assert.match(container.textContent ?? '', /重试未确认/)
+    assert.equal(sent.length, 1)
+    await open('remounted')
+    assert.equal(sent.length, 1, 'rendering and refresh cannot replay the unknown recovery')
+    await act(async () => { button('重新审阅')!.click() })
+    assert.equal(sent.length, 2)
+    assert.deepEqual(sent[1], sent[0])
+    assert.deepEqual(sent[0].binding, { taskId: 't1', revision: 24 })
+    assert.ok(sent[0].eventId)
+    assert.doesNotMatch(container.textContent ?? '', /重试未确认|发布失败|已验收/)
+  } finally { globalThis.fetch = original }
+})
 
 test('same-candidate review retry posts once while busy and refreshes to the new pending attempt', async () => {
   const current = failedCandidate()

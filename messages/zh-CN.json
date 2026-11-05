@@ -4524,17 +4524,20 @@
     "retry": "重试",
     "checkState": {
       "review": {
+        "blocked": "审阅受阻",
         "failed": "审阅未通过",
         "pending": "等待审阅",
         "running": "审阅中"
       },
       "verify": {
+        "blocked": "验证受阻",
         "failed": "验证未通过",
         "pending": "等待验证",
         "running": "验证中"
       }
     },
     "retryReview": "重新审阅",
+    "blocked": "受阻",
     "retryVerify": "重新验证",
     "checkRetryUnknown": "重试未确认",
     "checkRetryFailed": "重试未完成",
