@@ -20,10 +20,11 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 const scheduled: (() => Promise<void>)[] = []
 mock.module('next/server', { namedExports: { after: (work: () => Promise<void>) => { scheduled.push(work) } } })
 // The same writers also wake task/thread detail panels with their run, thread
-// or document IDs, and bot chats with their bot IDs; panels.db.test.ts and
-// chats.db.test.ts cover those keys. Here count list keys only.
+// or document IDs, bot chats with their bot IDs and group pages with their group
+// IDs; panels.db.test.ts, chats.db.test.ts and groups.db.test.ts cover those keys.
+// Here count list keys only.
 before(async () => {
-  for (const file of ['./panels.ts', './chats.ts', './group-chat.ts']) {
+  for (const file of ['./panels.ts', './chats.ts', './groups.ts']) {
     const actual = await import(file)
     mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(Object.entries(actual).map(([name, value]) =>
       [name, name.endsWith('ScopesBeforeChange') ? async () => [] : name.endsWith('Changed') ? async () => {} : value])) })

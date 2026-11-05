@@ -1,5 +1,5 @@
 import 'server-only'
-import { assertRunProfileClaim } from '@/lib/factory/profile-admission'
+import { assertRunProfileClaim, refreshCloudRunProfileClaim } from '@/lib/factory/profile-admission'
 import { executionIdentityForRun, ExecutionIdentityError } from '../execution-identity'
 import type { Pool, PoolClient } from 'pg'
 import { computerPermission, type ComputerPermission } from './permission'
@@ -37,6 +37,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
  * A run frozen on an API key has no subscription binding (null): its key
  * was checked and recorded for it by `apiKeyForRun` before the claim. */
 export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string | null, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>, desktop = true): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number; permission: ComputerPermission } | null> {
+  await refreshCloudRunProfileClaim(pool, actor, runId, deviceId, subscriptionBindingId)
   const client = await pool.connect()
   try {
     await client.query('BEGIN')

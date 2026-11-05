@@ -1,9 +1,15 @@
 import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
 import { asSchema, type ModelMessage, type ToolSet } from 'ai'
-import { sleep } from 'workflow'
+import { createHook, sleep } from 'workflow'
 import type { CoordinatorRuntime, NativeCoordinatorJob } from '@mikka/protocol/coordinator'
 import * as native from './native-steps'
 import type { NativeToolScope } from './tool-scope'
+import { nativeTurnToken } from './native-wake'
+
+/** The device's job expires 180 s after it is queued (lib/coordinator/native-store.ts). */
+const NATIVE_TURN_MS = 180_000
+/** The device route wakes the turn after each call or reply; this re-read only covers a lost wake. */
+export const NATIVE_TURN_FALLBACK_MS = 15_000
 
 /** A durable transport relay, not an additional LLM/agent loop. Native harness chooses tools. */
 export async function nativeCoordinatorTurn(userId: string, holder: string, round: number, runtime: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, createTools: (scope?: NativeToolScope) => ToolSet, botId: string, snapshot?: DefinitionSnapshot, signal?: AbortSignal) {
@@ -18,8 +24,12 @@ export async function nativeCoordinatorTurn(userId: string, holder: string, roun
     : await native.enqueue(userId,holder,round,runtime,definitions,botId)
   const responseMessages: ModelMessage[] = []
   const completed = new Map<string, unknown>()
+  const deadline = Date.now() + NATIVE_TURN_MS
+  // Woken by the device's writes (app/v1/devices/[deviceId]/coordinator), not a 1 s re-read (#1212).
+  const changed = createHook<Record<string, never>>({ token: nativeTurnToken(turnId) })
+  const stopped = new Promise<void>(resolve => { if (signal?.aborted) resolve(); else signal?.addEventListener('abort', () => resolve(), { once: true }) })
   try {
-    for (let attempt = 0; attempt < 180; attempt++) {
+    for (;;) {
       // 停止: closing the turn below refuses the device's later tool calls and reply.
       if (signal?.aborted) return { text: '', responseMessages, finishReason: 'stop' }
       const state = await native.poll(userId,holder,turnId)
@@ -49,8 +59,10 @@ export async function nativeCoordinatorTurn(userId: string, holder: string, roun
         responseMessages.push({ role: 'assistant', content: state.reply })
         return { text: state.reply, responseMessages, finishReason: 'stop' }
       }
-      await sleep('1s')
+      // A last read at the deadline, so a reply that just landed is not lost.
+      if (Date.now() >= deadline) break
+      await Promise.race([changed, stopped, sleep(Math.max(1_000, Math.min(NATIVE_TURN_FALLBACK_MS, deadline - Date.now())))])
     }
     throw new Error('nativeCoordinatorTimedOut: no fallback model was used')
-  } finally { await native.close(userId,holder,turnId) }
+  } finally { changed.dispose(); await native.close(userId,holder,turnId) }
 }

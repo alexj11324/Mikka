@@ -31,7 +31,7 @@ import { AgentThemeProvider } from '@/components/workspace/agent-theme'
 import { openThread } from '@/components/workspace/workspace-navigation'
 import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
-import { BotModelPicker, botModelMenuKey } from './bot-model-picker'
+import { BotModelPicker, botModelMenuKey, openModelPicker } from './bot-model-picker'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
 import { useLiveKey, useLiveKeys, watchPageVisibility } from '@/hooks/use-live-key'
@@ -63,6 +63,7 @@ import { SentSuggestion } from '@/components/suggestions/mobile-card'
 import { HostedRefusalNotice } from '@/components/billing/hosted-refusal-notice'
 import { hostedRefusal } from '@/lib/billing/verification-client'
 import { subscriptionRefusal } from '@/lib/subscription-refusal'
+import { chatBalanceRefusal } from '@/lib/chat-balance'
 import { SubscriptionRefusalNotice } from './subscription-refusal-notice'
 import { HostedUnavailableNotice } from './hosted-unavailable-notice'
 import { FailureReason } from './failure-reason'
@@ -294,6 +295,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const refusal = data?.working ? null : hostedRefusal(data?.error)
   // The chosen subscription refused it: the mapped line, never the raw step error.
   const declined = data?.working || refusal ? null : subscriptionRefusal(data?.error)
+  const apiBalance = !data?.working && !refusal && !declined && chatBalanceRefusal(data?.error)
   // 重试 on any failed reply, never on a wake still being retried by the server.
   const retry = <RetryReplyButton botId={botId} onQueued={mutate} />
   const wakeError = data?.error === 'wake_failed' || data?.error === 'wake_start_unconfirmed' || data?.error === 'wake_exhausted' ? data.error : null
@@ -335,7 +337,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const failureNotice = <>
     {refusal && <HostedRefusalNotice code={refusal} botId={botId} retry={retry} onQueued={mutate} />}
     {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} botId={botId} />}
-    {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive" className={COMPOSER_NOTICE}>{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="failed">{t('failedTitle')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">{retry}</span></>}</Alert>}
+    {apiBalance && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="balance">{t('apiBalance')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1"><Button size="sm" onClick={() => openModelPicker(botId)}>{t('modelPicker.changeModel')}</Button></span></Alert>}
+    {data?.error && !data.working && !refusal && !declined && !apiBalance && <Alert variant="destructive" className={COMPOSER_NOTICE}>{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="failed">{t('failedTitle')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">{retry}</span></>}</Alert>}
   </>
   const sentCount = useMemo(() => Math.max(0, ...items.filter(item => item.from === 'person').map(item => item.position)), [items])
   // The newest reply keeps its actions in view, as Claude's does; older ones show them on hover.

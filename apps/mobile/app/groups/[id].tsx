@@ -25,7 +25,8 @@ import { holdMessage } from '@/lib/message-actions'
 import { plainText, quotable } from '@/lib/quote'
 import { myReaction, toggled, withMine } from '@/lib/reactions'
 import type { GroupMember, GroupMessage, GroupPage, GroupSummary, Reaction } from '@/lib/types'
-import { useApi } from '@/lib/useApi'
+import { useApi, useLiveApi } from '@/lib/useApi'
+import { groupChatLive } from '@/lib/live-keys'
 import { colors } from '@/lib/theme'
 
 /**
@@ -49,10 +50,12 @@ export default function GroupChat() {
   const [quote, setQuote] = useState<string | null>(null)
   const [sendFailed, setSendFailed] = useState(false)
   const groups = useApi<{ conversations: GroupSummary[] }>(home.data ? `/api/conversations?workspaceId=${home.data.workspace.id}` : null)
-  const title = groups.data?.conversations.find(group => group.id === id)?.title ?? ''
-  const [fast, setFast] = useState(false)
-  const page = useApi<GroupPage>(`/api/conversations/${id}/messages?limit=100`, fast ? 2500 : 8000)
-  const members = useApi<{ members: GroupMember[] }>(`/api/conversations/${id}/members`, 60_000)
+  const summary = groups.data?.conversations.find(group => group.id === id)
+  const title = summary?.title ?? ''
+  // One key for this group's page (lib/live/groups.ts): a message, who is answering, a member, a reaction.
+  const live = groupChatLive(id, summary?.workspaceId)
+  const page = useLiveApi<GroupPage>(`/api/conversations/${id}/messages?limit=100`, () => live)
+  const members = useLiveApi<{ members: GroupMember[] }>(`/api/conversations/${id}/members`, () => live)
   const [history, setHistory] = useState<{ identity: string; messages: GroupMessage[]; before: string | null } | null>(null)
   const identity = `${id}:${apiContext}`
   const currentHistory = history?.identity === identity ? history : null
@@ -90,7 +93,7 @@ export default function GroupChat() {
     const pages = await Promise.all(groupReactionPaths(ids.split(',').filter(Boolean)).map(path => api<{ reactions: Record<string, Reaction[]> }>(path)))
     return { reactions: Object.assign({}, ...pages.map(page => page.reactions)) as Record<string, Reaction[]> }
   }, [ids])
-  const reactionState = useApi<{ reactions: Record<string, Reaction[]> }>(ids ? `/api/mobile/reactions?ids=${ids}` : null, 15_000, readReactions)
+  const reactionState = useLiveApi<{ reactions: Record<string, Reaction[]> }>(ids ? `/api/mobile/reactions?ids=${ids}` : null, () => live, readReactions)
   const [reactionSnapshot, setReactionSnapshot] = useState<{ identity: string; reactions: Record<string, Reaction[]> } | null>(null)
   useEffect(() => { if (reactionState.data) setReactionSnapshot({ identity, reactions: reactionState.data.reactions }) }, [identity, reactionState.data])
   const reactions = reactionState.data?.reactions ?? (reactionSnapshot?.identity === identity ? reactionSnapshot.reactions : {})
@@ -98,7 +101,6 @@ export default function GroupChat() {
   const [reactionFailure, setReactionFailure] = useState<{ id: string; emoji: string | null } | null>(null)
   useEffect(() => { reactionPending.current.clear(); setReactionFailure(null) }, [identity])
   const working = Boolean(page.data?.agentStatus)
-  useEffect(() => { setFast(working) }, [working])
   // 停止: the group's reply ends on the server; stop stays away until the group stops answering.
   const [stopping, setStopping] = useState(false)
   const [stopFailed, setStopFailed] = useState(false)

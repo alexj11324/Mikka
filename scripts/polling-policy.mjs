@@ -35,31 +35,17 @@ export const pollingAllowlist = {
   'components/billing/free-allowance-section.tsx': db(web, 'pollUntil after card verification: up to 10 reads, 2 s apart, until the webhook lands', 1),
   'components/billing/hosted-refusal-notice.tsx': db(web, 'pollUntil after a top-up: up to 10 reads, 2 s apart, until the balance lands', 1),
   'lib/billing/hosted-usage.ts': db(web, 'pollUntil, the bounded poll helper behind the billing notices', 1),
-  // Mobile: useApi polling that reads our database.
-  'apps/mobile/lib/useApi.ts': db(web, 'the useApi polling timer (every screen that passes an interval)', 2),
-  'apps/mobile/components/ChatScreen.tsx': db(web, 'chat re-read every 3.75 s while working, 45 s otherwise, pending actions every 10 s; the 1 s setInterval is the elapsed clock', 3),
-  'apps/mobile/components/ChatList.tsx': db(web, 'group conversations re-read every 30 s', 1),
-  'apps/mobile/components/ThreadsScreen.tsx': db(web, 'thread list re-read every 10 s', 1),
-  'apps/mobile/app/groups/[id].tsx': db(web, 'group messages every 2.5 s while answering (8 s otherwise), members every 60 s, reactions every 15 s', 3),
-  'apps/mobile/app/tasks.tsx': db(web, 'task list re-read every 30 s', 1),
-  'apps/mobile/app/thread/[id].tsx': db(web, 'thread re-read every 4 s while running, 30 s once ended', 1),
-  'apps/mobile/lib/home.tsx': db(web, 'drawer home data re-read every minute', 1),
-  'apps/mobile/app/bots/[id]/info.tsx': db(web, 'bot page and computer status re-read every 15 s', 2),
   // Server: loops that re-query our database.
   'app/api/computer/events/route.ts': db(server, 'the "SSE" route re-queries subagent_events in a loop', 1),
-  'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll re-checks device commands until the deadline', 1),
+  'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll fallback timer only: with the gateway configured it waits on LISTEN for the device (re-check per NOTIFY, one final check at the deadline); every 5 s without push or if LISTEN drops', 1),
   'lib/coordinator/group-turns.ts': db(server, 'untilStopped fallback timer only: 15 s while the worker LISTENs for the stop push, 1 s if LISTEN is unavailable', 1),
-  'workflows/coordinator/native-turn.ts': db(server, 'native coordinator turn re-reads its state every second (up to 180 times)', 1),
-  'workflows/factory-stage/workflow.ts': db(server, 'stage maintenance step every 30 s for up to 12 h', 1),
-  'workflows/run-publication/workflow.ts': db(server, 'publish and fail results retried every 30 s until done', 2),
-  'workflows/subagent/workflow.ts': db(server, 'subagent tick every 1–30 s until terminal', 1),
-  'workflows/thread-machine/workflow.ts': db(server, 'thread machine maintenance every 30 s for up to 12 h', 1),
+  'workflows/run-publication/workflow.ts': db(server, 'untilDone: publish and fail results retried with exponential backoff, 30 s doubling to a 10 min cap, until done (GitHub outage or another worker\'s lease; nothing to push)', 1),
   // Daemon: loops that call our server, which reads the database.
   'packages/daemon/src/agents/tool-approval.ts': db(daemon, 'ToolApprovalGate fallback timer only: none while the device gateway pushes run control, every 20 s while it is down, 1 s against a server older than run-control push', 1),
   'packages/daemon/src/server-link-http.ts': db(daemon, 'isLive retries an unanswered liveness check (timeout, 5xx) every second for at most 30 s; no periodic check', 1),
   'packages/daemon/src/subscription-hosted-runner.ts': db(daemon, 'a 3-attempt retry of an unanswered subscription context read; the background check runs on push and at token expiry', 1),
-  'packages/daemon/src/computer/web-review.ts': db(daemon, 'pollWebComputerReviews: checks the local broker every second and syncs pending reviews with the server', 1),
-  'packages/daemon/src/coordinator/runner.ts': db(daemon, 'native coordinator tool waits for its result by asking the server every 500 ms', 1),
+  'packages/daemon/src/computer/web-review.ts': db(daemon, 'pollWebComputerReviews: checks the local broker every second; with review push it syncs only when the pending set changes, on a gateway push, or every 5 s for presence (the server takes decisions on requests seen in the last 10 s); every second only against a server without review push or while the gateway is down', 1),
+  'packages/daemon/src/coordinator/runner.ts': db(daemon, 'awaitToolResult fallback timer only: none while the gateway pushes Coordinator tool results (a 15 s safety re-ask), every 5 s while it is down, 500 ms against a server older than that push', 1),
   'packages/daemon/src/login.ts': db(daemon, 'device login polls the token endpoint at the server-given interval until approved (RFC 8628)', 1),
   'packages/daemon/src/runs/supervisor.ts': db(daemon, 'CHECKPOINT_EVERY_MS: a periodic write, not a read; saves an idle run\'s checkpoint to the server at most every 2 min', 1),
   // Third-party APIs.
@@ -81,6 +67,7 @@ export const pollingAllowlist = {
   'apps/mobile/components/beui/components/loading-states/agent-progress.tsx': ui('progress animation', 1),
   'apps/mobile/components/beui/components/loading-states/reasoning-text.tsx': ui('reasoning text animation', 2),
   'apps/mobile/components/beui/components/tool-result/tool-result.tsx': ui('elapsed-time clock', 1),
+  'apps/mobile/components/ChatScreen.tsx': ui('the 1 s elapsed clock of a reply in progress; the chat and its proposals are pushed (lib/live.ts)', 1),
   'components/version-guard.tsx': ui('checks the public build metadata once a minute (decision 2026-11-03-1437); no database read', 1),
 }
 

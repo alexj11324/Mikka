@@ -254,8 +254,6 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     // Read-only checks inspect the retained files; they cannot use an
     // interactive desktop. Its policy must not gate their file-only claim.
     const useComputer = desktop && run.agentDefinition?.readOnly !== true
-    await refreshProfileQuota(pool, { ownerId: caller.userId, workspaceId: caller.scopeWorkspaceId, agentId: agent.id,
-      model: run.agentDefinition?.model, subscriptionBindingId: subscription?.id, selection: run.agentDefinition?.agentProfile })
     let claimed: Awaited<ReturnType<typeof claimCloudRun>>
     try { claimed = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim, useComputer) }
     catch (error) { if (error instanceof AgentProfileAdmissionError) return rejectProfile(); throw error }

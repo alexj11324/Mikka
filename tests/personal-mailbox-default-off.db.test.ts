@@ -34,7 +34,7 @@ test('default-off claim, MCP and Coordinator work on the tracked schema with the
   let runToken: string | undefined
   let deviceTokenCreated = false
   const tokenHash = (value: string) => createHash('sha256').update(value).digest('hex')
-  const request = (path: string, token?: string, body: unknown = {}, capabilityHeaders: Record<string, string> = {}) => new Request(`http://127.0.0.1:3100/mikka${path}`, { method: 'POST', headers: { 'x-mikka-client-version': '0.0.375', 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(token ? { authorization: `Bearer ${token}` } : {}), ...capabilityHeaders }, body: JSON.stringify(body) })
+  const request = (path: string, token?: string, body: unknown = {}, capabilityHeaders: Record<string, string> = {}) => new Request(`http://127.0.0.1:3100/mikka${path}`, { method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(token ? { authorization: `Bearer ${token}` } : {}), ...capabilityHeaders }, body: JSON.stringify(body) })
   const claimRequest = () => request(`/v1/devices/${deviceId}/runs/${runId}/claim`, deviceToken, {}, { [REPO_ORIGIN_HEADER]: '1', [SKILL_ARTIFACT_HEADER]: '1' })
   try {
     await assertDatabaseIdentity(pool, environment)

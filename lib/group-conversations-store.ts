@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { enqueueGroupTurn, GROUP_TURN_STOPPED, stopGroupTurns } from './coordinator/group-turns'
 import { groupParticipants, type GroupParticipant } from './group-participants'
 import { groupListChanged, groupListReadChanged } from './live/lists'
-import { groupChatChanged } from './live/group-chat'
+import { groupChatChanged } from './live/groups'
 
 const member = z.object({ memberType: z.enum(['user', 'agent', 'bot']), memberId: z.string().min(1).max(256) }).strict()
 const create = z.object({ workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]), leadAgentId: z.uuid().nullable().optional(), leadBotId: z.uuid().nullable().optional() }).strict().refine(input => !input.leadAgentId || !input.leadBotId)
@@ -236,9 +236,8 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
           if (queueAgents && input.memberType === 'bot') await q('UPDATE conversations SET "leadBotId"=NULL WHERE id=$1 AND "leadBotId"=$2', [req.id, input.memberId])
           await q('UPDATE conversation_members SET "leftAt"=now() WHERE "conversationId"=$1 AND "memberType"=$2 AND "memberId"=$3', [req.id, input.memberType, input.memberId])
         }
-        const removedUser = req.method === 'DELETE' && input.memberType === 'user' ? input.memberId : null
-        await groupListChanged(client, group.id, removedUser)
-        await groupChatChanged(client, group.id, removedUser)
+        await groupListChanged(client, group.id, req.method === 'DELETE' && input.memberType === 'user' ? input.memberId : null)
+        await groupChatChanged(client, group.id)
         result = { ok: true }
       } else return fail(405)
     }

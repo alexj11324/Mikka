@@ -76,7 +76,7 @@ test('the device list key reaches only the owner home, after real device writers
       const { POST } = await import('../../app/v1/devices/[deviceId]/heartbeat/route')
       const beat = async (harnesses: unknown[]) => {
         const response = await scope.run(() => POST(new Request(`http://127.0.0.1/v1/devices/${device}/heartbeat`, {
-          method: 'POST', headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+          method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, 'content-type': 'application/json' },
           body: JSON.stringify({ runs: [], worktreeDiskBytes: 0, harnesses }),
         }), { params: Promise.resolve({ deviceId: device }) }))
         assert.equal(response.status, 200)

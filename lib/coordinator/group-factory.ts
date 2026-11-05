@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg'
 import { createHash } from 'node:crypto'
 import { groupListChanged } from '@/lib/live/lists'
-import { groupChatChanged } from '@/lib/live/group-chat'
+import { groupChatChanged } from '@/lib/live/groups'
 import { factoryEventId } from '@/lib/factory/event-id'
 import type { GroupRuntime, GroupReply } from './group-turns'
 import type { GroupTaskReference } from './group-routing'

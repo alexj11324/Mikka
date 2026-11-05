@@ -59,7 +59,7 @@ export function automaticFactoryDispatch(pool: Pool) {
     }, { issueId: task.issueId, stage: task.stage, location: source.deviceKind === 'cloud' ? 'cloud' : 'local',
       defaultHarness: source.harness, cloudPurpose: source.remoteUrl ? 'task' : 'desktop',
       ...(source.agentDefinition?.pinnedDeviceId ? { deviceId: source.agentDefinition.pinnedDeviceId } : {}),
-    }) : undefined
+    }, { transaction: tx }) : undefined
     if (profileChoice?.target.kind === 'none') throw new FactoryError('factoryCheckHarnessUnavailable')
     const { rows: [pending] } = await tx.query('SELECT output FROM factory_attempts WHERE id=$1 AND "taskId"=$2', [task.attemptId, task.id])
     const recovery = pending?.output?.watchdogRecovery

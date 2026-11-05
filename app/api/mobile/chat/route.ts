@@ -4,7 +4,8 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
 import { tokenWorkspace } from '@/lib/tokens/principal'
-import { chatView } from '@/lib/coordinator/store'
+import { chatVersionState, chatView } from '@/lib/coordinator/store'
+import { ownerListRead } from '@/lib/live/list-read-server'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { reactionsFor } from '@/lib/reactions'
 import { chatFailure } from '@/lib/chat-failure'
@@ -32,6 +33,14 @@ async function tokenBotAllowed(user: { id: string; [tokenWorkspace]?: string }, 
 /** Reactions on the chat's stored messages (a message still waiting has no id yet). */
 const reactionsOf = (userId: string, items: readonly { id?: string }[]) => reactionsFor(userId, items.flatMap(item => item.id ? [item.id] : []))
 
+/** Where this chat's live key arrives (the owner's home channel) and, while a reply is coming, when its lease runs out:
+ * the one change with no write, so the app reads once more then (as the web's chat does). */
+async function chatLive(userId: string, botId: string, working: boolean) {
+  if (!working) return ownerListRead(userId)
+  const { expiries, observedAt } = await chatVersionState(userId, 200, botId)
+  return ownerListRead(userId, expiries, observedAt)
+}
+
 /** `GET /api/mobile/chat?bot=<id>`: the chat with the Coordinator (no `bot`) or one of the person's bots. */
 async function handleGET(request: Request) {
   const user = await mobileUser(request)
@@ -51,7 +60,8 @@ async function handleGET(request: Request) {
     }
     const read = await getCoordinatorChat(bot.data)
     const chat = { ...read, items: read.items.filter(item => !item.welcome) }
-    return json({ ...chat, failure: chat.enabled ? chatFailure(chat) : null, reactions: await reactionsOf(user.id, chat.items) })
+    const [reactions, live] = await Promise.all([reactionsOf(user.id, chat.items), chatLive(user.id, read.botId, chat.working)])
+    return json({ ...chat, failure: chat.enabled ? chatFailure(chat) : null, reactions, live })
   } catch (error) {
     if (error instanceof ActionFailureError) return json({ error: error.code }, 404)
     throw error
