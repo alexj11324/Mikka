@@ -28,6 +28,12 @@ test('thread waiting device uses the same private queue projection as visibleRun
   const thread = async () => (await listThreads()).find(row => row.id === runId)
   const waitFor = async () => (await visibleRuns(actor, { runIds: [runId] }))[0]?.waitFor
 
+  await t.test('list omits unused full errors while the stored detail keeps its cause', async () => {
+    const error = 'profile_unavailable:watchdog_receipt\\n' + 'Synthetic diagnostic context '.repeat(2048)
+    await fixtures.query('UPDATE agent_runs SET error=$2 WHERE id=$1', [runId, error])
+    assert.equal(Object.hasOwn((await thread())!, 'error'), false)
+    assert.equal((await fixtures.query('SELECT error FROM agent_runs WHERE id=$1', [runId])).rows[0].error, error)
+  })
   await t.test('offline queued run returns device metadata and snapshotted harness', async () => {
     assert.deepEqual((await thread())?.waitingFor, { deviceId, deviceName: 'Alex MacBook Pro', deviceType: 'laptop', harness: 'claude' })
     assert.equal(await waitFor(), deviceId)

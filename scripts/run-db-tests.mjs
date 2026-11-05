@@ -26,6 +26,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/onboarding.ts', file: 'lib/onboarding.db.test.ts', script: 'test:onboarding-db' },
   { marker: 'lib/device-enrollment.ts', file: 'lib/device-enrollment.db.test.ts', script: 'test:device-enrollment-db' },
   { marker:'lib/execution-settings.ts',file:'lib/execution-settings.db.test.ts',script:'test:execution-settings-db' },
+  { marker:'lib/execution-model-options.ts',file:'lib/execution-model-options.db.test.ts',script:'test:execution-settings-db' },
   { marker: 'lib/rule-dispatch.ts', file: 'tests/run-machine-fallback.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/thread-dispatch.ts', file: 'tests/one-thread-per-task.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/factory/questions/queue-local-continuation.ts', file: 'tests/factory-local-question.db.test.ts', script: 'test:bot-threads-db' },

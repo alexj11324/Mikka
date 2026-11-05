@@ -4,6 +4,7 @@ import { credentialMasker, identityMasker, maskDeep, maskStreamStep, withCredent
 import type { CoordinatorStreamEvent, CoordinatorWorkflowStreamPart } from './stream'
 import { TOOL_PREVIEW_CHARS } from './chat-projection'
 import { HIDDEN_TOOLS, jsonbText, quotePreview, toolQuoteText } from './context'
+import { rawToolOperation, rawToolTarget, toolDisplayName, toolLabel, toolResultMetadata, TOOL_TARGET_CHARS, type ToolCallMetadata, type ToolResultMetadata } from './tool-metadata'
 
 /**
  * The start of a tool's input or output as text, masked as stored messages are; nothing when it would still
@@ -26,6 +27,28 @@ function quote(userId: string, input: unknown, fingerprints: SecretFingerprint[]
   if (!text) return undefined
   try { assertNoSecret(userId, text, fingerprints) } catch { return undefined }
   return quotePreview(text)
+}
+
+/** Metadata checks whole source fields before shortening them; a secret can straddle the cutoff. */
+function callMetadata(userId: string, name: string, input: unknown, fingerprints: SecretFingerprint[]): ToolCallMetadata {
+  const masked = maskDeep(input, credentialMasker)
+  let target = rawToolTarget(name, masked), operation = rawToolOperation(name, masked)
+  try { if (target) assertNoSecret(userId, target, fingerprints) } catch { target = undefined }
+  try { if (operation) assertNoSecret(userId, operation, fingerprints) } catch { operation = undefined }
+  const label = toolLabel(target, TOOL_TARGET_CHARS)
+  return { displayName: toolDisplayName(name, operation), ...(label ? { target: label } : {}) }
+}
+
+/** Keep existing identifier-shaped codes/details, never a thrown message or a credential. */
+function resultMetadata(userId: string, value: unknown, forcedError: boolean, fingerprints: SecretFingerprint[]): ToolResultMetadata {
+  const receipt = toolResultMetadata(value, forcedError)
+  const result: ToolResultMetadata = { state: receipt.state }
+  for (const key of ['errorCode', 'errorDetail'] as const) {
+    const identifier = receipt[key]
+    if (!identifier || credentialMasker(identifier) !== identifier) continue
+    try { assertNoSecret(userId, identifier, fingerprints); result[key] = identifier } catch { /* Saved secrets never become metadata. */ }
+  }
+  return result
 }
 
 /** A stored thinking block as the chat may show it: masked like stored messages; nothing if it holds a saved secret. */
@@ -129,11 +152,12 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
       } else if (id && (part.type === 'tool-call' || part.type === 'tool-result' || part.type === 'tool-error')) {
         // A hand-off turn may end quiet, leaving nothing in the chat; its steps never show either.
         if (quietEligible || HIDDEN_TOOLS.has(part.toolName)) return
-        const state = part.type === 'tool-call' ? 'running' : part.type === 'tool-result' ? 'done' : 'error'
+        const result = part.type === 'tool-call' ? { state: 'running' as const } : resultMetadata(userId, part.type === 'tool-result' ? part.output : part.error, part.type === 'tool-error', fingerprints)
+        const metadata = part.type === 'tool-call' ? callMetadata(userId, part.toolName, part.input, fingerprints) : {}
         const input = part.type === 'tool-call' ? preview(userId, part.input, fingerprints) : undefined
         const output = part.type === 'tool-result' ? preview(userId, part.output, fingerprints) : undefined
         const words = part.type === 'tool-call' ? quote(userId, part.input, fingerprints) : undefined
-        controller.enqueue({ type: 'tool', id, call: part.toolCallId, name: part.toolName, state, ...(input ? { input } : {}), ...(output ? { output } : {}), ...(words ? { quote: words } : {}), ...(part.type === 'tool-call' ? { at: text.length } : {}) })
+        controller.enqueue({ type: 'tool', id, call: part.toolCallId, name: part.toolName, ...result, ...metadata, ...(input ? { input } : {}), ...(output ? { output } : {}), ...(words ? { quote: words } : {}), ...(part.type === 'tool-call' ? { at: text.length } : {}) })
       } else if (id && part.type === 'reasoning-start') {
         reasoning.set(part.id, { pending: '', buf: '', sent: 0, blocked: false })
         if (!quietEligible) controller.enqueue({ type: 'thinking', id, state: 'start' })

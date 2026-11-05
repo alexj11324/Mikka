@@ -101,7 +101,7 @@ for (const type of ['http', 'sse'] as const) test(`real MCP ${type} handshake, d
     const input = JSON.parse(body)
     if (!('id' in input)) { response.writeHead(202); response.end(); return }
     const result = input.method === 'initialize' ? { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'fixture', version: '1' } }
-      : input.method === 'tools/list' ? { tools: [{ name: 'echo', description: 'Fixture echo', inputSchema: { type: 'object', properties: { text: { type: 'string' } } } }] }
+      : input.method === 'tools/list' ? { tools: [{ name: 'echo', title: 'Echo text', description: 'Fixture echo', inputSchema: { type: 'object', properties: { text: { type: 'string' } } } }] }
       : { content: [{ type: 'text', text: `echoed ${input.params.arguments.text}; ${secret}` }] }
     if (input.method === 'tools/call') { calls++; if (loseResponse) { request.socket.destroy(); return } }
     const message = JSON.stringify({ jsonrpc: '2.0', id: input.id, result })
@@ -118,6 +118,7 @@ for (const type of ['http', 'sse'] as const) test(`real MCP ${type} handshake, d
   try {
     const list = await runtime('owner', snapshot, { serverId })
     assert.equal('tools' in list && Array.isArray(list.tools) && list.tools.length, 1)
+    assert.equal((list as { tools: { displayName: string }[] }).tools[0].displayName, 'Echo text')
     const result = await runtime('owner', snapshot, { serverId, name: 'echo', arguments: { text: 'hello' } })
     assert.equal(calls, 1); assert.ok(JSON.stringify(result).includes('hello')); assert.ok(!JSON.stringify(result).includes(secret))
     enabled = false; assert.deepEqual(await runtime('owner', snapshot, { serverId, name: 'echo', arguments: {} }), { error: 'mcpUnavailable' }); assert.equal(calls, 1)

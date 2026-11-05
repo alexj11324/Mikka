@@ -1,6 +1,7 @@
 import { sql, type SQL } from 'drizzle-orm'
 import { coordinatorMessages } from '@/lib/db/schema'
 import { QUOTE_KEYS, QUOTE_PREVIEW_CHARS, QUOTE_SPACE } from './context'
+import { compactToolCallMetadata, compactToolResultMetadata } from './tool-metadata-sql'
 
 /** Characters of a tool's input or output a chat summary keeps. */
 export const TOOL_PREVIEW_CHARS = 200
@@ -21,9 +22,9 @@ const DISPATCH_TOOLS = ['dispatch_run', 'dispatch_bot_computer'] as const
  * Stored messages are masked before they are saved (store.ts), so previews only shorten masked text.
  */
 export type CompactReasoningPart = { type: 'reasoning'; chars: number }
-export type CompactToolCallPart = { type: 'tool-call'; toolCallId: string; toolName: string; inputPreview?: string; quotePreview?: string }
+export type CompactToolCallPart = { type: 'tool-call'; toolCallId: string; toolName: string; inputPreview?: string; quotePreview?: string; target?: string; operationName?: string }
 export type CompactToolResultPart = {
-  type: 'tool-result'; toolCallId: string; toolName: string; status: 'done' | 'error'; outputPreview?: string
+  type: 'tool-result'; toolCallId: string; toolName: string; status: 'done' | 'error'; outputPreview?: string; errorCode?: string; errorDetail?: string
   output?: { type: 'json'; value: { runId?: string } }
 }
 
@@ -47,12 +48,11 @@ export const compactChatMessage: SQL<Record<string, unknown>> = sql`case when js
       when 'reasoning' then jsonb_build_object('type', 'reasoning', 'chars', char_length(coalesce(p->>'text', '')))
       when 'tool-call' then jsonb_strip_nulls(jsonb_build_object('type', 'tool-call', 'toolCallId', p->'toolCallId', 'toolName', p->'toolName',
         'inputPreview', left(p->>'input', ${preview}),
-        'quotePreview', left(coalesce(${quoteFields}), ${quoteChars})))
+        'quotePreview', left(coalesce(${quoteFields}), ${quoteChars}))) || ${compactToolCallMetadata}
       when 'tool-result' then jsonb_strip_nulls(jsonb_build_object('type', 'tool-result', 'toolCallId', p->'toolCallId', 'toolName', p->'toolName',
-        'status', case when p#>>'{output,type}' like 'error%' then 'error' else 'done' end,
         'outputPreview', left(p#>>'{output,value}', ${preview}),
         'output', case when p->>'toolName' in (${dispatchTools}) and p#>>'{output,type}' = 'json'
-          then jsonb_build_object('type', 'json', 'value', jsonb_strip_nulls(jsonb_build_object('runId', p#>'{output,value,runId}'))) end))
+          then jsonb_build_object('type', 'json', 'value', jsonb_strip_nulls(jsonb_build_object('runId', p#>'{output,value,runId}'))) end)) || ${compactToolResultMetadata}
       when 'file' then jsonb_strip_nulls(jsonb_build_object('type', 'file', 'mediaType', p->'mediaType'))
       else p end order by ord)
     from jsonb_array_elements(${coordinatorMessages.message}->'content') with ordinality as part(p, ord)), '[]'::jsonb))

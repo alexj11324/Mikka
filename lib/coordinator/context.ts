@@ -11,6 +11,7 @@ import { splitBrowserNotes, type BrowserNote } from '@/lib/browser/note'
 import { splitSuggestion, type SuggestionCard } from '@/lib/suggestions/card'
 import { chatFailure, type ChatFailure } from '@/lib/chat-failure'
 import { eventLine, type EventLine } from './event-line'
+import { projectedToolResult, toolCallMetadata, toolResultMetadata, type ProjectedToolMetadata } from './tool-metadata'
 
 // What the Coordinator's model sees. Everything here depends only on the
 // stored conversation, never on time or on how long the person was away, so
@@ -308,7 +309,7 @@ export function instructionsWithPersonal(instructions: string, personal: string)
 /** A tool a reply used, as the chat shows it: `running` until its result is stored. */
 /** `at`: how much of the reply's text came before this tool ran, so the chat draws it after those words. */
 /** `quote`: what the call was asked to do in words (a dispatch's note), whole up to QUOTE_PREVIEW_CHARS, sent apart from `input` so a cut preview never loses it. */
-export interface ChatTool { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string; quote?: string; at?: number }
+export interface ChatTool { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string; quote?: string; at?: number; target?: string; displayName?: string; errorCode?: string; errorDetail?: string }
 /** `reasoningAt`: the stored rows whose reasoning is readable text, fetched only when the person opens it (chat-projection.ts keeps its length). */
 export interface ChatActivity { tools: ChatTool[]; thought: boolean; reasoningAt?: number[] }
 
@@ -515,7 +516,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       const cited = takeArtifacts(parts.flatMap(part => part.type === 'text' && part.text.trim() && part.text.trim() !== QUIET_REPLY ? [part.text.trim()] : []).join('\n\n'))
       const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) ? [part.toolName] : [])
       const steps = parts.flatMap((part): ChatTool[] => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName)
-        ? [{ call: part.toolCallId, name: part.toolName, state: 'running', ...withPreview('input', toolPreview((part as { inputPreview?: unknown }).inputPreview, part.input)),
+        ? [{ call: part.toolCallId, name: part.toolName, state: 'running', ...toolCallMetadata(part.toolName, part.input, part as ProjectedToolMetadata), ...withPreview('input', toolPreview((part as { inputPreview?: unknown }).inputPreview, part.input)),
           ...withQuote(part.input === undefined ? quotePreview((part as { quotePreview?: unknown }).quotePreview) : toolQuote(part.input)) }] : [])
       // Any reasoning means it thought; only readable text (not encrypted or empty) can be opened.
       const thought = parts.some(part => part.type === 'reasoning')
@@ -554,9 +555,9 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         if (runId && !last.threads.includes(runId)) last.threads.push(runId)
         const step = part.type === 'tool-result' ? last.activity?.tools.find(tool => tool.call === part.toolCallId) : undefined
         if (step && part.type === 'tool-result') {
-          const compact = part as { status?: unknown; outputPreview?: unknown }
+          const compact = part as { status?: unknown; outputPreview?: unknown } & ProjectedToolMetadata
           const output = part.output as { type?: string; value?: unknown } | undefined
-          step.state = compact.status === 'error' || output?.type?.startsWith('error') ? 'error' : 'done'
+          Object.assign(step, compact.status === undefined ? toolResultMetadata(output?.value, output?.type?.startsWith('error')) : projectedToolResult(compact.status, compact))
           Object.assign(step, withPreview('output', toolPreview(compact.outputPreview, compact.status === undefined ? output?.value : undefined)))
         }
       }
