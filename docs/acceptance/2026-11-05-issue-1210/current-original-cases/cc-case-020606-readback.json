@@ -1,0 +1,50 @@
+{
+  "scope": "Read-only recheck of the same original Owner and CC task/question; no model, mutation or new session",
+  "target": {
+    "project_id": "autumn-fire-21908520",
+    "branch_id": "br-autumn-rain-b5leflom",
+    "database_name": "orvilo_mvp"
+  },
+  "query": "SELECT jsonb_build_object(\n  'observedAt', clock_timestamp(),\n  'task', (SELECT jsonb_build_object('id',id,'ownerId',\"userId\",'issueId',\"issueId\",'botId',\"botId\",'stage',stage,'status',status,'revision',revision,'candidateId',\"candidateId\",'updatedAt',\"updatedAt\") FROM factory_tasks WHERE id='e42571e5-58f7-40e3-9418-c02ee8843fe6' AND \"userId\"='XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ'),\n  'question', (SELECT jsonb_build_object('id',id,'taskId',\"taskId\",'kind',kind,'stage',stage,'status',status,'revision',revision,'answerId',\"answerId\",'answerSource',\"answerSource\",'continuationRunId',\"continuationRunId\",'answeredAt',\"answeredAt\",'expiresAt',\"expiresAt\",'updatedAt',\"updatedAt\") FROM factory_questions WHERE id='31b87a5f-7be6-49e9-9031-126dd2144007' AND \"userId\"='XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ'),\n  'runStatusCounts', (SELECT coalesce(jsonb_object_agg(status,n),'{}'::jsonb) FROM (SELECT status,count(*) n FROM agent_runs WHERE \"userId\"='XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ' AND \"issueId\"='0b9e6f79-790b-4931-aa54-2f45f5d142de' GROUP BY status) s),\n  'unexpiredRunLeases', (SELECT count(*) FROM agent_runs WHERE \"userId\"='XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ' AND \"issueId\"='0b9e6f79-790b-4931-aa54-2f45f5d142de' AND \"leaseExpiresAt\">now())\n) AS observation",
+  "result": [
+    {
+      "observation": {
+        "task": {
+          "id": "e42571e5-58f7-40e3-9418-c02ee8843fe6",
+          "botId": "279c373e-2a6b-415d-a430-ac64f4c33b16",
+          "stage": "verify",
+          "status": "waiting",
+          "issueId": "0b9e6f79-790b-4931-aa54-2f45f5d142de",
+          "ownerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+          "revision": 13,
+          "updatedAt": "2026-11-04T20:15:32.526505+00:00",
+          "candidateId": "2f338962-c690-4ba7-bc63-6c73a9de3acb"
+        },
+        "question": {
+          "id": "31b87a5f-7be6-49e9-9031-126dd2144007",
+          "kind": "decision",
+          "stage": "verify",
+          "status": "waiting_user",
+          "taskId": "e42571e5-58f7-40e3-9418-c02ee8843fe6",
+          "answerId": null,
+          "revision": 2,
+          "expiresAt": "2026-11-05T20:15:32.526505+00:00",
+          "updatedAt": "2026-11-04T20:15:52.877098+00:00",
+          "answeredAt": null,
+          "answerSource": null,
+          "continuationRunId": null
+        },
+        "observedAt": "2026-11-05T02:06:06.425424+00:00",
+        "runStatusCounts": {
+          "stopped": 2,
+          "succeeded": 2
+        },
+        "unexpiredRunLeases": 0
+      }
+    }
+  ],
+  "initialDefaultDatabaseAttempt": {
+    "result": "relation factory_tasks does not exist in the connector default database; no writes",
+    "followup": "Resolved databases via list_postgres_databases and reran unchanged SELECT with explicit orvilo_mvp"
+  }
+}

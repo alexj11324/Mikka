@@ -1,0 +1,49 @@
+{
+  "scope": "Read-only original Owner case status and lease counts; no model or mutation",
+  "target": {
+    "project_id": "autumn-fire-21908520",
+    "branch_id": "br-autumn-rain-b5leflom",
+    "database_name": "orvilo_mvp"
+  },
+  "query": "SELECT jsonb_build_object(\n  'observedAt', clock_timestamp(),\n  'tasks', coalesce(jsonb_agg(jsonb_build_object(\n    'id',t.id,'ownerId',t.\"userId\",'issueId',t.\"issueId\",'stage',t.stage,'status',t.status,\n    'revision',t.revision,'candidateId',t.\"candidateId\",'updatedAt',t.\"updatedAt\",\n    'runStatusCounts',(SELECT coalesce(jsonb_object_agg(status,n),'{}'::jsonb) FROM (SELECT status,count(*) n FROM agent_runs r WHERE r.\"userId\"=t.\"userId\" AND r.\"issueId\"=t.\"issueId\" GROUP BY status) s),\n    'unexpiredRunLeases',(SELECT count(*) FROM agent_runs r WHERE r.\"userId\"=t.\"userId\" AND r.\"issueId\"=t.\"issueId\" AND r.\"leaseExpiresAt\">now())\n  ) ORDER BY t.id),'[]'::jsonb)\n) AS observation\nFROM factory_tasks t\nWHERE t.\"userId\"='XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ'\n  AND t.id=ANY(ARRAY['6e413ef7-7179-442d-ad0e-b9492cf76145','9ea956ce-a604-4c2e-a724-fb04fa5a3c9b']::uuid[])",
+  "result": [
+    {
+      "observation": {
+        "tasks": [
+          {
+            "id": "6e413ef7-7179-442d-ad0e-b9492cf76145",
+            "stage": "execute",
+            "status": "failed",
+            "issueId": "9809bb6a-fdb8-4a00-926f-768c303a084f",
+            "ownerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+            "revision": 12,
+            "updatedAt": "2026-11-04T14:24:55.84416+00:00",
+            "candidateId": null,
+            "runStatusCounts": {
+              "failed": 4
+            },
+            "unexpiredRunLeases": 0
+          },
+          {
+            "id": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+            "stage": "approval",
+            "status": "passed",
+            "issueId": "65e92e1e-4d75-4531-b1bd-a2a68d7689c7",
+            "ownerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+            "revision": 35,
+            "updatedAt": "2026-11-04T19:19:39.832346+00:00",
+            "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+            "runStatusCounts": {
+              "failed": 1,
+              "stopped": 2,
+              "cancelled": 1,
+              "succeeded": 14
+            },
+            "unexpiredRunLeases": 0
+          }
+        ],
+        "observedAt": "2026-11-05T02:08:06.791705+00:00"
+      }
+    }
+  ]
+}
