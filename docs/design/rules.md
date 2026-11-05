@@ -436,10 +436,12 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   what it did in words first, ids never shown: a dispatch is 「交给」 and the
   coding agent with its mark (R-74), never the bot, then its thread's chip, then
   its note as a quote (three lines; only a cut note opens to the rest); a thread
-  the chat has not loaded is its state in words (「交给 Codex · 进行中」). The
-  thread's chip is the one place a tool call draws a chip, so the reader can
-  jump to the thread; the task gets none (an exception to R-15, which this
-  keeps: only the thread is a chip), and the chip carries its own state. Other
+  the chat has not loaded is its state in words (「交给 Codex · 进行中」), the
+  state the dispatch answered with, not the thread's state now. In a dispatch
+  the thread's chip is the only chip, so the reader can jump to the thread;
+  the dispatch's task gets none (an exception to R-15, which this keeps: only
+  the thread is a chip), and the chip carries its own state. A call whose
+  object is a task (create, update or look up tasks) draws that task's chip. Other
   known tools name their object, query, count or status; an unknown tool lists
   at most six of its own fields, cut short. A failed call says nothing more in
   words: its row names the reason. Raw input and output sit last, under

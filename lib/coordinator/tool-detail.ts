@@ -15,20 +15,37 @@ export type ToolDetailLine =
   /** An unregistered tool's own field, as it named it. */
   | { kind: 'pair'; key: string; value: string }
 
-/** An id's key, in any casing a tool uses: id, ID, runId, runID, run_id, ids, uuid. */
-const ID_KEY = /^(?:id|ID|Id|uuid|UUID)s?$|(?:Id|ID|_id|_ID|Uuid|UUID|_uuid)s?$/
+/**
+ * An id's key in any casing and joining: id, ID, runId, runID, run_id, run-id, runid, threadIds, uuid. A camelCase
+ * key is split first; a lowercase run-on key counts only for the things tools name by id, so `valid` or `paid` stay.
+ */
+const ID_KEY = /(^|[_\-\s])(id|uuid)s?$/
+const RUN_ON_ID = /^(run|thread|issue|task|bot|user|agent|device|message|call|tool|channel|team|workspace|project|event|session|chat|repo|account|org|file|doc|page|node|job|step|request|trace|parent|owner|candidate|approval|attempt)(id|uuid)s?$/
+export function isIdKey(key: string): boolean {
+  const joined = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
+  return ID_KEY.test(joined) || RUN_ON_ID.test(key.toLowerCase())
+}
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
 const WHOLE_UUID = new RegExp(`^${UUID.source}$`, 'i')
-const UUIDS = new RegExp(UUID.source, 'gi')
-/** An opaque id a tool returns besides UUIDs: `b_9f8e7d`, `toolu_01AbC…`, `dispatch:toolu_…` (a prefix, then letters with a digit). */
-const OPAQUE_ID = /\b[a-z]{1,12}_(?=[0-9a-z]*\d)[0-9a-z]{6,}\b/i
-const OPAQUE_IDS = new RegExp(OPAQUE_ID.source, 'gi')
+/**
+ * Ids a tool returns besides UUIDs: 24–32 hex digits (Mongo, hashes), ULIDs, a short prefix then letters with a digit
+ * (`b_9f8e7`, `run-2b2ff606`, `toolu_01AbC…`, `dispatch:toolu_…`), and Slack ids (`C01234ABCDE`).
+ */
+const ID_PATTERNS = [
+  '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}',
+  '\\b[0-9a-f]{24,32}\\b',
+  '\\b(?=[0-9A-HJKMNP-TV-Z]*\\d)[0-9A-HJKMNP-TV-Z]{26}\\b',
+  '\\b[a-z]{1,12}[_-](?=\\w*\\d)\\w{5,}\\b',
+  '\\b[CDGUW](?=[0-9A-Z]*\\d)[0-9A-Z]{8,}\\b',
+]
+const ANY_ID = new RegExp(ID_PATTERNS.map(source => `(?:${source})`).join('|'))
+const ANY_IDS = new RegExp(ANY_ID.source, 'g')
 const MAX_PAIRS = 6
 const MAX_VALUE = 80
 
 /** Text with every id in it replaced by an ellipsis, so a quote never shows one. */
 export function withoutIds(text: string): string {
-  return text.replace(UUIDS, '…').replace(OPAQUE_IDS, '…')
+  return text.replace(ANY_IDS, '…')
 }
 
 /**
@@ -65,18 +82,19 @@ export function previewFields(text: string | undefined): Record<string, unknown>
 const text = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null
 const firstText = (fields: Record<string, unknown>, keys: readonly string[]) => keys.map(key => text(fields[key])).find(Boolean) ?? null
 const id = (fields: Record<string, unknown>, keys: readonly string[]) => keys.map(key => text(fields[key])).find(value => value && WHOLE_UUID.test(value)) ?? null
+const nested = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 const count = (fields: Record<string, unknown>, keys: readonly string[]) => keys.map(key => fields[key]).find(Array.isArray)?.length ?? null
 /** A field's text unless it holds an id. */
-const plain = (value: string | null) => value && !UUID.test(value) && !OPAQUE_ID.test(value) ? value : null
+const plain = (value: string | null) => value && !ANY_ID.test(value) ? value : null
 
 /** An unregistered tool's fields as `key: value`: no ids, no nested objects, each value cut short, at most six in all. */
 function pairs(...sources: Record<string, unknown>[]): ToolDetailLine[] {
   const lines: ToolDetailLine[] = []
   for (const [key, value] of sources.flatMap(fields => Object.entries(fields))) {
     if (lines.length === MAX_PAIRS) break
-    if (ID_KEY.test(key) || value === null || value === undefined || typeof value === 'object') continue
+    if (isIdKey(key) || value === null || value === undefined || typeof value === 'object') continue
     const shown = String(value).replace(/\s+/g, ' ').trim()
-    if (!shown || UUID.test(shown) || OPAQUE_ID.test(shown)) continue
+    if (!shown || ANY_ID.test(shown)) continue
     lines.push({ kind: 'pair', key, value: shown.length > MAX_VALUE ? `${shown.slice(0, MAX_VALUE - 1)}…` : shown })
   }
   return lines
@@ -101,7 +119,7 @@ export function toolDetail(tool: Pick<ChatTool, 'name' | 'input' | 'output' | 'q
       // Who it went to and the thread it made first, its note under them. The task gets no chip: the thread's
       // carries it (R-15).
       lines.push({ kind: 'handoff', runId: id(output, ['runId', 'threadId', 'thread']) ?? id(input, ['runId']),
-        harness: firstText(output, ['harness']) ?? firstText(input, ['harness']), status: firstText(output, ['status']) })
+        harness: firstText(output, ['harness']) ?? firstText(input, ['harness']) ?? firstText(nested(input.model), ['harness']), status: firstText(output, ['status']) })
       quote(words())
       break
     case 'messageThread':

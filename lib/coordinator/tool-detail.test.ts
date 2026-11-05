@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { jsonbText } from './context'
-import { previewFields, toolDetail, withoutIds } from './tool-detail'
+import { isIdKey, previewFields, toolDetail, withoutIds } from './tool-detail'
 
 const RUN = '2b2ff606-ecb7-4b11-a211-0000000000c3'
 const TASK = '0a5c49d1-0d4d-489c-8f9e-0000000000a1'
@@ -58,4 +58,24 @@ test('a preview cut at 200 characters still gives its whole leading fields', () 
   assert.deepEqual(previewFields(`{"limit": 5, "query": "login", "note": "${'x'.repeat(300)}`), { limit: 5, query: 'login', note: `${'x'.repeat(300)}…` })
   assert.deepEqual(previewFields('not json'), {})
   assert.deepEqual(previewFields('[1, 2]'), { items: [1, 2] })
+})
+
+test('id keys in every casing and joining are ids; words that only end in "id" are not', () => {
+  for (const key of ['id', 'ID', 'Id', 'ids', 'uuid', 'runId', 'runID', 'run_id', 'run-id', 'runid', 'threadid', 'threadIds', 'issue_uuid', 'parent id'])
+    assert.ok(isIdKey(key), key)
+  for (const key of ['valid', 'paid', 'android', 'fluid', 'Valid', 'avoid', 'name', 'identity', 'idle'])
+    assert.ok(!isIdKey(key), key)
+})
+
+test('values holding an id are left out, and a quote shows none: hex, ULID, prefixed and Slack ids', () => {
+  const probes = { a: '507f1f77bcf86cd799439011', b: 'd41d8cd98f00b204e9800998ecf8427e', c: '01ARZ3NDEKTSV4RRFFQ69G5FAV', d: 'run-2b2ff606', e: 'b_9f8e7', f: 'C01234ABCDE', g: 'see U024BE7LH please', h: `/runs/${RUN.toUpperCase()}` }
+  assert.deepEqual(toolDetail({ name: 'mystery_tool', input: JSON.stringify({ ...probes, name: 'Weekly sync', words: 'CHANGELOG entry for CVE-2024-39338 in follow-redirects' }) }),
+    [{ kind: 'pair', key: 'name', value: 'Weekly sync' }, { kind: 'pair', key: 'words', value: 'CHANGELOG entry for CVE-2024-39338 in follow-redirects' }], 'ids go; plain words with numbers stay')
+  for (const value of Object.values(probes)) assert.doesNotMatch(withoutIds(`x ${value} y`), /[0-9]{3}|_9f|2b2f|ABCDE|U024/, value)
+  assert.deepEqual(toolDetail({ name: 'send_slack_message', input: cut({ channel: 'C01234ABCDE', text: 'Deploy done' }) }), [{ kind: 'quote', text: 'Deploy done' }], 'a Slack channel id is not a recipient to show')
+})
+
+test('a dispatch names the coding agent from its model when the answer does not', () => {
+  const [handoff] = toolDetail({ name: 'dispatch_run', input: JSON.stringify({ issueId: TASK, model: { harness: 'codex' }, note: 'Go' }), output: cut({ runId: RUN, status: 'queued' }) })
+  assert.deepEqual(handoff, { kind: 'handoff', runId: RUN, harness: 'codex', status: 'queued' })
 })

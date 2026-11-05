@@ -35,6 +35,10 @@ function conversation(): Record<string, unknown>[] {
     { role: 'assistant', mikkaStreamId: 'stream-1', content: [{ type: 'reasoning', text: 'Done.' }, { type: 'text', text: `Started a thread [[run:${runId}]].` }] },
     { role: 'user', content: [{ type: 'text', text: 'Here is a screenshot' }, { type: 'file', mediaType: 'image/png', data: 'iVBORw0KGgo'.repeat(500) }] },
     { role: 'assistant', mikkaStopped: true, content: 'Stopped here.' },
+    // Edge whitespace the SQL must trim as the chat does: a newline-led long note keeps its ellipsis; a note of only a
+    // newline falls through to the prompt.
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'call-4', toolName: 'dispatch_run', input: { note: `\n${'y'.repeat(1500)}` } }] },
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'call-5', toolName: 'dispatch_run', input: { note: '\n', prompt: 'Use the prompt' } }] },
   ]
 }
 
@@ -66,6 +70,9 @@ dbTest('the chat reads compact parts and shows exactly what the full messages sh
     assert.deepEqual(view.persistedStreamIds, ['stream-1'])
     assert.ok(view.items.some(item => item.threads.includes(runId)), 'the dispatched thread still shows')
     assert.ok(view.items.some(item => item.activity?.tools.some(tool => tool.quote === `${note.slice(0, QUOTE_PREVIEW_CHARS).trimEnd()}…`)), 'the chat shows the note to its limit, then an ellipsis')
+    const quotes = Object.fromEntries(view.items.flatMap(item => item.activity?.tools ?? []).map(tool => [tool.call, tool.quote]))
+    assert.equal(quotes['call-4'], `${'y'.repeat(QUOTE_PREVIEW_CHARS)}…`, 'a newline-led note is trimmed, then cut with its ellipsis')
+    assert.equal(quotes['call-5'], 'Use the prompt', 'a note of only whitespace gives way to the prompt')
 
     const compact = (await db.select({ message: compactChatMessage }).from(schema.coordinatorMessages).where(mine).orderBy(asc(schema.coordinatorMessages.position))).map(row => row.message)
     const calls = compact[1].content as { inputPreview: string }[]
@@ -89,9 +96,14 @@ dbTest('the chat reads compact parts and shows exactly what the full messages sh
     assert.deepEqual(compact[6], stored[6])
 
     // What leaves the database per read: the full rows against the compact ones.
+    // A call's quote is sent on purpose, capped per call; everything else stays a tenth of the full rows.
     const [bytes] = (await db.execute(sql`select sum(octet_length(${schema.coordinatorMessages.message}::text))::int as full, sum(octet_length((${compactChatMessage})::text))::int as compact
       from ${schema.coordinatorMessages} where ${mine}`)).rows as { full: number; compact: number }[]
-    t.diagnostic(JSON.stringify({ event: 'chat_read_bytes', ...bytes }))
-    assert.ok(bytes.compact * 10 < bytes.full, `compact ${bytes.compact} bytes, full ${bytes.full}`)
+    const quoted = compact.flatMap(message => Array.isArray(message.content) ? message.content as { quotePreview?: string }[] : []).map(part => part.quotePreview ?? '')
+    const quoteBytes = quoted.reduce((sum, quote) => sum + Buffer.byteLength(JSON.stringify(quote)), 0)
+    t.diagnostic(JSON.stringify({ event: 'chat_read_bytes', ...bytes, quotes: quoteBytes }))
+    assert.ok((bytes.compact - quoteBytes) * 10 < bytes.full, `compact ${bytes.compact} bytes (${quoteBytes} of them quotes), full ${bytes.full}`)
+    const longest = Math.max(...quoted.map(quote => quote.length))
+    assert.ok(longest <= QUOTE_PREVIEW_CHARS + 1, `a quote is capped: ${longest} characters`)
   })
 })

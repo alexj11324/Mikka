@@ -3,7 +3,7 @@ import { QUIET_REPLY } from '@/lib/attention/handoff'
 import { credentialMasker, identityMasker, maskDeep, maskStreamStep, withCredentialMasking } from '@/lib/secrets/mask'
 import type { CoordinatorStreamEvent, CoordinatorWorkflowStreamPart } from './stream'
 import { TOOL_PREVIEW_CHARS } from './chat-projection'
-import { HIDDEN_TOOLS, jsonbText, toolQuote } from './context'
+import { HIDDEN_TOOLS, jsonbText, quotePreview, toolQuoteText } from './context'
 
 /**
  * The start of a tool's input or output as text, masked as stored messages are; nothing when it would still
@@ -21,10 +21,11 @@ function preview(userId: string, value: unknown, fingerprints: SecretFingerprint
 
 /** A call's words (a dispatch's note) as the chat's quote, masked like the previews; nothing when it holds a saved secret. */
 function quote(userId: string, input: unknown, fingerprints: SecretFingerprint[]): string | undefined {
-  const text = toolQuote(maskDeep(input, credentialMasker))
+  // Checked whole, before the cut: a saved secret straddling it must not leave even its start.
+  const text = toolQuoteText(maskDeep(input, credentialMasker))
   if (!text) return undefined
   try { assertNoSecret(userId, text, fingerprints) } catch { return undefined }
-  return text
+  return quotePreview(text)
 }
 
 /** A stored thinking block as the chat may show it: masked like stored messages; nothing if it holds a saved secret. */

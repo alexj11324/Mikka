@@ -307,6 +307,40 @@ test('an opened dispatch reads 「Handed to」 its coding agent and its thread c
   } finally { await view.unmount() }
 })
 
+test('a quote cut at three lines is a button that opens the rest; one that fits is plain text (R-83)', async () => {
+  const { ReplyActivity } = await import('../components/coordinator/reply-activity')
+  const view = await mount()
+  const proto = browser.HTMLElement.prototype as unknown as object
+  const stub = (height: number) => {
+    Object.defineProperty(proto, 'scrollHeight', { configurable: true, get() { return height } })
+    Object.defineProperty(proto, 'clientHeight', { configurable: true, get() { return 60 } })
+  }
+  const settle = async (done: () => boolean) => { for (let tries = 0; tries < 100 && !done(); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20))) }
+  const quote = () => view.container.querySelector('[data-activity-quote]')
+  const tool = { call: 'q1', name: 'dispatch_run', state: 'done' as const, input: '{"note": "Long"}', quote: 'A long note. '.repeat(40).trim() }
+  try {
+    stub(200)
+    await view.render(<ReplyActivity tools={[tool]} />)
+    await act(async () => { (view.container.querySelector('[data-activity-tool] button') as HTMLButtonElement).click() })
+    await settle(() => quote()?.tagName === 'BUTTON')
+    assert.equal(quote()?.tagName, 'BUTTON', 'cut: a button')
+    assert.equal(quote()?.getAttribute('aria-expanded'), 'false')
+    await act(async () => { (quote() as HTMLButtonElement).click() })
+    assert.equal(quote()?.getAttribute('aria-expanded'), 'true')
+    assert.doesNotMatch(quote()?.querySelector('span')?.className ?? '', /line-clamp-3/, 'opened, the whole note')
+    stub(60)
+    await view.render(<ReplyActivity key="fits" tools={[{ ...tool, call: 'q2', quote: 'Short.' }]} />)
+    await act(async () => { (view.container.querySelector('[data-activity-tool] button') as HTMLButtonElement).click() })
+    await settle(() => Boolean(quote()))
+    assert.equal(quote()?.tagName, 'DIV', 'fits: plain text, nothing to open')
+    assert.equal(quote()?.hasAttribute('aria-expanded'), false)
+  } finally {
+    delete (proto as Record<string, unknown>).scrollHeight
+    delete (proto as Record<string, unknown>).clientHeight
+    await view.unmount()
+  }
+})
+
 test('a task and its thread in one reply: only the thread is a chip, the task is its number or nothing (R-15)', async () => {
   const view = await mount()
   const chips = () => [...view.container.querySelectorAll('[data-slot="inline-citation-trigger"]')]

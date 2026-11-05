@@ -172,7 +172,16 @@ function Handoff({ line }: { line: Extract<ToolDetailLine, { kind: 'handoff' }> 
 function Quote({ text }: { text: string }) {
   const [whole, setWhole] = useState(false)
   const [cut, setCut] = useState(false)
-  const measure = useCallback((node: HTMLSpanElement | null) => { if (node) setCut(node.scrollHeight > node.clientHeight + 1) }, [])
+  // Measured again whenever the quote's width changes (a resized column, a rotated phone), not only once.
+  const measure = useCallback((node: HTMLSpanElement | null) => {
+    if (!node) return
+    const check = () => setCut(node.scrollHeight > node.clientHeight + 1)
+    check()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(check)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
   const words = <span ref={whole ? undefined : measure} className={cn('min-w-0 [overflow-wrap:anywhere] whitespace-pre-wrap', !whole && 'line-clamp-3')}>{text}</span>
   const quote = 'border-l-2 border-l-muted-foreground/30 pl-2.5 text-left text-muted-foreground'
   if (!cut) return <div data-activity-quote="" className={quote}>{words}</div>

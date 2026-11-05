@@ -1,6 +1,6 @@
 import { sql, type SQL } from 'drizzle-orm'
 import { coordinatorMessages } from '@/lib/db/schema'
-import { QUOTE_KEYS, QUOTE_PREVIEW_CHARS } from './context'
+import { QUOTE_KEYS, QUOTE_PREVIEW_CHARS, QUOTE_SPACE } from './context'
 
 /** Characters of a tool's input or output a chat summary keeps. */
 export const TOOL_PREVIEW_CHARS = 200
@@ -30,7 +30,8 @@ export type CompactToolResultPart = {
 const dispatchTools = sql.raw(DISPATCH_TOOLS.map(name => `'${name}'`).join(','))
 const preview = sql.raw(String(TOOL_PREVIEW_CHARS))
 // A call's words (a dispatch's note) apart from its cut input preview; one character over so the chat can mark the cut.
-const quoteFields = sql.raw(QUOTE_KEYS.map(key => `nullif(btrim(p#>>'{input,${key}}'), '')`).join(', '))
+// Only string fields, trimmed of the same whitespace as quoteText (btrim would leave newlines and tabs).
+const quoteFields = sql.raw(QUOTE_KEYS.map(key => `case when jsonb_typeof(p#>'{input,${key}}') = 'string' then nullif(regexp_replace(p#>>'{input,${key}}', '^[${QUOTE_SPACE}]+|[${QUOTE_SPACE}]+$', '', 'g'), '') end`).join(', '))
 const quoteChars = sql.raw(String(QUOTE_PREVIEW_CHARS + 1))
 
 /**

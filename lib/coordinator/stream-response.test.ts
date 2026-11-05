@@ -131,6 +131,23 @@ test('a call\'s note streams whole as its quote, apart from the cut input previe
   assert.equal(tools[1].quote, `${'x'.repeat(1000)}…`)
 })
 
+test('a saved secret straddling the quote\'s cut leaves none of itself: the note is checked whole first', async () => {
+  const old = process.env.BETTER_AUTH_SECRET
+  process.env.BETTER_AUTH_SECRET = 'offline-stream-guard-fixture-secret'
+  try {
+    const secret = 'synthetic-straddling-value'
+    const note = `${'a'.repeat(990)} ${secret} tail`
+    const raw = new ReadableStream<CoordinatorWorkflowStreamPart>({ start(controller) { controller.enqueue(start()); controller.enqueue(call('c1', 'dispatch_run', { note })); controller.close() } })
+    const events = await drain(raw.pipeThrough(coordinatorTextStream('owner', [fingerprint('owner', secret)])))
+    const tool = events.find((event): event is Extract<CoordinatorStreamEvent, { type: 'tool' }> => event.type === 'tool')
+    assert.equal(tool?.quote, undefined, 'the quote is left out')
+    assert.equal(JSON.stringify(events).includes('synthetic-st'), false, 'not even the secret\'s start')
+  } finally {
+    if (old === undefined) delete process.env.BETTER_AUTH_SECRET
+    else process.env.BETTER_AUTH_SECRET = old
+  }
+})
+
 test('a tool call names how much of the reply was said before it, held back or not, so it shows after those words', async () => {
   const events = await project([start(), delta('I will make the task first.'), call('c1', 'create_issue', {}), result('c1', 'create_issue', {}), delta('Done.'), committed()])
   const tools = events.filter((event): event is Extract<CoordinatorStreamEvent, { type: 'tool' }> => event.type === 'tool')
