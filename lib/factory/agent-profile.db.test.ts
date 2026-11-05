@@ -3,8 +3,9 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
-import { dbUrl, seedUser, seedWorkspace, seedIssue } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedUser, seedWorkspace, seedIssue, seedBot } from '../../tests/support/workspace-admin-db'
 import type { OrderHarness } from '@/lib/model-order-plan'
+import { normalizeRepository } from '@mikka/protocol/repository'
 import type { DecisionAnswer } from '@/lib/coordinator/decision'
 process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 process.env.MIKKA_BYOS_ENABLED = '1'
@@ -18,12 +19,18 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   await pool.query(migration); await pool.query(migration)
   const owners: string[] = [], workspaces: string[] = []
   t.after(async () => {
+    await pool.query('DELETE FROM factory_tasks WHERE "userId"=ANY($1)', [owners])
+    await pool.query('DELETE FROM byos_native_runs WHERE "runId" IN (SELECT id FROM agent_runs WHERE "userId"=ANY($1))', [owners])
+    await pool.query('DELETE FROM run_publications WHERE "userId"=ANY($1)', [owners])
+    await pool.query('DELETE FROM coordinator_events WHERE "userId"=ANY($1)', [owners])
     await pool.query('DELETE FROM factory_agent_profiles WHERE "ownerId"=ANY($1)', [owners])
     await pool.query('DELETE FROM model_order_entries WHERE "ownerId"=ANY($1)', [owners])
     await pool.query('DELETE FROM model_order_settings WHERE "ownerId"=ANY($1)', [owners])
     await pool.query('DELETE FROM byos_bindings WHERE "ownerId"=ANY($1)', [owners])
     await pool.query('DELETE FROM byos_connections WHERE "ownerId"=ANY($1)', [owners])
     await pool.query('DELETE FROM agent_runs WHERE "userId"=ANY($1)', [owners])
+    await pool.query('DELETE FROM device_repos WHERE "userId"=ANY($1)', [owners])
+    await pool.query('DELETE FROM bots WHERE "ownerId"=ANY($1)', [owners])
     await pool.query('DELETE FROM agents WHERE "userId"=ANY($1)', [owners])
     await pool.query('DELETE FROM devices WHERE "ownerId"=ANY($1)', [owners])
     await pool.query('DELETE FROM issues WHERE "userId"=ANY($1)', [owners])
@@ -210,6 +217,12 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     await assert.rejects(assertRunProfileClaim(pool, queuedRunId), { message: 'agentProfileUnavailable' })
     assert.equal(await admitProfileSelection(pool, { ...input, sourceRunId }), sourceRunId)
     await assertRunProfileClaim(pool, continuedRunId)
+    // A manual native retry may retain stop-request history. It has no host
+    // watchdog attempt/event and must keep the existing exact-session grant.
+    await pool.query(`UPDATE agent_runs SET status='stopped',"stopRequestedAt"=now() WHERE id=$1`, [sourceRunId])
+    await pool.query('UPDATE agent_runs SET "retryOf"=$2 WHERE id=$1', [continuedRunId, sourceRunId])
+    await assertRunProfileClaim(pool, continuedRunId)
+    await pool.query(`UPDATE agent_runs SET status='succeeded',"stopRequestedAt"=NULL WHERE id=$1`, [sourceRunId])
     await assert.rejects(admitProfileSelection(pool, { ...input, sourceRunId: randomUUID() }), { message: 'agentProfileUnavailable' })
     await assert.rejects(admitProfileSelection(pool, { ...input, sourceRunId, ownerId: foreign.ownerId }), { message: 'agentProfileUnavailable' })
     await assert.rejects(admitProfileSelection(pool, { ...input, sourceRunId, issueId: randomUUID() }), { message: 'agentProfileUnavailable' })
@@ -289,6 +302,129 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     await assert.rejects(profiles.assertProfileSelection(pool, scope, frozen), { code: 'agentProfileArchived' })
     assert.ok(!(await store.list(scope)).some(row => row.id === ui.id))
     assert.equal((await store.history(scope, ui.id)).at(-1)!.digest, frozen.digest)
+  })
+  for (const mode of ['fixed', 'inherit', 'legacy'] as const) await t.test(mode === 'legacy' ? 'watchdog preserves historical absence of Profile through queue and first claim on B' : `watchdog ${mode} Profile uses B's real source and retains the started role through queue and first claim`, async () => {
+    const [{ createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun }, { automaticFactoryDispatch },
+      { sweepFactoryWatchdog }, { claimLocalRun }, { assertRunProfileClaim, admitProfileSelection }, { profileNativeSessionMatches },
+      { DAEMON_PROTOCOL_VERSION }, { workerDefinitionDigest }] = await Promise.all([
+      import('./store'), import('./dispatch'), import('../agent-runs'), import('./automatic-dispatch'), import('./watchdog'),
+      import('../computer/claim'), import('./profile-admission'), import('./profile-native-session'), import('@mikka/protocol/daemon'), import('../agent-kit/worker-digest'),
+    ])
+    const who = await person(`watchdog-profile-${mode}`), botId = await seedBot(pool, who.workspaceId, who.ownerId)
+    const taskIssue = await seedIssue(pool, who.ownerId), epoch = randomUUID()
+    await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [taskIssue, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1284 } }, content: [] })])
+    await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1,$2,$3,$4,'user_message',$5,'{"text":"Preserve this implementation role on recovery"}')`, [epoch, who.ownerId, botId, taskIssue, `profile-watchdog:${epoch}`])
+    const primary = await subscribe(who, 'codex', ['gpt-6-luna']), alternate = await subscribe(who, 'codex', ['gpt-6-luna'])
+    await pool.query('UPDATE model_order_settings SET customized=true WHERE "ownerId"=$1 AND "workspaceId"=$2', [who.ownerId, who.workspaceId])
+    for (const [position, connection] of [primary, alternate].entries()) await pool.query(`INSERT INTO model_order_entries(id,"ownerId","workspaceId",position,harness,model,"sourceKind","sourceId") VALUES ($1,$2,$3,$4,'codex','gpt-6-luna','subscription',$5)`, [randomUUID(), who.ownerId, who.workspaceId, position, connection])
+    const repository = normalizeRepository(`https://github.com/synthetic/profile-watchdog-${randomUUID()}.git`)
+    const machines: { id: string; agentId: string; repoId: string }[] = []
+    for (const name of ['A', 'B']) {
+      const id = randomUUID(), agentId = randomUUID(), repoId = randomUUID()
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"protocolVersion") VALUES ($1,$2,$3,'local',true,now(),$4,$5)`, [id, who.ownerId, name, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, models: ['gpt-6-luna'] }]), DAEMON_PROTOCOL_VERSION])
+      await pool.query(`INSERT INTO agents(id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,$4,'codex')`, [agentId, who.ownerId, id, name])
+      await pool.query(`INSERT INTO device_repos(id,"userId","deviceId","repoPath","remoteUrl","baseBranch") VALUES ($1,$2,$3,$4,$5,'main')`, [repoId, who.ownerId, id, repository.key, repository.remoteUrl])
+      machines.push({ id, agentId, repoId })
+    }
+    const [a, b] = machines
+    const profile = mode === 'legacy' ? undefined : await store.create(who, { name: `Frozen ${mode} role`, roles: ['implementation'], harness: 'codex',
+      model: mode === 'fixed' ? { mode, harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: primary } } : { mode },
+      effort: 'high', instructions: 'Keep the original implementation responsibility.', skills: ['systematic-debugging'] })
+    const picked = await profiles.resolveAgentProfileDispatch(pool, { ...who, botId }, { issueId: taskIssue, profileId: profile?.id, location: 'local', deviceId: a.id })
+    if (picked.target.kind !== 'device') assert.fail('A must be runnable')
+    const initialModel = { model: picked.target.model, subscriptionBindingId: picked.target.subscriptionBindingId, ...(profile ? { agentProfile: picked.agentProfile } : {}),
+      modelDispatch: { mode: picked.selectionMode!, location: 'local' as const, entry: picked.target.entry } }
+    const [{ factoryCheckGates }, { factoryCheckIndependent }] = await Promise.all([import('./checks'), import('./check-independence')])
+    const factory = createFactoryStore(pool, async (owner, issue, tx) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [issue, owner])).rowCount === 1, botId, { independent: factoryCheckIndependent, gates: factoryCheckGates })
+    const routed = await factory.route(who.ownerId, { issueId: taskIssue, sourceEventId: epoch, eventId: randomUUID(), rationale: 'Actual watchdog Profile recovery fixture' })
+    const dispatch = createFactoryDispatch(pool, factory, (tx, owner, input, bot, context) => queueFactoryRun(tx, owner, input, bot, context, undefined, initialModel))
+    const first = await dispatch(who.ownerId, { binding: factoryBinding(routed.task), agentId: a.agentId, deviceRepoId: a.repoId })
+    await pool.query(`UPDATE agent_runs SET status='running',"startedAt"=now()-interval '2 hours',"sessionId"='original-native-session',"leaseExpiresAt"=now()+interval '1 hour' WHERE id=$1`, [first.runId])
+    await pool.query(`UPDATE factory_tasks SET "updatedAt"='2000-01-01' WHERE id=$1`, [routed.task.id])
+    await pool.query(`UPDATE factory_attempts SET "createdAt"='2000-01-01' WHERE "runId"=$1`, [first.runId])
+    const original = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [first.runId])).rows[0]
+    const automatic = automaticFactoryDispatch(pool)
+    let rejectInvalidQueue = false
+    const recovery = {
+      runtime: () => ({ store: factory, reconcile: { run: async () => { throw new Error('No completion reconciliation is needed') } } }),
+      dispatch: async (...args: Parameters<typeof automatic>) => {
+        if (rejectInvalidQueue) {
+          const [tx, , task] = args
+          for (const mutation of ['handoff', 'unstarted'] as const) {
+            await tx.query('SAVEPOINT invalid_profile_recovery')
+            if (mutation === 'handoff') await tx.query(`UPDATE factory_attempts SET output=jsonb_set(output,'{watchdogRecovery,handoffDigest}',$2::jsonb) WHERE id=$1`, [task.attemptId, JSON.stringify('0'.repeat(64))])
+            else await tx.query('UPDATE agent_runs SET "startedAt"=NULL WHERE id=$1', [first.runId])
+            await assert.rejects(automatic(...args), { message: 'agentProfileUnavailable' }, mutation)
+            await tx.query('ROLLBACK TO SAVEPOINT invalid_profile_recovery'); await tx.query('RELEASE SAVEPOINT invalid_profile_recovery')
+          }
+        }
+        return automatic(...args)
+      },
+      wake: async () => { throw new Error('A host takeover must remain quiet') },
+    }
+    const stopped = await sweepFactoryWatchdog(pool, recovery, new Date(), Date.now() + 20_000, { userId: who.ownerId, runId: first.runId })
+    assert.equal(stopped.blocked, 1); assert.equal(stopped.failed, 0)
+    await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='cancelled',"finishedAt"=now() WHERE id=$1`, [first.runId])
+    if (profile) {
+      await store.update(who, profile.id, profile.version, { ...picked.agentProfile!.definition, enabled: false, instructions: 'This later edit applies only to new selections.' })
+      await assert.rejects(profiles.resolveAgentProfileDispatch(pool, { ...who, botId }, { issueId: taskIssue, profileId: profile.id, location: 'local' }), { code: 'agentProfileDisabled' })
+      await assert.rejects(admitProfileSelection(pool, { ownerId: who.ownerId, workspaceId: who.workspaceId, issueId: taskIssue, harness: 'codex', model: 'gpt-6-luna', selection: picked.agentProfile!, subscriptionBindingId: picked.target.subscriptionBindingId }), { message: 'agentProfileUnavailable' })
+    }
+    await pool.query('UPDATE model_order_entries SET position=position+10 WHERE "ownerId"=$1', [who.ownerId])
+    await pool.query('UPDATE model_order_entries SET position=CASE WHEN "sourceId"=$2 THEN 0 ELSE 1 END WHERE "ownerId"=$1', [who.ownerId, alternate])
+    rejectInvalidQueue = Boolean(profile)
+    const resumed = await sweepFactoryWatchdog(pool, recovery, new Date(Date.now() + 2 * 60_000), Date.now() + 20_000, { userId: who.ownerId, runId: first.runId })
+    assert.equal(resumed.failed, 0); assert.equal(resumed.recovered, 1)
+    const task = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [routed.task.id])).rows[0]
+    const attempt = (await pool.query('SELECT * FROM factory_attempts WHERE id=$1', [task.attemptId])).rows[0]
+    const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [attempt.runId])).rows[0]
+    assert.equal(run.deviceId, b.id); assert.equal(run.agentId, b.agentId)
+    assert.equal(run.retryOf, first.runId); assert.equal(run.continuesRunId, first.runId); assert.equal(run.sessionId, null)
+    assert.equal(run.agentDefinition.profileOriginRunId, undefined)
+    if (profile) {
+      assert.equal(run.agentDefinition.agentProfile.version, 1); assert.equal(run.agentDefinition.agentProfile.effort, 'high')
+      assert.deepEqual({ ...run.agentDefinition.agentProfile, targetEntry: undefined }, { ...original.agentDefinition.agentProfile, targetEntry: undefined })
+      assert.deepEqual(run.agentDefinition.agentProfile.targetEntry, run.agentDefinition.modelDispatch.entry)
+    } else assert.equal(run.agentDefinition.agentProfile, undefined)
+    const binding = (await pool.query('SELECT * FROM byos_bindings WHERE id=$1', [run.agentDefinition.subscription.bindingId])).rows[0]
+    assert.equal(binding.consumerId, b.agentId); assert.equal(binding.connectionId, mode === 'fixed' ? primary : alternate)
+    assert.equal(run.agentDefinition.modelDispatch.entry.source.connectionId, binding.connectionId)
+    assert.equal(run.agentDefinition.definitionDigest, workerDefinitionDigest(run.agentDefinition))
+    const lease = new Date(Date.now() + 60_000)
+    if (!profile) {
+      assert.equal(original.agentDefinition.agentProfile, undefined)
+      assert.equal(await claimLocalRun(pool, run.id, b.id, lease, binding.id), 'claimed')
+      const claimed = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [run.id])).rows[0]
+      assert.equal(claimed.sessionId, null); assert.equal(claimed.agentDefinition.agentProfile, undefined)
+      assert.equal(claimed.agentDefinition.profileOriginRunId, undefined)
+      return
+    }
+    assert.equal(profileNativeSessionMatches(original.agentDefinition, run.agentDefinition), false)
+    for (const [label, output] of [
+      ['missing', { ...attempt.output, watchdogRecovery: undefined }],
+      ['wrong source', { ...attempt.output, watchdogRecovery: { ...attempt.output.watchdogRecovery, previousRunId: randomUUID() } }],
+      ['stale epoch', { ...attempt.output, watchdogRecovery: { ...attempt.output.watchdogRecovery, requestEpoch: randomUUID() } }],
+      ['wrong handoff', { ...attempt.output, watchdogRecovery: { ...attempt.output.watchdogRecovery, handoffDigest: '0'.repeat(64) } }],
+    ] as const) {
+      await pool.query('UPDATE factory_attempts SET output=$2 WHERE id=$1', [attempt.id, JSON.stringify(output)])
+      await assert.rejects(claimLocalRun(pool, run.id, b.id, lease, binding.id), { message: 'agentProfileUnavailable' }, label)
+      assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [run.id])).rows[0].status, 'queued')
+    }
+    await pool.query('UPDATE factory_attempts SET output=$2 WHERE id=$1', [attempt.id, JSON.stringify(attempt.output)])
+    await pool.query('UPDATE factory_tasks SET "attemptId"=$2 WHERE id=$1', [task.id, original.agentDefinition.factory?.attemptId ?? routed.task.attemptId])
+    await assert.rejects(claimLocalRun(pool, run.id, b.id, lease, binding.id), { message: 'agentProfileUnavailable' })
+    await pool.query('UPDATE factory_tasks SET "attemptId"=$2 WHERE id=$1', [task.id, attempt.id])
+    await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [binding.connectionId])
+    await assert.rejects(assertRunProfileClaim(pool, run.id), { message: 'agentProfileUnavailable' })
+    await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [binding.connectionId])
+    await pool.query('UPDATE agent_runs SET "startedAt"=NULL WHERE id=$1', [first.runId])
+    await assert.rejects(claimLocalRun(pool, run.id, b.id, lease, binding.id), { message: 'agentProfileUnavailable' })
+    await pool.query('UPDATE agent_runs SET "startedAt"=$2 WHERE id=$1', [first.runId, original.startedAt])
+    assert.equal(await claimLocalRun(pool, run.id, b.id, lease, binding.id), 'claimed')
+    const claimed = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [run.id])).rows[0]
+    assert.equal(claimed.status, 'preparing'); assert.equal(claimed.sessionId, null)
+    assert.equal(claimed.agentDefinition.profileOriginRunId, undefined)
+    assert.deepEqual(claimed.agentDefinition.agentProfile, run.agentDefinition.agentProfile)
   })
   await t.test('suspended workspace members cannot read or change profiles', async () => {
     await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [scope.workspaceId, scope.ownerId])

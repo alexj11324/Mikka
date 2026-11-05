@@ -1,5 +1,6 @@
 import 'server-only'
 import type { Pool } from 'pg'
+import type { OrderEntry } from '@/lib/model-order-plan'
 import type { WorkerDefinitionSnapshot, WorkerModelDispatch } from '@/lib/agent-kit/worker'
 import { runPolicySchema } from '@mikka/protocol/agent-policy'
 import { intersectRunPolicy } from '@/lib/run-assignment-policy'
@@ -73,9 +74,9 @@ export async function chooseCloudRunModel(pool: Pool, scope: { ownerId: string; 
  * A new run's model on one computer by 优先使用的模型: the first entry that computer's Agent can run.
  * A local run is frozen with its model like a cloud one; it is no longer left to the CLI to choose.
  */
-export async function chooseLocalRunModel(pool: Pool, scope: { ownerId: string; workspaceId: string; botId: string | null }, agent: { id: string; deviceId: string; harness: 'claude_code' | 'codex' }, asked?: string): Promise<RunModel | { error: 'machineUnavailable'; reason?: string }> {
+export async function chooseLocalRunModel(pool: Pool, scope: { ownerId: string; workspaceId: string; botId: string | null }, agent: { id: string; deviceId: string; harness: 'claude_code' | 'codex' }, asked?: string, exactEntry?: OrderEntry): Promise<RunModel | { error: 'machineUnavailable'; reason?: string }> {
   const { resolveModelDispatch } = await import('@/lib/model-dispatch')
-  const target = await resolveModelDispatch(pool, scope, asked ? { harness: agent.harness, model: asked } : null, 'local', agent.deviceId, { harness: agent.harness })
+  const target = await resolveModelDispatch(pool, scope, asked ? { harness: agent.harness, model: asked } : null, 'local', agent.deviceId, { harness: agent.harness, ...(exactEntry ? { exactEntry } : {}) })
   if (target.kind !== 'device' || target.agentId !== agent.id) return { error: 'machineUnavailable', ...(target.kind === 'none' ? { reason: target.reason } : {}) }
   return { model: target.model, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}), ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}), modelDispatch: { mode: asked ? 'picked' : 'preference', location: 'local', entry: target.entry } }
 }

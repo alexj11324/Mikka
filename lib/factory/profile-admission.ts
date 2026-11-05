@@ -2,7 +2,9 @@ import 'server-only'
 import { isDeepStrictEqual } from 'node:util'
 import type { Pool, PoolClient } from 'pg'
 import type { WorkerDefinitionSnapshot } from '@/lib/agent-kit/worker'
-import { assertProfileSelection, BUILTIN_AGENT_PROFILE_ID, isBuiltinAgentProfileSelection, type AgentProfileSelection } from './agent-profile'
+import { assertProfileTarget, assertProfileSelection, BUILTIN_AGENT_PROFILE_ID, isBuiltinAgentProfileSelection, type AgentProfileSelection } from './agent-profile'
+
+import { watchdogProfileAdmission, watchdogProfileClaimContext, type ProfileFactoryContext } from './profile-watchdog'
 
 type Query = Pick<Pool | PoolClient, 'query'>
 export class AgentProfileAdmissionError extends Error {
@@ -14,6 +16,7 @@ export class AgentProfileAdmissionError extends Error {
 export async function admitProfileSelection(query: Query, input: {
   ownerId: string; workspaceId: string; issueId: string; harness: string
   selection?: AgentProfileSelection; sourceRunId?: string; model?: string; apiKeyId?: string; subscriptionBindingId?: string
+  factoryContext?: ProfileFactoryContext
 }): Promise<string | undefined> {
   if (input.selection) {
     if ((input.selection.profileId === BUILTIN_AGENT_PROFILE_ID || input.selection.source === 'default') && (!isBuiltinAgentProfileSelection(input.selection) || input.selection.scope.ownerId !== input.ownerId || input.selection.scope.workspaceId !== input.workspaceId)) throw new AgentProfileAdmissionError()
@@ -26,6 +29,19 @@ export async function admitProfileSelection(query: Query, input: {
       const bound = await query.query('SELECT 1 FROM byos_bindings WHERE id=$1 AND "connectionId"=$2 AND "modelId"=$3 AND "workspaceId"=$4',
         [input.subscriptionBindingId, entry.source.connectionId, input.model, input.workspaceId])
       if (!bound.rowCount) throw new AgentProfileAdmissionError()
+    }
+  }
+  if (input.selection && input.sourceRunId && input.factoryContext) {
+    const watchdog = await watchdogProfileAdmission(query, { ...input, sourceRunId: input.sourceRunId }, input.factoryContext)
+    if (watchdog === 'invalid' || (watchdog === 'none' && input.factoryContext.runId)) throw new AgentProfileAdmissionError()
+    if (watchdog === 'started' || watchdog === 'unstarted') {
+      try {
+        // A started task keeps its exact role, while B's live source is checked
+        // again. An unstarted selection must still match the editable head.
+        await (watchdog === 'started' ? assertProfileTarget : assertProfileSelection)(query,
+          { ownerId: input.ownerId, workspaceId: input.workspaceId }, input.selection!)
+      } catch { throw new AgentProfileAdmissionError() }
+      return undefined // A different executor receives no native-origin grant.
     }
   }
   if (input.sourceRunId) {
@@ -65,12 +81,35 @@ export async function assertRunProfileClaim(query: Query, runId: string) {
   const workspaceId = definition.executionIdentity?.workspaceId
   if (!workspaceId || !run.issueId) throw new AgentProfileAdmissionError()
   if ((definition.agentProfile.profileId === BUILTIN_AGENT_PROFILE_ID || definition.agentProfile.source === 'default') && (!isBuiltinAgentProfileSelection(definition.agentProfile) || definition.agentProfile.scope.ownerId !== run.userId || definition.agentProfile.scope.workspaceId !== workspaceId)) throw new AgentProfileAdmissionError()
+  if (run.questionContinuation && run.kind === 'implement') {
+    const { rows: [task] } = await query.query(`SELECT t.* FROM factory_tasks t
+      JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id AND a."runId"=$1
+      JOIN factory_questions q ON q."taskId"=t.id AND q."continuationRunId"=a."runId" AND q."userId"=t."userId" AND q."issueId"=t."issueId"
+      WHERE t."userId"=$2 AND t."issueId"=$3 AND t.stage='execute' AND t.status='running' AND a.status='running'
+        AND q.status='resuming' AND (q."expiresAt" IS NULL OR q."expiresAt">clock_timestamp()) FOR SHARE OF t,a,q`, [run.id,run.userId,run.issueId])
+    const edge = task ? await (await import('./questions/execution-continuation')).questionExecutionContinuation(query,task,task.attemptId) : null
+    if (!edge || run.stopRequestedAt || run.status !== 'queued') throw new AgentProfileAdmissionError()
+    const source = await admitProfileSelection(query, { ownerId: run.userId, workspaceId, issueId: run.issueId,
+      harness: definition.harness, model: definition.model, apiKeyId: definition.apiKey?.keyId,
+      subscriptionBindingId: definition.subscription?.bindingId, selection: definition.agentProfile, sourceRunId: edge.questionOriginRunId })
+    if (source !== edge.questionOriginRunId) throw new AgentProfileAdmissionError()
+    return
+  }
   // Provider recovery gets a fresh native session, with the old role and a
   // newly authorized model. Only its committed host receipt grants this path.
   const { rows: [providerSource] } = run.retryOf
     ? await query.query<typeof import('@/lib/db/schema').agentRuns.$inferSelect>('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "issueId"=$3 FOR SHARE', [run.retryOf, run.userId, run.issueId])
     : await query.query<typeof import('@/lib/db/schema').agentRuns.$inferSelect>(`SELECT * FROM agent_runs WHERE "userId"=$1 AND "issueId"=$2
         AND "stopReason"='provider_failure' AND report->'modelFallback'->>'retryRunId'=$3 ORDER BY "createdAt" DESC LIMIT 1 FOR SHARE`, [run.userId, run.issueId, run.id])
+  const watchdog = await watchdogProfileClaimContext(query, { id: run.id, userId: run.userId, issueId: run.issueId })
+  if (watchdog) {
+    if (!run.retryOf) throw new AgentProfileAdmissionError()
+    await admitProfileSelection(query, { ownerId: run.userId, workspaceId, issueId: run.issueId,
+      harness: definition.harness, model: definition.model, apiKeyId: definition.apiKey?.keyId,
+      subscriptionBindingId: definition.subscription?.bindingId, selection: definition.agentProfile,
+      sourceRunId: run.retryOf, factoryContext: watchdog })
+    return
+  }
   // Independent Factory checks deliberately clear retryOf and native SID.
   // Their exact current task/candidate/stage event is the recovery authority.
   if (providerSource?.agentDefinition?.agentProfile) {

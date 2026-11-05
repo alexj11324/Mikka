@@ -28,7 +28,7 @@ function imports(file) {
 test('Coordinator schemas cannot bring Node/server modules across the durable Workflow boundary', () => {
   // The schemas reach the workflow through its tool registries (tools.ts, factory-tools.ts), so walk
   // workflow.ts and every coordinator module it bundles. Step files ('use step') run outside the sandbox.
-  const names = new Set(['factoryDispatchSchema', 'contextQuestionAnswerSchema', 'questionReferenceSchema', 'questionEscalationSchema', 'commandSchema', 'skillEvaluationCommandSchema'])
+  const names = new Set(['factoryCheckRecoverySchema', 'factoryDispatchSchema', 'contextQuestionAnswerSchema', 'questionReferenceSchema', 'questionEscalationSchema', 'commandSchema', 'skillEvaluationCommandSchema'])
   const coordinator = resolve(root, 'workflows/coordinator')
   const bundled = new Set()
   function bundle(file) {

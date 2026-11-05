@@ -14,6 +14,7 @@ import { sectionFromQuery } from '@/components/workspace/workspace-navigation'
 import { SettingsShell } from '@/components/settings/settings-shell'
 import { SettingsDataPreloader } from '@/components/settings/settings-data-preloader'
 import { memberSettingsKey, teamDirectoryKey } from '@/lib/settings-data'
+import { LiveProvider } from '@/hooks/use-live-key'
 
 export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers, initialSelected, googleEnabled = false }: {
   user: { id: string; name: string; email: string; image?: string | null }
@@ -37,11 +38,11 @@ export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers
     if (initialMembers) fallback[memberSettingsKey(initialMembers.workspace.id)] = initialMembers
     return { provider: () => new Map(), fallback }
   })
-  return <SWRConfig value={cacheConfig}>
+  return <SWRConfig value={cacheConfig}><LiveProvider ownerId={user.id} workspaceId={workspaceId}>
     <DesktopIntegration userId={user.id} />
-    <SettingsDataPreloader workspaceId={params.get('workspace') ?? initialWorkspaceId} onWorkspaceResolved={setWorkspaceId} />
+    <SettingsDataPreloader ownerId={user.id} userKey={user.email} workspaceId={params.get('workspace') ?? initialWorkspaceId} onWorkspaceResolved={setWorkspaceId} />
     {pathname.startsWith('/settings')
       ? <SettingsShell user={user} defaultWorkspaceId={workspaceId} googleEnabled={googleEnabled} />
-      : <IssueWorkspace user={user} initialIssues={initialIssues} initialSelected={initialSelected} initialSection={sectionFromQuery(params.get('section') ?? undefined)} googleEnabled={googleEnabled} />}
-  </SWRConfig>
+      : <IssueWorkspace withinLiveProvider user={user} initialIssues={initialIssues} initialSelected={initialSelected} initialSection={sectionFromQuery(params.get('section') ?? undefined)} googleEnabled={googleEnabled} />}
+  </LiveProvider></SWRConfig>
 }

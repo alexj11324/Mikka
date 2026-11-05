@@ -9,6 +9,7 @@ import { ComputerRequestError } from '@/lib/computer/client'
 
 let state: ComputerState = { machine: 'sleeping', control: 'idle' }
 let requests = 0
+let stateReads = 0
 let refreshController = new AbortController()
 let viewer: { url: string } | undefined
 class FakeRFB extends EventTarget {
@@ -26,7 +27,7 @@ const failures: string[] = []
 mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
 mock.module('sonner', { namedExports: { toast: { error: (message: string) => failures.push(message) } } })
 mock.module(new URL('../hooks/use-computer.ts', import.meta.url).href, { namedExports: {
-  useComputer: () => ({ data: state, mutate: async () => state }),
+  useComputer: () => ({ data: state, mutate: async () => { stateReads++; return state } }),
   useViewerGrant: () => ({ data: viewer }),
 } })
 mock.module(new URL('../lib/computer/client.ts', import.meta.url).href, { namedExports: { ComputerRequestError, computerApi: {
@@ -48,7 +49,7 @@ before(async () => {
   ;({ ComputerScreen } = await import('../components/computer/computer-screen'))
 })
 beforeEach(() => {
-  state = { machine: 'sleeping', control: 'idle' }; requests = 0; failures.length = 0
+  state = { machine: 'sleeping', control: 'idle' }; requests = 0; stateReads = 0; failures.length = 0
   refreshController = new AbortController(); viewer = undefined; FakeRFB.instances.length = 0
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
 })
@@ -128,4 +129,32 @@ test('normal viewer unmount removes the update listener and does not stop the de
   refreshController.abort()
   assert.equal(client.disconnects, 1)
   assert.equal(requests, 0)
+})
+
+test('a remote viewer disconnect requests one authoritative state read; normal disposal does not', async () => {
+  showRunning()
+  await render()
+  for (let n = 0; n < 100 && FakeRFB.instances.length === 0; n++) await settleViewer()
+  const client = FakeRFB.instances[0]
+  assert.ok(client)
+  await act(async () => { client.dispatchEvent(new Event('disconnect')); client.dispatchEvent(new Event('disconnect')) })
+  assert.equal(stateReads, 1)
+  assert.equal(state.machine, 'running', 'a disconnect does not fabricate a sleeping or error state')
+  await act(async () => root.render(null))
+  assert.equal(stateReads, 1)
+})
+
+test('remote disconnect while hidden waits for the shared visibility catch-up', async () => {
+  showRunning()
+  await render()
+  for (let n = 0; n < 100 && FakeRFB.instances.length === 0; n++) await settleViewer()
+  const previous = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+  Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+  try {
+    await act(async () => FakeRFB.instances[0].dispatchEvent(new Event('disconnect')))
+    assert.equal(stateReads, 0)
+  } finally {
+    if (previous) Object.defineProperty(document, 'visibilityState', previous)
+    else delete (document as unknown as { visibilityState?: string }).visibilityState
+  }
 })

@@ -9,7 +9,8 @@ import { useTranslations } from 'next-intl'
 import { Box, Check, CircleUserRound, UserRoundPen, Columns3, Flag, List, ListFilter, PanelRightClose, PanelRightOpen, Plus, RefreshCw, Settings2, SquareKanban, Tag, X } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
 import { listAgents } from '@/app/actions/agents'
-import { listTaskRuns } from '@/app/actions/task-runs'
+import { useLiveTaskRunList } from '@/hooks/use-live-lists'
+import { useListExpiry } from '@/hooks/use-list-expiry'
 import { getLinearBoardSync } from '@/app/actions/linear-sync'
 import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
@@ -36,7 +37,6 @@ import { AgentSphere } from './issue-assignee-menu'
 import { LabelDot } from './issue-metadata-controls'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssueStatus } from './issue-properties'
 import { ResizablePane } from '@/components/ui/resizable-pane'
-import { LIST_POLL_MS } from '@/components/swr-defaults'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Scope = 'all' | 'workspace' | 'personal'
@@ -115,6 +115,8 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
   const [settings, update] = useBoardSettings()
   const { scope, view, filters, display } = settings
+  useListExpiry(display.completed === 'all' ? [] : issues.filter(issue => issue.status === 'done')
+    .map(issue => new Date(issue.updatedAt).getTime() + COMPLETED_DAYS[display.completed] * 86_400_000))
   const listScroll = useViewScroll<HTMLDivElement>(`${stateKey}:list`, view === 'list')
   const [sidebar, setSidebar] = useStoredFlag(SIDEBAR_KEY, true)
   // Below xl (1280) a 360px panel leaves the board too little room: it starts folded and opens as a sheet over the board, as Linear's side panel does on narrow windows (R-65).
@@ -148,7 +150,8 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
   // Without a connected Linear team, the button only reloads the board.
   const linearSynced = !!linear && !linear.error && linear.synced
   const { data: agents } = useSWR('agents', () => listAgents())
-  const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: LIST_POLL_MS })
+  const { data: runList } = useLiveTaskRunList(userId)
+  const runs = runList?.items
   const myAgents = useMemo(() => new Set((agents ?? []).map(agent => agent.id)), [agents])
   const owners = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, { bot: run.bot, harnesses: run.harnesses }] as const)), [runs])
   // listTaskRuns returns each task's newest run once; the card shows that run's group, never its raw status.

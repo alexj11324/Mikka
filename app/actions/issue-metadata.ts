@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import { db } from '@/lib/db'
+import { issueListChanged } from '@/lib/live/lists'
 import { agents, issues, issueMembers, issueVersions, users } from '@/lib/db/schema'
 import { issuePropertyChoices } from '@/lib/issue-property-choices'
 import { requireIssueAccess } from '@/lib/issue-access'
@@ -91,6 +92,7 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, next), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId), eq(issues.revision, latest.revision))).returning()
         if (!saved) return { error: 'issueOutdated' }
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(user.id) })
+        await issueListChanged(tx, saved.id)
         return { issue: await issueView(saved, tx) }
       })
       if ('issue' in result && result.issue?.scope === 'workspace' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })

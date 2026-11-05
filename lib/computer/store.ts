@@ -1,10 +1,13 @@
 import 'server-only'
+import { botListChanged, runListChanged } from '../live/lists'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import type { ComputerState } from '@mikka/protocol/computer'
 import * as provider from './e2b-provider'
 import { ensureCloudMachine } from './provision'
 import { computerPermission, type ComputerPermission } from './permission'
+import { computerChanged, computerWorkspaceChanged, machineChanged } from '@/lib/live/computer-state'
+import { computerLiveState } from './state-deadline'
 
 export class ComputerError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -20,6 +23,7 @@ export class ComputerStore {
 
   async createBot(actor: Actor, name: string) {
     const { rows } = await this.pool.query<Bot>('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4) RETURNING id,name,"workspaceId","ownerId"', [randomUUID(), actor.workspaceId, actor.userId, name])
+    if (rows[0]) await botListChanged(this.pool, rows[0].id)
     return rows[0]
   }
   async listBots(actor: Actor) {
@@ -56,11 +60,12 @@ export class ComputerStore {
         // Previously delivered approvals cannot be rebound to a later policy
         // generation. Stop these threads so they cannot appear to resume with
         // stale authority after an administrator re-enables computer use.
-        await client.query(`UPDATE agent_runs r SET "stopRequestedAt"=coalesce(r."stopRequestedAt",now()),"updatedAt"=now(),
+        const stopped = await client.query<{ id: string }>(`UPDATE agent_runs r SET "stopRequestedAt"=coalesce(r."stopRequestedAt",now()),"updatedAt"=now(),
           "finishedAt"=CASE WHEN r.status='queued' THEN now() ELSE r."finishedAt" END,
           status=CASE WHEN r.status='queued' THEN 'stopped' ELSE r.status END
           FROM computer_run_bindings b WHERE b."runId"=r.id AND b."workspaceId"=$1
-            AND r.status=ANY($2::text[])`, [workspaceId, ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']])
+            AND r.status=ANY($2::text[]) RETURNING r.id`, [workspaceId, ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']])
+        for (const { id } of stopped.rows) await runListChanged(client, id)
       }
       const sync = async () => {
         for (const machine of machines) {
@@ -81,6 +86,7 @@ export class ComputerStore {
       // Every transition increments the policy version. The display lock
       // fences old approvals even if the subsequent database commit fails.
       await sync()
+      if (previous !== permission) await computerWorkspaceChanged(client, this.pool, workspaceId)
       await client.query('COMMIT')
       return { permission }
     } catch (error) {
@@ -97,15 +103,20 @@ export class ComputerStore {
   }
   async state(actor: Actor, botId: string): Promise<ComputerState> {
     await this.bot(actor, botId)
-    const { rows } = await this.pool.query('SELECT m.state AS machine,m."sandboxId",d.control,d."controlledBy",d."controlUntil",d."lastAction" FROM bot_desktops d JOIN cloud_machines m ON m."workspaceId"=d."workspaceId" AND m."ownerId"=d."ownerId" WHERE d."botId"=$1 AND d."ownerId"=$2', [botId, actor.userId])
+    const { rows } = await this.pool.query('SELECT m.state AS machine,m."sandboxId",m."provisionLeaseUntil",d.control,d."controlledBy",d."controlUntil",d."lastAction" FROM bot_desktops d JOIN cloud_machines m ON m."workspaceId"=d."workspaceId" AND m."ownerId"=d."ownerId" WHERE d."botId"=$1 AND d."ownerId"=$2', [botId, actor.userId])
     const row = rows[0]
     if (!row) {
-      const machine = (await this.pool.query('SELECT state FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])).rows[0]
-      return { machine: machine?.state === 'waking' ? 'waking' : 'sleeping', control: 'idle' }
+      const machine = (await this.pool.query('SELECT state,"provisionLeaseUntil" FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])).rows[0]
+      return { machine: machine?.state === 'waking' ? 'waking' : 'sleeping', control: 'idle',
+        live: computerLiveState(actor.workspaceId, machine?.state === 'waking' ? [machine.provisionLeaseUntil] : []) }
     }
-    if (row.sandboxId && row.machine !== 'error' && row.machine !== 'waking') row.machine = await this.runtime.computerState(actor.workspaceId, row.sandboxId)
+    const deadlines: (Date | null | undefined)[] = row.machine === 'waking' ? [row.provisionLeaseUntil] : []
+    if (row.sandboxId && row.machine !== 'error' && row.machine !== 'waking') {
+      row.machine = await this.runtime.computerState(actor.workspaceId, row.sandboxId, expiresAt => deadlines.push(expiresAt))
+    }
     const held = row.control === 'user' && new Date(row.controlUntil).getTime() > Date.now()
-    const review = (await this.pool.query(`SELECT v.id,v.digest,v."runId",v.call,v."expiresAt"
+    const review = (await this.pool.query(`SELECT v.id,v.digest,v."runId",v.call,v."expiresAt",
+      LEAST(v."expiresAt",v."seenAt"+interval '10 seconds',r."leaseExpiresAt") AS "visibleUntil"
       FROM local_computer_reviews v JOIN agent_runs r ON r.id=v."runId" AND r."userId"=v."userId" AND r."deviceId"=v."deviceId"
       JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
       WHERE b."botId"=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3 AND v.decision IS NULL
@@ -121,7 +132,10 @@ export class ComputerStore {
                 : call.name === 'scroll' ? { tool: 'scroll', text: `${call.arguments.direction} × ${call.arguments.amount}`, x: call.arguments.x, y: call.arguments.y } : { tool: 'screenshot' },
           summary: call.name,
           expiresAt: new Date(review.expiresAt).toISOString() } : undefined
+    if (held) deadlines.push(row.controlUntil)
+    if (pendingApproval) deadlines.push(review.visibleUntil)
     return { machine: row.machine, control: held ? 'user' : row.control === 'user' ? 'agent' : row.control,
+      live: computerLiveState(actor.workspaceId, deadlines),
       ...(held ? { controlledBy: { userId: row.controlledBy } } : {}), ...(row.lastAction ? { lastAction: row.lastAction } : {}), ...(pendingApproval ? { pendingApproval } : {}) }
   }
   private lease(d: Desktop, computerAllowed = true, policyVersion = 0): provider.DesktopLease {
@@ -168,14 +182,16 @@ export class ComputerStore {
       // run is claimed on its own thread machine (decision 0251), so a takeover pauses no run.
       // Handback still resumes a run that an earlier takeover paused.
       if (action === 'handback') {
-        await client.query(`UPDATE agent_runs r SET status=COALESCE(r."resumeStatus",'running'),"resumeStatus"=NULL,"pauseReason"=NULL,"updatedAt"=now()
+        const resumed = await client.query<{ id: string }>(`UPDATE agent_runs r SET status=COALESCE(r."resumeStatus",'running'),"resumeStatus"=NULL,"pauseReason"=NULL,"updatedAt"=now()
           FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3
-          AND r."userId"=$3 AND r.status='paused' AND r."pauseReason"='human_control'`, [botId, actor.workspaceId, actor.userId])
+          AND r."userId"=$3 AND r.status='paused' AND r."pauseReason"='human_control' RETURNING r.id`, [botId, actor.workspaceId, actor.userId])
+        for (const { id } of resumed.rows) await runListChanged(client, id)
       }
       persistProgress = true
       await this.runtime.syncDesktopLease(sandbox, lease)
       const result = action === 'viewer' || action === 'takeover'
         ? await this.runtime.viewerGrant(sandbox, lease, actor.userId, action === 'takeover' ? 'control' : mode) : null
+      await computerChanged(client, this.pool, botId)
       await client.query('COMMIT')
       return result
     } catch (error) {
@@ -184,6 +200,7 @@ export class ComputerStore {
         // could revive an old control token on the next synchronization.
         // An expected authorization/conflict response is not a provider failure.
         if (!(error instanceof ComputerError)) await client.query('UPDATE cloud_machines SET state=$2 WHERE "workspaceId"=$1 AND "ownerId"=$3', [actor.workspaceId, 'error',actor.userId])
+        await machineChanged(client, this.pool, actor.userId, actor.workspaceId)
         await client.query('COMMIT')
       } else await client.query('ROLLBACK')
       throw error

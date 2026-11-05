@@ -50,7 +50,7 @@ export function useAgentProfiles(workspaceId?: string, enabled = true, preview?:
   const key = workspaceId ? preview?.location || preview?.deviceId ? [...agentProfilesKey(workspaceId), preview.location ?? null, preview.deviceId ?? null] : agentProfilesKey(workspaceId) : null
   return useSWR(enabled ? key : null,
     () => profileRequest<AgentProfilesView>(workspaceId!, 'GET', undefined, undefined, preview), {
-      keepPreviousData: false, revalidateOnFocus: true, shouldRetryOnError: false,
+      keepPreviousData: false, shouldRetryOnError: false,
     })
 }
 

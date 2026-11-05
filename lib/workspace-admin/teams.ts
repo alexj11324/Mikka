@@ -2,12 +2,13 @@ import 'server-only'
 import { sql, and, eq, inArray, ne } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { issues, teamIssueCreateRequests, teamIssuePromotions } from '@/lib/db/schema'
+import { agentRuns, issues, teamIssueCreateRequests, teamIssuePromotions } from '@/lib/db/schema'
 import { projectEvents, projects } from '@/lib/db/project-schema'
 import { teamIssueCreateReceipts, teamIssuePromotionReceipts, teamIssues, teamMembers, teamProjects, teams } from '@/lib/db/team-schema'
 import { requireWorkspace, WorkspaceError, type WorkspaceTransaction } from '@/lib/workspace-access'
 import { lockTeamRelations } from '@/lib/team-access'
 import { workspaceDb } from '@/lib/workspace-db'
+import { ownerListChanged, workspaceListChanged } from '../live/lists'
 
 export interface TeamDeletionImpact { teamId: string; name: string; tasks: number; projects: number }
 
@@ -66,7 +67,11 @@ export async function deleteTeamData(actorId: string, teamId: string, confirmNam
       await main.delete(teamIssueCreateRequests).where(eq(teamIssueCreateRequests.teamId, team.id))
       await main.delete(teamIssuePromotions).where(eq(teamIssuePromotions.teamId, team.id))
       if (!issueIds.length) return 0
-      return (await main.delete(issues).where(inArray(issues.id, issueIds)).returning({ id: issues.id })).length
+      const owners = await main.selectDistinct({ userId: agentRuns.userId }).from(agentRuns).where(inArray(agentRuns.issueId, issueIds))
+      const deleted = await main.delete(issues).where(inArray(issues.id, issueIds)).returning({ id: issues.id })
+      for (const { userId } of owners) await ownerListChanged(main, userId, ['thread_list', 'task_run_list', 'bot_chat_list'])
+      if (deleted.length) await workspaceListChanged(main, team.workspaceId, ['issue_list'])
+      return deleted.length
     })
     await tx.delete(teamIssueCreateReceipts).where(eq(teamIssueCreateReceipts.teamId, team.id))
     await tx.delete(teamIssuePromotionReceipts).where(eq(teamIssuePromotionReceipts.teamId, team.id))
@@ -79,6 +84,7 @@ export async function deleteTeamData(actorId: string, teamId: string, confirmNam
     }
     await tx.delete(teamMembers).where(eq(teamMembers.teamId, team.id))
     await tx.delete(teams).where(and(eq(teams.id, team.id), eq(teams.workspaceId, team.workspaceId)))
+    await workspaceListChanged(tx, team.workspaceId, ['workspace_settings', 'issue_list'])
     return { deleted: { tasks, projects: deletedProjects } }
   })
 }

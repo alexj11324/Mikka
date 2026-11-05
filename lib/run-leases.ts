@@ -1,4 +1,5 @@
 import 'server-only'
+import { runListChanged } from './live/lists'
 import { rebindExecutionDevice, revalidateExecutionIdentity, ExecutionIdentityError } from './execution-identity'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
@@ -67,7 +68,8 @@ export async function renewRunLeases(deviceId: string, runIds: readonly string[]
     catch (error) {
       if (!(error instanceof ExecutionIdentityError)) throw error
       // The daemon receives revoked on this heartbeat and removes injected credentials.
-      await db.update(agentRuns).set({ stopRequestedAt: now, leaseExpiresAt: now, updatedAt: now }).where(and(eq(agentRuns.id, run.id), eq(agentRuns.deviceId, deviceId), inArray(agentRuns.status, [...LEASED_RUN_STATUSES])))
+      const stopped = await db.update(agentRuns).set({ stopRequestedAt: now, leaseExpiresAt: now, updatedAt: now }).where(and(eq(agentRuns.id, run.id), eq(agentRuns.deviceId, deviceId), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]))).returning({ id: agentRuns.id })
+      if (stopped.length && !run.stopRequestedAt) await runListChanged(db, run.id)
     }
   }
   const renewed = authorized.length ? await db.update(agentRuns)
@@ -116,8 +118,9 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
       continue
     }
     if (target) {
-      await db.update(agentRuns).set({ deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, agentDefinition: await rebindExecutionDevice(pool, run, target.deviceId), updatedAt: now })
-        .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
+      const moved = await db.update(agentRuns).set({ deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, agentDefinition: await rebindExecutionDevice(pool, run, target.deviceId), updatedAt: now })
+        .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt))).returning({ id: agentRuns.id })
+      if (moved.length) await runListChanged(db, run.id)
       notifyDeviceWork(target.deviceId)
       continue
     }
@@ -254,6 +257,7 @@ async function reclaimLostRun(run: Run, now: Date) {
       .where(and(eq(agentRuns.id, run.id), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), lt(agentRuns.leaseExpiresAt, now), isNull(agentRuns.stopRequestedAt)))
       .returning({ id: agentRuns.id })
     if (!ended) return false
+    await runListChanged(tx, run.id)
     if (cloud) return true
     await tx.insert(agentRuns).values({
       id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
@@ -261,6 +265,7 @@ async function reclaimLostRun(run: Run, now: Date) {
       deviceId: target?.deviceId ?? run.deviceId, deviceRepoId: target?.deviceRepoId ?? run.deviceRepoId, status: 'queued', kind: run.kind, baseBranch: run.baseBranch,
       prompt: recovery.prompt, attempt: outcome.attempt, retryOf: run.id,
     })
+    await runListChanged(tx, retryId)
     if (bound) {
       // Same thread, new sandbox: the retry gets its own thread machine, built from the workspace snapshot.
       await tx.execute(sql`insert into computer_run_bindings ("runId","botId","workspaceId","ownerId") select ${retryId},"botId","workspaceId","ownerId" from computer_run_bindings where "runId"=${run.id} and "ownerId"=${run.userId}`)
@@ -422,6 +427,8 @@ export async function failUnclaimedCloudStart(actor: { userId: string; workspace
       .where(eq(agentRuns.id, runId)).returning()
     const event = runFinishedEvent({ ...ended, stopReason: 'device_lost', report: null })
     await recordCoordinatorEvent(tx, { ...event, payload: { ...event.payload, noMachine } })
+    // The terminal row changed even when its durable completion event already exists.
+    await runListChanged(tx, ended.id)
     return ended
   })
   if (!failed) return false

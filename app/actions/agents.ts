@@ -1,5 +1,6 @@
 'use server'
 import { deploymentSwitch } from '@/lib/deployment-switches'
+import { ownerListChanged } from '@/lib/live/lists'
 
 import { createHash } from 'node:crypto'
 import { gunzipSync } from 'node:zlib'
@@ -123,9 +124,10 @@ export async function setDeviceEnabled(input: { deviceId: string; enabled: boole
     const userId = await getUserId()
     const parsed = z.object({ deviceId: z.uuid(), enabled: z.boolean() }).safeParse(input)
     if (!parsed.success) return { error: 'deviceNotFound' }
-    await db.update(devices)
+    const changed = await db.update(devices)
       .set({ enabled: parsed.data.enabled, updatedAt: new Date() })
-      .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt)))
+      .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt))).returning({ id: devices.id })
+    if (changed.length) await ownerListChanged(db, userId, ['thread_list'])
     return { success: true }
   })
 }
@@ -247,7 +249,7 @@ export async function findThreadIssue(runId: string): Promise<{ issueId: string 
 
 export interface IssueThreadDetail {
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
-  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean; /** The latest run's failure reason, stored masked (agent_runs.error). */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null; /** Host-confirmed provider recovery, within this owner's thread chain. */ modelFallback?: import('@/lib/run-model-fallback-view').ThreadModelFallbackView[] | null; /** Keep polling while the host prepares a continuation; no uncommitted switch is displayed. */ modelFallbackPending?: boolean }
+  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean; /** The latest masked run error or the host's fixed wake failure. */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null; /** Host-confirmed provider recovery, within this owner's thread chain. */ modelFallback?: import('@/lib/run-model-fallback-view').ThreadModelFallbackView[] | null; /** Keep polling while the host prepares a continuation; no uncommitted switch is displayed. */ modelFallbackPending?: boolean }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
   /** Where `chunks` ends; passed back, the next read returns only later chunks. */
@@ -270,7 +272,15 @@ async function threadQuestions(threads: readonly IssueThread[], viewerId: string
   }))
   if (!asked.size || !deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return [...threads]
   const byRun = await threadQuestionStates(pool, [...new Set(asked.values())], viewerId)
-  return threads.map(thread => ({ ...thread, question: byRun.get(asked.get(thread.id) ?? '') ?? null }))
+  return Promise.all(threads.map(async thread => {
+    const question = byRun.get(asked.get(thread.id) ?? '') ?? null
+    // The list and detail share the owner's host-confirmed wake projection;
+    // the queued run and its committed answer remain unchanged.
+    const questionWake = thread.ownedByCurrentUser && question === 'resuming' && (thread.continuation?.status ?? thread.status) === 'queued'
+      ? await (await import('@/lib/factory/questions/wake')).questionWakeFailure(pool, viewerId, thread.latestRunId)
+      : null
+    return { ...thread, question, questionWake }
+  }))
 }
 
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
@@ -306,6 +316,8 @@ export async function getIssueThread(issueId: string | null, runId: string, afte
       error = failed?.error ?? null
     }
   }
+  const questionWake = thread.questionWake ?? null
+  if (questionWake) error = questionWake.error
   const quota = row.userId === user.id
     ? await (await import('@/lib/run-quota-view')).threadQuotaView(user.id, chain?.attempts.map(attempt => attempt.runId) ?? [row.id], thread.latestRunId)
     : null
@@ -313,7 +325,7 @@ export async function getIssueThread(issueId: string | null, runId: string, afte
     ? await (await import('@/lib/run-quota-view')).threadModelFallbackState(user.id, chain?.attempts.map(attempt => attempt.runId) ?? [row.id], thread.latestRunId)
     : null
   return {
-    thread: { ...thread, prompt: row.prompt, stopRequestedAt, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
+    thread: { ...thread, questionWake, prompt: row.prompt, stopRequestedAt, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
     chunkCursor: read.cursor,
@@ -353,7 +365,7 @@ function safeHttpUrl(value: string) {
 }
 
 /** Something a person says in a running thread; the daemon delivers it to the agent. */
-export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true }): Promise<{ runId: string; continued: boolean }> {
+export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<{ runId: string; continued: boolean }> {
   const text = z.string().trim().min(1).max(10_000).safeParse(input.text)
   if (!text.success) throw new ActionFailureError('messageRequired')
   const { row, user } = await readableThread(input.issueId, input.runId)
@@ -365,6 +377,17 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
   if(input.retryOriginalSession!==undefined && input.retryOriginalSession!==true)throw new ActionFailureError('runInvalid')
   if(input.requestId!==undefined && !z.uuid().safeParse(input.requestId).success)throw new ActionFailureError('validationGeneric')
   if(input.requestId!==undefined && input.retryOriginalSession)throw new ActionFailureError('validationGeneric')
+  if(input.questionWakeGeneration!==undefined && (!input.retryOriginalSession || !z.uuid().safeParse(input.questionWakeGeneration).success))throw new ActionFailureError('validationGeneric')
+  if(input.questionWakeGeneration!==undefined) {
+    if(!row.issueId)throw new ActionFailureError('threadCannotContinue')
+    try {
+      const {retryQueuedQuestionWake}=await import('@/lib/factory/questions/wake')
+      return await retryQueuedQuestionWake(pool,{userId:user.id,sessionId:session.session.id},row.id,input.questionWakeGeneration)
+    } catch(error) {
+      if(error instanceof FactoryError)throw new ActionFailureError(error.code==='factoryNotFound'?'runNotFound':'threadRecoveryUnavailable')
+      throw error
+    }
+  }
   if(input.retryOriginalSession && row.issueId) {
     // Only the existing owner Retry control requests recovery. A typed label,
     // Bot message or ordinary send never acquires this authority.
@@ -407,7 +430,7 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
  * dispatch with no machine or model) returned as its code, so the thread says
  * why instead of 「发送失败」. Other failures still throw.
  */
-export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
+export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
   return runAction(async () => { const result=await sendIssueThreadMessage(input); return { sent: true as const,...result } })
 }
 

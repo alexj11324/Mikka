@@ -45,4 +45,7 @@ test('only the authenticated publisher can deliver bounded invalidation keys', a
   assert.deepEqual(g.names, [])
   assert.equal((await push(payload)).status, 204)
   assert.deepEqual(g.pushed, [payload])
+  const approval = [{ kind: 'approved_writes', id: workspace }, { kind: 'approved_write', id: workspace }]
+  assert.equal((await push(approval)).status, 204)
+  assert.deepEqual(g.pushed.at(-1), approval)
 })

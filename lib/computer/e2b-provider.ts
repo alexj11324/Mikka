@@ -42,10 +42,11 @@ export async function killComputer(workspaceId: string, id: string) {
   await withE2BErrors(owner, false, () => Sandbox.kill(id, base))
 }
 
-export async function computerState(workspaceId: string, id: string) {
+export async function computerState(workspaceId: string, id: string, observed?: (expiresAt: Date) => void) {
   const owner = await ownerOf(workspaceId, id)
   const base = await options(owner)
   const info = await withE2BErrors(owner, false, () => Sandbox.getInfo(id, base))
+  if (info.state !== 'paused') observed?.(info.endAt)
   return info.state === 'paused' ? 'sleeping' : 'running'
 }
 

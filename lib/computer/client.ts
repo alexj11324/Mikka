@@ -27,9 +27,17 @@ async function call<T>(path: string, init?: RequestInit & { json?: unknown }): P
 
 const botPath = (botId: string, rest = '') => `/api/bots/${encodeURIComponent(botId)}/computer${rest}`
 
+export type ComputerRead = ComputerState & { requestedAt: number }
+
 export const computerApi = {
   bots: () => call<unknown>('/api/bots').then(value => z.array(botViewSchema).parse(value)),
-  state: (botId: string) => isMockedComputer(botId) ? mockComputer.state(botId) : call<ComputerState>(botPath(botId)).then(value => computerStateSchema.parse(value)),
+  state: async (botId: string): Promise<ComputerRead> => {
+    const requestedAt = performance.now()
+    const state = isMockedComputer(botId) ? await mockComputer.state(botId) : computerStateSchema.parse(await call<ComputerState>(botPath(botId)))
+    // Keep the request start with the cached result, so network and remount
+    // time cannot restart a server-observed expiry.
+    return { ...state, requestedAt }
+  },
   wake: (botId: string) => isMockedComputer(botId) ? mockComputer.wake(botId) : call<null>(botPath(botId, '/wake'), { method: 'POST' }),
   viewer: (botId: string, mode: ViewerMode) => isMockedComputer(botId) ? mockComputer.viewer(botId, mode) : call<ViewerGrant>(botPath(botId, '/viewer'), { method: 'POST', json: { mode } }).then(value => viewerGrantSchema.parse(value)),
   takeover: (botId: string, userId: string) => isMockedComputer(botId) ? mockComputer.takeover(botId, userId) : call<ViewerGrant>(botPath(botId, '/takeover'), { method: 'POST' }).then(value => viewerGrantSchema.parse(value)),
@@ -43,8 +51,8 @@ export const computerApi = {
 /**
  * Workspace-wide computer pushes. Only the mock sends them: GET /api/computer/events
  * carries sub-agent updates, never computer.* events, so a real bot's computer is
- * read by useComputer's 2 s poll alone, and opening that stream here (a database
- * read every second per tab) would deliver nothing.
+ * refreshed by the shared LiveChannels invalidations and observed expiry deadlines.
+ * Opening the subagent stream here would deliver no computer state.
  */
 export function subscribeComputerEvents(listener: (event: ComputerEvent) => void, mocked = computerMock): () => void {
   if (mocked) return mockComputer.subscribe(listener)

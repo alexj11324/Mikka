@@ -21,9 +21,9 @@ const forbidden=()=>{effects.push('external');throw Error('External effects forb
 function builder(action:()=>unknown){let ran=false,value:unknown;const run=()=>{if(!ran){ran=true;value=action()}return value};return {then:(resolve:(value:unknown)=>unknown,reject:(error:unknown)=>unknown)=>Promise.resolve().then(run).then(resolve,reject),returning:async()=>run(),onConflictDoNothing:()=>builder(run)}}
 const transport={
  async execute(statement:SQL){const query=dialect.sqlToQuery(statement);assert.match(query.sql,/^SELECT pg_advisory_xact_lock\(hashtextextended\(/);assert.deepEqual(query.params,[`bot-chat:${owner}:${COORDINATOR_BOT}`]);return {rows:[]}},
- select(selection?:Record<string,unknown>){let table:unknown,condition:SQL;const q={from(value:unknown){table=value;return q},where(value:SQL){condition=value;return q},orderBy(){return q},limit:async()=>read(),then:(resolve:(value:unknown)=>unknown,reject:(error:unknown)=>unknown)=>Promise.resolve().then(read).then(resolve,reject)}
+ select(selection?:Record<string,unknown>){let table:unknown,condition:SQL;const q={from(value:unknown){table=value;return q},where(value:SQL){condition=value;return q},for(mode:string){assert.equal(mode,'update');return q},orderBy(){return q},limit:async()=>read(),then:(resolve:(value:unknown)=>unknown,reject:(error:unknown)=>unknown)=>Promise.resolve().then(read).then(resolve,reject)}
   const read=()=>{const query=dialect.sqlToQuery(condition);assert.ok(query.params.includes(owner));assert.match(query.sql,/"botId" = \$\d+/);assert.ok(query.params.includes(COORDINATOR_BOT))
-   if(table===coordinatorSessions)return [session]
+   if(table===coordinatorSessions)return [{...session}]
    if(table===coordinatorMessages)return selection&&'last'in selection?[{last:messages.length}]:messages.filter(row=>row.position>Number(query.params.find(value=>typeof value==='number')??0))
    if(table===coordinatorEvents)return query.sql.includes('not in')?[]:events.filter(event=>!event.deliveredAt&&(event.kind==='user_message'||event.tier==='result'||event.tier==='attention'))
    throw Error('Unexpected query')};return q

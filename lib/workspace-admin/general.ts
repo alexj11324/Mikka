@@ -13,6 +13,7 @@ import { enqueueWorkspaceAudit, type AuditRequestContext } from '@/lib/audit/del
 import { deleteWorkspaceRows } from '@/lib/workspace-rows'
 import { teardownWorkspaceMachines } from '@/lib/cloud-computer/workspace-teardown'
 import { parseWorkspaceIcon } from './icon'
+import { ownerListChanged, workspaceListChanged, workspaceListScopesBeforeChange, workspaceListScopeChanged } from '../live/lists'
 
 export type MainTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -65,6 +66,7 @@ export async function updateWorkspaceGeneral(actorId: string, workspaceId: strin
     if (!Object.keys(changes).length) return { id: workspace.id, name: workspace.name, slug: workspace.slug, icon: workspace.icon }
     const [updated] = await tx.update(workspaces).set(changes).where(eq(workspaces.id, workspaceId))
       .returning({ id: workspaces.id, name: workspaces.name, slug: workspaces.slug, icon: workspaces.icon })
+    await workspaceListScopeChanged(tx, workspaceId, [])
     if (changes.slug && changes.slug !== workspace.slug && workspace.slug) await enqueueWorkspaceAudit(tx, {
       workspaceId, actor: { type: 'user', id: actorId, name: membership.name }, action: 'workspace.slug_changed',
       target: { type: 'workspace', id: workspaceId, label: updated.name }, metadata: { from: workspace.slug, to: changes.slug }, ...audit,
@@ -128,6 +130,7 @@ export async function transferWorkspaceOwnership(actorId: string, workspaceId: s
     if (!target) throw new WorkspaceError('workspaceTransferTargetInvalid')
     if (target.role !== 'admin') await tx.update(workspaceMembers).set({ role: 'admin' }).where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, to)))
     await tx.update(workspaces).set({ userId: to }).where(eq(workspaces.id, workspaceId))
+    await workspaceListChanged(tx, workspaceId, ['workspace_settings'])
     const base = { workspaceId, actor: { type: 'user' as const, id: actorId, name: membership.name }, target: { type: 'member', id: target.userId, label: target.name || target.email }, ...audit }
     if (target.role !== 'admin') await enqueueWorkspaceAudit(tx, { ...base, action: 'member.role_changed', metadata: { oldRole: target.role, newRole: 'admin' } })
     await enqueueWorkspaceAudit(tx, { ...base, action: 'workspace.ownership_transferred' })
@@ -187,6 +190,8 @@ async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: 
   if (billing?.status && (BILLING_LIVE_STATUSES as readonly string[]).includes(billing.status)) throw new WorkspaceError('workspaceHasActiveSubscription')
   const botRows = await tx.select({ id: bots.id }).from(bots).where(eq(bots.workspaceId, workspaceId)).for('update')
   const botIds = botRows.map(row => row.id)
+  const runOwners = botIds.length || issueIds.length ? await tx.selectDistinct({ userId: agentRuns.userId }).from(agentRuns)
+    .where(sql`${botIds.length ? inArray(agentRuns.botId, botIds) : sql`false`} OR ${issueIds.length ? inArray(agentRuns.issueId, issueIds) : sql`false`}`) : []
   // Rows that reference runs, bots or background tasks without ON DELETE CASCADE go first.
   await tx.execute(sql`delete from suggestion_executions where "workspaceId" = ${workspaceId}`)
   await tx.execute(sql`delete from thread_machines where "workspaceId" = ${workspaceId}`)
@@ -220,6 +225,8 @@ async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: 
   await tx.delete(workspaceCreditGrants).where(eq(workspaceCreditGrants.workspaceId, workspaceId))
   await tx.delete(workspaceBilling).where(eq(workspaceBilling.workspaceId, workspaceId))
   await deleteWorkspaceRows(rawQuery(tx), workspaceId)
+  for (const { userId } of runOwners) await ownerListChanged(tx, userId, ['thread_list', 'task_run_list', 'bot_chat_list'])
+  await workspaceListChanged(tx, workspaceId, ['issue_list', 'bot_list', 'group_list'])
   return { bots: deletedBots, threads, tasks }
 }
 
@@ -237,6 +244,7 @@ export async function deleteWorkspaceData(actorId: string, workspaceId: string, 
     // Every account keeps its one personal workspace (decision 2026-11-01-2310); only a team workspace is deleted.
     if (workspace.kind === 'personal') throw new WorkspaceError('workspacePersonalDelete')
     if (typed !== workspace.name) throw new WorkspaceError('workspaceDeleteNameMismatch')
+    const before = await workspaceListScopesBeforeChange(tx, workspaceId)
     const teamRows = await tx.select({ id: teams.id }).from(teams).where(eq(teams.workspaceId, workspaceId)).for('update')
     const teamIds = teamRows.map(row => row.id)
     const issueRows = await tx.select({ id: teamIssues.issueId }).from(teamIssues).where(eq(teamIssues.workspaceId, workspaceId))
@@ -263,6 +271,7 @@ export async function deleteWorkspaceData(actorId: string, workspaceId: string, 
     const members = (await tx.delete(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId)).returning({ id: workspaceMembers.userId })).length
     await tx.delete(workspaceSlugRedirects).where(eq(workspaceSlugRedirects.workspaceId, workspaceId))
     await tx.delete(workspaces).where(eq(workspaces.id, workspaceId))
+    await workspaceListScopeChanged(tx, workspaceId, before)
 
     const [next] = await tx.select({ id: workspaces.id }).from(workspaces)
       .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
+import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/lists'
 import { issues, issueVersions, teamIssueCreateRequests } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teams, teamIssues, teamIssueCreateReceipts } from '@/lib/db/team-schema'
@@ -79,9 +80,11 @@ export async function createTeamIssueForUser(userId: string, input: unknown, act
         // The workspace transaction still holds membership and relation locks.
         // Bind the transaction-local database fence to exactly this task.
         await tx.execute(sql`select set_config('mikka.team_scope_verified', ${issueId}, true), set_config('mikka.team_scope_team', ${teamId}, true), set_config('mikka.team_scope_request', ${requestId}, true)`)
+        const previousLists = await issueListScopesBeforeChange(issue)
         const [saved] = await tx.update(issues).set({ scope: 'workspace', linearSyncBlocked: true, scopeSetBy: 'user', scopeConfidence: null, revision: 2, updatedAt: new Date() }).where(eq(issues.id, issueId)).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId, userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...actor })
         await tx.update(teamIssueCreateRequests).set({ status: 'complete' }).where(eq(teamIssueCreateRequests.requestId, requestId))
+        await issueListScopeChanged(tx, issueId, previousLists)
         return { issue: await issueView(saved, tx), linearSync: { enabled: false as const, reason: 'no_explicit_target' as const } }
       })
     })

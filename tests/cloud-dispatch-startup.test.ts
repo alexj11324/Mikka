@@ -37,7 +37,7 @@ async function query(sql: string, values: unknown[] = []) {
 const pool = { query, connect: async () => ({ query, release() {} }) }
 stub('../lib/auth.ts', { auth: { api: {} } })
 stub('../lib/cloud-computer-flag.ts', { cloudComputerRunsEnabled: () => true, cloudComputerTasksEnabled: () => true, byosEnabled: () => true, byosEnrollmentEnabled: () => true })
-stub('../lib/db/index.ts', { db: { execute: async () => { calls.push('link-continuation') } }, pool, withDatabaseClient: unused, withDatabaseTransaction: unused })
+stub('../lib/db/index.ts', { db: { execute: async () => { calls.push('link-continuation'); return { rows: [], rowCount: 1 } } }, pool, withDatabaseClient: unused, withDatabaseTransaction: unused })
 stub('../lib/agent-runs.ts', { queueRun: unused, queueFactoryRun: unused, addRunMessage: unused, readRun: unused, requestRunStop: unused, visibleRuns: unused })
 stub('../lib/issue-access.ts', { issueForUser: async () => issueAllowed ? { id: issueId, title: 'Task', content: { type: 'doc' } } : null, requireUser: async () => {} })
 stub('../lib/subscription-runtime.ts', { authorizeSubscriptionWorkspace: async () => { if (!workspaceAllowed) throw new Error('Workspace access revoked') }, subscriptionRuntime: {} })

@@ -164,7 +164,15 @@ export async function assertProfileSelection(query: ProfileQuery, scope: AgentPr
     definition = parseAgentProfile(row.definition); skills = resolveAgentProfileSkills(definition.skills)
   }
   if (agentProfileDigest(definition, skills) !== selection.digest || digest(definition) !== digest(selection.definition) || digest(skills) !== digest(selection.skills) || selection.instructions !== agentProfileInstructions(definition, skills) || selection.effort !== definition.effort || selection.name !== definition.name) throw new AgentProfileError('agentProfileSelectionInvalid')
-  const entry = selection.targetEntry
+  await assertProfileTarget(query, scope, selection)
+}
+
+/** Recheck only the current target after a host receipt has independently
+ * established the frozen role. This never grants permission to use a Profile. */
+export async function assertProfileTarget(query: ProfileQuery, scope: AgentProfileScope, selection: AgentProfileSelection): Promise<void> {
+  validateProfileScope(scope)
+  if (selection.scope?.ownerId !== scope.ownerId || selection.scope?.workspaceId !== scope.workspaceId) throw new AgentProfileError('agentProfileScopeNotFound', 404)
+  const definition = selection.definition, entry = selection.targetEntry
   if (!entry || (definition.harness !== 'auto' && definition.harness !== entry.harness) || (definition.model.mode === 'fixed' && entryKey(definition.model) !== entryKey(entry))) throw new AgentProfileError('agentProfilePinConflict')
   const candidates = await orderCandidates(query, scope)
   if (!candidates.some(candidate => entryKey(candidate) === entryKey(entry))) throw new AgentProfileError('agentProfileModelUnavailable')

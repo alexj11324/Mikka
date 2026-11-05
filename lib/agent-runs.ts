@@ -146,7 +146,7 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
     const { execution, ...chosen } = selection
     const runModel = await factoryRunModel(userId, botId, parsed.data.agentId, chosen, sourceRunId
       ? (await executor.select({ agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, sourceRunId), eq(agentRuns.userId, userId))).limit(1))[0]?.agentDefinition : null, parsed.data.profileId, profileStage, parsed.data.issueId)
-    const result = await queueAdmittedRun(userId, { ...parsed.data, ...runModel, threadRunId: selection.threadRunId ?? sourceRunId, ...(chosen.pinnedDeviceId ? { pinnedDeviceId: chosen.pinnedDeviceId } : {}), ...(chosen.readOnly ? { readOnly: true } : {}), repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, execution, requestEventId, null, { executor, repo, client: tx, sourceRunId })
+    const result = await queueAdmittedRun(userId, { ...parsed.data, ...runModel, threadRunId: selection.threadRunId ?? sourceRunId, ...(chosen.pinnedDeviceId ? { pinnedDeviceId: chosen.pinnedDeviceId } : {}), ...(chosen.readOnly ? { readOnly: true } : {}), repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, execution, requestEventId, null, { executor, repo, client: tx, sourceRunId, factoryContext: context })
     const [run] = await executor.select({ status: agentRuns.status }).from(agentRuns).where(and(eq(agentRuns.id, result.runId), eq(agentRuns.userId, userId))).limit(1)
     if (!run) throw new ActionFailureError('runInvalid')
     // BE-13: the target device cannot take the run right now -> one reason-coded event, same transaction.
@@ -211,7 +211,7 @@ export async function queueProviderFallbackRun(tx: import('pg').PoolClient, user
 
 async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 'model'> & { model?: string }, botId: string | null, execution?: AgentExecution,
   requestEventId?: string, source: 'mcp' | null = null,
-  internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string; workspaceHint?: string | null }) {
+  internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string; workspaceHint?: string | null; factoryContext?: { sourceEventId: string; attemptId: string } }) {
   const executor = internal?.executor ?? db
   // Every local run is frozen with its model, a Factory or Skill run included: a caller that left it out fails here, before anything is read or written.
   if (typeof input.model !== 'string' || !input.model.trim() || input.model.trim() === 'auto') {
@@ -263,7 +263,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
       .catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
   }
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, profileSourceRunId: input.threadRunId, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, profileSourceRunId: input.threadRunId, factoryContext: internal?.factoryContext, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
 }
 
 /** A Factory run's model: the host's choice; else a rerun's source run's own; else 优先使用的模型 for the Agent's computer. */

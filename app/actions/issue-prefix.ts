@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { requireUser } from '@/lib/issue-access'
 import { db } from '@/lib/db'
 import { issuePrefixes, linearTeamSyncs } from '@/lib/db/schema'
+import { ownerIssueListsChanged } from '@/lib/live/lists'
 import { defaultPersonalPrefix, normalizePersonalPrefix, prefixCollides, resolvePersonalPrefix } from '@/lib/task-identifier'
 
 async function linearTeamKeys(userId: string) {
@@ -30,5 +31,6 @@ export async function saveIssuePrefix(input: { prefix: string }) {
   if (prefixCollides(prefix, await linearTeamKeys(user.id))) return { error: 'issuePrefixTaken' as const }
   await db.insert(issuePrefixes).values({ userId: user.id, prefix, updatedAt: new Date() })
     .onConflictDoUpdate({ target: issuePrefixes.userId, set: { prefix, updatedAt: new Date() } })
+  await ownerIssueListsChanged(db, user.id)
   return { success: true as const, prefix }
 }
