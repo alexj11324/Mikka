@@ -57,7 +57,9 @@
     "./computer": "./src/computer.ts",
     "./subscription": "./src/subscription.ts",
     "./repository": "./src/repository.ts",
-    "./subagent": "./src/subagent.ts"
+    "./subagent": "./src/subagent.ts",
+    "./trace-context": "./src/trace-context.ts",
+    "./tracing": "./src/tracing.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",

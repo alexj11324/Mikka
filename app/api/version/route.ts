@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { withRequestLog } from '@/lib/request-log'
 
 import { APP_BUILD, minDesktopVersion } from '@/lib/app-build'
 import { MIN_MOBILE_BUILD, MOBILE_UPDATE_URL } from '@/lib/mobile-min-build'
@@ -11,9 +12,9 @@ export const dynamic = 'force-dynamic'
  * where to get a newer one; and the oldest desktop app it still serves
  * (MIN_CLIENT_VERSION). Read before sign-in, so it needs no session.
  */
-export function GET() {
+export const GET = withRequestLog('/api/version', () => {
   return NextResponse.json(
     { build: APP_BUILD, minMobileBuild: MIN_MOBILE_BUILD, mobileUpdateUrl: MOBILE_UPDATE_URL, minDesktopVersion: minDesktopVersion(process.env.MIN_CLIENT_VERSION) },
     { headers: { 'Cache-Control': 'no-store, max-age=0' } },
   )
-}
+})

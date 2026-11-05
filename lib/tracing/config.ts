@@ -45,3 +45,19 @@ export function traceSettings(env: Env = process.env, token = posthogConfig.toke
     version: env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || undefined,
   }
 }
+
+/** Public ingestion configuration piggybacks on authenticated device registration; no extra request. */
+export function daemonTraceSettings(env: Env = process.env, token = posthogConfig.token): { endpoint: string; projectToken: string; sampleRate: number; environment: TraceEnvironment } | undefined {
+  const settings = traceSettings(env, token)
+  // Only a public project ingestion token may leave the server, never a personal management key.
+  if (!settings || !/^phc_[A-Za-z0-9_-]{8,128}$/.test(settings.token)) return undefined
+  let endpoint: URL
+  try { endpoint = new URL(settings.endpoint) } catch { return undefined }
+  const posthog = endpoint.protocol === 'https:' && ['us.i.posthog.com', 'eu.i.posthog.com'].includes(endpoint.hostname)
+    && !endpoint.port && endpoint.pathname === '/i/v1/traces'
+  // Test collectors are allowed only on the local development server, never distributed by production.
+  const local = env.NODE_ENV === 'development' && endpoint.protocol === 'http:'
+    && ['127.0.0.1', 'localhost', '[::1]'].includes(endpoint.hostname)
+  if ((!posthog && !local) || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) return undefined
+  return { endpoint: endpoint.href, projectToken: settings.token, sampleRate: settings.sampleRate, environment: settings.environment }
+}
