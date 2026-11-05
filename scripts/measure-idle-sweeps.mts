@@ -18,7 +18,7 @@ for (const proto of [pg.Client.prototype, pg.Pool.prototype]) {
 process.env.CRON_SECRET = 'idle-measure-local-only'
 process.env.AI_GATEWAY_API_KEY ??= 'idle-measure-placeholder' // coordinatorEnabled(); nothing is due, so no model call
 const request = (path: string) => new Request(`http://localhost/mikka/api/cron/${path}`, { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } })
-const routes = { reconcile: () => import('../app/api/cron/reconcile/route'), 'account-deletions': () => import('../app/api/cron/account-deletions/route'), 'audit-retention': () => import('../app/api/cron/audit-retention/route'), 'coordinator-wakes': () => import('../app/api/cron/coordinator-wakes/route'), schedules: () => import('../app/api/cron/schedules/route'), 'run-recovery': () => import('../app/api/cron/run-recovery/route') }
+const routes = { briefings: () => import('../app/api/cron/briefings/route'), 'suggestions-reconcile': () => import('../app/api/cron/suggestions-reconcile/route'), 'user-facts': () => import('../app/api/cron/user-facts/route'), reconcile: () => import('../app/api/cron/reconcile/route'), 'account-deletions': () => import('../app/api/cron/account-deletions/route'), 'audit-retention': () => import('../app/api/cron/audit-retention/route'), 'coordinator-wakes': () => import('../app/api/cron/coordinator-wakes/route'), schedules: () => import('../app/api/cron/schedules/route'), 'run-recovery': () => import('../app/api/cron/run-recovery/route') }
 const result: Record<string, number> = {}
 for (const [name, load] of Object.entries(routes)) {
   const { GET } = await load()
@@ -30,7 +30,8 @@ for (const [name, load] of Object.entries(routes)) {
   result[name] = statements - before
   // Outside a Next request, run-recovery's afterJob (its last line) has no `after` to schedule on and the route
   // answers 502; the group-turn sweep it would schedule is counted directly below.
-  if (!response.ok && name !== 'run-recovery') throw new Error(`${name} answered ${response.status}`)
+  // A route missing outside configuration here (a GitHub app, a provider key) answers non-2xx; its count stays, marked.
+  if (!response.ok && name !== 'run-recovery') result[`${name}:status`] = response.status
   if (name === 'run-recovery') {
     const { resumePendingGroupTurns } = await import('../lib/group-conversations-route')
     const groups = statements
