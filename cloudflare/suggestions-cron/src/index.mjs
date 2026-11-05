@@ -15,11 +15,16 @@ export const SCHEDULES = {
  * - schedules 10: occurrences, retries and leases run on the schedules due
  *   timer at their persisted time; a lost start is a timer start lost after a
  *   create, update, resume or failed read, rare enough for a 10 min catch-up.
+ * - run-recovery 15: lease expiries, outcome judging, kill and group-turn
+ *   retries, machine checks and the Factory watchdog run on the run-recovery
+ *   due timer at their persisted times, and every pass re-reads all of them,
+ *   so while any run is leased the timer is already running. A lost arm only
+ *   matters on an otherwise idle system; 15 min is the top of the range.
  */
 export const SWEEP_MINUTES = {
   '/api/cron/coordinator-wakes': 5,
   '/api/cron/schedules': 10,
-  '/api/cron/run-recovery': 1,
+  '/api/cron/run-recovery': 15,
 }
 
 export const MINUTE_ENDPOINTS = Object.keys(SWEEP_MINUTES)

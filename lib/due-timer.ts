@@ -8,13 +8,18 @@ import { wakeTokens, wakeTransport, workflowWakesEnabled } from './workflow-wake
  * it when none runs. The job's cron route stays as a slow reconciliation sweep
  * that only recovers a start lost between COMMIT and here.
  */
-export type DueKind = 'schedules'
+export type DueKind = 'schedules' | 'run-recovery'
 export type DueJob = { run(): Promise<number | null>; next(): Promise<number | null> }
 
 export const dueJobs: Record<DueKind, DueJob> = {
   schedules: {
     run: async () => { const { sweepSchedules, scheduleNextDue } = await import('./schedules/runtime'); await sweepSchedules(); return scheduleNextDue() },
     next: async () => (await import('./schedules/runtime')).scheduleNextDue(),
+  },
+  'run-recovery': {
+    // In a Workflow step the group-turn sweep runs inline: there is no request to run it after.
+    run: async () => { const { recoverRuns } = await import('./run-recovery'); await recoverRuns(work => work()); return (await import('./run-recovery-due')).runRecoveryNextDue() },
+    next: async () => (await import('./run-recovery-due')).runRecoveryNextDue(),
   },
 }
 

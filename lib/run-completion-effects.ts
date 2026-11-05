@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres'
 import type { RunCompleteRequest } from '@mikka/protocol/run'
 import { FactoryError } from './factory/contract'
 import { lockSkillScope } from './self-improvement/registry'
+import { armDueTimerSoon } from '@/lib/due-timer'
 
 type RunIdentity = { id: string; userId: string; botId: string | null }
 type RunScope = { issueId: string | null; deviceRepoId: string | null }
@@ -144,6 +145,8 @@ export async function reconcileFactoryAfterCompletion(db: Queryable, userId: str
  * completion transaction (claim rejection, lease loss/retry, stop request).
  * Call only after the ending write committed. Default-off and never throws. */
 export async function afterRunEnded(userId: string, runId: string, reconcileFor: FactoryReconcileFor = defaultReconcileFor) {
+  // An ended run is due for its outcome, and its task machine for parking, now (#1212).
+  armDueTimerSoon('run-recovery')
   if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return 0
   try {
     const { pool } = await import('./db')
