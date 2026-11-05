@@ -8,6 +8,9 @@ import useSWR, { useSWRConfig } from 'swr'
 import { CheckIcon } from 'lucide-react'
 import { createBot, listBots, type BotView } from '@/app/actions/bots'
 import { completeOnboarding } from '@/app/actions/onboarding'
+import { pollCoordinatorChat, retryCoordinatorTurn } from '@/app/actions/coordinator'
+import { FailureReason } from '@/components/coordinator/failure-reason'
+import { chatFailure } from '@/lib/chat-failure'
 import { BOT_MOOD_SECONDS, BotAvatar, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotMood, type BotShape } from '@/components/nav/bot-avatar'
 import { BotLookPicker } from '@/components/nav/bot-look-picker'
 import { AppTile, useConnectedApps } from '@/components/plugins/connected-apps'
@@ -72,6 +75,9 @@ export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: 
   const [lines, setLines] = useState<Line[]>([])
   const [mood, setMood] = useState<BotMood>('idle')
   const [bot, setBot] = useState<BotView | null>(null)
+  // The Bot's welcome may already have failed behind this page (a billing refusal, an outage): said here too, with 重试.
+  const welcomeChat = useSWR(card === 'welcome' && bot ? ['onboarding-welcome', bot.id] : null, () => pollCoordinatorChat(bot!.id))
+  const welcomeFailure = welcomeChat.data ? chatFailure({ working: welcomeChat.data.working, error: welcomeChat.data.error }) : null
   const [name, setName] = useState('')
   const [color, setColor] = useState<BotColor>(DEFAULT_BOT_COLOR)
   const [shape, setShape] = useState<BotShape>(DEFAULT_BOT_SHAPE)
@@ -414,6 +420,7 @@ export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: 
             <div className="flex flex-col gap-1">
               <h1 className="text-xl font-semibold">{bot?.name ?? t('title')}</h1>
               {bot && <p className="text-sm text-muted-foreground">{t('welcome')}</p>}
+              {bot && welcomeFailure && <span className="flex justify-center"><FailureReason retry failure={welcomeFailure} botId={bot.id} onResend={() => { void retryCoordinatorTurn(bot.id).then(() => welcomeChat.mutate()) }} /></span>}
             </div>
             <Button size="lg" autoFocus disabled={busy} onClick={() => { void close() }}>{busy && <Spinner data-icon="inline-start" />}{t('enter')}</Button>
           </div>}

@@ -224,6 +224,21 @@ test('a failed message retried with 重新发送 is left out; the new attempt ca
   assert.deepEqual(items.map(item => [item.position, item.text, item.failure?.kind ?? null]), [[2, '帮我看看 CI', 'subscription']])
 })
 
+test('a failed welcome shows on the Bot\'s side with its reason, for every error, until a reply follows', () => {
+  const at = new Date()
+  const welcome = (mikkaFailure?: string) => ({ position: 1, createdAt: at, message: { role: 'user', content: '[Welcome] The person has just opened their chat with you for the first time.', ...(mikkaFailure ? { mikkaFailure } : {}) } as unknown as ModelMessage })
+  // Billing refused it, the subscription refused it, or the turn just failed: each one a Bot-side item, never hidden.
+  for (const [error, kind] of [['Error: verification_required', 'hosted'], ['backend_unavailable', 'subscription'], ['socket hang up', 'failed']] as const) {
+    const items = chatItems([welcome(error)])
+    assert.deepEqual(items.map(item => [item.from, item.text, item.welcome, item.failure?.kind]), [['coordinator', '', true, kind]], error)
+  }
+  // No failure: the welcome request stays out of the chat, as before.
+  assert.deepEqual(chatItems([welcome()]), [])
+  // 重试 worked: the reply stands for it, and the welcome failure is gone.
+  const answered = chatItems([welcome('Error: verification_required'), { position: 2, createdAt: at, message: { role: 'assistant', content: '你好，我是你的 Bot。' } }])
+  assert.deepEqual(answered.map(item => [item.from, item.text, item.welcome ?? null]), [['coordinator', '你好，我是你的 Bot。', null]])
+})
+
 test('chatItems marks inbox (pending) user messages so they are never reported as read', () => {
   const at = new Date()
   const items = chatItems([

@@ -7,7 +7,9 @@ import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { useTranslations } from 'next-intl'
-import { pollCoordinatorChat, coordinatorHistory, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { pollCoordinatorChat, coordinatorHistory, retryCoordinatorTurn, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { getBotModelMenu } from '@/app/actions/execution-settings'
+import type { BotModelMenu } from '@/lib/bot-model-menu-view'
 import { knownVersion, mergeChat } from '@/lib/coordinator/chat-poll'
 import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
@@ -29,7 +31,7 @@ import { AgentThemeProvider } from '@/components/workspace/agent-theme'
 import { openThread } from '@/components/workspace/workspace-navigation'
 import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
-import { BotModelPicker } from './bot-model-picker'
+import { BotModelPicker, botModelMenuKey } from './bot-model-picker'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
 import { chatPollInterval } from '@/lib/coordinator/chat-poll-interval'
@@ -269,11 +271,24 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // The failure of the newest turn sits under the message it was answering (it carries the mark, store.failTurn),
   // with its way on; an older failure keeps only its reason there. Without the mark it stays above the composer.
   const lastSaid = items.findLast(item => item.from !== 'event')
-  const failedAt = data?.error && !data.working && lastSaid?.from === 'person' && lastSaid.failure ? lastSaid.position : null
+  const failedAt = data?.error && !data.working && (lastSaid?.from === 'person' || lastSaid?.welcome) && lastSaid.failure ? lastSaid.position : null
+  // The welcome never came: its failure is the chat's one line, on the Bot's side, never only a banner (11 people on 11-02).
+  const welcomeFailed = Boolean(data?.error && !data.working && (lastSaid?.welcome || (!items.length && !stream.replies.length)))
   // No empty chats: the Coordinator, like every bot, writes its welcome first.
   const welcomed = useRef(false)
+  // A welcome Mikka 默认 refused runs again once the chat's model can run now (the trial points arrived, a card was
+  // verified): the same turn, once per failure (store.retryFailedTurn), so it never loops.
+  const welcomeModel = useSWR<BotModelMenu>(welcomeFailed && refusal ? botModelMenuKey(botId ?? null) : null, () => getBotModelMenu(botId ?? null))
+  const rewelcomed = useRef<string | null>(null)
   useEffect(() => {
-    if (!data?.enabled || items.length || data.working || data.error || welcomed.current) return
+    if (!data?.enabled || data.working || welcomed.current) return
+    if (data.error) {
+      if (!welcomeFailed || !refusal || welcomeModel.data?.current?.available !== true || rewelcomed.current === data.error) return
+      rewelcomed.current = data.error
+      void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate())
+      return
+    }
+    if (items.length) return
     welcomed.current = true
     void (botId ? welcomeCoordinator(botId) : welcomeCoordinator()).then(() => mutate())
   })
@@ -406,6 +421,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
               <Skeleton className="h-24 w-2/3 rounded-2xl" />
             </div>}
             {/* The header pill and the 概览 panel already name the bot: an empty chat says one line, no third avatar (R-41). */}
+            {welcomeFailed && !items.length && <div data-message-failure="welcome" className="flex w-full max-w-md flex-col gap-2 self-start">{failureNotice}</div>}
             {data && !items.length && !stream.replies.length && !data.error && (data.enabled
               ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">{avatar('pill', 'thinking')}{tNav('writingWelcome')}</p>
               : <p className="m-auto text-sm text-muted-foreground">{t('empty', { name })}</p>)}
@@ -447,8 +463,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {item.id && <MessageReactions reactions={reactions[item.id]} align={item.from === 'person' ? 'end' : 'start'} />}
                     {item.stopped && <MessageFooter><p role="status">{t('stopped')}</p></MessageFooter>}
                     {item.failure && (item.position === failedAt
-                      ? <div data-message-failure="live" className="flex w-full max-w-md flex-col gap-2 self-end">{failureNotice}</div>
-                      : <MessageFooter className="self-end"><FailureReason failure={item.failure} botId={botId} sending={sending} onResend={() => { void deliver(item.text, false, item.position) }} /></MessageFooter>)}
+                      ? <div data-message-failure="live" className={cn('flex w-full max-w-md flex-col gap-2', item.welcome ? 'self-start' : 'self-end')}>{failureNotice}</div>
+                      : <MessageFooter className={cn(item.welcome ? 'self-start' : 'self-end')}><FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { if (item.welcome) void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()); else void deliver(item.text, false, item.position) }} /></MessageFooter>)}
                   </MessageContent></Message>}
             </MessageScrollerItem>
             </Fragment>)}
@@ -480,7 +496,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     </MessageScrollerProvider>
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
       {(loadError || stream.error) && <FieldError className="text-xs">{t('loadError')}</FieldError>}
-      {failedAt === null && failureNotice}
+      {failedAt === null && !welcomeFailed && failureNotice}
       {/* Out of quota: after a turn stopped on it, or before the next message is sent. */}
       {/* On Mikka 默认 with no points here: said before sending (decision 2026-11-02-1450). */}
       {!data?.error && <HostedUnavailableNotice botId={botId} />}
