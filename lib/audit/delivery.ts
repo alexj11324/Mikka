@@ -10,6 +10,7 @@ import type { WorkspaceTransaction } from '@/lib/workspace-access'
 import { toAuditRow, AuditEventError, type AuditEvent, type AuditRow } from './events'
 import { auditFailureSummary } from './record'
 import { auditDigest } from './integrity'
+import { armDueTimerAfterCommit } from '@/lib/due-timer'
 
 export type AuditRequestContext = ReturnType<typeof import('./events').auditRequestContext>
 /** Validate before the business transaction can commit; never store secrets or arbitrary payloads. */
@@ -17,6 +18,8 @@ export async function enqueueWorkspaceAudit(tx: Pick<WorkspaceTransaction, 'inse
   const id = randomUUID()
   const payload = { ...toAuditRow(event), workspaceId: event.workspaceId.toLowerCase() }
   await tx.insert(workspaceAuditOutbox).values({ id, workspaceId: payload.workspaceId, payload, createdAt: new Date() })
+  // Delivered to the main store right after the business change commits, by the audit-retention due timer (#1371).
+  armDueTimerAfterCommit(tx, 'audit-retention')
   return id
 }
 type Targets = { main: Pool; workspace: Pool }

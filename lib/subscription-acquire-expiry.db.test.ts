@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../tests/helpers/e2e-target.mjs'
-import { expireSubscriptionAcquisitions } from './subscription-acquire-expiry'
+import { expireSubscriptionAcquisitions, subscriptionCleanupDue } from './subscription-acquire-expiry'
 
 const databaseURL = process.env.E2E_DATABASE_URL
 const disposable = disposableDatabase(process.env, databaseURL)
@@ -214,5 +214,17 @@ test('expired enrollment reservations preserve their recovery sources before bin
     }
     assert.equal(await cleanupEligible(), 0)
     assert.deepEqual(await expireSubscriptionAcquisitions(pool), { expired: 0, ownerIds: [] })
+  })
+})
+
+test('the hourly pre-check is false when idle and true exactly when the sweep has an abandoned sign-in to expire', { skip: !disposable }, async () => {
+  await withDatabase(async pool => {
+    assert.equal(await subscriptionCleanupDue(pool), false, 'an idle hour runs only this one statement')
+    await connection(pool, 'future-owner', 'pending', 'acquire', 300)
+    assert.equal(await subscriptionCleanupDue(pool), false, 'a sign-in still inside its deadline is not due')
+    await connection(pool, 'expired-owner', 'pending', 'acquire', -60)
+    assert.equal(await subscriptionCleanupDue(pool), true)
+    assert.deepEqual(await expireSubscriptionAcquisitions(pool), { expired: 1, ownerIds: ['expired-owner'] })
+    assert.equal(await subscriptionCleanupDue(pool), false, 'nothing left after the sweep')
   })
 })

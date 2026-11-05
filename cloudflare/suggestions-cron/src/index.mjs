@@ -1,25 +1,20 @@
 // Scheduling only: each endpoint handles its own work in Mikka.
 export const SCHEDULES = {
-  '* * * * *': '/api/cron/coordinator-wakes',
+  '* * * * *': '/api/cron/reconcile',
   '*/15 * * * *': '/api/cron/briefings',
   '0 * * * *': '/api/cron/suggestions-reconcile',
   '30 * * * *': '/api/cron/user-facts',
 }
 
 /**
- * Reconciliation sweeps, in minutes between runs. Their work starts from the
- * write that makes it due and wakes at its due time (#1212); a sweep only
- * recovers a start that was lost (the process died between COMMIT and start).
- * - coordinator-wakes 5: a lost start is a person's unanswered message, so it
- *   gets the shortest catch-up inside the 5-15 min range.
- * - schedules 10: occurrences, retries and leases run on the schedules due
- *   timer at their persisted time; a lost start is a timer start lost after a
- *   create, update, resume or failed read, rare enough for a 10 min catch-up.
+ * The one safety-net sweep, in minutes between runs (#1371). Coordinator wakes,
+ * schedules and run recovery start from the write that makes them due and wake
+ * at their due time on durable timers. /api/cron/reconcile runs one statement
+ * and does only the work already due that none of those picked up (a start lost
+ * between COMMIT and its wake, a timer that failed): at worst 15 minutes late.
  */
 export const SWEEP_MINUTES = {
-  '/api/cron/coordinator-wakes': 5,
-  '/api/cron/schedules': 10,
-  '/api/cron/run-recovery': 1,
+  '/api/cron/reconcile': 15,
 }
 
 export const MINUTE_ENDPOINTS = Object.keys(SWEEP_MINUTES)
@@ -46,8 +41,10 @@ export async function runSchedule(cron, env, fetcher = fetch, scheduledTime = Da
   const minute = new Date(scheduledTime).getUTCMinutes()
   const endpoints = cron === '* * * * *' ? sweepsAt(minute) : [endpoint]
   if (cron === '* * * * *') {
-    if (minute === 0) endpoints.push('/api/cron/account-deletions', '/api/cron/audit-retention')
+    // Account deletion and audit retention run on their due timers, with /api/cron/reconcile as their safety net (#1371).
     if (minute % 15 === 0) endpoints.push('/api/cron/ops-monitor')
+    // Abandoned subscription sign-ins and their secret artifacts: maintenance with no single event (#1371).
+    if (minute === 0) endpoints.push('/api/cron/subscriptions')
     if (minute % 15 === 0) endpoints.push(SCHEDULES['*/15 * * * *'])
     if (minute === 0) endpoints.push(SCHEDULES['0 * * * *'])
     if (minute === 30) endpoints.push(SCHEDULES['30 * * * *'])

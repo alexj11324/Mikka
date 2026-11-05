@@ -5,6 +5,7 @@ import type { Pool, PoolClient } from 'pg'
 import { computerPermission, type ComputerPermission } from './permission'
 import { runMayUseCredentialSql } from '@/lib/personal-policy'
 import { runListChanged } from '@/lib/live/lists'
+import { armDueTimerAfterCommit } from '@/lib/due-timer'
 
 /** The existing local daemon cannot operate a Bot's cloud desktop. Keep its
  * claim serialized with Bot binding and fail closed until a cloud worker with
@@ -20,6 +21,8 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
     await assertRunProfileClaim(client, runId)
     if(await prepareLocalClaimBinding(client,runId,subscriptionBindingId)==='cloud-required'){await client.query('COMMIT');return 'cloud-required'}
     await client.query('UPDATE agent_runs SET status=$2,"startedAt"=now(),"leaseExpiresAt"=$3,"updatedAt"=now() WHERE id=$1', [runId, 'preparing', leaseExpiresAt])
+    // The lease is due to be reclaimed at its expiry if no heartbeat renews it (#1212).
+    armDueTimerAfterCommit(client, 'run-recovery')
     await runListChanged(client, runId)
     await runChanged(client, runId)
     if (afterClaim) await afterClaim(client)
@@ -70,6 +73,8 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
       await client.query('INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)', [runId, subscriptionBindingId])
     } else if (!(await client.query('SELECT 1 FROM model_api_key_runs WHERE "runId"=$1', [runId])).rowCount) { await client.query('COMMIT'); return null }
     await client.query('UPDATE agent_runs SET status=$2,"startedAt"=now(),"leaseExpiresAt"=$3,"updatedAt"=now() WHERE id=$1', [runId, 'preparing', leaseExpiresAt])
+    // The lease is due to be reclaimed at its expiry if no heartbeat renews it (#1212).
+    armDueTimerAfterCommit(client, 'run-recovery')
     await runListChanged(client, runId)
     await runChanged(client, runId)
     if (afterClaim) await afterClaim(client)
