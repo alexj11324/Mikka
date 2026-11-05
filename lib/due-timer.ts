@@ -54,12 +54,17 @@ async function auditRetentionNextDue() {
 /** Tests replace `start` here to observe timer starts without a Workflow world. */
 export const dueTimerTransport: { start?: (kind: DueKind) => Promise<unknown> } = {}
 
-/** Wakes the job's running timer, or starts one. Best effort: the slow sweep re-arms a lost start. */
+/**
+ * Wakes the job's running timer, or starts one. Best effort: the slow sweep re-arms a lost start.
+ * The wake names this deployment: a timer still running an older deployment's code hands over
+ * to the latest deployment instead of doing the work (workflows/due-timer/loop.ts, #1410).
+ */
 export async function armDueTimer(kind: DueKind): Promise<void> {
   if (!workflowWakesEnabled()) return
   try {
     const resume = wakeTransport.resume ?? (await import('workflow/api')).resumeHook
-    await resume(wakeTokens.dueTimer(kind), {})
+    const deploymentId = process.env.VERCEL_DEPLOYMENT_ID
+    await resume(wakeTokens.dueTimer(kind), deploymentId ? { deploymentId } : {})
     return
   } catch { /* no timer holds the token: start one */ }
   try {

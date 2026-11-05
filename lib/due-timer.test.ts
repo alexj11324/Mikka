@@ -30,3 +30,14 @@ test('a failed start never fails the write that armed it', async () => {
   try { await armDueTimer('schedules') } finally { console.error = original }
   assert.equal(JSON.stringify(logged).includes('private'), false)
 })
+
+test('the wake names the arming deployment, so a timer on older code hands over (#1410)', async () => {
+  const payloads: unknown[] = []
+  const previous = process.env.VERCEL_DEPLOYMENT_ID
+  process.env.VERCEL_DEPLOYMENT_ID = 'dpl_new'
+  wakeTransport.resume = async (_token, payload) => { payloads.push(payload) }
+  try { await armDueTimer('run-recovery') } finally {
+    if (previous === undefined) delete process.env.VERCEL_DEPLOYMENT_ID; else process.env.VERCEL_DEPLOYMENT_ID = previous
+  }
+  assert.deepEqual(payloads, [{ deploymentId: 'dpl_new' }])
+})

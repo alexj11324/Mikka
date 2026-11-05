@@ -15,11 +15,14 @@ export function workflowWakesEnabled(env: Record<string, string | undefined> = p
   return Boolean(wakeTransport.resume || env.VERCEL || env.WORKFLOW_TARGET_WORLD || env.NODE_ENV === 'development')
 }
 
+/** What a wake carries: nothing, or the deployment that sent it (lib/due-timer.ts, #1410). */
+export type WakePayload = { deploymentId?: string }
+
 /** Tests replace resumeHook here to observe wakes without a Workflow world. */
-export const wakeTransport: { resume?: (token: string, payload: Record<string, never>) => Promise<unknown> } = {}
+export const wakeTransport: { resume?: (token: string, payload: WakePayload) => Promise<unknown> } = {}
 
 /** Best effort, now. A token nobody holds (the workflow ended, or never waited) is not an error. */
-export async function wakeWorkflow(token: string, resume?: (token: string, payload: Record<string, never>) => Promise<unknown>) {
+export async function wakeWorkflow(token: string, resume?: (token: string, payload: WakePayload) => Promise<unknown>) {
   try {
     const resumeHook = resume ?? wakeTransport.resume ?? (await import('workflow/api')).resumeHook
     await resumeHook(token, {})

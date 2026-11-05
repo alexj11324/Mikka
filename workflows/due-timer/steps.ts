@@ -19,9 +19,16 @@ export async function nextDue(kind: DueKind) {
   return dueJobs[kind].next()
 }
 
+/** Starts the successor on the latest deployment: from a step, start() would otherwise pin it to this run's (#1410). */
 export async function handOffDueTimer(kind: DueKind) {
   'use step'
   const { start } = await import('workflow/api')
   const { dueTimer } = await import('./workflow')
-  await start(dueTimer, [kind])
+  await start(dueTimer, [kind], { deploymentId: 'latest' })
+}
+
+/** The deployment this run executes on; a step, so the workflow reads it once and replays it. */
+export async function dueTimerDeployment() {
+  'use step'
+  return process.env.VERCEL_DEPLOYMENT_ID ?? null
 }
