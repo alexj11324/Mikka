@@ -1,7 +1,7 @@
 import { runChanged } from '../live/panels';
 import { factoryRunBotMatches } from './run-scope'
+import { cloudTaskTarget, ownedCloudTaskTarget } from '../computer/cloud-task-target'
 import { runListChanged } from '../live/lists'
-import type { FactoryCloudStageAdmission } from './cloud-stage-admission'
 import type { Pool, PoolClient } from "pg";
 import { isDeepStrictEqual } from 'node:util';
 import { orchestratorSettings } from '@mikka/protocol/orchestrator';
@@ -231,7 +231,6 @@ export async function configureFactoryCheck(
   task: FactoryTask,
   runId: string,
   hostPolicy: RunPolicy = defaultRunPolicy(),
-  factoryStage?: FactoryCloudStageAdmission,
 ) {
   if (
     !["review", "verify"].includes(task.stage) ||
@@ -246,8 +245,7 @@ export async function configureFactoryCheck(
        json_build_object('runId',producer.id,'sessionId',producer."sessionId",'status',producer.status,
          'model',producer."agentDefinition"->>'model','harness',producer."agentDefinition"->>'harness',
          'observedModel',producer.report->'runtime'->>'observedModel') AS "producerExecution",
-       r."agentId",r."agentDefinition"->'policyCeiling' AS "policyCeiling",b."botId" AS "runtimeBotId",b."workspaceId" AS "runtimeWorkspaceId",
-       (EXISTS(SELECT 1 FROM thread_machines tm WHERE tm."deviceId"=d.id AND tm.state='running') OR EXISTS(SELECT 1 FROM cloud_machines cm WHERE cm."deviceId"=d.id AND cm.state='running')) AS "cloudOnline"
+       r."agentId",r."questionContinuation",r."agentDefinition"->'policyCeiling' AS "policyCeiling",b."botId" AS "runtimeBotId",b."workspaceId" AS "runtimeWorkspaceId"
      FROM factory_candidates c JOIN agent_runs r ON r.id=$3
      JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$4
      JOIN device_repos repo ON repo.id=r."deviceRepoId"
@@ -266,17 +264,23 @@ export async function configureFactoryCheck(
     row.repository !== (row.remoteUrl ?? row.repoPath)
   )
     throw new FactoryError("factoryEvidenceMismatch");
-  const staged = !row.cloudOnline && row.deviceKind === 'cloud' && factoryStage && row.runtimeBotId && row.runtimeWorkspaceId
-    ? await (await import('./cloud-stage-admission')).sleepingFactoryCloudTarget(tx, { userId: task.userId, workspaceId: row.runtimeWorkspaceId },
-      { botId: row.runtimeBotId, issueId: task.issueId, agentId: row.agentId, deviceRepoId: row.deviceRepoId, withoutBot: task.botId === null }, factoryStage, runId)
+  // New task VMs get their harness from the official template. A retained
+  // session must still prove its own VM custody and installed worker capability.
+  const freshCloudTarget = !row.questionContinuation && row.deviceKind === 'cloud' && row.runtimeBotId && row.runtimeWorkspaceId
+    ? await cloudTaskTarget(tx, { userId: task.userId, workspaceId: row.runtimeWorkspaceId },
+      { botId: row.runtimeBotId, agentId: row.agentId, deviceRepoId: row.deviceRepoId })
     : null
+  const cloudTarget = freshCloudTarget ?? (row.deviceKind === 'cloud' && row.runtimeBotId && row.runtimeWorkspaceId
+      ? await ownedCloudTaskTarget(tx, { userId: task.userId, workspaceId: row.runtimeWorkspaceId },
+        { botId: row.runtimeBotId, agentId: row.agentId, deviceRepoId: row.deviceRepoId, runId, issueId: task.issueId })
+      : null)
   if (
     !row.enabled ||
-    (row.deviceKind === 'cloud' ? !row.cloudOnline && !staged : !await deviceIsOnline({ id: row.deviceId, lastSeenAt: row.lastSeenAt })) ||
-    !row.harnesses?.some(
+    (row.deviceKind === 'cloud' ? cloudTarget?.deviceId !== row.deviceId || cloudTarget?.harness !== row.harness : !await deviceIsOnline({ id: row.deviceId, lastSeenAt: row.lastSeenAt })) ||
+    (!freshCloudTarget && !row.harnesses?.some(
       (h: { harness: string; installed: boolean }) =>
         h.harness === row.harness && h.installed,
-    )
+    ))
   )
     throw new FactoryError("factoryCheckHarnessUnavailable");
   if (row.verifyCommand?.length > 2000)
