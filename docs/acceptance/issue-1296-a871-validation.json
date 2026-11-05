@@ -1,0 +1,145 @@
+{
+  "recorded_at": "2026-11-05T09:37:45.394167+00:00",
+  "repository": "alexj11324/Mikka",
+  "pr": 1359,
+  "head": "a871356a227543f3e662d0841359e4dcfdbe3713",
+  "tree": "134bc11816b0dbfcf225f00c1a0ac5e7b9dae4fe",
+  "parents": [
+    "9aae0cabe1c44696f92ff5055844634e32e18e5c",
+    "9727fcfcfc16724e1cfcd915dc28d59b52d69481"
+  ],
+  "ci": {
+    "run_id": 42000504545,
+    "check_count": 28,
+    "success": 23,
+    "conditional_skip": 5,
+    "failed": 0,
+    "synthetic_commit": "984ad99cdc143acd4d36c4952bfbfb6c6417311a",
+    "synthetic_tree_matches_head": true
+  },
+  "docker": {
+    "sandbox": "sbx_001m6mjh8at15tpaxcxdmscetmz",
+    "vcpus": 8,
+    "memory_mib": 16384,
+    "environment_id": "local-c8c9b722-fccd-4165-a30a-7e9251ef62cf",
+    "database": "isolated-loopback-pg17:55499/mikka_e2e",
+    "source_clean_after_build": true,
+    "fake_cli_mode": "100755",
+    "fake_cli_blob": "fe43181a79fa5c1bb537484d4618ae495a5d1d3f"
+  },
+  "validation": {
+    "fresh_setup": "passed",
+    "normal_environment_bootstrap": "passed",
+    "factory_ui": {
+      "tests": 91,
+      "pass": 91,
+      "fail": 0,
+      "skip": 0
+    },
+    "factory_pg": {
+      "tests": 81,
+      "pass": 81,
+      "fail": 0,
+      "skip": 0
+    },
+    "production_build": {
+      "command": "pnpm build",
+      "exit_code": 0
+    },
+    "browser": {
+      "source": "a871356a227543f3e662d0841359e4dcfdbe3713",
+      "model_execution": false,
+      "normal_owner_accept": true,
+      "reload_after_accept": false,
+      "issue_status": "done",
+      "current_producer": "resolved",
+      "historical_failure": "blocked",
+      "factory": "accepted",
+      "gateway_websocket_status": 101,
+      "gateway_push_status": 204,
+      "screenshot": "issue-1296-evidence/sync-a871-live-accepted.jpg",
+      "screenshot_sha256": "96e91b77f3720f90f6710037cae9a7807c8841d048cd1967d505540924c68cd4"
+    }
+  },
+  "preparation_failure": {
+    "tests": 33,
+    "pass": 0,
+    "fail": 33,
+    "cause": "DB unit subprocess inherited UI gateway configuration; raw fixture pool had no commit observer",
+    "correction": "Only DB unit subprocess unsets DEVICE_GATEWAY_URL and DEVICE_GATEWAY_PUSH_SECRET to match CI; full UI/build retain live configuration",
+    "product_or_assertions_changed": false
+  },
+  "cleanup_v6": {
+    "leaseId": "15967b80-5c9f-44c4-a548-c44777bad4a8",
+    "leaseStateBeforeDisposal": "quarantined",
+    "fixtureDeletesExecuted": 0,
+    "fixtureMarkedCleaned": false,
+    "ownedServicesStopped": [
+      27974,
+      27991,
+      28000,
+      28015,
+      28016,
+      28035,
+      28052,
+      28068,
+      28084,
+      28094,
+      28107,
+      28118,
+      28135,
+      28144
+    ],
+    "ownedClusterStopped": true,
+    "ownedClusterDirectoryRemoved": true,
+    "privateStateRemoved": true,
+    "disposal": "entire-owned-disposable-environment"
+  },
+  "cleanup_v7": {
+    "leaseId": "f7304f88-ac5b-4f8a-8074-632e03458bb3",
+    "leaseStateBeforeDisposal": "quarantined",
+    "normalDirtyRelease": true,
+    "postRelease": {
+      "activeLeases": 0,
+      "validSessions": 0
+    },
+    "fixtureMarkedCleaned": true,
+    "cleanedIssueIds": [
+      "27e2f73a-d620-4de0-a5e2-810673be63c4",
+      "a0267764-a184-4821-945e-b594d5f5acf2"
+    ],
+    "ownedServicesStopped": [
+      29730,
+      29746,
+      29754,
+      29768,
+      29769,
+      29790,
+      29802,
+      29810,
+      29826,
+      29834,
+      29846,
+      29861,
+      29885,
+      29902,
+      29910
+    ],
+    "ownedClusterStopped": true,
+    "ownedClusterDirectoryRemoved": true,
+    "privateStateRemoved": true,
+    "disposal": "entire-owned-disposable-environment"
+  },
+  "source_logs": [
+    {
+      "file": "mikka-1296-a871-integration-first.log",
+      "sha256": "350dead631078fc0794da03417f7c2bc78d44ac9fbfc655ffb1e1b2988e7e25c",
+      "bytes": 73024
+    },
+    {
+      "file": "mikka-1296-a871-final-build.log",
+      "sha256": "c497710a0b176cac18cd097bb178c8e3214216aa7885a41817f5475ed851e392",
+      "bytes": 19077
+    }
+  ]
+}
