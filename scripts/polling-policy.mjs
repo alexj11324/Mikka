@@ -35,10 +35,6 @@ export const pollingAllowlist = {
   'hooks/use-computer.ts': db(web, 'computer grant re-read before it expires (at least every 5 s)', 1),
   'components/swr-defaults.tsx': db(web, 'LIST_POLL_MS, the 60 s list poll interval', 1),
   'lib/coordinator/chat-poll.ts': db(web, 'FULL_READ_EVERY_MS: the chat poll does a full read every 60 s', 1),
-  'components/settings/subscription-settings.tsx': db(web, 'subscription usage re-read every USAGE_EVERY_MS (5 min); the 30 s setInterval is only the clock that ages the "updated" label', 3),
-  'components/billing/free-allowance-section.tsx': db(web, 'pollUntil after card verification: up to 10 reads, 2 s apart, until the webhook lands', 1),
-  'components/billing/hosted-refusal-notice.tsx': db(web, 'pollUntil after a top-up: up to 10 reads, 2 s apart, until the balance lands', 1),
-  'lib/billing/hosted-usage.ts': db(web, 'pollUntil, the bounded poll helper behind the billing notices', 1),
   // Mobile: useApi polling that reads our database.
   'apps/mobile/lib/useApi.ts': db(web, 'the useApi polling timer (every screen that passes an interval)', 2),
   'apps/mobile/components/ChatScreen.tsx': db(web, 'chat re-read every 3.75 s while working, 45 s otherwise, pending actions every 10 s; the 1 s setInterval is the elapsed clock', 3),
@@ -85,6 +81,7 @@ export const pollingAllowlist = {
   'apps/mobile/components/beui/components/loading-states/agent-progress.tsx': ui('progress animation', 1),
   'apps/mobile/components/beui/components/loading-states/reasoning-text.tsx': ui('reasoning text animation', 2),
   'apps/mobile/components/beui/components/tool-result/tool-result.tsx': ui('elapsed-time clock', 1),
+  'components/settings/subscription-settings.tsx': ui('the 30 s setInterval only ages the meters\' "updated" label; the meters themselves read on the model_settings push and on focus once older than 5 min', 1),
   'components/version-guard.tsx': ui('checks the public build metadata once a minute (decision 2026-11-03-1437); no database read', 1),
 }
 

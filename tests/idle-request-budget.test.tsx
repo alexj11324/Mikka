@@ -211,6 +211,9 @@ routes['/api/conversations'] = url => ({ conversations: [], viewerId: OWNER, wor
 routes['/api/factory/tasks'] = () => ({ tasks: [], liveWorkspaceId: WORKSPACE })
 routes['/api/conversations/:id/read'] = () => ({ lastReadMessageId: 'm2', lastReadPosition: 2, unreadCount: 0 })
 routes['/api/settings/model-order'] = () => ({ deviceModels: { [DEVICE]: ['claude-sonnet-4-6'] } })
+const CONNECTION = 'a0000000-0000-4000-8000-000000000001'
+routes['/api/subscriptions'] = () => ({ enabled: true, providers: [{ provider: 'claude', available: true }, { provider: 'codex', available: true }], connections: [{ id: CONNECTION, provider: 'claude', state: 'connected', revision: 1, account: 'ada@example.invalid', paused: false, bots: [] }] })
+routes['/api/subscriptions/usage'] = () => ({ connections: [{ id: CONNECTION, status: 'ok', account: 'ada@example.invalid', plan: 'Max', windows: [{ kind: 'five_hour', remaining: 72, resetsAt: null }, { kind: 'weekly', remaining: 40, resetsAt: null }], observedAt: AT }] })
 
 const boardIssue = (id: string, title: string, status: string) => ({ id, ownerId: OWNER, ownerName: 'Ada', ownerImage: null, title, status, priority: 'normal', scope: 'workspace' as const, revision: 2,
   createdAt: new Date(AT), updatedAt: new Date(AT), identifier: `MIK-${id.slice(-1)}`, teamId: null, metadata: { ...issue(id, title).metadata, assignee: { kind: 'member' as const, id: OWNER, name: 'Ada', image: null } }, checklist: { total: 0, checked: 0, percentage: 0 } })
@@ -227,6 +230,7 @@ const shows: Record<string, string[]> = {
   devices: ['Ada’s MacBook'],
   'artifact-viewer': ['Release notes', 'Sign-in redirect fixed.'],
   'nav-bot-list': ['Scout'],
+  'subscription-settings': ['ada@example.invalid'],
 }
 const pages: Record<string, () => Promise<ReactNode>> = {
   board: async () => {
@@ -255,6 +259,11 @@ const pages: Record<string, () => Promise<ReactNode>> = {
   'nav-bot-list': async () => {
     const { BotList } = await import('../components/nav/bot-list')
     return <BotList bots={bots} workspaceId={WORKSPACE} threads={[listedThread]} issues={boardIssues as never} active={{ kind: 'coordinator' }} onOpen={noop} onNewBot={noop} rail={null} onRail={noop} user={user} onSettings={noop} onSignOut={noop} signingOut={false} />
+  },
+  // 设置 › 模型与订阅 with a connected subscription: its meters re-read on push and on a stale focus only.
+  'subscription-settings': async () => {
+    const { SubscriptionSettings } = await import('../components/settings/subscription-settings')
+    return <SubscriptionSettings workspaceId={WORKSPACE} />
   },
 }
 

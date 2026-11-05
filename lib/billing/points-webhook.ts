@@ -6,6 +6,7 @@ import type { db } from '@/lib/db'
 import { workspaceCreditGrants } from '@/lib/db/schema'
 import { POINTS_PURCHASE_AMOUNTS } from './points'
 import { stripeConfig, stripeGet } from './stripe'
+import { hostedBillingChanged } from '@/lib/live/billing'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 export interface PointsWebhookOptions {
@@ -44,6 +45,8 @@ export async function applyPointsEvent(tx: Transaction, type: string, object: Re
       stripePaymentIntentId: session.payment_intent, amountCents: session.amount_total, currency: session.currency,
       receiptUrl: charge?.receipt_url ?? null, stripeFeeCents: typeof fee === 'object' && fee?.currency === 'usd' ? fee.fee : null,
     }).onConflictDoNothing({ target: workspaceCreditGrants.externalId })
+    // The refused turn waiting on these points reads its balance again after COMMIT (#1212).
+    await hostedBillingChanged(tx, session.metadata.workspaceId)
     return
   }
   if (!object.payment_intent) return
@@ -74,6 +77,7 @@ export async function applyPointsEvent(tx: Transaction, type: string, object: Re
         id: randomUUID(), workspaceId: purchase.workspaceId, bucket: 'purchased', points: -item.amount, reason: 'refund', externalId: item.id,
         stripePaymentIntentId: charge.payment_intent, amountCents: -item.amount, currency: item.currency, receiptUrl: purchase.receiptUrl,
       }).onConflictDoNothing({ target: workspaceCreditGrants.externalId })
+      await hostedBillingChanged(tx, purchase.workspaceId)
     }
     if (!page.has_more) break
     const cursor = page.data.at(-1)?.id
