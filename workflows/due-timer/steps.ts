@@ -27,40 +27,44 @@ export async function handOffDueTimer(kind: DueKind) {
   await start(dueTimer, [kind])
 }
 
-async function ownerStep<T>(work: () => Promise<T>): Promise<T> {
+async function ownerStep<T>(phase: 'deployment' | 'prepare' | 'retire' | 'current' | 'handoff' | 'redirect', work: () => Promise<T>): Promise<T> {
   try { return await work() }
-  catch {
-    // error-cause: SDK errors may carry URLs or private response bodies. The Workflow event log receives only this closed internal failure category.
+  catch (error) {
+    const { CodedError, logCodedError } = await import('@mikka/protocol/coded-error')
+    if (!(error instanceof CodedError && error.code === 'due_timer_owner_unavailable')) {
+      logCodedError(new CodedError('due_timer_owner_unavailable', { detail: 'sdk_operation_failed', cause: error }), { kind: 'run-recovery', phase })
+    }
+    // error-cause: the original cause is logged by name/code above; the persisted Workflow error must not contain raw SDK messages, URLs or response bodies.
     throw new RetryableError('due_timer_owner_unavailable', { retryAfter: '1m' })
   }
 }
 
 export async function recoveryTimerOwnerDeployment() {
   'use step'
-  return ownerStep(async () => (await import('@/lib/due-timer-owner')).recoveryTimerDeployment())
+  return ownerStep('deployment', async () => (await import('@/lib/due-timer-owner')).recoveryTimerDeployment())
 }
 
 export async function prepareRecoveryTimerOwner(identity: RecoveryTimerIdentity) {
   'use step'
-  return ownerStep(async () => (await import('@/lib/due-timer-owner')).prepareRecoveryTimerClaim(identity))
+  return ownerStep('prepare', async () => (await import('@/lib/due-timer-owner')).prepareRecoveryTimerClaim(identity))
 }
 
 export async function retireRecoveryTimerOwner(identity: RecoveryTimerIdentity, claim: RecoveryTimerClaim) {
   'use step'
-  return ownerStep(async () => (await import('@/lib/due-timer-owner')).retirePreviousRecoveryTimer(identity, claim))
+  return ownerStep('retire', async () => (await import('@/lib/due-timer-owner')).retirePreviousRecoveryTimer(identity, claim))
 }
 
 export async function currentRecoveryTimerOwner(identity: RecoveryTimerIdentity) {
   'use step'
-  return ownerStep(async () => (await import('@/lib/due-timer-owner')).currentRecoveryTimer(identity))
+  return ownerStep('current', async () => (await import('@/lib/due-timer-owner')).currentRecoveryTimer(identity))
 }
 
 export async function handOffRecoveryTimerOwner(identity: RecoveryTimerIdentity, claim: RecoveryTimerClaim) {
   'use step'
-  return ownerStep(async () => (await import('@/lib/due-timer-owner')).handOffCurrentRecoveryTimer(identity, claim))
+  return ownerStep('handoff', async () => (await import('@/lib/due-timer-owner')).handOffCurrentRecoveryTimer(identity, claim))
 }
 
 export async function redirectRecoveryTimerOwner() {
   'use step'
-  return ownerStep(async () => (await import('@/lib/due-timer-owner')).redirectRecoveryTimer())
+  return ownerStep('redirect', async () => (await import('@/lib/due-timer-owner')).redirectRecoveryTimer())
 }

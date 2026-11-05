@@ -1,3 +1,4 @@
+import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
 import type { getWorld } from 'workflow/runtime'
 import type { getHookByToken } from 'workflow/api'
 import { DUE_TIMER_LIFETIME_MS, wakeTokens } from './workflow-wake-tokens'
@@ -12,7 +13,21 @@ export type RecoveryTimerState = 'current' | 'handoff' | 'lost'
 const TOKEN = wakeTokens.dueTimer('run-recovery')
 const active = (status: string) => status === 'pending' || status === 'running'
 const terminal = (status: string) => status === 'completed' || status === 'failed' || status === 'cancelled'
-const unavailable = () => new Error('due_timer_owner_unavailable')
+type OwnerRefusalDetail = 'runtime_unavailable' | 'latest_unavailable' | 'workflow_unregistered' | 'candidate_scope'
+  | 'election_scope' | 'holder_scope' | 'force_unsupported' | 'claim_receipt' | 'predecessor_scope' | 'previous_not_terminal'
+type OwnerDiagnostic = { runId?: string; deploymentId?: string; holderRunId?: string; holderDeploymentId?: string;
+  holderSpecVersion?: number; forceSupported?: boolean }
+const identifier = (value: string | undefined) => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value) ? value : undefined
+const unavailable = (detail: OwnerRefusalDetail, fields: OwnerDiagnostic = {}) => {
+  const error = new CodedError('due_timer_owner_unavailable', { detail })
+  // Project/Owner identities, hook tokens and SDK response objects never enter
+  // this line. These optional primitives come only from already-read metadata.
+  logCodedError(error, { kind: 'run-recovery', runId: identifier(fields.runId), deploymentId: identifier(fields.deploymentId),
+    holderRunId: identifier(fields.holderRunId), holderDeploymentId: identifier(fields.holderDeploymentId),
+    holderSpecVersion: Number.isSafeInteger(fields.holderSpecVersion) && fields.holderSpecVersion! >= 0 ? fields.holderSpecVersion : undefined,
+    forceSupported: typeof fields.forceSupported === 'boolean' ? fields.forceSupported : undefined })
+  return error
+}
 const lifetimeElapsed = (run: { startedAt?: Date }) => {
   const started = run.startedAt?.getTime()
   // startedAt is the SDK's first actual execution time. createdAt could be
@@ -29,13 +44,13 @@ export const productionRecoveryTimer = () => process.env.VERCEL_ENV === 'product
 
 async function runtime() {
   const world = await (await import('workflow/runtime')).getWorld()
-  if (!productionRecoveryTimer() || world.getEnvironment?.() !== 'production' || !world.resolveLatestDeploymentId) throw unavailable()
+  if (!productionRecoveryTimer() || world.getEnvironment?.() !== 'production' || !world.resolveLatestDeploymentId) throw unavailable('runtime_unavailable')
   return world
 }
 
 async function latest(world: World) {
   const value = await world.resolveLatestDeploymentId?.()
-  if (!value) throw unavailable()
+  if (!value) throw unavailable('latest_unavailable')
   return value
 }
 
@@ -54,14 +69,15 @@ async function registered() {
   // workflowId is the SDK's generated public start metadata. It is also what
   // start() validates; no private SDK path or hand-written workflow name.
   const workflowName = (dueTimer as typeof dueTimer & { workflowId?: string }).workflowId
-  if (!workflowName) throw unavailable()
+  if (!workflowName) throw unavailable('workflow_unregistered')
   return { dueTimer, workflowName }
 }
 
 async function matchingRun(world: World, hook: RuntimeHook, workflowName: string) {
   const run = await world.runs.get(hook.runId, { resolveData: 'none' })
   if ((!active(run.status) && !terminal(run.status)) || hook.token !== TOKEN || hook.environment !== 'production' || run.workflowName !== workflowName ||
-      (hook.resumeContext && (hook.resumeContext.workflowName !== run.workflowName || hook.resumeContext.deploymentId !== run.deploymentId))) throw unavailable()
+      (hook.resumeContext && (hook.resumeContext.workflowName !== run.workflowName || hook.resumeContext.deploymentId !== run.deploymentId))) throw unavailable('holder_scope',
+        { holderRunId: run.runId, holderDeploymentId: run.deploymentId, holderSpecVersion: run.specVersion })
   return run
 }
 
@@ -90,15 +106,15 @@ export async function armCurrentRecoveryTimer() {
 export async function recoveryTimerDeployment(): Promise<string | null> {
   if (!productionRecoveryTimer()) return null
   const world = await runtime(), deploymentId = await world.getDeploymentId()
-  if (!deploymentId) throw unavailable()
+  if (!deploymentId) throw unavailable('runtime_unavailable')
   await latest(world)
   return deploymentId
 }
 
 async function ownRun(world: World, identity: RecoveryTimerIdentity) {
-  if (await world.getDeploymentId() !== identity.deploymentId) throw unavailable()
+  if (await world.getDeploymentId() !== identity.deploymentId) throw unavailable('candidate_scope', identity)
   const run = await world.runs.get(identity.runId, { resolveData: 'none' })
-  if (!active(run.status) || run.workflowName !== identity.workflowName || run.deploymentId !== identity.deploymentId) throw unavailable()
+  if (!active(run.status) || run.workflowName !== identity.workflowName || run.deploymentId !== identity.deploymentId) throw unavailable('candidate_scope', identity)
   return run
 }
 
@@ -106,7 +122,7 @@ async function elected(world: World, identity: RecoveryTimerIdentity) {
   const run = await ownRun(world, identity)
   const hook = await lookup(wakeTokens.dueTimerDeployment('run-recovery', identity.deploymentId))
   if (!hook || hook.runId !== identity.runId || hook.environment !== 'production' || !hook.ownerId || !hook.projectId ||
-      hook.resumeContext?.deploymentId !== identity.deploymentId || hook.resumeContext.workflowName !== identity.workflowName) throw unavailable()
+      hook.resumeContext?.deploymentId !== identity.deploymentId || hook.resumeContext.workflowName !== identity.workflowName) throw unavailable('election_scope', identity)
   return { hook, run }
 }
 
@@ -116,12 +132,13 @@ export async function prepareRecoveryTimerClaim(identity: RecoveryTimerIdentity)
   if (await latest(world) !== identity.deploymentId) return { state: 'handoff' }
   const holder = await lookup(TOKEN)
   if (!holder) return { state: 'take', ownerId: election.ownerId, projectId: election.projectId, previous: null }
-  if (holder.ownerId !== election.ownerId || holder.projectId !== election.projectId) throw unavailable()
+  if (holder.ownerId !== election.ownerId || holder.projectId !== election.projectId) throw unavailable('holder_scope', identity)
   const run = await matchingRun(world, holder, identity.workflowName)
   if (active(run.status) && run.deploymentId === identity.deploymentId && !lifetimeSuccessor(identity, run, candidate)) return { state: 'existing' }
   // SDK 5.2.3 refuses force against active pre-v8 victims. Do not silently
   // replace that refusal with cancellation or an unguarded second timer.
-  if (active(run.status) && (run.specVersion ?? 1) < 8) throw unavailable()
+  if (active(run.status) && (run.specVersion ?? 1) < 8) throw unavailable('force_unsupported',
+    { ...identity, holderRunId: run.runId, holderDeploymentId: run.deploymentId, holderSpecVersion: run.specVersion, forceSupported: world.capabilities?.hookForceClaim })
   return { state: 'take', ownerId: election.ownerId, projectId: election.projectId,
     previous: { runId: run.runId, hookId: holder.hookId, deploymentId: run.deploymentId, active: active(run.status) } }
 }
@@ -134,25 +151,26 @@ async function owned(identity: RecoveryTimerIdentity, claim?: Extract<RecoveryTi
   const holder = await lookup(TOKEN)
   if (!holder || holder.runId !== identity.runId) return { world, holder: null, run: proof.run }
   if (holder.ownerId !== proof.hook.ownerId || holder.projectId !== proof.hook.projectId || holder.environment !== 'production' ||
-      holder.resumeContext?.deploymentId !== identity.deploymentId || holder.resumeContext.workflowName !== identity.workflowName) throw unavailable()
+      holder.resumeContext?.deploymentId !== identity.deploymentId || holder.resumeContext.workflowName !== identity.workflowName) throw unavailable('holder_scope', identity)
   return { world, holder, run: proof.run }
 }
 
 /** Uses the World's atomic claimedFrom receipt, never a run id supplied by a user. */
 export async function retirePreviousRecoveryTimer(identity: RecoveryTimerIdentity, claim: RecoveryTimerClaim): Promise<RecoveryTimerState> {
-  if (claim.state !== 'take') throw unavailable()
+  if (claim.state !== 'take') throw unavailable('claim_receipt', identity)
   const { world, holder, run: candidate } = await owned(identity)
   if (!holder) return 'lost'
-  if (holder.ownerId !== claim.ownerId || holder.projectId !== claim.projectId) throw unavailable()
+  if (holder.ownerId !== claim.ownerId || holder.projectId !== claim.projectId) throw unavailable('holder_scope', identity)
   if (await latest(world) !== identity.deploymentId) return 'handoff'
   const previous = claim.previous, receipt = holder.claimedFrom
   if (receipt) {
     if (!previous || receipt.runId !== previous.runId || receipt.hookId !== previous.hookId || receipt.runId === identity.runId ||
         (receipt.workflowName && receipt.workflowName !== identity.workflowName) ||
-        (receipt.deploymentId && receipt.deploymentId !== previous.deploymentId)) throw unavailable()
+        (receipt.deploymentId && receipt.deploymentId !== previous.deploymentId)) throw unavailable('claim_receipt', identity)
     const victim = await world.runs.get(receipt.runId, { resolveData: 'none' })
     if ((!active(victim.status) && !terminal(victim.status)) || victim.workflowName !== identity.workflowName || victim.deploymentId !== previous.deploymentId ||
-        (active(victim.status) && victim.deploymentId === identity.deploymentId && !lifetimeSuccessor(identity, victim, candidate))) throw unavailable()
+        (active(victim.status) && victim.deploymentId === identity.deploymentId && !lifetimeSuccessor(identity, victim, candidate))) throw unavailable('predecessor_scope',
+          { ...identity, holderRunId: victim.runId, holderDeploymentId: victim.deploymentId, holderSpecVersion: victim.specVersion })
     // The token may have moved again while metadata was read. Never cancel
     // the replacement or run business work from a superseded candidate.
     if ((await lookup(TOKEN))?.runId !== identity.runId) return 'lost'
@@ -162,7 +180,8 @@ export async function retirePreviousRecoveryTimer(identity: RecoveryTimerIdentit
     // prepare and force. Absence of claimedFrom never authorizes cancellation;
     // only that exact run's terminal metadata permits a fresh first pass.
     const victim = await world.runs.get(previous.runId, { resolveData: 'none' })
-    if (!terminal(victim.status) || victim.workflowName !== identity.workflowName || victim.deploymentId !== previous.deploymentId) throw unavailable()
+    if (!terminal(victim.status) || victim.workflowName !== identity.workflowName || victim.deploymentId !== previous.deploymentId) throw unavailable('previous_not_terminal',
+      { ...identity, holderRunId: victim.runId, holderDeploymentId: victim.deploymentId, holderSpecVersion: victim.specVersion })
   }
   return currentRecoveryTimer(identity)
 }
@@ -176,7 +195,7 @@ export async function currentRecoveryTimer(identity: RecoveryTimerIdentity): Pro
 
 /** The old holder keeps its hook until the new deployment atomically takes it. */
 export async function handOffCurrentRecoveryTimer(identity: RecoveryTimerIdentity, claim: RecoveryTimerClaim) {
-  if (claim.state !== 'take') throw unavailable()
+  if (claim.state !== 'take') throw unavailable('claim_receipt', identity)
   const { world, holder, run } = await owned(identity, claim)
   if (holder && (await latest(world) !== identity.deploymentId || lifetimeElapsed(run))) await startLatest(world, identity.runId)
 }

@@ -27,8 +27,17 @@ let afterForce: (() => void) | undefined
 let afterResume: (() => Promise<void>) | undefined
 let dueTimer: typeof import('./workflow').dueTimer, armDueTimer: typeof import('@/lib/due-timer').armDueTimer
 const previousEnvironment = { VERCEL: process.env.VERCEL, VERCEL_ENV: process.env.VERCEL_ENV }
+const previousWarn = console.warn, warnings: unknown[][] = []
+const privateMarkers = ['synthetic private transport text', 'timer-private-input', 'timer-private-cookie', 'timer-private-response']
+const diagnostics = () => warnings.filter(args => typeof args[0] === 'string' && args[0].startsWith('{'))
+  .map(args => JSON.parse(args[0] as string) as Record<string, unknown>)
+
 
 const error = (name: string, token?: string) => Object.assign(new Error('synthetic private transport text'), { name, token })
+const sdkFailure = () => Object.assign(error('WorkflowWorldError'), { code: 'ETIMEDOUT',
+  cause: Object.assign(new Error(privateMarkers[0]), { code: 'ECONNRESET' }),
+  inputs: privateMarkers[1], headers: { cookie: privateMarkers[2] }, response: { body: privateMarkers[3] },
+})
 const active = (runId: string) => ['pending', 'running'].includes(runs.get(runId)?.status ?? '')
 const row = (runId: string, deploymentId = 'new', workflowName = NAME): Row => ({ runId, deploymentId, workflowName, status: 'running', specVersion: 8, startedAt: new Date(), createdAt: new Date() })
 function seed(runId: string, deploymentId: string, fields: Partial<HookRow> = {}) {
@@ -100,7 +109,7 @@ function createHook(options: { token: string; experimental_force?: boolean }) {
   })
 }
 async function lookup(token: string) {
-  if (lookupFailure) throw error('WorkflowWorldError')
+  if (lookupFailure) throw sdkFailure()
   const value = hooks.get(token)
   if (!value) throw error('HookNotFoundError', token)
   return structuredClone(value)
@@ -143,6 +152,7 @@ mock.module('workflow', { namedExports: {
 } })
 mock.module('workflow/runtime', { namedExports: { getWorld: async () => ({
   getEnvironment: () => environment,
+  capabilities: { hookForceClaim: true },
   getDeploymentId: async () => context.getStore()?.deploymentId ?? caller,
   ...(resolver ? { resolveLatestDeploymentId: async () => latest } : {}),
   runs: { get: async (runId: string, options: { resolveData: string }) => {
@@ -160,7 +170,7 @@ mock.module('workflow/api', { namedExports: {
   getHookByToken: lookup, resumeHook: resume,
   getRun: (runId: string) => ({ cancel: async () => {
     trace.push({ event: 'cancel', runId })
-    if (cancelFailure) throw error('WorkflowWorldError')
+    if (cancelFailure) throw sdkFailure()
     runs.get(runId)!.status = 'cancelled'
   } }),
   start: async (_workflow: unknown, args: [Parameters<typeof dueTimer>[0], string?], options?: { deploymentId?: string }) => {
@@ -189,6 +199,7 @@ before(async () => {
 })
 beforeEach(() => {
   hooks.clear(); byId.clear(); runs.clear(); deliveries.clear(); buffered.clear(); lost.clear()
+  warnings.length = 0; console.warn = (...args: unknown[]) => { warnings.push(args) }
   completions.length = 0; failures.length = 0; trace.length = 0
   activity.clear(); observers.clear(); closing = false
   latest = 'new'; caller = 'new'; environment = 'production'; resolver = true; next = null
@@ -206,6 +217,7 @@ afterEach(async () => {
   } finally {
     for (const [key, value] of Object.entries(previousEnvironment)) { if (value === undefined) delete process.env[key]; else process.env[key] = value }
     mock.timers.reset()
+    console.warn = previousWarn
   }
 })
 
@@ -341,7 +353,7 @@ test('stale candidate never force-claims or cancels the current deployment', asy
 
 test('unsupported, foreign and unknown owners are never force-claimed or cancelled', async t => {
   for (const invalid of ['preview', 'project', 'owner', 'workflow', 'spec'] as const) await t.test(invalid, async () => {
-    hooks.clear(); byId.clear(); runs.clear(); trace.length = 0; failures.length = 0
+    hooks.clear(); byId.clear(); runs.clear(); trace.length = 0; failures.length = 0; warnings.length = 0
     const holder = seed('protected', 'old')
     if (invalid === 'preview') holder.environment = 'preview'
     if (invalid === 'project') holder.projectId = 'another-project'
@@ -351,6 +363,20 @@ test('unsupported, foreign and unknown owners are never force-claimed or cancell
     launch(`candidate-${invalid}`); await settle()
     assert.equal(forced().length, 0); assert.deepEqual(cancelled(), [])
     assert.equal(hooks.get(TOKEN)?.runId, 'protected')
+    const records = diagnostics()
+    assert.equal(records.length, 1, 'one structured refusal, without a duplicate generic error')
+    assert.equal(records[0].event, 'coded_error'); assert.equal(records[0].code, 'due_timer_owner_unavailable')
+    assert.equal(records[0].kind, 'run-recovery')
+    assert.equal(records[0].detail, invalid === 'spec' ? 'force_unsupported' : 'holder_scope')
+    if (invalid === 'spec') {
+      assert.equal(records[0].deploymentId, 'new'); assert.equal(records[0].holderDeploymentId, 'old')
+      assert.equal(records[0].holderSpecVersion, 7); assert.equal(records[0].forceSupported, true)
+    }
+    for (const failure of failures) {
+      assert.ok(failure instanceof Error); assert.equal(failure.message, 'due_timer_owner_unavailable')
+      assert.equal(failure.cause, undefined, 'the persisted Workflow refusal must not carry the raw SDK object')
+    }
+    for (const marker of [...privateMarkers, TOKEN]) assert.equal(JSON.stringify(warnings).includes(marker), false)
   })
 })
 
@@ -392,6 +418,11 @@ test('unknown lookup and missing latest capability do not become no-owner starts
   } finally { console.error = original }
   assert.equal(started().length, 0); assert.deepEqual(cancelled(), [])
   assert.equal(JSON.stringify(logged).includes('private'), false)
+  const records = diagnostics()
+  assert.deepEqual(records.map(item => item.detail), ['sdk_operation_failed', 'runtime_unavailable'])
+  assert.equal(records[0].kind, 'run-recovery'); assert.equal(records[0].phase, 'arm')
+  assert.deepEqual(records[0].causes, [{ name: 'WorkflowWorldError', code: 'ETIMEDOUT' }, { name: 'Error', code: 'ECONNRESET' }])
+  for (const marker of [...privateMarkers, TOKEN]) assert.equal(JSON.stringify([...logged, ...warnings]).includes(marker), false)
 })
 
 test('cancel failure prevents due work and never touches the native task', async () => {
@@ -399,6 +430,14 @@ test('cancel failure prevents due work and never touches the native task', async
   cancelFailure = true; launch('one'); await settle()
   assert.deepEqual(cancelled(), ['legacy']); assert.equal(jobs, 0)
   assert.equal(runs.get('native-child')?.status, 'running')
+  const records = diagnostics()
+  assert.equal(records.length, 1); assert.equal(records[0].code, 'due_timer_owner_unavailable')
+  assert.equal(records[0].detail, 'sdk_operation_failed'); assert.equal(records[0].phase, 'retire')
+  assert.equal(records[0].kind, 'run-recovery')
+  assert.deepEqual(records[0].causes, [{ name: 'WorkflowWorldError', code: 'ETIMEDOUT' }, { name: 'Error', code: 'ECONNRESET' }])
+  assert.equal(failures.length, 1); assert.ok(failures[0] instanceof Error)
+  assert.equal(failures[0].message, 'due_timer_owner_unavailable'); assert.equal(failures[0].cause, undefined)
+  for (const marker of [...privateMarkers, TOKEN]) assert.equal(JSON.stringify(warnings).includes(marker), false)
 })
 
 test('preview run-recovery keeps the existing non-force lifecycle', async () => {
