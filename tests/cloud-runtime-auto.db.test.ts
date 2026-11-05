@@ -714,6 +714,10 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       assert.ok(profileSelections.slice(decisionsBefore).some(choice => choice.stage === 'spec' && choice.profileId === planner.id), 'normal profile selection receives the actual spec stage')
       if (entry !== 'coordinator') return
 
+      const { rows: [plannerMachine] } = await pool.query(`SELECT m."sandboxId",m."deviceId",m."repoId",token.id AS "tokenId"
+        FROM thread_machines m JOIN device_tokens token ON token."boundDeviceId"=m."deviceId" AND token."revokedAt" IS NULL
+        WHERE m."runId"=$1`, [result.runId])
+      assert.ok(plannerMachine?.sandboxId && plannerMachine.tokenId)
       const { sendThreadMessage } = await import('../lib/thread-continue')
       const clarification = 'OWNER_PLAN_CONTEXT_1276: keep the original acceptance criteria and the exact final newline in the plan.'
       const ownerNote = await sendThreadMessage(who.id, result.runId!, clarification)
@@ -772,7 +776,19 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       assert.equal(implementation.run.agentDefinition.profileOriginRunId, undefined)
       assert.equal(implementation.run.continuesRunId, null)
       assert.equal(implementation.run.sessionId, null, 'implementation cannot inherit the planner native session')
-      assert.notEqual(implementation.run.deviceId, planned.run.deviceId, 'the implementation starts its own cloud task machine')
+      // One task retains its VM; the independent executor takes custody with
+      // new credentials, without inheriting the planner's native session.
+      assert.equal(implementation.run.deviceId, plannerMachine.deviceId)
+      assert.deepEqual((await pool.query('SELECT state,"sandboxId" FROM thread_machines WHERE "runId"=$1', [planned.run.id])).rows[0], { state: 'ended', sandboxId: null }, 'the completed planner gives up the task machine')
+      assert.deepEqual((await pool.query('SELECT "ownerId","workspaceId","botId","issueId","deviceId","repoId","sandboxId",state FROM thread_machines WHERE "runId"=$1', [implementation.run.id])).rows[0], {
+        ownerId: who.id, workspaceId: who.workspaceId, botId: who.botId, issueId: who.issueId,
+        deviceId: plannerMachine.deviceId, repoId: plannerMachine.repoId, sandboxId: plannerMachine.sandboxId, state: 'running',
+      }, 'the executor owns this same task runtime after the real handoff')
+      const tokens = (await pool.query('SELECT id,"revokedAt" FROM device_tokens WHERE "boundDeviceId"=$1', [plannerMachine.deviceId])).rows
+      assert.ok(tokens.find(token => token.id === plannerMachine.tokenId)?.revokedAt, 'the planner worker credential is revoked')
+      const activeTokens = tokens.filter(token => token.revokedAt === null)
+      assert.equal(activeTokens.length, 1)
+      assert.notEqual(activeTokens[0].id, plannerMachine.tokenId, 'the executor receives a new worker credential')
       assert.equal(implementation.run.machineState, 'running')
       assert.equal(implementation.run.agentDefinition.repositoryAdmission?.authority, 'owner_credential')
       assert.equal(implementation.counts.publications, 1)
