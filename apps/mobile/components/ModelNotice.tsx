@@ -1,17 +1,25 @@
 import { Pressable, StyleSheet, View } from 'react-native'
 import { Text } from '@/components/Text'
 import { ReadNotice } from '@/components/ReadNotice'
+import { ModelMenu } from '@/components/ModelMenu'
 import { modelStatusLine, type ModelMenuState } from '@/lib/model-menu'
 import { colors } from '@/lib/theme'
 
-/** Above the composer: which pick did not save and why, with 重试 (Figma 843:2 #3). */
+/**
+ * Above the composer: which pick did not save and why, with 重试 (Figma 843:2 #3); otherwise a line only when the
+ * next message will go differently (quota out, model unavailable), never an always-on status (#1386).
+ */
 export function ModelNotice({ model }: { model: ModelMenuState }) {
   const { failure, choose, busy, choosing } = model
   if (!failure) {
     if (choosing) return <View accessibilityLiveRegion="polite" style={styles.notice}><Text style={[styles.line, { color: colors.secondary }]}>正在切换模型…</Text></View>
     if (model.refreshFailed || (model.readError && model.menu)) return <ReadNotice error={model.refreshFailed || model.readError} hasData={Boolean(model.menu)} label="模型" onRetry={model.refreshFailed ? model.refresh : model.retryRead} />
     const status = model.menu ? modelStatusLine(model.menu.current) : null
-    return status ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.notice}><Text style={[styles.line, { color: colors.secondary }]}>{status}</Text></View> : null
+    // Only when the next message goes differently (#1386); 换模型 opens the same native model menu.
+    return status ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.notice}>
+      <Text style={[styles.line, { color: colors.secondary }]}>{status.line}</Text>
+      {status.change ? <ModelMenu model={model} label="换模型" /> : null}
+    </View> : null
   }
   return (
     <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.notice}>
