@@ -1,0 +1,31 @@
+{
+  "beforeRuntimeAlias": {
+    "observedAt": "2026-11-05T01:54:12.657Z",
+    "alias": "app.aspectlylabs.com",
+    "deploymentId": "dpl_FNPDNzS3isGCQNrLyK6KLbwXcAjh",
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "created": "2026-10-21T23:53:38.688Z",
+    "updatedAt": 1793843497863,
+    "redirect": null,
+    "redirectStatusCode": null
+  },
+  "beforeRuntimeDeployment": {
+    "observedAt": "2026-11-05T01:54:26.880Z",
+    "id": "dpl_FNPDNzS3isGCQNrLyK6KLbwXcAjh",
+    "url": "mikka-hgih8rnp2-mikka-dev.vercel.app",
+    "name": "mikka",
+    "target": "production",
+    "readyState": "READY",
+    "source": "cli",
+    "createdAt": 1793843460871,
+    "buildingAt": 1793843462212,
+    "ready": 1793843497702,
+    "gitSource": {},
+    "meta": {
+      "githubCommitSha": "40d03479ea8260b8934f609b84c7c9cb60a94b3c",
+      "githubCommitRef": "main",
+      "githubOrg": "alexj11324",
+      "githubRepo": "Mikka"
+    }
+  }
+}

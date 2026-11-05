@@ -2,7 +2,7 @@
 
 Published source: `c9da99ff14d7fd3446e0417d3a54fc0408442dff`, based on `5d2011f0f27a4ae300909dd1632ffede8a763471`, tree `58f14e63fc36cf12a936b9825604f71162586a84`. The seven release blobs exactly match the cloud-tested candidate below; all 4,573 unrelated main blobs are preserved (root independent GitHub tree proof).
 
-CI: https://github.com/alexj11324/Mikka/actions/runs/41949914315 . At evidence assembly the exact-head CI is in progress; the E2B PR offline test succeeded and production jobs were skipped. The live reusable OIDC, instance validation and prebuilt publication remain post-merge gates. No production write or model prompt was used to make this evidence.
+The initial evidence below records the pre-merge candidate. Exact-head CI and the merged production release have since passed; see [the completed production verification](production-40d/README.md). Historical candidate-only statements and original failed logs are retained without reclassifying them.
 
 # Runtime publication through GitHub Web deploy
 

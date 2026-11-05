@@ -1,0 +1,207 @@
+{
+  "version": {
+    "observedAt": "2026-11-05T01:52:43.501Z",
+    "status": 200,
+    "url": "https://app.aspectlylabs.com/mikka/api/version",
+    "body": {
+      "build": "40d03479ea8260b8934f609b84c7c9cb60a94b3c",
+      "minMobileBuild": 0,
+      "mobileUpdateUrl": "itms-beta://beta.itunes.apple.com/v1/app/6829300983",
+      "minDesktopVersion": null
+    }
+  },
+  "webJobs": {
+    "total_count": 1,
+    "jobs": [
+      {
+        "id": 126993932948,
+        "run_id": 41950780159,
+        "workflow_name": "Web deploy",
+        "head_branch": "main",
+        "run_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/41950780159",
+        "run_attempt": 1,
+        "node_id": "CR_kwDOVRYxA88AAAAdkW2ilA",
+        "head_sha": "40d03479ea8260b8934f609b84c7c9cb60a94b3c",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/126993932948",
+        "html_url": "https://github.com/alexj11324/Mikka/actions/runs/41950780159/job/126993932948",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-05T01:46:32Z",
+        "started_at": "2026-11-05T01:46:35Z",
+        "completed_at": "2026-11-05T01:51:41Z",
+        "name": "deploy",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1,
+            "started_at": "2026-11-05T01:46:35Z",
+            "completed_at": "2026-11-05T01:46:37Z"
+          },
+          {
+            "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2,
+            "started_at": "2026-11-05T01:46:37Z",
+            "completed_at": "2026-11-05T01:46:42Z"
+          },
+          {
+            "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3,
+            "started_at": "2026-11-05T01:46:42Z",
+            "completed_at": "2026-11-05T01:46:43Z"
+          },
+          {
+            "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4,
+            "started_at": "2026-11-05T01:46:43Z",
+            "completed_at": "2026-11-05T01:46:44Z"
+          },
+          {
+            "name": "Refuse an obsolete source before release work",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5,
+            "started_at": "2026-11-05T01:46:44Z",
+            "completed_at": "2026-11-05T01:46:44Z"
+          },
+          {
+            "name": "Read the Vercel deploy token",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6,
+            "started_at": "2026-11-05T01:46:44Z",
+            "completed_at": "2026-11-05T01:46:45Z"
+          },
+          {
+            "name": "Skip documentation-only changes",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7,
+            "started_at": "2026-11-05T01:46:45Z",
+            "completed_at": "2026-11-05T01:46:46Z"
+          },
+          {
+            "name": "Read the existing Vercel runtime release token",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 8,
+            "started_at": "2026-11-05T01:46:46Z",
+            "completed_at": "2026-11-05T01:46:46Z"
+          },
+          {
+            "name": "Publish the verified official runtime pair inside the deployment queue",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 9,
+            "started_at": "2026-11-05T01:46:46Z",
+            "completed_at": "2026-11-05T01:46:46Z"
+          },
+          {
+            "name": "Read the production values Vercel withholds from `vercel pull`",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 10,
+            "started_at": "2026-11-05T01:46:46Z",
+            "completed_at": "2026-11-05T01:46:46Z"
+          },
+          {
+            "name": "Pull the production project settings and environment",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 11,
+            "started_at": "2026-11-05T01:46:46Z",
+            "completed_at": "2026-11-05T01:47:05Z"
+          },
+          {
+            "name": "Fill build-time values",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 12,
+            "started_at": "2026-11-05T01:47:05Z",
+            "completed_at": "2026-11-05T01:47:05Z"
+          },
+          {
+            "name": "Build (runs migrations last, as the Vercel build did)",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 13,
+            "started_at": "2026-11-05T01:47:05Z",
+            "completed_at": "2026-11-05T01:50:34Z"
+          },
+          {
+            "name": "Upload the prebuilt output to production",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 14,
+            "started_at": "2026-11-05T01:50:34Z",
+            "completed_at": "2026-11-05T01:51:38Z"
+          },
+          {
+            "name": "Verify the public production version before releasing the deployment queue",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 15,
+            "started_at": "2026-11-05T01:51:38Z",
+            "completed_at": "2026-11-05T01:51:39Z"
+          },
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 28,
+            "started_at": "2026-11-05T01:51:39Z",
+            "completed_at": "2026-11-05T01:51:39Z"
+          },
+          {
+            "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 29,
+            "started_at": "2026-11-05T01:51:39Z",
+            "completed_at": "2026-11-05T01:51:39Z"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 30,
+            "started_at": "2026-11-05T01:51:39Z",
+            "completed_at": "2026-11-05T01:51:39Z"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 31,
+            "started_at": "2026-11-05T01:51:39Z",
+            "completed_at": "2026-11-05T01:51:39Z"
+          }
+        ],
+        "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/126993932948",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "runner_id": 1000197449,
+        "runner_name": "GitHub Actions 1000197449",
+        "runner_group_id": 0,
+        "runner_group_name": "GitHub Actions"
+      }
+    ]
+  },
+  "awaitWeb": {
+    "source": "GitHub Actions job logs",
+    "runId": 41950779968,
+    "jobId": 126995151560,
+    "retrievedAt": "2026-11-05T01:52:44.131Z",
+    "lines": [
+      "2026-11-05T01:51:53.0214389Z {\"event\":\"matching_web_deployment_verified\",\"sourceCommit\":\"40d03479ea8260b8934f609b84c7c9cb60a94b3c\",\"webRunId\":41950780159,\"webAttempt\":1,\"publicBuild\":\"40d03479ea8260b8934f609b84c7c9cb60a94b3c\",\"verifiedAt\":\"2026-11-05T01:51:53.019Z\"}"
+    ]
+  }
+}

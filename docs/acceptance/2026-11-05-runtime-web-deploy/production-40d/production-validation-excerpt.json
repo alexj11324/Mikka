@@ -1,0 +1,12 @@
+{
+  "source": "GitHub Actions job logs",
+  "runId": 41950779968,
+  "jobId": 126994070772,
+  "head": "40d03479ea8260b8934f609b84c7c9cb60a94b3c",
+  "retrievedAt": "2026-11-05T01:51:50.462Z",
+  "lines": [
+    "2026-11-05T01:49:55.0397018Z desktop: 3826 preserved entries, manifest c841ed38068908ec02b2cff61021b55f5084dda3eaec7b25e67c63e3a4d3107f",
+    "2026-11-05T01:49:55.0398567Z claude: 2134 preserved entries, manifest 8fff27d6da70a6ccdb956aac0afb2bed0ea4fe945b39af7c9af17460245dd6ce",
+    "2026-11-05T01:49:55.0400563Z codex: 9482 preserved entries, manifest a5a0a8fa3aa42051cff204fb47585453db0f760aeec085e1b1cba7d346157130"
+  ]
+}
