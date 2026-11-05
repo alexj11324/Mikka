@@ -229,4 +229,35 @@ describe('run-control push (#1212)', () => {
     await vi.advanceTimersByTimeAsync(RUN_CONTROL_FALLBACK_MS)
     expect(woke).toBe(2)
   })
+
+  it('a costly watcher (a cloud run\'s subscription context) re-reads at most every floor on timer ticks, at once on a push and at its due time', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date', 'performance'] })
+    const host = { isLive: vi.fn(() => true) }
+    // Even the one-second legacy cadence: the liveness check keeps it, the context read does not.
+    const gate = new ToolApprovalGate('run', host, 'legacy')
+    gates.push(gate)
+    const expiry = Date.now() + 3_600_000
+    const context = vi.fn(async () => expiry - 60_000)
+    gate.watch(context, undefined, { timedFloorMs: RUN_CONTROL_FALLBACK_MS, dueAt: expiry - 60_000 })
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(host.isLive.mock.calls.length).toBeGreaterThanOrEqual(59)
+    // One read on the first tick, then one per 20 s: 3 a minute, not 20.
+    expect(context).toHaveBeenCalledTimes(3)
+    gate.invalidate()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(context).toHaveBeenCalledTimes(4)
+    // Pushed: no timer at all, so the next read is at the seeded token due time.
+    gate.setControlMode('push')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(context).toHaveBeenCalledTimes(5)
+    await vi.advanceTimersByTimeAsync(expiry - 60_000 - Date.now() - 1)
+    expect(context).toHaveBeenCalledTimes(5)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(context).toHaveBeenCalledTimes(6)
+  })
+  it('rejects an invalid floor', () => {
+    const gate = new ToolApprovalGate('run', { isLive: () => true }, 'push')
+    gates.push(gate)
+    expect(() => gate.watch(async () => {}, undefined, { timedFloorMs: 0 })).toThrow('Run monitor interval unavailable')
+  })
 })
