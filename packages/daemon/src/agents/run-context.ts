@@ -159,6 +159,7 @@ interface HandoffFile {
   plan?: unknown
   /** Per acceptance criterion, with the evidence the agent saw. */
   criteria?: unknown
+  reviewVerdict?: AgentReport["reviewVerdict"]
   previewDatabaseBranch?: unknown
 }
 
@@ -457,6 +458,7 @@ export class RunContext {
       ...(plan ? { plan } : {}),
       ...(typeof file.previewDatabaseBranch === "string" ? { previewDatabaseBranch: file.previewDatabaseBranch } : {}),
       ...(Array.isArray(file.criteria) ? { criteria: file.criteria } : {}),
+      ...(file.reviewVerdict ? { reviewVerdict: file.reviewVerdict } : {}),
       ...(file.verificationCommand ? { verificationCommand: file.verificationCommand } : {}),
       ...(runQuestion.safeParse(file.question).success
         ? { question: runQuestion.parse(file.question) }
