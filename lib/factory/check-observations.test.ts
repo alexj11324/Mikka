@@ -11,11 +11,15 @@ test('independent delivery prompt carries host execution observations and usable
   const tx = { query: async (sql: string, args: unknown[]) => {
     if (sql.startsWith('SELECT c.*')) return { rows: [{ id: 'candidate', kind: 'deliverable', executionSha: sha,
       deviceId: 'device', deviceRepoId: 'repo', environment: 'device:device', repository: '/delivery', repoPath: '/delivery',
-      remoteUrl: null, enabled: true, deviceKind: 'cloud', cloudOnline: true, harness: 'claude_code',
+      remoteUrl: null, enabled: true, deviceKind: 'cloud', runtimeBotId: 'bot', runtimeWorkspaceId: 'workspace', agentId: 'agent', harness: 'claude_code',
       harnesses: [{ harness: 'claude_code', installed: true }],
       producerExecution: { runId: 'producer', sessionId: 'native-session', status: 'succeeded', model: 'deepseek-flash', harness: 'claude_code', observedModel: null },
       producerDefinition: { apiKey: 'private-key-must-not-appear' }, producerReport: { summary: 'Produced the file.' },
     }] }
+    if (sql.startsWith('SELECT m."deviceId"')) {
+      assert.deepEqual(args, ['bot', 'owner', 'workspace', 'agent', 'repo'])
+      return { rows: [{ deviceId: 'device', harness: 'claude_code' }] }
+    }
     if (sql.startsWith('SELECT c.id,c.kind')) return { rows: [{ id: 'candidate', kind: 'deliverable', reportedSha: sha }] }
     if (sql.includes('FROM run_chunks i JOIN run_chunks o')) {
       assert.deepEqual(args, ['producer', 'native-session', 'owner', 'issue', 'candidate', 'task'])

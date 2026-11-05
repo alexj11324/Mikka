@@ -259,6 +259,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const cloudRepo = randomUUID()
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,instructions,name) VALUES ($1,$2,$3,$4,$5,$6)', [consumer, actor.userId, worker.deviceId, 'codex', 'Follow the task', 'Fixture'])
     await pool.query('INSERT INTO device_repos (id,"userId","deviceId","baseBranch","repoPath") VALUES ($1,$2,$3,$4,$5)', [cloudRepo, actor.userId, worker.deviceId, 'main', '/tmp/cloud-repo'])
+    await pool.query('UPDATE bot_cloud_runtimes SET "agentId"=$2,"repoId"=$3 WHERE "botId"=$1 AND harness=\'codex\'', [bot.id,consumer,cloudRepo])
     const cloudInput = { botId: bot.id, issueId: randomUUID(), agentId: consumer, deviceRepoId: cloudRepo, title: 'Task', body: 'Use the desktop', model: 'fixture-model' }
     // A repository task: its repository has a remote, so it runs on a task machine and the 电脑 policy does not gate it.
     const remoteRepo = randomUUID()

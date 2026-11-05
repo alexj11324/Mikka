@@ -8,9 +8,11 @@ type Runtime = { agentId: string; deviceId: string; repoId: string }
 
 /** Register a missing executor only from this Bot's already prepared machine
  * and private workspace. No provider calls, machine wake or filesystem setup
- * belongs in the automatic-stage transaction. */
+ * belongs in the automatic-stage transaction. A fresh official task gets its
+ * own harnesses; its host may register the same private workspace metadata
+ * without treating the parent's installation as its execution capability. */
 export async function ensureRecordedBotHarnessRuntime(
-  tx: Pick<PoolClient, 'query'>, actor: Actor, botId: string, harness: string,
+  tx: Pick<PoolClient, 'query'>, actor: Actor, botId: string, harness: string, options: { freshTask?: boolean } = {},
 ): Promise<Runtime | null> {
   if (harness !== 'claude_code' && harness !== 'codex') return null
   await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`bot-runtime:${botId}`])
@@ -19,10 +21,10 @@ export async function ensureRecordedBotHarnessRuntime(
     JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId"
     JOIN devices d ON d.id=m."deviceId" AND d."ownerId"=b."ownerId" AND d.kind='cloud' AND d.enabled=true
     WHERE b.id=$1 AND b."ownerId"=$2 AND b."workspaceId"=$3 AND b."archivedAt" IS NULL
-      AND d.harnesses @> $4::jsonb
-      AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d.harnesses) info WHERE info->>'harness'=$5 AND info ? 'subscriptionPreflight')
+      AND ($6::boolean OR (d.harnesses @> $4::jsonb
+        AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d.harnesses) info WHERE info->>'harness'=$5 AND info ? 'subscriptionPreflight')))
       FOR SHARE OF b,desk,m,d`,
-  [botId, actor.userId, actor.workspaceId, JSON.stringify([{ harness, installed: true, subscriptionBroker: true, computerBroker: true }]), harness])
+  [botId, actor.userId, actor.workspaceId, JSON.stringify([{ harness, installed: true, subscriptionBroker: true, computerBroker: true }]), harness, options.freshTask === true])
   if (!machine) return null
   const { rows: [existing] } = await tx.query<Runtime>(`SELECT r."agentId",a."deviceId",r."repoId"
     FROM bot_cloud_runtimes r JOIN agents a ON a.id=r."agentId" AND a."userId"=r."ownerId" AND a.harness=r.harness
@@ -32,7 +34,7 @@ export async function ensureRecordedBotHarnessRuntime(
   if (existing) return existing
   // A stale or foreign slot cannot be repaired by adopting another identity.
   if ((await tx.query('SELECT 1 FROM bot_cloud_runtimes WHERE "botId"=$1 AND harness=$2', [botId, harness])).rowCount) return null
-  if (!machine.runtimeReady || !machine.sandboxId || !['running', 'sleeping'].includes(machine.state)) return null
+  if (!options.freshTask && (!machine.runtimeReady || !machine.sandboxId || !['running', 'sleeping'].includes(machine.state))) return null
   const { rows: [prepared] } = await tx.query<{ repoId: string }>(`SELECT repo.id AS "repoId"
     FROM bot_cloud_runtimes r JOIN agents a ON a.id=r."agentId" AND a."userId"=r."ownerId" AND a.harness=r.harness
     JOIN device_repos repo ON repo.id=r."repoId" AND repo."userId"=r."ownerId" AND repo."deviceId"=a."deviceId"
