@@ -67,7 +67,7 @@ test('shared subscriptions reach local and cloud claims with current membership 
     await pool.query('DELETE FROM agent_runs WHERE "userId"=ANY($1)', [users])
     await pool.query('DELETE FROM model_api_keys WHERE "ownerId"=ANY($1)', [users])
     await pool.query('DELETE FROM user_e2b_keys WHERE "userId"=ANY($1)', [users])
-    for (const table of ['byos_bindings', 'byos_connections', 'workspace_subscription_shares', 'bot_desktops', 'cloud_machines']) await pool.query(`DELETE FROM ${table} WHERE "ownerId"=ANY($1)`, [users])
+    for (const table of ['byos_bindings', 'byos_connections', 'workspace_subscription_shares', 'bot_cloud_runtimes', 'bot_desktops', 'cloud_machines']) await pool.query(`DELETE FROM ${table} WHERE "ownerId"=ANY($1)`, [users])
     for (const table of ['model_order_entries', 'model_order_settings']) await pool.query(`DELETE FROM ${table} WHERE "ownerId"=ANY($1)`, [users])
     for (const table of ['device_tokens', 'agents', 'device_repos']) await pool.query(`DELETE FROM ${table} WHERE "${table === 'agents' || table === 'device_repos' || table === 'device_tokens' ? 'userId' : 'ownerId'}"=ANY($1)`, [users])
     await pool.query('DELETE FROM devices WHERE "ownerId"=ANY($1)', [users])
@@ -95,6 +95,7 @@ test('shared subscriptions reach local and cloud claims with current membership 
       await pool.query('INSERT INTO user_e2b_keys("userId",ciphertext,iv,"keyVersion",last4) VALUES($1,$2,$3,$4,\'test\')', [userId, sealed.ciphertext, sealed.iv, sealed.keyVersion])
       await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,'running',true)`, [workspaceId, userId, randomUUID(), `synthetic-${randomUUID()}`, deviceId])
       await pool.query('INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)', [botId, workspaceId, userId])
+      await pool.query('INSERT INTO bot_cloud_runtimes ("botId","ownerId","workspaceId",harness,"agentId","repoId") VALUES ($1,$2,$3,$4,$5,$6)', [botId, userId, workspaceId, harness, agentId, repoId])
     }
     const scope = { ownerId: userId, workspaceId }
     // An own paid key offering the very same model must not steal an authorized shared subscription.
