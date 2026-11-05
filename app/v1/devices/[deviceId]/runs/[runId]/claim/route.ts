@@ -1,4 +1,5 @@
 import { deploymentSwitch } from '@/lib/deployment-switches'
+import { logCodedError } from '@mikka/protocol/coded-error'
 import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { withDeviceRoute } from '@/lib/device-route'
 import { runListChanged } from '@/lib/live/lists'
@@ -95,7 +96,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if (run.userId !== caller.userId || agent.userId !== caller.userId || repo.userId !== caller.userId || repo.deviceId !== deviceId) return NextResponse.json({ error: 'Run owner mismatch.' }, { status: 409 })
   if (device.kind === 'local' && !repositoryBindingMatches(repo.repoPath, repo.remoteUrl, { allowFile: daemonTestMode(process.env) })) return NextResponse.json({ error: 'Repository identity must be confirmed before scheduling a new thread.' }, { status: 409 })
   if (repo.remoteUrl && request.headers.get(REPO_ORIGIN_HEADER) !== '1') return NextResponse.json({ error: 'Device update required for repository verification.' }, { status: 409 })
-  const rejectProfile = async () => {
+  const rejectProfile = async (error: AgentProfileAdmissionError) => {
+    logCodedError(error, { runId })
     const summary = 'The selected Agent Profile changed or is no longer available. Select an available Profile for a new run.'
     // The claim transaction has rolled back. Only its still-unclaimed row may
     // be settled; a concurrent claim/stop must never be overwritten.
@@ -266,7 +268,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     const useComputer = desktop && run.agentDefinition?.readOnly !== true
     let claimed: Awaited<ReturnType<typeof claimCloudRun>>
     try { claimed = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim, useComputer) }
-    catch (error) { if (error instanceof AgentProfileAdmissionError) return rejectProfile(); throw error }
+    catch (error) { if (error instanceof AgentProfileAdmissionError) return rejectProfile(error); throw error }
     if (!claimed) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
     // Without a desktop the run gets none (the daemon refuses a `computer` it cannot serve).
     computer = useComputer ? claimed : null
@@ -286,7 +288,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
       model: run.agentDefinition?.model, subscriptionBindingId: subscription.id, selection: run.agentDefinition?.agentProfile })
     let claim: Awaited<ReturnType<typeof claimLocalRun>>
     try { claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id, beforeClaim, afterClaim) }
-    catch (error) { if (error instanceof AgentProfileAdmissionError) return rejectProfile(); throw error }
+    catch (error) { if (error instanceof AgentProfileAdmissionError) return rejectProfile(error); throw error }
     if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: 409 })
   }
   if (device.kind !== 'cloud' && device.computerUse?.installed) {

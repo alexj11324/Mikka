@@ -1,5 +1,6 @@
 import 'server-only'
 import { isDeepStrictEqual } from 'node:util'
+import { CodedError, type CodedErrorOptions } from '@mikka/protocol/coded-error'
 import type { Pool, PoolClient } from 'pg'
 import type { WorkerDefinitionSnapshot } from '@/lib/agent-kit/worker'
 import { MODEL_ROUTING_TIERS, modelTier } from '@/lib/model-routing'
@@ -10,8 +11,17 @@ import { assertProfileTarget, assertProfileSelection, BUILTIN_AGENT_PROFILE_ID, 
 import { watchdogProfileAdmission, watchdogProfileClaimContext, type ProfileFactoryContext } from './profile-watchdog'
 
 type Query = Pick<Pool | PoolClient, 'query'>
-export class AgentProfileAdmissionError extends Error {
-  constructor() { super('agentProfileUnavailable'); this.name = 'AgentProfileAdmissionError' }
+export type AgentProfileAdmissionDetail =
+  | 'scope_unavailable' | 'snapshot_invalid' | 'target_mismatch' | 'credential_mismatch' | 'binding_unavailable'
+  | 'watchdog_receipt' | 'watchdog_target' | 'continuation_mismatch' | 'current_profile' | 'question_receipt' | 'question_origin'
+export class AgentProfileAdmissionError extends CodedError<'agentProfileUnavailable', AgentProfileAdmissionDetail> {
+  constructor(options?: CodedErrorOptions<AgentProfileAdmissionDetail>) {
+    super('agentProfileUnavailable', options)
+    this.name = 'AgentProfileAdmissionError'
+    // Keep the existing public contract; the closed detail and original cause
+    // are available to structured diagnostics without exposing private input.
+    this.message = 'agentProfileUnavailable'
+  }
 }
 
 /** Runtime startup can outlive the queue's quota snapshot. Refresh only this
@@ -62,28 +72,28 @@ export async function admitProfileSelection(query: Query, input: {
   factoryContext?: ProfileFactoryContext
 }): Promise<string | undefined> {
   if (input.selection) {
-    if ((input.selection.profileId === BUILTIN_AGENT_PROFILE_ID || input.selection.source === 'default') && (!isBuiltinAgentProfileSelection(input.selection) || input.selection.scope.ownerId !== input.ownerId || input.selection.scope.workspaceId !== input.workspaceId)) throw new AgentProfileAdmissionError()
+    if ((input.selection.profileId === BUILTIN_AGENT_PROFILE_ID || input.selection.source === 'default') && (!isBuiltinAgentProfileSelection(input.selection) || input.selection.scope.ownerId !== input.ownerId || input.selection.scope.workspaceId !== input.workspaceId)) throw new AgentProfileAdmissionError({ detail: 'snapshot_invalid' })
     const entry = input.selection.targetEntry
-    if (entry.harness !== input.harness || entry.model !== input.model) throw new AgentProfileAdmissionError()
+    if (entry.harness !== input.harness || entry.model !== input.model) throw new AgentProfileAdmissionError({ detail: 'target_mismatch' })
     if (entry.source.kind === 'api_key') {
-      if (input.apiKeyId !== entry.source.keyId || input.subscriptionBindingId) throw new AgentProfileAdmissionError()
+      if (input.apiKeyId !== entry.source.keyId || input.subscriptionBindingId) throw new AgentProfileAdmissionError({ detail: 'credential_mismatch' })
     } else {
-      if (!input.subscriptionBindingId || input.apiKeyId) throw new AgentProfileAdmissionError()
+      if (!input.subscriptionBindingId || input.apiKeyId) throw new AgentProfileAdmissionError({ detail: 'credential_mismatch' })
       const bound = await query.query('SELECT 1 FROM byos_bindings WHERE id=$1 AND "connectionId"=$2 AND "modelId"=$3 AND "workspaceId"=$4',
         [input.subscriptionBindingId, entry.source.connectionId, input.model, input.workspaceId])
-      if (!bound.rowCount) throw new AgentProfileAdmissionError()
+      if (!bound.rowCount) throw new AgentProfileAdmissionError({ detail: 'binding_unavailable' })
     }
   }
   if (input.selection && input.sourceRunId && input.factoryContext) {
     const watchdog = await watchdogProfileAdmission(query, { ...input, sourceRunId: input.sourceRunId }, input.factoryContext)
-    if (watchdog === 'invalid' || (watchdog === 'none' && input.factoryContext.runId)) throw new AgentProfileAdmissionError()
+    if (watchdog === 'invalid' || (watchdog === 'none' && input.factoryContext.runId)) throw new AgentProfileAdmissionError({ detail: 'watchdog_receipt' })
     if (watchdog === 'started' || watchdog === 'unstarted') {
       try {
         // A started task keeps its exact role, while B's live source is checked
         // again. An unstarted selection must still match the editable head.
         await (watchdog === 'started' ? assertProfileTarget : assertProfileSelection)(query,
           { ownerId: input.ownerId, workspaceId: input.workspaceId }, input.selection!)
-      } catch { throw new AgentProfileAdmissionError() }
+      } catch (error) { throw new AgentProfileAdmissionError({ detail: 'watchdog_target', cause: error }) }
       return undefined // A different executor receives no native-origin grant.
     }
   }
@@ -126,7 +136,7 @@ export async function admitProfileSelection(query: Query, input: {
           FOR SHARE OF t,pending,failed,origin`, [input.ownerId, input.issueId, input.factoryContext.sourceEventId, input.factoryContext.attemptId, input.sourceRunId])
         routingRepair = Boolean(admitted.rowCount)
       }
-      if (!same && !unclaimedStartup && !routingRepair && (!input.selection || !isBuiltinAgentProfileSelection(input.selection) || !isBuiltinAgentProfileSelection(source.agentDefinition.agentProfile))) throw new AgentProfileAdmissionError()
+      if (!same && !unclaimedStartup && !routingRepair && (!input.selection || !isBuiltinAgentProfileSelection(input.selection) || !isBuiltinAgentProfileSelection(source.agentDefinition.agentProfile))) throw new AgentProfileAdmissionError({ detail: 'continuation_mismatch' })
       // An unclaimed failed startup may retry the same role on a newly
       // authorized target. This is fresh admission, not a native continuation.
       // A legacy/default thread can make a fresh authorized model selection.
@@ -138,7 +148,7 @@ export async function admitProfileSelection(query: Query, input: {
   }
   if (!input.selection) return undefined
   try { await assertProfileSelection(query, { ownerId: input.ownerId, workspaceId: input.workspaceId }, input.selection) }
-  catch { throw new AgentProfileAdmissionError() }
+  catch (error) { throw new AgentProfileAdmissionError({ detail: 'current_profile', cause: error }) }
   return undefined
 }
 
@@ -151,8 +161,8 @@ export async function assertRunProfileClaim(query: Query, runId: string) {
   const definition = run?.agentDefinition
   if (!definition?.agentProfile) return
   const workspaceId = definition.executionIdentity?.workspaceId
-  if (!workspaceId || !run.issueId) throw new AgentProfileAdmissionError()
-  if ((definition.agentProfile.profileId === BUILTIN_AGENT_PROFILE_ID || definition.agentProfile.source === 'default') && (!isBuiltinAgentProfileSelection(definition.agentProfile) || definition.agentProfile.scope.ownerId !== run.userId || definition.agentProfile.scope.workspaceId !== workspaceId)) throw new AgentProfileAdmissionError()
+  if (!workspaceId || !run.issueId) throw new AgentProfileAdmissionError({ detail: 'scope_unavailable' })
+  if ((definition.agentProfile.profileId === BUILTIN_AGENT_PROFILE_ID || definition.agentProfile.source === 'default') && (!isBuiltinAgentProfileSelection(definition.agentProfile) || definition.agentProfile.scope.ownerId !== run.userId || definition.agentProfile.scope.workspaceId !== workspaceId)) throw new AgentProfileAdmissionError({ detail: 'snapshot_invalid' })
   if (run.questionContinuation && run.kind === 'implement') {
     const { rows: [task] } = await query.query(`SELECT t.* FROM factory_tasks t
       JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id AND a."runId"=$1
@@ -160,11 +170,11 @@ export async function assertRunProfileClaim(query: Query, runId: string) {
       WHERE t."userId"=$2 AND t."issueId"=$3 AND t.stage='execute' AND t.status='running' AND a.status='running'
         AND q.status='resuming' AND (q."expiresAt" IS NULL OR q."expiresAt">clock_timestamp()) FOR SHARE OF t,a,q`, [run.id,run.userId,run.issueId])
     const edge = task ? await (await import('./questions/execution-continuation')).questionExecutionContinuation(query,task,task.attemptId) : null
-    if (!edge || run.stopRequestedAt || run.status !== 'queued') throw new AgentProfileAdmissionError()
+    if (!edge || run.stopRequestedAt || run.status !== 'queued') throw new AgentProfileAdmissionError({ detail: 'question_receipt' })
     const source = await admitProfileSelection(query, { ownerId: run.userId, workspaceId, issueId: run.issueId,
       harness: definition.harness, model: definition.model, apiKeyId: definition.apiKey?.keyId,
       subscriptionBindingId: definition.subscription?.bindingId, selection: definition.agentProfile, sourceRunId: edge.questionOriginRunId })
-    if (source !== edge.questionOriginRunId) throw new AgentProfileAdmissionError()
+    if (source !== edge.questionOriginRunId) throw new AgentProfileAdmissionError({ detail: 'question_origin' })
     return
   }
   // Provider recovery gets a fresh native session, with the old role and a
@@ -175,7 +185,7 @@ export async function assertRunProfileClaim(query: Query, runId: string) {
         AND "stopReason"='provider_failure' AND report->'modelFallback'->>'retryRunId'=$3 ORDER BY "createdAt" DESC LIMIT 1 FOR SHARE`, [run.userId, run.issueId, run.id])
   const watchdog = await watchdogProfileClaimContext(query, { id: run.id, userId: run.userId, issueId: run.issueId })
   if (watchdog) {
-    if (!run.retryOf) throw new AgentProfileAdmissionError()
+    if (!run.retryOf) throw new AgentProfileAdmissionError({ detail: 'watchdog_receipt' })
     await admitProfileSelection(query, { ownerId: run.userId, workspaceId, issueId: run.issueId,
       harness: definition.harness, model: definition.model, apiKeyId: definition.apiKey?.keyId,
       subscriptionBindingId: definition.subscription?.bindingId, selection: definition.agentProfile,

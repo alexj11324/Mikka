@@ -2,11 +2,12 @@ import type { Pool, PoolClient } from "pg";
 import { FactoryError, type FactoryBinding } from "./contract";
 import { completeFactoryExecution } from "./completed-execution";
 import { factoryEventId } from "./event-id";
-import type { FactoryTask, createFactoryStore } from "./store";
+import type { FactoryCompletionDispatch, FactoryTask, createFactoryStore } from "./store";
 import { MAX_RUN_ATTEMPTS } from "../run-retry";
 import type { createFactoryQuestions } from "./questions/store";
 import { checkFactoryRepairBudget } from "./check-recovery-evidence";
 import { modelFallbackRecordSchema } from "../run-model-fallback-view";
+import { AgentProfileError } from "./agent-profile-definition";
 
 /** A failed run or a failed verify gate is a visible failed attempt that
  * re-enters the existing repair loop (retry at execute, repair from
@@ -52,6 +53,43 @@ const binding = (task: FactoryTask): FactoryBinding => ({
   revision: task.revision,
   candidateId: task.candidateId,
 });
+
+/** A rejected role Decision blocks only the unstarted independent check.
+ * Preserve the complete host tuple, including optional recovery authority. */
+export function observeFactoryProfileDispatch(dispatch: FactoryCompletionDispatch): FactoryCompletionDispatch {
+  return async (...args: Parameters<FactoryCompletionDispatch>) => {
+    const [tx, store, prior] = args;
+    const before = await store.lockTask(tx, prior.userId, prior.id);
+    if (before.status !== 'pending' || !['review', 'verify'].includes(before.stage)) return dispatch(...args);
+    const { factoryAuthorizationCheckpoint } = await import('./transaction');
+    const restoreAuthority = factoryAuthorizationCheckpoint(tx);
+    await tx.query('SAVEPOINT factory_profile_dispatch');
+    try {
+      const start = await dispatch(...args);
+      await tx.query('RELEASE SAVEPOINT factory_profile_dispatch');
+      return start;
+    } catch (error) {
+      // Keep completed execution/candidate evidence outside this savepoint,
+      // but never commit a partial queue or its pending authorization leases.
+      await tx.query('ROLLBACK TO SAVEPOINT factory_profile_dispatch');
+      restoreAuthority();
+      await tx.query('RELEASE SAVEPOINT factory_profile_dispatch');
+      if (!(error instanceof AgentProfileError) || error.code !== 'agentProfileDecisionUnavailable') throw error;
+      const current = await store.lockTask(tx, prior.userId, prior.id);
+      if (current.status !== 'pending' || current.stage !== before.stage || current.attemptId !== before.attemptId ||
+          current.revision !== before.revision || current.sourceEventId !== before.sourceEventId ||
+          !current.candidateId || current.candidateId !== before.candidateId) throw error;
+      const { rows: [attempt] } = await tx.query('SELECT * FROM factory_attempts WHERE id=$1 AND "taskId"=$2 FOR UPDATE', [current.attemptId, current.id]);
+      if (!attempt || attempt.status !== 'pending' || attempt.stage !== current.stage || attempt.candidateId !== current.candidateId ||
+          attempt.runId !== null || attempt.sessionId !== null || attempt.output?.requestEpoch !== current.sourceEventId) throw error;
+      await store.apply(current.userId, binding(current), factoryEventId('check-dispatch-decision-unavailable', current.attemptId), {
+        action: 'finish', status: 'blocked',
+        reason: 'Independent check could not select an Agent Profile. Check the available profiles and retry the check.',
+        evidence: [], output: { dispatch: { code: 'agentProfileDecisionUnavailable' } },
+      }, tx);
+    }
+  };
+}
 
 /** Consume existing durable run state during a Coordinator turn. #176 owns wake delivery. */
 export function createFactoryReconciler(

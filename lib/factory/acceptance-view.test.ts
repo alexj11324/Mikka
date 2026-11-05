@@ -268,3 +268,53 @@ test('retry confirmation requires the canonical same-candidate pending transitio
       assert.equal(candidateCheckRetryConfirmed(task, { ...receipt, task: { ...next, ...patch } }), false)
   }
 })
+
+test('host-qualified dispatch retry requires the same blocked attempt with no Run', () => {
+  for (const stage of ['review', 'verify'] as const) {
+    const { task, ledger } = retryFixture(stage)
+    const blocked = { ...task, status: 'blocked', route: { flowVersion: 2 } }
+    const capability = { binding: { taskId: 't1', revision: 24 } }
+    const latest = check({ stage, attemptId: 'a1', status: 'blocked', runId: null })
+    const detail = { task: blocked, checkDispatchRecovery: capability, checks: [latest] }
+    assert.deepEqual(candidateCheckRetry(blocked, detail, ledger)?.binding, capability.binding)
+    for (const checkDispatchRecovery of [undefined, { binding: { taskId: 'other', revision: 24 } },
+      { binding: { taskId: 't1', revision: 23 } }, { binding: { taskId: 't1', revision: 25 } }])
+      assert.equal(candidateCheckRetry(blocked, { ...detail, checkDispatchRecovery }, ledger), null)
+    for (const patch of [{ id: 'other' }, { issueId: 'other' }, { attemptId: 'other' }, { candidateId: 'other' },
+      { revision: 23 }, { stage: stage === 'review' ? 'verify' : 'review' }, { status: 'failed' }])
+      assert.equal(candidateCheckRetry(blocked, { ...detail, task: { ...blocked, ...patch } }, ledger), null)
+    assert.equal(candidateCheckRetry(blocked, detail, { ...ledger, attemptId: 'older' }), null)
+    assert.equal(candidateCheckRetry(blocked, { ...detail, checks: [{ ...latest, runId: 'existing-run' }] }, ledger), null,
+      'a dispatch capability must never be reused for an existing Run')
+    assert.equal(candidateCheckRetry(blocked, { ...detail, checks: [{ ...latest, status: 'failed' }] }, ledger), null)
+    assert.equal(candidateCheckRetry(blocked, { ...detail, checks: [...detail.checks, { ...latest, attemptId: 'newer' }] }, ledger), null)
+    assert.equal(candidateCheckRetry(blocked, { ...detail, completionRecovery: capability }, ledger), null)
+    assert.equal(candidateCheckRetry(blocked, { ...detail, checkStartRecovery: capability }, ledger), null,
+      'conflicting recovery capabilities are not a safe retry signal')
+  }
+})
+
+test('dispatch recovery confirms only the same candidate queued without a Run at revision plus one', () => {
+  for (const stage of ['review', 'verify'] as const) {
+    const task = failedTask({ stage, status: 'blocked' })
+    const capability = { binding: { taskId: 't1', revision: 24 } }
+    const next = { ...task, revision: 25, attemptId: 'a2', status: 'pending' }
+    const attempt = { id: 'a2', taskId: 't1', candidateId: 'c1', stage, status: 'pending', runId: null }
+    const receipt = { contractVersion: 1, task: next, attempts: [attempt], candidates: [{ id: 'c1', taskId: 't1' }] }
+    assert.equal(candidateCheckRetryConfirmed(task, receipt, undefined, capability), true)
+    assert.equal(candidateCheckRetryConfirmed(task, receipt), false)
+    assert.equal(candidateCheckRetryConfirmed(task, receipt, capability), false,
+      'ordinary dispatch retry is distinct from recovery of a frozen Run')
+    assert.equal(candidateCheckRetryConfirmed(task, receipt, capability, capability), false)
+    assert.equal(candidateCheckRetryConfirmed(task, receipt, undefined, { binding: { taskId: 'other', revision: 24 } }), false)
+    assert.equal(candidateCheckRetryConfirmed(task, receipt, undefined, { binding: { taskId: 't1', revision: 23 } }), false)
+    for (const patch of [{ id: 'other' }, { issueId: 'other' }, { candidateId: 'other' }, { stage: 'execute' },
+      { status: 'running' }, { revision: 24 }, { revision: 26 }, { attemptId: 'a1' }])
+      assert.equal(candidateCheckRetryConfirmed(task, { ...receipt, task: { ...next, ...patch } }, undefined, capability), false)
+    for (const patch of [{ id: 'other' }, { taskId: 'other' }, { candidateId: 'other' }, { stage: 'execute' },
+      { status: 'running' }, { runId: 'unexpected-run' }, { runId: undefined }])
+      assert.equal(candidateCheckRetryConfirmed(task, { ...receipt, attempts: [{ ...attempt, ...patch }] }, undefined, capability), false)
+    assert.equal(candidateCheckRetryConfirmed({ ...task, stage: 'execute' }, receipt, undefined, capability), false)
+    assert.equal(candidateCheckRetryConfirmed({ ...task, completionRecovery: capability }, receipt, undefined, capability), false)
+  }
+})
