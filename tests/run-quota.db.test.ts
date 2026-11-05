@@ -105,7 +105,7 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
   const events = async (runId: string) => (await pool.query('SELECT kind,"dedupeKey","issueId","botId",payload FROM coordinator_events WHERE "runId"=$1 ORDER BY "createdAt"', [runId])).rows
   const continuations = async (runId: string) => (await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [runId])).rows
   const claim = (p: Person, runId: string) => claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${p.deviceId}/runs/${runId}/claim`, {
-    method: 'POST', headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${p.token}`, [REPO_ORIGIN_HEADER]: '1', [MODEL_CREDENTIAL_HEADER]: '1', [RECOVERY_WORKTREE_HEADER]: '1' },
+    method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${p.token}`, [REPO_ORIGIN_HEADER]: '1', [MODEL_CREDENTIAL_HEADER]: '1', [RECOVERY_WORKTREE_HEADER]: '1' },
   }), { params: Promise.resolve({ deviceId: p.deviceId, runId }) })
   const failsWith = async (work: Promise<unknown>, code: string) => assert.rejects(work, (error: { code?: string }) => error.code === code)
   const resetsAt = new Date(Date.now() + 3 * 3_600_000).toISOString()
