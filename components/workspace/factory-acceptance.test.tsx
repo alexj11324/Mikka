@@ -21,25 +21,47 @@ const translationsFor = (namespace = '') => {
 let swr: { data?: unknown; error?: unknown; isLoading: boolean; mutate: () => void }
 let ledger: unknown
 let taskDetail: unknown
+let publicFlow: unknown
 const cache = new Map()
 mock.module('swr', { defaultExport: (key: string) => String(key).includes('view=ledger')
   ? { data: ledger, mutate: () => {} }
-  : key === '/api/factory/tasks/t1' && taskDetail !== undefined ? { data: taskDetail, mutate: () => {} } : swr, namedExports: { useSWRConfig: () => ({ cache, mutate: async () => undefined }) } })
+  : key === '/api/factory/tasks/t1/flow' ? { data: publicFlow, mutate: () => {} }
+    : key === '/api/factory/tasks/t1' && taskDetail !== undefined ? { data: taskDetail, mutate: () => {} } : swr, namedExports: { useSWRConfig: () => ({ cache, mutate: async () => undefined }) } })
 mock.module('next-intl', { namedExports: { useTranslations: translationsFor, useFormatter: () => ({ dateTime: () => '' }) } })
 mock.module(new URL('./issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 
 let FactoryAcceptance: typeof import('./factory-acceptance')['FactoryAcceptance']
 let FactoryAcceptancePanel: typeof import('./factory-acceptance')['FactoryAcceptancePanel']
 let FactoryListError: typeof import('./factory-acceptance')['FactoryListError']
+let AcceptanceStateBadge: typeof import('./factory-acceptance')['AcceptanceStateBadge']
 let useThreadAcceptance: typeof import('./factory-acceptance')['useThreadAcceptance']
 let ApprovalBar: typeof import('./factory-approval-bar')['ApprovalBar']
 before(async () => {
-  ({ FactoryAcceptance, FactoryAcceptancePanel, FactoryListError, useThreadAcceptance } = await import('./factory-acceptance'))
+  ({ FactoryAcceptance, FactoryAcceptancePanel, FactoryListError, AcceptanceStateBadge, useThreadAcceptance } = await import('./factory-acceptance'))
   ;({ ApprovalBar } = await import('./factory-approval-bar'))
 })
-beforeEach(() => { cache.clear(); swr = { isLoading: false, mutate: () => {} }; ledger = { approvals: [], publications: [] }; taskDetail = undefined })
+beforeEach(() => { cache.clear(); swr = { isLoading: false, mutate: () => {} }; ledger = { approvals: [], publications: [] }; taskDetail = {}; publicFlow = undefined })
 const list = () => renderToStaticMarkup(<FactoryAcceptance issueId="issue-1" />)
 const task = (patch: Record<string, unknown> = {}) => ({ id: 't1', issueId: 'issue-1', stage: 'approval', status: 'pending', reason: '独立检查通过', candidateId: 'c1', candidateRunId: null, isSkillCandidate: false, ...patch })
+
+test('a v2 producer header uses the canonical task flow, never its legacy lifecycle status', () => {
+  const current = task({ stage: 'publish', status: 'passed' })
+  taskDetail = { task: { ...current, route: { flowVersion: 2 } } }
+  const flow = { version: 2, id: current.id, issueId: current.issueId, botId: 'bot', revision: 8,
+    stage: 'handoff', stages: ['implement', 'review', 'handoff'], review: null, acceptance: null, pullRequest: null }
+  const badge = () => renderToStaticMarkup(<AcceptanceStateBadge task={current} />)
+  publicFlow = { ...flow, needsYou: { kind: 'pr_review', since: '2026-11-05T00:00:00Z' } }
+  assert.match(badge(), />PR 待审</)
+  assert.doesNotMatch(badge(), />已合并</)
+  publicFlow = { ...flow, stage: 'completed', stages: [...flow.stages, 'completed'] }
+  assert.match(badge(), />已合并</)
+  publicFlow = { ...flow, stage: 'implement', needsYou: { kind: 'question', since: '2026-11-05T00:00:00Z' } }
+  assert.match(badge(), />在问你</)
+  publicFlow = undefined
+  assert.equal(badge(), '', 'an unread v2 flow cannot fall back to a contradictory legacy status')
+  taskDetail = undefined
+  assert.equal(badge(), '', 'an unread version cannot flash a legacy completion state')
+})
 
 test('loading reserves the row height with a skeleton', () => {
   swr.isLoading = true

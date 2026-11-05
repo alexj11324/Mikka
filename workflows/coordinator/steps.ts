@@ -11,6 +11,7 @@ import { FACTORY_QUESTION_INSTRUCTIONS } from '@/lib/factory/instructions'
 import { FACTORY_CHECK_RECOVERY_INSTRUCTIONS } from '@/lib/factory/check-recovery'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { FactoryError } from '@/lib/factory/contract'
+import { publicFactoryReceipt } from '@/lib/factory/public-receipt'
 import { preserveMessageSources } from '@/lib/coordinator/message-safety'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { personalMailboxInstructions } from '@/lib/personal-mailbox-instructions'
@@ -475,7 +476,7 @@ export async function getIssue(userId: string, input: { issueId: string }, scope
     status: issue.status, priority: issue.priority, body: tiptapToText(issue.content).slice(0, 8000),
     runs: runs.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
     thread: latest ? { runId: latest.id, status: latest.status, repository: latest.remoteUrl } : null,
-    ...(deploymentSwitch('factoryRouting') ? { factory: await (await import('@/lib/factory/server')).factoryForBot(botId).listForIssue(userId,issue.id) } : {}),
+    ...(deploymentSwitch('factoryRouting') ? { factory: await (await import('@/lib/factory/server')).factoryForBot(botId).listPublicForIssue(userId,issue.id) } : {}),
   }
 }
 
@@ -1026,7 +1027,7 @@ export async function intakeFactoryRequest(userId: string, input: import('@/lib/
     return intakeRequest(input, {
       source:id=>factoryRequestSource(userId,botId,id),
       create:async(body,key)=>(await import('@/lib/mcp/actions')).createIssue(userId,body,systemActor(botId),key),
-      route:route=>store.route(userId,route),
+      route:async route=>publicFactoryReceipt(await store.route(userId,route)),
     })
   })
 }
@@ -1038,30 +1039,30 @@ export async function listFactoryRequestsScoped(userId:string,scope?:NativeToolS
 export async function readFactoryTask(userId:string,taskId:string,scope?:NativeToolScope,botId:string|null=null) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async()=> (await import('@/lib/factory/server')).factoryForBot(botId).read(userId,taskId))
+  return asToolResult(async()=> (await import('@/lib/factory/public-task')).readFactoryTaskView(pool, (await import('@/lib/factory/server')).factoryForBot(botId), userId, taskId))
 }
 export async function resolveFactoryTaskScoped(userId:string,input: import('@/lib/factory/intake').ResolveInput,scope?:NativeToolScope,botId:string|null=null) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async()=> (await import('@/lib/factory/server')).factoryForBot(botId).apply(userId,input.binding,input.eventId,input.change))
+  return asToolResult(async()=> publicFactoryReceipt(await (await import('@/lib/factory/server')).factoryForBot(botId).apply(userId,input.binding,input.eventId,input.change)))
 }
 
 export async function stopFactoryTaskScoped(userId:string,input:import('@/lib/factory/intake').StopInput,scope?:NativeToolScope,botId:string|null=null) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async()=> (await import('@/lib/factory/server')).factoryForBot(botId).apply(userId,input.binding,input.eventId,{action:input.action,reason:input.reason}))
+  return asToolResult(async()=> publicFactoryReceipt(await (await import('@/lib/factory/server')).factoryForBot(botId).apply(userId,input.binding,input.eventId,{action:input.action,reason:input.reason})))
 }
 
 export async function dispatchFactoryTask(userId:string,input:import('@/lib/factory/dispatch').FactoryDispatchInput,scope?:NativeToolScope,botId:string|null=null) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).dispatch(userId,input))
+  return asToolResult(async()=> publicFactoryReceipt(await (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).dispatch(userId,input)))
 }
 export async function recoverFactoryCheck(userId:string,input:import('@/lib/factory/check-recovery').FactoryCheckRecoveryInput,sdkToolCallId:string,scope?:NativeToolScope,botId:string|null=null) {
   'use step'
   await assertNativeToolScope(userId,scope)
   if (!issueMutationsEnabled()) return {error:'issue_mutations_unavailable'}
-  return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).recoverCheck(userId,input,sdkToolCallId))
+  return asToolResult(async()=> publicFactoryReceipt(await (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).recoverCheck(userId,input,sdkToolCallId)))
 }
 export async function listFactoryQuestionsScoped(userId:string,taskId:string,scope?:NativeToolScope,botId:string|null=null) {
   'use step'

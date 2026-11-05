@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { gzipSync } from 'node:zlib'
 import test from 'node:test'
 import { Client, type QueryResult } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
@@ -207,5 +208,132 @@ test('team link reads page through all authorized pairs and retain explicit-id s
     await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=ANY($1::uuid[])', [[workspace, otherWorkspace]])
     await pool.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [[workspace, otherWorkspace]])
     await pool.query('DELETE FROM "user" WHERE id=$1', [owner])
+  }
+})
+
+
+test('thread identity reads keep owner-only, live membership and checkpoint behavior with bounded fields', { skip: !enabled }, async t => {
+  const { pool, db } = await import('../lib/db')
+  const { and, eq, isNull, sql } = await import('drizzle-orm')
+  const { agentRuns, agents, users } = await import('../lib/db/schema')
+  const { runBotName, runBotId } = await import('../lib/run-bot-name')
+  const { findThreadIssue, getThreadChanges } = await import('../app/actions/agents')
+  const owner = 'thread-identity-' + randomUUID(), peer = 'thread-peer-' + randomUUID(), outsider = 'thread-outsider-' + randomUUID()
+  const workspace = randomUUID(), team = randomUUID(), issue = randomUUID(), bot = randomUUID()
+  const agent = randomUUID(), peerAgent = randomUUID()
+  const linked = randomUUID(), peerRun = randomUUID(), solo = randomUUID(), botRun = randomUUID()
+  const runIds = [linked, peerRun, solo, botRun]
+  const filler = 'private payload '.repeat(600)
+  const find = (userId: string, runId: string) => withActivitySession(userId, () => findThreadIssue(runId))
+  const changes = (userId: string, issueId: string | null, runId: string) => withActivitySession(userId, () => getThreadChanges(issueId, runId))
+  // The old row projection is measured on the same IDs, joins and limits as the
+  // real actions. These JSON result bytes are not PostgreSQL/Neon wire bytes.
+  const fullColumns = {
+    id: agentRuns.id, issueId: agentRuns.issueId, userId: agentRuns.userId, status: agentRuns.status, prompt: agentRuns.prompt,
+    sessionId: agentRuns.sessionId, deviceRepoId: agentRuns.deviceRepoId, report: agentRuns.report, error: agentRuns.error,
+    createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, agentName: runBotName, harness: agents.harness, ownerName: users.name,
+    stopRequestedAt: agentRuns.stopRequestedAt, outcome: agentRuns.outcome,
+    botColor: sql<string | null>`(select b.color from bots b where b.id=${runBotId})`,
+    botShape: sql<string | null>`(select b.shape from bots b where b.id=${runBotId})`,
+  }
+  const taskFreeColumns = {
+    botWorkspaceId: sql<string | null>`(select b."workspaceId" from bots b where b.id=${runBotId})`,
+    hasBot: sql<boolean>`${runBotId} is not null`,
+  }
+  try {
+    for (const user of [owner, peer, outsider]) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [user, user + '@example.invalid'])
+    await pool.query('INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES($1,$2,\'Thread identity\',\'team\')', [workspace, owner])
+    for (const user of [owner, peer]) await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'member\',\'active\')', [workspace, user, user + '@example.invalid'])
+    await pool.query('INSERT INTO mikka_teams(id,"workspaceId","userId",name,identifier) VALUES($1,$2,$3,\'Thread identity\',\'IDENTITY\')', [team, workspace, owner])
+    await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,\'Thread identity\',\'{}\',\'todo\',\'normal\',\'workspace\')', [issue, owner])
+    await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [issue, team, workspace, owner])
+    await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,\'Thread identity\')', [bot, owner, workspace])
+    await pool.query('INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,\'Read fixture\',\'codex\'),($3,$4,\'Peer fixture\',\'claude_code\')', [agent, owner, peerAgent, peer])
+    for (const [id, userId, issueId, agentId, botId] of [[linked, owner, issue, agent, null], [peerRun, peer, issue, peerAgent, null], [solo, owner, null, agent, null], [botRun, owner, null, agent, bot]]) {
+      await pool.query('INSERT INTO agent_runs(id,"userId","issueId","agentId","botId",status,prompt,report,error) VALUES($1,$2,$3,$4,$5,\'failed\',$6,$7,$8)', [id, userId, issueId, agentId, botId, 'Read identity\n' + filler, JSON.stringify({ summary: 'Read fixture', files: filler }), 'subscriptionQuotaReached\n' + filler])
+    }
+    await t.test('identity projections are bounded and every read has a fixed action source', async sub => {
+      const samples: { read: Read; route: string; taskFree: boolean; baselineBytes: number; scoped: boolean }[] = []
+      for (const [label, runId, issueId] of [['linked', linked, issue], ['no-bot', solo, null], ['bot', botRun, null]] as const) {
+        const baseline = await measured(() => db.select({ ...fullColumns, ...(issueId === null ? taskFreeColumns : {}) })
+          .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
+          .where(and(eq(agentRuns.id, runId), issueId === null ? isNull(agentRuns.issueId) : eq(agentRuns.issueId, issueId))).limit(1))
+        const located = await measured(() => find(owner, runId))
+        assert.deepEqual(located.value, { issueId })
+        const changed = await measured(() => changes(owner, issueId, runId))
+        assert.deepEqual(changed.value, { state: 'none' })
+        for (const [action, result] of [['find-issue', located], ['changes', changed]] as const) {
+          const selected = result.reads.find(read => read.text.includes('from "agent_runs" inner join "agents"'))
+          assert.ok(selected)
+          const route = '/actions/threads/' + action
+          assert.equal(result.reads.length, (label === 'linked' ? 9 : label === 'bot' ? 3 : 2) + (action === 'changes' ? 1 : 0), 'projection and source labels add no queries')
+          sub.diagnostic(JSON.stringify({ read: 'thread-' + action + '-' + label, beforeResultBytes: baseline.reads[0].bytes, resultBytes: selected.bytes,
+            selectQueries: result.reads.length, allResultBytes: result.reads.reduce((sum, read) => sum + read.bytes, 0), rowCount: selected.rows, fields: selected.fields }))
+          samples.push({ read: selected, route, taskFree: issueId === null, baselineBytes: baseline.reads[0].bytes, scoped: result.reads.every(read => read.route === route) })
+        }
+      }
+      for (const sample of samples) {
+        assert.ok(sample.scoped, 'all reads inherit the fixed source, including ACL and checkpoint queries')
+        assert.deepEqual(sample.read.fields, sample.taskFree ? ['id', 'userId', 'workspaceId', '?column?'] : ['id', 'userId'])
+        assert.equal(sample.read.rows, 1)
+        assert.ok(sample.read.bytes < 200 && sample.read.bytes < sample.baselineBytes / 100, 'authorization does not fetch prompt, report, errors or display fields')
+        assert.ok(/limit \$\d+$/.test(sample.read.text), 'the run projection remains limited to one row')
+      }
+    })
+    await t.test('both actions preserve owner, peer, missing and null-issue boundaries', async () => {
+      assert.deepEqual(await find(peer, peerRun), { issueId: issue })
+      assert.deepEqual(await changes(peer, issue, peerRun), { state: 'none' })
+      for (const [userId, runId, issueId] of [[peer, linked, issue], [owner, peerRun, issue], [peer, solo, null], [peer, botRun, null]] as const) {
+        assert.equal(await find(userId, runId), null)
+        const denied = await measured(() => assert.rejects(changes(userId, issueId, runId), { code: 'runNotFound' }))
+        assert.ok(denied.reads.every(read => !read.text.includes('FROM run_checkpoints')), 'denied readers never reach checkpoint content')
+      }
+      assert.equal(await find(outsider, linked), null)
+      await assert.rejects(changes(outsider, issue, linked), { code: 'issueNotFound' })
+      await assert.rejects(changes(owner, null, linked), { code: 'runNotFound' })
+      await assert.rejects(changes(owner, issue, solo), { code: 'runNotFound' })
+      const invalid = await measured(() => find(owner, 'not-a-uuid'))
+      assert.equal(invalid.value, null); assert.equal(invalid.reads.length, 0)
+      assert.equal(await find(owner, randomUUID()), null)
+      await assert.rejects(changes(owner, null, 'not-a-uuid'), { code: 'runNotFound' })
+      await assert.rejects(changes(owner, null, randomUUID()), { code: 'runNotFound' })
+    })
+    await t.test('the changes result still returns valid checkpoints and rejects unreadable gzip', async () => {
+      const patch = 'diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-before\n+after\n'
+      await pool.query('INSERT INTO run_checkpoints("runId","userId","baseCommit",patch,files,"takenAt") VALUES($1,$2,$3,$4,1,now())', [linked, owner, 'a'.repeat(40), gzipSync(patch)])
+      const result = await changes(owner, issue, linked)
+      assert.equal(result.state, 'ready')
+      if (result.state !== 'ready') assert.fail('the valid checkpoint is readable')
+      assert.equal(result.changes.files[0].path, 'README.md')
+      await pool.query('UPDATE run_checkpoints SET "unavailableReason"=\'too_large\' WHERE "runId"=$1', [linked])
+      assert.deepEqual(await changes(owner, issue, linked), { state: 'tooLarge' })
+      await pool.query('UPDATE run_checkpoints SET "unavailableReason"=NULL,patch=$2 WHERE "runId"=$1', [linked, Buffer.from('not gzip')])
+      assert.deepEqual(await changes(owner, issue, linked), { state: 'tooLarge' })
+    })
+    await t.test('suspension and removal are read afresh, including Bot threads without an issue', async () => {
+      for (const status of ['suspended', 'removed']) {
+        await pool.query('UPDATE mikka_workspace_members SET status=$3 WHERE "workspaceId"=$1 AND "userId"=$2', [workspace, owner, status])
+        assert.equal(await find(owner, linked), null)
+        await assert.rejects(changes(owner, issue, linked), { code: 'runNotFound' })
+        assert.equal(await find(owner, botRun), null)
+        await assert.rejects(changes(owner, null, botRun), { code: 'runNotFound' })
+        assert.deepEqual(await find(owner, solo), { issueId: null }, 'a task-free thread with no Bot remains private to its owner')
+        assert.deepEqual(await changes(owner, null, solo), { state: 'none' })
+      }
+      await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspace, owner])
+      assert.deepEqual(await find(owner, linked), { issueId: issue })
+      assert.deepEqual(await find(owner, botRun), { issueId: null })
+      assert.deepEqual(await changes(owner, null, botRun), { state: 'none' })
+    })
+  } finally {
+    await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[]) AND "userId"=ANY($2::text[])', [runIds, [owner, peer]])
+    await pool.query('DELETE FROM agents WHERE id=ANY($1::uuid[])', [[agent, peerAgent]])
+    await pool.query('DELETE FROM bots WHERE id=$1 AND "ownerId"=$2', [bot, owner])
+    await pool.query('DELETE FROM mikka_team_issues WHERE "issueId"=$1', [issue])
+    await pool.query('DELETE FROM mikka_teams WHERE id=$1', [team])
+    await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [workspace])
+    await pool.query('DELETE FROM mikka_workspaces WHERE id=$1', [workspace])
+    await pool.query('DELETE FROM issues WHERE id=$1', [issue])
+    await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer, outsider]])
   }
 })

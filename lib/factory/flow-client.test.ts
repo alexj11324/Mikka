@@ -48,10 +48,35 @@ test('a model refusal keeps its code and detail for the copy and 详情', () => 
   assert.equal(approveSpecErrorKey(quota), 'profileModel.quota')
   assert.equal(approveSpecErrorCode(quota), 'agentProfileModelUnavailable · quota')
   assert.equal(approveSpecErrorKey(approveSpecError('agentProfileModelUnavailable', 409, 'not-a-detail')), 'profileModel.default')
-  assert.equal(approveSpecErrorKey(approveSpecError('agentProfileDisabled', 409)), 'profile')
+  assert.equal(approveSpecErrorKey(approveSpecError('agentProfileDisabled', 409)), 'profileDisabled')
   assert.equal(approveSpecErrorCode(approveSpecError('agentProfileDisabled', 409)), 'agentProfileDisabled')
   assert.equal(approveSpecErrorCode(approveSpecError('factoryStale', 409)), null)
   assert.equal(approveSpecErrorCode(approveSpecError(null, null)), null)
+})
+
+test('each reachable Profile state and Decision refusal has its own copy without changing click semantics', () => {
+  for (const [code, key] of [
+    ['agentProfileUnavailable', 'profile'],
+    ['agentProfileDisabled', 'profileDisabled'],
+    ['agentProfileArchived', 'profileArchived'],
+    ['agentProfileVersionConflict', 'profileVersionConflict'],
+  ]) {
+    const failure = approveSpecError(code, 409)
+    assert.deepEqual(failure, { kind: 'profile', code, detail: null })
+    assert.equal(approveSpecErrorKey(failure), key)
+    assert.equal(approveSpecErrorCode(failure), code)
+  }
+  for (const detail of ['decision_unavailable', 'no_suitable_profile', 'invalid_profile_answer', 'unknown_profile', 'uncertain_profile', 'invalid_reason']) {
+    const failure = approveSpecError('agentProfileDecisionUnavailable', 409, detail)
+    assert.deepEqual(failure, { kind: 'profile', code: 'agentProfileDecisionUnavailable', detail })
+    assert.equal(approveSpecErrorKey(failure), 'profileDecision.' + detail)
+    assert.equal(approveSpecErrorCode(failure), 'agentProfileDecisionUnavailable · ' + detail)
+  }
+  // A future code/detail keeps the existing Profile fallback, never guessed copy.
+  assert.equal(approveSpecErrorKey(approveSpecError('agentProfileFuture', 409)), 'profile')
+  assert.equal(approveSpecErrorKey(approveSpecError('agentProfileDecisionUnavailable', 409)), 'profile')
+  assert.equal(approveSpecErrorKey(approveSpecError('agentProfileDecisionUnavailable', 409, 'future_detail')), 'profile')
+  assert.equal(approveSpecErrorKey(approveSpecError('agentProfileDisabled', 503)), 'unknown')
 })
 
 test('the receipt must name this task and the implementation stage', () => {

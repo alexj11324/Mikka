@@ -14,7 +14,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptance-state'
 import { visibleAcceptance } from '@/lib/factory/acceptance-view'
 import { FactoryAcceptancePane, request, useAcceptance, type FactoryTask } from './factory-acceptance-pane'
-import { FactoryFlowCard, isFlowV2, useFactoryTaskDetail } from './factory-flow'
+import { FactoryFlowBadge, FactoryFlowCard, isFlowV2, useFactoryTaskDetail } from './factory-flow'
 
 export type { FactoryTask } from './factory-acceptance-pane'
 
@@ -41,7 +41,9 @@ export function useThreadAcceptance(issueId: string | null, runId: string) {
 /** The state chip next to a thread's name (等你验收, 已批准 …), from the same ledger as the pane. */
 export function AcceptanceStateBadge({ task }: { task: FactoryTask }) {
   const t = useTranslations('FactoryAcceptance')
-  const { derived, check } = useAcceptance(task)
+  const { derived, check, detailLoaded, v2, flow } = useAcceptance(task)
+  if (!detailLoaded) return null
+  if (v2) return flow ? <FactoryFlowBadge flow={flow} /> : null
   if (check) return <Badge variant="outline" tone={check.status === 'failed' || check.status === 'blocked' ? 'destructive' : check.status === 'pending' ? 'warning' : 'info'} className="shrink-0">{check.status === 'blocked' && <CircleAlert aria-hidden="true" />}{t(`checkState.${check.stage}.${check.status}`)}</Badge>
   return derived ? <Badge variant="outline" tone={tone(derived.state)} className="shrink-0">{derived.refusal ? t('cannotMerge') : t(acceptanceStateKey(derived.state, task.isSkillCandidate))}</Badge> : null
 }
@@ -84,7 +86,7 @@ function FactoryFlowEntry({ task, onOpenThread }: { task: FactoryTask; onOpenThr
 /** An older task's acceptance row; a v2 task has its own block instead. */
 function LegacyAcceptanceEntry({ task, onOpen }: { task: FactoryTask; onOpen: () => void }) {
   const { data: detail } = useFactoryTaskDetail(task.id)
-  return isFlowV2(detail) ? null : <FactoryAcceptanceRow task={task} onOpen={onOpen} />
+  return !detail || isFlowV2(detail) ? null : <FactoryAcceptanceRow task={task} onOpen={onOpen} />
 }
 
 /**

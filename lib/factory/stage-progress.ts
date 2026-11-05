@@ -22,8 +22,9 @@ export async function syncFactoryPresentation(tx: PoolClient, task: FactoryTask)
   const { rows: [bot] } = await tx.query<{ name: string; locale: string }>(`SELECT left(b.name,200) AS name,COALESCE(s.locale,'zh-CN') AS locale FROM bots b
     LEFT JOIN attention_settings s ON s."userId"=$2 WHERE b.id=$1 AND b."ownerId"=$2 LIMIT 1`,[task.botId,task.userId]);
   if (!bot) return;
-  const copy = (bot.locale === 'en' ? englishMessages : chineseMessages).FactoryFlow;
-  let body = copy.stages[flow.stage];
+  const messages = bot.locale === 'en' ? englishMessages : chineseMessages;
+  const copy = messages.FactoryFlow;
+  let body = flow.stage === 'completed' && flow.completion === 'accepted' ? messages.FactoryAcceptance.state.accepted : copy.stages[flow.stage];
   if (flow.needsYou?.kind === 'spec_review') body = copy.specReady;
   else if (flow.needsYou?.kind === 'question') body = copy.questionReady;
   else if (flow.needsYou?.kind === 'blocked' || flow.needsYou?.kind === 'failed') body = copy[flow.needsYou.kind].replace('{reason}', () => redactFactoryCheckText(task.reason).slice(0,500));

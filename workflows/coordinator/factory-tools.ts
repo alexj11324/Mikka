@@ -19,11 +19,11 @@ create_issue_from_request: tool({
       execute: input => steps.createIssueFromRequestStep(userId, input, scope),
     }),
 route_factory_task: tool({
-      description: 'Persist routing for the request and issue. Clear authorized work starts execute. Record only material missing information/permissions; spec is optional.',
+      description: 'Persist routing for the request and issue. Clear authorized work starts implementation. Record only material missing information/permissions; spec is optional. V2 returns an operation binding; get_factory_task reads current stage and needsYou.',
       inputSchema: routeSchema.omit({ eventId: true }), execute: ( input) => steps.routeFactoryTask(userId, input, scope),
     }),
 get_factory_task: tool({
-      description: 'Read durable routing, current binding, reasons, runs, attempts, candidate and evidence.',
+      description: 'Read the task, current operation binding, reasons, candidates and retained execution evidence. V2 exposes one public stage with optional needsYou and bounded clarification context; use binding for controls. Older tasks keep their legacy contract.',
       inputSchema: z.object({ taskId: id }), execute: ( input) => steps.getFactoryTask(userId, input, scope),
     }),
 list_factory_questions: tool({

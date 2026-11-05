@@ -86,12 +86,23 @@ it('permits the advertised fixed artifact reader without a repository-switch gra
   expect((await output(session)).first).toEqual({ action: 'accept', content: {} })
 })
 
-it.each(['implement', 'fix'] as const)('permits the advertised artifact reader in a read-only %s execution', async kind => {
+it.each(['implement', 'fix', 'plan'] as const)('permits the advertised artifact reader in a read-only %s execution', async kind => {
   const cwd = await makeRepo(), gate = new ToolApprovalGate('run-1', { isLive: () => true })
   const session = await adapter().start({ runId: 'run-1', kind, cwd, prompt: 'MIKKA_ARTIFACT_ELICITATION_TEST',
     policy: { ...defaultRunPolicy(), readOnly: true },
     env: { PATH: process.env.PATH ?? '' }, log: createLogger(), toolApproval: gate })
   expect((await output(session)).first).toEqual({ action: 'accept', content: {} })
+})
+
+it.each([true, false])('only permits the host repository reader when a plan advertises it (read-only: %s)', async readOnly => {
+  const cwd = await makeRepo(), gate = new ToolApprovalGate('run-1', { isLive: () => true })
+  const session = await adapter().start({ runId: 'run-1', kind: 'plan', cwd, prompt: 'MIKKA_REPOSITORY_INSPECT_ELICITATION_TEST',
+    policy: { ...defaultRunPolicy(), readOnly },
+    env: { PATH: process.env.PATH ?? '' }, log: createLogger(), toolApproval: gate })
+  const result = await output(session)
+  expect(result.first).toEqual(readOnly ? { action: 'accept', content: {} } : { action: 'decline' })
+  if (readOnly) expect(result.shellTool).toBe('features.shell_tool=false')
+  for (const name of ['foreignThread', 'foreignTurn', 'unknownServer', 'replay', 'afterCompletion']) expect(result[name]).toEqual({ action: 'decline' })
 })
 
 it('refuses an unregistered Mikka tool', async () => {

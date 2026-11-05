@@ -67,15 +67,49 @@ test('a pin or mute change pushes its bot chat keys to the owner home, after the
 
     await t.test('the owner home gets the bot list key and the chat key; the team and its other member get nothing', async () => {
       sent.length = 0
-      assert.equal(await scope.run(() => setChatPreference('owner', bot, { pinned: true })), true)
+      assert.equal(await scope.run(() => setChatPreference('owner', bot, { pinned: true })), 'ok')
       await drain()
       assert.deepEqual(sent, [{ scope: { ownerId: 'owner', workspaceId: home }, events: [{ kind: 'bot_chat_list', id: home }, { kind: 'bot_chat', id: bot }] }])
       assert.equal((await scope.run(() => chatPreferences('owner')))[bot]?.pinned, true, 'the write itself is unchanged')
     })
 
+    const { setGroupPreference, setChatOrder, MAX_PINNED_CHATS } = await import('../chat-preferences')
+    const group = randomUUID()
+    await database.query(`INSERT INTO conversations(id,"workspaceId",kind,title,"createdBy") VALUES($1,$2,'group','Launch','owner')`, [group, team])
+    await database.query(`INSERT INTO conversation_members("conversationId","memberType","memberId",role) VALUES($1,'user','owner','owner')`, [group])
+
+    await t.test('a group chat the person is in takes pin, hide and mark; one they are not in takes nothing', async () => {
+      assert.equal(await scope.run(() => setGroupPreference('owner', group, { hidden: true, markedUnread: true })), 'ok')
+      const mine = (await scope.run(() => chatPreferences('owner')))[group]
+      assert.deepEqual({ hidden: mine?.hidden, markedUnread: mine?.markedUnread, pinned: mine?.pinned }, { hidden: true, markedUnread: true, pinned: false })
+      assert.equal(await scope.run(() => setGroupPreference('peer', group, { hidden: true })), 'notFound')
+      await drain()
+    })
+
+    await t.test('a drag sets the pins and the list in order; a chat moved to the list is unpinned', async () => {
+      assert.equal(await scope.run(() => setChatOrder('owner', { pinned: [group, bot], list: [] })), 'ok')
+      let mine = await scope.run(() => chatPreferences('owner'))
+      assert.deepEqual([mine[group]?.pinOrder, mine[bot]?.pinOrder, mine[group]?.pinned], [1, 2, true])
+      assert.equal(await scope.run(() => setChatOrder('owner', { pinned: [bot], list: [group] })), 'ok')
+      mine = await scope.run(() => chatPreferences('owner'))
+      assert.deepEqual([mine[group]?.pinned, mine[group]?.listOrder, mine[bot]?.pinOrder], [false, 1, 1])
+      assert.equal(await scope.run(() => setChatOrder('peer', { pinned: [bot], list: [] })), 'notFound', 'another person’s bot is refused whole')
+      await drain()
+    })
+
+    await t.test('pinning past the limit is refused', async () => {
+      const extra = Array.from({ length: MAX_PINNED_CHATS }, () => randomUUID())
+      for (const id of extra) await database.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,$3)`, [id, team, `Extra ${id.slice(0, 8)}`])
+      assert.equal(await scope.run(() => setChatOrder('owner', { pinned: extra, list: [bot, group] })), 'ok')
+      assert.equal(await scope.run(() => setChatPreference('owner', bot, { pinned: true })), 'pinLimit')
+      assert.equal(await scope.run(() => setGroupPreference('owner', group, { pinned: true })), 'pinLimit')
+      assert.equal(await scope.run(() => setChatPreference('owner', extra[0]!, { pinned: true })), 'ok', 'a chat already pinned can be set again')
+      await drain()
+    })
+
     await t.test('a bot that is not the caller’s writes and pushes nothing', async () => {
       sent.length = 0
-      assert.equal(await scope.run(() => setChatPreference('peer', bot, { muted: true })), false)
+      assert.equal(await scope.run(() => setChatPreference('peer', bot, { muted: true })), 'notFound')
       await drain()
       assert.deepEqual(sent, [])
       assert.deepEqual(unexpected, [])
