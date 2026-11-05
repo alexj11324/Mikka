@@ -1,0 +1,14 @@
+{
+  "finishedAt": "2026-11-05T12:32:56.272087+00:00",
+  "role": "mikka1284_http_81784d09",
+  "database": "mikka1284_http_81784d09_e2e",
+  "connectionsBeforeDrop": 0,
+  "activeTestAccountLeases": 0,
+  "validSessions": 0,
+  "remainingDatabase": 0,
+  "remainingRole": 0,
+  "force": false,
+  "terminatedOtherSessions": false,
+  "clusterStopped": false,
+  "privateAuditContextRetainedInsideDocker": true
+}

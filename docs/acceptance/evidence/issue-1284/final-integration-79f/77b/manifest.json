@@ -1,0 +1,36 @@
+{
+  "sourceCommit": "77bba5ab7da80afd34705b02ae5e808a0a104988",
+  "sourceTree": "1eb94954f892c632de652071283bfd30a6606add",
+  "files": [
+    {
+      "file": "receipt.json",
+      "bytes": 3166,
+      "sha256": "494c87a3ef62cf5f89a8fc0f021da934e0c0f222b28afa4b52d69efe09d2d3ec"
+    },
+    {
+      "file": "http-61.json",
+      "bytes": 11584,
+      "sha256": "56f003e4f6f5367bda8b34826ead3b92d2a1cd98e201b9b08360c2dcd871be4f"
+    },
+    {
+      "file": "http-attempt1-60-incomplete.json",
+      "bytes": 11529,
+      "sha256": "755186baf41869f5cdf80ca3c7bb14235afb366cec467d6f04c04469468ae24d"
+    },
+    {
+      "file": "database-cleanup.json",
+      "bytes": 787,
+      "sha256": "f0a9c0ab7e7073f6e9540f751755b9b386525c79479a0ae25f574d860f63c488"
+    },
+    {
+      "file": "preview-stop.json",
+      "bytes": 523,
+      "sha256": "58f1aba7862ceb4c249a9a63b4961ec153bfd79f4925c9ec753f67212ca46535"
+    },
+    {
+      "file": "source-integrity.json",
+      "bytes": 5166,
+      "sha256": "c9714dbc01b7e9b9ee0f021d2e67d1f854224654ecd0887b2282ad6fec0ebfe4"
+    }
+  ]
+}

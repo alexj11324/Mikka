@@ -1,0 +1,15 @@
+{
+  "kind": "capture-navigation-preparation-fix",
+  "beforeSha256": "cbd76b87933930f31e8c9f49137002ac4376e24a4f4690d7f489cc4b14305110",
+  "afterSha256": "a9e1c4ca98404bc817e26f040fdaedef2f0417a33653b6809321e3b4a512dd1a",
+  "bytes": 7110,
+  "changes": [
+    "Use exact77b sectionFromQuery accepted section=all-issues; section=all falls back to Coordinator.",
+    "Use actual issue-workspace new-task button localization key Nav.newTask."
+  ],
+  "sourceCommit": "77bba5ab7da80afd34705b02ae5e808a0a104988",
+  "productChanged": false,
+  "priorCaptureCount": 0,
+  "priorHttpExecuted": 60,
+  "priorHttpOverallPassed": false
+}

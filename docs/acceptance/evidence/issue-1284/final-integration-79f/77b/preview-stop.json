@@ -1,0 +1,15 @@
+{
+  "kind": "isolated-preview-stopped",
+  "sourceCommit": "77bba5ab7da80afd34705b02ae5e808a0a104988",
+  "sourceTree": "1eb94954f892c632de652071283bfd30a6606add",
+  "observedAt": "2026-11-05T12:15:04.514599+00:00",
+  "controllerPid": 10788,
+  "controllerRunning": false,
+  "appPid": 11454,
+  "appRunning": false,
+  "port3110Open": false,
+  "signal": "SIGTERM to own controller only",
+  "buildLogSha256": "418bea224b4f55f3719363f6258e04c99007df28cfab92580bec9e1b22b0be0e",
+  "sourceStillExact": true,
+  "sourceClean": true
+}

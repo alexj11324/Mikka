@@ -1,0 +1,233 @@
+{
+  "schemaVersion": 1,
+  "kind": "independent-profile-picker-visual-review",
+  "reviewer": "ui_impl",
+  "reviewedAt": "2026-11-05T12:15:41.448845+00:00",
+  "sourceCommit": "77bba5ab7da80afd34705b02ae5e808a0a104988",
+  "sourceTree": "1eb94954f892c632de652071283bfd30a6606add",
+  "buildId": "6khbR_bFUG8dOorWkPYOq",
+  "captureWindow": {
+    "startedAt": "2026-11-05T12:11:17.599Z",
+    "finishedAt": "2026-11-05T12:11:34.406Z"
+  },
+  "sourceBinding": "The source/build binding comes from the unchanged capture receipt. Images remain labelled as captured on 77b; no later-head capture is claimed.",
+  "inputs": [
+    {
+      "filename": "manifest.json",
+      "sha256": "792aa0751c2b986ebac13508343f954a8cc853f324c4b5f7fc00e2528b7ddb5f"
+    },
+    {
+      "filename": "capture-receipt.json",
+      "sha256": "b8a9b50f8b566cb72682d4503858211a6518a2f89f42cfad90134899fe84e3f5"
+    }
+  ],
+  "method": "Independently opened and visually inspected all eight exported original PNGs. Read capture metadata separately and verified each PNG SHA256, byte length and IHDR dimensions against both receipts. No image editing, browser interaction, Docker access, product changes or production actions.",
+  "summary": {
+    "imagesViewed": 8,
+    "blockingVisualFindings": 0,
+    "result": "no_blocking_visual_issue_found_in_reviewed_states",
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "viewports": [
+      {
+        "width": 1440,
+        "height": 1000
+      },
+      {
+        "width": 390,
+        "height": 844
+      }
+    ],
+    "states": [
+      "selected checking",
+      "availability menu"
+    ]
+  },
+  "images": [
+    {
+      "filename": "77bba5ab7da8-profile-picker-selected-light-1440.png",
+      "sha256": "bc017f0f8ad69c95c45b89740c1ac714c8e35e4aecc7f29b5d2ca32a66337c43",
+      "bytes": 95232,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "state": "selected",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_issue_found",
+      "observations": [
+        "The selected checking Profile name is visible in the trigger.",
+        "The notice 模型额度待检查 uses neutral muted text, without a destructive alert.",
+        "The blue 创建任务 button and close control are fully visible.",
+        "The synthetic draft remains readable inside the dialog.",
+        "At 1440 px, machine and Profile controls, title, and close control remain separated without overlap."
+      ]
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-menu-light-1440.png",
+      "sha256": "a5782b9e8ad6dd5e49f1e3699fb3360b6a4c7bf5f11fca6c96e9ff350fcb7583",
+      "bytes": 118479,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "state": "menu",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_issue_found",
+      "observations": [
+        "The checking Profile is the selected row with a visible checkmark and normal foreground text.",
+        "The disabled and confirmed-unavailable rows are visibly muted; their reasons are shown separately as 已停用 and 没有可用的优先模型.",
+        "The built-in default checking reason and 管理 Agent 配置 footer are visible.",
+        "All menu rows and the menu boundary fit inside the viewport.",
+        "At 1440 px, machine and Profile controls, title, and close control remain separated without overlap."
+      ]
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-selected-dark-1440.png",
+      "sha256": "ba94a11e5ddfd9c3c0da3d501cf36c284ce161f909da3a149733da388212f53d",
+      "bytes": 95522,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "state": "selected",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_issue_found",
+      "observations": [
+        "The selected checking Profile name is visible in the trigger.",
+        "The notice 模型额度待检查 uses neutral muted text, without a destructive alert.",
+        "The blue 创建任务 button and close control are fully visible.",
+        "The synthetic draft remains readable inside the dialog.",
+        "At 1440 px, machine and Profile controls, title, and close control remain separated without overlap."
+      ]
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-menu-dark-1440.png",
+      "sha256": "db97969cc2a477a205de6167bb5566b180353cd78efdc74d9993306881a18e59",
+      "bytes": 117928,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "state": "menu",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_issue_found",
+      "observations": [
+        "The checking Profile is the selected row with a visible checkmark and normal foreground text.",
+        "The disabled and confirmed-unavailable rows are visibly muted; their reasons are shown separately as 已停用 and 没有可用的优先模型.",
+        "The built-in default checking reason and 管理 Agent 配置 footer are visible.",
+        "All menu rows and the menu boundary fit inside the viewport.",
+        "At 1440 px, machine and Profile controls, title, and close control remain separated without overlap."
+      ]
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-selected-light-390.png",
+      "sha256": "91dd0467960f3f35ecced3e8701fe2d28d5fa02e31bb9d5b1854668e65e6bbb8",
+      "bytes": 46348,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "selected",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_issue_found",
+      "observations": [
+        "The selected checking Profile name is visible in the trigger.",
+        "The notice 模型额度待检查 uses neutral muted text, without a destructive alert.",
+        "The blue 创建任务 button and close control are fully visible.",
+        "The synthetic draft remains readable inside the dialog.",
+        "At 390 px, the machine control occupies its own row; Profile control and 新建任务 title wrap to the next row without overlapping the close control.",
+        "No dialog or menu edge is clipped horizontally."
+      ]
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-menu-light-390.png",
+      "sha256": "fa1f2a91a502d26624aa068aff9cae4b5cef56a19c350e75354157cb3e23aeac",
+      "bytes": 58130,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "menu",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_issue_found",
+      "observations": [
+        "The checking Profile is the selected row with a visible checkmark and normal foreground text.",
+        "The disabled and confirmed-unavailable rows are visibly muted; their reasons are shown separately as 已停用 and 没有可用的优先模型.",
+        "The built-in default checking reason and 管理 Agent 配置 footer are visible.",
+        "All menu rows and the menu boundary fit inside the viewport.",
+        "At 390 px, the machine control occupies its own row; Profile control and 新建任务 title wrap to the next row without overlapping the close control.",
+        "No dialog or menu edge is clipped horizontally.",
+        "The open popup normally overlays part of the draft and creation button. The paired closed-menu screenshot shows the complete button; this is overlay occlusion, not viewport clipping."
+      ]
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-selected-dark-390.png",
+      "sha256": "5348b05609ee65907e92d6d54dc4ebf73f0cf949f336f7959e8053c33985da90",
+      "bytes": 46504,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "selected",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_issue_found",
+      "observations": [
+        "The selected checking Profile name is visible in the trigger.",
+        "The notice 模型额度待检查 uses neutral muted text, without a destructive alert.",
+        "The blue 创建任务 button and close control are fully visible.",
+        "The synthetic draft remains readable inside the dialog.",
+        "At 390 px, the machine control occupies its own row; Profile control and 新建任务 title wrap to the next row without overlapping the close control.",
+        "No dialog or menu edge is clipped horizontally."
+      ]
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-menu-dark-390.png",
+      "sha256": "4acd6b50bea0ec67a6f9263cd18695f9c2f20f23c208e45c30da627ed0c29dfc",
+      "bytes": 57629,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "menu",
+      "individuallyViewed": true,
+      "visualResult": "no_blocking_issue_found",
+      "observations": [
+        "The checking Profile is the selected row with a visible checkmark and normal foreground text.",
+        "The disabled and confirmed-unavailable rows are visibly muted; their reasons are shown separately as 已停用 and 没有可用的优先模型.",
+        "The built-in default checking reason and 管理 Agent 配置 footer are visible.",
+        "All menu rows and the menu boundary fit inside the viewport.",
+        "At 390 px, the machine control occupies its own row; Profile control and 新建任务 title wrap to the next row without overlapping the close control.",
+        "No dialog or menu edge is clipped horizontally.",
+        "The open popup normally overlays part of the draft and creation button. The paired closed-menu screenshot shows the complete button; this is overlay occlusion, not viewport clipping."
+      ]
+    }
+  ],
+  "captureObservationsNotInferredFromPixels": {
+    "provenance": "capture-receipt.json, recorded by the separate capture owner during normal-page interaction; not independently repeated by this visual reviewer",
+    "allSelectedStatesCreateButtonDisabled": false,
+    "allMenusCheckingAriaDisabled": null,
+    "allMenusConfirmedUnavailableAriaDisabled": "true",
+    "allMobileDocumentWidth": 390,
+    "allDesktopDocumentWidth": 1430,
+    "browserAndContextsClosed": true
+  },
+  "limits": [
+    "These are actual production-build Next pages under a normal isolated TestAccountPool session, with synthetic catalogue records; they are not production Owner or real subscription/model-execution evidence.",
+    "Static pixels establish the selected state, neutral notice, visual disabled treatment and layout only. They do not prove pointer/keyboard rejection, focus order, server authorization or successful dispatch. Recorded DOM observations are attributed separately above.",
+    "Create/Send was not clicked for these captures. The screenshots do not establish a new Run, native session, CC-to-Codex review, provider billing or in-flight Profile freeze.",
+    "No quantitative contrast measurement or screen-reader audit was performed. No layout obstruction was visible in the eight supplied states.",
+    "Earlier capture navigation/readiness failures remain separate historical evidence. This review covers only the final eight successful captures.",
+    "No claim is made that the images were captured on newer main or a later batch head. Reuse requires a separate source-dependency equivalence receipt."
+  ]
+}

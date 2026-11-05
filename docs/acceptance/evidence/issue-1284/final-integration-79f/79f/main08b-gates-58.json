@@ -1,0 +1,254 @@
+{
+  "schema": 1,
+  "purpose": "Targeted checks of the normal main08b merge; no product edits or repeated tests during collection.",
+  "source": {
+    "actualExecutionCommit": "46560cb0664e68492595655f249b26c4272a01cb",
+    "sameTreePublishedCommit": "79f56a4f3362067b22f1919af51ee1869f3bb86c",
+    "tree": "26cf764fb87bb7b6e549b4d421113626b8bc497e",
+    "orderedParents": [
+      "77bba5ab7da80afd34705b02ae5e808a0a104988",
+      "08b11f0d9c5a9273312267b6b21cb1b56d0624cc"
+    ],
+    "sourceDirtyAfter": false,
+    "worktree": "/workspace/Mikka-1284-main08b",
+    "versionBoundary": "Commands ran on local46560; public79f is verified to have the same tree and parents. They were not rerun or relabeled as executed on79f."
+  },
+  "environment": {
+    "platform": "Docker Cloud Sandbox",
+    "size": "Large, 8 CPUs / 16 GiB",
+    "database": "PostgreSQL17, synthetic owned loopback fixture database",
+    "CI": true,
+    "REQUIRE_DB": true,
+    "modelOrProviderCalls": "None; existing synthetic fixture boundaries only"
+  },
+  "startedAt": "2026-11-05T12:21:17.015164+00:00",
+  "finishedAt": "2026-11-05T12:21:31.172566+00:00",
+  "commands": [
+    {
+      "name": "schema",
+      "argv": [
+        "pnpm",
+        "test:e2e:setup"
+      ],
+      "startedAt": "2026-11-05T12:21:17.103349+00:00",
+      "finishedAt": "2026-11-05T12:21:19.309569+00:00",
+      "exitCode": 0,
+      "logPath": "/tmp/issue1284-main08b-gates-schema.log",
+      "logBytes": 18694,
+      "logSha256": "54068457aca118170bc3bedc248ced70a45286fe707d0f9d30943e07cf4ea757"
+    },
+    {
+      "name": "run-recovery-routes",
+      "argv": [
+        "pnpm",
+        "test:run-recovery"
+      ],
+      "startedAt": "2026-11-05T12:21:19.309929+00:00",
+      "finishedAt": "2026-11-05T12:21:20.286220+00:00",
+      "exitCode": 0,
+      "logPath": "/tmp/issue1284-main08b-gates-run-recovery-routes.log",
+      "logBytes": 2328,
+      "logSha256": "0e96ed5eaf2ee698dc66b549e945267775fff99206a0abfd4abd18dec305f097",
+      "counts": {
+        "tests": 13,
+        "pass": 13,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "suites": 0
+      }
+    },
+    {
+      "name": "due-timer",
+      "argv": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/due-timer.test.ts",
+        "workflows/due-timer/loop.test.ts"
+      ],
+      "startedAt": "2026-11-05T12:21:20.286482+00:00",
+      "finishedAt": "2026-11-05T12:21:20.615863+00:00",
+      "exitCode": 0,
+      "logPath": "/tmp/issue1284-main08b-gates-due-timer.log",
+      "logBytes": 1259,
+      "logSha256": "3658e29d12065a67fd5e754b2c023ab6b3c0ac3ab8745173022526e4a1dfa4c5",
+      "counts": {
+        "tests": 10,
+        "pass": 10,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "suites": 0
+      }
+    },
+    {
+      "name": "run-recovery-due-pg",
+      "argv": [
+        "node",
+        "--test-force-exit",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/run-recovery-due.db.test.ts"
+      ],
+      "startedAt": "2026-11-05T12:21:20.616132+00:00",
+      "finishedAt": "2026-11-05T12:21:21.958902+00:00",
+      "exitCode": 0,
+      "logPath": "/tmp/issue1284-main08b-gates-run-recovery-due-pg.log",
+      "logBytes": 1107,
+      "logSha256": "c07523811bdad39906bd8040d1faecb8de3134b4860eb8cc16d1acbb2bb7c967",
+      "counts": {
+        "tests": 10,
+        "pass": 10,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "suites": 0
+      }
+    },
+    {
+      "name": "queued-stop-pg",
+      "argv": [
+        "node",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/cloud-computer/thread-machine-stop.db.test.ts"
+      ],
+      "startedAt": "2026-11-05T12:21:21.959198+00:00",
+      "finishedAt": "2026-11-05T12:21:30.920957+00:00",
+      "exitCode": 0,
+      "logPath": "/tmp/issue1284-main08b-gates-queued-stop-pg.log",
+      "logBytes": 3304,
+      "logSha256": "fa7d96f739a8fa0a3d7282299e4d0792f6e3043f363a0493af8cd54f4bc97f7a",
+      "counts": {
+        "tests": 25,
+        "pass": 25,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "suites": 0
+      }
+    }
+  ],
+  "aggregate": {
+    "tests": 58,
+    "pass": 58,
+    "fail": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "unitTests": 23,
+    "postgresTests": 35
+  },
+  "staticChecks": [
+    {
+      "name": "install",
+      "log": "../evidence/install.log",
+      "bytes": 5353,
+      "sha256": "953156187e75604b85c5355897ce3dd279a10873a1dde91d93d0eace141c29e9",
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck",
+      "log": "../evidence/typecheck.log",
+      "bytes": 75,
+      "sha256": "3da6734a48b5b9d313568d12aa5ff40d03da8605215609220d8547dfc3ca2cd3",
+      "exitCode": 0
+    },
+    {
+      "name": "diff",
+      "log": "../evidence/diff.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    }
+  ],
+  "cleanup": {
+    "checkedAt": "2026-11-05T12:21:30.988341+00:00",
+    "sessionsBefore": 0,
+    "force": false,
+    "terminate": false,
+    "completedAt": "2026-11-05T12:21:31.083606+00:00",
+    "remainingDatabases": 0,
+    "remainingRole": 0,
+    "privateFileDeleted": true,
+    "ownedDatabasesAtCleanup": 1
+  },
+  "collectionVerification": {
+    "checkedAt": "2026-11-05T12:29:13.120117+00:00",
+    "logHashesReverified": true,
+    "sourceClean": true,
+    "protocolWorkspace": "/workspace/Mikka-1284-main08b/packages/protocol",
+    "cleanupDatabaseReadback": {
+      "remainingRole": 0,
+      "remainingAnchor": 0,
+      "remainingOwnedDatabases": 0,
+      "sessions": 0
+    },
+    "privateFileAbsent": true
+  },
+  "durableProcess": {
+    "name": "processes/proc-1793881276933161863-78",
+    "pid": 15403,
+    "createdAt": "2026-11-05T12:21:16Z",
+    "state": "exited",
+    "exitCode": 0
+  },
+  "originalDurableReceipt": {
+    "path": "/tmp/issue1284-main08b-gates.json",
+    "sha256": "87db027e11d8abb35fda1ab95ffee30b6271f26832dcd881c637d152127b377f",
+    "bytes": 4008,
+    "unchanged": true
+  },
+  "integrationProof": {
+    "path": "../evidence/parent-union.json",
+    "sha256": "f8d0b67c34c572fbec2fe99d8ebf07721232d578491356c1b17fb5b3cdd8dd8f",
+    "mainOnlyPreserved": 45,
+    "batchOnlyPreserved": 23,
+    "overlap": [
+      "package.json"
+    ],
+    "scriptUnion": {
+      "batch": [
+        "test:subscription-usability"
+      ],
+      "main": [
+        "test:account-db",
+        "test:audit-db",
+        "test:run-recovery",
+        "test:run-recovery-db",
+        "test:settings-backend"
+      ]
+    },
+    "unchangedUiAndRelatedDependencyBlobs": 600,
+    "dependencyLockUnchanged": true,
+    "screenshotBoundary": "Eight screenshots remain evidence from actual77b execution. The600 equal blobs establish limited UI/dependency reuse; this receipt does not relabel those screenshots or claim79f HTTP/build results."
+  },
+  "preservedPreparationFailures": [
+    {
+      "kind": "command preparation",
+      "exitCode": 128,
+      "cause": "First merge lacked per-command committer identity; no merge applied."
+    },
+    {
+      "kind": "command preparation",
+      "exitCode": 127,
+      "cause": "First preparation command used unavailable python; no commit, install, or tests ran before exit. Continued with python3 after checking the existing merge state."
+    }
+  ],
+  "complete": true,
+  "scopeLimits": [
+    "No additional tests were run while collecting this receipt.",
+    "The original ALEX66 claim cause remains unknown; these integration checks do not establish production recovery.",
+    "Final79f build, HTTP, CI and production acceptance are separately recorded by their owners."
+  ]
+}

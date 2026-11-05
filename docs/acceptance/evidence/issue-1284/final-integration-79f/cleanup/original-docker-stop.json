@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "sandbox": "sandboxes/sbx_001m6mcf2kr0phmx737s6js1e0r",
+  "platform": "Docker Agentic Platform",
+  "resources": {
+    "vCPU": 8,
+    "memoryGiB": 16
+  },
+  "ownedRuntimeTestCleanupCompletedAt": "2026-11-05T11:21:03.917838+00:00",
+  "cleanupReceipt": "runtime-stop-c717da52/receipt.json",
+  "postgresControlOutput": "17 main 5432 down",
+  "stopRequestAccepted": true,
+  "managementStateObserved": "stopped",
+  "managementObservationReadAt": "2026-11-05T11:36:46Z",
+  "observationKind": "read-only management GET; observation time is not an assertion of the platform transition timestamp",
+  "privateAuditContextsMigrated": false,
+  "sourceAndLogsCheckpointedBeforeStop": true,
+  "nextActiveSandbox": "sandboxes/sbx_001m6n9e6xhnqqg09ct1swwakwm",
+  "nextPurpose": "same-platform final merge checks, production build, normal isolated HTTP and screenshot acceptance",
+  "productionDatabaseTouched": false
+}

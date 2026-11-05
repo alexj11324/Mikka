@@ -1,0 +1,81 @@
+{
+  "kind": "normal-production-build-and-http-acceptance",
+  "sourceCommit": "77bba5ab7da80afd34705b02ae5e808a0a104988",
+  "sourceTree": "1eb94954f892c632de652071283bfd30a6606add",
+  "sourceDirty": false,
+  "origin": "http://localhost:3110",
+  "buildCommand": "pnpm build",
+  "buildStartedAt": "2026-11-05T11:51:32.721Z",
+  "buildFinishedAt": "2026-11-05T11:53:04.507Z",
+  "buildExitCode": 0,
+  "buildLogSha256": "418bea224b4f55f3719363f6258e04c99007df28cfab92580bec9e1b22b0be0e",
+  "serverReadyAt": "2026-11-05T11:53:08.144Z",
+  "strictAttestation": true,
+  "buildCount": 1,
+  "successfulHttpPrefix": "/tmp/issue1284-final-batch-r3-20261105",
+  "httpAssertions": 61,
+  "actualScreenshotCount": 8,
+  "screenshotSourceCommit": "77bba5ab7da80afd34705b02ae5e808a0a104988",
+  "firstAttempt": {
+    "httpExecuted": 60,
+    "httpPassed": 60,
+    "overallPassed": false,
+    "screenshots": 0,
+    "leaseReleased": true,
+    "validSessions": 0,
+    "preparationFailure": "Wrong section=all route; normal account hold expired after capture locator timeout. Preserved independently; not a product pass."
+  },
+  "capturePreparation": {
+    "secondLocatorFailure": "DOMContentLoaded preceded interactive board hydration; no dialog opened.",
+    "resolution": "Observed correct all-issues route and normal networkidle readiness opened dialog; placeholder and product unchanged.",
+    "productSourceModified": false,
+    "priorFailuresPreserved": true
+  },
+  "cleanup": {
+    "kind": "owned-isolated-postgres-cleanup",
+    "sourceCommit": "77bba5ab7da80afd34705b02ae5e808a0a104988",
+    "sourceTree": "1eb94954f892c632de652071283bfd30a6606add",
+    "finishedAt": "2026-11-05T12:15:58.546669+00:00",
+    "role": "mikka1284_http_1e48a459",
+    "databases": [
+      {
+        "database": "mikka1284_http_1e48a459_e2e",
+        "connectionsBeforeDrop": 0,
+        "activeTestAccountLeases": 0,
+        "validSessions": 0
+      },
+      {
+        "database": "mikka1284_http_1e48a459_final_e2e",
+        "connectionsBeforeDrop": 0,
+        "activeTestAccountLeases": 0,
+        "validSessions": 0
+      }
+    ],
+    "remainingOwnedDatabases": 0,
+    "remainingRole": 0,
+    "force": false,
+    "terminatedOtherSessions": false,
+    "clusterStopped": false,
+    "privateAuditContextsRetainedInsideDocker": true
+  },
+  "previewStop": {
+    "kind": "isolated-preview-stopped",
+    "sourceCommit": "77bba5ab7da80afd34705b02ae5e808a0a104988",
+    "sourceTree": "1eb94954f892c632de652071283bfd30a6606add",
+    "observedAt": "2026-11-05T12:15:04.514599+00:00",
+    "controllerPid": 10788,
+    "controllerRunning": false,
+    "appPid": 11454,
+    "appRunning": false,
+    "port3110Open": false,
+    "signal": "SIGTERM to own controller only",
+    "buildLogSha256": "418bea224b4f55f3719363f6258e04c99007df28cfab92580bec9e1b22b0be0e",
+    "sourceStillExact": true,
+    "sourceClean": true
+  },
+  "limits": [
+    "No real model, provider, or DeepSeek/API request was executed.",
+    "Screenshots use synthetic isolated subscription catalogue data and normal TestAccountPool sign-in.",
+    "These are Docker verification results; production subscription acceptance remains a separate task."
+  ]
+}

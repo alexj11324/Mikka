@@ -1,0 +1,146 @@
+{
+  "schema": 1,
+  "executionBaseCommit": "dbcd6214c49532ce233519e7e9fd21432ead1258",
+  "executionWorkingTree": "exact base plus one test-file adapter patch",
+  "patchSha256": "2fb3c5141fff68289c0ce94c17eccb58a776fe5cb4103ce582f59b7b5a37bc65",
+  "changedFile": "lib/run-control-actions.test.ts",
+  "startedAt": "2026-11-05T11:37:25.872860+00:00",
+  "commands": [
+    {
+      "name": "default",
+      "command": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/run-control-actions.test.ts",
+        "tests/thread-question-wake-actions.test.ts"
+      ],
+      "env": {
+        "CI": "true"
+      },
+      "startedAt": "2026-11-05T11:37:25.873017+00:00",
+      "log": "/tmp/issue1284-stop-fixture-dbcd-default.log",
+      "finishedAt": "2026-11-05T11:37:27.443670+00:00",
+      "exitCode": 0,
+      "logSha256": "e938dc60e6aa4ba61923cde7206c011713cd901e7a7a4c916fc84567243dfa81",
+      "counts": {
+        "tests": 33,
+        "pass": 33,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "name": "flags",
+      "command": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/run-control-actions.test.ts"
+      ],
+      "env": {
+        "CI": "true",
+        "MIKKA_FACTORY_ROUTING_ENABLED": "1",
+        "MIKKA_FACTORY_LIFECYCLE_ENABLED": "1"
+      },
+      "startedAt": "2026-11-05T11:37:27.444983+00:00",
+      "log": "/tmp/issue1284-stop-fixture-dbcd-flags.log",
+      "finishedAt": "2026-11-05T11:37:28.815284+00:00",
+      "exitCode": 0,
+      "logSha256": "69c4808e01bd3b928509d95a8449de49292fc1d5f48a6f432822c99864d7fb93",
+      "counts": {
+        "tests": 23,
+        "pass": 23,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "name": "types",
+      "command": [
+        "pnpm",
+        "typecheck"
+      ],
+      "env": {
+        "CI": "true"
+      },
+      "startedAt": "2026-11-05T11:37:28.815855+00:00",
+      "log": "/tmp/issue1284-stop-fixture-dbcd-types.log",
+      "finishedAt": "2026-11-05T11:37:29.633899+00:00",
+      "exitCode": 0,
+      "logSha256": "b596a9bc9e34b58c60cfe208ccde07260bea3b2007d83c0b73f85344f7fcee07"
+    },
+    {
+      "name": "lint",
+      "command": [
+        "pnpm",
+        "exec",
+        "oxlint",
+        "lib/run-control-actions.test.ts"
+      ],
+      "env": {
+        "CI": "true"
+      },
+      "startedAt": "2026-11-05T11:37:29.634336+00:00",
+      "log": "/tmp/issue1284-stop-fixture-dbcd-lint.log",
+      "finishedAt": "2026-11-05T11:37:29.998846+00:00",
+      "exitCode": 0,
+      "logSha256": "8fe67bf555cd8d7de023c384d24f66221f298337b1b3c016d9b71cac07752965"
+    },
+    {
+      "name": "diff",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "env": {
+        "CI": "true"
+      },
+      "startedAt": "2026-11-05T11:37:29.999234+00:00",
+      "log": "/tmp/issue1284-stop-fixture-dbcd-diff.log",
+      "finishedAt": "2026-11-05T11:37:30.006921+00:00",
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "providerCalls": 0,
+  "databaseCalls": "none; strict fixture only",
+  "productionChanges": false,
+  "red": {
+    "tests": 33,
+    "pass": 32,
+    "fail": 1,
+    "skip": 0,
+    "log": "/tmp/issue1284-stop-fixture-dbcd-before.log",
+    "logSha256": "c88d57120c207892c619311fbd294638d6eb9ce9cb65a854cf90f88b95bd68c3",
+    "failure": "Unexpected SQL pool access outside thread control for new owner/run-scoped machine-binding query"
+  },
+  "finishedAt": "2026-11-05T11:37:30.007225+00:00",
+  "exitCode": 0,
+  "complete": true,
+  "patchUnchanged": true,
+  "postTestCheckpoint": {
+    "commit": "245048de10a4ea7010adc57356ec104711873986",
+    "tree": "9be1bb1f341a01575110cb6f7949402130b160de",
+    "unchangedAfterVerification": true
+  },
+  "sourcePublicationCheckpoint": {
+    "commit": "84c1d781cbe29547c0c3cd07f47dae53fd61077e",
+    "tree": "5a4081d2c4e4d4e2a266faeda4607e22e5c58bd2",
+    "parent": "90817e92c41cb31fd3c73ca1769fb52c3b0b7db7",
+    "changedFileBlob": "85966beb9cd5bc54e13206f891b43535994ed339",
+    "sameTestedFile": true,
+    "sourceLevelCINeeded": true
+  }
+}

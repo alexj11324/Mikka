@@ -1,0 +1,129 @@
+{
+  "sourceCommit": "77bba5ab7da80afd34705b02ae5e808a0a104988",
+  "sourceTree": "1eb94954f892c632de652071283bfd30a6606add",
+  "clean": true,
+  "checkedAt": "2026-11-05T11:51:30.311015+00:00",
+  "fileComparisons": [
+    {
+      "path": "lib/factory/automatic-dispatch.ts",
+      "reviewedSource": "10d3754a640e3b5b3ba43ed421983d047ba18e6b",
+      "reviewedBlob": "76d954baa030a139b1d1e5ba621841fb023c5023",
+      "finalBlob": "76d954baa030a139b1d1e5ba621841fb023c5023",
+      "equal": true
+    },
+    {
+      "path": "lib/factory/agent-profile.ts",
+      "reviewedSource": "10d3754a640e3b5b3ba43ed421983d047ba18e6b",
+      "reviewedBlob": "c8193a43ee95322883ec48b4d181c079fa258996",
+      "finalBlob": "c8193a43ee95322883ec48b4d181c079fa258996",
+      "equal": true
+    },
+    {
+      "path": "lib/factory/agent-profile-decision.ts",
+      "reviewedSource": "b061905b8f336137928f4496902fec26a7c40af8",
+      "reviewedBlob": "397ef3e740458f9f476f7fa94819712b2291e03f",
+      "finalBlob": "397ef3e740458f9f476f7fa94819712b2291e03f",
+      "equal": true
+    },
+    {
+      "path": "components/settings/factory-profiles-data.ts",
+      "reviewedSource": "74bf8e2b40fd1cfe77fcbf6f8bc83ef3a3a57966",
+      "reviewedBlob": "717b2e2a1cc0c75eb99c41da8c7225071930cc43",
+      "finalBlob": "717b2e2a1cc0c75eb99c41da8c7225071930cc43",
+      "equal": true
+    },
+    {
+      "path": "components/coordinator/new-task-dialog.tsx",
+      "reviewedSource": "74bf8e2b40fd1cfe77fcbf6f8bc83ef3a3a57966",
+      "reviewedBlob": "95516cab37552cb88b5d5a2db80ae0088812fea0",
+      "finalBlob": "95516cab37552cb88b5d5a2db80ae0088812fea0",
+      "equal": true
+    },
+    {
+      "path": "components/coordinator/task-profile-picker.tsx",
+      "reviewedSource": "74bf8e2b40fd1cfe77fcbf6f8bc83ef3a3a57966",
+      "reviewedBlob": "c4d4f834a3574fa30fbe20d0b83a7bcbe34ebf2a",
+      "finalBlob": "c4d4f834a3574fa30fbe20d0b83a7bcbe34ebf2a",
+      "equal": true
+    },
+    {
+      "path": "lib/cloud-computer/thread-worker-logs.ts",
+      "reviewedSource": "6dbb61f1425e83cb931b320c0adad778da07a747",
+      "reviewedBlob": "362a9645db2a4120893fdd41dfb97da13b4047bc",
+      "finalBlob": "362a9645db2a4120893fdd41dfb97da13b4047bc",
+      "equal": true
+    },
+    {
+      "path": "lib/computer/official-runtime.ts",
+      "reviewedSource": "6dbb61f1425e83cb931b320c0adad778da07a747",
+      "reviewedBlob": "e7838e71f89414e3e466468c7e3529842837addc",
+      "finalBlob": "e7838e71f89414e3e466468c7e3529842837addc",
+      "equal": true
+    },
+    {
+      "path": "lib/computer/runtime-refresh-refusal.ts",
+      "reviewedSource": "6dbb61f1425e83cb931b320c0adad778da07a747",
+      "reviewedBlob": "bf7d5c4d4126eba97ec9fa4d2c395e5435f30ef7",
+      "finalBlob": "bf7d5c4d4126eba97ec9fa4d2c395e5435f30ef7",
+      "equal": true
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "reviewedSource": "6dbb61f1425e83cb931b320c0adad778da07a747",
+      "reviewedBlob": "8d46e76f1cd602ee6a354fd663a7433886752981",
+      "finalBlob": "8d46e76f1cd602ee6a354fd663a7433886752981",
+      "equal": true
+    },
+    {
+      "path": "packages/daemon/scripts/refresh-cloud-worker.py",
+      "reviewedSource": "6dbb61f1425e83cb931b320c0adad778da07a747",
+      "reviewedBlob": "866629a0a0e7e7d5e7fc6788a06135e362d6c4aa",
+      "finalBlob": "866629a0a0e7e7d5e7fc6788a06135e362d6c4aa",
+      "equal": true
+    },
+    {
+      "path": "lib/agent-runs.ts",
+      "reviewedSource": "90817e92c41cb31fd3c73ca1769fb52c3b0b7db7",
+      "reviewedBlob": "9bc1d9f239cd26935a97803b57bc1fd1a8d7e095",
+      "finalBlob": "9bc1d9f239cd26935a97803b57bc1fd1a8d7e095",
+      "equal": true
+    },
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "reviewedSource": "90817e92c41cb31fd3c73ca1769fb52c3b0b7db7",
+      "reviewedBlob": "59b1521e4b18d74e824d7642370b6956812a4abc",
+      "finalBlob": "59b1521e4b18d74e824d7642370b6956812a4abc",
+      "equal": true
+    },
+    {
+      "path": "workflows/thread-machine/steps.ts",
+      "reviewedSource": "90817e92c41cb31fd3c73ca1769fb52c3b0b7db7",
+      "reviewedBlob": "4ab5fde7e182d4ca7e14a084696c4529db27c227",
+      "finalBlob": "4ab5fde7e182d4ca7e14a084696c4529db27c227",
+      "equal": true
+    },
+    {
+      "path": "lib/cloud-computer/thread-machine-stop.db.test.ts",
+      "reviewedSource": "90817e92c41cb31fd3c73ca1769fb52c3b0b7db7",
+      "reviewedBlob": "15d23867c80f07f9a3415be70a6cb72ad59714ca",
+      "finalBlob": "15d23867c80f07f9a3415be70a6cb72ad59714ca",
+      "equal": true
+    },
+    {
+      "path": "lib/run-control-actions.test.ts",
+      "reviewedSource": "94749516b24b1e689fcb3dc45d57c6302e78a0d8",
+      "reviewedBlob": "85966beb9cd5bc54e13206f891b43535994ed339",
+      "finalBlob": "85966beb9cd5bc54e13206f891b43535994ed339",
+      "equal": true
+    }
+  ],
+  "changedPackageScriptsPreserved": [
+    "test:bot-chats-db",
+    "test:coordinator-events",
+    "test:schedules",
+    "test:schedules-db",
+    "test:subscription-usability"
+  ],
+  "lockfileEqualToPriorBuildDependencies": true,
+  "scope": "Exact reviewed product/Stop regression and strict adapter retention; this is source integrity, not production acceptance."
+}

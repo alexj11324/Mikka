@@ -229,3 +229,18 @@ ALEX-67 / Task `b5785091-2c95-4f55-821d-fce51e027b0e` 实际 Claude Code native 
 The [pre-build recovery group](prebuild-recovery-20261105/README.md) preserves 20 exact files (112,703 bytes) covering versioned source checks, the actual blocked production observations, the completed disabled Profile edit/archive exercise, and prepared HTTP/screenshot harness source. Its [manifest](prebuild-recovery-20261105/manifest.json) has SHA-256 `4972b5cbb162f4790342dcb9499716f002b5bb271658beabb613839baeedaef7`. Both retained 42b and 5251 TestAccountPool contexts passed their official static evidence audits on these exact bytes at 11:17 UTC. The audit reports sit outside the 20-file candidate count.
 
 This group does not include the pending queued-Stop increment, final merged build/HTTP/screenshots, or a completed native Codex Review. The recorded `d76d340` Review retry stayed blocked with no new Run and preserved the original candidate; the separate Profile lifecycle result is management-only. No DeepSeek coding prompt was attempted. The latest AGENTS rule removes the API-key path from merge and acceptance gates; both official subscription paths still require their own truthful results.
+
+
+## #1374 最终整合：79f 构建、正常 HTTP、截图与恢复门禁
+
+[本批完整证据](final-integration-79f/README.md)绑定受测提交 `79f56a4f3362067b22f1919af51ee1869f3bb86c`，tree `26cf764fb87bb7b6e549b4d421113626b8bc497e`，正常保留 `77bba5ab…` 与主线 `08b11f0d…` 两父提交。
+
+- 79f 实际完整生产构建 exit 0；严格环境校验及全新正常 TestAccountPool 会话 HTTP **61/61**，运行服务、会话、测试数据库和角色已清理。
+- 对应合并树实际在本地46560完成 **58/58**（23单元、35真实PG），类型与差异检查通过；相同 tree 的映射明确保留，不把旧命令重标为远端 SHA 执行。
+- 8张实际截图保留 **77b** 原时间、像素与版本，经两位 assistant 分别逐张复核。600个 UI/相关依赖 blob 与 lockfile 未变，因此在79f复用；79f新截图数量为0。DOM观察与像素判断分开记录。
+- 79f当前head CI workflow [42026523842](https://github.com/alexj11324/Mikka/actions/runs/42026523842) completed/success，31个检查为26 success＋5条件skip。旧源及77b CI、首次截图准备失败60/overall-false均保留。
+
+[冻结清单](final-integration-79f/manifest.json)覆盖37个原字节文件、871,558字节，SHA256 `9c31c11d9fefe870d9d902d88b71aa8dff7d2558ec792899fd14508b00dd92d8`。[77b凭证上下文审计](final-integration-79f/audits/issue1284-final-integration-public-audit-77b.json)与[79f凭证上下文审计](final-integration-79f/audits/issue1284-final-integration-public-audit-79f.json)均于12:39:10Z由未改变的官方 `auditEvidence` helper 扫描37文件并通过，前后字节一致；报告与清单自身放在37文件候选计数之外。
+
+本组是隔离环境和合并前验证。生产的CC/Codex原生执行、同Task独立Review、Owner Accept与运行中配置冻结仍需单独记录；不据此关闭#1284。DeepSeek编码API按Alex指示排除，没有余额探测或测试请求；内置Decision选择不在这项排除之内。
+

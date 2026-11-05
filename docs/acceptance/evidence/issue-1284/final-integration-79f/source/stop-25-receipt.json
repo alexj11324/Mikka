@@ -1,0 +1,336 @@
+{
+  "schema": 1,
+  "kind": "queued-thread-stop-source-validation",
+  "source": {
+    "localCheckpoint": "c717da52c8e212fee216e25582fa4c6d78a57067",
+    "tree": "983641ffc513670ef4d6a696e3bc49149c2905f7",
+    "parents": [
+      "6dbb61f1425e83cb931b320c0adad778da07a747"
+    ],
+    "clean": true,
+    "remoteHead": "90817e92c41cb31fd3c73ca1769fb52c3b0b7db7",
+    "executionNote": "Tests ran against the final four-file working tree based on 6dbb; the unchanged bytes were then committed as this local checkpoint. A GitData equivalent remote commit may have another SHA.",
+    "remoteTree": "983641ffc513670ef4d6a696e3bc49149c2905f7",
+    "remoteBindingProvenance": "Root verified GitData readback of all four blobs, exact tree, sole parent 6dbb61f1425e83cb931b320c0adad778da07a747 and source PR #1362 branch ref."
+  },
+  "scope": {
+    "files": [
+      {
+        "path": "lib/agent-runs.ts",
+        "gitBlob": "9bc1d9f239cd26935a97803b57bc1fd1a8d7e095",
+        "sha256": "6b70029bb31d07f5a32e14b2a94ed68cf802b536d2383bd67218101b502406e4",
+        "bytes": 37171
+      },
+      {
+        "path": "lib/cloud-computer/thread-machine-stop.db.test.ts",
+        "gitBlob": "15d23867c80f07f9a3415be70a6cb72ad59714ca",
+        "sha256": "2600c531b5a4662da7a66474b58a1c87b9600320ad4d95e47bdc07f1f761ba60",
+        "bytes": 25287
+      },
+      {
+        "path": "lib/cloud-computer/thread-machines.ts",
+        "gitBlob": "59b1521e4b18d74e824d7642370b6956812a4abc",
+        "sha256": "cf87a75ff1a38f9bd4e722b6e61d54d8b13cb0d61890cb2a38f03bbf3c678ddd",
+        "bytes": 73899
+      },
+      {
+        "path": "workflows/thread-machine/steps.ts",
+        "gitBlob": "4ab5fde7e182d4ca7e14a084696c4529db27c227",
+        "sha256": "754bfa13cf5c39b8fb4ce0ff70057d8d20639fd0975ec57047ad2fdf022560c9",
+        "bytes": 3809
+      }
+    ],
+    "summary": "Normal Stop and existing maintenance can acknowledge an already-bound queued run that has never been claimed and has no native history on its same task/device. Owner key preparation completes before checkout; locked scope/native/provision revalidation precedes provider kill; a confirmed kill precedes the existing same-client terminalizer. An uncertain kill rolls back and preserves the same Stop request and VM binding."
+  },
+  "riskTriage": [
+    {
+      "finding": "bound unclaimed Stop has no journal/lifecycle acknowledgement",
+      "occurrence": 4,
+      "impact": 8,
+      "evidence": "real requestRunStop and maintenance database red tests"
+    },
+    {
+      "finding": "provider key lookup after checkout can exhaust the same pool",
+      "occurrence": 2,
+      "impact": 7,
+      "evidence": "actual max=1 PG timeout and source-reviewed options/key query path"
+    },
+    {
+      "finding": "adopted native history can have no retry/continuation link",
+      "occurrence": 3,
+      "impact": 8,
+      "evidence": "adoptTaskMachine source plus real PG adopted-state regression"
+    }
+  ],
+  "validation": {
+    "final": {
+      "pg": {
+        "kind": "PG",
+        "command": [
+          "node",
+          "--import",
+          "./tests/support/server-only.mjs",
+          "--import",
+          "tsx",
+          "--test",
+          "lib/cloud-computer/thread-machine-stop.db.test.ts"
+        ],
+        "started": "2026-11-05T11:20:05.014204+00:00",
+        "finished": "2026-11-05T11:20:14.265505+00:00",
+        "exitCode": 0,
+        "log": "/tmp/issue1284-queued-stop-sealed-pg.log",
+        "sha256": "8b214300a3cedf6a466ba7759b3779da8b71f332e9b6f8f5159e51df6e53c739"
+      },
+      "static": [
+        {
+          "kind": "types",
+          "command": [
+            "pnpm",
+            "typecheck"
+          ],
+          "started": "2026-11-05T11:20:05.042831+00:00",
+          "finished": "2026-11-05T11:20:06.241744+00:00",
+          "exitCode": 0,
+          "log": "/tmp/issue1284-queued-stop-sealed-types.log",
+          "sha256": "6095cd1b63dbbad29cf49dbc6de636ed8fb12bb799830f886d4d802978378ea9"
+        },
+        {
+          "kind": "lint",
+          "command": [
+            "pnpm",
+            "exec",
+            "oxlint",
+            "lib/agent-runs.ts",
+            "lib/cloud-computer/thread-machines.ts",
+            "lib/cloud-computer/thread-machine-stop.db.test.ts",
+            "workflows/thread-machine/steps.ts"
+          ],
+          "started": "2026-11-05T11:20:06.242003+00:00",
+          "finished": "2026-11-05T11:20:06.642537+00:00",
+          "exitCode": 0,
+          "log": "/tmp/issue1284-queued-stop-sealed-lint.log",
+          "sha256": "bcbb1dbb42c52c66d6b5e39a257a76978845b5213cff69c81b33b1cd6dd9464b"
+        },
+        {
+          "kind": "diff",
+          "command": [
+            "git",
+            "diff",
+            "--check"
+          ],
+          "started": "2026-11-05T11:20:06.642675+00:00",
+          "finished": "2026-11-05T11:20:06.652573+00:00",
+          "exitCode": 0,
+          "log": "/tmp/issue1284-queued-stop-sealed-diff.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "polling",
+          "command": [
+            "node",
+            "scripts/polling-policy.mjs"
+          ],
+          "started": "2026-11-05T11:20:06.652635+00:00",
+          "finished": "2026-11-05T11:20:06.684975+00:00",
+          "exitCode": 0,
+          "log": "/tmp/issue1284-queued-stop-sealed-polling.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "executionCoverage": "module_load_only",
+          "repositoryAuditExecuted": false,
+          "coverageNote": "This module exports policy functions but has no CLI runner. The preserved node command and exit code 0 prove module loading only; they do not execute a repository policy audit."
+        },
+        {
+          "kind": "causes",
+          "command": [
+            "node",
+            "scripts/error-cause-policy.mjs"
+          ],
+          "started": "2026-11-05T11:20:06.685061+00:00",
+          "finished": "2026-11-05T11:20:06.786197+00:00",
+          "exitCode": 0,
+          "log": "/tmp/issue1284-queued-stop-sealed-causes.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "executionCoverage": "module_load_only",
+          "repositoryAuditExecuted": false,
+          "coverageNote": "This module exports policy functions but has no CLI runner. The preserved node command and exit code 0 prove module loading only; they do not execute a repository policy audit."
+        }
+      ]
+    },
+    "redGreen": [
+      {
+        "phase": "original_stop_red",
+        "file": "logs/issue1284-queued-stop-red.log",
+        "sha256": "602bcf3951840b347ba1a1df5932e5b4884f12b19c030470b38d50d19190a6ed",
+        "counts": {
+          "tests": 8,
+          "pass": 5,
+          "fail": 3,
+          "cancelled": 0,
+          "skipped": 0
+        },
+        "meaning": "Two product assertions failed: normal Stop stayed queued; maintenance returned a future deadline."
+      },
+      {
+        "phase": "initial_guard_green",
+        "file": "logs/issue1284-queued-stop-green.log",
+        "sha256": "7b618931a42f6e4468d49b8aa52acde5d558bcdb692e8bc6ec445efb574899e7",
+        "counts": {
+          "tests": 22,
+          "pass": 22,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0
+        },
+        "meaning": "Original acknowledgement and claim/native/scope boundaries passed."
+      },
+      {
+        "phase": "pool_red",
+        "file": "logs/issue1284-queued-stop-pool-red.log",
+        "sha256": "3eeddca0ffcaecf85967a805f171d0924154c095b3b4239115d910f9ba4ae55d",
+        "counts": {
+          "tests": 24,
+          "pass": 21,
+          "fail": 3,
+          "cancelled": 0,
+          "skipped": 0
+        },
+        "meaning": "A real max=1 PG pool timed out inside old kill; preparation/revalidation case returned true instead of false."
+      },
+      {
+        "phase": "pool_green",
+        "file": "logs/issue1284-queued-stop-final-pg.log",
+        "sha256": "a7bd45b0891a7229563a3f095b211512e0edbf542b7965e3bbfe881cb5892ab6",
+        "counts": {
+          "tests": 24,
+          "pass": 24,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0
+        },
+        "meaning": "Prepared provider closure and final scope revalidation passed."
+      },
+      {
+        "phase": "adopted_native_history_red",
+        "file": "logs/issue1284-queued-stop-history-red.log",
+        "sha256": "b06e37b06c5faf8370743d79134eff05b1a93d4382141bd28a0240cc01084786",
+        "counts": {
+          "tests": 25,
+          "pass": 23,
+          "fail": 2,
+          "cancelled": 0,
+          "skipped": 0
+        },
+        "meaning": "One product assertion failed: adopted same-task/device native history with no lineage was incorrectly ended."
+      },
+      {
+        "phase": "sealed_green",
+        "file": "logs/issue1284-queued-stop-sealed-pg.log",
+        "sha256": "8b214300a3cedf6a466ba7759b3779da8b71f332e9b6f8f5159e51df6e53c739",
+        "counts": {
+          "tests": 25,
+          "pass": 25,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0
+        },
+        "meaning": "All 25 tests passed on the files sealed by this checkpoint."
+      }
+    ],
+    "fixtureFailuresPreserved": [
+      {
+        "file": "logs/issue1284-queued-stop-fixture-setup-failure.log",
+        "sha256": "a478b5503e7630936104ca31833b4758e9fcc57d415593fd0bea7bd83a396d32",
+        "classification": "test fixture setup failure, excluded from product red evidence"
+      },
+      {
+        "file": "logs/issue1284-queued-stop-history-fixture-failure.log",
+        "sha256": "db974a6d019e11c8e6e7f5be3c13a8eab91f6f607633d8847673db24a32d9d0d",
+        "classification": "test fixture setup failure, excluded from product red evidence"
+      },
+      {
+        "file": "logs/issue1284-queued-stop-history-fixture-constraint-failure.log",
+        "sha256": "3e4f6cd9d1e38082ed30bd2e2d65434015deaa5102a947e832fd65dd6ceb5bff",
+        "classification": "test fixture setup failure, excluded from product red evidence"
+      }
+    ],
+    "independentReviews": [
+      {
+        "reviewer": "requirements_review",
+        "scope": "final source guards, actual provider preparation call graph and same-task/device adopted-history increment",
+        "result": "no remaining blocking finding",
+        "reviewedBytesMatchCheckpoint": true
+      },
+      {
+        "reviewer": "backend_impl",
+        "scope": "prepared closure has no APP DB dependency; same-task/device native history and adopted-state regression",
+        "result": "no remaining blocking finding",
+        "reviewedBytesMatchCheckpoint": true
+      }
+    ],
+    "policyCoverage": {
+      "correction": "The two original direct-node policy commands were module-load checks only. They are not counted as successful repository policy audits.",
+      "originalCommandsExitCodesAndLogsPreserved": true,
+      "priorReceiptSha256": "da2d0bbf6231e8da4f869f3dad76e352deec71a729df696f2b8dd88268cfb097",
+      "priorPrAppendSha256": "6e72557914a6000cd92fda8a591b976c5b282266b508cbf59d861c7e8208217a",
+      "finalBatch": {
+        "pullRequest": 1374,
+        "head": "dbcd6214c49532ce233519e7e9fd21432ead1258",
+        "repositoryAuditOwner": "backend_impl",
+        "repositoryAuditFunctions": [
+          "auditRepository()",
+          "staleAllowlistEntries()"
+        ],
+        "resultProvenance": "Recorded separately by the final-batch validation owner. This source receipt does not infer an audit result from the original module-load commands.",
+        "resultIncludedInThisReceipt": false
+      },
+      "sourceGitHubCi": {
+        "head": "90817e92c41cb31fd3c73ca1769fb52c3b0b7db7",
+        "check": "Source checks",
+        "conclusion": "success",
+        "provenance": "Reported by root; the actual GitHub CI result is separate from the local module-load commands."
+      }
+    }
+  },
+  "environment": {
+    "platform": "Docker Cloud Sandbox",
+    "instance": "sandboxes/sbx_001m6mcf2kr0phmx737s6js1e0r",
+    "database": "isolated loopback PostgreSQL; unique LOGIN CREATEDB role and derived *_e2e databases",
+    "providerBoundary": "synthetic kill and key-preparation adapters; no real E2B key was read and no provider/model request was sent",
+    "sdkAbsentBehavior": "Source inspected e2b@2.61.0 Sandbox.kill: explicit API error code 404 returns false; other API errors throw. Existing adapter treats confirmed absence as completed deletion."
+  },
+  "cleanup": {
+    "finished": "2026-11-05T11:21:03.917838+00:00",
+    "role": "mikka1284_stop_4bb348e1",
+    "roleDropped": true,
+    "databases": [
+      {
+        "database": "mikka1284_stop_4bb348e1_e2e",
+        "connections": 0
+      }
+    ],
+    "force": false,
+    "sessionTermination": false,
+    "clusterStopped": false,
+    "privateEnvRemoved": true
+  },
+  "limits": {
+    "productionAcceptance": "pending; this receipt does not claim ALEX66 recovered or that its private journal was inspected",
+    "nativeSessions": "synthetic test fixtures only, no production native SID",
+    "scopePreserved": [
+      "running and paused Runs",
+      "startedAt/session/deviceToken/claim-lease evidence",
+      "current native claim",
+      "question continuity",
+      "same-task/device actual native history including adopted VMs",
+      "other owner/workspace",
+      "active or unknown in-flight provisioning"
+    ],
+    "defaultBehavior": "Frozen Profile/executionIdentity and lineage IDs alone do not prove a claim; ordinary never-claimed retry can stop. No journal absence is treated as idle.",
+    "excludedWork": [
+      "no production browser/API mutation",
+      "no full build or browser suite in this source task",
+      "no run-chain rerun; final integration owner will run that existing suite once",
+      "no Docker/PG cluster lifecycle change by this agent"
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "kind": "official-test-account-evidence-audit",
+  "files": 37,
+  "archives": 0,
+  "archiveEntries": 0,
+  "decodedBytes": 0,
+  "result": "passed",
+  "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden",
+  "startedAt": "2026-11-05T12:39:10.189Z",
+  "finishedAt": "2026-11-05T12:39:10.229Z",
+  "runnerSourceCommit": "77bba5ab7da80afd34705b02ae5e808a0a104988",
+  "runnerSourceTree": "1eb94954f892c632de652071283bfd30a6606add",
+  "candidateProductSourceCommit": "79f56a4f3362067b22f1919af51ee1869f3bb86c",
+  "candidateProductSourceTree": "26cf764fb87bb7b6e549b4d421113626b8bc497e",
+  "manifestSha256": "9c31c11d9fefe870d9d902d88b71aa8dff7d2558ec792899fd14508b00dd92d8",
+  "candidateBytes": 871558,
+  "candidateByteIntegrityBeforeAndAfter": true,
+  "privateContextsExported": false,
+  "databaseOrServerRequired": false,
+  "helper": "scripts/test-accounts/session.mjs auditEvidence; official unchanged helper blob across 77b and 79f"
+}

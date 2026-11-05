@@ -1,0 +1,13 @@
+{
+  "kind": "capture-hydration-readiness-fix",
+  "beforeSha256": "a9e1c4ca98404bc817e26f040fdaedef2f0417a33653b6809321e3b4a512dd1a",
+  "afterSha256": "fad65cd4f48c90870eb29869a935b75a54942fc2bacfb6faf71407037c63c4d9",
+  "bytes": 7206,
+  "sourceCommit": "77bba5ab7da80afd34705b02ae5e808a0a104988",
+  "productChanged": false,
+  "observation": "At DOMContentLoaded click preceded interactive hydration and no dialog appeared. Same normal page at networkidle opened the actual NewTaskDialog, with expected placeholder and no page errors.",
+  "changes": [
+    "Wait for normal initial networkidle before clicking existing New task button."
+  ],
+  "written": "/tmp/issue1284-final-picker-screenshots.mjs"
+}

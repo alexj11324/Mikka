@@ -1,0 +1,111 @@
+{
+  "kind": "version-bound-ui-evidence-reuse",
+  "targetSourceCommit": "79f56a4f3362067b22f1919af51ee1869f3bb86c",
+  "targetSourceTree": "26cf764fb87bb7b6e549b4d421113626b8bc497e",
+  "actualCaptureSourceCommit": "77bba5ab7da80afd34705b02ae5e808a0a104988",
+  "actualCaptureSourceTree": "1eb94954f892c632de652071283bfd30a6606add",
+  "actualCaptureStartedAt": "2026-11-05T12:11:17.599Z",
+  "actualCaptureFinishedAt": "2026-11-05T12:11:34.406Z",
+  "actualOriginalCaptures": 8,
+  "newCapturesOnTarget": 0,
+  "unchangedUiAndRelatedDependencyBlobs": 600,
+  "dependencyLockUnchanged": true,
+  "parentUnionProofSha256": "f8d0b67c34c572fbec2fe99d8ebf07721232d578491356c1b17fb5b3cdd8dd8f",
+  "originalCaptureReceipt": "../77b/visual/capture-receipt.json",
+  "evidence": [
+    {
+      "filename": "77bba5ab7da8-profile-picker-selected-light-1440.png",
+      "sha256": "bc017f0f8ad69c95c45b89740c1ac714c8e35e4aecc7f29b5d2ca32a66337c43",
+      "bytes": 95232,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "state": "selected"
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-menu-light-1440.png",
+      "sha256": "a5782b9e8ad6dd5e49f1e3699fb3360b6a4c7bf5f11fca6c96e9ff350fcb7583",
+      "bytes": 118479,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "state": "menu"
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-selected-dark-1440.png",
+      "sha256": "ba94a11e5ddfd9c3c0da3d501cf36c284ce161f909da3a149733da388212f53d",
+      "bytes": 95522,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "state": "selected"
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-menu-dark-1440.png",
+      "sha256": "db97969cc2a477a205de6167bb5566b180353cd78efdc74d9993306881a18e59",
+      "bytes": 117928,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "state": "menu"
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-selected-light-390.png",
+      "sha256": "91dd0467960f3f35ecced3e8701fe2d28d5fa02e31bb9d5b1854668e65e6bbb8",
+      "bytes": 46348,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "selected"
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-menu-light-390.png",
+      "sha256": "fa1f2a91a502d26624aa068aff9cae4b5cef56a19c350e75354157cb3e23aeac",
+      "bytes": 58130,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "menu"
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-selected-dark-390.png",
+      "sha256": "5348b05609ee65907e92d6d54dc4ebf73f0cf949f336f7959e8053c33985da90",
+      "bytes": 46504,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "selected"
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-menu-dark-390.png",
+      "sha256": "4acd6b50bea0ec67a6f9263cd18695f9c2f20f23c208e45c30da627ed0c29dfc",
+      "bytes": 57629,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "menu"
+    }
+  ],
+  "boundaries": [
+    "Original pixels and labels remain tied to 77b.",
+    "79f had a new complete production build and fresh normal 61-assertion HTTP run.",
+    "The final no-additional-Run assertion on 79f followed fixture preparation without browser interaction.",
+    "Synthetic catalogue UI evidence is not actual provider or native subscription execution."
+  ]
+}

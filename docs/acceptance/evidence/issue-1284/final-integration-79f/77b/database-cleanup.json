@@ -1,0 +1,27 @@
+{
+  "kind": "owned-isolated-postgres-cleanup",
+  "sourceCommit": "77bba5ab7da80afd34705b02ae5e808a0a104988",
+  "sourceTree": "1eb94954f892c632de652071283bfd30a6606add",
+  "finishedAt": "2026-11-05T12:15:58.546669+00:00",
+  "role": "mikka1284_http_1e48a459",
+  "databases": [
+    {
+      "database": "mikka1284_http_1e48a459_e2e",
+      "connectionsBeforeDrop": 0,
+      "activeTestAccountLeases": 0,
+      "validSessions": 0
+    },
+    {
+      "database": "mikka1284_http_1e48a459_final_e2e",
+      "connectionsBeforeDrop": 0,
+      "activeTestAccountLeases": 0,
+      "validSessions": 0
+    }
+  ],
+  "remainingOwnedDatabases": 0,
+  "remainingRole": 0,
+  "force": false,
+  "terminatedOtherSessions": false,
+  "clusterStopped": false,
+  "privateAuditContextsRetainedInsideDocker": true
+}

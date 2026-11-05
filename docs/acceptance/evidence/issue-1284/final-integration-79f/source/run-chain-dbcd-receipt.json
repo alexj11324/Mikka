@@ -1,0 +1,146 @@
+{
+  "schema": 1,
+  "sourceCommit": "dbcd6214c49532ce233519e7e9fd21432ead1258",
+  "sourceTree": "f19553ee7844dcbbf352e3f4ec03e054b9e313f6",
+  "sourceDirty": false,
+  "environment": "Docker Large Ubuntu24.04 Node24.22.2 pnpm10.34.3 PostgreSQL17.11; isolated loopback owned database",
+  "startedAt": "2026-11-05T11:29:32.163272+00:00",
+  "commands": [
+    {
+      "name": "setup",
+      "command": [
+        "pnpm",
+        "test:e2e:setup"
+      ],
+      "startedAt": "2026-11-05T11:29:32.256314+00:00",
+      "log": "/tmp/issue1284-final-dbcd-setup.log",
+      "finishedAt": "2026-11-05T11:29:34.677752+00:00",
+      "exitCode": 0,
+      "logSha256": "11f58324e50d87997cc6b32bc812236e7f9af116f8e479244bd0bd2b75ba4c89"
+    },
+    {
+      "name": "run-chain",
+      "command": [
+        "node",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "tests/run-chain.db.test.ts"
+      ],
+      "startedAt": "2026-11-05T11:29:34.678616+00:00",
+      "log": "/tmp/issue1284-final-dbcd-run-chain.log",
+      "finishedAt": "2026-11-05T11:29:37.650202+00:00",
+      "exitCode": 0,
+      "logSha256": "f2e45db3ab588835d5b5dd8f7130852ed7481604702c2edb15b99f6cd438eb63",
+      "counts": {
+        "tests": 16,
+        "pass": 16,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "name": "types",
+      "command": [
+        "pnpm",
+        "typecheck"
+      ],
+      "startedAt": "2026-11-05T11:29:37.651909+00:00",
+      "log": "/tmp/issue1284-final-dbcd-types.log",
+      "finishedAt": "2026-11-05T11:29:41.532534+00:00",
+      "exitCode": 0,
+      "logSha256": "b596a9bc9e34b58c60cfe208ccde07260bea3b2007d83c0b73f85344f7fcee07"
+    },
+    {
+      "name": "lint",
+      "command": [
+        "pnpm",
+        "exec",
+        "oxlint",
+        "lib/agent-runs.ts",
+        "lib/cloud-computer/thread-machines.ts",
+        "lib/cloud-computer/thread-machine-stop.db.test.ts",
+        "workflows/thread-machine/steps.ts"
+      ],
+      "startedAt": "2026-11-05T11:29:41.533251+00:00",
+      "log": "/tmp/issue1284-final-dbcd-lint.log",
+      "finishedAt": "2026-11-05T11:29:41.948726+00:00",
+      "exitCode": 0,
+      "logSha256": "41fdd10ef1aa14b12480bca85c6e8e55b90ca1cc3c6785ed889b09c0027b1ea1"
+    },
+    {
+      "name": "polling",
+      "command": [
+        "node",
+        "--input-type=module",
+        "-e",
+        "import {auditRepository,staleAllowlistEntries} from './scripts/polling-policy.mjs'; const diagnostics=auditRepository(); const stale=staleAllowlistEntries(); console.log(JSON.stringify({diagnostics,stale,diagnosticCount:diagnostics.length,staleCount:stale.length})); if(diagnostics.length||stale.length) process.exitCode=1;"
+      ],
+      "startedAt": "2026-11-05T11:29:41.949104+00:00",
+      "log": "/tmp/issue1284-final-dbcd-polling.log",
+      "finishedAt": "2026-11-05T11:29:42.163469+00:00",
+      "exitCode": 0,
+      "logSha256": "bf02330a37656fa02e9f2cdae63ac7ea395c4f6e1f8ec8d87a9894359e0dd60b"
+    },
+    {
+      "name": "error-causes",
+      "command": [
+        "node",
+        "--input-type=module",
+        "-e",
+        "import {auditRepository,staleAllowlistEntries} from './scripts/error-cause-policy.mjs'; const diagnostics=auditRepository(); const stale=staleAllowlistEntries(); console.log(JSON.stringify({diagnostics,stale,diagnosticCount:diagnostics.length,staleCount:stale.length})); if(diagnostics.length||stale.length) process.exitCode=1;"
+      ],
+      "startedAt": "2026-11-05T11:29:42.163797+00:00",
+      "log": "/tmp/issue1284-final-dbcd-error-causes.log",
+      "finishedAt": "2026-11-05T11:29:42.277785+00:00",
+      "exitCode": 0,
+      "logSha256": "bf02330a37656fa02e9f2cdae63ac7ea395c4f6e1f8ec8d87a9894359e0dd60b"
+    },
+    {
+      "name": "diff",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "856274021facf62bf44c6d5168440d6e170ac564",
+        "HEAD"
+      ],
+      "startedAt": "2026-11-05T11:29:42.278090+00:00",
+      "log": "/tmp/issue1284-final-dbcd-diff.log",
+      "finishedAt": "2026-11-05T11:29:42.285654+00:00",
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "providerCalls": 0,
+  "browserTests": 0,
+  "testsReused": {
+    "Profile111": "actual earlier7a5/b061 source; unchanged blobs, not rerun here",
+    "Stop25": "actual c717/908 source; all4blobs unchanged, not rerun here"
+  },
+  "cleanup": {
+    "startedAt": "2026-11-05T11:29:42.285863+00:00",
+    "role": "mikka1284_chain_5ccf12be",
+    "database": "mikka1284_chain_5ccf12be_e2e",
+    "force": false,
+    "sessionTermination": false,
+    "clusterStopped": false,
+    "roleSessions": 0,
+    "databases": [
+      {
+        "database": "mikka1284_chain_5ccf12be_e2e",
+        "sessions": 0
+      }
+    ],
+    "roleDropped": true,
+    "privateEnvRemoved": true,
+    "finishedAt": "2026-11-05T11:29:42.483002+00:00"
+  },
+  "sourceUnchangedAfter": true,
+  "finishedAt": "2026-11-05T11:29:42.496442+00:00",
+  "exitCode": 0,
+  "complete": true
+}

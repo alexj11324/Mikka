@@ -1,0 +1,9 @@
+{
+  "observedAt": "2026-11-05T12:32:56.012562+00:00",
+  "controllerPid": 15912,
+  "controllerRunning": false,
+  "appPid": 16335,
+  "appRunning": false,
+  "port3110Open": false,
+  "signal": "SIGTERM to own controller only"
+}

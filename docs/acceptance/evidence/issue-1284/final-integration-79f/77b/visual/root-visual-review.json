@@ -1,0 +1,106 @@
+{
+  "schema": 1,
+  "kind": "root-assistant-visual-review",
+  "reviewedAt": "2026-11-05T12:13:46Z",
+  "sourceCommit": "77bba5ab7da80afd34705b02ae5e808a0a104988",
+  "sourceTree": "1eb94954f892c632de652071283bfd30a6606add",
+  "captureManifestSha256": "792aa0751c2b986ebac13508343f954a8cc853f324c4b5f7fc00e2528b7ddb5f",
+  "reviewMethod": "Individually displayed all eight original PNGs with view_image; no image edits. Findings are manual visual observations, separate from the capture DOM measurements.",
+  "reviewedImages": [
+    {
+      "filename": "77bba5ab7da8-profile-picker-selected-light-1440.png",
+      "sha256": "bc017f0f8ad69c95c45b89740c1ac714c8e35e4aecc7f29b5d2ca32a66337c43",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "state": "selected"
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-menu-light-1440.png",
+      "sha256": "a5782b9e8ad6dd5e49f1e3699fb3360b6a4c7bf5f11fca6c96e9ff350fcb7583",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "state": "menu"
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-selected-dark-1440.png",
+      "sha256": "ba94a11e5ddfd9c3c0da3d501cf36c284ce161f909da3a149733da388212f53d",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "state": "selected"
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-menu-dark-1440.png",
+      "sha256": "db97969cc2a477a205de6167bb5566b180353cd78efdc74d9993306881a18e59",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "state": "menu"
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-selected-light-390.png",
+      "sha256": "91dd0467960f3f35ecced3e8701fe2d28d5fa02e31bb9d5b1854668e65e6bbb8",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "selected"
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-menu-light-390.png",
+      "sha256": "fa1f2a91a502d26624aa068aff9cae4b5cef56a19c350e75354157cb3e23aeac",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "menu"
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-selected-dark-390.png",
+      "sha256": "5348b05609ee65907e92d6d54dc4ebf73f0cf949f336f7959e8053c33985da90",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "selected"
+    },
+    {
+      "filename": "77bba5ab7da8-profile-picker-menu-dark-390.png",
+      "sha256": "4acd6b50bea0ec67a6f9263cd18695f9c2f20f23c208e45c30da627ed0c29dfc",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "menu"
+    }
+  ],
+  "findings": [
+    "Desktop dialog and dropdown are fully visible in light and dark themes; no observed clipped labels or overlapping controls.",
+    "Mobile dialog wraps the execution target and Profile controls into two rows; input text wraps within the card, close and Create controls remain visible.",
+    "Checking state is presented as neutral status text; the selected checking option is clearly marked and the Create control is visibly active.",
+    "Disabled and enabled-but-no-model entries are visually muted and distinguish their respective reasons; actual disabled semantics are recorded separately by the capture DOM receipt.",
+    "Menu may cover part of the underlying dialog, as expected for an open dropdown; all menu entries and management action stay within the viewport.",
+    "No credentials, private Profile instructions, raw native session identifiers, or unrelated production task content are visible in these isolated images."
+  ],
+  "visualIssuesFound": [],
+  "limitations": [
+    "These are isolated Docker production-build pages at 77b, not live production or native subscription execution evidence.",
+    "A screenshot alone cannot prove server admission, successful task dispatch or provider availability.",
+    "Any later-head reuse requires unchanged UI/dependency proof; the image source commit remains 77b."
+  ],
+  "reviewer": "Root assistant; this is not an Alex or human acceptance claim."
+}
