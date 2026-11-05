@@ -91,6 +91,8 @@ export async function prepareCloudQuestionRecovery(pool: Pool, userId: string, s
 
 /** Only after the answer transaction committed; a replay wakes the same run. */
 export async function wakeCloudQuestionContinuation(pool: Pool, userId: string, result: { continuationRunId: string }) {
+  const { wakeQueuedQuestionContinuation } = await import('./wake');
+  if ((await wakeQueuedQuestionContinuation(pool,userId,result.continuationRunId)).recognized) return;
   const {rows:[binding]}=await pool.query('SELECT "workspaceId" FROM computer_run_bindings WHERE "runId"=$1 AND "ownerId"=$2',[result.continuationRunId,userId]);
   if (binding) await (await import('../automatic-dispatch')).factoryAutomaticRuntime.enqueue(pool,{userId,workspaceId:binding.workspaceId},null,result.continuationRunId);
 }
