@@ -1,0 +1,26 @@
+{
+  "kind": "official-test-account-evidence-static-audit",
+  "context": "42b",
+  "runnerSourceCommit": "42b1f3f5f2a19f1271e3e513a77b2b046c99d662",
+  "runnerSourceTree": "002ef49edfc7150fe0b56200d8f77296db5e519c",
+  "candidateGroup": "frozen-prebuild-public-evidence-group",
+  "candidateSourceBinding": "Each frozen file retains its own source commit and evidence boundary; this is not final merged build or production acceptance.",
+  "manifestSha256": "4972b5cbb162f4790342dcb9499716f002b5bb271658beabb613839baeedaef7",
+  "candidateDirectory": "/tmp/issue1284-prebuild-public-4972b5cb",
+  "candidateFiles": 20,
+  "candidateBytes": 112703,
+  "candidateBytesVerifiedBeforeAndAfter": true,
+  "privateContextExported": false,
+  "liveDatabaseOrServerRequired": false,
+  "newProductValidation": false,
+  "startedAt": "2026-11-05T11:17:01.934Z",
+  "completedAt": "2026-11-05T11:17:01.993Z",
+  "officialAudit": {
+    "files": 20,
+    "archives": 0,
+    "archiveEntries": 0,
+    "decodedBytes": 0,
+    "result": "passed",
+    "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+  }
+}

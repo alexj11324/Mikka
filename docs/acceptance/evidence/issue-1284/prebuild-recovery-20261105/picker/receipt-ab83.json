@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-05T10:11:38.812924+00:00",
+  "task": "issue-1284-checking-profile-picker",
+  "source": {
+    "checkpointCommit": "ab83ac016b7ea65843cc376af8431ecb976a5fb6",
+    "tree": "1cd1b7566b4da99dc9ae2b241909b9820e5f6524",
+    "baseCommit": "9cc753c660f31a95598998c43545ea030240e9e2",
+    "cleanAfterCommit": true,
+    "executionCheckoutHead": "9cc753c660f31a95598998c43545ea030240e9e2",
+    "executionSource": "Uncommitted six-file patch; unchanged source captured immediately afterward by checkpointCommit. Git identity metadata changed only at commit."
+  },
+  "demonstratedProblem": {
+    "readOnlyManagement": "probeQuota=false returns checking for stale or absent allowance; picker and form previously treated it as a confirmed refusal.",
+    "productionObservation": "Root observed Default and all three Owner profiles disabled solely for checking in the normal New task UI. No task was submitted for this observation."
+  },
+  "changes": [
+    "Allow selection of checking only for a present enabled and non-archived Profile, or the builtin Default.",
+    "Use a neutral pending notice; confirmed refusal and failed/missing reads remain blocked.",
+    "Use the same predicate in the picker and New task submit guard; structured profileId and authoritative server probes/admission remain unchanged."
+  ],
+  "gates": {
+    "counts": {
+      "tests": 137,
+      "pass": 137,
+      "fail": 0,
+      "skipped": 0
+    },
+    "newPickerCasesIncluded": 6,
+    "testType": "React server-rendered component and Select-property/onValueChange contract plus the existing subscription-usability unit suite. This does not claim browser pointer, keyboard, layout, native execution, or live HTTP coverage.",
+    "commands": [
+      {
+        "name": "subscription-suite-final",
+        "command": [
+          "pnpm",
+          "test:subscription-usability"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/issue1284-picker-subscription-suite-final.log",
+        "sha256": "17c0025ad5855c50892f706d9a5a17ab78161e01ab31f91c4da77624eaf33e36",
+        "startedAt": "2026-11-05T10:08:21.657179+00:00",
+        "finishedAt": "2026-11-05T10:08:30.217212+00:00",
+        "environment": {
+          "CI": "true"
+        }
+      },
+      {
+        "name": "types-final",
+        "command": [
+          "pnpm",
+          "typecheck"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/issue1284-picker-types-final.log",
+        "sha256": "0ecee11aac946d963c3f28639f1a7d3c6c21acaa4b430f6775dcd83ae8b5681b",
+        "startedAt": "2026-11-05T10:08:30.217670+00:00",
+        "finishedAt": "2026-11-05T10:08:31.032196+00:00",
+        "environment": {
+          "CI": "true"
+        }
+      },
+      {
+        "name": "lint-ui-final",
+        "command": [
+          "pnpm",
+          "lint:ui"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/issue1284-picker-lint-ui-final.log",
+        "sha256": "2051471ade22424840dcbbe4a9fbf98e75c36d7d97a25d07e152f56d755f0862",
+        "startedAt": "2026-11-05T10:08:31.032381+00:00",
+        "finishedAt": "2026-11-05T10:08:39.043650+00:00",
+        "environment": {
+          "CI": "true"
+        }
+      },
+      {
+        "name": "lint-final",
+        "command": [
+          "pnpm",
+          "exec",
+          "oxlint",
+          "components/coordinator/task-profile-picker.tsx",
+          "components/coordinator/task-profile-picker.test.tsx",
+          "components/coordinator/new-task-dialog.tsx",
+          "components/settings/factory-profiles-data.ts"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/issue1284-picker-lint-final.log",
+        "sha256": "f86718ed7a4c28c27033594d75e290d9ff5116c993ac6af204568082ec026f66",
+        "startedAt": "2026-11-05T10:08:39.044265+00:00",
+        "finishedAt": "2026-11-05T10:08:39.424903+00:00",
+        "environment": {
+          "CI": "true"
+        }
+      },
+      {
+        "name": "diffcheck-final",
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/issue1284-picker-diffcheck-final.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "startedAt": "2026-11-05T10:08:39.425072+00:00",
+        "finishedAt": "2026-11-05T10:08:39.432409+00:00",
+        "environment": {
+          "CI": "true"
+        }
+      }
+    ]
+  },
+  "redEvidence": {
+    "completePreChangeReproduction": {
+      "path": "/tmp/issue1284-picker-before.log",
+      "sha256": "73a1fe1428d28f3bec410925fc2fb59e98458efdee4751c6b197ab60f1fd0c2c",
+      "bytes": 16758,
+      "counts": {
+        "tests": 5,
+        "pass": 3,
+        "fail": 2,
+        "skipped": 0
+      },
+      "scope": "checking option disabled and blocking notice on pre-change product; new metadata-priority case was added afterward."
+    },
+    "initialIncompleteHarnessAttempts": [
+      {
+        "name": "issue1284-picker-initial-base-ui-harness.log",
+        "path": "/tmp/issue1284-picker-initial-base-ui-harness.log",
+        "sha256": "2504e5d864e2d53cfaddb4c9079bd5e668dd224783b472c4c08e00fd01a1445c",
+        "bytes": 1236,
+        "outcome": "Incomplete fixture/harness attempt; not counted as a passed or complete product gate."
+      },
+      {
+        "name": "issue1284-picker-initial-dom-harness.log",
+        "path": "/tmp/issue1284-picker-initial-dom-harness.log",
+        "sha256": "2cfb27bb7b6ad5e21c02d647cd34734c1529eb37af99ae6462a6f2713a824aad",
+        "bytes": 1235,
+        "outcome": "Incomplete fixture/harness attempt; not counted as a passed or complete product gate."
+      },
+      {
+        "name": "issue1284-picker-initial-ssr-harness.log",
+        "path": "/tmp/issue1284-picker-initial-ssr-harness.log",
+        "sha256": "ff18e00404c4db09f83b3e699e775645d01e9fb33b195c3c35780a986acf6b83",
+        "bytes": 364,
+        "outcome": "Incomplete fixture/harness attempt; not counted as a passed or complete product gate."
+      }
+    ],
+    "uiPolicyBeforeFixtureProjection": [
+      {
+        "path": "/tmp/issue1284-picker-lint-ui-before.log",
+        "sha256": "8b95fa667e3f378c060491f20f98460c86268695486c5c3d4a9b00b893395f9e",
+        "bytes": 1747
+      },
+      {
+        "path": "/tmp/issue1284-picker-lint-ui-intermediate.log",
+        "sha256": "abe568732f6527d4c74c315eb8da9d55dba556477c53518125a8fdc48304eff9",
+        "bytes": 925
+      }
+    ]
+  },
+  "resourceBoundary": {
+    "sandbox": "sandboxes/sbx_001m6mcf2kr0phmx737s6js1e0r",
+    "worktree": "/workspace/Mikka-1284-picker9727",
+    "databaseRolesCreated": 0,
+    "databasesCreated": 0,
+    "serversStarted": 0,
+    "externalProviderCalls": 0,
+    "realModelCalls": 0,
+    "deepseekChecks": 0,
+    "remainingTestProcesses": 0,
+    "note": "No shared PostgreSQL/server lifecycle was changed."
+  },
+  "pendingFinalBatchVerification": [
+    "Production build at immutable merged source",
+    "Normal TestAccountPool session and management GET",
+    "Actual picker captures showing checking selectable and confirmed unavailable disabled; no paid submission"
+  ],
+  "limitations": [
+    "This fixes a proven UI selection dead end, not ALEX66 native startup or ALEX67 historical Decision confidence.",
+    "Checking is not a grant and is not evidence of sufficient quota. Backend source/credential/Profile/version checks are unchanged."
+  ]
+}

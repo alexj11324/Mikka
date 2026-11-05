@@ -1,0 +1,242 @@
+{
+  "schema": "issue1284-runtime-journal-fix/v1",
+  "createdAt": "2026-11-05T09:52:50.203007+00:00",
+  "source": {
+    "baseCommit": "9727fcfcfc16724e1cfcd915dc28d59b52d69481",
+    "localCheckpoint": "954767dbaefbf41333a6395ed1c467bf2fda3475",
+    "tree": "1caa232e26def94b31523d2dceb8043c76fafbbe",
+    "clean": true,
+    "testBinding": "Tests ran on the identical eight-file working tree sealed by this local checkpoint; no remote CI or production pass is claimed."
+  },
+  "changeScope": "Fresh official-instance install initializes a private exclusive journal before registration/claim; retained runtime refusals expose only closed code/phase. No legacy history is inferred or reset.",
+  "files": [
+    {
+      "path": "lib/cloud-computer/thread-worker-logs.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dc3b985ff7a36970317403e1d46f95d38c75ef09",
+      "sha256": "781392eb1847d38d0ebd7987603b7a890848d52c75f82b485f6e9edcdc314646",
+      "bytes": 18488,
+      "knownRemoteParent": null
+    },
+    {
+      "path": "lib/cloud-computer/thread-worker-logs.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "362a9645db2a4120893fdd41dfb97da13b4047bc",
+      "sha256": "66d39c363654cca27dc1b6f43cd28fac78e82d2ba1f9db5b5fc9eb05d92fd497",
+      "bytes": 7012,
+      "knownRemoteParent": null
+    },
+    {
+      "path": "lib/computer/official-runtime.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "649884acf239452dc4fea0e4d2eb3b91d5b3a6f1",
+      "sha256": "64f1361f58148d65e9e7aaf991e924abbaecf3900c3c6e4833730f62217009ed",
+      "bytes": 9484,
+      "knownRemoteParent": null
+    },
+    {
+      "path": "lib/computer/official-runtime.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e7838e71f89414e3e466468c7e3529842837addc",
+      "sha256": "746e3c60e75a9669c9c574e0d981ed98b8bd2bfcfa98e780246527523d4b2497",
+      "bytes": 7951,
+      "knownRemoteParent": null
+    },
+    {
+      "path": "lib/computer/runtime-refresh-refusal.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bf7d5c4d4126eba97ec9fa4d2c395e5435f30ef7",
+      "sha256": "9afe6450b8943fd5e631bd87a8c8d0d44e6212648148756c2a562a91f93aac38",
+      "bytes": 3384,
+      "knownRemoteParent": null
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8d46e76f1cd602ee6a354fd663a7433886752981",
+      "sha256": "e0b9555c5e3ae6a01751f9bc7fbfc8f849df06d075720b5175085b0df03dd9dc",
+      "bytes": 9015,
+      "knownRemoteParent": null
+    },
+    {
+      "path": "packages/daemon/scripts/refresh-cloud-worker.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "866629a0a0e7e7d5e7fc6788a06135e362d6c4aa",
+      "sha256": "8c51f2efdba116d4f61b54562476c1e7bd098dd282068a48edbd00fdcbf47d6f",
+      "bytes": 10673,
+      "knownRemoteParent": null
+    },
+    {
+      "path": "packages/daemon/scripts/refresh-cloud-worker.test.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9dddc36d9d3396752ddea96638901e22c75bb370",
+      "sha256": "8e10b84a9bb492adc557f037bc1373b7cd9f9284762903ce86a93e9e76588cc4",
+      "bytes": 15939,
+      "knownRemoteParent": null
+    }
+  ],
+  "reproduction": {
+    "file": "logs/issue1284-runtime9727-missing-journal-reproduction.json",
+    "sourceCommit": "9727fcfcfc16724e1cfcd915dc28d59b52d69481",
+    "facts": [
+      "Original switch and rollback both exit 1 when a never-written journal is missing.",
+      "Both fail before stopping the old process or changing the release link/marker; no backup is created.",
+      "Real disposable filesystem/process reproduction; not proof of the production branch."
+    ]
+  },
+  "validation": [
+    {
+      "command": "python3 packages/daemon/scripts/refresh-cloud-worker.test.py [three refusal cases]",
+      "phase": "red",
+      "exitCode": 1,
+      "tests": 3,
+      "errors": 4,
+      "log": "issue1284-runtime9727-python-red.log"
+    },
+    {
+      "command": "node --import ./scripts/server-test.mjs --import tsx --test --test-name-pattern=\"runtime refusal receipt|unknown, extra|runtime guard diagnostics\" lib/computer/official-runtime.test.ts lib/cloud-computer/thread-worker-logs.test.ts",
+      "phase": "red",
+      "exitCode": 1,
+      "tests": 3,
+      "failed": 2,
+      "log": "issue1284-runtime9727-ts-red.log"
+    },
+    {
+      "command": "python3 packages/daemon/scripts/refresh-cloud-worker.test.py [two fresh initialization cases]",
+      "phase": "red",
+      "exitCode": 1,
+      "tests": 2,
+      "failed": 2,
+      "log": "issue1284-runtime9727-initialize-red.log"
+    },
+    {
+      "command": "python3 packages/daemon/scripts/refresh-cloud-worker.test.py",
+      "phase": "green",
+      "exitCode": 0,
+      "tests": 12,
+      "failed": 0,
+      "log": "issue1284-runtime9727-python-complete.log"
+    },
+    {
+      "command": "node --import ./scripts/server-test.mjs --import tsx --test lib/computer/official-runtime.test.ts lib/cloud-computer/thread-worker-logs.test.ts",
+      "phase": "green",
+      "exitCode": 0,
+      "tests": 20,
+      "failed": 0,
+      "skipped": 0,
+      "includesNestedPythonSuite": true,
+      "log": "issue1284-runtime9727-node-complete.log"
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "log": "issue1284-runtime9727-typecheck.log"
+    },
+    {
+      "command": "pnpm exec oxlint lib/computer/official-runtime.ts lib/computer/official-runtime.test.ts lib/computer/runtime-refresh-refusal.ts lib/cloud-computer/thread-worker-logs.ts lib/cloud-computer/thread-worker-logs.test.ts",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0,
+      "log": "issue1284-runtime9727-lint.log"
+    },
+    {
+      "command": [
+        "bash",
+        "-n",
+        "packages/daemon/scripts/official-e2b-instance-bootstrap.sh"
+      ],
+      "exitCode": 0,
+      "stdoutEmpty": true,
+      "stderrEmpty": true
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "HEAD^",
+        "HEAD"
+      ],
+      "exitCode": 0,
+      "stdoutEmpty": true,
+      "stderrEmpty": true
+    }
+  ],
+  "logs": [
+    {
+      "name": "issue1284-runtime9727-python-red.log",
+      "sha256": "8438266d7922252efc33bae5d4633cb455e0fc6e28266485ce4ac6f96e3aee92",
+      "bytes": 5163
+    },
+    {
+      "name": "issue1284-runtime9727-ts-red.log",
+      "sha256": "3844346973e29ff6366d98825d74e08a34935fe898cb1a7f0b09be664218dbf5",
+      "bytes": 2907
+    },
+    {
+      "name": "issue1284-runtime9727-initialize-red.log",
+      "sha256": "438e37085aec45047bfcfd0824dd8b4d3d1df4466d0395e57ff3d423021fcbfa",
+      "bytes": 16827
+    },
+    {
+      "name": "issue1284-runtime9727-python-complete.log",
+      "sha256": "f9a33b7e5349196c4cad0096f475f8245ddb08adb3c683ea2d07c9a8b7f72f10",
+      "bytes": 111
+    },
+    {
+      "name": "issue1284-runtime9727-node-complete.log",
+      "sha256": "1f5cce4a54caf7c7a19143f631669f1c243411250970ef4450573761c4dcff50",
+      "bytes": 2119
+    },
+    {
+      "name": "issue1284-runtime9727-typecheck.log",
+      "sha256": "2ebe880edd7da65f7d7108b4ff5ea08e9c76b2199c2e317cf9372d3fff8c18b7",
+      "bytes": 79
+    },
+    {
+      "name": "issue1284-runtime9727-lint.log",
+      "sha256": "0645e38fd30a1761cf78336e393178e8575c45d268bab1cde30b710b520145c8",
+      "bytes": 90
+    },
+    {
+      "name": "issue1284-runtime9727-missing-journal-reproduction.json",
+      "sha256": "c7380009ce6ffcf93afb0dfa62eed706718031c7e4514676845417908cacf943",
+      "bytes": 1623
+    }
+  ],
+  "independentReview": {
+    "reviewer": "requirements_review",
+    "mode": "read-only",
+    "result": "No blocking issue found in the final eight-file diff. Reviewer did not rerun tests.",
+    "boundaries": [
+      "stage and installed-marker paths never initialize",
+      "legacy missing/corrupt/unreadable/nonregular journal never becomes idle",
+      "exclusive private directory and file; no existing identity/history overwritten",
+      "double journal, native busy, identity, process, release, backup and maintenance-lock boundaries preserved",
+      "bounded exact code/phase receipt adds no authority and exposes no provider payload"
+    ]
+  },
+  "cleanup": {
+    "observedAt": "2026-11-05T09:52:49.972064+00:00",
+    "ownedFixtureSleepersRemaining": 0,
+    "fixtureTemporaryDirectories": "removed by unittest tearDown",
+    "generatedPythonBytecode": "two owned files removed before checkpoint",
+    "startedAppServers": 0,
+    "createdDatabaseRolesOrDatabases": 0,
+    "productionOrE2BMutations": 0,
+    "dockerAndPgLifecycle": "unchanged; managed by root"
+  },
+  "limitations": [
+    "Existing ALEX66 retained VM is not repaired by inferring a missing journal as empty.",
+    "Production has not exposed a specific refusal branch; generic exit 1 alone does not prove a missing journal.",
+    "No new build, live provider validation, production run, or screenshot is claimed here."
+  ]
+}

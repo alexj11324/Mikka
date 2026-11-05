@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-05T10:18:38.247675+00:00",
+  "change": "Profile refusal notice uses archived, disabled, then availability precedence. Default and authoritative execution admission unchanged.",
+  "source": {
+    "baseCommit": "f39d8ddec833612c855515dd8da54bda15fb097d",
+    "checkpointCommit": "af337a145bb7e88ee73925994930ad970662b9c2",
+    "tree": "9c23d6127426960136f15b2f2351f503665a1600",
+    "clean": true,
+    "executionSource": "Final two-file patch on the named base, captured unchanged by checkpoint after gates."
+  },
+  "red": {
+    "counts": {
+      "tests": 6,
+      "pass": 5,
+      "fail": 1,
+      "skipped": 0
+    },
+    "cause": "Existing metadata refusal case received reasons.unavailable rather than reasons.disabled before the product fix.",
+    "log": "/tmp/issue1284-picker-notice-before.log",
+    "sha256": "90b2bd32325856dbb50ccde3c0d13a43aee356225dd360740c4708cc1e6a55bd"
+  },
+  "green": {
+    "counts": {
+      "tests": 6,
+      "pass": 6,
+      "fail": 0,
+      "skipped": 0
+    },
+    "commands": [
+      {
+        "name": "unit-after",
+        "command": [
+          "node",
+          "--experimental-test-module-mocks",
+          "--import",
+          "./scripts/server-test.mjs",
+          "--import",
+          "tsx",
+          "--test",
+          "components/coordinator/task-profile-picker.test.tsx"
+        ],
+        "environment": {
+          "CI": "true"
+        },
+        "exitCode": 0,
+        "startedAt": "2026-11-05T10:17:46.562633+00:00",
+        "finishedAt": "2026-11-05T10:17:47.217006+00:00",
+        "log": "/tmp/issue1284-picker-notice-unit-after.log",
+        "sha256": "803f6de811a8ea29bbc2dd155578aa1b52de041e4469db21a513f89029913f64"
+      },
+      {
+        "name": "types",
+        "command": [
+          "pnpm",
+          "typecheck"
+        ],
+        "environment": {
+          "CI": "true"
+        },
+        "exitCode": 0,
+        "startedAt": "2026-11-05T10:17:47.217471+00:00",
+        "finishedAt": "2026-11-05T10:17:48.649218+00:00",
+        "log": "/tmp/issue1284-picker-notice-types.log",
+        "sha256": "0ecee11aac946d963c3f28639f1a7d3c6c21acaa4b430f6775dcd83ae8b5681b"
+      },
+      {
+        "name": "lint-ui",
+        "command": [
+          "pnpm",
+          "lint:ui"
+        ],
+        "environment": {
+          "CI": "true"
+        },
+        "exitCode": 0,
+        "startedAt": "2026-11-05T10:17:48.649514+00:00",
+        "finishedAt": "2026-11-05T10:17:56.320159+00:00",
+        "log": "/tmp/issue1284-picker-notice-lint-ui.log",
+        "sha256": "2051471ade22424840dcbbe4a9fbf98e75c36d7d97a25d07e152f56d755f0862"
+      },
+      {
+        "name": "oxlint",
+        "command": [
+          "pnpm",
+          "exec",
+          "oxlint",
+          "components/coordinator/task-profile-picker.tsx",
+          "components/coordinator/task-profile-picker.test.tsx"
+        ],
+        "environment": {
+          "CI": "true"
+        },
+        "exitCode": 0,
+        "startedAt": "2026-11-05T10:17:56.320314+00:00",
+        "finishedAt": "2026-11-05T10:17:56.671129+00:00",
+        "log": "/tmp/issue1284-picker-notice-oxlint.log",
+        "sha256": "e1d75b4626e910aaae6e1b411c16fd6d9225a41b00689ffeef6e621cf6716a5c"
+      },
+      {
+        "name": "diffcheck",
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "environment": {
+          "CI": "true"
+        },
+        "exitCode": 0,
+        "startedAt": "2026-11-05T10:17:56.671277+00:00",
+        "finishedAt": "2026-11-05T10:17:56.676644+00:00",
+        "log": "/tmp/issue1284-picker-notice-diffcheck.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "coverage": "Actual TaskProfileNotice markup under available/checking plus disabled/archive metadata; archived wins when both metadata fields refuse. Select surface is a noninteractive unit property projection."
+  },
+  "scope": {
+    "files": [
+      "components/coordinator/task-profile-picker.test.tsx",
+      "components/coordinator/task-profile-picker.tsx"
+    ],
+    "backendChanges": false,
+    "newTestCases": 0,
+    "expandedAssertionsInExistingCase": true,
+    "providerCalls": 0,
+    "databaseResourcesCreated": 0,
+    "serversStarted": 0
+  },
+  "pending": [
+    "Final merged-tree production build and normal session UI capture"
+  ],
+  "priorReceipt": "ops/issue1284-picker-ab83/evidence/receipt.json remains unchanged; prior137/137 refers to the prior source, not this increment."
+}

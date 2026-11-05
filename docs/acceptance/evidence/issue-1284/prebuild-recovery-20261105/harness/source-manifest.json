@@ -1,0 +1,20 @@
+{
+  "kind": "prepared-unexecuted-nonsecret-harness-source",
+  "files": [
+    {
+      "path": "/workspace/scratch/50f8cfcdd7f3/ops/issue1284-final-picker-driver-source/issue1284-final-picker-http-check.mjs",
+      "bytes": 23617,
+      "sha256": "638fab20dca867b272a4d50737bdf5dfdb617fef6ea37a89d3e5f15c8197f233"
+    },
+    {
+      "path": "/workspace/scratch/50f8cfcdd7f3/ops/issue1284-final-picker-driver-source/issue1284-final-picker-fixture.mts",
+      "bytes": 5676,
+      "sha256": "4a64af98732216dd4e879a7fb0825ce84f839bf386af0a4a533cdc4ea9661a39"
+    },
+    {
+      "path": "/workspace/scratch/50f8cfcdd7f3/ops/issue1284-final-picker-driver-source/issue1284-final-picker-screenshots.mjs",
+      "bytes": 7111,
+      "sha256": "cbd76b87933930f31e8c9f49137002ac4376e24a4f4690d7f489cc4b14305110"
+    }
+  ]
+}

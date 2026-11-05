@@ -1,0 +1,362 @@
+{
+  "schema": "issue1284-exact-head-ci/v1",
+  "checkedAt": "2026-11-05T10:07:36.253Z",
+  "repository": "alexj11324/Mikka",
+  "pullRequest": 1362,
+  "head": "6dbb61f1425e83cb931b320c0adad778da07a747",
+  "tree": "1caa232e26def94b31523d2dceb8043c76fafbbe",
+  "baseObserved": "9cc753c660f31a95598998c43545ea030240e9e2",
+  "draftObserved": true,
+  "mergeable": true,
+  "mergeableState": "clean",
+  "counts": {
+    "total": 28,
+    "success": 23,
+    "expectedSkipped": 5,
+    "pending": 0,
+    "failures": 0
+  },
+  "expectedSkipBasis": [
+    {
+      "name": "Cloud credential access (OIDC)",
+      "file": ".github/workflows/ui-policy.yml",
+      "condition": "Push-only credential check; this run is pull_request"
+    },
+    {
+      "names": [
+        "check",
+        "validate",
+        "await-web",
+        "publish"
+      ],
+      "file": ".github/workflows/e2b-official-runtime.yml",
+      "condition": "Release chain runs only non-PR main; check is skipped for pull_request and its dependents remain skipped"
+    }
+  ],
+  "workflows": [
+    {
+      "id": 42006511731,
+      "name": "Browser gate",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "6dbb61f1425e83cb931b320c0adad778da07a747",
+      "path": ".github/workflows/browser-gate.yml",
+      "updatedAt": "2026-11-05T09:56:29Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511731"
+    },
+    {
+      "id": 42006511687,
+      "name": "E2B official instance runtime",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "6dbb61f1425e83cb931b320c0adad778da07a747",
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "updatedAt": "2026-11-05T09:56:35Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511687"
+    },
+    {
+      "id": 42006511594,
+      "name": "Unattended sandbox acceptance",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "6dbb61f1425e83cb931b320c0adad778da07a747",
+      "path": ".github/workflows/unattended-sandbox.yml",
+      "updatedAt": "2026-11-05T09:58:16Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511594"
+    },
+    {
+      "id": 42006511778,
+      "name": "Cloud computer backend",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "6dbb61f1425e83cb931b320c0adad778da07a747",
+      "path": ".github/workflows/cloud-computer.yml",
+      "updatedAt": "2026-11-05T09:58:30Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511778"
+    },
+    {
+      "id": 42006511589,
+      "name": "Analytics SSR",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "6dbb61f1425e83cb931b320c0adad778da07a747",
+      "path": ".github/workflows/analytics-ssr.yml",
+      "updatedAt": "2026-11-05T09:59:32Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511589"
+    },
+    {
+      "id": 42006511577,
+      "name": "E2B subscription custody",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "6dbb61f1425e83cb931b320c0adad778da07a747",
+      "path": ".github/workflows/e2b-byos.yml",
+      "updatedAt": "2026-11-05T10:00:39Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511577"
+    },
+    {
+      "id": 42006511575,
+      "name": "SSH device backend",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "6dbb61f1425e83cb931b320c0adad778da07a747",
+      "path": ".github/workflows/ssh-device-backend.yml",
+      "updatedAt": "2026-11-05T10:01:52Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511575"
+    },
+    {
+      "id": 42006511579,
+      "name": "CI",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "6dbb61f1425e83cb931b320c0adad778da07a747",
+      "path": ".github/workflows/ui-policy.yml",
+      "updatedAt": "2026-11-05T10:02:05Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511579"
+    }
+  ],
+  "checks": [
+    {
+      "id": 127177144724,
+      "name": "UI policy (strict)",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T10:02:04Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511579/job/127177144724"
+    },
+    {
+      "id": 127176516707,
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T10:00:46Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511579/job/127176516707"
+    },
+    {
+      "id": 127175919020,
+      "name": "analytics-ssr",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T09:59:32Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511589/job/127175919020"
+    },
+    {
+      "id": 127174724760,
+      "name": "Analytics SSR (full)",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T09:59:25Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511589/job/127174724760"
+    },
+    {
+      "id": 127174597152,
+      "name": "publish",
+      "status": "completed",
+      "conclusion": "skipped",
+      "completedAt": "2026-11-05T09:56:35Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511687/job/127174597152"
+    },
+    {
+      "id": 127174596831,
+      "name": "await-web",
+      "status": "completed",
+      "conclusion": "skipped",
+      "completedAt": "2026-11-05T09:56:34Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511687/job/127174596831"
+    },
+    {
+      "id": 127174596486,
+      "name": "validate",
+      "status": "completed",
+      "conclusion": "skipped",
+      "completedAt": "2026-11-05T09:56:34Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511687/job/127174596486"
+    },
+    {
+      "id": 127174596068,
+      "name": "check",
+      "status": "completed",
+      "conclusion": "skipped",
+      "completedAt": "2026-11-05T09:56:34Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511687/job/127174596068"
+    },
+    {
+      "id": 127174585482,
+      "name": "Cloud credential access (OIDC)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "completedAt": "2026-11-05T09:56:33Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511579/job/127174585482"
+    },
+    {
+      "id": 127174583823,
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T09:59:20Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511579/job/127174583823"
+    },
+    {
+      "id": 127174583624,
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T10:00:41Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511579/job/127174583624"
+    },
+    {
+      "id": 127174583611,
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T10:00:14Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511579/job/127174583611"
+    },
+    {
+      "id": 127174583601,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T10:00:09Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511579/job/127174583601"
+    },
+    {
+      "id": 127174583543,
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T09:59:53Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511579/job/127174583543"
+    },
+    {
+      "id": 127174583526,
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T10:01:59Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511579/job/127174583526"
+    },
+    {
+      "id": 127174583488,
+      "name": "Integration unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T10:01:27Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511579/job/127174583488"
+    },
+    {
+      "id": 127174583486,
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T09:57:45Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511579/job/127174583486"
+    },
+    {
+      "id": 127174511103,
+      "name": "GitGuardian Security Checks",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T09:56:25Z",
+      "url": "https://dashboard.gitguardian.com"
+    },
+    {
+      "id": 127174502403,
+      "name": "Local driver (macOS permissions, nonblocking)",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T09:56:58Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511778/job/127174502403"
+    },
+    {
+      "id": 127174502108,
+      "name": "Local driver (Linux Xvfb)",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T09:56:55Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511778/job/127174502108"
+    },
+    {
+      "id": 127174501774,
+      "name": "backend",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T09:58:29Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511778/job/127174501774"
+    },
+    {
+      "id": 127174501298,
+      "name": "test",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T09:56:34Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511687/job/127174501298"
+    },
+    {
+      "id": 127174501073,
+      "name": "runtime",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T09:58:16Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511594/job/127174501073"
+    },
+    {
+      "id": 127174501017,
+      "name": "Browser tests (before merge)",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T09:56:28Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511731/job/127174501017"
+    },
+    {
+      "id": 127174500859,
+      "name": "Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T09:56:33Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511579/job/127174500859"
+    },
+    {
+      "id": 127174500699,
+      "name": "ssh",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T10:01:52Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511575/job/127174500699"
+    },
+    {
+      "id": 127174500482,
+      "name": "Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T09:56:52Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511589/job/127174500482"
+    },
+    {
+      "id": 127174500290,
+      "name": "custody",
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-05T10:00:38Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42006511577/job/127174500290"
+    }
+  ],
+  "actions": {
+    "rerun": false,
+    "cancel": false,
+    "merge": false,
+    "sourceModified": false
+  },
+  "limitations": [
+    "CI evidence does not claim production runtime recovery or native Claude/Codex acceptance.",
+    "No runtime service was started for this monitoring."
+  ]
+}

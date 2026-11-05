@@ -1,0 +1,284 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-05T10:37:02.093983+00:00",
+  "source": {
+    "localCommit": "7a5bc4eb1f353fe1f61d880bed39d10a43cfe858",
+    "tree": "7f04f6fce260f8bd7ba7f423136a5ed57227af33",
+    "parents": [
+      "85488c56bbb5dd932510a9bf935ab8f47169bf13",
+      "d76d34007ec3a7a8a364b4e15f9a0f6e46c62635"
+    ],
+    "publicSourceAncestors": [
+      "4f66734b6a4f2590bd485081b7a3ef7365fe55b1",
+      "74bf8e2b40fd1cfe77fcbf6f8bc83ef3a3a57966",
+      "d76d34007ec3a7a8a364b4e15f9a0f6e46c62635"
+    ],
+    "clean": true,
+    "worktree": "/workspace/Mikka-1284-batch-d76",
+    "protocolResolution": "/workspace/Mikka-1284-batch-d76/packages/protocol/src/coded-error.ts"
+  },
+  "merge": {
+    "textConflicts": [
+      "docs/design/factory-agent-profiles.md",
+      "lib/factory/agent-profile-decision.ts",
+      "lib/factory/agent-profile.test.ts"
+    ],
+    "preserved": [
+      "Latest main single constrained Profile-and-reason pair; exact pair table lookup, answers.size=1, confidence floor0.55,201-choice bound, no legacy two-answer fallback.",
+      "Host currentWork stage responsibility, nullable actual candidate SHA, producer public metadata, and original task as untrusted background.",
+      "Final checking picker behavior and metadata refusal notices.",
+      "Latest main real-PostgreSQL synthetic-Owner recovery assertions; agent-profile.db.test.ts identical to main d76."
+    ],
+    "adaptation": "Rejection diagnostics map a known complete pair through the same choice table, log only eligible UUID and finite0..1 confidence, and reject raw/bare IDs, unknown suffixes and extra legacy answers. No raw pair is logged.",
+    "independentReview": "requirements_review read the actual product/unit/PG union; no blocker, no additional tests run."
+  },
+  "validation": {
+    "totalTests": 111,
+    "unit": {
+      "counts": {
+        "tests": 15,
+        "pass": 15,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "executionSource": "Final staged merge source; unchanged when captured by localCommit.",
+      "commands": [
+        {
+          "name": "unit-after",
+          "command": [
+            "node",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "lib/factory/agent-profile.test.ts"
+          ],
+          "environment": {
+            "CI": "true"
+          },
+          "exitCode": 0,
+          "startedAt": "2026-11-05T10:31:23.226494+00:00",
+          "finishedAt": "2026-11-05T10:31:23.758110+00:00",
+          "log": "/tmp/issue1284-d76-unit-after.log",
+          "sha256": "d88abe540890f4fd008611d22244d7da0da2dcb24b74175623651355960f56f6"
+        },
+        {
+          "name": "types",
+          "command": [
+            "pnpm",
+            "typecheck"
+          ],
+          "environment": {
+            "CI": "true"
+          },
+          "exitCode": 0,
+          "startedAt": "2026-11-05T10:31:23.758335+00:00",
+          "finishedAt": "2026-11-05T10:31:27.251698+00:00",
+          "log": "/tmp/issue1284-d76-types.log",
+          "sha256": "c05c62f67430a8a24bb55ac190723a1bb270f543d5b4c029f407a0740f9dbde0"
+        },
+        {
+          "name": "lint",
+          "command": [
+            "pnpm",
+            "exec",
+            "oxlint",
+            "lib/factory/agent-profile-decision.ts",
+            "lib/factory/agent-profile.test.ts",
+            "lib/factory/agent-profile.db.test.ts",
+            "lib/factory/profile-dispatch.db.test.ts"
+          ],
+          "environment": {
+            "CI": "true"
+          },
+          "exitCode": 0,
+          "startedAt": "2026-11-05T10:31:27.252089+00:00",
+          "finishedAt": "2026-11-05T10:31:27.632859+00:00",
+          "log": "/tmp/issue1284-d76-lint.log",
+          "sha256": "dcb2ca257ab6819d42397334a3f8e4a9e38a5c6879aa22ecf781a43f4b768d26"
+        },
+        {
+          "name": "diff",
+          "command": [
+            "git",
+            "diff",
+            "--cached",
+            "--check"
+          ],
+          "environment": {
+            "CI": "true"
+          },
+          "exitCode": 0,
+          "startedAt": "2026-11-05T10:31:27.633036+00:00",
+          "finishedAt": "2026-11-05T10:31:27.639167+00:00",
+          "log": "/tmp/issue1284-d76-diff.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    "realPostgres": {
+      "counts": {
+        "tests": 96,
+        "pass": 96,
+        "fail": 0,
+        "skipped": 0
+      },
+      "commands": [
+        {
+          "name": "setup",
+          "command": [
+            "pnpm",
+            "test:e2e:setup"
+          ],
+          "exitCode": 0,
+          "sourceCommit": "7a5bc4eb1f353fe1f61d880bed39d10a43cfe858",
+          "sourceTree": "7f04f6fce260f8bd7ba7f423136a5ed57227af33",
+          "startedAt": "2026-11-05T10:33:46.529229+00:00",
+          "finishedAt": "2026-11-05T10:33:49.320493+00:00",
+          "log": "/tmp/issue1284-d76-setup.log",
+          "sha256": "12b78dd99453bbf0726e3de63b8a9c1921b3bfe49171d74d9aaceda72f26550f",
+          "counts": {},
+          "environment": {
+            "CI": "true",
+            "REQUIRE_DB": "1",
+            "RUN_DISPATCH_DB_TESTS": "1",
+            "databaseRole": "mikka1284_pair_539b63b6",
+            "database": "mikka1284_pair_539b63b6_e2e"
+          }
+        },
+        {
+          "name": "profile-db",
+          "command": [
+            "node",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "lib/factory/agent-profile.db.test.ts"
+          ],
+          "exitCode": 0,
+          "sourceCommit": "7a5bc4eb1f353fe1f61d880bed39d10a43cfe858",
+          "sourceTree": "7f04f6fce260f8bd7ba7f423136a5ed57227af33",
+          "startedAt": "2026-11-05T10:33:49.320901+00:00",
+          "finishedAt": "2026-11-05T10:34:38.031075+00:00",
+          "log": "/tmp/issue1284-d76-profile-db.log",
+          "sha256": "edfe98d45ce91ffeeca695bea0a1bee0999fec18fd94d8b7a236fbeaaee4ee9c",
+          "counts": {
+            "tests": 49,
+            "pass": 49,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0
+          },
+          "environment": {
+            "CI": "true",
+            "REQUIRE_DB": "1",
+            "RUN_DISPATCH_DB_TESTS": "1",
+            "databaseRole": "mikka1284_pair_539b63b6",
+            "database": "mikka1284_pair_539b63b6_e2e"
+          }
+        },
+        {
+          "name": "dispatch-db",
+          "command": [
+            "node",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "lib/factory/profile-dispatch.db.test.ts"
+          ],
+          "exitCode": 0,
+          "sourceCommit": "7a5bc4eb1f353fe1f61d880bed39d10a43cfe858",
+          "sourceTree": "7f04f6fce260f8bd7ba7f423136a5ed57227af33",
+          "startedAt": "2026-11-05T10:34:38.031339+00:00",
+          "finishedAt": "2026-11-05T10:34:51.994312+00:00",
+          "log": "/tmp/issue1284-d76-dispatch-db.log",
+          "sha256": "e1daebacc1a9e3dbde803bc62d334757872f8ba814442b1eb56e375136de3e3f",
+          "counts": {
+            "tests": 47,
+            "pass": 47,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0
+          },
+          "environment": {
+            "CI": "true",
+            "REQUIRE_DB": "1",
+            "RUN_DISPATCH_DB_TESTS": "1",
+            "databaseRole": "mikka1284_pair_539b63b6",
+            "database": "mikka1284_pair_539b63b6_e2e"
+          }
+        }
+      ],
+      "executionSource": "Exact clean localCommit; PostgreSQL17, isolated owned role and databases, synthetic provider/Decision transport.",
+      "routeTestBoundary": "Existing recovery cases invoke the Owner domain handleFactory handler with synthetic identity; no Next listener, session adapter or production Owner action was exercised."
+    },
+    "redReproduction": {
+      "counts": {
+        "tests": 15,
+        "pass": 14,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "log": {
+        "path": "/tmp/issue1284-d76-unit-before.log",
+        "sha256": "c136cde752753b350a7605406b9a5f0de00123100ed768f61121beb1c3d3a65a",
+        "bytes": 2606
+      },
+      "cause": "Before pair diagnostics adaptation, the known eligible low-confidence pair lost its selectedProfileId. All other14 unit cases passed."
+    }
+  },
+  "cleanup": {
+    "receipt": {
+      "completedAt": "2026-11-05T10:35:53.297787+00:00",
+      "role": "mikka1284_pair_539b63b6",
+      "ownedDatabasesBefore": [
+        {
+          "database": "mikka1284_pair_539b63b6_e2e",
+          "sessions": 0
+        }
+      ],
+      "roleSessionsBefore": 0,
+      "databasesDropped": [
+        "mikka1284_pair_539b63b6_e2e"
+      ],
+      "roleDropped": true,
+      "privateConfigDeleted": true,
+      "forceUsed": false,
+      "terminateUsed": false,
+      "clusterStopped": false,
+      "remainingOwnedDatabases": 0,
+      "remainingRole": false
+    },
+    "log": {
+      "path": "/tmp/issue1284-d76-cleanup.json",
+      "sha256": "b776513c333fb0c6dfab918ca84827f7ff4a86c254f47348f6831e95af53fbc3",
+      "bytes": 485
+    }
+  },
+  "boundaries": {
+    "realModelCalls": 0,
+    "providerAPICalls": 0,
+    "deepseekChecks": 0,
+    "productionDataChanges": 0,
+    "buildRun": false,
+    "liveHttpRun": false,
+    "initialPgState": "Existing cluster17/main was down; first pg_isready returned2 before role creation. Started the existing cluster once in coordination with ui_impl, without configuration changes.",
+    "pgClusterLeftRunning": true,
+    "pending": [
+      "UI separate queued-Stop increment",
+      "Final immutable remote batch identity",
+      "One final production build/normal session HTTP/screenshots/CI and production acceptance"
+    ],
+    "historicalProductionConfidence": "The original production selection ID and confidence were not exposed; synthetic0.42 exercises the diagnostic contract and is not a reconstruction of that response."
+  }
+}

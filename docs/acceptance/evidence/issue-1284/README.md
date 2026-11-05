@@ -222,3 +222,10 @@ ALEX-67 / Task `b5785091-2c95-4f55-821d-fce51e027b0e` 实际 Claude Code native 
 ## Review selection recovery follow-up (10d / PR #1361)
 
 [Scoped repair and immutable 9727 production observations](review-context-10d/README.md). The source CI passed with one expected OIDC skip; the recorded production Review and queued frontend run remain blocked. The two historical static credential audits cover exactly the three manifest files and are not new provider or production acceptance.
+
+
+## 2026-11-05 frozen recovery evidence before the final build
+
+The [pre-build recovery group](prebuild-recovery-20261105/README.md) preserves 20 exact files (112,703 bytes) covering versioned source checks, the actual blocked production observations, the completed disabled Profile edit/archive exercise, and prepared HTTP/screenshot harness source. Its [manifest](prebuild-recovery-20261105/manifest.json) has SHA-256 `4972b5cbb162f4790342dcb9499716f002b5bb271658beabb613839baeedaef7`. Both retained 42b and 5251 TestAccountPool contexts passed their official static evidence audits on these exact bytes at 11:17 UTC. The audit reports sit outside the 20-file candidate count.
+
+This group does not include the pending queued-Stop increment, final merged build/HTTP/screenshots, or a completed native Codex Review. The recorded `d76d340` Review retry stayed blocked with no new Run and preserved the original candidate; the separate Profile lifecycle result is management-only. No DeepSeek coding prompt was attempted. The latest AGENTS rule removes the API-key path from merge and acceptance gates; both official subscription paths still require their own truthful results.

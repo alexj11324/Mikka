@@ -1,0 +1,23 @@
+{
+  "kind": "prepared-unexecuted-harness-cleanup-fix",
+  "preparedAt": "2026-11-05T11:13:36.432984+00:00",
+  "remotePath": "/tmp/issue1284-final-picker-http-check.mjs",
+  "previousSha256": "69e5629f767a3aa0175fa4593ff2d38a277a9cd54a0511c3cf82a7143539742e",
+  "sha256": "638fab20dca867b272a4d50737bdf5dfdb617fef6ea37a89d3e5f15c8197f233",
+  "bytes": 23617,
+  "changes": [
+    "Each successful Profile POST is recorded immediately for cleanup.",
+    "Finally recovers saved metadata and verifies owner, source commit and tree before cleanup; ENOENT is ignored only for the initial metadata read.",
+    "Cleanup failures continue to mark the acceptance failed; no guard or assertion was removed."
+  ],
+  "syntaxCheck": {
+    "command": "node --check /tmp/issue1284-final-picker-http-check.mjs",
+    "exitCode": 0
+  },
+  "productSourceChanged": false,
+  "databaseCreated": false,
+  "servicesStarted": false,
+  "httpExecuted": false,
+  "old51AssertionsUnchanged": true,
+  "sourceManifestSha256": "bd4d90bfdced776c11af4bd0ecfaa97c7bc161eb76c5ba2d39417f0519a67a04"
+}

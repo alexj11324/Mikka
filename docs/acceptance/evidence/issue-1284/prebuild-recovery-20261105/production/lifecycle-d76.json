@@ -1,0 +1,48 @@
+{
+  "schema": "issue1284-production-profile-lifecycle/v1",
+  "profileId": "9192fe4b-b145-4baf-afb1-e6a364cf1b7b",
+  "name": "1284 生命周期验收（停用）",
+  "source": "normal Owner settings UI",
+  "createdObservedAt": "2026-11-05T10:30:27.844Z",
+  "productionSha": "d76d34007ec3a7a8a364b4e15f9a0f6e46c62635",
+  "initial": {
+    "version": 1,
+    "digest": "7c81d4c1f7c6b9c0d2f9bf25d167202cef941b04bd1c267124a70f50d47fd9ad",
+    "enabled": false,
+    "archivedAt": null,
+    "availability": "disabled"
+  },
+  "everEnabled": false,
+  "nativeDispatchRequested": false,
+  "existingThreeProfilesVersionsUnchanged": true,
+  "cleanupPending": false,
+  "edited": {
+    "observedAt": "2026-11-05T10:32:00.657Z",
+    "name": "1284 生命周期验收（已编辑·停用）",
+    "version": 2,
+    "digest": "e1d019fcb60f09fbbd995f31dd4c306522ea2eab06ce57f174de8167cb620541",
+    "enabled": false,
+    "archivedAt": null,
+    "availability": "disabled"
+  },
+  "persistedAfterSettingsReload": true,
+  "image": {
+    "browserPath": "/home/oai/share/browser-screenshot-1793874778699.jpg",
+    "capturedAt": "2026-11-05T10:32:58.700Z",
+    "syncVerified": false
+  },
+  "archived": {
+    "apiObservedAt": "2026-11-05T10:34:53.349Z",
+    "uiObservedAt": "2026-11-05T10:35:00.715Z",
+    "normalUiConfirmationCompleted": true,
+    "absentFromManagementList": true,
+    "absentFromSettingsUi": true,
+    "archivedAt": "not_exposed",
+    "remainingExecutionProfilesUnchanged": true
+  },
+  "limitations": [
+    "This proves normal Owner Profile management only, not native CC/Codex execution or in-flight version freezing.",
+    "The normal management endpoint omits archived rows; archivedAt is not exposed by this readback.",
+    "The screenshot was visually inspected in the browser, but its file did not synchronize within five seconds and is not linked as an attached artifact."
+  ]
+}

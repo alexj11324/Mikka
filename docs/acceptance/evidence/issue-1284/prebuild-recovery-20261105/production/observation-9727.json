@@ -1,0 +1,119 @@
+{
+  "kind": "issue-1284-production-observation",
+  "servingCommit": "9727fcfcfc16724e1cfcd915dc28d59b52d69481",
+  "deploymentId": "dpl_9aiT1rnsgY7FWTTRhPr9xazDdwTP",
+  "observedVersionWindowUTC": [
+    "2026-11-05T09:05:45Z",
+    "2026-11-05T09:06:19Z"
+  ],
+  "backend": {
+    "servingCommit": "9727fcfcfc16724e1cfcd915dc28d59b52d69481",
+    "deploymentId": "dpl_9aiT1rnsgY7FWTTRhPr9xazDdwTP",
+    "taskId": "b5785091-2c95-4f55-821d-fce51e027b0e",
+    "issueId": "6cda8149-144c-49cc-bdcb-a85ff14cb144",
+    "originalExecuteRunId": "52c25088-3cbf-4e3f-882f-d7b3296637a4",
+    "retryStartedAt": "2026-11-05T09:07:08.531Z",
+    "observedAt": "2026-11-05T09:07:27.952Z",
+    "stage": "review",
+    "status": "blocked",
+    "revision": 7,
+    "candidate": {
+      "id": "816513cf-503e-4ccc-b708-4bbd565206f3",
+      "sha": null,
+      "runId": "52c25088-3cbf-4e3f-882f-d7b3296637a4"
+    },
+    "reviewAttemptId": "53459953-114d-4959-b98a-bb36b7b3d7de",
+    "reviewRunId": null,
+    "checkDispatchRecovery": {
+      "binding": {
+        "taskId": "b5785091-2c95-4f55-821d-fce51e027b0e",
+        "revision": 7
+      }
+    },
+    "outcome": "Original completed producer/candidate preserved; Review selection still blocked, no native Codex execution yet."
+  },
+  "backendDiagnostics": [
+    {
+      "level": "warn",
+      "msg": "agentProfileDecisionUnavailable",
+      "event": "coded_error",
+      "code": "agentProfileDecisionUnavailable",
+      "detail": "uncertain_profile",
+      "causes": [],
+      "issueId": "6cda8149-144c-49cc-bdcb-a85ff14cb144",
+      "stage": "review",
+      "candidateCount": 3,
+      "candidateIds": "55e1952f-0129-43c6-9690-2f1b9d99e6b2,923c75f2-cecb-4bb2-b812-646d057e8a22,1880144e-4005-4d72-b3e3-6f362fbe8bd8",
+      "profileCount": 3,
+      "profileAvailability": "55e1952f-0129-43c6-9690-2f1b9d99e6b2:available,923c75f2-cecb-4bb2-b812-646d057e8a22:available,1880144e-4005-4d72-b3e3-6f362fbe8bd8:available",
+      "profileDiagnosticsTruncated": false,
+      "decisionExecutionId": "b65b9d07-221e-4bb0-af02-c613efcd9d02"
+    }
+  ],
+  "frontend": {
+    "runId": "bc74cb2f-c209-49c3-819d-2ba28a700dc7",
+    "taskId": "9c1da61e-14e2-4a96-a228-7085bebcfd5a",
+    "attemptId": "09546245-666c-4731-9f86-c68f6f7a9052",
+    "revision": 5,
+    "profileId": "55e1952f-0129-43c6-9690-2f1b9d99e6b2",
+    "profileVersion": 1,
+    "profileDigest": "3a33e10dff60bf8ae3c5702ab9ce6b30184f9b3c4e65cff1055caea87621c182",
+    "source": "decision",
+    "reason": "capability_fit",
+    "harness": "claude_code",
+    "model": "claude-haiku-5-5",
+    "credentialType": "subscription",
+    "subscriptionRoute": "claude_code_cli",
+    "nativeStarted": false,
+    "observedAt": "2026-11-05T09:13:40.080Z",
+    "threadStatus": "running",
+    "nativeItems": 0,
+    "retry": {
+      "taskId": "9c1da61e-14e2-4a96-a228-7085bebcfd5a",
+      "oldRunId": "aef86f65-3c9b-4434-8f50-eaaed004678b",
+      "startedAt": "2026-11-05T09:11:31.581Z",
+      "source": "normal Owner Thread Retry",
+      "servingCommit": "9727fcfcfc16724e1cfcd915dc28d59b52d69481"
+    },
+    "latest": {
+      "at": "2026-11-05T09:19:34.305Z",
+      "threadStatus": "running",
+      "active": true,
+      "working": true,
+      "paused": null,
+      "error": null,
+      "summary": null,
+      "itemCount": 0,
+      "nativeStartVerified": false
+    },
+    "runtimeRefreshFailures": [
+      {
+        "at": "2026-11-05T09:12:02.666Z",
+        "phase": "switch_release",
+        "errorClass": "CommandExitError",
+        "errorCode": "unknown",
+        "exitCode": 1
+      },
+      {
+        "at": "2026-11-05T09:12:02.941Z",
+        "phase": "rollback",
+        "errorClass": "CommandExitError",
+        "errorCode": "unknown",
+        "exitCode": 1
+      }
+    ],
+    "preservation": {
+      "ownerStopNotRequested": true,
+      "reason": "Normal Stop may terminate the task VM and remove runtime journal/backup files; retain the stopped-startup scene while isolated diagnostics are prepared."
+    }
+  },
+  "limits": {
+    "noProductionSQL": true,
+    "noSubscriptionOrAccountChanges": true,
+    "noNativeSessionMigrationClaim": true,
+    "api": "DeepSeek skipped per Alex; no balance testing or model fallback",
+    "profileV2": "Editor draft only; not saved before actual native startup",
+    "issueState": "open",
+    "nativeCodexReviewVerified": false
+  }
+}
