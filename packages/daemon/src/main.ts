@@ -283,6 +283,13 @@ export class Daemon {
   constructor(private readonly options: DaemonOptions) {
     this.paths = daemonPaths(options.dataDir)
     this.log = options.log ?? createLogger({ dir: this.paths.logs })
+    // A cloud computer runs the daemon built with this deployment, whose server
+    // pushes every run-control write (notifyRunControl). Off the gateway (no
+    // ticket yet, a refused ticket, a dropped socket) its runs use the 20 s
+    // fallback, never the 1 s check kept for older self-hosted servers: stops
+    // still arrive at once through the commands long poll, which the same
+    // write wakes, and each provider request checks its own authority.
+    this.runControlPush = Boolean(options.hostedSubscriptions)
   }
 
   async start() {
@@ -328,6 +335,8 @@ export class Daemon {
     this.repositories = new RepositoryCache(paths.repos, undefined, this.options.retainResources)
     // Hosted subscriptions start their CLIs through the hosted runner.
     this.sandbox = this.options.hostedSubscriptions ? null : await this.createAgentSandbox()
+    // Before its first gateway session, too (runControlPush in the constructor).
+    if (this.runControlPush) this.options.link.setRunControlMode?.('fallback')
     if (this.stopped) throw new Error("daemon stopped during startup")
     if (!this.options.hostedSubscriptions && this.sandbox) this.localComputerDriver = await detectComputerDriver()
     if (this.localComputerDriver && this.options.link.syncComputerReviews && this.options.link.localComputerAuthority) {
@@ -775,7 +784,7 @@ export class Daemon {
       const ticket = await mint.call(this.options.link, deviceId, connection.signal)
       // Only a server that pushes every run-control write lets live runs drop
       // their periodic check; an older one keeps the one-second check.
-      this.runControlPush = ticket.runControl === 'push'
+      this.runControlPush = ticket.runControl === 'push' || Boolean(this.options.hostedSubscriptions)
       this.options.link.setRunControlMode?.(this.runControlPush ? 'fallback' : 'legacy')
       this.workSignal.setPushedWaits((['computerReviews', 'coordinatorResults'] as const satisfies readonly PushedWait[]).filter(wait => ticket[wait] === 'push'))
       if (!ticket.url || !ticket.protocol) { this.gatewayUnavailable = true; return false }

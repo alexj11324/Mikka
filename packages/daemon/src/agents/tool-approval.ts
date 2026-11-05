@@ -23,7 +23,16 @@ const MAX_TIMER_MS = 2 ** 31 - 1
 
 /** A watcher's check may return an epoch ms (an expiry) by which it must run again. */
 type WatchCheck = () => Promise<unknown>
-type Watcher = { check?: WatchCheck; running: boolean; dirty: boolean; intervalMs?: number; due?: ReturnType<typeof setTimeout> }
+type Watcher = { check?: WatchCheck; running: boolean; dirty: boolean; intervalMs?: number; timedFloorMs?: number; lastRun?: number; due?: ReturnType<typeof setTimeout> }
+export type WatchOptions = {
+  /** A timer tick (not a push, mode switch or due time) runs this watcher's
+   * check at most this often. For a costly check whose changes are pushed or
+   * bounded by its own due time; the liveness check still runs every tick. */
+  timedFloorMs?: number
+  /** Epoch ms by which the check first runs (an expiry already known), as if
+   * a first check had returned it. */
+  dueAt?: number
+}
 
 async function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) throw new Error('cancelled')
@@ -45,6 +54,8 @@ export class ToolApprovalGate {
   private intervalMs?: number
   private monitoring?: Promise<void>
   private dirty = false
+  /** A push, mode switch or due time is waiting for the monitor loop. */
+  private pushed = false
   private mode: RunControlMode
   private readonly changes = new Set<() => void>()
   constructor(readonly runId: string, private readonly host: ToolApprovalHost, mode: RunControlMode = 'legacy') { this.mode = mode }
@@ -115,12 +126,15 @@ export class ToolApprovalGate {
    * fresh result; a check may return an epoch ms (an expiry) by which it runs
    * again. Actual operations still call checkLive. Slow credential I/O never
    * delays the next liveness check. `intervalMs` only shortens a timed cadence. */
-  watch(check?: WatchCheck, intervalMs?: number): () => void {
+  watch(check?: WatchCheck, intervalMs?: number, options: WatchOptions = {}): () => void {
     if (this.revoked) return () => {}
     if (intervalMs !== undefined && (!Number.isFinite(intervalMs) || intervalMs <= 0 || intervalMs > RUN_CONTROL_FALLBACK_MS)) throw new Error('Run monitor interval unavailable')
-    const monitor: Watcher = { check, running: false, dirty: false, intervalMs }
+    const { timedFloorMs } = options
+    if (timedFloorMs !== undefined && (!Number.isFinite(timedFloorMs) || timedFloorMs <= 0)) throw new Error('Run monitor interval unavailable')
+    const monitor: Watcher = { check, running: false, dirty: false, intervalMs, timedFloorMs }
     this.monitors.add(monitor)
     this.scheduleMonitor()
+    if (options.dueAt !== undefined) this.due(monitor, options.dueAt)
     return () => { clearTimeout(monitor.due); this.monitors.delete(monitor); this.scheduleMonitor() }
   }
   private scheduleMonitor() {
@@ -154,6 +168,7 @@ export class ToolApprovalGate {
     if (this.revoked || !this.monitors.size) return
     if (this.monitoring && !invalidated) return
     this.dirty = true
+    if (invalidated) this.pushed = true
     if (this.monitoring) return
     // A real operation may have started the shared HTTP request before this
     // push, while no background check existed yet. Its old success cannot
@@ -162,16 +177,20 @@ export class ToolApprovalGate {
     this.monitoring = (async () => {
       while (this.dirty && !this.revoked && this.monitors.size) {
         this.dirty = false
+        const pushed = this.pushed
+        this.pushed = false
         if (!await this.checkLive()) { this.revoke(); return }
-        if (olderOperation) { olderOperation = false; this.dirty = true; continue }
+        if (olderOperation) { olderOperation = false; this.dirty = true; this.pushed ||= pushed; continue }
         for (const monitor of this.monitors) {
           if (!monitor.check) continue
+          if (!pushed && monitor.timedFloorMs !== undefined && monitor.lastRun !== undefined && performance.now() - monitor.lastRun < monitor.timedFloorMs) continue
           monitor.dirty = true
           if (monitor.running) continue
           monitor.running = true
           void (async () => {
             while (monitor.dirty && !this.revoked && this.monitors.has(monitor)) {
               monitor.dirty = false
+              monitor.lastRun = performance.now()
               const due = await monitor.check!()
               this.due(monitor, due)
             }

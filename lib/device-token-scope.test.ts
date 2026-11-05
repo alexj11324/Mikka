@@ -12,6 +12,12 @@ test('cloud device token admits only its own explicit daemon routes', async () =
   for (const path of [`/v1/devices/${own}/heartbeat`, `/mikka/v1/devices/${own}/runs`, `/v1/devices/${own}/runs/${run}/claim`, `/v1/runs/${run}/events`, `/v1/runs/${run}/tool-approval`, `/v1/runs/${run}/policy-snapshot?deviceId=${own}`]) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), true)
   for (const path of [`/v1/devices/${other}/heartbeat`, `/v1/devices/${own}/runs/${other}/claim`, `/v1/runs/${other}/events`, `/v1/runs/${other}/tool-approval`, `/v1/runs/${other}/policy-snapshot?deviceId=${own}`, `/v1/devices/${own}/coordinator`, `/v1/devices/${own}/runs/${run}/future`, '/api/subscriptions', '/v1/devices/other']) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), false)
 })
+test('a cloud device token mints the push gateway ticket of its own device only', async () => {
+  // Without it the cloud daemon never joins the gateway and its live runs fall
+  // back to the one-second run-control and subscription checks.
+  assert.equal(await cloudDeviceScopeAllows(req(`/mikka/v1/devices/${own}/gateway`), own, belongs), true)
+  for (const path of [`/v1/devices/${other}/gateway`, `/v1/devices/${own}/gateway/extra`, `/v1/devices/${own}/socket`]) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), false)
+})
 test('registration must explicitly name the bound device', async () => {
   for (const [deviceId, expected] of [[own, true], [other, false], [undefined, false]] as const) {
     const request = req('/mikka/v1/devices/register', { method: 'POST', body: JSON.stringify({ deviceId }) })

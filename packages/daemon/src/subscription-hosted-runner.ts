@@ -32,7 +32,7 @@ import type { AgentSession, StartOptions } from "./adapters/types";
 import { runPaths } from "./agents/run-context";
 import type { spawnCli } from "./agents/child";
 import type { AgentSandbox } from "./agents/sandbox";
-import { requireRunToolApproval } from "./agents/tool-approval";
+import { RUN_CONTROL_FALLBACK_MS, requireRunToolApproval } from "./agents/tool-approval";
 import { createNativeSubscriptionBroker } from "./subscription-native-broker";
 import { DaemonError, ServerUnreachableError } from "./errors";
 import { ProviderFailureError } from "@mikka/protocol/provider-failure";
@@ -56,6 +56,8 @@ const computerProxy = fileURLToPath(new URL("./computer/proxy.mjs", import.meta.
 const placeholder = "mikka-native-broker-placeholder";
 /** How long before a subscription token expires its run re-reads the broker context. */
 const SUBSCRIPTION_REFRESH_LEAD_MS = 60_000;
+/** Without a push, a run's background subscription context read runs at most this often. */
+export const SUBSCRIPTION_TIMED_FLOOR_MS = RUN_CONTROL_FALLBACK_MS;
 type Detail = UserErrorDetail<"subscription_hosted_runtime_unavailable">;
 /** One code for the UI; the detail says which check failed, the cause is kept (decision 2026-11-05-0330). */
 const unavailable = (detail: Detail, cause?: unknown) =>
@@ -472,15 +474,20 @@ export async function createHostedBotRunner(host: {
           // It runs on each run-control push and again when the subscription
           // token is due: shortly before it expires (the broker refreshes it),
           // then at expiry itself if it did not move, where the check fails closed.
+          // The first context's expiry seeds the watcher, so a run that gets no
+          // push still re-reads shortly before its token expires. A read already
+          // inside that lead time waits for the expiry itself.
+          const firstExpiry = Date.parse(first.expiresAt);
+          const firstDue = Number.isFinite(firstExpiry) ? firstExpiry - SUBSCRIPTION_REFRESH_LEAD_MS : undefined;
           let lastExpiry: number | undefined;
           const background = async () => {
             const current = await check("context_check", false);
             const expiry = Date.parse(current.expiresAt);
-            const due = expiry === lastExpiry ? expiry : expiry - SUBSCRIPTION_REFRESH_LEAD_MS;
+            const due = expiry === lastExpiry || expiry - SUBSCRIPTION_REFRESH_LEAD_MS <= Date.now() ? expiry : expiry - SUBSCRIPTION_REFRESH_LEAD_MS;
             lastExpiry = expiry;
             return due;
           };
-          return { first, revision, check, background };
+          return { first, revision, check, background, firstDue };
         })() : undefined;
         // An API-key run is live while its gate is; withdrawing the key stops the run from the server.
         const check: () => Promise<unknown> = subscription?.check ?? live;
@@ -778,7 +785,13 @@ export async function createHostedBotRunner(host: {
           // A quick, successful adapter may already have ended and revoked its
           // gate here. Preserve its terminal events; sends/spawns/provider work
           // remain fenced by close, and do not install a new monitor after it.
-          if (!closed) offMonitor = gate.watch(subscription?.background);
+          // A fallback or legacy timer tick re-reads the context at most every
+          // 20 s (each tick did, about one request every 3 s on cloud runs):
+          // changes come by push, at token expiry and with each provider
+          // request's own fresh check. Pushes and the expiry always re-read.
+          if (!closed) offMonitor = subscription
+            ? gate.watch(subscription.background, undefined, { timedFloorMs: SUBSCRIPTION_TIMED_FLOOR_MS, dueAt: subscription.firstDue })
+            : gate.watch();
           const finish = async () => {
             offMonitor();
             await close();
