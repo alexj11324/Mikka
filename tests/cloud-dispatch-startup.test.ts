@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 import { ComputerError } from '../lib/computer/store'
+import * as profileDefinitions from '../lib/factory/agent-profile-definition'
 
 const owner = 'synthetic-owner', botId = '10000000-0000-4000-8000-000000000001'
 const issueId = '10000000-0000-4000-8000-000000000002', runId = '10000000-0000-4000-8000-000000000003'
@@ -9,6 +10,7 @@ const priorRunId = '10000000-0000-4000-8000-000000000006'
 const workspaceId = 'workspace', agentId = 'agent', model = 'synthetic-model'
 const calls: string[] = []
 let failure: 'wake' | 'machine' | 'lifecycle' | null = null
+let settledStartup = true
 let present = true, workspaceAllowed = true, issueAllowed = true, suggestionAllowed = true
 let permission: string | undefined, awake = true, credentialAvailable = true, switchedCredential = false
 let moveDevice = false, replaceAgent = false, revokeDuringWake = false, revokeWorkspaceDuringWake = false
@@ -51,6 +53,12 @@ stub('../lib/model-dispatch.ts', {
     bindingSelections++
     assert.equal(selectedAgent, agentId); assert.equal(connectionId, subscription.connectionId); assert.equal(selected, model)
     return bindingId
+  },
+})
+stub('../lib/factory/agent-profile.ts', { ...profileDefinitions, assertProfileTarget: unused, assertProfileSelection: unused,
+  resolveAgentProfileDispatch: async (db: unknown, scope: unknown, request: { asked?: { harness: string; model?: string } }) => {
+    const { resolveModelDispatch } = await import('../lib/model-dispatch')
+    return { target: await resolveModelDispatch(db as never, scope as never, request.asked as never), selectionMode: request.asked?.model ? 'picked' : 'preference' }
   },
 })
 stub('../lib/computer/native-run-binding.ts', { nativeRunBinding: async (_pool: unknown, user: string, agent: string, harness: string, workspace: string, binding?: string) => {
@@ -100,7 +108,7 @@ stub('../lib/run-leases.ts', { failUnclaimedCloudStart: async (actor: unknown, i
   assert.deepEqual(actor, { userId: owner, workspaceId }); assert.equal(id, runId)
   assert.ok(error instanceof Error)
   calls.push('fail-unclaimed-start')
-  return true
+  return settledStartup
 } })
 mock.module('workflow/api', { namedExports: { start: async () => { calls.push('lifecycle'); if (failure === 'lifecycle') throw new Error('Synthetic workflow launch failure'); return { runId: 'workflow' } } } })
 stub('../workflows/thread-machine/workflow.ts', { threadMachineLifecycle: async () => {} })
@@ -108,7 +116,7 @@ let dispatch: typeof import('../workflows/coordinator/steps')['dispatchComputerT
 let dispatchThread: typeof import('../workflows/coordinator/steps')['dispatchComputerThread']
 before(async () => { ({ dispatchComputerTask: dispatch, dispatchComputerThread: dispatchThread } = await import('../workflows/coordinator/steps')) })
 beforeEach(() => {
-  calls.length = 0; failure = null; present = workspaceAllowed = issueAllowed = suggestionAllowed = true
+  calls.length = 0; failure = null; settledStartup = true; present = workspaceAllowed = issueAllowed = suggestionAllowed = true
   permission = undefined; awake = credentialAvailable = true; switchedCredential = moveDevice = replaceAgent = revokeDuringWake = revokeWorkspaceDuringWake = false
   selectedSource = 'subscription'; selectedHarness = 'codex'; selectedModel = model; deviceId = 'device'; repoId = 'repo'
   previous = null; modelResolutions = bindingSelections = credentialReads = 0; queued.clear()
@@ -130,10 +138,17 @@ test('model arguments cannot grant local recovery; only the separate host placem
 
 for (const stage of ['machine', 'lifecycle'] as const) test(`a ${stage} failure uses the unclaimed infrastructure-failure path without requesting a user stop`, async () => {
   failure = stage
-  assert.deepEqual(await dispatch(owner, { botId, issueId, harness: 'codex', model: 'synthetic-model' }, 'synthetic-call'), { error: 'cloudComputerUnavailable' })
+  assert.deepEqual(await dispatch(owner, { botId, issueId, harness: 'codex', model: 'synthetic-model' }, 'synthetic-call'), { error: 'cloudComputerUnavailable', failedRunId: runId })
   assert.deepEqual(calls, ['queue', 'machine', ...(stage === 'lifecycle' ? ['lifecycle'] : []), 'fail-unclaimed-start'])
   assert.equal(modelResolutions, 0, 'a machine failure does not select another model')
   assert.equal(queued.get('coordinator:synthetic-call')?.model, model)
+})
+
+test('a lost startup-failure race grants no local placement recovery or failed-run ancestry', async () => {
+  failure = 'machine'; settledStartup = false
+  assert.deepEqual(await dispatch(owner, { botId, issueId, harness: 'codex', model }, 'lost-startup-race'), { error: 'cloudComputerUnavailable', recoveryBlocked: true })
+  assert.deepEqual(calls, ['queue', 'machine', 'fail-unclaimed-start'])
+  assert.equal(queued.size, 1); assert.equal(modelResolutions, 0)
 })
 
 for (const harness of ['codex', 'claude_code'] as const) for (const source of ['subscription', 'api_key'] as const) test(`a sleeping Bot dispatches ${harness} with its selected ${source}, without a separate wake tool`, async () => {

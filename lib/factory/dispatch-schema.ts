@@ -4,6 +4,7 @@ import { bindingSchema } from "./contract";
 export const factoryDispatchSchema = z
   .object({
     binding: bindingSchema,
+    profileId: z.uuid().optional(),
     agentId: z.uuid().transform(value => value.toLowerCase()),
     deviceRepoId: z.uuid().transform(value => value.toLowerCase()),
     note: z.string().trim().max(10000).optional(),

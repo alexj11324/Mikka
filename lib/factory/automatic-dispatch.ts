@@ -2,11 +2,11 @@ import 'server-only'
 import type { Pool, PoolClient } from 'pg'
 import { queueFactoryRun } from '@/lib/agent-runs'
 import { queueCloudRun } from '@/lib/computer/queue-run'
-import { chooseCloudRunModel, chooseLocalRunModel, threadRunModel } from '@/lib/computer/run-model'
+import { ensureRecordedBotHarnessRuntime } from '@/lib/computer/bot-runtime-records'
+import { chooseCloudRunModel, chooseLocalRunModel, threadRunModel, type RunModel } from '@/lib/computer/run-model'
 import { deviceOnlineStates } from '@/lib/device-presence'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
-import { withDatabaseClient } from '@/lib/db'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding } from './dispatch'
 import { configureFactoryCheck } from './checks'
@@ -44,7 +44,7 @@ export function automaticFactoryDispatch(pool: Pool) {
       }
     }
     if (task.status !== 'pending' || !['execute','review','verify'].includes(task.stage)) return
-    const { rows: [source] } = await tx.query(`SELECT r.*,repo."remoteUrl",d.kind AS "deviceKind",b."botId" AS "runtimeBotId",b."workspaceId",a.harness
+    const { rows: [source] } = await tx.query(`SELECT r.*,repo."remoteUrl",d.kind AS "deviceKind",b."botId" AS "runtimeBotId",b."workspaceId",COALESCE(r."agentDefinition"->>'harness',a.harness) AS harness
       FROM factory_attempts f JOIN agent_runs r ON r.id=f."runId"
       JOIN agents a ON a.id=r."agentId" JOIN devices d ON d.id=r."deviceId"
       JOIN device_repos repo ON repo.id=r."deviceRepoId"
@@ -53,7 +53,14 @@ export function automaticFactoryDispatch(pool: Pool) {
     if (!source) throw new FactoryError('factoryRunMismatch')
     const check = task.stage !== 'execute'
     const inheritedPolicy = source.agentDefinition?.policyCeiling ? { policyCeiling: source.agentDefinition.policyCeiling } : {}
-    let selection = check ? inheritedPolicy : threadRunModel(source.agentDefinition) ?? inheritedPolicy
+    let selection: Partial<RunModel> = check ? inheritedPolicy : threadRunModel(source.agentDefinition) ?? inheritedPolicy
+    const profileChoice = check ? await (await import('./agent-profile')).resolveAgentProfileDispatch(pool, {
+      ownerId: task.userId, workspaceId: source.workspaceId ?? await (await import('@/lib/execution-settings')).executionWorkspace(task.userId, task.botId), botId: task.botId,
+    }, { issueId: task.issueId, stage: task.stage, location: source.deviceKind === 'cloud' ? 'cloud' : 'local',
+      defaultHarness: source.harness, cloudPurpose: source.remoteUrl ? 'task' : 'desktop',
+      ...(source.agentDefinition?.pinnedDeviceId ? { deviceId: source.agentDefinition.pinnedDeviceId } : {}),
+    }) : undefined
+    if (profileChoice?.target.kind === 'none') throw new FactoryError('factoryCheckHarnessUnavailable')
     const { rows: [pending] } = await tx.query('SELECT output FROM factory_attempts WHERE id=$1 AND "taskId"=$2', [task.attemptId, task.id])
     const recovery = pending?.output?.watchdogRecovery
     let agentId = source.agentId, deviceId = source.deviceId, deviceRepoId = source.deviceRepoId
@@ -70,38 +77,69 @@ export function automaticFactoryDispatch(pool: Pool) {
       const targets = candidates.filter(c => online.get(c.deviceId)).slice(0, 5)
       const workspaceId = await (await import('@/lib/execution-settings')).executionWorkspace(task.userId, task.botId)
       let selected = false
+      const profile = source.agentDefinition?.agentProfile
+      const exactEntry = profile?.definition.model.mode === 'fixed' ? profile.targetEntry
+        : source.agentDefinition?.modelDispatch?.mode === 'picked' ? source.agentDefinition.modelDispatch.entry : undefined
       for (const target of targets) {
-        const model = await chooseLocalRunModel(pool, { ownerId: task.userId, workspaceId, botId: task.botId }, target, source.agentDefinition?.model)
+        const model = await chooseLocalRunModel(pool, { ownerId: task.userId, workspaceId, botId: task.botId }, target, source.agentDefinition?.model, exactEntry)
         if ('error' in model) continue
         agentId = target.id
         deviceId = target.deviceId
-        deviceRepoId = (await withDatabaseClient(tx, () => ensureDeviceRepository(task.userId, target.deviceId, source.remoteUrl))).id
-        // This is a same-model recovery, not a new explicit model request.
-        selection = { ...model, modelDispatch: source.agentDefinition?.modelDispatch, ...inheritedPolicy }
+        deviceRepoId = (await ensureDeviceRepository(task.userId, target.deviceId, source.remoteUrl, tx)).id
+        // Retain the frozen role and selection policy, but record B's actual
+        // authorized source. The queue verifies the current watchdog receipt.
+        const modelDispatch = model.modelDispatch?.entry ? { ...model.modelDispatch, entry: model.modelDispatch.entry,
+          mode: source.agentDefinition?.modelDispatch?.mode ?? 'preference' as const } : undefined
+        if (profile && !modelDispatch) throw new FactoryError('factoryRecoveryExecutorUnavailable')
+        const agentProfile = profile && modelDispatch ? profile.source === 'default'
+          ? (await import('./agent-profile')).builtinAgentProfileSelection({ ownerId: task.userId, workspaceId }, modelDispatch.entry)
+          : { ...structuredClone(profile), targetEntry: structuredClone(modelDispatch.entry) } : undefined
+        selection = { ...model, modelDispatch, ...(agentProfile ? { agentProfile } : {}), ...inheritedPolicy }
         selected = true
         break
       }
       if (!selected) throw new FactoryError('factoryRecoveryExecutorUnavailable')
     }
     if (source.deviceKind !== 'cloud') {
-      const dispatch = createFactoryDispatch(pool, store, (client, userId, input, botId, context) => queueFactoryRun(client, userId, input, botId, context, undefined, { ...selection, pinnedDeviceId: source.agentDefinition?.pinnedDeviceId, readOnly: check || source.agentDefinition?.readOnly }))
+      if (profileChoice) {
+        const target = profileChoice.target
+        if (target.kind !== 'device') throw new FactoryError('factoryCheckHarnessUnavailable')
+        agentId = target.agentId
+        deviceId = target.deviceId
+        deviceRepoId = (await ensureDeviceRepository(task.userId, target.deviceId, source.remoteUrl, tx)).id
+        selection = { ...inheritedPolicy, model: target.model, agentProfile: profileChoice.agentProfile,
+          modelDispatch: { mode: profileChoice.selectionMode ?? 'preference', location: 'local', entry: target.entry },
+          ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
+          ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
+      }
+      const dispatch = createFactoryDispatch(pool, store, (client, userId, input, botId, context) => queueFactoryRun(client, userId, input, botId, context, undefined, { ...selection, ...(!check ? { threadRunId: source.id } : {}), pinnedDeviceId: source.agentDefinition?.pinnedDeviceId, readOnly: check || source.agentDefinition?.readOnly }))
       const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId, deviceRepoId }, tx)
       if (!check) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
       if (recovery && !check) await tx.query('UPDATE agent_runs SET "retryOf"=$2,attempt=$3 WHERE id=$1', [result.runId, source.id, source.attempt + 1])
       return async () => { notifyDeviceWork(deviceId) }
     }
-    const { rows: [runtime] } = await tx.query(`SELECT r."agentId",a."deviceId",r."repoId" FROM bot_cloud_runtimes r JOIN agents a ON a.id=r."agentId" WHERE r."botId"=$1 AND r."ownerId"=$2 AND r.harness=$3`, [source.runtimeBotId, task.userId, source.harness])
-    if (!runtime) throw new FactoryError('factoryRunMismatch')
-    const model = check ? await chooseCloudRunModel(pool, { ownerId: task.userId, workspaceId: source.workspaceId, botId: task.botId }, runtime.agentId, source.harness, undefined, source.remoteUrl ? 'task' : 'desktop') : selection
+    const selectedHarness = profileChoice?.target.kind === 'cloud' ? profileChoice.target.harness : source.harness
+    const runtime = await ensureRecordedBotHarnessRuntime(tx, { userId: task.userId, workspaceId: source.workspaceId }, source.runtimeBotId, selectedHarness)
+    if (!runtime) throw new FactoryError('factoryCheckHarnessUnavailable')
+    let model: Partial<RunModel> | { error: string } = selection
+    if (profileChoice) {
+      const target = profileChoice.target
+      if (target.kind !== 'cloud') throw new FactoryError('factoryCheckHarnessUnavailable')
+      const entry = target.entry.source
+      model = { model: target.model, agentProfile: profileChoice.agentProfile,
+        modelDispatch: { mode: profileChoice.selectionMode ?? 'preference', location: 'cloud', entry: target.entry },
+        ...(entry.kind === 'api_key' ? { apiKeyId: entry.keyId } : { subscriptionBindingId: await (await import('@/lib/model-dispatch')).bindAgentToConnection(tx,
+          { ownerId: task.userId, workspaceId: source.workspaceId }, runtime.agentId, target.harness, entry.connectionId, target.model) }) }
+    } else if (check) model = await chooseCloudRunModel(pool, { ownerId: task.userId, workspaceId: source.workspaceId, botId: task.botId }, runtime.agentId, source.harness, undefined, source.remoteUrl ? 'task' : 'desktop')
     if ('error' in model || !('model' in model) || typeof model.model !== 'string') throw new FactoryError('factoryCheckHarnessUnavailable')
     const cloudModel = model.model
-    const repoId = source.remoteUrl ? (await withDatabaseClient(tx, () => ensureDeviceRepository(task.userId, runtime.deviceId, source.remoteUrl))).id : runtime.repoId
+    const repoId = source.remoteUrl ? (await ensureDeviceRepository(task.userId, runtime.deviceId, source.remoteUrl, tx)).id : runtime.repoId
     const { rows: [issue] } = await tx.query('SELECT title,content FROM issues WHERE id=$1', [task.issueId])
     const actor = { userId: task.userId, workspaceId: source.workspaceId as string }
     const factoryStage = { binding: factoryBinding(task), sourceEventId: task.sourceEventId, sourceRunId: source.id as string }
     const dispatch = createFactoryDispatch(pool, store, (client, _owner, _input, _bot, context) => queueCloudRun(pool, actor, {
       botId: source.runtimeBotId, issueId: task.issueId, agentId: runtime.agentId, deviceRepoId: repoId, title: issue.title, body: tiptapToText(issue.content), ...model, model: cloudModel, ...inheritedPolicy,
-      withoutBot: task.botId === null, readOnly: check || source.agentDefinition?.readOnly, idempotencyKey: `factory:${context.attemptId}`,
+      withoutBot: task.botId === null, ...(!check ? { threadRunId: source.id } : {}), readOnly: check || source.agentDefinition?.readOnly, idempotencyKey: `factory:${context.attemptId}`,
       allowLocalRecovery: source.agentDefinition?.allowLocalRecovery, sourceEventId: context.sourceEventId,
     }, client, factoryStage), { ...defaultFactoryDispatchAdapters, configure: {
       ...defaultFactoryDispatchAdapters.configure,

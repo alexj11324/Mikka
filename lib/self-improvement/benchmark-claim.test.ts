@@ -18,9 +18,14 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
   const calls:string[]=[]
   const admissionScopes:string[]=[]
   const workspaceIds=['bot-workspace','task-workspace']
-  const run={id:'run',userId:'owner',issueId:'issue',agentId:'agent',deviceRepoId:'repo',deviceId:'device',deviceTokenId:null as string|null,status:'queued',kind:'implement',baseBranch:'frozen-sha',prompt:'frozen task',attempt:1}
+  const run={id:'run',userId:'owner',issueId:'issue',agentId:'agent',deviceRepoId:'repo',deviceId:'device',deviceTokenId:null as string|null,status:'queued',kind:'implement',baseBranch:'frozen-sha',prompt:'frozen task',attempt:1,agentDefinition:undefined as {agentProfile?:unknown}|undefined}
   const agent={id:'agent',userId:'owner',harness:'codex'},repo={id:'repo',userId:'owner',deviceId:'device',repoPath:'v2/github.com/mikka-ci/benchmark-claim',remoteUrl:'https://github.com/mikka-ci/benchmark-claim.git',verifyCommand:'mutable-repo-command'}
   const selections=[run,agent,repo]
+  // This benchmark fixture has no Profile. Real Profile admission and native
+  // continuation use PostgreSQL coverage; never silently admit one here.
+  const assertNoProfile=(definition:{agentProfile?:unknown}|null|undefined)=>{
+    assert.equal(definition?.agentProfile,undefined,'benchmark fixture does not authorize Agent Profiles')
+  }
   class ImprovementError extends Error {constructor(public code:string){super(code)}}
   class FactoryError extends Error {}
   const db={select:()=>({from:()=>({where:()=>({limit:async()=>[selections.shift()]})})}),update:()=>({set:(values:object)=>({where:()=>({returning:async()=>{calls.push('block');Object.assign(run,values);return [{id:run.id}]}})})})}
@@ -71,10 +76,15 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/thread-continuation':{continuationFollowUp:()=>null},
     '@/lib/run-completion-effects':{afterRunEnded:async()=>{calls.push('runEnded');return 0}},
     '@/lib/factory/checks':{isFactoryCheckRun:async()=>false},
+    '@/lib/factory/profile-admission':{AgentProfileAdmissionError:class extends Error {}},
+    '@/lib/factory/profile-native-session':{profileNativeSessionMatches:(before:{agentProfile?:unknown}|null|undefined,after:{agentProfile?:unknown}|null|undefined)=>{
+      assertNoProfile(before);assertNoProfile(after);return true
+    }},
     '@/lib/factory/runtime':{guardFactoryClaim:async()=>{calls.push('guard');if(stopped)throw new FactoryError('stopped');return {preserveQuestionWorktree:true}}},
     '@mikka/protocol/agent-policy':{defaultRunPolicy},
     '@/lib/computer/local-authority':{localComputerAuthority:async()=>null},
     '@/lib/computer/claim':{claimLocalRun:async(_pool:unknown,_runId:string,_deviceId:string,_lease:Date,_subscription:unknown,guard:(tx:object)=>Promise<boolean>,after:(tx:object)=>Promise<void>)=>{
+      assertNoProfile(run.agentDefinition)
       const tx={query:async(statement:string,args:unknown[])=>{
         assert.ok(statement.startsWith('UPDATE agent_runs SET "deviceTokenId"=$2'))
         assert.deepEqual(Array.from(args),['run','synthetic-device-token','owner'])

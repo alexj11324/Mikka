@@ -342,7 +342,7 @@ export function ImageGeneration({
                 aria-live="polite"
                 className={cn(
                   "flex min-h-5 items-center gap-2 text-sm font-medium text-foreground",
-                  status === "error" && "text-destructive",
+                  status === "error" && "text-destructive-foreground",
                   statusClassName,
                 )}
               >

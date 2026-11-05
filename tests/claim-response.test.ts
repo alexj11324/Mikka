@@ -381,3 +381,33 @@ test('capable workers receive the signed final composed policy, not the earlier 
     assert.equal(body.policySnapshotRequired,true)
   } finally {if(before===undefined)delete process.env.BETTER_AUTH_SECRET;else process.env.BETTER_AUTH_SECRET=before}
 })
+
+
+test('Profile model, source or version changes keep ancestry but start a fresh native session', async () => {
+  const profile = { profileId: 'default', version: 1, digest: 'frozen-role', targetEntry: { id: 'first', harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: 'source-a' } } }
+  const definition = { harness: 'codex' as 'codex' | 'claude_code', model: 'gpt-6-luna', subscription: { bindingId: 'binding-a', modelId: 'gpt-6-luna', route: 'codex_cli' }, agentProfile: profile }
+  overrideDeploymentSwitch('byos', true)
+  try { for (const lineage of ['retry', 'thread'] as const) {
+    for (const change of ['same', 'model', 'source', 'version', 'harness'] as const) {
+      const probe = fixture()
+      Object.assign(probe.run, { agentDefinition: structuredClone(definition), ...(lineage === 'retry' ? { retryOf: 'profile-parent' } : { continuesRunId: 'profile-parent' }) })
+      probe.lost = { deviceId: 'device', sessionId: 'old-native-session', agentId: 'agent', agentDefinition: structuredClone(definition) }
+      if (lineage === 'retry') probe.checkpoint = validCheckpoint()
+      const target = (probe.run as typeof probe.run & { agentDefinition: typeof definition }).agentDefinition
+      if (change === 'model') target.model = target.agentProfile.targetEntry.model = 'other-currently-authorized-model'
+      if (change === 'source') { target.agentProfile.targetEntry.source.connectionId = 'source-b'; target.subscription.bindingId = 'binding-b' }
+      if (change === 'version') target.agentProfile.version++
+      if (change === 'harness') target.harness = target.agentProfile.targetEntry.harness = 'claude_code'
+      target.subscription.modelId = target.model
+      Object.assign(probe, { cloud: { subscription: { id: target.subscription.bindingId, modelId: target.model, route: target.subscription.route, consumerId: 'agent', workspaceId: 'ws' } } })
+      probe.device.harnesses = [{ harness: target.harness, installed: true, toolApproval: true, subscriptionBroker: true } as typeof probe.device.harnesses[number]]
+      const preparation = ['skill-preflight','policy','model-admission','publication','claim','skill-claim','benchmark-claim','token','settings']
+      if (lineage === 'retry') preparation.unshift('question-retry','checkpoint')
+      const response = await claim(probe, preparation)
+      assert.equal(response.status, 200, `${lineage}:${change}`)
+      const body = await response.json()
+      assert.equal(body.continuesRunId, 'profile-parent', `${lineage}:${change}`)
+      assert.equal(body.resumeSessionId, change === 'same' ? 'old-native-session' : undefined, `${lineage}:${change}`)
+    }
+  } } finally { overrideDeploymentSwitch('byos', undefined) }
+})

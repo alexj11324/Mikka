@@ -455,10 +455,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
             {failed && <MessageScrollerItem messageId="failed" data-testid="failed-message" className="[content-visibility:visible]">
               <Message align="end"><MessageContent>
                 <span className="flex w-full min-w-0 items-center justify-end gap-2">
-                  <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-destructive" />
+                  <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-destructive-foreground" />
                   <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap"><PersonWords text={failed.text} /></BubbleContent></Bubble>
                 </span>
-                <span role="alert" className="flex items-center justify-end gap-1 self-end text-xs text-destructive">
+                <span role="alert" className="flex items-center justify-end gap-1 self-end text-xs text-destructive-foreground">
                   {failed.message}
                   <Button variant="ghost" size="xs" className="text-foreground" disabled={sending} onClick={() => { void deliver(failed.text, failed.withNotes, failed.retryOf) }}>{tCommon('retry')}</Button>
                 </span>

@@ -177,6 +177,13 @@ test('a stored reply keeps its tools, how each ended and their previews, and whe
     { position: 2, createdAt: at, message: { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'list_issues', output: { type: 'error-text', value: 'boom' } }] } as ModelMessage },
   ])
   assert.deepEqual(full[0].activity?.tools, [{ call: 'c1', name: 'list_issues', state: 'error', input: '{"query": "login"}', output: 'boom', at: 0 }])
+  // A call's words come whole, apart from the cut input preview: from the compact projection's quotePreview, or the full input.
+  const note = 'Reproduce the redirect loop and fix it. '.repeat(8).trim()
+  const quoted = chatItems([
+    { position: 1, createdAt: at, message: { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c1', toolName: 'dispatch_run', inputPreview: jsonbText({ note }).slice(0, 200), quotePreview: note }] } as unknown as ModelMessage },
+    { position: 2, createdAt: at, message: { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c2', toolName: 'dispatch_run', input: { issueId: 'i1', note } }] } as ModelMessage },
+  ])
+  assert.deepEqual(quoted[0].activity?.tools.map(tool => tool.quote), [note, note])
   // Words said before a tool ran stay above it: its `at` is the reply's text so far.
   const spoken = chatItems([
     { position: 1, createdAt: at, message: { role: 'assistant', content: [{ type: 'text', text: 'I will make the task first.' }, { type: 'tool-call', toolCallId: 'c1', toolName: 'create_issue', input: {} }] } as ModelMessage },

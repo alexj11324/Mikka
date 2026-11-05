@@ -287,6 +287,65 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(named.thread, 'continued', JSON.stringify(named))
     assert.equal((await frozen(named.runId!)).model, 'gpt-5')
   })
+  for (const entryPoint of ['coordinator', 'desktop'] as const) await t.test(`a default thread may explicitly select another authorized model through ${entryPoint} without claiming the old native Profile origin`, async () => {
+    const who = await person(`default-explicit-model-${entryPoint}`)
+    await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1', [who.issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: entryPoint === 'coordinator' ? 801 : 802 } } })])
+    const { templateModelsFixture } = await import('./support/template-models')
+    const models = templateModelsFixture(['gpt-5', 'gpt-5-next'])
+    try {
+      await pool.query('UPDATE byos_connections SET "modelCatalog"=$2::jsonb WHERE id=$1', [who.connection, JSON.stringify({ revision: '2', models: ['gpt-5', 'gpt-5-next'] })])
+      await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5-next')`, [randomUUID(), who.id, who.workspaceId, who.connection])
+      await order.changeOrder(pool, { ownerId: who.id, workspaceId: who.workspaceId }, { kind: 'add', entries: [{ harness: 'codex', model: 'gpt-5-next', source: { kind: 'subscription', connectionId: who.connection } }] })
+      const first = await dispatch(who.id, who.issueId, who.botId) as { runId: string }
+      const original = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [first.runId])).rows[0]
+      assert.equal(original.agentDefinition.agentProfile.source, 'default')
+      assert.equal(original.agentDefinition.model, 'gpt-5')
+      await pool.query(`UPDATE agent_runs SET status='completed',"startedAt"=now(),"finishedAt"=now(),"sessionId"='native-default-original' WHERE id=$1`, [first.runId])
+      const next = await (entryPoint === 'coordinator'
+        ? steps.dispatchRun(who.id, { issueId: who.issueId, model: { harness: 'codex', model: 'gpt-5-next' }, note: 'Continue with the explicitly chosen model.', requestKey: `default-model:${randomUUID()}` }, undefined, who.botId)
+        : steps.dispatchComputerThread(who.id, { botId: who.botId, issueId: who.issueId, harness: 'codex', model: 'gpt-5-next', note: 'Continue with the explicitly chosen model.' }, `default-model:${randomUUID()}`, undefined, undefined, who.botId)) as unknown as { runId?: string; thread?: string; error?: string }
+      assert.ok(next.runId, JSON.stringify(next)); assert.equal(next.thread, 'continued')
+      const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [next.runId])).rows[0]
+      assert.equal(run.agentDefinition.model, 'gpt-5-next')
+      assert.equal(run.agentDefinition.agentProfile.source, 'default')
+      assert.equal(run.agentDefinition.agentProfile.targetEntry.model, 'gpt-5-next')
+      assert.deepEqual(run.agentDefinition.agentProfile.targetEntry, run.agentDefinition.modelDispatch.entry)
+      assert.equal(run.agentDefinition.profileOriginRunId, undefined, 'a new model does not obtain the old native session exemption')
+      assert.equal(run.sessionId, null)
+      await (await import('../lib/factory/profile-admission')).assertRunProfileClaim(pool, run.id)
+    } finally { models.restore() }
+  })
+
+  for (const [index, entryPoint, askedModel] of [[0, 'coordinator', 'gpt-5'], [1, 'desktop', 'gpt-5'], [2, 'desktop', 'gpt-5-next']] as const) await t.test(`a historical thread ${entryPoint} selection of ${askedModel} preserves native compatibility only for the exact old target`, async () => {
+    const who = await person(`legacy-model-${entryPoint}-${index}`)
+    await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1', [who.issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 901 + index } } })])
+    const { templateModelsFixture } = await import('./support/template-models')
+    const models = templateModelsFixture(['gpt-5', 'gpt-5-next'])
+    try {
+      await pool.query('UPDATE byos_connections SET "modelCatalog"=$2::jsonb WHERE id=$1', [who.connection, JSON.stringify({ revision: '2', models: ['gpt-5', 'gpt-5-next'] })])
+      await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5-next')`, [randomUUID(), who.id, who.workspaceId, who.connection])
+      await order.changeOrder(pool, { ownerId: who.id, workspaceId: who.workspaceId }, { kind: 'add', entries: [{ harness: 'codex', model: 'gpt-5-next', source: { kind: 'subscription', connectionId: who.connection } }] })
+      const first = await dispatch(who.id, who.issueId, who.botId) as { runId: string }
+      const legacy = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [first.runId])).rows[0].agentDefinition
+      delete legacy.agentProfile; delete legacy.profileOriginRunId
+      legacy.definitionDigest = (await import('../lib/agent-kit/worker-digest')).workerDefinitionDigest(legacy)
+      await pool.query(`UPDATE agent_runs SET status='completed',"startedAt"=now(),"finishedAt"=now(),"sessionId"='pre-profile-native-session',"agentDefinition"=$2 WHERE id=$1`, [first.runId, JSON.stringify(legacy)])
+      const next = await (entryPoint === 'coordinator'
+        ? steps.dispatchRun(who.id, { issueId: who.issueId, model: { harness: 'codex', model: askedModel }, note: 'Continue with the named model.', requestKey: `legacy:${randomUUID()}` }, undefined, who.botId)
+        : steps.dispatchComputerThread(who.id, { botId: who.botId, issueId: who.issueId, harness: 'codex', model: askedModel, note: 'Continue with the named model.' }, `legacy:${randomUUID()}`, undefined, undefined, who.botId)) as unknown as { runId?: string; error?: string }
+      assert.ok(next.runId, JSON.stringify(next))
+      const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [next.runId])).rows[0]
+      assert.equal(run.agentDefinition.model, askedModel)
+      const same = askedModel === legacy.model
+      assert.equal((await import('../lib/factory/profile-native-session')).profileNativeSessionMatches(legacy, run.agentDefinition), same)
+      if (same) {
+        assert.equal(run.agentDefinition.agentProfile, undefined, 'exact historical continuation retains absent metadata')
+        assert.equal(run.agentDefinition.subscription.bindingId, legacy.subscription.bindingId)
+      } else assert.equal(run.agentDefinition.agentProfile?.source, 'default', 'a new target gets its own current default receipt')
+      assert.equal(run.agentDefinition.profileOriginRunId, undefined)
+    } finally { models.restore() }
+  })
+
   await t.test('no E2B key of their own: no cloud runtime; with no computer the card offers one or a key, and 云端 then runs on the person\'s own server', async () => {
     const n = await person('no-key', false)
     const before = provisioned
@@ -474,7 +533,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const { factoryAutomaticRuntime } = await import('../lib/factory/automatic-dispatch')
     const { handoffFactoryCloudStage } = await import('../lib/factory/cloud-stage-handoff')
     const parentProviderCalls = provisioned
-    const completeFromDevice = async (sourceRunId: string, check: boolean, unit: boolean) => {
+    const completeFromDevice = async (sourceRunId: string, check: boolean, unit: boolean, expectsHandoff = true) => {
       if (parentState === 'sleeping') await pool.query(`UPDATE cloud_machines SET state='sleeping' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [personState.workspaceId, personState.id])
       const parentBefore = (await pool.query('SELECT row_to_json(m) AS value FROM cloud_machines m WHERE "workspaceId"=$1 AND "ownerId"=$2', [personState.workspaceId,personState.id])).rows[0].value
       const sourceToken = (await pool.query(`SELECT token.id FROM device_tokens token JOIN agent_runs r ON r."deviceId"=token."boundDeviceId" WHERE r.id=$1 AND token."revokedAt" IS NULL`, [sourceRunId])).rows[0]
@@ -486,6 +545,12 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
         await fence({ tokenId:sourceToken.id, userId:personState.id }, () => complete(sourceRunId,check))
       } finally { factoryAutomaticRuntime.enqueue = realEnqueue }
       assert.equal((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1',[sourceToken.id])).rows[0].revokedAt,null,'the device request only queues host work; it does not revoke itself')
+      if (!expectsHandoff) {
+        assert.equal(stageHandoffs.length, beforeHandoffs, 'v2 review enters approval without enqueueing a Verify run')
+        assert.deepEqual((await pool.query('SELECT row_to_json(m) AS value FROM cloud_machines m WHERE "workspaceId"=$1 AND "ownerId"=$2', [personState.workspaceId, personState.id])).rows[0].value, parentBefore)
+        assert.equal(provisioned, parentProviderCalls, 'finishing review performs no provider I/O inside the device unit fence')
+        return
+      }
       assert.equal(stageHandoffs.length,beforeHandoffs+1,'production enqueue registers durable host work rather than calling provider I/O in the device request')
       const [actor,previous,runId] = stageHandoffs.at(-1)!
       assert.equal(await handoffFactoryCloudStage(appPool,{...actor,userId:'foreign-owner'},previous,runId),false)
@@ -504,12 +569,11 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(review.status, 'running')
     assert.equal(review.candidateKind, 'deliverable')
     assert.equal(review.sha, null, 'no invented Git commit')
-    await completeFromDevice(review.runId, true, true)
-    const verify = await current()
-    assert.equal(verify.stage, 'verify', JSON.stringify(verify))
-    await complete(verify.runId, true)
+    await completeFromDevice(review.runId, true, true, false)
     const pending = await current()
     assert.deepEqual([pending.stage, pending.status], ['approval', 'pending'])
+    const checks = (await pool.query(`SELECT stage,count(*)::int AS count FROM factory_attempts WHERE "taskId"=$1 AND stage IN ('review','verify') GROUP BY stage ORDER BY stage`, [pending.id])).rows
+    assert.deepEqual(checks, [{ stage: 'review', count: 1 }], 'new v2 deliveries use one independent review and no automatic Verify')
     const sessionId = randomUUID()
     await pool.query(`INSERT INTO "session" (id,token,"userId","expiresAt","createdAt","updatedAt") VALUES ($1,$2,$3,now()+interval '1 hour',now(),now())`, [sessionId, randomUUID(), personState.id])
     const { createFactoryMerges } = await import('../lib/factory/merge')

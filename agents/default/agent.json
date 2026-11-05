@@ -25,6 +25,7 @@
     "create_issue",
     "update_issue",
     "list_agents",
+    "list_factory_agent_profiles",
     "find_repository",
     "github_tools",
     "github_call",

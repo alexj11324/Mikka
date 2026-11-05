@@ -10,8 +10,10 @@ import { overrideDeploymentSwitch } from './deployment-switches'
 const submissionId = 'a4000000-0000-4000-8000-000000000001'
 /** The owner's Coordinator: an ordinary bot row, resolved where a message enters. */
 const COORDINATOR_BOT = 'a4000000-0000-4000-8000-0000000c0de1'
+const PROFILE_WORKSPACE = 'a4000000-0000-4000-8000-0000000c0de2'
+const profileRows = new Map<string, { id: string; ownerId: string; workspaceId: string; archivedAt: string | null; definition: { enabled: boolean; instructions: string } }>()
 const dialect = new PgDialect()
-type Stored = { id: string; userId: string; botId: string | null; kind: string; dedupeKey: string; issueId: null; runId: null; payload: { text: string; taskDestination?: TaskDestination; humanSessionId?: string } }
+type Stored = { id: string; userId: string; botId: string | null; kind: string; dedupeKey: string; issueId: null; runId: null; payload: { text: string; taskDestination?: TaskDestination; profileId?: string; humanSessionId?: string } }
 function fixture() {
   const rows = new Map<string, Stored>()
   const botRows = new Map<string, { id: string; name: string; ownerId: string }>([[COORDINATOR_BOT, { id: COORDINATOR_BOT, name: 'Coordinator', ownerId: 'owner' }]])
@@ -190,7 +192,12 @@ let transactionTail: Promise<unknown> = Promise.resolve()
 before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => userId ? { user: { id: userId }, session: { id: 'synthetic-browser-session' } } : null } } } })
   // A transaction runs on the same in-memory executor; the real one rolls back when the callback throws.
-  mock.module('@/lib/db', { namedExports: { db: new Proxy({}, { get(_target, key) { return key === 'transaction' ? (run: (tx: unknown) => Promise<unknown>) => { const result = transactionTail.then(() => run(current.executor)); transactionTail = result.catch(() => {}); return result } : Reflect.get(current.executor, key) } }) } })
+  mock.module('@/lib/execution-settings', { namedExports: { executionWorkspace: async (owner: string, botId: string) => { assert.equal(owner, userId); assert.equal(botId, COORDINATOR_BOT); return PROFILE_WORKSPACE } } })
+  mock.module('@/lib/db', { namedExports: { pool: { async query(sql: string, params: string[]) {
+    assert.match(sql, /SELECT \* FROM factory_agent_profiles WHERE id=\$1 AND "ownerId"=\$2 AND "workspaceId"=\$3/)
+    const row = profileRows.get(params[0])
+    return { rows: row?.ownerId === params[1] && row.workspaceId === params[2] ? [structuredClone(row)] : [] }
+  } }, db: new Proxy({}, { get(_target, key) { return key === 'transaction' ? (run: (tx: unknown) => Promise<unknown>) => { const result = transactionTail.then(() => run(current.executor)); transactionTail = result.catch(() => {}); return result } : Reflect.get(current.executor, key) } }) } })
   mock.module('@/lib/suggestions/store', { namedExports: {
     readClaimedSuggestion: async (owner: string, id: string) => owner === 'owner' && suggestion?.id === id ? suggestion : null,
     claimSuggestion: async (owner: string, id: string) => {
@@ -509,4 +516,48 @@ test('actual server action stamps only its authenticated same-origin browser ses
     assert.deepEqual(await sendCoordinatorMessage('hello',null,null,submissionId),{queued:true})
     assert.equal([...current.rows.values()][0].payload.humanSessionId,undefined)
   }finally{actionHeaders=new Headers()}
+})
+
+test('task Profile is frozen in the immutable user submission and cannot be changed on retry', async () => {
+  const f = fixture()
+  const profileId = 'a1284000-0000-4000-8000-000000000005'
+  const options = { botId: COORDINATOR_BOT, submissionId, profileId, taskDestination: { kind: 'cloud' as const } }
+  const sent = await recordPersonalSubmission(f.executor, 'owner', 'Build this feature', options)
+  assert.deepEqual(await recordPersonalSubmission(f.executor, 'owner', 'Build this feature', options), { duplicate: true, eventId: sent.eventId })
+  assert.equal((([...f.rows.values()][0].payload) as Record<string, unknown>).profileId, profileId)
+  await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'Build this feature', { ...options, profileId: 'a1284000-0000-4000-8000-000000000006' }), SubmissionConflictError)
+  await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'Build this feature', { ...options, profileId: undefined }), SubmissionConflictError)
+})
+
+
+test('an explicit Profile keeps workspace-default placement and the normal task submission gates', async () => {
+  const profileId = 'b4000000-0000-4000-8000-000000000084'
+  const row = { id: profileId, ownerId: 'owner', workspaceId: PROFILE_WORKSPACE, archivedAt: null as string | null, definition: { enabled: true, instructions: 'private-profile-instructions-must-not-enter-event' } }
+  current = fixture(); callbacks.length = 0; userId = 'owner'; enabled = true
+  profileRows.set(profileId, row); overrideDeploymentSwitch('issueTools', true)
+  const send = (id: string | undefined = submissionId) => sendCoordinatorMessage('do the task', null, null, id, undefined, undefined, undefined, undefined, profileId)
+  try {
+    assert.deepEqual(await send(), { queued: true })
+    const stored = [...current.rows.values()][0]
+    assert.equal(stored.payload.profileId, profileId)
+    assert.equal(stored.payload.taskDestination, undefined)
+    assert.equal(JSON.stringify(stored).includes(row.definition.instructions), false)
+    assert.deepEqual(await send(), { queued: true })
+    assert.equal(current.rows.size, 1)
+    const wakes = callbacks.length
+    assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, undefined, undefined, undefined, undefined, undefined, profileId), { error: 'validationGeneric', params: undefined })
+    row.definition.enabled = false
+    assert.deepEqual(await send(), { error: 'runInvalid', params: undefined })
+    row.definition.enabled = true; row.archivedAt = new Date().toISOString()
+    assert.deepEqual(await send(), { error: 'runInvalid', params: undefined })
+    row.archivedAt = null; row.ownerId = 'foreign'
+    assert.deepEqual(await send(), { error: 'runInvalid', params: undefined })
+    row.ownerId = 'owner'; row.workspaceId = 'a4000000-0000-4000-8000-0000000c0de3'
+    assert.deepEqual(await send(), { error: 'runInvalid', params: undefined })
+    row.workspaceId = PROFILE_WORKSPACE; enabled = false
+    assert.deepEqual(await send(), { error: 'coordinatorUnavailable', params: undefined })
+    enabled = true; overrideDeploymentSwitch('issueTools', false)
+    assert.deepEqual(await send(), { error: 'issueToolsDisabled', params: undefined })
+    assert.equal(current.rows.size, 1); assert.equal(callbacks.length, wakes)
+  } finally { enabled = true; profileRows.clear(); overrideDeploymentSwitch('issueTools', undefined) }
 })

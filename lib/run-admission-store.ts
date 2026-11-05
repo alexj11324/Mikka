@@ -1,4 +1,6 @@
+import { workerDefinitionDigest } from './agent-kit/worker-digest'
 import 'server-only'
+import { admitProfileSelection } from './factory/profile-admission'
 import { runListChanged } from './live/lists'
 import { freezeExecutionIdentity, revalidateExecutionIdentity, ExecutionIdentityError } from './execution-identity'
 import type { PoolClient } from 'pg'
@@ -25,7 +27,8 @@ import type { RunInvalidReason } from './run-invalid-reason'
 export async function acceptLocalRun(input: {
   id: string; userId: string; issueId: string; agentId: string; deviceId: string; deviceRepoId: string
   source?: 'mcp' | null; botId: string | null; prompt: string; definition: WorkerDefinitionSnapshot; requestEventId?: string
-  dispatch?: DispatchInput & DispatchCredential; continuation?: boolean; sourceRunId?: string
+  dispatch?: DispatchInput & DispatchCredential; continuation?: boolean; sourceRunId?: string; profileSourceRunId?: string
+  factoryContext?: { sourceEventId: string; attemptId: string }
 }, existing?: PoolClient): Promise<{ runId: string; status?: typeof agentRuns.$inferSelect.status; replayed?: boolean }> {
   const client = existing ?? await pool.connect()
   try {
@@ -72,7 +75,14 @@ export async function acceptLocalRun(input: {
       ? revalidateExecutionIdentity(client, authority)
       : freezeExecutionIdentity(client, authority)).catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
     if (!executionIdentity) throw new ActionFailureError('executionAccountUnavailable')
-    const definition = { ...input.definition, executionIdentity }
+    const questionSource = input.definition.agentProfile && input.sourceRunId
+      ? await (await import('./factory/questions/execution-continuation')).questionExecutionQueueSource(client,
+        { userId: input.userId, issueId: task.id, botId: input.botId, sourceRunId: input.sourceRunId }) : null
+    const profileOriginRunId = await admitProfileSelection(client, { ownerId: input.userId, workspaceId: executionIdentity.workspaceId ?? '', issueId: task.id, harness: input.definition.harness, model: input.definition.model, apiKeyId: input.definition.apiKey?.keyId, subscriptionBindingId: input.definition.subscription?.bindingId, selection: input.definition.agentProfile, sourceRunId: questionSource ?? input.profileSourceRunId, factoryContext: input.factoryContext })
+    // A question's host receipt grants the same native execution. Its origin,
+    // child and wake receipt must keep the exact original definition digest.
+    const definition = { ...input.definition, executionIdentity, ...(profileOriginRunId && !questionSource ? { profileOriginRunId } : {}) }
+    if (profileOriginRunId && !questionSource) definition.definitionDigest = workerDefinitionDigest(definition)
     const context = { ...(bot ? { workspaceId: bot.workspaceId } : {}), ...(input.requestEventId ? { requestEventId: input.requestEventId } : {}) }
     const replayMatches = async (prior: typeof agentRuns.$inferSelect) => {
       await revalidateExecutionIdentity(client, prior)

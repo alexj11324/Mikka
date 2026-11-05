@@ -1,3 +1,4 @@
+import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { factoryTestLifecycle } from "../../tests/helpers/factory-test-authority";
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
@@ -14,7 +15,7 @@ import {
   type FactoryStatus,
 } from "./contract";
 import { handleFactory } from "./http";
-import { createFactoryStore, type FactoryTask } from "./store";
+import { type FactoryTask } from "./store";
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 // Only an explicitly opted-in local PG or a disposable loopback *_e2e database.

@@ -78,7 +78,7 @@ function Viewer({ start = 0, readText }: { start?: number; readText: (name: stri
 test('the viewer is titled with the criterion and its result; text shows its command and exit code', async () => {
   await act(async () => root.render(<Viewer readText={async () => '2 passed (8.6 s)'} />))
   assert.equal(document.querySelector('h2')?.textContent, '首屏图片懒加载后无布局跳动')
-  assert.ok(document.querySelector('header svg.text-success'), 'a passed criterion shows the green check')
+  assert.ok(document.querySelector('header svg.text-success-foreground'), 'a passed criterion shows the green check')
   assert.match(container.textContent ?? '', /\$ pnpm e2e home-clsexit 0/)
   const tile = [...document.querySelectorAll('[role="group"] button')][0]
   assert.match(tile.textContent ?? '', /^\$ pnpm e2e home-clsexit 0$/, 'the filmstrip shows text as a terminal tile')

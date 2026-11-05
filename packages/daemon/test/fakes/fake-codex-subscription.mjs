@@ -94,6 +94,8 @@ lines.on("line", async (line) => {
     })
   }
   if (method === "turn/start") {
+    // Read the actual official RPC parameter sent by the adapter; no provider calls.
+    writeFileSync(join(process.env.CODEX_HOME, "fixture-effort.json"), JSON.stringify({ transport: "turn/start", sessionId: params.threadId, effort: params.effort ?? null }))
     const turnId = `fixture-turn-${++turn}`
     const prompt = params.input[0].text
     const diagnostic = prompt.startsWith('DIAGNOSTIC ') ? JSON.parse(prompt.slice('DIAGNOSTIC '.length)) : null

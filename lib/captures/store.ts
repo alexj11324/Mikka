@@ -1,3 +1,4 @@
+import type { RunAgentProfile } from '@/lib/agent-runs'
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { and, asc, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
@@ -291,6 +292,10 @@ export async function runEvidence(userId: string, runId: string) {
     harness: sql<string | null>`${agentRuns.agentDefinition}->>'harness'`,
     model: sql<string | null>`${agentRuns.agentDefinition}->>'model'`,
     executionIdentity: sql<unknown>`${agentRuns.agentDefinition}->'executionIdentity'`,
+    agentProfile: sql<RunAgentProfile | null>`case when ${agentRuns.agentDefinition}->'agentProfile' is null then null else jsonb_build_object(
+      'profileId',${agentRuns.agentDefinition}->'agentProfile'->'profileId','name',${agentRuns.agentDefinition}->'agentProfile'->'name',
+      'version',${agentRuns.agentDefinition}->'agentProfile'->'version','digest',${agentRuns.agentDefinition}->'agentProfile'->'digest',
+      'source',${agentRuns.agentDefinition}->'agentProfile'->'source','reason',${agentRuns.agentDefinition}->'agentProfile'->'reason') end`,
     credentialType: sql<'subscription' | 'api_key' | 'unknown'>`CASE WHEN ${agentRuns.agentDefinition}->'apiKey' IS NOT NULL AND ${agentRuns.agentDefinition}->'apiKey'<>'null'::jsonb THEN 'api_key' WHEN ${agentRuns.agentDefinition}->'subscription' IS NOT NULL AND ${agentRuns.agentDefinition}->'subscription'<>'null'::jsonb THEN 'subscription' ELSE 'unknown' END`,
     subscriptionRoute: sql<string | null>`${agentRuns.agentDefinition}->'subscription'->>'route'` })
     .from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1)

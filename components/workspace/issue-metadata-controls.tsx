@@ -28,7 +28,7 @@ export type MetadataRequest = { target: Target | 'assignee'; sequence: number }
 
 /** small: the 6px dot of a board card's bare label (Figma 看板/标签). */
 export function LabelDot({ color, small = false }: { color: IssueLabel['color']; small?: boolean }) {
-  return <Circle data-icon="inline-start" className={cn('fill-current', small && 'size-1.5 shrink-0', { 'text-label-violet': color === 'violet', 'text-label-blue': color === 'blue', 'text-success-foreground': color === 'green', 'text-warning-foreground': color === 'yellow', 'text-destructive': color === 'red', 'text-muted-foreground': color === 'gray' })} />
+  return <Circle data-icon="inline-start" className={cn('fill-current', small && 'size-1.5 shrink-0', { 'text-label-violet': color === 'violet', 'text-label-blue': color === 'blue', 'text-success-foreground': color === 'green', 'text-warning-foreground': color === 'yellow', 'text-destructive-foreground': color === 'red', 'text-muted-foreground': color === 'gray' })} />
 }
 
 export function IssueMetadataControls({ task, section = 'all', compact = false, disabled = false, onSaved, onBusyChange, request, assigneeAvatar }: {

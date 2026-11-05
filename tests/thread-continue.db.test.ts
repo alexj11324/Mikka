@@ -504,15 +504,29 @@ test('a message to an ended thread runs it again in the same thread; only its ow
 
   await t.test('generic thread dispatch cannot bypass the current Factory repair budget', async t => {
     const { queueTaskRun } = await import('../lib/factory/queue-local')
-    const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
+    const { factoryRuntimeForBot, factoryAuthorize } = await import('../lib/factory/runtime')
+    const { createLegacyFactoryStore } = await import('./helpers/factory-legacy')
     const { factoryBinding } = await import('../lib/factory/dispatch')
     const { latestThreadRunModel } = await import('../lib/computer/run-model')
     const { latestTaskRun } = await import('../lib/thread-dispatch')
-    const fixture = async (executeCount: number, atExecution = false) => {
+    const fixture = async (executeCount: number, atExecution = false, legacyReview = false) => {
       const b = await person()
       const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `budget:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
       assert.ok(initial.runId, JSON.stringify(initial))
       const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [initial.runId])).rows[0]
+      if (legacyReview) {
+        // Only the three old review-retry budget scenarios use pre-upgrade
+        // task semantics. Materialize them before any synthetic execution;
+        // the real queue and Owner/source authorization remain unchanged.
+        const queued = (await pool.query('SELECT status,"startedAt","sessionId" FROM agent_runs WHERE id=$1', [initial.runId])).rows[0]
+        assert.deepEqual(queued, { status: 'queued', startedAt: null, sessionId: null })
+        const route = { ...task.route }; delete route.flowVersion
+        const legacy = await createLegacyFactoryStore(pool, factoryAuthorize, b.botId).route(b.id, route)
+        assert.equal(legacy.task.id, task.id)
+        task.route = legacy.task.route
+      }
+      assert.equal(task.route.flowVersion, legacyReview ? undefined : 2)
+
       // These completed executions are synthetic history, not real model
       // turns. Give them a past chronology so a fast local DB cannot put
       // several executions in one JS millisecond and let random UUIDs choose
@@ -566,7 +580,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     }
 
     for (const status of ['failed', 'pending'] as const) await t.test(`exhausted ${status} review cannot be replaced by a generic thread continuation`, async () => {
-      const f = await fixture(4)
+      const f = await fixture(4, false, status === 'pending')
       if (status === 'pending') await f.retryReview()
       const before = await f.snapshot()
       await assert.rejects(queueTaskRun(f.b.id, f.request, f.b.botId, undefined, status === 'pending' ? f.task.sourceEventId : undefined), { code: 'factoryRecoveryBudgetExceeded' })
@@ -583,8 +597,8 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       assert.deepEqual(await f.snapshot(), before, 'a retry cannot add a fifth execute attempt, source, receipt or run')
     })
 
-    await t.test('direct Owner repair cannot replace a pending review after the same-epoch cap', async () => {
-      const f = await fixture(4)
+    await t.test('direct Owner repair cannot replace a legacy pending review after the same-epoch cap', async () => {
+      const f = await fixture(4, false, true)
       const current = await f.retryReview()
       const before = await f.snapshot()
       const { handleFactory } = await import('../lib/factory/http')
@@ -608,8 +622,8 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       assert.deepEqual(await f.snapshot(), before)
     })
 
-    await t.test('same-epoch continuation within budget queues the fourth execution once', async () => {
-      const f = await fixture(3)
+    await t.test('same-epoch legacy continuation within budget queues the fourth execution once', async () => {
+      const f = await fixture(3, false, true)
       await f.retryReview()
       const before = await f.snapshot()
       const result = await queueTaskRun(f.b.id, f.request, f.b.botId)
