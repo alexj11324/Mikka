@@ -124,7 +124,11 @@ async function changed(executor: object, key: string, resolve: Resolve) {
   }))
 }
 
-export const runListChanged = (executor: object, runId: string, previewOnly = false) => changed(executor, `run:${runId}:${previewOnly ? 'reply' : 'state'}`, (db, workspace) => runListTargets(db, workspace, runId, previewOnly))
+export async function runListChanged(executor: object, runId: string, previewOnly = false) {
+  await changed(executor, `run:${runId}:${previewOnly ? 'reply' : 'state'}`, (db, workspace) => runListTargets(db, workspace, runId, previewOnly))
+  // The run's cards in its own bot's chat show its state; a reply preview is not a state change.
+  if (!previewOnly) await (await import('./chats')).runBotChatChanged(executor, runId)
+}
 export const issueListChanged = (executor: object, issueId: string, titleChanged = false) => changed(executor, `issue:${issueId}:${titleChanged ? 'title' : 'content'}`, (db, workspace) => issueListTargets(db, workspace, issueId, titleChanged))
 export const botListChanged = (executor: object, botId: string) => changed(executor, `bot:${botId}`, (db, workspace) => botListTargets(db, workspace, botId))
 export const groupListChanged = (executor: object, conversationId: string, removedUserId: string | null = null) => changed(executor, `group:${conversationId}:${removedUserId ?? ''}`, (db, workspace) => groupListTargets(db, workspace, conversationId, removedUserId))

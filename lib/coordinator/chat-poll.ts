@@ -1,5 +1,7 @@
+import type { ListLiveRead } from '@/lib/live/list-read'
+
 /** A poll whose version matched: only the chat's live state, the conversation itself is as before. */
-export type UnchangedChat = { unchanged: true; version: string; cursor: number; streamRunId?: string; working: boolean; error: string | null; botId: string; enabled: boolean }
+export type UnchangedChat = { unchanged: true; version: string; cursor: number; streamRunId?: string; working: boolean; error: string | null; botId: string; enabled: boolean; live?: ListLiveRead }
 
 /**
  * At most this long between decoration refreshes: cited names and artifact

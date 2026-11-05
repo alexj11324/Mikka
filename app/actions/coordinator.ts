@@ -2,6 +2,7 @@
 
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { ownerListRead } from '@/lib/live/list-read-server'
+import type { ListLiveRead } from '@/lib/live/list-read'
 
 import { cookies, headers } from 'next/headers'
 import { after } from 'next/server'
@@ -14,7 +15,7 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
-import { botChats, chatVersion, chatView, citationSources, storedReasoning, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import { botChats, chatVersionState, chatView, citationSources, storedReasoning, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import * as chatStore from '@/lib/coordinator/store'
 import type { UnchangedChat } from '@/lib/coordinator/chat-poll'
 import type { CitationSource } from '@/lib/coordinator/citations'
@@ -44,7 +45,7 @@ async function getUserId(): Promise<string> {
 }
 
 /** `botId` is the chat's bot row, the Coordinator's included. */
-export type CoordinatorChat = ChatView & { botId: string; enabled: boolean; version?: string; after?: number; baseCursor?: number; metadataRefresh?: boolean }
+export type CoordinatorChat = ChatView & { botId: string; enabled: boolean; version?: string; after?: number; baseCursor?: number; metadataRefresh?: boolean; live?: ListLiveRead }
 
 const botIdSchema = z.uuid().nullable()
 
@@ -92,8 +93,10 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
   const bot = await ownBot(user, botId)
   const enabled = coordinatorEnabled()
   const parsed = versionSchema.safeParse(known)
-  const current = await chatVersion(user.id, 200, bot.id)
-  if (parsed.success && parsed.data === current.version) return { unchanged: true, ...current, botId: bot.id, enabled, working: enabled && current.working }
+  const { expiries, observedAt, ...current } = await chatVersionState(user.id, 200, bot.id)
+  // The owner's home channel says when to read again; a lease running out is the one change with no write.
+  const live = await ownerListRead(user.id, expiries, observedAt)
+  if (parsed.success && parsed.data === current.version) return { unchanged: true, ...current, botId: bot.id, enabled, working: enabled && current.working, live }
   const proof = continuationSchema.safeParse(continuation)
   const chat: ChatView & { after?: number; baseCursor?: number } = await chatStore.chatUpdate(user.id, bot.id, proof.success ? proof.data : undefined)
   // Refresh card names and authorization independently from historical message bodies.
@@ -108,7 +111,7 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
     chat.artifacts = { ...artifacts, ...chat.artifacts }
   }
   // The version read first: a message stored in between makes the next poll read again, never miss it.
-  return { ...chat, ...(!known ? { metadataRefresh: true } : {}), version: current.version, botId: bot.id, enabled, working: enabled && chat.working }
+  return { ...chat, ...(!known ? { metadataRefresh: true } : {}), version: current.version, botId: bot.id, enabled, working: enabled && chat.working, live }
 }
 
 /** A bounded older page overlaps the first rendered item, preserving multi-step reply grouping. */

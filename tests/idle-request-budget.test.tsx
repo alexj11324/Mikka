@@ -167,7 +167,7 @@ const live = { ownerId: OWNER, workspaceId: OWNER_HOME }
 const doc = (text: string) => ({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] })
 const issue = (id: string, title: string, status = 'todo') => ({ ...issueWithMetadata({ id, userId: OWNER, title, content: doc(title), status, priority: 'normal', scope: 'workspace' as const, scopeVersion: 1, linearSyncBlocked: false, scopeSetBy: 'user' as const, scopeConfidence: null, revision: 3, createdAt: new Date(AT), updatedAt: new Date(AT) }), identifier: 'MIK-7', linearTargetVerified: false })
 const CHAT_VERSION = '0123456789abcdef0123456789abcdef'
-const chat = { botId: BOT, enabled: true, version: CHAT_VERSION, working: false, error: null, cursor: 2, sources: {}, artifacts: {}, persistedStreamIds: [], items: [
+const chat = { botId: BOT, enabled: true, version: CHAT_VERSION, working: false, error: null, cursor: 2, sources: {}, artifacts: {}, persistedStreamIds: [], live, items: [
   { id: 'm1', position: 1, from: 'person', text: 'Can you fix the sign-in redirect?', tools: [], threads: [], artifacts: [], createdAt: AT },
   { id: 'm2', position: 2, from: 'coordinator', text: 'Done: the redirect is fixed.', tools: [], threads: [], artifacts: [], createdAt: AT },
 ] }
@@ -196,7 +196,7 @@ Object.assign(fixtures, {
   'task-runs.pollTaskRuns': () => ({ items: [{ issueId: ISSUE, runId: RUN, issueTitle: 'Fix sign-in redirect', agentId: AGENT, agentName: 'Claude Code', status: 'running', outcome: null, error: null, finishedAt: null, bot: null, harnesses: ['claude_code'] }], live }),
   'execution-settings.getBotModelMenu': () => ({ groups: [{ kind: 'subscription', provider: 'claude', plan: 'Max', credentialLabel: 'ada@example.invalid', options: [{ id: 'binding-1', modelId: 'claude-sonnet-4-6', provider: 'claude' }] }],
     current: { id: 'binding-1', modelId: 'claude-sonnet-4-6', provider: 'claude', kind: 'subscription', chosen: false, available: true } }),
-  'coordinator.pollCoordinatorChat': (_bot: unknown, known: unknown) => known === CHAT_VERSION ? { unchanged: true, version: CHAT_VERSION, cursor: 2, working: false, error: null, botId: BOT, enabled: true } : chat,
+  'coordinator.pollCoordinatorChat': (_bot: unknown, known: unknown) => known === CHAT_VERSION ? { unchanged: true, version: CHAT_VERSION, cursor: 2, working: false, error: null, botId: BOT, enabled: true, live } : chat,
   'coordinator.getCoordinatorChat': () => chat,
   'coordinator.pollBotChatSummaries': () => ({ items: { [BOT]: { at: AT, text: 'Done: the redirect is fixed.' } }, live }),
   'artifacts.getArtifactText': () => '# Release notes\n\nSign-in redirect fixed.',
