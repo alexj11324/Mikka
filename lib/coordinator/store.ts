@@ -11,6 +11,7 @@ import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
+import { coordinatorSessionChanged } from '@/lib/live/coordinator-session'
 import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
@@ -118,6 +119,7 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
     // Ordinary renewal is not a broad list update. Only a new/changed turn
     // or actual message delivery changes the summary that the sidebar shows.
     if (!coordinatorLeaseActive(previousLease, now) || previousLease?.leaseHolder !== holder) await ownerListChanged(tx, userId, ['bot_chat_list'])
+    await coordinatorSessionChanged(tx, userId, botId)
     const candidates = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
     // A schedule is a separate read-only turn. Hydrate its authority through
@@ -204,6 +206,7 @@ export async function releaseLease(userId: string, holder: string, botId: string
   const released = await db.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, updatedAt: new Date() })
     .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
   if (released.length) await ownerListChanged(db, userId, ['bot_chat_list'])
+  if (released.length) await coordinatorSessionChanged(db, userId, botId)
   return hasWakingEvents(userId, botId)
 }
 
@@ -291,8 +294,9 @@ export async function appendMessages(userId: string, holder: string, unmasked: M
       await ownerListChanged(tx, userId, ['bot_chat_list'])
     }
     const now = new Date()
-    await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning && maskCredentials(warning), lastErrorAt: warning ? now : null, updatedAt: now })
-      .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder)))
+    const renewed = await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning && maskCredentials(warning), lastErrorAt: warning ? now : null, updatedAt: now })
+      .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
+    if (messages.length || renewed.length) await coordinatorSessionChanged(tx, userId, botId)
     return first + messages.length - 1
   })
 }
@@ -342,6 +346,7 @@ export async function failTurn(userId: string, holder: string, error: string, bo
       .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
     if (!released.length) return
     await ownerListChanged(tx, userId, ['bot_chat_list'])
+    await coordinatorSessionChanged(tx, userId, botId)
     await tx.execute(sql`UPDATE coordinator_messages SET message = message || jsonb_build_object('mikkaFailure', ${reason}::text)
       WHERE "userId"=${userId} AND "botId"=${botId}::uuid AND message->>'role'='user'
         AND position=(SELECT max(position) FROM coordinator_messages WHERE "userId"=${userId} AND "botId"=${botId}::uuid)`)

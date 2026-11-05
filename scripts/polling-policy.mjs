@@ -58,7 +58,6 @@ export const pollingAllowlist = {
   // Server: loops that re-query our database.
   'app/api/computer/events/route.ts': db(server, 'the "SSE" route re-queries subagent_events in a loop', 1),
   'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll re-checks device commands until the deadline', 1),
-  'lib/mcp/tools.ts': db(server, 'REPLY_POLL_MS: waits for a reply by re-reading every 2 s', 2),
   'lib/coordinator/group-turns.ts': db(server, 'STOP_POLL_MS: untilStopped re-reads the stop flag every second', 2),
   'lib/coordinator/stop-turn.ts': db(server, 'stop waits briefly for a starting turn by re-reading the session lease', 1),
   'workflows/coordinator/native-turn.ts': db(server, 'native coordinator turn re-reads its state every second (up to 180 times)', 1),
