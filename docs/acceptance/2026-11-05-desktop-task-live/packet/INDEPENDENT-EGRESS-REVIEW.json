@@ -1,0 +1,152 @@
+{
+  "reviewer": "/root/egress_1211",
+  "reviewedAt": "2026-11-05T01:45:36.257419+00:00",
+  "base": "5d2011f0f27a4ae300909dd1632ffede8a763471",
+  "candidateTree": "6050481953e91c6b32c2f03a48d62e9cdf3a3760",
+  "candidateFiles": [
+    {
+      "path": "components/desktop/desktop-integration.tsx",
+      "bytes": 4344,
+      "sha256": "9d28f56af01e04b3583046b8fbbea18cd82e11ba2b38c25eb5efd6d8a387dd5d",
+      "blob": "05cceda9c82df78dbd1178d396b88eeb0d0ffcf3"
+    },
+    {
+      "path": "package.json",
+      "bytes": 63243,
+      "sha256": "97abdd517cd2c3e7bec8e53b22a953a26d07ae7a97a057614ba2175e2d3f79b2",
+      "blob": "8e9cd60ff01b18272a24b586276dba054a4bd8ab"
+    },
+    {
+      "path": "scripts/desktop-task-list.live.test.tsx",
+      "bytes": 19991,
+      "sha256": "302d16cff49f75bbd885fccf011284d607233bcd93f1b277e437cd76bf58d03b",
+      "blob": "4f447c08c9f42fb945c42ded9e2b696aa5b3795d"
+    }
+  ],
+  "directlyReadDependencyBlobs": {
+    "lib/platform/desktop-notifications.ts": "e32edc7af48d37c5e67febb70f1aa2e8494d3976",
+    "lib/push-allowed.ts": "3039dcfec2a78d6286ef988aa52936b6781eb0bc",
+    "hooks/use-live-key.tsx": "8170d2612775e7ab836a74fb01bf85630c3665d4",
+    "hooks/use-live-lists.ts": "d05c1428f827de08ec07a56a0c516deceafe98c2",
+    "lib/live/list-read.ts": "c94492fc70ec5d5502d1f1ea59ac06b7a32d1a72",
+    "lib/live/channel.ts": "1292ddc2431c0e726f74a9e36308aee3c553123f",
+    "lib/live/channels.ts": "6d1eb1fb41dd9c6a061feaf892414e8908b05a3a",
+    "app/actions/task-runs.ts": "36148af8c26049fe5d0fd73539275997ce5956e5",
+    "app/actions/desktop-notifications.ts": "6739f4dd30bbd1b80872a28ea5062c902a35bffd",
+    "lib/platform/use-platform.ts": "6ad08e2ab9c04d7766def20e63b6b3c28828f2bb"
+  },
+  "evidence": [
+    {
+      "path": "evidence/red-final.log",
+      "bytes": 1290,
+      "sha256": "1f0d0ac7fee9b9c59768280ba25153b3eb1ceb798579c52aab4d9257a6cf4c95"
+    },
+    {
+      "path": "evidence/red-final.hashes",
+      "bytes": 215,
+      "sha256": "d484892b0476dd1c0ee862a9e130e07e7496d118361dc6585194ecd3c23770d4"
+    },
+    {
+      "path": "evidence/red-final.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "evidence/green-final.log",
+      "bytes": 4454,
+      "sha256": "0455e3d33135d3a3a32beb8762fdada31c3392cc8e6b3100fa049624fcc7982c"
+    },
+    {
+      "path": "evidence/green-final.hashes",
+      "bytes": 294,
+      "sha256": "cd9622bf3d538e68132fc60b7bcdb1c84605efc17bc96d6a3abb80b0413d7476"
+    },
+    {
+      "path": "evidence/green-final.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/typecheck-initial.log",
+      "bytes": 357,
+      "sha256": "a6f3b635ae43527cd5e3ca81c5f28dc95b3c4c323bbf33a85a4ebabf482fb6b8"
+    },
+    {
+      "path": "evidence/typecheck-final.log",
+      "bytes": 85,
+      "sha256": "0f1d95f44f3460f2d09b94f2715f01814c9819cbdb063e7225a5817ccb5740e8"
+    },
+    {
+      "path": "evidence/static-final.exits",
+      "bytes": 32,
+      "sha256": "b6a7a3cb3afd56c347486350de00c5fa037ae483a51ef7825eca9d863c923091"
+    },
+    {
+      "path": "evidence/lint-final.log",
+      "bytes": 89,
+      "sha256": "19c85f647d00ad87af361dd55a0adb802db7443b652fda6cf0d78137e0f25cc4"
+    },
+    {
+      "path": "evidence/navigation-policy.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/typegen.log",
+      "bytes": 115,
+      "sha256": "3ce5d6f16e9a8f0feb1c01dc8d0267c91792474ab7de286f9a65ee20602e659d"
+    },
+    {
+      "path": "evidence/hidden-warning-trace.log",
+      "bytes": 2855,
+      "sha256": "717e064471019ff4de89c9f7ff722736c6fab5f2e3307c7637c0b303694c782f"
+    },
+    {
+      "path": "evidence/hidden-warning-trace.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/swr-focus-callback.json",
+      "bytes": 1810,
+      "sha256": "f74562b22152f6feb5198d8098b40a42da9b02c6f6915f7da440c09ca35ac15b"
+    }
+  ],
+  "conclusion": "No source blocker in this three-file migration; exact-head CI and real production/hour gates remain.",
+  "ownTestExecutions": 0,
+  "productionActions": 0,
+  "results": {
+    "oldProductSameFixture": {
+      "exitCode": 1,
+      "elapsedMs": 16101.738844000001,
+      "readsBefore": 1,
+      "readsAfter": 2
+    },
+    "candidateQuietWindow": {
+      "elapsedMs": 16102.281727000001,
+      "readsBefore": 2,
+      "readsAfter": 2
+    },
+    "combined": {
+      "pass": 31,
+      "fail": 0,
+      "skip": 0,
+      "desktopCases": 18,
+      "existingListCases": 13
+    }
+  },
+  "limitations": [
+    "Task list Owner envelope is verified; unchanged shared preferences is not Owner-bound.",
+    "Native bridge, service and WS boundaries are mocked; React/SWR/component/channel code is real.",
+    "Synthetic visibility is not physical browser or OS desktop acceptance.",
+    "No egress/hour/model acceptance claimed."
+  ],
+  "report": {
+    "bytes": 10170,
+    "sha256": "948e29f56ce8a5031547b63022b356f4df1fd2a06533e3fc559ceedb5c5d2c20"
+  },
+  "verifiedPacket": {
+    "files": 32,
+    "manifestSha256": "57a321ee851e55672bf49472ebafbfb48bf8e5dbb804422028187fe9930c7551"
+  }
+}

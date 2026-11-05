@@ -1,0 +1,37 @@
+(node:61771) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+    at emitExperimentalWarning (node:internal/util:330:11)
+    at MockTracker.module (node:internal/test_runner/mock/mock:667:5)
+    at <anonymous> (/vercel/sandbox/mikka-desktop-task-live/scripts/desktop-task-list.live.test.tsx:32:6)
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+(node:61771) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+    at node:internal/util:132:17
+    at node:internal/util:149:7
+    at normalizeModuleMockOptions (node:internal/test_runner/mock/mock:875:3)
+    at MockTracker.module (node:internal/test_runner/mock/mock:679:9)
+    at <anonymous> (/vercel/sandbox/mikka-desktop-task-live/scripts/desktop-task-list.live.test.tsx:32:6)
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+(node:61771) TimeoutNaNWarning: NaN is not a number.
+Timeout duration was set to 1.
+    at new Timeout (node:internal/timers:238:17)
+    at setTimeout (node:timers:125:19)
+    at WindowErrorUtility.captureError (/vercel/sandbox/mikka-desktop-task-live/node_modules/.pnpm/happy-dom@15.11.7/node_modules/happy-dom/src/window/WindowErrorUtility.ts:29:13)
+    at HTMLDocument.#callDispatchEventListeners (/vercel/sandbox/mikka-desktop-task-live/node_modules/.pnpm/happy-dom@15.11.7/node_modules/happy-dom/src/event/EventTarget.ts:277:25)
+    at HTMLDocument.dispatchEvent (/vercel/sandbox/mikka-desktop-task-live/node_modules/.pnpm/happy-dom@15.11.7/node_modules/happy-dom/src/event/EventTarget.ts:121:35)
+    at HTMLDocument.#goThroughDispatchEventPhases (/vercel/sandbox/mikka-desktop-task-live/node_modules/.pnpm/happy-dom@15.11.7/node_modules/happy-dom/src/event/EventTarget.ts:184:32)
+    at HTMLDocument.dispatchEvent (/vercel/sandbox/mikka-desktop-task-live/node_modules/.pnpm/happy-dom@15.11.7/node_modules/happy-dom/src/event/EventTarget.ts:116:38)
+    at <anonymous> (/vercel/sandbox/mikka-desktop-task-live/scripts/desktop-task-list.live.test.tsx:272:14)
+    at process.env.NODE_ENV.exports.act (/vercel/sandbox/mikka-desktop-task-live/node_modules/.pnpm/react@19.3.1/node_modules/react/cjs/react.development.js:890:22)
+    at TestContext.<anonymous> (/vercel/sandbox/mikka-desktop-task-live/scripts/desktop-task-list.live.test.tsx:270:9)
+✔ a hidden desktop has no event reads and catches up through the shared transport when visible (3030.049979ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3499.158666

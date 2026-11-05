@@ -1,0 +1,19 @@
+{
+  "base": "40d03479ea8260b8934f609b84c7c9cb60a94b3c",
+  "tree": "d9faf9e04129555fc5251ef493e7f82702c0588d",
+  "files": [
+    {
+      "path": "components/desktop/desktop-integration.tsx",
+      "blob": "05cceda9c82df78dbd1178d396b88eeb0d0ffcf3"
+    },
+    {
+      "path": "package.json",
+      "blob": "8e9cd60ff01b18272a24b586276dba054a4bd8ab"
+    },
+    {
+      "path": "scripts/desktop-task-list.live.test.tsx",
+      "blob": "4f447c08c9f42fb945c42ded9e2b696aa5b3795d"
+    }
+  ],
+  "dependenciesUnchanged": true
+}

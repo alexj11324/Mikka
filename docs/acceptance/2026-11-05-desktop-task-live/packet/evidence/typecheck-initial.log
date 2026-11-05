@@ -1,0 +1,7 @@
+
+> next-app@0.0.1 typecheck /vercel/sandbox/mikka-desktop-task-live
+> tsrs --noEmit
+
+scripts/desktop-task-list.live.test.tsx(241,66): error TS2339: Property 'kind' does not exist on type 'never'.
+scripts/desktop-task-list.live.test.tsx(243,38): error TS2339: Property 'kind' does not exist on type 'never'.
+ ELIFECYCLE  Command failed with exit code 2.

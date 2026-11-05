@@ -1,0 +1,30 @@
+(node:60984) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:60984) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ healthy DesktopIntegration stays quiet beyond its former fifteen-second poll (16521.608916ms)
+ℹ {"elapsedMs":16101.688129,"readsBefore":2,"readsAfter":2,"tickets":["10000000-0000-4000-8000-000000000001"]}
+✔ web renders no desktop reader, ticket, subscription or native side effect (3343.071849ms)
+✔ desktop and board consumer share one owner-home read, not the selected team, and unchanged state does not repeat Decision (5124.467598ms)
+✔ initial waiting, failed and finished rows seed the badge without replaying old notifications (364.513759ms)
+✔ Owner changes reset the baseline and discard the old Owner Decision callback (5591.332877ms)
+✔ an old pending HTTP result cannot replace the next Owner baseline or adopt its transport (908.989361ms)
+✔ a response from the wrong authenticated Owner is unavailable before the desktop processes any rows (364.325857ms)
+✔ a late Decision cannot show a notification after web (2976.635706ms)
+✔ a late Decision cannot show a notification after unmount (2977.181489ms)
+✔ the shared preferences key keeps finished and proactive gates, without changing awaiting/failed policy (13874.609749ms)
+✔ Decision rejection and failure never become native notifications or implicit retries (7117.507507ms)
+(node:60984) TimeoutNaNWarning: NaN is not a number.
+Timeout duration was set to 1.
+✔ a hidden desktop has no event reads and catches up through the shared transport when visible (2979.087811ms)
+✔ a read deadline removes expired rows and badge state even without an invalidation (1215.919193ms)
+✔ a pending native click cannot navigate after owner changes (727.597125ms)
+✔ a pending native click cannot navigate after web changes (724.590627ms)
+✔ a pending native click cannot navigate after unmount changes (725.520541ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 68374.43153

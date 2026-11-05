@@ -1,0 +1,32 @@
+(node:61363) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:61363) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✖ healthy DesktopIntegration stays quiet beyond its former fifteen-second poll (16513.371423ms)
+ℹ {"elapsedMs":16101.738844000001,"readsBefore":1,"readsAfter":2,"tickets":[]}
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17054.554467
+
+✖ failing tests:
+
+test at scripts/desktop-task-list.live.test.tsx:1:8212
+✖ healthy DesktopIntegration stays quiet beyond its former fifteen-second poll (16513.371423ms)
+  AssertionError [ERR_ASSERTION]: a healthy desktop must not retain its fifteen-second task list read
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/vercel/sandbox/mikka-desktop-task-live/scripts/desktop-task-list.live.test.tsx:152:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

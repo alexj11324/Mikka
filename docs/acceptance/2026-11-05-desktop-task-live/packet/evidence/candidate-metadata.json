@@ -1,0 +1,94 @@
+{
+  "base": "5d2011f0f27a4ae300909dd1632ffede8a763471",
+  "baseTree": "66e43629a684bfed778cadd1df3c073d93cddb5a",
+  "tree": "6050481953e91c6b32c2f03a48d62e9cdf3a3760",
+  "branch": "feat/1212-desktop-task-live-20261105",
+  "files": [
+    {
+      "path": "components/desktop/desktop-integration.tsx",
+      "bytes": 4344,
+      "sha256": "9d28f56af01e04b3583046b8fbbea18cd82e11ba2b38c25eb5efd6d8a387dd5d",
+      "blob": "05cceda9c82df78dbd1178d396b88eeb0d0ffcf3"
+    },
+    {
+      "path": "package.json",
+      "bytes": 63243,
+      "sha256": "97abdd517cd2c3e7bec8e53b22a953a26d07ae7a97a057614ba2175e2d3f79b2",
+      "blob": "8e9cd60ff01b18272a24b586276dba054a4bd8ab"
+    },
+    {
+      "path": "scripts/desktop-task-list.live.test.tsx",
+      "bytes": 19991,
+      "sha256": "302d16cff49f75bbd885fccf011284d607233bcd93f1b277e437cd76bf58d03b",
+      "blob": "4f447c08c9f42fb945c42ded9e2b696aa5b3795d"
+    }
+  ],
+  "unchangedDependencies": [
+    {
+      "path": "hooks/use-live-lists.ts",
+      "baseBlob": "d05c1428f827de08ec07a56a0c516deceafe98c2",
+      "currentBlob": "d05c1428f827de08ec07a56a0c516deceafe98c2",
+      "efefBlob": "d05c1428f827de08ec07a56a0c516deceafe98c2"
+    },
+    {
+      "path": "lib/live/list-read.ts",
+      "baseBlob": "c94492fc70ec5d5502d1f1ea59ac06b7a32d1a72",
+      "currentBlob": "c94492fc70ec5d5502d1f1ea59ac06b7a32d1a72",
+      "efefBlob": "c94492fc70ec5d5502d1f1ea59ac06b7a32d1a72"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "baseBlob": "8170d2612775e7ab836a74fb01bf85630c3665d4",
+      "currentBlob": "8170d2612775e7ab836a74fb01bf85630c3665d4",
+      "efefBlob": "8170d2612775e7ab836a74fb01bf85630c3665d4"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "baseBlob": "1292ddc2431c0e726f74a9e36308aee3c553123f",
+      "currentBlob": "1292ddc2431c0e726f74a9e36308aee3c553123f",
+      "efefBlob": "1292ddc2431c0e726f74a9e36308aee3c553123f"
+    },
+    {
+      "path": "lib/live/channels.ts",
+      "baseBlob": "6d1eb1fb41dd9c6a061feaf892414e8908b05a3a",
+      "currentBlob": "6d1eb1fb41dd9c6a061feaf892414e8908b05a3a",
+      "efefBlob": "6d1eb1fb41dd9c6a061feaf892414e8908b05a3a"
+    },
+    {
+      "path": "lib/platform/desktop-notifications.ts",
+      "baseBlob": "e32edc7af48d37c5e67febb70f1aa2e8494d3976",
+      "currentBlob": "e32edc7af48d37c5e67febb70f1aa2e8494d3976",
+      "efefBlob": "e32edc7af48d37c5e67febb70f1aa2e8494d3976"
+    },
+    {
+      "path": "lib/push-allowed.ts",
+      "baseBlob": "3039dcfec2a78d6286ef988aa52936b6781eb0bc",
+      "currentBlob": "3039dcfec2a78d6286ef988aa52936b6781eb0bc",
+      "efefBlob": "3039dcfec2a78d6286ef988aa52936b6781eb0bc"
+    },
+    {
+      "path": "app/actions/desktop-notifications.ts",
+      "baseBlob": "6739f4dd30bbd1b80872a28ea5062c902a35bffd",
+      "currentBlob": "6739f4dd30bbd1b80872a28ea5062c902a35bffd",
+      "efefBlob": "6739f4dd30bbd1b80872a28ea5062c902a35bffd"
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "baseBlob": "36148af8c26049fe5d0fd73539275997ce5956e5",
+      "currentBlob": "36148af8c26049fe5d0fd73539275997ce5956e5",
+      "efefBlob": "36148af8c26049fe5d0fd73539275997ce5956e5"
+    },
+    {
+      "path": "components/workspace-app.tsx",
+      "baseBlob": "9c0c6461f4a01adb490ded0d0c3dc3ebfdb306e3",
+      "currentBlob": "9c0c6461f4a01adb490ded0d0c3dc3ebfdb306e3",
+      "efefBlob": "9c0c6461f4a01adb490ded0d0c3dc3ebfdb306e3"
+    },
+    {
+      "path": "lib/platform/use-platform.ts",
+      "baseBlob": "6ad08e2ab9c04d7766def20e63b6b3c28828f2bb",
+      "currentBlob": "6ad08e2ab9c04d7766def20e63b6b3c28828f2bb",
+      "efefBlob": "6ad08e2ab9c04d7766def20e63b6b3c28828f2bb"
+    }
+  ]
+}

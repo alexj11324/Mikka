@@ -1,0 +1,54 @@
+
+> next-app@0.0.1 test:live-lists /vercel/sandbox/mikka-desktop-task-live
+> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/use-live-lists.live.test.tsx scripts/desktop-task-list.live.test.tsx
+
+(node:61459) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:61459) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ healthy DesktopIntegration stays quiet beyond its former fifteen-second poll (16517.131569ms)
+ℹ {"elapsedMs":16102.281727000001,"readsBefore":2,"readsAfter":2,"tickets":["10000000-0000-4000-8000-000000000001"]}
+✔ web renders no desktop reader, ticket, subscription or native side effect (3342.467636ms)
+✔ desktop and board consumer share one owner-home read, not the selected team, and unchanged state does not repeat Decision (5123.644097ms)
+✔ initial waiting, failed and finished rows seed the badge without replaying old notifications (365.553375ms)
+✔ Owner changes reset the baseline and discard the old Owner Decision callback (5591.542216ms)
+✔ an old pending HTTP result cannot replace the next Owner baseline or adopt its transport (909.224426ms)
+✔ a response from the wrong authenticated Owner is unavailable before the desktop processes any rows (365.079278ms)
+✔ a late read after the cookie Owner changes cannot notify under the former Owner key (729.021786ms)
+✔ a late Decision cannot show a notification after web (2977.46217ms)
+✔ a late Decision cannot show a notification after unmount (2975.40857ms)
+✔ the shared preferences key keeps finished and proactive gates, without changing awaiting/failed policy (13873.140621ms)
+✔ Decision rejection and failure never become native notifications or implicit retries (7116.880838ms)
+(node:61459) TimeoutNaNWarning: NaN is not a number.
+Timeout duration was set to 1.
+✔ a hidden desktop has no event reads and catches up through the shared transport when visible (2979.675786ms)
+✔ a disconnected desktop re-reads current state when the shared connection returns (1715.124818ms)
+✔ a read deadline removes expired rows and badge state even without an invalidation (1214.686243ms)
+✔ a pending native click cannot navigate after owner changes (728.328268ms)
+✔ a pending native click cannot navigate after web changes (725.775471ms)
+✔ a pending native click cannot navigate after unmount changes (724.711289ms)
+(node:61460) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:61460) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list (62020.960245ms)
+✔ a late tasks response after the cookie changes cannot populate the old owner's real SWR cache (329.362198ms)
+✔ a late bots response after the cookie changes cannot populate the old owner's real SWR cache (325.589742ms)
+✔ a late issue response cannot replace the selected workspace, and an unresolved read has no adopted SSR rows (813.56324ms)
+✔ a server-selected replacement workspace is refused under the former issue-list key (326.161838ms)
+✔ group list GET results are bound to both the authenticated owner and the requested workspace before caching (327.365597ms)
+✔ a delayed Bot roster cannot populate another owner's list key (325.310491ms)
+✔ a delayed Bot roster cannot populate another workspace's list key (325.12771ms)
+✔ leaving Settings catches up a roster event that arrived while its read was paused (2747.071189ms)
+(node:61460) TimeoutNaNWarning: NaN is not a number.
+Timeout duration was set to 1.
+✔ hidden list views retain a dirty event and catch up once when visible (3079.45474ms)
+✔ without an active owned home, the owner-wide list never guesses the Provider workspace (323.970514ms)
+✔ a server-derived chat lease expiry performs one read without recreating the transport (2275.567562ms)
+✔ a completed-list age boundary repaints once without a data read, and a hidden boundary catches up on visibility (1356.026056ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 75140.468369
