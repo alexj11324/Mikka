@@ -7,7 +7,7 @@ import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { retryWorkerDefinition } from '@/lib/agent-kit/worker'
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { and, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { DEVICE_ONLINE_WINDOW_MS, RUN_LEASE_MS, type RunCheckpoint } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
@@ -496,5 +496,5 @@ async function announceEnd(run: Run & { status: 'failed' | 'stopped' }) {
   await revokeRunTokens(run.id)
   stopRecordingsAfter([run.id])
   await afterRunEnded(run.userId, run.id)
-  after(() => wakeCoordinator(run.userId))
+  afterJob('after:coordinator-wake', () => wakeCoordinator(run.userId))
 }

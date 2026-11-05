@@ -22,3 +22,14 @@ test('a legacy run displays its missing snapshot and never invents actors or bil
   assert.match(html,/snapshotMissing/);assert.match(html,/credentialKinds.unknown/)
   assert.doesNotMatch(html,/model-payer|output-owner|amounts\.|claude_code_cli|access\.workspace_share/)
 })
+
+test('the frozen Agent 配置 words its selection reason in the reader\'s language; a pre-code English sentence shows no reason row, and no digest shows',()=>{
+  const profile={profileId:'00000000-0000-4000-8000-000000000009',name:'Frontend',version:3,digest:'d'.repeat(64),source:'decision' as const}
+  const coded=renderToStaticMarkup(<Content evidence={{...evidence,agentProfile:{...profile,reason:'stage_fit'}}} />)
+  assert.match(coded,/selectionReasons\.stage_fit/)
+  assert.doesNotMatch(coded,/d{64}|>digest</,'the configuration digest is not shown')
+  const legacy=renderToStaticMarkup(<Content evidence={{...evidence,agentProfile:{...profile,reason:'Declared capabilities fit the task.'}}} />)
+  assert.doesNotMatch(legacy,/selectionReason/,'选择方式 already says it; a second 「按任务能力选择」 would repeat it')
+  assert.match(legacy,/selectionSources\.decision/)
+  assert.doesNotMatch(legacy,/Declared capabilities/)
+})

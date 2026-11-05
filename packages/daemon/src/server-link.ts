@@ -38,7 +38,7 @@ import {
 import type { LocalComputerDecision, LocalComputerRequest } from "@mikka/protocol/computer"
 import type { CaptureUploadRequest, CaptureUploadResponse, CaptureView, ScreenCaptureRequest, ScreenCaptureResponse } from "@mikka/protocol/capture"
 import type { RunChunk } from "./chunks"
-import type { ToolApprovalGate } from "./agents/tool-approval"
+import type { RunControlMode, ToolApprovalGate } from "./agents/tool-approval"
 import type { RunMailbox } from './run-mailbox'
 import type { ServerDecide } from './server-decision'
 import type { ChatFileDownload } from '@mikka/protocol/chat-attachments'
@@ -75,6 +75,8 @@ export interface ServerLink {
   prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
   /** A gateway hint only; every live run rechecks its current authority. */
   invalidateRunControls?(): void
+  /** How live runs learn of stops and revocations; see RunControlMode. */
+  setRunControlMode?(mode: RunControlMode): void
   /** The server's Decisions API on behalf of one run (server-decision.ts). */
   decide?: ServerDecide
   /** Optional host-only adapter for the claimed run; never model-supplied. */
@@ -151,7 +153,7 @@ export interface ServerLink {
   deviceGateway?(
     deviceId: string,
     signal?: AbortSignal
-  ): Promise<{ url: string | null; protocol: string | null }>
+  ): Promise<{ url: string | null; protocol: string | null; runControl?: 'push' }>
   /** Marks messages as handed to their agents. */
   ackCommands(deviceId: string, delivered: string[]): Promise<void>
   /**

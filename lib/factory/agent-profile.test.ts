@@ -43,6 +43,7 @@ const answer = (id: string, confidence = .9, why = 'capability_fit') => new Map<
 ])
 for (const row of catalog) test(`Decision exact-ID selection: ${row.name}`, () => {
   assert.equal(selectedProfileAnswer(catalog, answer(row.id))?.id, row.id)
+  assert.equal(selectedProfileAnswer(catalog, answer(row.id))?.reason, 'capability_fit', 'the reason is stored as a code, worded by the reader\'s language')
   const questions = profileDecisionQuestions(catalog)
   assert.equal(questions[0].type, 'choice')
   assert.ok(JSON.stringify(questions).includes(row.id))

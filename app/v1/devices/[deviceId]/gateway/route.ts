@@ -17,13 +17,15 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
   if (!await ownsDevice(deviceId, caller.userId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   const base = process.env.DEVICE_GATEWAY_URL
   const secret = process.env.DEVICE_GATEWAY_PUSH_SECRET
-  if (!base || !secret) return NextResponse.json({ url: null, protocol: null })
+  // runControl: every write that ends, pauses or revokes a run wakes its device
+  // (notifyRunControl), so a connected daemon drops its periodic check (#1212).
+  if (!base || !secret) return NextResponse.json({ url: null, protocol: null, runControl: 'push' })
   let url: URL
-  try { url = new URL(`/v1/devices/${encodeURIComponent(deviceId)}/socket`, base) } catch { return NextResponse.json({ url: null, protocol: null }) }
+  try { url = new URL(`/v1/devices/${encodeURIComponent(deviceId)}/socket`, base) } catch { return NextResponse.json({ url: null, protocol: null, runControl: 'push' }) }
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
   url.search = ''
   const { protocol } = deviceGatewayTicket(deviceId, secret)
-  return NextResponse.json({ url: url.toString(), protocol }, { headers: { 'Cache-Control': 'private, no-store' } })
+  return NextResponse.json({ url: url.toString(), protocol, runControl: 'push' }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
 
 export const GET = withDeviceRoute(handleGET)

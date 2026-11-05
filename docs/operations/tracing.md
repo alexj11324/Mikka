@@ -17,16 +17,18 @@ users' own Claude Code or Codex sessions.
   render and outbound `fetch` spans.
 - One `pg.query:<COMMAND> <db>` span per statement, from
   `@opentelemetry/instrumentation-pg` on the `pg` pool behind `lib/db`
-  (drizzle `node-postgres`). Statements outside a request are not traced, and
+  (drizzle `node-postgres`). Statements outside any span are not traced, and
   neither are connect spans.
+- Background work, each as a labelled job (see [Background work](#background-work)):
+  `after()` callbacks, Workflow steps and cron handlers.
 
 Every span has `service.name=mikka-web` and `deployment.environment`
 (`production`, `preview` or `dev`) as resource attributes, and:
 
 | Attribute | Meaning |
 | --- | --- |
-| `mikka.route` | Grouping key: the `withRequestLog('/api/…')` route, the `withDatabaseOperation('/actions/…')` action, or Next's route template |
-| `mikka.client_kind` | `daemon` (`/v1/*`, `/api/runs/mcp/*`, `/api/runs/github-token`), `mobile` (`/api/mobile/*`), `cron` (`/api/cron/*`), `worker` (`/api/webhooks/*`, Workflow steps) or `web` |
+| `mikka.route` | Grouping key: the `withRequestLog('/api/…')` route, the `withDatabaseOperation('/actions/…')` action, a background job (`after:<job>`, `cron:<name>`, `workflow:<workflow>/<step>`), or Next's route template |
+| `mikka.client_kind` | `daemon` (`/v1/*`, `/api/runs/mcp/*`, `/api/runs/github-token`), `mobile` (`/api/mobile/*`), `cron` (`/api/cron/*`, `cron:` jobs), `workflow` (Workflow steps, `/.well-known/workflow/*`), `background` (`after:` jobs), `worker` (`/api/webhooks/*`) or `web` |
 
 Database spans also have:
 
@@ -37,6 +39,47 @@ Database spans also have:
 | `db.query.text` | Parameterized SQL, literals replaced by `?`, cut to 200 characters |
 | `db.response.returned_rows` | Rows returned or affected |
 | `mikka.db.response_bytes_approx` | Result JSON size, estimated from the first 50 rows (not wire bytes) |
+
+## Background work
+
+Work with no request of its own runs as a job, labelled by
+`lib/tracing/jobs.ts` (`runJob`) and `lib/tracing/labels.ts`. The label is
+also the `route` of its `db_sample` log lines, which the egress monitor
+groups like a route.
+
+| Work | Label | Kind | Span |
+| --- | --- | --- | --- |
+| `after()` callbacks (coordinator wakes, live notifications, issue effects, webhook ingest, device wakes …) | `after:<job>` | `background` | New root span, linked to the request that scheduled it |
+| Fan-out a cron handler defers with `after()` | `cron:<name>/<part>` | `cron` | Same, root and linked |
+| Cron handlers (`app/api/cron/*`: run recovery and lease sweeps, coordinator wake recovery, the ops/egress monitor …) | `cron:<name>` | `cron` | Child of the cron request's span |
+| Workflow steps (every `'use step'` body) | `workflow:<workflow>/<step>` | `workflow` | Inside the step delivery request, under the SDK's own `step.execute` spans |
+
+- Schedule deferred work with `afterJob('after:<job>', task)` from
+  `lib/background.ts`, never next/server's `after` directly (oxlint
+  `no-restricted-imports`). Next runs an `after()` callback in a snapshot of
+  the scheduling request's async context, so a bare `after()` keeps the
+  request's route and parents its queries to a request span that has already
+  ended. `afterJob` enters the job inside that callback, after the snapshot
+  is restored, so the job's label is the one in force. Do not bind the task
+  with `AsyncLocalStorage.bind`/`snapshot`: entering it would restore the
+  request's context over the label. Work that must keep its scheduling
+  context when called back from elsewhere (live notifications) passes
+  `retainContext`, which binds outside the job. The only bare `after()` calls left hand over promises
+  already running in their webhook (Slack, Telegram) or flush analytics.
+- Wrap a cron handler with `cronJob('<name>', handler)`.
+- Workflow steps need nothing: the label comes from the step context the
+  Workflow SDK runs every step body in (`getStepMetadata()`'s
+  AsyncLocalStorage).
+- Job names are fixed strings, never ids or user data.
+- Root job spans are head sampled at `MIKKA_TRACE_SAMPLE_RATE` like a
+  request, independently of it; child job spans follow their request.
+
+`requireParentSpan` stays on, so a statement outside every span is still not
+traced. Turning it off would make each such statement its own single-span
+trace, labelled from a stack trace: in the bundled server those frames are
+`.next/server/chunks/*.js` files, not modules, and capturing a stack on every
+unparented query costs CPU on hot paths. Labelling the entry points instead
+gives every background statement a parent, a real name and a trace.
 
 ## Querying
 

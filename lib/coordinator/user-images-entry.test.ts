@@ -20,7 +20,7 @@ const effects:unknown[]=[]
 const forbidden=()=>{effects.push('external');throw Error('External effects forbidden in image-entry fixture')}
 function builder(action:()=>unknown){let ran=false,value:unknown;const run=()=>{if(!ran){ran=true;value=action()}return value};return {then:(resolve:(value:unknown)=>unknown,reject:(error:unknown)=>unknown)=>Promise.resolve().then(run).then(resolve,reject),returning:async()=>run(),onConflictDoNothing:()=>builder(run)}}
 const transport={
- async execute(statement:SQL){const query=dialect.sqlToQuery(statement);assert.match(query.sql,/^SELECT pg_advisory_xact_lock\(hashtextextended\(/);assert.deepEqual(query.params,[`bot-chat:${owner}:${COORDINATOR_BOT}`]);return {rows:[]}},
+ async execute(statement:SQL){const query=dialect.sqlToQuery(statement);if(query.sql.startsWith("SELECT pg_notify(")){assert.deepEqual(query.params,["mikka_coordinator_lease",COORDINATOR_BOT]);return {rows:[]}};assert.match(query.sql,/^SELECT pg_advisory_xact_lock\(hashtextextended\(/);assert.deepEqual(query.params,[`bot-chat:${owner}:${COORDINATOR_BOT}`]);return {rows:[]}},
  select(selection?:Record<string,unknown>){let table:unknown,condition:SQL;const q={from(value:unknown){table=value;return q},where(value:SQL){condition=value;return q},for(mode:string){assert.equal(mode,'update');return q},orderBy(){return q},limit:async()=>read(),then:(resolve:(value:unknown)=>unknown,reject:(error:unknown)=>unknown)=>Promise.resolve().then(read).then(resolve,reject)}
   const read=()=>{const query=dialect.sqlToQuery(condition);assert.ok(query.params.includes(owner));assert.match(query.sql,/"botId" = \$\d+/);assert.ok(query.params.includes(COORDINATOR_BOT))
    if(table===coordinatorSessions)return [{...session}]

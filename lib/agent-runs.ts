@@ -84,6 +84,18 @@ export const runViewColumns = {
 }
 
 /**
+ * `runViewColumns` for list reads (citations, the inbox): no provenance, the
+ * report holds only its `summary` and the error only its first non-blank line,
+ * exactly what `runSummaryText` reads from them.
+ */
+const { agentProfile: _profile, model: _model, modelSource: _modelSource, executionIdentity: _identity, ...runBriefColumns } = runViewColumns
+const runBriefViewColumns = {
+  ...runBriefColumns,
+  report: sql<Record<string, unknown> | null>`case when jsonb_typeof(${agentRuns.report}) = 'object' then jsonb_build_object('summary', ${agentRuns.report}->'summary') end`,
+  error: sql<string | null>`substring(${agentRuns.error} from '[^\\n]*\\S[^\\n]*')`,
+}
+
+/**
  * Queues one run of one agent against one issue. The daemon picks it up on its
  * next poll, claims it, and reports back through `/v1/runs/:runId/complete`.
  * `note` is extra direction for this run only, after the issue.
@@ -301,8 +313,9 @@ async function localRunCredential<S extends { id: string; ownerId: string; conne
 }
 
 /** Every surface uses this gate. Workspace membership never grants run control,
- * personal agent/session access, or raw transcript access. */
-export async function visibleRuns(userId: string, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number } = {}): Promise<RunView[]> {
+ * personal agent/session access, or raw transcript access.
+ * `brief`: the list projection (`runBriefViewColumns`), for callers that show a run's name, state and summary only. */
+export async function visibleRuns(userId: string, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number; brief?: boolean } = {}): Promise<RunView[]> {
   if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
   // Asked about one task or known runs: only their tasks' team links are read.
@@ -311,7 +324,7 @@ export async function visibleRuns(userId: string, input: { issueId?: string; run
     : undefined
   const visibility = await issueVisibility(userId, false, undefined, db, { onlyIssueIds })
   const shared = visibility.allowedIds.length ? and(eq(issues.scope, 'workspace'), inArray(issues.id, visibility.allowedIds)) : sql`false`
-  const rows = await db.select({ ...runViewColumns, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
+  const rows = await db.select({ ...(input.brief ? runBriefViewColumns : runViewColumns), ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))
     .where(and(
       or(and(eq(agentRuns.userId, userId), or(isNull(agentRuns.issueId), visibility.predicate)), and(visibility.predicate, shared)),
