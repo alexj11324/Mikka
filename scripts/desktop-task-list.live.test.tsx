@@ -1,0 +1,319 @@
+import assert from 'node:assert/strict'
+import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
+import { act, StrictMode } from 'react'
+import type { Root } from 'react-dom/client'
+import type { State } from 'swr'
+import { Window } from 'happy-dom'
+import type { DesktopNotification, DesktopRun } from '../lib/platform/desktop-notifications'
+import type { Preferences } from '../lib/preferences'
+import { LIVE_KINDS } from '../lib/live/events'
+
+const home = '10000000-0000-4000-8000-000000000001'
+const otherHome = '10000000-0000-4000-8000-000000000002'
+const team = '20000000-0000-4000-8000-000000000001'
+type Read = { items: DesktopRun[]; live: { ownerId: string; workspaceId: string | null; deadline?: { at: string; afterMs: number } } }
+type Candidate = { id: string; issueId: string; kind: DesktopNotification['kind'] }
+type Decision = { show: string[] } | { error: string }
+let runtime: 'desktop' | 'web'
+let readTasks: () => Promise<Read>
+let reads: number, preferenceReads: number, deviceReads: number
+let preferences: Preferences
+let decide: (candidates: Candidate[]) => Promise<Decision>
+let decisions: Candidate[][], shown: DesktopNotification[], badges: number[], tickets: string[]
+let pendingClick: () => Promise<string | null>
+let clickListeners: Set<(href: string) => void>
+const router = { push: (href: string) => { routed.push(href) } }
+let routed: string[]
+const read = () => { reads++; return readTasks() }
+
+// Only service, native-shell and transport boundaries are replaced. The real
+// component, notification rules, React, SWR, live hook and channels run below.
+// listTaskRuns is retained in the fixture so the exact old component can run RED.
+mock.module(new URL('../app/actions/task-runs.ts', import.meta.url).href, { namedExports: {
+  listTaskRuns: async () => (await read()).items, pollTaskRuns: read,
+  pollThreads: () => { throw new Error('unexpected thread reader') },
+} })
+mock.module(new URL('../app/actions/issues.ts', import.meta.url).href, { namedExports: { pollIssues: () => { throw new Error('unexpected issue reader') } } })
+mock.module(new URL('../app/actions/coordinator.ts', import.meta.url).href, { namedExports: { pollBotChatSummaries: () => { throw new Error('unexpected bot reader') } } })
+mock.module(new URL('../app/actions/bots.ts', import.meta.url).href, { namedExports: { pollBots: () => { throw new Error('unexpected roster reader') } } })
+mock.module(new URL('../app/actions/agents.ts', import.meta.url).href, { namedExports: { listDevices: async () => { deviceReads++; return [] } } })
+mock.module(new URL('../app/actions/preferences.ts', import.meta.url).href, { namedExports: { getPreferences: async () => { preferenceReads++; return preferences } } })
+mock.module(new URL('../app/actions/desktop-notifications.ts', import.meta.url).href, { namedExports: { chooseDesktopNotifications: (candidates: Candidate[]) => { decisions.push(candidates); return decide(candidates) } } })
+mock.module(new URL('../lib/platform/use-platform.ts', import.meta.url).href, { namedExports: { usePlatform: () => ({ runtime }) } })
+mock.module(new URL('../i18n/navigation.ts', import.meta.url).href, { namedExports: { useRouter: () => router } })
+
+const browser = new Window({ url: 'https://mikka.example/mikka/en' })
+const originalFetch = globalThis.fetch, originalSocket = globalThis.WebSocket
+let createRoot: typeof import('react-dom/client')['createRoot']
+let SWRConfig: typeof import('swr')['SWRConfig']
+let useSWRConfig: typeof import('swr')['useSWRConfig']
+let serialize: typeof import('swr')['unstable_serialize']
+let LiveProvider: typeof import('../hooks/use-live-key')['LiveProvider']
+let useLiveTaskRunList: typeof import('../hooks/use-live-lists')['useLiveTaskRunList']
+let DesktopIntegration: typeof import('../components/desktop/desktop-integration')['DesktopIntegration']
+let root: Root, mounted: boolean, container: HTMLDivElement, cache: Map<string, State>
+let mutate: ReturnType<typeof useSWRConfig>['mutate']
+const sockets: FakeSocket[] = []
+
+class FakeSocket {
+  readyState = 0
+  onopen: (() => void) | null = null
+  onclose: (() => void) | null = null
+  onerror: (() => void) | null = null
+  onmessage: ((event: { data: string }) => void) | null = null
+  constructor(readonly url: string) {
+    sockets.push(this)
+    queueMicrotask(() => {
+      if (this.readyState !== 0) return
+      this.readyState = 1; this.onopen?.()
+      this.message({ type: 'live_ready', version: 1, kinds: LIVE_KINDS })
+    })
+  }
+  send(value: string) { if (value === 'ping') this.onmessage?.({ data: 'pong' }) }
+  close() { this.readyState = 3; this.onclose?.() }
+  message(value: unknown) { if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(value) }) }
+}
+
+function Peer({ owner }: { owner: string }) {
+  const { data } = useLiveTaskRunList(owner)
+  return <output data-peer>{JSON.stringify(data?.items)}</output>
+}
+function CacheControl() { mutate = useSWRConfig().mutate; return null }
+
+before(async () => {
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: browser.document })
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, WebSocket: FakeSocket })
+  ;({ createRoot } = await import('react-dom/client'))
+  ;({ SWRConfig, useSWRConfig, unstable_serialize: serialize } = await import('swr'))
+  ;({ LiveProvider } = await import('../hooks/use-live-key'))
+  ;({ useLiveTaskRunList } = await import('../hooks/use-live-lists'))
+  ;({ DesktopIntegration } = await import('../components/desktop/desktop-integration'))
+})
+beforeEach(() => {
+  runtime = 'desktop'; reads = 0; preferenceReads = 0; deviceReads = 0
+  decisions = []; shown = []; badges = []; tickets = []; routed = []; sockets.length = 0
+  clickListeners = new Set(); pendingClick = async () => null
+  preferences = { proactive: true, pushDecide: true, pushReview: true, pushFinished: true, pushBriefing: true, pushWhen: 'always', memoryEnabled: true, sendKey: 'enter', personalInstructions: '', dailySuggestions: true }
+  readTasks = async () => snapshot()
+  decide = async candidates => ({ show: candidates.map(candidate => candidate.id) })
+  Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+  Object.defineProperty(browser, 'mikka', { configurable: true, value: {
+    notifications: {
+      setBadge: async (count: number) => { badges.push(count) },
+      show: async (value: DesktopNotification) => { shown.push(value) },
+      onClick: (listener: (href: string) => void) => { clickListeners.add(listener); return () => clickListeners.delete(listener) },
+      consumePendingClick: () => pendingClick(),
+    },
+  } })
+  cache = new Map(); container = document.createElement('div'); document.body.append(container); root = createRoot(container); mounted = true
+  globalThis.fetch = async (input, options) => {
+    assert.ok(!options?.method || options.method === 'GET', 'no model or mutation request belongs in this fixture')
+    const url = new URL(String(input), 'https://mikka.example')
+    assert.ok(url.pathname.endsWith('/api/live/ticket'), `unexpected network boundary ${url.pathname}`)
+    const workspace = url.searchParams.get('workspace'); assert.ok(workspace); tickets.push(workspace)
+    return Response.json({ url: `wss://fixture.invalid/${workspace}`, protocol: 'fixture', expiresAt: Date.now() + 600_000 })
+  }
+})
+afterEach(async () => { if (mounted) await act(async () => root.unmount()); container.remove(); globalThis.fetch = originalFetch })
+after(async () => { Object.assign(globalThis, { WebSocket: originalSocket }); mock.restoreAll(); await browser.close() })
+
+function run(status: DesktopRun['status'] = 'running', issueId = '30000000-0000-4000-8000-000000000001'): DesktopRun {
+  return { issueId, runId: '40000000-0000-4000-8000-000000000001', issueTitle: 'Desktop task', agentName: 'Fixture agent', status }
+}
+function snapshot(status: DesktopRun['status'] = 'running', ownerId = 'owner-a', workspaceId: string | null = home): Read {
+  return { items: [run(status)], live: { ownerId, workspaceId } }
+}
+const wait = async (ms = 180) => { await act(async () => { await new Promise(resolve => setTimeout(resolve, ms)) }) }
+async function settled() { await wait(); await wait() }
+function emit(scope = home) { for (const socket of sockets) if (socket.url.endsWith(scope)) socket.message({ kind: 'task_run_list', id: scope }) }
+const deferred = <T,>() => { let resolve!: (value: T) => void; return { promise: new Promise<T>(done => { resolve = done }), resolve: (value: T) => resolve(value) } }
+async function render({ owner = 'owner-a', desktop = true, peer = false, strict = false } = {}) {
+  runtime = desktop ? 'desktop' : 'web'
+  const content = <LiveProvider ownerId={owner} workspaceId={team}>
+    <CacheControl /><DesktopIntegration userId={owner} />{peer && <Peer owner={owner} />}
+  </LiveProvider>
+  await act(async () => root.render(<SWRConfig value={{ provider: () => cache, dedupingInterval: 0 }}>{strict ? <StrictMode>{content}</StrictMode> : content}</SWRConfig>))
+}
+async function transition(status: DesktopRun['status'], owner = 'owner-a', scope = home) {
+  readTasks = async () => snapshot(status, owner, scope)
+  await act(async () => emit(scope)); await wait(2_250)
+}
+async function setPreferences(patch: Partial<Preferences>) {
+  preferences = { ...preferences, ...patch }
+  await act(async () => { await mutate('preferences', preferences, { revalidate: false }) })
+}
+
+test('healthy DesktopIntegration stays quiet beyond its former fifteen-second poll', { timeout: 25_000 }, async context => {
+  await render(); await settled()
+  const before = reads, startedAt = performance.now()
+  await wait(16_100)
+  context.diagnostic(JSON.stringify({ elapsedMs: performance.now() - startedAt, readsBefore: before, readsAfter: reads, tickets }))
+  assert.equal(reads, before, 'a healthy desktop must not retain its fifteen-second task list read')
+  assert.deepEqual(new Set(tickets), new Set([home]))
+  assert.equal(decisions.length, 0)
+})
+
+test('web renders no desktop reader, ticket, subscription or native side effect', async () => {
+  await render({ desktop: false }); await settled()
+  assert.deepEqual({ reads, preferenceReads, deviceReads, tickets, badges, shown, listeners: clickListeners.size }, { reads: 0, preferenceReads: 0, deviceReads: 0, tickets: [], badges: [], shown: [], listeners: 0 })
+  assert.equal(container.innerHTML, '')
+  await render(); await settled(); assert.ok(reads > 0); assert.ok(tickets.includes(home))
+  const before = reads
+  await render({ desktop: false }); await settled()
+  await act(async () => emit()); await wait(2_250)
+  assert.equal(reads, before); assert.equal(clickListeners.size, 0)
+  assert.ok(sockets.every(socket => socket.readyState === 3))
+})
+
+test('desktop and board consumer share one owner-home read, not the selected team, and unchanged state does not repeat Decision', async () => {
+  await render({ peer: true }); await settled()
+  assert.deepEqual(new Set(tickets), new Set([home]))
+  const before = reads
+  await act(async () => emit(team)); await wait(250); assert.equal(reads, before)
+  await transition('waiting_input')
+  assert.equal(reads, before + 1, 'both real consumers share the same SWR revalidation')
+  assert.equal(badges.at(-1), 1)
+  assert.equal(decisions.length, 1); assert.equal(decisions[0][0].kind, 'awaiting')
+  assert.equal(shown.length, 1); assert.equal(shown[0].id, decisions[0][0].id)
+  assert.equal(shown[0].href, '/?issue=30000000-0000-4000-8000-000000000001&thread=40000000-0000-4000-8000-000000000001')
+  assert.ok(container.querySelector('[data-peer]')?.textContent?.includes('waiting_input'))
+  await transition('waiting_input'); assert.equal(decisions.length, 1); assert.equal(shown.length, 1)
+})
+
+test('initial waiting, failed and finished rows seed the badge without replaying old notifications', async () => {
+  readTasks = async () => ({ ...snapshot(), items: [run('waiting_input', 'a'), run('failed', 'b'), run('succeeded', 'c')] })
+  await render({ strict: true }); await settled()
+  assert.equal(badges.at(-1), 1); assert.deepEqual(decisions, []); assert.deepEqual(shown, [])
+  assert.equal(clickListeners.size, 1, 'StrictMode cleanup leaves only the current bridge listener')
+})
+
+test('Owner changes reset the baseline and discard the old Owner Decision callback', async () => {
+  await render(); await settled()
+  const held = deferred<Decision>(); decide = () => held.promise
+  await transition('failed'); assert.equal(decisions.length, 1)
+  const oldIds = decisions[0].map(candidate => candidate.id)
+  readTasks = async () => snapshot('waiting_input', 'owner-b', otherHome)
+  await render({ owner: 'owner-b' }); await settled()
+  assert.equal(badges.at(-1), 1); assert.equal(decisions.length, 1, 'the next Owner has a new launch baseline')
+  await act(async () => held.resolve({ show: oldIds })); await settled()
+  assert.deepEqual(shown, [], 'an approved result for the unmounted Owner cannot reach the native shell')
+  decide = async candidates => ({ show: candidates.map(candidate => candidate.id) })
+  await transition('failed', 'owner-b', otherHome)
+  assert.equal(decisions.length, 2); assert.equal(shown.length, 1)
+})
+
+test('an old pending HTTP result cannot replace the next Owner baseline or adopt its transport', async () => {
+  const held = deferred<Read>(); readTasks = () => held.promise
+  await render(); await wait()
+  readTasks = async () => snapshot('waiting_input', 'owner-b', otherHome)
+  await render({ owner: 'owner-b' }); await settled()
+  const before = [...badges]
+  await act(async () => held.resolve(snapshot('failed'))); await settled()
+  assert.deepEqual(badges, before); assert.deepEqual(decisions, []); assert.deepEqual(shown, [])
+  assert.deepEqual(new Set(tickets), new Set([otherHome]))
+  assert.ok(!JSON.stringify(cache.get(serialize(['task-runs', 'owner-b']))).includes('owner-a'))
+})
+
+test('a response from the wrong authenticated Owner is unavailable before the desktop processes any rows', async () => {
+  readTasks = async () => snapshot('waiting_input', 'owner-b', otherHome)
+  await render(); await settled()
+  assert.deepEqual(badges, []); assert.deepEqual(decisions, []); assert.deepEqual(tickets, [])
+  assert.ok(!JSON.stringify(cache.get(serialize(['task-runs', 'owner-a']))).includes('owner-b'))
+})
+
+test('a late read after the cookie Owner changes cannot notify under the former Owner key', async () => {
+  await render(); await settled()
+  const held = deferred<Read>(); readTasks = () => held.promise
+  let pending!: Promise<unknown>
+  await act(async () => { pending = mutate(serialize(['task-runs', 'owner-a'])).catch(() => undefined) })
+  const before = [...badges]
+  await act(async () => { held.resolve(snapshot('waiting_input', 'owner-b', otherHome)); await pending })
+  await settled()
+  assert.deepEqual(badges, before); assert.deepEqual(decisions, []); assert.deepEqual(shown, [])
+  assert.ok(!tickets.includes(otherHome)); assert.ok(!JSON.stringify(cache.get(serialize(['task-runs', 'owner-a']))).includes('owner-b'))
+})
+
+for (const end of ['web', 'unmount'] as const) test(`a late Decision cannot show a notification after ${end}`, async () => {
+  await render(); await settled()
+  const held = deferred<Decision>(); decide = () => held.promise
+  await transition('waiting_input'); assert.equal(decisions.length, 1)
+  if (end === 'web') await render({ desktop: false })
+  else { await act(async () => root.unmount()); mounted = false }
+  await act(async () => held.resolve({ show: decisions[0].map(candidate => candidate.id) })); await settled()
+  assert.deepEqual(shown, []); assert.equal(clickListeners.size, 0)
+})
+
+test('the shared preferences key keeps finished and proactive gates, without changing awaiting/failed policy', async () => {
+  await render(); await settled()
+  await setPreferences({ pushFinished: false }); await transition('succeeded')
+  assert.equal(decisions.length, 0)
+  await transition('running'); await setPreferences({ pushFinished: true, proactive: false }); await transition('succeeded')
+  assert.equal(decisions.length, 0)
+  await transition('failed'); assert.equal(decisions.at(-1)?.[0].kind, 'failed')
+  await transition('running'); await setPreferences({ proactive: true }); await transition('succeeded')
+  assert.equal(decisions.at(-1)?.[0].kind, 'finished')
+  assert.equal(shown.filter(value => value.kind === 'finished').length, 1)
+})
+
+test('Decision rejection and failure never become native notifications or implicit retries', async () => {
+  await render(); await settled()
+  decide = async () => ({ show: [] }); await transition('waiting_input')
+  assert.equal(decisions.length, 1); assert.deepEqual(shown, [])
+  decide = async () => { throw new Error('controlled Decision unavailable') }; await transition('failed')
+  assert.equal(decisions.length, 2); assert.deepEqual(shown, [])
+  await transition('failed'); assert.equal(decisions.length, 2); assert.deepEqual(shown, [])
+})
+
+test('a hidden desktop has no event reads and catches up through the shared transport when visible', async () => {
+  await render(); await settled()
+  await act(async () => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    document.dispatchEvent(new browser.Event('visibilitychange') as unknown as Event)
+  })
+  const before = reads; readTasks = async () => snapshot('waiting_input')
+  await act(async () => emit()); await wait(2_250)
+  assert.equal(reads, before); assert.deepEqual(decisions, [])
+  await act(async () => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    document.dispatchEvent(new browser.Event('visibilitychange') as unknown as Event)
+  })
+  await settled()
+  assert.equal(reads, before + 1); assert.equal(badges.at(-1), 1); assert.equal(shown.length, 1)
+})
+
+test('a disconnected desktop re-reads current state when the shared connection returns', async () => {
+  await render(); await settled()
+  const before = reads, original = sockets.find(socket => socket.readyState === 1)!
+  readTasks = async () => snapshot('waiting_input')
+  await act(async () => original.close()); await wait(1_350)
+  assert.ok(sockets.some(socket => socket !== original && socket.readyState === 1))
+  assert.equal(reads, before + 1); assert.equal(badges.at(-1), 1); assert.equal(shown.length, 1)
+})
+
+test('a read deadline removes expired rows and badge state even without an invalidation', async () => {
+  const expiresAt = Date.now() + 900
+  readTasks = async () => Date.now() >= expiresAt
+    ? { items: [], live: { ownerId: 'owner-a', workspaceId: home } }
+    : { ...snapshot('waiting_input'), live: { ownerId: 'owner-a', workspaceId: home, deadline: { at: new Date(expiresAt).toISOString(), afterMs: Math.max(0, expiresAt - Date.now()) } } }
+  await render(); await settled()
+  assert.equal(badges.at(-1), 1)
+  const before = reads
+  await wait(850)
+  assert.ok(reads > before, 'the actual read deadline performs a fresh list read')
+  assert.equal(badges.at(-1), 0); assert.deepEqual(decisions, [])
+})
+
+for (const end of ['owner', 'web', 'unmount'] as const) test(`a pending native click cannot navigate after ${end} changes`, async () => {
+  const held = deferred<string | null>(); pendingClick = () => held.promise
+  await render(); await settled()
+  const oldClick = [...clickListeners][0]
+  pendingClick = async () => null
+  if (end === 'owner') { readTasks = async () => snapshot('running', 'owner-b', otherHome); await render({ owner: 'owner-b' }) }
+  else if (end === 'web') await render({ desktop: false })
+  else { await act(async () => root.unmount()); mounted = false }
+  const before = window.location.href
+  await act(async () => { held.resolve('/?issue=30000000-0000-4000-8000-000000000001'); oldClick('/?thread=40000000-0000-4000-8000-000000000001') })
+  await settled()
+  assert.equal(window.location.href, before); assert.deepEqual(routed, [])
+})
