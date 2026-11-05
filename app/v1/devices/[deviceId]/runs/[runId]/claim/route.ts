@@ -26,7 +26,9 @@ import { withBasePath } from '@/lib/base-path'
 import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
 import { issueForUser } from '@/lib/issue-access'
-import { failRunForDaemonUpgrade, latestCheckpoint } from '@/lib/run-leases'
+import { failRunForDaemonUpgrade, failQueuedSubscriptionRuntime, latestCheckpoint } from '@/lib/run-leases'
+import { subscriptionPreflightSchema } from '@mikka/protocol/harness'
+import messages from '@/messages/zh-CN.json'
 import { continuationFollowUp } from '@/lib/thread-continuation'
 import { checkpointRecoveryError, providerContinuationNote, quotaContinuationNote, retryNote } from '@/lib/run-retry'
 import { constrainedAssignmentPolicy, intersectRunPolicy } from '@/lib/run-assignment-policy'
@@ -142,8 +144,6 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     return NextResponse.json({ error: error.code }, { status: error.code === 'notFound' ? 404 : 409 })
   }
   const harness = run.agentDefinition?.harness ?? agent.harness
-  if (device.kind === 'local' && (!repo.remoteUrl || !localExecutionHarnesses(device.harnesses).includes(harness))) return NextResponse.json({ error: 'Repository or execution harness unavailable.' }, { status: 409 })
-  if ((harness === 'codex' || harness === 'claude_code') && !device.harnesses.some(info => info.harness === harness && info.installed && info.toolApproval === true)) return NextResponse.json({ error: 'Run approval capability unavailable.' }, { status: 409 })
   const pinned = run.agentDefinition?.subscription
   let subscription: Awaited<ReturnType<ReturnType<typeof subscriptionRuntime>['repository']['nativeBinding']>>
   try { subscription = deploymentSwitch('byos')
@@ -152,7 +152,17 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
       : pinned ? await nativeRunBinding(pool, caller.userId, agent.id, harness, undefined, pinned.bindingId) : await localRunBinding(caller.userId, agent.id, harness, run.botId ?? null) : null
   } catch { return NextResponse.json({ error:'Subscription unavailable.' },{ status:409 }) }
   if (pinned && (!subscription || subscription.id !== pinned.bindingId || subscription.modelId !== pinned.modelId || subscription.route !== pinned.route || subscription.consumerId !== agent.id)) return NextResponse.json({ error:'Pinned subscription unavailable.' },{ status:409 })
-  if (subscription && !device.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
+  if (subscription && !device.harnesses.some(info => info.harness === harness && info.installed && info.toolApproval && info.subscriptionBroker && !info.subscriptionPreflight)) {
+    if (device.kind === 'local' && (harness === 'codex' || harness === 'claude_code')) {
+      const info = device.harnesses.find(info => info.harness === harness)
+      const detail = subscriptionPreflightSchema.safeParse(info?.subscriptionPreflight).data ?? (!info?.installed ? 'cli_missing' : 'adapter_start_failed')
+      await failQueuedSubscriptionRuntime(runId, deviceId, caller.userId, { harness, bindingId: subscription.id })
+      return NextResponse.json({ error: messages.RunErrors.subscription_local_runtime_unavailable[detail ?? 'default'], code: 'subscription_local_runtime_unavailable', ...(detail ? { detail } : {}) }, { status: 409 })
+    }
+    return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
+  }
+  if (device.kind === 'local' && (!repo.remoteUrl || !localExecutionHarnesses(device.harnesses).includes(harness))) return NextResponse.json({ error: 'Repository or execution harness unavailable.' }, { status: 409 })
+  if ((harness === 'codex' || harness === 'claude_code') && !device.harnesses.some(info => info.harness === harness && info.installed && info.toolApproval === true)) return NextResponse.json({ error: 'Run approval capability unavailable.' }, { status: 409 })
   // A run frozen on the person's API key goes only to a daemon that injects it; nothing is opened yet.
   const frozenKey = run.agentDefinition?.apiKey
   if (frozenKey && (subscription || pinned)) return NextResponse.json({ error: 'Run credential unavailable.' }, { status: 409 })

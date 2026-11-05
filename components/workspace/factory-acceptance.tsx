@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { useTranslations } from 'next-intl'
-import { ChevronRight, ClipboardCheck, RefreshCw, X } from 'lucide-react'
+import { ChevronRight, CircleAlert, ClipboardCheck, RefreshCw, X } from 'lucide-react'
 import { Alert, AlertAction, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -41,7 +41,7 @@ export function useThreadAcceptance(issueId: string | null, runId: string) {
 export function AcceptanceStateBadge({ task }: { task: FactoryTask }) {
   const t = useTranslations('FactoryAcceptance')
   const { derived, check } = useAcceptance(task)
-  if (check) return <Badge variant="outline" tone={check.status === 'failed' ? 'destructive' : check.status === 'pending' ? 'warning' : 'info'} className="shrink-0">{t(`checkState.${check.stage}.${check.status}`)}</Badge>
+  if (check) return <Badge variant="outline" tone={check.status === 'failed' || check.status === 'blocked' ? 'destructive' : check.status === 'pending' ? 'warning' : 'info'} className="shrink-0">{check.status === 'blocked' && <CircleAlert aria-hidden="true" />}{t(`checkState.${check.stage}.${check.status}`)}</Badge>
   return derived ? <Badge variant="outline" tone={tone(derived.state)} className="shrink-0">{derived.refusal ? t('cannotMerge') : t(acceptanceStateKey(derived.state, task.isSkillCandidate))}</Badge> : null
 }
 
@@ -63,10 +63,10 @@ function FactoryAcceptanceRow({ task, onOpen }: { task: FactoryTask; onOpen: () 
       <ItemMedia variant="icon"><ClipboardCheck aria-hidden="true" /></ItemMedia>
       <ItemContent>
         <ItemTitle>{task.isSkillCandidate ? t('skillTitle') : t('title')}</ItemTitle>
-        <ItemDescription>{task.reason}</ItemDescription>
+        {check?.status !== 'blocked' && <ItemDescription>{task.reason}</ItemDescription>}
       </ItemContent>
       <ItemActions>
-        {check ? <Badge variant="outline" tone={check.status === 'failed' ? 'destructive' : check.status === 'pending' ? 'warning' : 'info'}>{t(`checkState.${check.stage}.${check.status}`)}</Badge>
+        {check ? <Badge variant="outline" tone={check.status === 'failed' || check.status === 'blocked' ? 'destructive' : check.status === 'pending' ? 'warning' : 'info'}>{check.status === 'blocked' && <CircleAlert aria-hidden="true" />}{t(`checkState.${check.stage}.${check.status}`)}</Badge>
           : state && <Badge variant="outline" tone={tone(state)}>{derived?.refusal ? t('cannotMerge') : t(acceptanceStateKey(state, task.isSkillCandidate))}</Badge>}
         <Button variant="ghost" size="icon" aria-label={task.isSkillCandidate ? t('skillTitle') : t('title')} onClick={onOpen}><ChevronRight data-icon="inline-start" /></Button>
       </ItemActions>

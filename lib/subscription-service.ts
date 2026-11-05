@@ -11,6 +11,8 @@ import { nativeBrokerContextSchema, nativeLeaseSchema, type NativeBrokerRequest 
 import { accountLabel, failedUsage, parseSubscriptionUsage, type SubscriptionUsage, type WorkerUsage } from './subscription-usage'
 import { BACKEND_FAILURES, GENERATION_FAILURES, PRIVATE_FAILURES, generationFailureDetails } from './subscription-generation-diagnostics'
 import { stepIdentity } from './model-call-timing'
+import { expireSubscriptionAcquisitions } from './subscription-acquire-expiry'
+import { ownerSettingsChanged } from './live/lists'
 
 // Matches modelRequestMaxBytes in the Go worker. The conversation's 100k
 // compaction estimate excludes the system prompt and tool schemas.
@@ -132,7 +134,9 @@ export class SubscriptionService {
   }
   async check(use: SubscriptionUse, signal?: AbortSignal, modelOverride?: string | null) { return authorizeSubscriptionUse(use, await this.access(use, signal, modelOverride)) }
   async nativeRun(ownerId: string, deviceId: string, runId: string) {
-    const { rows } = await this.repository.pool.query(`select b.id,b."ownerId",b."workspaceId",b."consumerId",b.route,b."modelId",r."agentDefinition",a.harness from byos_native_runs n join agent_runs r on r.id=n."runId" join agents a on a.id=r."agentId" join devices d on d.id=r."deviceId" and d."ownerId"=r."userId" and d.enabled=true join byos_bindings b on b.id=n."bindingId" where r.id=$1 and r."userId"=$2 and r."deviceId"=$3 and a."userId"=$2 and ${runMayUseCredentialSql('b."ownerId"', '$2', 'b."workspaceId"')} and b."consumerId"=a.id::text and d.harnesses @> jsonb_build_array(jsonb_build_object('harness',coalesce(r."agentDefinition"->>'harness',a.harness),'installed',true,'subscriptionBroker',true)) and r.status in ('preparing','running','paused','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null`, [runId,ownerId,deviceId])
+    const { rows } = await this.repository.pool.query(`select b.id,b."ownerId",b."workspaceId",b."consumerId",b.route,b."modelId",r."agentDefinition",a.harness from byos_native_runs n join agent_runs r on r.id=n."runId" join agents a on a.id=r."agentId" join devices d on d.id=r."deviceId" and d."ownerId"=r."userId" and d.enabled=true join byos_bindings b on b.id=n."bindingId" where r.id=$1 and r."userId"=$2 and r."deviceId"=$3 and a."userId"=$2 and ${runMayUseCredentialSql('b."ownerId"', '$2', 'b."workspaceId"')} and b."consumerId"=a.id::text and d.harnesses @> jsonb_build_array(jsonb_build_object('harness',coalesce(r."agentDefinition"->>'harness',a.harness),'installed',true,'subscriptionBroker',true))
+      and not exists (select 1 from jsonb_array_elements(d.harnesses) info where info->>'harness'=coalesce(r."agentDefinition"->>'harness',a.harness) and info ? 'subscriptionPreflight')
+      and r.status in ('preparing','running','paused','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null`, [runId,ownerId,deviceId])
     if (!rows[0]) throw new SubscriptionRefusal('account_unavailable')
     const row=rows[0]
     if (!workerSubscriptionMatches(row.agentDefinition,row.harness,row)) throw new SubscriptionRefusal('binding_mismatch')
@@ -255,13 +259,15 @@ export class SubscriptionService {
   async cleanupBatch() {
     // Operator-authenticated caller only. Each worker remains fixed to one
     // owner/connection; this never lists or exports credential values.
+    const expired = await expireSubscriptionAcquisitions(this.repository.pool)
+    await Promise.all(expired.ownerIds.map(ownerId => ownerSettingsChanged(this.repository.pool, ownerId)))
     const { rows } = await this.repository.pool.query(`with due as(select a."connectionId",a."deletingAt" as attempted from byos_secret_artifacts a join byos_connections c on c.id=a."connectionId" where a."deletedAt" is null and (a."publishedAt" is not null or a."notBefore"<=now()) and a.name not in (coalesce(c."secretName",''),coalesce(c."accessSecretName",''),coalesce(c."stagedSecretName",''),coalesce(c."stagedAccessName",'')) union all select a."connectionId",a."lastAttemptAt" from byos_enrollment_sources a join byos_enrollment_transfers t on t."enrollmentId"=a."enrollmentId" join byos_connections c on c.id=a."connectionId" where a."deletedAt" is null and (t."canonicalPublishedAt" is not null or t."boundAt" is not null or c.epoch>t.epoch)) select c.id,c."ownerId",c."workspaceId",c.provider from due d join byos_connections c on c.id=d."connectionId" group by c.id,c."ownerId",c."workspaceId",c.provider order by coalesce(max(d.attempted),'epoch'::timestamptz),c.id limit 2`)
     const results = []
     for (const row of rows) {
       try { results.push(await this.worker(this.repository.scope(row)).call<{pending: number; failed: number; providerRevocation: 'not_implemented'}>('cleanup')) }
       catch { results.push({ pending: null, failed: true }) }
     }
-    return { processed: results.length, results }
+    return { expired: expired.expired, processed: results.length, results }
   }
 }
 

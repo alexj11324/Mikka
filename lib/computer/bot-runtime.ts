@@ -20,8 +20,8 @@ export async function ensureBotRuntime(pool: Pool, actor: { userId: string; work
       WHERE b.id=$1 AND b."ownerId"=$2 AND b."workspaceId"=$3 AND m."sandboxId"=$4 AND d.id=$5 FOR UPDATE OF m`,
     [botId, actor.userId, actor.workspaceId, sandbox.sandboxId, deviceId])).rows[0]
     if (!machine) throw new Error('Bot runtime unavailable')
-    const harnesses = (Array.isArray(machine.harnesses) ? machine.harnesses : []).filter((h: { harness?: string; installed?: boolean; subscriptionBroker?: boolean; computerBroker?: boolean }) =>
-      (h.harness === 'codex' || h.harness === 'claude_code') && h.installed === true && h.subscriptionBroker === true && h.computerBroker === true)
+    const harnesses = (Array.isArray(machine.harnesses) ? machine.harnesses : []).filter((h: { harness?: string; installed?: boolean; subscriptionBroker?: boolean; computerBroker?: boolean; subscriptionPreflight?: unknown }) =>
+      (h.harness === 'codex' || h.harness === 'claude_code') && h.installed === true && h.subscriptionBroker === true && h.computerBroker === true && !h.subscriptionPreflight)
     if (!harnesses.length) throw new Error('Bot runtime unavailable')
     const path = await initializeBotWorkspace(sandbox, botId)
     const repo = (await client.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch") VALUES ($1,$2,$3,$4,'main')
@@ -52,6 +52,6 @@ export async function ensureBotRuntime(pool: Pool, actor: { userId: string; work
     }
     const rows = (await client.query('SELECT harness,"agentId","repoId" FROM bot_cloud_runtimes WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 ORDER BY harness', [botId, actor.userId, actor.workspaceId])).rows
     await client.query('COMMIT')
-    return rows as { harness: 'codex' | 'claude_code'; agentId: string; repoId: string }[]
+    return rows.filter(row => harnesses.some((info: { harness: string }) => info.harness === row.harness)) as { harness: 'codex' | 'claude_code'; agentId: string; repoId: string }[]
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
 }

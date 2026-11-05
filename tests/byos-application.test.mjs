@@ -193,7 +193,9 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       assert.equal((await post(completion, 'bob')).status, 409)
       assert.equal((await post(completion, 'alice-new-session')).status, 409)
       if (provider === 'codex') {
-        assert.equal((await post(completion)).status, 409, 'early polling refused')
+        const early = await post(completion)
+        assert.equal(early.status, 200)
+        assert.equal(early.body.pending, true, 'early polling preserves the active attempt without requesting another grant')
         await readyPoll(connectionId)
         assert.equal((await post(completion)).body.pending, true)
         await readyPoll(connectionId)
@@ -339,11 +341,17 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
     assert.ok(!secrets.has(fairness[2]), 'two failed connections starved later cleanup')
     for(const name of fairness) blockedDeletes.delete(name)
     for(let pass=0;pass<4;pass++) await service.cleanupBatch()
-    // 移除: a pending (never finished) connection is not listed (#690), is fenced, and stays gone once removed.
+    // A pending sign-in is recoverable for its owning session (#1315); 移除
+    // still fences it and keeps it out of future lists.
     const abandoned = await post({ action: 'connect', workspaceId, provider: 'claude' })
     assert.equal(abandoned.status, 200)
     const listedIds = async () => (await (await subscriptionList(new Request(`http://localhost/api/subscriptions?workspace=${workspaceId}`, { headers: { cookie: 'fixture=alice' } }), dependencies)).json()).connections.map(item => item.id)
-    assert.ok(!(await listedIds()).includes(abandoned.body.connectionId), 'a connection that never finished sign-in is listed')
+    assert.ok((await listedIds()).includes(abandoned.body.connectionId), 'unfinished sign-in disappeared from its owner list')
+    const pendingList = await (await subscriptionList(new Request(`http://localhost/api/subscriptions?workspace=${workspaceId}`, { headers: { cookie: 'fixture=alice' } }), dependencies)).json()
+    const pendingEntry = pendingList.connections.find(item => item.id === abandoned.body.connectionId)
+    assert.equal(pendingEntry.state, 'pending')
+    assert.deepEqual(pendingEntry.activeAttempt, abandoned.body, 'same-session list changed the authorization attempt')
+    assert.ok(!/device_auth_id|code_verifier|refresh_token|access_token|secretName|session-alice/.test(JSON.stringify(pendingEntry.activeAttempt)), 'recovery projection exported server-only authorization data')
     assert.equal((await post({ action: 'remove', connectionId: abandoned.body.connectionId, revision: abandoned.body.revision }, 'bob')).status, 409, 'another owner cannot remove it')
     const removed = await post({ action: 'remove', connectionId: abandoned.body.connectionId, revision: abandoned.body.revision })
     assert.equal(removed.status, 200)

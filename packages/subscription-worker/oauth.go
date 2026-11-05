@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -38,6 +39,9 @@ type oauthSecret struct {
 	Device      *DeviceAttempt `json:"device,omitempty"`
 	Verifier    string         `json:"verifier"`
 	OperationID string         `json:"operationId"`
+	// Only the owning session can recover this encrypted presentation. SQL
+	// retains its state hash, never the raw state or the private provider code.
+	Start *OAuthStart `json:"start,omitempty"`
 }
 
 func hashText(value string) string {
@@ -59,6 +63,21 @@ func (w *Worker) StartOAuth(ctx context.Context, epoch int64, sessionID string) 
 	if w.OAuth == nil || sessionID == "" || len(sessionID) > 512 {
 		return OAuthStart{}, ErrUnsupported
 	}
+	current, err := w.Repo.Lookup(ctx, w.Scope)
+	if err != nil {
+		return OAuthStart{}, err
+	}
+	// A reserved connection starts at epoch 1. Every later pending epoch
+	// belongs to a start; another tab must resume it, never replace it.
+	if current.State == "pending" && current.Epoch > 1 && current.Deadline.After(time.Now()) {
+		if epoch != current.Epoch && epoch+1 != current.Epoch {
+			return OAuthStart{}, ErrStale
+		}
+		return w.ResumeOAuth(ctx, sessionID)
+	}
+	if current.Epoch != epoch {
+		return OAuthStart{}, ErrStale
+	}
 	if device, ok := w.OAuth.(DeviceOAuth); ok {
 		return w.startDevice(ctx, epoch, sessionID, device)
 	}
@@ -73,20 +92,68 @@ func (w *Worker) StartOAuth(ctx context.Context, epoch int64, sessionID string) 
 	}
 	op, err := w.Repo.BeginAcquire(ctx, w.Scope, epoch)
 	if err != nil {
+		if err == ErrStale {
+			return w.ResumeOAuth(ctx, sessionID)
+		}
 		return OAuthStart{}, err
 	}
 	name := "mikka-byos-" + newID()
-	raw, _ := json.Marshal(oauthSecret{Scope: w.Scope, SessionHash: hashText(sessionID), Verifier: verifier, OperationID: op.OperationID})
+	start := OAuthStart{Flow: "callback_handoff", State: state, AuthorizationURL: authURL, Revision: op.Epoch, ExpiresAt: op.Deadline}
+	raw, _ := json.Marshal(oauthSecret{Scope: w.Scope, SessionHash: hashText(sessionID), Verifier: verifier, OperationID: op.OperationID, Start: &start})
 	if err = createArtifact(ctx, w.Repo, w.Secrets, op, "oauth", name, raw); err != nil {
 		_ = w.Repo.Fail(context.WithoutCancel(ctx), op, "publication_failed")
 		return OAuthStart{}, ErrStore
 	}
-	_, err = w.Repo.DB.ExecContext(ctx, `insert into byos_oauth_attempts ("stateHash","sessionHash","connectionId","ownerId","workspaceId","operationId","secretName","expiresAt") values ($1,$2,$3,$4,$5,$6,$7,now()+interval '5 minutes')`, hashText(state), hashText(sessionID), w.Scope.ConnectionID, w.Scope.OwnerID, w.Scope.WorkspaceID, op.OperationID, name)
+	_, err = w.Repo.DB.ExecContext(ctx, `insert into byos_oauth_attempts ("stateHash","sessionHash","connectionId","ownerId","workspaceId","operationId","secretName","expiresAt") select $1,$2,$3,$4,$5,$6,$7,$8 where exists(select 1 from byos_connections where id=$3 and "ownerId"=$4 and "workspaceId"=$5 and "operationId"=$6 and epoch=$9 and state='pending' and "operationDeadline">now())`, hashText(state), hashText(sessionID), w.Scope.ConnectionID, w.Scope.OwnerID, w.Scope.WorkspaceID, op.OperationID, name, op.Deadline, op.Epoch)
 	if err != nil {
 		_ = w.Repo.Fail(context.WithoutCancel(ctx), op, "publication_failed")
 		return OAuthStart{}, ErrDatabase
 	}
-	return OAuthStart{Flow: "callback_handoff", State: state, AuthorizationURL: authURL, Revision: op.Epoch, ExpiresAt: time.Now().Add(5 * time.Minute)}, nil
+	return w.ResumeOAuth(ctx, sessionID)
+}
+
+// ResumeOAuth reads an existing acquisition without contacting the provider.
+// Navigation cannot change its owner, session, operation, revision or deadline.
+func (w *Worker) ResumeOAuth(ctx context.Context, sessionID string) (OAuthStart, error) {
+	if w.ExecutionOnly || w.Secrets == nil || sessionID == "" || len(sessionID) > 512 {
+		return OAuthStart{}, ErrUnsupported
+	}
+	record, err := w.Repo.Lookup(ctx, w.Scope)
+	if err != nil || record.State != "pending" || record.OperationKind != "acquire" || !record.Deadline.After(time.Now()) {
+		return OAuthStart{}, ErrStale
+	}
+	var name, stateHash, sessionHash string
+	err = w.Repo.DB.QueryRowContext(ctx, `select "secretName","stateHash","sessionHash" from byos_oauth_attempts where "connectionId"=$1 and "ownerId"=$2 and "workspaceId"=$3 and "operationId"=$4 and "expiresAt">now()`, w.Scope.ConnectionID, w.Scope.OwnerID, w.Scope.WorkspaceID, record.OperationID).Scan(&name, &stateHash, &sessionHash)
+	if err == sql.ErrNoRows {
+		return OAuthStart{}, ErrBusy // the first start has not published its attempt yet
+	}
+	if err != nil {
+		return OAuthStart{}, ErrDatabase
+	}
+	if sessionHash != hashText(sessionID) {
+		return OAuthStart{}, ErrStale
+	}
+	raw, err := w.Secrets.Read(ctx, name)
+	if err != nil {
+		return OAuthStart{}, ErrStore
+	}
+	var secret oauthSecret
+	if json.Unmarshal(raw, &secret) != nil || secret.Scope != w.Scope || secret.SessionHash != sessionHash || secret.OperationID != record.OperationID {
+		return OAuthStart{}, ErrIntegrity
+	}
+	if secret.Start == nil { // Legacy attempts retain their bounded expiry.
+		return OAuthStart{}, ErrReauthenticate
+	}
+	start := *secret.Start
+	if !validState(start.State) || hashText(start.State) != stateHash || start.Revision != record.Epoch || !start.ExpiresAt.Equal(record.Deadline) {
+		return OAuthStart{}, ErrIntegrity
+	}
+	// A secret read can race Cancel or expiry. Recheck before returning the URL.
+	current, err := w.Repo.Lookup(ctx, w.Scope)
+	if err != nil || current.State != "pending" || current.OperationID != record.OperationID || current.Epoch != record.Epoch || !current.Deadline.After(time.Now()) {
+		return OAuthStart{}, ErrStale
+	}
+	return start, nil
 }
 
 type codeAuthenticator struct {
@@ -107,7 +174,7 @@ func (w *Worker) CompleteOAuth(ctx context.Context, sessionID, state, code strin
 		return Metadata{}, ErrUnsupported
 	}
 	var opID, name string
-	err := w.Repo.DB.QueryRowContext(ctx, `update byos_oauth_attempts set "consumedAt"=now() where "stateHash"=$1 and "sessionHash"=$2 and "connectionId"=$3 and "ownerId"=$4 and "workspaceId"=$5 and flow='pkce' and "consumedAt" is null and "expiresAt">now() returning "operationId"::text,"secretName"`, hashText(state), hashText(sessionID), w.Scope.ConnectionID, w.Scope.OwnerID, w.Scope.WorkspaceID).Scan(&opID, &name)
+	err := w.Repo.DB.QueryRowContext(ctx, `update byos_oauth_attempts a set "consumedAt"=now() where "stateHash"=$1 and "sessionHash"=$2 and "connectionId"=$3 and "ownerId"=$4 and "workspaceId"=$5 and flow='pkce' and "consumedAt" is null and "expiresAt">now() and exists(select 1 from byos_connections c where c.id=a."connectionId" and c."operationId"=a."operationId" and c.state='pending' and c."operationDeadline">now()) returning "operationId"::text,"secretName"`, hashText(state), hashText(sessionID), w.Scope.ConnectionID, w.Scope.OwnerID, w.Scope.WorkspaceID).Scan(&opID, &name)
 	if err != nil {
 		return Metadata{}, ErrStale
 	}

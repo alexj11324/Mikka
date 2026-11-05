@@ -105,6 +105,8 @@ test('the owner detail reads only the current queued question child failure, pre
   const detail = await actions.getIssueThread(ISSUE, ORIGIN)
   assert.deepEqual(reads, [[pool, OWNER, CHILD]])
   assert.deepEqual(detail.thread.questionWake, failure)
+  assert.equal(detail.thread.retryAvailable, true, 'the host-confirmed queued wake keeps its explicit Retry')
+  assert.equal(detail.thread.replyAvailable, true, 'the existing resuming state, not ordinary continuation, controls Send')
   assert.equal(detail.thread.error, failure.error)
   assert.equal(detail.thread.continuation?.status, 'queued')
   assert.equal(detail.thread.question, 'resuming')
