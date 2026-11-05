@@ -150,12 +150,17 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1,$2,$4,'user_message',$3,'{"text":"Create a task to keep the API compatible"}')`,[sourceId,owner,sourceId,coordinator])
     const factoryTools=createCoordinatorRegistry(owner,coordinator,undefined,{coordinator:true})
     const request={sourceEventId:sourceId,title:'Factory intake fixture',body:'Keep the API compatible',rationale:'Actual personal source fixture',missingInformation:[],missingPermissions:[],needsSpec:false}
-    type Snapshot=import('../lib/factory/store').FactorySnapshot
-    const invoke=factoryTools.intake_factory_request!.execute! as unknown as (input:unknown,options:{toolCallId:string;messages:never[];context:object})=>Promise<Snapshot|{error:string}>
+    type Receipt=import('../lib/factory/public-receipt').FactoryActionReceipt
+    const invoke=factoryTools.intake_factory_request!.execute! as unknown as (input:unknown,options:{toolCallId:string;messages:never[];context:object})=>Promise<Receipt|{error:string}>
     const issueCount=await count('issues')
     const routed=await settledValues(Array.from({length:10},(_,n)=>invoke({...request,sourceEventId:n%2?sourceId.toUpperCase():sourceId},{toolCallId:`attempt-${n}`,messages:[],context:{}})))
-    for(const result of routed){assert.ok('task' in result,JSON.stringify(result));assert.equal(result.task.stage,'execute');assert.equal(result.task.status,'pending')}
-    assert.equal(new Set(routed.map(result=>'task' in result?result.task.id:null)).size,1)
+    for(const result of routed){
+      assert.ok('binding' in result,JSON.stringify(result));assert.equal(result.contractVersion,2)
+      assert.equal('task' in result,false);assert.equal('attempts' in result,false);assert.equal('candidates' in result,false)
+      assert.deepEqual(result,routed[0],'concurrent intake replays return the same frozen public receipt')
+      assert.deepEqual(result.readTask,{tool:'get_factory_task',input:{taskId:result.binding.taskId}})
+    }
+    assert.equal(new Set(routed.map(result=>'binding' in result?result.binding.taskId:null)).size,1)
     assert.equal(await count('issues'),issueCount+1)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM issue_tool_calls WHERE "userId"=$1 AND "toolCallId"=$2',[owner,`factory-intake:${sourceId}`])).rows[0].n,1)
     assert.deepEqual(await invoke({...request,title:'Conflicting retry'},{toolCallId:'changed',messages:[],context:{}}),{error:'issueToolCallConflict'})
@@ -175,18 +180,32 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     const botWorkspace = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1', [coordinator])).rows[0].workspaceId
     await seedAllowedModel(pool, owner, { workspaceId: botWorkspace, deviceIds: [device] })
     const lifecycleTools=createCoordinatorRegistry(owner,coordinator,undefined,{coordinator:true})
-    const first=routed[0];assert.ok('task' in first)
-    const {factoryBinding}=await import('../lib/factory/dispatch')
-    const dispatch=lifecycleTools.dispatch_factory_task!.execute! as unknown as (input:unknown,options:{toolCallId:string;messages:never[];context:object})=>Promise<import('../lib/factory/dispatch').FactoryDispatchResult|{error:string}>
-    const dispatchInput={binding:factoryBinding(first.task),agentId:worker,deviceRepoId:repo}
+    const first=routed[0];assert.ok('binding' in first)
+    const dispatch=lifecycleTools.dispatch_factory_task!.execute! as unknown as (input:unknown,options:{toolCallId:string;messages:never[];context:object})=>Promise<Receipt|{error:string}>
+    const dispatchInput={binding:first.binding,agentId:worker,deviceRepoId:repo}
     const executions=await settledValues(Array.from({length:10},(_,n)=>dispatch(dispatchInput,{toolCallId:`dispatch-${n}`,messages:[],context:{}})))
-    for(const execution of executions)assert.ok('runId' in execution,JSON.stringify(execution))
+    for(const execution of executions){
+      assert.ok('runId' in execution,JSON.stringify(execution));assert.equal(execution.contractVersion,2)
+      assert.equal('task' in execution,false);assert.equal('attempts' in execution,false);assert.equal('candidates' in execution,false)
+      assert.equal(execution.binding.taskId,first.binding.taskId);assert.equal(execution.binding.attemptId,first.binding.attemptId)
+    }
     assert.equal(new Set(executions.map(r=>'runId' in r?r.runId:null)).size,1)
-    const frozen=(await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1',[first.task.issueId])).rows
+    const frozen=(await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1',[first.binding.issueId])).rows
     assert.equal(frozen.length,1);assert.equal(frozen[0].agentDefinition.kind,'worker')
     assert.equal(frozen[0].agentDefinition.harness,'codex');assert.equal(frozen[0].status,'queued')
     assert.equal(frozen[0].agentDefinition.repositoryAdmission.remoteKey,repository.key)
-    assert.deepEqual((await pool.query('SELECT "runId","remoteKey","pushApproved" FROM run_publications WHERE "issueId"=$1',[first.task.issueId])).rows,[{runId:frozen[0].id,remoteKey:repository.key,pushApproved:true}])
+    assert.deepEqual((await pool.query('SELECT "runId","remoteKey","pushApproved" FROM run_publications WHERE "issueId"=$1',[first.binding.issueId])).rows,[{runId:frozen[0].id,remoteKey:repository.key,pushApproved:true}])
+    const replay=await dispatch(dispatchInput,{toolCallId:'exact-retry',messages:[],context:{}})
+    assert.ok('runId' in replay);assert.equal(replay.runId,frozen[0].id);assert.equal(replay.replayed,true)
+    const readOptions={toolCallId:'read-flow',messages:[],context:{}}
+    const view=await lifecycleTools.get_factory_task!.execute!({taskId:first.binding.taskId},readOptions) as Awaited<ReturnType<typeof import('../lib/factory/public-task').readFactoryTaskView>>
+    assert.equal(view.contractVersion,2);if(view.contractVersion!==2)assert.fail('normal tool must expose v2')
+    assert.equal(view.task.stage,'implement');assert.equal('status' in view.task,false);assert.equal('route' in view.task,false)
+    assert.deepEqual(view.binding,replay.binding);assert.equal(view.attempts[0].runId,frozen[0].id)
+    const context=await lifecycleTools.get_issue!.execute!({issueId:first.binding.issueId},readOptions) as {status:string;factory:{tasks:import('../lib/factory/public-task').FactoryPublicTaskSummary[]}}
+    assert.equal(context.status,(await pool.query('SELECT status FROM issues WHERE id=$1',[first.binding.issueId])).rows[0].status,'the issue keeps its own native status')
+    assert.equal(context.factory.tasks.length,1);assert.equal(context.factory.tasks[0].stage,view.task.stage)
+    assert.deepEqual(context.factory.tasks[0].binding,view.binding);assert.equal('status' in context.factory.tasks[0],false)
     assert.deepEqual(await dispatch({...dispatchInput,note:'Changed'},{toolCallId:'changed',messages:[],context:{}}),{error:'factoryReplayMismatch'})
     process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = '0'
     process.env.MIKKA_FACTORY_ROUTING_ENABLED = '0'

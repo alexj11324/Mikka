@@ -18,6 +18,8 @@ import { factoryChanged } from '../live/factory';
 import { factoryCheckIndependent } from "./check-independence";
 import { maskFactoryNote } from "./note-mask";
 import { factoryTaskDetail, type FactoryTaskDetail } from "./task-detail";
+import { readFactoryFlowStates } from './public-flow';
+import { publicFactoryTaskSummary, type FactoryPublicTaskSummary } from './public-task';
 import { factoryScopeAllows, type FactoryIssueScope } from "./scope";
 import { captureIdOf } from "./evidence";
 import type { Pool, PoolClient } from "pg";
@@ -375,6 +377,43 @@ export function createFactoryStore(
     task.stage = stage;
     task.status = "pending";
   }
+
+  type IssueList<T> = { contractVersion: 1; issueId: string; tasks: T[] };
+  async function listIssueTasks(userId: string, issueId: string, anyBot: boolean, publicFlow: false): Promise<IssueList<FactoryTaskSummary>>;
+  async function listIssueTasks(userId: string, issueId: string, anyBot: boolean, publicFlow: true): Promise<IssueList<FactoryTaskSummary | FactoryPublicTaskSummary>>;
+  async function listIssueTasks(userId: string, issueId: string, anyBot: boolean, publicFlow: boolean): Promise<IssueList<FactoryTaskSummary | FactoryPublicTaskSummary>> {
+    uuid(issueId);
+    return transaction(async (tx) => {
+      if (publicFlow) await tx.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+      const issue = await lockedIssue(tx, issueId, false);
+      if (!issue || !(await authorize(userId, issueId, tx))) fail("factoryNotFound");
+      // The newest 50 count every task of the issue; the issue's current scope then decides which are listed.
+      const { rows } = await tx.query<FactoryTask & { isSkillCandidate: boolean; candidateRunId: string | null; candidateSha: string | null; publication: PublicationRow | null; inScope: boolean }>(
+        'SELECT t.*, c."runId" AS "candidateRunId", c.sha AS "candidateSha", (SELECT json_build_object(\'id\',p.id,\'approvalId\',p."approvalId",\'status\',p.status,\'action\',p.action,\'target\',p.target,\'createdAt\',p."createdAt",\'finishedAt\',p."finishedAt") FROM factory_publications p WHERE p."taskId"=t.id AND p."candidateId"=t."candidateId" ORDER BY p."createdAt" DESC,p.id DESC LIMIT 1) AS publication, EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate", (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")) AS "inScope" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id WHERE t."userId"=$1 AND t."issueId"=$2 AND ($4::boolean OR (t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")))) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
+        [userId, issueId, botId, anyBot],
+      );
+      const listed = rows.filter(row => row.inScope && factoryScopeAllows(row, issue));
+      // Each task's source message, from its own Bot's chat (or the unscoped chat), in one read.
+      const sources = listed.some(row => row.sourceEventId) ? (await tx.query<{ id: string; botId: string | null }>(
+        `SELECT e.id,e."botId" FROM coordinator_events e WHERE e.id=ANY($1::uuid[]) AND e."userId"=$2 AND e.kind='user_message' AND (e."issueId" IS NULL OR e."issueId"=$3) AND (e."botId" IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=e."botId" AND b."ownerId"=$2))`,
+        [[...new Set(listed.flatMap(row => row.sourceEventId ? [row.sourceEventId] : []))], userId, issueId],
+      )).rows : [];
+      const authorized = listed.filter(row => sources.some(source => source.id === row.sourceEventId && source.botId === (row.botId ?? null)));
+      const states = await readFactoryFlowStates(tx, publicFlow ? authorized.filter(row => factoryFlowVersion(row) === 2) : []);
+      const tasks: (FactoryTaskSummary | FactoryPublicTaskSummary)[] = [];
+      for (const row of authorized) {
+        const state = states.get(row.id);
+        if (state) {
+          tasks.push(publicFactoryTaskSummary(row, state, row));
+          continue;
+        }
+        const { id, issueId, stage, status, revision, attemptId, candidateId, reason, isSkillCandidate, candidateRunId, candidateSha, publication } = row;
+        const completionRecovery = (await completedRunForRecovery(tx, row)) || (await retainedDeliverableForRecovery(tx, row)) ? { binding: { taskId: id, revision } } : undefined;
+        tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason:maskFactoryNote(reason),isSkillCandidate,candidateRunId,candidateSha:candidateSha ?? null,publication:publicationSummary(publication),...(completionRecovery ? { completionRecovery } : {})});
+      }
+      return { contractVersion: 1 as const, issueId, tasks };
+    });
+  }
   const store = {
     lockTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId),
     /** Read-only GET paths: ownership/scope checked, nothing locked. */
@@ -688,33 +727,9 @@ export function createFactoryStore(
       }
     },
     /** `anyBot`: every Bot's tasks of the issue (and unscoped ones) in this one read, newest 50 first, as each Bot's store lists them. */
-    async listForIssue(userId: string, issueId: string, options: { anyBot?: boolean } = {}) {
-      uuid(issueId);
-      return transaction(async (tx) => {
-        const issue = await lockedIssue(tx, issueId, false);
-        if (!issue || !(await authorize(userId, issueId, tx))) fail("factoryNotFound");
-        // The newest 50 count every task of the issue; the issue's current scope then decides which are listed.
-        const { rows } = await tx.query<FactoryTask & { isSkillCandidate: boolean; candidateRunId: string | null; candidateSha: string | null; publication: PublicationRow | null; inScope: boolean }>(
-          'SELECT t.*, c."runId" AS "candidateRunId", c.sha AS "candidateSha", (SELECT json_build_object(\'id\',p.id,\'approvalId\',p."approvalId",\'status\',p.status,\'action\',p.action,\'target\',p.target,\'createdAt\',p."createdAt",\'finishedAt\',p."finishedAt") FROM factory_publications p WHERE p."taskId"=t.id AND p."candidateId"=t."candidateId" ORDER BY p."createdAt" DESC,p.id DESC LIMIT 1) AS publication, EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate", (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")) AS "inScope" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id WHERE t."userId"=$1 AND t."issueId"=$2 AND ($4::boolean OR (t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")))) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
-          [userId, issueId, botId, options.anyBot === true],
-        );
-        const listed = rows.filter(row => row.inScope && factoryScopeAllows(row, issue));
-        // Each task's source message, from its own Bot's chat (or the unscoped chat), in one read.
-        const sources = listed.some(row => row.sourceEventId) ? (await tx.query<{ id: string; botId: string | null }>(
-          `SELECT e.id,e."botId" FROM coordinator_events e WHERE e.id=ANY($1::uuid[]) AND e."userId"=$2 AND e.kind='user_message' AND (e."issueId" IS NULL OR e."issueId"=$3) AND (e."botId" IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=e."botId" AND b."ownerId"=$2))`,
-          [[...new Set(listed.flatMap(row => row.sourceEventId ? [row.sourceEventId] : []))], userId, issueId],
-        )).rows : [];
-        const tasks: FactoryTaskSummary[] = [];
-        for (const row of listed)
-          if (sources.some(source => source.id === row.sourceEventId && source.botId === (row.botId ?? null))) {
-            const { id, issueId, stage, status, revision, attemptId, candidateId, reason, isSkillCandidate, candidateRunId, candidateSha, publication } = row;
-            const completionRecovery = (await completedRunForRecovery(tx, row)) || (await retainedDeliverableForRecovery(tx, row)) ? { binding: { taskId: id, revision } } : undefined;
-            tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason:maskFactoryNote(reason),isSkillCandidate,candidateRunId,candidateSha:candidateSha ?? null,publication:publicationSummary(publication),...(completionRecovery ? { completionRecovery } : {})});
-            // Same minimal masker copy as #444 (lib/factory/note-mask.ts); switch to #438's once merged.
-          }
-        return { contractVersion: 1 as const, issueId, tasks };
-      });
-    },
+    listForIssue: (userId: string, issueId: string, options: { anyBot?: boolean } = {}) => listIssueTasks(userId, issueId, options.anyBot === true, false),
+    /** Coordinator issue context: same batched authorization, with canonical state only for v2 tasks. */
+    listPublicForIssue: (userId: string, issueId: string) => listIssueTasks(userId, issueId, false, true),
     /** Hold the task fence before #191 takes its dispatch-key then issue locks. */
     async lockForDispatch(
       userId: string,
