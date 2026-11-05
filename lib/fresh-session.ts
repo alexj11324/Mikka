@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { currentDesktopSession } from '@/lib/desktop-rpc/session'
 
 /**
  * The session is cached in a signed cookie for 5 minutes (lib/auth.ts
@@ -33,5 +34,10 @@ export const SESSION_OPTIONS = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- better-auth's getSession is overloaded; the wrapper only adds a query flag.
 export function readFreshSessionsInScope(api: { getSession: (context: any) => Promise<unknown> }) {
   const read = api.getSession
-  api.getSession = (context: { query?: Record<string, unknown> } | undefined) => read(sessionMustBeFresh() ? { ...context, query: { ...context?.query, disableCookieCache: true } } : context)
+  api.getSession = (context: { query?: Record<string, unknown> } | undefined) => {
+    // RPC already checked this bearer against the database in this request. Reuse
+    // that identity, including for an action which receives ambient browser cookies.
+    const desktop = currentDesktopSession()
+    return desktop ? Promise.resolve(desktop) : read(sessionMustBeFresh() ? { ...context, query: { ...context?.query, disableCookieCache: true } } : context)
+  }
 }

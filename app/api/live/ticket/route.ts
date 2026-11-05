@@ -4,15 +4,18 @@ import { workspacePool } from '@/lib/workspace-db'
 import { withRequestLog } from '@/lib/request-log'
 import { LIVE_ID } from '@/lib/live/events'
 import { liveGatewayConfig, liveTicket } from '@/lib/live/scope'
+import { desktopBearerHeaders } from '@/lib/desktop-rpc/handler'
 
 export const dynamic = 'force-dynamic'
 const headers = { 'cache-control': 'private, no-store' }
 
 async function ticket(request: Request) {
-  // This is a browser subscription. API tokens do not grant an ambient owner channel.
-  if (request.headers.has('authorization')) return NextResponse.json({ error: 'authRequired' }, { status: 401, headers })
+  // A native session grants the same owner channel as its browser session. PATs
+  // remain workspace-scoped and never grant this ambient owner capability.
+  const bearerHeaders = request.headers.has('authorization') ? desktopBearerHeaders(request) : null
+  if (request.headers.has('authorization') && !bearerHeaders) return NextResponse.json({ error: 'authRequired' }, { status: 401, headers })
   // A new capability must not extend a revoked session through its cached cookie.
-  const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
+  const session = await auth.api.getSession({ headers: bearerHeaders ?? request.headers, query: { disableCookieCache: true } })
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401, headers })
   const workspaceId = new URL(request.url).searchParams.get('workspace') ?? ''
   if (!LIVE_ID.test(workspaceId)) return NextResponse.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })

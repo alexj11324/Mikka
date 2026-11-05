@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from 'node:fs'
 
 export const pollingMessage = '不要新增轮询；数据变化用 live push（`hooks/use-live-key.tsx` / `lib/live/*`），见 #1212；确实只是界面计时器或外部 API 才加入 allowlist 并写明原因。'
 
-export const pollingRoots = ['app/', 'components/', 'hooks/', 'lib/', 'packages/daemon/src/', 'apps/mobile/', 'workflows/']
+export const pollingRoots = ['app/', 'components/', 'hooks/', 'lib/', 'packages/daemon/src/', 'apps/mobile/', 'apps/desktop/src/', 'workflows/']
 
 const web = 'hooks/use-live-key.tsx'
 const daemon = 'lib/device-gateway-notify.ts'
@@ -44,6 +44,8 @@ export const pollingAllowlist = {
   'packages/daemon/src/runs/supervisor.ts': db(daemon, 'CHECKPOINT_EVERY_MS: a periodic write, not a read; saves an idle run\'s checkpoint to the server at most every 2 min', 1),
   // Third-party APIs.
   'packages/daemon/src/quota/poller.ts': external('provider quota (Claude/Codex), every 3 min; not our database', 2),
+  'apps/desktop/src/main/index.ts': external('the existing published GitHub desktop-release update check; no Mikka database request and disabled in Mikka Dev', 1),
+  'apps/desktop/src/main/ssh-install.ts': external('bounded SSH installation handshake (30 attempts) reads remote daemon status after an explicit user install; not idle application polling', 1),
   // Same machine only.
   'packages/daemon/src/lock.ts': local('waits for the daemon file lock', 1),
   'packages/daemon/src/repositories.ts': local('waits for the repository cache file lock', 1),

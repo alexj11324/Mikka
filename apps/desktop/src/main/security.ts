@@ -7,7 +7,8 @@ export function originOf(candidate: string): string | null {
   try {
     const url = new URL(candidate)
     if (url.username || url.password) return null
-    return url.origin
+    if (url.protocol === 'mikka:' && url.hostname === 'app' && !url.port) return 'mikka://app'
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.origin : null
   } catch {
     return null
   }
@@ -17,7 +18,16 @@ export function originOf(candidate: string): string | null {
 export function isTrustedFrame(frameUrl: string | undefined, appUrl: string): boolean {
   if (!frameUrl) return false
   const app = originOf(appUrl)
-  return app !== null && originOf(frameUrl) === app
+  if (app === null || originOf(frameUrl) !== app) return false
+  if (app === 'mikka://app') {
+    const path = new URL(frameUrl).pathname
+    return (path === '/mikka' || path.startsWith('/mikka/')) && !/^\/mikka\/(?:api|assets)(?:\/|$)/.test(path)
+  }
+  return true
+}
+
+export function trustedIpcSender(frame: { url: string; parent: unknown } | null, appUrl: string): boolean {
+  return frame !== null && frame.parent === null && isTrustedFrame(frame.url, appUrl)
 }
 
 /**
@@ -32,8 +42,7 @@ export function navigationDecision(
   appUrl: string
 ): NavigationDecision {
   const origin = originOf(candidate)
-  if (!origin) return 'deny'
-  if (origin === originOf(appUrl)) return 'allow'
+  if (origin && origin === originOf(appUrl)) return origin === 'mikka://app' && !isTrustedFrame(candidate, appUrl) ? 'deny' : 'allow'
   return externalUrl(candidate) ? 'external' : 'deny'
 }
 

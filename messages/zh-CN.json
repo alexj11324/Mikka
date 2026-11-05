@@ -4960,5 +4960,22 @@
       "adapter_start_failed": "Agent 无法在云电脑上启动",
       "cleanup_failed": "Agent 未启动，清理也未完成"
     }
+  },
+  "DesktopRenderer": {
+    "serverUnavailable": "无法连接 Mikka",
+    "networkUnavailable": "没有网络",
+    "reconnecting": "正在重新连接…",
+    "offlineHint": "当前对话和未发送的文字已保留。请检查网络后重试。",
+    "retry": "立即重试",
+    "browserTitle": "在浏览器中继续",
+    "browserOpened": "页面已在浏览器打开。完成后可以返回 Mikka。",
+    "browserFailed": "浏览器未能打开，请再试一次。",
+    "openBrowser": "在浏览器中打开",
+    "back": "返回 Mikka",
+    "updateTitle": "更新 Mikka 后继续",
+    "updateHint": "当前版本已无法连接 Mikka，请检查应用更新。",
+    "checkUpdate": "检查更新",
+    "renderFailed": "此页面未能打开",
+    "renderHint": "请重试打开页面。已保存的对话仍在。"
   }
 }

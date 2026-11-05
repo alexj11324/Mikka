@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "incremental": false,
+    "plugins": [],
+    "paths": {
+      "@/*": ["../../*"],
+      "next/navigation": ["./src/renderer/next-navigation.ts"],
+      "next/link": ["./src/renderer/next-link.tsx"],
+      "next/dynamic": ["./src/renderer/dynamic.tsx"]
+    }
+  },
+  "include": ["src/renderer", "../../types", "../../lib/platform/window.d.ts"],
+  "exclude": ["node_modules", "../../node_modules"]
+}

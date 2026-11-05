@@ -56,6 +56,9 @@ next-env.d.ts
 # Electron shell build output and packaged apps.
 /apps/desktop/dist/
 /apps/desktop/release/
+/apps/desktop/release-dev/
+/apps/desktop/release-acceptance/
+/.cache/desktop-evidence/
 # Generated standalone credential broker bundles.
 /services/credential-broker/dist/
 /services/credential-broker/public/

@@ -64,7 +64,7 @@ provided by the client.
 | Startup | Same machine/build mode and cold profile; compare time to the same usable UI state |
 | Idle | Fixed one-hour wall-clock runs with real isolated DB instrumentation, query/byte totals per client |
 | Web compatibility | Before/after screenshots and existing web checks; shared adapter extraction must not change web behavior |
-| Delivery | Green draft-PR CI and an unsigned Apple Silicon `Mikka Dev` artifact bound to an isolated Preview |
+| Delivery | Green draft-PR CI and an unsigned Apple Silicon `Mikka Dev` artifact bound to the disposable Docker production build |
 
 Screenshot filenames, dynamic masks, measurements, SHA, database identity and
 application origins are recorded in machine-readable evidence. A short unit
@@ -75,9 +75,13 @@ idle-budget test is not represented as the one-hour runtime measurement.
 - Prefer the current agent VM. Builds and unit checks run there. Use Docker
   Agentic Platform when the required native runtime cannot be exercised there;
   stop disposable machines after use.
-- `vercel.json` currently disables all Git deployments, despite the issue's
-  expectation of automatic PR previews. Inspect and use an isolated Preview
-  path without changing production project settings or database configuration.
+- The updated issue explicitly prohibits Vercel deployments. Run `next build`
+  and `next start` against an independent `mikka_e2e` PostgreSQL in Docker or
+  GitHub Actions. Publish only that test server's port for the unsigned test
+  package. Never use `next dev` for acceptance or change Vercel settings.
+- The first baseline build exceeded the current VM's 8 GiB cgroup limit
+  (`memory.events`: `oom_kill=1`). Full builds and regression can use a Large
+  Docker sandbox; the ordinary Medium sandbox is stopped during this work.
 - The issue requires macOS ARM64 evidence. Linux Electron proves shared logic
   and rendering but does not prove macOS Keychain, vibrancy or installer behavior.
   The draft PR's macOS job builds the test package; release remains separate.

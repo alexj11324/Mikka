@@ -2,6 +2,7 @@
 
 import { singleFlight } from '@/lib/single-flight'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
+import { desktopHumanSessionId } from '@/lib/desktop-rpc/session'
 import { ownerListRead } from '@/lib/live/list-read-server'
 import { beginOwnerListRead } from '@/lib/live/revision-read'
 import type { ListLiveRead } from '@/lib/live/list-read'
@@ -199,7 +200,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     const session=await auth.api.getSession({headers:requestHeaders})
     if(!session?.user)throw new ActionFailureError('authRequired')
     const userId=session.user.id
-    let humanSessionId:string|undefined
+    let humanSessionId:string|undefined=desktopHumanSessionId()===session.session.id?session.session.id:undefined
     if(!requestHeaders.has('authorization')&&requestHeaders.get('cookie')){
       try{const origin=new URL(requestHeaders.get('origin')??'');const host=requestHeaders.get('x-forwarded-host')??requestHeaders.get('host')
         if(['http:','https:'].includes(origin.protocol)&&origin.host===host)humanSessionId=session.session.id

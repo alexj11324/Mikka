@@ -1,6 +1,7 @@
 'use server'
 
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
+import { desktopHumanSessionId } from '@/lib/desktop-rpc/session'
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { ownerListChanged } from '@/lib/live/lists'
 
@@ -466,7 +467,7 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
   if (!text.success) throw new ActionFailureError('messageRequired')
   const { row, user } = await readableThread(input.issueId, input.runId)
   const requestHeaders=await headers()
-  if(requestHeaders.has('authorization')||!requestHeaders.get('cookie'))throw new ActionFailureError('authRequired')
+  if(!desktopHumanSessionId()&&(requestHeaders.has('authorization')||!requestHeaders.get('cookie')))throw new ActionFailureError('authRequired')
   const session=await auth.api.getSession({headers:requestHeaders,query:{disableCookieCache:true}})
   if(!session?.user||!session.session?.id||session.user.id!==user.id)throw new ActionFailureError('authRequired')
   if(row.userId!==user.id)throw new ActionFailureError('runNotFound')

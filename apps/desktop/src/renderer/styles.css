@@ -1,0 +1,45 @@
+@import "../../../../app/globals.css";
+
+/* These are the exact files, weight ranges and display policy used by
+ * app/[locale]/layout.tsx. No network font or metric-adjusted fallback. */
+@font-face {
+  font-family: "Mikka Inter";
+  src: url("../../../../app/fonts/InterVariable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+}
+@font-face {
+  font-family: "Mikka Inter";
+  src: url("../../../../app/fonts/InterVariable-Italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: block;
+}
+@font-face {
+  font-family: "Mikka Geist Mono";
+  src: url("../../../../app/fonts/GeistMono-Variable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+}
+:root {
+  --font-inter: "Mikka Inter";
+  --font-geist-mono: "Mikka Geist Mono";
+}
+
+/* The existing native offline card, using the identical system-font metrics,
+ * spacing and colours from src/offline.html. This document stays local. */
+.desktop-offline {
+  --offline-bg: #f5f5f4; --offline-card: #ffffff; --offline-fg: #1c1917; --offline-muted: #78716c; --offline-border: #e7e5e4; --offline-primary: #1c1917; --offline-primary-fg: #fafaf9;
+  min-height: 100vh; display: grid; place-items: center; padding: 24px;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--offline-bg); color: var(--offline-fg); -webkit-app-region: drag;
+}
+.dark .desktop-offline { --offline-bg: #0a0a0a; --offline-card: #171717; --offline-fg: #e7e5e4; --offline-muted: #a8a29e; --offline-border: #292524; --offline-primary: #e7e5e4; --offline-primary-fg: #1c1917; }
+.desktop-offline section { width: 100%; max-width: 360px; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 28px 24px 24px; border: 1px solid var(--offline-border); border-radius: 12px; background: var(--offline-card); text-align: center; }
+.desktop-offline svg { width: 20px; height: 20px; color: var(--offline-muted); }
+.desktop-offline h1 { margin: 0; font-size: 15px; font-weight: 600; }
+.desktop-offline p { margin: 0; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--offline-muted); }
+.desktop-offline button { -webkit-app-region: no-drag; margin-top: 4px; display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 14px; border-radius: 8px; background: var(--offline-primary); color: var(--offline-primary-fg); font-size: 13px; font-weight: 500; }
+.desktop-offline button:focus-visible { outline: 2px solid var(--offline-muted); outline-offset: 2px; }

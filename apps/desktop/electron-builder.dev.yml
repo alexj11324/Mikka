@@ -1,0 +1,15 @@
+# Unsigned, isolated review artifact. This never invokes the release hooks or
+# publishes an update. The build must use MIKKA_DESKTOP_FLAVOR=dev and an
+# explicitly selected disposable backend; CI supplies both.
+extends: electron-builder.yml
+appId: com.aspectlylabs.mikka.dev
+productName: Mikka Dev
+directories:
+  output: release-dev
+publish: null
+afterSign: null
+mac:
+  identity: null
+  notarize: false
+  target: [zip]
+artifactName: Mikka-Dev-${version}-${os}-${arch}.${ext}

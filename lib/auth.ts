@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth'
 import { createAuthMiddleware } from 'better-auth/api'
-import { deviceAuthorization, multiSession } from 'better-auth/plugins'
+import { bearer, deviceAuthorization, multiSession } from 'better-auth/plugins'
 import { nextCookies } from 'better-auth/next-js'
 import { oauthProvider } from '@better-auth/oauth-provider'
 import { expo } from '@better-auth/expo'
@@ -95,6 +95,7 @@ export const auth = betterAuth({
   // themselves (RFC 7591) and use PKCE; access tokens are opaque and hashed in
   // the database, and lib/mcp/auth.ts checks them.
   plugins: [
+    bearer(),
     ...(proxyOptions ? [oAuthProxy(proxyOptions)] : []),
     // The iOS app signs in through the system browser and keeps its session cookie in the keychain.
     expo(),

@@ -4960,5 +4960,22 @@
       "adapter_start_failed": "The Agent could not start on the cloud computer",
       "cleanup_failed": "The Agent did not start, and cleanup did not finish"
     }
+  },
+  "DesktopRenderer": {
+    "serverUnavailable": "Can't reach Mikka",
+    "networkUnavailable": "No network",
+    "reconnecting": "Reconnecting…",
+    "offlineHint": "Your open conversation and unsent text are kept. Check your connection, then retry.",
+    "retry": "Retry now",
+    "browserTitle": "Continue in your browser",
+    "browserOpened": "The page is open in your browser. You can return to Mikka when finished.",
+    "browserFailed": "The browser did not open. Try opening the page again.",
+    "openBrowser": "Open in browser",
+    "back": "Back to Mikka",
+    "updateTitle": "Update Mikka to continue",
+    "updateHint": "This version can no longer connect to Mikka. Check for an app update.",
+    "checkUpdate": "Check for update",
+    "renderFailed": "This view could not open",
+    "renderHint": "Retry to reopen the view. Your saved conversations are kept."
   }
 }

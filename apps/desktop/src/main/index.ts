@@ -2,11 +2,11 @@
 // the UI reads through `window.mikka`. The renderer is treated as untrusted;
 // every privileged call goes through the validated IPC surface in `./bridge`.
 
-import { app, BrowserWindow, Menu, Notification, dialog, nativeTheme, net, session, shell, webContents } from 'electron'
+import { app, BrowserWindow, Menu, Notification, dialog, nativeTheme, net, protocol, safeStorage, session, shell, webContents } from 'electron'
 import { autoUpdater } from 'electron-updater'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 
-import { IPC } from '@mikka/protocol/ipc'
+import { IPC, BUNDLED_IPC } from '@mikka/protocol/ipc'
 
 import { registerBridge } from './bridge'
 import { localDeviceStatus, localQuota } from './daemon'
@@ -22,14 +22,30 @@ import { UPDATE_CHECK_INTERVAL_MS, Updates, updateCopy } from './updates'
 import { UpdateGate, gateCopy, gateView, type GateState } from './launch-update'
 import { meetsMinimumVersion } from '@mikka/protocol/version'
 import { TRANSLUCENT_ARGUMENT, windowAppearance } from './window-appearance'
+import { RENDERER_ORIGIN, RENDERER_URL } from './bundled-policy'
+import { bundledProtocol } from './bundled-protocol'
+import { BundledAuth } from './bundled-auth'
+import { BundledLive } from './bundled-live'
+import { registerBundledBridge } from './bundled-bridge'
+import { SessionVault } from './session-vault'
+import { pickRepo } from './repo-picker'
 
 const APP_URL = __MIKKA_APP_URL__
 const APP_VERSION = __MIKKA_APP_VERSION__
 const FLAVOR = __MIKKA_FLAVOR__
 const PARTITION = FLAVOR === 'dev' ? 'persist:mikka-dev' : 'persist:mikka'
 const APP_ORIGIN = new URL(APP_URL).origin
+const BUNDLED = process.env.MIKKA_DESKTOP_RENDERER !== 'hosted'
+const PAGE_URL = BUNDLED ? RENDERER_URL : APP_URL
+const PAGE_ORIGIN = BUNDLED ? RENDERER_ORIGIN : APP_ORIGIN
+
+protocol.registerSchemesAsPrivileged([{ scheme: 'mikka', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }])
 
 app.setName(FLAVOR === 'dev' ? 'Mikka Dev' : 'Mikka')
+// Dev and production never share keychain ciphertext or Chromium state.
+const profile = process.env.MIKKA_USER_DATA_DIR
+if (profile && isAbsolute(profile)) app.setPath('userData', profile)
+else if (FLAVOR === 'dev') app.setPath('userData', join(app.getPath('appData'), 'Mikka Dev'))
 if (process.platform === 'win32') app.setAppUserModelId('com.aspectlylabs.mikka')
 app.enableSandbox()
 
@@ -42,6 +58,8 @@ let pendingClick: string | null = null
 let retrying: NodeJS.Timeout | null = null
 let authServer: LoopbackAuthServer | null = null
 let authTimer: NodeJS.Timeout | null = null
+let bundledAuth: BundledAuth | null = null
+let bundledLive: BundledLive | null = null
 
 function closeAuthServer(): void {
   if (authTimer) { clearTimeout(authTimer); authTimer = null }
@@ -100,7 +118,7 @@ async function prepareReturn(rawState: string): Promise<string> {
       mainWindow.show()
       mainWindow.focus()
       const contents = mainWindow.webContents
-      if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), APP_URL)) contents.send(IPC.appReturned, { state: rawState, result })
+      if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), PAGE_URL)) contents.send(IPC.appReturned, { state: rawState, result })
     },
   })
   returnListener = listener
@@ -136,13 +154,13 @@ const notifications = new NotificationCenter(
 
 function registerSession(): void {
   const appSession = session.fromPartition(PARTITION)
-  appSession.setPermissionRequestHandler((_contents, permission, callback) => {
-    callback(permission === 'clipboard-sanitized-write')
+  appSession.setPermissionRequestHandler((contents, permission, callback) => {
+    callback(permission === 'clipboard-sanitized-write' && contents !== null && isTrustedFrame(contents.getURL(), PAGE_URL))
   })
-  appSession.setPermissionCheckHandler((_contents, permission) => permission === 'clipboard-sanitized-write')
+  appSession.setPermissionCheckHandler((contents, permission) => permission === 'clipboard-sanitized-write' && contents !== null && isTrustedFrame(contents.getURL(), PAGE_URL))
   appSession.webRequest.onBeforeSendHeaders((details, callback) => {
     try {
-      if (new URL(details.url).origin === APP_ORIGIN) {
+      if (!BUNDLED && new URL(details.url).origin === APP_ORIGIN) {
         details.requestHeaders['x-mikka-client'] = 'desktop'
         details.requestHeaders['x-mikka-client-version'] = APP_VERSION
       }
@@ -154,7 +172,7 @@ function registerSession(): void {
 }
 
 function handleNavigation(event: Electron.Event, url: string): void {
-  if (navigationDecision(url, APP_URL) === 'allow') return
+  if (navigationDecision(url, PAGE_URL) === 'allow') return
   event.preventDefault()
   openOutside(url)
 }
@@ -166,7 +184,7 @@ function openOutside(url: string): void {
 }
 
 function openChild(url: string): void {
-  const trusted = new URL(url).origin === APP_ORIGIN
+  const trusted = isTrustedFrame(url, PAGE_URL)
   const child = new BrowserWindow({
     width: 1100,
     height: 800,
@@ -181,7 +199,7 @@ function openChild(url: string): void {
       devTools: !app.isPackaged,
       ...(trusted ? {
         preload: join(__dirname, 'preload.cjs'),
-        additionalArguments: [`--mikka-app-origin=${APP_ORIGIN}`],
+        additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`],
       } : {}),
     },
   })
@@ -195,7 +213,7 @@ function openChild(url: string): void {
 }
 
 function openWindow(url: string): void {
-  if (navigationDecision(url, APP_URL) === 'allow') openChild(url)
+  if (navigationDecision(url, PAGE_URL) === 'allow') openChild(url)
   else openOutside(url)
 }
 
@@ -204,7 +222,7 @@ const appLoad = new AppLoadState(APP_ORIGIN)
 
 function loadApp(): void {
   if (retrying) { clearTimeout(retrying); retrying = null }
-  if (mainWindow && !mainWindow.isDestroyed()) void mainWindow.loadURL(APP_URL)
+  if (mainWindow && !mainWindow.isDestroyed()) void mainWindow.loadURL(PAGE_URL)
 }
 
 function showOffline(reason: 'network' | 'server'): void {
@@ -249,7 +267,7 @@ function createMainWindow(): void {
       experimentalFeatures: false,
       devTools: !app.isPackaged,
       partition: PARTITION,
-      additionalArguments: [`--mikka-app-origin=${APP_ORIGIN}`, ...(appearance.translucent ? [TRANSLUCENT_ARGUMENT] : [])],
+      additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`, ...(appearance.translucent ? [TRANSLUCENT_ARGUMENT] : [])],
     },
   })
   mainWindow.setMenuBarVisibility(false)
@@ -278,11 +296,11 @@ function createMainWindow(): void {
     loadApp()
   })
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, _description, validatedURL, isMainFrame) => {
-    if (!isMainFrame || errorCode === -3 || !validatedURL.startsWith(APP_ORIGIN)) return
+    if (BUNDLED || !isMainFrame || errorCode === -3 || !validatedURL.startsWith(APP_ORIGIN)) return
     appLoad.failedLoad()
     showOffline(offlineReason(errorCode, net.isOnline()))
   })
-  void mainWindow.loadURL(APP_URL)
+  void mainWindow.loadURL(PAGE_URL)
 }
 
 function messageBox(options: Electron.MessageBoxOptions): Promise<Electron.MessageBoxReturnValue> {
@@ -307,7 +325,7 @@ const updates = new Updates(autoUpdater, {
   failed: error => { void messageBox({ type: 'error', message: copy().failed, detail: error.message, buttons: [copy().ok] }) },
 }, version => {
   for (const contents of webContents.getAllWebContents()) {
-    if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), APP_URL)) contents.send(IPC.appUpdateReady, version)
+    if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), PAGE_URL)) contents.send(IPC.appUpdateReady, version)
   }
 })
 
@@ -376,7 +394,7 @@ function runUpdateGate(open: () => void): void {
  * itself, so a page cannot force an update the server does not require.
  */
 async function enforceMinimumVersion(): Promise<void> {
-  if (!app.isPackaged || gate) return
+  if (!app.isPackaged || FLAVOR === 'dev' || gate) return
   try {
     const response = await session.fromPartition(PARTITION).fetch(`${APP_URL.replace(/\/$/, '')}/api/version`, { headers: { origin: APP_ORIGIN }, redirect: 'error', cache: 'no-store' })
     if (!response.ok) return
@@ -393,7 +411,7 @@ async function enforceMinimumVersion(): Promise<void> {
 }
 
 async function checkForUpdates(interactive: boolean): Promise<void> {
-  if (!app.isPackaged) {
+  if (!app.isPackaged || FLAVOR === 'dev') {
     if (interactive) await messageBox({ type: 'info', message: copy().notInstalled, buttons: [copy().ok] })
     return
   }
@@ -465,16 +483,49 @@ function installMenu(): void {
   ]))
 }
 
-function start(): void {
+async function start(): Promise<void> {
   registerSession()
+  if (BUNDLED) {
+    const backend = session.fromPartition(`${PARTITION}-backend`)
+    const vault = new SessionVault(join(app.getPath('userData'), 'credentials'), APP_URL, {
+      available: async () => await safeStorage.isAsyncEncryptionAvailable() && (process.platform !== 'linux' || !['basic_text', 'unknown'].includes(safeStorage.getSelectedStorageBackend())),
+      encrypt: value => safeStorage.encryptStringAsync(value),
+      decrypt: async value => (await safeStorage.decryptStringAsync(value)).result,
+    })
+    bundledAuth = new BundledAuth({
+      serverUrl: APP_URL, version: APP_VERSION, vault,
+      fetch: (url, init) => backend.fetch(url, init),
+      openExternal: url => shell.openExternal(url),
+      changed: () => {
+        bundledLive?.closeAll()
+        for (const contents of webContents.getAllWebContents()) if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), PAGE_URL)) contents.send(BUNDLED_IPC.sessionChanged)
+      },
+      returned: next => {
+        if (!mainWindow || mainWindow.isDestroyed()) return
+        if (mainWindow.isMinimized()) mainWindow.restore()
+        mainWindow.show(); mainWindow.focus()
+        const path = next === '/' ? '/mikka' : next === '/mikka' || next.startsWith('/mikka/') || next.startsWith('/mikka?') ? next : `/mikka${next}`
+        void mainWindow.loadURL(`${RENDERER_ORIGIN}${path}`)
+      },
+    })
+    await bundledAuth.restore()
+    bundledLive = new BundledLive(bundledAuth, (owner, event) => {
+      const contents = webContents.fromId(owner)
+      if (contents && !contents.isDestroyed() && isTrustedFrame(contents.getURL(), PAGE_URL)) contents.send(BUNDLED_IPC.liveEvent, event)
+    })
+    registerBundledBridge(bundledAuth, bundledLive)
+    session.fromPartition(PARTITION).protocol.handle('mikka', bundledProtocol(join(__dirname, 'renderer'), bundledAuth))
+  }
   registerBridge({
     appUrl: APP_URL,
+    rendererUrl: PAGE_URL,
     flavor: FLAVOR,
     mintEnrollment: async () => {
       const url = `${APP_URL.replace(/\/$/, '')}/api/devices/enrollment`
-      const response = await session.fromPartition(PARTITION).fetch(url, {
+      const init: RequestInit = {
         method: 'POST', headers: { origin: APP_ORIGIN }, redirect: 'error',
-      })
+      }
+      const response = bundledAuth ? await bundledAuth.request('/api/devices/enrollment', init) : await session.fromPartition(PARTITION).fetch(url, init)
       if (!response.ok) throw new Error('Sign in to register a device')
       const body = await response.json() as { token: string }
       return body.token
@@ -484,11 +535,12 @@ function start(): void {
       if (!target) throw new Error('openExternal accepts only app-origin HTTP(S) URLs')
       return shell.openExternal(target)
     },
-    prepareAuth,
+    prepareAuth: BUNDLED ? async () => { throw new Error('Use main-owned bundled sign-in / 请使用桌面登录') } : prepareAuth,
     prepareReturn,
     claudeCallback: url => catchClaudeCallback(url, page => shell.openExternal(page)),
     localDevice: localDeviceStatus,
-    localAccount: () => readLocalDeviceAccount((url, init) => session.fromPartition(PARTITION).fetch(url, init), APP_URL),
+    pickRepo,
+    localAccount: () => readLocalDeviceAccount((url, init) => bundledAuth ? bundledAuth.request('/api/devices/enrollment', init) : session.fromPartition(PARTITION).fetch(url, init), APP_URL),
     quota: localQuota,
     notifications,
     consumePendingClick: () => {
@@ -502,7 +554,7 @@ function start(): void {
   installMenu()
   const open = () => {
     createMainWindow()
-    if (!app.isPackaged) return
+    if (!app.isPackaged || FLAVOR === 'dev') return
     // This app may just have updated: the daemon on this computer updates too, when idle (daemon-update.ts).
     void updateLocalDaemon(FLAVOR, { connect: connectForUpdate({ name: 'mikka-desktop', version: APP_VERSION }) })
     // Background checks start once the app is open, so they never race the launch gate.
@@ -510,7 +562,7 @@ function start(): void {
     setInterval(() => { void checkForUpdates(false) }, UPDATE_CHECK_INTERVAL_MS)
   }
   // A cold start of the installed app installs any newer version first (launch-update.ts).
-  if (app.isPackaged) runUpdateGate(open)
+  if (app.isPackaged && FLAVOR === 'prod') runUpdateGate(open)
   else open()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0 && !gate) createMainWindow()
@@ -529,6 +581,7 @@ if (!app.requestSingleInstanceLock()) {
   })
   app.on('before-quit', closeAuthServer)
   app.on('before-quit', closeReturnListener)
+  app.on('before-quit', () => { bundledAuth?.dispose(); bundledLive?.closeAll() })
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
   })
