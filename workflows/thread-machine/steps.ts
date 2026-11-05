@@ -13,11 +13,12 @@ export const MAINTENANCE_FALLBACK_MS = 5 * 60_000
 export async function maintainThreadMachine(actor: { userId: string; workspaceId: string }, runId: string): Promise<false | number> {
   'use step'
   const { pool } = await import('@/lib/db')
-  const { threadMachineAction } = await import('@/lib/cloud-computer/thread-machines')
+  const { acknowledgeQueuedThreadStop, threadMachineAction } = await import('@/lib/cloud-computer/thread-machines')
   const { connectComputer } = await import('@/lib/computer/e2b-provider')
-  const row = (await pool.query(`SELECT m.*,r.status,r."updatedAt" FROM thread_machines m JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."ownerId"
+  const row = (await pool.query(`SELECT m.*,r.status,r."updatedAt",r."stopRequestedAt" FROM thread_machines m JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."ownerId"
     WHERE m."runId"=$1 AND m."ownerId"=$2 AND m."workspaceId"=$3`, [runId, actor.userId, actor.workspaceId])).rows[0]
   if (!row || row.state === 'ended') return false
+  if (row.status === 'queued' && row.stopRequestedAt && await acknowledgeQueuedThreadStop(pool, actor, runId)) return false
   if (['succeeded', 'failed', 'stopped', 'cancelled'].includes(row.status)) {
     // A run of an open task leaves its sandbox paused for the task's next run
     // (one task, one sandbox); anything else ends it. A refused pause throws

@@ -2,6 +2,7 @@ import 'server-only'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Sandbox } from 'e2b'
+import { runtimeRefreshRefusal } from './runtime-refresh-refusal'
 
 export const OFFICIAL_E2B_TEMPLATES = ['desktop', 'claude', 'codex'] as const
 export type OfficialE2BTemplate = typeof OFFICIAL_E2B_TEMPLATES[number]
@@ -72,7 +73,9 @@ export async function switchOfficialWorkerRelease(sandbox: Pick<Sandbox, 'comman
   const source = await script()
   const lock = budget ? 'flock --exclusive /opt/mikka/runtime-refresh.lock ' : ''
   const switched = foregroundRuntimeCommand(`${lock}python3 - ${action} ${identity.deviceId} ${identity.workspaceId} ${release.previousSha} ${release.sourceCommit} ${release.workerSha} ${identity.operationId} <<'MIKKA_PRIVATE_RUNTIME_SWITCH'\n${source}\nMIKKA_PRIVATE_RUNTIME_SWITCH`, 30_000, budget)
-  const result = await sandbox.commands.run(switched.command, { user: 'root', ...switched.options })
+  let result
+  try { result = await sandbox.commands.run(switched.command, { user: 'root', ...switched.options }) }
+  catch (error) { throw runtimeRefreshRefusal(error, action) ?? error }
   const receipt = JSON.parse(result.stdout)
   if (receipt.status !== (action === 'switch' ? 'switched' : action === 'rollback' ? 'restored_not_ready' : 'verified_process') || receipt.workerSha !== (action === 'rollback' ? release.previousSha : release.workerSha) || (action !== 'rollback' && receipt.workerSourceCommit !== release.sourceCommit)) throw new Error('Worker runtime switch unconfirmed')
   if (action === 'verify') {

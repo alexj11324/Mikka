@@ -38,7 +38,10 @@ export async function threadQuotaView(userId: string, runIds: readonly string[],
   const { agentRuns } = await import('@/lib/db/schema')
   const { db } = await import('@/lib/db')
   const { and, eq } = await import('drizzle-orm')
-  const [live] = await db.select().from(agentRuns).where(and(eq(agentRuns.id, liveRunId), eq(agentRuns.userId, userId))).limit(1)
+  // A normal thread has no paused-quota card. Do not transfer its prompt,
+  // report and frozen definition merely to discover that it is not paused.
+  const [live] = await db.select().from(agentRuns).where(and(eq(agentRuns.id, liveRunId), eq(agentRuns.userId, userId),
+    eq(agentRuns.status, 'paused'), eq(agentRuns.pauseReason, 'quota_exhausted'))).limit(1)
   let paused: ThreadQuotaView['paused'] = null
   if (live?.status === 'paused' && live.pauseReason === 'quota_exhausted') {
     const event = events.findLast(item => item.kind === 'run_quota_paused' && item.runId === live.id)

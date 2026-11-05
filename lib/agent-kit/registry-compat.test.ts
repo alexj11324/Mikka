@@ -59,3 +59,16 @@ test('native subscription requests retain the run snapshot after Agent harness/d
  row={...row,agentDefinition:freezeWorkerDefinition({harness:'codex',instructions:'Review',prompt:'task',parent:null,executionId:null})}
  await assert.rejects(service.nativeRun(owner,device,run),{code:'binding_mismatch'})
 })
+
+test('registration and execution wrappers keep a readable display name for every enabled tool', () => {
+ const tools=registry.createCoordinatorRegistry(owner,botId,undefined,{coordinator:true,computerEnabled:true,switches:{issueTools:true,factoryRouting:true,factoryLifecycle:true}})
+ for(const [name,definition] of Object.entries(tools)) {
+  const displayName=(definition as {displayName?:unknown}).displayName
+  assert.equal(typeof displayName,'string',name)
+  assert.ok((displayName as string).length>0 && (displayName as string).length<=128,name)
+ }
+ assert.equal((tools.github_call as {displayName?:string}).displayName,'GitHub call')
+ assert.equal((tools.call_personal_mcp_tool as {displayName?:string}).displayName,'Call personal MCP tool')
+ const wrapped=registry.coordinatorTools(owner,botId,undefined,{execution:execution(),computerEnabled:true})
+ assert.equal((wrapped.dispatch_bot_computer as {displayName?:string}).displayName,'Dispatch bot computer')
+})

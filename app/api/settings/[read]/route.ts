@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withRequestLog } from '@/lib/request-log'
 import { singleFlight } from '@/lib/single-flight'
+import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { getPasswordStatus, listSessions } from '@/app/actions/account'
 import { getPreferences } from '@/app/actions/preferences'
 import { listSavedLogins } from '@/app/actions/settings-activity'
@@ -77,7 +78,7 @@ async function handleGET(request: Request, { params }: { params: Promise<{ read:
   const { read } = await params
   if (!Object.hasOwn(READS, read)) return NextResponse.json({ error: 'notFound' }, { status: 404, headers: { 'Cache-Control': 'private, no-store' } })
   const query = new URL(request.url).searchParams
-  const run = () => READS[read as SettingsRead](query)
+  const run = () => withDatabaseOperation(`/api/settings/${read}`, () => READS[read as SettingsRead](query))
   const key = await shareKey(read, query)
   const body = key ? await singleFlight(key, run) : await run()
   return NextResponse.json(body ?? null, { headers: { 'Cache-Control': 'private, no-store' } })

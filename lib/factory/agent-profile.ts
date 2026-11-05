@@ -14,7 +14,7 @@ import { BUILTIN_AGENT_PROFILE_ID, BUILTIN_AGENT_PROFILE_VERSION, builtinAgentPr
 import { acquireProfileMembership, profileView, readProfileRow, readProfileRows, validateProfileScope, type ProfileMembership, type ProfileQuery, type ProfileRow } from './agent-profile-store'
 import { agentProfileSkillsCatalog, resolveAgentProfileSkills } from './agent-profile-skills'
 import { maskFactoryNote } from './note-mask'
-import { profileDecisionDiagnostics, profileDecisionQuestions, profileDecisionSelection, type PublicAgentProfile } from './agent-profile-decision'
+import { profileDecisionDiagnostics, profileDecisionInput, profileDecisionQuestions, profileDecisionSelection, type ProfileCheckWork, type PublicAgentProfile } from './agent-profile-decision'
 import type { ModelRoutingContext } from '@/lib/model-routing-server'
 
 export * from './agent-profile-definition'
@@ -47,6 +47,8 @@ type DispatchScope = AgentProfileScope & { botId: string | null }
 type DispatchDependencies = {
   /** Host-owned Factory client; its real COMMIT acquires the final lease. */
   transaction?: PoolClient
+  /** Host projection of the current independent check, not request JSON. */
+  checkWork?: ProfileCheckWork
   membership?: (scope: AgentProfileScope) => Promise<ProfileMembership>
   resolve?: typeof resolveModelDispatch
   decision?: typeof invokeDecision
@@ -266,23 +268,14 @@ export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchSco
     const issue = await issueForUser(scope.ownerId, request.issueId)
     if (!issue) throw new AgentProfileError('agentProfileScopeNotFound', 404)
     const catalog = eligible.map(item => item.public)
-    const originalTask = { title: issue.title, content: JSON.stringify(issue.content).slice(0, 12_000), note: request.note?.slice(0, 4000) }
     const check = await deps.independentCheck?.()
-    const input = maskFactoryNote(JSON.stringify({
-      task: check ? {
-        kind: 'independent_check', stage: check.stage, taskId: check.taskId,
-        requestEpoch: check.requestEpoch, candidateId: check.candidateId, readOnly: true,
-        objective: 'Independently assess the fixed submitted candidate for this stage against the acceptance reference. Do not implement or modify the candidate.',
-      } : { title: originalTask.title, content: originalTask.content, stage: request.stage ?? 'execute', note: originalTask.note },
-      ...(check ? { acceptanceReference: { originalTask, currentOwnerRequest: check.currentOwnerRequest } } : {}),
-      candidates: catalog,
-    }))
+    const input = maskFactoryNote(profileDecisionInput({ title: issue.title, content: JSON.stringify(issue.content).slice(0, 12_000), stage: request.stage ?? 'execute', note: request.note?.slice(0, 4000) }, catalog, deps.checkWork, check))
     execution = await hostedBillingScope.run({ workspaceId: scope.workspaceId, ownerId: scope.ownerId }, () => (deps.decision ?? invokeDecision)('factory-agent-profile', input, profileDecisionQuestions(catalog), undefined, { retainInvalidReceipt: true }))
     const result = profileDecisionSelection(catalog, execution?.answers ?? null)
     if ('unavailable' in result) {
       const error = new AgentProfileError('agentProfileDecisionUnavailable', 409, { detail: result.unavailable })
       const stage = ['triage', 'plan', 'spec', 'execute', 'review', 'verify', 'approval', 'publish', 'monitor'].includes(request.stage ?? '') ? request.stage : undefined
-      logCodedError(error, { issueId: request.issueId, stage, ...profileDecisionDiagnostics(catalog, availability), decisionExecutionId: execution?.execution.executionId })
+      logCodedError(error, { issueId: request.issueId, stage, ...profileDecisionDiagnostics(catalog, availability, execution?.answers), decisionExecutionId: execution?.execution.executionId })
       throw error
     }
     chosen = eligible.find(item => item.row.id === result.selected.id); reason = result.selected.reason

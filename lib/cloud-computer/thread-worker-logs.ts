@@ -10,6 +10,7 @@ import { runChanged } from '../live/panels'
 // fails to provision or ends, and kept with the machine row (logTail).
 import type { Pool } from 'pg'
 import { runListChanged } from '../live/lists'
+import { isRuntimeGuardPhase, isRuntimeRefreshCode } from '../computer/runtime-refresh-refusal'
 
 type Mask = (text: string) => string
 
@@ -27,7 +28,7 @@ export type RuntimeRefreshPhase = 'admission' | 'execution_identity' | 'question
 const REFRESH_ERROR_CLASSES = new Set(['Error', 'TypeError', 'SyntaxError', 'AbortError', 'TimeoutError', 'SandboxError',
   'InvalidArgumentError', 'NotEnoughSpaceError', 'NotFoundError', 'FileNotFoundError', 'SandboxNotFoundError',
   'SandboxNotRunningError', 'SandboxUnreachableError', 'AuthenticationError', 'RateLimitError', 'ServiceBusyError',
-  'CommandExitError', 'E2BKeyError'])
+  'CommandExitError', 'E2BKeyError', 'RuntimeRefreshError'])
 const REFRESH_ERROR_CODES = new Set(['ENOENT', 'EACCES', 'EINVAL', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND',
   'EAI_AGAIN', 'EPIPE', 'ABORT_ERR', 'ERR_INVALID_URL', '57014', '55P03', 'e2b_key_missing', 'e2b_key_invalid',
   'e2b_limit_reached', 'e2b_template_unavailable', 'e2b_unavailable'])
@@ -38,12 +39,15 @@ const REFRESH_ERROR_CODES = new Set(['ENOENT', 'EACCES', 'EINVAL', 'ETIMEDOUT', 
 export function logRuntimeRefreshFailure(runId: string, phase: RuntimeRefreshPhase, error: unknown,
   log: (line: string) => void = line => console.warn(line), operation: 'refresh' | 'start' = 'refresh') {
   try {
-    const value = error && typeof error === 'object' ? error as { name?: unknown; code?: unknown; exitCode?: unknown; status?: unknown; statusCode?: unknown } : {}
+    const value = error && typeof error === 'object' ? error as { name?: unknown; code?: unknown; exitCode?: unknown; status?: unknown; statusCode?: unknown; runtimePhase?: unknown } : {}
     const name = value.name, code = value.code
     const errorClass = typeof name === 'string' && REFRESH_ERROR_CLASSES.has(name) ? name : 'unknown'
-    const errorCode = typeof code === 'string' && REFRESH_ERROR_CODES.has(code) ? code : 'unknown'
+    const runtimeCode = errorClass === 'RuntimeRefreshError' && isRuntimeRefreshCode(code)
+    const errorCode = runtimeCode || typeof code === 'string' && REFRESH_ERROR_CODES.has(code) ? code : 'unknown'
+    const runtimePhase = runtimeCode ? value.runtimePhase : undefined
     const status = value.status ?? value.statusCode, exitCode = value.exitCode
     log(JSON.stringify({ event: operation === 'start' ? 'thread_runtime_start_failed' : 'thread_runtime_refresh_failed', runId, phase, errorClass, errorCode,
+      ...(isRuntimeGuardPhase(runtimePhase) ? { runtimePhase } : {}),
       ...(typeof status === 'number' && Number.isInteger(status) && status >= 100 && status <= 599 ? { status } : {}),
       ...(typeof exitCode === 'number' && Number.isInteger(exitCode) && exitCode >= 0 && exitCode <= 255 ? { exitCode } : {}),
     }))
