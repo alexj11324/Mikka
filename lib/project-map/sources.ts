@@ -28,8 +28,8 @@ type LoadedSource = Omit<SourceMetadata, 'normalizedKey'> & {
   ownerId?: string
   maskRunId?: string
 }
-type Run = { id: string; userId: string; issueId: string | null; botId: string | null; sessionId: string | null; mailboxId: string | null; questionContinuation: { questionId: string; originRunId: string } | null; createdAt: Date; prompt: string; report: unknown; status: string }
-type Task = { id: string; userId: string; issueId: string; botId: string | null; revision: number; createdAt: Date; stage: string; status: string; reason: string }
+type Run = { id: string; userId: string; issueId: string | null; botId: string | null; sessionId: string | null; mailboxId: string | null; questionContinuation: { questionId: string; originRunId: string } | null; createdAt: Date; status: string }
+type Task = { id: string; userId: string; issueId: string; botId: string | null; revision: number; createdAt: Date; stage: string; status: string }
 type Context = { scope: ProjectScope; issues: Set<string>; runs: Map<string, Run>; tasks: Map<string, Task> }
 function unavailable(): never { throw new ProjectMapError('SOURCE_NOT_FOUND', 404) }
 const uuid = (id: string) => { if (!z.uuid().safeParse(id).success) unavailable(); return id }
@@ -53,7 +53,7 @@ async function requireRun(ctx: Context, id: string, question?: { id: string; con
   }
   const prior = ctx.runs.get(id)
   if (prior) return prior
-  const { rows: [run] } = await pool.query<Run>('SELECT id,"userId","issueId","botId","sessionId","mailboxId","questionContinuation","createdAt",prompt,report,status FROM agent_runs WHERE id=$1 AND "userId"=$2', [id, ctx.scope.userId])
+  const { rows: [run] } = await pool.query<Run>('SELECT id,"userId","issueId","botId","sessionId","mailboxId","questionContinuation","createdAt",status FROM agent_runs WHERE id=$1 AND "userId"=$2', [id, ctx.scope.userId])
   if (!run || (botScoped(ctx.scope) && run.botId !== ctx.scope.botId)) unavailable()
   await requireIssue(ctx, run.issueId)
   if (await runOutsideToken({ id: ctx.scope.userId, [tokenWorkspace]: ctx.scope.workspaceId }, id)) unavailable()
@@ -64,7 +64,7 @@ async function requireTask(ctx: Context, id: string): Promise<Task> {
   uuid(id)
   const prior = ctx.tasks.get(id)
   if (prior) return prior
-  const { rows: [task] } = await pool.query<Task>('SELECT id,"userId","issueId","botId",revision,"createdAt",stage,status,reason FROM factory_tasks WHERE id=$1 AND "userId"=$2', [id, ctx.scope.userId])
+  const { rows: [task] } = await pool.query<Task>('SELECT id,"userId","issueId","botId",revision,"createdAt",stage,status FROM factory_tasks WHERE id=$1 AND "userId"=$2', [id, ctx.scope.userId])
   if (!task || (botScoped(ctx.scope) && task.botId !== ctx.scope.botId)) unavailable()
   await requireIssue(ctx, task.issueId)
   if (ctx.scope.runId) {
@@ -152,7 +152,7 @@ async function loadSource(ctx: Context, raw: DecisionSourceLocator): Promise<Loa
     }
     case 'run': {
       const run = await requireRun(ctx, input.id)
-      return { locator: constrain(input, { type: input.type, id: run.id, ...runCoordinates(run) }), relation: 'host_verified', occurredAt: run.createdAt, authorKind: 'agent', authorId: run.id, maskRunId: run.id, content: { prompt: run.prompt, report: run.report, status: run.status } }
+      return { locator: constrain(input, { type: input.type, id: run.id, ...runCoordinates(run) }), relation: 'host_verified', occurredAt: run.createdAt, authorKind: 'agent', authorId: run.id, maskRunId: run.id, content: async () => (await pool.query('SELECT prompt,report,status FROM agent_runs WHERE id=$1 AND "userId"=$2 LIMIT 1', [run.id, scope.userId])).rows[0] }
     }
     case 'run_chunk': {
       const { rows: [row] } = await pool.query<{ id: string; runId: string; seq: number; chunk: unknown; createdAt: Date }>('SELECT id,"runId",seq,chunk,"createdAt" FROM run_chunks WHERE id=$1', [input.id])
@@ -200,7 +200,7 @@ async function loadSource(ctx: Context, raw: DecisionSourceLocator): Promise<Loa
     }
     case 'factory_task': {
       const task = await requireTask(ctx, input.id)
-      return { locator: constrain(input, { type: input.type, id: task.id, taskId: task.id, issueId: task.issueId, botId: task.botId, ...(input.revision !== undefined ? { revision: task.revision } : {}) }), relation: 'host_verified', occurredAt: task.createdAt, content: { stage: task.stage, status: task.status, reason: task.reason } }
+      return { locator: constrain(input, { type: input.type, id: task.id, taskId: task.id, issueId: task.issueId, botId: task.botId, ...(input.revision !== undefined ? { revision: task.revision } : {}) }), relation: 'host_verified', occurredAt: task.createdAt, content: async () => (await pool.query('SELECT stage,status,reason FROM factory_tasks WHERE id=$1 AND "userId"=$2 LIMIT 1', [task.id, scope.userId])).rows[0] }
     }
     case 'attempt': {
       const { rows: [row] } = await pool.query<{ id: string; taskId: string; runId: string | null; sessionId: string | null; stage: string; status: string; reason: string; output: unknown; evidence: unknown; createdAt: Date }>('SELECT id,"taskId","runId","sessionId",stage,status,reason,output,evidence,"createdAt" FROM factory_attempts WHERE id=$1', [input.id])
@@ -323,11 +323,11 @@ export function sanitizeSourceText(text: string): string {
 }
 
 /** Read one original record after current authorization; mask before clipping it. */
-export async function readDecisionSource(scope: ProjectScope, locator: DecisionSourceLocator): Promise<DecisionSourceRead> {
+export async function readDecisionSource(scope: ProjectScope, locator: DecisionSourceLocator, options: { maxChars?: number } = {}): Promise<DecisionSourceRead> {
   const loaded = await loadSource(context(scope), locator)
   const raw = typeof loaded.content === 'function' ? await loaded.content() : loaded.content
   const safe = loaded.maskRunId ? await maskForRun(loaded.maskRunId, raw) : await maskFor({ workspaceId: scope.workspaceId, ownerId: loaded.ownerId ?? scope.userId }, raw)
   const text = sanitizeSourceText(typeof safe === 'string' ? safe : JSON.stringify(safe) ?? '')
-  const limit = 16_000
+  const limit = Math.max(1, Math.min(131_072, options.maxChars ?? 16_000))
   return { ...metadata(loaded), text: text.slice(0, limit), truncated: text.length > limit }
 }
