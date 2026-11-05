@@ -1,11 +1,11 @@
-import { forwardRef, useImperativeHandle, useRef, type ReactElement } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useState, type ReactElement } from 'react'
 import { StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native'
 import { KeyboardAwareLegendList } from '@legendapp/list/keyboard'
 import type { LegendListRef } from '@legendapp/list/react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { underBar } from '@/components/NavBar'
-import { CHAT_LIST_ESTIMATED_ROW, CHAT_ROW_GAP, isAtLatest } from '@/features/chat/model/chat-layout'
+import { ANCHOR_GAP, CHAT_LIST_ESTIMATED_ROW, CHAT_ROW_GAP, isAtLatest } from '@/features/chat/model/chat-layout'
 import { VIRTUALIZED_CHAT_LIST, type ChatListHandle, type ChatListProps } from './chat-message-list.types'
 
 export { VIRTUALIZED_CHAT_LIST, type ChatListHandle, type ChatListProps }
@@ -15,9 +15,14 @@ export { VIRTUALIZED_CHAT_LIST, type ChatListHandle, type ChatListProps }
  * at its latest message, a new message keeps the reader at the end when they are there, and an older page loading in
  * front leaves the message they are reading where it is. The keyboard lifts the list while the reader is at the end.
  */
-function ChatMessageListInner<T>({ data, keyOf, renderItem, header, footer, bottomInset, onStartReached, onAtLatestChange, scrollEnabled, testID }: ChatListProps<T>, ref: React.Ref<ChatListHandle>) {
+function ChatMessageListInner<T>({ data, keyOf, renderItem, header, footer, bottomInset, onStartReached, onAtLatestChange, anchorIndex, scrollEnabled, testID }: ChatListProps<T>, ref: React.Ref<ChatListHandle>) {
   const insets = useSafeAreaInsets()
+  // The bar floats over the list on iOS: the anchored message sits under it, not behind it.
+  const topOffset = insets.top + 44
   const list = useRef<LegendListRef>(null)
+  // The anchored space counts the rows after the anchor but not the footer (the waiting line, notices): the anchor
+  // sits that much lower so the footer does not push it above the top.
+  const [footerHeight, setFooterHeight] = useState(0)
   const fallback = useRef<ScrollViewInstance>(null)
   const atLatest = useRef(true)
   const following = useRef(true)
@@ -59,14 +64,16 @@ function ChatMessageListInner<T>({ data, keyOf, renderItem, header, footer, bott
       estimatedItemSize={CHAT_LIST_ESTIMATED_ROW}
       ItemSeparatorComponent={Separator}
       initialScrollAtEnd
-      // Following the end: a new message, a reply growing or the footer changing keep the latest in view.
-      maintainScrollAtEnd={{ animated: false, on: { dataChange: true, itemLayout: true, footerLayout: true, layout: true } }}
+      // Following the end: a new message, the footer or the screen changing keep the latest in view. A reply growing
+      // under the anchored message fills its blank space instead, without scrolling (v0).
+      maintainScrollAtEnd={{ animated: false, on: { dataChange: true, itemLayout: anchorIndex === undefined, footerLayout: true, layout: true } }}
+      anchoredEndSpace={anchorIndex === undefined ? undefined : { anchorIndex, anchorOffset: topOffset + ANCHOR_GAP + footerHeight }}
       // An older page in front of the chat leaves the message being read where it is.
       maintainVisibleContentPosition={{ data: true }}
       onStartReached={onStartReached ? () => onStartReached() : undefined}
       onStartReachedThreshold={0.5}
       ListHeaderComponent={header ? <View style={styles.row}>{header}</View> : undefined}
-      ListFooterComponent={footer ? <View style={styles.footer}>{footer}</View> : undefined}
+      ListFooterComponent={footer ? <View style={styles.footer} onLayout={event => setFooterHeight(event.nativeEvent.layout.height)}>{footer}</View> : undefined}
       contentContainerStyle={content}
       onScroll={onScroll}
       scrollEventThrottle={16}

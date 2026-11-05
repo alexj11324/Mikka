@@ -1,11 +1,11 @@
-import { Platform, Pressable, StyleSheet, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
 import Reanimated, { cubicBezier } from 'react-native-reanimated'
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect'
+import { GlassView } from 'expo-glass-effect'
+import { useLiquidGlass } from '@/lib/glass'
 import { ArrowDown } from 'lucide-react-native'
 import { Symbol } from '@/components/Symbol'
 import { colors, lift } from '@/lib/theme'
 
-const glass = Platform.OS === 'ios' && isLiquidGlassAvailable()
 /** expo-animation: a state change with no finger on it is a CSS transition, strong ease-out, under 300 ms. */
 const FADE = { transitionProperty: 'opacity' as const, transitionDuration: 200, transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1) }
 
@@ -17,6 +17,7 @@ const FADE = { transitionProperty: 'opacity' as const, transitionDuration: 200, 
  */
 export function ChatScrollToLatest({ visible, bottom, onPress }: { visible: boolean; bottom: number; onPress: () => void }) {
   const hidden = !visible
+  const glass = useLiquidGlass()
   const arrow = (
     <Reanimated.View style={[styles.center, { opacity: hidden ? 0 : 1 }, FADE]}>
       <Symbol name="arrow.down" size={20} color={colors.ink} web={<ArrowDown size={22} color={colors.ink} strokeWidth={2.2} />} />
