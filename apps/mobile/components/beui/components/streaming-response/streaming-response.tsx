@@ -75,7 +75,7 @@ function ActionButton({
     >
       <Animated.View
         style={[styles.action, style]}
-        className={pressed ? "bg-surface" : ""}
+        className={pressed ? "bg-default" : ""}
       >
         {children}
       </Animated.View>
@@ -394,7 +394,7 @@ export function StreamingResponse({
       ) : null}
       {hasSources ? (
         <Disclosure open={sourcesOpen && hasActions} reduce={reduce}>
-          <View className="mt-2 rounded-xl bg-surface p-2">
+          <View className="mt-2 rounded-xl bg-default p-2">
             <CitationList
               citations={sources}
               onOpenSource={onOpenSource}

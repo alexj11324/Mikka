@@ -9,7 +9,7 @@ export const variants: Record<
 > = {
   primary: { container: "bg-primary border-primary", label: "text-on-primary" },
   secondary: {
-    container: "bg-surface border-border",
+    container: "bg-default border-transparent",
     label: "text-foreground",
   },
   ghost: {

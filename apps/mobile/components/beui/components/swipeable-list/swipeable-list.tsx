@@ -699,7 +699,7 @@ function Row({
           }
           onAccessibilityAction={onAccessibilityAction}
           accessibilityState={{ disabled: item.disabled ?? false }}
-          className={`min-h-[72px] justify-center rounded-2xl border border-border bg-surface px-4 py-3 ${classNames?.surface ?? ""}`}
+          className={`min-h-[72px] justify-center rounded-2xl border border-border bg-default px-4 py-3 ${classNames?.surface ?? ""}`}
           style={[styles.surface, surfaceStyle]}
         >
           <Animated.View

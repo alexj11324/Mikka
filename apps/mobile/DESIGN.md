@@ -27,6 +27,17 @@ props, and `styles/tokens.css` gives the same values to Uniwind classes, HeroUI 
 `tests/theme-tokens.test.mts` fails when a CSS value differs from the token named in its comment. To change a colour,
 edit both files.
 
+The layers follow iOS's grouped screens:
+
+| Layer | Class | Light / dark |
+| --- | --- | --- |
+| Page | `bg-background` | grouped, `#F2F2F7` / black. The chat page stays `colors.page`, white / black |
+| Card, sheet row | `bg-surface` | `#FFFFFF` / `#1C1C1E` |
+| Muted fill, secondary button, default alert, chip | `bg-default` | chip grey, `#EBEBF0` / systemFill. It shows on a card and on the white chat page |
+| Outline | `border-border`, transparent fill | separator |
+
+A secondary button is filled and has no outline.
+
 ## Text
 
 - Chat body: 16 pt on a 22 pt line, the same as the composer. Secondary chat text: 14 on 20.

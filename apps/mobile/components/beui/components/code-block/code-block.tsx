@@ -210,7 +210,7 @@ export function CodeBlock({
   return (
     <View
       accessibilityState={{ busy: streaming }}
-      className={`w-full overflow-hidden rounded-2xl bg-surface ${className}`}
+      className={`w-full overflow-hidden rounded-2xl bg-default ${className}`}
       {...props}
     >
       <View style={styles.header} className="px-3">

@@ -1036,7 +1036,7 @@ export function MenuContent({
           },
           panelStyle,
         ]}
-        className={`rounded-2xl border border-border bg-background p-1.5 ${className}`}
+        className={`rounded-2xl border border-border bg-surface p-1.5 ${className}`}
       >
         {scrollable ? (
           <ScrollView

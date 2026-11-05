@@ -58,12 +58,12 @@ export type AnimatedBadgeProps = Omit<ViewProps, "children"> & {
 
 // Full class strings, so Uniwind can see every token at build time.
 const STATUS_CLASS: Record<AnimatedBadgeStatus, string> = {
-  neutral: "border-border bg-surface text-muted",
-  info: "border-primary/30 bg-surface text-primary",
+  neutral: "border-border bg-default text-muted",
+  info: "border-primary/30 bg-default text-primary",
   success: "border-success/30 bg-success/10 text-success",
   warning: "border-warning/30 bg-warning/10 text-warning",
   danger: "border-destructive/30 bg-destructive/10 text-destructive",
-  loading: "border-primary/30 bg-surface text-primary",
+  loading: "border-primary/30 bg-default text-primary",
 };
 
 const SIZES = {

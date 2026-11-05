@@ -256,7 +256,7 @@ export function ToolResult({
   return (
     <View
       accessibilityState={{ busy: running }}
-      className={`w-full overflow-hidden rounded-2xl border border-border bg-surface/50 ${className}`}
+      className={`w-full overflow-hidden rounded-2xl border border-border bg-default/50 ${className}`}
       {...props}
     >
       <Pressable
@@ -269,7 +269,7 @@ export function ToolResult({
       >
         <View
           style={styles.tile}
-          className="rounded-lg border border-border bg-background"
+          className="rounded-lg border border-border bg-surface"
         >
           {kindIcon}
         </View>
@@ -327,7 +327,7 @@ export function ToolResult({
       </Pressable>
       <Disclosure open={open} reduce={reduce}>
         <View
-          className={`mx-3 mb-3 overflow-hidden rounded-xl border ${failed ? "border-destructive/20 bg-destructive/5" : "border-border bg-background"}`}
+          className={`mx-3 mb-3 overflow-hidden rounded-xl border ${failed ? "border-destructive/20 bg-destructive/5" : "border-border bg-surface"}`}
         >
           <ScrollView
             ref={scrollRef}
