@@ -8,8 +8,9 @@ export type HomeItem<R> = { kind: 'section'; id: string; title: string; count: n
 
 export function homeSections<R extends Row>(rows: readonly R[], searching: boolean): { pinned: R[]; items: HomeItem<R>[] } {
   if (searching) return { pinned: [], items: rows.map(row => ({ kind: 'row', row })) }
-  // Pin order is the order `rows` already has (the saved arrangement, or the Coordinator first when there is none).
+  // The Coordinator stays the first pin (lib/pins.ts). A saved arrangement may reorder the other pins only.
   const pinned = rows.filter(row => row.kind === 'bot' && row.bot.pinned)
+    .sort((a, b) => Number(Boolean(b.kind === 'bot' && b.bot.coordinator)) - Number(Boolean(a.kind === 'bot' && a.bot.coordinator)))
   const rest = rows.filter(row => !pinned.includes(row))
   const sections: [string, string, R[]][] = [
     ['working', '正在工作', rest.filter(row => row.kind === 'bot' && row.bot.working)],

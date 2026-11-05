@@ -57,11 +57,13 @@ test('the menu is the actions Mikka has: a group has no pin and no 资料', () =
   assert.deepEqual(chatMenu({ kind: 'group', pinned: false, unread: 0 }), ['unread', 'copy-id'])
 })
 
-test('without a saved order the Coordinator stays the first pin; a saved order is the one used', () => {
+test('the Coordinator stays the first pin, including when a saved order names another pin first', () => {
   const rows = [bot('a', { pinned: true }), bot('c', { pinned: true, coordinator: true }), bot('b'), group('g')]
   assert.deepEqual(orderedRows(rows, null).map(row => row.id), ['c', 'a', 'b', 'g'])
   const saved = { pins: ['a', 'c'], sections: { working: [], bots: ['b'], groups: ['g'] } }
-  assert.deepEqual(orderedRows(rows, saved).map(row => row.id), ['a', 'c', 'b', 'g'])
+  assert.deepEqual(orderedRows(rows, saved).map(row => row.id), ['c', 'a', 'b', 'g'])
+  const dropped = applyDrop(rows, 'a', { zone: 'pins', index: 0 })
+  assert.deepEqual(dropped?.order.pins, ['c', 'a'])
 })
 
 test('a drop on the pins pins a bot, a drop back in its section unpins it, and a group cannot be pinned', () => {

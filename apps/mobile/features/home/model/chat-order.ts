@@ -34,19 +34,26 @@ function bySaved<T extends { id: string }>(items: readonly T[], saved: readonly 
   return [...known, ...items.filter(item => !placed.has(item.id))]
 }
 
-/** Rows in home order: pins (the saved order, else the given order), then each section the same way. */
+/** The Coordinator is the first pin. Other pins keep `saved`, then the order they were given. */
+function coordinatorFirst<R extends OrderRow>(pinned: readonly R[]): R[] {
+  const first = pinned.filter(row => row.coordinator)
+  return [...first, ...pinned.filter(row => !row.coordinator)]
+}
+
+function pinIdsWithCoordinatorFirst(ids: readonly string[], rows: readonly OrderRow[]): string[] {
+  const coordinator = rows.find(row => row.coordinator && ids.includes(row.id))?.id
+  if (!coordinator) return [...ids]
+  return [coordinator, ...ids.filter(id => id !== coordinator)]
+}
+
+/** Rows in home order: the Coordinator first among pins, then each section. */
 export function orderedRows<R extends OrderRow>(rows: readonly R[], saved: ChatOrder | null): R[] {
-  if (!saved) {
-    const pinned = rows.filter(row => row.kind === 'bot' && row.pinned)
-      .sort((a, b) => Number(Boolean(b.coordinator)) - Number(Boolean(a.coordinator)))
-    const rest = rows.filter(row => !(row.kind === 'bot' && row.pinned))
-    return [...pinned, ...rest]
-  }
   const pinned = rows.filter(row => row.kind === 'bot' && row.pinned)
   const rest = rows.filter(row => !(row.kind === 'bot' && row.pinned))
+  if (!saved) return [...coordinatorFirst(pinned), ...rest]
   const section = (id: SectionId) => rest.filter(row => naturalSection(row) === id)
   return [
-    ...bySaved(pinned, saved.pins),
+    ...coordinatorFirst(bySaved(pinned, saved.pins)),
     ...bySaved(section('working'), saved.sections.working),
     ...bySaved(section('bots'), saved.sections.bots),
     ...bySaved(section('groups'), saved.sections.groups),
@@ -80,7 +87,7 @@ export function applyDrop(rows: readonly OrderRow[], id: string, target: DropTar
   const order = visualOrder(rows)
   if (target.zone === 'pins') {
     if (row.kind !== 'bot') return null
-    order.pins = moveId(order.pins, id, target.index)
+    order.pins = pinIdsWithCoordinatorFirst(moveId(order.pins, id, target.index), rows)
     for (const section of SECTIONS) order.sections[section] = order.sections[section].filter(item => item !== id)
     return { order, pin: row.pinned ? null : true }
   }
