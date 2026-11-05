@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
 import { MAX_USER_IMAGES, normalizeUserImages, userImageContent, type StoredUserImage } from './user-attachments'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { ModelMessage } from 'ai'
@@ -28,7 +28,7 @@ export function sourcedEventMessage(event: EventSource, projection: string): Sou
   if (event.kind === 'user_message') {
     const images = userImageContent(event.payload.images)
     const destination = taskDestinationSchema.safeParse(event.payload.taskDestination)
-    const profile = z.uuid().safeParse(event.payload.profileId)
+    const profile = agentProfileReferenceSchema.safeParse(event.payload.profileId)
     return { role: 'user', content: images.length ? [{ type: 'text', text: projection }, ...images] : projection, mikkaUserEvent: { id: event.id ?? null, sentAt: asTime(event.createdAt), ...(destination.success ? { taskDestination: destination.data } : {}), ...(profile.success ? { profileId: profile.data } : {}) } }
   }
   const packet = personalMessagePacket({ messageId: event.id ?? null, senderId: null,

@@ -201,10 +201,13 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.equal(states.get(preferred[1].id)?.credential.usable, true)
     assert.equal(states.get(preferred[2].id)?.credential.usable, true)
 
-    for (const defaultOnly of [false, true]) await t.test(defaultOnly
-      ? 'default-only dispatch keeps the same harness and skips its failed first preference'
-      : 'new default dispatch keeps the same harness and skips its failed first preference', async () => {
-      const selected = await profiles.resolveAgentProfileDispatch(pool, who, { ...request, defaultOnly })
+    for (const choice of [
+      { name: 'new default', profileId: undefined, defaultOnly: false },
+      { name: 'default-only', profileId: undefined, defaultOnly: true },
+      { name: 'task-form Default', profileId: 'default', defaultOnly: false },
+      { name: 'task-form Default continuation', profileId: 'default', defaultOnly: true },
+    ]) await t.test(`${choice.name} dispatch keeps the same harness and skips its failed first preference`, async () => {
+      const selected = await profiles.resolveAgentProfileDispatch(pool, who, { ...request, profileId: choice.profileId, defaultOnly: choice.defaultOnly })
       if (selected.target.kind !== 'device') assert.fail(`Expected the healthy preferred source, got ${JSON.stringify(selected.target)}`)
       assert.equal(selected.target.agentId, runtimeAgents.claude_code)
       assert.equal(selected.target.deviceId, device)
@@ -220,11 +223,12 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     await t.test('default availability follows the healthy preferred source without writing bindings', async () => {
       const before = await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [who.ownerId])
       assert.deepEqual(await profiles.agentProfileDispatchAvailability(pool, who, request), { available: true })
+      assert.deepEqual(await profiles.agentProfileDispatchAvailability(pool, who, { ...request, profileId: 'default' }), { available: true })
       assert.deepEqual((await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [who.ownerId])).rows, before.rows)
     })
 
-    await t.test('an explicitly named failed model stays unavailable instead of selecting Haiku', async () => {
-      const picked = { ...request, asked: { harness: 'claude_code' as const, model: 'deepseek-flash' } }
+    for (const profileId of [undefined, 'default']) await t.test(`an explicitly named failed model stays unavailable on ${profileId ?? 'automatic'} instead of selecting Haiku`, async () => {
+      const picked = { ...request, profileId, asked: { harness: 'claude_code' as const, model: 'deepseek-flash' } }
       const selected = await profiles.resolveAgentProfileDispatch(pool, who, picked)
       assert.equal(selected.target.kind, 'none')
       if (selected.target.kind !== 'none') assert.fail('An explicit failed source must not dispatch')
@@ -256,6 +260,87 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   const ui = await store.create(scope, definition('UI', 'claude_code', exactClaude, 'claude-haiku-5-5'), randomUUID())
   const backend = await store.create(scope, definition('Backend', 'codex', codex, 'gpt-6-luna'))
   const review = await store.create(scope, { ...definition('Review', 'codex', codex, 'gpt-6-luna'), roles: ['review'], skills: ['independent-review'] })
+
+  await t.test('a persisted task-form Default choice uses preferred models with custom roles present and retains its continuation pin', async () => {
+    const [{ db }, { recordPersonalSubmission }, { requestedAgentProfile }] = await Promise.all([
+      import('../db'), import('../coordinator-submission'), import('./profile-request'),
+    ])
+    const botId = await seedBot(pool, scope.workspaceId, scope.ownerId), owner = { ...scope, botId }
+    const receipt = await recordPersonalSubmission(db, scope.ownerId, 'Use the preferred models for this task.', { botId, submissionId: randomUUID(), profileId: 'default' })
+    assert.equal((await pool.query('SELECT payload FROM coordinator_events WHERE id=$1', [receipt.eventId])).rows[0].payload.profileId, 'default')
+    const profileId = await requestedAgentProfile(pool, owner, receipt.eventId, review.id)
+    assert.equal(profileId, 'default', 'the stored task choice wins over the model-proposed review role')
+    await assert.rejects(requestedAgentProfile(pool, { ...owner, ownerId: foreign.ownerId }, receipt.eventId, 'default'), { code: 'agentProfilePinConflict' })
+    await assert.rejects(requestedAgentProfile(pool, { ...owner, botId: randomUUID() }, receipt.eventId, 'default'), { code: 'agentProfilePinConflict' })
+    const beforeBindings = (await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [scope.ownerId])).rows
+    assert.deepEqual(await profiles.agentProfileDispatchAvailability(pool, owner, { profileId, asked: { harness: 'codex' }, location: 'local' }), { available: true })
+    assert.deepEqual((await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [scope.ownerId])).rows, beforeBindings, 'preview remains read-only')
+    const decision = async () => { throw new Error('A real task-form Default pin must not ask Decision for another role') }
+    for (const request of [
+      { asked: { harness: 'codex' as const } },
+      { asked: { harness: 'codex' as const }, defaultOnly: true },
+      { asked: { harness: 'codex' as const, model: 'gpt-6-luna' } },
+    ]) {
+      const purposes: string[] = []
+      const result = await profiles.resolveAgentProfileDispatch(pool, owner, { issueId, profileId, location: 'local', ...request }, {
+        decision, modelDecision: async purpose => { purposes.push(purpose); return null },
+      })
+      if (result.target.kind !== 'device') assert.fail('the explicit Default choice must retain its authorized local target')
+      assert.equal(result.target.agentId, agents.codex)
+      assert.equal(result.target.model, 'gpt-6-luna')
+      assert.deepEqual(result.target.entry.source, { kind: 'subscription', connectionId: codex })
+      assert.equal(result.selectionMode, request.asked.model ? 'picked' : 'preference')
+      assert.deepEqual(purposes, request.asked.model ? [] : ['task-model-routing'], 'the existing model routing path remains independent of Profile selection')
+      const selection = result.agentProfile!
+      assert.equal(selection.profileId, 'default'); assert.equal(selection.source, 'default'); assert.equal(selection.reason, 'default')
+      assert.equal(selection.version, 1); assert.equal(selection.decision, undefined); assert.equal(selection.instructions, '')
+      assert.deepEqual(selection.skills, []); assert.deepEqual(selection.definition.roles, [])
+      await profiles.assertProfileSelection(pool, owner, selection)
+    }
+    await assert.rejects(profiles.resolveAgentProfileDispatch(pool, owner, { issueId, profileId: review.id, defaultOnly: true }), { code: 'agentProfilePinConflict' })
+    assert.equal((await store.list(scope)).length, 3, 'selecting Default does not create or modify a custom Profile')
+  })
+
+  await t.test('public Factory Default dispatch requires the original user pin without changing UUID or host-selected paths', async () => {
+    const [{ db }, { recordPersonalSubmission }, { createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun }, order] = await Promise.all([
+      import('../db'), import('../coordinator-submission'), import('./store'), import('./dispatch'), import('../agent-runs'), import('../model-order'),
+    ])
+    const botId = await seedBot(pool, scope.workspaceId, scope.ownerId), repoId = randomUUID()
+    const repository = normalizeRepository(`https://github.com/synthetic/default-task-${randomUUID()}.git`)
+    await pool.query(`INSERT INTO device_repos(id,"userId","deviceId","repoPath","remoteUrl","baseBranch") VALUES ($1,$2,$3,$4,$5,'main')`, [repoId, scope.ownerId, deviceId, repository.key, repository.remoteUrl])
+    const [{ factoryCheckGates }, { factoryCheckIndependent }] = await Promise.all([import('./checks'), import('./check-independence')])
+    const factory = createFactoryStore(pool, async (owner, issue, tx) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [issue, owner])).rowCount === 1, botId, { independent: factoryCheckIndependent, gates: factoryCheckGates })
+    const dispatch = createFactoryDispatch(pool, factory, (tx, owner, input, bot, context) => queueFactoryRun(tx, owner, input, bot, context))
+    // Source-pin admission is independent of the existing difficulty-routing toggle.
+    await order.changeOrder(pool, scope, { kind: 'autoRouting', enabled: false })
+    let taskNumber = 1225
+    try {
+      for (const [pin, offered, expected] of [
+        ['default', undefined, 'default'], ['default', review.id, 'default'],
+        [backend.id, 'default', backend.id], [backend.id, review.id, review.id],
+        [undefined, 'default', null],
+      ] as const) {
+        const taskIssue = await seedIssue(pool, scope.ownerId)
+        await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [taskIssue, JSON.stringify({ type: 'doc', attrs: { mikka: { number: taskNumber++ } }, content: [] })])
+        const receipt = await recordPersonalSubmission(db, scope.ownerId, 'Run this task with the default Profile.', { botId, submissionId: randomUUID(), ...(pin ? { profileId: pin } : {}) })
+        const routed = await factory.route(scope.ownerId, { issueId: taskIssue, sourceEventId: receipt.eventId, eventId: randomUUID(), rationale: 'Task-form Profile admission fixture' })
+        const input = { binding: factoryBinding(routed.task), agentId: agents.codex, deviceRepoId: repoId, ...(offered ? { profileId: offered } : {}) }
+        if (expected === null) {
+          await assert.rejects(dispatch(scope.ownerId, input), { code: 'runInvalid' })
+          assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [taskIssue])).rowCount, 0, 'a tool-only Default cannot queue a run even when the user text contains its name')
+          assert.equal((await factory.read(scope.ownerId, routed.task.id)).task.status, 'pending')
+          continue
+        }
+        const queued = await dispatch(scope.ownerId, input)
+        const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [queued.runId])).rows[0]
+        assert.equal(run.agentDefinition.agentProfile.profileId, expected)
+        assert.equal(run.agentDefinition.agentProfile.source, expected === 'default' ? 'default' : 'explicit')
+        assert.equal(run.agentDefinition.model, 'gpt-6-luna')
+        assert.equal((await dispatch(scope.ownerId, input)).runId, queued.runId, 'the same request replays its frozen selection')
+        await pool.query("UPDATE agent_runs SET status='succeeded',\"finishedAt\"=now() WHERE id=$1", [queued.runId])
+      }
+    } finally { await order.changeOrder(pool, scope, { kind: 'autoRouting', enabled: true }) }
+  })
 
   await t.test('custom Profile survives a 21-second Decision wait and binds its exact authorized source', { timeout: 45_000 }, async () => {
     const selected = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' }, {

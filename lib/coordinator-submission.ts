@@ -9,6 +9,7 @@ import type { db } from './db'
 import { MESSAGE_MAX } from './message-limits'
 import { taskDestinationSchema, type TaskDestination } from './task-destination'
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
+import { agentProfileReferenceSchema } from './factory/agent-profile-reference'
 
 /** Personal Coordinator HTTP contract. Question/approval fields are not supported. */
 export const personalSubmissionInput = z.object({
@@ -53,7 +54,7 @@ export async function recordPersonalSubmission(executor: Executor, userId: strin
   }
   const images = normalizeUserImages(options.images)
   const taskDestination = options.taskDestination ? taskDestinationSchema.parse(options.taskDestination) : undefined
-  const profileId = z.uuid().optional().parse(options.profileId)
+  const profileId = agentProfileReferenceSchema.optional().parse(options.profileId)
   const dedupeKey = submissionId
     ? submissionKey(userId, botId, submissionId)
     : `user_message:${randomUUID()}`
