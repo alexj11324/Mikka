@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { Platform, useColorScheme, View } from 'react-native'
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
+import { HeroUINativeProvider } from 'heroui-native/provider'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
@@ -16,6 +17,9 @@ import { HomeProvider } from '@/lib/home'
 import { openPush } from '@/lib/navigate'
 import { colors, screenOptions } from '@/lib/theme'
 
+/** HeroUI Native draws product content (DESIGN.md). Mikka has no toasts: a state shows in place. */
+const HERO_UI = { toast: false, devInfo: { stylingPrinciples: false } } as const
+
 export default function RootLayout() {
   // The navigation bar's title, back button and material follow the system's appearance: without a theme the stack
   // draws in its light default, a light bar with dark words on a dark app (#1386).
@@ -25,10 +29,12 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <KeyboardProvider>
-          <StatusBar style="auto" />
-          <StartupGate>
-            <SessionGate />
-          </StartupGate>
+          <HeroUINativeProvider config={HERO_UI}>
+            <StatusBar style="auto" />
+            <StartupGate>
+              <SessionGate />
+            </StartupGate>
+          </HeroUINativeProvider>
         </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

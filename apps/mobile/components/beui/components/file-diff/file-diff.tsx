@@ -359,7 +359,7 @@ export function FileDiff({
       </Pressable>
       <Disclosure open={open} reduce={reduce}>
         <View className="pl-6 pt-1.5">
-          <View className="overflow-hidden rounded-xl bg-surface">
+          <View className="overflow-hidden rounded-xl bg-default">
             <ScrollView
               ref={scrollRef}
               style={[styles.fixed, { maxHeight }]}

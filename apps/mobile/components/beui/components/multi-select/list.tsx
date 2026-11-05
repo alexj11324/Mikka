@@ -177,7 +177,7 @@ export function MultiSelectContent({
         {position ? (
           <Animated.View
             accessibilityViewIsModal
-            className={`overflow-hidden rounded-xl border border-border bg-background ${className}`}
+            className={`overflow-hidden rounded-xl border border-border bg-surface ${className}`}
             style={[styles.panel, position, panelStyle]}
           >
             {/* Pinned to the edge nearest the field and measured at its own
@@ -371,7 +371,7 @@ function ItemRow({
         onSelect?.(value);
         context.toggle(value);
       }}
-      className={`min-h-11 flex-row items-center gap-2 rounded-lg px-2 py-2 active:bg-surface ${disabled ? "opacity-45" : ""} ${className}`}
+      className={`min-h-11 flex-row items-center gap-2 rounded-lg px-2 py-2 active:bg-default ${disabled ? "opacity-45" : ""} ${className}`}
     >
       <View className="min-w-0 flex-1">
         {typeof children === "string" ? (
