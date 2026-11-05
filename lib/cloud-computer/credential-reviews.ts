@@ -7,6 +7,7 @@ import type { BrowserCaller } from '@/lib/credentials/contracts'
 import type { BrowserTarget } from '@/lib/credentials/store'
 import { SubagentStore } from './subagents'
 import { credentialPlanDigest, credentialPlanSchema, credentialReviewSummary, type CredentialPlan } from './credential-plan'
+import { wakeTokens, wakeWorkflowSoon } from '@/lib/workflow-wake'
 
 /** Reuse an explicit saved-account unattended-login grant for the exact owner
  * and origin. Historical fill/submit/clear decisions keep their original narrow
@@ -54,6 +55,14 @@ export async function proposeCredentialOperation(pool: Pool, caller: BrowserCall
 }
 
 export async function executeCredentialOperation(pool: Pool, userId: string, raw: unknown, approved: boolean): Promise<{ data: Record<string, unknown> } | { error: string }> {
+  try { return await executeCredential(pool, userId, raw, approved) }
+  finally {
+    // The login decision changed the web task's row: its workflow continues now (#1212).
+    const subagentId = z.object({ subagentId: z.uuid() }).safeParse(raw).data?.subagentId
+    if (subagentId) wakeWorkflowSoon(wakeTokens.subagent(subagentId))
+  }
+}
+async function executeCredential(pool: Pool, userId: string, raw: unknown, approved: boolean): Promise<{ data: Record<string, unknown> } | { error: string }> {
   let plan: CredentialPlan | undefined
   let bound=false
   try {
