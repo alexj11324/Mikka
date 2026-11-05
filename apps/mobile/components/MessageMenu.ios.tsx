@@ -6,8 +6,8 @@ import { Button, ContextMenu, ControlGroup, Host, RNHostView, Toggle, Text } fro
 import { tap } from '@/lib/haptics'
 import { holdMessage, REACTIONS, type HeldMessage } from '@/lib/message-actions'
 
-/** iOS draws a message's long press as the system context menu (UIContextMenu via SwiftUI). */
-export const NATIVE_MESSAGE_MENU = true
+/** Off (2026-11-05): on device the SwiftUI host sized rows wrong and bubbles overlapped; long press uses the sheet until that is fixed. */
+export const NATIVE_MESSAGE_MENU = false
 
 /**
  * A long press on a message lifts it and opens the system context menu, as in Messages (#1386, native first):
