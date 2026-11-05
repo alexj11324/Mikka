@@ -10,6 +10,7 @@ let calls = 0, picks = 0, reply: () => Promise<unknown> = async () => ({ queued:
 class FixtureApiError extends Error { constructor(readonly status: number, readonly code: string) { super(code) } }
 mock.module('react-native', { namedExports: { Platform: { OS: 'ios' }, StyleSheet: { create: (value: unknown) => value }, View: ({ children }: { children: ReactNode }) => createElement('div', null, children) } })
 mock.module(new URL('../components/cards.tsx', import.meta.url).href, { namedExports: { CardButton: ({ label, disabled, busy, onPress }: { label: string; disabled?: boolean; busy?: boolean; onPress: () => void }) => createElement('button', { disabled: disabled || busy, onClick: onPress }, label) } })
+mock.module(new URL('../components/GlassButton.tsx', import.meta.url).href, { namedExports: { GlassButton: ({ label, disabled, busy, onPress }: { label: string; disabled?: boolean; busy?: boolean; onPress: () => void }) => createElement('button', { disabled: disabled || busy, onClick: onPress }, label) } })
 mock.module(new URL('../components/Text.tsx', import.meta.url).href, { namedExports: { Text: ({ children }: { children: ReactNode }) => createElement('span', null, children) } })
 mock.module(new URL('../lib/home.tsx', import.meta.url).href, { namedExports: { useHome: () => ({ data: { workspace: { id: workspace } } }) } })
 mock.module(new URL('../lib/api.ts', import.meta.url).href, { namedExports: { api: async () => { calls++; return reply() }, ApiError: FixtureApiError } })
