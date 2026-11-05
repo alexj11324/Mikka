@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "8608b63f522e6bbb8db8fc0caac7f606f17cf218",
+  "sourceTree": "ff973ac99fea66a4d97a757c1475103363fb21c4",
+  "ci": {
+    "runId": 41959959947,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/41959959947",
+    "jobId": 127023798232,
+    "job": "Database checks (2/4)",
+    "suite": "pnpm test:coordinator-issue-tools-db",
+    "visibleError": "40P01 deadlock detected",
+    "location": "tests/issue-tool-calls.db.test.ts:199",
+    "note": "Fixture cleanup raced pending dispatch work after Promise.all rejected. The production-build dependent gate rejected the failed suite before compilation."
+  },
+  "reproduction": {
+    "provider": "Docker Agentic Platform Cloud Sandbox",
+    "cpus": 8,
+    "memoryGiB": 16,
+    "postgres": 17,
+    "database": "mikka1284_issue_tools_04233661_e2e",
+    "command": "pnpm test:coordinator-issue-tools-db",
+    "result": "failed",
+    "primaryError": "timeout exceeded when trying to connect",
+    "observedFrames": [
+      "factory/dispatch.ts:63 pool.connect",
+      "factory/check-dispatch.ts:17",
+      "workflows/coordinator/steps.ts:79",
+      "Promise.all index 5",
+      "tests/issue-tool-calls.db.test.ts:175"
+    ],
+    "counts": {
+      "pass": 1,
+      "fail": 1,
+      "skip": 0
+    }
+  },
+  "cause": "Ten concurrent dispatches fill the existing request pool (max 5). An outer Factory transaction invokes Profile finalization, which unconditionally checks out another APP connection; the resulting timeout precedes cleanup deadlock.",
+  "repairScope": "Reuse the explicitly owned Factory client only for finalization and defer fresh membership acquisition/check to its actual COMMIT. Preserve independent model catalogue and Decision billing transactions, ten-way concurrency, strict replay, rollback and authorization.",
+  "status": "Initial exact-head CI failure retained; fix-forward work and new exact-head CI are separate evidence.",
+  "exclusions": {
+    "deepseekApi": "User-excluded; no balance probe or paid API test",
+    "testLocalLoop": "Not run because it uses the excluded DeepSeek route"
+  }
+}

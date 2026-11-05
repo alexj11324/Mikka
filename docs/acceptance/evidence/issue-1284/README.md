@@ -53,3 +53,14 @@ The follow-up batch includes #1307 UI changes. Nine manually inspected screensho
 The original #1307 screenshots predated that PR's final head and are historical only. These captures cover the integrated follow-up UI. Later backend-only commits may reuse this layout evidence only after the recorded 11 relevant source files are byte-identical; the screenshot source remains `8608b63`.
 
 CI for `8608b63` is not green: the real ten-way dispatch test exposed an additional pool checkout in Profile finalization. Docker reproduction confirmed the pool timeout precedes the cleanup deadlock. The batch remains unmerged while this transaction regression is repaired; the screenshots do not claim production acceptance.
+
+
+## #1313 first integrated verification and CI regression
+
+`8608b63` completed a clean full production build and 27/27 normal authenticated HTTP assertions. Profile PG 30/30 (including both 21-second planning waits), shared-subscription claims PG 28/28, related unit/component checks, schema/type/lint/diff gates passed. The two sanitized JSON receipts passed the existing credential/session evidence scanner. No suite totals are presented as a count of unique scenarios.
+
+- [Exact-source build, HTTP, cleanup and evidence audit](./isolated-8608b63f.json)
+- [Exact-source targeted gates](./gates-8608b63f.json)
+- [CI failure and independently reproduced connection-pool timeout](./ci-first-failure-8608b63f.json)
+
+These passing local checks do not override the failing CI concurrency suite. The same ten-way suite is the required regression for the fix-forward; later source and final CI evidence will be recorded separately. The original sandbox was resumed on 2026-11-05 after its configured one-hour deadline completed stopping; no substitute platform or new sandbox was used.

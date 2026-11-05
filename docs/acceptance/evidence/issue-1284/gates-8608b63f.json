@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "sha": "8608b63f522e6bbb8db8fc0caac7f606f17cf218",
+  "tree": "ff973ac99fea66a4d97a757c1475103363fb21c4",
+  "branch": "batch/20261105-1284-dispatch-ui",
+  "database": {
+    "name": "mikka1284_lease_514_e2e",
+    "kind": "isolated-local-PostgreSQL",
+    "urlRecorded": false
+  },
+  "configuration": {
+    "CI": true,
+    "REQUIRE_DB": true,
+    "syntheticFixturesOnly": true,
+    "providerInference": false
+  },
+  "startedAt": "2026-11-05T03:14:12.302993+00:00",
+  "status": "passed",
+  "worktreeBefore": "clean",
+  "gates": [
+    {
+      "id": "schema",
+      "category": "setup",
+      "command": "pnpm test:e2e:setup",
+      "log": "/tmp/issue1284-fix-8608-schema.log",
+      "startedAt": "2026-11-05T03:14:12.305697+00:00",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T03:14:14.425636+00:00",
+      "status": "passed"
+    },
+    {
+      "id": "agent-profile-db",
+      "category": "database",
+      "command": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/agent-profile.db.test.ts",
+      "log": "/tmp/issue1284-fix-8608-agent-profile-db.log",
+      "startedAt": "2026-11-05T03:14:14.429250+00:00",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T03:15:04.766566+00:00",
+      "counts": {
+        "tests": 30,
+        "pass": 30,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "status": "passed"
+    },
+    {
+      "id": "shared-subscription-claims",
+      "category": "database",
+      "command": "node --experimental-test-module-mocks --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/shared-subscription-runs.db.test.ts",
+      "log": "/tmp/issue1284-fix-8608-shared-subscription-claims.log",
+      "startedAt": "2026-11-05T03:15:04.785236+00:00",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T03:15:15.205288+00:00",
+      "counts": {
+        "tests": 28,
+        "pass": 28,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "status": "passed"
+    },
+    {
+      "id": "agent-profile-unit",
+      "category": "unit",
+      "command": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/agent-profile.test.ts",
+      "log": "/tmp/issue1284-fix-8608-agent-profile-unit.log",
+      "startedAt": "2026-11-05T03:15:15.209843+00:00",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T03:15:15.732025+00:00",
+      "counts": {
+        "tests": 8,
+        "pass": 8,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "status": "passed"
+    },
+    {
+      "id": "thread-identity-view-unit",
+      "category": "unit",
+      "command": "node --import tsx --test lib/thread-execution-identity-view.test.ts",
+      "log": "/tmp/issue1284-fix-8608-thread-identity-view-unit.log",
+      "startedAt": "2026-11-05T03:15:15.735665+00:00",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T03:15:15.996228+00:00",
+      "counts": {
+        "tests": 2,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "status": "passed"
+    },
+    {
+      "id": "thread-identity-component-unit",
+      "category": "unit",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/workspace/thread-execution-identity.test.tsx",
+      "log": "/tmp/issue1284-fix-8608-thread-identity-component-unit.log",
+      "startedAt": "2026-11-05T03:15:15.999519+00:00",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T03:15:16.827166+00:00",
+      "counts": {
+        "tests": 3,
+        "pass": 3,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "status": "passed"
+    },
+    {
+      "id": "types",
+      "category": "static",
+      "command": "pnpm typecheck",
+      "log": "/tmp/issue1284-fix-8608-types.log",
+      "startedAt": "2026-11-05T03:15:16.831440+00:00",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T03:15:17.630674+00:00",
+      "status": "passed"
+    },
+    {
+      "id": "lint",
+      "category": "static",
+      "command": "pnpm exec oxlint --deny-warnings lib/factory/agent-profile.ts lib/factory/agent-profile.db.test.ts lib/subscription-runtime.ts lib/factory/agent-profile.test.ts lib/thread-execution-identity-view.test.ts components/workspace/thread-execution-identity.test.tsx",
+      "log": "/tmp/issue1284-fix-8608-lint.log",
+      "startedAt": "2026-11-05T03:15:17.633850+00:00",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T03:15:17.994173+00:00",
+      "status": "passed"
+    },
+    {
+      "id": "diff-check",
+      "category": "static",
+      "command": "git diff --check",
+      "log": "/tmp/issue1284-fix-8608-diff-check.log",
+      "startedAt": "2026-11-05T03:15:17.997921+00:00",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T03:15:18.002827+00:00",
+      "status": "passed"
+    }
+  ],
+  "totals": {
+    "database": {
+      "tests": 58,
+      "pass": 58,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "unit": {
+      "tests": 13,
+      "pass": 13,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    }
+  },
+  "worktreeAfter": "clean",
+  "completedAt": "2026-11-05T03:15:18.013624+00:00"
+}
