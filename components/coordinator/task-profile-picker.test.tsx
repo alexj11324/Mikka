@@ -97,8 +97,13 @@ test('the shared form gate admits checking only for an existing enabled role and
     const selected = data.profiles[0]
     selected.enabled = false; render(selected.id)
     assert.equal(taskProfileSelectable(selected.id, data), false); assert.equal(optionDisabled(selected.id), true)
-    selected.enabled = true; selected.archivedAt = '2026-11-05T00:01:00Z'; render(selected.id)
+    assert.match(markup, /role="alert"[^>]*>reasons.disabled/)
+    selected.archivedAt = '2026-11-05T00:01:00Z'; render(selected.id)
     assert.equal(taskProfileSelectable(selected.id, data), false); assert.equal(optionDisabled(selected.id), true)
+    assert.match(markup, /role="alert"[^>]*>reasons.archived/, 'archive takes precedence even when disabled')
+    selected.enabled = true; render(selected.id)
+    assert.equal(taskProfileSelectable(selected.id, data), false); assert.equal(optionDisabled(selected.id), true)
+    assert.match(markup, /role="alert"[^>]*>reasons.archived/)
     assert.equal(taskProfileSelectable(randomUUID(), data), false)
   }
   for (const reason of ['quota', 'expired', 'paused', 'missing', 'noDevice', 'unknown_reason']) {
