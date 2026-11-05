@@ -59,3 +59,8 @@ export function computerLive(data: ComputerStatus | null, botId: string | null |
   const scope = data?.live?.workspaceId ?? null
   return { minIntervalMs: 500, deadline: data?.live?.deadline, refs: [{ kind: 'computer_state', id: botId && scope ? botId : UNRESOLVED_LIVE_ID, scope }] }
 }
+
+/** A group chat's page, on its workspace's channel (where its members' group_list arrives too). */
+export function groupChatLive(conversationId: string, workspaceId: string | null | undefined): Spec {
+  return { minIntervalMs: 1_000, refs: [{ kind: 'group_chat', id: workspaceId ? conversationId : UNRESOLVED_LIVE_ID, scope: workspaceId || null }] }
+}

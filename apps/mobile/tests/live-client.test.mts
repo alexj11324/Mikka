@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createLiveClient, LIVE_FALLBACK_MS, pendingActionsDeadline, UNRESOLVED_LIVE_ID, validTicket, type AppStateLike } from '../lib/live-client.ts'
-import { botPageLive, listRef, tasksLive, threadLive, threadsLive } from '../lib/live-keys.ts'
+import { botPageLive, groupChatLive, listRef, tasksLive, threadLive, threadsLive } from '../lib/live-keys.ts'
 import { LIVE_KINDS, type LiveKind } from '../../../lib/live/events.ts'
 
 const home = '19df8afd-0f8c-4c6b-bc9c-20df0b046a72'
@@ -205,6 +205,8 @@ test('screens listen to the keys the web uses, on the right channel', () => {
   ])
   const thread = threadLive({ live: { runs: [{ id: bot, workspaceId: team }] } } as never, bot)
   assert.deepEqual(thread.refs, [{ kind: 'thread', id: bot, scope: team }, { kind: 'run', id: bot, scope: team }])
+  assert.deepEqual(groupChatLive(bot, team).refs, [{ kind: 'group_chat', id: bot, scope: team }], 'a group page listens on its workspace channel')
+  assert.deepEqual(groupChatLive(bot, undefined).refs, [{ kind: 'group_chat', id: UNRESOLVED_LIVE_ID, scope: null }], 'an unknown workspace reads once a minute')
 })
 
 test('a short-lived proposal reads again when it expires', () => {
