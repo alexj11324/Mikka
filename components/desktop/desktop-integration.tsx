@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import useSWR from 'swr'
 
-import { listTaskRuns } from '@/app/actions/task-runs'
 import { listDevices } from '@/app/actions/agents'
 import { localSetupAction } from '@/lib/local-device-setup'
 import { getPreferences } from '@/app/actions/preferences'
@@ -12,9 +11,8 @@ import { chooseDesktopNotifications } from '@/app/actions/desktop-notifications'
 import { desktopRunUpdate, type DesktopRun } from '@/lib/platform/desktop-notifications'
 import { pushAllowed } from '@/lib/push-allowed'
 import { usePlatform } from '@/lib/platform/use-platform'
+import { useLiveTaskRunList } from '@/hooks/use-live-lists'
 import { openAppLink } from '@/components/workspace/workspace-navigation'
-
-const POLL_MS = 15_000
 
 function appHref(href: string): string | null {
   return href.startsWith('/') && !href.startsWith('//') ? href : null
@@ -29,41 +27,50 @@ function appHref(href: string): string | null {
  */
 export function DesktopIntegration({ userId }: { userId: string }) {
   const platform = usePlatform()
-  const desktop = platform.runtime === 'desktop'
+  // A web renderer never mounts the reader or its live subscription. Each
+  // signed-in owner also starts with their own notification baseline.
+  return platform.runtime === 'desktop' ? <DesktopSession key={userId} userId={userId} /> : null
+}
+
+function DesktopSession({ userId }: { userId: string }) {
   const router = useRouter()
-  const { data } = useSWR(
-    desktop ? 'task-runs' : null,
-    () => listTaskRuns(),
-    { refreshInterval: POLL_MS, shouldRetryOnError: false },
-  )
+  const { data } = useLiveTaskRunList(userId)
   // Same key as Settings › 通知, so a change there applies here at once.
-  const { data: preferences } = useSWR(desktop ? 'preferences' : null, getPreferences, { shouldRetryOnError: false })
+  const { data: preferences } = useSWR('preferences', getPreferences, { shouldRetryOnError: false })
   const finished = preferences !== undefined && pushAllowed(preferences, ['finished'])
   const previous = useRef<Map<string, DesktopRun['status']> | null>(null)
+  const lifetime = useRef(0)
+  useEffect(() => {
+    lifetime.current++
+    return () => { lifetime.current++ }
+  }, [])
 
   useEffect(() => {
-    if (!desktop || !data) return
+    if (!data) return
     const bridge = window.mikka
     if (!bridge) return
 
-    const update = desktopRunUpdate(previous.current, data, Date.now(), finished)
+    const update = desktopRunUpdate(previous.current, data.items, Date.now(), finished)
     previous.current = update.next
     void bridge.notifications.setBadge(update.badge).catch(() => {})
     if (!update.notifications.length) return
+    const generation = lifetime.current
     // The notification id is run:<issueId>:<kind>:<stamp>.
     void chooseDesktopNotifications(update.notifications.map(notification => ({ id: notification.id, issueId: notification.id.split(':')[1], kind: notification.kind })))
       .then(result => {
+        if (lifetime.current !== generation) return
         const show = new Set('show' in result && result.show ? result.show : [])
         for (const notification of update.notifications) if (show.has(notification.id)) void bridge.notifications.show(notification).catch(() => {})
       })
       .catch(() => {})
-  }, [data, desktop, finished])
+  }, [data, finished])
 
   useEffect(() => {
-    if (!desktop) return
     const bridge = window.mikka
     if (!bridge) return
+    let live = true
     const open = (href: string) => {
+      if (!live) return
       const target = appHref(href)
       if (target && !openAppLink(target)) router.push(target)
     }
@@ -71,14 +78,13 @@ export function DesktopIntegration({ userId }: { userId: string }) {
     void bridge.notifications.consumePendingClick()
       .then(href => { if (href) open(href) })
       .catch(() => {})
-    return unsubscribe
-  }, [desktop, router])
+    return () => { live = false; unsubscribe() }
+  }, [router])
 
   // Installing the app makes this computer a device (Alex, 2026-11-02): once per
   // signed-in account, when it is not yet one of mine and online, main installs or restarts
   // its daemon in the background. Progress shows on 设置 › 设备.
   useEffect(() => {
-    if (!desktop) return
     const bridge = window.mikka
     if (!bridge?.ssh?.autoLocal) return
     let live = true
@@ -89,7 +95,7 @@ export function DesktopIntegration({ userId }: { userId: string }) {
       })
       .catch(() => {})
     return () => { live = false }
-  }, [desktop, userId])
+  }, [userId])
 
   return null
 }
