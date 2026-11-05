@@ -185,8 +185,13 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.equal((await profiles.agentProfileDispatchAvailability(pool, f.scope, pinned, { deferStaleQuota: true })).available, false, 'provider failure memory wins over a positive old allowance')
     assert.equal(usageCalls.length, beforeUsage)
   })
-  const exercise = async (withProfiles: boolean, missingCodex: boolean, autoModelRouting = true, explicitDefault = false, parentMode: 'prepared' | 'metadata-only' = 'prepared') => {
+  const exercise = async (withProfiles: boolean, missingCodex: boolean, autoModelRouting = true, explicitDefault = false, parentMode: 'prepared' | 'metadata-only' = 'prepared', flowVersion: 1 | 2 = 2) => {
     const f = await fixture(withProfiles, missingCodex, false, explicitDefault ? 'default' : undefined), beforeDecisions = decisionCounts()
+    if (flowVersion === 1) {
+      // Persist the historical contract before any execution/check is queued.
+      await pool.query(`UPDATE factory_tasks SET route=route-'flowVersion' WHERE id=$1`, [f.task.id])
+      delete f.task.route.flowVersion
+    }
     const readParent = async () => (await pool.query(`
       SELECT to_jsonb(m) AS machine, to_jsonb(d) AS device
       FROM cloud_machines m
@@ -228,7 +233,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     await reconciler.run(f.ownerId, source.runId)
     const current = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0]
     assert.equal(current.stage, 'review', current.reason); assert.equal(current.status, 'running', current.reason)
-    assert.equal(current.route.flowVersion, 2)
+    assert.equal(current.route.flowVersion ?? 1, flowVersion)
     const attempt = (await pool.query('SELECT * FROM factory_attempts WHERE id=$1', [current.attemptId])).rows[0]
     const candidate = (await pool.query('SELECT * FROM factory_candidates WHERE id=$1', [current.candidateId])).rows[0]
     const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [attempt.runId])).rows[0]
@@ -256,7 +261,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       assert.equal(profileInput.currentWork.readOnly, true)
       assert.match(profileInput.currentWork.objective, /correctness and regressions/)
       assert.match(profileInput.currentWork.evidence, /implementation.*validation evidence/)
-      assert.match(profileInput.currentWork.evidence, /single review/)
+      if (flowVersion === 2) assert.match(profileInput.currentWork.evidence, /single review/)
       assert.deepEqual(profileInput.currentWork.candidate, { id: candidate.id, kind: candidate.kind, sha: candidate.sha })
       assert.equal(candidate.sha, null, 'a deliverable is not given a fabricated repository candidate SHA')
       assert.deepEqual(profileInput.currentWork.producer, { runId: source.runId, harness: 'claude_code', model: model.claude_code,
@@ -402,10 +407,362 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     await reconcile.run(f.ownerId, f.run.id)
     return { ...f, blocked: await f.store.read(f.ownerId, f.task.id) }
   }
+  const recheckCallsStart = decisionInputs.length
   const { createFactoryHumanStore } = await import('./human-store')
   const humanStore = (dispatch = automaticFactoryDispatch(pool)) => createFactoryHumanStore(pool, botId => createFactoryStore(pool,
     async (owner, issueId, tx) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [issueId, owner])).rowCount === 1,
     botId, { independent: factoryCheckIndependent, gates: factoryCheckGates }), dispatch)
+  const recheckCandidate = async (waiting: boolean, legacy = false) => {
+    const f = await exercise(true, false, false, false, 'prepared', 1)
+    const { reconcileFactoryCheck } = await import('./reconcile-check')
+    const { createFactoryQuestions } = await import('./questions/store')
+    const questions = createFactoryQuestions(pool,
+      async (owner, issue, tx) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [issue, owner])).rowCount === 1,
+      f.store, async () => { throw new Error('A recheck must never resume a native session') })
+    const reconcile = createFactoryReconciler(pool, f.store, questions, { review: reconcileFactoryCheck, verify: reconcileFactoryCheck }, f.botId, automaticFactoryDispatch(pool))
+    const complete = async (runId: string, question = false, failed = false) => {
+      const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0]
+      await pool.query(`UPDATE agent_runs SET status=$2,"stopReason"=$3,"startedAt"=now()-interval '1 second',"finishedAt"=now(),"leaseExpiresAt"=NULL,"sessionId"=$4,report=$5 WHERE id=$1`,
+        [runId, question ? 'stopped' : 'succeeded', question ? 'asked_human' : 'submitted', `independent-${runId}`, JSON.stringify({
+          summary: 'Actual synthetic adapter completion', filesChanged: [], verify: { status: 'not_run' },
+          check: { sha: run.baseBranch, readOnly: true }, criteria: [{ text: 'Inspect the delivered bytes', passed: !failed, evidence: 'The fixed candidate artifact was inspected' }],
+          ...(question ? { question: { questionId: randomUUID(), kind: 'decision', question: 'Which criterion should be inspected?', options: ['All acceptance criteria'] } } : {}),
+        })])
+      await reconcile.run(f.ownerId, runId)
+      return (await f.store.read(f.ownerId, f.task.id)).task
+    }
+    // The two historical checks intentionally have different frozen roles and sources.
+    decisionProfile = f.implement!.id
+    const verifyTask = await complete(f.run.id)
+    assert.equal(verifyTask.stage, 'verify'); assert.equal(verifyTask.status, 'running')
+    const verify = (await pool.query('SELECT r.* FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId" WHERE a.id=$1', [verifyTask.attemptId])).rows[0]
+    if (legacy) for (const runId of [f.run.id, verify.id]) {
+      const run = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0]
+      delete run.agentDefinition.agentProfile
+      run.agentDefinition.modelDispatch.mode = 'preference'
+      run.agentDefinition.definitionDigest = workerDefinitionDigest(run.agentDefinition)
+      await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [runId, JSON.stringify(run.agentDefinition)])
+    }
+    const current = await complete(verify.id, waiting)
+    assert.equal(current.stage, waiting ? 'verify' : 'approval'); assert.equal(current.status, waiting ? 'waiting' : 'pending')
+    const human = humanStore(), { handleFactory } = await import('./http')
+    const request = { userId: f.ownerId, taskId: f.task.id, method: 'POST', origin: 'https://app.example', url: `https://app.example/api/factory/tasks/${f.task.id}`,
+      body: { binding: { taskId: f.task.id, revision: current.revision }, eventId: randomUUID(), action: 'recheck', reason: 'Inspect every criterion again on this same candidate.' } }
+    return { ...f, current, verify, human, handleFactory, request, complete, reconcile, questions }
+  }
+  for (const state of ['waiting verify', 'pending approval', 'elapsed open', 'elapsed waiting_user', 'saved expired'] as const)
+    for (const legacy of [true, false]) await t.test(`Owner rechecks the same v1 candidate from ${state} (${legacy ? 'legacy frozen source' : 'Profile'})`, async () => {
+    const waiting = state !== 'pending approval', expired = state.startsWith('elapsed') || state === 'saved expired'
+    const f = await recheckCandidate(waiting, legacy)
+    if (expired) await pool.query(`UPDATE factory_questions SET status=$2,"expiresAt"=clock_timestamp()-interval '1 minute' WHERE "taskId"=$1`,
+      [f.task.id, state === 'saved expired' ? 'expired' : state === 'elapsed open' ? 'open' : 'waiting_user'])
+    const originalRuns = (await pool.query('SELECT * FROM agent_runs WHERE id=ANY($1::uuid[]) ORDER BY id', [[f.run.id, f.verify.id]])).rows
+    const originalAttempts = (await pool.query('SELECT * FROM factory_attempts WHERE "taskId"=$1 ORDER BY position', [f.task.id])).rows
+    const question = (await pool.query('SELECT * FROM factory_questions WHERE "taskId"=$1', [f.task.id])).rows[0]
+    const detail = await f.handleFactory(f.human, { ...f.request, method: 'GET' })
+    assert.deepEqual((detail.body as { candidateRecheck?: unknown }).candidateRecheck, { binding: f.request.body.binding })
+    if (question) assert.deepEqual((await pool.query('SELECT * FROM factory_questions WHERE id=$1', [question.id])).rows[0], question, 'GET never persists expiry or supersession')
+    const humanSessionId = randomUUID(), oldActor = { source: 'human' as const, userId: f.ownerId, sessionId: humanSessionId }
+    const oldReference = question && (await f.questions.read(f.ownerId, question.id)).reference
+    const rejectsExpiredAnswer = () => assert.rejects(f.questions.answer(oldActor, { reference: oldReference, answerId: randomUUID(), text: 'This old continuation must not resume.' }),
+      (error: unknown) => (error as { code?: string }).code === 'factoryQuestionExpired')
+    if (expired) {
+      await pool.query(`INSERT INTO "session" (id,"userId",token,"expiresAt","createdAt","updatedAt") VALUES ($1,$2,$3,now()+interval '1 hour',now(),now())`,
+        [humanSessionId, f.ownerId, `fixture-${randomUUID()}`])
+      await assert.rejects(f.questions.recover(oldActor, { requestId: randomUUID(), expectedFailedRunId: f.verify.id, reference: oldReference }),
+        (error: unknown) => (error as { code?: string }).code === 'factoryQuestionExpired')
+      await assert.rejects(f.questions.claimContinuation(f.ownerId, f.verify.deviceId, f.verify.id, new Date(Date.now() + 60_000).toISOString()),
+        (error: unknown) => (error as { code?: string }).code === 'factoryQuestionContinuationUnavailable')
+    }
+    // Changing present preferences cannot change either historical selection.
+    await pool.query('UPDATE model_order_settings SET "preferredHarness"=\'claude_code\' WHERE "ownerId"=$1 AND "workspaceId"=$2', [f.ownerId, f.workspaceId])
+    decisionProfile = f.implement!.id
+    const decisionsBefore = decisionCounts()
+    const [response, duplicate] = await Promise.all([f.handleFactory(f.human, f.request), f.handleFactory(f.human, f.request),
+      expired ? rejectsExpiredAnswer() : Promise.resolve()])
+    assert.equal(response.status, 200, JSON.stringify(response.body)); assert.deepEqual(duplicate, response)
+    const result = response.body as FactorySnapshot
+    assert.equal(result.task.stage, 'review'); assert.equal(result.task.status, 'running')
+    assert.equal(result.task.revision, f.current.revision + 2); assert.equal(result.task.candidateId, f.current.candidateId)
+    assert.equal(result.task.sourceEventId, f.current.sourceEventId)
+    const review = (await pool.query('SELECT r.* FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId" WHERE a.id=$1', [result.task.attemptId])).rows[0]
+    for (const key of ['harness', 'model', 'subscription', 'agentProfile', 'modelDispatch']) assert.deepEqual(review.agentDefinition[key], originalRuns.find(r => r.id === f.run.id).agentDefinition[key], key)
+    for (const key of ['sessionId', 'continuesRunId', 'retryOf', 'questionContinuation']) assert.equal(review[key], null, key)
+    const machine = (await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [review.id])).rows[0]
+    assert.equal(machine.state, 'starting'); assert.equal(machine.snapshotId, 'pending'); assert.equal(machine.sandboxId, null)
+    if (question) {
+      const after = (await pool.query('SELECT * FROM factory_questions WHERE id=$1', [question.id])).rows[0]
+      assert.equal(after.status, expired ? 'expired' : 'superseded')
+      for (const key of ['expiresAt', 'answerId', 'answerSource', 'answerSourceEventId', 'answerFingerprint', 'answeredAt', 'answer', 'result', 'continuationRunId']) assert.deepEqual(after[key], question[key], key)
+      assert.equal(after.revision, question.revision + (question.status === 'expired' ? 0 : 1))
+      if (question.status === 'expired') assert.deepEqual(after, question, 'a terminal expired question remains byte-for-byte unchanged')
+      const receipt = (await pool.query('SELECT request FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, f.request.body.eventId])).rows[0]
+      assert.deepEqual(receipt.request.questionDisposition, { id: question.id, revision: question.revision, fromStatus: question.status, toStatus: expired ? 'expired' : 'superseded' })
+      if (expired) await rejectsExpiredAnswer()
+    }
+    assert.deepEqual((await pool.query('SELECT * FROM factory_attempts WHERE id=ANY($1::uuid[]) ORDER BY position', [originalAttempts.map(a => a.id)])).rows, originalAttempts)
+    const next = await f.complete(review.id)
+    assert.equal(next.stage, 'verify'); assert.equal(next.status, 'running')
+    const verify = (await pool.query('SELECT r.* FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId" WHERE a.id=$1', [next.attemptId])).rows[0]
+    for (const key of ['harness', 'model', 'subscription', 'agentProfile', 'modelDispatch']) assert.deepEqual(verify.agentDefinition[key], originalRuns.find(r => r.id === f.verify.id).agentDefinition[key], key)
+    assert.notEqual(verify.id, review.id)
+    const verifyMachine = (await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [verify.id])).rows[0]
+    assert.equal(verifyMachine.state, 'starting'); assert.equal(verifyMachine.snapshotId, 'pending')
+    assert.notEqual(verifyMachine.operationId, machine.operationId, 'each independent run queues its own new thread machine')
+    const approved = await f.complete(verify.id)
+    assert.equal(approved.stage, 'approval'); assert.equal(approved.status, 'pending'); assert.equal(approved.candidateId, f.current.candidateId)
+    assert.deepEqual(decisionCounts(), decisionsBefore, 'neither check reselects a role or model')
+    assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE id=ANY($1::uuid[]) ORDER BY id', [[f.run.id, f.verify.id]])).rows, originalRuns)
+    assert.deepEqual(await f.handleFactory(f.human, f.request), response, 'the same Owner event replays without queuing another pair')
+    assert.equal((await f.handleFactory(f.human, { ...f.request, body: { ...f.request.body, reason: 'Different intent' } })).status, 409)
+  })
+  await t.test('Owner recheck rejects stale, stopped, answered, active and accepted state without changing historical evidence', async t => {
+    const f = await recheckCandidate(true, true)
+    const base = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0]
+    const question = (await pool.query('SELECT * FROM factory_questions WHERE "taskId"=$1', [f.task.id])).rows[0]
+    const mutations = [
+      ["UPDATE factory_tasks SET route=route || '{\"flowVersion\":2}' WHERE id=$1", [f.task.id]],
+      ["UPDATE factory_tasks SET revision=revision+1 WHERE id=$1", [f.task.id]],
+      ["UPDATE factory_tasks SET status='cancelled' WHERE id=$1", [f.task.id]],
+      ["UPDATE agent_runs SET \"leaseExpiresAt\"=now()+interval '1 minute' WHERE id=$1", [f.verify.id]],
+      ["UPDATE agent_runs SET status='running' WHERE id=$1", [f.verify.id]],
+      ["UPDATE factory_questions SET status='answered',\"answerId\"=$2 WHERE id=$1", [question.id, randomUUID()]],
+      ["UPDATE factory_questions SET status='blocked',\"answerId\"=$2 WHERE id=$1", [question.id, randomUUID()]],
+      ["UPDATE factory_questions SET status='expired',\"expiresAt\"=NULL WHERE id=$1", [question.id]],
+      ["UPDATE factory_questions SET status='expired',\"expiresAt\"=now()+interval '1 minute' WHERE id=$1", [question.id]],
+      ["UPDATE factory_questions SET status='expired',\"expiresAt\"=now()-interval '1 minute',\"originSessionId\"='wrong-session' WHERE id=$1", [question.id]],
+      ["UPDATE factory_questions SET status='expired',\"expiresAt\"=now()-interval '1 minute',\"answerSource\"='human' WHERE id=$1", [question.id]],
+      ["UPDATE factory_questions SET status='expired',\"expiresAt\"=now()-interval '1 minute',\"answerFingerprint\"='partial-answer' WHERE id=$1", [question.id]],
+      ["UPDATE factory_questions SET status='expired',\"expiresAt\"=now()-interval '1 minute',\"answerSourceEventId\"=$2 WHERE id=$1", [question.id, randomUUID()]],
+      ["UPDATE factory_questions SET status='expired',\"expiresAt\"=now()-interval '1 minute',\"answeredAt\"=now() WHERE id=$1", [question.id]],
+      ["UPDATE factory_questions SET status='expired',\"expiresAt\"=now()-interval '1 minute',answer='{}' WHERE id=$1", [question.id]],
+      ["UPDATE factory_questions SET status='expired',\"expiresAt\"=now()-interval '1 minute',result='{}' WHERE id=$1", [question.id]],
+      ["UPDATE factory_questions SET status='expired',\"expiresAt\"=now()-interval '1 minute',\"continuationRunId\"=$2 WHERE id=$1", [question.id, f.verify.id]],
+      ['UPDATE factory_questions SET "waitingBinding"=jsonb_set("waitingBinding",\'{revision}\',to_jsonb($2::int)) WHERE id=$1', [question.id, base.revision + 1]],
+      ['UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1', [f.verify.id, JSON.stringify({ questionId: question.id })]],
+      ['UPDATE factory_attempts SET output=jsonb_set(output,\'{check,requestEpoch}\',to_jsonb($2::text)) WHERE id=$1', [f.attempt.id, randomUUID()]],
+      ['INSERT INTO factory_deliverable_acceptances (id,"taskId","candidateId","userId","sessionId","eventId") VALUES ($1,$2,$3,$4,\'synthetic\',$5)', [randomUUID(), f.task.id, base.candidateId, f.ownerId, randomUUID()]],
+    ] as const
+    for (const [sql, values] of mutations) await t.test(sql, async () => {
+      const tx = await pool.connect()
+      try {
+        await tx.query('BEGIN'); await tx.query(sql, [...values])
+        const { candidateRecheckForRecovery } = await import('./candidate-recheck')
+        const current = (await tx.query('SELECT * FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0]
+        assert.equal(await candidateRecheckForRecovery(tx, current, true), null)
+      } finally { await tx.query('ROLLBACK'); tx.release() }
+    })
+    assert.equal((await f.handleFactory(f.human, { ...f.request, userId: null })).status, 401)
+    assert.equal((await f.handleFactory(f.human, { ...f.request, origin: 'https://other.example' })).status, 403)
+    assert.equal((await f.handleFactory(f.human, { ...f.request, userId: await seedUser(pool, 'foreign-recheck') })).status, 404)
+    assert.equal((await f.handleFactory(f.human, { ...f.request, body: { ...f.request.body, binding: { ...f.request.body.binding, revision: base.revision - 1 } } })).status, 409)
+  })
+  await t.test('Owner recheck refuses an expiry crossing preflight and the locked write, then accepts a fresh exact request', async () => {
+    const f = await recheckCandidate(true, true)
+    const question = (await pool.query('SELECT * FROM factory_questions WHERE "taskId"=$1', [f.task.id])).rows[0]
+    await pool.query(`UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',to_jsonb((now()-interval '94 seconds')::text)) WHERE "ownerId"=$1`, [f.ownerId])
+    await pool.query(`UPDATE factory_questions SET "expiresAt"=clock_timestamp()+interval '2 seconds' WHERE id=$1`, [question.id])
+    const before = (await pool.query('SELECT * FROM factory_questions WHERE id=$1', [question.id])).rows[0]
+    const oldProbe = usageProbe
+    let crossed = false
+    usageProbe = async (owner, connection) => {
+      assert.equal(owner, f.ownerId)
+      if (!crossed) {
+        crossed = true
+        assert.equal((await pool.query('SELECT "expiresAt">clock_timestamp() AS fresh FROM factory_questions WHERE id=$1', [question.id])).rows[0].fresh, true)
+        await pool.query('SELECT pg_sleep(GREATEST(0,extract(epoch FROM ("expiresAt"-clock_timestamp())))+0.02) FROM factory_questions WHERE id=$1', [question.id])
+      }
+      await pool.query(`UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',to_jsonb(now()::text)) WHERE id=$1 AND "ownerId"=$2`, [connection, owner])
+    }
+    try {
+      const response = await f.handleFactory(f.human, f.request)
+      assert.equal(crossed, true); assert.equal(response.status, 409); assert.deepEqual(response.body, { error: 'factoryStale' })
+    } finally { usageProbe = oldProbe }
+    assert.deepEqual((await pool.query('SELECT * FROM factory_questions WHERE id=$1', [question.id])).rows[0], before)
+    assert.deepEqual((await f.store.read(f.ownerId, f.task.id)).task, f.current)
+    assert.equal((await pool.query('SELECT 1 FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, f.request.body.eventId])).rowCount, 0)
+    assert.equal((await f.handleFactory(f.human, f.request)).status, 200, 'no failed preflight event or answer is forged; the Owner can read and retry')
+    const after = (await pool.query('SELECT * FROM factory_questions WHERE id=$1', [question.id])).rows[0]
+    assert.equal(after.status, 'expired'); assert.deepEqual(after.expiresAt, before.expiresAt); assert.equal(after.answerId, null); assert.equal(after.result, null)
+  })
+  await t.test('a failed Owner recheck keeps its candidate and original verdict, with no automatic repair or alternate model', async () => {
+    const f = await recheckCandidate(false, true)
+    const response = await f.handleFactory(f.human, f.request)
+    assert.equal(response.status, 200)
+    const result = response.body as FactorySnapshot
+    const attempt = result.attempts.find(a => a.id === result.task.attemptId)!
+    const decisionsBefore = decisionCounts()
+    const failed = await f.complete(attempt.runId!, false, true)
+    assert.equal(failed.stage, 'review'); assert.equal(failed.status, 'failed'); assert.equal(failed.candidateId, f.current.candidateId)
+    assert.deepEqual(decisionCounts(), decisionsBefore)
+    assert.equal((await pool.query('SELECT count(*)::int n FROM factory_attempts WHERE "taskId"=$1 AND stage=\'execute\'', [f.task.id])).rows[0].n, 1)
+  })
+  for (const stage of ['review', 'verify'] as const) for (const quota of [false, true]) await t.test(`Owner ${stage} keeps its exact legacy subscription after ${quota ? 'quota exhaustion' : 'provider failure'}`, async () => {
+    const f = await recheckCandidate(false, true)
+    const response = await f.handleFactory(f.human, f.request)
+    assert.equal(response.status, 200)
+    let task = (response.body as FactorySnapshot).task
+    if (stage === 'verify') task = await f.complete((response.body as FactorySnapshot).attempts.find(a => a.id === task.attemptId)!.runId!)
+    const run = (await pool.query('SELECT r.* FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId" WHERE a.id=$1', [task.attemptId])).rows[0]
+    assert.equal(run.agentDefinition.modelDispatch.mode, 'preference')
+    assert.equal(run.agentDefinition.agentProfile, undefined)
+    // Both another healthy official subscription and an API source are offered.
+    // No key is opened and no provider call is made in this real SQL fixture.
+    const keyId = randomUUID()
+    await pool.query(`INSERT INTO model_api_keys (id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4,models)
+      VALUES ($1,$2,'openai','openai','synthetic-unopened','synthetic-unopened',1,'test',$3)`, [keyId, f.ownerId, JSON.stringify([model.codex])])
+    await pool.query(`INSERT INTO model_order_entries (id,"ownerId","workspaceId",position,harness,model,"sourceKind","sourceId")
+      VALUES ($1,$2,$3,2,'codex',$4,'api_key',$5)`, [randomUUID(), f.ownerId, f.workspaceId, model.codex, keyId])
+    const { emptyRunReport } = await import('@mikka/protocol/run')
+    const { recoverProviderFailure, pendingProviderFallback, providerCompletion } = await import('../run-provider-fallback')
+    const completion = providerCompletion(run, { stopReason: quota ? 'quota_exhausted' : 'provider_failure', report: {
+      ...emptyRunReport('Synthetic adapter provider failure'), check: { sha: run.baseBranch, readOnly: true },
+      ...(!quota ? { providerFailure: { kind: 'unavailable' as const, retryable: true as const, code: 'rate_limit' as const } } : {}),
+    } })
+    const report = { ...completion.report, modelFallback: pendingProviderFallback(run, completion.report!.providerFailure!) }
+    await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='provider_failure',"startedAt"=now()-interval '1 second',
+      "finishedAt"=now(),"leaseExpiresAt"=NULL,"sessionId"=$2,report=$3 WHERE id=$1`, [run.id, `independent-${run.id}`, JSON.stringify(report)])
+    const beforeRuns = (await pool.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [f.issueId])).rows
+    const beforeBindings = (await pool.query('SELECT id FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [f.ownerId])).rows
+    const beforeDecisions = decisionCounts(), beforeUsage = usageCalls.length
+    assert.equal(await recoverProviderFailure(pool, f.ownerId, run.id), null)
+    assert.equal(await recoverProviderFailure(pool, f.ownerId, run.id), null, 'a repeated completion cannot plan an alternate')
+    assert.deepEqual((await pool.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [f.issueId])).rows, beforeRuns)
+    assert.deepEqual((await pool.query('SELECT id FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [f.ownerId])).rows, beforeBindings)
+    assert.deepEqual(decisionCounts(), beforeDecisions); assert.equal(usageCalls.length, beforeUsage)
+    const failed = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [run.id])).rows[0]
+    assert.deepEqual(failed.agentDefinition, run.agentDefinition)
+    assert.equal(failed.report.modelFallback.state, 'picked')
+    assert.equal(failed.report.modelFallback.retryRunId, undefined)
+    // Even a separately queued, otherwise valid host provider receipt cannot
+    // adopt another subscription/API source into this Owner's frozen round.
+    const tx = await pool.connect()
+    try {
+      await tx.query('BEGIN')
+      const { readOrder } = await import('../model-order')
+      const entries = (await readOrder(tx, f.scope)).entries
+      const target = entries.find(entry => quota ? entry.source.kind === 'api_key'
+        : entry.source.kind === 'subscription' && entry.harness !== run.agentDefinition.harness)!
+      assert.ok(target)
+      const subscriptionBindingId = target.source.kind === 'subscription'
+        ? await bindAgentToConnection(tx, f.scope, f.agents[target.harness], target.harness, target.source.connectionId, target.model) : undefined
+      const queued = await queueCloudRun(pool, f.actor, { botId: f.botId, issueId: f.issueId, agentId: f.agents[target.harness], deviceRepoId: f.repoId,
+        title: 'Synthetic inadmissible provider continuation', body: 'Isolated transaction; never started', model: target.model,
+        modelDispatch: { mode: 'preference', location: 'cloud', entry: target }, readOnly: true, sourceEventId: f.sourceEventId,
+        ...(subscriptionBindingId ? { subscriptionBindingId } : {}), ...(target.source.kind === 'api_key' ? { apiKeyId: target.source.keyId } : {}),
+      }, tx)
+      const child = (await tx.query('SELECT * FROM agent_runs WHERE id=$1', [queued.runId])).rows[0]
+      const { providerContinuationDefinition, providerContinuationMatches, providerContinuationLaunchMatches } = await import('../run-provider-fallback')
+      const prompt = (await import('../run-retry')).providerContinuationPrompt(run.prompt)
+      const definition = providerContinuationDefinition(run.agentDefinition, child.agentDefinition, prompt)
+      definition.executionIdentity = await (await import('../execution-identity')).freezeExecutionIdentity(tx, { ...child, agentDefinition: definition }, undefined, f.workspaceId)
+      await tx.query('UPDATE agent_runs SET "retryOf"=$2,kind=$3,"baseBranch"=$4,prompt=$5,"agentDefinition"=$6 WHERE id=$1',
+        [child.id, run.id, run.kind, run.baseBranch, prompt, JSON.stringify(definition)])
+      await tx.query(`UPDATE agent_runs SET report=jsonb_set(report,'{modelFallback}',$2::jsonb) WHERE id=$1`, [run.id, JSON.stringify({
+        ...failed.report.modelFallback, state: 'switched', to: { harness: target.harness, model: target.model, source: target.source.kind },
+        retryRunId: child.id, nextDefinitionDigest: definition.definitionDigest,
+      })])
+      const prior = (await tx.query('SELECT * FROM agent_runs WHERE id=$1', [run.id])).rows[0]
+      const next = (await tx.query('SELECT * FROM agent_runs WHERE id=$1', [child.id])).rows[0]
+      assert.equal(providerContinuationMatches(prior, next), true, 'the ordinary host continuation contract is otherwise valid')
+      assert.equal(await providerContinuationLaunchMatches(tx, prior, next), false, 'launch still requires the Owner round source')
+      await assert.rejects(f.store.apply(f.ownerId, factoryBinding(task), randomUUID(), { action: 'adopt_retry', runId: child.id, reason: 'Synthetic forbidden source change' }, tx),
+        (error: unknown) => (error as { code?: string }).code === 'factoryRunMismatch')
+    } finally { await tx.query('ROLLBACK'); tx.release() }
+    await f.reconcile.run(f.ownerId, run.id)
+    const current = (await f.store.read(f.ownerId, f.task.id)).task
+    assert.equal(current.stage, stage); assert.equal(current.status, 'blocked'); assert.equal(current.candidateId, f.current.candidateId)
+    assert.equal((await pool.query('SELECT count(*)::int n FROM factory_attempts WHERE "taskId"=$1 AND stage=\'execute\'', [f.task.id])).rows[0].n, 1)
+  })
+  await t.test('a lost Owner response does not restart a committed check, and normal retry keeps its frozen round after startup failure', async () => {
+    const f = await recheckCandidate(true, true)
+    const response = await f.handleFactory(f.human, f.request)
+    assert.equal(response.status, 200)
+    const result = response.body as FactorySnapshot, attempt = result.attempts.find(a => a.id === result.task.attemptId)!
+    const queued = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [attempt.runId])).rows[0]
+    const beforeHandoffs = handoffs.length
+    // Exact terminal metadata written by failFactoryCloudStage when enqueue
+    // fails before claim; this is not a Profile refusal or a native resume.
+    await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='device_lost',error='Cloud stage handoff could not be queued',
+      "finishedAt"=now(),"updatedAt"=now() WHERE id=$1`, [queued.id])
+    await f.reconcile.run(f.ownerId, queued.id)
+    const blocked = (await f.store.read(f.ownerId, f.task.id)).task
+    assert.equal(blocked.stage, 'review'); assert.equal(blocked.status, 'blocked')
+    assert.deepEqual(await f.handleFactory(f.human, f.request), response)
+    assert.equal(handoffs.length, beforeHandoffs, 'replaying the committed Owner event never starts or creates a second run')
+    const retried = await f.handleFactory(f.human, { ...f.request, body: { action: 'retry', reason: 'Retry the unstarted check',
+      eventId: randomUUID(), binding: { taskId: blocked.id, revision: blocked.revision } } })
+    assert.equal(retried.status, 200)
+    const pending = (retried.body as FactorySnapshot).task
+    assert.equal(pending.stage, 'review'); assert.equal(pending.status, 'pending'); assert.equal(pending.candidateId, f.current.candidateId)
+    const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('./transaction')
+    const tx = await pool.connect()
+    try {
+      await beginFactoryTransaction(tx)
+      const start = await automaticFactoryDispatch(pool)(tx, f.store, pending, queued)
+      await commitFactoryTransaction(tx)
+      await start?.()
+    } catch (error) { await rollbackFactoryTransaction(tx); throw error }
+    finally { forgetFactoryTransaction(tx); tx.release() }
+    const next = (await pool.query('SELECT r.* FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" JOIN agent_runs r ON r.id=a."runId" WHERE t.id=$1', [f.task.id])).rows[0]
+    assert.notEqual(next.id, queued.id)
+    for (const key of ['harness', 'model', 'subscription', 'agentProfile', 'modelDispatch']) assert.deepEqual(next.agentDefinition[key], queued.agentDefinition[key], key)
+    for (const key of ['sessionId', 'retryOf', 'continuesRunId', 'questionContinuation']) assert.equal(next[key], null, key)
+    assert.equal((await f.store.read(f.ownerId, f.task.id)).task.candidateId, f.current.candidateId)
+  })
+  for (const expired of [false, true]) await t.test(`same-candidate Owner receipt failure rolls back question ${expired ? 'expiry' : 'supersession'}, queue and task together`, async () => {
+    const f = await recheckCandidate(true, true)
+    if (expired) await pool.query(`UPDATE factory_questions SET status='waiting_user',"expiresAt"=now()-interval '1 minute' WHERE "taskId"=$1`, [f.task.id])
+    const rows = async () => ({
+      task: (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [f.task.id])).rows,
+      attempts: (await pool.query('SELECT * FROM factory_attempts WHERE "taskId"=$1 ORDER BY position', [f.task.id])).rows,
+      questions: (await pool.query('SELECT * FROM factory_questions WHERE "taskId"=$1 ORDER BY id', [f.task.id])).rows,
+      runs: (await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [f.issueId])).rows,
+    })
+    const before = await rows()
+    await pool.query(`CREATE FUNCTION reject_recheck_receipt() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic Owner recheck receipt failure'; END $$;
+      CREATE TRIGGER reject_recheck_receipt BEFORE INSERT ON factory_events FOR EACH ROW
+      WHEN (NEW.request->>'kind'='owner_candidate_recheck') EXECUTE FUNCTION reject_recheck_receipt()`)
+    try { await assert.rejects(f.handleFactory(f.human, f.request), /synthetic Owner recheck receipt failure/) }
+    finally { await pool.query('DROP TRIGGER reject_recheck_receipt ON factory_events; DROP FUNCTION reject_recheck_receipt()') }
+    assert.deepEqual(await rows(), before)
+    await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [f.connections.codex])
+    assert.equal((await f.handleFactory(f.human, f.request)).status, 409)
+    assert.deepEqual(await rows(), before, 'source refusal never consumes the waiting question')
+  })
+  await t.test('a missing exact verify source in the Owner receipt cannot fall back to current preferences', async () => {
+    const f = await recheckCandidate(false, true)
+    const response = await f.handleFactory(f.human, f.request)
+    assert.equal(response.status, 200)
+    const result = response.body as FactorySnapshot, review = result.attempts.find(a => a.id === result.task.attemptId)!
+    await pool.query(`UPDATE factory_events SET request=jsonb_set(request,'{sources,verify,runId}',to_jsonb($3::text)) WHERE "taskId"=$1 AND "eventId"=$2`, [f.task.id, f.request.body.eventId, randomUUID()])
+    const before = decisionCounts()
+    const blocked = await f.complete(review.runId!)
+    assert.equal(blocked.stage, 'review'); assert.equal(blocked.status, 'blocked'); assert.equal(blocked.candidateId, f.current.candidateId)
+    assert.equal((await pool.query('SELECT count(*)::int n FROM factory_attempts WHERE "taskId"=$1 AND stage=\'verify\'', [f.task.id])).rows[0].n, 1)
+    assert.deepEqual(decisionCounts(), before)
+  })
+  for (const exhausted of [false, true]) await t.test(`Owner recheck discovers a stale allowance without probing and re-admits official ${exhausted ? 'exhaustion' : 'availability'} only on POST`, async () => {
+    const f = await recheckCandidate(true, true), oldProbe = usageProbe
+    await pool.query(`UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',to_jsonb((now()-interval '94 seconds')::text)) WHERE "ownerId"=$1`, [f.ownerId])
+    const beforeCalls = usageCalls.length
+    assert.ok((await f.handleFactory(f.human, { ...f.request, method: 'GET' })).body &&
+      (await f.human.read(f.ownerId, f.task.id)).candidateRecheck)
+    assert.equal(usageCalls.length, beforeCalls)
+    usageProbe = async (owner, connection) => {
+      assert.equal(owner, f.ownerId)
+      await pool.query(`UPDATE byos_connections SET quota=jsonb_set(jsonb_set(quota,'{observedAt}',to_jsonb(now()::text)),'{windows,0,used}',$3::jsonb) WHERE id=$1 AND "ownerId"=$2`, [connection, owner, exhausted ? '1' : '0.1'])
+    }
+    try {
+      const response = await f.handleFactory(f.human, f.request)
+      assert.equal(response.status, exhausted ? 409 : 200, JSON.stringify(response.body))
+      assert.ok(usageCalls.length > beforeCalls)
+      const current = (await f.store.read(f.ownerId, f.task.id)).task
+      assert.equal(current.stage, exhausted ? 'verify' : 'review'); assert.equal(current.status, exhausted ? 'waiting' : 'running')
+      if (exhausted) assert.equal((await pool.query('SELECT status FROM factory_questions WHERE "taskId"=$1', [f.task.id])).rows[0].status, 'open')
+    } finally { usageProbe = oldProbe }
+  })
+  const recheckCallsEnd = decisionInputs.length
   const unsubmittedReview = async (snapshot = false) => {
     const f = await exercise(false, false, false)
     // The daemon boundary is synthetic; queue, immutable completion receipt,
@@ -1257,7 +1614,9 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       assert.equal((await pool.query('SELECT 1 FROM byos_native_runs WHERE "runId"=$1', [f.runId])).rowCount, 0)
     })
   }
-  assert.deepEqual(decisionInputs.map(call => call.purpose), ['factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'task-model-routing', 'factory-agent-profile', 'task-model-routing',
+  // Recheck fixtures independently assert their initial role selection and
+  // the absence of any new Decision during the frozen review/verify round.
+  assert.deepEqual([...decisionInputs.slice(0, recheckCallsStart), ...decisionInputs.slice(recheckCallsEnd)].map(call => call.purpose), ['factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'task-model-routing', 'factory-agent-profile', 'task-model-routing',
     'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile'])
   // Validate captured inputs outside the transport: model routing intentionally
   // catches transport errors, which must not swallow a privacy assertion.

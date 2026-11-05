@@ -194,6 +194,13 @@ export async function assertProfileTarget(query: ProfileQuery, scope: AgentProfi
   if (selection.scope?.ownerId !== scope.ownerId || selection.scope?.workspaceId !== scope.workspaceId) throw new AgentProfileError('agentProfileScopeNotFound', 404)
   const definition = selection.definition, entry = selection.targetEntry
   if (!entry || (definition.harness !== 'auto' && definition.harness !== entry.harness) || (definition.model.mode === 'fixed' && entryKey(definition.model) !== entryKey(entry))) throw new AgentProfileError('agentProfilePinConflict')
+  await assertFrozenModelTarget(query, scope, entry)
+}
+
+/** The same source fence also serves historical runs that predate Profiles.
+ * This validates one frozen entry; it never selects another role or model. */
+export async function assertFrozenModelTarget(query: ProfileQuery, scope: AgentProfileScope, entry: OrderEntry): Promise<void> {
+  validateProfileScope(scope)
   const candidates = await orderCandidates(query, scope)
   if (!candidates.some(candidate => entryKey(candidate) === entryKey(entry))) throw new AgentProfileError('agentProfileModelUnavailable')
   // Pin the source's current authorization row against a concurrent disconnect/delete.

@@ -434,22 +434,29 @@ export function factoryBlockedCheckAssignment(tx: Pick<PoolClient, "query">, use
   return readFactoryCheckAssignment(tx, userId, runId, "blocked");
 }
 
+/** Host-only source validation for an Owner's new independent check. It cannot
+ * claim the historical run or relax the current-attempt fence used above. */
+export function historicalFactoryCheckAssignment(tx: Pick<PoolClient, "query">, task: FactoryTask, attemptId: string, runId: string) {
+  return readFactoryCheckAssignment(tx, task.userId, runId, null, { taskId: task.id, attemptId, candidateId: task.candidateId, sourceEventId: task.sourceEventId });
+}
+
 async function readFactoryCheckAssignment(
   tx: Pick<PoolClient, "query">,
   userId: string,
   runId: string,
-  status: "running" | "waiting" | "blocked",
+  status: "running" | "waiting" | "blocked" | null,
+  historical?: { taskId: string; attemptId: string; candidateId: string | null; sourceEventId: string },
 ) {
   const {
     rows: [row],
   } = await tx.query(
-    `SELECT t.id AS "taskId",t."issueId",t.stage,t.status,t."sourceEventId",t."candidateId",a.output,r."baseBranch",r.kind,r."deviceRepoId",r."deviceId",r."retryOf",r."stopRequestedAt",r."botId",t."botId" AS "taskBotId",a.status AS "attemptStatus",a."candidateId" AS "attemptCandidateId",c.repository,c.kind AS "candidateKind",${reportedCandidateShaSql()} AS sha,c.environment,repo."remoteUrl",repo."repoPath"
-     FROM factory_attempts a JOIN factory_tasks t ON t."attemptId"=a.id
+    `SELECT t.id AS "taskId",t."issueId",${historical ? 'a.stage,a.status' : 't.stage,t.status'},t."sourceEventId",t."candidateId",a.output,r."baseBranch",r.kind,r."deviceRepoId",r."deviceId",r."retryOf",r."stopRequestedAt",r."botId",t."botId" AS "taskBotId",a.status AS "attemptStatus",a."candidateId" AS "attemptCandidateId",c.repository,c.kind AS "candidateKind",${reportedCandidateShaSql()} AS sha,c.environment,repo."remoteUrl",repo."repoPath"
+     FROM factory_attempts a JOIN factory_tasks t ON ${historical ? 't.id=a."taskId" AND t.id=$3 AND a.id=$4 AND t."candidateId"=$5 AND t."sourceEventId"=$6' : 't."attemptId"=a.id'}
      JOIN agent_runs r ON r.id=a."runId" JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id
      JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$2
      JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=t."userId" AND repo."deviceId"=r."deviceId"
      WHERE r.id=$1 AND t."userId"=$2 AND r."userId"=$2 AND r."issueId"=t."issueId"`,
-    [runId, userId],
+    historical ? [runId, userId, historical.taskId, historical.attemptId, historical.candidateId, historical.sourceEventId] : [runId, userId],
   );
   if (row) row.sha = await resolveFactoryCandidateSha(tx, { id: row.taskId, userId, issueId: row.issueId }, { id: row.candidateId, kind: row.candidateKind }, row.sha);
   const check = row?.output?.check;
@@ -457,16 +464,17 @@ async function readFactoryCheckAssignment(
   if (
     !row ||
     !["review", "verify"].includes(row.stage) ||
-    row.status !== status ||
+    (historical ? !["passed", "waiting", "blocked", "failed"].includes(row.status) : row.status !== status) ||
     row.kind !== "acceptance" ||
     row.retryOf ||
     row.stopRequestedAt ||
     !(await factoryRunBotMatches(tx, { userId, botId: row.taskBotId }, { id: runId, botId: row.botId })) ||
-    row.attemptStatus !== status ||
+    row.attemptStatus !== row.status ||
     row.attemptCandidateId !== row.candidateId ||
     check?.stage !== row.stage ||
     (check?.requestEpoch != null && check.requestEpoch !== row.sourceEventId) ||
     (row.output?.requestEpoch != null && row.output.requestEpoch !== row.sourceEventId) ||
+    (historical && (check?.requestEpoch !== historical.sourceEventId || row.output?.requestEpoch !== historical.sourceEventId)) ||
     check?.candidateId !== row.candidateId ||
     check?.sha !== row.sha ||
     check?.repository !== row.repository ||

@@ -15,7 +15,7 @@ import type { PublicationEnvironment } from '@/lib/factory/vercel-target'
 import { acceptanceState, mergeAcceptance, type AcceptanceMerge, type AcceptanceState } from '@/lib/factory/acceptance-state'
 import { canReject, closedReject, rejectFlow } from '@/lib/factory/reject-flow'
 import { evidenceEntries, orderEvidence, type EvidenceEntry } from '@/lib/factory/evidence-view'
-import { bareUrl, candidateCheckRetry, candidateCheckRetryConfirmed, candidateCheckState, criterionGroups, pullNumber, resultRows, type AcceptanceDetail, type CriterionGroup, type ResultRow } from '@/lib/factory/acceptance-view'
+import { bareUrl, candidateCheckRetry, candidateCheckRetryConfirmed, candidateCheckState, candidateRecheck, candidateRecheckConfirmed, criterionGroups, pullNumber, resultRows, type AcceptanceDetail, type CriterionGroup, type ResultRow } from '@/lib/factory/acceptance-view'
 import { CriterionEvidence, EvidenceViewer } from './factory-evidence'
 import { ApprovalBar } from './factory-approval-bar'
 import { RejectNote } from './factory-reject-note'
@@ -232,6 +232,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   const pullRequestUrl = detail?.delivery?.pullRequest?.url ?? null
   const refusal = state === 'pending' ? refused ?? derived.refusal ?? null : null
   const retryCheck = candidateCheckRetry(task, detail, ledger?.binding)
+  const recheck = candidateRecheck(task, detail, ledger?.binding)
 
   async function run(operation: 'approve' | 'publish' | 'reconcile' | 'revoke', input: Record<string, unknown>) {
     setBusy(true); setError(null)
@@ -260,7 +261,8 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
     }
   }
 
-  async function retryCandidateCheck() {
+  async function retryCandidateCheck(rechecking = false) {
+    const retryCheck = rechecking ? recheck : candidateCheckRetry(task, detail, ledger?.binding)
     if (!retryCheck || retrying.current || busy) return
     retrying.current = true; setBusy(true); setError(null); setCheckError(null)
     // A lost response keeps this event id. Only a later explicit click on a
@@ -270,8 +272,10 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
     setCheckRequest(submission)
     try {
       const result = await request(`/api/factory/tasks/${task.id}`, { binding: retryCheck.binding, eventId: submission.eventId,
-        action: 'retry', reason: submission.reason })
-      if (!candidateCheckRetryConfirmed({ ...task, route: detail?.task?.route }, result, detail?.checkStartRecovery, detail?.checkDispatchRecovery, detail?.checkSubmissionRecovery)) setCheckError({ key: retryCheck.key, unknown: true })
+        action: rechecking ? 'recheck' : 'retry', reason: submission.reason })
+      const confirmed = rechecking ? candidateRecheckConfirmed(task, result)
+        : candidateCheckRetryConfirmed({ ...task, route: detail?.task?.route }, result, detail?.checkStartRecovery, detail?.checkDispatchRecovery, detail?.checkSubmissionRecovery)
+      if (!confirmed) setCheckError({ key: retryCheck.key, unknown: true })
     } catch (caught) {
       setCheckError({ key: retryCheck.key, unknown: !(caught instanceof RequestError) || caught.status >= 500 })
     } finally {
@@ -365,13 +369,17 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       {check?.status === 'blocked' && currentTask.reason && <RunErrorDetails code={currentTask.reason} />}
       {!check && state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
       {error && <FieldError className="text-xs">{t(ERROR_KEYS[error] ?? 'error')}</FieldError>}
-      {retryCheck && checkError?.key === retryCheck.key && <FieldError className="text-xs">{t(checkError.unknown ? 'checkRetryUnknown' : 'checkRetryFailed')}</FieldError>}
+      {checkError && [retryCheck?.key, recheck?.key].includes(checkError.key) && <FieldError className="text-xs">{t(checkError.unknown ? 'checkRetryUnknown' : 'checkRetryFailed')}</FieldError>}
     </div>
     {detail?.completionRecovery && <footer className="shrink-0 px-4 pb-4 sm:px-5">
       <Button size="sm" disabled={busy} aria-busy={busy} onClick={() => { void retryCompletion() }}>{busy ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{t('retry')}</Button>
     </footer>}
     {retryCheck && <footer className="shrink-0 px-4 pb-4 sm:px-5">
       <Button size="sm" disabled={busy} aria-busy={busy} onClick={() => { void retryCandidateCheck() }}>{busy ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{t(retryCheck.stage === 'review' ? 'retryReview' : 'retryVerify')}</Button>
+    </footer>}
+    {recheck && <footer className="flex shrink-0 flex-col items-start gap-2 px-4 pb-4 sm:px-5">
+      <p className="text-xs text-muted-foreground">{t('recheckDescription')}</p>
+      <Button size="sm" variant="outline" disabled={busy} aria-busy={busy} onClick={() => { void retryCandidateCheck(true) }}>{busy ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{t('retryReview')}</Button>
     </footer>}
     {!detail?.completionRecovery && !check && state !== 'unavailable' && <footer className="shrink-0 px-4 pb-4 sm:px-5">
       <ApprovalBar state={state} isSkill={task.isSkillCandidate} isDeliverable={candidate?.kind === 'report' || candidate?.kind === 'deliverable'} busy={busy} canApprove={task.isSkillCandidate ? Boolean(evidence && environment) : Boolean(evidence && (pullRequestUrl || candidate?.kind === 'report' || candidate?.kind === 'deliverable'))}

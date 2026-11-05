@@ -49,15 +49,41 @@ export interface AcceptanceTaskView {
   revision?: number
   completionRecovery?: { binding: { taskId: string; revision: number } }
 }
-export interface AcceptanceDetail { task?: AcceptanceTaskView; checks?: AcceptanceCheck[]; delivery?: AcceptanceDelivery; completionRecovery?: AcceptanceTaskView['completionRecovery']; checkStartRecovery?: { binding: { taskId: string; revision: number } }; checkSubmissionRecovery?: { binding: { taskId: string; revision: number } }; checkDispatchRecovery?: { binding: { taskId: string; revision: number } }; liveWorkspaceId?: string | null }
+export interface AcceptanceDetail { task?: AcceptanceTaskView; checks?: AcceptanceCheck[]; delivery?: AcceptanceDelivery; completionRecovery?: AcceptanceTaskView['completionRecovery']; checkStartRecovery?: { binding: { taskId: string; revision: number } }; checkSubmissionRecovery?: { binding: { taskId: string; revision: number } }; checkDispatchRecovery?: { binding: { taskId: string; revision: number } }; candidateRecheck?: { binding: { taskId: string; revision: number } }; liveWorkspaceId?: string | null }
 export interface AcceptanceBinding { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }
-export type CandidateCheckState = { stage: 'review' | 'verify'; status: 'failed' | 'pending' | 'running' | 'blocked' }
+export type CandidateCheckState = { stage: 'review' | 'verify'; status: 'failed' | 'pending' | 'running' | 'blocked' | 'waiting' }
 
 /** A fixed candidate remains reachable while its independent checks need attention. */
 export function candidateCheckState(task: AcceptanceTaskView): CandidateCheckState | null {
   if (task.completionRecovery || !task.candidateId || (task.stage !== 'review' && task.stage !== 'verify')) return null
+  if (task.stage === 'verify' && task.status === 'waiting') return { stage: 'verify', status: 'waiting' }
   if (task.status !== 'failed' && task.status !== 'pending' && task.status !== 'running' && task.status !== 'blocked') return null
   return { stage: task.stage, status: task.status }
+}
+
+/** Only a current Owner GET can offer this operation. A list/ledger from a
+ * different revision, or an older restored detail, cannot enable the button. */
+export function candidateRecheck(task: AcceptanceTaskView, detail: AcceptanceDetail | undefined, ledger: AcceptanceBinding | undefined) {
+  const current = detail?.task, capability = detail?.candidateRecheck
+  if (!current || !capability || !ledger || !task.id || !task.issueId || !task.attemptId || !task.candidateId ||
+      !Number.isSafeInteger(task.revision) || !task.revision || current.route?.flowVersion === 2 ||
+      !(task.stage === 'verify' && ['waiting', 'blocked', 'failed'].includes(task.status) || task.stage === 'approval' && task.status === 'pending') ||
+      capability.binding.taskId !== task.id || capability.binding.revision !== task.revision ||
+      current.id !== task.id || current.issueId !== task.issueId || current.attemptId !== task.attemptId || current.candidateId !== task.candidateId ||
+      current.stage !== task.stage || current.status !== task.status || current.revision !== task.revision ||
+      ledger.taskId !== task.id || ledger.issueId !== task.issueId || ledger.attemptId !== task.attemptId || ledger.candidateId !== task.candidateId || ledger.revision !== task.revision) return null
+  return { stage: 'review' as const, key: JSON.stringify(['recheck', task.id, task.attemptId, task.candidateId, task.revision]), binding: capability.binding }
+}
+
+export function candidateRecheckConfirmed(task: AcceptanceTaskView, value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || !task.id || !task.issueId || !task.attemptId || !task.candidateId ||
+      typeof task.revision !== 'number' || !Number.isSafeInteger(task.revision)) return false
+  const receipt = value as Record<string, any>, next = receipt.task
+  return receipt.contractVersion === 1 && Array.isArray(receipt.attempts) && Array.isArray(receipt.candidates) &&
+    next?.id === task.id && next.issueId === task.issueId && next.candidateId === task.candidateId &&
+    next.stage === 'review' && next.status === 'running' && next.revision === task.revision + 2 && next.attemptId !== task.attemptId &&
+    receipt.attempts.some((attempt: Record<string, unknown>) => attempt?.id === next.attemptId && attempt.taskId === task.id &&
+      attempt.candidateId === task.candidateId && attempt.stage === 'review' && attempt.status === 'running' && typeof attempt.runId === 'string' && attempt.runId.length > 0)
 }
 
 export function visibleAcceptance(task: AcceptanceTaskView): boolean {

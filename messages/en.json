@@ -4561,12 +4561,14 @@
     "retry": "Retry",
     "checkState": {
       "review": {
+        "waiting": "Review awaiting your answer",
         "blocked": "Review blocked",
         "failed": "Review not passed",
         "pending": "Review queued",
         "running": "Reviewing"
       },
       "verify": {
+        "waiting": "Verification awaiting your answer",
         "blocked": "Verification blocked",
         "failed": "Verification not passed",
         "pending": "Verification queued",
@@ -4574,6 +4576,7 @@
       }
     },
     "retryReview": "Retry review",
+    "recheckDescription": "Run a new review and verification on this candidate. Previous results are kept.",
     "blocked": "Blocked",
     "retryVerify": "Retry verification",
     "checkRetryUnknown": "Retry unconfirmed",
