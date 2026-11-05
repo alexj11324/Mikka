@@ -5,9 +5,57 @@ import { mock, test } from 'node:test'
 import { NextRequest } from 'next/server.js'
 import { TestAccountError } from '../test-accounts/pool.mjs'
 import { ReadCacheDiagnosticError } from './read-cache.mjs'
-import { createOwnedRuntimeObserver, observeOwnedRequests, prepareAttestationRoute, prepareLandingRoute, publicOwnedFailure } from './run-read-cache.mjs'
+import { createOwnedRuntimeObserver, loadOwnedDiagnosticSources, observeOwnedRequests, prepareAttestationRoute, prepareLandingRoute, publicOwnedFailure } from './run-read-cache.mjs'
 
 const environment = { origin: 'http://localhost:3137', basePath: '/mikka' }
+
+test('diagnostic source names come only from tracked files and declared package names', async () => {
+  const sources = await loadOwnedDiagnosticSources({
+    cwd: '/repo',
+    execFileImpl: async (command, args, options) => {
+      assert.equal(command, 'git'); assert.deepEqual(args, ['ls-files', '-z']); assert.equal(options.cwd, '/repo')
+      return { stdout: 'package.json\0packages/protocol/package.json\0lib/db.ts\0app/[locale]/layout.tsx\0.env\0../private.ts\0/private.ts\0' }
+    },
+    readFileImpl: async path => JSON.stringify(path.endsWith('protocol/package.json') ? { name: '@mikka/protocol' } : { name: 'mikka', dependencies: { next: 'private-version', react: 'private-version' }, scripts: { private: 'private-command' } }),
+  })
+  assert.deepEqual(sources.files, ['lib/db.ts', 'app/[locale]/layout.tsx'])
+  assert.deepEqual(sources.modules, ['mikka', 'next', 'react', '@mikka/protocol'])
+  assert.doesNotMatch(JSON.stringify(sources), /private|\.env/u)
+  assert.deepEqual(await loadOwnedDiagnosticSources({ cwd: '/repo', execFileImpl: async () => { throw new Error('private git failure') } }), { root: '/repo', files: [], modules: [] })
+})
+
+test('Next multiline errors retain fixed phases, known source positions and module names without raw messages', async () => {
+  const observer = createOwnedRuntimeObserver({ readFileImpl: async () => null, diagnosticSources: { root: '/repo', files: ['app/[locale]/layout.tsx', 'lib/db.ts'], modules: ['react', 'next'] } })
+  observer.output('stderr', ' ⨯ Failed to patch lockfile, please try uninstalling and reinstalling next in this workspace\nTypeError: private-token\n    at patch (/repo/lib/db.ts:17:4)')
+  observer.phase('attestation-prepare')
+  observer.output('stderr', '\n ⨯ Error: private-attestation\n')
+  observer.phase('attestation')
+  observer.phase('landing-prepare')
+  observer.output('stderr', " ⨯ ./app/[locale]/layout.tsx:2:1\nModule not found: Can't resolve 'react/private-subpath'\nError [ERR_MODULE_NOT_FOUND]: private-cookie\n    at render (webpack-internal:///(rsc)/./lib/db.ts:24:8)\n    at run (file:///repo/lib/db.ts:25:9)\n > 18 | const secret = 'ERR_REQUIRE_ESM';\n    at external (/private-user/lib/db.ts:99:1)\nCannot find module 'private-package'\nSQL: private-value\n")
+  const result = await observer.finish()
+  assert.deepEqual(result.errors, [
+    { phase: 'startup', categories: ['lockfile_patch'], classes: ['TypeError'], codes: [], locations: [{ file: 'lib/db.ts', line: 17, column: 4 }], modules: [] },
+    { phase: 'attestation-prepare', categories: ['unclassified'], classes: ['Error'], codes: [], locations: [], modules: [] },
+    { phase: 'landing-prepare', categories: ['module_not_found'], classes: ['Error'], codes: ['ERR_MODULE_NOT_FOUND'], locations: [{ file: 'app/[locale]/layout.tsx', line: 2, column: 1 }, { file: 'lib/db.ts', line: 24, column: 8 }, { file: 'lib/db.ts', line: 25, column: 9 }], modules: ['react'] },
+  ])
+  assert.doesNotMatch(JSON.stringify(result), /private|SQL|secret|ERR_REQUIRE_ESM|\/repo|webpack-internal|file:\/\//u)
+})
+
+test('error blocks and records are bounded and cannot adopt foreign paths or an unknown phase', async () => {
+  const observer = createOwnedRuntimeObserver({ readFileImpl: async () => null, diagnosticSources: { root: '/repo', files: ['lib/db.ts'], modules: ['next'] } })
+  observer.phase('private-phase')
+  observer.output('stderr', ' ⨯ TypeError: private\n')
+  observer.output('stderr', `${'private continuation\n'.repeat(40)}./lib/db.ts:3:1\n`)
+  for (let index = 0; index < 10; index++) observer.output('stderr', ' ⨯ Error: private\n at external (/other/repo/lib/db.ts:1:2)\n at next (/repo/node_modules/next/dist/index.js:3:4)\n')
+  observer.output('stdout', ' GET /private 200 in 1ms\n')
+  const result = await observer.finish()
+  assert.equal(result.errors.length, 8)
+  assert.equal(result.errors[0].phase, 'startup')
+  assert.deepEqual(result.errors[0].locations, [])
+  assert.ok(result.errors.every(error => error.locations.length === 0))
+  assert.deepEqual(result.errors[1].modules, ['next'])
+  assert.doesNotMatch(JSON.stringify(result), /private|other|\/repo/u)
+})
 
 test('owned output observations retain only closed counters across split and oversized log lines', async () => {
   const privateText = 'private-account-cookie-command-and-sql'

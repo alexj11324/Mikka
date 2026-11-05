@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { channel } from 'node:diagnostics_channel'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { availableParallelism, cpus, totalmem } from 'node:os'
@@ -7,13 +7,100 @@ import { resolve } from 'node:path'
 import { StringDecoder } from 'node:string_decoder'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
-import { stripVTControlCharacters } from 'node:util'
+import { promisify, stripVTControlCharacters } from 'node:util'
 import { loadEnvironment, assertDeploymentIdentity, EnvironmentError } from '../test-accounts/environment.mjs'
 import { runReadCacheAcceptance, publicFailure, ReadCacheAcceptanceError } from './read-cache.mjs'
 
 const ownedFailures = new WeakMap()
 const networkErrors = new Set(['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'UND_ERR_ABORTED', 'UND_ERR_SOCKET', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT', 'ABORT_ERR', 'AbortError', 'TimeoutError'])
 const processSignals = new Set(['SIGHUP', 'SIGINT', 'SIGQUIT', 'SIGILL', 'SIGTRAP', 'SIGABRT', 'SIGBUS', 'SIGFPE', 'SIGKILL', 'SIGSEGV', 'SIGPIPE', 'SIGALRM', 'SIGTERM', 'SIGUSR1', 'SIGUSR2'])
+const runtimePhases = new Set(['startup', 'attestation-prepare', 'attestation', 'landing-prepare', 'accounts-and-reads', 'evidence'])
+const errorClasses = new Set(['Error', 'TypeError', 'SyntaxError', 'ReferenceError', 'RangeError', 'EvalError', 'URIError', 'AggregateError', 'ModuleBuildError', 'ModuleNotFoundError', 'ModuleParseError', 'WebpackError'])
+const errorCodes = new Set([...networkErrors, 'ERR_MODULE_NOT_FOUND', 'MODULE_NOT_FOUND', 'ERR_PACKAGE_PATH_NOT_EXPORTED', 'ERR_PACKAGE_IMPORT_NOT_DEFINED', 'ERR_REQUIRE_ESM', 'ERR_REQUIRE_ASYNC_MODULE', 'ERR_INVALID_ARG_TYPE', 'ENOENT', 'EACCES', 'EPERM', 'EMFILE', 'ENOMEM', 'ENOSPC', 'EADDRINUSE', 'CERT_HAS_EXPIRED', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'SELF_SIGNED_CERT_IN_CHAIN', 'ERR_TLS_CERT_ALTNAME_INVALID', 'NEXT_REDIRECT', 'NEXT_NOT_FOUND'])
+const errorCategories = [
+  ['lockfile_patch', /Failed to patch lockfile|lockfile missing swc dependencies/iu],
+  ['module_not_found', /Module not found|Cannot find (?:module|package)|Can't resolve/iu],
+  ['missing_export', /Attempted import error|export .* was not found|does not provide an export/iu],
+  ['parse_error', /Module parse failed|SyntaxError:|Unexpected token/iu],
+  ['client_server_boundary', /server-only|client-only|only works? in Client Components|createContext is not a function/iu],
+  ['font_failure', /next\/font.*error|Failed to (?:fetch|download).*font/iu],
+  ['loader_failure', /Module build failed|Error in .*loader/iu],
+  ['native_binding', /Failed to load SWC|Failed to load native binding/iu],
+  ['heap_out_of_memory', /^FATAL ERROR:.*(?:heap limit|heap out of memory|Allocation failed)/iu],
+  ['framework_control_flow', /\bNEXT_(?:REDIRECT|NOT_FOUND)\b/u],
+]
+
+// Only repository-tracked source names and manifest-declared package names can
+// enter an error report. No dependency value, command or environment is retained.
+export async function loadOwnedDiagnosticSources({ cwd = process.cwd(), execFileImpl = promisify(execFile), readFileImpl = readFile } = {}) {
+  const root = resolve(cwd), files = [], modules = new Set()
+  try {
+    const { stdout } = await execFileImpl('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8', maxBuffer: 2 * 1024 ** 2 })
+    const tracked = stdout.split('\0').filter(path => /^[a-zA-Z\d_./@()[\]-]+$/u.test(path) && !path.startsWith('/') && !path.split('/').includes('..'))
+    files.push(...tracked.filter(path => /\.(?:[cm]?[jt]sx?|css|scss)$/u.test(path)))
+    for (const path of tracked.filter(path => path === 'package.json' || /^packages\/[^/]+\/package\.json$/u.test(path))) {
+      try {
+        const manifest = JSON.parse(await readFileImpl(resolve(root, path), 'utf8'))
+        for (const name of [manifest.name, ...['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'].flatMap(key => Object.keys(manifest[key] ?? {}))]) {
+          if (typeof name === 'string' && /^(?:@[a-z\d._-]+\/)?[a-z\d._-]+$/u.test(name)) modules.add(name)
+        }
+      } catch { /* Missing manifest observations cannot change acceptance. */ }
+    }
+  } catch { /* Missing git observations leave locations and modules empty. */ }
+  return { root, files, modules: [...modules] }
+}
+
+function createOwnedErrorObserver({ root = '', files = [], modules = [] } = {}) {
+  const knownFiles = new Set(files), knownModules = new Set(modules), records = []
+  const active = new Map()
+  let phase = 'startup'
+  const add = (array, value) => { if (array.length < 8 && !array.some(entry => JSON.stringify(entry) === JSON.stringify(value))) array.push(value) }
+  const location = token => {
+    let value = token.replace(/^[([]/u, '').replace(/[),;]$/u, '')
+    const position = /:(\d+)(?::(\d+))?$/u.exec(value)
+    if (position) value = value.slice(0, position.index)
+    if (value.startsWith('file://')) value = value.slice(7)
+    if (root && value.startsWith(`${root}/`)) value = value.slice(root.length + 1)
+    else if (value.startsWith('webpack-internal:///')) value = value.slice('webpack-internal:///'.length).replace(/^\([^/]+\)\//u, '')
+    else if (value.startsWith('/')) return null
+    value = value.replace(/^\.\//u, '')
+    if (!knownFiles.has(value)) return null
+    const number = input => input && Number.isSafeInteger(Number(input)) && Number(input) > 0 && Number(input) < 10_000_000 ? Number(input) : null
+    return { file: value, line: number(position?.[1]), column: number(position?.[2]) }
+  }
+  return {
+    phase(value) { if (runtimePhases.has(value) && value !== phase) { phase = value; active.clear() } },
+    line(stream, value) {
+      // Code-frame source strings are data, not diagnostics. Multiline compiler
+      // errors and their import traces otherwise continue for at most 40 lines.
+      if (/^(?:>\s*)?\d+\s*\|/u.test(value)) return
+      const starts = /^⨯\s|^FATAL ERROR:|^(?:Error|TypeError|SyntaxError|ReferenceError|RangeError|AggregateError|ModuleBuildError|ModuleNotFoundError|ModuleParseError|WebpackError)(?:\s*\[[A-Z_]+\])?:/u.test(value)
+      if (/^(?:[✓○]\s*)?(?:Ready in|Compiling|Compiled)\b|^(?:GET|POST|HEAD)\s+\S+\s+[1-5]\d{2}\s+in\b/u.test(value)) active.delete(stream)
+      let block = active.get(stream)
+      if (starts && (/^⨯\s|^FATAL ERROR:/u.test(value) || !block)) {
+        if (records.length === 8) { active.delete(stream); return }
+        const record = { phase, categories: [], classes: [], codes: [], locations: [], modules: [] }
+        records.push(record); block = { record, remaining: 40 }; active.set(stream, block)
+      }
+      if (!block || block.remaining-- <= 0) { active.delete(stream); return }
+      const record = block.record
+      for (const [name, pattern] of errorCategories) if (pattern.test(value)) add(record.categories, name)
+      for (const token of value.match(/[A-Za-z][A-Za-z_\d]*/gu) ?? []) {
+        if (errorClasses.has(token)) add(record.classes, token)
+        if (errorCodes.has(token)) add(record.codes, token)
+      }
+      for (const token of value.match(/[^\s'"`<>]+/gu) ?? []) {
+        const source = location(token)
+        if (source) add(record.locations, source)
+      }
+      for (const match of value.matchAll(/(?:Cannot find (?:module|package)|Can't resolve)\s+['"]([^'"]+)['"]|node_modules\/((?:@[^/\s]+\/)?[^/\s]+)/gu)) {
+        const target = match[1] ?? match[2], name = target.startsWith('@') ? target.split('/').slice(0, 2).join('/') : target.split('/')[0]
+        if (knownModules.has(name)) add(record.modules, name)
+      }
+    },
+    result() { return records.map(record => ({ ...record, categories: record.categories.length ? record.categories : ['unclassified'] })) },
+  }
+}
 
 export function publicOwnedFailure(error) {
   return { ...publicFailure(error), ...ownedFailures.get(error) }
@@ -21,16 +108,18 @@ export function publicOwnedFailure(error) {
 
 /** Two snapshots and event-driven counters only. /proc reads are confined to
  * the owned CLI's direct children; their PIDs and cgroup path stay private. */
-export function createOwnedRuntimeObserver({ readFileImpl = readFile, hardware = () => ({ cpuCount: cpus().length, availableCpuCount: availableParallelism(), systemMemoryBytes: totalmem() }) } = {}) {
+export function createOwnedRuntimeObserver({ readFileImpl = readFile, hardware = () => ({ cpuCount: cpus().length, availableCpuCount: availableParallelism(), systemMemoryBytes: totalmem() }), diagnosticSources } = {}) {
   const counters = { ready: 0, compiling: 0, compiled: 0, httpCompleted: 0, nextError: 0, fatalError: 0, heapOutOfMemory: 0, esbuildDeadlock: 0 }
   const streams = Object.fromEntries(['stdout', 'stderr'].map(name => [name, { decoder: new StringDecoder('utf8'), tail: '' }]))
+  const errors = createOwnedErrorObserver(diagnosticSources)
   const number = value => /^\d+$/u.test(String(value ?? '')) && Number.isSafeInteger(Number(value)) ? Number(value) : null
   const field = (text, name) => number(new RegExp(`^${name}:?\\s+(\\d+)(?:\\s|$)`, 'm').exec(text ?? '')?.[1])
   const bytes = (text, name) => { const value = field(text, name); return value === null ? null : number(value * 1024) }
   const read = async path => { try { return await readFileImpl(path, 'utf8') } catch { return null } }
   let start = null, finishPromise, sealed = false
-  const line = raw => {
+  const line = (stream, raw) => {
     const value = stripVTControlCharacters(raw).trimStart()
+    errors.line(stream, value)
     if (/^(?:✓\s*)?Ready in\b/u.test(value)) counters.ready++
     if (/^(?:○\s*)?Compiling\b/u.test(value)) counters.compiling++
     // Next 16.4 webpack does not emit this on every successful compile.
@@ -70,13 +159,19 @@ export function createOwnedRuntimeObserver({ readFileImpl = readFile, hardware =
     } }
   }
   return {
+    phase(value) {
+      // Attribute a partial line to the phase where it arrived, not a later
+      // request merely because its newline was buffered by the child.
+      for (const [stream, state] of Object.entries(streams)) if (state.tail) { line(stream, state.tail); state.tail = '' }
+      errors.phase(value)
+    },
     output(stream, data) {
       if (sealed || !Object.hasOwn(streams, stream)) return
       const state = streams[stream], parts = state.decoder.write(Buffer.isBuffer(data) ? data : Buffer.from(data)).split('\n')
       for (let index = 0; index < parts.length; index++) {
         // Retain only a bounded line prefix until newline, never raw log history.
         state.tail = (state.tail + parts[index]).slice(0, 4096)
-        if (index < parts.length - 1) { line(state.tail); state.tail = '' }
+        if (index < parts.length - 1) { line(stream, state.tail); state.tail = '' }
       }
     },
     async ready(child) {
@@ -89,7 +184,7 @@ export function createOwnedRuntimeObserver({ readFileImpl = readFile, hardware =
         let end = null, machine = {}
         try { end = await snapshot(child) } catch { /* Unobservable: keep null. */ }
         try { machine = hardware() ?? {} } catch { /* Unobservable: keep null. */ }
-        for (const state of Object.values(streams)) { line((state.tail + state.decoder.end()).slice(0, 4096)); state.tail = '' }
+        for (const [stream, state] of Object.entries(streams)) { line(stream, (state.tail + state.decoder.end()).slice(0, 4096)); state.tail = '' }
         sealed = true
         const sameCgroup = start?.cgroup && start.cgroup === end?.cgroup
         const delta = (name, monotonic = false) => {
@@ -98,7 +193,7 @@ export function createOwnedRuntimeObserver({ readFileImpl = readFile, hardware =
         }
         return {
           cpuCount: number(machine.cpuCount), availableCpuCount: number(machine.availableCpuCount), systemMemoryBytes: number(machine.systemMemoryBytes),
-          output: { ...counters }, start: start?.public ?? null, end: end?.public ?? null,
+          output: { ...counters }, errors: errors.result(), start: start?.public ?? null, end: end?.public ?? null,
           retainedDirectChildren: start?.childIds && end?.childIds ? start.childIds.filter(pid => end.childIds.includes(pid)).length : null,
           cgroupCurrentBytesDelta: delta('cgroupCurrentBytes'), cgroupOomDelta: delta('cgroupOom', true), cgroupOomKillDelta: delta('cgroupOomKill', true),
         }
@@ -225,7 +320,7 @@ export async function runOwnedReadCacheAcceptance() {
   const origin = new URL(environment.origin)
   if (origin.protocol !== 'http:') throw new EnvironmentError('HTTP_RUNNER_REQUIRES_HTTP_ORIGIN')
   const observedRequests = observeOwnedRequests(environment)
-  const runtime = createOwnedRuntimeObserver()
+  const runtime = createOwnedRuntimeObserver({ diagnosticSources: await loadOwnedDiagnosticSources() })
   let server, serverStdoutBytes = 0, serverStderrBytes = 0
   const cancel = () => { void stop(server) }
   process.once('SIGINT', cancel)
@@ -250,14 +345,19 @@ export async function runOwnedReadCacheAcceptance() {
       server.stderr.on('data', data => { serverStderrBytes += data.length; runtime.output('stderr', data) })
     })
     await runtime.ready(server)
+    runtime.phase('attestation-prepare')
     const preparingAt = Date.now()
     await prepareAttestationRoute(environment)
     const initialRouteCompileMs = Date.now() - preparingAt
+    runtime.phase('attestation')
     await assertDeploymentIdentity(environment)
+    runtime.phase('landing-prepare')
     const landingPreparingAt = Date.now()
     await prepareLandingRoute(environment)
     const initialLandingCompileMs = Date.now() - landingPreparingAt
+    runtime.phase('accounts-and-reads')
     const result = await runReadCacheAcceptance()
+    runtime.phase('evidence')
     const ownedRuntime = await runtime.finish(server)
     const summary = { ...result, initialRouteCompileMs, initialLandingCompileMs, serverStdoutBytes, serverStderrBytes, ownedRuntime }
     await mkdir('.cache/e2e', { recursive: true, mode: 0o700 })

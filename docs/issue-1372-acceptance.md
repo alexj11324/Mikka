@@ -34,6 +34,10 @@ Expected authorization failures cross the production Server Action boundary as e
 
 Chat message versions do not cover access to cited tasks or artifacts. A cursor request therefore reauthorizes those decorations separately. An unchanged transcript can return an empty metadata map, which replaces the prior map and removes revoked cards. The existing task-list and artifact pushes request this refresh; they do not create a new timer.
 
+Tool display metadata has a separate recovery path. Disk retains only call/name/state/time, the original body continuation and a `restoreToolMetadata` hint; target, display name and error labels stay out of IndexedDB. A restored request computes its existing prefix hash and compact display metadata in one PostgreSQL statement snapshot. Only positions, ordered call identities and bounded display fields leave that statement, not prefix text, reasoning, input/output/quote previews or dispatch bodies. The client matches these fields to each proved reply, consumes the response-only overlay and clears the hint. Missing, reordered or ambiguous identities require the existing single full reset. Prefix edits/deletion and long gaps still invalidate the original proof.
+
+The integrated shared-read path authorizes each requester before joining. Its key includes the current authorized manifest and normalized held proofs; chat also distinguishes the metadata-repair hint. Cited tasks and artifacts are reauthorized independently after the shared transcript completes, without mutating the shared object. Cross-tab adoption additionally requires the same authorized user/workspace/build/role namespace and an established live transport scope.
+
 ### Cached task documents
 
 A recovered task can be displayed before its server read finishes, but its title, editor, metadata and mutation actions remain read-only. It does not create or seed `DocumentSync`. Navigation and close controls remain usable. Only a successful response for the expected viewer enables the normal document lifecycle.
@@ -159,6 +163,28 @@ The workflow retains only `.cache/e2e/http-acceptance-summary.json`, after the e
 Settings has no durable rows in this fixture, so its zero JSON-result bytes do not mean zero traffic: the corresponding PostgreSQL socket bytes were 1,204 / 599 / 599. Settings without live coverage continues to revalidate. The authenticated namespace gate separately used 1 statement, 100 result bytes and 799 socket bytes. Chat's store measurements exclude the action's session/metadata checks. The initial task-list `legacyReload` mixed in personal-workspace initialization and is excluded from the comparison; fixture setup now performs that initialization before all measured reads. Detail/activity has no final numeric diagnostic from this failed run.
 
 One changed task returned 3,953 database JSON bytes and 3,702 action JSON bytes; one changed thread returned 9,843 and 11,866 respectively. A restored chat performs more small proof/tail queries than a full snapshot. Deleting an old chat message correctly reset the prefix and required a full response (60,418 database JSON bytes, 62,024 returned bytes); a deleted message is never retained just to preserve the savings.
+
+### Executed metadata recovery and combined-read measurements
+
+[CI run 42047606396](https://github.com/alexj11324/Mikka/actions/runs/42047606396) checked out merge SHA `7fe43d49a269a03b749b4906e1540423a346f461`, associated with feature head `cb849283f87db1ba0653437734f407b26ce8dff7`. Its tree `3767b0863d4e63cebf7e8fff8beae852e8b5aba0` exactly matches the published integration of main `3251144`, #1384 and this cache protocol. These are executed measurements, not a completed release: three DB shards passed; the fourth failed three shared-read fixture assertions, and Source found a generic-union narrowing error.
+
+The new real PostgreSQL metadata fixture passed, as did all 90 tests in `test:bot-chats-db`. It uses the actual `persistentReadData → chatUpdate → mergeChat` path and validates hidden tools, repeated call IDs in separate replies, same-statement query count, append, prefix edits, deletion, cursor-ahead and long gaps.
+
+| Tool-chat store, 40 messages | DB queries | DB JSON bytes | DB socket bytes | Returned JSON bytes |
+| --- | ---: | ---: | ---: | ---: |
+| Full reader / cold snapshot | 4 | 95,842 | 97,396 | 97,065 |
+| Warm known version | 3 | 58 | 554 | 104 |
+| Ordinary overlapping tail | 8 | 5,197 | 6,610 | 5,336 |
+| Actual disk restore + tool metadata | 8 | 6,065 | 7,589 | 6,288 |
+| Appended turn | 8 | 6,309 | 7,806 | 6,304 |
+| Changed prefix, full reset | 5 | 92,777 | 94,578 | 93,067 |
+| Deleted prefix row, full reset | 5 | 92,143 | 93,902 | 92,445 |
+
+Restoration reduced this fixture's DB JSON by 93.67% and returned JSON by 93.52%, while using the same eight queries as the ordinary tail. These store measurements exclude action authentication and page-render reads. In the same run, task-list cold/warm/restored DB bytes were 19,107/683/683 with 14/8/8 queries; thread-list bytes were 83,811/83/83 with 5/3/3 queries. Detail plus activity used 55,548/2,377/2,377 bytes with 22/18/18 queries, compared with 1,776,084 bytes and 19 queries for the same fixture's old full-history read.
+
+The natural simultaneous push fixture reduced five client requests to three, 71 queries to 44, and 86,932 socket bytes to 49,172. No server flight joined in that particular timing window: those reductions came from the three tabs sharing a request. The old 40% query / 50% byte thresholds therefore did not describe the integrated per-request authorization and manifest work. Two additional race fixtures timed out before reaching their query barrier because they installed a prototype interceptor after pooled clients had bound their query functions. Both defects are recorded as failed tests and require corrected, deterministic fixture execution before acceptance; none is counted as a green gate or as proof of an authorization failure.
+
+The matching isolated HTTP run `42047606506` still failed before account allocation: anonymous landing preparation timed out at 120,004 ms. The owned direct child remained present, system RAM was 16,765,386,752 bytes, and cgroup OOM/OOM-kill counters stayed zero. A Next error marker was observed; no raw error message, account or fixture was emitted. Its cause remains under investigation, so these DB results do not establish end-to-end acceptance.
 
 ### Production measurement and final evidence
 

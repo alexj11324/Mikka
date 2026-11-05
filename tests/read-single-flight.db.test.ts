@@ -17,9 +17,47 @@ const sockets = new Set<Socket>()
 const connect = Socket.prototype.connect
 Socket.prototype.connect = function (this: Socket, ...args: unknown[]) { sockets.add(this); return Reflect.apply(connect, this, args) } as typeof Socket.prototype.connect
 const received = () => [...sockets].reduce((sum, socket) => sum + socket.bytesRead, 0)
-let queries = 0
+let queries = 0, payloadQueries = 0
+type ListRowsBarrier = { armed: boolean; reached: () => void; gate: Promise<void> }
+let listRowsBarrier: ListRowsBarrier | undefined
+let queryCompletionCheckpoint: (() => void) | undefined
+function checkpointAfterQuery() {
+  const checkpoint = queryCompletionCheckpoint
+  // After the last manifest query, continuation microtasks can reach
+  // singleFlight before this checkpoint, without a timer loop.
+  if (checkpoint) setImmediate(() => { if (queryCompletionCheckpoint === checkpoint) checkpoint() })
+}
 const query = pg.Client.prototype.query
-pg.Client.prototype.query = function (this: pg.Client, ...args: unknown[]) { queries++; return Reflect.apply(query, this, args) } as typeof pg.Client.prototype.query
+// Pool instrumentation binds this wrapper when a client connects. Arm its
+// state later; replacing the prototype after fixture setup misses those clients.
+pg.Client.prototype.query = function (this: pg.Client, ...args: unknown[]) {
+  queries++
+  const argument = args[0]
+  const sql = typeof argument === 'string' ? argument : argument && typeof argument === 'object' && 'text' in argument ? String(argument.text) : ''
+  // Only the outer payload SELECT has this predicate; manifest/version/auth
+  // queries must remain free to complete while the leader's rows are held.
+  const payload = sql.includes('"task_list" where "task_list"."id" in (')
+  if (payload) payloadQueries++
+  const barrier = payload && listRowsBarrier?.armed ? listRowsBarrier : undefined
+  if (barrier) barrier.armed = false
+  const callback = args.at(-1)
+  if (typeof callback === 'function' && (barrier || queryCompletionCheckpoint)) {
+    return Reflect.apply(query, this, [...args.slice(0, -1), (error: unknown, result: unknown) => {
+      const complete = () => {
+        const value: unknown = callback(error, result)
+        checkpointAfterQuery()
+        return value
+      }
+      if (error || !barrier) return complete()
+      barrier.reached()
+      void barrier.gate.then(complete)
+    }])
+  }
+  const result: unknown = Reflect.apply(query, this, args)
+  const pending = barrier ? Promise.resolve(result).then(async value => { barrier.reached(); await barrier.gate; return value }) : result
+  return queryCompletionCheckpoint && pending instanceof Promise
+    ? pending.then(value => { checkpointAfterQuery(); return value }) : pending
+} as typeof pg.Client.prototype.query
 
 /** Same-origin BroadcastChannel: same name, other instances, asynchronous delivery. */
 function hub() {
@@ -56,22 +94,13 @@ async function fixture(prefix: string) {
 /** Hold a completed payload query, so another request definitely enters while
  * the first single-flight is pending. The manifest/version reads stay live. */
 function holdNextListRows() {
+  assert.equal(listRowsBarrier, undefined, 'only one payload barrier may be active')
   let reached!: () => void, release!: () => void
   const atRows = new Promise<void>(resolve => { reached = resolve })
   const gate = new Promise<void>(resolve => { release = resolve })
-  const original = pg.Client.prototype.query
-  let armed = true
-  pg.Client.prototype.query = function (this: pg.Client, ...args: unknown[]) {
-    const argument = args[0]
-    const sql = typeof argument === 'string' ? argument : argument && typeof argument === 'object' && 'text' in argument ? String(argument.text) : ''
-    const result: unknown = Reflect.apply(original, this, args)
-    if (armed && sql.includes('"task_list"."id" in (')) {
-      armed = false
-      return Promise.resolve(result).then(async value => { reached(); await gate; return value })
-    }
-    return result
-  } as typeof pg.Client.prototype.query
-  return { atRows, release, restore: () => { release(); pg.Client.prototype.query = original } }
+  const barrier = { armed: true, reached, gate }
+  listRowsBarrier = barrier
+  return { atRows, release, restore: () => { release(); if (listRowsBarrier === barrier) listRowsBarrier = undefined } }
 }
 
 function timely<T>(promise: Promise<T>) {
@@ -79,7 +108,7 @@ function timely<T>(promise: Promise<T>) {
   return Promise.race([promise, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('read did not cross the held-query barrier')), 10_000) })]).finally(() => clearTimeout(timer))
 }
 
-test('one push to 3 tabs and 2 devices of one person: one list read instead of five', { skip: !enabled, timeout: 180_000 }, async t => {
+test('one push to 3 tabs and 2 devices: tab sharing reduces five list requests to three and lowers DB traffic', { skip: !enabled, timeout: 180_000 }, async t => {
   const { actAs } = await import('../lib/acting-user')
   const { pollIssues } = await import('../app/actions/issues')
   const { TabShare, tabShareChannelName } = await import('../lib/live/tab-share')
@@ -109,10 +138,42 @@ test('one push to 3 tabs and 2 devices of one person: one list read instead of f
   measureWithoutSingleFlight(false)
   assert.equal(results.before.listReads, 5)
   assert.equal(results.after.listReads, 3, 'the tabs read once; each device asks the server')
-  // Each request reauthorizes its complete manifest and reads its revision;
-  // the tabs collapse their request and identical payload queries can join.
-  assert.ok(results.after.queries < results.before.queries * 0.6 && results.after.bytes < results.before.bytes / 2, JSON.stringify(results))
+  // Each remaining request still reauthorizes its complete manifest. These
+  // short reads need not overlap on the server; payload joining is tested below.
+  assert.ok(results.after.queries < results.before.queries, `tab sharing reduces SQL queries: ${JSON.stringify(results)}`)
+  assert.ok(results.after.bytes < results.before.bytes, `tab sharing reduces received socket bytes: ${JSON.stringify(results)}`)
   t.diagnostic(JSON.stringify({ measured: results }))
+})
+
+test('overlapping reads with identical authorization and proofs join exactly one list payload query', { skip: !enabled, timeout: 180_000 }, async () => {
+  const { actAs } = await import('../lib/acting-user')
+  const { pollIssues } = await import('../app/actions/issues')
+  const { singleFlightJoined } = await import('../lib/single-flight')
+  const { owner, personal } = await fixture('single-flight-identical')
+  const read = () => withActivitySession(owner, () => actAs(owner, () => pollIssues()), personal)
+  const beforePayloads = payloadQueries, beforeJoined = singleFlightJoined()
+  const barrier = holdNextListRows(), leader = read()
+  let follower: ReturnType<typeof read> | undefined
+  try {
+    await timely(barrier.atRows)
+    const joined = new Promise<void>(resolve => {
+      queryCompletionCheckpoint = () => { if (singleFlightJoined() > beforeJoined) resolve() }
+    })
+    follower = read()
+    await timely(joined)
+    queryCompletionCheckpoint = undefined
+    assert.equal(singleFlightJoined() - beforeJoined, 1)
+    assert.equal(payloadQueries - beforePayloads, 1, 'the follower has not issued another payload SELECT')
+    barrier.release()
+    const [first, second] = await timely(Promise.all([leader, follower]))
+    assert.equal(first.items?.length, 20)
+    assert.deepEqual(second, first)
+    assert.equal(payloadQueries - beforePayloads, 1)
+  } finally {
+    queryCompletionCheckpoint = undefined
+    barrier.restore()
+    await Promise.allSettled([leader, ...(follower ? [follower] : [])])
+  }
 })
 
 test('concurrent reads of two people, or of a removed member, are never shared', { skip: !enabled, timeout: 180_000 }, async () => {

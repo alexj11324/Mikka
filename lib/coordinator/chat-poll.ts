@@ -6,6 +6,10 @@ import { restoreChatToolMetadata, type ChatToolMetadata } from './chat-tool-meta
 /** A poll whose version matched: only the chat's live state, the conversation itself is as before. */
 export type UnchangedChat = { unchanged: true; version: string; cursor: number; streamRunId?: string; working: boolean; error: string | null; botId: string; enabled: boolean; live?: ListLiveRead; metadata?: Pick<ChatView, 'sources' | 'artifacts'> }
 
+function currentChatMetadata(chat: Pick<ChatView, 'sources' | 'artifacts'> | UnchangedChat): Pick<ChatView, 'sources' | 'artifacts'> | undefined {
+  return 'unchanged' in chat ? chat.metadata : chat
+}
+
 /** A shared transcript never shares its decorations' authority. Each requester
  * authorizes both its retained cards and the shared tail, then replaces those
  * maps on a new response object. Neither a flight nor a sibling is mutated. */
@@ -14,7 +18,7 @@ export async function refreshChatMetadata<T extends Pick<ChatView, 'sources' | '
   held: { sourceIds?: readonly string[]; artifactIds?: readonly string[] } | undefined,
   read: (ids: { sourceIds: string[]; artifactIds: string[] }) => Promise<Pick<ChatView, 'sources' | 'artifacts'>>,
 ): Promise<T> {
-  const current = 'unchanged' in chat ? chat.metadata : chat
+  const current = currentChatMetadata(chat)
   const sourceIds = [...new Set([...held?.sourceIds ?? [], ...Object.keys(current?.sources ?? {})])].sort()
   const artifactIds = [...new Set([...held?.artifactIds ?? [], ...Object.keys(current?.artifacts ?? {})])].sort()
   const metadata = sourceIds.length || artifactIds.length ? await read({ sourceIds, artifactIds }) : { sources: {}, artifacts: {} }
