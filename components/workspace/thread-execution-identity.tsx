@@ -70,9 +70,9 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
       <ValueRow label={profileT('name')}>{profile.source === 'default' && profile.profileId === 'default' ? profileT('defaultName') : profile.name}</ValueRow>
       <ValueRow label={profileT('revision')}>{profileT('version', { version: profile.version })}</ValueRow>
       <ValueRow label={profileT('selectedBy')}>{profileT(`selectionSources.${profile.source}`)}</ValueRow>
-      <ValueRow label={profileT('selectionReason')}>{profile.source === 'explicit' ? profileT('explicitReason') : profile.source === 'default' ? profileT('defaultReason')
-        // A run frozen before reasons were codes holds an English sentence: it reads as the neutral reason.
-        : (DECISION_REASONS as readonly string[]).includes(profile.reason) ? profileT(`selectionReasons.${profile.reason as DecisionReason}`) : profileT('selectionReasons.other')}</ValueRow>
+      {/* A run frozen before reasons were codes holds an English sentence: 选择方式 already says how it was chosen, so no reason row. */}
+      {(profile.source !== 'decision' || (DECISION_REASONS as readonly string[]).includes(profile.reason)) && <ValueRow label={profileT('selectionReason')}>{profile.source === 'explicit' ? profileT('explicitReason')
+        : profile.source === 'default' ? profileT('defaultReason') : profileT(`selectionReasons.${profile.reason as DecisionReason}`)}</ValueRow>}
     </dl></section>}
     {!identity ? <p className="text-muted-foreground">{t('snapshotMissing')}</p> : <>
       <section className="flex flex-col gap-3"><h3 className="font-medium">{t('participants')}</h3><dl className="flex flex-col gap-3">

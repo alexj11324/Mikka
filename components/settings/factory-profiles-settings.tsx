@@ -22,7 +22,8 @@ import { profileAvailabilityKey, profileDefinition, profileModelKey, profileRequ
 
 type ProfileEditor = { profile?: AgentProfile; duplicate?: boolean }
 const EFFORTS = ['auto', 'low', 'medium', 'high', 'xhigh', 'max'] as const
-const skillCopyKey = (id: string) => id === 'implementation-evidence' || id === 'independent-review' || id === 'systematic-debugging' ? id : null
+const SKILL_COPY = ['implementation-evidence', 'independent-review', 'systematic-debugging'] as const
+const skillCopyKey = (id: string) => (SKILL_COPY as readonly string[]).includes(id) ? id as typeof SKILL_COPY[number] : null
 const initialDefinition: AgentProfileDefinition = { name: '', description: '', roles: [], enabled: true, harness: 'auto', model: { mode: 'inherit' }, instructions: '', skills: [] }
 
 function modelSourceName(model: AgentProfilesView['catalog']['models'][number], t: ReturnType<typeof useTranslations<'Settings.agentProfiles'>>) {
@@ -234,7 +235,7 @@ function ProfileEditorDialog({ workspaceId, editor, catalog, onClose, onSaved, o
               </Field> })}
               {draft.skills.filter(skill => !catalog.skills.some(item => item.id === skill)).map(skill => <Field key={skill} orientation="horizontal">
                 <Checkbox id={id + '-missing-' + skill} checked disabled={pending || frozen} onCheckedChange={() => change({ skills: draft.skills.filter(value => value !== skill) })} />
-                <FieldLabel htmlFor={id + '-missing-' + skill} className="text-destructive-foreground">{t.has(`skillNames.${skill}` as never) ? t(`skillNames.${skill}` as never) : t('removedSkill')} · {t('skillUnavailable')}</FieldLabel>
+                <FieldLabel htmlFor={id + '-missing-' + skill} className="text-destructive-foreground">{(key => key ? t('unavailableNamed', { name: t(`skillNames.${key}`) }) : t('removedSkill'))(skillCopyKey(skill))}</FieldLabel>
               </Field>)}
             </FieldGroup>
           </FieldSet>
@@ -253,7 +254,7 @@ function ProfileEditorDialog({ workspaceId, editor, catalog, onClose, onSaved, o
 /** A Profile's state as the shared status badge (R-34, R-87): icon, colour and word. */
 function ProfileState({ available, enabled, label }: { available: boolean; enabled: boolean; label: string }) {
   const Icon = available ? CircleCheck : enabled ? CircleAlert : CircleSlash
-  return <Badge size="sm" variant={available ? 'success-light' : enabled ? 'destructive-light' : 'secondary'} className="max-w-full self-start">
+  return <Badge size="lg" variant={available ? 'success-light' : enabled ? 'destructive-light' : 'secondary'} className="max-w-full self-start">
     <Icon aria-hidden="true" /><span className="truncate">{label}</span>
   </Badge>
 }
