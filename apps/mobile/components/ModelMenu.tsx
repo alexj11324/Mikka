@@ -5,7 +5,7 @@ import { groupTag, groupTitle, modelMenuLabel, modelMenuReadLabel, modelSourceLa
 import { colors } from '@/lib/theme'
 
 /** Expo Web exposes the same saved choices and source groups as the native menu. */
-export function ModelMenu({ model, running = false }: { model: ModelMenuState; running?: boolean }) {
+export function ModelMenu({ model, running = false, label }: { model: ModelMenuState; running?: boolean; label?: string }) {
   const { menu, loading, retryRead, busy, choosing, choose, refresh, refreshing, refreshFailed } = model
   const [open, setOpen] = useState(false)
   const trigger = useRef<ComponentRef<typeof View>>(null)
@@ -16,7 +16,7 @@ export function ModelMenu({ model, running = false }: { model: ModelMenuState; r
   const { current, groups } = menu
   return <>
     <Pressable ref={trigger} accessibilityRole="button" accessibilityLabel={`选择模型，${modelSourceLabel(current)}`} accessibilityState={{ expanded: open, busy }} aria-expanded={open} aria-busy={busy} aria-disabled={false} onPress={() => setOpen(true)} style={styles.chip}>
-      <Text style={styles.label}>{modelMenuLabel(current, running)} ▾</Text>
+      <Text style={[styles.label, label ? { color: colors.accent } : null]}>{label ?? `${modelMenuLabel(current, running)} ▾`}</Text>
     </Pressable>
     <Modal visible={open} transparent animationType="none" onRequestClose={close} onShow={() => closeButton.current?.focus()}>
       <View style={styles.overlay}>

@@ -1,13 +1,13 @@
-import { Fragment, type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, View, type ScrollViewInstance } from 'react-native'
 import { ChatScrollView } from '@/components/ChatScrollView'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ellipsis } from 'lucide-react-native'
 import { uuid } from 'expo'
-import { BotAvatar, Spinner } from '@/components/icons'
+import { Spinner } from '@/components/icons'
 import { runIcon } from '@/lib/thread-icon'
-import { BotBubble, CopyButton, EventLine, MyBubble, OutgoingBubble, Reactions, ThreadCard, TimedRow, useChatPhotos, useTimeReveal } from '@/components/chat'
+import { Arrival, BotBubble, EventLine, MyBubble, OutgoingBubble, Reactions, ReplyActions, ThreadCard, TimedRow, useChatPhotos, useTimeReveal } from '@/components/chat'
 import { myReaction, toggled, withMine } from '@/lib/reactions'
 import { Markdown } from '@/components/Markdown'
 import { OfflineBanner } from '@/components/OfflineBanner'
@@ -27,7 +27,7 @@ import { apiCache } from '@/lib/api-cache'
 import { askForPush, usePushState } from '@/lib/push-state'
 import { runTitle, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
 import { FailedReply } from '@/components/FailedReply'
-import { eventText } from '@/lib/event-line'
+import { eventText, questionCard } from '@/lib/event-line'
 import { waitingLabel } from '@/lib/waiting'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { listRef, UNRESOLVED_LIVE_ID } from '@/lib/live'
@@ -51,7 +51,7 @@ import { colors } from '@/lib/theme'
  * person (approve or decline, as on the web); `focus` marks the one a push
  * was about. OpenUI cards are drawn natively (components/OpenUI.tsx).
  */
-export function ChatScreen({ botId, name, color, shape, draft, focus, compose, composerAccessory, composerNotice }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string; compose?: boolean; composerAccessory?: ReactNode | ((running: boolean) => ReactNode); composerNotice?: ReactNode }) {
+export function ChatScreen({ botId, name, draft, focus, compose, composerAccessory, composerNotice }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string; compose?: boolean; composerAccessory?: ReactNode | ((running: boolean) => ReactNode); composerNotice?: ReactNode }) {
   const [quote, setQuote] = useState<string | null>(null)
   const self = botId ?? 'coordinator'
   const router = useRouter()
@@ -106,6 +106,13 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
 
   const items = data?.items ?? []
   const sources = data?.sources ?? {}
+  // What the chat held when it opened just appears; anything after it rises in (Arrival).
+  const opened = useRef<{ chat: string; last: number } | null>(null)
+  const chatKey = `${self}:${apiContext}`
+  if (data && opened.current?.chat !== chatKey) opened.current = { chat: chatKey, last: items.reduce((last, item) => Math.max(last, item.position), -1) }
+  const arrived = (position: number) => Boolean(opened.current && position > opened.current.last)
+  // The one action row goes under the bot's latest reply, once it has finished (#1386).
+  const latestReply = items.reduce((last, item, index) => item.from === 'coordinator' && item.text ? index : item.from === 'person' ? -1 : last, -1)
   // A card is answered once the person has written after it (here or anywhere else).
   const lastMine = items.reduce((last, item, index) => item.from === 'person' ? index : last, -1)
   const proactive = items.some((item, index) => item.from === 'coordinator' && items[index - 1]?.from === 'event')
@@ -201,8 +208,8 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
       <NavBar material
         titleView={
           <Pressable accessibilityRole="button" accessibilityLabel={name ? `${name} 的资料` : '资料'} onPress={() => router.push(`/bots/${self}/info`)}>
+            {/* The name alone, as Messages and ChatGPT title a chat; the bot's mark is on its page (#1386). */}
             <Capsule>
-              <BotAvatar color={color} shape={shape} size={22} />
               {/* The bot's name is not in yet (opened from a push before 对话 loaded): a spinner, never an empty pill. */}
               {name ? <Text style={styles.titleText} numberOfLines={1}>{name}</Text> : <Spinner size={14} />}
             </Capsule>
@@ -216,12 +223,15 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
       />
       {/* The message list comes first, so the iOS bar finds it and blurs what scrolls under (scroll-edge effect). */}
       <View style={{ flex: 1, overflow: 'hidden' }} {...handlers}>
-        <ChatScrollView ref={scroll} testID="bot-chat-scroll" {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={[styles.list, { paddingBottom: composerHeight + 16 }]} onScroll={event => { if (chatScroll.onScroll(event)) setPinned(false) }} scrollEventThrottle={16} onContentSizeChange={chatScroll.onContentSizeChange}>
+        {/* The system scroll: momentum, and a bounce at both ends even while the chat is shorter than the screen. */}
+        <ChatScrollView ref={scroll} testID="bot-chat-scroll" bounces alwaysBounceVertical {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={[styles.list, { paddingBottom: composerHeight + 16 }]} onScroll={event => { if (chatScroll.onScroll(event)) setPinned(false) }} scrollEventThrottle={16} onContentSizeChange={chatScroll.onContentSizeChange}>
           {items.map((item, index) => {
             const time = clockTime(item.createdAt)
+            const question = item.from === 'event' ? questionCard(item.line, sources) : null
             return (
-              <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
-                {item.from === 'event' ? <EventLine text={eventText(item.line, sources)} /> : null}
+              <Arrival key={item.pending ? `pending-${item.position}` : item.position} animate={arrived(item.position)}>
+                {question ? <ThreadCard title={question.title} status="waiting" info="在等你回答" action="去回答" onPress={() => router.push(`/thread/${question.runId}`)} />
+                  : item.from === 'event' ? <EventLine text={eventText(item.line, sources)} /> : null}
                 {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right" onQuote={item.text ? () => setQuote(quotable(item.text)) : undefined} onLongPress={item.text ? () => actions(item.text, item.id) : undefined}><MyBubble text={item.text} photos={photos(item.id, item.images)} />{chips(item.id, 'right')}</TimedRow> : null}
                 {item.from === 'coordinator' && item.text ? (
                   <TimedRow time={time} offset={offset} onQuote={() => setQuote(quotable(item.text))} onLongPress={() => actions(item.text, item.id)}>
@@ -229,7 +239,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
                       ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} webPath={webChatPath(data?.botId ?? botId, workspaceId)} sources={sources} onOpen={open} />
                       : <BotBubble><Markdown text={item.text} sources={sources} onOpen={open} /></BotBubble>}
                     {chips(item.id)}
-                    <CopyButton text={plainText(item.text)} />
+                    {index === latestReply && !working ? <ReplyActions text={plainText(item.text)} onQuote={() => setQuote(quotable(item.text))} onMore={() => actions(item.text, item.id)} /> : null}
                   </TimedRow>
                 ) : null}
                 {item.from === 'coordinator' && item.stopped ? <Text style={styles.stopped}>已停止</Text> : null}
@@ -239,7 +249,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
                     ? <TimedRow key={id} time={time} offset={offset}><ThreadCard title={runTitle(run)} status={runIcon(run)} info={runInfoLine(run.info)} onPress={() => router.push(`/thread/${id}`)} /></TimedRow>
                     : null
                 })}
-              </Fragment>
+              </Arrival>
             )
           })}
           {outbox.map(item => <OutgoingBubble key={item.key} text={item.text} photos={item.images.map(image => image.uri)} failed={item.state !== 'sending'} unconfirmed={item.state === 'unconfirmed'} onRetry={() => void retry(item)} />)}

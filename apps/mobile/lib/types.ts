@@ -189,6 +189,11 @@ export interface Settings {
 }
 
 /** A run's name as the app shows it: its task as "MIK-11 群聊建表" when it has one (glossary), else its own name. */
+/** A run as people name it on a card or a chip: its task's title, never the task's key (#1386). */
+export function runName(run: RunSource): string {
+  return run.issue?.title || run.name
+}
+
 export function runTitle(run: RunSource): string {
   if (!run.issue) return run.name
   const key = run.issue.identifier ?? (run.issue.number === null ? null : `#${run.issue.number}`)

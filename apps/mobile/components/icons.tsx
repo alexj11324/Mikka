@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Animated, Easing, Platform, useColorScheme, View } from 'react-native'
+import { ActivityIndicator, Animated, Easing, Platform, useColorScheme, View } from 'react-native'
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg'
 import { Cloud, LoaderCircle, Laptop, MessageCircle, Server } from 'lucide-react-native'
 import type { MachineKind, Source, ThreadStatus } from '@/lib/types'
@@ -27,6 +27,8 @@ export function Spinner({ size = 18, color = colors.secondary }: { size?: number
     loop.start()
     return () => { loop.stop(); turn.setValue(0) }
   }, [reduceMotion, turn])
+  // iOS has its own (UIActivityIndicatorView, 20 pt); the drawn ring is for the web build only (native first, #1386).
+  if (Platform.OS === 'ios') return <ActivityIndicator accessibilityLabel="正在加载" size="small" color={color} style={size === 20 ? null : { transform: [{ scale: size / 20 }], width: size, height: size }} />
   const rotate = turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] })
   return (
     <Animated.View accessible accessibilityRole="progressbar" accessibilityLabel="正在加载" accessibilityState={{ busy: true }} style={{ width: size, height: size, transform: [{ rotate }] }}>
