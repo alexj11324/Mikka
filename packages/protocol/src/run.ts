@@ -116,6 +116,35 @@ export const runSkillMount = z.object({
 }).strict()
 export type RunSkillMount = z.infer<typeof runSkillMount>
 
+export const CRITERION_STATUSES = ["passed", "failed", "unverified"] as const
+export const criterionStatus = z.enum(CRITERION_STATUSES)
+export type CriterionStatus = z.infer<typeof criterionStatus>
+export const REVIEW_VERDICTS = ["passed", "changes_requested", "needs_judgment"] as const
+export const reviewVerdict = z.enum(REVIEW_VERDICTS)
+export type ReviewVerdict = z.infer<typeof reviewVerdict>
+
+/** An unavailable observation stays distinct from an observed mismatch. */
+export const runCriterion = z.object({
+  criterionId: z.uuid().optional(),
+  text: z.string().max(2_000).optional(),
+  /** Kept for older consumers; unverified is always false, never an invented pass. */
+  passed: z.boolean(),
+  status: criterionStatus.optional(),
+  reason: z.string().trim().min(1).max(2_000).optional(),
+  resolution: z.string().trim().min(1).max(2_000).optional(),
+  evidence: z.string().max(10_000).optional(),
+  command: z.string().trim().min(1).max(2_000).optional(),
+  exitCode: z.number().int().nullable().optional(),
+}).superRefine((value, ctx) => {
+  if (value.status && value.passed !== (value.status === "passed"))
+    ctx.addIssue({ code: "custom", path: ["passed"], message: "Criterion status and passed disagree" })
+  if (value.status === "unverified" && !value.reason)
+    ctx.addIssue({ code: "custom", path: ["reason"], message: "An unverified criterion needs its reason" })
+})
+export type RunCriterion = z.infer<typeof runCriterion>
+export const criterionVerificationStatus = (criterion: RunCriterion): CriterionStatus =>
+  criterion.status ?? (criterion.passed ? "passed" : "failed")
+
 /**
  * The handoff report sent with every run completion. The agent fills what
  * it can through its submit / ask / blocker call (summary, open questions,
@@ -173,20 +202,9 @@ export const runReport = z.object({
   /** Preview branch created or used by the producing run; descriptive metadata only. */
   previewDatabaseBranch: z.string().trim().min(1).max(500).optional(),
   /** Acceptance criteria the agent checked, with evidence. */
-  criteria: z
-    .array(
-      z.object({
-        criterionId: z.uuid().optional(),
-        text: z.string().max(2_000).optional(),
-        passed: z.boolean(),
-        evidence: z.string().max(10_000).optional(),
-        /** Agent-reported criterion check; the daemon-owned verify remains authoritative. */
-        command: z.string().trim().min(1).max(2_000).optional(),
-        exitCode: z.number().int().nullable().optional(),
-      }),
-    )
-    .max(200)
-    .optional(),
+  criteria: z.array(runCriterion).max(200).optional(),
+  /** A review completes once; this verdict never changes daemon-owned verification. */
+  reviewVerdict: reviewVerdict.optional(),
   /**
    * A `plan` run's hand-in: the spec it wrote and the split it proposes for
    * it (ADR ORV-205). Only the daemon sets this, and only for a `plan` run.

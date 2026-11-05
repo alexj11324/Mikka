@@ -4959,6 +4959,9 @@
       "session_mismatch": "The Agent did not return to the original session",
       "adapter_start_failed": "The Agent could not start on the cloud computer",
       "cleanup_failed": "The Agent did not start, and cleanup did not finish"
+    },
+    "factory_spec_approval_required": {
+      "default": "Review and approve the specification before implementation starts."
     }
   }
 }

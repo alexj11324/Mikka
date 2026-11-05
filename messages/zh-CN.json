@@ -4959,6 +4959,9 @@
       "session_mismatch": "Agent 没有回到原会话",
       "adapter_start_failed": "Agent 无法在云电脑上启动",
       "cleanup_failed": "Agent 未启动，清理也未完成"
+    },
+    "factory_spec_approval_required": {
+      "default": "请先审阅并批准方案，再开始实现。"
     }
   }
 }

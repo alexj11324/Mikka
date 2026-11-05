@@ -1,3 +1,4 @@
+import { runCriterion, reviewVerdict } from "@mikka/protocol/run"
 // Run supervisor: owns the run state machine
 //   queued -> preparing -> running <-> waiting_input -> finishing -> succeeded
 //   running -> stopped | failed | cancelled (and finishing -> failed on verify)
@@ -1739,6 +1740,8 @@ function pickAgentReport(agent: AgentReport | undefined): AgentReport {
   if (agent.repositorySelection) picked.repositorySelection = agent.repositorySelection
   if (agent.verificationCommand && typeof agent.verificationCommand.command === 'string' && agent.verificationCommand.command.trim() && typeof agent.verificationCommand.basis === 'string' && agent.verificationCommand.basis.trim())
     picked.verificationCommand = { command: agent.verificationCommand.command.trim().slice(0, 2000), basis: agent.verificationCommand.basis.trim().slice(0, 2000) }
+  const verdict = reviewVerdict.safeParse(agent.reviewVerdict)
+  if (verdict.success) picked.reviewVerdict = verdict.data
   if (typeof agent.summary === "string")
     picked.summary = agent.summary.slice(0, 10_000)
   if (
@@ -1770,10 +1773,13 @@ function pickAgentReport(agent: AgentReport | undefined): AgentReport {
     for (const entry of agent.criteria) {
       if (criteria.length >= MAX_REPORTED_CRITERIA) break
       if (!entry || typeof entry !== "object") continue
-      const { criterionId, text, passed, evidence, command, exitCode } = entry as {
+      const { criterionId, text, passed, status, reason, resolution, evidence, command, exitCode } = entry as {
         criterionId?: unknown
         text?: unknown
         passed?: unknown
+        status?: unknown
+        reason?: unknown
+        resolution?: unknown
         evidence?: unknown
         command?: unknown
         exitCode?: unknown
@@ -1781,15 +1787,19 @@ function pickAgentReport(agent: AgentReport | undefined): AgentReport {
       if (!(typeof criterionId === 'string' && UUID_RE.test(criterionId)) && !(typeof text === 'string' && text.trim()))
         continue
       if (typeof passed !== "boolean") continue
-      criteria.push({
+      const criterion = runCriterion.safeParse({
         ...(typeof criterionId === 'string' && UUID_RE.test(criterionId) ? { criterionId } : {}),
         ...(typeof text === 'string' && text.trim() ? { text: text.trim().slice(0, 2000) } : {}),
         passed,
+        ...(status !== undefined ? { status } : {}),
+        ...(typeof reason === "string" && reason.trim() ? { reason: reason.trim().slice(0, 2000) } : {}),
+        ...(typeof resolution === "string" && resolution.trim() ? { resolution: resolution.trim().slice(0, 2000) } : {}),
         ...(typeof command === "string" && command.trim() ? { command: command.trim().slice(0, 2_000), ...(exitCode === null || (typeof exitCode === "number" && Number.isSafeInteger(exitCode)) ? { exitCode } : {}) } : {}),
         ...(typeof evidence === "string"
           ? { evidence: evidence.slice(0, 10_000) }
           : {}),
       })
+      if (criterion.success) criteria.push(criterion.data)
     }
     picked.criteria = criteria
   }

@@ -8,6 +8,7 @@
 //
 // No imports: the CI guard loads this file directly with Node.
 export const USER_ERROR_CODES = {
+  factory_spec_approval_required: [],
   /** A subscription run on the bot owner's own device (subscription-local-runner.ts). */
   subscription_local_runtime_unavailable: [
     "assignment_invalid",

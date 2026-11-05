@@ -1,4 +1,5 @@
 import { factoryNextStage } from './flow'
+import { factoryFlowVersion } from './contract'
 import type { PoolClient } from 'pg'
 import type { FactoryEvidence, FactoryBinding } from './contract'
 import { runCaptureEvidence } from './evidence'
@@ -83,6 +84,7 @@ export async function completeFactoryExecution(tx: PoolClient, store: Pick<Retur
       },
       tx,
     );
+    if (task.stage === 'spec' && factoryFlowVersion(task) === 2) return next.task;
     const stage = await factoryNextStage(tx, next.task);
     const advanced = await store.apply(
       userId,

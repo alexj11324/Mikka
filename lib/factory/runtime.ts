@@ -1,3 +1,4 @@
+import { syncFactoryPresentation } from './stage-progress';
 import { prepareCloudQuestionRecovery, queueCloudQuestionContinuation, wakeCloudQuestionContinuation } from './questions/queue-continuation';
 import { queueLocalQuestionContinuation } from './questions/queue-local-continuation';
 import 'server-only';
@@ -35,7 +36,7 @@ export const factoryAuthorize = (userId: string, issueId: string, tx: PoolClient
 /** Consumer owners supply actual validators/configurators. Sixth argument is host-only recovery I/O, never tool input. Text observations need no images. */
 export function factoryRuntimeForBot(botId: string | null, lifecycle: FactoryLifecycle = {}, configure: FactoryDispatchAdapters['configure'] = {}, validateCheck?: Parameters<typeof createFactoryClaim>[2], consumers: Parameters<typeof createFactoryReconciler>[3] = {}, recovery: FactoryCheckRecoveryDependencies = {}) {
   if (!factoryLifecycleEnabled()) throw new FactoryError('factoryLifecycleUnavailable');
-  const store = createFactoryStore(pool,factoryAuthorize,botId,{...lifecycle,independent:factoryCheckIndependent,gates:{...factoryCheckGates,approval:approvalGate,publish:publishGate,monitor:monitorGate,...lifecycle.gates}});
+  const store = createFactoryStore(pool,factoryAuthorize,botId,{onTransition:syncFactoryPresentation,...lifecycle,independent:factoryCheckIndependent,gates:{...factoryCheckGates,approval:approvalGate,publish:publishGate,monitor:monitorGate,...lifecycle.gates}});
   const validate = validateCheck ?? ((tx:PoolClient,task:import('./store').FactoryTask,id:string) => task.stage === 'monitor' ? factoryMonitorDispatchAssignment(tx,task.userId,id) : factoryCheckAssignment(tx,task.userId,id));
   const dispatch = createFactoryDispatch(pool,store,
     async (tx,userId,input,scopeBot,context) => await queueCloudQuestionContinuation(tx,userId,input,scopeBot,context) ?? await queueLocalQuestionContinuation(tx,userId,input,scopeBot,context) ?? queueFactoryRun(tx,userId,input,scopeBot,context), {
