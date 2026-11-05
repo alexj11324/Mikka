@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { mergeChat } from './chat-poll'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
+import { measured, readMetrics } from '../../tests/helpers/read-metrics'
 
 // Database regressions execute only in CI against ephemeral Postgres 17.
 // Local pure runs skip them; REQUIRE_DB=1 makes a missing database fail.
@@ -89,14 +90,21 @@ dbTest('the chat version changes exactly when the conversation or its inbox does
     t.diagnostic(JSON.stringify({ event: 'chat_poll_bytes', full, unchanged: poll }))
     assert.ok(poll * 50 < full, `unchanged poll ${poll} bytes, full read ${full}`)
 
-    const previous = await store.chatView(owner, 200, botId)
+    const cold = await measured(() => store.chatView(owner, 200, botId))
+    const previous = cold.value
+    const legacyReload = await measured(() => store.chatView(owner, 200, botId))
+    const warm = await measured(async () => ({ unchanged: true, ...await store.chatVersion(owner, 200, botId) }))
+    const restored = await measured(() => store.chatUpdate(owner, botId, previous.continuation))
+    assert.ok('after' in restored.value)
+    assert.deepEqual(mergeChat(previous, restored.value).items, previous.items)
     await db.insert(schema.coordinatorMessages).values([
       { id: randomUUID(), userId: owner, botId, position: 41, message: { role: 'user', content: 'Next question' } },
       { id: randomUUID(), userId: owner, botId, position: 42, message: { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'delta-tool', toolName: 'read_file', input: { path: 'fixture' } }] } },
       { id: randomUUID(), userId: owner, botId, position: 43, message: { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'delta-tool', toolName: 'read_file', output: { type: 'text', value: 'read' } }] } },
       { id: randomUUID(), userId: owner, botId, position: 44, message: { role: 'assistant', content: 'The new answer' } },
     ])
-    const delta = await store.chatUpdate(owner, botId, previous.continuation)
+    const deltaRead = await measured(() => store.chatUpdate(owner, botId, previous.continuation))
+    const delta = deltaRead.value
     assert.ok('after' in delta, 'an append reads only the overlapping tail')
     const complete = await store.chatView(owner, 200, botId)
     assert.deepEqual(mergeChat(previous, delta).items, complete.items, 'pending input and tool-result grouping match a full read')
@@ -107,6 +115,14 @@ dbTest('the chat version changes exactly when the conversation or its inbox does
     await db.update(schema.coordinatorMessages).set({ message: { role: 'assistant', content: 'Earlier reply was corrected' } }).where(and(eq(schema.coordinatorMessages.userId, owner), eq(schema.coordinatorMessages.botId, botId), eq(schema.coordinatorMessages.position, 2)))
     assert.ok(!('after' in await store.chatUpdate(owner, botId, complete.continuation)), 'rewriting an older message invalidates the prefix proof')
     assert.ok(!('after' in await store.chatUpdate(owner, otherBot, complete.continuation)), 'another bot cannot reuse this prefix')
+
+    const beforeDelete = await store.chatView(owner, 200, botId)
+    await db.delete(schema.coordinatorMessages).where(and(eq(schema.coordinatorMessages.userId, owner), eq(schema.coordinatorMessages.botId, botId), eq(schema.coordinatorMessages.position, 1)))
+    const deletion = await measured(() => store.chatUpdate(owner, botId, beforeDelete.continuation))
+    assert.ok(!('after' in deletion.value), 'deleting a cached prefix row invalidates its proof')
+    assert.ok(!mergeChat(beforeDelete, deletion.value).items.some(item => item.position === 1))
+    t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'bot-chat-store', scope: 'data-read-path_not_page_http', fixtureMessages: 40,
+      legacyReload: readMetrics(legacyReload), cold: readMetrics(cold), warmKnown: readMetrics(warm), reloadRestored: readMetrics(restored), appendedTurnDelta: readMetrics(deltaRead), deletion: readMetrics(deletion) }))
 
     await db.insert(schema.coordinatorMessages).values(Array.from({ length: 210 }, (_, index) => ({ id: randomUUID(), userId: owner, botId, position: 45 + index, message: { role: 'user', content: `Long absence ${index}` } })))
     const resumed = await store.chatUpdate(owner, botId, complete.continuation)

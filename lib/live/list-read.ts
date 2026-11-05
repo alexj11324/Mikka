@@ -1,4 +1,5 @@
 import { LIVE_ID } from './events'
+import { botKeys, issueKeys } from '@/lib/swr/keys'
 
 export type ListLiveRead = {
   ownerId: string
@@ -16,12 +17,12 @@ export class ListReadScopeError extends Error {
 export const UNRESOLVED_LIST_SCOPE = '00000000-0000-4000-8000-000000000000'
 export const liveListReadOptions = { refreshInterval: 0, revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false } as const
 
-export const issueListKey = (ownerId: string, workspaceId: string) => ['issues', ownerId, workspaceId] as const
+export const issueListKey = issueKeys.list
 /** Existing detail controls can refresh all of this viewer's cached workspaces
  * without knowing (or borrowing) the currently selected transport scope. */
 export const isIssueListKey = (key: unknown, ownerId?: string) => Array.isArray(key) && key[0] === 'issues' && (!ownerId || key[1] === ownerId)
-export const groupListKey = (ownerId: string, workspaceId: string) => ['bot-list-groups', ownerId, workspaceId] as const
-export const botListKey = (ownerId: string, workspaceId: string) => ['bots', ownerId, workspaceId] as const
+export const groupListKey = botKeys.groups
+export const botListKey = botKeys.list
 export const isBotListKey = (key: unknown) => key === 'bots' || (Array.isArray(key) && key[0] === 'bots')
 
 /** The request-start anchor belongs to this actual read, not its response or

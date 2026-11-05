@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -18,7 +19,7 @@ export function ArchivedBotsSettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.archivedBots')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const list = useSWR(['settings:archived-bots', workspaceId], () => listArchivedBots(workspaceId))
+  const list = useSWR(settingsKeys.archivedBots(workspaceId), () => listArchivedBots(workspaceId))
   const [pending, setPending] = useState<string | null>(null)
   const [failed, setFailed] = useState<{ botId: string; message: string } | null>(null)
   const bots = list.data && !list.data.error ? list.data.bots : []

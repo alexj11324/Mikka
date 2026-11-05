@@ -93,6 +93,39 @@ test('online idle channels send pings and perform no polling reads', async () =>
   f.channel.dispose()
 })
 
+test('focus coverage follows this key, live capabilities and disconnects', async () => {
+  const f = fixture()
+  assert.equal(f.channel.keyConnected('detail'), undefined)
+  const stop = f.subscribe()
+  assert.equal(f.channel.keyConnected('detail'), false)
+  await f.open()
+  assert.equal(f.channel.keyConnected('detail'), true)
+  assert.equal(f.channel.keyConnected('unrelated-setting'), undefined)
+  f.sockets[0].close()
+  assert.equal(f.channel.keyConnected('detail'), false)
+  stop()
+  assert.equal(f.channel.keyConnected('detail'), undefined)
+})
+
+test('duplicate visible events skip healthy live reads while a real hidden interval still catches up', async () => {
+  const f = fixture()
+  f.subscribe(); await f.open(); f.reads.length = 0
+  f.visibility(true); await f.advance(100)
+  assert.deepEqual(f.reads, [])
+  f.visibility(false); f.visibility(true); await f.open()
+  assert.deepEqual(f.reads, ['detail', 'ledger'])
+  f.channel.dispose()
+})
+
+test('unsupported live kinds keep visibility catch-up even while their socket is connected', async () => {
+  const f = fixture()
+  f.capabilities([]); f.subscribe(); await f.open(); f.reads.length = 0
+  assert.equal(f.channel.keyConnected('detail'), false)
+  f.visibility(true); await f.advance(100)
+  assert.deepEqual(f.reads, ['detail', 'ledger'])
+  f.channel.dispose()
+})
+
 test('offline fallback waits at least 60 seconds; hidden tabs make no requests', async () => {
   const f = fixture(); f.available(false); f.subscribe(); await settle()
   await f.advance(LIVE_FALLBACK_MS - 1)

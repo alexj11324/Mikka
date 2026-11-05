@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useState, type ReactNode } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
@@ -32,7 +33,7 @@ function protocolAgents(t: ApiKeysT, protocols: readonly ApiKeyProtocol[]) {
   return t('protocolAgents', { protocols: protocols.map(item => t(`protocolName.${item}`)).join('、'), agents: protocols.map(item => harnessName(protocolHarness(item))).join('、') })
 }
 
-export const apiKeysKey = (workspaceId: string) => ['settings:api-keys', workspaceId] as const
+export const apiKeysKey = settingsKeys.apiKeys
 /** A GET, like the other settings reads: it never waits in front of a save in the server-action queue. */
 export const readApiKeys = (workspaceId: string) => settingsRead<Awaited<ReturnType<typeof getApiKeys>>>('api-keys', { workspace: workspaceId })
 

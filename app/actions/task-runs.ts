@@ -14,6 +14,8 @@ import { replyLine } from '@/lib/thread-groups'
 import { queryVersion } from '@/lib/db/query-version'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { ownerListRead } from '@/lib/live/list-read-server'
+import { changedListIds, readListPositions, type ListPosition } from '@/lib/list-poll'
+import { cacheReadAction } from '@/lib/cache-read-action'
 
 /** The newest run on each issue, for the right column's 我的任务 groups (MIK-38). */
 export interface TaskRun {
@@ -94,11 +96,17 @@ export async function listThreads(): Promise<Thread[]> {
 }
 
 /** Authorization is checked even when an existing snapshot has not changed. */
-export async function pollThreads(known?: string) {
-  return readThreads(known && /^[0-9a-f]{32}$/.test(known) ? known : undefined)
+export async function pollThreads(known?: string, positions?: readonly ListPosition[]) {
+  const previous = readListPositions(positions, 200)
+  const valid = positions === undefined || previous !== undefined
+  return readThreads(valid && known && /^[0-9a-f]{32}$/.test(known) ? known : undefined, previous)
 }
 
-async function readThreads(known?: string) {
+export async function syncThreadList(known?: string, positions?: readonly ListPosition[]) {
+  return cacheReadAction(async () => ({ snapshot: await pollThreads(known, positions) }))
+}
+
+async function readThreads(known?: string, previous?: ListPosition[]) {
   return withDatabaseOperation('/actions/threads/poll', async () => {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
@@ -129,7 +137,7 @@ async function readThreads(known?: string) {
       outcome: agentRuns.outcome,
     }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
       .where(and(eq(agentRuns.userId, session.user.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
-      .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt)).limit(200)
+      .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
     const signature = await queryVersion(snapshot)
     const version = createHash('sha256').update(JSON.stringify([session.user.id, signature])).digest('hex').slice(0, 32)
     const visible = snapshot.as('thread_list_expiry')
@@ -140,7 +148,12 @@ async function readThreads(known?: string) {
     const presenceFallback = queuedDevices.length > 0
     if (known === version) return { unchanged: true, version, live, presenceFallback } as const
     // Reading the version first makes a concurrent edit visible on the next poll.
-    const rows = await snapshot
+    const manifest = await db.select({ id: visible.id, version: sql<string>`md5(to_jsonb(thread_list_expiry)::text)` }).from(visible)
+      .orderBy(desc(sql`greatest(${visible.lastReplyAt}, ${visible.updatedAt})`), desc(visible.createdAt), desc(visible.id))
+    const positions = manifest.map(row => ({ id: row.id, version: createHash('sha256').update(`${session.user.id}:${row.version}`).digest('hex').slice(0, 32) }))
+    const changedIds = changedListIds(positions, previous)
+    const rows = changedIds.length ? await db.select().from(visible).where(inArray(visible.id, changedIds))
+      .orderBy(desc(sql`greatest(${visible.lastReplyAt}, ${visible.updatedAt})`), desc(visible.createdAt), desc(visible.id)) : []
     const items: Thread[] = rows.map(({ deviceId, deviceName, deviceType, waitingForDevice, harness, ...row }) => ({
       // A cloud run waits on its own sandbox, never on a machine the person can turn on.
       ...(waitingForDevice && deviceId && deviceName !== null && deviceType
@@ -148,6 +161,6 @@ async function readThreads(known?: string) {
       ...row, harness: harness ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
       lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
     }))
-    return { version, items, live, presenceFallback }
+    return { version, items, positions, ...(previous ? { delta: true as const } : {}), live, presenceFallback }
   })
 }

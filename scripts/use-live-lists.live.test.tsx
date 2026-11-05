@@ -11,12 +11,18 @@ const team = '20000000-0000-4000-8000-000000000001'
 const otherTeam = '20000000-0000-4000-8000-000000000002'
 const otherHome = '10000000-0000-4000-8000-000000000002'
 type Kind = 'issues' | 'threads' | 'tasks' | 'bots' | 'groups' | 'roster'
-type Read = { items: { id: string; title: string }[]; live: { ownerId: string; workspaceId: string | null; selectedWorkspaceId?: string; deadline?: { at: string; afterMs: number } }; version?: string; presenceFallback?: boolean }
+type Read = { items: { id: string; title: string }[]; live: { ownerId: string; workspaceId: string | null; selectedWorkspaceId?: string; deadline?: { at: string; afterMs: number } }; version?: string; positions?: { id: string; version: string }[]; delta?: true; presenceFallback?: boolean }
 const replies = new Map<Kind, () => Promise<Read>>()
 let reads: Kind[]
+let cursors: { kind: Kind; known?: string; positions?: unknown }[]
+let scopeError: string | null = null
 const read = (kind: Kind) => { reads.push(kind); return replies.get(kind)!() }
-mock.module(new URL('../app/actions/issues.ts', import.meta.url).href, { namedExports: { pollIssues: () => read('issues') } })
-mock.module(new URL('../app/actions/task-runs.ts', import.meta.url).href, { namedExports: { pollThreads: () => read('threads'), pollTaskRuns: () => read('tasks') } })
+const sync = async (kind: Kind, known?: string, positions?: unknown) => {
+  cursors.push({ kind, known, positions })
+  return scopeError ? { error: scopeError } : { snapshot: await read(kind) }
+}
+mock.module(new URL('../app/actions/issues.ts', import.meta.url).href, { namedExports: { syncIssueList: (known?: string, positions?: unknown) => sync('issues', known, positions) } })
+mock.module(new URL('../app/actions/task-runs.ts', import.meta.url).href, { namedExports: { syncThreadList: (known?: string, positions?: unknown) => sync('threads', known, positions), pollTaskRuns: () => read('tasks') } })
 mock.module(new URL('../app/actions/coordinator.ts', import.meta.url).href, { namedExports: { pollBotChatSummaries: () => read('bots') } })
 mock.module(new URL('../app/actions/bots.ts', import.meta.url).href, { namedExports: { pollBots: () => read('roster') } })
 
@@ -75,7 +81,7 @@ before(async () => {
   ;({ useListExpiry } = await import('../hooks/use-list-expiry'))
 })
 beforeEach(() => {
-  reads = []; tickets = []; sockets.length = 0; refresh = {}; cache = new Map(); replies.clear()
+  reads = []; cursors = []; scopeError = null; tickets = []; sockets.length = 0; refresh = {}; cache = new Map(); replies.clear()
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
   for (const kind of ['issues', 'threads', 'tasks', 'bots', 'groups', 'roster'] as const) replies.set(kind, async () => snapshot(kind))
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
@@ -115,6 +121,45 @@ async function render(kinds: Kind[], workspace = team, owner = 'owner') {
 async function settled() { await wait(); await wait() }
 function emit(scope: string, kind: string) { for (const socket of sockets) if (socket.url.endsWith(scope)) socket.message({ kind, id: scope }) }
 const deferred = <T,>() => { let resolve!: (value: T) => void; return { promise: new Promise<T>(done => { resolve = done }), resolve: (value: T) => resolve(value) } }
+
+for (const kind of ['issues', 'threads'] as const) test(`a restored ${kind} snapshot sends its existing row proofs and removes rows absent from the authorized delta`, async () => {
+  const kept = '30000000-0000-4000-8000-000000000001', removed = '30000000-0000-4000-8000-000000000002'
+  const positions = [{ id: kept, version: 'a'.repeat(32) }, { id: removed, version: 'b'.repeat(32) }]
+  const previous = { ...snapshot(kind), version: 'c'.repeat(32), positions, items: [{ id: kept, title: 'cached row' }, { id: removed, title: 'deleted row' }] }
+  const key = kind === 'issues' ? ['issues', 'owner', team] : ['threads', 'owner']
+  cache.set(unstableSerialize(key), { data: previous })
+  replies.set(kind, async () => ({ ...snapshot(kind), version: 'd'.repeat(32), delta: true, positions: [positions[0]], items: [] }))
+  await render([kind]); await settled()
+  assert.deepEqual(cursors[0], { kind, known: previous.version, positions })
+  assert.ok(view(kind)?.includes('cached row'))
+  assert.ok(!view(kind)?.includes('deleted row'))
+  assert.deepEqual((cache.get(unstableSerialize(key))?.data as Read).positions, [positions[0]])
+})
+
+for (const proof of ['partial', 'missing'] as const) test(`a restored list with ${proof} proofs cannot receive unchanged while rows are missing`, async () => {
+  const kept = '30000000-0000-4000-8000-000000000001', missing = '30000000-0000-4000-8000-000000000002'
+  const positions = [{ id: kept, version: 'a'.repeat(32) }, { id: missing, version: 'b'.repeat(32) }]
+  const previous = { ...snapshot('issues'), version: 'c'.repeat(32), ...(proof === 'partial' ? { positions } : {}), items: [{ id: kept, title: 'held row' }] }
+  cache.set(unstableSerialize(['issues', 'owner', team]), { data: previous })
+  replies.set('issues', async () => ({ ...snapshot('issues'), version: 'c'.repeat(32), positions, ...(proof === 'partial' ? { delta: true as const } : {}),
+    items: [...(proof === 'partial' ? [] : previous.items), { id: missing, title: 'recovered missing row' }] }))
+  await render(['issues']); await settled()
+  assert.equal(cursors[0].known, undefined)
+  assert.deepEqual(cursors[0].positions, proof === 'partial' ? [positions[0]] : undefined)
+  assert.ok(view('issues')?.includes('held row'))
+  assert.ok(view('issues')?.includes('recovered missing row'))
+})
+
+test('an explicit revoked access response hides a previously visible cached issue list', async () => {
+  await render(['issues']); await settled()
+  assert.ok(view('issues')?.includes('owner:issues'))
+  scopeError = 'workspaceAccessDenied'
+  await act(async () => { await refresh.issues!().catch(() => undefined) })
+  assert.equal(view('issues'), 'unavailable')
+  const deniedReads = cursors.length
+  await act(async () => { emit(home, 'issue_list'); emit(team, 'issue_list') }); await wait(350)
+  assert.equal(cursors.length, deniedReads, 'terminal access failure retires live invalidation and its disconnected fallback')
+})
 
 test('healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list', { timeout: 80_000 }, async () => {
   await render(['threads', 'tasks', 'bots']); await settled()

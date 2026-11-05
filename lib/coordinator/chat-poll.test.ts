@@ -39,3 +39,11 @@ test('a delta replaces the replayed tail and pending messages, without duplicati
   assert.deepEqual(mergeChat(previous, next).items, [chat.items[0], ...next.items])
   assert.equal(mergeChat({ ...previous, cursor: 7 }, next).cursor, 7, 'an old response cannot overwrite newer cache data')
 })
+
+test('an unchanged transcript replaces reauthorized metadata, removing deleted and revoked cards', () => {
+  const previous = { ...chat, sources: { private: { title: 'No longer shared' } }, artifacts: { deleted: { title: 'Removed' } } }
+  const next = mergeChat(previous, unchanged({ metadata: { sources: {}, artifacts: {} } }))
+  assert.equal(next.items, previous.items, 'unchanged message bodies are retained')
+  assert.deepEqual(next.sources, {})
+  assert.deepEqual(next.artifacts, {})
+})

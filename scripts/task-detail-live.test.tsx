@@ -29,14 +29,27 @@ mock.module('next-intl', { namedExports: {
 
 let stored: IssueView
 let versions: ActivityVersion[]
-let issueReads = 0, versionReads = 0
+let issueReads = 0, versionReads = 0, fullVersionReads = 0, documentReads = 0
 let readOverride: (() => Promise<IssueView>) | null = null
+let readFailure: string | null = null
+let readViewerId = owner
+let knownVersions: (string | undefined)[]
 let documentHold: Promise<void> | null = null
 let documentWaits = 0
 let writes: Parameters<typeof import('../app/actions/issues')['saveIssue']>[0][]
 mock.module(at('app/actions/issues.ts'), { namedExports: {
-  getIssue: async (id: string) => { assert.equal(id, issueId); issueReads++; return { issue: readOverride ? await readOverride() : structuredClone(stored) } },
-  listIssueVersions: async (id: string) => { assert.equal(id, issueId); versionReads++; return structuredClone(versions) },
+  pollIssue: async (id: string, known?: string) => {
+    assert.equal(id, issueId); issueReads++; knownVersions.push(known)
+    const issue = readOverride ? await readOverride() : structuredClone(stored)
+    if (readFailure) return { error: readFailure }
+    const version = String(issue.revision).padStart(32, '0')
+    return known === version ? { viewerId: readViewerId, version, unchanged: true } : { viewerId: readViewerId, issue, version }
+  },
+  pollIssueVersionSummaries: async (id: string) => {
+    assert.equal(id, issueId); versionReads++
+    return { viewerId: readViewerId, snapshot: { version: String(versions.length).padStart(32, '0'), items: structuredClone(versions) } }
+  },
+  listIssueVersions: async (id: string) => { assert.equal(id, issueId); fullVersionReads++; return structuredClone(versions) },
   saveIssue: async (input: Parameters<typeof import('../app/actions/issues')['saveIssue']>[0]) => {
     writes.push(structuredClone(input))
     if (input.revision !== stored.revision) return { error: 'issueStale' }
@@ -47,6 +60,7 @@ mock.module(at('app/actions/issues.ts'), { namedExports: {
 mock.module(at('app/actions/collaboration.ts'), { namedExports: {
   exchangeDocument: async (input: { id: string; seed: string; known?: string }) => {
     assert.equal(input.id, issueId)
+    documentReads++
     if (documentHold) { documentWaits++; await documentHold }
     return { ...(!input.known ? { update: input.seed } : {}), version: 'fixture-document', workspaceId }
   },
@@ -56,13 +70,14 @@ mock.module(at('app/actions/issue-operations.ts'), { namedExports: {
 } })
 const none = () => null
 for (const [file, names] of [
-  ['issue-detail-actions', ['IssueDetailActions']], ['issue-description-history', ['IssueDescriptionHistory']],
+  ['issue-description-history', ['IssueDescriptionHistory']],
   ['issue-relations', ['IssueRelations']], ['issue-members', ['IssueMembers']], ['issue-thread-panel', ['IssueThreadPanel']],
   ['factory-acceptance', ['FactoryAcceptance', 'FactoryAcceptancePanel']],
 ] as const) mock.module(at(`components/workspace/${file}.tsx`), { namedExports: Object.fromEntries(names.map(name => [name, none])) })
+mock.module(at('components/workspace/issue-detail-actions.tsx'), { namedExports: { IssueDetailActions: ({ onHistory, disabled }: { onHistory: () => void; disabled: boolean }) => <button disabled={disabled} data-history="" onClick={onHistory}>History</button> } })
 const emptyThreads = { data: [] }
 mock.module(at('components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: none, ThreadEventRow: none, useIssueThreads: () => emptyThreads } })
-mock.module(at('components/workspace/issue-detail-header.tsx'), { namedExports: { IssueDetailHeader: () => <header>Task</header> } })
+mock.module(at('components/workspace/issue-detail-header.tsx'), { namedExports: { IssueDetailHeader: ({ actions }: { actions: ReactNode }) => <header>Task{actions}</header> } })
 mock.module(at('components/workspace/issue-detail-properties.tsx'), { namedExports: { IssueDetailProperties: ({ status, priority, task }: { status: string; priority: string; task: IssueView }) =>
   <output data-properties="" data-revision={task.revision}>{status}:{priority}</output> } })
 mock.module(at('components/workspace/issue-editor.tsx'), { namedExports: {
@@ -115,7 +130,7 @@ function version(issue: IssueView): ActivityVersion {
 beforeEach(() => {
   stored = { id: issueId, userId: owner, title: 'Accepted report', content: body('Original description'), status: 'review', priority: 'normal', revision: 1,
     identifier: 'ALEX-60', metadata: {}, createdAt: new Date('2026-11-05T08:00:00Z'), updatedAt: new Date('2026-11-05T08:00:00Z') } as IssueView
-  versions = [version(stored)]; writes = []; issueReads = 0; versionReads = 0; readOverride = null; documentHold = null; documentWaits = 0; flush = null; cache = new Map(); sockets.length = 0
+  versions = [version(stored)]; writes = []; issueReads = 0; versionReads = 0; fullVersionReads = 0; documentReads = 0; knownVersions = []; readFailure = null; readViewerId = owner; readOverride = null; documentHold = null; documentWaits = 0; flush = null; cache = new Map(); sockets.length = 0
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
   globalThis.fetch = async (input, options) => {
@@ -137,12 +152,13 @@ const properties = () => container.querySelector('[data-properties]')!
 const title = () => container.querySelector<HTMLTextAreaElement>('#task-title')!
 const description = () => container.querySelector<HTMLTextAreaElement>('[data-description]')!
 const activity = () => container.querySelector('[data-activity]')?.textContent ?? ''
-async function mount() {
+async function mount(ready = true) {
   await act(async () => root.render(<SWRConfig value={{ provider: () => cache, dedupingInterval: 0, shouldRetryOnError: false }}>
     <LiveProvider ownerId={owner} workspaceId={workspaceId}><TaskDetail id={issueId} thread={null} origin="Tasks"
       user={{ id: owner, name: 'Owner', email: 'owner@example.invalid' }} navigation={{ index: -1, total: 0, onOpen: noop }}
       onOpen={noop} onSaved={noop} onDirty={noop} onClose={noop} onDeleted={noop} onRegisterFlush={registerFlush} /></LiveProvider>
   </SWRConfig>))
+  if (!ready) return
   await until(() => !!description() && sockets.some(socket => socket.readyState === 1) && activity().includes('createdTask'), 'task, activity and live channel mounted')
   await wait(100)
 }
@@ -157,6 +173,53 @@ function accepted() {
   stored = { ...stored, status: 'done', revision: 2 }
   versions.push(version(stored))
 }
+
+test('a recovered task appears before its conditional read, without creating a writable document until access is revalidated', { timeout: 10_000 }, async () => {
+  const { unstable_serialize } = await import('swr')
+  const readVersion = String(stored.revision).padStart(32, '0')
+  cache.set(unstable_serialize(['issue', issueId]), { data: { ...structuredClone(stored), readVersion } })
+  let release!: () => void
+  const waiting = new Promise<void>(resolve => { release = resolve })
+  readOverride = async () => { await waiting; return structuredClone(stored) }
+  try {
+    await mount(false); await until(() => !!description(), 'cached task preview appears')
+    assert.equal(description().value, 'Original description')
+    assert.equal(container.querySelector('[role="region"]')?.getAttribute('aria-busy'), 'true')
+    assert.equal(title().readOnly, true)
+    assert.deepEqual(knownVersions, [readVersion])
+    assert.equal(documentReads, 0, 'no stale seed is exchanged before authorization')
+    assert.equal(versionReads, 0, 'activity is deferred until the task read succeeds')
+    assert.equal(writes.length, 0)
+    await act(async () => release())
+    await until(() => documentReads > 0 && activity().includes('createdTask'), 'verified document and activity mount')
+    assert.equal(title().readOnly, false)
+    assert.equal(fullVersionReads, 0, 'the activity feed reads summaries, not fifty full historical documents')
+    await act(async () => { (container.querySelector('[data-history]') as HTMLButtonElement).click() })
+    await until(() => fullVersionReads === 1, 'opening history fetches the version bodies on demand')
+  } finally { release() }
+})
+
+test('a failed cached-task authorization removes its preview without exchanging the stored document', { timeout: 10_000 }, async () => {
+  const { unstable_serialize } = await import('swr')
+  cache.set(unstable_serialize(['issue', issueId]), { data: { ...structuredClone(stored), readVersion: '1'.padStart(32, '0') } })
+  readFailure = 'workspaceAccessDenied'
+  await mount(false)
+  await until(() => container.textContent?.includes('unavailableTitle') === true, 'revoked task is unavailable')
+  assert.equal(description(), null)
+  assert.equal(documentReads, 0)
+  assert.equal(writes.length, 0)
+})
+
+test('a shared-task response after an account cookie change cannot validate the old viewer\'s document', { timeout: 10_000 }, async () => {
+  const { unstable_serialize } = await import('swr')
+  cache.set(unstable_serialize(['issue', issueId]), { data: { ...structuredClone(stored), readVersion: '1'.padStart(32, '0') } })
+  readViewerId = 'other-viewer'
+  await mount(false)
+  await until(() => container.textContent?.includes('unavailableTitle') === true, 'foreign viewer response is refused')
+  assert.equal(description(), null)
+  assert.equal(documentReads, 0)
+  assert.equal(writes.length, 0)
+})
 
 test('a committed acceptance event refreshes the mounted task status and activity without reload', { timeout: 10_000 }, async () => {
   await mount()

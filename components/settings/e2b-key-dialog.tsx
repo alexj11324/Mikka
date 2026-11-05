@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -18,7 +19,7 @@ import type { PresenceProps } from '@/lib/use-presence'
  */
 export function useE2BKeyStatus(workspaceId: string | null | undefined) {
   // The read names the workspace and says whether this person may set the key (canEdit).
-  return useSWR(workspaceId ? ['settings:e2b-key', workspaceId] : null, () => settingsRead<Awaited<ReturnType<typeof getE2BKeyCapability>>>('e2b-key', { workspace: workspaceId }))
+  return useSWR(workspaceId ? settingsKeys.e2bKey(workspaceId) : null, () => settingsRead<Awaited<ReturnType<typeof getE2BKeyCapability>>>('e2b-key', { workspace: workspaceId }))
 }
 
 /**
@@ -27,7 +28,7 @@ export function useE2BKeyStatus(workspaceId: string | null | undefined) {
  * Mikka Cloud can run only with one. `undefined` while loading or when the read fails.
  */
 export function useOwnE2BKey(enabled = true) {
-  const swr = useSWR(enabled ? ['settings:e2b-key', 'current'] : null, () => settingsRead<Awaited<ReturnType<typeof getE2BKeyCapability>>>('e2b-key'))
+  const swr = useSWR(enabled ? settingsKeys.e2bKey('current') : null, () => settingsRead<Awaited<ReturnType<typeof getE2BKeyCapability>>>('e2b-key'))
   const status = swr.data && !swr.data.error ? swr.data : undefined
   return { configured: status?.configured, mutate: swr.mutate }
 }

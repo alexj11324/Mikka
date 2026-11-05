@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
 import useSWRInfinite from 'swr/infinite'
 import { useLocale, useTranslations } from 'next-intl'
@@ -36,7 +37,7 @@ export function AuditLogSettings({ workspaceId }: { workspaceId: string }) {
   const pages = useSWRInfinite(
     (index, previous: Awaited<ReturnType<typeof listAuditLog>> | null) => {
       if (previous && (previous.error || !previous.nextCursor)) return null
-      return ['settings:audit', workspaceId, filter, index === 0 ? null : previous && !previous.error ? previous.nextCursor : null] as const
+      return settingsKeys.audit(workspaceId, filter, index === 0 ? null : previous && !previous.error ? previous.nextCursor : null)
     },
     ([, id, segment, cursor]) => settingsRead<Awaited<ReturnType<typeof listAuditLog>>>('audit', { workspace: id, filter: segment, cursor }),
     { revalidateFirstPage: false },

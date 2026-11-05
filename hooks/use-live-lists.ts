@@ -1,19 +1,22 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import useSWR, { unstable_serialize } from 'swr'
-import { pollIssues, type listIssues } from '@/app/actions/issues'
-import { pollTaskRuns, pollThreads, type Thread } from '@/app/actions/task-runs'
+import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
+import { syncIssueList, type listIssues } from '@/app/actions/issues'
+import { pollTaskRuns, syncThreadList, type Thread } from '@/app/actions/task-runs'
 import { pollBotChatSummaries } from '@/app/actions/coordinator'
 import { pollBots } from '@/app/actions/bots'
-import { mergeList } from '@/lib/list-poll'
+import { heldListPositions, mergeList, type ListPosition } from '@/lib/list-poll'
+import { waitForCacheHydration } from '@/lib/swr/persistent-cache'
+import { CacheReadError } from '@/lib/cache-read-error'
+import { chatKeys, taskRunKeys, threadKeys } from '@/lib/swr/keys'
 import { botListKey, groupListKey, issueListKey, ListReadScopeError, listReadDeadline, liveListReadOptions, observeListRead, ownerListWorkspace, UNRESOLVED_LIST_SCOPE, type ListLiveRead } from '@/lib/live/list-read'
 import { fetchScopedGroups, GroupMessagesRequestError } from '@/lib/group-messages'
 import { useLiveKey, useLiveKeys } from './use-live-key'
 
 type Issues = Awaited<ReturnType<typeof listIssues>>
-type IssueRead = { items: Issues; version?: string; live?: ListLiveRead & { selectedWorkspaceId: string }; requestedAt?: number }
-type ThreadRead = { items: Thread[]; version?: string; live?: ListLiveRead; presenceFallback?: boolean; requestedAt?: number }
+type IssueRead = { items: Issues; version?: string; positions?: ListPosition[]; live?: ListLiveRead & { selectedWorkspaceId: string }; requestedAt?: number }
+type ThreadRead = { items: Thread[]; version?: string; positions?: ListPosition[]; live?: ListLiveRead; presenceFallback?: boolean; requestedAt?: number }
 const LIST_MERGE_MS = 2_000
 
 /** All workspaces keep their existing read authorization. The extra key part
@@ -21,51 +24,65 @@ const LIST_MERGE_MS = 2_000
 export function useLiveIssueList(ownerId: string, workspaceId: string | undefined, paused = false) {
   // Legacy SSR items do not carry the workspace of their authorized read.
   // Read this key normally instead of adopting an unbound snapshot into it.
-  const snapshot = useRef<{ ownerId: string; workspaceId?: string; version?: string; items: Issues }>({ ownerId, workspaceId, items: [] })
+  const { cache } = useSWRConfig()
   const key = workspaceId ? issueListKey(ownerId, workspaceId) : null
-  const result = useSWR<IssueRead>(key, () => observeListRead(async () => {
-    const previous: { items: Issues; version?: string } = snapshot.current.ownerId === ownerId && snapshot.current.workspaceId === workspaceId ? snapshot.current : { items: [] }
-    const next = await pollIssues(previous.version)
-    if (next.live.ownerId !== ownerId) throw new ListReadScopeError('owner')
-    if (next.live.selectedWorkspaceId !== workspaceId) throw new ListReadScopeError('workspace')
-    const items = mergeList(previous.items, next)
-    snapshot.current = { ownerId, workspaceId, version: next.version, items }
-    return { ...next, items }
-  }), {
+  const result = useSWR<IssueRead>(key, async () => {
+    await waitForCacheHydration(cache)
+    return observeListRead(async () => {
+      const cached = cache.get(unstable_serialize(key))?.data as IssueRead | undefined
+      const previous: IssueRead = cached?.live?.ownerId === ownerId && cached.live.selectedWorkspaceId === workspaceId ? cached : { items: [] }
+      const held = heldListPositions(previous)
+      const known = held && held.length === previous.positions?.length ? previous.version : undefined
+      const result = await syncIssueList(known, held)
+      if (result.error) throw new CacheReadError(result.error)
+      const next = result.snapshot
+      if (next.live.ownerId !== ownerId) throw new ListReadScopeError('owner')
+      if (next.live.selectedWorkspaceId !== workspaceId) throw new ListReadScopeError('workspace')
+      return { version: next.version, live: next.live, items: mergeList(previous.items, next), positions: 'positions' in next ? next.positions : previous.positions }
+    })
+  }, {
     ...liveListReadOptions, isPaused: () => paused,
     revalidateOnMount: true,
   })
-  const home = result.error instanceof ListReadScopeError ? null : ownerListWorkspace(result.data, ownerId)
+  const unavailable = result.error instanceof ListReadScopeError || result.error instanceof CacheReadError
+  const home = unavailable ? null : ownerListWorkspace(result.data, ownerId)
   const scopes = [...new Set([workspaceId ?? null, home])]
-  useLiveKeys(scopes.map(scope => ({ kind: 'issue_list', id: scope ?? UNRESOLVED_LIST_SCOPE, workspaceId: scope })), key ? [unstable_serialize(key)] : [], null, { minIntervalMs: LIST_MERGE_MS })
-  return { ...result, data: result.error instanceof ListReadScopeError ? undefined : result.data }
+  useLiveKeys(unavailable ? [] : scopes.map(scope => ({ kind: 'issue_list', id: scope ?? UNRESOLVED_LIST_SCOPE, workspaceId: scope })), key ? [unstable_serialize(key)] : [], null, { minIntervalMs: LIST_MERGE_MS })
+  return { ...result, data: unavailable ? undefined : result.data }
 }
 
 /** The thread reader is owner-wide, independent of the selected team. */
 export function useLiveThreadList(ownerId: string, paused = false) {
-  const snapshot = useRef<{ ownerId: string; version?: string; items: Thread[] }>({ ownerId, items: [] })
-  const key = ['threads', ownerId] as const
-  const result = useSWR<ThreadRead>(key, () => observeListRead(async () => {
-    const previous: { items: Thread[]; version?: string } = snapshot.current.ownerId === ownerId ? snapshot.current : { items: [] }
-    const next = await pollThreads(previous.version)
-    if (next.live.ownerId !== ownerId) throw new ListReadScopeError('owner')
-    const items = mergeList(previous.items, next)
-    snapshot.current = { ownerId, version: next.version, items }
-    return { ...next, items }
-  }), { ...liveListReadOptions, isPaused: () => paused })
-  const home = result.error instanceof ListReadScopeError ? null : ownerListWorkspace(result.data, ownerId)
+  const { cache } = useSWRConfig()
+  const key = threadKeys.list(ownerId)
+  const result = useSWR<ThreadRead>(key, async () => {
+    await waitForCacheHydration(cache)
+    return observeListRead(async () => {
+      const cached = cache.get(unstable_serialize(key))?.data as ThreadRead | undefined
+      const previous: ThreadRead = cached?.live?.ownerId === ownerId ? cached : { items: [] }
+      const held = heldListPositions(previous)
+      const known = held && held.length === previous.positions?.length ? previous.version : undefined
+      const result = await syncThreadList(known, held)
+      if (result.error) throw new CacheReadError(result.error)
+      const next = result.snapshot
+      if (next.live.ownerId !== ownerId) throw new ListReadScopeError('owner')
+      return { version: next.version, live: next.live, presenceFallback: next.presenceFallback, items: mergeList(previous.items, next), positions: 'positions' in next ? next.positions : previous.positions }
+    })
+  }, { ...liveListReadOptions, isPaused: () => paused, revalidateOnMount: true })
+  const unavailable = result.error instanceof ListReadScopeError || result.error instanceof CacheReadError
+  const home = unavailable ? null : ownerListWorkspace(result.data, ownerId)
   const keys = [unstable_serialize(key)]
-  useLiveKey('thread_list', home ?? UNRESOLVED_LIST_SCOPE, keys, home, { minIntervalMs: LIST_MERGE_MS, deadline: listReadDeadline(result.data, ownerId) })
+  useLiveKey('thread_list', unavailable ? null : home ?? UNRESOLVED_LIST_SCOPE, keys, home, { minIntervalMs: LIST_MERGE_MS, deadline: listReadDeadline(result.data, ownerId) })
   // Presence is not a durable run write. Until the independent Device DO watch
   // can prove its expiry notification, keep its shared 60s fallback alongside
   // the real home channel. A null scope never creates another socket/ticket.
   useLiveKey('thread_list', result.data?.presenceFallback && home ? UNRESOLVED_LIST_SCOPE : null, keys, null, { minIntervalMs: LIST_MERGE_MS })
-  return { ...result, data: result.error instanceof ListReadScopeError ? undefined : result.data }
+  return { ...result, data: unavailable ? undefined : result.data }
 }
 
 /** `enabled: false` reads nothing and registers no key (the desktop badge on the web). */
 export function useLiveTaskRunList(ownerId: string, enabled = true) {
-  const key = enabled ? ['task-runs', ownerId] as const : null
+  const key = enabled ? taskRunKeys.list(ownerId) : null
   const result = useSWR(key, () => observeListRead(async () => {
     const next = await pollTaskRuns()
     if (next.live.ownerId !== ownerId) throw new ListReadScopeError('owner')
@@ -77,7 +94,7 @@ export function useLiveTaskRunList(ownerId: string, enabled = true) {
 }
 
 export function useLiveBotChatList(ownerId: string) {
-  const key = ['bot-chats', ownerId] as const
+  const key = chatKeys.list(ownerId)
   const result = useSWR(key, () => observeListRead(async () => {
     const next = await pollBotChatSummaries()
     if (next.live.ownerId !== ownerId) throw new ListReadScopeError('owner')
@@ -85,7 +102,7 @@ export function useLiveBotChatList(ownerId: string) {
   }), liveListReadOptions)
   const home = result.error instanceof ListReadScopeError ? null : ownerListWorkspace(result.data, ownerId)
   // The pinned Coordinator row already shares this normal authorized cache.
-  useLiveKey('bot_chat_list', home ?? UNRESOLVED_LIST_SCOPE, [unstable_serialize(key), 'coordinator-chat'], home, { minIntervalMs: LIST_MERGE_MS, deadline: listReadDeadline(result.data, ownerId) })
+  useLiveKey('bot_chat_list', home ?? UNRESOLVED_LIST_SCOPE, [unstable_serialize(key), unstable_serialize(chatKeys.detail())], home, { minIntervalMs: LIST_MERGE_MS, deadline: listReadDeadline(result.data, ownerId) })
   return { ...result, data: result.error instanceof ListReadScopeError ? undefined : result.data }
 }
 

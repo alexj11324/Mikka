@@ -34,6 +34,7 @@ import { suggestionMessage } from '@/lib/suggestions/card'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { AgentProfileError } from '@/lib/factory/agent-profile-definition'
 import { agentProfileReferenceSchema, BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-reference'
+import { cacheReadAction } from '@/lib/cache-read-action'
 
 async function getUser() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -63,7 +64,7 @@ async function ownBot(user: Parameters<typeof openChatBotId>[0], botId: string |
   const id = await openChatBotId(user, parsed.data)
   const [bot] = await db.select({ id: bots.id, name: bots.name, coordinator: sql<boolean>`exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})` })
     .from(bots).where(and(eq(bots.id, id), eq(bots.ownerId, userId))).limit(1)
-  if (!bot) throw new ActionFailureError('validationGeneric')
+  if (!bot) throw new ActionFailureError('botNotFound')
   return bot
 }
 
@@ -92,6 +93,13 @@ export async function pollCoordinatorChat(botId: string | null = null, known?: s
   return withDatabaseOperation('/actions/coordinator/poll', () => readCoordinatorChat(botId, known, continuation))
 }
 
+/** Expected authorization failures cross the Server Action boundary as codes,
+ * so a local cache can erase them instead of retaining data under a redacted
+ * production exception. The established reader and cursor stay unchanged. */
+export async function syncCoordinatorChat(botId: string | null = null, known?: string, continuation?: z.infer<typeof continuationSchema>): Promise<ActionResult<{ chat: CoordinatorChat | UnchangedChat }>> {
+  return cacheReadAction(async () => ({ chat: await pollCoordinatorChat(botId, known, continuation) }))
+}
+
 async function readCoordinatorChat(botId: string | null, known?: string, continuation?: z.infer<typeof continuationSchema>): Promise<CoordinatorChat | UnchangedChat> {
   const user = await getUser()
   const bot = await ownBot(user, botId)
@@ -100,22 +108,28 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
   const { expiries, observedAt, ...current } = await chatVersionState(user.id, 200, bot.id)
   // The owner's home channel says when to read again; a lease running out is the one change with no write.
   const live = await ownerListRead(user.id, expiries, observedAt)
-  if (parsed.success && parsed.data === current.version) return { unchanged: true, ...current, botId: bot.id, enabled, working: enabled && current.working, live }
   const proof = continuationSchema.safeParse(continuation)
-  const chat: ChatView & { after?: number; baseCursor?: number } = await chatStore.chatUpdate(user.id, bot.id, proof.success ? proof.data : undefined)
-  // Refresh card names and authorization independently from historical message bodies.
-  if (!known && proof.success && proof.data) {
+  // A message version does not grant continued access to its cited task or
+  // artifact. Reauthorize cached decorations even when the transcript itself
+  // is unchanged; absence removes a deleted/revoked card in the client merge.
+  let metadata: Pick<ChatView, 'sources' | 'artifacts'> | undefined
+  if (proof.success && proof.data) {
     const { artifactSummaries } = await import('@/lib/artifacts/store')
-    const ids = proof.data.sourceIds ?? []
     const [sources, artifacts] = await Promise.all([
-      citationSources(user.id, ids.map(id => `[[issue:${id}]] [[run:${id}]]`)),
+      citationSources(user.id, (proof.data.sourceIds ?? []).map(id => `[[issue:${id}]] [[run:${id}]]`)),
       artifactSummaries(user.id, proof.data.artifactIds ?? []),
     ])
-    chat.sources = { ...sources, ...chat.sources }
-    chat.artifacts = { ...artifacts, ...chat.artifacts }
+    metadata = { sources, artifacts }
+  }
+  if (parsed.success && parsed.data === current.version) return { unchanged: true, ...current, botId: bot.id, enabled, working: enabled && current.working, live, ...(metadata ? { metadata } : {}) }
+  const chat: ChatView & { after?: number; baseCursor?: number } = await chatStore.chatUpdate(user.id, bot.id, proof.success ? proof.data : undefined)
+  // Refresh card names and authorization independently from historical message bodies.
+  if (metadata) {
+    chat.sources = { ...metadata.sources, ...chat.sources }
+    chat.artifacts = { ...metadata.artifacts, ...chat.artifacts }
   }
   // The version read first: a message stored in between makes the next poll read again, never miss it.
-  return { ...chat, ...(!known ? { metadataRefresh: true } : {}), version: current.version, botId: bot.id, enabled, working: enabled && chat.working, live }
+  return { ...chat, ...(!known || metadata ? { metadataRefresh: true } : {}), version: current.version, botId: bot.id, enabled, working: enabled && chat.working, live }
 }
 
 /** A bounded older page overlaps the first rendered item, preserving multi-step reply grouping. */

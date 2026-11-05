@@ -45,6 +45,12 @@ export class LiveChannel {
 
   constructor(private runtime: LiveRuntime) {}
 
+  keyConnected(key: string): boolean | undefined {
+    const subscriptions = [...this.subscriptions].filter(subscription => subscription.keys.includes(key))
+    if (!subscriptions.length) return undefined
+    return this.connected && subscriptions.every(subscription => this.capabilities.has(subscription.kind))
+  }
+
   subscribe(kind: LiveKind, id: string, keys: readonly string[], refresh: Subscription['refresh'], options: LiveSubscriptionOptions = {}): LiveSubscription {
     if (!LIVE_ID.test(id)) return Object.assign(() => {}, { update() {} })
     const subscription: Subscription = { kind, id, keys, refresh, minIntervalMs: Math.max(0, options.minIntervalMs ?? 0),
@@ -133,7 +139,10 @@ export class LiveChannel {
       for (const timer of this.timers.values()) this.runtime.cancel(timer)
       this.timers.clear(); this.pending.clear(); this.inFlight.clear(); this.flushAt = null
     } else if (this.subscriptions.size) {
-      this.invalidate()
+      // A real hidden/offline interval has closed the socket and always reads.
+      // Duplicate visible/online events on a healthy channel leave supported
+      // keys to SWR's age-based focus check; unsupported kinds still catch up.
+      this.invalidate(undefined, undefined, false, true)
       for (const subscription of this.subscriptions) {
         if (subscription.deadlineAt !== null && subscription.deadlineAt <= this.localNow()) subscription.deadlineAt = null
         this.scheduleDeadline(subscription)

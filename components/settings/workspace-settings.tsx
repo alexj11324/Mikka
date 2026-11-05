@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useRef, useState, type ChangeEvent } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -44,7 +45,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   const t = useTranslations('Settings.workspaceForm')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const general = useSWR(['workspace:general', workspaceId ?? ''], () => settingsRead<Awaited<ReturnType<typeof getWorkspaceGeneral>>>('workspace-general', { workspace: workspaceId }))
+  const general = useSWR(settingsKeys.workspaceGeneral(workspaceId ?? ''), () => settingsRead<Awaited<ReturnType<typeof getWorkspaceGeneral>>>('workspace-general', { workspace: workspaceId }))
   const data = general.data && !general.data.error ? general.data : null
   const [name, setName] = useState<string | null>(null)
   const [slug, setSlug] = useState<string | null>(null)
@@ -206,7 +207,7 @@ function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone, open = tr
   const t = useTranslations('Settings.workspaceForm')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const targets = useSWR(['workspace:transfer-targets', workspaceId], () => settingsRead<Awaited<ReturnType<typeof getWorkspaceTransferTargets>>>('transfer-targets', { workspace: workspaceId }))
+  const targets = useSWR(settingsKeys.transferTargets(workspaceId), () => settingsRead<Awaited<ReturnType<typeof getWorkspaceTransferTargets>>>('transfer-targets', { workspace: workspaceId }))
   const people = targets.data && !targets.data.error ? targets.data : null
   const [to, setTo] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -257,7 +258,7 @@ function DeleteWorkspaceDialog({ workspaceId, name, onClose, open = true, onOpen
   const computerBilling = useGatedFeature('computerBilling')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const impact = useSWR(['workspace:deletion-impact', workspaceId], () => settingsRead<Awaited<ReturnType<typeof getWorkspaceDeletionImpact>>>('deletion-impact', { workspace: workspaceId }))
+  const impact = useSWR(settingsKeys.deletionImpact(workspaceId), () => settingsRead<Awaited<ReturnType<typeof getWorkspaceDeletionImpact>>>('deletion-impact', { workspace: workspaceId }))
   const counts = impact.data && !impact.data.error ? impact.data : null
   const [typed, setTyped] = useState('')
   const [pending, setPending] = useState(false)

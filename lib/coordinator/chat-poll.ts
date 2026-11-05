@@ -1,11 +1,12 @@
 import type { ListLiveRead } from '@/lib/live/list-read'
+import type { ChatView } from './store'
 
 /** A poll whose version matched: only the chat's live state, the conversation itself is as before. */
-export type UnchangedChat = { unchanged: true; version: string; cursor: number; streamRunId?: string; working: boolean; error: string | null; botId: string; enabled: boolean; live?: ListLiveRead }
+export type UnchangedChat = { unchanged: true; version: string; cursor: number; streamRunId?: string; working: boolean; error: string | null; botId: string; enabled: boolean; live?: ListLiveRead; metadata?: Pick<ChatView, 'sources' | 'artifacts'> }
 
 /**
- * Cited task names and artifact cards change without a chat write, so a read
- * with the known version keeps them. No timer refreshes them (#1212): an
+ * Cited task names and artifact cards change without a chat write. Every
+ * cursor read rechecks their current authorization. No timer refreshes them (#1212): an
  * artifact's own live key, or the page coming back into view, marks them stale,
  * and the next read omits the version so the server refreshes them. The server
  * still uses the history cursor.
@@ -39,7 +40,7 @@ export function mergeChat<T extends ChatCache>(previous: T | undefined, next: T 
   }
   // The cache moved on while the poll was out (a send revalidated it): keep the newer chat.
   if (!previous || previous.version !== next.version) return previous as T
-  const { unchanged: _, streamRunId, ...state } = next
+  const { unchanged: _, streamRunId, metadata, ...state } = next
   const { streamRunId: _previousRun, ...rest } = previous
-  return { ...rest, ...state, ...(streamRunId ? { streamRunId } : {}) } as unknown as T
+  return { ...rest, ...state, ...metadata, ...(streamRunId ? { streamRunId } : {}) } as unknown as T
 }

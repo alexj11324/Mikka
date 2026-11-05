@@ -1,28 +1,15 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { Socket } from 'node:net'
 import test from 'node:test'
 import type { JSONContent } from '@tiptap/core'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
+import { measured, readMetrics } from './helpers/read-metrics'
+import { mergeList } from '../lib/list-poll'
 
 // Only a disposable loopback *_e2e database is admissible; required in CI.
 const required = process.env.REQUIRE_DB === '1'
 const enabled = disposableDatabase()
 if (required && !enabled) throw new Error('Issue list DB test requires a loopback *_e2e database')
-
-// Every byte the database sends to this process, over every pool's sockets.
-const sockets = new Set<Socket>()
-const connect = Socket.prototype.connect
-Socket.prototype.connect = function (this: Socket, ...args: unknown[]) {
-  sockets.add(this)
-  return Reflect.apply(connect, this, args)
-} as typeof Socket.prototype.connect
-const received = () => [...sockets].reduce((sum, socket) => sum + socket.bytesRead, 0)
-async function measured<T>(work: () => Promise<T>) {
-  const before = received()
-  const value = await work()
-  return { value, bytes: received() - before }
-}
 
 test('the task list and a task\'s relations read metadata and checklist counts, not every body', { skip: !enabled }, async t => {
   const { pool } = await import('../lib/db')
@@ -60,21 +47,27 @@ test('the task list and a task\'s relations read metadata and checklist counts, 
     assert.equal(list.value.find(row => row.id === ids[0])?.metadata.estimate, 5)
     assert.equal('content' in list.value[0], false)
 
-    const snapshot = await actAs(owner, () => pollIssues())
+    const cold = await measured(() => actAs(owner, () => pollIssues()))
+    const snapshot = cold.value
     assert.ok(snapshot.items)
     const quiet = await measured(() => actAs(owner, () => pollIssues(snapshot.version)))
     assert.equal(quiet.value.unchanged, true)
     assert.equal(quiet.value.items, undefined)
     assert.ok(quiet.bytes < list.bytes / 2, `unchanged ${quiet.bytes} B vs full ${list.bytes} B`)
-    t.diagnostic(JSON.stringify({ fullListBytes: list.bytes, unchangedListBytes: quiet.bytes }))
+    const restored = await measured(() => actAs(owner, () => pollIssues(snapshot.version, snapshot.positions)))
+    assert.equal(restored.value.unchanged, true)
     await pool.query('update issues set title=$2 where id=$1', [ids[0], 'Renamed without a clock change'])
+    const delta = await measured(() => actAs(owner, () => pollIssues(snapshot.version, snapshot.positions)))
+    assert.equal(delta.value.delta, true)
+    assert.deepEqual(delta.value.items?.map(row => row.id), [ids[0]], 'only the changed projection is read')
     const changed = await actAs(owner, () => pollIssues(snapshot.version))
     assert.ok(changed.items?.some(row => row.title === 'Renamed without a clock change'))
+    assert.deepEqual(mergeList(snapshot.items!, delta.value), changed.items)
     assert.notEqual(changed.version, snapshot.version)
     await pool.query('update "user" set image=$2 where id=$1', [owner, 'https://example.invalid/changed-avatar.png'])
     assert.notEqual((await actAs(owner, () => pollIssues(changed.version))).version, changed.version, 'profile changes invalidate the list too')
     await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [peer, `${peer}@example.invalid`])
-    const foreign = await actAs(peer, () => pollIssues(changed.version))
+    const foreign = await actAs(peer, () => pollIssues(changed.version, changed.positions))
     assert.deepEqual(foreign.items, [], 'another identity cannot reuse an owner snapshot to obtain private tasks')
     assert.notEqual(foreign.version, changed.version)
 
@@ -125,15 +118,19 @@ test('the task list and a task\'s relations read metadata and checklist counts, 
     const shared = await withActivitySession(peer, () => actAs(peer, () => pollIssues()), workspaceId)
     assert.equal(shared.items?.length, 1)
     await pool.query('update mikka_workspace_members set status=$3 where "workspaceId"=$1 and "userId"=$2', [workspaceId, peer, 'suspended'])
-    const revoked = await withActivitySession(peer, () => actAs(peer, () => pollIssues(shared.version)), workspaceId)
+    const revoked = await withActivitySession(peer, () => actAs(peer, () => pollIssues(shared.version, shared.positions)), workspaceId)
     assert.deepEqual(revoked.items, [], 'revocation falls back to the personal workspace and clears the formerly shared row')
+    assert.deepEqual(mergeList(shared.items!, revoked), [], 'the authoritative manifest removes the revoked cached task')
     assert.notEqual(revoked.version, shared.version, 'revocation cannot return an unchanged snapshot')
     const beforeDelete = await actAs(owner, () => pollIssues())
     await pool.query('delete from issue_versions where "issueId"=$1', [ids[0]])
     await pool.query('delete from issue_documents where "issueId"=$1', [ids[0]])
     await pool.query('delete from issues where id=$1', [ids[0]])
-    const deleted = await actAs(owner, () => pollIssues(beforeDelete.version))
-    assert.equal(deleted.items?.length, beforeDelete.items!.length - 1, 'deletion invalidates the snapshot even without updating another task')
+    const deletion = await measured(() => actAs(owner, () => pollIssues(beforeDelete.version, beforeDelete.positions)))
+    assert.equal(deletion.value.items?.length, 0, 'deletion needs no unchanged task payloads')
+    assert.equal(mergeList(beforeDelete.items!, deletion.value).length, beforeDelete.items!.length - 1, 'deletion invalidates the snapshot even without updating another task')
+    t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'task-list', scope: 'data-read-path_not_page_http', fixtureRows: 30,
+      legacyReload: readMetrics(list), cold: readMetrics(cold), warmKnown: readMetrics(quiet), reloadRestored: readMetrics(restored), oneRowDelta: readMetrics(delta), deletion: readMetrics(deletion) }))
   } finally {
     await pool.query('delete from team_issue_promotion_receipts where "requestId"=$1', [requestId])
     await pool.query('delete from team_issue_promotions where "requestId"=$1', [requestId])

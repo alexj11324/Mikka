@@ -12,6 +12,7 @@ import { auth, googleEnabled } from '@/lib/auth'
 import { onboardingDone } from '@/lib/onboarding'
 import { byoE2BKeyEnabled, getE2BKeyStatus } from '@/lib/secrets/e2b'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
+import { authorizedCacheWorkspace } from '@/lib/swr/cache-scope'
 
 // Owner Retry may prepare the retained task runtime before resuming its session.
 export const maxDuration = 300
@@ -24,7 +25,7 @@ async function onboardingComputer(): Promise<OnboardingComputer> {
   return 'ask'
 }
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ acceptance?: string; issue?: string; section?: string; app?: string; settings?: string; google?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ acceptance?: string; issue?: string; section?: string; app?: string; settings?: string; google?: string; workspace?: string }> }) {
   const query = await searchParams
   const initialSelected = query.issue && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(query.issue) ? query.issue : null
   const session = await auth.api.getSession({ headers: await headers() })
@@ -39,5 +40,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ a
   // A failed read must not lock anyone into the guide.
   const onboarding = !await onboardingDone(user.id).catch(() => true)
   const computer = onboarding ? await onboardingComputer().catch((): OnboardingComputer => 'none') : 'none'
-  return <IssueWorkspace key={user.id} onboarding={onboarding ? { computer } : undefined} initialSelected={initialSelected} user={{ id: user.id, name: user.name, email: user.email, image: user.image }} initialSection={sectionFromQuery(query.section)} initialSettingsSection={query.settings === 'account' || (query.settings === 'integrations' && query.google) ? 'account' : query.settings === 'integrations' ? 'integrations' : undefined} googleEnabled={googleEnabled} />
+  const cacheWorkspace = await authorizedCacheWorkspace(user.id, query.workspace)
+  return <IssueWorkspace key={user.id} cacheWorkspace={cacheWorkspace} onboarding={onboarding ? { computer } : undefined} initialSelected={initialSelected} user={{ id: user.id, name: user.name, email: user.email, image: user.image }} initialSection={sectionFromQuery(query.section)} initialSettingsSection={query.settings === 'account' || (query.settings === 'integrations' && query.google) ? 'account' : query.settings === 'integrations' ? 'integrations' : undefined} googleEnabled={googleEnabled} />
 }

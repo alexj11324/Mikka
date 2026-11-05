@@ -6,6 +6,7 @@ import { withBasePath } from '@/lib/base-path'
 import { type LiveRuntime, type LiveTicket, type LiveSubscriptionOptions, type LiveSubscription } from '@/lib/live/channel'
 import { LiveChannels } from '@/lib/live/channels'
 import type { LiveKind } from '@/lib/live/events'
+import { registerLiveKeyConnection } from '@/lib/swr/live-focus'
 
 const LiveContext = createContext<{ channels: LiveChannels; workspaceId?: string } | null>(null)
 
@@ -61,7 +62,7 @@ export function useLiveKeys(entities: readonly { kind: LiveKind; id: string; wor
   const context = useContext(LiveContext)
   const channels = context?.channels
   const scope = workspaceId === undefined ? context?.workspaceId ?? null : workspaceId
-  const { mutate } = useSWRConfig()
+  const { cache, mutate } = useSWRConfig()
   const serialized = JSON.stringify(keys)
   const references = JSON.stringify(entities)
   const minIntervalMs = options?.minIntervalMs ?? 0
@@ -76,14 +77,16 @@ export function useLiveKeys(entities: readonly { kind: LiveKind; id: string; wor
     if (!channels) return
     const subscriptions = (JSON.parse(references) as { kind: LiveKind; id: string; workspaceId?: string | null }[]).map(({ kind, id, workspaceId: entityScope }) =>
       channels.subscribe(entityScope === undefined ? scope : entityScope, kind, id, JSON.parse(serialized) as string[], key => mutate(key), timing.current))
+    const connections = (JSON.parse(serialized) as string[]).map(key => registerLiveKeyConnection(cache, [key], () => channels.keyConnected(key)))
     active.current = subscriptions
     return () => {
       for (const stop of subscriptions) stop()
+      for (const stop of connections) stop()
       if (active.current === subscriptions) active.current = []
     }
     // Timing options update the existing handles below. Only an actual scope,
     // entity, cache key or refresh owner change needs a new initial read.
-  }, [channels, scope, references, serialized, mutate])
+  }, [channels, scope, references, serialized, cache, mutate])
   useEffect(() => {
     for (const subscription of active.current) subscription.update(timing.current)
   }, [minIntervalMs, deadlineKey, deadlineObservation])

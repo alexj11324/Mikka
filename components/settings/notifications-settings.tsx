@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -16,7 +17,7 @@ type Flags = Pick<Preferences, 'proactive' | 'pushDecide' | 'pushReview' | 'push
 /** D16: the notification settings the phone already has, on the web Settings page. */
 export function NotificationSettings() {
   const t = useTranslations('Settings.notifications')
-  const { data, error, mutate } = useSWR('preferences', () => settingsRead<Awaited<ReturnType<typeof getPreferences>>>('preferences'))
+  const { data, error, mutate } = useSWR(settingsKeys.preferences(), () => settingsRead<Awaited<ReturnType<typeof getPreferences>>>('preferences'))
   // The change that did not save, kept so 重试 sends exactly it again.
   const [failed, setFailed] = useState<Partial<Flags> | null>(null)
 

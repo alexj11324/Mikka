@@ -23,7 +23,12 @@ export type GroupMessagePage = { messages: GroupMessage[]; nextBefore: string | 
 export type GroupMessagesError = 'unauthorized' | 'not_found' | 'unavailable'
 
 export class GroupMessagesRequestError extends Error {
-  constructor(public code: GroupMessagesError) { super(code) }
+  readonly retryable: boolean
+  constructor(public code: GroupMessagesError, readonly status = code === 'unauthorized' ? 401 : code === 'not_found' ? 404 : undefined, options?: ErrorOptions) {
+    super(code, options)
+    this.name = 'GroupMessagesRequestError'
+    this.retryable = code !== 'not_found'
+  }
 }
 
 export const GROUP_PAGE_SIZE = 50
@@ -38,10 +43,10 @@ export function groupMessagesUrl(id: string, before?: string | null, after?: str
 export async function fetchGroupMessages(id: string, before?: string | null, fetcher: typeof fetch = fetch, after?: string | null): Promise<GroupMessagePage> {
   let response: Response
   try { response = await fetcher(groupMessagesUrl(id, before, after), { cache: 'no-store', credentials: 'same-origin' }) }
-  catch { throw new GroupMessagesRequestError('unavailable') }
+  catch (cause) { throw new GroupMessagesRequestError('unavailable', undefined, { cause }) }
   const body = await response.json().catch(() => null) as GroupMessagePage | null
   if (response.ok && body && Array.isArray(body.messages)) return body
-  throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable')
+  throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable', response.status)
 }
 
 /** POST a message to the group; the bots it @mentions answer it, else the ones the server judges should. */
@@ -51,18 +56,18 @@ export async function postGroupMessage(id: string, body: string, mentions: Group
     response = await fetcher(withBasePath(`/api/conversations/${encodeURIComponent(id)}/messages`), {
       method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body, mentions }),
     })
-  } catch { throw new GroupMessagesRequestError('unavailable') }
+  } catch (cause) { throw new GroupMessagesRequestError('unavailable', undefined, { cause }) }
   const sent = await response.json().catch(() => null) as GroupMessage | null
   if (response.ok && sent?.id) return sent
-  throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable')
+  throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable', response.status)
 }
 
 /** 停止: ends the reply the group is waiting on. Replies already posted stay. */
 export async function stopGroupReply(id: string, fetcher: typeof fetch = fetch): Promise<void> {
   let response: Response
   try { response = await fetcher(withBasePath(`/api/conversations/${encodeURIComponent(id)}/stop`), { method: 'POST', credentials: 'same-origin' }) }
-  catch { throw new GroupMessagesRequestError('unavailable') }
-  if (!response.ok) throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable')
+  catch (cause) { throw new GroupMessagesRequestError('unavailable', undefined, { cause }) }
+  if (!response.ok) throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable', response.status)
 }
 
 /** A poll that already shows the latest message keeps that page. New messages are prepended; a full page replaces it. */
@@ -109,10 +114,10 @@ export function authorRuns(messages: GroupMessage[]) {
 async function readGroupApi<T>(path: string, pick: (body: unknown) => T | undefined, fetcher: typeof fetch): Promise<T> {
   let response: Response
   try { response = await fetcher(withBasePath(path), { cache: 'no-store', credentials: 'same-origin' }) }
-  catch { throw new GroupMessagesRequestError('unavailable') }
+  catch (cause) { throw new GroupMessagesRequestError('unavailable', undefined, { cause }) }
   const value = response.ok ? pick(await response.json().catch(() => null)) : undefined
   if (value !== undefined) return value
-  throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable')
+  throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable', response.status)
 }
 
 const listIn = <T>(key: string) => (body: unknown) => {

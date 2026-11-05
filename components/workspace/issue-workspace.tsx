@@ -36,13 +36,15 @@ import { BrowserNotesProvider } from '@/components/browser/browser-notes'
 import { BrowserToggle, useBrowserFits } from '@/components/browser/browser-toggle'
 import { ComputerAgentsProvider } from '@/components/computer/computer-agents'
 import type { BotView } from '@/app/actions/bots'
-import { getCoordinatorChat, type CoordinatorChat as CoordinatorChatView } from '@/app/actions/coordinator'
+import type { CoordinatorChat as CoordinatorChatView } from '@/app/actions/coordinator'
+import { readCachedCoordinatorChat } from '@/lib/coordinator/chat-read-client'
+import { chatKeys } from '@/lib/swr/keys'
 import { chatPreview } from '@/lib/agent-history'
 import { PanelRight } from 'lucide-react'
 import { ISSUE_STATUSES, type IssueStatus, type IssueView } from './issue-properties'
 import type { listIssues } from '@/app/actions/issues'
 import { useLiveBotRoster, useLiveGroupList, useLiveIssueList, useLiveThreadList } from '@/hooks/use-live-lists'
-import { ListReadScopeError, observeListRead, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
+import { ListReadScopeError, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { endSession } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -74,6 +76,8 @@ import { focusChatComposer } from '@/hooks/use-focus-return'
 import { usePresence } from '@/lib/use-presence'
 import { FieldError } from '@/components/ui/field'
 import { ViewStateProvider, useViewState } from '@/lib/hooks/view-state'
+import { AuthenticatedReadCache } from '@/components/authenticated-read-cache'
+import type { AuthorizedCacheWorkspace } from '@/lib/swr/cache-scope'
 
 // Start the chunk download during module evaluation, before hydration and its effects.
 if (typeof window !== 'undefined') {
@@ -100,7 +104,12 @@ const SettingsShell = dynamic(() => import('@/components/settings/settings-shell
 const SettingsFrame = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsFrame), { loading: WorkspaceLoading })
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView), { loading: WorkspaceContentLoading })
 
-export function IssueWorkspace({ withinLiveProvider = false, ...props }: Parameters<typeof IssueWorkspaceContent>[0] & { withinLiveProvider?: boolean }) {
+export function IssueWorkspace({ cacheWorkspace, ...props }: Parameters<typeof IssueWorkspaceContent>[0] & { withinLiveProvider?: boolean; cacheWorkspace?: AuthorizedCacheWorkspace | null }) {
+  const content = <IssueWorkspaceScope {...props} />
+  return props.withinLiveProvider ? content : <AuthenticatedReadCache ownerId={props.user.id} workspace={cacheWorkspace}>{content}</AuthenticatedReadCache>
+}
+
+function IssueWorkspaceScope({ withinLiveProvider = false, ...props }: Parameters<typeof IssueWorkspaceContent>[0] & { withinLiveProvider?: boolean }) {
   const { data: read } = useWorkspace(props.user.email)
   const data = read?.currentUserId === props.user.id ? read : undefined
   const content = <ViewStateProvider scope={`${props.user.id}:${data?.workspace.id ?? 'loading'}`}><IssueWorkspaceContent {...props} /></ViewStateProvider>
@@ -122,7 +131,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const workspaceContext = workspaceContextRead?.live?.ownerId === user.id ? workspaceContextRead : undefined
   const workspaceHome = ownerListWorkspace(workspaceContext, user.id)
   useLiveKey('workspace_settings', workspaceHome ?? UNRESOLVED_LIST_SCOPE, ['/api/workspace/switcher', unstable_serialize(['/api/workspace', user.email]), 'teams', 'project-teams'], workspaceHome, { minIntervalMs: 2_000 })
-  const { mutate: clearCache } = useSWRConfig()
+  const { cache, mutate: clearCache } = useSWRConfig()
   // The group chat in the centre (`group=<id>`): the one just opened, else found among the workspace's group chats (the bot list's own request) after a reload or back.
   const [groupId, setGroupId] = useState<string | null>(() => readLocation(params).group)
   const [openedGroup, setOpenedGroup] = useState<GroupChatRequest | null>(null)
@@ -205,7 +214,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   }, [listsPaused, mutate, refreshThreads])
   const [creatingBot, setCreatingBot] = useState(false)
   const [createdBot, setCreatedBot] = useState<BotView>()
-  const { data: coordinatorChat } = useSWR<CoordinatorChatView>('coordinator-chat', () => observeListRead(() => getCoordinatorChat()), { ...whileSettings })
+  const { data: coordinatorChat } = useSWR<CoordinatorChatView>(chatKeys.detail(), () => readCachedCoordinatorChat(cache), { ...whileSettings })
   const [panelOpen, setPanelOpen] = useState(true)
   useEffect(() => { try { if (window.localStorage.getItem('mikka:context-panel') === '0') setPanelOpen(false) } catch { /* storage unavailable */ } }, [])
   // Below xl the column has no room, so 打开右栏 shows it in a Sheet instead.

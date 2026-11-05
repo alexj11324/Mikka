@@ -6,6 +6,16 @@ export class LiveChannels {
   private channels = new Map<string | null, { channel: LiveChannel; subscribers: number }>()
   constructor(private runtime: (workspaceId: string | null) => LiveRuntime) {}
 
+  keyConnected(key: string): boolean | undefined {
+    let connected: boolean | undefined
+    for (const { channel } of this.channels.values()) {
+      const current = channel.keyConnected(key)
+      if (current === false) return false
+      if (current === true) connected = true
+    }
+    return connected
+  }
+
   subscribe(workspaceId: string | null, kind: LiveKind, id: string, keys: readonly string[], refresh: (key: string) => unknown, options?: LiveSubscriptionOptions) {
     let entry = this.channels.get(workspaceId)
     if (!entry) {
