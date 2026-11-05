@@ -1,0 +1,254 @@
+{
+  "schema": 1,
+  "recordedAt": "2026-11-05T08:35:05.904445+00:00",
+  "purpose": "Public evidence addendum for the already-merged main536 integration; earlier frozen evidence remains unchanged.",
+  "source": {
+    "mainCommit": "536d2f0cd85a698e9c401f8e1dea8039fb50bdf4",
+    "localMergeCommit": "585c101d5fcb3ed5aefeb8a549052df8fea0a98f",
+    "publishedBatchCommit": "5251a6bfeda13c2e6c300dfba5fa0841ee0e9f8a",
+    "tree": "d1397ffac0a07e2a8a62290a161839d44a2b0a97",
+    "parents": [
+      "42b1f3f5f2a19f1271e3e513a77b2b046c99d662",
+      "536d2f0cd85a698e9c401f8e1dea8039fb50bdf4"
+    ],
+    "identityStatement": "The gates below ran on local585c. The fetched published5251 Git object has exactly the same tree and parents; this is tree equivalence, not a claim that local commands ran at the remote SHA.",
+    "exportedDeltaFileCount": 19,
+    "exportManifestSha256": "d38d651ef77fca140aee46189036cd91fcbd883c96f7677b01727c55e93257d9",
+    "productUnionDiffSha256": "f0f770abd06444c74a74947ddb8155c136d5723b39dfd68b7804968835d37f35"
+  },
+  "fourFileUnion": [
+    {
+      "path": "lib/factory/agent-profile-definition.ts",
+      "integration": "Main moves the reserved Default identifier to the shared closed reference module; existing CodedError details and causes remain."
+    },
+    {
+      "path": "lib/factory/agent-profile.ts",
+      "integration": "Main explicit task-form Default routing and availability coexist with unchanged Profile/source/member gates, current-version checks, and closed refusal diagnostics."
+    },
+    {
+      "path": "lib/factory/agent-profile.test.ts",
+      "integration": "Both closed Default-reference/immutable-builtin assertions and diagnostic/privacy assertions remain and execute."
+    },
+    {
+      "path": "lib/factory/profile-dispatch.db.test.ts",
+      "integration": "Both main Default task/continuation assertions and existing inherited/fixed Profile, exact claim, recovery, refusal, and diagnostic assertions remain and execute."
+    }
+  ],
+  "manualConflictResolution": {
+    "onlyConflict": "lib/factory/profile-dispatch.db.test.ts",
+    "fixtureSignature": "fixture(withProfiles = true, missingCodex = false, inherit = false, profileId?: \"default\")",
+    "edits": "Retained inherit as argument three and appended explicit Default as argument four; updated only the two incoming Default call sites.",
+    "assertionsDeleted": false,
+    "productionChecksWeakened": false
+  },
+  "verification": {
+    "actualExecutionCommit": "585c101d5fcb3ed5aefeb8a549052df8fea0a98f",
+    "tree": "d1397ffac0a07e2a8a62290a161839d44a2b0a97",
+    "startedAt": "2026-11-05T08:29:19.120281+00:00",
+    "finishedAt": "2026-11-05T08:30:32.680038+00:00",
+    "context": {
+      "location": "Primary Docker Cloud Sandbox",
+      "node": "v24.22.2",
+      "pnpm": "10.34.3",
+      "postgresMajor": 17,
+      "CI": true,
+      "REQUIRE_DB": 1,
+      "providerIO": "synthetic fixture boundaries only"
+    },
+    "counts": {
+      "realPostgres": {
+        "tests": 96,
+        "pass": 96,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "unitAndStrictVmClaim": {
+        "tests": 40,
+        "pass": 40,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "total": {
+        "tests": 136,
+        "pass": 136,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      }
+    },
+    "groups": [
+      {
+        "name": "profile-unit",
+        "kind": "source unit tests",
+        "command": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/agent-profile.test.ts lib/factory/profile-request.test.ts",
+        "startedAt": "2026-11-05T08:29:21.842476+00:00",
+        "finishedAt": "2026-11-05T08:29:23.116750+00:00",
+        "exitCode": 0,
+        "counts": {
+          "tests": 14,
+          "suites": 0,
+          "pass": 14,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 1242.71209
+        },
+        "logSha256": "146f2b6e98c5fc2b3d89c60ef1ba910e16209ab0840c848c5830f79ef07a40b4"
+      },
+      {
+        "name": "agent-profile-db",
+        "kind": "real isolated PostgreSQL",
+        "command": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/agent-profile.db.test.ts",
+        "startedAt": "2026-11-05T08:29:23.136296+00:00",
+        "finishedAt": "2026-11-05T08:30:12.377148+00:00",
+        "exitCode": 0,
+        "counts": {
+          "tests": 49,
+          "suites": 0,
+          "pass": 49,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 49201.00587
+        },
+        "logSha256": "0a9394f4bf9f96ad05c08c9c4198a527452869b80bb005d7893070c865378af3"
+      },
+      {
+        "name": "profile-dispatch-db",
+        "kind": "real isolated PostgreSQL with synthetic provider/Decision boundaries",
+        "command": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/profile-dispatch.db.test.ts",
+        "startedAt": "2026-11-05T08:30:12.395013+00:00",
+        "finishedAt": "2026-11-05T08:30:27.240504+00:00",
+        "exitCode": 0,
+        "counts": {
+          "tests": 47,
+          "suites": 0,
+          "pass": 47,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 14809.622436
+        },
+        "logSha256": "9cbf51149956346967370e9ef492f906796ac43aaf3a1dc34455081f752403e2"
+      },
+      {
+        "name": "claim-response",
+        "kind": "existing strict VM claim-route contract fixture",
+        "command": "node --import ./scripts/credential-diagnostics-offline.mjs --import ./tests/fixtures/claim-response-runtime.mjs --import tsx --test tests/claim-response.test.ts",
+        "startedAt": "2026-11-05T08:30:27.261924+00:00",
+        "finishedAt": "2026-11-05T08:30:28.863962+00:00",
+        "exitCode": 0,
+        "counts": {
+          "tests": 26,
+          "suites": 0,
+          "pass": 26,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 1569.059703
+        },
+        "logSha256": "c0613d4bb67be540eecc4d7b0d8f9f5cd2a81ef44d7155667bdcd73771ed9587"
+      }
+    ],
+    "static": [
+      {
+        "command": "pnpm typecheck",
+        "exitCode": 0,
+        "logSha256": "832af116144943afa1440e4709b874dc85a9d467b30a7d18ac6712a15dd8670c"
+      },
+      {
+        "command": "pnpm exec oxlint <37 related TypeScript/TSX/MJS files>",
+        "targetCount": 37,
+        "exitCode": 0,
+        "logSha256": "54c15faf5be927d3cd6fd442733ff0207a3343097fc005a4beb3f9b2812500d2"
+      },
+      {
+        "command": "git diff --check 536d2f0cd85a698e9c401f8e1dea8039fb50bdf4 HEAD",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "rawExecutionReceiptSha256": "47a0109ae39bdf59377423e12b20e2b316b03e92b75e6360754bf38ea0f7a1ea",
+    "finalSanitizedReceiptSha256": "71a28606d3c379320c9513f20e996065ec51aa80147ab7e72a68e1d1846c787a"
+  },
+  "cleanup": {
+    "finishedAt": "2026-11-05T08:31:27.470226+00:00",
+    "ownedDatabasesRemoved": 1,
+    "sessionsBeforeCleanup": 0,
+    "remainingRoleCount": 0,
+    "testProcessesAtHandoff": 0,
+    "normalDrop": true,
+    "forceDrop": false,
+    "terminatedBackends": 0,
+    "syntheticCredentialFileRemoved": true,
+    "cleanupReceiptSha256": "91fca9bab141e77ef54763f23b80ef773dde789dc8c7330661d09822c7c55bbd",
+    "boundary": "Only the role and databases created for these targeted backend gates were removed; the separate HTTP/screenshot environment is reported separately."
+  },
+  "noRunRetryReadOnlyFinding": {
+    "inspectedCommit": "42b1f3f5f2a19f1271e3e513a77b2b046c99d662",
+    "finding": "The ordinary Owner retry does have an existing background consumer; another human message is not required by this code path.",
+    "chain": [
+      {
+        "path": "lib/factory/human-store.ts",
+        "lines": "23-35",
+        "fact": "If the three special recoveries return null, the authorized retry applies the current revision change and creates a pending attempt."
+      },
+      {
+        "path": "lib/live/factory.ts",
+        "lines": "48-85",
+        "fact": "factoryChanged emits UI live invalidations only; it is not itself the execution wake."
+      },
+      {
+        "path": "cloudflare/suggestions-cron/wrangler.jsonc",
+        "lines": "10",
+        "fact": "The existing Worker has a once-per-minute cron trigger."
+      },
+      {
+        "path": "cloudflare/suggestions-cron/src/index.mjs",
+        "lines": "9,23",
+        "fact": "MINUTE_ENDPOINTS includes /api/cron/run-recovery."
+      },
+      {
+        "path": "app/api/cron/run-recovery/route.ts",
+        "lines": "30",
+        "fact": "The authenticated recovery cron calls sweepFactoryWatchdog independently of the client."
+      },
+      {
+        "path": "lib/factory/watchdog.ts",
+        "lines": "32,59-83,223,240-250",
+        "fact": "Pending execution/check stages with no active run, including current runId=null, are eligible after updatedAt is at least one minute old. Dispatch is committed before the returned start closure runs."
+      },
+      {
+        "path": "lib/factory/automatic-dispatch.ts",
+        "lines": "49-55,68-72,217-222",
+        "fact": "The execution source comes from the same Task latest execute attempt. The input null run id does not prevent strict Profile selection; a cloud handoff explicitly accepts null previousRunId."
+      },
+      {
+        "path": "workflows/factory-stage/workflow.ts",
+        "lines": "6-19",
+        "fact": "The durable workflow accepts previousRunId:string|null and owns handoff plus maintenance."
+      },
+      {
+        "path": "lib/factory/cloud-stage-handoff.ts",
+        "lines": "23,38-48",
+        "fact": "The owned/current queued-run query permits null previousRunId; only parking is conditional, while the new run still goes through normal start."
+      }
+    ],
+    "limits": [
+      "This is source-path verification, not a live cron or production Review success result.",
+      "The HTTP pending response proves authorized retry acceptance only; it does not prove Review dispatch, native startup, or a passed Review.",
+      "Eligibility, current authorization, credential availability and strict Decision selection still govern the later attempt; a new refusal may safely block it again."
+    ]
+  },
+  "openAcceptance": {
+    "originalALEX66FirstClaimCause": "unknown; this integration does not claim to fix the original production refusal",
+    "newFullBuildAndNextHTTP": "owned by the separate final-head acceptance; not asserted by this backend gate addendum",
+    "liveModelAcceptance": "not run by these commands; no external API or subscription model calls"
+  }
+}

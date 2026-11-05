@@ -1,0 +1,379 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "issue": 1284,
+  "preparedAt": "2026-11-05T08:10:32.804844+00:00",
+  "publicationState": "prepared-for-review; not published by this evidence-preparation task",
+  "kind": "exact-fused-head-verification",
+  "source": {
+    "head": "42b1f3f5f2a19f1271e3e513a77b2b046c99d662",
+    "tree": "002ef49edfc7150fe0b56200d8f77296db5e519c",
+    "parents": [
+      "f793f3d40b3ed167b26d8ab1d30c2bbdf4903418",
+      "bbf2f70087c459fd82fbc7a38d47c0402f990df6",
+      "7e23a2326fb2b4e849562e03cb263ad32be37c2e"
+    ],
+    "pullRequest": "https://github.com/alexj11324/Mikka/pull/1358",
+    "cleanBeforeAndAfter": true
+  },
+  "integrationSignoff": {
+    "localCommit": "82c9725bc8677171d48dcc4664ab993dd002fbfc",
+    "tree": "002ef49edfc7150fe0b56200d8f77296db5e519c",
+    "sameTreeAsPublishedHead": true,
+    "reviewedAt": "2026-11-05T07:45:52.719293+00:00",
+    "verificationType": "Read-only integration/signoff; not a claim that tests ran on this local commit.",
+    "artifactSha256": "d8cbf02033f915635f6791c34cbf23bb38d0639131a8471b34fe982413c7d33e"
+  },
+  "backendVerification": {
+    "startedAt": "2026-11-05T07:54:58.199705+00:00",
+    "finishedAt": "2026-11-05T07:56:07.211509+00:00",
+    "environment": {
+      "CI": "true",
+      "REQUIRE_DB": "1",
+      "TSX_DISABLE_CACHE": "1",
+      "node": "v24.22.2",
+      "pnpm": "10.34.3",
+      "postgresMajor": 17,
+      "isolation": "unique disposable role and loopback databases"
+    },
+    "gates": [
+      {
+        "name": "schema",
+        "command": "pnpm test:e2e:setup",
+        "startedAt": "2026-11-05T07:54:58.548011+00:00",
+        "finishedAt": "2026-11-05T07:55:01.544065+00:00",
+        "exitCode": 0,
+        "verificationType": "database-schema-bootstrap",
+        "log": {
+          "artifact": "schema.log",
+          "sha256": "dacf03184b801600e6503c728f1b172106ff39e3bc9c7b09e4992d14d631f2c6",
+          "bytes": 18603
+        }
+      },
+      {
+        "name": "profile-dispatch",
+        "command": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/profile-dispatch.db.test.ts",
+        "startedAt": "2026-11-05T07:55:01.561170+00:00",
+        "finishedAt": "2026-11-05T07:55:17.194461+00:00",
+        "exitCode": 0,
+        "verificationType": "real-isolated-postgresql",
+        "log": {
+          "artifact": "profile-dispatch.log",
+          "sha256": "34ea21d92dec567d26056dd87ee6f37f7a3c1f54eda2d2171eedecc0e220eb88",
+          "bytes": 4455
+        },
+        "counts": {
+          "tests": 45,
+          "suites": 0,
+          "pass": 45,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 15590.656025
+        }
+      },
+      {
+        "name": "completion-reconcile",
+        "command": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/completion-reconcile.db.test.ts",
+        "startedAt": "2026-11-05T07:55:17.234031+00:00",
+        "finishedAt": "2026-11-05T07:55:29.388916+00:00",
+        "exitCode": 0,
+        "verificationType": "real-isolated-postgresql",
+        "log": {
+          "artifact": "completion-reconcile.log",
+          "sha256": "94849e885cbbb754fe5ea1602ec85e800f322b43126a3ad0fdf50f4249b60175",
+          "bytes": 4655
+        },
+        "counts": {
+          "tests": 34,
+          "suites": 0,
+          "pass": 34,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 12112.656306
+        }
+      },
+      {
+        "name": "checks",
+        "command": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/checks.db.test.ts",
+        "startedAt": "2026-11-05T07:55:29.416264+00:00",
+        "finishedAt": "2026-11-05T07:56:01.911772+00:00",
+        "exitCode": 0,
+        "verificationType": "real-isolated-postgresql",
+        "log": {
+          "artifact": "checks.log",
+          "sha256": "e5d7c6e622be7435490ed60f5db124e06d20a0a951b4021e7cefbbe2061ded2a",
+          "bytes": 7478
+        },
+        "counts": {
+          "tests": 71,
+          "suites": 0,
+          "pass": 71,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 32457.668058
+        }
+      },
+      {
+        "name": "contract",
+        "command": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/contract.test.ts",
+        "startedAt": "2026-11-05T07:56:01.943525+00:00",
+        "finishedAt": "2026-11-05T07:56:02.851242+00:00",
+        "exitCode": 0,
+        "verificationType": "source-unit",
+        "log": {
+          "artifact": "contract.log",
+          "sha256": "9cc5f00c85b55fe3a5138397811cf00286c26a88321d9d4e64905cfefeb2ea3f",
+          "bytes": 1063
+        },
+        "counts": {
+          "tests": 10,
+          "suites": 0,
+          "pass": 10,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 864.829246
+        }
+      },
+      {
+        "name": "claim-response",
+        "command": "node --import ./scripts/credential-diagnostics-offline.mjs --import ./tests/fixtures/claim-response-runtime.mjs --import tsx --test tests/claim-response.test.ts",
+        "startedAt": "2026-11-05T07:56:02.867682+00:00",
+        "finishedAt": "2026-11-05T07:56:04.496123+00:00",
+        "exitCode": 0,
+        "verificationType": "strict-route-fixture",
+        "log": {
+          "artifact": "claim-response.log",
+          "sha256": "984f0217d7cf39dc63fc5e3af8dc98def3156f808b0db5ccfeac134c257e1c51",
+          "bytes": 7800
+        },
+        "counts": {
+          "tests": 26,
+          "suites": 0,
+          "pass": 26,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 1594.569443
+        }
+      },
+      {
+        "name": "self-improvement-unit",
+        "command": "pnpm test:self-improvement-unit",
+        "startedAt": "2026-11-05T07:56:04.513602+00:00",
+        "finishedAt": "2026-11-05T07:56:07.193816+00:00",
+        "exitCode": 0,
+        "verificationType": "source-unit",
+        "log": {
+          "artifact": "self-improvement-unit.log",
+          "sha256": "54b95b00c85cbcf346464ace4d56baccfb3feb46d3f5b06cd7cb73dc27eb5d78",
+          "bytes": 11143
+        },
+        "counts": {
+          "tests": 90,
+          "suites": 0,
+          "pass": 90,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 2335.693459
+        }
+      }
+    ],
+    "totals": {
+      "realPostgresTests": 150,
+      "unitAndStrictRouteTests": 126,
+      "tests": 276,
+      "pass": 276,
+      "fail": 0,
+      "skipped": 0
+    },
+    "executionReceiptSha256": "7a8ffb56e5595167371016724b10c35937f8b2823d16d80e1ba5e16d484c8a53",
+    "finalReceiptSha256": "6d228146fcc52a6cc94fc92fa4c9bb2d2d8aa57d18959793418eddeaded566a6",
+    "launcherSha256": "3d367e069d5512c9ee8eb67c484e3f3a89c252e47ff43682e250564e0362ea44"
+  },
+  "mergedCoverage": [
+    "Both branches of Profile-dispatch tests ran: closed Decision diagnostics and filtered availability; unclaimed check refusal stays a check block; invalid/stale/active recovery proof refusal; membership revocation at actual commit; unchanged inherited frontend Profile through JSONB, device handoff and expired quota first claim.",
+    "The merged claim fixture executed both runtime preflight and Profile refusal logging/CAS behavior.",
+    "The merged benchmark fixture retained upstream harness/messages mappings and the coded-error mapping; all 90 tests ran."
+  ],
+  "uiAndStaticVerification": {
+    "executionBinding": "All five commands below were freshly executed on exact published 42b, not reused from 82c or another same-tree commit.",
+    "checks": [
+      {
+        "name": "acceptance-ui",
+        "head": "42b1f3f5f2a19f1271e3e513a77b2b046c99d662",
+        "tree": "002ef49edfc7150fe0b56200d8f77296db5e519c",
+        "argv": [
+          "pnpm",
+          "test:factory-acceptance-ui"
+        ],
+        "startedAt": "2026-11-05T07:55:12.558639+00:00",
+        "finishedAt": "2026-11-05T07:55:14.884422+00:00",
+        "exitCode": 0,
+        "log": {
+          "artifact": "issue1284-final-42b1-acceptance-ui.log",
+          "sha256": "743810d60b15b1cea864c9520765f64ccc19ab8064ffdb905ec168024212fcdb",
+          "bytes": 10616
+        },
+        "counts": {
+          "tests": 91,
+          "pass": 91,
+          "fail": 0,
+          "skipped": 0
+        },
+        "verificationType": "source-unit/static; not browser or live HTTP acceptance"
+      },
+      {
+        "name": "thread-controls",
+        "head": "42b1f3f5f2a19f1271e3e513a77b2b046c99d662",
+        "tree": "002ef49edfc7150fe0b56200d8f77296db5e519c",
+        "argv": [
+          "node",
+          "--experimental-test-module-mocks",
+          "--import",
+          "./scripts/server-test.mjs",
+          "--import",
+          "tsx",
+          "--test",
+          "scripts/thread-composer.test.tsx",
+          "lib/run-control-actions.test.ts",
+          "tests/thread-question-wake-actions.test.ts"
+        ],
+        "startedAt": "2026-11-05T07:55:14.884764+00:00",
+        "finishedAt": "2026-11-05T07:55:19.747545+00:00",
+        "exitCode": 0,
+        "log": {
+          "artifact": "issue1284-final-42b1-thread-controls.log",
+          "sha256": "51b9cd4c98ea056e3347f1336a0237c55cbcc67774a13761b5000f85e99be393",
+          "bytes": 5990
+        },
+        "counts": {
+          "tests": 44,
+          "pass": 44,
+          "fail": 0,
+          "skipped": 0
+        },
+        "verificationType": "source-unit/static; not browser or live HTTP acceptance"
+      },
+      {
+        "name": "typecheck",
+        "head": "42b1f3f5f2a19f1271e3e513a77b2b046c99d662",
+        "tree": "002ef49edfc7150fe0b56200d8f77296db5e519c",
+        "argv": [
+          "pnpm",
+          "typecheck"
+        ],
+        "startedAt": "2026-11-05T07:55:19.748504+00:00",
+        "finishedAt": "2026-11-05T07:55:23.967983+00:00",
+        "exitCode": 0,
+        "log": {
+          "artifact": "issue1284-final-42b1-typecheck.log",
+          "sha256": "8788f6f8a39d4c999430567534e4034ce817353769fe503398aa254a6d579134",
+          "bytes": 76
+        },
+        "verificationType": "source-unit/static; not browser or live HTTP acceptance"
+      },
+      {
+        "name": "lint-ui",
+        "head": "42b1f3f5f2a19f1271e3e513a77b2b046c99d662",
+        "tree": "002ef49edfc7150fe0b56200d8f77296db5e519c",
+        "argv": [
+          "pnpm",
+          "lint:ui"
+        ],
+        "startedAt": "2026-11-05T07:55:23.968277+00:00",
+        "finishedAt": "2026-11-05T07:55:32.011849+00:00",
+        "exitCode": 0,
+        "log": {
+          "artifact": "issue1284-final-42b1-lint-ui.log",
+          "sha256": "a2c4cf57d9dff7a75bbaa489125e3c0896254b55a68b8db43b25b8a0f938f663",
+          "bytes": 297
+        },
+        "verificationType": "source-unit/static; not browser or live HTTP acceptance"
+      },
+      {
+        "name": "targeted-oxlint",
+        "head": "42b1f3f5f2a19f1271e3e513a77b2b046c99d662",
+        "tree": "002ef49edfc7150fe0b56200d8f77296db5e519c",
+        "argv": [
+          "pnpm",
+          "exec",
+          "oxlint",
+          "--deny-warnings",
+          "lib/factory/acceptance-view.ts",
+          "lib/factory/acceptance-view.test.ts",
+          "components/workspace/factory-acceptance-pane.tsx",
+          "scripts/factory-acceptance-ui.test.tsx",
+          "components/workspace/issue-thread-panel.tsx",
+          "scripts/thread-composer.test.tsx"
+        ],
+        "startedAt": "2026-11-05T07:55:32.012321+00:00",
+        "finishedAt": "2026-11-05T07:55:32.395258+00:00",
+        "exitCode": 0,
+        "log": {
+          "artifact": "issue1284-final-42b1-targeted-oxlint.log",
+          "sha256": "88fe970d176967e22176585158a6a13c8823c3e47f3d7b4a112368f800dcbf2d",
+          "bytes": 89
+        },
+        "verificationType": "source-unit/static; not browser or live HTTP acceptance"
+      }
+    ],
+    "receiptSha256": "9be952a2bf77dcfb330ded63b22a01334d49481a5ba37954fa31ce08356585da"
+  },
+  "testFileFingerprints": {
+    "lib/factory/profile-dispatch.db.test.ts": {
+      "gitBlob": "f46777af3b5a83f61aa3c3d5158f6441900764db",
+      "sha256": "0c70e6d43628f61b86cc84ae5b53cf73629561baadc05a7ea06e777b4f7fe001"
+    },
+    "lib/factory/completion-reconcile.db.test.ts": {
+      "gitBlob": "ddac484af6636a7f2a4bbd36465dec3ca99293bc",
+      "sha256": "02cd212826ac3555c30ea25192d1afafbdf2bd6536b7f51e57878eb45c693694"
+    },
+    "lib/factory/checks.db.test.ts": {
+      "gitBlob": "8dc79ec38e77433a052e5389e8ef784dc1f8d98d",
+      "sha256": "8ba0eae9fac6e58b7cd8308a8518b025931032fa2ab952671fd9133a41c9a5e8"
+    },
+    "lib/factory/contract.test.ts": {
+      "gitBlob": "5124ce461b1af4148a6ac58d763482a9cf40445c",
+      "sha256": "dd2753f46fdcfe64ef40ce0b146d07cf597325b2a3e35fc9c3ba2251391191bb"
+    },
+    "tests/claim-response.test.ts": {
+      "gitBlob": "e59edc2cd1118e5bdcd4dd2c7f0fc8499bc53831",
+      "sha256": "e2a729ef7d1b0dbff68a613e18a2c6255f2264484ed064693a2dd716ec590f1d"
+    },
+    "tests/fixtures/claim-response-runtime.mjs": {
+      "gitBlob": "1db7c48f1de429fa1a8e7a339b5a440b0a19b437",
+      "sha256": "31db2048216ff793ba5b88cfe55d34d7dd4df3afa08f05c854af8dd2b50b45b2"
+    },
+    "lib/self-improvement/benchmark-claim.test.ts": {
+      "gitBlob": "69d66ade4b9575d3903014de076f91d649afbac0",
+      "sha256": "8934e2b91a2059cb93a37c57be576968f361ab9acaa285d74ae496cfcdb703a0"
+    }
+  },
+  "cleanup": {
+    "checkedAt": "2026-11-05T07:57:00.037875+00:00",
+    "finishedAt": "2026-11-05T07:57:00.340260+00:00",
+    "ownedDatabasesDropped": 2,
+    "rolesDropped": 1,
+    "sessionsBeforeCleanup": 0,
+    "remainingRoles": 0,
+    "forcedDrop": false,
+    "terminatedBackends": 0,
+    "privateDisposableCredentialFileRemoved": true
+  },
+  "limitations": [
+    "The three PostgreSQL groups use synthetic provider/Decision transport. They are not live model acceptance.",
+    "The 34 completion cases exercise handleFactory directly with a synthetic actor; no Next route/session adapter or listening HTTP service is covered by that group.",
+    "Older failed CI/teardown observations remain retained separately; these green results do not relabel them."
+  ]
+}

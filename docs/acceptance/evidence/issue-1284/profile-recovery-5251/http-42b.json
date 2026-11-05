@@ -1,0 +1,388 @@
+{
+  "kind": "normal-next-http-acceptance",
+  "sourceCommit": "42b1f3f5f2a19f1271e3e513a77b2b046c99d662",
+  "sourceTree": "002ef49edfc7150fe0b56200d8f77296db5e519c",
+  "origin": "http://localhost:3110",
+  "sourceDirty": false,
+  "build": {
+    "buildCommand": "pnpm build",
+    "buildExitCode": 0,
+    "buildStartedAt": "2026-11-05T07:59:36.539Z",
+    "buildFinishedAt": "2026-11-05T08:01:32.431Z",
+    "serverReadyAt": "2026-11-05T08:01:36.094Z",
+    "strictAttestation": true
+  },
+  "http": {
+    "startedAt": "2026-11-05T08:21:57.593Z",
+    "finishedAt": "2026-11-05T08:28:28.524Z",
+    "originalProfileAssertions": 27,
+    "totalAssertions": 51,
+    "passedAssertions": 51,
+    "passed": true,
+    "checks": [
+      {
+        "name": "strict deployment attestation",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "owner session HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "owner session identity",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "peer session HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "peer session identity",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "owner workspace HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "peer workspace HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "anonymous Profile list refused",
+        "actual": 401,
+        "expected": 401,
+        "passed": true
+      },
+      {
+        "name": "authenticated Profile list",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "Profile response is private",
+        "actual": "private, no-store",
+        "expected": "private, no-store",
+        "passed": true
+      },
+      {
+        "name": "create Profile via authenticated POST",
+        "actual": 201,
+        "expected": 201,
+        "passed": true
+      },
+      {
+        "name": "initial Profile version",
+        "actual": 1,
+        "expected": 1,
+        "passed": true
+      },
+      {
+        "name": "read own Profile",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "saved instructions unchanged",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "peer cannot read owner workspace Profile",
+        "actual": 404,
+        "expected": 404,
+        "passed": true
+      },
+      {
+        "name": "update owned Profile via PATCH",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "updated Profile version",
+        "actual": 2,
+        "expected": 2,
+        "passed": true
+      },
+      {
+        "name": "revision changes digest",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "stale Profile update rejected",
+        "actual": 409,
+        "expected": 409,
+        "passed": true
+      },
+      {
+        "name": "read Profile history",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "immutable revisions retained",
+        "actual": 2,
+        "expected": 2,
+        "passed": true
+      },
+      {
+        "name": "archive owned Profile via DELETE",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "archive recorded",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "list after archive",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "archived Profile absent from active list",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "peer own workspace remains available",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "peer list isolated",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "Owner noRun Task detail HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "Task detail is private",
+        "actual": "private, no-store",
+        "expected": "private, no-store",
+        "passed": true
+      },
+      {
+        "name": "host noRun capability matches current binding",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "frozen Run start capability remains absent",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "blocked check has candidate and no execution",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "Owner Task list HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "list and detail identify the same current attempt",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "Owner candidate ledger HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "ledger identifies exact Task attempt candidate and revision",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "peer cannot read noRun Task",
+        "actual": 404,
+        "expected": 404,
+        "passed": true
+      },
+      {
+        "name": "anonymous Task detail refused",
+        "actual": 401,
+        "expected": 401,
+        "passed": true
+      },
+      {
+        "name": "peer cannot retry noRun Task",
+        "actual": 404,
+        "expected": 404,
+        "passed": true
+      },
+      {
+        "name": "Owner ordinary retry through Next HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "ordinary retry retains Task and candidate",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "noRun retry receipt is pending with revision plus one",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "retry event replays successfully",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "retry replay retains the same exact receipt",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "stale retry binding rejected",
+        "actual": 409,
+        "expected": 409,
+        "passed": true
+      },
+      {
+        "name": "read retried Task HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "pending read clears both recovery hints",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "ordinary HTTP retry creates no additional native Run",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "UI and HTTP fixtures are separate Tasks and Issues",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "read independent UI fixture HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "UI fixture is blocked with candidate and noRun recovery",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      }
+    ],
+    "syntheticFixtures": [
+      {
+        "purpose": "http-contract",
+        "taskId": "a9374d4a-f77a-47ab-8bee-ba4b729e6411",
+        "issueId": "f28863dc-b81c-4e87-9cb8-f50f58cadafe",
+        "candidateId": "b657b2f2-8758-47c0-b845-5035dab4885f",
+        "candidateSha": null,
+        "finalStatus": "pending",
+        "finalAttemptId": "8a1c90e0-0f06-4f53-8723-76e494c36f65",
+        "description": "Isolated HTTP/UI fixture: retained candidate and host Decision refusal; no native run or model request was executed."
+      },
+      {
+        "purpose": "visual-only",
+        "taskId": "409b351d-81c4-4168-a634-35e218aaa7df",
+        "issueId": "53bd2f07-053d-4f90-8308-2b902fdb7fca",
+        "candidateId": "4e716282-5185-464d-a9d7-5549e8676693",
+        "candidateSha": null,
+        "finalStatus": "blocked",
+        "description": "Isolated HTTP/UI fixture: retained candidate and host Decision refusal; no native run or model request was executed."
+      }
+    ],
+    "nativeModelRequests": 0
+  },
+  "cleanup": {
+    "fixtureCleanup": [
+      {
+        "purpose": "http-contract",
+        "taskId": "a9374d4a-f77a-47ab-8bee-ba4b729e6411",
+        "issueId": "f28863dc-b81c-4e87-9cb8-f50f58cadafe",
+        "remainingIssues": 0,
+        "remainingTasks": 0,
+        "remainingRuns": 0,
+        "at": "2026-11-05T08:28:25.550Z"
+      },
+      {
+        "purpose": "visual-only",
+        "taskId": "409b351d-81c4-4168-a634-35e218aaa7df",
+        "issueId": "53bd2f07-053d-4f90-8308-2b902fdb7fca",
+        "remainingIssues": 0,
+        "remainingTasks": 0,
+        "remainingRuns": 0,
+        "at": "2026-11-05T08:28:28.356Z"
+      }
+    ],
+    "leaseReleased": true,
+    "leaseState": "quarantined",
+    "validSessions": 0
+  },
+  "scope": "Real Next listening-port requests with official TestAccountPool signup/signin and deployment attestation. Both Task fixtures are explicitly synthetic; no provider or native subscription request was executed. HTTP retry proves normal acceptance to pending; native review completion remains a separate production acceptance.",
+  "preparationFailures": {
+    "retained": true,
+    "productSourceChanged": false,
+    "causes": [
+      "temporary fixture referenced lib/db.ts instead of lib/db/index.ts (first failure plus diagnostic repeat)",
+      "temporary fixture mixed uuid/text inference for coordinator event id and dedupeKey; id was explicitly cast to uuid",
+      "temporary fixture used routing-only factoryForBot; replaced with the existing guarded factoryRuntimeForBot(botId).store"
+    ]
+  }
+}

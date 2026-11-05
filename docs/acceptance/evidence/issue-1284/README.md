@@ -203,3 +203,17 @@ ALEX-67 / Task `b5785091-2c95-4f55-821d-fce51e027b0e` 实际 Claude Code native 
 ### 06:37–06:38 Factory 状态补充
 
 现有 Owner FactoryTask GET 显示：ALEX-67 的 Run 虽为 succeeded，Factory 本身却仍为 execute / blocked / revision 3，candidateId=null、candidates=[]、checks=[]；06:35:21 的原因是自动恢复次数耗尽。它提供正常 completionRecovery 绑定（同 Task、revision 3）。此前 Issue 页面 In Review 只作为界面观察保留，不冒充 Factory 阶段。ALEX-66 同为 execute / blocked / revision 3、唯一一次尝试、无候选，其持久原因是 `Question recovery blocked: factoryQuestionRunMismatch`，与 Run 的通用 Profile 文案分别记录。见 `factory-state-supplement.json`。两项尚未人工重试，继续用 Docker 查明因果并保留同 Task 恢复路径。
+
+
+## Profile 拒绝诊断与独立审阅恢复：发布前验证
+
+新增 [#1358 恢复修复完整证据](profile-recovery-5251/README.md)，当前批次提交 `5251a6bfeda13c2e6c300dfba5fa0841ee0e9f8a`，tree `d1397ffac0a07e2a8a62290a161839d44a2b0a97`。
+
+- 当前 head CI：17 success＋1预期OIDC skip；完整 Docker production build 成功。
+- 最新主线整合的同树本地提交585c：136/136定点检查、types/lint/diff通过。此前42b的276项和UI91＋44仍归属原版本。
+- 当前5251正常TestAccountPool／Next session HTTP：51/51，双fixture及会话清理完成；不含原生模型执行。
+- 四张实际本地production build页面明确摄于42b，经过36文件与4语言子树核对后用于未变化的5251恢复界面；无版本改标。
+- ALEX66原始claim根因仍未知；ALEX67真实生产恢复、Codex审阅与Owner Accept等待本批上线后独立验收。API路径按用户指示跳过，未查余额或发请求。
+
+本次增量保留以上旧证据与原失败，不覆盖或改写此前的生产观察。#1284仍保持打开。
+

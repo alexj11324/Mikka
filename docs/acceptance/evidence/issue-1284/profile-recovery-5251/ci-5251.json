@@ -1,0 +1,137 @@
+{
+  "kind": "github-ci-and-merge-tree-verification",
+  "observedAt": "2026-11-05 08:38:17 UTC",
+  "head": "5251a6bfeda13c2e6c300dfba5fa0841ee0e9f8a",
+  "tree": "d1397ffac0a07e2a8a62290a161839d44a2b0a97",
+  "ci": {
+    "runId": 41994845571,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845571",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "checks": {
+    "total": 18,
+    "completed": 18,
+    "success": 17,
+    "skipped": 1,
+    "items": [
+      {
+        "name": "UI policy (strict)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845571/job/127138177136"
+      },
+      {
+        "name": "Production build and browser interactions",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845571/job/127137239204"
+      },
+      {
+        "name": "analytics-ssr",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845751/job/127136917459"
+      },
+      {
+        "name": "Analytics SSR (full)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845751/job/127135518077"
+      },
+      {
+        "name": "Cloud credential access (OIDC)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845571/job/127135516234"
+      },
+      {
+        "name": "Database checks (1/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845571/job/127135513917"
+      },
+      {
+        "name": "Database checks (4/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845571/job/127135513886"
+      },
+      {
+        "name": "Integration unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845571/job/127135513857"
+      },
+      {
+        "name": "Source checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845571/job/127135513856"
+      },
+      {
+        "name": "Database checks (3/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845571/job/127135513812"
+      },
+      {
+        "name": "Daemon checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845571/job/127135513753"
+      },
+      {
+        "name": "Database checks (2/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845571/job/127135513737"
+      },
+      {
+        "name": "Core unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845571/job/127135513724"
+      },
+      {
+        "name": "Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845751/job/127135437117"
+      },
+      {
+        "name": "Browser tests (before merge)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845823/job/127135437010"
+      },
+      {
+        "name": "Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845571/job/127135436938"
+      },
+      {
+        "name": "ssh",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41994845817/job/127135436873"
+      },
+      {
+        "name": "GitGuardian Security Checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://dashboard.gitguardian.com"
+      }
+    ]
+  },
+  "mergePreview": {
+    "sha": "2774d1bd8b71ebaefe20a43900ddbc84ba180574",
+    "tree": "d1397ffac0a07e2a8a62290a161839d44a2b0a97",
+    "parents": [
+      "536d2f0cd85a698e9c401f8e1dea8039fb50bdf4",
+      "5251a6bfeda13c2e6c300dfba5fa0841ee0e9f8a"
+    ]
+  },
+  "interpretation": "Check names are retained as GitHub metadata. The browser-gate check is a required-name placeholder, not browser testing. The local production build and real Next/session HTTP acceptance are recorded separately. This record does not claim production deployment or native model acceptance."
+}

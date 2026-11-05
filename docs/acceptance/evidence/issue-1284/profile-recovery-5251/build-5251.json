@@ -1,0 +1,31 @@
+{
+  "phase": "ready",
+  "sourceCommit": "5251a6bfeda13c2e6c300dfba5fa0841ee0e9f8a",
+  "sourceTree": "d1397ffac0a07e2a8a62290a161839d44a2b0a97",
+  "sourceDirty": false,
+  "controllerPid": 27933,
+  "appPid": 28662,
+  "buildStartedAt": "2026-11-05T08:36:38.730Z",
+  "buildFinishedAt": "2026-11-05T08:38:40.180Z",
+  "buildExitCode": 0,
+  "serverReadyAt": "2026-11-05T08:38:43.807Z",
+  "strictAttestation": true,
+  "kind": "exact-head-local-production-build",
+  "recordedAt": "2026-11-05T08:40:43.575607+00:00",
+  "root": "/workspace/Mikka-1358-main536",
+  "command": "MIKKA_FINAL_CONFIG=/tmp/issue1284-http-final-5251-config.json node /tmp/issue1284-final-recovery-launch.mjs",
+  "buildCommand": "pnpm build",
+  "buildId": "5mN40hXBa-62l5UsqLcsB",
+  "sourceCleanAfterBuild": true,
+  "buildLog": {
+    "path": "/tmp/issue1284-http-final-5251-build.log",
+    "bytes": 9853,
+    "sha256": "426818742b2c59d9aed8487d9d3659db37cbafee20144a2fc8221fc6409a2fd2"
+  },
+  "accountEnvironment": "Fresh dedicated accounts_e2e database and official TestAccountPool descriptor bound to this exact source; temporary credentials remain private.",
+  "boundaries": [
+    "Local production build/start and strict deployment attestation, not a public deployment.",
+    "The separate 51-case normal-account HTTP result is reported by the acceptance agent.",
+    "No browser test suite; original 42b screenshots are reused only with the separate byte-comparison receipt."
+  ]
+}

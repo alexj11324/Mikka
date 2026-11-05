@@ -1,0 +1,305 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "issue": 1284,
+  "preparedAt": "2026-11-05T08:10:32.804844+00:00",
+  "publicationState": "prepared-for-review; not published by this evidence-preparation task",
+  "kind": "source-diagnostics-and-reconciliation",
+  "source": {
+    "base": "81f8493c1a76f371f90008ddacc039abf185eaba",
+    "localCheckpoint": "250ab8e1b603eae07bcdbf25bb8fee3be54fcd1e",
+    "tree": "98a6fd10e40153fecbbb346f0bc29ef3501910ca",
+    "publishedEquivalent": "6f400d1b0851abbe823983ddd3a1d1ff9eb95725",
+    "pullRequest": "https://github.com/alexj11324/Mikka/pull/1356",
+    "sameTreeDifferentCommitIdentity": true,
+    "executionBinding": "Commands ran against baseline 81f8493 with the recorded controlled working-tree changes before the local checkpoint commit. The checkpoint contains those validated changes; this is not a claim of production acceptance or final integrated-head CI.",
+    "controlledFiles": [
+      "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+      "lib/factory/agent-profile-decision.ts",
+      "lib/factory/agent-profile-definition.ts",
+      "lib/factory/agent-profile.test.ts",
+      "lib/factory/agent-profile.ts",
+      "lib/factory/automatic-dispatch.ts",
+      "lib/factory/completion-reconcile.db.test.ts",
+      "lib/factory/profile-admission.ts",
+      "lib/factory/profile-dispatch.db.test.ts",
+      "lib/factory/reconcile.ts",
+      "lib/factory/store.ts",
+      "tests/claim-response.test.ts",
+      "tests/fixtures/claim-response-runtime.mjs",
+      "scripts/error-cause-policy.mjs"
+    ]
+  },
+  "productionObservations": [
+    {
+      "case": "ALEX66",
+      "fact": "The first native claim was refused with a generic Agent Profile unavailable/changed message; normal Owner reads later showed the same enabled v1 and digest.",
+      "originalClaimRootCause": "unknown; not reproduced by the isolated regression",
+      "changeClaim": "Diagnostic only: preserve original causes and closed-set detail without changing selection, refusal, ownership, credential, or lease checks.",
+      "secondaryQuestionClassification": "The separate failed-run-as-Question classification correction belongs to upstream #1353 integration, not the diagnostic change."
+    },
+    {
+      "case": "ALEX67",
+      "fact": "A completed execute run hit agentProfileDecisionUnavailable before a Review run existed. Completion reconciliation rolled back and subsequent Coordinator preparePrompt calls retried the same failure.",
+      "changeClaim": "The narrowly classified pre-Run Review Decision refusal is persisted as a current-task block within the existing transaction boundary. The producer/candidate survive and unrelated Coordinator work can proceed. Owner retry still invokes the real selector contract."
+    }
+  ],
+  "diagnosticPrivacy": {
+    "closedCodesOnly": true,
+    "boundedCandidateIdentifiers": 50,
+    "unknownAvailabilityReason": "other",
+    "rawProviderAnswerIncluded": false,
+    "privateInstructionsIncluded": false,
+    "accountOrCredentialMaterialIncluded": false,
+    "newProviderProbeAdded": false
+  },
+  "gates": [
+    {
+      "name": "profile-unit",
+      "exitCode": 0,
+      "log": {
+        "artifact": "issue1284-profile-diagnostics-unit-final.log",
+        "sha256": "7ab197ac44b0969a105692ac4af2bc12c67458798baf7420a20c5d9b85e7d070",
+        "bytes": 1044,
+        "counts": {
+          "tests": 10,
+          "pass": 10,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0
+        }
+      },
+      "command": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/agent-profile.test.ts"
+    },
+    {
+      "name": "claim-route",
+      "exitCode": 0,
+      "log": {
+        "artifact": "issue1284-profile-diagnostics-claim-after.log",
+        "sha256": "30d4cec9e0ec9738ef9f02ffe310bd6ce736d512a15d7c81867a5e64c34d3e8d",
+        "bytes": 7685,
+        "counts": {
+          "tests": 25,
+          "pass": 25,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0
+        }
+      },
+      "reproductionCommand": "TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import ./tests/fixtures/claim-response-runtime.mjs --import tsx --test tests/claim-response.test.ts",
+      "commandNote": "The existing strict claim-response fixture/tsx test execution and 25/25 result are preserved in this log. This canonical reproduction command is taken from the repository test:scope-policy script; the original transport command text was not retained, so exact original flag spelling is not asserted."
+    },
+    {
+      "name": "profile-postgres",
+      "exitCode": 0,
+      "log": {
+        "artifact": "issue1284-profile-diagnostics-pg-final.log",
+        "sha256": "d7fe1a10310d385e298d933a225bda9a3f2febf29f65ec219c89486ef6c2349c",
+        "bytes": 3013,
+        "counts": {
+          "tests": 25,
+          "pass": 25,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0
+        }
+      },
+      "command": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/profile-dispatch.db.test.ts",
+      "testSourceNote": "After this run, the synthetic Decision execution modelId received only an as const TypeScript annotation. Its emitted runtime behavior is unchanged; final typecheck below passed. Product files exercised by this gate were unchanged."
+    },
+    {
+      "name": "typecheck",
+      "exitCode": 0,
+      "log": {
+        "artifact": "issue1284-profile-diagnostics-types-final.log",
+        "sha256": "b596a9bc9e34b58c60cfe208ccde07260bea3b2007d83c0b73f85344f7fcee07",
+        "bytes": 62
+      },
+      "command": "pnpm typecheck"
+    },
+    {
+      "name": "lint-controlled-diagnostics",
+      "exitCode": 0,
+      "log": {
+        "artifact": "issue1284-profile-diagnostics-lint-final.log",
+        "sha256": "6efae4418da09ae1690d36a06025c132bde386347405e822fdcfa366a1fe0f63",
+        "bytes": 89
+      },
+      "command": "pnpm exec oxlint --deny-warnings app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts lib/factory/agent-profile-decision.ts lib/factory/agent-profile-definition.ts lib/factory/agent-profile.test.ts lib/factory/agent-profile.ts lib/factory/profile-admission.ts lib/factory/profile-dispatch.db.test.ts tests/claim-response.test.ts tests/fixtures/claim-response-runtime.mjs"
+    },
+    {
+      "name": "diff-check",
+      "exitCode": 0,
+      "log": {
+        "artifact": "issue1284-profile-diagnostics-diff-final.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "command": "git diff --check"
+    },
+    {
+      "name": "error-cause-policy",
+      "exitCode": 0,
+      "log": {
+        "artifact": "issue1284-profile-diagnostics-error-policy-after.log",
+        "sha256": "15912665f21fb1c77824e0f4d58f10f44f1edd0be054c14b141ac50659272519",
+        "bytes": 39
+      },
+      "command": "node module invocation of auditRepository() and staleAllowlistEntries() from scripts/error-cause-policy.mjs; fail if either array is nonempty"
+    }
+  ],
+  "reviewIsolation": {
+    "command": "REQUIRE_DB=1 node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/completion-reconcile.db.test.ts",
+    "executionType": "Real isolated PostgreSQL with direct handleFactory domain HTTP-handler invocation using a synthetic actor; no Next route/session adapter or listening HTTP server.",
+    "red": {
+      "tests": 34,
+      "pass": 32,
+      "fail": 2,
+      "skipped": 0,
+      "errorCode": "agentProfileDecisionUnavailable",
+      "log": {
+        "artifact": "issue1284-review-decision-before.log",
+        "sha256": "b9292ca514a10929bb1b0e277c21b7b5e17b416d86d9af40af400e80f9be5cfe",
+        "bytes": 5536
+      }
+    },
+    "green": {
+      "tests": 34,
+      "pass": 34,
+      "fail": 0,
+      "skipped": 0,
+      "log": {
+        "artifact": "issue1284-review-decision-after-import.log",
+        "sha256": "6604cac1ce336cb5396b3a35be197f3110d4dd8f159a2157e2af335de2fc0fe9",
+        "bytes": 4652,
+        "counts": {
+          "tests": 34,
+          "pass": 34,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0
+        }
+      }
+    },
+    "receiptSha256": "e9ba30b899adbf336ab983a04da6cc5f5d4d5ff3201d6f585dcd696e8c5350ba"
+  },
+  "limitedBaselineInvestigations": [
+    {
+      "productSource": "81f8493c1a76f371f90008ddacc039abf185eaba",
+      "scope": "synthetic inherited frontend shape with real PostgreSQL queue/JSONB/device handoff/cloud claim",
+      "log": {
+        "artifact": "issue1284-inherit-claim-current-before.log",
+        "sha256": "6f320dabfa0187e126b0ca1e395394d57233947e83b011b2971248a85fa3e960",
+        "bytes": 2867,
+        "counts": {
+          "tests": 24,
+          "pass": 24,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "productSource": "7bf009959071afe4d9e6963a9c9bd81085d33a4b",
+      "scope": "isolated git archive of production product code plus the same regression fixture adapted only for pre-model-routing expectations",
+      "log": {
+        "artifact": "issue1284-inherit-claim-7bf-before.log",
+        "sha256": "edb2aa1b9cafe425174b4ad89d1238f57c8dd6dacc2457f39f9a0294cd12ad89",
+        "bytes": 2861,
+        "counts": {
+          "tests": 24,
+          "pass": 24,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "productSource": "81f8493c1a76f371f90008ddacc039abf185eaba",
+      "scope": "corrected formal Factory dispatch and real beforeClaim callback with inherited frontend profile",
+      "log": {
+        "artifact": "issue1284-inherit-claim-factory-corrected-before.log",
+        "sha256": "2183b7cb410d74dd0251179aec180efed4ee80acbebaa0c564ca0bd001a8ac70",
+        "bytes": 2869,
+        "counts": {
+          "tests": 24,
+          "pass": 24,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0
+        }
+      }
+    }
+  ],
+  "retainedFailedDiagnostics": [
+    {
+      "kind": "fixture setup",
+      "reason": "An initial test re-routed an already routed/stopped task; factoryStopped occurred before the relevant claim. The corrected real dispatch test passed. Original log retained.",
+      "log": {
+        "artifact": "issue1284-inherit-claim-factory-before.log",
+        "sha256": "f12e4688d2d03b8d5d00dac87d2db25b22180dfffb19e2fb3213efe35cd1527a",
+        "bytes": 3956,
+        "counts": {
+          "tests": 24,
+          "pass": 22,
+          "fail": 2,
+          "cancelled": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "kind": "fixture generated-module escaping",
+      "reason": "New strict DB fixture regex escapes were lost inside the generated module; corrected without changing production behavior. Original claim run was 24 pass / 1 fail.",
+      "log": {
+        "artifact": "issue1284-profile-diagnostics-claim.log",
+        "sha256": "930e8c0e69012eba217d5b9750bf16ab33ac02f7ff8dc0ad57d5d589df9aebf6",
+        "bytes": 11633,
+        "counts": {
+          "tests": 25,
+          "pass": 24,
+          "fail": 1,
+          "cancelled": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "kind": "typecheck",
+      "reason": "Initial error detail/test union narrowing was corrected. Original log retained.",
+      "log": {
+        "artifact": "issue1284-profile-diagnostics-types.log",
+        "sha256": "95249eb888c70d8ecce5df4e5b7a4bd45a690ad40cd90c0d0470748bd701991f",
+        "bytes": 2368
+      }
+    },
+    {
+      "kind": "typecheck",
+      "reason": "Synthetic Decision modelId needed its existing literal type, fixed with as const. Original shared typecheck log retained.",
+      "log": {
+        "artifact": "issue1284-review-decision-types.log",
+        "sha256": "3ce76db4d76e1ade1cc0ea6c88b8ebef7d10c69560bc4b7037f67681af4a3fed",
+        "bytes": 2563
+      }
+    },
+    {
+      "kind": "policy ratchet",
+      "reason": "Preserving the last dropped causes made the existing profile-admission exception stale; removed only that allowlist row.",
+      "log": {
+        "artifact": "issue1284-profile-diagnostics-error-policy.log",
+        "sha256": "089eca0fb5b44a56ebc3665fd542534e96d4ac5bf7aa791245b1bc6d1a36908a",
+        "bytes": 144
+      }
+    }
+  ],
+  "sourceReceiptSha256": "40f869ed74fd402f806b135fa93fae799a6a08d167a617d4cddae08a93e379a4",
+  "clarificationSha256": "34958f82646bdbb714953877d783146a6932b4199f2cc7d21363ec1bd8b8ca3e",
+  "limitations": [
+    "Original ALEX66 first-claim root cause has not been reproduced. The claim changes preserve refusal semantics and add safe diagnostics only.",
+    "Review Decision refusal isolation is a separate verified functional fix; selection still requires a valid exact-ID Decision.",
+    "The old 19a local routing teardown 42501 failures remain retained and are not reclassified by these gates.",
+    "No production database, membership, profile, subscription, preferences or credentials were altered; no external model was called by these tests."
+  ]
+}

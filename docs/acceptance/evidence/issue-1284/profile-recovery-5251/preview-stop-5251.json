@@ -1,0 +1,11 @@
+{
+  "recordedAt": "2026-11-05T08:42:22Z",
+  "sourceCommit": "5251a6bfeda13c2e6c300dfba5fa0841ee0e9f8a",
+  "sourceTree": "d1397ffac0a07e2a8a62290a161839d44a2b0a97",
+  "controllerPid": 27933,
+  "appPid": 28662,
+  "controllerRunning": false,
+  "appRunning": false,
+  "port3110Open": false,
+  "scope": "Only this UI agent launcher was signalled after normal HTTP cleanup and evidence audit; no Docker or PostgreSQL lifecycle action."
+}

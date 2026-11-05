@@ -1,0 +1,249 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "issue": 1284,
+  "preparedAt": "2026-11-05T08:10:32.804844+00:00",
+  "publicationState": "prepared-for-review; not published by this evidence-preparation task",
+  "kind": "strict-claim-fixture-ci-repair",
+  "originalFailure": {
+    "head": "6f400d1b0851abbe823983ddd3a1d1ff9eb95725",
+    "runId": 41985533601,
+    "jobId": 127105347049,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/41985533601/job/127105347049",
+    "command": "pnpm test:self-improvement-unit",
+    "counts": {
+      "tests": 90,
+      "pass": 85,
+      "fail": 5,
+      "skipped": 0
+    },
+    "failure": "Unexpected import @mikka/protocol/coded-error",
+    "location": "lib/self-improvement/benchmark-claim.test.ts strict VM module map",
+    "artifact": {
+      "kind": "retained CI excerpt, not full job log",
+      "sha256": "ff96240350f764d654701234f627026b16b6507806a52415be8ff4ebf9e4e522"
+    }
+  },
+  "repair": {
+    "localCommit": "ecb1bc4b6a3c40d19baf2d8a483982815db9b429",
+    "tree": "ab1e3c73744a5fe2d920136978af865f8bff8317",
+    "localParent": "250ab8e1b603eae07bcdbf25bb8fee3be54fcd1e",
+    "publishedParent": "6f400d1b0851abbe823983ddd3a1d1ff9eb95725",
+    "publishedCommit": "7e23a2326fb2b4e849562e03cb263ad32be37c2e",
+    "changedFile": "lib/self-improvement/benchmark-claim.test.ts",
+    "insertions": 2,
+    "behavior": "Import the real coded-error namespace and register that exact module in the existing VM whitelist.",
+    "unknownImportGuardPreserved": true,
+    "assertNoProfilePreserved": true,
+    "priorAssertionsPreserved": true,
+    "productionFilesChanged": false
+  },
+  "localGates": [
+    {
+      "name": "before",
+      "command": "CI=true REQUIRE_DB=1 pnpm test:self-improvement-unit",
+      "exitCode": 1,
+      "counts": {
+        "tests": 90,
+        "pass": 85,
+        "fail": 5,
+        "skip": 0
+      },
+      "log": {
+        "artifact": "issue1284-benchmark-claim-before.log",
+        "sha256": "d3675e19103fc071e57c14a3fcb3aafeee32c4d09a7f145e90b78e690044a4e6",
+        "bytes": 17033
+      }
+    },
+    {
+      "name": "after",
+      "command": "CI=true REQUIRE_DB=1 pnpm test:self-improvement-unit",
+      "exitCode": 0,
+      "counts": {
+        "tests": 90,
+        "pass": 90,
+        "fail": 0,
+        "skip": 0
+      },
+      "log": {
+        "artifact": "issue1284-benchmark-claim-after.log",
+        "sha256": "fe84f1418f4c00706719f27c9c8196b596f3952c16f075f54757ec5548db801e",
+        "bytes": 11132
+      }
+    },
+    {
+      "name": "types",
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "counts": null,
+      "log": {
+        "artifact": "issue1284-benchmark-claim-types.log",
+        "sha256": "b596a9bc9e34b58c60cfe208ccde07260bea3b2007d83c0b73f85344f7fcee07",
+        "bytes": 62
+      }
+    },
+    {
+      "name": "lint",
+      "command": "pnpm exec oxlint lib/self-improvement/benchmark-claim.test.ts",
+      "exitCode": 0,
+      "counts": null,
+      "log": {
+        "artifact": "issue1284-benchmark-claim-lint.log",
+        "sha256": "f05275fe448f294269e9739866129f4d32631cfad51de59e9ae2349d24b3b29f",
+        "bytes": 89
+      }
+    },
+    {
+      "name": "diffcheck",
+      "command": "git diff --check",
+      "exitCode": 0,
+      "counts": null,
+      "log": {
+        "artifact": "issue1284-benchmark-claim-diffcheck.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    }
+  ],
+  "testEnvironment": {
+    "CI": "true",
+    "REQUIRE_DB": "1",
+    "TSX_DISABLE_CACHE": "1",
+    "runtime": "Node 24.22.2 / pnpm 10.34.3 in the restored primary Docker sandbox",
+    "databaseUse": "Pure functions and injected Pool doubles; no database or role created for this unit gate.",
+    "externalModelCalls": 0
+  },
+  "sourceCI": {
+    "observedAt": "2026-11-05 08:01:49 UTC",
+    "head": "7e23a2326fb2b4e849562e03cb263ad32be37c2e",
+    "tree": "ab1e3c73744a5fe2d920136978af865f8bff8317",
+    "parents": [
+      "6f400d1b0851abbe823983ddd3a1d1ff9eb95725"
+    ],
+    "ci": {
+      "runId": 41988364745,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364745",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    "checks": {
+      "total": 18,
+      "completed": 18,
+      "success": 17,
+      "skipped": 1,
+      "failure": 0,
+      "items": [
+        {
+          "name": "UI policy (strict)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364745/job/127116874778"
+        },
+        {
+          "name": "Production build and browser interactions",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364745/job/127116093003"
+        },
+        {
+          "name": "analytics-ssr",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364673/job/127115787451"
+        },
+        {
+          "name": "Cloud credential access (OIDC)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364745/job/127114553541"
+        },
+        {
+          "name": "Database checks (3/4)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364745/job/127114551283"
+        },
+        {
+          "name": "Database checks (4/4)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364745/job/127114551065"
+        },
+        {
+          "name": "Integration unit checks",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364745/job/127114550968"
+        },
+        {
+          "name": "Database checks (2/4)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364745/job/127114550926"
+        },
+        {
+          "name": "Database checks (1/4)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364745/job/127114550887"
+        },
+        {
+          "name": "Daemon checks",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364745/job/127114550884"
+        },
+        {
+          "name": "Core unit checks",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364745/job/127114550864"
+        },
+        {
+          "name": "Source checks",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364745/job/127114550826"
+        },
+        {
+          "name": "Analytics SSR (full)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364673/job/127114490830"
+        },
+        {
+          "name": "Changed files",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364745/job/127114402218"
+        },
+        {
+          "name": "Changed files",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364673/job/127114402162"
+        },
+        {
+          "name": "Browser tests (before merge)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364705/job/127114401701"
+        },
+        {
+          "name": "ssh",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41988364714/job/127114401524"
+        },
+        {
+          "name": "GitGuardian Security Checks",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/runs/127114393529"
+        }
+      ]
+    }
+  },
+  "integrationRequirement": "The final merged benchmark fixture also includes upstream changes. Its 90 tests were rerun on final 42b; the earlier source result was not substituted for merged-tree verification.",
+  "receiptSha256": "d74ee0420dea3869f50dcec7619c9dc3300e01c5807137ba2220662343d4428e"
+}

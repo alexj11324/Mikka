@@ -1,0 +1,16 @@
+{
+  "sourceCommit": "42b1f3f5f2a19f1271e3e513a77b2b046c99d662",
+  "database": "mikka1284_http_r_904397dd_e2e",
+  "role": "mikka1284_http_r_904397dd",
+  "preDrop": {
+    "active_leases": 0,
+    "valid_sessions": 0,
+    "active_runs": 0
+  },
+  "databaseSessionsBeforeDrop": 0,
+  "databaseExists": false,
+  "roleExists": false,
+  "forceOrTerminateUsed": false,
+  "droppedAt": "2026-11-05T08:34:30.365377+00:00",
+  "privateAuditLedgerRetained": true
+}

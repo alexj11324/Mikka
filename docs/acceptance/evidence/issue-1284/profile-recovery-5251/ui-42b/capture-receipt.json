@@ -1,0 +1,97 @@
+{
+  "kind": "local-production-next-ui-capture",
+  "sourceCommit": "42b1f3f5f2a19f1271e3e513a77b2b046c99d662",
+  "sourceTree": "002ef49edfc7150fe0b56200d8f77296db5e519c",
+  "buildId": "Sq_HR8OhHqwkOrBXx2cuF",
+  "startedAt": "2026-11-05T08:26:19.822Z",
+  "finishedAt": "2026-11-05T08:26:31.655Z",
+  "fixture": {
+    "issueId": "53bd2f07-053d-4f90-8308-2b902fdb7fca",
+    "taskId": "409b351d-81c4-4168-a634-35e218aaa7df",
+    "purpose": "Dedicated isolated screenshot fixture: host DecisionUnavailable before a Review Run; retained candidate; no native model execution."
+  },
+  "authentication": "Normal TestAccountPool sign-in; private storageState consumed directly inside the same Docker sandbox; no credential or cookie export.",
+  "method": "Repository screenshot-only Chromium pattern, actual next build/start page navigation; no browser test suite or action assertions.",
+  "metadataSha256": "be27e10afa66f60952ce6b669b47eac69ad193ddb22e28565be5418e824babac",
+  "readiness": "Waited for the real reason code element to become visible, then allowed 1200ms for existing layout transitions to settle; no animation or style override.",
+  "initialCapture": "Earlier 08:23:31–08:23:39 capture is retained separately as unsettled history; these files are the subsequent normal-motion capture.",
+  "captures": [
+    {
+      "filename": "42b1f3f5f2a1-review-blocked-light-1440.png",
+      "path": "/tmp/issue1284-http-recovery-final-screenshots/42b1f3f5f2a1-review-blocked-light-1440.png",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "layout": {
+        "viewportWidth": 1440,
+        "viewportHeight": 1000,
+        "documentWidth": 1430
+      },
+      "pageUrl": "http://localhost:3110/mikka?issue=53bd2f07-053d-4f90-8308-2b902fdb7fca&thread=261ecd5c-c380-403e-9e8a-36f2a4b9e29b",
+      "bytes": 88543,
+      "sha256": "f06d0968a7906b8a71ca6ad12f9a5d6e2e737fe7964ae639d2c4ab1db45660d8",
+      "capturedAt": "2026-11-05T08:26:22.900Z"
+    },
+    {
+      "filename": "42b1f3f5f2a1-review-blocked-dark-1440.png",
+      "path": "/tmp/issue1284-http-recovery-final-screenshots/42b1f3f5f2a1-review-blocked-dark-1440.png",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "layout": {
+        "viewportWidth": 1440,
+        "viewportHeight": 1000,
+        "documentWidth": 1430
+      },
+      "pageUrl": "http://localhost:3110/mikka?issue=53bd2f07-053d-4f90-8308-2b902fdb7fca&thread=261ecd5c-c380-403e-9e8a-36f2a4b9e29b",
+      "bytes": 90877,
+      "sha256": "692d69c4c8b1dd27639497da8f8267a2f6d1fcb2dc115e0be85336dbe2dcf975",
+      "capturedAt": "2026-11-05T08:26:25.795Z"
+    },
+    {
+      "filename": "42b1f3f5f2a1-review-blocked-light-390.png",
+      "path": "/tmp/issue1284-http-recovery-final-screenshots/42b1f3f5f2a1-review-blocked-light-390.png",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "layout": {
+        "viewportWidth": 390,
+        "viewportHeight": 844,
+        "documentWidth": 390
+      },
+      "pageUrl": "http://localhost:3110/mikka?issue=53bd2f07-053d-4f90-8308-2b902fdb7fca&thread=261ecd5c-c380-403e-9e8a-36f2a4b9e29b",
+      "bytes": 24307,
+      "sha256": "f56e44fe5c6a6bc0ac81a0ba715257853a657a19b4f9e37b17aecc885f42524d",
+      "capturedAt": "2026-11-05T08:26:28.696Z"
+    },
+    {
+      "filename": "42b1f3f5f2a1-review-blocked-dark-390.png",
+      "path": "/tmp/issue1284-http-recovery-final-screenshots/42b1f3f5f2a1-review-blocked-dark-390.png",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "layout": {
+        "viewportWidth": 390,
+        "viewportHeight": 844,
+        "documentWidth": 390
+      },
+      "pageUrl": "http://localhost:3110/mikka?issue=53bd2f07-053d-4f90-8308-2b902fdb7fca&thread=261ecd5c-c380-403e-9e8a-36f2a4b9e29b",
+      "bytes": 24867,
+      "sha256": "cf531f1573ca32aa79222df2e54ef3da2b180dccf468631a825a89530d63b726",
+      "capturedAt": "2026-11-05T08:26:31.615Z"
+    }
+  ],
+  "boundaries": [
+    "Synthetic isolated fixture data; these images are not production account or native model acceptance.",
+    "The Factory Retry button is visible but is not clicked by this capture process.",
+    "HTTP recovery assertions use a separate task and are reported by the normal TestAccountPool driver."
+  ]
+}

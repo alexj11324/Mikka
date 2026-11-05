@@ -1,0 +1,340 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "issue": 1284,
+  "preparedAt": "2026-11-05T08:10:32.804844+00:00",
+  "publicationState": "prepared-for-review; not published by this evidence-preparation task",
+  "kind": "environment-ci-and-open-acceptance",
+  "primaryEnvironment": {
+    "sandbox": "sandboxes/sbx_001m6mcf2kr0phmx737s6js1e0r",
+    "classification": "existing Docker Cloud Large",
+    "interruption": "The original sandbox entered stopping/hibernation and was later restored; original source checkpoints and integration worktree survived.",
+    "productVerificationLocation": "All product verification used the same primary sandbox. Some source gates ran before the interruption; final fused-head gates ran after restoration.",
+    "stateAtPreparation": "continued local build/acceptance work; this package does not claim the primary sandbox is stopped."
+  },
+  "standbyEnvironment": {
+    "sandbox": "sandboxes/sbx_001m6n9e6xhnqqg09ct1swwakwm",
+    "actions": [
+      "Install baseline git/curl/CA/Python utilities",
+      "Install SHA256-verified Node 24.22.2 and pnpm 10.34.3"
+    ],
+    "repositoryCreated": false,
+    "databaseCreated": false,
+    "productTestsRun": false,
+    "modelCalls": 0,
+    "observedState": "stopped",
+    "observedStoppedAt": "2026-11-05T07:33:48Z",
+    "observationSource": "Coordinator management-state observation; no standby product result exists."
+  },
+  "batchCI": {
+    "observedAt": "2026-11-05 08:01:49 UTC",
+    "head": "42b1f3f5f2a19f1271e3e513a77b2b046c99d662",
+    "tree": "002ef49edfc7150fe0b56200d8f77296db5e519c",
+    "parents": [
+      "f793f3d40b3ed167b26d8ab1d30c2bbdf4903418",
+      "bbf2f70087c459fd82fbc7a38d47c0402f990df6",
+      "7e23a2326fb2b4e849562e03cb263ad32be37c2e"
+    ],
+    "ci": {
+      "runId": 41990240365,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240365",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    "checks": {
+      "total": 32,
+      "completed": 32,
+      "success": 27,
+      "skipped": 5,
+      "failure": 0,
+      "items": [
+        {
+          "name": "UI policy (strict)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240365/job/127122818273"
+        },
+        {
+          "name": "Production build and browser interactions",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240365/job/127122194400"
+        },
+        {
+          "name": "analytics-ssr",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240268/job/127121849240"
+        },
+        {
+          "name": "Cloud credential access (OIDC)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240365/job/127120621929"
+        },
+        {
+          "name": "Database checks (4/4)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240365/job/127120620279"
+        },
+        {
+          "name": "Database checks (3/4)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240365/job/127120620248"
+        },
+        {
+          "name": "Database checks (1/4)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240365/job/127120620169"
+        },
+        {
+          "name": "Database checks (2/4)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240365/job/127120620104"
+        },
+        {
+          "name": "Source checks",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240365/job/127120620088"
+        },
+        {
+          "name": "Integration unit checks",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240365/job/127120620065"
+        },
+        {
+          "name": "Daemon checks",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240365/job/127120620033"
+        },
+        {
+          "name": "Core unit checks",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240365/job/127120620029"
+        },
+        {
+          "name": "Analytics SSR (full)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240268/job/127120577260"
+        },
+        {
+          "name": "publish",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240322/job/127120556400"
+        },
+        {
+          "name": "await-web",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240322/job/127120555372"
+        },
+        {
+          "name": "validate",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240322/job/127120554376"
+        },
+        {
+          "name": "check",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240322/job/127120553599"
+        },
+        {
+          "name": "test",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240322/job/127120483826"
+        },
+        {
+          "name": "custody",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240435/job/127120483767"
+        },
+        {
+          "name": "EAS Update",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240343/job/127120483705"
+        },
+        {
+          "name": "Changed files",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240365/job/127120483678"
+        },
+        {
+          "name": "Local driver (macOS permissions, nonblocking)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240335/job/127120483674"
+        },
+        {
+          "name": "Local driver (Linux Xvfb)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240335/job/127120483602"
+        },
+        {
+          "name": "runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240321/job/127120483481"
+        },
+        {
+          "name": "smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240307/job/127120483265"
+        },
+        {
+          "name": "icon",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240307/job/127120483227"
+        },
+        {
+          "name": "backend",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240335/job/127120483197"
+        },
+        {
+          "name": "Changed files",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240268/job/127120483000"
+        },
+        {
+          "name": "checks",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240307/job/127120482867"
+        },
+        {
+          "name": "Browser tests (before merge)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240340/job/127120482798"
+        },
+        {
+          "name": "ssh",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/41990240266/job/127120482572"
+        },
+        {
+          "name": "GitGuardian Security Checks",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/alexj11324/Mikka/runs/127120481448"
+        }
+      ]
+    },
+    "interpretation": "27 successful and 5 skipped checks are job conclusions, not live model acceptance or proof that skipped publishing steps ran."
+  },
+  "independentMainFailure": {
+    "head": "7cae54d3b16c8b3a06b931980fff5b7b2071698b",
+    "tree": "adad0b8f5c7d429e9fe5f3f1330c49e4c8fa9ce3",
+    "parents": [
+      "f793f3d40b3ed167b26d8ab1d30c2bbdf4903418",
+      "bbf2f70087c459fd82fbc7a38d47c0402f990df6"
+    ],
+    "ci": {
+      "runId": 41990588417,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41990588417",
+      "conclusion": "failure",
+      "firstFailedJobId": 127121685713,
+      "failedTest": "records host lease revocation before Claude exits 143, even before the heartbeat learns it",
+      "file": "packages/daemon/test/tool-approval-liveness.test.ts",
+      "line": 137,
+      "errorCode": "ENOENT",
+      "missingResource": "temporary sigterm-exit marker",
+      "counts": {
+        "tests": 950,
+        "pass": 947,
+        "fail": 1,
+        "skipped": 2
+      }
+    },
+    "downstreamPolicy": {
+      "jobId": 127123854055,
+      "result": "failure",
+      "reason": "DAEMON_RESULT=failure"
+    },
+    "daemonPublication": {
+      "runId": 41990588515,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41990588515",
+      "jobId": 127121612377,
+      "conclusion": "failure",
+      "ownUnitTests": {
+        "tests": 950,
+        "pass": 948,
+        "fail": 0,
+        "skipped": 2
+      },
+      "buildAndTarballTest": "passed",
+      "refusalCode": "releaseCheckFailed:ui-policy.yml",
+      "publication": "not performed"
+    },
+    "sameBlobAsBatch42b": {
+      "packages/daemon/test/tool-approval-liveness.test.ts": "a372d9429f3e3f83ff05dfa6d6e8c75328dd8673",
+      "packages/daemon/src/runs/supervisor.ts": "1aa33ca760623a2e1783aaa21b0ee88e5d1244c8"
+    },
+    "conclusion": "The same main SHA produced different outcomes in two existing jobs. The cause remains undetermined. The source7e benchmark fixture import fix does not change these daemon files and is not a fix for this failure. No rerun, source change, or additional test was performed.",
+    "redactedExcerpt": {
+      "sha256": "4a7e8bea1c2b7a9aa1ed2f4c9148157d6277731b38089d88b0fb3359db0812d6",
+      "bytes": 1840,
+      "note": "Only the failure/footer excerpt; ANSI removed and random temporary fixture path redacted. Not a hash of the full raw CI log."
+    }
+  },
+  "localBuild": {
+    "head": "42b1f3f5f2a19f1271e3e513a77b2b046c99d662",
+    "tree": "002ef49edfc7150fe0b56200d8f77296db5e519c",
+    "sourceDirty": false,
+    "command": "pnpm build",
+    "startedAt": "2026-11-05T07:59:36.539Z",
+    "finishedAt": "2026-11-05T08:01:32.431Z",
+    "exitCode": 0,
+    "serverReadyAt": "2026-11-05T08:01:36.094Z",
+    "strictAttestation": true,
+    "log": {
+      "artifact": "issue1284-http-recovery-final-build.log",
+      "sha256": "359de06abd6b40b3f1eebb20820d3bce0c3dd87e05103f150c335f4a5af0fdd1",
+      "bytes": 9856
+    },
+    "scope": "Local production build and server readiness only; not an HTTP business-flow or production acceptance result."
+  },
+  "openAcceptance": {
+    "normalNextSessionHttp": "pending separate evidence; not filled from handleFactory tests or server readiness",
+    "screenshotReview": "pending separate evidence",
+    "productionClaudeCode": "pending renewed production acceptance for this batch",
+    "productionCodex": "pending renewed production acceptance for this batch",
+    "apiDeepSeek": "skipped by explicit user instruction because the API account was declared out of funds; no paid test or balance check performed",
+    "alex66OriginalClaimRootCause": "unknown; diagnostics must not be represented as a functional fix"
+  },
+  "priorEvidence": {
+    "reference": "existing 4dd53 evidence checkpoint",
+    "modifiedByThisPreparation": false,
+    "earlier19aRoutingTeardown42501": "original failures retained; not changed to green by subsequent results"
+  },
+  "privacy": {
+    "rawLogsIncluded": false,
+    "accountIdentitiesIncluded": false,
+    "databaseUrlsIncluded": false,
+    "credentialsOrSessionMaterialIncluded": false,
+    "privateProfileInstructionsIncluded": false,
+    "references": "only source versions, controlled test types/counts, closed error codes, public GitHub URLs and log/artifact hashes"
+  }
+}

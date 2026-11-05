@@ -1,0 +1,25 @@
+{
+  "kind": "official-test-account-evidence-audit",
+  "context": "5251",
+  "runnerSourceCommit": "5251a6bfeda13c2e6c300dfba5fa0841ee0e9f8a",
+  "runnerSourceTree": "d1397ffac0a07e2a8a62290a161839d44a2b0a97",
+  "candidateBaseCommit": "4dd5339b82aed6f92bab222bac011fc2268b0305",
+  "candidateBaseTree": "6eda2d17d86a9c61ce63e97dc302b14478e0e4bf",
+  "manifestSha256": "c6ef6df62cd64a6bf1bcc9c881b26f640635b635f375a61bd0d5eea6cd389278",
+  "candidateDirectory": "/tmp/issue1284-recovery-5251-public-c6ef6df6",
+  "candidateFiles": 21,
+  "candidateBytes": 378228,
+  "candidateBytesVerifiedBeforeAndAfter": true,
+  "privateContextExported": false,
+  "liveDatabaseOrServerRequired": false,
+  "startedAt": "2026-11-05T08:49:48.715143+00:00",
+  "completedAt": "2026-11-05T08:49:48.819847+00:00",
+  "officialAudit": {
+    "files": 21,
+    "archives": 0,
+    "archiveEntries": 0,
+    "decodedBytes": 0,
+    "result": "passed",
+    "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+  }
+}

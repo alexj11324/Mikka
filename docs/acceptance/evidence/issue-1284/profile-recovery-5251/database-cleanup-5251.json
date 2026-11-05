@@ -1,0 +1,17 @@
+{
+  "sourceCommit": "5251a6bfeda13c2e6c300dfba5fa0841ee0e9f8a",
+  "sourceTree": "d1397ffac0a07e2a8a62290a161839d44a2b0a97",
+  "database": "mikka1284_http_5251_d5bbe69c_e2e",
+  "role": "mikka1284_http_5251_d5bbe69c",
+  "preDrop": {
+    "active_leases": 0,
+    "valid_sessions": 0,
+    "active_runs": 0
+  },
+  "databaseSessionsBeforeDrop": 0,
+  "databaseExists": false,
+  "roleExists": false,
+  "forceOrTerminateUsed": false,
+  "droppedAt": "2026-11-05T08:43:27.163093+00:00",
+  "privateAuditLedgerRetained": true
+}
