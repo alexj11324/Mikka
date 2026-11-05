@@ -26,29 +26,32 @@ test('not judged yet: failed is 受阻, any other ended run 等待你, never 已
   assert.equal(threadGroupOfRun('waiting_input'), 'waiting')
 })
 
-// Alex, 2026-11-02: a hollow circle read too close to 进行中's spinner and 空闲's slashed circle.
-test('等待你 raises a hand, in rows and chips and in a header', () => {
-  for (const small of [true, false]) {
-    const html = renderToStaticMarkup(<ThreadStatusIcon group="waiting" small={small} />)
-    assert.match(html, /lucide-hand\b/)
-    assert.doesNotMatch(html, /lucide-circle\b/)
+// Alex, 2026-11-04: a task and a thread must never look alike. A task is a circle; a thread is a bubble with a dot.
+test('a thread is a speech bubble with its group as a dot, never a circle like a task\'s status', () => {
+  for (const group of ['running', 'waiting', 'blocked', 'idle', 'resolved'] as const) {
+    for (const small of [true, false]) {
+      const html = renderToStaticMarkup(<ThreadStatusIcon group={group} small={small} />)
+      assert.match(html, /lucide-message-circle\b/)
+      assert.doesNotMatch(html, /lucide-circle|lucide-hand|lucide-loader/)
+      assert.match(html, new RegExp(`data-thread-dot="${group}"`))
+      assert.match(html, new RegExp(`aria-label="Shell\\.threads\\.state\\.${group}"`), 'the dot is never the only sign')
+    }
   }
-  assert.match(renderToStaticMarkup(<ThreadStatusIcon status="stopped" waiting />), /lucide-hand\b/)
-  assert.doesNotMatch(renderToStaticMarkup(<ThreadStatusIcon group="running" />), /lucide-hand\b/)
+  assert.match(renderToStaticMarkup(<ThreadStatusIcon status="stopped" waiting />), /data-thread-dot="waiting"/)
 })
 
 // Decision (coordinator, 2026-11-02, option A): the badge says its group, as the list does, never the run's raw status.
 test('a thread\'s badge shows its group\'s icon and word: an unjudged finished run is 等待你, never 已完成', () => {
   const badge = (props: Parameters<typeof ThreadStatus>[0]) => renderToStaticMarkup(<ThreadStatus {...props} />)
   const table: [Parameters<typeof ThreadStatus>[0], string, RegExp][] = [
-    [{ status: 'running' }, 'running', /lucide-loader-circle/],
-    [{ status: 'waiting_input' }, 'waiting', /lucide-hand/],
-    [{ status: 'succeeded' }, 'waiting', /lucide-hand/],
-    [{ status: 'stopped' }, 'waiting', /lucide-hand/],
-    [{ status: 'succeeded', outcome: 'done' }, 'resolved', /lucide-circle-check/],
-    [{ status: 'failed' }, 'blocked', /lucide-circle-alert/],
-    [{ status: 'succeeded', outcome: 'blocked' }, 'blocked', /lucide-circle-alert/],
-    [{ status: 'stopped', outcome: 'idle' }, 'idle', /lucide-circle-slash/],
+    [{ status: 'running' }, 'running', /data-thread-dot="running"/],
+    [{ status: 'waiting_input' }, 'waiting', /data-thread-dot="waiting"/],
+    [{ status: 'succeeded' }, 'waiting', /data-thread-dot="waiting"/],
+    [{ status: 'stopped' }, 'waiting', /data-thread-dot="waiting"/],
+    [{ status: 'succeeded', outcome: 'done' }, 'resolved', /data-thread-dot="resolved"/],
+    [{ status: 'failed' }, 'blocked', /data-thread-dot="blocked"/],
+    [{ status: 'succeeded', outcome: 'blocked' }, 'blocked', /data-thread-dot="blocked"/],
+    [{ status: 'stopped', outcome: 'idle' }, 'idle', /data-thread-dot="idle"/],
   ]
   for (const [props, group, icon] of table) {
     const html = badge(props)

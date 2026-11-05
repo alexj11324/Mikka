@@ -88,9 +88,13 @@ export function SourceAvatar({ source, className }: { source: StreamingSource; c
 export const sourceChipClassName =
   "mx-0.5 inline-flex max-w-64 translate-y-[-1px] cursor-pointer items-center gap-1.5 align-middle text-current underline decoration-current/30 underline-offset-[3px] outline-none transition-[text-decoration-color] duration-150 hover:decoration-current focus-visible:rounded-[4px] focus-visible:ring-2 focus-visible:ring-ring data-popup-open:decoration-current animate-in fade-in-0 animation-duration-250 ease-[cubic-bezier(0.23,1,0.32,1)] fill-mode-both";
 
-/** A Mikka object named in text (task, thread): a boxed chip with a faint accent fill and the title in the accent; it never breaks across lines (R-15). */
+/**
+ * A Mikka object named in text (task, thread): a faint accent fill and the title in the accent, at the text's own size
+ * and line height so it reads as a word of the sentence. A long title wraps like the words around it, each line keeping
+ * the fill (R-15). The icon says what it is: a task's status circle, a thread's bubble.
+ */
 export const objectChipClassName =
-  "mx-0.5 inline-flex h-5 max-w-72 translate-y-[-1px] cursor-pointer items-center gap-1 whitespace-nowrap rounded-[5px] bg-object-chip px-1.5 align-middle text-object-chip-foreground no-underline outline-none transition-colors duration-150 hover:bg-object-chip-hover focus-visible:ring-2 focus-visible:ring-ring data-popup-open:bg-object-chip-hover animate-in fade-in-0 animation-duration-250 ease-[cubic-bezier(0.23,1,0.32,1)] fill-mode-both";
+  "mx-0.5 inline cursor-pointer rounded-md bg-object-chip px-1.5 py-px box-decoration-clone text-object-chip-foreground no-underline outline-none transition-colors duration-150 hover:bg-object-chip-hover focus-visible:ring-2 focus-visible:ring-ring data-popup-open:bg-object-chip-hover [&>[data-slot=inline-citation-label]]:inline [&>[data-slot=inline-citation-label]]:whitespace-normal [&>[role=img]]:mr-1 [&>[role=img]]:inline-flex [&>[role=img]]:align-[-0.125em] [&>svg]:mr-1 [&>svg]:inline [&>svg]:align-[-0.125em] animate-in fade-in-0 animation-duration-250 ease-[cubic-bezier(0.23,1,0.32,1)] fill-mode-both";
 
 /** A source's icon inside a chip: its own small rounded tile. The neutral fill shows only where the favicon is transparent, or behind the globe when there is none. */
 export const sourceTileClassName = "size-4.5 rounded-[5px] bg-muted [&:is(span)]:p-[3px] [&:is(span)]:text-muted-foreground";

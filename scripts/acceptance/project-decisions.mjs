@@ -173,14 +173,31 @@ function publicChunk(value) {
   } catch { return null }
 }
 
+// Public Turbopack loader factories associate .A(moduleId) with literal chunks.
+// Decode that generated shape without evaluating downloaded JavaScript.
+const loaderModule = /(?:^|,)\s*(\d+)\s*,\s*([$A-Z_a-z][$\w]*)\s*=>\s*\{\s*\2\.v\(\s*([$A-Z_a-z][$\w]*)\s*=>\s*Promise\.all\(\s*(\[\s*(?:"[^"\\\r\n]*"\s*,?\s*)*\])\s*\.map\(\s*([$A-Z_a-z][$\w]*)\s*=>\s*\2\.l\(\s*\5\s*\)\s*\)\s*\)\s*\.then\(\s*\(\s*\)\s*=>\s*\3\(\s*\d+\s*\)\s*\)\s*\)\s*\}/g
+const lazyImport = /[$A-Z_a-z][$\w]*\s*\.\s*A\s*\(\s*(\d+)\s*\)/g
+const literalChunk = /(["'])((?:static\/chunks\/|\/mikka\/_next\/static\/chunks\/)[^"'\\\r\n]+\.js(?:\?[^"'\\\r\n]*)?)\1/g
+
 /** Only deployment-published named UI Server Actions; no manifest or private server access. */
 export async function discoverActions(request, diagnostics = {}) {
-  const queue = [], queued = new Set(), seen = new Set(), refs = {}
+  const pending = new Map(), seen = new Set(), refs = {}
+  const loaders = new Map(), imports = new Map()
   Object.assign(diagnostics, { required: [...ACTIONS], found: [], missing: [...ACTIONS],
     pagesRead: 0, pagesFailed: 0, chunksRead: 0, chunksFailed: 0, chunksRemaining: 0 })
-  const enqueue = value => {
+  const enqueue = (value, priority) => {
     const path = publicChunk(value)
-    if (path && !queued.has(path) && queue.length < 3000) { queued.add(path); queue.push(path) }
+    if (!path || seen.has(path)) return
+    const previous = pending.get(path)
+    // A component can promote a path first queued by the whole-app table.
+    if (previous !== undefined) {
+      if (priority < previous) pending.set(path, priority)
+    } else if (pending.size < 3000) pending.set(path, priority)
+  }
+  const resolveImport = id => {
+    const priority = imports.get(id), paths = loaders.get(id)
+    if (priority === undefined || !paths) return
+    for (const path of paths) enqueue(path, Math.max(priority, paths.length))
   }
   try {
     for (const path of ACTION_PAGES) {
@@ -190,12 +207,14 @@ export async function discoverActions(request, diagnostics = {}) {
       diagnostics.pagesRead++
       check(html.length <= 8_000_000, 'response_invalid')
       for (const match of html.matchAll(/(?:src|href)\s*=\s*(["'])([^"']+\.js(?:\?[^"']*)?)\1/g))
-        enqueue(match[2].replaceAll('&amp;', '&'))
+        enqueue(match[2].replaceAll('&amp;', '&'), 0)
     }
-    while (queue.length && seen.size < 200 && Object.keys(refs).length < ACTIONS.size) {
-      const batch = queue.splice(0, Math.min(20, 200 - seen.size))
-      for (const path of batch) seen.add(path)
-      const reads = await Promise.allSettled(batch.map(async path => {
+    while (pending.size && seen.size < 200 && Object.keys(refs).length < ACTIONS.size) {
+      // Page seeds first, then small component branches. A whole-app loader
+      // table remains a bounded fallback, rather than consuming the scan budget.
+      const batch = [...pending].sort((left, right) => left[1] - right[1]).slice(0, Math.min(20, 200 - seen.size))
+      for (const [path] of batch) { pending.delete(path); seen.add(path) }
+      const reads = await Promise.allSettled(batch.map(async ([path, priority]) => {
         const response = await request(path).catch(() => null)
         if (!response?.ok) { diagnostics.chunksFailed++; return }
         const source = await response.text()
@@ -203,8 +222,23 @@ export async function discoverActions(request, diagnostics = {}) {
         check(source.length <= 8_000_000, 'response_invalid')
         for (const match of source.matchAll(referenceCall))
           if (ACTIONS.has(match[4])) refs[match[4]] = match[2]
-        for (const match of source.matchAll(/(["'])((?:static\/chunks\/|\/mikka\/_next\/static\/chunks\/)[^"'\\\r\n]+\.js(?:\?[^"'\\\r\n]*)?)\1/g))
-          enqueue(match[2])
+        for (const match of source.matchAll(loaderModule)) {
+          if (!loaders.has(match[1]) && loaders.size >= 3000) continue
+          let paths
+          try { paths = JSON.parse(match[4]) } catch { continue }
+          loaders.set(match[1], [...new Set(paths.map(publicChunk).filter(Boolean))])
+          // Imports can arrive before their table in concurrent chunk reads.
+          resolveImport(match[1])
+        }
+        const ids = new Set([...source.matchAll(lazyImport)].map(match => match[1]))
+        const importPriority = Math.max(priority, ids.size)
+        for (const id of ids) {
+          if (!imports.has(id) && imports.size >= 3000) continue
+          imports.set(id, Math.min(imports.get(id) ?? Infinity, importPriority))
+          resolveImport(id)
+        }
+        const paths = [...new Set([...source.matchAll(literalChunk)].map(match => publicChunk(match[2])).filter(Boolean))]
+        for (const dependency of paths) enqueue(dependency, Math.max(priority, paths.length))
       }))
       for (const read of reads) if (read.status === 'rejected') throw read.reason
     }
@@ -212,7 +246,7 @@ export async function discoverActions(request, diagnostics = {}) {
   } finally {
     diagnostics.found = [...ACTIONS].filter(name => refs[name])
     diagnostics.missing = [...ACTIONS].filter(name => !refs[name])
-    diagnostics.chunksRemaining = queue.length
+    diagnostics.chunksRemaining = pending.size
   }
 }
 
