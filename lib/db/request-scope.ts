@@ -71,6 +71,11 @@ export function withDatabaseClient<T>(client: PoolClient, callback: () => T): T 
   return heldClient.run(client, () => transactionDatabase.run(drizzle(client, { schema }), callback))
 }
 
+/** A held client or an ambient transaction: this read may see its own uncommitted writes. */
+export function inDatabaseTransaction() {
+  return Boolean(heldClient.getStore() || transactionDatabase.getStore())
+}
+
 /** After-commit work must not retain a client that its owner has returned to the pool. */
 export function withoutDatabaseClient<T>(callback: () => T): T {
   return heldClient.exit(() => transactionDatabase.exit(callback))

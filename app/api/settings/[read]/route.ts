@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withRequestLog } from '@/lib/request-log'
+import { singleFlight } from '@/lib/single-flight'
 import { getPasswordStatus, listSessions } from '@/app/actions/account'
 import { getPreferences } from '@/app/actions/preferences'
 import { listSavedLogins } from '@/app/actions/settings-activity'
@@ -48,6 +49,26 @@ const READS: Record<SettingsRead, (query: URLSearchParams) => Promise<unknown>> 
   audit: query => listAuditLog({ filter: (query.get('filter') ?? undefined) as AuditFilter | undefined, cursor: query.get('cursor') }, workspace(query)),
 }
 
+/**
+ * Each request is authorized on its own: its session and, for a workspace read,
+ * its membership and role in that workspace (a removed member resolves elsewhere
+ * or is refused). Identical concurrent reads with the same authorization share
+ * one read, which still runs its own checks. Any failure here reads unshared.
+ */
+async function shareKey(read: string, query: URLSearchParams) {
+  try {
+    const { requireUser } = await import('@/lib/issue-access')
+    const user = await requireUser()
+    if (ACCOUNT_READS.has(read)) return ['/api/settings', read, user.id, query.toString()]
+    const { loadWorkspaceContext } = await import('@/lib/workspace-access')
+    const context = await loadWorkspaceContext(workspace(query), user)
+    return ['/api/settings', read, user.id, context.workspace.id, context.role, query.toString()]
+  } catch { return null }
+}
+
+/** Reads of the signed-in account alone, with no workspace input. */
+const ACCOUNT_READS = new Set<string>(['password', 'sessions', 'preferences', 'saved-logins'])
+
 function workspace(query: URLSearchParams) {
   return query.get('workspace') ?? undefined
 }
@@ -55,7 +76,10 @@ function workspace(query: URLSearchParams) {
 async function handleGET(request: Request, { params }: { params: Promise<{ read: string }> }) {
   const { read } = await params
   if (!Object.hasOwn(READS, read)) return NextResponse.json({ error: 'notFound' }, { status: 404, headers: { 'Cache-Control': 'private, no-store' } })
-  const body = await READS[read as SettingsRead](new URL(request.url).searchParams)
+  const query = new URL(request.url).searchParams
+  const run = () => READS[read as SettingsRead](query)
+  const key = await shareKey(read, query)
+  const body = key ? await singleFlight(key, run) : await run()
   return NextResponse.json(body ?? null, { headers: { 'Cache-Control': 'private, no-store' } })
 }
 
