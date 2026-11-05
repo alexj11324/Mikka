@@ -55,6 +55,27 @@ test('revoked task access keeps issue_unavailable ahead of policy and claim prep
   assert.equal(probe.run.leaseExpiresAt, null)
 })
 
+test('a failed local subscription preflight ends the queued claim before policy, leases or credentials', async () => {
+  overrideDeploymentSwitch('byos', true)
+  try {
+    for (const detail of ['env_not_clean', 'cli_missing', 'cli_version_mismatch', 'adapter_start_failed'] as const) {
+      const probe = fixture()
+      Object.assign(probe.run, { agentDefinition: { harness: 'codex', subscription: { bindingId: 'binding', modelId: 'fixture-model', route: 'codex_cli' } } })
+      Object.assign(probe, { cloud: { subscription: { id: 'binding', modelId: 'fixture-model', route: 'codex_cli', consumerId: 'agent', workspaceId: 'ws' } } })
+      Object.assign(probe.device.harnesses[0], { installed: detail !== 'cli_missing', subscriptionBroker: true, subscriptionPreflight: detail })
+      const response = await claim(probe, ['skill-preflight', 'subscription-preflight'])
+      assert.equal(response.status, 409)
+      const body = await response.json()
+      assert.equal(body.code, 'subscription_local_runtime_unavailable')
+      assert.equal(body.detail, detail)
+      assert.doesNotMatch(body.error, /subscription_local_runtime_unavailable|env_not_clean|cli_missing|cli_version_mismatch|adapter_start_failed/)
+      assert.equal(probe.run.status, 'failed')
+      assert.equal(probe.run.leaseExpiresAt, null)
+      assert.equal(probe.preparation.includes('token'), false)
+    }
+  } finally { overrideDeploymentSwitch('byos', undefined) }
+})
+
 test('task access database errors are not misclassified as a permission denial', async () => {
   const probe = fixture(), failure = new Error('synthetic task access database fault')
   probe.issueAccessError = failure

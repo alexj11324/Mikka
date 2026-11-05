@@ -138,5 +138,7 @@
       "height": 844,
       "gitBlob": "8f16eb3cfba7d937a17b3abcd26e14521dfe58e1"
     }
-  ]
+  ],
+  "integrationBase": "7cae54d3b16c8b3a06b931980fff5b7b2071698b",
+  "integrationScope": "22 original blobs unchanged; the only overlapping database test preserves both branches with merged helper parameters and strict expected Decision sequence. No New task/Profile UI component changes; final integrated validation is recorded in the PR."
 }

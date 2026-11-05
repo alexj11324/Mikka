@@ -19,8 +19,10 @@ export async function ensureRecordedBotHarnessRuntime(
     JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId"
     JOIN devices d ON d.id=m."deviceId" AND d."ownerId"=b."ownerId" AND d.kind='cloud' AND d.enabled=true
     WHERE b.id=$1 AND b."ownerId"=$2 AND b."workspaceId"=$3 AND b."archivedAt" IS NULL
-      AND d.harnesses @> $4::jsonb FOR SHARE OF b,desk,m,d`,
-  [botId, actor.userId, actor.workspaceId, JSON.stringify([{ harness, installed: true, subscriptionBroker: true, computerBroker: true }])])
+      AND d.harnesses @> $4::jsonb
+      AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d.harnesses) info WHERE info->>'harness'=$5 AND info ? 'subscriptionPreflight')
+      FOR SHARE OF b,desk,m,d`,
+  [botId, actor.userId, actor.workspaceId, JSON.stringify([{ harness, installed: true, subscriptionBroker: true, computerBroker: true }]), harness])
   if (!machine) return null
   const { rows: [existing] } = await tx.query<Runtime>(`SELECT r."agentId",a."deviceId",r."repoId"
     FROM bot_cloud_runtimes r JOIN agents a ON a.id=r."agentId" AND a."userId"=r."ownerId" AND a.harness=r.harness

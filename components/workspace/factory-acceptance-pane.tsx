@@ -4,7 +4,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { useFormatter, useTranslations } from 'next-intl'
-import { CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, Laptop, RefreshCw, Server } from 'lucide-react'
+import { CircleAlert, CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, Laptop, RefreshCw, Server } from 'lucide-react'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -22,6 +22,7 @@ import { RejectNote } from './factory-reject-note'
 import { PullRequestIcon } from './pull-request-icon'
 import { ShortSha, shortSha } from './short-sha'
 import { FieldError } from '@/components/ui/field'
+import { RunErrorDetails } from './run-error-text'
 
 type Candidate = { sha: string | null; kind?: 'repository' | 'report' | 'deliverable'; repository: string; environment: string; scope: string }
 export type FactoryTask = { id: string; issueId: string; stage: string; status: string; reason: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean; revision?: number; attemptId?: string; completionRecovery?: AcceptanceDetail['completionRecovery'] }
@@ -76,7 +77,7 @@ export function useAcceptance(task: FactoryTask) {
     ? acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals: Array.isArray(ledger.approvals) ? ledger.approvals : [], publications: Array.isArray(ledger.publications) ? ledger.publications : [], now: Date.now() })
     : mergeAcceptance({ stage: current.stage, status: current.status, candidateId: current.candidateId, merges: Array.isArray(ledger.merges) ? ledger.merges : [] })
   const check = task.completionRecovery || detail?.completionRecovery ? null : candidateCheckState(current)
-  return { ledger, reload, ledgerError, derived, check }
+  return { ledger, reload, ledgerError, derived, check, current }
 }
 
 function Label({ children }: { children: string }) {
@@ -162,13 +163,14 @@ function ResultLine({ row, onOpenThread }: { row: ResultRow; onOpenThread?: (run
   const t = useTranslations('FactoryAcceptance')
   const format = useFormatter()
   const done = row.status === 'passed' || row.status === 'failed'
-  const word = row.status === 'passed' || row.status === 'failed' ? t(RESULT_WORD[row.stage][row.status]) : t('inProgress')
+  const blocked = row.status === 'blocked'
+  const word = row.status === 'passed' || row.status === 'failed' ? t(RESULT_WORD[row.stage][row.status]) : t(blocked ? 'blocked' : 'inProgress')
   const meta = row.stage === 'verify' ? (row.total ? `${row.passed}/${row.total}` : null) : row.total - row.passed > 0 ? t('opinions', { count: String(row.total - row.passed) }) : null
   const thread = t(row.stage === 'review' ? 'reviewThread' : 'verifyThread')
   return <li className="flex min-h-10 min-w-0 flex-wrap items-center gap-2 rounded-xl px-3 py-2.5">
-    {done ? <Verdict passed={row.status === 'passed'} /> : <Spinner className="size-4 shrink-0 text-muted-foreground" />}
+    {done ? <Verdict passed={row.status === 'passed'} /> : blocked ? <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-destructive-foreground" /> : <Spinner className="size-4 shrink-0 text-muted-foreground" />}
     <span className="text-sm font-medium">{t(row.stage === 'review' ? 'review' : 'verify')}</span>
-    <span className={cn('text-sm', row.status === 'passed' ? 'text-success-foreground' : row.status === 'failed' ? 'text-destructive-foreground' : 'text-muted-foreground')}>{word}</span>
+    <span className={cn('text-sm', row.status === 'passed' ? 'text-success-foreground' : row.status === 'failed' || blocked ? 'text-destructive-foreground' : 'text-muted-foreground')}>{word}</span>
     {meta && <span className="text-xs text-muted-foreground">{meta}</span>}
     <span className="flex-1" />
     {row.runId && onOpenThread
@@ -192,7 +194,7 @@ function ResultLine({ row, onOpenThread }: { row: ResultRow; onOpenThread?: (run
 export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTask; onOpenThread?: (runId: string) => void }) {
   const t = useTranslations('FactoryAcceptance')
   const { mutate: mutateCache } = useSWRConfig()
-  const { ledger, reload, ledgerError, derived: acceptance, check } = useAcceptance(task)
+  const { ledger, reload, ledgerError, derived: acceptance, check, current: currentTask } = useAcceptance(task)
   // A voided approval puts the task back to pending, so the current candidate's evidence is needed to enable it again.
   const { data: evidence, error: evidenceError } = useSWR<Evidence>(task.stage === 'approval' || acceptance?.superseded || acceptance?.state === 'merged' ? `/api/factory/tasks/${task.id}/approval` : null, request)
   // Checks and the delivery header (B8/B9/B11) are read-only extras; the pane works without them.
@@ -269,7 +271,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
     try {
       const result = await request(`/api/factory/tasks/${task.id}`, { binding: retryCheck.binding, eventId: submission.eventId,
         action: 'retry', reason: submission.reason })
-      if (!candidateCheckRetryConfirmed(task, result)) setCheckError({ key: retryCheck.key, unknown: true })
+      if (!candidateCheckRetryConfirmed(task, result, detail?.checkStartRecovery)) setCheckError({ key: retryCheck.key, unknown: true })
     } catch (caught) {
       setCheckError({ key: retryCheck.key, unknown: !(caught instanceof RequestError) || caught.status >= 500 })
     } finally {
@@ -360,6 +362,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
         <h4 className="pl-3 text-xs font-medium text-muted-foreground">{t('results')}</h4>
         <ul className="flex flex-col gap-1">{results.map(row => <ResultLine key={row.stage} row={row} onOpenThread={onOpenThread} />)}</ul>
       </section>}
+      {check?.status === 'blocked' && currentTask.reason && <RunErrorDetails code={currentTask.reason} />}
       {!check && state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
       {error && <FieldError className="text-xs">{t(ERROR_KEYS[error] ?? 'error')}</FieldError>}
       {retryCheck && checkError?.key === retryCheck.key && <FieldError className="text-xs">{t(checkError.unknown ? 'checkRetryUnknown' : 'checkRetryFailed')}</FieldError>}

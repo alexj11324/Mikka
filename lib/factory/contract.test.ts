@@ -79,7 +79,7 @@ const req = {
 test("Owner Retry consumes an admitted completed run before ordinary execution retry", async () => {
   let retried = 0, recovered = 0, started = 0;
   const result = { task: { id: req.taskId, stage: "review", status: "running" } };
-  const store = { apply: async () => { retried++; return {}; }, retryCompletion: async () => {
+  const store = { retryCheckStart: async () => null, apply: async () => { retried++; return {}; }, retryCompletion: async () => {
     recovered++; return { result, start: async () => { started++; } };
   } } as unknown as FactoryStore;
   const pool = { query: async () => ({ rows: [{ botId: null }] }) };
@@ -93,7 +93,7 @@ test("Owner Retry consumes an admitted completed run before ordinary execution r
 });
 test("an unavailable completion recovery cannot fall through to ordinary Retry", async () => {
   let retries = 0;
-  const store = { apply: async () => { retries++; }, retryCompletion: async () => { throw new FactoryError('factoryCompletionRecoveryUnavailable'); } } as unknown as FactoryStore;
+  const store = { retryCheckStart: async () => null, apply: async () => { retries++; }, retryCompletion: async () => { throw new FactoryError('factoryCompletionRecoveryUnavailable'); } } as unknown as FactoryStore;
   const human = createFactoryHumanStore({ query: async () => ({ rows: [{ botId: null }] }) } as never, () => store);
   const response = await handleFactory(human, { ...req, body: {
     binding: { taskId: req.taskId, revision: 16 }, eventId: randomUUID(), action: 'retry', reason: 'Retry',
@@ -103,7 +103,7 @@ test("an unavailable completion recovery cannot fall through to ordinary Retry",
 });
 test("ordinary failed-run Retry keeps its existing store path", async () => {
   let retries = 0;
-  const store = { apply: async () => { retries++; return { normalRetry: true }; }, retryCompletion: async () => null } as unknown as FactoryStore;
+  const store = { retryCheckStart: async () => null, apply: async () => { retries++; return { normalRetry: true }; }, retryCompletion: async () => null } as unknown as FactoryStore;
   const human = createFactoryHumanStore({ query: async () => ({ rows: [{ botId: null }] }) } as never, () => store);
   const response = await handleFactory(human, { ...req, body: {
     binding: { taskId: req.taskId, revision: 16 }, eventId: randomUUID(), action: 'retry', reason: 'Retry',
