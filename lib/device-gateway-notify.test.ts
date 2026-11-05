@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { mock, test } from 'node:test'
+import type { PoolClient } from 'pg'
 
 const callbacks: (() => Promise<void>)[] = []
 let outsideNext = false
@@ -69,7 +70,7 @@ test('a stop or policy write wakes the devices holding its runs only after it co
   const devices = ['22222222-2222-4222-8222-222222222222', '33333333-3333-4333-8333-333333333333']
   const lookups: { text: string; values: unknown[] }[] = []
   const lookup = { query: async (text: string, values: unknown[]) => { lookups.push({ text, values }); return { rows: devices.map(deviceId => ({ deviceId })) } } }
-  const client = { query: async (text: string) => ({ command: text.trim().split(/\s/)[0].toUpperCase(), rows: [], rowCount: 0 }) } as unknown as import('pg').PoolClient
+  const client = { query: async (text: string) => ({ command: text.trim().split(/\s/)[0].toUpperCase(), rows: [], rowCount: 0 }) } as unknown as PoolClient
   observeCommitEffects(client)
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   callbacks.length = 0
