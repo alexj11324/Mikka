@@ -118,7 +118,10 @@ old module owners (backend was Codex's).
 1. **One owner.** Work is assigned through a GitHub issue to one agent
    (currently ChatGPT Pro sessions; earlier Codex and Cursor). That agent
    owns it end to end: code, PR, merge, deploy check and production
-   acceptance.
+   acceptance. It resolves every blocker itself and keeps going until the
+   goal is met in production, without stopping to wait for anyone (Alex,
+   2026-11-05). When Alex grants an owner full permissions on its issue,
+   that grant overrides the limits in this document for that issue.
 2. **No direct pushes.** Nobody pushes to `main`. Every change goes through a
    PR from a branch based on `main`. Each original PR changes one thing;
    ready PRs are integrated as a batch under rule 3.
