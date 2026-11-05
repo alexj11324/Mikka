@@ -4,7 +4,7 @@ import useSWR, { unstable_serialize } from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { ChevronRight } from 'lucide-react'
 import { pollIssueThreads } from '@/app/actions/agents'
-import { threadQuestionView, threadTime, type IssueThread } from '@/lib/issue-threads'
+import { acceptedProducerOutcome, threadQuestionView, threadTime, type IssueThread } from '@/lib/issue-threads'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { BotAvatar, COORDINATOR_AVATAR, colorFor } from '@/components/nav/bot-avatar'
@@ -13,6 +13,7 @@ import { ThreadStatus, ThreadStatusIcon } from './thread-status-icon'
 import { cn } from '@/lib/utils'
 import { InlineLoadError } from '@/components/load-error'
 import { useRunErrorText } from './run-error-text'
+import { useAcceptanceTasks } from './factory-acceptance'
 
 /** The SWR key of an issue's thread list; it holds `{ threads, live }`. */
 export const issueThreadsKey = (issueId: string) => ['issue-threads', issueId] as const
@@ -39,6 +40,7 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
   const now = useNow({ updateInterval: 60_000 })
   const runErrorText = useRunErrorText()
   const { data, error, mutate } = useIssueThreads(issueId)
+  const { allTasks } = useAcceptanceTasks(issueId)
   if (error) return <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
   if (!data?.length) return null
   return <section aria-labelledby={`threads-${issueId}`} className="flex flex-col gap-2">
@@ -50,13 +52,14 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
         // A known failure code shows its words; the code itself stays in the thread's 详情.
         const meta = runErrorText(thread.detail?.summary ?? null).message
         const view = threadQuestionView(thread)
+        const outcome = acceptedProducerOutcome(thread, issueId, allTasks)
         const body = <>
-          <ThreadStatusIcon status={view.status} outcome={view.outcome} waiting={view.waiting} />
+          <ThreadStatusIcon status={view.status} outcome={outcome} waiting={view.waiting} />
           <span className="flex min-w-0 flex-1 flex-col text-left">
             <span className="truncate text-sm font-medium">{name}</span>
             {meta && <span className="truncate text-xs font-normal text-muted-foreground">{meta}</span>}
           </span>
-          <ThreadStatus status={view.status} outcome={view.outcome} stopping={view.stopping} waiting={view.waiting} icon={false} />
+          <ThreadStatus status={view.status} outcome={outcome} stopping={view.stopping} waiting={view.waiting} icon={false} />
           <time className="min-w-14 shrink-0 whitespace-nowrap text-right text-xs font-normal text-muted-foreground tabular-nums" dateTime={new Date(thread.finishedAt ?? thread.createdAt).toISOString()}>{format.relativeTime(threadTime(thread, now), now)}</time>
         </>
         return <li key={thread.id}>

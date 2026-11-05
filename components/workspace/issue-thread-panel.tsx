@@ -13,7 +13,7 @@ import { prepareThreadReply, type ThreadReplySubmission } from '@/lib/thread-sub
 import { mergeThreadChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
 import { ThreadExecutionIdentity } from './thread-execution-identity'
-import { threadQuestionView } from '@/lib/issue-threads'
+import { acceptedProducerOutcome, threadQuestionView } from '@/lib/issue-threads'
 import { threadComposerHarness } from '@/lib/run-model-fallback-view'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { QuoteChip, QuoteLine } from '@/components/artifacts/artifact-quote'
@@ -38,7 +38,7 @@ import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { ArtifactKindIcon } from '@/components/artifacts/artifact-card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AcceptanceStateBadge, useThreadAcceptance } from './factory-acceptance'
+import { AcceptanceStateBadge, useAcceptanceTasks } from './factory-acceptance'
 import { FactoryAcceptancePane } from './factory-acceptance-pane'
 import { ChangesTabLabel, ThreadChangesPane } from './thread-changes'
 
@@ -95,7 +95,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   useLiveKeys(liveRuns.map(reference => ({ ...reference, kind: 'run' as const })), liveKeys, null)
   useLiveKey('factory_issue', issueId, liveKeys, data?.live?.issueWorkspaceId ?? null, { deadline: data?.live?.questionDeadline })
   // Frame 06: a thread whose candidate waits for acceptance has 对话 | 验收 in its header.
-  const acceptance = useThreadAcceptance(issueId, runId)
+  const { tasks: acceptanceTasks, allTasks } = useAcceptanceTasks(issueId)
+  // Keep the pane on the addressed producer; its status can follow an accepted continuation.
+  const acceptance = acceptanceTasks.find(task => task.candidateRunId === runId)
   const [tab, setTab] = useViewState<ThreadTab>(`thread:${runId}:tab:${initialTab}`, initialTab)
   const accepting = !bare && Boolean(acceptance) && tab === 'acceptance'
   // 改动 (Figma 820:4843): the agent's work tree diff, read-only, once the run saved one.
@@ -124,6 +126,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   // Once answered it reads as the running thread it continues, with nothing to send or stop yet;
   // as soon as the resumed run starts, messages and stop go to that run.
   const view = data ? threadQuestionView(data.thread) : null
+  const displayOutcome = data ? acceptedProducerOutcome(data.thread, issueId, allTasks) : null
   const question = view?.question ?? null
   const liveRunId = view?.runId ?? runId
   const active = !!view && question !== 'resuming' && runIsActive(view.status)
@@ -232,7 +235,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <ThreadStatus status={view?.status ?? data.thread.status} outcome={view ? view.outcome : data.thread.outcome} stopping={stopRequested} waiting={question === 'waiting'} />
+            <ThreadStatus status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} />
             <span>{t('started', { time: format.dateTime(new Date(data.thread.createdAt), { hour: '2-digit', minute: '2-digit' }) })}</span>
             {/* The bot that dispatched it, also when it is not the chat beside it (R-78, R-82). */}
             {detail?.agentName && <span>{detail.agentName} {t('dispatched')}</span>}
