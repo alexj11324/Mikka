@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { channel } from 'node:diagnostics_channel'
 import { readFile } from 'node:fs/promises'
-import { test } from 'node:test'
+import { mock, test } from 'node:test'
 import { NextRequest } from 'next/server.js'
 import { TestAccountError } from '../test-accounts/pool.mjs'
 import { ReadCacheDiagnosticError } from './read-cache.mjs'
-import { observeOwnedRequests, prepareAttestationRoute, publicOwnedFailure } from './run-read-cache.mjs'
+import { observeOwnedRequests, prepareAttestationRoute, prepareLandingRoute, publicOwnedFailure } from './run-read-cache.mjs'
 
 const environment = { origin: 'http://localhost:3137', basePath: '/mikka' }
 
@@ -126,6 +126,50 @@ test('preparation preserves the cause without exposing a response or credential'
     assert.equal(error.code, 'owned_attestation_prepare_unavailable')
     assert.equal(error.cause, cause)
     assert.equal(error.message, 'owned_attestation_prepare_unavailable')
+    return true
+  })
+})
+
+test('landing compilation makes one bounded anonymous request and never follows the guest redirect', async () => {
+  const abort = new AbortController()
+  const timeout = mock.method(AbortSignal, 'timeout', duration => { assert.equal(duration, 120_000); return abort.signal })
+  try {
+    for (const response of [new Response('<html>streamed redirect</html>'), new Response(null, { status: 307, headers: { location: '/api/acceptance' } }), new Response(null, { status: 307, headers: { location: `${environment.origin}/mikka/api/acceptance`, 'set-cookie': 'NEXT_LOCALE=zh-CN; Path=/mikka; SameSite=Lax' } })]) {
+      let calls = 0
+      await prepareLandingRoute(environment, async (url, options) => {
+        calls++
+        assert.equal(url, 'http://localhost:3137/mikka')
+        assert.equal(options.method, 'GET')
+        assert.equal(options.redirect, 'manual')
+        assert.equal(options.credentials, 'omit')
+        assert.equal(options.cache, 'no-store')
+        assert.equal(options.headers, undefined)
+        assert.equal(options.body, undefined)
+        assert.equal(options.signal, abort.signal)
+        return response
+      })
+      assert.equal(calls, 1)
+    }
+  } finally { timeout.mock.restore() }
+})
+
+test('landing preparation refuses unexpected status, redirect and auth cookies without a second request', async () => {
+  for (const response of [new Response(null, { status: 500 }), new Response(null, { status: 404 }), new Response(null, { status: 307 }),
+    ...['https://foreign.example/api/acceptance', '//foreign.example/api/acceptance', '/api/acceptance?next=private', '/mikka/api/auth/sign-up/email'].map(location => new Response(null, { status: 307, headers: { location } })),
+    ...['better-auth.session_token=private; HttpOnly', 'NEXT_LOCALE=private', 'NEXT_LOCALE=en, better-auth.session_token=private'].map(cookie => new Response(null, { headers: { 'set-cookie': cookie } })),
+  ]) {
+    let calls = 0
+    await assert.rejects(prepareLandingRoute(environment, async () => { calls++; return response }), { code: 'owned_landing_prepare_refused' })
+    assert.equal(calls, 1)
+  }
+})
+
+test('a landing preparation transport failure retains its cause and reports no original error text', async () => {
+  const cause = new DOMException('private transport context', 'TimeoutError')
+  await assert.rejects(prepareLandingRoute(environment, async () => { throw cause }), error => {
+    assert.equal(error.code, 'owned_landing_prepare_unavailable')
+    assert.equal(error.cause, cause)
+    assert.deepEqual(publicOwnedFailure(error), { status: 'fail', code: 'owned_landing_prepare_unavailable' })
     return true
   })
 })

@@ -95,6 +95,28 @@ export async function prepareAttestationRoute(environment, fetchImpl = fetch) {
   if (response.status !== 404 || response.headers.has('set-cookie')) throw new ReadCacheAcceptanceError('owned_attestation_prepare_refused')
 }
 
+export async function prepareLandingRoute(environment, fetchImpl = fetch) {
+  // The observed first authenticated landing timed out at 30,001 ms while
+  // next dev was compiling its large page graph. Compile that same route
+  // once before leasing accounts; retain the session client's 30-second limit.
+  // In development an anonymous page can redirect to the guest-creation API.
+  // Never follow it: this request is compilation preparation, not a login.
+  let response
+  try {
+    response = await fetchImpl(`${environment.origin}${environment.basePath}`, {
+      method: 'GET', redirect: 'manual', credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(120_000),
+    })
+  } catch (error) { throw new ReadCacheAcceptanceError('owned_landing_prepare_unavailable', { cause: error }) }
+  await response.body?.cancel()
+  // next-intl 4.14.9 syncCookie can set NEXT_LOCALE on an anonymous document.
+  // Discard that language preference; refuse every other cookie, including auth.
+  if (response.headers.getSetCookie().some(value => !/^NEXT_LOCALE=(?:zh-CN|en)(?:;|$)/u.test(value))) throw new ReadCacheAcceptanceError('owned_landing_prepare_refused')
+  const destinations = ['/api/acceptance', `${environment.basePath}/api/acceptance`].flatMap(path => [path, `${environment.origin}${path}`])
+  // loading.tsx can make the redirect a 200 streamed document. No document or
+  // redirect is executed, and no request to any acceptance endpoint is made.
+  if (response.status !== 200 && !(response.status === 307 && destinations.includes(response.headers.get('location')))) throw new ReadCacheAcceptanceError('owned_landing_prepare_refused')
+}
+
 async function stop(child) {
   if (!child?.pid) return
   const signal = name => { try { process.kill(-child.pid, name) } catch { /* Already stopped. */ } }
@@ -137,8 +159,11 @@ export async function runOwnedReadCacheAcceptance() {
     await prepareAttestationRoute(environment)
     const initialRouteCompileMs = Date.now() - preparingAt
     await assertDeploymentIdentity(environment)
+    const landingPreparingAt = Date.now()
+    await prepareLandingRoute(environment)
+    const initialLandingCompileMs = Date.now() - landingPreparingAt
     const result = await runReadCacheAcceptance()
-    const summary = { ...result, initialRouteCompileMs, serverStdoutBytes, serverStderrBytes }
+    const summary = { ...result, initialRouteCompileMs, initialLandingCompileMs, serverStdoutBytes, serverStderrBytes }
     await mkdir('.cache/e2e', { recursive: true, mode: 0o700 })
     await writeFile('.cache/e2e/http-acceptance-summary.json', `${JSON.stringify(summary, null, 2)}\n`, { mode: 0o600 })
     return summary
