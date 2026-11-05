@@ -5004,6 +5004,37 @@
       "candidate": "候选",
       "exit": "退出码",
       "unrecorded": "未记录"
+    },
+    "card": {
+      "needsYou": {
+        "spec_review": "方案待审",
+        "question": "在问你",
+        "pr_review": "PR 待审",
+        "blocked": "阻塞",
+        "failed": "失败"
+      },
+      "stageList": "阶段",
+      "counts": {
+        "passed": "{count} 项已验证",
+        "unverified": "{count} 项未验证",
+        "failed": "{count} 项失败"
+      },
+      "openSpec": "查看方案",
+      "approveSpec": "批准方案",
+      "openAcceptance": "打开验收页",
+      "answer": "去回答",
+      "openPullRequest": "打开 PR",
+      "loadError": "任务进展加载失败",
+      "retry": "重试",
+      "approveError": {
+        "stale": "方案已更新",
+        "transition": "方案已不在待审状态",
+        "evidence": "方案线程未提交结果，无法批准",
+        "signedOut": "登录已失效，请刷新页面后重试。",
+        "notFound": "任务不存在或无权访问",
+        "unknown": "批准未确认"
+      },
+      "retryApprove": "重新确认"
     }
   }
 }
