@@ -3,6 +3,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/lists'
+import { runControlChanged } from '@/lib/device-gateway-notify'
 import { issues, issueVersions, teamIssuePromotions } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teams, teamIssues, teamIssuePromotionReceipts, teamProjects } from '@/lib/db/team-schema'
@@ -93,6 +94,8 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId, userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...userActor(userId) })
         await tx.update(teamIssuePromotions).set({ status: 'complete' }).where(eq(teamIssuePromotions.requestId, requestId))
         await issueListScopeChanged(tx, issueId, previousLists)
+        // A task's scope is part of its runs' policy revision.
+        runControlChanged(tx, { userId })
         return { issue: await issueView(saved, tx), linearSync: syncResult }
       })
     })

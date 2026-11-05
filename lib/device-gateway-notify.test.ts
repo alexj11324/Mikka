@@ -62,3 +62,50 @@ test('committed work survives the response boundary, with bounded transient retr
     await new Promise<void>(resolve => server.close(() => resolve()))
   }
 })
+
+test('a stop or policy write wakes the devices holding its runs only after it commits (#1212)', async () => {
+  const { runControlChanged, notifyRunControl } = await import('./device-gateway-notify')
+  const { observeCommitEffects } = await import('./db/commit-effects')
+  const devices = ['22222222-2222-4222-8222-222222222222', '33333333-3333-4333-8333-333333333333']
+  const lookups: { text: string; values: unknown[] }[] = []
+  const lookup = { query: async (text: string, values: unknown[]) => { lookups.push({ text, values }); return { rows: devices.map(deviceId => ({ deviceId })) } } }
+  const client = { query: async (text: string) => ({ command: text.trim().split(/\s/)[0].toUpperCase(), rows: [], rowCount: 0 }) } as unknown as import('pg').PoolClient
+  observeCommitEffects(client)
+  const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
+  callbacks.length = 0
+  try {
+    // Without a gateway nothing is looked up or sent.
+    delete process.env.DEVICE_GATEWAY_URL
+    await notifyRunControl(lookup, { userId: 'owner-1' })
+    assert.equal(lookups.length, 0)
+    process.env.DEVICE_GATEWAY_URL = 'http://127.0.0.1:9'
+    process.env.DEVICE_GATEWAY_PUSH_SECRET = 'isolated-test-gateway-secret'
+
+    await client.query('BEGIN')
+    runControlChanged(client, { runIds: [id] }, lookup)
+    await client.query('ROLLBACK')
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(lookups.length, 0, 'a rolled-back stop wakes nobody')
+
+    await client.query('BEGIN')
+    runControlChanged(client, { runIds: [id] }, lookup)
+    runControlChanged(client, { runIds: [id] }, lookup)
+    assert.equal(lookups.length, 0, 'nothing is sent before COMMIT')
+    await client.query('COMMIT')
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(lookups.length, 1, 'repeated changes in one transaction coalesce')
+    assert.deepEqual(lookups[0]!.values, [[id]])
+    assert.equal(callbacks.length, devices.length, 'one wake per device holding the runs')
+
+    await notifyRunControl(lookup, { workspaceId: id })
+    assert.match(lookups[1]!.text, /"botId" IN \(SELECT id FROM bots WHERE "workspaceId"=\$1\)/)
+    await notifyRunControl(lookup, { runIds: [] })
+    assert.equal(lookups.length, 2)
+  } finally {
+    callbacks.length = 0
+    if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL
+    else process.env.DEVICE_GATEWAY_URL = previous.url
+    if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET
+    else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
+  }
+})

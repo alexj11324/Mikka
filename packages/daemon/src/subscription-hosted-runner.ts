@@ -52,6 +52,8 @@ const bootstrap = fileURLToPath(
 );
 const computerProxy = fileURLToPath(new URL("./computer/proxy.mjs", import.meta.url));
 const placeholder = "mikka-native-broker-placeholder";
+/** How long before a subscription token expires its run re-reads the broker context. */
+const SUBSCRIPTION_REFRESH_LEAD_MS = 60_000;
 const unavailable = (cause?: unknown) =>
   new Error(cause instanceof ClaudeInitializationError ? cause.code : "subscription_hosted_runtime_unavailable", cause === undefined ? undefined : { cause });
 /** Why a start failed, in words a person can act on; never argv or env. */
@@ -458,9 +460,20 @@ export async function createHostedBotRunner(host: {
               throw error;
             }
           };
-          // Only the shared background monitor has just checked authority.
+          // Only the shared background watcher has just checked authority.
           // Every actual provider/tool operation keeps the fresh checks above.
-          return { first, revision, check, background: () => check("context_check", false) };
+          // It runs on each run-control push and again when the subscription
+          // token is due: shortly before it expires (the broker refreshes it),
+          // then at expiry itself if it did not move, where the check fails closed.
+          let lastExpiry: number | undefined;
+          const background = async () => {
+            const current = await check("context_check", false);
+            const expiry = Date.parse(current.expiresAt);
+            const due = expiry === lastExpiry ? expiry : expiry - SUBSCRIPTION_REFRESH_LEAD_MS;
+            lastExpiry = expiry;
+            return due;
+          };
+          return { first, revision, check, background };
         })() : undefined;
         // An API-key run is live while its gate is; withdrawing the key stops the run from the server.
         const check: () => Promise<unknown> = subscription?.check ?? live;
@@ -758,7 +771,7 @@ export async function createHostedBotRunner(host: {
           // A quick, successful adapter may already have ended and revoked its
           // gate here. Preserve its terminal events; sends/spawns/provider work
           // remain fenced by close, and do not install a new monitor after it.
-          if (!closed) offMonitor = gate.monitor(subscription?.background);
+          if (!closed) offMonitor = gate.watch(subscription?.background);
           const finish = async () => {
             offMonitor();
             await close();

@@ -227,6 +227,11 @@ export type HeartbeatResult = z.input<typeof heartbeatResultSchema>
 export const deviceGatewaySchema = z.object({
   url: z.string().url().nullable(),
   protocol: z.string().regex(/^mikka-ticket-[0-9]+-[a-f0-9]{64}$/).nullable(),
+  /** This server wakes the device after every write that can end, pause or
+   * revoke one of its runs (stop, lease, credential, policy, membership), so a
+   * connected daemon needs no periodic run-control check (#1212). Absent from
+   * older servers: the daemon then keeps its one-second check. */
+  runControl: z.literal('push').optional(),
 })
 export type DeviceGatewayTicket = z.infer<typeof deviceGatewaySchema>
 

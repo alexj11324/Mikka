@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg'
 import { runListChanged } from './live/lists'
+import { runControlChanged } from './device-gateway-notify'
 
 type Query = Pick<Pool | PoolClient, 'query'>
 
@@ -23,5 +24,6 @@ export async function stopRunsUsingApiKeys(query: Query, scope: { keyId?: string
       AND (NOT $4::boolean OR r."userId"<>k."ownerId") RETURNING r.id`,
   [scope.keyId ?? null, scope.ownerId ?? null, scope.workspaceId ?? null, scope.othersOnly ?? false])
   for (const { id } of rows) await runListChanged(query, id)
+  runControlChanged(query, { runIds: rows.map(row => row.id) })
   return rowCount ?? 0
 }

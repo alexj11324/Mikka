@@ -69,10 +69,9 @@ export const pollingAllowlist = {
   'workflows/subagent/workflow.ts': db(server, 'subagent tick every 1–30 s until terminal', 1),
   'workflows/thread-machine/workflow.ts': db(server, 'thread machine maintenance every 30 s for up to 12 h', 1),
   // Daemon: loops that call our server, which reads the database.
-  'packages/daemon/src/agents/tool-approval.ts': db(daemon, 'ToolApprovalGate.monitor: the 1 s run liveness check', 1),
-  'packages/daemon/src/server-link-http.ts': db(daemon, 'prepareRunToolApproval: gate.monitor plus the 1 s isLive loop while a run is paused', 2),
-  'packages/daemon/src/subscription-launcher.ts': db(daemon, 'gate.monitor checking liveness and subscription access', 1),
-  'packages/daemon/src/subscription-hosted-runner.ts': db(daemon, 'gate.monitor with the hosted subscription background check; also a 3-attempt context retry loop', 2),
+  'packages/daemon/src/agents/tool-approval.ts': db(daemon, 'ToolApprovalGate fallback timer only: none while the device gateway pushes run control, every 20 s while it is down, 1 s against a server older than run-control push', 1),
+  'packages/daemon/src/server-link-http.ts': db(daemon, 'isLive retries an unanswered liveness check (timeout, 5xx) every second for at most 30 s; no periodic check', 1),
+  'packages/daemon/src/subscription-hosted-runner.ts': db(daemon, 'a 3-attempt retry of an unanswered subscription context read; the background check runs on push and at token expiry', 1),
   'packages/daemon/src/computer/web-review.ts': db(daemon, 'pollWebComputerReviews: checks the local broker every second and syncs pending reviews with the server', 1),
   'packages/daemon/src/coordinator/runner.ts': db(daemon, 'native coordinator tool waits for its result by asking the server every 500 ms', 1),
   'packages/daemon/src/login.ts': db(daemon, 'device login polls the token endpoint at the server-given interval until approved (RFC 8628)', 1),
@@ -110,8 +109,8 @@ const rules = [
   { rule: 'polling/refresh-interval', pattern: /[{,]\s*(?:refreshInterval|refetchInterval)\s*(?=[,}])/g },
   { rule: 'polling/set-interval', pattern: /\bsetInterval\s*\(/g },
   { rule: 'polling/poll-constant', pattern: /\b[A-Z][A-Z0-9_]*(?:_POLL_MS|POLL_INTERVAL[A-Z0-9_]*|_EVERY_MS)\s*=(?!=)/g },
-  // Polling helpers of our own: the daemon's run liveness monitor and mobile useApi with an interval.
-  { rule: 'polling/helper', pattern: /\bgate\.monitor\(/g },
+  // Polling helpers of our own: mobile useApi with an interval. (The daemon's
+  // gate.watch is push-driven; its fallback timer counts in tool-approval.ts.)
   { rule: 'polling/helper', skip: definition, pattern: /\buseApi\b(?:<[^\n(]*?>)?\((?:[^()]|\([^()]*\))*?,\s*(?!0\s*\)|undefined\s*\)|null\s*\))[^\s)]/g },
   { rule: 'polling/helper', skip: definition, pattern: /\bpollUntil\(/g },
 ]
