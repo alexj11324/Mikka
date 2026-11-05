@@ -5081,6 +5081,17 @@
           "provider_unavailable": "The executor model's provider is unavailable"
         },
         "profile": "The executor Profile is unavailable",
+        "profileDisabled": "The executor Profile is disabled",
+        "profileArchived": "The executor Profile is archived",
+        "profileVersionConflict": "The executor Profile changed. Review it before approving.",
+        "profileDecision": {
+          "decision_unavailable": "No executor Profile selection was returned",
+          "no_suitable_profile": "No executor Profile fits this task",
+          "invalid_profile_answer": "The executor Profile selection format is invalid",
+          "unknown_profile": "The selected executor Profile is not in the available list",
+          "uncertain_profile": "The executor Profile choice is uncertain",
+          "invalid_reason": "The executor Profile selection reason is invalid"
+        },
         "refused": "Approval refused"
       },
       "retryApprove": "Check again"
