@@ -401,15 +401,18 @@ export function createFactoryMerges(
     /** A verified `pull_request` closed+merged webhook: completes every task waiting on that PR, including merges made on GitHub. */
     async pullRequestMerged(input: { url: string; headSha: string | null; mergeCommitSha: string | null }) {
       if (!PULL.test(input.url)) return { completed: 0 };
-      await pool.query(
-        `UPDATE run_publications SET "pullRequest"=jsonb_set("pullRequest",'{state}','"merged"') WHERE lower("pullRequest"->>'url')=lower($1)`,
-        [input.url],
-      );
+      // One statement: marks the deliveries merged (only those not yet marked) and reads the tasks waiting on the PR.
       const { rows: waiting } = await pool.query<{ id: string; userId: string }>(
-        `SELECT t.id,t."userId" FROM factory_tasks t
+        `WITH delivered AS (
+           SELECT "runId","userId" FROM run_publications WHERE lower("pullRequest"->>'url')=lower($1)
+         ), marked AS (
+           UPDATE run_publications SET "pullRequest"=jsonb_set("pullRequest",'{state}','"merged"')
+            WHERE lower("pullRequest"->>'url')=lower($1) AND "pullRequest"->>'state' IS DISTINCT FROM 'merged'
+         )
+         SELECT t.id,t."userId" FROM factory_tasks t
            JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id
-           JOIN run_publications p ON p."runId"=c."runId" AND p."userId"=t."userId"
-          WHERE lower(p."pullRequest"->>'url')=lower($1) AND t.stage='approval' AND t.status IN ('pending','waiting')`,
+           JOIN delivered p ON p."runId"=c."runId" AND p."userId"=t."userId"
+          WHERE t.stage='approval' AND t.status IN ('pending','waiting')`,
         [input.url],
       );
       let completed = 0;
