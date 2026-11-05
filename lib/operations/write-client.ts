@@ -3,7 +3,7 @@ import type { ApprovedWriteView } from './approved-writes'
 import type { WritePage } from './write-discovery'
 import type { WriteActionName } from './write-schema'
 
-export type ApprovedWriteItem = WritePage['items'][number]
+export type ApprovedWriteItem = WritePage['items'][number] & { observedAt?: string; requestedAt?: number }
 export class ApprovedWriteClientError extends Error {
   constructor(readonly uncertain = false, readonly disabled = false) { super('approvedWriteUnavailable') }
 }
@@ -18,7 +18,7 @@ export async function loadApprovedWriteAvailability(): Promise<boolean> {
   } catch { throw new ApprovedWriteClientError() }
 }
 
-/** Only read calls belong in polling. A decision is sent once per explicit click. */
+/** A notification only invalidates reads. A decision is sent once per explicit click. */
 async function request(body: Record<string, unknown>, decision = false): Promise<Record<string, unknown>> {
   let response: Response
   try {
@@ -34,6 +34,7 @@ async function request(body: Record<string, unknown>, decision = false): Promise
 }
 
 export async function loadUnresolvedWrites(viewerId: string, cursor?: string): Promise<WritePage> {
+  const requestedAt = performance.now()
   let result: Record<string, unknown>
   try { result = await request({ op: 'list', unresolvedOnly: true, limit: 50, ...(cursor ? { cursor } : {}) }) }
   catch (error) {
@@ -43,13 +44,14 @@ export async function loadUnresolvedWrites(viewerId: string, cursor?: string): P
   // The session hook/cache can lag a cookie switch. Never cache another owner's
   // response under the old viewer's key (same pattern as integration settings).
   if (result.viewerId !== viewerId || !Array.isArray(result.items) || !(result.nextCursor === null || typeof result.nextCursor === 'string') || typeof result.asOf !== 'string') throw new ApprovedWriteClientError()
-  return result as unknown as WritePage
+  return { ...result, requestedAt } as unknown as WritePage
 }
 
 export async function readApprovedWrite(action: WriteActionName, id: string): Promise<ApprovedWriteView> {
+  const requestedAt = performance.now()
   const result = await request({ op: 'view', action, id })
   if (result.id !== id || result.action !== action || !['pending', 'running', 'done', 'declined'].includes(String(result.status))) throw new ApprovedWriteClientError()
-  return result as unknown as ApprovedWriteView
+  return { ...result, requestedAt } as unknown as ApprovedWriteView
 }
 
 export async function decideApprovedWrite(action: WriteActionName, id: string, approve: boolean): Promise<'done' | 'declined' | 'running'> {

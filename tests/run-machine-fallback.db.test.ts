@@ -279,15 +279,16 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     const refused = await dispatch(c.id, c.issueId, botId) as unknown as NoMachine
     assert.equal(refused.error, 'machineUnavailable', 'an error the person can act on')
     assert.deepEqual([refused.reason, actions(refused)], ['cloudTemporarilyUnavailable', ['modelSettings']])
-    const cloudRuns = (await pool.query(`SELECT r.status,m.state FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1`, [c.id])).rows
-    assert.deepEqual(cloudRuns, [{ status: 'stopped', state: 'ended' }], 'the refused cloud run was queued, then ended instead of left stuck')
+    const cloudRuns = (await pool.query(`SELECT r.status,r."stopReason",r."stopRequestedAt",m.state FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1`, [c.id])).rows
+    assert.deepEqual(cloudRuns, [{ status: 'failed', stopReason: 'device_lost', stopRequestedAt: null, state: 'ended' }],
+      'a refused startup ends as an infrastructure failure, never a forged Owner stop')
     const frozen = (await pool.query(`SELECT r."agentDefinition"->>'harness' AS harness FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1`, [c.id])).rows[0]
     assert.equal(frozen.harness, 'codex', 'every cloud run freezes its definition when it is created')
     // A server comes online: 云端 tries the cloud, which refuses again, then the server takes it and the result says so.
     const deviceId = await onlineMac(c.id, true, 'server')
     const fallback = await dispatch(c.id, await anotherTask(c.id), botId) as unknown as { runId: string; status: string; fallback?: string }
     assert.deepEqual([fallback.status, fallback.fallback, (await runOf(fallback.runId)).deviceId], ['queued', 'cloudUnavailable', deviceId])
-    assert.equal((await pool.query(`SELECT count(*)::int AS n FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1 AND r.status='stopped' AND m.state='ended'`, [c.id])).rows[0].n, 2, 'the second refused cloud run is ended too')
+    assert.equal((await pool.query(`SELECT count(*)::int AS n FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1 AND r.status='failed' AND r."stopReason"='device_lost' AND r."stopRequestedAt" IS NULL AND m.state='ended'`, [c.id])).rows[0].n, 2, 'the second refused cloud run is ended too')
     // A run the person put in the cloud goes nowhere else.
     const pinned = await steps.dispatchRun(c.id, { issueId: await anotherTask(c.id), repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}`, target: 'cloud' }, undefined, botId) as unknown as NoMachine
     assert.equal(pinned.error, 'machineUnavailable')
@@ -318,6 +319,8 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     assert.deepEqual(retried.payload.movedTo, { kind: 'cloud' })
     // E2B refuses the new sandbox: the retry ends with the card instead of waiting.
     assert.equal(moved[0].status, 'failed')
+    assert.deepEqual((await pool.query('SELECT "stopReason","stopRequestedAt" FROM agent_runs WHERE id=$1', [moved[0].id])).rows[0],
+      { stopReason: 'device_lost', stopRequestedAt: null })
     const card = (await pool.query(`SELECT payload FROM coordinator_events WHERE "runId"=$1 AND kind='run_finished'`, [moved[0].id])).rows[0]
     assert.ok(card.payload.noMachine)
   })

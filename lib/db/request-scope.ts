@@ -7,7 +7,7 @@ import { deviceScopedPool, readUnderAuthority } from './device-scope'
 import { sampleClient } from './egress-sample'
 import { samplePoolTransport } from './transport-sample'
 import { manageDatabasePool } from './pool-lifecycle'
-import { observePoolCommits } from './commit-effects'
+import { COMMIT_EXECUTOR, observePoolCommits } from './commit-effects'
 
 const defaultConnectionString = mikkaDatabaseURL(process.env)
 
@@ -35,6 +35,7 @@ const transactionDatabase = new AsyncLocalStorage<Transaction | NodePgDatabase<t
 
 export const pool = new Proxy(defaultPool, {
   get(target, property) {
+    if (property === COMMIT_EXECUTOR) return heldClient.getStore() ?? requestDatabase.getStore()?.pool ?? target
     if (property === 'query' && heldClient.getStore()) return heldClient.getStore()!.query.bind(heldClient.getStore()!)
     const current = deviceScopedPool(requestDatabase.getStore()?.pool ?? target)
     const value = Reflect.get(current, property, current)

@@ -63,9 +63,11 @@ into its newest thread (「第 N 次尝试」); 新线程 and the filter menu si
 - A thread row is a status icon, the thread name, and one grey line: the
   bot's name and a machine icon (cloud, laptop, server), never the machine
   as text. Only 等你回复 and 待审阅 add a word before the name; no 完成 or
-  失败 word (the icon says it) and no failure reason. Never the bot's bloub avatar (glossary). Icons: grey
-  spinner 进行中, red alert 受阻, hollow circle 等待你, slashed circle 空闲,
-  green check 已解决; the icon follows the row's group (R-52), never the run's raw status.
+  失败 word (the icon says it) and no failure reason. Never the bot's bloub avatar (glossary). Icon: a speech
+  bubble with the state as a dot on its corner, as on the web: pulsing grey 进行中, red 受阻, orange 等待你,
+  hollow ring 空闲, green 已解决; the icon names its state for the screen reader. A circle is always a task
+  ([decision](decisions/2026-11-04-2220-task-circle-thread-bubble.md)); the icon follows the row's group (R-52),
+  never the run's raw status.
   A thread whose output is a PR shows the PR icon in GitHub's colours: open
   green (待审阅), draft grey, merged purple, closed red. Rows waiting on the person carry a blue unread dot on the right.
 - 设备 chips at the top (Mikka Cloud, Mac, …); an online machine has a green
@@ -111,7 +113,7 @@ message's time on the right, as in iMessage and ChatGPT (Figma 01b); no time
 labels above messages or inside cards, and no date label above the briefing:
 it is one bubble (decisions 2026-10-27).
 
-Colour is restrained: grey spinners; blue only for unread dots and send;
+Colour is restrained: a grey pulsing dot for work in progress; blue only for unread dots and send;
 red only for failure; green for a finished thread and an online machine; PR
 states use GitHub's colours.
 

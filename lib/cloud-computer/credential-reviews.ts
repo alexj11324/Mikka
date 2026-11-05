@@ -1,5 +1,6 @@
 import 'server-only'
 import { lockSubagentEvents, notifySubagentEvents } from '@/lib/computer/event-log'
+import { pendingActionsChanged } from '../live/pending-actions'
 import { randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { z } from 'zod'
@@ -44,6 +45,7 @@ export async function proposeCredentialOperation(pool: Pool, caller: BrowserCall
     await lockSubagentEvents(client, { ownerId: caller.userId, workspaceId: caller.workspaceId })
     await client.query(`WITH changed AS (UPDATE bot_subagents SET status=$6,step=$7,needs=$5,"activeActionId"=$8 WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4 RETURNING *) INSERT INTO subagent_events("ownerId","workspaceId","botId","subagentId",event) SELECT "ownerId","workspaceId","botId",id,jsonb_build_object('type','data-subagent','data',jsonb_build_object('botId',"botId",'subagentId',id,'task',task,'state',status,'step',step,'needs',needs)) FROM changed`, [plan.subagentId, caller.userId, plan.workspaceId, plan.botId, operation==='login'?null:needs,operation==='login'?'running':'needs_you',operation==='login'?'Signing in':'Credential approval',operation==='login'?plan.actionId:null])
     if(operation==='login') await client.query(`UPDATE bot_subagents SET status='running',step='Signing in',needs=NULL,"activeActionId"=$2 WHERE id=$1`,[plan.subagentId,plan.actionId])
+    if (operation !== 'login') await pendingActionsChanged(client, plan.actionId, caller.userId)
     await client.query('COMMIT')
     notifySubagentEvents({ ownerId: caller.userId, workspaceId: caller.workspaceId })
     if(operation!=='login') return { status: 'needs_approval' as const, origin: target.origin }

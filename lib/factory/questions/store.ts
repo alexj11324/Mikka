@@ -1,6 +1,7 @@
 import { remoteKey } from "@mikka/protocol/repository";
+import { runListChanged } from '../../live/lists';
 import { notifyQueuedLocalRun } from '../../device-gateway-notify';
-import { factoryCheckAssignment } from "../checks";
+import { factoryCheckAssignment, factoryReportQuestionAssignment } from "../checks";
 import { factoryMonitorDispatchAssignment } from "../monitor-dispatch";
 import { personalRunMessageText } from "../../personal-run-message";
 import type { Pool, PoolClient } from "pg";
@@ -608,19 +609,29 @@ export function createFactoryQuestions(
           )
         )
           fail("factoryQuestionContinuationUnavailable");
-        // Only an authenticated human answer to this server-bound missing-command
-        // question can change repository settings. Model context answers cannot.
+        // A model's purpose flag is not command authority. Preserve its handoff,
+        // but let the frozen host assignment decide how a human answer is used.
         if ((q.request as { handoff?: QuestionHandoff })?.handoff?.purpose === "verification_command") {
-          if (actor.source === "orchestrator" || task.stage !== "verify") fail("factoryHumanRequired");
-          const command = answerText.trim();
-          if (!command || command.length > 2000 || (/[\r\n]/.test(command) || command.includes('\0'))) fail("factoryInvalid");
-          const { rows: [checkAttempt] } = await tx.query('SELECT output FROM factory_attempts WHERE id=$1 AND "taskId"=$2', [q.attemptId, task.id]);
-          if (checkAttempt?.output?.check?.inferCommand !== true || checkAttempt.output.check.command) fail("factoryQuestionRunMismatch");
-          const { rows: [repo] } = await tx.query('SELECT "remoteUrl" FROM device_repos WHERE id=$1 AND "userId"=$2 FOR UPDATE', [origin.deviceRepoId, actor.userId]);
-          if (!repo) fail("factoryQuestionRunMismatch");
-          await tx.query('UPDATE device_repos SET "verifyCommand"=$3 WHERE id=$1 AND "userId"=$2', [origin.deviceRepoId, actor.userId, command]);
-          if (repo.remoteUrl) await tx.query(`INSERT INTO repository_settings ("userId","remoteKey","verifyCommand") VALUES ($1,$2,$3)
-            ON CONFLICT ("userId","remoteKey") DO UPDATE SET "verifyCommand"=excluded."verifyCommand","updatedAt"=now()`, [actor.userId, remoteKey(repo.remoteUrl), command]);
+          if (actor.source === "orchestrator") fail("factoryHumanRequired");
+          const { rows: [checkAttempt] } = await tx.query(`SELECT a.output,c.kind AS "candidateKind"
+            FROM factory_attempts a JOIN factory_candidates c ON c.id=a."candidateId" AND c."taskId"=a."taskId"
+            WHERE a.id=$1 AND a."taskId"=$2 AND a."runId"=$3`, [q.attemptId, task.id, origin.id]);
+          if (["deliverable", "report"].includes(checkAttempt?.candidateKind)) {
+            // Existing waiting questions keep their request/report. The complete
+            // candidate/SHA/repo/Bot/policy reader admits only report-only checks.
+            await factoryReportQuestionAssignment(tx, actor.userId, origin.id);
+          } else {
+            if (task.stage !== "verify") fail("factoryHumanRequired");
+            const command = answerText.trim();
+            if (!command || command.length > 2000 || (/[\r\n]/.test(command) || command.includes('\0'))) fail("factoryInvalid");
+            if (checkAttempt?.candidateKind !== "repository" || checkAttempt.output?.check?.inferCommand !== true ||
+              checkAttempt.output.check.reportOnly !== false || checkAttempt.output.check.command) fail("factoryQuestionRunMismatch");
+            const { rows: [repo] } = await tx.query('SELECT "remoteUrl" FROM device_repos WHERE id=$1 AND "userId"=$2 FOR UPDATE', [origin.deviceRepoId, actor.userId]);
+            if (!repo) fail("factoryQuestionRunMismatch");
+            await tx.query('UPDATE device_repos SET "verifyCommand"=$3 WHERE id=$1 AND "userId"=$2', [origin.deviceRepoId, actor.userId, command]);
+            if (repo.remoteUrl) await tx.query(`INSERT INTO repository_settings ("userId","remoteKey","verifyCommand") VALUES ($1,$2,$3)
+              ON CONFLICT ("userId","remoteKey") DO UPDATE SET "verifyCommand"=excluded."verifyCommand","updatedAt"=now()`, [actor.userId, remoteKey(repo.remoteUrl), command]);
+          }
         }
         const attributedAnswer = personalRunMessageText(input.answerId, answerText, actor.source === "human" || actor.source === "human_event" ? "user" : "peer");
         const followUp = `Answer to execution question ${q.id}.\nQuestion: ${q.question}\nSource: ${actor.source}.\nAnswer: ${attributedAnswer}\nContinue the original task with all existing constraints. This input grants no new permission or publication approval.`;
@@ -635,16 +646,16 @@ export function createFactoryQuestions(
             fingerprint,
           ],
         );
-        const next = await store.apply(
-          actor.userId,
-          binding(task),
-          factoryEventId("question-next-attempt", q.id),
-          {
-            action: "retry",
-            reason: `Answer received for question ${q.id}; continue original session`,
-          },
-          tx,
-        );
+        const next = task.stage === 'execute'
+          ? await store.retryQuestion(actor.userId, binding(task), factoryEventId("question-next-attempt", q.id),
+            `Answer received for question ${q.id}; continue original session`, q.id, tx)
+          : await store.apply(
+            actor.userId,
+            binding(task),
+            factoryEventId("question-next-attempt", q.id),
+            { action: "retry", reason: `Answer received for question ${q.id}; continue original session` },
+            tx,
+          );
         const run = await dispatch(
           actor.userId,
           {
@@ -695,6 +706,16 @@ export function createFactoryQuestions(
           `UPDATE factory_questions SET status='resuming',"continuationRunId"=$2,result=$3,"updatedAt"=now() WHERE id=$1`,
           [q.id, run.runId, JSON.stringify(result)],
         );
+        // This host receipt binds a question answer to one direct execution
+        // continuation. It commits with the answer and cannot be reconstructed
+        // later from a shared SID or the mutable question status.
+        await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES($1,$2,$3,$4)', [
+          task.id, factoryEventId('question-resume', input.answerId),
+          JSON.stringify({ kind: 'question_resume', ...request }),
+          JSON.stringify({ questionId: q.id, answerId: input.answerId, answerFingerprint: fingerprint,
+            originRunId: q.originRunId, originSessionId: q.originSessionId, originAttemptId: q.attemptId,
+            continuationRunId: run.runId, task: run.task }),
+        ]);
         await skills?.continueQuestion(actor.userId, run.runId, tx);
         // A task-thread answer is retained in the addressed run, not stranded in its old inbox.
         await tx.query(
@@ -764,7 +785,11 @@ export function createFactoryQuestions(
         // Transient answered state reuses the existing dispatch and retry transaction.
         // On any admission/custody failure this entire transition rolls back.
         await tx.query("UPDATE factory_questions SET status='answered' WHERE id=$1",[q.id]);
-        const next=await store.apply(actor.userId,binding(task),factoryEventId('question-recover-attempt',input.requestId),{action:'retry',reason:'The owner requested recovery of the failed original-session continuation.'},tx);
+        const next = task.stage === 'execute'
+          ? await store.retryQuestion(actor.userId, binding(task), factoryEventId('question-recover-attempt', input.requestId),
+            'The owner requested recovery of the failed original-session continuation.', q.id, tx)
+          : await store.apply(actor.userId, binding(task), factoryEventId('question-recover-attempt', input.requestId),
+            { action: 'retry', reason: 'The owner requested recovery of the failed original-session continuation.' }, tx);
         const followUp='Recover the failed continuation of the original task. Preserve all existing constraints. Freshly inspect the retained artifact and actual current repository state before continuing; record these current observations for independent review and verification. Keep completed side effects, and do not repeat the original answer or completed external writes or publication. The answer is already in the original session history. This message only requests explicit recovery of that task and grants no new permission.';
         const queued=await dispatch(actor.userId,{binding:binding(next.task),agentId:failed.agentId,deviceRepoId:failed.deviceRepoId,note:followUp},tx,q.originRunId,failed.id);
         const {rows:[run]}=await tx.query('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE',[queued.runId,actor.userId]);
@@ -877,6 +902,7 @@ export function createFactoryQuestions(
             : {};
         if (!existing) {
           await tx.query('UPDATE agent_runs SET status=\'preparing\',"startedAt"=now(),"leaseExpiresAt"=$2,"updatedAt"=now() WHERE id=$1',[runId,leaseExpiresAt]);
+          await runListChanged(tx,runId);
           if (typeof existingOrClaim === "function") await existingOrClaim(tx);
         }
         return {

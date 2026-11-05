@@ -8,6 +8,13 @@ import { MessageAction } from '@/components/ai-elements/message'
 /** Actions under a message (`MessageActions`): shown while its `group/message` is hovered or focused, always on a touch screen. */
 export const HOVER_ACTIONS = 'opacity-0 transition-opacity duration-150 group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100 motion-reduce:transition-none'
 
+/**
+ * The actions under a reply in a chat (R-83): shown while the reply is hovered, focused or tapped (a tapped reply takes
+ * focus), and while a list they opened is open. The latest reply adds `pointer-coarse:opacity-100`: a touch screen has no hover,
+ * so its actions stay; older replies stay quiet there until tapped.
+ */
+export const REPLY_ACTIONS = 'opacity-0 transition-opacity duration-150 group-hover/message:opacity-100 group-focus-within/message:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100 motion-reduce:transition-none'
+
 /** How long the tick stays after a copy, as under a Claude or ChatGPT reply. */
 export const COPIED_MS = 2000
 

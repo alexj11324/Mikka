@@ -2,9 +2,9 @@ import { handoffStage } from './steps'
 import { sleep } from 'workflow'
 import { maintainThreadMachine, pauseAtCap } from '../thread-machine/steps'
 
-export async function factoryCloudStageHandoff(actor: { userId: string; workspaceId: string }, previousRunId: string | null, runId: string) {
+export async function factoryCloudStageHandoff(actor: { userId: string; workspaceId: string }, previousRunId: string | null, runId: string, providerContinuation = false) {
   'use workflow'
-  if (!await handoffStage(actor, previousRunId, runId)) return
+  if (!await handoffStage(actor, previousRunId, runId, providerContinuation)) return
   // This same durable execution owns maintenance, including after a handoff
   // step response was lost. No second lifecycle is started during step replay.
   for (let step = 0; step < 1440; step++) {

@@ -107,3 +107,31 @@ export function groupActivityByMinute(events: IssueActivityEvent[]): IssueActivi
   }
   return groups
 }
+
+/** A thread the issue dispatched, as the activity timeline needs it. */
+export type ActivityThread = { id: string; createdAt: Date | string }
+
+export type ActivityTimelineRow<T extends ActivityThread> =
+  | { type: 'events'; id: string; at: string; events: IssueActivityEvent[] }
+  | { type: 'thread'; id: string; at: string; thread: T }
+
+/**
+ * One time-ordered activity list (#1264): task events and dispatched threads
+ * interleave by when they happened. Same-minute events by one actor still
+ * read as one row (R-63), but a thread dispatched between them splits it.
+ * Ties keep a stable order: task events before threads, then by id.
+ */
+export function activityTimeline<T extends ActivityThread>(events: IssueActivityEvent[], threads: T[]): ActivityTimelineRow<T>[] {
+  const items = [
+    ...events.map(event => ({ at: event.at, rank: 0, id: event.id, event })),
+    ...threads.map(thread => ({ at: timestamp(thread.createdAt), rank: 1, id: thread.id, thread })),
+  ].sort((a, b) => a.at.localeCompare(b.at) || a.rank - b.rank || a.id.localeCompare(b.id))
+  const rows: ActivityTimelineRow<T>[] = []
+  for (const item of items) {
+    if ('thread' in item) { rows.push({ type: 'thread', id: `thread-${item.id}`, at: item.at, thread: item.thread }); continue }
+    const last = rows.at(-1)
+    if (last?.type === 'events' && groupActivityByMinute([last.events[0], item.event]).length === 1) last.events.push(item.event)
+    else rows.push({ type: 'events', id: item.event.id, at: item.at, events: [item.event] })
+  }
+  return rows
+}

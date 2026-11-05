@@ -8,6 +8,7 @@ import { remoteKey } from '@mikka/protocol/repository'
 import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 import type { db } from './db'
 import { notifyDeviceWork } from './device-gateway-notify'
+import { runListChanged } from './live/lists'
 
 export type RunControlDatabase = Pick<typeof db, 'transaction'>
 
@@ -75,12 +76,14 @@ export async function stopOwnedRun(database: RunControlDatabase, userId: string,
     if ((run.status === 'queued' && !machineBound) || quotaPaused) {
       await tx.update(agentRuns).set({ status: 'stopped', pauseReason: null, stopRequestedAt: run.stopRequestedAt ?? now, finishedAt: now, updatedAt: now })
         .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId)))
+      await runListChanged(tx, runId)
       ended = true
       return true
     }
     if (run.stopRequestedAt) return false
     await tx.update(agentRuns).set({ stopRequestedAt: now, updatedAt: now })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId)))
+    await runListChanged(tx, runId)
     wake = run.deviceId
     return false
   })

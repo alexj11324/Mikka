@@ -1,6 +1,6 @@
 'use client'
 
-import { Hand, MessagesSquare, Search, X } from 'lucide-react'
+import { MessagesSquare, Search, X } from 'lucide-react'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { useTranslations } from 'next-intl'
 import type { listIssues } from '@/app/actions/issues'
@@ -36,7 +36,7 @@ export function AllThreadsToggle({ open, onToggle, waiting = 0 }: { open: boolea
   return <Tooltip><TooltipTrigger render={<Button variant="ghost" size={waiting ? 'sm' : 'icon-sm'} aria-label={label} aria-pressed={open} onClick={onToggle}
     className={cn('text-muted-foreground', waiting && 'relative gap-1 px-1.5 pointer-coarse:after:absolute pointer-coarse:after:-inset-1.5', open && 'bg-muted text-foreground')} />}>
     <MessagesSquare data-icon="inline-start" />
-    {waiting > 0 && <Badge data-slot="threads-waiting" variant="warning-light" className="gap-0.5 px-1.5 tabular-nums"><Hand aria-hidden="true" />{waiting > 99 ? '99+' : waiting}</Badge>}
+    {waiting > 0 && <Badge data-slot="threads-waiting" variant="warning-light" className="gap-1 px-1.5 tabular-nums"><span aria-hidden="true" className="size-1.5 rounded-full bg-warning" />{waiting > 99 ? '99+' : waiting}</Badge>}
   </TooltipTrigger><TooltipContent side="bottom">{label}</TooltipContent></Tooltip>
 }
 

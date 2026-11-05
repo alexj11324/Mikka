@@ -166,17 +166,25 @@ test('a stored reply keeps its tools, how each ended and their previews, and whe
   const [, reply] = chatItems(compact.map((message, index) => ({ position: index + 1, message, createdAt: at })))
   assert.equal(reply.text, 'Made it; the thread could not start.')
   assert.deepEqual(reply.activity, { thought: true, reasoningAt: [2], tools: [
-    { call: 'c1', name: 'create_issue', state: 'done', input: '{"title": "Fix login"}', output: '{"id": "i1"}' },
-    { call: 'c3', name: 'dispatch_run', state: 'error', input: '{"issueId": "i1"}', output: 'no device' },
+    { call: 'c1', name: 'create_issue', state: 'done', input: '{"title": "Fix login"}', output: '{"id": "i1"}', at: 0 },
+    { call: 'c3', name: 'dispatch_run', state: 'error', input: '{"issueId": "i1"}', output: 'no device', at: 0 },
     // No result stored yet: still running.
-    { call: 'c4', name: 'web_search', state: 'running' },
+    { call: 'c4', name: 'web_search', state: 'running', at: 0 },
   ] })
   // Full stored messages (not the compact projection) read the same way.
   const full = chatItems([
     { position: 1, createdAt: at, message: { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c1', toolName: 'list_issues', input: { query: 'login' } }] } as ModelMessage },
     { position: 2, createdAt: at, message: { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'list_issues', output: { type: 'error-text', value: 'boom' } }] } as ModelMessage },
   ])
-  assert.deepEqual(full[0].activity?.tools, [{ call: 'c1', name: 'list_issues', state: 'error', input: '{"query": "login"}', output: 'boom' }])
+  assert.deepEqual(full[0].activity?.tools, [{ call: 'c1', name: 'list_issues', state: 'error', input: '{"query": "login"}', output: 'boom', at: 0 }])
+  // Words said before a tool ran stay above it: its `at` is the reply's text so far.
+  const spoken = chatItems([
+    { position: 1, createdAt: at, message: { role: 'assistant', content: [{ type: 'text', text: 'I will make the task first.' }, { type: 'tool-call', toolCallId: 'c1', toolName: 'create_issue', input: {} }] } as ModelMessage },
+    { position: 2, createdAt: at, message: { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'create_issue', output: { type: 'json', value: {} } }] } as ModelMessage },
+    { position: 3, createdAt: at, message: { role: 'assistant', content: [{ type: 'text', text: 'Done.' }, { type: 'tool-call', toolCallId: 'c2', toolName: 'list_issues', input: {} }] } as ModelMessage },
+  ])
+  assert.equal(spoken[0].text, 'I will make the task first.\n\nDone.')
+  assert.deepEqual(spoken[0].activity?.tools.map(tool => tool.at), ['I will make the task first.'.length, spoken[0].text.length])
   // Encrypted or empty reasoning: it thought, but there is nothing to open.
   const sealed = chatItems([{ position: 1, createdAt: at, message: { role: 'assistant', content: [{ type: 'reasoning', chars: 0 }, { type: 'text', text: 'Done.' }] } as unknown as ModelMessage }])
   assert.deepEqual(sealed[0].activity, { tools: [], thought: true })

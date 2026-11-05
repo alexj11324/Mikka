@@ -9,6 +9,7 @@ import { createLinkedIssue, setIssueDeleted, toggleIssuePreference, updateIssueR
 import { updateIssueMetadata } from '@/app/actions/issue-metadata'
 import type { IssueView } from '@/app/actions/issues'
 import { useActionError } from '@/lib/use-action-error'
+import { isIssueListKey } from '@/lib/live/list-read'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -87,11 +88,11 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
       if (!result.issue) throw new Error(actionError(result.error ?? 'generic'))
       if (mode === 'current') onSaved(result.issue)
       // 'current' saves go through onSaved, whose saved() in issue-workspace already refetches the viewer's board.
-      await Promise.all([mutate(['issue-connections', task.id]), mode === 'current' ? undefined : mutate(['issues', userId])])
+      await Promise.all([mutate(['issue-connections', task.id]), mode === 'current' ? undefined : mutate(key => isIssueListKey(key, userId))])
       if (mode === 'duplicate') onOpen(result.issue.id)
       if (mode === 'delete') {
         onDeleted()
-        toast.success(t('taskDeleted'), { action: { label: t('undo'), onClick: () => { void setIssueDeleted({ id: task.id, restore: true }).then(async response => { if (response.error) toast.error(actionError(response.error)); else { await mutate(['issues', userId]); onOpen(task.id) } }).catch(() => toast.error(t('restoreViaLinkFailed'))) } } })
+        toast.success(t('taskDeleted'), { action: { label: t('undo'), onClick: () => { void setIssueDeleted({ id: task.id, restore: true }).then(async response => { if (response.error) toast.error(actionError(response.error)); else { await mutate(key => isIssueListKey(key, userId)); onOpen(task.id) } }).catch(() => toast.error(t('restoreViaLinkFailed'))) } } })
       } else toast.success(mode === 'child' ? t('childCreated') : mode === 'duplicate' ? t('duplicateCreated') : mode === 'favorite' ? t('favorited') : mode === 'unfavorite' ? t('unfavorited') : t('taskUpdated'))
       return true
     } catch (error) { const message = error instanceof Error ? error.message : t('operationFailed'); setError(message); toast.error(message); return false }

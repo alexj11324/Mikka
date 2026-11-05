@@ -13,6 +13,7 @@ import { accessibleTeams, requireTeam } from '@/lib/team-access'
 import type { ActionResult } from '@/lib/action-result'
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { deleteTeamData, teamDeletionImpact, type TeamDeletion, type TeamDeletionImpact } from '@/lib/workspace-admin/teams'
+import { workspaceListChanged } from '@/lib/live/lists'
 
 const fields = z.object({ name: z.string().trim().min(1, 'validationNameRequired').max(100), identifier: z.string().trim().toUpperCase().regex(/^[A-Z][A-Z0-9]{1,11}$/, 'teamIdentifierInvalid'), description: z.string().trim().max(500) })
 async function result<T>(operation: () => Promise<T>) {
@@ -56,10 +57,12 @@ export async function saveTeam(input: { id?: string; workspaceId: string; name: 
         const current = await requireTeam(tx, input.id, user.id, true)
         if (current.workspaceId !== input.workspaceId) throw new WorkspaceError(i18nText("FeatureCopy.c_55559894"))
         const [team] = await tx.update(teams).set({ ...values, updatedAt: new Date() }).where(and(eq(teams.id, input.id), eq(teams.workspaceId, current.workspaceId))).returning()
+        await workspaceListChanged(tx, current.workspaceId, ['workspace_settings', 'issue_list'])
         return team
       }
       const [team] = await tx.insert(teams).values({ ...values, id: crypto.randomUUID(), workspaceId: input.workspaceId, userId: user.id }).returning()
       await tx.insert(teamMembers).values({ teamId: team.id, userId: user.id, role: 'owner' })
+      await workspaceListChanged(tx, input.workspaceId, ['workspace_settings', 'issue_list'])
       return team
     })
   })
@@ -88,7 +91,11 @@ async function changeTeamMemberBody(input: { teamId: string; userId?: string; ac
       const team = await requireTeam(tx, input.teamId, user.id, action !== 'join' && action !== 'leave')
       const [target] = await tx.select({ status: workspaceMembers.status }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, team.workspaceId), eq(workspaceMembers.userId, targetId))).limit(1)
       if (!target || (target.status !== 'active' && action !== 'remove')) throw new WorkspaceError(i18nText("FeatureCopy.c_ddc37f65"))
-      if (action === 'join' || action === 'add') { await tx.insert(teamMembers).values({ teamId: team.id, userId: targetId }).onConflictDoNothing(); return }
+      if (action === 'join' || action === 'add') {
+        const added = await tx.insert(teamMembers).values({ teamId: team.id, userId: targetId }).onConflictDoNothing().returning({ id: teamMembers.userId })
+        if (added.length) await workspaceListChanged(tx, team.workspaceId, ['workspace_settings', 'issue_list'])
+        return
+      }
       const [current] = await tx.select({ role: teamMembers.role }).from(teamMembers).where(and(eq(teamMembers.teamId, team.id), eq(teamMembers.userId, targetId))).limit(1)
       if (!current) throw new WorkspaceError(i18nText("FeatureCopy.c_5aa7a0e5"))
       if (current.role === 'owner' && action !== 'owner') {
@@ -98,6 +105,7 @@ async function changeTeamMemberBody(input: { teamId: string; userId?: string; ac
       const scope = and(eq(teamMembers.teamId, team.id), eq(teamMembers.userId, targetId))
       if (action === 'leave' || action === 'remove') await tx.delete(teamMembers).where(scope)
       else await tx.update(teamMembers).set({ role: action === 'owner' ? 'owner' : 'member' }).where(scope)
+      await workspaceListChanged(tx, team.workspaceId, ['workspace_settings', 'issue_list'])
     })
   })
 }

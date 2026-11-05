@@ -1,4 +1,5 @@
 import { withBasePath } from '@/lib/base-path'
+import { ListReadScopeError } from './live/list-read'
 
 // Client side of GET /api/conversations/{id}/messages (lib/group-conversations-store.ts).
 // The server requires a signed-in active workspace member who is still in the group;
@@ -125,6 +126,17 @@ export type GroupSummary = { id: string; workspaceId: string; title: string; cre
 /** The person's group chats in one workspace, for the bot list (R-01). */
 export function fetchGroups(workspaceId: string, fetcher: typeof fetch = fetch): Promise<GroupSummary[]> {
   return readGroupApi(`/api/conversations?${new URLSearchParams({ workspaceId })}`, listIn<GroupSummary>('conversations'), fetcher)
+}
+
+/** The list cache belongs to an owner/workspace, even if a cookie changes
+ * while its GET is in flight. Legacy API consumers keep fetchGroups. */
+export function fetchScopedGroups(ownerId: string, workspaceId: string, fetcher: typeof fetch = fetch): Promise<GroupSummary[]> {
+  return readGroupApi(`/api/conversations?${new URLSearchParams({ workspaceId })}`, body => {
+    const value = body as { viewerId?: unknown; workspaceId?: unknown } | null
+    if (value?.viewerId !== ownerId) throw new ListReadScopeError('owner')
+    if (value.workspaceId !== workspaceId) throw new ListReadScopeError('workspace')
+    return listIn<GroupSummary>('conversations')(body)
+  }, fetcher)
 }
 
 /** A group's members as GET /api/conversations/{id}/members returns them; bots carry their colour and shape. */

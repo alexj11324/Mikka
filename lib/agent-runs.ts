@@ -1,4 +1,5 @@
 import 'server-only'
+import { runDecisionWarnings, type ProjectDecisionWarning } from './project-decision-warnings'
 import type { ExecutionIdentity } from './execution-identity'
 import { personalMailboxEnabled } from './personal-mailbox-config'
 import { byosEnabled } from './cloud-computer-flag'
@@ -56,6 +57,7 @@ export interface RunView {
 }
 
 export interface RunDetail {
+  decisionWarnings?: ProjectDecisionWarning[]
   run: RunView
   chunks: Record<string, unknown>[]
   messages: { id: string; text: string; createdAt: Date }[]
@@ -309,7 +311,8 @@ export async function readRun(userId: string, runId: string): Promise<RunDetail 
     .where(eq(runChunks.runId, run.id)).orderBy(asc(runChunks.seq))
   const messages = await db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt })
     .from(runMessages).where(eq(runMessages.runId, run.id)).orderBy(asc(runMessages.createdAt))
-  return { run, chunks: chunks.map(row => row.chunk), messages }
+  const decisionWarnings = await runDecisionWarnings(pool, userId, run.id)
+  return { run, chunks: chunks.map(row => row.chunk), messages, decisionWarnings }
 }
 
 /** A message to the running agent; the daemon delivers it. */
@@ -340,15 +343,19 @@ export async function addRunMessage(
       run.status,
     )
   ) {
-    const { factoryQuestions } = await import('@/lib/factory/server')
+    const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
     const { pool } = await import('@/lib/db')
     const {
       rows: [identity],
     } = await pool.query(
-      'SELECT id FROM factory_questions WHERE "originRunId"=$1 AND "userId"=$2',
+      `SELECT q.id,t."botId" FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId"
+       WHERE q."originRunId"=$1 AND q."userId"=$2 AND t."userId"=$2`,
       [run.id, userId],
     )
     if (!identity) throw new ActionFailureError('runNotActive')
+    // The task owns this scope. A worker can also belong to a Bot when its
+    // legacy Factory task is unscoped; neither the caller nor worker chooses it.
+    const factoryQuestions = factoryRuntimeForBot(identity.botId).questions
     const q = await factoryQuestions.read(userId, identity.id)
     if (q.status === 'resolved' && q.continuationRunId) {
       const previous = q.answer as {

@@ -1,4 +1,5 @@
 import { prepareCloudQuestionRecovery, queueCloudQuestionContinuation, wakeCloudQuestionContinuation } from './questions/queue-continuation';
+import { queueLocalQuestionContinuation } from './questions/queue-local-continuation';
 import "server-only";
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { createSkillActivationAdapters } from "../self-improvement/activation";
@@ -103,7 +104,7 @@ import { createFactoryDispatch, defaultFactoryDispatchAdapters } from "./dispatc
 export const dispatchFactoryRun = createFactoryDispatch(
   pool,
   factoryStore,
-  async (tx, userId, input, botId, context) => await queueCloudQuestionContinuation(tx,userId,input,botId,context) ?? queueFactoryRun(tx, userId, input, botId, context),
+  async (tx, userId, input, botId, context) => await queueCloudQuestionContinuation(tx,userId,input,botId,context) ?? await queueLocalQuestionContinuation(tx,userId,input,botId,context) ?? queueFactoryRun(tx, userId, input, botId, context),
   {
     ...defaultFactoryDispatchAdapters,
     lockAdmission: async (tx,userId,input) => { await lockCliAgentPolicy(tx,userId,input.agentId,null); },

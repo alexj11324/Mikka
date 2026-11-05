@@ -58,7 +58,7 @@ export async function factory194Fixture(connectionString: string) {
     CREATE TABLE factory_attempts (id uuid PRIMARY KEY,"taskId" uuid,"candidateId" uuid,stage text,position integer,"runId" uuid,"sessionId" text,status text,evidence jsonb,output jsonb,"finishedAt" timestamptz,UNIQUE("taskId",id));
     CREATE TABLE factory_events ("taskId" uuid,"eventId" uuid,request jsonb NOT NULL DEFAULT '{}',result jsonb NOT NULL DEFAULT '{}',PRIMARY KEY("taskId","eventId"));
     CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"sessionId" text,status text,"stopRequestedAt" timestamptz,report jsonb,"startedAt" timestamptz,"finishedAt" timestamptz,"stopReason" text);
-    ALTER TABLE agent_runs ADD COLUMN "deviceId" uuid, ADD COLUMN "agentDefinition" jsonb, ADD COLUMN "leaseExpiresAt" timestamptz, ADD COLUMN kind text NOT NULL DEFAULT 'implement', ADD COLUMN "botId" uuid;
+    ALTER TABLE agent_runs ADD COLUMN "deviceId" uuid, ADD COLUMN "agentDefinition" jsonb, ADD COLUMN "leaseExpiresAt" timestamptz, ADD COLUMN kind text NOT NULL DEFAULT 'implement', ADD COLUMN "botId" uuid, ADD COLUMN "questionContinuation" jsonb;
     CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,enabled boolean);
     CREATE TABLE run_tokens (id uuid PRIMARY KEY,"runId" uuid,"userId" text,"tokenHash" text,"revokedAt" timestamptz,"expiresAt" timestamptz);
     CREATE TABLE run_chunks (id uuid PRIMARY KEY,"runId" uuid,chunk jsonb,"createdAt" timestamptz,seq integer NOT NULL DEFAULT 1);

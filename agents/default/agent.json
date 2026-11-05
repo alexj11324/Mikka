@@ -38,6 +38,7 @@
     "mailbox_ack",
     "mailbox_sent",
     "record_attention",
+    "record_decision",
     "remember",
     "forget",
     "stop_run",

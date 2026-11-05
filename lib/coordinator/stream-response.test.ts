@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { fingerprint } from '@/lib/credentials/fingerprint'
 import { QUIET_REPLY } from '@/lib/attention/handoff'
 import { coordinatorTextStream } from './stream-response'
+import { coordinatorStreamReply, type CoordinatorLiveReply } from '../coordinator-stream-client'
 import type { CoordinatorStreamEvent, CoordinatorWorkflowStreamPart } from './stream'
 
 const start = (id = 'run:0', quietEligible = false): CoordinatorWorkflowStreamPart => ({ type: 'coordinator-turn-start', id, quietEligible })
@@ -101,12 +102,15 @@ const result = (toolCallId: string, toolName: string, output: unknown) => ({ typ
 const failure = (toolCallId: string, toolName: string) => ({ type: 'tool-error', toolCallId, toolName, input: {}, error: 'private failure detail' }) as unknown as CoordinatorWorkflowStreamPart
 const reasoning = (type: 'reasoning-start' | 'reasoning-end') => ({ type, id: 'r' }) as unknown as CoordinatorWorkflowStreamPart
 
-test('each tool streams its name, state and short previews; thinking streams as start and end only', async () => {
+test('each tool streams its name, state and short previews; thinking streams as it goes', async () => {
   const events = await project([start(), reasoning('reasoning-start'), { type: 'reasoning-delta', id: 'r', text: 'private reasoning' } as CoordinatorWorkflowStreamPart, reasoning('reasoning-end'),
     call('c1', 'create_issue', { title: 'Fix login', body: 'x'.repeat(400) }), result('c1', 'create_issue', { id: 'i1' }),
     call('c2', 'record_attention', { level: 'high' }), result('c2', 'record_attention', {}),
     call('c3', 'dispatch_run', { issueId: 'i1' }), failure('c3', 'dispatch_run'), delta('Done.'), committed()])
-  const steps = events.filter(event => event.type === 'tool' || event.type === 'thinking')
+  // Deltas as the masker releases them: a token-shaped end ("…g" could start "ghp_") waits for the next piece.
+  const thought = events.flatMap(event => event.type === 'thinking' && event.state === 'delta' ? [event.text] : []).join('')
+  assert.equal(thought, 'private reasoning', 'readable reasoning streams as it is thought')
+  const steps = events.filter(event => event.type === 'tool' || (event.type === 'thinking' && event.state !== 'delta'))
   assert.deepEqual(steps.map(event => event.type === 'tool' ? [event.call, event.name, event.state] : [event.type, event.state]), [
     ['thinking', 'start'], ['thinking', 'end'], ['c1', 'create_issue', 'running'], ['c1', 'create_issue', 'done'], ['c3', 'dispatch_run', 'running'], ['c3', 'dispatch_run', 'error'],
   ], 'a hidden tool never shows')
@@ -115,12 +119,18 @@ test('each tool streams its name, state and short previews; thinking streams as 
   assert.ok(created.input?.startsWith('{"body": "xxx'), 'printed as the stored chat prints jsonb: keys in its order, ", " and ": "')
   assert.equal((steps[3] as Extract<CoordinatorStreamEvent, { type: 'tool' }>).output, '{"id": "i1"}')
   assert.equal(JSON.stringify(events).includes('private failure detail'), false, 'tool error details stay on the server')
-  assert.deepEqual(steps[1], { type: 'thinking', id: 'run:0', state: 'end', text: 'private reasoning' }, 'readable reasoning arrives whole when its block ends')
+  assert.ok(events.findIndex(event => event.type === 'thinking' && event.state === 'delta') < events.findIndex(event => event.type === 'thinking' && event.state === 'end'))
+})
+
+test('a tool call names how much of the reply was said before it, held back or not, so it shows after those words', async () => {
+  const events = await project([start(), delta('I will make the task first.'), call('c1', 'create_issue', {}), result('c1', 'create_issue', {}), delta('Done.'), committed()])
+  const tools = events.filter((event): event is Extract<CoordinatorStreamEvent, { type: 'tool' }> => event.type === 'tool')
+  assert.deepEqual(tools.map(tool => tool.at), ['I will make the task first.'.length, undefined], 'the call carries it; its result keeps the call\'s place')
 })
 
 const reasoningDelta = (text: string) => ({ type: 'reasoning-delta', id: 'r', text }) as unknown as CoordinatorWorkflowStreamPart
 
-test('reasoning text is masked as a whole block; encrypted, empty or secret-holding reasoning streams no text', async () => {
+test('reasoning streams masked as it goes: no credential or saved secret, whole or in part, ever leaves; encrypted or empty reasoning streams no text', async () => {
   const old = process.env.BETTER_AUTH_SECRET
   process.env.BETTER_AUTH_SECRET = 'offline-stream-guard-fixture-secret'
   try {
@@ -130,22 +140,43 @@ test('reasoning text is masked as a whole block; encrypted, empty or secret-hold
       const raw = new ReadableStream<CoordinatorWorkflowStreamPart>({ start(controller) { [start(), ...parts].forEach(part => controller.enqueue(part)); controller.close() } })
       return (await drain(raw.pipeThrough(coordinatorTextStream('owner', [fingerprint('owner', secret)])))).filter(event => event.type === 'thinking')
     }
-    // A credential split over deltas is masked once the block is whole; none of it streams before.
+    const streamed = (events: CoordinatorStreamEvent[]) => events.flatMap(event => event.type === 'thinking' && event.state === 'delta' ? [event.text] : []).join('')
+    // A credential split over deltas is held back while it grows and masked whole; no part of it streams.
     const split = await run([reasoning('reasoning-start'), reasoningDelta(`use ${token.slice(0, 10)}`), reasoningDelta(`${token.slice(10)} to call GitHub`), reasoning('reasoning-end')])
-    assert.equal(split.length, 2)
-    const text = (split[1] as { text?: string }).text ?? ''
-    assert.match(text, /^use .+ to call GitHub$/)
-    assert.equal(text.includes(token) || text.includes(token.slice(0, 10)), false)
+    assert.match(streamed(split), /^use \[secret:github-token\] to call GitHub$/)
+    assert.equal(JSON.stringify(split).includes(token.slice(0, 4)), false, 'not even its first characters stream')
+    // Words before a credential stream before it ends.
+    const early = await run([reasoning('reasoning-start'), reasoningDelta('first I check the logs, '), reasoningDelta('then ghp_'), reasoningDelta(`${'C'.repeat(36)} done`), reasoning('reasoning-end')])
+    assert.equal(streamed(early), 'first I check the logs, then [secret:github-token] done')
+    const firstDelta = early.findIndex(event => event.type === 'thinking' && event.state === 'delta')
+    assert.ok(firstDelta > 0 && early.filter(event => event.type === 'thinking' && event.state === 'delta').length > 1, 'it streams in pieces, not as one block at the end')
     // Encrypted reasoning (no text) or empty text: start and end only.
     assert.deepEqual(await run([reasoning('reasoning-start'), reasoning('reasoning-end')]), [{ type: 'thinking', id: 'run:0', state: 'start' }, { type: 'thinking', id: 'run:0', state: 'end' }])
-    assert.deepEqual((await run([reasoning('reasoning-start'), reasoningDelta('  '), reasoning('reasoning-end')]))[1], { type: 'thinking', id: 'run:0', state: 'end' })
-    // A saved secret in the reasoning: the block streams no text at all.
-    const held = await run([reasoning('reasoning-start'), reasoningDelta(`the password is ${secret}`), reasoning('reasoning-end')])
-    assert.deepEqual(held[1], { type: 'thinking', id: 'run:0', state: 'end' })
+    assert.deepEqual(await run([reasoning('reasoning-start'), reasoningDelta('  '), reasoning('reasoning-end')]), [{ type: 'thinking', id: 'run:0', state: 'start' }, { type: 'thinking', id: 'run:0', state: 'end' }])
+    // A saved secret: no part of it leaves, however the deltas cut it, and the block streams nothing after it.
+    for (const parts of [[`the password is ${secret}`], ['the password is synth', `etic-password-value and more`], [`${'x'.repeat(60)} then `, secret, ' after']]) {
+      const held = await run([reasoning('reasoning-start'), ...parts.map(reasoningDelta), reasoning('reasoning-end')])
+      const json = JSON.stringify(held)
+      for (let k = 4; k <= secret.length; k++) assert.equal(json.includes(secret.slice(0, k)), false, `${parts.length} parts: ${secret.slice(0, k)}`)
+      assert.equal(json.includes('after') || json.includes('and more'), false)
+      assert.deepEqual(held.at(-1), { type: 'thinking', id: 'run:0', state: 'end' })
+    }
   } finally {
     if (old === undefined) delete process.env.BETTER_AUTH_SECRET
     else process.env.BETTER_AUTH_SECRET = old
   }
+})
+
+test('a retried model step drops the reasoning it streamed; earlier steps keep theirs', async () => {
+  const reasoningOf = (id: string, type: 'reasoning-start' | 'reasoning-end') => ({ type, id }) as unknown as CoordinatorWorkflowStreamPart
+  const thinkingDelta = (id: string, text: string) => ({ type: 'reasoning-delta', id, text }) as unknown as CoordinatorWorkflowStreamPart
+  const events = await project([start(), boundary('start-step'), reasoningOf('a', 'reasoning-start'), thinkingDelta('a', 'first thought'), reasoningOf('a', 'reasoning-end'), boundary('finish-step'),
+    boundary('start-step'), reasoningOf('b', 'reasoning-start'), thinkingDelta('b', 'wrong'), { type: 'reset-step' },
+    reasoningOf('c', 'reasoning-start'), thinkingDelta('c', 'right'), reasoningOf('c', 'reasoning-end'), delta('Done.'), committed()])
+  let replies: CoordinatorLiveReply[] = []
+  for (const event of events) if (event.type !== 'committed') replies = coordinatorStreamReply(replies, event)
+  assert.equal(replies[0].thinking?.text, 'first thought\n\nright')
+  assert.ok(events.some(event => event.type === 'thinking' && event.state === 'reset' && event.text === 'first thought'))
 })
 
 test('a hand-off turn that may end quiet streams no tools or thinking', async () => {
