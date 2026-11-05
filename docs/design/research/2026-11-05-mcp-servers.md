@@ -59,10 +59,16 @@ Page 「MCP 服务器 2026-11-05」 (`1002:2`) in `zPe5LKycb2XuT1ivCLRw07`. Each
 | S5a 网址无响应 | `1006:893` | `1006:1064` | `1006:1204` |
 | S5b 认证失败 | `1006:1382` | `1006:1567` | `1006:1713` |
 | S5c OAuth 授权取消 | `1006:1905` | `1006:2038` | `1006:2154` |
-| S6 需要重新连接 | `1007:1002` | `1007:1134` | `1007:1249` |
+| S5d 服务器要求 OAuth | `1014:2213` | `1014:2365` | `1014:2517` |
+| S6 令牌过期 | `1007:1002` | `1007:1134` | `1007:1249` |
+| S7 服务器无响应 | `1014:505` | `1014:646` | `1014:787` |
+| C1 对话里工具调用失败 | `1014:2676` | `1014:2691` | `1014:2705` |
 | P1 服务器页 | `1007:239` | `1007:367` | `1007:479` |
+| P5 已停用 | `1014:935` | `1014:1063` | `1014:1191` |
 | P2 ⋯ 菜单 | `1008:341` | `1008:473` | `1008:594` |
+| D3 编辑对话框 | `1014:1729` | `1014:1888` | `1014:2047` |
 | P3 删除确认 | `1008:733` | `1008:881` | `1008:1002` |
+| P3b 删除确认 · 已分享 | `1014:1326` | `1014:1458` | `1014:1590` |
 | P4 分享确认（#1186） | `1008:1153` | `1008:1299` | `1008:1419` |
 | I1 iOS 插件 › MCP 服务器 | `1010:457` | `1010:749` | — |
 | I2 iOS 服务器页（推入） | `1010:524` | `1010:816` | — |
@@ -116,12 +122,35 @@ An independent review (R-84–R-90 step 1) is still owed; this session was told 
 | Share with the workspace | Switch in 设置 › 连接 (#1186) | Same switch and confirm, also on the server page (P1, P4) | Found, 0 |
 | Add from the phone | Missing | Not offered (I1) | Missing, 2 — open question |
 
+## Review round 1 (Nielsen heuristics, reviewer session)
+
+| Finding | Severity | Outcome |
+| --- | --- | --- |
+| F1 Authorization takes a raw token, so people paste it without `Bearer` | 3 | Fixed: a fixed 「Bearer」 prefix (`InputGroupAddon`) in front of 值 when the header is Authorization; a pasted `Bearer ` is stripped (D2, S5b, D3) |
+| F2 The person must know the auth method in advance | 3 | Fixed: 认证 is preselected from the server's protected-resource metadata and marked 「已自动识别」; it can be changed (D1, D2). If someone overrides it wrongly, connecting says 「此服务器使用 OAuth 登录」 with 「改用 OAuth」 (S5d) |
+| F3 No way to change the URL, auth or key | 3 | Fixed: ⋯ › 编辑 opens the same dialog prefilled; a saved key shows as 已保存 and is replaced only when typed; saving connects again (P2, D3) |
+| F4 需要重新连接 gives no cause, and a down server needs a different action | 3 | Fixed: a status line with the cause and time (S6 「令牌已过期 · 11月5日 14:02」); S7 for a server that does not answer, with 重新检查. Each cause is a coded error with copy in `RunErrors.*` (decision 2026-11-05-0330) |
+| F5 A broken server looks healthy in the web list; the failed call in chat does not lead to it | 3 | Fixed: the store item shows 需要重新连接 (icon, colour, word) (E1); 设置 › 连接 uses the same badge as `ConnectedAppRow`. C1 shows the failed tool call and an 「打开 Sentry」 button |
+| F6 「包含 19 个工具…」 repeats the group headings | 2 | Fixed: removed |
+| F7 Many tools need many clicks | 2 | Fixed: a switch on each 写入 / 读取 group header. A `SearchInput` above the groups appears past 20 tools; not drawn, Sentry has 19 |
+| F8 Disable hidden in ⋯ on the web, a switch on iOS | 2 | Fixed: 启用 is a `SettingRow` switch on the web as on iOS; P5 draws the disabled state |
+| F9 iOS switch mixes 启用 and broken | 2 | Fixed: the switch means 启用 only; Context7 is on with the red line (I1) |
+| F10 One message for four URL failures | 2 | Fixed: one coded message each — 仅支持公网地址, 找不到 <host>, 连接超时, 这个网址不是 MCP 服务器; S5a draws the first |
+| F11 Delete does not say members lose it | 2 | Fixed: P3b when shared |
+| F12 No pointer to where a client ID comes from | 2 | Fixed: a 「在 GitHub 创建 OAuth 应用 ↗」 link under the callback URL when the provider's page is known (S3) |
+| F13 S5b keeps the typed secret, unlike `CredentialDialog` | 1 | Kept the existing behaviour (cleared on send) so both key forms behave the same; S5b now shows the field empty. Changing both is Alex's call |
+| F14 Rail and top bar missing | 1 | Declined: the frames follow the accepted-draft convention of the earlier 插件 page (`773:3`); the column is the same width and position as on main |
+| F15 读取 14 shows 5 rows | 1 | Declined: `ToolGroup` lists every tool in a scrolling list (`max-h-96`); the frame shows the top of it |
+| F16 Every server has the same icon | 1 | Left to Alex (open question 3); the reviewer recommends the server's own icon with the fallback |
+| F17 Dark card outlines read as light lines | 1 | Fixed: outlines use the solid `border/rule` grey instead of white at low opacity (R-31) |
+
 ## Open questions for Alex
 
-1. **Detect auth or ask?** Claude probes the URL first and fills in the auth choice. That adds a step before the form. The draft asks the person and corrects them on failure.
+1. **Detect auth (decided in the draft after review).** The draft now probes the URL and preselects 认证, as Claude does; the reviewer agreed. Confirm.
 2. **Name: 「自定义 MCP」 or 「MCP 服务器」?** The section in 设置 › 连接 is 自定义 MCP today (#1186). The draft uses MCP 服务器 everywhere, the word in #1397.
 3. **Server icon.** The draft uses the fallback `Blocks` glyph that `AppTile` already draws. The MCP spec lets a server send its own icon; showing it would make rows easier to tell apart.
 4. **Adding on iOS.** The draft has no add on iOS. The alternative is a row that opens the web dialog signed in, as app 连接 does today.
+5. **A failed key.** Both key forms clear what was typed when it is sent. The reviewer would keep it until the dialog closes so it can be corrected.
 
 ## Sources
 
