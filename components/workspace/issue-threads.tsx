@@ -55,24 +55,20 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
   </section>
 }
 
-/** Activity rows: 「<Agent> 派出线程 [线程]」, oldest first. */
-export function ThreadEvents({ issueId, onOpen }: { issueId: string; onOpen: (id: string) => void }) {
+/** One activity row: 「<Agent> 派出线程 [线程]」. The activity feed places it in time order. */
+export function ThreadEventRow({ thread, onOpen }: { thread: IssueThread; onOpen: (id: string) => void }) {
   const t = useTranslations('IssueThreads')
   const format = useFormatter()
-  const { data } = useIssueThreads(issueId)
-  if (!data?.length) return null
-  return <>{[...data].reverse().map((thread: IssueThread) => {
-    const name = thread.detail?.name ?? (thread.ownerName ? t('ownerThread', { name: thread.ownerName }) : t('hidden'))
-    return <div key={thread.id} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-      <ThreadBotAvatar thread={thread} />
-      <span className="font-medium">{thread.detail?.agentName ?? t('agent')}</span>
-      <span className="text-muted-foreground">{t('dispatched')}</span>
-      {thread.detail
-        ? <Button variant="secondary" size="xs" className="max-w-60 rounded-md" aria-label={t('open', { name })} onClick={() => onOpen(thread.id)}><span className="truncate">{name}</span></Button>
-        : <span className="truncate text-muted-foreground">{name}</span>}
-      <time className="text-xs text-muted-foreground" dateTime={new Date(thread.createdAt).toISOString()}>{format.dateTime(new Date(thread.createdAt), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
-    </div>
-  })}</>
+  const name = thread.detail?.name ?? (thread.ownerName ? t('ownerThread', { name: thread.ownerName }) : t('hidden'))
+  return <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+    <ThreadBotAvatar thread={thread} />
+    <span className="font-medium">{thread.detail?.agentName ?? t('agent')}</span>
+    <span className="text-muted-foreground">{t('dispatched')}</span>
+    {thread.detail
+      ? <Button variant="secondary" size="xs" className="max-w-60 rounded-md" aria-label={t('open', { name })} onClick={() => onOpen(thread.id)}><span className="truncate">{name}</span></Button>
+      : <span className="truncate text-muted-foreground">{name}</span>}
+    <time className="text-xs text-muted-foreground" dateTime={new Date(thread.createdAt).toISOString()}>{format.dateTime(new Date(thread.createdAt), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
+  </div>
 }
 
 /** The dispatching Bot in its own look (R-36): the same bloub as its bot-list row; the Coordinator's own runs use its mark. */

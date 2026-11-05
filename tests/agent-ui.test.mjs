@@ -48,7 +48,7 @@ test('综合演示每个分组都可解析，覆盖全部本地回复组件', ()
   for (const name of Object.keys(agentComponentCatalog)) assert.match(source, new RegExp(`\\b${name}\\(`), name)
 })
 
-test('beUI 代码块在 OpenUI 和 Markdown 中真正接入，等待状态使用 ReasoningText', async () => {
+test('beUI 代码块在 OpenUI 和 Markdown 中真正接入，等待状态使用 Trace', async () => {
   const source = 'root = BeCodeBlock("const demo = true", "typescript", "demo.ts", [1])'
   const result = createParser(library.toJSONSchema(), library.root).parse(source)
   assert.ok(result.root)
@@ -57,6 +57,12 @@ test('beUI 代码块在 OpenUI 和 Markdown 中真正接入，等待状态使用
   const code = await readFile(new URL('../components/workspace/agent-code-block.tsx', import.meta.url), 'utf8')
   assert.match(markdown, /<AgentCodeBlock/)
   assert.match(code, /from '@\/components\/agents\/code-block'/)
+  const activity = await readFile(new URL('../components/coordinator/reply-activity.tsx', import.meta.url), 'utf8')
+  const chat = await readFile(new URL('../components/coordinator/coordinator-chat.tsx', import.meta.url), 'utf8')
+  assert.match(activity, /from '@\/components\/ui\/trace'/)
+  assert.doesNotMatch(activity, /ai-elements/)
+  assert.match(chat, /<ReplyWaiting \/>/)
+  await assert.rejects(readFile(new URL('../components/agents/loading-states/thinking-shimmer.tsx', import.meta.url), 'utf8'))
 })
 
 test('普通聊天正文不加载公式引擎，含公式时复用完整 Markdown 渲染', async () => {

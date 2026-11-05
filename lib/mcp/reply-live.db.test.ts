@@ -16,6 +16,7 @@ import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits } from '../db/commit-effects'
 import { coordinatorSessionScope } from '../live/coordinator-session'
+import { liveReady } from '../live/events'
 import { ScheduleStore, type WorkspaceGuard } from '../schedules/store'
 import { ScheduleError, type Definition } from '../schedules/contract'
 
@@ -79,14 +80,19 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
   process.env.DEVICE_GATEWAY_URL = origin
   process.env.DEVICE_GATEWAY_PUSH_SECRET = secret
   const NativeWebSocket = globalThis.WebSocket
-  const sockets: { socket: WebSocket; received: unknown[]; closes: number }[] = []
+  const sockets: { socket: WebSocket; received: unknown[]; closes: number; ready: boolean }[] = []
   globalThis.WebSocket = class extends NativeWebSocket {
     constructor(url: string | URL, protocols?: string | string[]) {
       super(url, protocols)
-      const state = { socket: this as WebSocket, received: [] as unknown[], closes: 0 }
+      const state = { socket: this as WebSocket, received: [] as unknown[], closes: 0, ready: false }
       sockets.push(state)
       this.addEventListener('message', message => {
-        if (message.data !== 'pong') state.received.push(JSON.parse(String(message.data)))
+        if (message.data === 'pong') return
+        const value = JSON.parse(String(message.data))
+        if (value?.type === 'live_ready') {
+          assert.deepEqual(value, liveReady(), 'the deployed Worker explicitly supports the reply kind')
+          state.ready = true
+        } else state.received.push(value)
       })
       const close = this.close.bind(this)
       this.close = (...args) => { state.closes++; close(...args) }
@@ -100,6 +106,13 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
   const request = app.createRequestDatabaseScope(target!)
   const chats: { owner: string; botId: string; workspaceId: string }[] = []
   const controllers: AbortController[] = []
+  const ordered = (rows: typeof deliveries) => [...rows].sort((a, b) => JSON.stringify(a.events).localeCompare(JSON.stringify(b.events)))
+  function committedChatEvents(identity: { owner: string; workspaceId: string; botId: string }) {
+    return [
+      { ownerId: identity.owner, workspaceId: identity.workspaceId, events: [{ kind: 'bot_chat_list', id: identity.workspaceId }] },
+      { ownerId: identity.owner, workspaceId: identity.workspaceId, events: [{ kind: 'coordinator_session', id: identity.botId }] },
+    ]
+  }
   async function chat() {
     const owner = `mcp-reply-${randomUUID()}`
     return request.run(async () => {
@@ -118,7 +131,7 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
     // A later failure still cancels this local waiter; tests never leave a 90s timer.
     void promise.catch(() => {})
     return { controller, promise, open: async () => {
-      await eventually(() => sockets.length > before && sockets[before].socket.readyState === WebSocket.OPEN, 'MCP channel did not open')
+      await eventually(() => sockets.length > before && sockets[before].socket.readyState === WebSocket.OPEN && sockets[before].ready, 'MCP channel did not become ready')
       return sockets[before]
     } }
   }
@@ -150,8 +163,7 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
         await flush()
         const reply = await bounded(waiter.promise)
         assert.deepEqual(reply.messages.map(value => value.text), ['Committed outer reply'])
-        assert.equal(deliveries.length, before + 1)
-        assert.deepEqual(deliveries.at(-1), { ownerId: identity.owner, workspaceId: identity.workspaceId, events: [{ kind: 'coordinator_session', id: identity.botId }] })
+        assert.deepEqual(ordered(deliveries.slice(before)), ordered(committedChatEvents(identity)))
       } finally { onSchedule = () => {}; waiter.controller.abort() }
     })
 
@@ -183,7 +195,7 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
       assert.equal(pending.length, before + 1)
       await request.run(() => store.releaseLease(identity.owner, 'mcp-fixture-holder', identity.botId))
       await flush()
-      assert.equal(pending.length, before + 2)
+      assert.equal(pending.length, before + 3, 'release invalidates both the owner list and this reply waiter')
       assert.equal((await independent.query('SELECT "leaseHolder" FROM coordinator_sessions WHERE "userId"=$1 AND "botId"=$2', [identity.owner, identity.botId])).rows[0].leaseHolder, null)
       await request.run(() => store.takeInbox(identity.owner, 'mcp-fixture-holder', identity.botId))
       const waiter = waiting(identity)
@@ -213,7 +225,7 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
         const [code, signal] = await bounded(exited, 15_000)
         assert.equal(code, 0, stderr)
         assert.equal(signal, null)
-        assert.deepEqual(JSON.parse(stdout.trim()), { written: true, notifications: 1 })
+        assert.deepEqual(JSON.parse(stdout.trim()), { written: true, notifications: 2 })
         assert.ok(socket.received.some(value => JSON.stringify(value) === JSON.stringify({ kind: 'coordinator_session', id: identity.botId })), 'the actual server notification crossed the independent process boundary')
         assert.deepEqual(reply.messages.map(value => value.text), ['Reply from a separate writer process'])
       } finally { waiter.controller.abort() }
@@ -244,7 +256,7 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
         await flush()
         const reply = await bounded(waiter.promise)
         assert.match(reply.messages.at(-1)!.text, /Scheduled reply body/)
-        assert.equal(deliveries.length, before + 1)
+        assert.deepEqual(ordered(deliveries.slice(before)), ordered(committedChatEvents(identity)))
         const count = pending.length
         await schedules.tick()
         assert.equal(pending.length, count, 'idempotent schedule replay does not republish')
@@ -312,7 +324,7 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
         deferredScheduledWork = deferred
         await isolatedRequest.run(() => store.appendMessages(owner, 'mcp-fixture-holder', [{ role: 'assistant', content: 'Only the original request database' }], null, botId))
         deferredScheduledWork = null
-        assert.equal(deferred.length, 1)
+        assert.equal(deferred.length, 2, 'the main list and reply resolvers both retain the original request')
         // Simulate after() invoking a queued callback outside the originating ALS scope.
         await Promise.all(deferred.map(work => work()))
         assert.deepEqual(deliveries.slice(before), [{ ownerId: owner, workspaceId: intended, events: [{ kind: 'coordinator_session', id: botId }] }])
@@ -352,6 +364,6 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
     if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
     await request.close()
     await independent.end()
-    t.diagnostic(JSON.stringify({ event: 'mcp_reply_fixtures_retained', database: 'mikka_e2e', ownerIds: chats.map(value => value.owner) }))
+    t.diagnostic(JSON.stringify({ event: 'mcp_reply_fixtures_retained', database: new URL(target!).pathname.slice(1), ownerIds: chats.map(value => value.owner) }))
   }
 })

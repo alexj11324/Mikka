@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { JSONContent } from '@tiptap/core'
-import { deriveIssueActivity, groupActivityByMinute } from './issue-activity'
+import { activityTimeline, deriveIssueActivity, groupActivityByMinute } from './issue-activity'
 
 function content(assignee: { id: string; name: string } | null): JSONContent {
   return {
@@ -97,4 +97,30 @@ test('derived events carry the resolved actor for the row to name (R-63)', () =>
     { id: 'v2', revision: 2, title: 'A', status: 'doing', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:05:00.000Z' },
   ], [])
   assert.deepEqual(events.map(event => event.actor ?? null), [ada, null])
+})
+
+test('interleaves task events and dispatched threads by time (#1264)', () => {
+  const events = deriveIssueActivity([
+    { id: 'v1', revision: 1, title: 'A', status: 'todo', priority: 'normal', content: content(null), createdAt: '2026-11-04T20:44:00.000Z' },
+    { id: 'v2', revision: 2, title: 'A', status: 'in_review', priority: 'normal', content: content(null), createdAt: '2026-11-04T20:49:30.000Z' },
+  ], [])
+  const rows = activityTimeline(events, [
+    { id: 't3', createdAt: new Date('2026-11-04T20:51:00.000Z') },
+    { id: 't1', createdAt: new Date('2026-11-04T20:45:00.000Z') },
+    { id: 't2', createdAt: '2026-11-04T20:49:10.000Z' },
+  ])
+  assert.deepEqual(rows.map(row => row.id), ['created-v1', 'thread-t1', 'thread-t2', 'status-v2', 'thread-t3'])
+})
+
+test('keeps same-time rows in a stable order and splits a minute group around a thread', () => {
+  const at = '2026-11-04T20:49:00.000Z'
+  const event = (id: string, second: string) => ({ id, at: `2026-11-04T20:49:${second}.000Z`, kind: 'status' as const, actorKey: 'user:u' })
+  const threads = [{ id: 'b', createdAt: at }, { id: 'a', createdAt: at }]
+  const once = activityTimeline([event('e2', '00'), event('e1', '00')], threads)
+  const again = activityTimeline([event('e1', '00'), event('e2', '00')], [...threads].reverse())
+  assert.deepEqual(once.map(row => row.id), ['e1', 'thread-a', 'thread-b'])
+  assert.deepEqual(once, again)
+  assert.deepEqual(once[0]?.type === 'events' && once[0].events.map(item => item.id), ['e1', 'e2'])
+  const split = activityTimeline([event('e1', '10'), event('e2', '50')], [{ id: 't', createdAt: '2026-11-04T20:49:30.000Z' }])
+  assert.deepEqual(split.map(row => row.id), ['e1', 'thread-t', 'e2'])
 })

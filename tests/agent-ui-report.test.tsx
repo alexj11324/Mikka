@@ -197,23 +197,29 @@ test('A task or run chip is boxed with no underline and only its title; a source
   const html = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages}><AgentCitationsContext value={{ sources, previews: {}, onOpenIssue: () => {} }}>
     <AgentGenerativeUI response={`root = InlineText(["See ", TaskChip("${task}"), " and ", RunChip("${run}"), ", PR ", SourceChip("https://github.com/alexj11324/Mikka/pull/92", "Mikka#92")])`} isStreaming={false} onAction={() => {}} />
   </AgentCitationsContext></NextIntlClientProvider>)
-  const chips = [...html.matchAll(/<(?:button|a)[^>]*data-slot="inline-citation-trigger"[^>]*>.*?<\/(?:button|a)>/g)].map(match => match[0])
+  // Each chip from its opening tag to the next chip: an object chip is an inline span (R-15), so its end tag is ambiguous.
+  const starts = [...html.matchAll(/<(?:button|a|span)[^>]*data-slot="inline-citation-trigger"/g)].map(match => match.index)
+  const chips = starts.map((start, index) => html.slice(start, starts[index + 1] ?? html.length))
   assert.equal(chips.length, 3)
   const [taskChip, runChip, sourceChip] = chips
   for (const chip of [taskChip, runChip]) {
+    assert.match(chip, /^<span[^>]*role="button"[^>]*tabindex="0"/, 'an object chip is an inline span that acts as a button')
     const className = chip.match(/class="([^"]*)"/)?.[1] ?? ''
     assert.match(chip, /data-variant="object"/)
     assert.ok(className.split(' ').includes('bg-object-chip'), 'object chip has a fill')
-    assert.ok(className.split(' ').includes('rounded-[5px]'), 'object chip is rounded')
+    assert.ok(className.split(' ').includes('rounded-md'), 'object chip is rounded')
     assert.ok(className.split(' ').includes('no-underline'), 'object chip title is not underlined')
     assert.ok(!className.split(' ').includes('underline'), 'object chip has no underline')
-    assert.ok(className.split(' ').includes('whitespace-nowrap'), 'object chip does not break across lines')
+    assert.ok(className.split(' ').includes('inline') && className.split(' ').includes('box-decoration-clone'), 'object chip wraps like a word, each line keeping its fill (R-15)')
+    assert.ok(!className.split(' ').some(name => /^h-\d/.test(name)), 'object chip takes the text\'s own height')
     assert.ok(className.split(' ').includes('text-object-chip-foreground'), 'object chip title is in the accent')
   }
-  assert.match(taskChip, />Move the chat to OpenUI</)
+  const text = (chip: string) => chip.replace(/<[^>]+>/g, '')
+  assert.match(text(taskChip), /^Move the chat to OpenUI/)
   assert.doesNotMatch(taskChip, /MIK-43/)
   // A thread chip carries the thread's own name, the same as its row and header: task identifier and title (D9).
-  assert.match(runChip, />MIK-43 Move the chat to OpenUI</)
+  assert.match(text(runChip), /^MIK-43 Move the chat to OpenUI/)
+  assert.match(taskChip, /data-slot="chip-head"[^>]*><svg[^>]*>.*?<\/svg>M<\/span>/, 'the icon and the first character never part across lines')
   const sourceClass = sourceChip.match(/class="([^"]*)"/)?.[1] ?? ''
   assert.match(sourceChip, /data-variant="source"/)
   assert.ok(sourceClass.split(' ').includes('underline'), 'source chip keeps its underline')

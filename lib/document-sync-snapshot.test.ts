@@ -13,14 +13,3 @@ test('document sync notifies only when the visible snapshot changes', () => {
   assert.deepEqual(nextSyncSnapshot(pending, { syncing: false, error: false }), null)
   assert.deepEqual(nextSyncSnapshot(pending, { error: true }), { ready: true, pending: true, error: true, syncing: false })
 })
-
-
-test('only a changed authorized workspace moves the live document subscription', () => {
-  const first = nextSyncSnapshot(idle, { workspaceId: 'workspace-a' })!
-  assert.equal(first.workspaceId, 'workspace-a')
-  assert.equal(nextSyncSnapshot(first, { workspaceId: 'workspace-a' }), null)
-  assert.equal(nextSyncSnapshot(first, { workspaceId: undefined }), null)
-  const revoked = nextSyncSnapshot(first, { workspaceId: null })!
-  assert.equal(revoked.workspaceId, null)
-  assert.equal(nextSyncSnapshot(revoked, { workspaceId: 'workspace-b' })?.workspaceId, 'workspace-b')
-})

@@ -1,3 +1,4 @@
+import { factoryDecisionWarnings } from "../project-decision-warnings";
 import type { PoolClient } from "pg";
 import type { RunReport } from "@mikka/protocol/run";
 import {
@@ -80,6 +81,7 @@ export async function reconcileFactoryCheck(
       : [];
   const output = {
     runId: run.id,
+    decisionWarnings: await factoryDecisionWarnings(tx, task),
     stopReason: run.stopReason,
     error: run.error,
     verify: run.report?.verify,

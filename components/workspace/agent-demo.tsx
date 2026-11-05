@@ -5,7 +5,7 @@ import { ArrowLeft, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { SidebarTrigger } from '@/components/ui/sidebar'
-import { ReasoningText } from '@/components/agents/loading-states/reasoning-text'
+import { ThinkingLoader } from '@/components/ui/thinking-loader-clean'
 import { AGENT_DEMO_CITATIONS, AGENT_DEMO_CODE, AGENT_DEMO_SECTIONS } from '@/lib/agent-demo'
 import { AgentCitationsContext } from './agent-citations'
 import { AgentCodeBlock } from './agent-code-block'
@@ -44,10 +44,10 @@ export function AgentDemo({ onClose }: { onClose: () => void }) {
           </div>
         </div>
         <section id="demo-motion" aria-label="加载与流式代码" className="flex scroll-mt-4 flex-col gap-5">
-          <h2 className="text-lg font-semibold">Reasoning Text 与流式 Code Block</h2>
-          <p className="text-sm text-muted-foreground">beUI 原组件：三种文字动效、语法高亮、行号、重点行、滚动跟随和复制反馈。</p>
-          <div className="grid gap-5 rounded-xl border p-4 sm:grid-cols-3">
-            {(['cascade', 'swap', 'scramble'] as const).map(variant => <div key={variant} className="flex min-w-0 flex-col gap-2"><h3 className="text-xs text-muted-foreground">{variant}</h3><ReasoningText variant={variant} phrases={['正在准备回复', '正在整理内容']} /></div>)}
+          <h2 className="text-lg font-semibold">Thinking Loader 与流式 Code Block</h2>
+          <div className="flex flex-wrap items-center gap-5 rounded-xl border p-4">
+            <ThinkingLoader phases={['思考中', '搜索网页', '阅读结果']} loop />
+            <ThinkingLoader phases={['思考中']} done doneLabel="思考了 4 秒" />
           </div>
           <DemoStreamingCode />
         </section>

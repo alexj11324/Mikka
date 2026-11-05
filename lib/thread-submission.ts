@@ -3,7 +3,6 @@ import type { Pool } from 'pg'
 import { z } from 'zod'
 import { ActionFailureError } from './action-error'
 import { factoryEventId } from './factory/event-id'
-import { runChanged } from './live/panels'
 
 export type ThreadSubmissionResult = { runId: string; continued: boolean }
 type Input = {
@@ -15,9 +14,12 @@ const resultSchema = z.object({ runId: z.uuid(), continued: z.boolean() }).stric
 
 /** This is the existing owner turn's receipt, not another inbox or dispatcher.
  * A client ID belongs to one owner and immutable thread/payload. An existing
- * intent without a durable outcome is never dispatched a second time. */
+ * intent without a durable outcome is never dispatched a second time. Only
+ * the host's existing question-answer adapter may recover its own transaction. */
 export async function submitThreadOnce(pool: Pool, input: Input,
-  deliver: (sourceEventId: string) => Promise<ThreadSubmissionResult>): Promise<ThreadSubmissionResult> {
+  deliver: (sourceEventId: string) => Promise<ThreadSubmissionResult>,
+  recoverQuestion?: (sourceEventId: string, previousRunId: string, receiptOnly: boolean) => Promise<ThreadSubmissionResult | null>,
+): Promise<ThreadSubmissionResult> {
   const requestId = z.uuid().parse(input.requestId).toLowerCase()
   const id = factoryEventId('thread-submission', JSON.stringify([input.userId, requestId]))
   const binding = { requestId, rootRunId: input.rootRunId, requestedRunId: input.requestedRunId, mode: input.mode }
@@ -41,11 +43,10 @@ export async function submitThreadOnce(pool: Pool, input: Input,
   const showOnce = async (result: ThreadSubmissionResult) => {
     // A recovered Factory acceptance can precede the original response's
     // display row. This is history only: the target already reached its epoch.
-    const shown = await pool.query(`INSERT INTO run_messages(id,"runId","userId",text,origin,"mailboxWakeDepth","deliveredAt")
+    await pool.query(`INSERT INTO run_messages(id,"runId","userId",text,origin,"mailboxWakeDepth","deliveredAt")
       SELECT $1,id,$2,$3,'owner',-1,now() FROM agent_runs
       WHERE id=$4 AND "userId"=$2 AND "issueId" IS NOT DISTINCT FROM $5::uuid
-      ON CONFLICT DO NOTHING RETURNING id`, [id, input.userId, input.text, result.runId, input.issueId])
-    if (shown.rowCount) await runChanged(pool, result.runId)
+      ON CONFLICT DO NOTHING`, [id, input.userId, input.text, result.runId, input.issueId])
   }
   const saveResult = async (result: ThreadSubmissionResult) => {
     const { rows: [saved] } = await pool.query(`UPDATE coordinator_events
@@ -97,7 +98,16 @@ export async function submitThreadOnce(pool: Pool, input: Input,
   }
   if (!inserted.length) {
     const outcome = await readOutcome()
-    if (outcome) return outcome
+    if (outcome) {
+      // An answered question can be durable before its VM wake succeeds. A
+      // saved acknowledgement permits replay of that exact receipt only;
+      // it never authorizes answering a new question or dispatching again.
+      if (recorded.mode === 'continuation' && outcome.runId === previousRunId && !outcome.continued)
+        await recoverQuestion?.(id, previousRunId, true)
+      return outcome
+    }
+    const answer = recorded.mode === 'continuation' ? await recoverQuestion?.(id, previousRunId, false) : null
+    if (answer) return saveResult(answer)
     throw new Error('threadSubmissionOutcomeUnconfirmed')
   }
   try { return await saveResult(await deliver(id)) }

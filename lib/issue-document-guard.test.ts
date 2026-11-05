@@ -13,11 +13,6 @@ const tx = {
   update: () => ({ set: () => ({ where: async () => { state.writes.push('issues.content') } }) }),
 }
 mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db: { transaction: (fn: (t: typeof tx) => unknown) => fn(tx) }, pool: {} } })
-mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: {} } })
-mock.module(new URL('./live/panels.ts', import.meta.url).href, { namedExports: {
-  documentLiveWorkspace: async (_database: unknown, _workspaceDatabase: unknown, id: string, viewerId: string) => { assert.equal(id, ISSUE); assert.equal(viewerId, 'owner'); return null },
-  documentChanged: async (executor: unknown, id: string) => { assert.equal(executor, tx); assert.equal(id, ISSUE) },
-} })
 const access = async () => ({ issue: { id: ISSUE, userId: 'owner', scopeVersion: 1 }, user: { id: 'owner', name: 'Owner', email: 'o@example.invalid' } })
 mock.module(new URL('./issue-access.ts', import.meta.url).href, { namedExports: { requireIssueAccess: access, requireIssueAccessWithoutBody: access } })
 mock.module(new URL('./issue-scope-authorization.ts', import.meta.url).href, { namedExports: { requireLockedIssueScope: () => {} } })

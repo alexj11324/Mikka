@@ -36,7 +36,7 @@ const EMPTY_DOCUMENT: JSONContent = { type: "doc", content: [{ type: "paragraph"
 const EMPTY_THREADS: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").ThreadIndex = {}
 
 export { createEditorExtensions, createDocumentSeed } from './issue-editor-schema'
-export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, authorId: authorUserId, syncLabel: syncLabelProp, replacement, onReplacementApplied, compact = false, layout = 'document', activity, threadEvents, afterDescription, label: labelProp, disabled = false }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; authorId?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; threadEvents?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean }) {
+export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, authorId: authorUserId, syncLabel: syncLabelProp, replacement, onReplacementApplied, compact = false, layout = 'document', activity, afterDescription, label: labelProp, disabled = false }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; authorId?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean }) {
   const t = useTranslations('Editor')
   const tCommon = useTranslations('Common')
   const author = authorProp ?? t('draftAuthor')
@@ -174,7 +174,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
       </div>}</>}
     </section>
     {layout === 'issue' && !compact && afterDescription}
-    {layout === 'issue' && !compact && <IssueActivity author={author} threads={threadList} anchors={anchors} events={activity} runs={threadEvents} onComment={body => {
+    {layout === 'issue' && !compact && <IssueActivity author={author} threads={threadList} anchors={anchors} events={activity} onComment={body => {
       const now = new Date().toISOString()
       addThread(threadDoc, { id: `discussion-${crypto.randomUUID()}`, author, authorUserId, createdAt: now, messages: [{ author, authorUserId, body, at: now }] }, 'issue-discussion')
     }} onReply={(id, body) => { replyToThread(threadDoc, id, { author, authorUserId, body, at: new Date().toISOString() }) }} onResolve={(id, resolved) => { setThreadResolved(threadDoc, id, resolved) }} onSelect={id => {

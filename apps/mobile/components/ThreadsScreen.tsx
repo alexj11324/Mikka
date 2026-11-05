@@ -2,7 +2,7 @@ import { type ComponentType, useMemo, useState } from 'react'
 import { FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Check, CircleCheck, Hand, List, LoaderCircle, Plus, SlidersHorizontal } from 'lucide-react-native'
+import { Check, List, Plus, SlidersHorizontal } from 'lucide-react-native'
 import { MachineIcon, Spinner, StatusIcon } from '@/components/icons'
 import { GROUP_ICON } from '@/lib/thread-icon'
 import { Text } from '@/components/Text'
@@ -17,11 +17,13 @@ import { HARNESS } from '@/lib/harness'
 
 // 待审阅 and 已归档 (Figma 03b) wait for the server to track reviews and archiving.
 type Filter = 'all' | 'waiting' | 'running' | 'resolved'
-const filters: { id: Filter; label: string; icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>; symbol: 'list.bullet' | 'hand.raised' | 'arrow.triangle.2.circlepath' | 'checkmark.circle' }[] = [
+/** A thread group's menu icon: the same bubble and dot its rows show (R-52), never a task's circle. */
+const groupIcon = (group: ThreadGroup) => function GroupIcon({ size = 18 }: { size?: number }) { return <StatusIcon status={GROUP_ICON[group]} size={size} /> }
+const filters: { id: Filter; label: string; icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>; symbol: 'list.bullet' | 'bubble.left' }[] = [
   { id: 'all', label: '全部', icon: List, symbol: 'list.bullet' },
-  { id: 'waiting', label: '等待你', icon: Hand, symbol: 'hand.raised' },
-  { id: 'running', label: '进行中', icon: LoaderCircle, symbol: 'arrow.triangle.2.circlepath' },
-  { id: 'resolved', label: '已解决', icon: CircleCheck, symbol: 'checkmark.circle' },
+  { id: 'waiting', label: '等待你', icon: groupIcon('waiting'), symbol: 'bubble.left' },
+  { id: 'running', label: '进行中', icon: groupIcon('running'), symbol: 'bubble.left' },
+  { id: 'resolved', label: '已解决', icon: groupIcon('resolved'), symbol: 'bubble.left' },
 ]
 
 /** The server's group (R-52); an older server sends none, so its status stands in, never as resolved. */

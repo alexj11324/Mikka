@@ -1,4 +1,3 @@
-import { runChanged } from '../live/panels'
 // What a cloud thread worker printed, visible while it runs and kept after.
 //
 // The worker starts as an E2B background command. Its output is streamed to
@@ -9,6 +8,7 @@ import { runChanged } from '../live/panels'
 // (https://docs.e2b.dev/filesystem/read-write.md) when the machine is parked,
 // fails to provision or ends, and kept with the machine row (logTail).
 import type { Pool } from 'pg'
+import { runListChanged } from '../live/lists'
 
 type Mask = (text: string) => string
 
@@ -18,7 +18,8 @@ const LINE_MAX = 500
 const LINES_PER_INVOCATION = 500
 export const TAIL_MAX = 8000
 
-export type RuntimeRefreshPhase = 'admission' | 'provider_state' | 'connect' | 'record_sandbox' | 'post_connect_admission' |
+export type RuntimeRefreshPhase = 'admission' | 'execution_identity' | 'question_machine' | 'question_source' |
+  'provider_state' | 'connect' | 'record_sandbox' | 'post_connect_admission' |
   'runtime_configuration' | 'read_worker' | 'install_computer' | 'stage_admission' | 'stage_release' | 'switch_release' |
   'read_refreshed_worker' | 'start_desktop' | 'credential_bootstrap' | 'publish_bootstrap' | 'start_worker' | 'worker_register' |
   'verify_runtime' | 'finish' | 'rollback'
@@ -33,14 +34,15 @@ const REFRESH_ERROR_CODES = new Set(['ENOENT', 'EACCES', 'EINVAL', 'ETIMEDOUT', 
 /** Maintenance failures must be diagnosable before a worker can register. Only
  * fixed classifications and bounded numbers leave this boundary, never the
  * provider's message, stack, command, output, URL or credential-bearing cause. */
-export function logRuntimeRefreshFailure(runId: string, phase: RuntimeRefreshPhase, error: unknown, log: (line: string) => void = line => console.warn(line)) {
+export function logRuntimeRefreshFailure(runId: string, phase: RuntimeRefreshPhase, error: unknown,
+  log: (line: string) => void = line => console.warn(line), operation: 'refresh' | 'start' = 'refresh') {
   try {
     const value = error && typeof error === 'object' ? error as { name?: unknown; code?: unknown; exitCode?: unknown; status?: unknown; statusCode?: unknown } : {}
     const name = value.name, code = value.code
     const errorClass = typeof name === 'string' && REFRESH_ERROR_CLASSES.has(name) ? name : 'unknown'
     const errorCode = typeof code === 'string' && REFRESH_ERROR_CODES.has(code) ? code : 'unknown'
     const status = value.status ?? value.statusCode, exitCode = value.exitCode
-    log(JSON.stringify({ event: 'thread_runtime_refresh_failed', runId, phase, errorClass, errorCode,
+    log(JSON.stringify({ event: operation === 'start' ? 'thread_runtime_start_failed' : 'thread_runtime_refresh_failed', runId, phase, errorClass, errorCode,
       ...(typeof status === 'number' && Number.isInteger(status) && status >= 100 && status <= 599 ? { status } : {}),
       ...(typeof exitCode === 'number' && Number.isInteger(exitCode) && exitCode >= 0 && exitCode <= 255 ? { exitCode } : {}),
     }))
@@ -105,6 +107,6 @@ export async function saveWorkerTail(query: Pick<Pool, 'query'>, runId: string, 
   await query.query('UPDATE thread_machines SET "logTail"=$2 WHERE "runId"=$1', [runId, masked])
   if (asError) {
     const updated = await query.query('UPDATE agent_runs SET error=$2 WHERE id=$1 AND error IS NULL RETURNING id', [runId, `${asError}\n${masked}`.slice(-TAIL_MAX)])
-    if (updated.rowCount) await runChanged(query, runId)
+    if (updated.rowCount) await runListChanged(query, runId)
   }
 }

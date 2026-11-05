@@ -8,9 +8,7 @@ import { yXmlFragmentToProsemirrorJSON } from '@tiptap/y-tiptap'
 import type { JSONContent } from '@tiptap/core'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
-import { db, pool } from '@/lib/db'
-import { workspacePool } from '@/lib/workspace-db'
-import { documentChanged, documentLiveWorkspace } from '@/lib/live/panels'
+import { db } from '@/lib/db'
 import { issues, issueDocuments, issueMembers, issueVersions, linearIssueLinks, users } from '@/lib/db/schema'
 import { requireIssueAccess, requireIssueAccessWithoutBody } from '@/lib/issue-access'
 import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
@@ -19,6 +17,7 @@ import { bindCommentAuthorship, snapshotCommentAuthorship } from '@/lib/linear-s
 import { activityActor } from '@/lib/activity-actor'
 import { requireLockedIssueScope } from '@/lib/issue-scope-authorization'
 import { readableIssueContentOnServer as readableIssueContent } from '@/lib/issue-editor-schema-snapshot'
+import { issueListChanged } from '@/lib/live/lists'
 
 const encodedState = z.string().max(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/)
 const syncSchema = z.object({ id: z.uuid(), vector: encodedState.optional(), update: encodedState.optional(), seed: encodedState.optional(), known: z.string().regex(/^[0-9a-f]{32}$/).optional() })
@@ -27,16 +26,15 @@ const documentVersion = (state: string) => createHash('md5').update(state).diges
 /**
  * Sync the task body. A poll with no local edits passes the version it last
  * received (`known`); while the stored document still has that version, the
- * answer carries the version and authorized live workspace, never the body or state.
+ * answer is `{ version }` alone, read from one hash, never the body or state.
  */
-export async function exchangeDocument(input: z.infer<typeof syncSchema>): Promise<{ update?: string; version: string; workspaceId: string | null }> {
+export async function exchangeDocument(input: z.infer<typeof syncSchema>): Promise<{ update?: string; version: string }> {
   const parsed = syncSchema.parse(input)
   const { issue, user } = await requireIssueAccessWithoutBody(parsed.id)
-  const workspaceId = await documentLiveWorkspace(pool, workspacePool, issue.id, user.id)
   if (parsed.known && !parsed.update) {
     const [current] = await db.select({ version: sql<string>`md5(${issueDocuments.state})` }).from(issueDocuments)
       .where(and(eq(issueDocuments.issueId, issue.id), eq(issueDocuments.userId, issue.userId))).limit(1)
-    if (current?.version === parsed.known) return { version: current.version, workspaceId }
+    if (current?.version === parsed.known) return { version: current.version }
   }
   const result = await db.transaction(async tx => {
     const [locked] = await tx.select({ id: issues.id, userId: issues.userId, scopeVersion: issues.scopeVersion, content: issues.content, scope: issues.scope, linearSyncBlocked: issues.linearSyncBlocked }).from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
@@ -61,14 +59,14 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>): Promi
       if (changed) {
         await tx.insert(issueDocuments).values({ issueId: issue.id, userId: issue.userId, state }).onConflictDoUpdate({ target: issueDocuments.issueId, set: { state, updatedAt: new Date() } })
         await tx.update(issues).set({ content, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId)))
-        await documentChanged(tx, issue.id)
+        await issueListChanged(tx, issue.id)
       }
       const [link] = locked.scope === 'workspace' && !locked.linearSyncBlocked ? await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(and(eq(linearIssueLinks.issueId, locked.id), eq(linearIssueLinks.ownerId, issue.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1) : []
       return { changed, syncEligible: Boolean(link), version: documentVersion(state), update: Buffer.from(Y.encodeStateAsUpdate(doc, parsed.vector ? Buffer.from(parsed.vector, 'base64') : undefined)).toString('base64') }
     } finally { doc.destroy() }
   })
   if (result.changed && result.syncEligible) dispatchLinearIssueSync(issue.id)
-  return { update: result.update, version: result.version, workspaceId }
+  return { update: result.update, version: result.version }
 }
 export async function listMembers(id: string) {
   const { issue, user } = await requireIssueAccess(id)
@@ -110,6 +108,7 @@ export async function removeMember(id: string, memberId: string): Promise<Action
       if (metadata.assignee?.kind === 'member' && metadata.assignee.id === parsed.data) {
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, assignee: null }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, user.id))).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: user.id, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(user.id) })
+        await issueListChanged(tx, id)
         if (saved.scope !== 'workspace' || saved.linearSyncBlocked) return false
         const [link] = await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(and(eq(linearIssueLinks.issueId, saved.id), eq(linearIssueLinks.ownerId, saved.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1)
         return Boolean(link)

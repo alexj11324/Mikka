@@ -31,8 +31,10 @@ new rule it needs. A new rule needs Alex's decision and a file in `decisions/`.
 
 ## Components
 
-What it is built from (`components.md`). Name any new component and why
-nothing existing fits.
+What it is built from, one line per part: the existing component
+(`components.md`, the live screen for the same job, or `components/reui/`,
+`components/ui/`, `components/motion/`, the OpenUI catalog) it reuses, as its
+code renders it (R-90). Name any new component and why nothing existing fits.
 
 ## Copy
 

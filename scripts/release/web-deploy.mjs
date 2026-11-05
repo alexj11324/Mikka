@@ -8,6 +8,7 @@
 // comes from the Vercel project; nothing here is uploaded as configuration.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { shouldSkip } from '../vercel-ignore-build.mjs'
 
 /** Must be non-empty in the final build environment: inlined client keys, the migration targets, the worker build. */
@@ -16,6 +17,7 @@ export const REQUIRED = ['MIKKA_DATABASE_URL', 'DATABASE_URL', 'NEXT_PUBLIC_POST
 
 const LINE = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/
 const SHA = /^[a-f0-9]{40}$/
+export const PRODUCTION_VERSION_URL = 'https://app.aspectlylabs.com/mikka/api/version'
 
 function parse(text) {
   const entries = new Map()
@@ -60,6 +62,43 @@ export async function productionSha({ token, fetchImpl = fetch }) {
   return SHA.test(sha ?? '') ? sha : ''
 }
 
+/** Verify the public application while this job still owns the deployment
+ * queue. Deployment metadata alone does not prove what the public route serves. */
+export async function verifyProductionBuild({ expectedBuild, fetchImpl = fetch, maxWaitMs = 120_000,
+  intervalMs = 2_000, now = () => performance.now(), wait = sleep }) {
+  if (!SHA.test(expectedBuild ?? '')) throw Error('webDeploy:commitShaRequired')
+  if (!Number.isFinite(maxWaitMs) || maxWaitMs <= 0 || !Number.isFinite(intervalMs) || intervalMs <= 0) {
+    throw Error('webDeploy:invalidVerificationWait')
+  }
+  const started = now()
+  let status = 'unavailable', build = 'unavailable', attempts = 0
+  while (now() - started < maxWaitMs) {
+    attempts++
+    try {
+      const remaining = maxWaitMs - (now() - started)
+      if (remaining <= 0) break
+      const response = await fetchImpl(PRODUCTION_VERSION_URL, {
+        cache: 'no-store', headers: { 'cache-control': 'no-cache' },
+        signal: AbortSignal.timeout(Math.max(1, Math.min(10_000, Math.ceil(remaining)))),
+      })
+      status = String(response.status)
+      build = 'unavailable'
+      if (response.ok) {
+        const value = await response.json()
+        build = SHA.test(value?.build ?? '') ? value.build : 'invalid'
+        if (build === expectedBuild && now() - started < maxWaitMs) return { url: PRODUCTION_VERSION_URL, build, status: response.status,
+          verifiedAt: new Date().toISOString(), attempts }
+      } else await response.body?.cancel()
+    } catch {
+      // Public error bodies and transport messages are not deployment evidence.
+      status = 'unavailable'; build = 'unavailable'
+    }
+    const remaining = maxWaitMs - (now() - started)
+    if (remaining > 0) await wait(Math.min(intervalMs, remaining))
+  }
+  throw Error(`webDeploy:productionVersionUnverified:expected=${expectedBuild}:status=${status}:build=${build}:attempts=${attempts}`)
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [command, file] = process.argv.slice(2)
   if (command === 'env') {
@@ -71,5 +110,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const { skip, reason } = shouldSkip({ VERCEL_ENV: 'production', VERCEL_GIT_PREVIOUS_SHA: previous, VERCEL_GIT_COMMIT_SHA: process.env.GITHUB_SHA })
     console.log(`${skip ? 'Skipping' : 'Building'}: ${reason}`)
     if (process.env.GITHUB_OUTPUT) writeFileSync(process.env.GITHUB_OUTPUT, `skip=${skip}\n`, { flag: 'a' })
-  } else throw Error('usage: web-deploy.mjs env <file> | skip')
+  } else if (command === 'verify') {
+    const result = await verifyProductionBuild({ expectedBuild: process.env.GITHUB_SHA })
+    console.log(JSON.stringify({ event: 'production_version_verified', ...result }))
+    if (process.env.GITHUB_STEP_SUMMARY) writeFileSync(process.env.GITHUB_STEP_SUMMARY,
+      `\n### Public production version verified\n${result.url}\n\nBuild: \`${result.build}\`\n\nUTC: ${result.verifiedAt}\n`, { flag: 'a' })
+  } else throw Error('usage: web-deploy.mjs env <file> | skip | verify')
 }

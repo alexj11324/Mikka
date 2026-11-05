@@ -57,20 +57,24 @@ export type QuestionExecutionContinuation = {
 /** Only immutable host receipts establish execution continuity. This proves
  * attribution, not successful native resume or command execution: a queued
  * child has no actual SID yet. Evidence consumers must additionally validate
- * actual sessions, observation times and the fixed candidate independently. */
+ * actual sessions, observation times and the fixed candidate independently.
+ * Normal cloud resumes leave continuesRunId empty; only their validated
+ * question_resume receipt may bind the direct question origin instead. */
 export async function questionExecutionContinuation(tx: Query, scope: Scope, continuationAttemptId: string): Promise<QuestionExecutionContinuation | null> {
   const { rows } = await tx.query(`SELECT to_jsonb(q) AS question, ${ownerEvent} AS "ownerEventMatches",
     e."eventId",e.request,e.result,pa.id AS "childAttemptId",sa.id AS "sourceAttemptId",oa.id AS "questionOriginAttemptId",
     p.id AS "childRunId",s.id AS "sourceRunId",p."botId" AS "childBotId",s."botId" AS "sourceBotId",o."botId" AS "originBotId",p."questionContinuation" AS "childContinuation",s."questionContinuation" AS "sourceContinuation"
     FROM factory_tasks t JOIN factory_attempts pa ON pa."taskId"=t.id AND pa.id=$6 AND pa.stage='execute'
     JOIN agent_runs p ON p.id=pa."runId" AND p."userId"=t."userId" AND p."issueId"=t."issueId"
-    JOIN agent_runs s ON s.id=p."continuesRunId" AND s."userId"=t."userId" AND s."issueId"=t."issueId"
-    JOIN factory_attempts sa ON sa."taskId"=t.id AND sa."runId"=s.id AND sa.stage='execute' AND sa.position+1=pa.position
     JOIN factory_questions q ON q.id::text=p."questionContinuation"->>'questionId'
       AND q."taskId"=t.id AND q."userId"=t."userId" AND q."issueId"=t."issueId" AND q.stage='execute'
+    JOIN factory_events e ON e."taskId"=t.id AND e.request->>'kind' IN ('question_resume','question_recover') AND e.result->>'continuationRunId'=p.id::text
+    JOIN agent_runs s ON s.id=CASE
+      WHEN e.request->>'kind'='question_resume' AND p."continuesRunId" IS NULL THEN q."originRunId"
+      ELSE p."continuesRunId" END AND s."userId"=t."userId" AND s."issueId"=t."issueId"
+    JOIN factory_attempts sa ON sa."taskId"=t.id AND sa."runId"=s.id AND sa.stage='execute' AND sa.position+1=pa.position
     JOIN agent_runs o ON o.id=q."originRunId" AND o."userId"=t."userId" AND o."issueId"=t."issueId"
     JOIN factory_attempts oa ON oa.id=q."attemptId" AND oa."taskId"=t.id AND oa."runId"=o.id AND oa.stage='execute' AND oa.position<=sa.position
-    JOIN factory_events e ON e."taskId"=t.id AND e.request->>'kind' IN ('question_resume','question_recover') AND e.result->>'continuationRunId'=p.id::text
     LEFT JOIN computer_run_bindings pc ON pc."runId"=p.id LEFT JOIN computer_run_bindings sc ON sc."runId"=s.id
     JOIN devices d ON d.id=p."deviceId" AND d."ownerId"=t."userId"
     LEFT JOIN byos_bindings b ON b.id::text=p."agentDefinition"->'subscription'->>'bindingId'

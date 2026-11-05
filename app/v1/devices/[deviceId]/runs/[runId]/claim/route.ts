@@ -1,6 +1,7 @@
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { withDeviceRoute } from '@/lib/device-route'
+import { runListChanged } from '@/lib/live/lists'
 import { after, NextResponse } from 'next/server'
 import { and, eq, isNull } from 'drizzle-orm'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
@@ -17,7 +18,6 @@ import { readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
 import { assertUnmanagedModelTransport, assertSubscriptionModelTransport } from '@/lib/model-admission/runtime'
 import { ModelAdmissionError } from '@/lib/model-admission/contract'
 import { db, pool } from '@/lib/db'
-import { runChanged } from '@/lib/live/panels'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
 import { authenticateDevice, ownedDeviceWithReport } from '@/lib/device-link'
 import { withBasePath } from '@/lib/base-path'
@@ -79,10 +79,10 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if ((agent && agent.userId !== caller.userId) || (repo && (repo.userId !== caller.userId || repo.deviceId !== deviceId)))
     return NextResponse.json({ error: 'Run ownership unavailable.' }, { status: 409 })
   if (!agent || !repo || !run.issueId) {
-    const changed = await db.update(agentRuns)
+    const failed = await db.update(agentRuns)
       .set({ status: 'failed', stopReason: 'error', error: 'Run is missing its agent, repository or issue.', finishedAt: new Date(), updatedAt: new Date() })
       .where(eq(agentRuns.id, runId)).returning({ id: agentRuns.id })
-    if (changed.length) await runChanged(db, runId)
+    if (failed.length) await runListChanged(db, runId)
     await afterRunEnded(caller.userId, runId)
     return NextResponse.json({ error: 'Run is missing its agent, repository or issue.' }, { status: 409 })
   }
@@ -268,9 +268,9 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     skillAssignment = await skillAssignments.recordClaim(caller.userId, deviceId, runId, leaseExpiresAt, supportsSkillArtifacts, supportsTeamSkills)
     benchmarkAssignment = await claimBenchmarkAssignment(caller.userId, deviceId, runId, leaseExpiresAt)
   } catch (error) {
-    const changed = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: 'Skill assignment provenance unavailable.', finishedAt: new Date(), updatedAt: new Date() })
+    const failed = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: 'Skill assignment provenance unavailable.', finishedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.status, 'preparing'), eq(agentRuns.leaseExpiresAt, new Date(leaseExpiresAt)))).returning({ id: agentRuns.id })
-    if (changed.length) await runChanged(db, runId)
+    if (failed.length) await runListChanged(db, runId)
     await afterRunEnded(caller.userId, runId)
     if (!(error instanceof ImprovementError)) throw error
     return NextResponse.json({ error: error.code }, { status: 409 })

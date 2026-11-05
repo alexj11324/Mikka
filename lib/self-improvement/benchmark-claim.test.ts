@@ -30,6 +30,9 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     // the actual route/fence and token revocation have real PostgreSQL tests.
     '@/lib/issue-access':{issueForUser:async(userId:string,id:string)=>{assert.equal(userId,'owner');assert.equal(id,'issue');return issueDenied?null:{id,userId,scope:'personal',content:{type:'doc'}}}},
     '@/lib/device-route':{withDeviceRoute:<T>(handler:T)=>handler},
+    '@/lib/live/lists':{runListChanged:async(executor:unknown,runId:string)=>{
+      assert.equal(executor,db);assert.equal(runId,run.id);assert.equal(run.status,'failed');calls.push('listChanged')
+    }},
     '@/lib/cloud-computer-flag':{cloudComputerTasksEnabled:()=>true},
     'next/server':{after:()=>{calls.push('wakeScheduled')},NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
     'drizzle-orm':{and:(...args:unknown[])=>args,eq:(...args:unknown[])=>args,isNull:(value:unknown)=>value},
@@ -43,7 +46,6 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/device-agents':{localExecutionHarnesses:()=>['codex']},
     '@/lib/device-repositories':{readRepositorySettings:async()=>({verifyCommand:repo.verifyCommand})},
     '@/lib/run-test-fixture':{runTestFixture:()=>undefined},
-    '@/lib/live/panels':{runChanged:async(_executor:unknown,id:string)=>{assert.equal(id,'run');assert.equal(run.status,'failed')}},
     '@/lib/agent-tool-approval/policy-store':{readCliRunPolicy:async()=>({policy:defaultRunPolicy(),revision:'synthetic-current-policy',workspaceIds})},
     '@/lib/model-admission/contract':{ModelAdmissionError},
     '@/lib/model-admission/runtime':{assertUnmanagedModelTransport:async(scope:{workspaceId:string;ownerId:string},model:string)=>{
@@ -125,7 +127,7 @@ test('actual claim route withholds all assignment bytes when frozen configuratio
   const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,409)
   assert.deepEqual(await response.json(),{error:'runUnavailable'})
-  assert.deepEqual(calls,['preflight','guard','claim','token','receipt','benchmark','block','runEnded'])
+  assert.deepEqual(calls,['preflight','guard','claim','token','receipt','benchmark','block','listChanged','runEnded'])
   assert.equal(run.status,'failed')
 })
 

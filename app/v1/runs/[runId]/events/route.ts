@@ -1,4 +1,3 @@
-import { runChanged } from '@/lib/live/panels'
 import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { and, eq, sql } from 'drizzle-orm'
@@ -9,6 +8,7 @@ import { authenticateDevice } from '@/lib/device-link'
 import { computerEventsMatch } from '@/lib/computer/events'
 import { secretMaskerFor } from '@/lib/secrets/runtime'
 import { persistRunEventBatch } from '@/lib/secrets/run-events'
+import { runListChanged } from '@/lib/live/lists'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,7 +48,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
   const started = await db.update(agentRuns)
     .set({ status: 'running', updatedAt: new Date() })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'preparing'))).returning({ id: agentRuns.id })
-  if (started.length) await runChanged(db, runId)
+  if (started.length) await runListChanged(db, runId)
   const [tail] = await db
     .select({ seq: sql<number | null>`max(${runChunks.seq})` })
     .from(runChunks)

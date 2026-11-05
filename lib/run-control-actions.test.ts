@@ -137,19 +137,6 @@ before(async () => {
       && (!taskOwner || current.run.userId === viewerId)).map(id => ({ runId: id, status: current.questions.get(id) })) }
   } } } })
   mock.module('@/lib/workspace-db', { namedExports: { workspaceDb: { select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }) } } })
-  // Scope SQL and post-COMMIT delivery have real-PG coverage in live/panels.db.test.ts.
-  // This action fixture retains the original ownership/chain checks before resolving keys.
-  mock.module('@/lib/live/panels', { namedExports: {
-    runChanged: async () => {},
-    threadLiveReferences: async (_database: unknown, _workspace: unknown, ids: string[], ownerId: string) => {
-      assert.equal(ownerId, 'owner')
-      assert.ok(ids.every(id => [current.run.id, current.continuation?.id].includes(id)))
-      return ids.map(id => ({ id, workspaceId: null }))
-    },
-    documentLiveWorkspace: async (_database: unknown, _workspace: unknown, id: string, ownerId: string) => {
-      assert.equal(id, issueId); assert.equal(ownerId, 'owner'); return null
-    },
-  } })
   mock.module('@/lib/issue-access', { namedExports: {
     requireIssueAccess: async (id: string) => {
       if (!viewer) throw new ActionFailureError('authRequired')

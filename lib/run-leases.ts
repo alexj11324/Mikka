@@ -1,5 +1,5 @@
-import { runChanged } from './live/panels'
 import 'server-only'
+import { runListChanged } from './live/lists'
 import { rebindExecutionDevice, revalidateExecutionIdentity, ExecutionIdentityError } from './execution-identity'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
@@ -69,7 +69,7 @@ export async function renewRunLeases(deviceId: string, runIds: readonly string[]
       if (!(error instanceof ExecutionIdentityError)) throw error
       // The daemon receives revoked on this heartbeat and removes injected credentials.
       const stopped = await db.update(agentRuns).set({ stopRequestedAt: now, leaseExpiresAt: now, updatedAt: now }).where(and(eq(agentRuns.id, run.id), eq(agentRuns.deviceId, deviceId), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]))).returning({ id: agentRuns.id })
-      if (stopped.length && !run.stopRequestedAt) await runChanged(db, run.id)
+      if (stopped.length && !run.stopRequestedAt) await runListChanged(db, run.id)
     }
   }
   const renewed = authorized.length ? await db.update(agentRuns)
@@ -118,8 +118,9 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
       continue
     }
     if (target) {
-      await db.update(agentRuns).set({ deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, agentDefinition: await rebindExecutionDevice(pool, run, target.deviceId), updatedAt: now })
-        .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
+      const moved = await db.update(agentRuns).set({ deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, agentDefinition: await rebindExecutionDevice(pool, run, target.deviceId), updatedAt: now })
+        .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt))).returning({ id: agentRuns.id })
+      if (moved.length) await runListChanged(db, run.id)
       notifyDeviceWork(target.deviceId)
       continue
     }
@@ -256,7 +257,7 @@ async function reclaimLostRun(run: Run, now: Date) {
       .where(and(eq(agentRuns.id, run.id), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), lt(agentRuns.leaseExpiresAt, now), isNull(agentRuns.stopRequestedAt)))
       .returning({ id: agentRuns.id })
     if (!ended) return false
-    await runChanged(tx, run.id)
+    await runListChanged(tx, run.id)
     if (cloud) return true
     await tx.insert(agentRuns).values({
       id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
@@ -264,6 +265,7 @@ async function reclaimLostRun(run: Run, now: Date) {
       deviceId: target?.deviceId ?? run.deviceId, deviceRepoId: target?.deviceRepoId ?? run.deviceRepoId, status: 'queued', kind: run.kind, baseBranch: run.baseBranch,
       prompt: recovery.prompt, attempt: outcome.attempt, retryOf: run.id,
     })
+    await runListChanged(tx, retryId)
     if (bound) {
       // Same thread, new sandbox: the retry gets its own thread machine, built from the workspace snapshot.
       await tx.execute(sql`insert into computer_run_bindings ("runId","botId","workspaceId","ownerId") select ${retryId},"botId","workspaceId","ownerId" from computer_run_bindings where "runId"=${run.id} and "ownerId"=${run.userId}`)
@@ -361,6 +363,11 @@ export async function startThreadMachine(actor: { userId: string; workspaceId: s
   } catch (error) {
     const { RetainedTaskMachineUnavailable } = await import('@/lib/cloud-computer/thread-machines')
     if (error instanceof RetainedTaskMachineUnavailable) return { state: 'unavailable' as const, reason: 'retained_runtime' as const }
+    // A concurrent durable handoff owns this run's provisioning lease. Its
+    // first VM is not a failed attempt, and only that lease may finish/clean it.
+    const { ComputerError } = await import('@/lib/computer/store')
+    if (error instanceof ComputerError && error.status === 409 && error.message === 'Thread provisioning in progress')
+      return { state: 'unavailable' as const, reason: 'provisioning' as const }
     // A question continuation cannot replace its original native session VM.
     // Keep the committed answer/run and placement for the same answer's retry.
     const [continuation] = await db.select({ question: agentRuns.questionContinuation }).from(agentRuns)
@@ -376,14 +383,63 @@ export async function startThreadMachine(actor: { userId: string; workspaceId: s
             AND old."deviceId"=m."deviceId" AND old."repoId"=m."repoId" AND old.state='ended' AND old."sandboxId" IS NULL
             AND previous.status IN ('succeeded','failed','stopped','cancelled'))`, [runId,actor.userId,actor.workspaceId])
     if (retained.rowCount) return { state: 'unavailable' as const, reason: 'retained_runtime' as const }
-    await (await import('@/lib/cloud-computer/thread-machines')).threadMachineAction(pool, actor, runId, 'end').catch(() => undefined)
-    const [run] = await db.update(agentRuns).set({ status: 'failed', stopReason: 'device_lost', error: DEVICE_STAYED_OFFLINE, updatedAt: new Date() })
-      .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, actor.userId), inArray(agentRuns.status, ['queued', 'stopped']))).returning()
-    if (run) {
-      await recordCoordinatorEvent(db, { ...runFinishedEvent({ ...run, stopReason: 'device_lost', report: null }), payload: { status: 'failed', stopReason: 'device_lost', runKind: run.kind, summary: null, noMachine: await noMachineCard() } })
-      await wakeCoordinator(actor.userId).catch(() => undefined)
-    }
+    await failUnclaimedCloudStart(actor, runId, error)
   }
+}
+
+/** A startup error is an infrastructure failure, never an Owner stop. Commit
+ * that distinction before machine cleanup invokes the Factory end hook. */
+export async function failUnclaimedCloudStart(actor: { userId: string; workspaceId: string }, runId: string, error: unknown): Promise<boolean> {
+  const { RetainedTaskMachineUnavailable, threadMachineAction, threadMachineStartFailure } = await import('@/lib/cloud-computer/thread-machines')
+  const { ComputerError } = await import('@/lib/computer/store')
+  if (error instanceof RetainedTaskMachineUnavailable ||
+    (error instanceof ComputerError && error.status === 409 && error.message === 'Thread provisioning in progress')) return false
+  const provisionFailure = threadMachineStartFailure(error)
+  if (provisionFailure && (provisionFailure.userId !== actor.userId || provisionFailure.workspaceId !== actor.workspaceId || provisionFailure.runId !== runId)) return false
+  const noMachine = await noMachineCard()
+  const failed = await db.transaction(async tx => {
+    const [run] = await tx.select().from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, actor.userId),
+      sql`EXISTS(SELECT 1 FROM computer_run_bindings b WHERE b."runId"=${agentRuns.id} AND b."ownerId"=${actor.userId} AND b."workspaceId"=${actor.workspaceId})`)).for('update')
+    // A worker claim or an explicit stop owns its outcome. A failed lifecycle
+    // enqueue must not turn either one into a new failure or clean its VM.
+    const now = new Date()
+    if (!run || run.status !== 'queued' || run.startedAt || run.sessionId || run.stopRequestedAt ||
+      (run.leaseExpiresAt && run.leaseExpiresAt > now) || run.questionContinuation?.requireSessionResume) return null
+    const { rows: [machine] } = await tx.execute(sql`SELECT "ownerId","workspaceId","workerLeaseId","workerLeaseUntil" FROM thread_machines WHERE "runId"=${runId} FOR UPDATE`)
+    // An error from our own committed provision may settle that lease, but a
+    // newer lease or a completed provision wins even after its lease cleared.
+    // Keep the old lease until end() records unknown-create cleanup custody.
+    if (provisionFailure && machine?.workerLeaseId !== provisionFailure.leaseId) return null
+    if (machine && (machine.ownerId !== actor.userId || machine.workspaceId !== actor.workspaceId ||
+      (!provisionFailure && machine.workerLeaseUntil && new Date(String(machine.workerLeaseUntil)) > now))) return null
+    // The same retention fence also covers the synchronous Coordinator path
+    // and a lifecycle enqueue failure after an old task VM was adopted.
+    const retained = await tx.execute(sql`SELECT 1 FROM thread_machines m
+      WHERE m."runId"=${runId} AND m."ownerId"=${actor.userId} AND m."workspaceId"=${actor.workspaceId}
+        AND m."issueId"=${run.issueId} AND m.state<>'ended' AND m."sandboxId" IS NOT NULL
+        AND EXISTS(SELECT 1 FROM thread_machines old JOIN agent_runs previous ON previous.id=old."runId" AND previous."userId"=old."ownerId"
+          WHERE old."runId"<>m."runId" AND old."ownerId"=m."ownerId" AND old."workspaceId"=m."workspaceId" AND old."issueId"=m."issueId"
+            AND old."deviceId"=m."deviceId" AND old."repoId"=m."repoId" AND old.state='ended' AND old."sandboxId" IS NULL
+            AND previous.status IN ('succeeded','failed','stopped','cancelled'))`)
+    if (retained.rowCount) return null
+    const [ended] = await tx.update(agentRuns).set({ status: 'failed', pauseReason: null, resumeStatus: null,
+      stopReason: 'device_lost', error: run.error ?? DEVICE_STAYED_OFFLINE, finishedAt: now, updatedAt: now })
+      .where(eq(agentRuns.id, runId)).returning()
+    const event = runFinishedEvent({ ...ended, stopReason: 'device_lost', report: null })
+    await recordCoordinatorEvent(tx, { ...event, payload: { ...event.payload, noMachine } })
+    // The terminal row changed even when its durable completion event already exists.
+    await runListChanged(tx, ended.id)
+    return ended
+  })
+  if (!failed) return false
+  // end() cannot overwrite this already-terminal failure. It still fences
+  // provisioning and revokes/cleans only the machine that this run owns.
+  await threadMachineAction(pool, actor, runId, 'end').catch(() => undefined)
+  // Admission may have failed before any machine row existed, so do not rely
+  // on cleanup to reconcile the committed failure. This hook is idempotent.
+  await afterRunEnded(actor.userId, runId)
+  await wakeCoordinator(actor.userId).catch(() => undefined)
+  return true
 }
 
 /** The card of what the person can do when no machine can continue a run. */

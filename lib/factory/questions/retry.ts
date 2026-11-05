@@ -1,5 +1,5 @@
-import { runChanged } from '../../live/panels';
 import type { Pool } from "pg";
+import { runListChanged } from "../../live/lists";
 
 /** Historical generic retries must not discard an ancestor's strict session fence. */
 export async function blockQuestionRetry(
@@ -27,9 +27,9 @@ export async function blockQuestionRetry(
          "finishedAt"=now(),"updatedAt"=now()
        WHERE id=$3 AND "userId"=$1 AND "issueId"=$2 AND status='queued' AND (SELECT blocked FROM unsafe)
        RETURNING id
-     ) SELECT blocked,EXISTS(SELECT 1 FROM ended) AS changed FROM unsafe`,
+     ) SELECT blocked, (SELECT id FROM ended) AS "changedRunId" FROM unsafe`,
     [userId, issueId, runId],
   );
-  if (result.changed) await runChanged(db, runId);
+  if (result.changedRunId) await runListChanged(db, result.changedRunId);
   return result.blocked;
 }

@@ -2,11 +2,11 @@ import 'server-only'
 import { createHash } from 'node:crypto'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
+import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/lists'
 import { issues, issueVersions, linearIssueLinks, linearIssuePublications, linearSyncOutbox } from '@/lib/db/schema'
 import { activityActor } from '@/lib/activity-actor'
 import { issueView } from '@/lib/task-identifier-server'
 import type { TaskScope } from '@/lib/task-identifier'
-import { documentScopesBeforeChange, documentScopeChanged } from '@/lib/live/panels'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -68,11 +68,11 @@ async function changeScopeTransaction(userId: string, input: { id: string; revis
     // above prove no recorded or uncertain external publication. A preview
     // digest, when supplied, still has to match the current state.
     if (options.allowLinkedPersonal) await tx.execute(sql`select set_config('mikka.personal_scope_request', ${latest.id}, true)`)
-    const previousScopes = latest.scope !== input.scope ? await documentScopesBeforeChange(latest) : null
+    const previousLists = await issueListScopesBeforeChange(latest)
     const [saved] = await tx.update(issues).set({ scope: input.scope, scopeSetBy: 'user', scopeConfidence: null, revision: latest.revision + 1, updatedAt: new Date() })
       .where(and(eq(issues.id, latest.id), eq(issues.userId, userId), eq(issues.revision, input.revision))).returning()
     await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(userId) })
-    if (previousScopes) await documentScopeChanged(tx, saved.id, previousScopes)
+    await issueListScopeChanged(tx, saved.id, previousLists)
     return { issue: await issueView(saved, tx) }
   })
 }

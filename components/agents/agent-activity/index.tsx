@@ -13,7 +13,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ThinkingShimmer } from "@/components/agents/loading-states/thinking-shimmer";
+import { ThinkingLoader } from "@/components/ui/thinking-loader-clean";
 import { AgentDisclosure } from "@/components/agents/agent-disclosure";
 import {
   EASE_OUT,
@@ -82,11 +82,11 @@ function getContentType(items: AgentActivityItem[]): AgentActivityContentType {
 }
 
 function getActiveLabel(type: AgentActivityContentType) {
-  if (type === "search") return "Searching the web…";
-  if (type === "tool") return "Running tools…";
-  if (type === "trace") return "Working through the run…";
-  if (type === "mixed") return "Working through it…";
-  return "Thinking…";
+  if (type === "search") return "Searching the web";
+  if (type === "tool") return "Running tools";
+  if (type === "trace") return "Working through the run";
+  if (type === "mixed") return "Working through it";
+  return "Thinking";
 }
 
 function getSummary(
@@ -208,7 +208,9 @@ export function AgentActivity({
         >
           {renderWorkingStatus
             ? renderWorkingStatus({ label: liveLabel, duration })
-            : <ThinkingShimmer>{liveLabel}</ThinkingShimmer>}
+            : typeof liveLabel === "string"
+              ? <ThinkingLoader size="sm" phases={[liveLabel]} />
+              : liveLabel}
         </div>
       ) : (
         <Button variant="bare" size="bare"

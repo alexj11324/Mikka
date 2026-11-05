@@ -59,7 +59,7 @@ test('a document poll with no edits on either side reads a version, not the body
     assert.equal(legacy.value.version, first.version)
     // After: a quiet poll sends the version it holds.
     const quiet = await measured(() => actAs(owner, () => exchangeDocument({ id, seed: encode(seed), vector, known: first.version })))
-    assert.deepEqual(quiet.value, { version: first.version, workspaceId: first.workspaceId })
+    assert.deepEqual(quiet.value, { version: first.version })
     t.diagnostic(JSON.stringify({ bodyBytes: JSON.stringify(content).length, stateBytes: state.length, legacyPollDbBytes: legacy.bytes, quietPollDbBytes: quiet.bytes }))
     assert.ok(quiet.bytes * 5 < legacy.bytes, `quiet poll read ${quiet.bytes} B, legacy ${legacy.bytes} B`)
 

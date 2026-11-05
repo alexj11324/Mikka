@@ -13,6 +13,7 @@ import { runAgentName, runBotId, runBotName } from '@/lib/run-bot-name'
 import { replyLine } from '@/lib/thread-groups'
 import { queryVersion } from '@/lib/db/query-version'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
+import { ownerListRead } from '@/lib/live/list-read-server'
 
 /** The newest run on each issue, for the right column's 我的任务 groups (MIK-38). */
 export interface TaskRun {
@@ -35,21 +36,30 @@ export interface TaskRun {
 }
 
 export async function listTaskRuns(): Promise<TaskRun[]> {
+  return (await pollTaskRuns()).items
+}
+
+/** Same owner-wide reader, with server-observed scope and window expiry. */
+export async function pollTaskRuns() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
+  const observedAt = Date.now()
   // A run whose device went offline is retried (or lands in 等你) by the minute
   // run-recovery cron (sweepExpiredRunLeases), not by this poll.
   const rows = await db.selectDistinctOn([agentRuns.issueId], {
     issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: issues.title, agentId: agentRuns.agentId, agentName: runAgentName,
     status: agentRuns.status, outcome: agentRuns.outcome, error: agentRuns.error, finishedAt: agentRuns.finishedAt,
     botId: runBotId,
+    expiresAt: sql<Date | null>`(select min(r."createdAt")+interval '30 days' from agent_runs r where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt">now()-interval '30 days')`,
     harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r."agentId" where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt" > now() - interval '30 days' group by a.harness order by max(r."createdAt") desc)`,
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).innerJoin(issues, eq(issues.id, agentRuns.issueId))
     .where(and(eq(agentRuns.userId, session.user.id), isNotNull(agentRuns.issueId), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
     .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
   const botIds = [...new Set(rows.flatMap(row => row.botId ? [row.botId] : []))]
   const looks = botIds.length ? await db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }).from(bots).where(and(eq(bots.ownerId, session.user.id), inArray(bots.id, botIds))) : []
-  return rows.map(({ botId, ...row }) => ({ ...row, issueId: row.issueId!, finishedAt: row.finishedAt?.toISOString() ?? null, bot: looks.find(look => look.id === botId) ?? null }))
+  const live = await ownerListRead(session.user.id, rows.map(row => row.expiresAt), observedAt)
+  const items: TaskRun[] = rows.map(({ botId, expiresAt: _expiresAt, ...row }) => ({ ...row, issueId: row.issueId!, finishedAt: row.finishedAt?.toISOString() ?? null, bot: looks.find(look => look.id === botId) ?? null }))
+  return { items, live }
 }
 
 /** A thread: one run, newest first. Its name comes from its task, else its prompt. */
@@ -92,6 +102,7 @@ async function readThreads(known?: string) {
   return withDatabaseOperation('/actions/threads/poll', async () => {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
+    const observedAt = Date.now()
     // Only queued local work can show "waiting for device". Ask the gateway
     // on this user read, so an idle socket affects both the view and its hash.
     const queuedDevices = process.env.DEVICE_GATEWAY_URL && process.env.DEVICE_GATEWAY_PUSH_SECRET
@@ -121,7 +132,13 @@ async function readThreads(known?: string) {
       .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt)).limit(200)
     const signature = await queryVersion(snapshot)
     const version = createHash('sha256').update(JSON.stringify([session.user.id, signature])).digest('hex').slice(0, 32)
-    if (known === version) return { unchanged: true, version } as const
+    const visible = snapshot.as('thread_list_expiry')
+    const [expiry] = await db.select({ at: sql<Date | null>`min(${visible.createdAt})+interval '30 days'` }).from(visible)
+    const live = await ownerListRead(session.user.id, [expiry?.at], observedAt)
+    // Device presence has its own bounded watcher prerequisite. Until that
+    // route is ready, queued local work retains the shared slow fallback.
+    const presenceFallback = queuedDevices.length > 0
+    if (known === version) return { unchanged: true, version, live, presenceFallback } as const
     // Reading the version first makes a concurrent edit visible on the next poll.
     const rows = await snapshot
     const items: Thread[] = rows.map(({ deviceId, deviceName, deviceType, waitingForDevice, harness, ...row }) => ({
@@ -131,6 +148,6 @@ async function readThreads(known?: string) {
       ...row, harness: harness ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
       lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
     }))
-    return { version, items }
+    return { version, items, live, presenceFallback }
   })
 }

@@ -20,6 +20,7 @@ export function subscribeToCoordinatorReplies(scope: LiveScope, botId: string, c
     visible: () => true,
     watchVisibility: () => () => {},
     now: Date.now,
+    monotonicNow: () => performance.now(),
     later: (callback, milliseconds) => setTimeout(callback, milliseconds),
     cancel: timer => clearTimeout(timer as ReturnType<typeof setTimeout>),
   })

@@ -1,8 +1,12 @@
 # Components: what to use, what not to bring back
 
 Pick the component from the "Use" table. If nothing fits, use reUI, then
-shadcn (`components/ui/`), then write a new one and add it here in the same
-PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
+shadcn (`components/ui/`, including components nothing imports yet), then
+`components/motion/` or the OpenUI catalog, and only then write a new one
+and add it here in the same PR. This applies to designs in Figma as much as
+to code: a frame draws the existing component as its code renders it, never
+a look-alike (R-90). `pnpm lint:ui` blocks hand-built UI that a library
+component covers.
 
 ## Use
 
@@ -19,7 +23,7 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | Composer | `ChatComposer` in `components/coordinator/chat-composer.tsx` (`InputGroup` + `InputGroupTextarea`) | Attachment button; a bot chat passes `BotModelPicker` (`components/coordinator/bot-model-picker.tsx`) as `model` (R-11). Reuse it for every chat |
 | Personal account approvals above the composer | `PendingActions` and `ApprovedWriteActions` in `components/coordinator/` | Existing card layout; ledger-backed Notion, Slack and Calendar deletion use `/api/approved-writes`, never the legacy decider. Unknown results have no effectful retry button; a verified pending result can explicitly restore approval controls without sending a decision |
 | Messages | `components/ui/message.tsx`, `components/ui/bubble.tsx`, `MessageScroller*` | R-13, R-14 |
-| A reply's thinking and tools | `ReplyActivity` (`components/coordinator/reply-activity.tsx`) over AI Elements `Reasoning` and `Tool` (`components/ai-elements/`) | Muted lines, not cards: status icon, name, chevron; the state word shows only on failure. An opened tool is one borderless muted panel with xs code, at most 82% wide like the reply bubble, full width on a phone |
+| A reply's thinking and tools, and the wait before it | `ReplyActivity` and `ReplyWaiting` (`components/coordinator/reply-activity.tsx`) over shadcn/ui `Trace` (`components/ui/trace.tsx`) and `CodeBlock` | As the Trace docs' Reasoning and Tool rows, unchanged: running with a spinner, done with a check, failed in red; thinking opens as it streams, a tool opens to its output ([decision](decisions/2026-11-04-1659-reply-trace.md)) |
 | Actions under a message (复制) | AI Elements `MessageActions` / `MessageAction` (`components/ai-elements/message.tsx`); 复制 is `CopyAction` (`components/chat/copy-action.tsx`) | Every reply and person's message in a bot chat and an open thread; shown on hover or focus (`HOVER_ACTIONS`), always on touch and under the newest reply. A reply copies its Markdown (`lib/chat-copy.ts`). [Decision](decisions/2026-11-03-0455-chat-quote-and-copy.md) |
 | Quote words from a reply | `SelectionQuote` (`components/chat/selection-quote.tsx`) over text marked `data-quote-source`; `QuoteChip` in the composer, `QuoteLine` in the sent message (`components/artifacts/artifact-quote.tsx`) | Rides as `> ` lines at the head of the message (`lib/chat-quote.ts`), as on the phone. No side chat |
 | A code diff (a suggested change in a chat, a thread's 改动 tab) | `FileDiff` (`components/agents/file-diff.tsx`) and `ThreadChangesPane` (`components/workspace/thread-changes.tsx`), both drawn by `@pierre/diffs` | The library's own look and themes, stacked lines, full width; only light/dark follows Mikka. Our controls go in its header slots. [Decision](decisions/2026-11-04-1520-code-diffs-use-pierre-diffs.md) |
@@ -34,6 +38,7 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | Thread state icon | `components/workspace/thread-status-icon.tsx` | Shared by thread card, thread list and open-thread header; Bot avatars remain for actual Bot actors only (R-62/R-66) |
 | Factory review and verification command source | `ResultLine` in `components/workspace/factory-acceptance-pane.tsx` | A check's host-validated `commandSources` appears below its existing result: 来自提问前的执行, localized observation time, and the existing thread-opening action for that source run. No source means no extra row; provenance does not change the verdict. SID and immutable recovery receipt remain in data, not screen copy (#1237) |
 | New task | `components/coordinator/new-task-dialog.tsx` | R-22, R-23 |
+| A question an agent asks the person (one or several, choices with descriptions, 其他 free text, submit or skip) | shadcn `Questionnaire` (`components/ui/questionnaire.tsx`: `QuestionnaireItem`, `QuestionnaireTitle`, `QuestionnaireDescription`, `QuestionnaireChoices` / `QuestionnaireChoice` / `QuestionnaireChoiceDescription`, `QuestionnaireInput`, `QuestionnaireProgress`, `QuestionnaireSubmit`, `QuestionnaireSkip`) | Shown in the bot's own chat (R-86); the title is the question, the description names the agent and task asking. No hand-made quick-reply chips (R-90) |
 | Search field on a page (filter a list) | `SearchInput` in `components/ui/search-input.tsx` | Borderless grey fill, icon left (R-31). Never an outlined `Input` with a magnifier |
 | Search | reUI `CommandDialog` (⌘K), centred | Local rows first, then `GET /api/search` hits per source (`hooks/use-site-search.ts`) |
 | New group chat | `NewGroupDialog` (`components/nav/new-group-dialog.tsx`), opened by the bot list’s `+` menu | Name and select the person’s Bots in the current workspace; reuses the mobile group-creation API and opens the existing group chat. Unknown create results lead to the group list, never an automatic POST retry |
