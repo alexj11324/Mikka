@@ -3420,7 +3420,21 @@
       "more": "and more",
       "separator": " · ",
       "expandAll": "Expand all",
-      "collapseAll": "Collapse all"
+      "collapseAll": "Collapse all",
+      "detail": {
+        "handedTo": "Handed to",
+        "query": "Query",
+        "count": "Results",
+        "countValue": "{count, plural, one {# result} other {# results}}",
+        "title": "Title",
+        "status": "Status",
+        "page": "Page",
+        "to": "To",
+        "subject": "Subject",
+        "repository": "Repository",
+        "raw": "Raw data",
+        "dispatched": "Dispatched"
+      }
     }
   },
   "AgentCopy": {

@@ -3420,7 +3420,21 @@
       "more": "等",
       "separator": "，",
       "expandAll": "全部展开",
-      "collapseAll": "全部收起"
+      "collapseAll": "全部收起",
+      "detail": {
+        "handedTo": "交给",
+        "query": "查询",
+        "count": "结果",
+        "countValue": "{count, plural, other {# 条}}",
+        "title": "标题",
+        "status": "状态",
+        "page": "网页",
+        "to": "发给",
+        "subject": "主题",
+        "repository": "仓库",
+        "raw": "原始数据",
+        "dispatched": "已派发"
+      }
     }
   },
   "AgentCopy": {
