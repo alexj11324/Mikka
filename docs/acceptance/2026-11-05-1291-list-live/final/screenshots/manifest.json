@@ -1,0 +1,3223 @@
+{
+  "sha": "c68fc0bc9ddea0ee59a5c33afd3735283a7e0542",
+  "tree": "4a291d12049d0e9fc04d82ed1061cdae570229a8",
+  "environmentId": "local-de9852a9-6d65-4f45-8f29-4994fbae33f3",
+  "origin": "http://localhost:3373",
+  "startedAt": "2026-11-05T00:51:01.967Z",
+  "status": "completed",
+  "captures": [
+    {
+      "name": "en-board-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "task-board-list",
+      "at": "2026-11-05T00:51:07.434Z",
+      "sha256": "f9ea668ca61331c2d85957f398e497b31629d913875af891392396bbac73f4e6"
+    },
+    {
+      "name": "en-threads-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "all-threads",
+      "at": "2026-11-05T00:51:08.151Z",
+      "sha256": "2c48c766b970577336e391b46f39c15de2c87c8a4c1f62de2dde9b84b6f5b24c"
+    },
+    {
+      "name": "en-chats-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "bot-and-group-list",
+      "at": "2026-11-05T00:51:09.009Z",
+      "sha256": "b8f39d3d5b32b442ecf55f8782030a37b18fa001de2ca6a9c67bc6e0df67990d"
+    },
+    {
+      "name": "en-settings-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "members-settings",
+      "at": "2026-11-05T00:51:09.739Z",
+      "sha256": "08e5e833f83eb8ea52f7a926a41174893dbd233c280531a351133caa1b9641bf"
+    },
+    {
+      "name": "en-board-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "task-board-list",
+      "at": "2026-11-05T00:51:10.545Z",
+      "sha256": "cb383ab08abeaf4481bc3a53bfeaf9a79104aeffa3ab93bb9ad0256a94675612"
+    },
+    {
+      "name": "en-threads-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "all-threads",
+      "at": "2026-11-05T00:51:11.166Z",
+      "sha256": "5190bf0defed1be653dd704182d64731a4e976f1a5bdeb37d3688f88263d6f81"
+    },
+    {
+      "name": "en-chats-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "bot-and-group-list",
+      "at": "2026-11-05T00:51:12.014Z",
+      "sha256": "74b4a31d363f148804e6e0b137a25ac25faf22a56f8611ef3961f10541f6732f"
+    },
+    {
+      "name": "en-settings-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "members-settings",
+      "at": "2026-11-05T00:51:12.675Z",
+      "sha256": "258335960280336c6661ee8468e055bcfc48eabdde54b0aec86f17e3d8fb7397"
+    },
+    {
+      "name": "en-board-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "task-board-list",
+      "at": "2026-11-05T00:51:13.791Z",
+      "sha256": "75657545dba0da30700292642c8299896fca97948d93a283aa97408edccf704f"
+    },
+    {
+      "name": "en-threads-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "all-threads",
+      "at": "2026-11-05T00:51:14.355Z",
+      "sha256": "922e49074e4cf2feac76481aa830882bf9b40de6878cbafc5b6c193d1ac140a8"
+    },
+    {
+      "name": "en-chats-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "bot-and-group-list",
+      "at": "2026-11-05T00:51:15.167Z",
+      "sha256": "1383c3d8c7d1d814428cac636991df79953469dba182281c78d804d6682c1a1d"
+    },
+    {
+      "name": "en-settings-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "members-settings",
+      "at": "2026-11-05T00:51:15.726Z",
+      "sha256": "85b19dd2e5e1c60e8dcb0fcc43070d6992c2eb63db2a727ebe73ac3abe0aba51"
+    },
+    {
+      "name": "en-board-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "task-board-list",
+      "at": "2026-11-05T00:51:16.507Z",
+      "sha256": "9e296633749d1696e5272fe661acd6b09a5d0a67c44606df5f7ea357170e3163"
+    },
+    {
+      "name": "en-threads-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "all-threads",
+      "at": "2026-11-05T00:51:17.140Z",
+      "sha256": "465121aef7ae0d9d3bd271c498b6f592114bdf4be70a99fcc1930542cb6858e9"
+    },
+    {
+      "name": "en-chats-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "bot-and-group-list",
+      "at": "2026-11-05T00:51:17.988Z",
+      "sha256": "b7049bcc362d092f67c77f727d72eb6b50b6d0a8ab2447008490e59fbfba1eff"
+    },
+    {
+      "name": "en-settings-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "members-settings",
+      "at": "2026-11-05T00:51:18.576Z",
+      "sha256": "2affc34c68e7db219dbf2712488a7189cc8bd9161b0a7081491eb857ae4ceafe"
+    },
+    {
+      "name": "zh-board-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "task-board-list",
+      "at": "2026-11-05T00:51:19.440Z",
+      "sha256": "1e84dc2440dd8d6befe83a31b32822c5ff62f5e7b14ca73b3101bac76d9dbf8d"
+    },
+    {
+      "name": "zh-threads-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "all-threads",
+      "at": "2026-11-05T00:51:20.062Z",
+      "sha256": "56ae6b71135c1ff2ca224db1cbd292680e2290f70cb703631b6fb04095fd757a"
+    },
+    {
+      "name": "zh-chats-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "bot-and-group-list",
+      "at": "2026-11-05T00:51:20.663Z",
+      "sha256": "f8a900bb50a63521d2f2caf6118a17339f02c4ab14f4025845783c901aab0620"
+    },
+    {
+      "name": "zh-settings-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "members-settings",
+      "at": "2026-11-05T00:51:21.357Z",
+      "sha256": "7f95a14f193473a6854da01e6ba9b34c916ead958d97cb7771b9b28bb96a3aca"
+    },
+    {
+      "name": "zh-board-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "task-board-list",
+      "at": "2026-11-05T00:51:22.187Z",
+      "sha256": "1d2dbaa9ec493f869681e3e9389ceb64e3c403e63fa10c5b5bdf7d8e6a6fe51d"
+    },
+    {
+      "name": "zh-threads-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "all-threads",
+      "at": "2026-11-05T00:51:22.816Z",
+      "sha256": "8159c0b11fa6d8294a9b9b8a1f62ddee5bcb3112271b4be2d708169645db8932"
+    },
+    {
+      "name": "zh-chats-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "bot-and-group-list",
+      "at": "2026-11-05T00:51:23.445Z",
+      "sha256": "431d32451422acd2acafe5b8515696abf0dc649a89c669e30f371fad2aeedfad"
+    },
+    {
+      "name": "zh-settings-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "members-settings",
+      "at": "2026-11-05T00:51:24.056Z",
+      "sha256": "012a36935c7c8c0f022458926e315713776c38ecd00c4212876701f2f4b9bfe5"
+    },
+    {
+      "name": "zh-board-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "task-board-list",
+      "at": "2026-11-05T00:51:25.191Z",
+      "sha256": "939a8ff9b2709a03dd298aa2ad219a4866e684be81e246594efbd54883a9ef5e"
+    },
+    {
+      "name": "zh-threads-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "all-threads",
+      "at": "2026-11-05T00:51:25.792Z",
+      "sha256": "50f25d92ada6aeff498cad0e3791c945892d6a39f243e0a9e090ae70538fca4e"
+    },
+    {
+      "name": "zh-chats-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "bot-and-group-list",
+      "at": "2026-11-05T00:51:26.601Z",
+      "sha256": "5bc33eca7addde35280f1eb78d8e63707e0d867f0fb9975337edab1c67e696f2"
+    },
+    {
+      "name": "zh-settings-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "members-settings",
+      "at": "2026-11-05T00:51:27.242Z",
+      "sha256": "c90a18a9b6caf145296fa9a31e659745aaac83f6c0db3fd47c8febf0a48f3fc4"
+    },
+    {
+      "name": "zh-board-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "task-board-list",
+      "at": "2026-11-05T00:51:28.006Z",
+      "sha256": "6a718dfd48315ab5efe23d7be0449ea7c9c50a96a23f195b3ea5a0f670ac0ac4"
+    },
+    {
+      "name": "zh-threads-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "all-threads",
+      "at": "2026-11-05T00:51:28.588Z",
+      "sha256": "ea2538ee3dff2d429f40df8eb75eacc2aee0a9b7efc56423bb8005f7e9756ef5"
+    },
+    {
+      "name": "zh-chats-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "bot-and-group-list",
+      "at": "2026-11-05T00:51:29.421Z",
+      "sha256": "df6ba99eb6eeb75f8cf1328e7b921b69610868f1e038644bfc77e9846a0f9eb8"
+    },
+    {
+      "name": "zh-settings-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "members-settings",
+      "at": "2026-11-05T00:51:30.009Z",
+      "sha256": "3405fa9caa0d8b429cfc12cd2e47eec6ad1a42738aae9c0f09f1584374c4134d"
+    }
+  ],
+  "checks": [
+    {
+      "name": "actual-group-create",
+      "status": 201,
+      "groupTurnCount": 0
+    },
+    {
+      "name": "actual-team-settings-read",
+      "status": 200,
+      "exactWorkspace": true,
+      "exactMembers": 2
+    },
+    {
+      "name": "degraded-local-live-transport",
+      "status": 200,
+      "ticketUrlAbsent": true
+    }
+  ],
+  "pageErrors": [],
+  "httpFailures": [],
+  "apiReads": [
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/integrations/composio",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/teams/directory",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions/usage",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/password",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/saved-logins",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/workspace-general",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/preferences",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/api-keys",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/e2b-key",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/transfer-targets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/model-order",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/deletion-impact",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspaces/f9615fa0-8709-46c4-983d-d1ce51bcd2be/computer-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/share-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/app-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/secrets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/audit",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/card-verification",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/credit-billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/usage",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/integrations/composio",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/teams/directory",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions/usage",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/preferences",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/password",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/api-keys",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/saved-logins",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/workspace-general",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/transfer-targets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/e2b-key",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/model-order",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/deletion-impact",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspaces/f9615fa0-8709-46c4-983d-d1ce51bcd2be/computer-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/share-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/app-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/secrets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/audit",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/card-verification",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/credit-billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/usage",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/teams/directory",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/integrations/composio",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions/usage",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/preferences",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/password",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/api-keys",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/saved-logins",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/workspace-general",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/transfer-targets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/e2b-key",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/model-order",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/deletion-impact",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspaces/f9615fa0-8709-46c4-983d-d1ce51bcd2be/computer-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/app-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/share-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/secrets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/audit",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/card-verification",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/credit-billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/usage",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/teams/directory",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/integrations/composio",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions/usage",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/preferences",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/password",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/api-keys",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/saved-logins",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/workspace-general",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/transfer-targets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/e2b-key",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/model-order",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspaces/f9615fa0-8709-46c4-983d-d1ce51bcd2be/computer-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/deletion-impact",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/share-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/app-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/secrets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/audit",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/card-verification",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/credit-billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/usage",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/teams/directory",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/integrations/composio",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions/usage",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/preferences",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/password",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/api-keys",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/saved-logins",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/workspace-general",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/transfer-targets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/e2b-key",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/deletion-impact",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspaces/f9615fa0-8709-46c4-983d-d1ce51bcd2be/computer-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/model-order",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/app-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/share-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/secrets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/audit",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/card-verification",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/credit-billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/usage",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/teams/directory",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/integrations/composio",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions/usage",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/preferences",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/password",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/api-keys",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/saved-logins",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/workspace-general",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/transfer-targets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/e2b-key",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/model-order",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/deletion-impact",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspaces/f9615fa0-8709-46c4-983d-d1ce51bcd2be/computer-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/share-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/secrets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/app-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/audit",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/credit-billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/card-verification",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/usage",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/integrations/composio",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/teams/directory",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions/usage",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/preferences",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/password",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/api-keys",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/saved-logins",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/workspace-general",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/transfer-targets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/e2b-key",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/model-order",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/deletion-impact",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspaces/f9615fa0-8709-46c4-983d-d1ce51bcd2be/computer-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/share-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/app-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/secrets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/audit",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/card-verification",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/credit-billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/usage",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/coordinator/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/pending-actions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/approved-writes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/computer/events",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/reactions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations/bot%3A51dc7400-533b-423c-8c8b-0507064c0f9b/read",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/integrations/composio",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/teams/directory",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/subscriptions/usage",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/preferences",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/password",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/api-keys",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/saved-logins",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/workspace-general",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/transfer-targets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/e2b-key",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/model-order",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspaces/f9615fa0-8709-46c4-983d-d1ce51bcd2be/computer-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/deletion-impact",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/share-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/app-policy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/secrets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/audit",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/card-verification",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/credit-billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/billing",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/usage",
+      "method": "GET",
+      "status": 200
+    }
+  ],
+  "fixture": {
+    "bots": [
+      "51dc7400-533b-423c-8c8b-0507064c0f9b",
+      "db704d16-7e54-4434-b7b4-8f6cf7400a7c",
+      "d2201ec6-2249-43dd-a38d-0cca7a33c747"
+    ],
+    "issues": [
+      "f819072c-f36f-4299-a987-65d8dab51986",
+      "b4cb844b-d2cd-4e2c-a447-486c14549789",
+      "b0d26ff8-29ad-4fe2-a779-544cba5475c6"
+    ],
+    "runs": [
+      "ffcfc60f-11e7-4e9e-8bde-b02e3e5077ce",
+      "a555e7a5-3845-49b3-9d35-9a7f9ffdc3be",
+      "6e493ae5-8f08-494b-8e61-c2b65229fd63"
+    ],
+    "agent": "ab6598b5-52fd-4b22-a5e3-9433c9442f15",
+    "message": "11bce36e-6346-47cb-af4e-54f21c4cc090",
+    "settingsWorkspace": "f9615fa0-8709-46c4-983d-d1ce51bcd2be",
+    "group": "2142231c-3f20-4b9c-b575-927f76de21a7"
+  },
+  "limits": [
+    "Actual local production build and authorized HTTP reads with normal TestAccountPool sign-up/sign-in; isolated local PostgreSQL only.",
+    "Task, run and message rows are explicitly synthetic display fixtures. They do not establish any model execution, worker claim or production acceptance.",
+    "Group creation uses the actual authorized POST with owned Bots and creates no group turn.",
+    "No browser test runner, HTTP interception, provider/model call, decision POST or production traffic.",
+    "No Device Gateway configured locally: the authorized ticket GET returns 200 with a null URL; this is degraded transport, not healthy WebSocket acceptance.",
+    "Healthy transport, owner changes, visibility and the former 60-second polling boundary are covered separately by the actual React/SWR suite.",
+    "The members page uses an explicit isolated team workspace with the TestPool owner and peer; personal workspaces correctly redirect away from team-only settings.",
+    "All exact fixture IDs are removed and the pair quarantined; the parent process then drops its own database and role."
+  ],
+  "scope": {
+    "ownerId": "i7rkeFWtp7MZGk0iMz518j0820b3aFCg",
+    "workspaceId": "980f6562-babc-43dd-8b98-6821b241e41c",
+    "personalHomeVerified": true
+  },
+  "finishedAt": "2026-11-05T00:51:30.010Z",
+  "audit": {
+    "files": 33,
+    "archives": 0,
+    "archiveEntries": 0,
+    "decodedBytes": 0,
+    "result": "passed",
+    "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+  },
+  "cleanup": {
+    "fixtureResourcesRemoved": true,
+    "leaseState": "quarantined",
+    "reason": "Exact local display fixtures removed; pair quarantined",
+    "at": "2026-11-05T00:51:30.133Z"
+  }
+}

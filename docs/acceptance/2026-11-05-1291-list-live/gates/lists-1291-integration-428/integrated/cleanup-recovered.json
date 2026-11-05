@@ -1,0 +1,12 @@
+{
+  "phase": "integrated",
+  "role": "mikka_lists_integrate_2974050e51",
+  "allOwnedDatabasesAbsent": true,
+  "roleAbsent": true,
+  "removed": [
+    "mikka_fixture_42d8f93fc681465b90fd43d8bd39af6e",
+    "mikka_fixture_ad31a4bd62f241269ec094c1ed1fef75"
+  ],
+  "at": "2026-11-05T00:31:38.982Z",
+  "boundary": "Exact fresh role ownership and zero active connections checked before every DROP; no role grants or foreign termination"
+}

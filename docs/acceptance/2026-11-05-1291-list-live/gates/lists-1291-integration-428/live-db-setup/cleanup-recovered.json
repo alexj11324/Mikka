@@ -1,0 +1,13 @@
+{
+  "phase": "live-db-setup",
+  "role": "mikka_lists_integrate_46196b0887",
+  "allOwnedDatabasesAbsent": true,
+  "roleAbsent": true,
+  "removed": [
+    "mikka_fixture_ac6f40ba779e4c1bb22ca6c92630d33d",
+    "mikka_fixture_b631f86785db49269ba424393e45e4dd",
+    "mikka_fixture_e7c409c1811a40638fb660404c3b2187"
+  ],
+  "at": "2026-11-05T00:31:38.985Z",
+  "boundary": "Exact fresh role ownership and zero active connections checked before every DROP; no role grants or foreign termination"
+}

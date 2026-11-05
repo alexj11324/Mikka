@@ -1,0 +1,50 @@
+{
+  "sha": "c68fc0bc9ddea0ee59a5c33afd3735283a7e0542",
+  "tree": "4a291d12049d0e9fc04d82ed1061cdae570229a8",
+  "database": "mikka_lists_ui_3cdea812a4_e2e",
+  "role": "mikka_lists_ui_3cdea812a4",
+  "origin": "http://localhost:3373",
+  "descriptor": "/vercel/acceptance/private-lists-environments/c68fc0b.json",
+  "startedAt": "2026-11-05T00:49:48.033Z",
+  "captureScriptSha256": "02c4f5b7b21f7754884cd80f6885fd6cab7da639f257f5560d73afa9f57a664d",
+  "commands": [
+    {
+      "name": "setup",
+      "startedAt": "2026-11-05T00:49:48.066Z",
+      "finishedAt": "2026-11-05T00:49:49.916Z",
+      "exitCode": 0,
+      "log": "/vercel/acceptance/lists-1291-c68fc0b/setup.log"
+    },
+    {
+      "name": "bootstrap",
+      "startedAt": "2026-11-05T00:49:49.916Z",
+      "finishedAt": "2026-11-05T00:49:50.043Z",
+      "exitCode": 0,
+      "log": "/vercel/acceptance/lists-1291-c68fc0b/bootstrap.log"
+    },
+    {
+      "name": "build",
+      "startedAt": "2026-11-05T00:49:50.044Z",
+      "finishedAt": "2026-11-05T00:50:59.658Z",
+      "exitCode": 0,
+      "log": "/vercel/acceptance/lists-1291-c68fc0b/build.log"
+    },
+    {
+      "name": "capture",
+      "startedAt": "2026-11-05T00:51:01.310Z",
+      "finishedAt": "2026-11-05T00:51:30.179Z",
+      "exitCode": 0,
+      "log": "/vercel/acceptance/lists-1291-c68fc0b/capture.log"
+    }
+  ],
+  "status": "completed",
+  "serverPid": 46956,
+  "versionVerifiedAt": "2026-11-05T00:51:01.309Z",
+  "cleanup": {
+    "databaseAbsent": true,
+    "roleAbsent": true,
+    "serverExited": true,
+    "at": "2026-11-05T00:51:30.278Z"
+  },
+  "finishedAt": "2026-11-05T00:51:30.278Z"
+}

@@ -1,0 +1,36 @@
+{
+  "head": "c68fc0bc9ddea0ee59a5c33afd3735283a7e0542",
+  "purpose": "bounded offline diagnostic, not an acceptance pass",
+  "startedAt": "2026-11-05T00:43:36.349Z",
+  "commands": [
+    {
+      "name": "setup",
+      "startedAt": "2026-11-05T00:43:36.396Z",
+      "finishedAt": "2026-11-05T00:43:38.252Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "ownedPid": 45357,
+      "log": "/vercel/acceptance/lists-1291-pending-diagnostic-concurrent/setup.log"
+    },
+    {
+      "name": "live-db-instrumented",
+      "startedAt": "2026-11-05T00:43:38.253Z",
+      "finishedAt": "2026-11-05T00:44:03.973Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "ownedPid": 45384,
+      "log": "/vercel/acceptance/lists-1291-pending-diagnostic-concurrent/live-db-instrumented.log"
+    }
+  ],
+  "role": "mikka_pending_diag_15b9259dd7",
+  "database": "mikka_pending_diag_15b9259dd7_e2e",
+  "source": "70313a718b9fc4b8aa9be2f50b3a622ea3fb0c8f9b326814defad5c78e7b1fc5",
+  "cleanup": {
+    "roleAbsent": true,
+    "ownedDatabasesAbsent": true,
+    "at": "2026-11-05T00:44:04.058Z"
+  },
+  "finishedAt": "2026-11-05T00:44:04.058Z"
+}

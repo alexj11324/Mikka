@@ -1,0 +1,46 @@
+{
+  "role": "mikka_lists_integrate_323b14bda6",
+  "at": "2026-11-05T00:43:23.890Z",
+  "originalCommandExit": 137,
+  "processes": [
+    {
+      "pid": 44251,
+      "present": false,
+      "state": null
+    },
+    {
+      "pid": 44297,
+      "present": false,
+      "state": null
+    },
+    {
+      "pid": 44310,
+      "present": false,
+      "state": null
+    },
+    {
+      "pid": 44311,
+      "present": false,
+      "state": null
+    },
+    {
+      "pid": 44338,
+      "present": false,
+      "state": null
+    },
+    {
+      "pid": 44376,
+      "present": false,
+      "state": null
+    }
+  ],
+  "databases": [
+    "mikka_lists_integrate_323b14bda6_e2e",
+    "mikka_fixture_63e9233ee8c246c0a975167e939e69ce",
+    "mikka_fixture_df15a99b77c047e6a065f2bf1e14d3a3",
+    "mikka_fixture_997fe8b511424c93b4ed58f9520d1f4e",
+    "pending_live_request_43caa93770b34f8d85b04156be6bb615_e2e"
+  ],
+  "roleAbsent": true,
+  "databaseAbsent": true
+}

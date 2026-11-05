@@ -1,0 +1,130 @@
+
+> next-app@0.0.1 test:live-db /vercel/sandbox/mikka-lists-1291-integration-428
+> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/live/factory.db.test.ts lib/live/store.db.test.ts lib/live/ticket-session.db.test.ts lib/db/request-scope-live.db.test.ts lib/live/notification-context.db.test.ts lib/live/computer-state.db.test.ts lib/live/approved-writes.db.test.ts lib/live/pending-actions.db.test.ts lib/live/lists.db.test.ts
+
+▶ deferred post-commit reads retain their database and device authority after releasing the writer
+  ✔ live (23.756668ms)
+  ✔ revoked (14.887945ms)
+  ✔ closed (12.526813ms)
+✔ deferred post-commit reads retain their database and device authority after releasing the writer (753.191229ms)
+(node:44318) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44318) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ approved writes publish only committed owner-personal invalidations through the real service
+  ✔ an actual proposal is invisible and silent until its authorized COMMIT; replay and reads are silent (75.565765ms)
+  ✔ the actual authorization rollback discards the inserted proposal and its notification (12.550294ms)
+  ✔ decline and ledger completion wake the same proposal without resending an uncertain external operation (85.131876ms)
+  ✔ another owner receives only their own personal key; revoked membership is rechecked after scheduling (12.894485ms)
+  ✔ a delayed callback retains its request database even when the default DB has the same proposal ID for another owner (17.917326ms)
+✔ approved writes publish only committed owner-personal invalidations through the real service (3075.288427ms)
+(node:44319) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44319) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ real PG: computer changes publish committed owner state without heartbeat polling
+  ✔ cold wake and takeover notify only the owned machine after real commits (353.478459ms)
+  ✔ outer rollback and rolled-back savepoints publish nothing (4.043104ms)
+  ✔ a policy provider failure rolls back the write and produces no invalidation (6.399649ms)
+  ✔ new and reappearing cloud approvals notify; unchanged seenAt heartbeats do not (37.093358ms)
+  ✔ a later invalid snapshot rolls back the earlier pending approval and its effect (5.799977ms)
+  ✔ decisions and withdrawal refresh the matching Bot; replay and foreign owners do not (61.097173ms)
+  ✔ the earliest actual approval expiry and run lease bound the server projection (27.43123ms)
+  ✔ handback and server-observed provider expiry refresh without guessing a local state (21.66552ms)
+  ✔ actual reconciliation and provider failure publish durable machine changes (91.746218ms)
+  ✔ active membership and persisted owner/workspace partition notifications (6.298471ms)
+✔ real PG: computer changes publish committed owner state without heartbeat polling (1052.684291ms)
+▶ real PG: committed invalidations, savepoint rollback, and canonical owner/workspace targets
+  ✔ same-owner different-workspace and same-workspace different-owner targets stay separate (9.377443ms)
+  ✔ removed membership and a mismatched Bot owner cannot produce a target (7.566271ms)
+  ✔ personal issue lists and Bot task details keep their distinct canonical scopes when viewed from another workspace (7.665307ms)
+  ✔ outer COMMIT is visible to a separate connection before a queued effect runs (9.853297ms)
+  ✔ savepoint and failed-transaction rollback do not publish reverted state (3.348386ms)
+✔ real PG: committed invalidations, savepoint rollback, and canonical owner/workspace targets (150.328808ms)
+(node:44331) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44331) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ real PG: lists retain their reader scope and publish only the originating committed writes
+  ✔ owner-wide lists use the real home, not the selected team or another personal member (6.571658ms)
+  ✔ workspace lists use active members; a private group does not notify unrelated members (8.227368ms)
+  ✔ issue lists retain personal/unlinked visibility; body saves do not invalidate unrelated chat/run summaries (6.939444ms)
+  ✔ a committed scope change clears old list keys and former members own previews without disclosing the issue (88.811647ms)
+  ✔ a held client publishes after COMMIT even when commit and delivery run in another database context (8.855248ms)
+  ✔ outer rollback and rolled-back nested savepoints never publish a list key (6.710506ms)
+  ✔ actual stream batches notify on a completed preview, not tokens or duplicate outbox delivery (47.748318ms)
+  ✔ the actual Owner stop writer publishes once after commit, and an enclosing rollback or foreign Owner publishes nothing (96.751856ms)
+  ✔ an actual unclaimed startup failure publishes its terminal lists once even when the completion event is already present (2177.22665ms)
+  ✔ actual private group message, read receipt and member removal update only their authorized list audiences (47.319096ms)
+  ✔ the actual workspace member removal rolls back without notification and clears only previously known scopes after commit (49.629387ms)
+✔ real PG: lists retain their reader scope and publish only the originating committed writes (4464.543255ms)
+(node:44337) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44337) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ real Factory notifications retain their database across COMMIT and delayed Next after callbacks
+  ✔ a real store COMMIT in the request and later scheduler invocation outside it retain the originating database (83.789335ms)
+  ✔ registration in the request survives COMMIT and scheduling in a different context, after visibility to another connection (15.345128ms)
+  ✔ an already committed Factory update uses the same public scheduling boundary (18.100001ms)
+  ✔ permission is read after scheduling, so suspended membership suppresses delivery even while the other database is still active (14.931514ms)
+  ✔ actual outer and savepoint rollbacks schedule no notification (22.494753ms)
+✔ real Factory notifications retain their database across COMMIT and delayed Next after callbacks (3261.574158ms)
+(node:44338) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44338) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ legacy pending producers invalidate only their committed owner-personal list
+  ✔ actual Drizzle proposal waits for the held outer COMMIT and reads are silent (63.881343ms)
+  ✔ the actual Drizzle nested savepoint rollback discards only its notification; outer rollback discards all (10.493478ms)
+  ✔ actual account proposal and owner decline invalidate; repeated/foreign decisions execute nothing (25.960827ms)
+  ✔ another owner gets only its personal key and membership is rechecked after scheduling (8.548519ms)
+  ✔ delayed scheduling and COMMIT outside a request keep the source DB even for the same UUID (13.82047ms)
+  ✔ actual credential proposal commits once, replay is silent, and a later failed event rolls everything back (18.29237ms)
+  ✔ the historical browser pending sweep invalidates only rows that actually leave pending (5.171964ms)
+✖ legacy pending producers invalidate only their committed owner-personal list (3099.838962ms)
+(node:44409) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44409) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ the real Factory store schedules one invalidation only after its outer transaction commits
+  ✔ route waits for the caller COMMIT; reads and idempotent replay send nothing (39.103135ms)
+  ✔ a route rolled back by its caller never schedules work (7.311131ms)
+  ✔ a non-merge PR webhook refreshes the current Factory delivery after its update commits (291.501883ms)
+✔ the real Factory store schedules one invalidation only after its outer transaction commits (2819.069877ms)
+(node:44438) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44438) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a real revoked Better Auth session cannot renew a live ticket through its still-valid cache cookie (875.524402ms)
+ℹ tests 58
+ℹ suites 0
+ℹ pass 57
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 664987.046582
+
+✖ failing tests:
+
+test at lib/live/pending-actions.db.test.ts:1:839
+✖ legacy pending producers invalidate only their committed owner-personal list (3099.838962ms)
+  error: permission denied to terminate process
+      at /vercel/sandbox/mikka-lists-1291-integration-428/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async dropTestDatabase (/vercel/sandbox/mikka-lists-1291-integration-428/tests/support/drop-test-database.ts:42:3)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-lists-1291-integration-428/lib/live/pending-actions.db.test.ts:198:56)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    length: 264,
+    severity: 'ERROR',
+    code: '42501',
+    detail: 'Only roles with privileges of the role whose process is being terminated or with privileges of the "pg_signal_backend" role may terminate this process.',
+    hint: undefined,
+    position: undefined,
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: undefined,
+    table: undefined,
+    column: undefined,
+    dataType: undefined,
+    constraint: undefined,
+    file: 'procarray.c',
+    line: '3899',
+    routine: 'TerminateOtherDBBackends'
+  }
+ ELIFECYCLE  Command failed with exit code 1.

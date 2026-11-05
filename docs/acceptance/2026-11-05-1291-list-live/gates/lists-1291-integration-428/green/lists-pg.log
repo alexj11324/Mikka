@@ -1,0 +1,24 @@
+(node:42309) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:42309) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ real PG: lists retain their reader scope and publish only the originating committed writes
+  ✔ owner-wide lists use the real home, not the selected team or another personal member (4.295342ms)
+  ✔ workspace lists use active members; a private group does not notify unrelated members (5.19793ms)
+  ✔ issue lists retain personal/unlinked visibility; body saves do not invalidate unrelated chat/run summaries (4.597564ms)
+  ✔ a committed scope change clears old list keys and former members own previews without disclosing the issue (75.688017ms)
+  ✔ a held client publishes after COMMIT even when commit and delivery run in another database context (7.852784ms)
+  ✔ outer rollback and rolled-back nested savepoints never publish a list key (5.765862ms)
+  ✔ actual stream batches notify on a completed preview, not tokens or duplicate outbox delivery (41.295457ms)
+  ✔ the actual Owner stop writer publishes once after commit, and an enclosing rollback or foreign Owner publishes nothing (101.378602ms)
+  ✔ an actual unclaimed startup failure publishes its terminal lists once even when the completion event is already present (2042.651351ms)
+  ✔ actual private group message, read receipt and member removal update only their authorized list audiences (44.223245ms)
+  ✔ the actual workspace member removal rolls back without notification and clears only previously known scopes after commit (61.43953ms)
+✔ real PG: lists retain their reader scope and publish only the originating committed writes (4157.257ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24134.841117

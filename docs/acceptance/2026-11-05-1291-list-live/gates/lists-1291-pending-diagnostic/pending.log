@@ -1,0 +1,20 @@
+(node:45273) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:45273) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ legacy pending producers invalidate only their committed owner-personal list
+  ✔ actual Drizzle proposal waits for the held outer COMMIT and reads are silent (68.445646ms)
+  ✔ the actual Drizzle nested savepoint rollback discards only its notification; outer rollback discards all (14.421507ms)
+  ✔ actual account proposal and owner decline invalidate; repeated/foreign decisions execute nothing (30.937057ms)
+  ✔ another owner gets only its personal key and membership is rechecked after scheduling (13.33397ms)
+  ✔ delayed scheduling and COMMIT outside a request keep the source DB even for the same UUID (15.347682ms)
+  ✔ actual credential proposal commits once, replay is silent, and a later failed event rolls everything back (21.402056ms)
+  ✔ the historical browser pending sweep invalidates only rows that actually leave pending (5.141727ms)
+✔ legacy pending producers invalidate only their committed owner-personal list (2774.191966ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7989.884519

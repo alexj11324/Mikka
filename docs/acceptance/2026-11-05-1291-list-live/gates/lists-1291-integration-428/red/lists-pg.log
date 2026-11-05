@@ -1,0 +1,66 @@
+(node:42123) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:42123) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ real PG: lists retain their reader scope and publish only the originating committed writes
+  ✔ owner-wide lists use the real home, not the selected team or another personal member (4.01413ms)
+  ✔ workspace lists use active members; a private group does not notify unrelated members (4.3416ms)
+  ✔ issue lists retain personal/unlinked visibility; body saves do not invalidate unrelated chat/run summaries (5.717393ms)
+  ✔ a committed scope change clears old list keys and former members own previews without disclosing the issue (96.044727ms)
+  ✔ a held client publishes after COMMIT even when commit and delivery run in another database context (8.669289ms)
+  ✔ outer rollback and rolled-back nested savepoints never publish a list key (7.409966ms)
+  ✔ actual stream batches notify on a completed preview, not tokens or duplicate outbox delivery (68.606727ms)
+  ✔ the actual Owner stop writer publishes once after commit, and an enclosing rollback or foreign Owner publishes nothing (167.07493ms)
+  ✖ an actual unclaimed startup failure publishes its terminal lists once even when the completion event is already present (2862.753855ms)
+  ✔ actual private group message, read receipt and member removal update only their authorized list audiences (80.038122ms)
+  ✔ the actual workspace member removal rolls back without notification and clears only previously known scopes after commit (43.480555ms)
+✖ real PG: lists retain their reader scope and publish only the originating committed writes (4846.555179ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 10
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24990.91876
+
+✖ failing tests:
+
+test at lib/live/lists.db.test.ts:4:10805
+✖ an actual unclaimed startup failure publishes its terminal lists once even when the completion event is already present (2862.753855ms)
+  AssertionError [ERR_ASSERTION]: the actual committed row needs exactly one list update, completion event deduped=true
+  + actual - expected
+  
+  + []
+  - [
+  -   {
+  -     committedStatus: 'failed',
+  -     events: [
+  -       {
+  -         id: '87dd6770-2569-46eb-8d10-d896fff74971',
+  -         kind: 'thread_list'
+  -       },
+  -       {
+  -         id: '87dd6770-2569-46eb-8d10-d896fff74971',
+  -         kind: 'task_run_list'
+  -       }
+  -     ],
+  -     scope: {
+  -       ownerId: 'owner',
+  -       workspaceId: '87dd6770-2569-46eb-8d10-d896fff74971'
+  -     }
+  -   }
+  - ]
+  
+      at TestContext.<anonymous> (/vercel/sandbox/mikka-lists-1291-integration-428/lib/live/lists.db.test.ts:268:18)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-lists-1291-integration-428/lib/live/lists.db.test.ts:245:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ { scope: [Object], events: [Array], committedStatus: 'failed' } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

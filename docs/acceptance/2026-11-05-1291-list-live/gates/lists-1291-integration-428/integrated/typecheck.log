@@ -1,0 +1,9 @@
+lib/factory/completion-reconcile.db.test.ts(246,64): error TS2345: Argument of type '() => Promise<void>' is not assignable to parameter of type 'FactoryCompletionDispatch'.
+  Type 'Promise<void>' is not assignable to type 'Promise<(() => Promise<void>) | undefined>'.
+    Type 'void' is not assignable to type '(() => Promise<void>) | undefined'.
+lib/factory/completion-reconcile.db.test.ts(291,71): error TS2345: Argument of type '(tx: PoolClient, _store: { lockTask: (tx: PoolClient, userId: string, taskId: string) => Promise<FactoryTask>; readTask: (tx: PoolClient, userId: string, taskId: string) => Promise<...>; ... 7 more ...; apply(userId: string, rawBinding: FactoryBindingInput, eventId: string, rawChange: { ...; } | ... 9 more ... | { ....' is not assignable to parameter of type 'FactoryCompletionDispatch'.
+  Type 'Promise<void>' is not assignable to type 'Promise<(() => Promise<void>) | undefined>'.
+    Type 'void' is not assignable to type '(() => Promise<void>) | undefined'.
+lib/github/catalogue-budget.test.ts(71,30): error TS2504: Type 'ReadableStream<LanguageModelV4StreamPart>' must have a '[Symbol.asyncIterator]()' method that returns an async iterator.
+lib/subscription-generation-failure.test.ts(54,30): error TS2504: Type 'ReadableStream<LanguageModelV4StreamPart> | ReadableStream<LanguageModelV3StreamPart>' must have a '[Symbol.asyncIterator]()' method that returns an async iterator.
+lib/subscription-generation-failure.test.ts(104,30): error TS2504: Type 'ReadableStream<LanguageModelV4StreamPart>' must have a '[Symbol.asyncIterator]()' method that returns an async iterator.

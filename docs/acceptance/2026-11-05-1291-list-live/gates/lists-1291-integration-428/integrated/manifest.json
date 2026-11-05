@@ -1,0 +1,53 @@
+{
+  "head": "42840b2ceb403b942bec3f5b3b21ac0e0fdd3234",
+  "phase": "integrated",
+  "sources": {
+    "lib/run-leases.ts": "633b5ae14377209951f9873b3fbe5f589e2511116acb0fe362251ce291ea6cb0",
+    "lib/live/lists.db.test.ts": "e6b5355dafe2ed6168802445194a6b51389929e1351bb54e6d07cc31513476bc"
+  },
+  "startedAt": "2026-11-05T00:27:32.273Z",
+  "commands": [
+    {
+      "name": "live-db",
+      "startedAt": "2026-11-05T00:27:32.318Z",
+      "finishedAt": "2026-11-05T00:27:57.409Z",
+      "exitCode": 1,
+      "log": "/vercel/acceptance/lists-1291-integration-428/integrated/live-db.log"
+    },
+    {
+      "name": "run-end-paths",
+      "startedAt": "2026-11-05T00:27:57.410Z",
+      "finishedAt": "2026-11-05T00:28:06.338Z",
+      "exitCode": 0,
+      "log": "/vercel/acceptance/lists-1291-integration-428/integrated/run-end-paths.log"
+    },
+    {
+      "name": "startup-units",
+      "startedAt": "2026-11-05T00:28:06.338Z",
+      "finishedAt": "2026-11-05T00:28:08.950Z",
+      "exitCode": 0,
+      "log": "/vercel/acceptance/lists-1291-integration-428/integrated/startup-units.log"
+    },
+    {
+      "name": "typegen",
+      "startedAt": "2026-11-05T00:28:08.950Z",
+      "finishedAt": "2026-11-05T00:28:12.445Z",
+      "exitCode": 0,
+      "log": "/vercel/acceptance/lists-1291-integration-428/integrated/typegen.log"
+    },
+    {
+      "name": "typecheck",
+      "startedAt": "2026-11-05T00:28:12.446Z",
+      "finishedAt": "2026-11-05T00:29:12.029Z",
+      "exitCode": 2,
+      "log": "/vercel/acceptance/lists-1291-integration-428/integrated/typecheck.log"
+    },
+    {
+      "name": "lint",
+      "startedAt": "2026-11-05T00:29:12.030Z",
+      "finishedAt": "2026-11-05T00:29:23.580Z",
+      "exitCode": 0,
+      "log": "/vercel/acceptance/lists-1291-integration-428/integrated/lint.log"
+    }
+  ]
+}

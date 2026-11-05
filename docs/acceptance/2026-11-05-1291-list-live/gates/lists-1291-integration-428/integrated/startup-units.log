@@ -1,0 +1,76 @@
+✔ the chat polls slowly when quiet, quickly while a turn starts, and leans on the stream while it streams (0.794968ms)
+✔ migrated lists use shared invalidation while the fallback interval remains one minute (0.898428ms)
+✔ duplicate badges share a connection and one revalidation per SWR key (3.713134ms)
+✔ online idle channels send pings and perform no polling reads (1.135759ms)
+✔ offline fallback waits at least 60 seconds; hidden tabs make no requests (1.273033ms)
+✔ a reconnect reconciles missed changes immediately and resets the offline fallback (0.8951ms)
+✔ unknown ids, kinds and payload fields cannot trigger revalidation (0.659212ms)
+✔ workspace teardown aborts a pending ticket and discards late events (0.44146ms)
+✔ ticket renewal reauthenticates and catches up without keeping an expired subscription (0.879609ms)
+✔ a late ticket cannot open a socket after the tab becomes hidden (0.449782ms)
+✔ a half-open socket becomes offline when pongs stop (0.694842ms)
+✔ a healthy socket catches a lost invalidation at the full ticket lifetime (1.218471ms)
+✔ a hung renewal still reconciles a lost invalidation after one offline fallback interval (0.826476ms)
+✔ stream bursts retain the last change without reading more often than the old two-second cadence (0.782584ms)
+✔ semantic changes bypass a pending stream delay and deduplicate the same SWR key (0.421627ms)
+✔ a change during an in-flight read gets one trailing read after it settles (0.513023ms)
+✔ hidden documents discard delayed reads and reconcile the current document on visibility return (0.422601ms)
+✔ teardown during a read cannot schedule an old owner or workspace trailing read (0.406495ms)
+✔ a server question deadline performs one catch-up read and never becomes a poll (0.67617ms)
+✔ hidden question deadlines make no reads; visibility and teardown reconcile or discard them (0.471805ms)
+✔ a subscriber joining an already healthy channel reconciles a read that started before its subscription (0.457351ms)
+✔ a new client on an old Worker keeps the sixty-second fallback despite healthy auto-pongs (2.059271ms)
+✔ capabilities are per-kind, including subscriptions added after the channel is ready (0.409828ms)
+✔ malformed readiness cannot suppress fallback, and a verified readiness stops only supported-key fallback (0.514703ms)
+✔ approval expiry still triggers one authoritative read when the old Worker has no capability announcement (0.291209ms)
+✔ moving the browser wall clock backwards cannot postpone a server-derived approval expiry (0.304595ms)
+✔ a backward wall-clock correction cannot postpone a pushed key beyond its existing pacing interval (0.295641ms)
+✔ updating or clearing a deadline retains the same subscription and cannot restart the same expiry (0.431275ms)
+✔ timing updates while hidden do not read, and updates after teardown cannot revive a subscription (0.394173ms)
+✔ updating read pacing retains the connection and applies the new spacing to subsequent pushes (0.27946ms)
+✔ only a newer real observation can rearm the same fired deadline, and an active deadline is never postponed (0.581727ms)
+✔ a fresh server-future observation whose conservative remaining time is zero gets only one immediate recheck (0.564216ms)
+cloud task dispatch refused { error: 'Error', code: undefined }
+cloud task dispatch refused { error: 'Error', code: undefined }
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+cloud task dispatch refused { error: 'Error', code: undefined }
+(node:43018) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:43018) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ cloud startup succeeds only after both machine preparation and lifecycle launch (430.519706ms)
+✔ model arguments cannot grant local recovery; only the separate host placement argument can (4.594508ms)
+✔ a machine failure uses the unclaimed infrastructure-failure path without requesting a user stop (3.732952ms)
+✔ a lifecycle failure uses the unclaimed infrastructure-failure path without requesting a user stop (3.318409ms)
+✔ a sleeping Bot dispatches codex with its selected subscription, without a separate wake tool (14.401605ms)
+✔ a sleeping Bot dispatches codex with its selected api_key, without a separate wake tool (3.148737ms)
+✔ a sleeping Bot dispatches claude_code with its selected subscription, without a separate wake tool (3.139835ms)
+✔ a sleeping Bot dispatches claude_code with its selected api_key, without a separate wake tool (3.460911ms)
+✔ a owner refusal performs no cloud preparation or queue write (0.362287ms)
+✔ a runtime refusal performs no cloud preparation or queue write (0.251652ms)
+✔ a workspace refusal performs no cloud preparation or queue write (0.602374ms)
+✔ a issue refusal performs no cloud preparation or queue write (0.563956ms)
+✔ a policy refusal performs no cloud preparation or queue write (0.983186ms)
+✔ a suggestion refusal performs no cloud preparation or queue write (0.57922ms)
+✔ a subscription refusal performs no cloud preparation or queue write (0.903304ms)
+✔ a key-switch refusal performs no cloud preparation or queue write (0.955648ms)
+✔ preparation permits authorized quota fallback and leaves the original selection for queue-time validation (3.233692ms)
+✔ desktop dispatch rejects workspace access before model resolution (0.596137ms)
+✔ desktop dispatch rejects issue access before model resolution (0.511408ms)
+✔ a wake failure queues no run or continuation write for the ended thread (1.525508ms)
+✔ a wake cannot swap the selected Agent, even inside the same workspace (0.725313ms)
+✔ a credential revoked during the wake is still rejected by the queue (1.64565ms)
+✔ workspace access revoked during the wake stops before queueing a run (1.380979ms)
+✔ a repeated dispatch keeps its queue key and one run after waking once (4.901906ms)
+✔ a completed thread retains its model, binding, ancestry and read-only policy through wake (5.419294ms)
+✔ a working thread receives its message without waking or reselecting anything (0.913402ms)
+ℹ tests 58
+ℹ suites 0
+ℹ pass 58
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2577.086285

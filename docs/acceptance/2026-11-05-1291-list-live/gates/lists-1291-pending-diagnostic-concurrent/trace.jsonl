@@ -1,0 +1,27 @@
+{"phase":"test:start","at":"2026-11-05T00:43:38.488Z"}
+{"phase":"migrations:done","at":"2026-11-05T00:43:40.361Z"}
+{"phase":"module:request-scope","at":"2026-11-05T00:43:40.806Z"}
+{"phase":"modules:done","at":"2026-11-05T00:43:41.325Z"}
+{"phase":"sub:start","name":"actual Drizzle proposal waits for the held outer COMMIT and reads are silent","at":"2026-11-05T00:43:41.336Z"}
+{"phase":"sub:passed","name":"actual Drizzle proposal waits for the held outer COMMIT and reads are silent","at":"2026-11-05T00:43:41.382Z"}
+{"phase":"sub:start","name":"the actual Drizzle nested savepoint rollback discards only its notification; outer rollback discards all","at":"2026-11-05T00:43:41.383Z"}
+{"phase":"sub:passed","name":"the actual Drizzle nested savepoint rollback discards only its notification; outer rollback discards all","at":"2026-11-05T00:43:41.394Z"}
+{"phase":"sub:start","name":"actual account proposal and owner decline invalidate; repeated/foreign decisions execute nothing","at":"2026-11-05T00:43:41.395Z"}
+{"phase":"sub:passed","name":"actual account proposal and owner decline invalidate; repeated/foreign decisions execute nothing","at":"2026-11-05T00:43:41.425Z"}
+{"phase":"sub:start","name":"another owner gets only its personal key and membership is rechecked after scheduling","at":"2026-11-05T00:43:41.425Z"}
+{"phase":"sub:passed","name":"another owner gets only its personal key and membership is rechecked after scheduling","at":"2026-11-05T00:43:41.436Z"}
+{"phase":"sub:start","name":"delayed scheduling and COMMIT outside a request keep the source DB even for the same UUID","at":"2026-11-05T00:43:41.436Z"}
+{"phase":"sub:passed","name":"delayed scheduling and COMMIT outside a request keep the source DB even for the same UUID","at":"2026-11-05T00:43:41.451Z"}
+{"phase":"sub:start","name":"actual credential proposal commits once, replay is silent, and a later failed event rolls everything back","at":"2026-11-05T00:43:41.452Z"}
+{"phase":"sub:passed","name":"actual credential proposal commits once, replay is silent, and a later failed event rolls everything back","at":"2026-11-05T00:43:41.476Z"}
+{"phase":"sub:start","name":"the historical browser pending sweep invalidates only rows that actually leave pending","at":"2026-11-05T00:43:41.476Z"}
+{"phase":"sub:passed","name":"the historical browser pending sweep invalidates only rows that actually leave pending","at":"2026-11-05T00:43:41.481Z"}
+{"phase":"finally:start","at":"2026-11-05T00:43:41.482Z"}
+{"phase":"scope:close:before","at":"2026-11-05T00:43:41.482Z"}
+{"phase":"scope:close:after","at":"2026-11-05T00:43:41.482Z"}
+{"phase":"drop:before","index":0,"name":"pending_live_default_1e7cc4a91b324188a65577fa49af07e3_e2e","total":2,"idle":2,"waiting":0,"at":"2026-11-05T00:43:41.482Z"}
+{"phase":"drop:after","index":0,"at":"2026-11-05T00:43:42.063Z"}
+{"phase":"drop:before","index":1,"name":"pending_live_request_c3f1070054184099ad97d5e291d0b92e_e2e","total":1,"idle":1,"waiting":0,"at":"2026-11-05T00:43:42.063Z"}
+{"phase":"drop:after","index":1,"at":"2026-11-05T00:43:42.128Z"}
+{"phase":"receiver:close:before","at":"2026-11-05T00:43:42.128Z"}
+{"phase":"receiver:close:after","at":"2026-11-05T00:43:42.129Z"}

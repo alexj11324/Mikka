@@ -1,0 +1,26 @@
+{
+  "head": "42840b2ceb403b942bec3f5b3b21ac0e0fdd3234",
+  "phase": "red",
+  "sources": {
+    "lib/run-leases.ts": "c7969be32e7af0518ed81634396dfe5ea0e28fda92f8da854caef64a5d6ca7e2",
+    "lib/live/lists.db.test.ts": "33cf9724abeae205b67179fe66601764789bb9c24c46b1b475b41c195efb4671"
+  },
+  "startedAt": "2026-11-05T00:25:22.924Z",
+  "commands": [
+    {
+      "name": "lists-pg",
+      "startedAt": "2026-11-05T00:25:22.969Z",
+      "finishedAt": "2026-11-05T00:25:47.996Z",
+      "exitCode": 1,
+      "log": "/vercel/acceptance/lists-1291-integration-428/red/lists-pg.log"
+    }
+  ],
+  "cleanup": {
+    "database": "mikka_lists_integrate_a7fb697099_e2e",
+    "role": "mikka_lists_integrate_a7fb697099",
+    "databaseAbsent": true,
+    "roleAbsent": true,
+    "at": "2026-11-05T00:25:48.012Z"
+  },
+  "finishedAt": "2026-11-05T00:25:48.013Z"
+}

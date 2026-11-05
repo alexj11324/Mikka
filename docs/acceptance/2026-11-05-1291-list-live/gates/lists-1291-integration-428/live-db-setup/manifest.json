@@ -1,0 +1,25 @@
+{
+  "head": "42840b2ceb403b942bec3f5b3b21ac0e0fdd3234",
+  "phase": "live-db-setup",
+  "sources": {
+    "lib/run-leases.ts": "633b5ae14377209951f9873b3fbe5f589e2511116acb0fe362251ce291ea6cb0",
+    "lib/live/lists.db.test.ts": "e6b5355dafe2ed6168802445194a6b51389929e1351bb54e6d07cc31513476bc"
+  },
+  "startedAt": "2026-11-05T00:28:27.939Z",
+  "commands": [
+    {
+      "name": "setup",
+      "startedAt": "2026-11-05T00:28:27.991Z",
+      "finishedAt": "2026-11-05T00:28:29.816Z",
+      "exitCode": 0,
+      "log": "/vercel/acceptance/lists-1291-integration-428/live-db-setup/setup.log"
+    },
+    {
+      "name": "live-db",
+      "startedAt": "2026-11-05T00:28:29.817Z",
+      "finishedAt": "2026-11-05T00:28:55.484Z",
+      "exitCode": 1,
+      "log": "/vercel/acceptance/lists-1291-integration-428/live-db-setup/live-db.log"
+    }
+  ]
+}

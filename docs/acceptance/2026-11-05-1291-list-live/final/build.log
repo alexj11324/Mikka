@@ -1,0 +1,270 @@
+
+> next-app@0.0.1 build /vercel/sandbox/mikka-lists-1291-pending-diagnostic
+> node scripts/build-subscription-worker.mjs && pnpm generate:agent-ui && next build && pnpm typecheck && node scripts/migrate.mjs
+
+$ node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs
+OpenUI 组件目录与提示词已生成：121 个组件定义。
+▲ Next.js 16.4.1 (Turbopack)
+✓ Compiled workflows in 2.5s (147 steps, 6 workflows)
+✓ Running next.config.mjs took 3.0s
+- Experiments (use with caution):
+  · cpus: 1
+  ✓ globalNotFound
+  · serverActions
+  ⨯ turbopackFileSystemCacheForDev
+  ⨯ turbopackSourceMaps
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 52s
+  Running next.config.js provided runAfterProductionCompile ...
+✓ Completed runAfterProductionCompile in 4ms
+  Skipping validation of types
+  Finished TypeScript config validation in 6ms ...
+  Collecting page data using 1 worker ...
+Yjs was already imported. This breaks constructor checks and will lead to issues! - https://github.com/yjs/yjs/issues/438
+  Generating static pages using 1 worker (0/67) ...
+  Generating static pages using 1 worker (16/67) 
+  Generating static pages using 1 worker (33/67) 
+  Generating static pages using 1 worker (50/67) 
+✓ Generating static pages using 1 worker (67/67) in 124ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /_not-found
+├ ƒ /.well-known/oauth-authorization-server
+├ ƒ /.well-known/oauth-protected-resource
+├ ƒ /.well-known/workflow/v1/flow
+├ ƒ /.well-known/workflow/v1/webhook/[token]
+├ ƒ /[locale]
+├ ƒ /[locale]/[...rest]
+├ ƒ /[locale]/a/[token]
+├ ƒ /[locale]/acceptance
+├ ƒ /[locale]/dashboard
+├ ƒ /[locale]/device
+├ ƒ /[locale]/forgot-password
+├ ƒ /[locale]/invite/[token]
+├ ƒ /[locale]/oauth/consent
+├ ƒ /[locale]/preview
+├ ƒ /[locale]/preview/credential-login
+├ ƒ /[locale]/preview/settings
+├ ƒ /[locale]/preview/subagent-login
+├ ƒ /[locale]/reset-password
+├ ƒ /[locale]/settings
+├ ƒ /[locale]/settings/members
+├ ƒ /[locale]/settings/teams
+├ ƒ /[locale]/sign-in
+├ ƒ /[locale]/sign-up
+├ ƒ /[locale]/verify-email
+├ ƒ /[locale]/workspaces/new
+├ ƒ /api/acceptance
+├ ƒ /api/account/deletion
+├ ƒ /api/account/export/[token]
+├ ƒ /api/agent
+├ ƒ /api/agent-cli-policy
+├ ƒ /api/agent/images
+├ ƒ /api/agent/sessions
+├ ƒ /api/agent/sessions/active
+├ ƒ /api/approved-writes
+├ ƒ /api/artifacts/[artifactId]/versions/[version]/download
+├ ƒ /api/artifacts/[artifactId]/versions/[version]/frame
+├ ƒ /api/artifacts/shared/[token]/frame
+├ ƒ /api/auth/[...all]
+├ ƒ /api/avatars/[userId]/[hash]
+├ ƒ /api/billing/stripe
+├ ƒ /api/bots
+├ ƒ /api/bots/[botId]
+├ ƒ /api/bots/[botId]/computer
+├ ƒ /api/bots/[botId]/computer/handback
+├ ƒ /api/bots/[botId]/computer/runs
+├ ƒ /api/bots/[botId]/computer/runtimes
+├ ƒ /api/bots/[botId]/computer/subscription
+├ ƒ /api/bots/[botId]/computer/takeover
+├ ƒ /api/bots/[botId]/computer/viewer
+├ ƒ /api/bots/[botId]/computer/wake
+├ ƒ /api/bots/[botId]/definition
+├ ƒ /api/bots/[botId]/subagents
+├ ƒ /api/bots/[botId]/subagents/[id]
+├ ƒ /api/bots/[botId]/subagents/[id]/credentials
+├ ƒ /api/bots/[botId]/subagents/[id]/credentials/challenge
+├ ƒ /api/bots/[botId]/subagents/[id]/credentials/login
+├ ƒ /api/bots/[botId]/subagents/[id]/stop
+├ ƒ /api/bots/[botId]/subagents/[id]/viewer
+├ ƒ /api/captures/[captureId]
+├ ƒ /api/captures/shared/[token]
+├ ƒ /api/chat/attachments
+├ ƒ /api/chat/attachments/[id]
+├ ƒ /api/computer/approvals/[id]
+├ ƒ /api/computer/events
+├ ƒ /api/conversation-links/[id]/messages
+├ ƒ /api/conversations
+├ ƒ /api/conversations/[id]
+├ ƒ /api/conversations/[id]/decisions
+├ ƒ /api/conversations/[id]/decisions/replay
+├ ƒ /api/conversations/[id]/members
+├ ƒ /api/conversations/[id]/messages
+├ ƒ /api/conversations/[id]/read
+├ ƒ /api/conversations/[id]/stop
+├ ƒ /api/coordinator/attention
+├ ƒ /api/coordinator/messages
+├ ƒ /api/coordinator/runtime
+├ ƒ /api/coordinator/stream
+├ ƒ /api/credentials
+├ ƒ /api/credentials/oidc
+├ ƒ /api/cron/account-deletions
+├ ƒ /api/cron/audit-retention
+├ ƒ /api/cron/briefings
+├ ƒ /api/cron/coordinator-wakes
+├ ƒ /api/cron/credential-cleanup
+├ ƒ /api/cron/linear-sync
+├ ƒ /api/cron/ops-monitor
+├ ƒ /api/cron/run-recovery
+├ ƒ /api/cron/schedules
+├ ƒ /api/cron/subscriptions
+├ ƒ /api/cron/suggestions-reconcile
+├ ƒ /api/cron/user-facts
+├ ƒ /api/desktop/begin
+├ ƒ /api/desktop/exchange
+├ ƒ /api/desktop/finish
+├ ƒ /api/desktop/return
+├ ƒ /api/device-tokens
+├ ƒ /api/device-tokens/[tokenId]/revoke
+├ ƒ /api/devices/[deviceId]/commands
+├ ƒ /api/devices/computer
+├ ƒ /api/devices/enrollment
+├ ƒ /api/devices/ssh
+├ ƒ /api/factory/monitor-incidents/[incidentId]/links
+├ ƒ /api/factory/questions
+├ ƒ /api/factory/questions/[questionId]
+├ ƒ /api/factory/questions/[questionId]/recover
+├ ƒ /api/factory/tasks
+├ ƒ /api/factory/tasks/[taskId]
+├ ƒ /api/factory/tasks/[taskId]/approval
+├ ƒ /api/factory/tasks/[taskId]/dispatch
+├ ƒ /api/factory/tasks/[taskId]/dispatch/cloud
+├ ƒ /api/factory/tasks/[taskId]/evidence/[captureId]
+├ ƒ /api/factory/tasks/route
+├ ƒ /api/github/pull-request-status
+├ ƒ /api/health
+├ ƒ /api/integrations/composio
+├ ƒ /api/integrations/composio/callback
+├ ƒ /api/integrations/composio/catalog
+├ ƒ /api/integrations/composio/catalog/[toolkit]
+├ ƒ /api/integrations/composio/credentials
+├ ƒ /api/integrations/github
+├ ƒ /api/integrations/github/connect
+├ ƒ /api/integrations/github/connect/intent
+├ ƒ /api/integrations/github/connect/intent/confirm
+├ ƒ /api/integrations/github/permissions
+├ ƒ /api/integrations/github/repositories/verification
+├ ƒ /api/integrations/google/callback
+├ ƒ /api/integrations/linear/callback
+├ ƒ /api/integrations/linear/status
+├ ƒ /api/integrations/mcp
+├ ƒ /api/integrations/mcp/shares
+├ ƒ /api/issues/search
+├ ƒ /api/live/ticket
+├ ƒ /api/mcp
+├ ƒ /api/mobile/artifacts/[id]
+├ ƒ /api/mobile/bots
+├ ƒ /api/mobile/bots/[id]
+├ ƒ /api/mobile/chat
+├ ƒ /api/mobile/chat/image
+├ ƒ /api/mobile/chat/retry
+├ ƒ /api/mobile/chat/stop
+├ ƒ /api/mobile/home
+├ ƒ /api/mobile/model
+├ ƒ /api/mobile/open
+├ ƒ /api/mobile/pending-actions/[id]
+├ ƒ /api/mobile/preferences
+├ ƒ /api/mobile/push-tokens
+├ ƒ /api/mobile/reactions
+├ ƒ /api/mobile/settings
+├ ƒ /api/mobile/tasks
+├ ƒ /api/mobile/threads
+├ ƒ /api/mobile/threads/[id]
+├ ƒ /api/mobile/threads/[id]/continue
+├ ƒ /api/mobile/threads/[id]/stop
+├ ƒ /api/pending-actions
+├ ƒ /api/projects/[projectId]/decisions
+├ ƒ /api/projects/[projectId]/decisions/from-message
+├ ƒ /api/runs/[runId]/evidence
+├ ƒ /api/runs/github-token
+├ ƒ /api/runs/mcp/[toolkit]
+├ ƒ /api/search
+├ ƒ /api/self-improvement
+├ ƒ /api/settings/[read]
+├ ƒ /api/skills
+├ ƒ /api/skills/search
+├ ƒ /api/subscriptions
+├ ƒ /api/subscriptions/callback
+├ ƒ /api/subscriptions/enrollments
+├ ƒ /api/subscriptions/enrollments/bind
+├ ƒ /api/subscriptions/enrollments/handoff
+├ ƒ /api/subscriptions/usage
+├ ƒ /api/suggestions
+├ ƒ /api/suggestions/[id]
+├ ƒ /api/suggestions/[id]/start
+├ ƒ /api/teams/[teamId]/members
+├ ƒ /api/teams/directory
+├ ƒ /api/test-environment
+├ ƒ /api/test-workspace
+├ ƒ /api/threads/[runId]/credentials
+├ ƒ /api/threads/[runId]/credentials/challenge
+├ ƒ /api/threads/[runId]/credentials/login
+├ ƒ /api/threads/[runId]/machine
+├ ƒ /api/version
+├ ƒ /api/webhooks/composio
+├ ƒ /api/webhooks/github
+├ ƒ /api/webhooks/linear
+├ ƒ /api/webhooks/slack
+├ ƒ /api/webhooks/telegram
+├ ƒ /api/workspace
+├ ƒ /api/workspace/switcher
+├ ƒ /api/workspaces/[workspaceId]/audit-log
+├ ƒ /api/workspaces/[workspaceId]/audit-log/retention
+├ ƒ /api/workspaces/[workspaceId]/computer-policy
+├ ƒ /api/workspaces/[workspaceId]/model-admission
+├ ƒ /api/workspaces/[workspaceId]/skills
+├ ○ /apple-icon.png
+├ ○ /icon.svg
+├ ƒ /v1/devices/[deviceId]/commands
+├ ƒ /v1/devices/[deviceId]/commands/ack
+├ ƒ /v1/devices/[deviceId]/computer
+├ ƒ /v1/devices/[deviceId]/coordinator
+├ ƒ /v1/devices/[deviceId]/fs/requests
+├ ƒ /v1/devices/[deviceId]/fs/requests/[requestId]
+├ ƒ /v1/devices/[deviceId]/gateway
+├ ƒ /v1/devices/[deviceId]/github-token
+├ ƒ /v1/devices/[deviceId]/heartbeat
+├ ƒ /v1/devices/[deviceId]/repos
+├ ƒ /v1/devices/[deviceId]/runs
+├ ƒ /v1/devices/[deviceId]/runs/[runId]/attachments/[id]
+├ ƒ /v1/devices/[deviceId]/runs/[runId]/claim
+├ ƒ /v1/devices/[deviceId]/runs/[runId]/computer-authority
+├ ƒ /v1/devices/[deviceId]/runs/[runId]/credentials/login
+├ ƒ /v1/devices/[deviceId]/runs/[runId]/subscription
+├ ƒ /v1/devices/[deviceId]/runs/[runId]/subscription-lease
+├ ƒ /v1/devices/enroll
+├ ƒ /v1/devices/register
+├ ƒ /v1/mailbox
+├ ƒ /v1/runs/[runId]
+├ ƒ /v1/runs/[runId]/captures
+├ ƒ /v1/runs/[runId]/captures/[captureId]
+├ ƒ /v1/runs/[runId]/captures/[captureId]/complete
+├ ƒ /v1/runs/[runId]/checkpoint
+├ ƒ /v1/runs/[runId]/complete
+├ ƒ /v1/runs/[runId]/decision
+├ ƒ /v1/runs/[runId]/events
+├ ƒ /v1/runs/[runId]/policy-snapshot
+├ ƒ /v1/runs/[runId]/screen
+├ ƒ /v1/runs/[runId]/skill-receipt
+├ ƒ /v1/runs/[runId]/tool-approval
+└ ƒ /w/[slug]
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+$ tsrs --noEmit

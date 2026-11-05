@@ -1,0 +1,18 @@
+{
+  "head": "5b1c72944453318b87ec562427a4d147a29f733c",
+  "phase": "final",
+  "sources": {
+    "lib/run-leases.ts": "633b5ae14377209951f9873b3fbe5f589e2511116acb0fe362251ce291ea6cb0",
+    "lib/live/lists.db.test.ts": "e6b5355dafe2ed6168802445194a6b51389929e1351bb54e6d07cc31513476bc"
+  },
+  "startedAt": "2026-11-05T00:31:13.930Z",
+  "commands": [
+    {
+      "name": "setup",
+      "startedAt": "2026-11-05T00:31:13.980Z",
+      "finishedAt": "2026-11-05T00:31:15.940Z",
+      "exitCode": 0,
+      "log": "/vercel/acceptance/lists-1291-integration-5b/final/setup.log"
+    }
+  ]
+}

@@ -1,0 +1,909 @@
+{
+  "observedAt": "2026-11-05T00:28:04.484Z",
+  "head": "42840b2ceb403b942bec3f5b3b21ac0e0fdd3234",
+  "tree": "b3adc6ad0a6f17286a77b4b4f59caddf6aae1033",
+  "parents": [
+    "601d1d6553595af71e9fa0795acc264c52b788fa",
+    "a18d22a9d4b6b067297a72eb37205493be4f0b2b"
+  ],
+  "mergeBase": "2b25caad1608df6a2a54d5e18e798b3c9807ce89",
+  "ownFiles": 112,
+  "mainFiles": 114,
+  "overlap": [
+    "cloudflare/device-gateway/src/live-route.test.ts",
+    "cloudflare/device-gateway/src/session.ts",
+    "cloudflare/device-gateway/test/runtime.test.mjs",
+    "hooks/use-live-key.tsx",
+    "lib/cloud-computer/thread-machines.ts",
+    "lib/computer/store.ts",
+    "lib/db/commit-effects.ts",
+    "lib/db/request-scope.ts",
+    "lib/live/channel.test.ts",
+    "lib/live/channel.ts",
+    "lib/live/channels.ts",
+    "lib/live/events.ts",
+    "lib/run-leases.ts",
+    "package.json",
+    "tests/cloud-dispatch-startup.test.ts"
+  ],
+  "mainOnly": 99,
+  "mainOnlyChangedByMerge": [],
+  "1293Total": 57,
+  "1293Overlap": [
+    "cloudflare/device-gateway/src/live-route.test.ts",
+    "cloudflare/device-gateway/src/session.ts",
+    "cloudflare/device-gateway/test/runtime.test.mjs",
+    "hooks/use-live-key.tsx",
+    "lib/computer/store.ts",
+    "lib/db/commit-effects.ts",
+    "lib/db/request-scope.ts",
+    "lib/live/channel.test.ts",
+    "lib/live/channel.ts",
+    "lib/live/channels.ts",
+    "lib/live/events.ts",
+    "package.json"
+  ],
+  "1293MainOnly": 45,
+  "compare": {
+    "repository_full_name": "alexj11324/Mikka",
+    "base": "601d1d6553595af71e9fa0795acc264c52b788fa",
+    "head": "42840b2ceb403b942bec3f5b3b21ac0e0fdd3234",
+    "status": "ahead",
+    "ahead_by": 8,
+    "behind_by": 0,
+    "total_commits": 8,
+    "too_large": null,
+    "base_commit": {
+      "sha": "601d1d6553595af71e9fa0795acc264c52b788fa",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/commits/601d1d6553595af71e9fa0795acc264c52b788fa",
+      "html_url": "https://github.com/alexj11324/Mikka/commit/601d1d6553595af71e9fa0795acc264c52b788fa"
+    },
+    "merge_base_commit": {
+      "sha": "601d1d6553595af71e9fa0795acc264c52b788fa",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/commits/601d1d6553595af71e9fa0795acc264c52b788fa",
+      "html_url": "https://github.com/alexj11324/Mikka/commit/601d1d6553595af71e9fa0795acc264c52b788fa"
+    },
+    "files": [
+      {
+        "filename": ".claude/skills/README.md",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1,
+        "changes": 2,
+        "previous_filename": null
+      },
+      {
+        "filename": ".github/workflows/model-provider-fallback-acceptance.yml",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1,
+        "changes": 2,
+        "previous_filename": null
+      },
+      {
+        "filename": ".github/workflows/production-readiness.yml",
+        "status": "added",
+        "additions": 97,
+        "deletions": 0,
+        "changes": 97,
+        "previous_filename": null
+      },
+      {
+        "filename": ".github/workflows/project-decisions-acceptance.yml",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1,
+        "changes": 2,
+        "previous_filename": null
+      },
+      {
+        "filename": "AGENTS.md",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 0,
+        "changes": 1,
+        "previous_filename": null
+      },
+      {
+        "filename": "app/api/pending-actions/route.test.ts",
+        "status": "added",
+        "additions": 32,
+        "deletions": 0,
+        "changes": 32,
+        "previous_filename": null
+      },
+      {
+        "filename": "app/api/pending-actions/route.ts",
+        "status": "modified",
+        "additions": 4,
+        "deletions": 3,
+        "changes": 7,
+        "previous_filename": null
+      },
+      {
+        "filename": "apps/mobile/components/ThreadsScreen.tsx",
+        "status": "modified",
+        "additions": 7,
+        "deletions": 5,
+        "changes": 12,
+        "previous_filename": null
+      },
+      {
+        "filename": "apps/mobile/components/icons.tsx",
+        "status": "modified",
+        "additions": 30,
+        "deletions": 10,
+        "changes": 40,
+        "previous_filename": null
+      },
+      {
+        "filename": "apps/mobile/lib/thread-icon.ts",
+        "status": "modified",
+        "additions": 13,
+        "deletions": 1,
+        "changes": 14,
+        "previous_filename": null
+      },
+      {
+        "filename": "apps/mobile/tests/thread-icon.test.mts",
+        "status": "modified",
+        "additions": 11,
+        "deletions": 0,
+        "changes": 11,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/blocks/kanban-board-1/components/kanban-board.tsx",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 3,
+        "changes": 6,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/chat/copy-action.tsx",
+        "status": "modified",
+        "additions": 7,
+        "deletions": 0,
+        "changes": 7,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/computer/computer-screen.tsx",
+        "status": "modified",
+        "additions": 11,
+        "deletions": 3,
+        "changes": 14,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/coordinator/approved-write-actions.tsx",
+        "status": "modified",
+        "additions": 22,
+        "deletions": 11,
+        "changes": 33,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/coordinator/coordinator-chat.tsx",
+        "status": "modified",
+        "additions": 26,
+        "deletions": 10,
+        "changes": 36,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/coordinator/coordinator-reply.tsx",
+        "status": "modified",
+        "additions": 10,
+        "deletions": 8,
+        "changes": 18,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/coordinator/pending-actions.tsx",
+        "status": "modified",
+        "additions": 13,
+        "deletions": 9,
+        "changes": 22,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/coordinator/reply-activity.tsx",
+        "status": "modified",
+        "additions": 139,
+        "deletions": 26,
+        "changes": 165,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/coordinator/retry-reply-button.test.tsx",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 2,
+        "changes": 5,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/coordinator/thread-card.tsx",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 1,
+        "changes": 4,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/nav/all-threads.tsx",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 2,
+        "changes": 4,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/ui/inline-citation.tsx",
+        "status": "modified",
+        "additions": 11,
+        "deletions": 2,
+        "changes": 13,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/ui/streaming-text.tsx",
+        "status": "modified",
+        "additions": 6,
+        "deletions": 2,
+        "changes": 8,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/workspace/agent-citations.tsx",
+        "status": "modified",
+        "additions": 51,
+        "deletions": 24,
+        "changes": 75,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/workspace/thread-status-icon.test.tsx",
+        "status": "modified",
+        "additions": 19,
+        "deletions": 16,
+        "changes": 35,
+        "previous_filename": null
+      },
+      {
+        "filename": "components/workspace/thread-status-icon.tsx",
+        "status": "modified",
+        "additions": 21,
+        "deletions": 28,
+        "changes": 49,
+        "previous_filename": null
+      },
+      {
+        "filename": "docs/acceptance/2026-11-04-issue-1212/approved-write-live.md",
+        "status": "added",
+        "additions": 27,
+        "deletions": 0,
+        "changes": 27,
+        "previous_filename": null
+      },
+      {
+        "filename": "docs/acceptance/2026-11-04-issue-1212/pending-actions-live.md",
+        "status": "added",
+        "additions": 45,
+        "deletions": 0,
+        "changes": 45,
+        "previous_filename": null
+      },
+      {
+        "filename": "docs/design/README.md",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 1,
+        "changes": 4,
+        "previous_filename": null
+      },
+      {
+        "filename": "docs/design/chat-tool-calls.md",
+        "status": "added",
+        "additions": 101,
+        "deletions": 0,
+        "changes": 101,
+        "previous_filename": null
+      },
+      {
+        "filename": "docs/design/components.md",
+        "status": "modified",
+        "additions": 7,
+        "deletions": 2,
+        "changes": 9,
+        "previous_filename": null
+      },
+      {
+        "filename": "docs/design/decisions/2026-11-02-0220-waiting-raises-a-hand.md",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 0,
+        "changes": 1,
+        "previous_filename": null
+      },
+      {
+        "filename": "docs/design/decisions/2026-11-04-2220-task-circle-thread-bubble.md",
+        "status": "added",
+        "additions": 22,
+        "deletions": 0,
+        "changes": 22,
+        "previous_filename": null
+      },
+      {
+        "filename": "docs/design/decisions/2026-11-04-2221-chat-tool-groups-and-citations.md",
+        "status": "added",
+        "additions": 19,
+        "deletions": 0,
+        "changes": 19,
+        "previous_filename": null
+      },
+      {
+        "filename": "docs/design/decisions/2026-11-04-2320-reuse-existing-components.md",
+        "status": "added",
+        "additions": 18,
+        "deletions": 0,
+        "changes": 18,
+        "previous_filename": null
+      },
+      {
+        "filename": "docs/design/mobile.md",
+        "status": "modified",
+        "additions": 6,
+        "deletions": 4,
+        "changes": 10,
+        "previous_filename": null
+      },
+      {
+        "filename": "docs/design/research/chat-tool-calls-and-citations.md",
+        "status": "added",
+        "additions": 118,
+        "deletions": 0,
+        "changes": 118,
+        "previous_filename": null
+      },
+      {
+        "filename": "docs/design/rules.md",
+        "status": "modified",
+        "additions": 63,
+        "deletions": 20,
+        "changes": 83,
+        "previous_filename": null
+      },
+      {
+        "filename": "docs/design/spec-template.md",
+        "status": "modified",
+        "additions": 4,
+        "deletions": 2,
+        "changes": 6,
+        "previous_filename": null
+      },
+      {
+        "filename": "docs/review-checklist.md",
+        "status": "modified",
+        "additions": 9,
+        "deletions": 0,
+        "changes": 9,
+        "previous_filename": null
+      },
+      {
+        "filename": "hooks/use-approval-live.ts",
+        "status": "added",
+        "additions": 36,
+        "deletions": 0,
+        "changes": 36,
+        "previous_filename": null
+      },
+      {
+        "filename": "hooks/use-computer.ts",
+        "status": "modified",
+        "additions": 14,
+        "deletions": 7,
+        "changes": 21,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/account/cloud-cleanup.ts",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 0,
+        "changes": 2,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/cloud-computer/action-reviews.ts",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 1,
+        "changes": 4,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/cloud-computer/credential-reviews.ts",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 0,
+        "changes": 2,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/cloud-computer/thread-machines.ts",
+        "status": "modified",
+        "additions": 14,
+        "deletions": 0,
+        "changes": 14,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/computer/client-deadline.test.ts",
+        "status": "added",
+        "additions": 38,
+        "deletions": 0,
+        "changes": 38,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/computer/client.ts",
+        "status": "modified",
+        "additions": 11,
+        "deletions": 3,
+        "changes": 14,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/computer/e2b-provider.ts",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 1,
+        "changes": 3,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/computer/provision.ts",
+        "status": "modified",
+        "additions": 5,
+        "deletions": 1,
+        "changes": 6,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/computer/reconcile.ts",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 0,
+        "changes": 2,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/computer/reviews.ts",
+        "status": "modified",
+        "additions": 21,
+        "deletions": 5,
+        "changes": 26,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/computer/state-deadline.test.ts",
+        "status": "added",
+        "additions": 44,
+        "deletions": 0,
+        "changes": 44,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/computer/state-deadline.ts",
+        "status": "added",
+        "additions": 27,
+        "deletions": 0,
+        "changes": 27,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/computer/store.db.test.ts",
+        "status": "modified",
+        "additions": 11,
+        "deletions": 6,
+        "changes": 17,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/computer/store.ts",
+        "status": "modified",
+        "additions": 18,
+        "deletions": 5,
+        "changes": 23,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/coordinator/chat-dedupe.test.ts",
+        "status": "added",
+        "additions": 25,
+        "deletions": 0,
+        "changes": 25,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/coordinator/chat-dedupe.ts",
+        "status": "added",
+        "additions": 30,
+        "deletions": 0,
+        "changes": 30,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/coordinator/tool-activity.test.ts",
+        "status": "added",
+        "additions": 66,
+        "deletions": 0,
+        "changes": 66,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/coordinator/tool-activity.ts",
+        "status": "added",
+        "additions": 114,
+        "deletions": 0,
+        "changes": 114,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/factory/run-end-paths.db.test.ts",
+        "status": "modified",
+        "additions": 128,
+        "deletions": 1,
+        "changes": 129,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/live/approval-cache.test.ts",
+        "status": "added",
+        "additions": 55,
+        "deletions": 0,
+        "changes": 55,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/live/approval-cache.ts",
+        "status": "added",
+        "additions": 59,
+        "deletions": 0,
+        "changes": 59,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/live/approved-writes.db.test.ts",
+        "status": "added",
+        "additions": 172,
+        "deletions": 0,
+        "changes": 172,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/live/approved-writes.ts",
+        "status": "added",
+        "additions": 42,
+        "deletions": 0,
+        "changes": 42,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/live/computer-state.db.test.ts",
+        "status": "added",
+        "additions": 273,
+        "deletions": 0,
+        "changes": 273,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/live/computer-state.ts",
+        "status": "added",
+        "additions": 67,
+        "deletions": 0,
+        "changes": 67,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/live/events.ts",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1,
+        "changes": 2,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/live/pending-action-cache.test.ts",
+        "status": "added",
+        "additions": 39,
+        "deletions": 0,
+        "changes": 39,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/live/pending-action-cache.ts",
+        "status": "added",
+        "additions": 37,
+        "deletions": 0,
+        "changes": 37,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/live/pending-actions.db.test.ts",
+        "status": "added",
+        "additions": 200,
+        "deletions": 0,
+        "changes": 200,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/live/pending-actions.ts",
+        "status": "added",
+        "additions": 39,
+        "deletions": 0,
+        "changes": 39,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/operations/approved-writes.ts",
+        "status": "modified",
+        "additions": 11,
+        "deletions": 1,
+        "changes": 12,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/operations/ledger.ts",
+        "status": "modified",
+        "additions": 4,
+        "deletions": 0,
+        "changes": 4,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/operations/write-client.ts",
+        "status": "modified",
+        "additions": 6,
+        "deletions": 4,
+        "changes": 10,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/operations/write-discovery.ts",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1,
+        "changes": 2,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/operations/write-http.ts",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 2,
+        "changes": 4,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/pending-action-store.ts",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 0,
+        "changes": 3,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/pending-actions.ts",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 0,
+        "changes": 2,
+        "previous_filename": null
+      },
+      {
+        "filename": "lib/run-leases.ts",
+        "status": "modified",
+        "additions": 54,
+        "deletions": 7,
+        "changes": 61,
+        "previous_filename": null
+      },
+      {
+        "filename": "messages/en.json",
+        "status": "modified",
+        "additions": 73,
+        "deletions": 4,
+        "changes": 77,
+        "previous_filename": null
+      },
+      {
+        "filename": "messages/zh-CN.json",
+        "status": "modified",
+        "additions": 73,
+        "deletions": 4,
+        "changes": 77,
+        "previous_filename": null
+      },
+      {
+        "filename": "package.json",
+        "status": "modified",
+        "additions": 7,
+        "deletions": 6,
+        "changes": 13,
+        "previous_filename": null
+      },
+      {
+        "filename": "packages/protocol/src/computer.ts",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 0,
+        "changes": 2,
+        "previous_filename": null
+      },
+      {
+        "filename": "scripts/acceptance/production-readiness-plan.json",
+        "status": "added",
+        "additions": 5,
+        "deletions": 0,
+        "changes": 5,
+        "previous_filename": null
+      },
+      {
+        "filename": "scripts/acceptance/production-readiness.mjs",
+        "status": "added",
+        "additions": 323,
+        "deletions": 0,
+        "changes": 323,
+        "previous_filename": null
+      },
+      {
+        "filename": "scripts/acceptance/production-readiness.test.mjs",
+        "status": "added",
+        "additions": 315,
+        "deletions": 0,
+        "changes": 315,
+        "previous_filename": null
+      },
+      {
+        "filename": "scripts/acceptance/project-decisions.mjs",
+        "status": "modified",
+        "additions": 45,
+        "deletions": 11,
+        "changes": 56,
+        "previous_filename": null
+      },
+      {
+        "filename": "scripts/acceptance/project-decisions.test.mjs",
+        "status": "modified",
+        "additions": 44,
+        "deletions": 0,
+        "changes": 44,
+        "previous_filename": null
+      },
+      {
+        "filename": "scripts/approved-write-actions.live.test.tsx",
+        "status": "added",
+        "additions": 190,
+        "deletions": 0,
+        "changes": 190,
+        "previous_filename": null
+      },
+      {
+        "filename": "scripts/approved-write-actions.test.tsx",
+        "status": "modified",
+        "additions": 7,
+        "deletions": 5,
+        "changes": 12,
+        "previous_filename": null
+      },
+      {
+        "filename": "scripts/check-copy.mjs",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 1,
+        "changes": 3,
+        "previous_filename": null
+      },
+      {
+        "filename": "scripts/computer-screen.test.tsx",
+        "status": "modified",
+        "additions": 31,
+        "deletions": 2,
+        "changes": 33,
+        "previous_filename": null
+      },
+      {
+        "filename": "scripts/pending-actions.live.test.tsx",
+        "status": "added",
+        "additions": 132,
+        "deletions": 0,
+        "changes": 132,
+        "previous_filename": null
+      },
+      {
+        "filename": "scripts/ui-policy.mjs",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 0,
+        "changes": 2,
+        "previous_filename": null
+      },
+      {
+        "filename": "scripts/ui-policy.test.mjs",
+        "status": "modified",
+        "additions": 7,
+        "deletions": 0,
+        "changes": 7,
+        "previous_filename": null
+      },
+      {
+        "filename": "scripts/use-computer.live.test.tsx",
+        "status": "added",
+        "additions": 225,
+        "deletions": 0,
+        "changes": 225,
+        "previous_filename": null
+      },
+      {
+        "filename": "scripts/use-computer.test.tsx",
+        "status": "added",
+        "additions": 135,
+        "deletions": 0,
+        "changes": 135,
+        "previous_filename": null
+      },
+      {
+        "filename": "tests/agent-ui-report.test.tsx",
+        "status": "modified",
+        "additions": 11,
+        "deletions": 5,
+        "changes": 16,
+        "previous_filename": null
+      },
+      {
+        "filename": "tests/cloud-dispatch-startup.test.ts",
+        "status": "modified",
+        "additions": 10,
+        "deletions": 2,
+        "changes": 12,
+        "previous_filename": null
+      },
+      {
+        "filename": "tests/coordinator-streaming-render.test.tsx",
+        "status": "modified",
+        "additions": 80,
+        "deletions": 8,
+        "changes": 88,
+        "previous_filename": null
+      },
+      {
+        "filename": "tests/object-chip-open.test.tsx",
+        "status": "modified",
+        "additions": 9,
+        "deletions": 4,
+        "changes": 13,
+        "previous_filename": null
+      },
+      {
+        "filename": "tests/run-machine-fallback.db.test.ts",
+        "status": "modified",
+        "additions": 6,
+        "deletions": 3,
+        "changes": 9,
+        "previous_filename": null
+      },
+      {
+        "filename": "workflows/coordinator/steps.ts",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 2,
+        "changes": 5,
+        "previous_filename": null
+      }
+    ]
+  }
+}

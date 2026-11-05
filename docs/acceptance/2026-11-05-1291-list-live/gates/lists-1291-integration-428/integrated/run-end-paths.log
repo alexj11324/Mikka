@@ -1,0 +1,38 @@
+▶ cancel and thread end reach a terminal run, then afterRunEnded finalizes the Factory task
+  ✔ cancel: the stop request alone is not an end; the daemon's stopped write finalizes the task (106.115651ms)
+  ✔ stopping a queued run ends it as stopped and finalizes the task (no daemon ack) (47.312987ms)
+  ✔ a queued cloud run with a thread machine binding only records the stop request (15.96107ms)
+  ✔ stop on an ended earlier attempt reaches the queued latest: stopped, and afterRunEnded runs under the latest's own runId (BE-18) (33.826118ms)
+  ✔ ending a thread machine stops a Factory run and finalizes its task (54.349572ms)
+{"event":"thread_runtime_start_failed","runId":"96b264dc-c88d-4c7e-afba-7101f0280db8","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"96b264dc-c88d-4c7e-afba-7101f0280db8","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"96b264dc-c88d-4c7e-afba-7101f0280db8","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ an unclaimed cloud startup failure is recoverable infrastructure failure, with machine=true (68.434068ms)
+{"event":"thread_runtime_start_failed","runId":"dff7c605-514d-4e05-943e-5c163dc6c2c4","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"dff7c605-514d-4e05-943e-5c163dc6c2c4","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"dff7c605-514d-4e05-943e-5c163dc6c2c4","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ an unclaimed cloud startup failure is recoverable infrastructure failure, with machine=false (50.232723ms)
+{"event":"thread_runtime_start_failed","runId":"ba0b2019-a779-4c7f-b698-5ac06351f684","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"0d4527f2-0a8c-4bae-ac3e-b266eebc2d3c","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"88215513-f456-4c2a-84ec-ec654613470e","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"90b00f2b-c51e-45e0-9f5e-c25d1070b216","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"f4c6b12c-644a-448b-908c-fa5c68863b0b","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ a startup-error cleanup cannot overwrite a claimed run, a live lease, or another workspace (75.023001ms)
+{"event":"thread_runtime_start_failed","runId":"1b8efc2d-bf6d-4c25-b7a4-a862ff0717b6","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ a real Owner stop stays cancelled when a late cloud-start failure arrives (32.156261ms)
+{"event":"thread_runtime_start_failed","runId":"3b10ea45-a660-4ffd-bb6b-f22511bbdf09","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+  ✔ a real provider-start failure can settle only its own committed provisioning lease (64.370569ms)
+{"event":"thread_runtime_start_failed","runId":"19424a4f-d970-4463-8547-0f8b59d467c3","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"event":"thread_runtime_start_failed","runId":"4f49a9d6-9b27-4835-9f94-3d7dadfa9fae","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"event":"thread_runtime_start_failed","runId":"4dfd8128-a3da-49bd-be5e-e897d460ea7a","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"event":"thread_runtime_start_failed","runId":"6f65a570-3577-4757-be8a-47dd74db41bd","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+  ✔ a captured startup failure cannot overtake a replaced lease, successful provisioning, claim or Owner stop (62.739456ms)
+✔ cancel and thread end reach a terminal run, then afterRunEnded finalizes the Factory task (3691.898433ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8895.630647

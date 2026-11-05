@@ -1,0 +1,36 @@
+{
+  "head": "c68fc0bc9ddea0ee59a5c33afd3735283a7e0542",
+  "purpose": "exact public c68 unmodified full live DB suite, no model calls",
+  "startedAt": "2026-11-05T00:45:38.988Z",
+  "commands": [
+    {
+      "name": "setup",
+      "startedAt": "2026-11-05T00:45:39.037Z",
+      "finishedAt": "2026-11-05T00:45:40.833Z",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "ownedPid": 45735,
+      "log": "/vercel/acceptance/lists-1291-c68-final/setup.log"
+    },
+    {
+      "name": "live-db",
+      "startedAt": "2026-11-05T00:45:40.833Z",
+      "finishedAt": "2026-11-05T00:47:40.863Z",
+      "exitCode": null,
+      "signal": "SIGTERM",
+      "timedOut": true,
+      "ownedPid": 45762,
+      "log": "/vercel/acceptance/lists-1291-c68-final/live-db.log"
+    }
+  ],
+  "role": "mikka_pending_diag_066ec1d031",
+  "database": "mikka_pending_diag_066ec1d031_e2e",
+  "source": "70ef16b2c1a9e9f69ef86214ab57bd6576019840808156f09cf0893a4d593752",
+  "cleanup": {
+    "roleAbsent": true,
+    "ownedDatabasesAbsent": true,
+    "at": "2026-11-05T00:47:40.999Z"
+  },
+  "finishedAt": "2026-11-05T00:47:41.000Z"
+}

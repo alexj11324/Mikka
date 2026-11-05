@@ -1,0 +1,15 @@
+{
+  "source": "c68fc0bc9ddea0ee59a5c33afd3735283a7e0542",
+  "reviewedOriginalPngs": [
+    "en-board-1440-light.png",
+    "zh-board-390-dark.png",
+    "en-threads-1440-light.png",
+    "zh-threads-390-dark.png",
+    "en-chats-1440-dark.png",
+    "zh-chats-390-light.png",
+    "en-settings-1440-dark.png",
+    "zh-settings-390-light.png"
+  ],
+  "result": "No visible overlap, broken controls or unintended clipping in these eight originals. Long thread/card/email text uses expected truncation; mobile navigation/settings retain readable controls. Remaining matrix is provided as original PNGs for independent root review.",
+  "limits": "Local TestPool display fixtures; no production/model/healthy-gateway acceptance inferred."
+}
