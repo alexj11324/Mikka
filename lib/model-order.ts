@@ -76,14 +76,14 @@ export async function orderCandidates(query: Query, scope: OrderScope): Promise<
   const { ExecutionSettings } = await import('./execution-settings')
   const { usableApiKeys } = await import('./model-api-keys')
   const settings = new ExecutionSettings(query as Pool)
-  const rows = await settings.botModels(scope, query)
+  const rows = await settings.modelCandidates(scope, query)
   const { pooledOwners } = await import('./personal-policy')
   const { authorizeSubscriptionWorkspace } = await import('./subscription-runtime')
   // Sharing grants use in this workspace, never ownership of the account. Both parties must still
   // be active members; the owner is derived from server records, never an EntrySource supplied by a client.
   for (const ownerId of await pooledOwners(query, scope.ownerId, scope.workspaceId)) {
     try { await authorizeSubscriptionWorkspace(ownerId, scope.workspaceId) } catch { continue }
-    rows.push(...await settings.botModels({ ...scope, ownerId }, query))
+    rows.push(...await settings.modelCandidates({ ...scope, ownerId }, query))
   }
   // Each account's models in the order the account listed them (its catalogue): the default takes the first Codex model.
   const connectionIds = [...new Set(rows.map(row => String(row.connectionId)))]

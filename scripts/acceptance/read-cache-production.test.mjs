@@ -39,10 +39,15 @@ const live = () => ({ ownerId: OWNER, workspaceId: WORKSPACE, selectedWorkspaceI
 function fixture(options = {}) {
   const calls = [], actions = [], counts = new Map()
   let versions = 0
-  const list = (name, read) => {
+  const list = (name, read, args) => {
     const ids = name === 'syncIssueList' ? [TASK, id(4)] : name === 'syncThreadList' ? [id(5), id(6)] : [id(7), id(8)]
     const changed = options.changed && read >= 2, current = changed ? V2 : V1
-    if (read === 1) return { version: current, items: ids.map(row), positions: ids.map(value => position(value)), live: live() }
+    const offset = name === 'pollIssueVersionSummaries' ? 1 : 0
+    if (read === 1 || args[offset] == null && args[offset + 1] == null) return {
+      version: current,
+      items: ids.map(value => ({ ...row(value), ...(options.rejectedNonChat ? { credential: PRIVATE } : {}) })),
+      positions: ids.map(value => position(value, current)), live: live(),
+    }
     if (changed && read === 2) return { version: current, delta: true, items: [row(ids[0]), row(id(9))],
       positions: [position(ids[0], V2), position(id(9), V2)], live: live() }
     if (changed && read === 4) return { version: current, delta: true, items: [], positions: [position(ids[0], V2)], live: live() }
@@ -77,19 +82,23 @@ function fixture(options = {}) {
       assert.match(headers.get('traceparent'), /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
       if (options.accessLost && name === 'pollIssue') return flight({ error: 'issueNotFound' })
       if (name === 'syncIssueList' || name === 'syncThreadList') return flight({ snapshot: options.noTask && name === 'syncIssueList'
-        ? { version: V1, items: [], positions: [], live: live() } : list(name, read) })
-      if (name === 'pollIssueVersionSummaries') return flight({ viewerId: OWNER, snapshot: list(name, read) })
+        ? { version: V1, items: [], positions: [], live: live() } : list(name, read, args) })
+      if (name === 'pollIssueVersionSummaries') return flight({ viewerId: OWNER, snapshot: list(name, read, args) })
       if (name === 'pollIssue') {
         const current = options.changed && read >= 2 ? V2 : V1
         return flight({ viewerId: options.foreignViewer ? 'foreign' : OWNER, version: current,
-          ...(args[1] === current ? { unchanged: true } : { issue: { id: TASK, title: PRIVATE, content: { type: 'doc', content: PRIVATE } } }) })
+          ...(args[1] === current ? { unchanged: true } : { issue: { id: TASK, title: PRIVATE, content: {
+            type: 'doc', content: PRIVATE, ...(options.rejectedNonChat ? { attrs: { integrationPayload: PRIVATE } } : {}),
+          } } }) })
       }
       const current = options.changed && read >= 2 ? V2 : V1
       if (args[1] === current) return flight({ chat: { botId: BOT, version: current, cursor: options.changed ? 3 : 2, unchanged: true, live: live() } })
       const cursor = options.changed && read >= 2 ? 3 : 2, previous = args[2]
       const after = previous?.after ?? -1
       return flight({ chat: { botId: BOT, version: current, cursor, live: live(), sources: {}, artifacts: {},
-        items: Array.from({ length: cursor }, (_, index) => ({ position: index + 1, text: PRIVATE })).filter(item => item.position > after),
+        items: Array.from({ length: cursor }, (_, index) => ({ position: index + 1, text: PRIVATE,
+          ...(options.toolMetadata && index === 0 ? { activity: { tools: [{ call: 'tool-call', name: 'Read', state: 'done', at: 1, [options.toolMetadata]: PRIVATE }] } } : {}),
+        })).filter(item => item.position > after),
         continuation: { after: cursor - 1, cursor, prefix: PREFIX },
         ...(previous ? { after, baseCursor: previous.cursor, metadataRefresh: true } : {}) } })
     }
@@ -276,6 +285,53 @@ test('live deltas update restored proofs, remove absent rows and do not require 
   assert.deepEqual(mergeReadList(previous, next, 100).items, next.items)
   assert.throws(() => mergeReadList(previous, { ...next, items: [] }, 100), /list_merge_invalid/)
   assert.throws(() => mergeReadChat({ cursor: 2, version: V1, items: [] }, { cursor: 3, version: V2, after: 1, baseCursor: 1, items: [] }), /chat_merge_invalid/)
+})
+
+test('plain chat persistence retains its continuation and measures an incremental restored read', async () => {
+  const f = fixture(), report = await f.run()
+  assert.equal(report.status, 'pass')
+  assert.equal(report.browserCacheVerified, false)
+  const replay = f.actions.find(action => action.name === 'syncCoordinatorChat' && action.read === 3)
+  assert.equal(replay.args[1], null)
+  assert.deepEqual(replay.args[2], { after: 1, cursor: 2, prefix: PREFIX, sourceIds: [], artifactIds: [] })
+  const measure = report.reads.find(read => read.action === 'syncCoordinatorChat' && read.scenario === 'reload-restored')
+  assert.equal(measure.responseMode, 'delta')
+  assert.equal(measure.receivedItems, 1)
+})
+
+test('projected tool metadata requires one full restored chat repair before later incremental catch-up', async () => {
+  for (const toolMetadata of ['target', 'displayName', 'errorCode', 'errorDetail']) {
+    const f = fixture({ toolMetadata }), report = await f.run()
+    assert.equal(report.status, 'pass', toolMetadata)
+    assert.equal(report.browserCacheVerified, false)
+    const chats = f.actions.filter(action => action.name === 'syncCoordinatorChat')
+    assert.equal(chats[1].args[1], V1, 'the preceding warm read still has its complete in-memory snapshot')
+    assert.deepEqual(chats[2].args, [BOT, null, null], 'discarded prefix metadata cannot reuse either proof')
+    assert.equal(chats[3].args[1], null)
+    assert.equal(chats[3].args[2].cursor, 2, 'the repair response supplies the next incremental continuation')
+    const reads = report.reads.filter(read => read.action === 'syncCoordinatorChat')
+    assert.equal(reads[2].responseMode, 'snapshot')
+    assert.equal(reads[2].receivedItems, 2, 'the repaired prefix is included in measured HTTP bytes')
+    assert.equal(reads[3].responseMode, 'delta')
+    assert.equal(reads[3].receivedItems, 1)
+    assert.equal(JSON.stringify(report).includes(PRIVATE), false)
+  }
+})
+
+test('rejected task, thread and activity records reload without their former version or row proofs', async () => {
+  const f = fixture({ rejectedNonChat: true }), report = await f.run()
+  assert.equal(report.status, 'pass')
+  assert.equal(report.browserCacheVerified, false)
+  for (const name of ['syncIssueList', 'syncThreadList', 'pollIssue', 'pollIssueVersionSummaries']) {
+    const reads = f.actions.filter(action => action.name === name)
+    const offset = name === 'pollIssue' || name === 'pollIssueVersionSummaries' ? 1 : 0
+    assert.equal(reads[1].args[offset], V1, 'warm memory remains usable before restart')
+    assert.ok(reads[2].args[offset] == null, `${name} cannot send a rejected version`)
+    assert.ok(reads[2].args[offset + 1] == null, `${name} cannot send rejected row proofs`)
+    assert.equal(reads[3].args[offset], V1, `${name} uses the freshly authorized response on the next read`)
+    assert.equal(report.reads.find(read => read.action === name && read.scenario === 'reload-restored').responseMode, 'snapshot')
+  }
+  assert.equal(JSON.stringify(report).includes(PRIVATE), false)
 })
 
 test('missing existing resources are blocked and never cause fixture creation', async () => {

@@ -4,6 +4,7 @@ import { unstable_serialize, type Cache } from 'swr'
 import { CacheReadError } from '../cache-read-error'
 import { chatKeys } from '../swr/keys'
 import { ListReadScopeError } from '../live/list-read'
+import { persistentReadData } from '../swr/cache-policy'
 
 const botId = '10000000-0000-4000-8000-000000000001'
 const ownerId = 'fixture-owner'
@@ -56,6 +57,43 @@ test('a newer cache write wins over the response to an older cursor', async () =
   cache.set(key, { data: newer })
   release()
   assert.equal(await pending, newer)
+})
+
+test('a projected tool in the historical prefix gets one full repair, then resumes cursor reads', async () => {
+  const tool = { call: 'call-1', name: 'github_call', state: 'error', at: 0, target: 'private/repo', displayName: 'Dynamic operation', errorCode: 'upstream_denied', errorDetail: 'workspace_mismatch' }
+  const full = { ...chat(), cursor: 500, continuation: { after: 490, cursor: 500, prefix: 'c'.repeat(32) }, items: [
+    { ...chat().items[1], position: 301, activity: { tools: [tool] } }, { ...chat().items[1], position: 500 },
+  ] }
+  const projected = persistentReadData(chatKeys.detail(botId), full) as typeof full
+  assert.equal(projected.continuation, undefined)
+  assert.ok(!JSON.stringify(projected).includes('private/repo'))
+  const cache: Cache = new Map([[key, { data: projected }]])
+  answer = async () => ({ chat: full })
+  const repaired = await readCachedCoordinatorChat(cache, botId)
+  assert.equal(calls[0][1], undefined); assert.equal(calls[0][2], undefined)
+  assert.deepEqual(repaired.items[0].activity?.tools[0], tool, 'the full network read restores metadata before the saved tail cursor')
+  cache.set(key, { data: repaired })
+  answer = async () => ({ chat: { unchanged: true, version: oldVersion, cursor: 500, working: false, error: null, botId, enabled: true, live: chat().live } })
+  await readCachedCoordinatorChat(cache, botId)
+  assert.equal(calls[1][1], oldVersion)
+  assert.deepEqual(calls[1][2], { ...full.continuation, sourceIds: [], artifactIds: [] })
+})
+
+test('a late full repair preserves a newer cache write and leaves the preview unvalidated', async () => {
+  const preview = { ...chat(), continuation: undefined }
+  const cache: Cache = new Map([[key, { data: preview }]])
+  let release!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  answer = async () => { await gate; return { chat: chat() } }
+  const pending = readCachedCoordinatorChat(cache, botId)
+  await Promise.resolve()
+  const newer = { ...preview, version: newVersion, cursor: 3, items: [...preview.items, { ...preview.items[1], position: 3, text: 'Newly saved reply' }] }
+  cache.set(key, { data: newer })
+  release()
+  assert.equal(await pending, newer)
+  answer = async () => ({ chat: { ...chat(), ...newer } })
+  await readCachedCoordinatorChat(cache, botId)
+  assert.equal(calls[1][1], undefined, 'discarding a full response cannot mark an old projected prefix as verified')
 })
 
 test('expected authorization errors retain their code and purge classification without retrying', async () => {

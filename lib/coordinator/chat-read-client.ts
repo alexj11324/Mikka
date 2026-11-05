@@ -22,7 +22,8 @@ export async function readCachedCoordinatorChat(cache: Cache, botId: string | nu
   const requestedAt = performance.now()
   let validated = checked.get(cache)
   if (!validated) { validated = new Set(); checked.set(cache, validated) }
-  // The first read of a recovered cache replays its tail and current metadata;
+  // The first read of a recovered cache replays its tail and current metadata.
+  // Lossy tool previews have no continuation and get one bounded full repair;
   // transient pending/stream state is never trusted across a page restart.
   const known = validated.has(key) && !options.refreshMetadata ? previous?.version : undefined
   const continuation = previous?.continuation && { ...previous.continuation,
@@ -31,6 +32,9 @@ export async function readCachedCoordinatorChat(cache: Cache, botId: string | nu
   if (result.error) { validated.delete(key); throw new CacheReadError(result.error) }
   if (expectedOwner && result.chat.live?.ownerId !== expectedOwner) { validated.delete(key); throw new ListReadScopeError('owner') }
   const current = cache.get(key)?.data as CachedCoordinatorChat | undefined
+  // A full repair has no baseCursor. Keep a local/newer server write made
+  // while it was in flight, and do not mark the old preview validated yet.
+  if (current && current !== previous && current.botId === result.chat.botId && !('unchanged' in result.chat) && result.chat.after === undefined) return current
   const held = current?.botId === result.chat.botId ? current : previous?.botId === result.chat.botId ? previous : undefined
   const merged = mergeChat(held, result.chat)
   if (!merged) {
@@ -39,6 +43,8 @@ export async function readCachedCoordinatorChat(cache: Cache, botId: string | nu
     const full = await syncCoordinatorChat(botId)
     if (full.error) { validated.delete(key); throw new CacheReadError(full.error) }
     if (expectedOwner && full.chat.live?.ownerId !== expectedOwner) { validated.delete(key); throw new ListReadScopeError('owner') }
+    const latest = cache.get(key)?.data as CachedCoordinatorChat | undefined
+    if (latest && latest !== current && latest.botId === full.chat.botId) return latest
     validated.add(key)
     // With no known version the server always returns a full snapshot.
     return { ...(full.chat as CoordinatorChat), requestedAt }

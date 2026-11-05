@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withRequestLog } from '@/lib/request-log'
+import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { getPasswordStatus, listSessions } from '@/app/actions/account'
 import { getPreferences } from '@/app/actions/preferences'
 import { getIssuePrefixState } from '@/app/actions/issue-prefix'
@@ -58,7 +59,7 @@ function workspace(query: URLSearchParams) {
 async function handleGET(request: Request, { params }: { params: Promise<{ read: string }> }) {
   const { read } = await params
   if (!Object.hasOwn(READS, read)) return NextResponse.json({ error: 'notFound' }, { status: 404, headers: { 'Cache-Control': 'private, no-store' } })
-  const body = await cacheReadAction(() => READS[read as SettingsRead](new URL(request.url).searchParams))
+  const body = await cacheReadAction(() => withDatabaseOperation(`/api/settings/${read}`, () => READS[read as SettingsRead](new URL(request.url).searchParams)))
   const code = body && typeof body === 'object' && 'error' in body ? body.error : undefined
   const status = code === 'authRequired' ? 401 : code === 'workspaceAccessDenied' || code === 'workspaceMembershipSuspended' ? 403 : 200
   return NextResponse.json(body ?? null, { status, headers: { 'Cache-Control': 'private, no-store' } })

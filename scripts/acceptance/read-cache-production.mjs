@@ -5,6 +5,8 @@ import { pathToFileURL } from 'node:url'
 import { isSmokeAccountEmail } from '../../lib/smoke-account.ts'
 import { changedListIds, heldListPositions, mergeList, readListPositions } from '../../lib/list-poll.ts'
 import { mergeChat } from '../../lib/coordinator/chat-poll.ts'
+import { persistentReadData } from '../../lib/swr/cache-policy.ts'
+import { chatKeys, issueKeys, settingsKeys, threadKeys } from '../../lib/swr/keys.ts'
 import { ORIGIN, REPOSITORY, successfulRelease } from './project-decisions.mjs'
 import { attestReadiness, ReadinessError, triggerGuard } from './production-readiness.mjs'
 import { createReadClient, discoverReadActions, requestAllowed as readRequestAllowed } from './read-cache.mjs'
@@ -18,6 +20,10 @@ const uuid = value => typeof value === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4})
 const version = value => typeof value === 'string' && /^[0-9a-f]{32}$/.test(value)
 const integer = value => Number.isSafeInteger(value) && value >= 0
 const clone = value => JSON.parse(JSON.stringify(value))
+const restoreRead = (key, data) => {
+  const projected = persistentReadData(key, data)
+  return projected === undefined ? undefined : clone(projected)
+}
 const blocked = new Set(['trigger_rejected', 'attestation_required', 'account_required', 'build_mismatch', 'sign_in_failed',
   'session_missing', 'session_identity', 'session_close_failed', 'existing_bot_missing', 'existing_task_missing',
   'scope_changed', 'read_access_changed', 'request_failed', 'http_refused', 'acceptance_timeout', 'action_discovery_failed',
@@ -260,9 +266,17 @@ export async function runProductionReadCache({ env = process.env, event, attesta
     const issueId = held.issues.items[0].id
     report.existingVisibleTasks = held.issues.items.length
     for (const scenario of SCENARIOS) {
-      // This JSON round trip exercises the HTTP cursors held after reload. It
-      // does not claim an IndexedDB write, first paint, or focus event occurred.
-      if (scenario === 'reload-restored') held = clone(held)
+      // Restore the same allowed read models as the browser. A rejected record
+      // has no proof; redacted tool labels can require one full chat repair.
+      // This still does not exercise IndexedDB, first paint, or a focus event.
+      if (scenario === 'reload-restored') held = {
+        issues: restoreRead(issueKeys.list(ownerId, workspaceId), held.issues),
+        threads: restoreRead(threadKeys.list(ownerId), held.threads),
+        chat: restoreRead(chatKeys.detail(botId), held.chat),
+        detail: restoreRead(issueKeys.detail(issueId), held.detail),
+        activity: restoreRead(issueKeys.activityVersions(issueId), held.activity),
+        prefix: restoreRead(settingsKeys.issuePrefix(), held.prefix),
+      }
       if (scenario !== 'cold') {
         const next = (await action('syncIssueList', listArguments(held.issues), 'task-list', scenario)).snapshot
         listScope(next, true); measureResult(next); held.issues = mergeReadList(held.issues, next, 100)
@@ -273,16 +287,17 @@ export async function runProductionReadCache({ env = process.env, event, attesta
       const chat = (await action('syncCoordinatorChat', [botId, refreshMetadata ? undefined : held.chat?.version, chatProof(held.chat)], 'bot-chat', scenario)).chat
       check(chat?.botId === botId, 'scope_changed'); listScope(chat); measureResult(chat)
       held.chat = mergeReadChat(held.chat, chat)
-      const detail = await action('pollIssue', [issueId, held.detail?.version], 'task-detail', scenario)
+      const detail = await action('pollIssue', [issueId, held.detail?.readVersion], 'task-detail', scenario)
       check(detail.viewerId === ownerId, 'scope_changed'); check(version(detail.version), 'response_invalid'); measureResult(detail)
-      if (detail.unchanged === true) check(held.detail?.version === detail.version, 'list_merge_invalid')
-      else { check(detail.issue?.id === issueId && detail.issue.content && typeof detail.issue.content === 'object', 'response_invalid'); held.detail = detail }
+      if (detail.unchanged === true) check(held.detail?.readVersion === detail.version, 'list_merge_invalid')
+      else { check(detail.issue?.id === issueId && detail.issue.content && typeof detail.issue.content === 'object', 'response_invalid'); held.detail = { ...detail.issue, readVersion: detail.version } }
       const activity = await action('pollIssueVersionSummaries', [issueId, ...listArguments(held.activity)], 'task-activity', scenario)
       check(activity.viewerId === ownerId, 'scope_changed'); measureResult(activity.snapshot)
       held.activity = mergeReadList(held.activity, activity.snapshot, 50)
       const prefix = await client.json('/mikka/api/settings/issue-prefix', 'settings', scenario)
       check(typeof prefix?.suggested === 'string' && Array.isArray(prefix.teamKeys)
         && prefix.teamKeys.every(key => typeof key === 'string'), 'response_invalid')
+      held.prefix = prefix
     }
     await session(); await pin()
     report.status = 'pass'

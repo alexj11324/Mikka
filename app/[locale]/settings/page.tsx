@@ -1,3 +1,4 @@
+import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
@@ -12,9 +13,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ workspace?: string }> }) {
-  const query = await searchParams
-  const session = await getSession()
-  if (!session?.user) redirect('/sign-in?next=%2Fsettings')
-  const cacheWorkspace = await authorizedCacheWorkspace(session.user.id, query.workspace)
-  return <WorkspaceApp user={session.user} cacheWorkspace={cacheWorkspace} googleEnabled={googleEnabled} />
+  return withDatabaseOperation('/pages/settings', async () => {
+    const query = await searchParams
+    const session = await getSession()
+    if (!session?.user) redirect('/sign-in?next=%2Fsettings')
+    const cacheWorkspace = await authorizedCacheWorkspace(session.user.id, query.workspace)
+    return <WorkspaceApp user={session.user} cacheWorkspace={cacheWorkspace} googleEnabled={googleEnabled} />
+  })
 }

@@ -44,6 +44,10 @@ export async function listTaskRuns(): Promise<TaskRun[]> {
 
 /** Same owner-wide reader, with server-observed scope and window expiry. */
 export async function pollTaskRuns() {
+  return withDatabaseOperation('/actions/task-runs/read', readTaskRuns)
+}
+
+async function readTaskRuns() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
   const observedAt = Date.now()
@@ -78,7 +82,6 @@ export interface Thread {
   issueId: string | null
   prompt: string
   status: RunStatus
-  error: string | null
   createdAt: string
   updatedAt: string
   /** The opening of the agent's last reply on one plain line; null before it says anything (and for runs from before it was stored). */
@@ -130,12 +133,15 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
     // heartbeat must not invalidate every historic thread on that machine.
     const waitingForDevice = sql<boolean>`${devices.kind}='local' and ${agentRuns.status}='queued' and
       (${devices.enabled} is false or (${gatewayOffline} and (${devices.lastSeenAt} is null or
-       ${devices.lastSeenAt}<statement_timestamp()-(${DEVICE_ONLINE_WINDOW_MS} * interval '1 millisecond'))))`.as('waitingForDevice')
+       ${devices.lastSeenAt}<statement_timestamp()-(${DEVICE_ONLINE_WINDOW_MS} * interval '1 millisecond'))))`
     const snapshot = db.select({
       id: agentRuns.id, botId: agentRuns.botId, agentName: runBotName.as('agentName'), issueId: agentRuns.issueId, prompt: sql<string>`left(${agentRuns.prompt}, 200)`.as('prompt'),
-      status: agentRuns.status, error: agentRuns.error, createdAt: agentRuns.createdAt, updatedAt: agentRuns.updatedAt,
+      status: agentRuns.status, createdAt: agentRuns.createdAt, updatedAt: agentRuns.updatedAt,
       lastReply: agentRuns.lastReply, lastReplyAt: agentRuns.lastReplyAt, source: agentRuns.source,
-      deviceId: sql<string | null>`${devices.id}`.as('deviceId'), deviceName: devices.name, deviceType: devices.deviceType, waitingForDevice,
+      deviceId: sql<string | null>`case when ${waitingForDevice} then ${devices.id} end`.as('deviceId'),
+      deviceName: sql<string | null>`case when ${waitingForDevice} then ${devices.name} end`.as('deviceName'),
+      deviceType: sql<'laptop' | 'server' | null>`case when ${waitingForDevice} then ${devices.deviceType} end`.as('deviceType'),
+      waitingForDevice: waitingForDevice.as('waitingForDevice'),
       harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`.as('harness'),
       outcome: agentRuns.outcome,
     }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))

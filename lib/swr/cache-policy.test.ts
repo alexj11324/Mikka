@@ -85,3 +85,17 @@ test('chat stores only the proven tail and safe activity labels; first read repl
   assert.deepEqual(value.continuation, data.continuation)
   assert.equal(data.items[1].activity?.tools[0].input, 'sensitive parameters', 'sanitizing must not mutate the live read model')
 })
+
+test('stripped visible tool metadata invalidates only that restored chat continuation', () => {
+  const continuation = { after: 490, cursor: 500, prefix: 'a'.repeat(32) }
+  for (const field of ['target', 'displayName', 'errorCode', 'errorDetail']) {
+    const data = { cursor: 500, continuation, version: 'b'.repeat(32), items: [
+      { position: 301, text: 'prefix', activity: { tools: [{ call: 'call-1', name: 'github_call', state: 'done', [field]: 'private-value' }] } },
+      { position: 500, text: 'tail' },
+    ] }
+    const projected = persistentReadData(['coordinator-chat', 'bot'], data) as typeof data
+    assert.equal(projected.continuation, undefined, `${field} in the held prefix needs a bounded repair`)
+    assert.ok(!JSON.stringify(projected).includes('private-value'))
+    assert.equal(data.continuation, continuation, 'the live in-memory cursor is unchanged')
+  }
+})

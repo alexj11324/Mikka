@@ -21,7 +21,8 @@ const documentAttrs = new Set(['mikka', 'orvilo', 'textAlign', 'id', 'label', 'm
 const issueMetadata = new Set(['number', 'assignee', 'project', 'labels', 'pullRequests', 'parentId', 'blockedByIds', 'relatedIds', 'duplicateOfId', 'dueDate', 'estimate', 'favoriteUserIds', 'subscriberUserIds', 'deletedAt'])
 const activityFields = new Set(['tools', 'thought', 'reasoningAt'])
 const toolFields = new Set(['call', 'name', 'state', 'at'])
-type Projection = { sensitive: boolean; changed: boolean; issue: boolean; chat: boolean; issuePrefix: boolean }
+const toolMetadataFields = new Set(['target', 'displayName', 'errorCode', 'errorDetail'])
+type Projection = { sensitive: boolean; changed: boolean; needsChatMetadataRefresh: boolean; issue: boolean; chat: boolean; issuePrefix: boolean }
 
 /** Return plain structured data only; never serialize SWR errors or functions. */
 function clean(value: unknown, context: Projection, depth = 0, allowed?: ReadonlySet<string>): unknown {
@@ -45,6 +46,7 @@ function clean(value: unknown, context: Projection, depth = 0, allowed?: Readonl
     if (!publicTeamKeys && privateField.test(key) || allowed && !allowed.has(key)) {
       // requestedAt is a page-local monotonic clock, never a server proof.
       if (key !== 'requestedAt' && field !== undefined) context.changed = true
+      if (allowed === toolFields && toolMetadataFields.has(key) && field !== undefined) context.needsChatMetadataRefresh = true
       continue
     }
     const fields = context.issue && key === 'attrs' ? documentAttrs
@@ -60,7 +62,7 @@ function clean(value: unknown, context: Projection, depth = 0, allowed?: Readonl
 export function persistentReadData(key: unknown, data: unknown): unknown {
   if (!persistentReadKey(key) || data === undefined) return undefined
   const family = Array.isArray(key) ? key[0] : key
-  const context: Projection = { sensitive: false, changed: false, issue: ['issue', 'issues', 'issue-activity-versions'].includes(family), chat: family === 'coordinator-chat', issuePrefix: key === 'settings:issue-prefix' }
+  const context: Projection = { sensitive: false, changed: false, needsChatMetadataRefresh: false, issue: ['issue', 'issues', 'issue-activity-versions'].includes(family), chat: family === 'coordinator-chat', issuePrefix: key === 'settings:issue-prefix' }
   let projected = data
   if (family === 'coordinator-chat' && data && typeof data === 'object' && 'items' in data && Array.isArray(data.items)) {
     // The existing continuation proves the server's latest 200-message window.
@@ -75,6 +77,14 @@ export function persistentReadData(key: unknown, data: unknown): unknown {
   // a credential, skip the entire record instead of persisting a broken model.
   // A task's readVersion and list row proofs cover the original payload. Never
   // restore an altered document as verified/writable. Chat is the sole projected
-  // exception: its first read always replays the tail and current metadata.
-  return context.sensitive || context.changed && !context.chat ? undefined : value
+  // exception: a bounded preview remains useful. New visible tool metadata
+  // still derives from parameters and cannot go to disk. Repair snapshots that
+  // lost those labels once on startup; a tail replay cannot restore the prefix.
+  // Existing input/output/quote redaction alone keeps its incremental cursor.
+  if (context.sensitive || context.changed && !context.chat) return undefined
+  if (context.chat && context.needsChatMetadataRefresh && value && typeof value === 'object' && !Array.isArray(value)) {
+    const { continuation: _continuation, ...preview } = value as Record<string, unknown>
+    return preview
+  }
+  return value
 }
