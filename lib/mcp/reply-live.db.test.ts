@@ -109,7 +109,8 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
   const ordered = (rows: typeof deliveries) => [...rows].sort((a, b) => JSON.stringify(a.events).localeCompare(JSON.stringify(b.events)))
   function committedChatEvents(identity: { owner: string; workspaceId: string; botId: string }) {
     return [
-      { ownerId: identity.owner, workspaceId: identity.workspaceId, events: [{ kind: 'bot_chat_list', id: identity.workspaceId }] },
+      // The owner's open chat re-reads on the same request as its bot list row (lib/live/chats.ts).
+      { ownerId: identity.owner, workspaceId: identity.workspaceId, events: [{ kind: 'bot_chat_list', id: identity.workspaceId }, { kind: 'bot_chat', id: identity.botId }] },
       { ownerId: identity.owner, workspaceId: identity.workspaceId, events: [{ kind: 'coordinator_session', id: identity.botId }] },
     ]
   }
