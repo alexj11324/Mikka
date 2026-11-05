@@ -188,7 +188,7 @@ Object.assign(fixtures, {
   'artifacts.getArtifact': () => ({ id: ARTIFACT, kind: 'markdown', title: 'Release notes', latestVersion: 2, runId: RUN, issueId: ISSUE, botId: BOT, shared: false,
     versions: [1, 2].map(version => ({ version, authorName: 'Scout', authorColor: 'bleu', authorShape: 'cercle', createdAt: AT })) }),
   'artifacts.listRunArtifacts': () => [],
-  'agents.listIssueThreads': () => [thread],
+  'agents.pollIssueThreads': () => ({ threads: [thread], live: { workspaceId: WORKSPACE } }),
   'agents.getIssueThread': () => ({ live: { runs: [{ id: RUN, workspaceId: WORKSPACE }], issueWorkspaceId: WORKSPACE, questionDeadline: null }, thread: { ...thread, prompt: 'Fix the sign-in redirect', stopRequestedAt: null, feedbackEligible: false, error: null, quota: null }, chunks: [{ chunk: { type: 'text-delta', id: 't1', delta: 'Looking at the redirect handler.' }, at: new Date(AT) }], messages: [], chunkCursor: null, chunksAppend: false }),
   'agents.getThreadChanges': () => ({ state: 'none' }),
   'agents.listAgents': () => [{ id: AGENT, name: 'Claude Code', description: '', instructions: '', harness: 'claude_code', deviceId: DEVICE, deviceName: 'Ada’s MacBook' }],

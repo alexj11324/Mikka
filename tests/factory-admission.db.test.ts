@@ -393,6 +393,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
         assert.deepEqual(browserReceived.flat().toSorted(keyOrder), [
           { kind: 'factory_task', id: f.task.id }, { kind: 'factory_issue', id: f.issueId },
           { kind: 'thread_list', id: f.workspaceId }, { kind: 'task_run_list', id: f.workspaceId },
+          { kind: 'run', id: result.runId }, { kind: 'issue_threads', id: f.issueId },
         ].toSorted(keyOrder), 'the browser receives each exact committed entity/list invalidation once, regardless of HTTP delivery order')
         const scheduled = pending.length
         await dispatch(f)
