@@ -118,14 +118,23 @@ old module owners (backend was Codex's).
 1. **One owner.** Work is assigned through a GitHub issue to one agent
    (currently ChatGPT Pro sessions; earlier Codex and Cursor). That agent
    owns it end to end: code, PR, merge, deploy check and production
-   acceptance.
+   acceptance. It resolves every blocker itself and keeps going until the
+   goal is met in production, without stopping to wait for anyone (Alex,
+   2026-11-05). When Alex grants an owner full permissions on its issue,
+   that grant overrides the limits in this document for that issue.
+   Full permissions are for finishing the goal, not for spending: size
+   machines and paid resources to the actual need and stop each one as soon
+   as its step is done.
 2. **No direct pushes.** Nobody pushes to `main`. Every change goes through a
    PR from a branch based on `main`. Each original PR changes one thing;
    ready PRs are integrated as a batch under rule 3.
-3. **The owner merges.** When CI is green on the latest head and the PR is
-   mergeable, the owner completes the merge. When two or more PRs are ready,
-   combine their branches into one `batch/<date>-<n>` branch, resolve conflicts
-   once and run CI on the final batch head. Merge the batch PR with a merge
+3. **The owner merges.** Each PR is merged by its owner, the agent that
+   leads its issue (Alex, 2026-11-05). A Pro owner always has the right to
+   merge its own PRs on its own: when CI is green on the latest head and the
+   PR is mergeable, it merges, without waiting for or handing the PR to
+   anyone. When the owner has two or more of its own PRs ready, it combines
+   their branches into one `batch/<date>-<n>` branch, resolves conflicts once
+   and runs CI on the final batch head, then merges the batch PR with a merge
    commit so the original PRs are recorded as merged. Each original issue
    keeps its owner and production acceptance criteria. A single ready PR may
    be squash-merged. A UI change merges only after the owner has reviewed its
@@ -151,7 +160,8 @@ old module owners (backend was Codex's).
    revert PR. Never delete deployments, revoke shared tokens, change
    production Neon settings or create paid resources without Alex.
 7. **The coordinator** (a Claude Code session) writes issues, reviews and
-   verifies. It does not gate merges.
+   verifies. It merges only the PRs it leads itself; every other PR is merged
+   by its own owner. Review findings go on the PR as comments for the owner.
 8. A documentation conflict is resolved by whoever merges: they edit the
    documents directly.
 
