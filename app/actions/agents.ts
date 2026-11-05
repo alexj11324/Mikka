@@ -32,7 +32,7 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, taskFreeThreadMembers, threadQuestionRunId, withRunChain, type IssueThread } from '@/lib/issue-threads'
-import { threadQuestionStates } from '@/lib/issue-thread-questions'
+import { readThreadQuestionState, type ThreadQuestionDeadline } from '@/lib/issue-thread-questions'
 import { listIssueRunChains, readRunChain } from '@/lib/run-chain'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import { parseUnifiedDiff, type ThreadChangesResult } from '@/lib/thread-changes'
@@ -200,7 +200,7 @@ export async function listIssueThreads(issueId: string): Promise<IssueThread[]> 
     .where(and(eq(agentRuns.issueId, issue.id), inArray(agentRuns.userId, [...memberIds]), inArray(agentRuns.id, chains.map(chain => chain.rootRunId))))
     .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(ISSUE_THREAD_LIMIT)
   const byRoot = new Map(chains.map(chain => [chain.rootRunId, chain]))
-  return threadQuestions(projectIssueThreads(rows, issue.id, user.id, memberIds).map(thread => withRunChain(thread, byRoot.get(thread.id))), user.id)
+  return (await threadQuestions(projectIssueThreads(rows, issue.id, user.id, memberIds).map(thread => withRunChain(thread, byRoot.get(thread.id))), user.id)).threads
 }
 
 /**
@@ -248,6 +248,8 @@ export async function findThreadIssue(runId: string): Promise<{ issueId: string 
 }
 
 export interface IssueThreadDetail {
+  /** Authorized scopes for every attempt; browser state never guesses them. */
+  live?: { runs: import('@/lib/live/panels').ThreadLiveReference[]; issueWorkspaceId: string | null; questionDeadline: ThreadQuestionDeadline | null }
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
   thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean; /** The latest masked run error or the host's fixed wake failure. */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null; /** Host-confirmed provider recovery, within this owner's thread chain. */ modelFallback?: import('@/lib/run-model-fallback-view').ThreadModelFallbackView[] | null; /** Keep polling while the host prepares a continuation; no uncommitted switch is displayed. */ modelFallbackPending?: boolean }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
@@ -264,23 +266,23 @@ export interface IssueThreadDetail {
  * is on; the answer itself goes through sendIssueThreadMessage to the chain's latestRunId.
  * A teammate's thread or a live run never carries a question.
  */
-async function threadQuestions(threads: readonly IssueThread[], viewerId: string): Promise<IssueThread[]> {
+async function threadQuestions(threads: readonly IssueThread[], viewerId: string): Promise<{ threads: IssueThread[]; deadline: ThreadQuestionDeadline | null }> {
   // Keyed by the chain's live end (threadQuestionRunId), so an earlier attempt's answered question never resurfaces.
   const asked = new Map(threads.flatMap(thread => {
     const runId = thread.ownedByCurrentUser ? threadQuestionRunId(thread) : null
     return runId ? [[thread.id, runId] as const] : []
   }))
-  if (!asked.size || !deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return [...threads]
-  const byRun = await threadQuestionStates(pool, [...new Set(asked.values())], viewerId)
-  return Promise.all(threads.map(async thread => {
-    const question = byRun.get(asked.get(thread.id) ?? '') ?? null
+  if (!asked.size || !deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return { threads: [...threads], deadline: null }
+  const { states, deadline } = await readThreadQuestionState(pool, [...new Set(asked.values())], viewerId)
+  return { threads: await Promise.all(threads.map(async thread => {
+    const question = states.get(asked.get(thread.id) ?? '') ?? null
     // The list and detail share the owner's host-confirmed wake projection;
     // the queued run and its committed answer remain unchanged.
     const questionWake = thread.ownedByCurrentUser && question === 'resuming' && (thread.continuation?.status ?? thread.status) === 'queued'
       ? await (await import('@/lib/factory/questions/wake')).questionWakeFailure(pool, viewerId, thread.latestRunId)
       : null
     return { ...thread, question, questionWake }
-  }))
+  })), deadline }
 }
 
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
@@ -293,13 +295,13 @@ export async function getIssueThread(issueId: string | null, runId: string, afte
   // The conversation is the thread's, across its runs from this one on, oldest first.
   const from = chain ? Math.max(0, chain.attempts.findIndex(attempt => attempt.runId === row.id)) : 0
   const runIds = chain ? chain.attempts.slice(from).map(attempt => attempt.runId) : [row.id]
-  // A live run is polled every 2 s; only the chunks after the caller's cursor are read, not the whole chain again.
+  // Invalidation reads retain the cursor: only later chunks, not the whole chain again.
   const read = await readThreadChunks(runIds, cursor)
   const chunks = read.chunks
   const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
     .where(inArray(runMessages.runId, runIds)).orderBy(asc(runMessages.createdAt))
-  const [thread] = projected ? await threadQuestions([withRunChain(projected, chain)], user.id) : []
+  const { threads: [thread], deadline: questionDeadline } = projected ? await threadQuestions([withRunChain(projected, chain)], user.id) : { threads: [], deadline: null }
   if (!thread) throw new ActionFailureError('runNotFound')
   // A stop request belongs to the live run that send and stop address, not to an earlier attempt.
   const live = chain?.attempts.find(attempt => attempt.runId === thread.latestRunId)
@@ -324,7 +326,14 @@ export async function getIssueThread(issueId: string | null, runId: string, afte
   const modelFallback = row.userId === user.id
     ? await (await import('@/lib/run-quota-view')).threadModelFallbackState(user.id, chain?.attempts.map(attempt => attempt.runId) ?? [row.id], thread.latestRunId)
     : null
+  const { threadLiveReferences, documentLiveWorkspace } = await import('@/lib/live/panels')
+  const { workspacePool } = await import('@/lib/workspace-db')
+  const [runs, issueWorkspaceId] = await Promise.all([
+    threadLiveReferences(pool, workspacePool, runIds, user.id),
+    row.issueId ? documentLiveWorkspace(pool, workspacePool, row.issueId, user.id) : null,
+  ])
   return {
+    live: { runs, issueWorkspaceId, questionDeadline },
     thread: { ...thread, questionWake, prompt: row.prompt, stopRequestedAt, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),

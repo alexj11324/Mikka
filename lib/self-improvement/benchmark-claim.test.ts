@@ -51,6 +51,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/device-agents':{localExecutionHarnesses:()=>['codex']},
     '@/lib/device-repositories':{readRepositorySettings:async()=>({verifyCommand:repo.verifyCommand})},
     '@/lib/run-test-fixture':{runTestFixture:()=>undefined},
+    '@/lib/live/panels':{runChanged:async(_executor:unknown,id:string)=>{assert.equal(id,'run');assert.equal(run.status,'failed')}},
     '@/lib/agent-tool-approval/policy-store':{readCliRunPolicy:async()=>({policy:defaultRunPolicy(),revision:'synthetic-current-policy',workspaceIds})},
     '@/lib/model-admission/contract':{ModelAdmissionError},
     '@/lib/model-admission/runtime':{assertUnmanagedModelTransport:async(scope:{workspaceId:string;ownerId:string},model:string)=>{
