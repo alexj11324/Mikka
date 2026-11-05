@@ -777,7 +777,7 @@ export class Daemon {
       // their periodic check; an older one keeps the one-second check.
       this.runControlPush = ticket.runControl === 'push'
       this.options.link.setRunControlMode?.(this.runControlPush ? 'fallback' : 'legacy')
-      this.workSignal.setPushedWaits((['computerReviews'] as const satisfies readonly PushedWait[]).filter(wait => ticket[wait] === 'push'))
+      this.workSignal.setPushedWaits((['computerReviews', 'coordinatorResults'] as const satisfies readonly PushedWait[]).filter(wait => ticket[wait] === 'push'))
       if (!ticket.url || !ticket.protocol) { this.gatewayUnavailable = true; return false }
       if (signal.aborted) return false
       const socket = openDeviceGateway(ticket.url, ticket.protocol)
