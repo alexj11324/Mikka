@@ -70,6 +70,8 @@ import { ensureHarness, type HarnessStore } from "./harness-install"
 import { probeHarnessModels, sweepModelProbeHomes, type ModelReport } from "./model-probe"
 import { sweepRunCredentials } from "./agents/harness-home"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
+import { preflightLocalSubscription } from "./subscription-preflight"
+import { logCodedError } from "@mikka/protocol/coded-error"
 import { isSafeId } from "./ids"
 import { acquireLock } from "./lock"
 import { closeLogger, createLogger, type Logger } from "./log"
@@ -585,16 +587,17 @@ export class Daemon {
     if (this.stopped) throw new Error("daemon stopped during startup")
     // A callback alone is insufficient: the host must own the enforcement
     // boundary and bind its lifetime to the run's authenticated gate.
-    if (!hosted && !this.options.harnesses) this.harnessPrint = harnessFingerprint(this.harnessStore())
-    this.harnesses = [...detected.filter((info) => this.adapters.has(info.harness)).map(info => ({
+    const supported = detected.filter((info) => this.adapters.has(info.harness))
+    this.harnesses = hosted ? supported.map(info => ({
       ...info,
       ...this.modelReports.get(info.harness),
       // The run's live gate stops a revoked run; Codex also verifies its
       // pinned interface at initialize.
       toolApproval: this.supportsToolApproval(info),
-      coordinator: hosted ? false : coordinatorCapable(info),
-      ...(!hosted && this.localSubscriptionCapable(info) ? { subscriptionBroker: true as const } : {}),
-    }))]
+      coordinator: false,
+    })) : await Promise.all(supported.map(info => this.localHarnessReport(info)))
+    if (this.stopped) throw new Error("daemon stopped during startup")
+    if (!hosted && !this.options.harnesses) this.harnessPrint = harnessFingerprint(this.harnessStore())
     // A crash or kill skipped the run-end wipe; resumed runs get fresh credentials.
     sweepRunCredentials(paths.adapterState)
     // Probe homes a crashed daemon left (model-probe.ts).
@@ -998,16 +1001,31 @@ export class Daemon {
       this.supportsToolApproval(info) === true && Boolean(this.options.link.nativeLease)
   }
 
-  private async redetectHarnesses() {
+  /** Advertise only a checked local runner, replacing any old readiness or failure. */
+  private async localHarnessReport(info: HarnessInfo): Promise<HarnessInfo> {
+    const report: HarnessInfo = { ...info, ...this.modelReports.get(info.harness),
+      toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info) }
+    delete report.subscriptionBroker
+    delete report.subscriptionPreflight
+    if (!this.localSubscriptionCapable(info) || (info.harness !== "codex" && info.harness !== "claude_code")) return report
+    const result = await preflightLocalSubscription(info.harness, { store: this.harnessStore(), scratchDir: this.paths.dataDir,
+      binary: this.options.harnessBinaries?.[info.harness] })
+    if (result.ready) return { ...report, version: result.version, subscriptionBroker: true }
+    logCodedError(result.error, { harness: info.harness }, this.log)
+    return { ...report, subscriptionPreflight: result.error.detail }
+  }
+
+  private async redetectHarnesses(refreshModels = true) {
+    if (this.options.hostedSubscriptions) {
+      if (refreshModels && this.modelProbeOn()) await this.probeModels()
+      return
+    }
     const detected = detectHarnesses(this.harnessStore())
-    this.harnessPrint = harnessFingerprint(this.harnessStore())
     this.docker = await dockerAvailable()
-    this.harnesses = [...detected.filter(info => this.adapters.has(info.harness)).map(info => {
-      return { ...info, ...this.modelReports.get(info.harness), toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info),
-        ...(this.localSubscriptionCapable(info) ? { subscriptionBroker: true as const } : {}) }
-    })]
+    this.harnesses = await Promise.all(detected.filter(info => this.adapters.has(info.harness)).map(info => this.localHarnessReport(info)))
+    this.harnessPrint = harnessFingerprint(this.harnessStore())
     // 重新检测 asks the CLIs for their models again too.
-    if (this.modelProbeOn()) await this.probeModels().catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
+    if (refreshModels && this.modelProbeOn()) await this.probeModels().catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
   }
 
   /** The models each harness CLI reported, by harness (model-probe.ts). */
@@ -1053,6 +1071,13 @@ export class Daemon {
         changed = true
       }
       if (changed) this.harnesses = this.harnesses.map(info => ({ ...info, ...this.modelReports.get(info.harness) }))
+      // A first probe may have installed the managed CLI. Recheck its runtime
+      // on that completion event; an idle gateway need not send another tick.
+      // Skip model probing here because this very probe is still completing.
+      if (!this.options.hostedSubscriptions && !this.options.harnesses && harnessFingerprint(this.harnessStore()) !== this.harnessPrint) {
+        await this.redetectHarnesses(false)
+        changed = true
+      }
       return changed
     })().finally(() => { this.probingModels = null })
     return this.probingModels

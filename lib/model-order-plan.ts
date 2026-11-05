@@ -16,7 +16,7 @@
  * first (`pickDevice`). A model the person picked for the thread goes before
  * the list. Once a run starts nothing about it changes.
  */
-import { harnessReportsModel, type HarnessInfo } from '@mikka/protocol/harness'
+import { harnessReportsModel, type HarnessInfo, type SubscriptionPreflightFailure } from '@mikka/protocol/harness'
 import type { CloudModelState } from './cloud-template-models'
 
 export type OrderHarness = 'claude_code' | 'codex'
@@ -48,7 +48,7 @@ export interface PoolDevice {
   activeRuns: number
   /** When it joined (ms): the earlier goes first on a tie. */
   joinedAt: number
-  harnesses: readonly Pick<HarnessInfo, 'harness' | 'installed' | 'models' | 'modelSlots' | 'subscriptionBroker'>[]
+  harnesses: readonly Pick<HarnessInfo, 'harness' | 'installed' | 'models' | 'modelSlots' | 'subscriptionBroker' | 'subscriptionPreflight'>[]
 }
 
 export type EntryBlock =
@@ -87,16 +87,19 @@ export function deviceModel(device: PoolDevice, entry: OrderEntry): string | nul
 }
 
 /** modelNotReported: the daemon reported its models and this one is not among them. */
-export type DeviceStage = 'off' | 'offline' | 'notInstalled' | 'modelNotReported' | 'needsUpdate' | 'ready'
-const STAGES: readonly DeviceStage[] = ['off', 'offline', 'notInstalled', 'modelNotReported', 'needsUpdate', 'ready']
+export type DeviceStage = 'off' | 'offline' | 'notInstalled' | 'modelNotReported' | 'needsUpdate' | 'subscriptionRuntimeUnavailable' | 'ready'
+const STAGES: readonly DeviceStage[] = ['off', 'offline', 'notInstalled', 'modelNotReported', 'needsUpdate', 'subscriptionRuntimeUnavailable', 'ready']
 
 /** Whether a harness report lists a model (@mikka/protocol harnessReportsModel). Null when it reported none. */
 export const reportsModel = harnessReportsModel
 
 /** What a device can do for an entry whatever its 参与调度 or whether it is online (those come first in deviceStage). */
 export function deviceSupport(device: Pick<PoolDevice, 'harnesses'>, entry: OrderEntry): Exclude<DeviceStage, 'off' | 'offline'> {
-  const info = device.harnesses.find(item => item.harness === entry.harness && item.installed)
-  if (!info) return 'notInstalled'
+  const info = device.harnesses.find(item => item.harness === entry.harness)
+  // A failed check wins over a stale broker flag. API-key runs do not use
+  // subscription auth, so their existing installed-Agent path is unchanged.
+  if (entry.source.kind === 'subscription' && info?.subscriptionPreflight) return 'subscriptionRuntimeUnavailable'
+  if (!info?.installed) return 'notInstalled'
   if (entry.source.kind !== 'subscription') return 'ready'
   if (!info.subscriptionBroker) return 'needsUpdate'
   const reported = reportsModel(info, entry.model)
@@ -115,14 +118,15 @@ export function deviceStage(device: PoolDevice, entry: OrderEntry): DeviceStage 
  * too old to take a subscription run. `device` names that computer when it is
  * the only one at that step, `count` how many are.
  */
-export type NoDeviceWhy = { why: 'none' } | { why: Exclude<DeviceStage, 'ready'>; device: string; count: number }
+export type NoDeviceWhy = { why: 'none' } | { why: Exclude<DeviceStage, 'ready'>; device: string; count: number; detail?: SubscriptionPreflightFailure }
 
 export function whyNoDevice(devices: readonly PoolDevice[], entry: OrderEntry): NoDeviceWhy {
   if (!devices.length) return { why: 'none' }
   const staged = devices.map(device => ({ device, stage: deviceStage(device, entry) }))
   const best = staged.reduce((top, item) => STAGES.indexOf(item.stage) > STAGES.indexOf(top.stage) ? item : top)
   const why = best.stage === 'ready' ? 'needsUpdate' : best.stage
-  return { why, device: best.device.name, count: staged.filter(item => item.stage === best.stage).length }
+  const detail = why === 'subscriptionRuntimeUnavailable' ? best.device.harnesses.find(info => info.harness === entry.harness)?.subscriptionPreflight : undefined
+  return { why, device: best.device.name, count: staged.filter(item => item.stage === best.stage).length, ...(detail ? { detail } : {}) }
 }
 
 /**

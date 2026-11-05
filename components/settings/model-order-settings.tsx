@@ -214,6 +214,7 @@ function OrderList({ rows, pending, unsaved, preferred, repair, onMove, onRemove
 
 function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgent, onFirst, onUp, onDown, onRemove }: { row: OrderRow; index: number; last: boolean; pending: boolean; preferred: OrderHarness; repair?: ReactNode; retry?: () => void; onAgent: (harness: OrderHarness) => void; onFirst: () => void; onUp: () => void; onDown: () => void; onRemove: () => void }) {
   const t = useTranslations('Settings.modelOrder')
+  const runtimeT = useTranslations('RunErrors.subscription_local_runtime_unavailable')
   const commonT = useTranslations('Common')
   const format = useFormatter()
   const block = row.block
@@ -223,7 +224,7 @@ function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgen
   const status = retry ? t('orderUnsaved') : checking ? t('blocked.checking')
     : !block ? t('ready')
     : block.reason === 'quota' && block.resetsAt ? t('quotaUntil', { time: format.dateTime(new Date(block.resetsAt), { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) })
-      : block.reason === 'noDevice' ? (block.device.why === 'none' ? t('noDevice.none') : t(`noDevice.${block.device.why}`, { device: block.device.device, count: block.device.count, harness: harnessName(row.harness) }))
+      : block.reason === 'noDevice' ? (block.device.why === 'subscriptionRuntimeUnavailable' ? runtimeT(block.device.detail ?? 'default') : block.device.why === 'none' ? t('noDevice.none') : t(`noDevice.${block.device.why}`, { device: block.device.device, count: block.device.count, harness: harnessName(row.harness) }))
         : t(`blocked.${block.reason}`)
   // The handle carries the drag semantics; the row stays a list item (the primitive puts role=button on the item too).
   return <KanbanItem value={row.id} disabled={pending} render={<li />} role="listitem" tabIndex={-1} aria-roledescription={undefined} className="flex flex-wrap items-center gap-x-3 gap-y-2 bg-card py-3 pr-3 pl-2 data-[dragging=true]:relative data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg data-[dragging=true]:ring-1 data-[dragging=true]:ring-border">

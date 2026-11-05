@@ -4874,7 +4874,9 @@
       "model_mismatch": "订阅不提供线程所选的模型，请换一个模型",
       "account_changed": "订阅账号在运行中已切换，运行已停止",
       "env_not_clean": "本机运行环境不符合订阅运行要求，请更新 Mikka",
-      "adapter_start_failed": "Agent 无法用订阅启动"
+      "cli_missing": "本机订阅 Agent 尚未安装或安装不完整，请重启 Mikka 以安装后重新检测 Agent",
+      "cli_version_mismatch": "本机订阅 Agent 的版本与 Mikka 要求不符，请更新 Mikka 后重新检测 Agent",
+      "adapter_start_failed": "本机订阅 Agent 启动失败，请重启 Mikka 后重新检测 Agent"
     },
     "subscription_hosted_runtime_unavailable": {
       "default": "云电脑上的运行无法启动",

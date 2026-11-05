@@ -17,6 +17,8 @@ export const USER_ERROR_CODES = {
     "model_mismatch",
     "account_changed",
     "env_not_clean",
+    "cli_missing",
+    "cli_version_mismatch",
     "adapter_start_failed",
   ],
   /** A subscription or key run on a Mikka cloud machine (subscription-hosted-runner.ts). */

@@ -4874,7 +4874,9 @@
       "model_mismatch": "The subscription does not offer this thread's model. Please choose another model.",
       "account_changed": "The subscription account changed during the run, so the run stopped",
       "env_not_clean": "This computer's run environment does not meet the subscription requirements. Please update Mikka.",
-      "adapter_start_failed": "The Agent could not start on the subscription"
+      "cli_missing": "The subscription Agent is missing or incomplete on this computer. Restart Mikka to install it, then check the Agent again.",
+      "cli_version_mismatch": "The subscription Agent version on this computer does not match Mikka's required version. Update Mikka and check the Agent again.",
+      "adapter_start_failed": "The subscription Agent could not start on this computer. Restart Mikka and check the Agent again."
     },
     "subscription_hosted_runtime_unavailable": {
       "default": "The run could not start on the cloud computer",
