@@ -157,7 +157,7 @@ function AttachmentChip({
   return (
     <RiseIn reduce={reduce}>
       <View
-        className="h-9 flex-row items-center gap-2 rounded-xl bg-background pl-2.5 pr-1.5"
+        className="h-9 flex-row items-center gap-2 rounded-xl bg-surface pl-2.5 pr-1.5"
         style={styles.chip}
       >
         {attachment.icon
@@ -175,7 +175,7 @@ function AttachmentChip({
             accessibilityLabel={`Remove ${attachment.label}`}
             hitSlop={8}
             onPress={() => onRemove(attachment.id)}
-            className="size-6 items-center justify-center rounded-full active:bg-surface"
+            className="size-6 items-center justify-center rounded-full active:bg-default"
           >
             <CrossGlyph size={12} color={muted} />
           </Pressable>
@@ -492,7 +492,7 @@ export function PromptInput({
       layout={reduce ? undefined : GLIDE}
       onLayout={({ nativeEvent }) => setWidth(nativeEvent.layout.width)}
       style={[styles.surface, expanded ? styles.card : styles.pill]}
-      className={`bg-surface ${disabled ? "opacity-60" : ""} ${className}`}
+      className={`bg-default ${disabled ? "opacity-60" : ""} ${className}`}
     >
       {attachments.length > 0 ? (
         <View style={styles.attachments}>

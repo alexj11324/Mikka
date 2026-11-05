@@ -278,3 +278,18 @@ test('a completed-list age boundary repaints once without a data read, and a hid
   assert.equal(container.textContent, 'expired')
   assert.deepEqual(reads, [])
 })
+
+test('a bot-list push re-reads the bot list only, never a mounted whole Coordinator chat', { timeout: 20_000 }, async () => {
+  const { default: useSWR } = await import('swr')
+  let chatReads = 0
+  // A screen that still keeps the Coordinator's whole chat under its shared key (as the bot list once did).
+  const Chat = () => { useSWR('coordinator-chat', async () => { chatReads++; return { items: [] } }, { revalidateOnFocus: false }); return null }
+  await act(async () => root.render(<SWRConfig value={{ provider: () => cache, dedupingInterval: 0 }}>
+    <LiveProvider ownerId="owner" workspaceId={team}><Bots owner="owner" /><Chat /></LiveProvider>
+  </SWRConfig>))
+  await settled()
+  const bots = count('bots'), chats = chatReads
+  await act(async () => emit(home, 'bot_chat_list')); await wait(2_300)
+  assert.equal(count('bots'), bots + 1, 'the list itself re-reads')
+  assert.equal(chatReads, chats, 'a list push is not a reason to read 200 chat messages again (#1414)')
+})

@@ -1,7 +1,7 @@
 import { type ReactNode, useRef, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
-import { CardButton } from '@/components/cards'
 import { Text } from '@/components/Text'
+import { GlassButton } from '@/components/GlassButton'
 import { api, ApiError } from '@/lib/api'
 import { failureLine, failureSettingsPath } from '@/lib/chat-failure'
 import { replyRetryLine, retryReply, type ReplyRetryOutcome } from '@/lib/reply-retry'
@@ -46,9 +46,9 @@ export function FailedReply({ failure, botId, onQueued, modelChoice }: { failure
       <Text style={styles.error}>{line.text}</Text>
       {outcome ? <Text accessibilityLiveRegion="polite" style={styles.retryResult}>{replyRetryLine(outcome)}</Text> : null}
       <View style={styles.failedActions}>
-        {line.retry ? <CardButton label="重试" busy={busy} onPress={() => void retry()} /> : null}
-        {line.recovery === 'model' ? Platform.OS === 'ios' && modelChoice ? modelChoice : <CardButton label="聊天模型" disabled={!modelPath} onPress={() => { if (modelPath) void openOnWeb(modelPath) }} /> : null}
-        {line.recovery === 'models' || line.recovery === 'billing' ? <CardButton label={line.recovery === 'models' ? '模型与订阅' : '账单'} disabled={!settingsPath} onPress={() => { if (settingsPath) void openOnWeb(settingsPath) }} /> : null}
+        {line.retry ? <GlassButton label="重试" busy={busy} onPress={() => void retry()} /> : null}
+        {line.recovery === 'model' ? Platform.OS === 'ios' && modelChoice ? modelChoice : <GlassButton label="聊天模型" disabled={!modelPath} onPress={() => { if (modelPath) void openOnWeb(modelPath) }} /> : null}
+        {line.recovery === 'models' || line.recovery === 'billing' ? <GlassButton label={line.recovery === 'models' ? '模型与订阅' : '账单'} disabled={!settingsPath} onPress={() => { if (settingsPath) void openOnWeb(settingsPath) }} /> : null}
       </View>
     </View>
   )

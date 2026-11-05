@@ -104,6 +104,72 @@ rejected/abandoned option 必须说明理由。当前记录中路线停止的位
 
 本地检查由 source/type/lint、真实隔离 PostgreSQL、真实 HTTP PAT 与 worker MCP 调用，以及 daemon stdio 协议测试组成。源 SQL 用当前迁移后的真实 schema 校验。
 
-生产验收通过既有 GitHub OIDC 读取 Infisical 的 smoke 账号，正常登录；凭证仅在环境和进程内存。三条路径分别记录 API deepseek-flash、Claude 订阅 claude-haiku-5-5、Codex 订阅 gpt-6-luna 的结果。API 余额不足独立记 BLOCKED。订阅需先证明原 thread 仍工作，再真实插话改变方向，核对工具记录、实际执行身份和产物；只列出模型、只读工具目录或结束后续跑不算这项通过。
+生产验收沿用现有租用测试账号机制；真实订阅使用已授权 Owner 与其仍有效的订阅绑定。凭证不得进入日志、截图或 GitHub。按最新 AGENTS.md，仅记录 Claude Code 订阅 claude-haiku-5-5、Codex 订阅 gpt-6-luna 两条路径；DeepSeek 不再是合并和验收门禁。订阅需先证明原 thread 仍工作，再真实插话改变方向，核对工具记录、实际执行身份和产物；只列出模型、只读工具目录或结束后续跑不算这项通过。生产写入/改设置仍需 Alex 的具体授权。
 
 完成记录以对应 issue 的 PR、commit、Web deploy、生产 version 和脱敏验收报告为准。
+
+## 项目地图读取（#1247）
+
+实现与共享类型位于 `lib/project-map/read-contracts.ts`、`response-contracts.ts`；构图使用 `graph.ts`。这里列的是后端合同，不代表前端或生产真实任务验收已经完成。所有读取只使用 Mikka 已有事实，不调用模型、不读取用户代码仓库。
+
+| GET（统一前缀 `/mikka/api/projects/:projectId/map`） | 参数与返回 |
+| --- | --- |
+| 根路径 | `workspaceId` 必填，`limit=50`（1–100）、`laneLimit=3`（2/3）、`cursor?`、`branchId?`、`q?`、`filter=all/mainline/abandoned/with_artifacts`、`from?/to?`；返回 nodes/edges/branches/folds、跨页 boundaryNodes/laneState、coverage、snapshot、page |
+| `/nodes/:nodeId` | `workspaceId, snapshot`；固定 tasks、decisions、artifacts、checks、conversation_summary、threads 六个 section。project/task 节点关联自己的可读工作；run/candidate 只关联有实际关系的工作 |
+| `/path` | `workspaceId, nodeId, snapshot`；全部明确因果祖先、实际边、可确定的 primaryPath、选中路线及展开位置 |
+| `/overview` | `workspaceId, snapshot`；过滤条件必须与 snapshot 一致；最多 100 个 bin 和完整有界布局骨架 |
+| `/sources/:sourceRef` | `workspaceId, limit=50, cursor?`；单来源按需读取。仅接受 `run:<uuid>` 或 `source:<已持久化来源uuid>`，不接任意 URL |
+
+nodeId/sourceRef 必须 URL 编码。`schemaVersion=1`。成功响应包含 `live: {ownerId, workspaceId, revisions}`，以及强 ETag（本次原始 JSON 的 SHA-256）和 `Cache-Control: private, no-store`。ETag 是表示版本；当前不返回 304，带 If-None-Match 的请求仍完整验权。首屏新签发 snapshot 的到期时间会改变响应字节，不能用“首次请求的 ETag 永久不变”代替内容/权限检查。
+
+### 决定、路线与证据
+
+只用 contextOptionRef、predecessorDecisionIds、branch_work/stopped_at/merges_from、run retry/continue/replacement、候选与检查关联构图。时间只决定稳定排序，不把相邻工作推断成因果。明确放弃和未选路线保留终点/原因；失败的 run 不自动变成放弃。候选只有自己的 deliverable acceptance 或已合并的 factory_merges 回执才能完成；单有 PR URL、review passed 不算合并。
+
+决定详情明确投影可见语义与 sourceRefs，不透传 sources 原行、recordedBy/decidedBy 内部对象、idempotencyKey 或 payloadHash。历史更正/撤回保留在可见详情；被替代的事实不继续参与当前路线。Artifact 链接指向当时的精确 versionId/数字版本，检查指向精确 candidateId。私有 section 对没有来源权限的成员为空，不返回私有条目数量。
+
+### 分页、来源与界限
+
+snapshot/cursor 以服务端密钥签名，绑定 viewer、workspace、project、过滤/布局和内容 fingerprint，10 分钟过期。有效期内仍逐次检查当前权限。内容或查询变化返回 `409 map_snapshot_changed`（`restart:true`），过期返回 `410 map_snapshot_expired`；不能拿别人的 cursor 切换主体或项目。
+
+原始来源使用 `sourceKind` 区分：
+
+- `run_chunks`：本次 run 的 chunk 流；不是全部初始提示或人工消息。人工消息有自己的持久化 sourceRef。每页最多 100 条、原始响应最多 256 KiB；DB 正文预算 200 KiB，先在 SQL 内计字节再传正文。首屏固定 seq 上限；后续追加不挤入这组页，删除原 chunk 则返回 409。
+- `record`：单个原始来源先做 SQL 大小检查，原记录最多 64 KiB；脱敏后每段最多 16 KiB，超出给 continuation，内容变化返回 409。单条过大明确返回 413，不把截断预览冒充完整来源。
+- `unavailable`：只用于曾验证的 run 来源已删除，且当前仍能验证其可读 issue anchor；locator 为 null、items 为空。权限撤销返回 404，不用 unavailable 暴露私有对象。
+
+source 查询只重核本次决定的最多 50 个 sourceRef 及最多 51 个 run ID，整个引用投影在 SQL 内限制为 64 KiB；不为每段来源重读整图。即使所请求的单条来源仍可见，同一决定的另一条来源失去权限，也不能利用保存的 sourceRef 继续读取该决定来源。
+
+地图元数据有独立预算：每项目最多 100 个 issue ID（SQL 投影同时限制 4 KiB）、2000 个节点、2000 条路线、20000 条边、10000 个来源引用，整次 app DB 元数据投影合计最多 1 MiB。超限明确返回 413；项目关联异常返回 409。**256 KiB 是原始来源响应硬界限，不是地图列表原始 JSON 的硬界限。** 列表目标是默认页 gzip ≤150 KiB；根节点连接大量独立运行时，跨页边和边界节点会使首屏 raw JSON 大于 256 KiB，仍不包含 transcript。
+
+应用库读取在短只读 repeatable-read 事务内；项目/工作区权限在读取前后重新检查。它不是跨两库的统一 MVCC 快照。workspace PAT 的成员资格被停用后，认证层使 PAT 失效并返回 401；已认证但不可见的项目/来源返回 404。
+
+### 实时刷新与错误
+
+`project_map` 复用现有 scoped live channel。决定、project/issue 关系、影响地图的 run/Factory/Artifact 状态在提交后发内容为空的 key；回滚不推送，同一提交的重复注册合并。沿用 main 的 live_revisions：一次 fan-out 对每个项目只增加一次 revision，所有当前收件人收到同一个值；GET 先读取 revision 再读取内容。版本提升失败时保留既有普通失效 key 回退。没有新增定时器或轮询。
+
+稳定读取错误包括 `map_invalid_request`（400）、`map_auth_required`（401）、`map_not_found`（404）、`map_scope_conflict/map_snapshot_changed`（409）、`map_snapshot_expired`（410）、`map_too_large/map_source_too_large`（413）、`map_unavailable`（503）。原因以 cause 链保留，仅记录安全类型/代码；文案在既有中英文 RunErrors registry 内按 code 一一映射。
+
+### 隔离环境的读取量（2026-11-05）
+
+Medium 4 CPU / 8 GiB、PostgreSQL 17，500/1000 个 run（另有 project/task 两节点），每路 10 次暖请求。表中 KB 按 1000 B 计；DB 是实际 app/workspace PG 结果行 JSON 字节，包含 PAT 认证、当前权限、revision 与内容读取，不是 PostgreSQL 协议字节或 Neon 账单。HTTP 是单次响应 raw JSON，gzip 单独列出。测试通过真实 socket 调用 handler，并走真实 PAT 验证；此性能测量不等同于正常 Next + 租用账号验收。
+
+| GET | 500 runs：DB / HTTP / gzip KB | 1000 runs：DB / HTTP / gzip KB |
+| --- | --- | --- |
+| map 首屏（50条） | 157.540 / 176.705 / 27.454 | 313.040 / 338.708 / 53.200 |
+| map 后一页 | 157.540 / 30.703 / 3.674 | 313.040 / 30.704 / 3.662 |
+| map q=codex | 157.540 / 30.708 / 3.677 | 313.040 / 30.709 / 3.693 |
+| 单 run node | 157.540 / 1.844 / 0.994 | 313.040 / 1.844 / 0.993 |
+| 单 run path | 157.540 / 1.413 / 0.779 | 313.040 / 1.413 / 0.776 |
+| overview | 157.540 / 13.401 / 1.410 | 313.040 / 14.675 / 1.534 |
+| source（2条 chunk） | 20.306 / 13.288 / 0.969 | 20.306 / 13.288 / 0.968 |
+
+这是新增 GET，main 上没有同名接口的“改前”读量。实现期间 source 从重读整图的 176.766/332.266 KB，收窄到上表的 20.306/20.306 KB。500/1000 fixtures 的 prompt+report 全文分别为 8,199,500/16,399,000 B；这是被排除的合成正文量，不是假称旧版地图 API 实测。
+
+collector 无决定来源时固定 8 个批量查询，有来源的代表项目为 10 个；完整 page/node/path/overview 链路是 38 个 SQL statements（33 SELECT），source 是 35（30 SELECT），所以**不能把“collector ≤12”写成“完整 HTTP ≤12”**。后者仍高于 RFC 的初版往返目标。每路 p95：500 runs 32.78–104.14 ms, 1000 runs 34.54–145.06 ms；这是同机 loopback，不是生产同区或用户端 p95。
+
+### 验收与交接边界
+
+隔离回归包括共享 schema、真实 PG/HTTP 的 cursor/ACL/source、500/1000 规模、提交/回滚/幂等 live revision。正常应用验收另外使用实际 Next 与自动租用测试账号，记录固定 source SHA、origin、隔离数据库、资源清理、lease release 和 evidence audit；该结果写在 PR/issue，不拿 handler 集成代替。
+
+上线后仍需按 #1245/#1247 对真实 Owner 两条订阅任务的决定、分叉/放弃、Artifact、同候选检查、原始来源逐项核实，并给出部署 SHA、真实项目脱敏 JSON。当前代码和隔离结果不构成这项生产证据。没有足够规模的既有授权生产项目时，生产 500/1000 性能项保持未完成，不造生产垃圾数据。

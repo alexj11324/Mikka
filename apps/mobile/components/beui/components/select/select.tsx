@@ -266,7 +266,7 @@ export function SelectTrigger({
       {...props}
       ref={context.triggerRef}
       collapsable={false}
-      className={`border border-border bg-background ${disabled ? "opacity-50" : ""} ${className}`}
+      className={`border border-border bg-surface ${disabled ? "opacity-50" : ""} ${className}`}
       style={[styles.trigger, shapeStyle, props.style]}
     >
       <Pressable
@@ -428,7 +428,7 @@ export function SelectContent({
         {position ? (
           <Animated.View
             accessibilityViewIsModal
-            className={`overflow-hidden border border-border bg-background ${className}`}
+            className={`overflow-hidden border border-border bg-surface ${className}`}
             style={[styles.panel, position, panelStyle]}
           >
             {/* Pinned to the near edge, so the reveal uncovers it from there. */}
@@ -499,7 +499,7 @@ export function SelectItem({
     >
       {({ pressed }) => (
         <View
-          className={`min-h-10 flex-row items-center justify-between gap-2 rounded-lg px-2.5 py-2 ${selected || pressed ? "bg-surface" : ""} ${disabled ? "opacity-50" : ""} ${className}`}
+          className={`min-h-10 flex-row items-center justify-between gap-2 rounded-lg px-2.5 py-2 ${selected || pressed ? "bg-default" : ""} ${disabled ? "opacity-50" : ""} ${className}`}
         >
           {typeof children === "string" ? (
             <Text

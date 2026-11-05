@@ -76,7 +76,7 @@ export function ColorPickerHexInput({
   return (
     <Animated.View
       style={shakeStyle}
-      className={`min-w-0 flex-1 flex-row items-center rounded-lg border bg-background pl-3 ${focused ? "border-border-strong" : "border-border"} ${className}`}
+      className={`min-w-0 flex-1 flex-row items-center rounded-lg border bg-surface pl-3 ${focused ? "border-border-strong" : "border-border"} ${className}`}
     >
       <Text className="text-sm text-muted">#</Text>
       <TextInput
@@ -135,7 +135,7 @@ function ChannelField({ spec }: { spec: ChannelSpec }) {
   return (
     <View className="min-w-0 flex-1 items-center gap-1">
       <View
-        className={`h-9 w-full justify-center rounded-lg border bg-background ${focused ? "border-border-strong" : "border-border"}`}
+        className={`h-9 w-full justify-center rounded-lg border bg-surface ${focused ? "border-border-strong" : "border-border"}`}
       >
         <TextInput
           accessibilityLabel={spec.name}

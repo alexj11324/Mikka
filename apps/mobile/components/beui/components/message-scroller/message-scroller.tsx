@@ -113,7 +113,7 @@ export function MessageScroller({
   const jumpPress = useSharedValue(1);
   const [scrolled, setScrolled] = useState(false);
   const fade = useSharedValue(0);
-  const { backgroundColor: page } = useResolveClassNames("bg-background");
+  const { backgroundColor: page } = useResolveClassNames("bg-surface");
   useEffect(() => {
     fade.value = withTiming(scrolled ? 1 : 0, { duration: 160 });
   }, [fade, scrolled]);
@@ -275,7 +275,7 @@ export function MessageScroller({
             onPressOut={() => {
               jumpPress.value = withSpring(1, SPRING_PRESS);
             }}
-            className="h-9 flex-row items-center gap-1.5 rounded-full border border-border bg-background px-3.5"
+            className="h-9 flex-row items-center gap-1.5 rounded-full border border-border bg-surface px-3.5"
             style={styles.pill}
           >
             <View style={styles.down}>

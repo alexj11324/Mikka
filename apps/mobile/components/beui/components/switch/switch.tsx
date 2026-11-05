@@ -174,7 +174,7 @@ export function Switch({
     >
       <Animated.View style={[styles.track, trackStyle]}>
         <Animated.View
-          className="bg-background"
+          className="bg-surface"
           style={[styles.thumb, thumbStyle]}
         />
       </Animated.View>

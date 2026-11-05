@@ -65,7 +65,7 @@ export function useAlert(): AlertState {
 
 // Full class strings, so Uniwind can see every token at build time.
 const SURFACE_CLASS: Record<AlertVariant, string> = {
-  default: "bg-surface",
+  default: "bg-default",
   info: "bg-primary/5",
   success: "bg-success/5",
   warning: "bg-warning/5",

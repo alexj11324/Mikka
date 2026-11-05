@@ -34,8 +34,8 @@ export type CardSize = "default" | "compact";
 const CardSizeContext = createContext<CardSize>("default");
 
 const VARIANTS: Record<CardVariant, string> = {
-  outlined: "border-border bg-background",
-  muted: "border-transparent bg-surface",
+  outlined: "border-border bg-surface",
+  muted: "border-transparent bg-default",
 };
 // The root owns the vertical padding and the gap between parts; each part pads
 // itself horizontally, so any part can be left out without others losing edges.

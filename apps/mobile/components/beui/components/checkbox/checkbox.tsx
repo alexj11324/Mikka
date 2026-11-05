@@ -136,7 +136,7 @@ export function Checkbox({
   const reducedMotion = useReducedMotionPreference();
   const animate = !reducedMotion && !disableAnimation;
 
-  const { backgroundColor: idleFill } = useResolveClassNames("bg-background");
+  const { backgroundColor: idleFill } = useResolveClassNames("bg-surface");
   const { backgroundColor: idleBorder } = useResolveClassNames("bg-muted/50");
   const { backgroundColor: activeFill } = useResolveClassNames("bg-primary");
   const { color: markColor } = useResolveClassNames("text-on-primary");

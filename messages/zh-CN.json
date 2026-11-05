@@ -4968,6 +4968,40 @@
       "session_mismatch": "Agent 没有回到原会话",
       "adapter_start_failed": "Agent 无法在云电脑上启动",
       "cleanup_failed": "Agent 未启动，清理也未完成"
+    },
+    "map_invalid_request": {
+      "default": "地图请求无效。",
+      "invalid_query": "地图筛选条件或每页数量无效。",
+      "invalid_token": "地图分页凭据无效，请重新加载地图。"
+    },
+    "map_not_found": {
+      "default": "你无法访问这个地图或来源。"
+    },
+    "map_snapshot_changed": {
+      "default": "地图已更新，请重新加载后继续。",
+      "source_changed": "地图数据或筛选条件已变更，请重新加载后继续。"
+    },
+    "map_snapshot_expired": {
+      "default": "地图分页已过期，请重新加载地图。"
+    },
+    "map_too_large": {
+      "default": "这个项目超出了当前地图的规模上限。",
+      "limit": "这个项目超出了当前地图的规模上限。"
+    },
+    "map_source_too_large": {
+      "default": "这个来源超出了地图预览上限，请打开原始来源。",
+      "limit": "这个来源超出了地图预览上限，请打开原始来源。"
+    },
+    "map_scope_conflict": {
+      "default": "项目的工作区归属冲突，请检查项目工作区。"
+    },
+    "map_unavailable": {
+      "default": "地图无法加载，请重试。",
+      "database": "地图数据读取失败，请重试。",
+      "signing_key": "地图分页暂时不可用，请稍后重试。"
+    },
+    "map_auth_required": {
+      "default": "登录后查看这个地图。"
     }
   },
   "DesktopRenderer": {

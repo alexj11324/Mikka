@@ -307,10 +307,10 @@ test('panel notifications follow actual committed writes and persisted owner/wor
         const reference = (await questions.read('owner', first.questionId)).reference
         const escalation = { reference, eventId: randomUUID(), reason: 'Context requires the owner' }
         assert.equal((await questions.escalate('owner', escalation)).status, 'waiting_user')
-        assert.equal(pending.length, 1, 'escalation changes only the question, not the task')
+        assert.equal(pending.length, 2, 'question escalation schedules Factory and project-map readers after commit')
         await questions.read('owner', first.questionId)
         await questions.escalate('owner', escalation)
-        assert.equal(pending.length, 1, 'reads and an idempotent replay add nothing')
+        assert.equal(pending.length, 2, 'reads and an idempotent replay add nothing')
         await drain()
         assert.ok(sent.some(target => target.events.some(event => event.kind === 'factory_issue' && event.id === first.issueId)))
         sent.length = 0
@@ -319,7 +319,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
         assert.equal(expired.states.size, 0)
         assert.equal(expired.deadline, null)
         assert.equal((await questions.escalate('owner', escalation)).status, 'expired')
-        assert.equal(pending.length, 1, 'currentView on a write path persists expiry and invalidates')
+        assert.equal(pending.length, 2, 'currentView on a write path persists expiry and invalidates')
         await drain(); sent.length = 0
 
         const second = await asked(), continuation = await run(second.issueId)
@@ -337,9 +337,9 @@ test('panel notifications follow actual committed writes and persisted owner/wor
           await questions.settle('owner', continuation, tx)
           assert.equal(pending.length, 0)
           await tx.query('COMMIT')
-          assert.equal(pending.length, 1)
+          assert.equal(pending.length, 2)
           await questions.settle('owner', continuation)
-          assert.equal(pending.length, 1, 'settled replay does not notify again')
+          assert.equal(pending.length, 2, 'settled replay does not notify again')
           await drain()
           assert.ok(sent.some(target => target.events.some(event => event.kind === 'factory_issue' && event.id === second.issueId)))
         } finally { tx.release() }

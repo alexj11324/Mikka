@@ -11,7 +11,7 @@ Alex requested the full Agent-as-Code engineering layer on 2026-10-26: declarati
 
 ## Rollout
 
-Apply the additive `20261027181000_agent_kit.sql` migration to the matching isolated Preview database before enabling `MIKKA_AGENT_KIT=1` on that Preview. The flag is off by default; no production configuration is changed by this PR. With the flag off, Coordinator tools and prompts follow the old path. Enabling does not change the user's selected harness.
+Apply the additive `20261027181000_agent_kit.sql` migration to the isolated test database before enabling `MIKKA_AGENT_KIT=1` in a local or Docker production build (branches have no Vercel Preview; deployment migrates production). The flag is off by default; no production configuration is changed by this PR. With the flag off, Coordinator tools and prompts follow the old path. Enabling does not change the user's selected harness.
 
 A new execution records an immutable definition revision, content digest, exact host instructions and their digest, effective tools, and the selected runtime/model where known. An execution replay reuses that record even if the user edits the Bot. Memory is loaded separately under the current owner/Bot scope. The host prompt snapshot is not a model's hidden internal system prompt and does not claim to capture provider-internal state.
 
@@ -61,7 +61,7 @@ Skill artifact publication and Factory review/verification in #316 remain separa
 
 Run the pure definition/loader/tool/eval/HTTP suite with `pnpm test:agent-kit`. `pnpm test:agent-kit-db` uses only the existing Actions loopback service or an explicitly named isolated cloud-sandbox database; it refuses application/cloud URLs. The actual migration is applied repeatedly, and concurrency, immutable snapshots, tenant isolation, idempotency, proposal gates and HTTP-to-Postgres paths are exercised. Existing native relay and scope tests remain mandatory.
 
-Passing these suites establishes implementation contracts, not model quality. Real model comparisons and authenticated frozen-Preview acceptance must be reported separately, with their exact version and any missing authorization or configuration.
+Passing these suites establishes implementation contracts, not model quality. Real model comparisons and authenticated acceptance (local/Docker production build before merge, production after) must be reported separately, with their exact version and any missing authorization or configuration.
 
 ## Current main compatibility
 
