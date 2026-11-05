@@ -140,7 +140,7 @@ test('provider failure continues the same task through its authorized preferred 
       const answers = new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>(
         Object.entries({ difficulty: 'easy', model: candidate.id, effort: 'low', reason: 'difficulty_fit' })
           .map(([name, choice]) => [name, { name, type: 'choice', choice, confidence: .99 }]))
-      return { answers, execution: { executionId: randomUUID(), modelId: 'synthetic-decision', providerGenerationId: 'fixture-routing',
+      return { answers, execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'fixture-routing',
         startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
     }
     const { resolveAgentProfileDispatch } = await import('../lib/factory/agent-profile')
