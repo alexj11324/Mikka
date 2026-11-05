@@ -5,8 +5,7 @@ import { visibleRuns } from '@/lib/agent-runs'
 import { threadNamePrompt } from '@/lib/run-bot-name'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { credentialMasker, maskCredentials, maskDeep } from '@/lib/secrets/mask'
-import { issuesForUser } from '@/lib/issue-access'
-import { accessibleTeamScopes } from '@/lib/team-access'
+import { issuesForUser } from '@/lib/issues-for-user'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
@@ -476,7 +475,8 @@ export async function citationSources(userId: string, texts: readonly string[], 
   const sources: Record<string, CitationSource> = {}
   if (!issueIds.length && !runIds.length) return sources
   // One membership read for every visibility check of this call (never kept past it).
-  const teams = await accessibleTeamScopes(userId)
+  // Loaded here, not at module load: team-access brings in the workspace resolver, which the store's other callers never need.
+  const teams = await (await import('@/lib/team-access')).accessibleTeamScopes(userId)
   const issueRows = issueIds.length ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds, teams })).predicate)) : []

@@ -148,7 +148,8 @@ test('the polled routes read with a fixed number of queries, whatever the number
 
 test('issuesForUser answers as issueForUser does for each task: personal, shared, revoked, deleted and token-pinned', { skip: !enabled, timeout: 60_000 }, async () => {
   const { pool } = await import('../lib/db')
-  const { issueForUser, issuesForUser } = await import('../lib/issue-access')
+  const { issueForUser } = await import('../lib/issue-access')
+  const { issuesForUser } = await import('../lib/issues-for-user')
   const { tokenWorkspace } = await import('../lib/tokens/principal')
   const suffix = randomUUID()
   const owner = `batch-owner-${suffix}`, peer = `batch-peer-${suffix}`
