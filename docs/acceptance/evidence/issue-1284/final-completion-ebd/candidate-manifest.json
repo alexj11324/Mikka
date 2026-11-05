@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "evidenceSet": "issue1284-final-completion",
+  "createdAt": "2026-11-05T16:28:53.712774+00:00",
+  "publicationBase": "docs/acceptance/evidence/issue-1284/final-completion-ebd",
+  "auditContext": {
+    "sourceCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+    "sourceTree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+    "retainedPrivateContext": true,
+    "privateContextExported": false
+  },
+  "sourceBindings": {
+    "productionRelease": {
+      "commit": "ebd822e9c3b8af2b6dfb0967064438642761f59b",
+      "tree": "0c828329a69932ade9abe678631587d238b365b9",
+      "deploymentId": "dpl_12XdeeaNuun8cQXXQ5Wj9dDvp7S2"
+    },
+    "backend67": {
+      "taskId": "b5785091-2c95-4f55-821d-fce51e027b0e",
+      "reviewedCandidateId": "816513cf-503e-4ccc-b708-4bbd565206f3",
+      "acceptedCandidateId": "a46be664-682b-48db-b967-1b6874275e91",
+      "reviewNativeStatus": "succeeded",
+      "reviewBusinessStatus": "failed",
+      "ownerAcceptanceObservedAt": "2026-11-05T16:14:49.449Z"
+    },
+    "profileCleanup": {
+      "afterObservedAt": "2026-11-05T16:23:09.998Z",
+      "operation": "normal UI disable, not archive",
+      "profiles": 3,
+      "historicalRunsRead": 4
+    },
+    "releaseFollowup": {
+      "observedAt": "2026-11-05T16:24:12.624Z",
+      "desktopAttempt": 2,
+      "desktopTag": "desktop-2026.10000.477",
+      "assetsUploaded": 8
+    }
+  },
+  "fileCount": 6,
+  "totalBytes": 164252,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 5795,
+      "sha256": "6ecdea238f0225f732a9cce31c2888e12ac5a12eef94c96b18e68dacc851076f",
+      "gitBlobSha1": "66249a6ea127e671b2e497b64a8d271071e36154"
+    },
+    {
+      "path": "captures/issue1284-owner-accepted-alex67-1793895307091.jpg",
+      "bytes": 131666,
+      "sha256": "30cd453d1a13b35f38f4077e8a45758a7ad2ca11a90e75403a6c88cec1e91924",
+      "gitBlobSha1": "9fd1997634396255970f1bfc957894708fca67ac"
+    },
+    {
+      "path": "production/backend67-owner-accepted.json",
+      "bytes": 9756,
+      "sha256": "db5930765a57eed97e1caef81f55dee4bfc9c7f33d67085846c50fbc9f7da756",
+      "gitBlobSha1": "9bcea7f18b0d2f0130fc2842a8cbcd3c10e106c1"
+    },
+    {
+      "path": "production/profiles-cleanup.json",
+      "bytes": 6069,
+      "sha256": "c51ebd484e429e556f981fe835d96bbf3f2d9d3e852c9b0ca00e1b191dcbdf6a",
+      "gitBlobSha1": "864a67613a0a11a1e546453d07422cd55294bb0e"
+    },
+    {
+      "path": "release/ebd.json",
+      "bytes": 7317,
+      "sha256": "fe349c9b68f3321f8686b0645e963089a6dd5709a4b313c5a17191462a5f8fe8",
+      "gitBlobSha1": "d0008f50fca22deb4ed8f8aa5affec7ed867bc86"
+    },
+    {
+      "path": "release/followup-ebd.json",
+      "bytes": 3649,
+      "sha256": "656af089ebd563c02935c07f5a71514d248d4f704fb5df41a82524bd38383ee4",
+      "gitBlobSha1": "8d27b6c30f4581a769cfd558a6ff797b35d81676"
+    }
+  ]
+}

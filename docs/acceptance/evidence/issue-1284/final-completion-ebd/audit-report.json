@@ -1,0 +1,66 @@
+{
+  "kind": "official-test-account-evidence-audit",
+  "files": 6,
+  "archives": 0,
+  "archiveEntries": 0,
+  "decodedBytes": 0,
+  "result": "passed",
+  "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden",
+  "startedAt": "2026-11-05T16:32:19.058Z",
+  "finishedAt": "2026-11-05T16:32:19.123Z",
+  "evidenceSet": "issue1284-final-completion",
+  "runnerSourceCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+  "runnerSourceTree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+  "evidenceSourceBindings": {
+    "productionRelease": {
+      "commit": "ebd822e9c3b8af2b6dfb0967064438642761f59b",
+      "tree": "0c828329a69932ade9abe678631587d238b365b9",
+      "deploymentId": "dpl_12XdeeaNuun8cQXXQ5Wj9dDvp7S2"
+    },
+    "backend67": {
+      "taskId": "b5785091-2c95-4f55-821d-fce51e027b0e",
+      "reviewedCandidateId": "816513cf-503e-4ccc-b708-4bbd565206f3",
+      "acceptedCandidateId": "a46be664-682b-48db-b967-1b6874275e91",
+      "reviewNativeStatus": "succeeded",
+      "reviewBusinessStatus": "failed",
+      "ownerAcceptanceObservedAt": "2026-11-05T16:14:49.449Z"
+    },
+    "profileCleanup": {
+      "afterObservedAt": "2026-11-05T16:23:09.998Z",
+      "operation": "normal UI disable, not archive",
+      "profiles": 3,
+      "historicalRunsRead": 4
+    },
+    "releaseFollowup": {
+      "observedAt": "2026-11-05T16:24:12.624Z",
+      "desktopAttempt": 2,
+      "desktopTag": "desktop-2026.10000.477",
+      "assetsUploaded": 8
+    }
+  },
+  "manifestSha256": "4512722d38760126f997661720f741316841d367c435726f38560b66b5175f9b",
+  "candidateBytes": 164252,
+  "candidateByteIntegrityBeforeAndAfter": true,
+  "helperBindings": [
+    {
+      "path": "scripts/test-accounts/session.mjs",
+      "gitBlobSha1": "36a314187b7580b718c3987d84d0db830eb019a4",
+      "sha256": "0af2d324bdfbfda64c8e4ba791f5668afa943d978b08472eeee78ad30ea5d699"
+    },
+    {
+      "path": "scripts/test-accounts/environment.mjs",
+      "gitBlobSha1": "908a22f0086decf3c654b13558d5b5b715d7894e",
+      "sha256": "967eec59d8c641440eaf03d04a89f6d493930cf824ee1eeaa2c59e3f2dbb426c"
+    }
+  ],
+  "privateContextsExported": false,
+  "databaseOrServerRequired": false,
+  "productionCalls": 0,
+  "modelOrProviderCalls": 0,
+  "helper": "scripts/test-accounts/session.mjs auditEvidence, with retained 8641 environment and secret ledger",
+  "limitations": [
+    "This is a new exact-file audit; prior audit pass reports are not reused.",
+    "The official helper checks known credentials/cookies from its retained isolated test-account context; it does not assert knowledge of unrelated production secrets.",
+    "The evidence records version-bound production acceptance, release follow-up and normal Profile cleanup; the original receipts preserve distinct candidate identities, failed business Review outcomes, and source-specific limitations."
+  ]
+}

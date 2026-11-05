@@ -1,0 +1,218 @@
+{
+  "schema": 1,
+  "kind": "read-only-release-observation",
+  "recordedAt": "2026-11-05T16:03:12.028Z",
+  "sourceCommit": "ebd822e9c3b8af2b6dfb0967064438642761f59b",
+  "sourceTree": "0c828329a69932ade9abe678631587d238b365b9",
+  "mainRef": {
+    "readAt": "2026-11-05T16:02:03.745Z",
+    "sha": "ebd822e9c3b8af2b6dfb0967064438642761f59b"
+  },
+  "workflows": {
+    "mainCI": {
+      "id": 42058500793,
+      "name": "CI",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42058500793",
+      "headSha": "ebd822e9c3b8af2b6dfb0967064438642761f59b",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-05T15:53:53Z"
+    },
+    "firstWeb": {
+      "id": 42058500973,
+      "name": "Web deploy",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42058500973",
+      "headSha": "ebd822e9c3b8af2b6dfb0967064438642761f59b",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-05T15:53:30Z"
+    },
+    "officialRuntime": {
+      "id": 42058501015,
+      "name": "E2B official instance runtime",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42058501015",
+      "headSha": "ebd822e9c3b8af2b6dfb0967064438642761f59b",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-05T16:00:19Z"
+    },
+    "daemon": {
+      "id": 42058500813,
+      "name": "Publish daemon",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42058500813",
+      "headSha": "ebd822e9c3b8af2b6dfb0967064438642761f59b",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-05T15:56:52Z"
+    }
+  },
+  "mainCIJobs": {
+    "observedAt": "2026-11-05T15:54:56.762Z",
+    "total": 12,
+    "success": 12,
+    "failed": 0,
+    "skipped": 0,
+    "jobs": [
+      {
+        "id": 127353345250,
+        "name": "Changed files",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 127353459721,
+        "name": "Core unit checks",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 127353459766,
+        "name": "Integration unit checks",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 127353459881,
+        "name": "Cloud credential access (OIDC)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 127353459991,
+        "name": "Daemon checks",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 127353460006,
+        "name": "Source checks",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 127353460023,
+        "name": "Database checks (4/4)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 127353460044,
+        "name": "Database checks (1/4)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 127353460062,
+        "name": "Database checks (2/4)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 127353460770,
+        "name": "Database checks (3/4)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 127356037573,
+        "name": "Production build and browser interactions",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 127357217377,
+        "name": "UI policy (strict)",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "firstWeb": {
+    "deployment": {
+      "id": "dpl_Af7ZiS6NrHsQWz2UMTYS1qbCmPxt",
+      "url": "mikka-1h2pm0r3n-mikka-dev.vercel.app",
+      "target": "production",
+      "readyState": "READY",
+      "createdAt": "2026-11-05T15:52:31.549Z",
+      "readyAt": "2026-11-05T15:53:20.779Z",
+      "sourceCommit": "ebd822e9c3b8af2b6dfb0967064438642761f59b"
+    },
+    "jobId": 127353349572,
+    "buildUploadAndPublicVersionSteps": "success",
+    "publicVersion": {
+      "logTimestamp": "2026-11-05T15:53:25.5490147Z",
+      "status": 200,
+      "attempts": 2,
+      "buildTextPartiallyMaskedByGitHub": true,
+      "fullSourceBinding": "Workflow head SHA and Vercel deployment Git metadata both equal sourceCommit."
+    }
+  },
+  "runtimeAndSecondWeb": {
+    "runtimeWorkerSha": "553c1aa18500bb63bd6a3fc0e37a69f3f48ccaf9",
+    "runtimeVerification": {
+      "logTimestamp": "2026-11-05T15:53:52.7455612Z",
+      "event": "official_runtime_env_verified",
+      "changed": true,
+      "requiresWebBuild": true,
+      "sourceCommit": "ebd822e9c3b8af2b6dfb0967064438642761f59b",
+      "workerSha": "553c1aa18500bb63bd6a3fc0e37a69f3f48ccaf9"
+    },
+    "jobId": 127357145636,
+    "deployment": {
+      "id": "dpl_12XdeeaNuun8cQXXQ5Wj9dDvp7S2",
+      "url": "mikka-r6qj9fwew-mikka-dev.vercel.app",
+      "target": "production",
+      "readyState": "READY",
+      "createdAt": "2026-11-05T15:59:18.026Z",
+      "readyAt": "2026-11-05T16:00:15.590Z",
+      "sourceCommit": "ebd822e9c3b8af2b6dfb0967064438642761f59b"
+    },
+    "productionAliasesObserved": [
+      "app.aspectlylabs.com",
+      "mikka.aspectlylabs.com",
+      "new-base-nova-project-ten.vercel.app",
+      "mikka-mikka-dev.vercel.app"
+    ],
+    "buildUploadAndPublicVersionSteps": "success",
+    "publicVersion": {
+      "logTimestamp": "2026-11-05T16:00:16.5312575Z",
+      "status": 200,
+      "buildTextAndAttemptsPartiallyMaskedByGitHub": true,
+      "fullSourceBinding": "Workflow head SHA and Vercel deployment Git metadata both equal sourceCommit."
+    },
+    "overallWorkflowCompletedSuccessAt": "2026-11-05T16:00:19Z"
+  },
+  "daemonPackage": {
+    "name": "@aspectlylabs/mikka",
+    "version": "0.0.473",
+    "jobId": 127353345471,
+    "source": "backend_impl independent completed-job log review; overall workflow independently corroborated by this reviewer",
+    "publishLogTimestamp": "2026-11-05T15:54:02.931Z",
+    "registrySameCommitConfirmationTimestamp": "2026-11-05T15:56:49.917Z",
+    "jobCompletedAt": "2026-11-05T15:56:51Z"
+  },
+  "desktopRelease": {
+    "workflowRunId": 42058500798,
+    "lastObservedAt": "2026-11-05T16:01:00Z",
+    "lastObservedStatus": "in_progress",
+    "stage": "macOS packaging",
+    "source": "backend_impl read-only observation",
+    "completionClaimed": false
+  },
+  "safety": {
+    "externalWrites": 0,
+    "dockerActions": 0,
+    "browserActions": 0,
+    "productionApplicationRequests": 0,
+    "modelProviderCalls": 0,
+    "rawLogsExported": false,
+    "credentialsOrRawHeadersIncluded": false
+  },
+  "limitations": [
+    "This receipt records release readiness for the exact commit, not acceptance of ALEX67 or proof that its existing durable workflow has migrated.",
+    "No Owner Retry, task state mutation, production browser interaction, database query, or model execution was performed by this reviewer.",
+    "Both Web deployments and their public-version steps are recorded separately; the first READY alone was not treated as official-runtime completion.",
+    "GitHub-masked log fragments were not reconstructed. Full source SHA comes from workflow and Vercel metadata.",
+    "The daemon package version is attributed to the sibling's completed-job log review. Desktop completion is not claimed."
+  ]
+}

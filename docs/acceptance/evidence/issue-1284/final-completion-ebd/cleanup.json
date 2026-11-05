@@ -1,0 +1,85 @@
+{
+  "kind": "official-static-evidence-audit-cleanup",
+  "observedAt": "2026-11-05T16:38:49.799169+00:00",
+  "evidenceSet": "issue1284-final-completion",
+  "manifestSha256": "4512722d38760126f997661720f741316841d367c435726f38560b66b5175f9b",
+  "auditSha256": "5ae62bd9e734af17653ddef6e63af0c2f4818538e22c414f0c137967a15845d4",
+  "auditResult": "passed",
+  "auditFiles": 6,
+  "candidateBytes": 164252,
+  "candidateIntegrityBeforeAfterAndFullRoundtrip": true,
+  "remoteAuditExitCodeFieldExposed": false,
+  "auditCompletionEvidence": "Official auditEvidence returned passed and wrote the final report; the transport driver completed successfully.",
+  "filesystemCleanup": {
+    "observedAt": "2026-11-05T16:35:14.402947+00:00",
+    "remotePublicArchivesRemoved": [
+      "issue1284-final-completion-public-transport.tar.gz",
+      "issue1284-final-completion-public-export.tar.gz"
+    ],
+    "privateRunnerContextRetained": true,
+    "privateContextWrittenOrExported": false
+  },
+  "localPublicTransportArchiveRemoved": true,
+  "resourcesCreatedByThisAudit": {
+    "applicationServers": 0,
+    "databaseServers": 0,
+    "databaseRoles": 0,
+    "databases": 0,
+    "browserProcesses": 0,
+    "testAccountLeases": 0,
+    "nativeOrModelRuns": 0
+  },
+  "productionApplicationCalls": 0,
+  "modelProviderCalls": 0,
+  "sourceFilesChanged": 0,
+  "privateContextsExported": false,
+  "publicCandidateAndReportsRetained": true,
+  "auditWrapperRetainedForReproducibility": true,
+  "controlPlaneObservations": [
+    {
+      "operation": "get",
+      "observedAt": "2026-11-05T16:29:28.362067+00:00",
+      "sandbox": "sandboxes/sbx_001m6n9e6xhnqqg09ct1swwakwm",
+      "status": "stopped",
+      "expiresAt": null,
+      "errorPresent": false
+    },
+    {
+      "operation": "start",
+      "observedAt": "2026-11-05T16:29:36.579154+00:00",
+      "sandbox": "sandboxes/sbx_001m6n9e6xhnqqg09ct1swwakwm",
+      "status": "starting",
+      "expiresAt": null,
+      "errorPresent": false
+    },
+    {
+      "operation": "get",
+      "observedAt": "2026-11-05T16:30:49.710869+00:00",
+      "sandbox": "sandboxes/sbx_001m6n9e6xhnqqg09ct1swwakwm",
+      "status": "running",
+      "errorPresent": false
+    },
+    {
+      "operation": "stop",
+      "observedAt": "2026-11-05T16:35:23.639307+00:00",
+      "sandbox": "sandboxes/sbx_001m6n9e6xhnqqg09ct1swwakwm",
+      "status": "stopping",
+      "errorPresent": false
+    }
+  ],
+  "startRequests": 1,
+  "stopRequests": 1,
+  "stopResponseStatus": "stopping",
+  "stopRequestAccepted": true,
+  "stoppedStateConfirmed": false,
+  "originalSandboxTouched": false,
+  "noRuntimeRequestsAfterStop": true,
+  "boundary": "Exactly one backup-sandbox start and one stop request were issued for this final file-only audit. The stop response is an observation, not an inferred transition timestamp; the root separately confirms stopped. No private context was printed or transferred.",
+  "localPublicArchiveCleanup": {
+    "verifiedAbsentAt": "2026-11-05T16:38:49.799169+00:00",
+    "archive": "issue1284-final-completion-public-transport.tar.gz",
+    "bytesBeforeRemoval": 128060,
+    "sha256BeforeRemoval": "eed0b8565cc769cbb9921a09d5ca00e7a30ec7b294402efeca421373a7a08b4a",
+    "correction": "Final local readback found the public transport archive still present after the aggregate cleanup report. The exact known public archive was then removed locally; no Docker request was issued and no candidate or audit bytes changed."
+  }
+}

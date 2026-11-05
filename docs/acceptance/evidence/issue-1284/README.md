@@ -1,5 +1,7 @@
 # #1284 component visual review
 
+> 最新状态见[最终生产验收与收尾](final-completion-ebd/README.md)。本页保留各阶段的历史记录与失败边界。
+
 These screenshots render the actual Agent Profile settings, editor and task selector in a Docker Cloud Sandbox production build with synthetic fixture data. They are component layout evidence only: no real account, credential, model call or final deployment acceptance is claimed. The fixture is outside the product repository and has no authentication or mutation API.
 
 Captured 2026-11-05 UTC from the pre-rebase implementation working tree based on 2b25caad1608df6a2a54d5e18e798b3c9807ce89. Product UI source was later replayed onto fc2d401bde7b3f567b1288b01accd6fdeb433d0c. The PR records exact-head CI, isolated authenticated API acceptance and subsequent production acceptance separately.
@@ -273,3 +275,10 @@ ALEX66 的原 Review failed 和原生 Chrome SIGABRT 保持原样；补充检查
 
 公开源码提交 [89f1829](https://github.com/alexj11324/Mikka/commit/89f1829e9620c5f59013781adc107228a666413c) 的tree精确等于实际Docker checkpoint24aa。该贡献已纳入#1403当前head；最终整合构建/CI、Web/worker发布及ALEX67原候选恢复仍需后续生产证据。API coding路径继续按Alex要求排除。
 
+## 最终生产验收与收尾（2026-11-05）
+
+[最终增量证据](final-completion-ebd/README.md)记录 main `ebd822e9c3b8af2b6dfb0967064438642761f59b` 的 Web、official runtime、Daemon 0.0.473 及 Desktop 2026.10000.477 发布，以及公网版本、ALEX67 的正常 Owner 接受、三个自建 Profile 的正常停用和四个历史 Run 冻结快照读回。Desktop 的首次 GitHub 502/500 发布失败和一次定向重试成功分别保留；未重新打包或移动 main。
+
+ALEX67 的 Codex 原生 Run succeeded 与业务 Review failed 6/7 分开记录；第七项是后续 Owner 接受。随后 CC 未改文件、复跑测试并提交新候选，正常 Owner 接受同一 Task 的同字节产物；不冒称原 candidate UUID 被接受，也不将历史 Review 改成 passed。ALEX72/73 的完整通过审阅和接受记录仍见前述生产包。未调用或验证被排除的 DeepSeek coding API。
+
+本增量的[文件清单](final-completion-ebd/candidate-manifest.json)、[官方脱敏审计](final-completion-ebd/audit-report.json)、[审计清理](final-completion-ebd/cleanup.json)和[最终 Docker 停机观察](final-completion-ebd/sandbox-final-stop.json)单独保存。下方/上方早期的待办状态均保留其原观察时间，由本次最新收据补充，不改写历史。

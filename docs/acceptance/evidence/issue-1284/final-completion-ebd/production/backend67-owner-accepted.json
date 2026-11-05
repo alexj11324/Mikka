@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "issue": 1284,
+  "observedAt": "2026-11-05T16:14:49.449Z",
+  "scope": {
+    "route": "Normal signed-in production Owner UI and read-only Owner GET",
+    "deepSeekApiExcluded": true,
+    "directProductionSqlWrites": false,
+    "normalAuthorizedOwnerMutations": ["Retry review", "Owner acceptance note", "Accept"],
+    "unrelatedTasksChanged": false
+  },
+  "production": {
+    "mainCommit": "ebd822e9c3b8af2b6dfb0967064438642761f59b",
+    "webDeployment": "dpl_12XdeeaNuun8cQXXQ5Wj9dDvp7S2",
+    "publicVersionObservedAt": "2026-11-05T16:01:53.601Z",
+    "handoff": [
+      {
+        "header": "### 2026-11-05T16:03:36.380Z POST /mikka/.well-known/workflow/v1/flow [info/function]",
+        "deploymentId": "dpl_12XdeeaNuun8cQXXQ5Wj9dDvp7S2",
+        "requestId": "jvr5r-1793894596631-e792f4665468",
+        "event": "factory_cloud_handoff_finished",
+        "runId": "24a6ebe7-b36b-46ec-825f-e46b5d2a2b8f",
+        "started": true
+      },
+      {
+        "header": "### 2026-11-05T16:03:16.947Z POST /mikka/.well-known/workflow/v1/flow [info/function]",
+        "deploymentId": "dpl_12XdeeaNuun8cQXXQ5Wj9dDvp7S2",
+        "requestId": "jvr5r-1793894596631-e792f4665468",
+        "event": "factory_cloud_handoff",
+        "runId": "24a6ebe7-b36b-46ec-825f-e46b5d2a2b8f",
+        "previousRunId": null,
+        "providerContinuation": false
+      }
+    ],
+    "boundary": "The deployment is tied to this Run by two production handoff events; no global due-timer owner execution ID is inferred."
+  },
+  "task": {
+    "issueKey": "ALEX-67",
+    "issueId": "6cda8149-144c-49cc-bdcb-a85ff14cb144",
+    "taskId": "b5785091-2c95-4f55-821d-fce51e027b0e",
+    "originalCandidateId": "816513cf-503e-4ccc-b708-4bbd565206f3",
+    "originalCandidateSha": null,
+    "originalProducerRunId": "52c25088-3cbf-4e3f-882f-d7b3296637a4"
+  },
+  "retry": {
+    "clickedAt": "2026-11-05T16:02:03.059Z",
+    "attemptId": "d45d62f2-d2ae-4219-baba-99c3308a4cc2",
+    "createdAt": "2026-11-05T16:02:07.406Z",
+    "pendingObservedAt": "2026-11-05T16:02:31.764Z",
+    "runningObservedAt": "2026-11-05T16:03:53.209Z",
+    "nativeCompletedObservedAt": "2026-11-05T16:05:15.029Z"
+  },
+  "review": {
+    "runId": "24a6ebe7-b36b-46ec-825f-e46b5d2a2b8f",
+    "nativeStatus": "succeeded",
+    "harness": "codex",
+    "model": "gpt-6-luna",
+    "credentialType": "subscription",
+    "subscriptionRoute": "codex_cli",
+    "profile": {
+      "id": "1880144e-4005-4d72-b3e3-6f362fbe8bd8",
+      "name": "1284 独立审阅",
+      "version": 1,
+      "digest": "a8f543efb2a4e53afc388434788952f8473108dd3f6f762b52f3053ba31dc134",
+      "source": "decision",
+      "reason": "stage_fit"
+    },
+    "businessStatus": "failed",
+    "finishedAt": "2026-11-05T16:05:10.264Z",
+    "criteriaPassed": 6,
+    "criteriaTotal": 7,
+    "failedCriterion": "Owner UI acceptance and independent Review outcome",
+    "failureReason": "Owner UI acceptance is a subsequent human flow and was not established by the independent review.",
+    "materialCodeFindings": 0,
+    "checkSha": "d01964968b3e31bb108b05c0dd53714eb33a2bee",
+    "candidateSha": null,
+    "checkShaIsNotCandidateSha": true,
+    "reportOnly": true,
+    "readOnly": true,
+    "independentNativeSession": true,
+    "nativeSessionIdentifiersOmitted": true,
+    "nodeTestsRerunByReviewer": false,
+    "criteria": [
+      {
+        "criterion": "Record starting implementation failing tests and exit code",
+        "passed": true,
+        "evidence": "Retained producer command record run-chunk:1e981594-8199-4a12-9edd-acd71fb046ad: node test-summarize-jobs.mjs; 4/8 passed, exit 1."
+      },
+      {
+        "criterion": "Export a pure summarizeJobs function with required total, counts, rounding and empty-input behavior",
+        "passed": true,
+        "evidence": "Actual implementation artifact independently inspected; 597 bytes; contentMatchesGit=true."
+      },
+      {
+        "criterion": "Reject non-array input, null items and unknown status with TypeError",
+        "passed": true,
+        "evidence": "Actual implementation inspected; producer final command record also covers these cases."
+      },
+      {
+        "criterion": "Node tests cover required normal, boundary, error and input-immutability cases",
+        "passed": true,
+        "evidence": "Actual test artifact independently inspected; 2665 bytes; contentMatchesGit=true."
+      },
+      {
+        "criterion": "Rerun after fix and report exact command, exit code and SHA-256",
+        "passed": true,
+        "evidence": "Retained producer command record run-chunk:937762aa-b1c0-47af-9cde-a363ad53dce7: node test-summarize-jobs.mjs; 8/8 passed, exit 0, matching hashes."
+      },
+      {
+        "criterion": "Publish only fixed code and test for normal independent Review and Owner acceptance; no auto-Accept or extra Verify",
+        "passed": true,
+        "evidence": "Independent review inspected the two described artifacts and did not accept or verify."
+      },
+      {
+        "criterion": "Owner UI acceptance and independent Review outcome",
+        "passed": false,
+        "evidence": "Subsequent Owner flow was not yet established; this historical result remains unchanged."
+      }
+    ],
+    "artifactObservations": [
+      {
+        "path": "summarize-jobs.mjs",
+        "bytes": 597,
+        "sha256": "24854ab8136c9a466f3fab2c446ee9f4b901afa8b0260ffb028a55744ae38546",
+        "contentMatchesGit": true
+      },
+      {
+        "path": "test-summarize-jobs.mjs",
+        "bytes": 2665,
+        "sha256": "d1e7192a6ce5143736956a6ac3d5abf6813563e5848feeb068c6f67a155b0103",
+        "contentMatchesGit": true
+      }
+    ]
+  },
+  "automaticRepair": {
+    "attemptId": "1420772a-0439-42a3-9ff9-421971e1e19d",
+    "createdAt": "2026-11-05T16:05:09.586Z",
+    "finishedAt": "2026-11-05T16:07:07.668Z",
+    "attemptStatus": "passed",
+    "runId": "89f073b4-973e-4f80-88de-a75ed306d0d3",
+    "nativeStatus": "succeeded",
+    "harness": "claude_code",
+    "model": "claude-haiku-5-5",
+    "credentialType": "subscription",
+    "subscriptionRoute": "claude_code_cli",
+    "profile": {
+      "id": "923c75f2-cecb-4bb2-b812-646d057e8a22",
+      "name": "1284 后端实现",
+      "version": 1,
+      "digest": "91fb6c351e970b2920a3d07de9d60c3df58fd755b9ae3a3534ac947f9292b731",
+      "source": "decision",
+      "reason": "capability_fit"
+    },
+    "sourceChanged": false,
+    "nativeBashInvocationObserved": true,
+    "report": {
+      "baseline": {
+        "command": "node test-summarize-jobs.mjs (starting implementation reproduced temporarily inside the worktree)",
+        "passed": 4,
+        "total": 8,
+        "exitCode": 1,
+        "failures": [
+          "empty array",
+          "2 of 3 done rounding",
+          "unknown status",
+          "frozen input"
+        ]
+      },
+      "final": {
+        "command": "node test-summarize-jobs.mjs",
+        "passed": 8,
+        "total": 8,
+        "exitCode": 0
+      },
+      "hashCommand": {
+        "command": "sha256sum summarize-jobs.mjs test-summarize-jobs.mjs",
+        "exitCode": 0
+      },
+      "worktreeClean": true,
+      "sourceCommit": "ddbfef24df90cfd7e12b53719f95e8344cc4bf0e",
+      "deliverableCommit": "d01964968b3e31bb108b05c0dd53714eb33a2bee",
+      "verifyStatus": "not_run"
+    },
+    "evidenceBoundary": "The native thread visibly contains a real Bash step; baseline 4/8 exit 1 and final 8/8 exit 0 are recorded in the normal Execute Report. The original producer command records were independently considered by Codex. Codex did not rerun Node tests.",
+    "finalCandidateId": "a46be664-682b-48db-b967-1b6874275e91",
+    "finalCandidateSha": null,
+    "fileHashesUnchangedFromReviewedCandidate": true
+  },
+  "ownerAcceptance": {
+    "noteSentAt": "2026-11-05T16:14:17.160Z",
+    "notePurpose": "Records the real failed seventh review criterion, matching hashes, new candidate identity, null candidate sha versus fixed check HEAD, actual rerun report and manual Owner acceptance boundary.",
+    "clickedAt": "2026-11-05T16:14:37.348Z",
+    "observedAt": "2026-11-05T16:14:49.449Z",
+    "taskStage": "approval",
+    "taskStatus": "passed",
+    "taskRevision": 20,
+    "taskUpdatedAt": "2026-11-05T16:14:38.557Z",
+    "approvalAttemptId": "90279422-2aef-4fbe-925b-e942afc4f48e",
+    "approvalFinishedAt": "2026-11-05T16:14:39.159Z",
+    "uiAccepted": true,
+    "uiIssueDone": true,
+    "candidateId": "a46be664-682b-48db-b967-1b6874275e91",
+    "completedNativeReviewCount": 1,
+    "blockedReviewAttemptsWithoutRun": 3,
+    "verifyAttemptCount": 0,
+    "verifiedUrl": "https://app.aspectlylabs.com/mikka/en?section=all-issues&issue=6cda8149-144c-49cc-bdcb-a85ff14cb144&thread=89f073b4-973e-4f80-88de-a75ed306d0d3",
+    "screenshot": {
+      "file": "issue1284-owner-accepted-alex67-1793895307091.jpg",
+      "scope": "Visible Accepted and Changed status to Done; the long Owner note is partially outside the viewport. This is normal authorized Owner UI acceptance, not evidence that Alex personally reviewed it.",
+      "bytes": 131666,
+      "sha256": "30cd453d1a13b35f38f4077e8a45758a7ad2ca11a90e75403a6c88cec1e91924"
+    }
+  },
+  "limitations": [
+    "Business Review remains failed (6/7) because its seventh item required subsequent Owner acceptance; the history was not rewritten.",
+    "The accepted candidate is a new candidate record after automatic execute handoff, with byte-identical two files. It is not the original candidate UUID.",
+    "Candidate database sha values are null; fixed review HEAD is separately recorded.",
+    "The excluded path was DeepSeek API coding; no DeepSeek balance probe or coding request was made for this acceptance. Local Node validation and normal official-subscription execution were performed as recorded."
+  ]
+}
+

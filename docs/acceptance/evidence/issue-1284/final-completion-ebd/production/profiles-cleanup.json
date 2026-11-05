@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "issue": 1284,
+  "scope": "Normal production UI cleanup of only the three Agent Profiles created for this acceptance; history retained; no direct SQL or configuration writes.",
+  "coordination": {
+    "comment": "https://github.com/alexj11324/Mikka/issues/1225#issuecomment-6663121590",
+    "confirmedAt": "2026-11-05T16:20:25Z",
+    "confirmation": "The concurrent #1225 session explicitly confirmed its remaining Owner acceptance does not require new dispatch or any of these three enabled Profiles, and it will not modify them."
+  },
+  "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+  "beforeObservedAt": "2026-11-05T16:18:27.884Z",
+  "afterObservedAt": "2026-11-05T16:23:09.998Z",
+  "profiles": [
+    {
+      "id": "55e1952f-0129-43c6-9690-2f1b9d99e6b2",
+      "name": "1284 前端实现",
+      "before": {
+        "enabled": true,
+        "version": 2,
+        "digest": "2d28a80aa6d0fcb94cb912db17f14df6fa7d41adb0a70a0683c60a8e210c69f5"
+      },
+      "clickedAt": "2026-11-05T16:22:30.630Z",
+      "after": {
+        "enabled": false,
+        "version": 3,
+        "digest": "948830754adbadab3de8e25be2609712b180c71d31e14524c970d4c7f445e7b0",
+        "updatedAt": "2026-11-05T16:22:31.257Z",
+        "archivedAt": null,
+        "available": false,
+        "availabilityReason": "disabled"
+      },
+      "createdAtUnchanged": true,
+      "changedKeys": [
+        "enabled",
+        "version",
+        "digest",
+        "updatedAt"
+      ]
+    },
+    {
+      "id": "923c75f2-cecb-4bb2-b812-646d057e8a22",
+      "name": "1284 后端实现",
+      "before": {
+        "enabled": true,
+        "version": 1,
+        "digest": "91fb6c351e970b2920a3d07de9d60c3df58fd755b9ae3a3534ac947f9292b731"
+      },
+      "clickedAt": "2026-11-05T16:22:44.449Z",
+      "after": {
+        "enabled": false,
+        "version": 2,
+        "digest": "19ba9cb217e572e7fd5159ff218873ccc227c1912ae4f6f0b9d96c22ce03c311",
+        "updatedAt": "2026-11-05T16:22:46.330Z",
+        "archivedAt": null,
+        "available": false,
+        "availabilityReason": "disabled"
+      },
+      "createdAtUnchanged": true,
+      "changedKeys": [
+        "enabled",
+        "version",
+        "digest",
+        "updatedAt"
+      ]
+    },
+    {
+      "id": "1880144e-4005-4d72-b3e3-6f362fbe8bd8",
+      "name": "1284 独立审阅",
+      "before": {
+        "enabled": true,
+        "version": 1,
+        "digest": "a8f543efb2a4e53afc388434788952f8473108dd3f6f762b52f3053ba31dc134"
+      },
+      "clickedAt": "2026-11-05T16:22:59.236Z",
+      "after": {
+        "enabled": false,
+        "version": 2,
+        "digest": "65b20b974938e963aab5e873ba8102e2367cc41d53fca88303db17fe21ac1086",
+        "updatedAt": "2026-11-05T16:22:59.426Z",
+        "archivedAt": null,
+        "available": false,
+        "availabilityReason": "disabled"
+      },
+      "createdAtUnchanged": true,
+      "changedKeys": [
+        "enabled",
+        "version",
+        "digest",
+        "updatedAt"
+      ]
+    }
+  ],
+  "normalUiReadback": {
+    "allThreeSwitchesOff": true,
+    "allThreeCardsDisabled": true,
+    "observedAt": "2026-11-05T16:24:12.624Z"
+  },
+  "historicalRunReadbacks": [
+    {
+      "observedAt": "2026-11-05T16:23:27.996Z",
+      "runId": "495a2c8f-4e8d-492b-8368-3165e38d802a",
+      "status": "succeeded",
+      "harness": "claude_code",
+      "model": "claude-haiku-5-5",
+      "credentialType": "subscription",
+      "subscriptionRoute": "claude_code_cli",
+      "profileId": "55e1952f-0129-43c6-9690-2f1b9d99e6b2",
+      "profileVersion": 1,
+      "profileDigest": "3a33e10dff60bf8ae3c5702ab9ce6b30184f9b3c4e65cff1055caea87621c182",
+      "source": "explicit",
+      "reason": "explicit"
+    },
+    {
+      "observedAt": "2026-11-05T16:23:28.343Z",
+      "runId": "66584a3e-3d09-4f45-8e3b-6b92dff16778",
+      "status": "succeeded",
+      "harness": "claude_code",
+      "model": "claude-haiku-5-5",
+      "credentialType": "subscription",
+      "subscriptionRoute": "claude_code_cli",
+      "profileId": "55e1952f-0129-43c6-9690-2f1b9d99e6b2",
+      "profileVersion": 2,
+      "profileDigest": "2d28a80aa6d0fcb94cb912db17f14df6fa7d41adb0a70a0683c60a8e210c69f5",
+      "source": "explicit",
+      "reason": "explicit"
+    },
+    {
+      "observedAt": "2026-11-05T16:23:28.708Z",
+      "runId": "89f073b4-973e-4f80-88de-a75ed306d0d3",
+      "status": "succeeded",
+      "harness": "claude_code",
+      "model": "claude-haiku-5-5",
+      "credentialType": "subscription",
+      "subscriptionRoute": "claude_code_cli",
+      "profileId": "923c75f2-cecb-4bb2-b812-646d057e8a22",
+      "profileVersion": 1,
+      "profileDigest": "91fb6c351e970b2920a3d07de9d60c3df58fd755b9ae3a3534ac947f9292b731",
+      "source": "decision",
+      "reason": "capability_fit"
+    },
+    {
+      "observedAt": "2026-11-05T16:23:29.133Z",
+      "runId": "24a6ebe7-b36b-46ec-825f-e46b5d2a2b8f",
+      "status": "succeeded",
+      "harness": "codex",
+      "model": "gpt-6-luna",
+      "credentialType": "subscription",
+      "subscriptionRoute": "codex_cli",
+      "profileId": "1880144e-4005-4d72-b3e3-6f362fbe8bd8",
+      "profileVersion": 1,
+      "profileDigest": "a8f543efb2a4e53afc388434788952f8473108dd3f6f762b52f3053ba31dc134",
+      "source": "decision",
+      "reason": "stage_fit"
+    }
+  ],
+  "conclusion": "All three are disabled for future selection. Existing Run status, version/digest, harness/model and subscription route remain frozen as previously recorded. Only enabled/version/digest/updatedAt changed in each current Profile; names, instructions, skills, harness/model configuration and createdAt remained unchanged.",
+  "boundaries": [
+    "The four Run records were read through normal Owner evidence GET after cleanup; no native model runs were started.",
+    "Original account, subscriptions, model preference order and Bots were not mutated by this cleanup. Other concurrent sessions may independently work under their own authorization.",
+    "Disabled is reversible and preserves history; no archival or deletion of these three Profiles was performed."
+  ]
+}
+

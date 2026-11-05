@@ -1,0 +1,44 @@
+{
+  "kind": "docker-final-stop-control-plane-receipt",
+  "sandbox": "sandboxes/sbx_001m6n9e6xhnqqg09ct1swwakwm",
+  "scope": "Final static audit only; no application/database/browser/model execution.",
+  "stopRequests": 1,
+  "stopResponseAt": "2026-11-05T16:35:23.639307Z",
+  "stopResponseStatus": "stopping",
+  "readOnlyObservations": [
+    {
+      "operation": "get",
+      "requestStartedAt": "2026-11-05T16:37:58.669288+00:00",
+      "observedAt": "2026-11-05T16:38:04.479502+00:00",
+      "status": "stopping",
+      "errorPresent": false
+    },
+    {
+      "operation": "get",
+      "requestStartedAt": "2026-11-05T16:39:27.634179+00:00",
+      "observedAt": "2026-11-05T16:39:33.849676+00:00",
+      "status": "stopping",
+      "errorPresent": false
+    },
+    {
+      "operation": "get",
+      "requestStartedAt": "2026-11-05T16:43:03.791327+00:00",
+      "observedAt": "2026-11-05T16:43:12.402479+00:00",
+      "status": "stopping",
+      "errorPresent": false
+    },
+    {
+      "operation": "get",
+      "requestStartedAt": "2026-11-05T16:46:36.071336+00:00",
+      "observedAt": "2026-11-05T16:46:40.682379+00:00",
+      "status": "stopped",
+      "errorPresent": false
+    }
+  ],
+  "finalStatus": "stopped",
+  "stoppedStateConfirmed": true,
+  "confirmedAt": "2026-11-05T16:46:40.682379+00:00",
+  "newRuntimeRequestAfterStop": false,
+  "originalSandboxTouchedByFinalAudit": false,
+  "boundary": "Observation timestamps are not inferred VM transition timestamps. Only a single stop request was issued by the audit driver; subsequent operations were read-only control-plane GETs."
+}

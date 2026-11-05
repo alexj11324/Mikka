@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "issue": 1284,
+  "observedAt": "2026-11-05T16:24:12.624Z",
+  "mainCommit": "ebd822e9c3b8af2b6dfb0967064438642761f59b",
+  "publicVersion": {
+    "build": "ebd822e9c3b8af2b6dfb0967064438642761f59b",
+    "observedAt": "2026-11-05T16:24:12.624Z",
+    "route": "normal production GET /mikka/api/version"
+  },
+  "coreReleaseReceipt": "release/ebd.json",
+  "desktop": {
+    "firstAttempt": {
+      "workflowRun": 42058500798,
+      "conclusion": "failure",
+      "macosBuild": "success",
+      "failedJob": 127365218590,
+      "failedStep": "softprops/action-gh-release",
+      "cause": "GitHub release notes/create release endpoint returned 502 and 500 Server Error; action exhausted its built-in retries.",
+      "sourceChanged": false
+    },
+    "retry": {
+      "scope": "Only the failed release job was explicitly rerun once.",
+      "workflow": {
+        "id": 42058500798,
+        "status": "completed",
+        "conclusion": "success",
+        "headSha": "ebd822e9c3b8af2b6dfb0967064438642761f59b",
+        "updatedAt": "2026-11-05T16:22:04Z",
+        "attempt": 2,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42058500798"
+      },
+      "jobs": [
+        {
+          "id": 127371373348,
+          "name": "release",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-05T16:21:20Z",
+          "completedAt": "2026-11-05T16:22:03Z"
+        },
+        {
+          "id": 127371373835,
+          "name": "preflight",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-05T15:47:16Z",
+          "completedAt": "2026-11-05T15:47:20Z"
+        },
+        {
+          "id": 127371466253,
+          "name": "macos",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-05T15:47:22Z",
+          "completedAt": "2026-11-05T16:10:09Z"
+        }
+      ]
+    },
+    "publishedRelease": {
+      "id": 435435674,
+      "tagName": "desktop-2026.10000.477",
+      "targetCommitish": "ebd822e9c3b8af2b6dfb0967064438642761f59b",
+      "draft": false,
+      "prerelease": false,
+      "publishedAt": "2026-11-05T16:22:00Z",
+      "url": "https://github.com/alexj11324/Mikka/releases/tag/desktop-2026.10000.477",
+      "assets": [
+        {
+          "name": "latest-mac.yml",
+          "state": "uploaded",
+          "size": 539
+        },
+        {
+          "name": "Mikka-2026.10000.477-mac-arm64.dmg",
+          "state": "uploaded",
+          "size": 448881183
+        },
+        {
+          "name": "Mikka-2026.10000.477-mac-arm64.dmg.blockmap",
+          "state": "uploaded",
+          "size": 469235
+        },
+        {
+          "name": "Mikka-2026.10000.477-mac-arm64.zip",
+          "state": "uploaded",
+          "size": 431327453
+        },
+        {
+          "name": "Mikka-2026.10000.477-mac-arm64.zip.blockmap",
+          "state": "uploaded",
+          "size": 448527
+        },
+        {
+          "name": "mikka-release-manifest.json",
+          "state": "uploaded",
+          "size": 1507
+        },
+        {
+          "name": "sbom.cdx.json",
+          "state": "uploaded",
+          "size": 106747
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "state": "uploaded",
+          "size": 503
+        }
+      ]
+    }
+  },
+  "boundaries": [
+    "The original release receipt retains its 16:01 Desktop pending observation. This follow-up records the later failure and successful retry, without rewriting history.",
+    "Web, official runtime and daemon already succeeded; the Desktop publish retry did not move main or rebuild source."
+  ]
+}
+
