@@ -261,3 +261,15 @@ test('daemon reconnects retain their one-socket replacement and work signal', as
     second.close(1000, 'done')
   } finally { first.terminate() }
 })
+
+test('Coordinator session invalidation uses the same scoped wire without reply contents', async () => {
+  const channel = liveChannel('mcp-owner', 'personal-workspace')
+  const socket = liveSocket(channel)
+  await event(socket, 'open')
+  assert.ok((await socket.liveReady).kinds.includes('coordinator_session'))
+  const received = event(socket, 'message')
+  const invalidation = { kind: 'coordinator_session', id: deviceId }
+  await pushLive(channel, [invalidation])
+  assert.deepEqual(JSON.parse((await received).data), invalidation)
+  socket.close(1000, 'done')
+})

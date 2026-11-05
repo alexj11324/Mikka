@@ -1,6 +1,7 @@
 import { ChatFileError } from '@/lib/chat-attachments/extract'
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
-import { after, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { auth } from '@/lib/api-auth'
 import { db } from '@/lib/db'
 import { personalSubmissionInput, recordPersonalSubmission, SubmissionConflictError, readPersonalSubmissionBody, PersonalSubmissionBodyError } from '@/lib/coordinator-submission'
@@ -56,7 +57,7 @@ async function handlePOST(request: Request) {
     if (error instanceof SubmissionConflictError) return NextResponse.json({ error: 'submissionConflict' }, { status: 409 })
     throw error
   }
-  after(() => wakeCoordinator(userId))
+  afterJob('after:coordinator-wake', () => wakeCoordinator(userId))
   return NextResponse.json({ queued: true, enabled: coordinatorEnabled() }, { status: 202 })
 }
 

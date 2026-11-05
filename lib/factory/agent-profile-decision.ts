@@ -14,11 +14,13 @@ export function profileDecisionQuestions(catalog: readonly PublicAgentProfile[])
     ] },
   ]
 }
+/** Why the Decision chose a Profile, stored as a code the run's detail words in the reader's language. */
+export const DECISION_REASONS = ['capability_fit', 'stage_fit', 'only_suitable'] as const
+export type DecisionReason = typeof DECISION_REASONS[number]
 /** Exact IDs only. No fuzzy name, phase keyword, first-item, or stale-catalog fallback. */
 export function selectedProfileAnswer(catalog: readonly PublicAgentProfile[], answers: Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>> | null) {
   const answer = answers?.get('profile'), reason = answers?.get('reason')
   if (answer?.type !== 'choice' || answer.choice === 'none' || !catalog.some(profile => profile.id === answer.choice) || (answer.confidence !== undefined && (!Number.isFinite(answer.confidence) || answer.confidence < 0.55 || answer.confidence > 1))) return null
-  const reasons = { capability_fit: 'Declared capabilities fit the task.', stage_fit: 'Declared responsibilities fit this stage.', only_suitable: 'Only eligible Profile with suitable declared capabilities.' }
-  if (reason?.type !== 'choice' || !(reason.choice in reasons)) return null
-  return { id: answer.choice, reason: reasons[reason.choice as keyof typeof reasons] }
+  if (reason?.type !== 'choice' || !(DECISION_REASONS as readonly string[]).includes(reason.choice)) return null
+  return { id: answer.choice, reason: reason.choice as DecisionReason }
 }

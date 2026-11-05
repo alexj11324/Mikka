@@ -15,7 +15,7 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 // retrying cannot fix.
 import { z } from "zod"
 import { chatFileDownloadSchema, chatFileTransferSchema, CHAT_FILE_MAX_BYTES } from '@mikka/protocol/chat-attachments'
-import { ToolApprovalGate } from "./agents/tool-approval"
+import { ToolApprovalGate, type RunControlMode } from "./agents/tool-approval"
 import type { ServerDecide, ServerDecisionAnswer } from "./server-decision"
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
@@ -117,10 +117,16 @@ export function serverUrl(base: string, path: string): URL {
 
 export class HttpServerLink implements ServerLink {
   private readonly runControls = new Set<ToolApprovalGate>()
+  private runControlMode: RunControlMode = 'legacy'
 
   /** Work frames are hints, never authority: re-read each active run. */
   invalidateRunControls() {
     for (const gate of this.runControls) gate.invalidate()
+  }
+  /** The daemon reports whether the gateway can push run control to this run. */
+  setRunControlMode(mode: RunControlMode) {
+    this.runControlMode = mode
+    for (const gate of this.runControls) gate.setControlMode(mode)
   }
   async downloadChatFile(assignment: RunAssignment, id: string, signal: AbortSignal) {
     const transfer = await this.call('GET', `/v1/devices/${seg(assignment.deviceId)}/runs/${seg(assignment.runId)}/attachments/${seg(id)}`, { schema: chatFileTransferSchema, signal, timeoutMs: 60000 })
@@ -234,13 +240,14 @@ export class HttpServerLink implements ServerLink {
             if (!current.live) refusal('server_check', 'run_not_live')
             if (!current.live && current.revokeReason) gate.revoke(current.revokeReason)
             if (!current.live || !current.paused) return current.live
-            await pause()
+            // Resume arrives as a push (or on the fallback cadence), not a 1 s re-ask.
+            await gate.changed(liveness.signal)
           }
         } catch (error) { refusal(phase, 'check_failed', error); return false }
       }
-    })
+    }, this.runControlMode)
     this.runControls.add(gate)
-    const offMonitor = gate.monitor()
+    const offMonitor = gate.watch()
     const abort = () => gate.revoke()
     gate.onRevoke(() => { liveness.abort(); offMonitor(); this.runControls.delete(gate); signal.removeEventListener('abort',abort) })
     if (signal.aborted) gate.revoke()
