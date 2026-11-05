@@ -38,7 +38,7 @@ import { issueListChanged } from '@/lib/live/lists'
 import { issueRelationsChanged } from '@/lib/live/issue-detail'
 import { ownerListRead } from '@/lib/live/list-read-server'
 import { issuePrefixes, linearIssueLinks, linearTeamSyncs } from '@/lib/db/schema'
-import { changedListIds, readListPositions, type ListPosition } from '@/lib/list-poll'
+import { changedListIds, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
 import { cacheReadAction } from '@/lib/cache-read-action'
 
 type IssueRow = typeof issues.$inferSelect
@@ -121,7 +121,7 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
   )`.as('identifiers') }).from(candidates)
   const tasksVersion = await queryVersion(signature)
   const version = createHash('sha256').update(JSON.stringify([userId, context.workspace.id, teams.map(team => team.id).sort(), tasksVersion, linksVersion])).digest('hex').slice(0, 32)
-  if (known === version) return { unchanged: true, version, live } as const
+  if (known === version) return { ...unchangedList(version), live }
   // Read the version first: a concurrent change is picked up on the next poll, never acknowledged unseen.
   const signed = signature.as('task_signatures')
   const manifest = await db.select({ id: signed.id, scope: signed.scope, signature: sql<string>`md5(to_jsonb(task_signatures)::text)` })

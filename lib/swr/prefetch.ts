@@ -1,5 +1,5 @@
 import { unstable_serialize, type Cache, type Key, type useSWRConfig } from 'swr'
-import { PersistentReadCache, readAccessFailure, waitForCacheHydration } from './persistent-cache'
+import { PersistentReadCache, readAccessFailure, waitForCacheHydration, type ReadCacheState } from './persistent-cache'
 
 type ScopedMutate = ReturnType<typeof useSWRConfig>['mutate']
 const inFlight = new WeakMap<Cache, Map<string, Promise<void>>>()
@@ -19,7 +19,8 @@ export async function prefetchScopedRead(cache: Cache, mutate: ScopedMutate, key
   const request = Promise.resolve().then(read).then(async value => {
     if (cache instanceof PersistentReadCache && !cache.isEnabled) return
     if (cache.get(id) === undefined) {
-      cache.set(id, { _k: key })
+      const state: ReadCacheState = { _k: key }
+      cache.set(id, state)
       await mutate(key, value, { revalidate: false })
     }
   }).catch(error => {

@@ -2,7 +2,14 @@
  * These are read cursors, not live-channel versions or authorization grants. */
 export type ListPosition = { id: string; version: string }
 export type ListSnapshot<T> = { version: string; items: T[]; positions?: ListPosition[] }
-export type ListPoll<T> = ListSnapshot<T> | { version: string; items: T[]; positions: ListPosition[]; delta: true } | { version: string; unchanged: true }
+export type UnchangedList = { version: string; unchanged: true; items?: never; positions?: never; delta?: never }
+export type ListPoll<T> = ListSnapshot<T> | { version: string; items: T[]; positions: ListPosition[]; delta: true } | UnchangedList
+
+/** The unchanged wire result has no rows or row proofs. Declaring their
+ * absence keeps the full/delta row type in consumers of a poll's union. */
+export function unchangedList(version: string): UnchangedList {
+  return { version, unchanged: true }
+}
 
 /** Invalid/oversized client cursors request a normal snapshot. Never trust a
  * cursor for visibility: readers rebuild the authorized row set each time. */

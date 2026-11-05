@@ -133,7 +133,9 @@ for (const kind of ['issues', 'threads'] as const) test(`a restored ${kind} snap
   assert.deepEqual(cursors[0], { kind, known: previous.version, positions })
   assert.ok(view(kind)?.includes('cached row'))
   assert.ok(!view(kind)?.includes('deleted row'))
-  assert.deepEqual((cache.get(unstableSerialize(key))?.data as Read).positions, [positions[0]])
+  const restored = cache.get(unstableSerialize(key))?.data as Read | undefined
+  assert.ok(restored)
+  assert.deepEqual(restored.positions, [positions[0]])
 })
 
 for (const proof of ['partial', 'missing'] as const) test(`a restored list with ${proof} proofs cannot receive unchanged while rows are missing`, async () => {

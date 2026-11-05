@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { SWRConfiguration } from 'swr'
+import { defaultConfig } from 'swr/_internal'
 import { CacheReadError } from '../cache-read-error'
 import { fetchGroups } from '../group-messages'
 import { isAutoRetryable, MAX_READ_RETRIES, MAX_READ_RETRY_MS, readRetryDelay, ReadResponseError, retryRead } from './retry'
+
+const retryConfig = (error: unknown, overrides: Partial<Parameters<typeof retryRead>[2]> = {}) => ({
+  ...defaultConfig, ...overrides, cache: new Map([['key', { error }]]),
+})
 
 test('access, rate limit and explicit terminal errors never retry, including wrapped causes', () => {
   for (const status of [401, 403, 429]) {
@@ -28,13 +32,18 @@ test('read retries have exponential equal jitter, a 30-second cap and at most fi
   assert.equal(readRetryDelay(40, () => 0.5), 22_500)
   let calls = 0
   for (let retryCount = 1; retryCount <= MAX_READ_RETRIES + 1; retryCount++) {
-    retryRead(new ReadResponseError(503), 'key', {}, () => { calls++ }, { retryCount, dedupe: true })
+    const error = new ReadResponseError(503)
+    retryRead(error, 'key', retryConfig(error), () => { calls++ }, { retryCount, dedupe: true })
     t.mock.timers.tick(MAX_READ_RETRY_MS)
     assert.equal(calls, Math.min(retryCount, MAX_READ_RETRIES))
   }
-  for (const status of [401, 403, 429]) retryRead(new ReadResponseError(status), 'key', {}, () => { calls++ }, { retryCount: 1 })
-  retryRead(new Error('offline'), 'key', { errorRetryCount: 2 }, () => { calls++ }, { retryCount: 3 })
-  retryRead(new Error('offline'), 'key', { isPaused: () => true }, () => { calls++ }, { retryCount: 1 })
+  for (const status of [401, 403, 429]) {
+    const error = new ReadResponseError(status)
+    retryRead(error, 'key', retryConfig(error), () => { calls++ }, { retryCount: 1 })
+  }
+  const offline = new Error('offline')
+  retryRead(offline, 'key', retryConfig(offline, { errorRetryCount: 2 }), () => { calls++ }, { retryCount: 3 })
+  retryRead(offline, 'key', retryConfig(offline, { isPaused: () => true }), () => { calls++ }, { retryCount: 1 })
   t.mock.timers.tick(MAX_READ_RETRY_MS)
   assert.equal(calls, MAX_READ_RETRIES)
 })
@@ -59,8 +68,9 @@ test('a queued transient retry cannot repeat a newer rate-limit failure or succe
   t.mock.timers.enable({ apis: ['setTimeout'] })
   const failure = new ReadResponseError(503)
   const cache = new Map([['key', { error: failure as unknown }]])
+  const config = { ...defaultConfig, cache }
   let calls = 0
-  const schedule = () => retryRead(failure, 'key', { cache } as SWRConfiguration, () => { calls++ }, { retryCount: 1 })
+  const schedule = () => retryRead(failure, 'key', config, () => { calls++ }, { retryCount: 1 })
   schedule()
   cache.set('key', { error: new ReadResponseError(429) })
   t.mock.timers.tick(MAX_READ_RETRY_MS)

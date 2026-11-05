@@ -14,7 +14,7 @@ import { replyLine } from '@/lib/thread-groups'
 import { queryVersion } from '@/lib/db/query-version'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { ownerListRead } from '@/lib/live/list-read-server'
-import { changedListIds, readListPositions, type ListPosition } from '@/lib/list-poll'
+import { changedListIds, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
 import { cacheReadAction } from '@/lib/cache-read-action'
 
 /** The newest run on each issue, for the right column's 我的任务 groups (MIK-38). */
@@ -146,7 +146,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
     // Device presence has its own bounded watcher prerequisite. Until that
     // route is ready, queued local work retains the shared slow fallback.
     const presenceFallback = queuedDevices.length > 0
-    if (known === version) return { unchanged: true, version, live, presenceFallback } as const
+    if (known === version) return { ...unchangedList(version), live, presenceFallback }
     // Reading the version first makes a concurrent edit visible on the next poll.
     const manifest = await db.select({ id: visible.id, version: sql<string>`md5(to_jsonb(thread_list_expiry)::text)` }).from(visible)
       .orderBy(desc(sql`greatest(${visible.lastReplyAt}, ${visible.updatedAt})`), desc(visible.createdAt), desc(visible.id))

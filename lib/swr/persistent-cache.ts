@@ -1,8 +1,9 @@
+import type { State } from 'swr'
 import { persistentReadData, persistentReadKey } from './cache-policy'
 import { IndexedReadStorage, type ReadStorage } from './indexed-db'
 
 export type ReadCacheScope = { userId: string; workspaceId: string; build: string; role: string }
-type CacheState = { data?: unknown; error?: unknown; _k?: unknown; isValidating?: boolean; isLoading?: boolean }
+export type ReadCacheState = State<unknown, unknown> & { _k?: unknown }
 export const readCacheNamespace = (scope: ReadCacheScope) => JSON.stringify([1, scope.userId, scope.workspaceId, scope.build, scope.role])
 type Restore = (key: string, data: unknown) => Promise<unknown>
 const activeCaches = new Set<PersistentReadCache>()
@@ -21,7 +22,7 @@ export function readAccessFailure(error: unknown): 'session' | 'workspace' | 're
 /** SWR still reads synchronously from memory; IndexedDB is only the durable
  * backing. Every startup fetch waits for hydration, then uses the restored
  * cursor. Hydration never overwrites a newer server result or optimistic write. */
-export class PersistentReadCache extends Map<string, CacheState> {
+export class PersistentReadCache extends Map<string, ReadCacheState> {
   readonly namespace: string | null
   readonly ownerId: string | undefined
   readonly hydrated: Promise<void>
@@ -65,7 +66,7 @@ export class PersistentReadCache extends Map<string, CacheState> {
     return next
   }
 
-  override set(key: string, state: CacheState): this {
+  override set(key: string, state: ReadCacheState): this {
     if (!this.enabled) return this
     const previous = this.get(key)
     const failure = readAccessFailure(state.error)

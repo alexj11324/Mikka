@@ -129,6 +129,20 @@ The following complete sampled traces establish real read costs before this feat
 
 Initial source-only verification: 83 cache, real React/SWR, IndexedDB adapter, chat merge/reader, list merge, live-channel, retry and settings-read tests passed, with 0 failures and 0 skips, in 5.23 seconds. Node 24.22.1 used the repository-locked React 19.3.1, SWR 2.5.1 and pinned fake-indexeddb 6.2.4. No application, database or browser test environment was started for this source-only run. The polling and error-cause source policies also passed. These preliminary results will be replaced by commit-bound CI results.
 
-The next Docker continuation was rejected by automatic approval review before modified-code acceptance ran; no post-change Docker result is claimed. The repository's existing GitHub CI remains the final source/database gate.
+The next Docker continuation was rejected by automatic approval review before modified-code acceptance ran; no post-change Docker result is claimed. The repository's GitHub CI remains the source/database gate.
+
+The first draft CI run on `5eb7babda486a1c9b83b13ec73dc28cf8241b7cc` found TypeScript union inference, incomplete SWR test mocks and a source-only IndexedDB test whose filename was incorrectly classified as a PostgreSQL suite. The follow-up fixes preserve the wire protocol, complete the mocks and rename that test to `indexed-storage.test.ts`; they do not relax the database classifier or required checks. After those fixes, the focused source-only suite passed 83 tests with 0 failures and 0 skips, and the API-driver/database-runner guard suites passed 27 tests with 0 failures and 0 skips. The new commit still requires matching CI results.
+
+### Isolated API acceptance
+
+The `Read cache API acceptance` workflow uses a disposable loopback PostgreSQL service, the existing environment/database attestation and normal owner/peer account leases. Its owned Next development server exposes the same Server Actions used by the application. The driver discovers their references from public client chunks and restricts business requests to five named read actions and bounded GET paths. It exercises cold, warm, restored cursor, changed row, deletion and foreign-account cases without sending a message, dispatching a run or invoking a model. Synthetic fixture edits are restricted to registered resources in the isolated database. No browser test runner is involved.
+
+Run against the configured, attested isolated environment with:
+
+```sh
+node scripts/acceptance/run-read-cache.mjs
+```
+
+The workflow retains only `.cache/e2e/http-acceptance-summary.json`, after the existing evidence audit. It contains scenario names, HTTP/result byte counts and generated trace IDs, not response bodies or credentials. The 6 driver source tests pass; real HTTP acceptance is pending and is not implied by those source tests. Browser persistence, hydration and focus behavior are covered separately by the real SWR/IndexedDB adapter tests and subsequent read-only production observation.
 
 Production acceptance is pending. Record the exact submitted commit, matching CI jobs, production deployment/build ID, authorized read-only test identity allocation, page/trace measurement windows and the four required surfaces (Bot chat, task board, task detail and Settings). Populate actual measurements only from those runs. Production acceptance and issue closure are not established by this draft.

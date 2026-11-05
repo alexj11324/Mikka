@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { useRouter } from '@/i18n/navigation'
 import { APP_BUILD } from '@/lib/app-build'
 import type { AuthorizedCacheWorkspace } from '@/lib/swr/cache-scope'
-import { clearPersistentReadCaches, PersistentReadCache, readCacheNamespace, type ReadCacheScope } from '@/lib/swr/persistent-cache'
+import { clearPersistentReadCaches, PersistentReadCache, readCacheNamespace, type ReadCacheScope, type ReadCacheState } from '@/lib/swr/persistent-cache'
 
 type InitialRead = { key: unknown; data: unknown }
 
@@ -28,7 +28,10 @@ function ReadCacheBoundary({ scope, unauthorized, initialReads, children }: { sc
     const cache: Cache = scope ? new PersistentReadCache(scope) : new Map()
     // SWR fallback is not necessarily stored in the provider. Put authorized
     // server reads there before the asynchronous disk snapshot can arrive.
-    for (const read of initialReads ?? []) cache.set(unstable_serialize(read.key as Key), { data: read.data, _k: read.key })
+    for (const read of initialReads ?? []) {
+      const initialState: ReadCacheState = { data: read.data, _k: read.key }
+      cache.set(unstable_serialize(read.key as Key), initialState)
+    }
     return { cache, generation: 0 }
   })
   const config = useMemo(() => ({ provider: () => state.cache }), [state.cache])
