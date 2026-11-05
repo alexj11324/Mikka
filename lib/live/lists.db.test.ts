@@ -23,7 +23,7 @@ mock.module('next/server', { namedExports: { after: (work: () => Promise<void>) 
 // or document IDs, and bot chats with their bot IDs; panels.db.test.ts and
 // chats.db.test.ts cover those keys. Here count list keys only.
 before(async () => {
-  for (const file of ['./panels.ts', './chats.ts']) {
+  for (const file of ['./panels.ts', './chats.ts', './group-chat.ts']) {
     const actual = await import(file)
     mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(Object.entries(actual).map(([name, value]) =>
       [name, name.endsWith('ScopesBeforeChange') ? async () => [] : name.endsWith('Changed') ? async () => {} : value])) })

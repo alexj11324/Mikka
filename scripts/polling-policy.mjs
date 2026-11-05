@@ -29,12 +29,8 @@ const local = (reason, hits) => ({ kind: 'local', reason, hits })
  */
 export const pollingAllowlist = {
   // Web: SWR polling that reads our database.
-  'components/desktop/desktop-integration.tsx': db(web, 'desktop link status re-read every POLL_MS', 1),
-  'components/workspace/group-chat-view.tsx': db(web, 'group chat re-read every ANSWER_POLL_MS while an agent answers', 2),
   'components/workspace/issue-pull-request-link.tsx': db(web, 'linked pull request status re-read every 60 s through our API', 1),
   'hooks/use-computer.ts': db(web, 'computer grant re-read before it expires (at least every 5 s)', 1),
-  'components/swr-defaults.tsx': db(web, 'LIST_POLL_MS, the 60 s list poll interval', 1),
-  'lib/coordinator/chat-poll.ts': db(web, 'FULL_READ_EVERY_MS: the chat poll does a full read every 60 s', 1),
   'components/settings/subscription-settings.tsx': db(web, 'subscription usage re-read every USAGE_EVERY_MS (5 min); the 30 s setInterval is only the clock that ages the "updated" label', 3),
   'components/billing/free-allowance-section.tsx': db(web, 'pollUntil after card verification: up to 10 reads, 2 s apart, until the webhook lands', 1),
   'components/billing/hosted-refusal-notice.tsx': db(web, 'pollUntil after a top-up: up to 10 reads, 2 s apart, until the balance lands', 1),

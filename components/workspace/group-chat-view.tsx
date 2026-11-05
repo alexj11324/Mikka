@@ -1,8 +1,8 @@
 'use client'
 
 import { Fragment, useEffect, useRef, useState } from 'react'
-import useSWRInfinite from 'swr/infinite'
-import useSWR from 'swr'
+import useSWRInfinite, { unstable_serialize as infiniteKey } from 'swr/infinite'
+import useSWR, { unstable_serialize } from 'swr'
 import { useTranslations } from 'next-intl'
 import { listAgents } from '@/app/actions/agents'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { ConversationPill } from '@/components/nav/conversation-pill'
-import { GroupAvatar, useGroupMembers } from '@/components/nav/group-avatar'
+import { GroupAvatar, groupMembersKey, useGroupMembers } from '@/components/nav/group-avatar'
+import { useLiveKey } from '@/hooks/use-live-key'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { BotAvatar } from '@/components/nav/bot-avatar'
 import { UserMessageText } from '@/components/workspace/user-message-text'
@@ -27,8 +28,11 @@ import { useActionError } from '@/lib/use-action-error'
 /** A message the person sent that the server has not stored yet; a failed one waits for 重试. */
 type Pending = { key: string; body: string; failed: boolean; sentId?: string }
 
-/** How often the chat reads again while a bot is answering; it does not poll otherwise. */
-const ANSWER_POLL_MS = 2500
+/** The newest page and the members re-read on the group's live key, at most this often while a reply streams in. */
+const GROUP_MERGE_MS = 500
+
+/** The newest page's key, then each older page before the last one shown. */
+const pageKey = (groupId: string) => (index: number, previous: GroupMessagePage | null) => index === 0 ? ['group-messages', groupId, null] : previous?.nextBefore ? ['group-messages', groupId, previous.nextBefore] : null
 
 export type GroupChatRequest = { id: string; title: string; workspaceId: string }
 
@@ -36,8 +40,9 @@ export type GroupChatRequest = { id: string; title: string; workspaceId: string 
  * A group chat. It reads and sends through the group API (the phone's path),
  * which checks workspace and group membership on every request. A message goes
  * to the bots it @mentions, else to the ones the server judges should answer;
- * it shows at once and, if it fails, stays with 重试. While a bot is answering
- * the chat reads again every few seconds. Names and bot avatars come from the
+ * it shows at once and, if it fails, stays with 重试. A stored message, a
+ * member change or the reply starting or ending pushes the group's key; no
+ * timer reads it (#1212). Names and bot avatars come from the
  * group's member list, then the workspace's members and the person's agents.
  */
 export function GroupChatView({ group, userId, people }: {
@@ -53,10 +58,9 @@ export function GroupChatView({ group, userId, people }: {
   const member = (type: 'user' | 'agent' | 'bot', id: string) => members.find(item => item.memberType === type && item.id === id)
   const [draft, setDraft] = useViewState(`group:${group.id}:draft`, '')
   const [pending, setPending] = useState<Pending[]>([])
-  const [answering, setAnswering] = useState(false)
   const shown = useRef<{ id: string; page: GroupMessagePage } | null>(null)
   const { data: pages, error, size, setSize, isValidating, mutate } = useSWRInfinite<GroupMessagePage>(
-    (index, previous: GroupMessagePage | null) => index === 0 ? ['group-messages', group.id, null] : previous?.nextBefore ? ['group-messages', group.id, previous.nextBefore] : null,
+    pageKey(group.id),
     async ([, id, before]: [string, string, string | null]) => {
       if (before) return fetchGroupMessages(id, before)
       const known = shown.current?.id === id ? shown.current.page : null
@@ -66,9 +70,11 @@ export function GroupChatView({ group, userId, people }: {
       shown.current = { id, page: merged }
       return merged
     },
-    // The first page carries new messages and who is answering; only it is read again while a bot answers.
-    { revalidateOnFocus: false, refreshInterval: answering ? ANSWER_POLL_MS : 0, onSuccess: data => setAnswering(!!data[0]?.agentStatus) },
+    // The first page carries new messages and who is answering; it is read again when the group's key arrives.
+    { revalidateOnFocus: false },
   )
+  // While the live channel is down, the live layer falls back to one read a minute.
+  useLiveKey('group_chat', group.id, [infiniteKey(pageKey(group.id)), unstable_serialize(groupMembersKey(group.id))], group.workspaceId, { minIntervalMs: GROUP_MERGE_MS })
   const messages = pages ? chronological(pages) : []
   const reactions = useMessageReactions(messages.map(message => message.id))
   const older = pages?.at(-1)?.nextBefore ?? null

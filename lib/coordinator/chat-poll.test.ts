@@ -1,16 +1,25 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { FULL_READ_EVERY_MS, knownVersion, mergeChat, type UnchangedChat } from './chat-poll'
+import { knownVersion, mergeChat, metadataEntities, METADATA_KEYS_MAX, type UnchangedChat } from './chat-poll'
 
 type Chat = { version?: string; streamRunId?: string; items: { position: number; text: string; pending?: true }[]; working: boolean; error: string | null; cursor?: number; botId: string; enabled: boolean; after?: number; baseCursor?: number }
 const chat: Chat = { version: 'v1', streamRunId: 'wrun_old', items: [{ position: 1, text: 'hello' }], working: true, error: null, cursor: 4, botId: 'b', enabled: true }
 const unchanged = (state: Partial<UnchangedChat> = {}): UnchangedChat => ({ unchanged: true, version: 'v1', cursor: 4, working: false, error: null, botId: 'b', enabled: true, ...state })
 
-test('a poll names the shown version until card metadata needs refreshing', () => {
-  assert.equal(knownVersion(undefined, 0, 1), undefined, 'the first read is full')
-  assert.equal(knownVersion({}, 0, 1), undefined, 'a chat without a version is read in full')
-  assert.equal(knownVersion(chat, 1_000, 1_000 + FULL_READ_EVERY_MS - 1), 'v1')
-  assert.equal(knownVersion(chat, 1_000, 1_000 + FULL_READ_EVERY_MS), undefined, 'refresh metadata while still sending the history continuation')
+test('a read names the shown version until card metadata is marked stale; time alone never makes a read full', () => {
+  assert.equal(knownVersion(undefined, false), undefined, 'the first read is full')
+  assert.equal(knownVersion({}, false), undefined, 'a chat without a version is read in full')
+  assert.equal(knownVersion(chat, false), 'v1', 'however long since the last full read')
+  assert.equal(knownVersion(chat, true), undefined, 'refresh metadata while still sending the history continuation')
+})
+
+test('each artifact card listens on its own key, bounded and in a stable order', () => {
+  assert.deepEqual(metadataEntities(undefined), [])
+  const artifacts = Object.fromEntries(Array.from({ length: METADATA_KEYS_MAX + 5 }, (_, i) => [`a${String(i).padStart(3, '0')}`, {}]).reverse())
+  const entities = metadataEntities({ artifacts })
+  assert.equal(entities.length, METADATA_KEYS_MAX)
+  assert.deepEqual(entities[0], { kind: 'artifact', id: 'a000' })
+  assert.ok(entities.every(entity => entity.kind === 'artifact'))
 })
 
 test('an unchanged poll keeps the conversation and takes the live state', () => {

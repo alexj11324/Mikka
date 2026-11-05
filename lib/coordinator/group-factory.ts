@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg'
 import { createHash } from 'node:crypto'
 import { groupListChanged } from '@/lib/live/lists'
+import { groupChatChanged } from '@/lib/live/group-chat'
 import { factoryEventId } from '@/lib/factory/event-id'
 import type { GroupRuntime, GroupReply } from './group-turns'
 import type { GroupTaskReference } from './group-routing'
@@ -313,6 +314,7 @@ export async function reconcileGroupTaskReports(conversationId:string, dependenc
         const inserted=await client.query(`INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body,mentions,"replyToId") VALUES($1,$2,$3,'bot',$4,$5,'[]',$6) ON CONFLICT DO NOTHING RETURNING id`,[id,conversationId,position.lastPosition,binding.reporterId,text,binding.sourceMessageId])
         if (inserted.rowCount) {
           await groupListChanged(client, conversationId)
+          await groupChatChanged(client, conversationId)
           await recordGroupTraceEvent(client,binding.sourceMessageId,{id:`publish:${id}`,type:'publish',memberId:binding.reporterId,taskId:task.taskId,runId:task.runId ?? undefined,contentDigest:createHash('sha256').update(text.trim()).digest('hex')})
           const outcome=taskSucceeded(task) ? 'succeeded' : ['cancelled','revoked'].includes(task.status) ? 'stopped' : task.status==='failed' ? 'failed' : 'blocked'
           await recordGroupTraceEvent(client,binding.sourceMessageId,{id:`task-result:${id}`,type:'task_result',memberId:binding.reporterId,taskId:task.taskId,runId:task.runId ?? undefined,outcome})
