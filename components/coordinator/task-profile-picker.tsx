@@ -7,6 +7,7 @@ import { HarnessLabel } from '@/components/labels/entity-labels'
 import { InlineLoadError } from '@/components/load-error'
 import { withBasePath } from '@/lib/base-path'
 import { settingsHref } from '@/lib/settings-sections'
+import { BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-reference'
 import { profileAvailabilityKey, type AgentProfilesView } from '@/components/settings/factory-profiles-data'
 
 const MANAGE = '__manage'
@@ -21,15 +22,22 @@ export function TaskProfilePicker({ workspaceId, value, onChange, data, disabled
 }) {
   const t = useTranslations('Settings.agentProfiles')
   const profiles = data?.profiles ?? []
+  const builtin = value === BUILTIN_AGENT_PROFILE_ID
   const selected = profiles.find(profile => profile.id === value)
   const manage = () => { if (workspaceId) window.open(withBasePath(settingsHref('models', workspaceId) + '#factory-profiles-heading'), '_blank', 'noopener,noreferrer') }
   return <Select value={value ?? 'auto'} onValueChange={id => { if (id === MANAGE) manage(); else if (id) onChange(id === 'auto' ? null : id) }}
-    items={[{ value: 'auto', label: t('automaticShort') }, ...profiles.map(profile => ({ value: profile.id, label: profile.name })),
-      ...(value && !selected ? [{ value, label: t('selectionUnavailable') }] : []), { value: MANAGE, label: t('manage') }]} disabled={disabled || !workspaceId}>
+    items={[{ value: 'auto', label: t('automaticShort') }, { value: BUILTIN_AGENT_PROFILE_ID, label: t('defaultName') }, ...profiles.map(profile => ({ value: profile.id, label: profile.name })),
+      ...(value && !builtin && !selected ? [{ value, label: t('selectionUnavailable') }] : []), { value: MANAGE, label: t('manage') }]} disabled={disabled || !workspaceId}>
     <SelectTrigger size="sm" className="h-7 min-w-28 max-w-56 gap-1.5 rounded-full px-2.5" aria-label={t('taskProfile')}><SlidersHorizontal aria-hidden="true" /><SelectValue className="min-w-0 truncate" /></SelectTrigger>
     <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-64 max-w-[calc(100vw-3rem)]">
       <SelectGroup>
         <SelectItem value="auto">{t('automatic')}</SelectItem>
+        <SelectItem value={BUILTIN_AGENT_PROFILE_ID} disabled={!data?.defaultAvailability?.available}>
+          <span className="flex min-w-0 flex-col gap-0.5 py-1">
+            <span className="truncate">{t('defaultName')}</span>
+            <span className="text-xs text-muted-foreground">{data?.defaultAvailability?.available ? t('inherit') : t(`reasons.${profileAvailabilityKey(data?.defaultAvailability?.reason)}`)}</span>
+          </span>
+        </SelectItem>
         {profiles.map(profile => {
           const available = data?.availability[profile.id]
           return <SelectItem key={profile.id} value={profile.id} disabled={!available?.available}>
@@ -53,8 +61,9 @@ export function TaskProfileNotice({ value, data, error, onRetry }: { value: stri
   const t = useTranslations('Settings.agentProfiles')
   const common = useTranslations('Common')
   const selected = data?.profiles.find(profile => profile.id === value)
-  const unavailable = value && (!selected || !data?.availability[value]?.available)
+  const availability = value === BUILTIN_AGENT_PROFILE_ID ? data?.defaultAvailability : selected && data?.availability[selected.id]
+  const unavailable = value && !availability?.available
   if (error) return <InlineLoadError message={t('loadFailed')} retryLabel={common('retry')} onRetry={onRetry} />
-  if (unavailable) return <p role="alert" className="text-sm text-destructive-foreground">{t(`reasons.${profileAvailabilityKey(data?.availability[value]?.reason)}`)}</p>
+  if (unavailable) return <p role="alert" className="text-sm text-destructive-foreground">{t(`reasons.${profileAvailabilityKey(availability?.reason)}`)}</p>
   return null
 }

@@ -33,6 +33,7 @@ import { claimSuggestion, readClaimedSuggestion } from '@/lib/suggestions/store'
 import { suggestionMessage } from '@/lib/suggestions/card'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { AgentProfileError } from '@/lib/factory/agent-profile-definition'
+import { agentProfileReferenceSchema, BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-reference'
 
 async function getUser() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -201,10 +202,10 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     if (withNotes === null) throw new ActionFailureError('messageTooLong')
     const destination = taskDestinationSchema.optional().safeParse(taskDestination)
     if (!destination.success) throw new ActionFailureError('validationGeneric')
-    const profile = z.uuid().optional().safeParse(profileId)
+    const profile = agentProfileReferenceSchema.optional().safeParse(profileId)
     if (!profile.success) throw new ActionFailureError('validationGeneric')
     const taskSubmission = Boolean(destination.data || profile.data)
-    if (profile.data) {
+    if (profile.data && profile.data !== BUILTIN_AGENT_PROFILE_ID) {
       try {
         const row = await (await import('@/lib/factory/agent-profile-store')).readProfileRow((await import('@/lib/db')).pool, { ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, bot.id) }, profile.data)
         if (row.archivedAt || !row.definition.enabled) throw new ActionFailureError('runInvalid')

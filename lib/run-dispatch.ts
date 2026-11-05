@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { agentProfileReferenceSchema } from './factory/agent-profile-reference'
 import { ActionFailureError } from './action-error'
 import type { db } from './db'
 import { agentRuns, type RunStatus } from './db/schema'
@@ -13,7 +14,7 @@ export const dispatchRequestKey = z.string().trim().min(1).max(200)
 export const dispatchInput = z.object({
   issueId: z.uuid(), agentId: z.uuid(), deviceRepoId: z.uuid(),
   note: z.string().trim().max(10_000).optional(),
-  profileId: z.uuid().optional(),
+  profileId: agentProfileReferenceSchema.optional(),
   requestKey: dispatchRequestKey.optional(),
 })
 export type DispatchInput = z.infer<typeof dispatchInput>

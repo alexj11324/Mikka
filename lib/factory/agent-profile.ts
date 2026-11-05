@@ -105,10 +105,11 @@ export async function agentProfileDispatchAvailability(pool: Pool, scope: Dispat
   const member = await acquireProfileMembership(scope)
   try {
     const rows = await readProfileRows(pool, scope)
-    const explicit = request.profileId ? rows.find(row => row.id === request.profileId) : undefined
-    if (request.profileId && !explicit) return { available: false, reason: 'agentProfileNotFound' }
+    const builtin = request.profileId === BUILTIN_AGENT_PROFILE_ID
+    const explicit = request.profileId && !builtin ? rows.find(row => row.id === request.profileId) : undefined
+    if (request.profileId && !builtin && !explicit) return { available: false, reason: 'agentProfileNotFound' }
     if (explicit && !explicit.definition.enabled) return { available: false, reason: 'agentProfileDisabled' }
-    if (explicit || rows.some(row => row.definition.enabled)) {
+    if (!builtin && (explicit || rows.some(row => row.definition.enabled))) {
       const result = await eligibleProfiles(pool, scope, explicit ? [explicit] : rows, request, {}, true)
       await member.check()
       if (result.eligible.length) return { available: true }
@@ -233,8 +234,10 @@ export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchSco
     const agentProfile = target.kind === 'none' ? undefined : builtinAgentProfileSelection(scope, target.entry)
     return finalize(target, agentProfile, request.asked?.model ? 'picked' : 'preference')
   }
-  if (request.defaultOnly && request.profileId) throw new AgentProfileError('agentProfilePinConflict')
-  if (request.defaultOnly || (!request.profileId && !rows.some(row => row.definition.enabled))) return await legacy()
+  if (request.defaultOnly && request.profileId && request.profileId !== BUILTIN_AGENT_PROFILE_ID) throw new AgentProfileError('agentProfilePinConflict')
+  // A task-form Default pin and a host continuation of that same role agree.
+  // Automatic selection and every explicit custom Profile retain their gates.
+  if (request.defaultOnly || request.profileId === BUILTIN_AGENT_PROFILE_ID || (!request.profileId && !rows.some(row => row.definition.enabled))) return await legacy()
   const selectedRow = request.profileId ? rows.find(row => row.id === request.profileId) : undefined
   if (request.profileId && !selectedRow) throw new AgentProfileError('agentProfileNotFound', 404)
   if (selectedRow && !selectedRow.definition.enabled) throw new AgentProfileError('agentProfileDisabled')

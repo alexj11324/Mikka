@@ -1,4 +1,5 @@
 import { AgentProfileError } from '@/lib/factory/agent-profile-definition'
+import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
 import { AgentProfileAdmissionError } from '@/lib/factory/profile-admission'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { z } from 'zod'
@@ -12,7 +13,7 @@ import { ComputerError } from '@/lib/computer/store'
 import { latestThreadRunModel } from '@/lib/computer/run-model'
 import { queueFactoryCloudRun } from '@/lib/factory/queue-cloud'
 
-const inputSchema = z.object({ issueId: z.uuid(), harness: z.enum(['codex', 'claude_code']).optional(), profileId: z.uuid().optional(), note: z.string().trim().max(10_000).optional() }).strict()
+const inputSchema = z.object({ issueId: z.uuid(), harness: z.enum(['codex', 'claude_code']).optional(), profileId: agentProfileReferenceSchema.optional(), note: z.string().trim().max(10_000).optional() }).strict()
 const headers = { 'Cache-Control': 'private, no-store' }
 
 export async function POST(request: Request, { params }: { params: Promise<{ botId: string }> }) {

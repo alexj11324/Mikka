@@ -25,6 +25,7 @@ import { tiptapToText } from '@/lib/tiptap-text'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { runPrompt } from '@/lib/run-prompt'
 import { dispatchInput, dispatchRequestKey, type DispatchInput, type DispatchResult } from '@/lib/run-dispatch'
+import { agentProfileReferenceSchema, BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-reference'
 import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
 import { resolveStopTargets } from '@/lib/run-chain'
 import { afterRunEnded } from '@/lib/run-completion-effects'
@@ -144,6 +145,14 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
           AND (i."userId"=t."userId" OR (i.scope='workspace' AND t."scopeVersion" IS NOT NULL AND t."scopeVersion"=i."scopeVersion"))`, [context.sourceEventId, userId, parsed.data.issueId, botId, context.attemptId])
       if (!event) throw new ActionFailureError('runInvalid')
       profileStage = event.stage
+      // The public Factory tool shares this queue with host-selected stages.
+      // Only a stored user choice can select Default on the public path;
+      // independent checks and frozen continuations keep the host's selection.
+      if (!selection.model?.trim()) {
+        const profile = agentProfileReferenceSchema.safeParse(event.payload?.profileId)
+        if (profile.success && (profile.data === BUILTIN_AGENT_PROFILE_ID || parsed.data.profileId === BUILTIN_AGENT_PROFILE_ID)) parsed.data.profileId = profile.data
+        else if (parsed.data.profileId === BUILTIN_AGENT_PROFILE_ID) throw new ActionFailureError('runInvalid')
+      }
       // Even malformed destination data must reach the strict host-bound
       // admission check; an unbound ordinary chat request remains valid intake.
       if (Object.hasOwn(event.payload ?? {}, 'taskDestination')) requestEventId = context.sourceEventId

@@ -17,6 +17,12 @@ Settings › Models and subscriptions › the current workspace's model defaults
 
 New task has an Agent 配置 chip in its header row beside the machine and Bot chips, drawn the same way (`h-7 rounded-full`, icon first, R-90); its menu ends with 管理, which opens Settings in a new tab so the task draft stays. A load failure or an unavailable choice shows under the row. Automatic selection omits the explicit Profile ID. A selected Profile is sent as structured `profileId` beside `taskDestination`, through the existing Coordinator submission; the selector does not put a claimed choice into natural-language instructions.
 
+The same menu offers the existing built-in Default profile, including when custom Profiles are enabled. It uses the Default row's availability and inherits preferred models. Its structured task-form reference is the closed literal `default`; custom references remain UUIDs. The stored user event is authoritative: a model's text or tool argument cannot select Default on its own or replace the user's pin. Mutable Profile APIs remain UUID-only.
+
+An explicit Default choice enters the existing preferred-model dispatcher, preserving named Agent/model/source constraints, difficulty routing and current authorization. Its frozen receipt still has source and reason `default`, with the same immutable definition and no Profile Decision receipt. An explicit model remains a picked model; a named Agent alone still inherits that Agent's list. Automatic selection keeps its existing Decision and refusal behavior. This is an entry point for the person's existing Default choice, not a change to Automatic fallback policy.
+
+The host-only default continuation selector may retain the same structured Default pin, never a different custom Profile. Question answers keep the original frozen native role and session guards; independent review stages keep their own host-selected Profile.
+
 Task availability is requested for the explicitly selected cloud or device destination. A location change invalidates the previous availability result while the host evaluates the new destination; dispatch revalidates it again.
 
 The existing thread execution identity dialog shows the frozen Profile name, version, selection source and reason (stored as a code — `capability_fit`, `stage_fit`, `only_suitable` — and worded in the reader's language; a run frozen before the codes reads as the neutral 按任务能力选择). The configuration digest stays in the snapshot but is not shown beside the run's actual Agent, model and credential kind. Opening a thread from a task uses the same dialog. It never reconstructs historical Profile data from the current settings.
@@ -74,6 +80,7 @@ Rules: R-01, R-22/23, R-30/31/32/33/34, R-40/41/42/43, R-70, R-74, R-90. Setting
 | Pause a Profile | Missing | Disable; historical run snapshots stay intact |
 | Stop using a Profile | Missing | Archive with a named confirmation |
 | Choose a role for one task | Missing | New task selector sends the exact Profile ID |
+| Use preferred models for one task while custom Profiles exist | Default available only as a read-only settings row | New task can explicitly select Default with its current availability |
 | Explain a previous run's selection | Physical run identity only | Frozen Profile version/source/reason in the same run identity dialog |
 | Recover from a removed source, Skill or concurrent edit | Missing | Explicit errors, replacement/removal controls and reload |
 
