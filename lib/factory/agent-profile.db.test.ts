@@ -24,6 +24,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     await pool.query('DELETE FROM run_publications WHERE "userId"=ANY($1)', [owners])
     await pool.query('DELETE FROM coordinator_events WHERE "userId"=ANY($1)', [owners])
     await pool.query('DELETE FROM factory_agent_profiles WHERE "ownerId"=ANY($1)', [owners])
+    await pool.query('DELETE FROM workspace_subscription_shares WHERE "ownerId"=ANY($1)', [owners])
     await pool.query('DELETE FROM model_order_entries WHERE "ownerId"=ANY($1)', [owners])
     await pool.query('DELETE FROM model_order_settings WHERE "ownerId"=ANY($1)', [owners])
     await pool.query('DELETE FROM byos_bindings WHERE "ownerId"=ANY($1)', [owners])
@@ -66,6 +67,28 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   for (const harness of ['claude_code', 'codex'] as const) await pool.query('INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,$4,$4)', [agents[harness], scope.ownerId, deviceId, harness])
   const definition = (name: string, harness: OrderHarness, sourceId: string, model: string) => ({ name, harness, description: `${name} public capability`, roles: [name], model: { mode: 'fixed', harness, model, source: { kind: 'subscription', connectionId: sourceId } }, instructions: 'PRIVATE_PROFILE_INSTRUCTIONS_DO_NOT_SEND_TO_DECISION', skills: ['systematic-debugging'], effort: 'low' })
 
+  await t.test('default dispatch survives a 21-second catalogue wait before final membership admission', { timeout: 45_000 }, async () => {
+    const selected = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' }, {
+      resolve: async (...args) => {
+        await new Promise(resolve => setTimeout(resolve, 21_000))
+        // The real daemon keeps reporting presence while catalogue work waits.
+        await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
+        return resolveModelDispatch(...args)
+      },
+    })
+    assert.equal(selected.agentProfile?.source, 'default')
+    assert.ok(selected.agentProfile)
+    if (selected.target.kind !== 'device') assert.fail('the delayed default still selects its authorized local device')
+    assert.equal(selected.target.agentId, agents[selected.target.entry.harness])
+    assert.deepEqual(selected.target, await resolveModelDispatch(pool, scope, undefined, 'local'))
+    assert.deepEqual(selected.agentProfile.targetEntry, selected.target.entry)
+    const binding = (await pool.query('SELECT "consumerId","connectionId","modelId" FROM byos_bindings WHERE id=$1', [selected.target.subscriptionBindingId])).rows[0]
+    assert.equal(binding.consumerId, selected.target.agentId)
+    if (selected.target.entry.source.kind !== 'subscription') assert.fail('the default fixture uses a subscription')
+    assert.equal(binding.connectionId, selected.target.entry.source.connectionId)
+    assert.equal(binding.modelId, selected.target.model)
+  })
+
   await t.test('zero configuration preserves the existing model resolver', async () => {
     const actual = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' })
     const expected = await resolveModelDispatch(pool, scope, undefined, 'local')
@@ -100,6 +123,167 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   const ui = await store.create(scope, definition('UI', 'claude_code', exactClaude, 'claude-haiku-5-5'), randomUUID())
   const backend = await store.create(scope, definition('Backend', 'codex', codex, 'gpt-6-luna'))
   const review = await store.create(scope, { ...definition('Review', 'codex', codex, 'gpt-6-luna'), roles: ['review'], skills: ['independent-review'] })
+
+  await t.test('custom Profile survives a 21-second Decision wait and binds its exact authorized source', { timeout: 45_000 }, async () => {
+    const selected = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' }, {
+      decision: async () => {
+        await new Promise(resolve => setTimeout(resolve, 21_000))
+        await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
+        return { answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([['profile', { name: 'profile', type: 'choice', choice: ui.id, confidence: .95 }], ['reason', { name: 'reason', type: 'choice', choice: 'capability_fit' }]]), execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'fixture-delayed-decision', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
+      },
+    })
+    assert.equal(selected.agentProfile?.profileId, ui.id)
+    assert.equal(selected.agentProfile?.version, ui.version)
+    assert.equal(selected.agentProfile?.digest, ui.digest)
+    assert.equal(selected.agentProfile?.source, 'decision')
+    assert.ok(selected.agentProfile)
+    if (selected.target.kind !== 'device') assert.fail('the delayed Decision still selects its authorized local device')
+    assert.deepEqual(selected.agentProfile.targetEntry, selected.target.entry)
+    assert.equal(selected.target.agentId, agents.claude_code)
+    const binding = (await pool.query('SELECT "consumerId","connectionId","modelId" FROM byos_bindings WHERE id=$1', [selected.target.subscriptionBindingId])).rows[0]
+    assert.equal(binding.consumerId, selected.target.agentId)
+    assert.equal(binding.connectionId, exactClaude)
+    assert.equal(binding.modelId, selected.target.model)
+  })
+
+  for (const change of ['default-member', 'custom-member', 'default-source', 'custom-source', 'disabled', 'edited'] as const) await t.test(`planning ${change} change leaves no committed binding or run`, async () => {
+    const who = await person(`profiles-planning-${change}`)
+    const sourceId = await subscribe(who, 'codex', ['gpt-6-luna'])
+    const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId)
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Planning boundary','local',true,now(),$3)`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
+    await pool.query(`INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,'Planning boundary','codex')`, [agentId, who.ownerId, device])
+    const input = definition('Planning role', 'codex', sourceId, 'gpt-6-luna')
+    const profile = change.startsWith('default-') ? undefined : await store.create(who, input)
+    let planned = false
+    await assert.rejects(profiles.resolveAgentProfileDispatch(pool, who, { issueId: taskIssue, location: 'local', profileId: profile?.id }, {
+      resolve: async (...args) => {
+        assert.equal(args[5]?.bindSubscription, false, 'planning must not write the chosen executor binding')
+        const target = await resolveModelDispatch(...args)
+        assert.equal(target.kind, 'device')
+        planned = true
+        if (change.endsWith('-member')) {
+          const writer = await pool.connect()
+          try {
+            await writer.query('BEGIN')
+            // NOWAIT proves the initial membership lease was released before planning.
+            await writer.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 FOR UPDATE NOWAIT', [who.workspaceId, who.ownerId])
+            await writer.query("UPDATE mikka_workspace_members SET status='suspended' WHERE \"workspaceId\"=$1 AND \"userId\"=$2", [who.workspaceId, who.ownerId])
+            await writer.query('COMMIT')
+          } catch (error) { await writer.query('ROLLBACK'); throw error }
+          finally { writer.release() }
+        } else if (change.endsWith('-source')) await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [sourceId])
+        else await store.update(who, profile!.id, profile!.version, change === 'disabled' ? { ...input, enabled: false } : { ...input, instructions: 'Changed during planning.' })
+        return target
+      },
+    }), { code: change.endsWith('-member') ? 'agentProfileScopeNotFound' : change.endsWith('-source') ? 'agentProfileModelUnavailable' : change === 'disabled' ? 'agentProfileDisabled' : 'agentProfileVersionConflict' })
+    assert.equal(planned, true)
+    assert.equal((await pool.query('SELECT 1 FROM byos_bindings WHERE "ownerId"=$1 AND "consumerId"=$2', [who.ownerId, agentId])).rowCount, 0)
+    assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "userId"=$1', [who.ownerId])).rowCount, 0)
+  })
+
+  for (const mode of ['default', 'custom', 'edited-concurrently'] as const) await t.test(mode === 'edited-concurrently' ? 'shared-source dispatch and Profile edits serialize without membership lock cycles' : `${mode} dispatch authorizes a shared source without holding a conflicting membership lease`, async () => {
+    const who = await person(`profiles-shared-${mode}`)
+    const sourceOwner = await seedUser(pool, `profiles-shared-source-${mode}`); owners.push(sourceOwner)
+    await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,'member','active')`, [who.workspaceId, sourceOwner, `${sourceOwner}@example.invalid`])
+    const connectionId = await subscribe({ ...who, ownerId: sourceOwner }, 'codex', ['gpt-6-luna'])
+    await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,true)', [sourceOwner, who.workspaceId])
+    const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId)
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Shared source','local',true,now(),$3)`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
+    await pool.query(`INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,'Shared source','codex')`, [agentId, who.ownerId, device])
+    const input = definition('Shared role', 'codex', connectionId, 'gpt-6-luna')
+    const profile = mode === 'default' ? undefined : await store.create(who, input)
+    if (mode === 'edited-concurrently') {
+      const { acquireWorkspaceMembership } = await import('../workspace-membership-guard')
+      // Only the editor's APP statement is bounded for failure cleanup. The
+      // production membership guard retains its real 20-second deadline.
+      const editorPool = new Pool({ connectionString: dbUrl, max: 1, options: '-c lock_timeout=1000' })
+      let memberReady!: (pid: number) => void, releaseEditor!: () => void
+      const acquired = new Promise<number>(resolve => { memberReady = resolve })
+      const proceed = new Promise<void>(resolve => { releaseEditor = resolve })
+      const editor = new profiles.AgentProfileStore(editorPool, { membership: async identity => {
+        const member = await acquireWorkspaceMembership(workspacePool, { workspaceId: identity.workspaceId, userId: identity.ownerId })
+        assert.ok(member.workspaceClient)
+        const { rows: [backend] } = await member.workspaceClient.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')
+        memberReady(backend.pid)
+        await proceed
+        return member
+      } })
+      let editing: ReturnType<typeof editor.update> | undefined
+      const dispatch = profiles.resolveAgentProfileDispatch(pool, who, { issueId: taskIssue, location: 'local', profileId: profile!.id }, {
+        resolve: async (...args) => {
+          const target = await resolveModelDispatch(...args)
+          editing = editor.update(who, profile!.id, profile!.version, { ...input, instructions: 'Edited while shared-source admission is authorizing membership.' })
+          void editing.catch(() => {})
+          await acquired
+          return target
+        },
+      })
+      let dispatchFinished = false
+      const result = dispatch.then(value => ({ value, error: undefined }), (error: unknown) => ({ value: undefined, error })).finally(() => { dispatchFinished = true })
+      try {
+        const memberPid = await acquired
+        let blocked = false
+        for (let attempt = 0; attempt < 200; attempt++) {
+          blocked = (await pool.query<{ blocked: boolean }>('SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND $1::int=ANY(pg_blocking_pids(pid))) AS blocked', [memberPid])).rows[0].blocked
+          if (blocked || dispatchFinished) break
+          await new Promise(resolve => setTimeout(resolve, 10))
+        }
+        assert.equal(blocked || dispatchFinished, true, 'shared admission reaches either its authorization boundary or a completed result')
+        releaseEditor()
+        const updated = await editing!
+        assert.equal(updated.version, profile!.version + 1)
+        const outcome = await result
+        if (outcome.error) {
+          assert.ok(outcome.error instanceof profiles.AgentProfileError)
+          assert.equal(outcome.error.code, 'agentProfileVersionConflict')
+          assert.equal((await pool.query('SELECT 1 FROM byos_bindings WHERE "consumerId"=$1', [agentId])).rowCount, 0)
+        } else {
+          const selected = outcome.value; assert.ok(selected)
+          assert.equal(selected.agentProfile?.version, profile!.version)
+          assert.equal(selected.agentProfile?.digest, profile!.digest)
+          if (selected.target.kind !== 'device') assert.fail('the serialized dispatch selects the authorized device')
+          const binding = (await pool.query('SELECT "ownerId","consumerId","connectionId","modelId" FROM byos_bindings WHERE id=$1', [selected.target.subscriptionBindingId])).rows[0]
+          assert.equal(binding.ownerId, sourceOwner)
+          assert.equal(binding.consumerId, agentId)
+          assert.equal(binding.connectionId, connectionId)
+          assert.equal(binding.modelId, selected.target.model)
+          await assert.rejects(profiles.assertProfileSelection(pool, who, selected.agentProfile!), { code: 'agentProfileVersionConflict' })
+        }
+        assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "userId"=$1', [who.ownerId])).rowCount, 0)
+      } finally {
+        releaseEditor()
+        await Promise.allSettled([editing, result])
+        await editorPool.end()
+      }
+      return
+    }
+    const selected = await profiles.resolveAgentProfileDispatch(pool, who, { issueId: taskIssue, location: 'local', profileId: profile?.id })
+    if (selected.target.kind !== 'device') assert.fail('the shared source should select the authorized executor')
+    assert.equal(selected.agentProfile?.source, mode === 'default' ? 'default' : 'explicit')
+    assert.deepEqual(selected.target.entry.source, { kind: 'subscription', connectionId })
+    const binding = (await pool.query('SELECT "ownerId","workspaceId","consumerId","connectionId","modelId" FROM byos_bindings WHERE id=$1', [selected.target.subscriptionBindingId])).rows[0]
+    assert.equal(binding.ownerId, sourceOwner)
+    assert.equal(binding.workspaceId, who.workspaceId)
+    assert.equal(binding.consumerId, agentId)
+    assert.equal(binding.connectionId, connectionId)
+    assert.equal(binding.modelId, selected.target.model)
+  })
+
+  await t.test('subscription authorization requires the parent workspace and an active matching member', async () => {
+    const { authorizeSubscriptionWorkspace } = await import('../subscription-runtime')
+    const who = await person('profiles-authorization')
+    await authorizeSubscriptionWorkspace(who.ownerId, who.workspaceId)
+    await assert.rejects(authorizeSubscriptionWorkspace(foreign.ownerId, who.workspaceId), { code: 'workspaceAccessDenied' })
+    await assert.rejects(authorizeSubscriptionWorkspace(who.ownerId, 'invalid-workspace-id'), { name: 'ZodError' })
+    await pool.query("UPDATE mikka_workspace_members SET status='suspended' WHERE \"workspaceId\"=$1 AND \"userId\"=$2", [who.workspaceId, who.ownerId])
+    await assert.rejects(authorizeSubscriptionWorkspace(who.ownerId, who.workspaceId), { code: 'workspaceAccessDenied' })
+    await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [who.workspaceId, who.ownerId])
+    await assert.rejects(authorizeSubscriptionWorkspace(who.ownerId, who.workspaceId), { code: 'workspaceAccessDenied' })
+    const orphan = await seedWorkspace(pool, who.ownerId, [{ userId: who.ownerId, role: 'admin' }]); workspaces.push(orphan.id)
+    await pool.query('DELETE FROM mikka_workspaces WHERE id=$1', [orphan.id])
+    assert.equal((await pool.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND status=\'active\'', [orphan.id])).rowCount, 1)
+    await assert.rejects(authorizeSubscriptionWorkspace(who.ownerId, orphan.id), { code: 'workspaceAccessDenied' })
+  })
 
   await t.test('default thread recovery never reselects a role when custom profiles were enabled later', async () => {
     const selected = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local', defaultOnly: true }, {
