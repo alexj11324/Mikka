@@ -55,7 +55,6 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
     }
   }
   Object.assign(machines.threadMachineProvider, {
-    snapshot: async () => 'snapshot-fixture',
     connect: async (sandboxId: string) => sandbox(sandboxId),
     create: async (_snapshot: string, operationId: string) => sandbox(`sandbox-${operationId}`),
     kill: async () => {},

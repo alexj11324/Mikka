@@ -201,7 +201,6 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
       const error = Object.freeze(new ComputerError(503, 'Fixture provider refused startup'));
       let calls = 0;
       const provider: typeof threadMachineProvider = {
-        snapshot: async () => assert.fail('the existing fixture snapshot is used'),
         connect: async () => assert.fail('no sandbox has been recorded'),
         create: async () => { calls++; throw error; },
         kill: async () => assert.fail('an unknown create response has no sandbox to kill'),

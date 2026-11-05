@@ -77,7 +77,6 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       const calls: string[] = [];
       const sources: string[] = [];
       const provider: typeof threadMachineProvider = {
-        snapshot: async () => { calls.push("snapshot"); return "snapshot-fixture"; },
         // The fake sandbox has no runtime: provisioning stops right after the provider step.
         connect: async (id) => { calls.push(`connect:${id}`); return { sandboxId: id } as never; },
         create: async (source, op) => { calls.push("create"); sources.push(source); return { sandboxId: `sandbox-${op}` } as never; },
@@ -122,6 +121,28 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.deepEqual(fixture.calls,['state']);
       assert.equal((await machine(f.next)).sandboxId,f.prior.sandboxId);
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM device_tokens WHERE "boundDeviceId"=$1',[f.prior.device])).rows[0].n,0);
+    });
+    await t.test('retained original question VMs ignore replacement-template configuration', async () => {
+      const savedTemplates = { codex: process.env.E2B_CODEX_TEMPLATE, desktop: process.env.E2B_BYO_COMPUTER_TEMPLATE };
+      process.env.E2B_CODEX_TEMPLATE = 'unavailable-replacement';
+      process.env.E2B_BYO_COMPUTER_TEMPLATE = 'unavailable-replacement';
+      try {
+        for (const state of ['running', 'paused']) {
+          const f = await questionMachine(state), fixture = exactFake(state);
+          if (state === 'running') {
+            assert.deepEqual(await ensureThreadMachine(pool,actor,f.next,fixture.provider),{runId:f.next,state:'running'});
+            assert.deepEqual(fixture.calls,['state']);
+          } else {
+            fixture.provider.connect = async id => {fixture.calls.push(`connect:${id}`); throw new Error('fixture original connection');};
+            await assert.rejects(ensureThreadMachine(pool,actor,f.next,fixture.provider),/fixture original connection/);
+            assert.deepEqual(fixture.calls,['state',`connect:${f.prior.sandboxId}`]);
+          }
+          assert.equal((await machine(f.next)).sandboxId,f.prior.sandboxId);
+        }
+      } finally {
+        if (savedTemplates.codex === undefined) delete process.env.E2B_CODEX_TEMPLATE; else process.env.E2B_CODEX_TEMPLATE = savedTemplates.codex;
+        if (savedTemplates.desktop === undefined) delete process.env.E2B_BYO_COMPUTER_TEMPLATE; else process.env.E2B_BYO_COMPUTER_TEMPLATE = savedTemplates.desktop;
+      }
     });
     await t.test('original VM provider loss never creates or adopts a replacement and releases only its own wake lease', async () => {
       const f = await questionMachine(), fixture = exactFake();
