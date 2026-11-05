@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { CLAIM_WINDOW_MS, RESULT_TIMEOUT_MS, TabShare, type TabChannel, type TabShareClock } from './tab-share'
+import { CLAIM_WINDOW_MS, RESULT_TIMEOUT_MS, TabShare, tabShareChannelName, type TabChannel, type TabShareClock } from './tab-share'
+import { PersistentReadCache, readCacheShareNamespace } from '../swr/persistent-cache'
 
 /** BroadcastChannel semantics: same name, other instances only, delivered asynchronously. */
 function hub() {
@@ -90,4 +91,26 @@ test('a failed leader read sends no data: the followers read themselves', async 
   await failed
   await second
   assert.equal(followerReads, 1)
+})
+
+test('the default chat alias cannot share across authenticated workspace, build or role namespaces', async () => {
+  const h = hub()
+  const base = { userId: 'owner', workspaceId: 'team-a', build: 'build-a', role: 'admin' }
+  const scopes = [base, { ...base, workspaceId: 'team-b' }, { ...base, build: 'build-b' }, { ...base, role: 'member' }]
+  const caches = scopes.map(scope => new PersistentReadCache(scope))
+  let reads = 0
+  const tabs = caches.map(cache => {
+    const namespace = readCacheShareNamespace(cache, base.userId)
+    assert.ok(namespace)
+    return new TabShare(tabShareChannelName(namespace, 'same-personal-home'), h.open, h.clock)
+  })
+  const pending = tabs.map((tab, index) => tab.run('coordinator-chat', async () => { reads++; return { botId: `bot-${index}` } }, () => assert.fail('another namespace must not populate this chat')))
+  await h.advance(CLAIM_WINDOW_MS + 10)
+  assert.deepEqual(await Promise.all(pending), scopes.map((_, index) => ({ botId: `bot-${index}` })))
+  assert.equal(reads, scopes.length)
+  assert.equal(readCacheShareNamespace(new Map(), base.userId), null, 'memory-only/unapproved scopes never join')
+  assert.equal(readCacheShareNamespace(caches[0], 'other-owner'), null)
+  caches[0].invalidate(false)
+  assert.equal(readCacheShareNamespace(caches[0], base.userId), null, 'a retired namespace cannot adopt late data')
+  for (const tab of tabs) tab.close()
 })

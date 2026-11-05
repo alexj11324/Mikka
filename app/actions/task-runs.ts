@@ -1,6 +1,7 @@
 'use server'
 
 import { singleFlight } from '@/lib/single-flight'
+
 import { createHash } from 'node:crypto'
 import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
 import { headers } from 'next/headers'
@@ -15,6 +16,8 @@ import { replyLine } from '@/lib/thread-groups'
 import { queryVersion } from '@/lib/db/query-version'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { ownerListRead } from '@/lib/live/list-read-server'
+import { changedListIds, listPositionKey, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
+import { cacheReadAction } from '@/lib/cache-read-action'
 import { beginOwnerListRead } from '@/lib/live/revision-read'
 
 /** The newest run on each issue, for the right column's 我的任务 groups (MIK-38). */
@@ -97,29 +100,28 @@ export async function listThreads(): Promise<Thread[]> {
 }
 
 /** Authorization is checked even when an existing snapshot has not changed. */
-export async function pollThreads(known?: string) {
-  return readThreads(known && /^[0-9a-f]{32}$/.test(known) ? known : undefined)
+export async function pollThreads(known?: string, positions?: readonly ListPosition[]) {
+  const previous = readListPositions(positions, 200)
+  const valid = positions === undefined || previous !== undefined
+  return readThreads(valid && known && /^[0-9a-f]{32}$/.test(known) ? known : undefined, previous)
 }
 
-async function readThreads(known?: string) {
+export async function syncThreadList(known?: string, positions?: readonly ListPosition[]) {
+  return cacheReadAction(async () => ({ snapshot: await pollThreads(known, positions) }))
+}
+
+async function readThreads(known?: string, previous?: ListPosition[]) {
   return withDatabaseOperation('/actions/threads/poll', async () => {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
-    // The list is the session user's own runs only: identical concurrent polls share one read.
-    return singleFlight(['/actions/threads/poll', session.user.id, known ?? null], () => readThreadSnapshot(session.user.id, known))
-  })
-}
-
-async function readThreadSnapshot(userId: string, known?: string) {
-  {
     const observedAt = Date.now()
-    const begun = await beginOwnerListRead(userId, ['thread_list'])
+    const begun = await beginOwnerListRead(session.user.id, ['thread_list'])
     // Only queued local work can show "waiting for device". Ask the gateway
     // on this user read, so an idle socket affects both the view and its hash.
     const queuedDevices = process.env.DEVICE_GATEWAY_URL && process.env.DEVICE_GATEWAY_PUSH_SECRET
       ? await db.selectDistinct({ id: devices.id, lastSeenAt: devices.lastSeenAt }).from(devices)
         .innerJoin(agentRuns, eq(agentRuns.deviceId, devices.id))
-        .where(and(eq(agentRuns.userId, userId), eq(devices.ownerId, userId),
+        .where(and(eq(agentRuns.userId, session.user.id), eq(devices.ownerId, session.user.id),
           eq(devices.kind, 'local'), eq(devices.enabled, true), eq(agentRuns.status, 'queued'),
           sql`${agentRuns.createdAt} > now() - interval '30 days'`))
       : []
@@ -142,26 +144,35 @@ async function readThreadSnapshot(userId: string, known?: string) {
       harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`.as('harness'),
       outcome: agentRuns.outcome,
     }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
-      .where(and(eq(agentRuns.userId, userId), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
-      .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt)).limit(200)
+      .where(and(eq(agentRuns.userId, session.user.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
+      .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
     const signature = await queryVersion(snapshot)
-    const version = createHash('sha256').update(JSON.stringify([userId, signature])).digest('hex').slice(0, 32)
+    const version = createHash('sha256').update(JSON.stringify([session.user.id, signature])).digest('hex').slice(0, 32)
     const visible = snapshot.as('thread_list_expiry')
     const [expiry] = await db.select({ at: sql<Date | null>`min(${visible.createdAt})+interval '30 days'` }).from(visible)
-    const live = await ownerListRead(userId, [expiry?.at], observedAt, begun)
+    const live = await ownerListRead(session.user.id, [expiry?.at], observedAt, begun)
     // Device presence has its own bounded watcher prerequisite. Until that
     // route is ready, queued local work retains the shared slow fallback.
     const presenceFallback = queuedDevices.length > 0
-    if (known === version) return { unchanged: true, version, live, presenceFallback } as const
+    if (known === version) return { ...unchangedList(version), live, presenceFallback }
     // Reading the version first makes a concurrent edit visible on the next poll.
-    const rows = await snapshot
-    const items: Thread[] = rows.map(({ deviceId, deviceName, deviceType, waitingForDevice, harness, ...row }) => ({
-      // A cloud run waits on its own sandbox, never on a machine the person can turn on.
-      ...(waitingForDevice && deviceId && deviceName !== null && deviceType
-        ? { waitingFor: { deviceId, deviceName, deviceType, harness } } : {}),
-      ...row, harness: harness ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
-      lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
-    }))
-    return { version, items, live, presenceFallback }
-  }
+    const manifest = await db.select({ id: visible.id, version: sql<string>`md5(to_jsonb(thread_list_expiry)::text)` }).from(visible)
+      .orderBy(desc(sql`greatest(${visible.lastReplyAt}, ${visible.updatedAt})`), desc(visible.createdAt), desc(visible.id))
+    const positions = manifest.map(row => ({ id: row.id, version: createHash('sha256').update(`${session.user.id}:${row.version}`).digest('hex').slice(0, 32) }))
+    // Auth, current version and the full deletion/expiry manifest belong to
+    // each request. Only identical changed-row reads can join after that proof.
+    return singleFlight(['/actions/threads/poll', session.user.id, version, known ?? null, listPositionKey(previous), JSON.stringify(positions)], async () => {
+      const changedIds = changedListIds(positions, previous)
+      const rows = changedIds.length ? await db.select().from(visible).where(inArray(visible.id, changedIds))
+        .orderBy(desc(sql`greatest(${visible.lastReplyAt}, ${visible.updatedAt})`), desc(visible.createdAt), desc(visible.id)) : []
+      const items: Thread[] = rows.map(({ deviceId, deviceName, deviceType, waitingForDevice, harness, ...row }) => ({
+        // A cloud run waits on its own sandbox, never on a machine the person can turn on.
+        ...(waitingForDevice && deviceId && deviceName !== null && deviceType
+          ? { waitingFor: { deviceId, deviceName, deviceType, harness } } : {}),
+        ...row, harness: harness ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+        lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
+      }))
+      return { version, items, positions, ...(previous ? { delta: true as const } : {}), live, presenceFallback }
+    })
+  })
 }

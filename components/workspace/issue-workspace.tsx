@@ -73,6 +73,8 @@ import { focusChatComposer } from '@/hooks/use-focus-return'
 import { usePresence } from '@/lib/use-presence'
 import { FieldError } from '@/components/ui/field'
 import { ViewStateProvider, useViewState } from '@/lib/hooks/view-state'
+import { AuthenticatedReadCache } from '@/components/authenticated-read-cache'
+import type { AuthorizedCacheWorkspace } from '@/lib/swr/cache-scope'
 
 // Start the chunk download during module evaluation, before hydration and its effects.
 if (typeof window !== 'undefined') {
@@ -99,7 +101,12 @@ const SettingsShell = dynamic(() => import('@/components/settings/settings-shell
 const SettingsFrame = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsFrame), { loading: WorkspaceLoading })
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView), { loading: WorkspaceContentLoading })
 
-export function IssueWorkspace({ withinLiveProvider = false, ...props }: Parameters<typeof IssueWorkspaceContent>[0] & { withinLiveProvider?: boolean }) {
+export function IssueWorkspace({ cacheWorkspace, ...props }: Parameters<typeof IssueWorkspaceContent>[0] & { withinLiveProvider?: boolean; cacheWorkspace?: AuthorizedCacheWorkspace | null }) {
+  const content = <IssueWorkspaceScope {...props} />
+  return props.withinLiveProvider ? content : <AuthenticatedReadCache ownerId={props.user.id} workspace={cacheWorkspace}>{content}</AuthenticatedReadCache>
+}
+
+function IssueWorkspaceScope({ withinLiveProvider = false, ...props }: Parameters<typeof IssueWorkspaceContent>[0] & { withinLiveProvider?: boolean }) {
   const { data: read } = useWorkspace(props.user.email)
   const data = read?.currentUserId === props.user.id ? read : undefined
   const content = <ViewStateProvider scope={`${props.user.id}:${data?.workspace.id ?? 'loading'}`}><IssueWorkspaceContent {...props} /></ViewStateProvider>

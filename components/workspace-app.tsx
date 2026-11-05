@@ -15,8 +15,11 @@ import { SettingsShell } from '@/components/settings/settings-shell'
 import { SettingsDataPreloader } from '@/components/settings/settings-data-preloader'
 import { memberSettingsKey, teamDirectoryKey } from '@/lib/settings-data'
 import { LiveProvider } from '@/hooks/use-live-key'
+import { AuthenticatedReadCache } from '@/components/authenticated-read-cache'
+import type { AuthorizedCacheWorkspace } from '@/lib/swr/cache-scope'
 
-export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers, initialSelected, googleEnabled = false }: {
+export function WorkspaceApp({ user, cacheWorkspace, initialIssues, initialTeams, initialMembers, initialSelected, googleEnabled = false }: {
+  cacheWorkspace?: AuthorizedCacheWorkspace | null
   user: { id: string; name: string; email: string; image?: string | null }
   googleEnabled?: boolean
   initialSelected?: string | null
@@ -36,13 +39,17 @@ export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers
     const fallback: Record<string, unknown> = {}
     if (initialTeams) fallback[unstable_serialize(teamDirectoryKey(initialTeams.workspace.id))] = initialTeams
     if (initialMembers) fallback[memberSettingsKey(initialMembers.workspace.id)] = initialMembers
-    return { provider: () => new Map(), fallback }
+    return { fallback }
   })
-  return <SWRConfig value={cacheConfig}><LiveProvider ownerId={user.id} workspaceId={workspaceId}>
+  const [initialReads] = useState(() => [
+    ...(initialTeams ? [{ key: teamDirectoryKey(initialTeams.workspace.id), data: initialTeams }] : []),
+    ...(initialMembers ? [{ key: memberSettingsKey(initialMembers.workspace.id), data: initialMembers }] : []),
+  ])
+  return <AuthenticatedReadCache ownerId={user.id} workspace={cacheWorkspace} initialReads={initialReads}><SWRConfig value={cacheConfig}><LiveProvider ownerId={user.id} workspaceId={workspaceId}>
     <DesktopIntegration userId={user.id} />
     <SettingsDataPreloader ownerId={user.id} userKey={user.email} workspaceId={params.get('workspace') ?? initialWorkspaceId} onWorkspaceResolved={setWorkspaceId} />
     {pathname.startsWith('/settings')
       ? <SettingsShell user={user} defaultWorkspaceId={workspaceId} googleEnabled={googleEnabled} />
       : <IssueWorkspace withinLiveProvider user={user} initialIssues={initialIssues} initialSelected={initialSelected} initialSection={sectionFromQuery(params.get('section') ?? undefined)} googleEnabled={googleEnabled} />}
-  </LiveProvider></SWRConfig>
+  </LiveProvider></SWRConfig></AuthenticatedReadCache>
 }

@@ -1,8 +1,10 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
 import useSWR from 'swr'
-import { getPreferences, updatePreferences } from '@/app/actions/preferences'
+import { type getPreferences, updatePreferences } from '@/app/actions/preferences'
+import { settingsRead } from '@/lib/settings-read'
 import type { ActionErrorCode } from '@/lib/action-result'
 import type { Preferences } from '@/lib/preferences'
 
@@ -17,7 +19,7 @@ export interface FailedSave { patch: PreferencesPatch; code: ActionErrorCode | n
  * `failed` so the page can show why and retry it.
  */
 export function usePreferences() {
-  const swr = useSWR('preferences', getPreferences)
+  const swr = useSWR(settingsKeys.preferences(), () => settingsRead<Awaited<ReturnType<typeof getPreferences>>>('preferences'))
   const [failed, setFailed] = useState<FailedSave | null>(null)
 
   async function save(patch: PreferencesPatch): Promise<boolean> {

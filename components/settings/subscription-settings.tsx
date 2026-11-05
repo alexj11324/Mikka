@@ -1,5 +1,7 @@
 'use client'
 
+import { ReadResponseError } from '@/lib/swr/retry'
+import { settingsKeys } from '@/lib/swr/keys'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { toast } from 'sonner'
@@ -427,16 +429,16 @@ export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { 
   </div>
 }
 
-export const subscriptionsKey = (workspaceId: string) => ['settings:subscriptions', workspaceId] as const
+export const subscriptionsKey = settingsKeys.subscriptions
 export async function readSubscriptions(workspaceId: string): Promise<State> {
   const response = await fetch(`${path}?workspace=${encodeURIComponent(workspaceId)}`, { cache: 'no-store', credentials: 'same-origin' })
-  if (!response.ok) throw new Error('Subscription list unavailable')
+  if (!response.ok) throw new ReadResponseError(response.status)
   return subscriptionListSchema.parse(await response.json())
 }
-export const subscriptionUsageKey = (workspaceId: string) => ['settings:subscription-usage', workspaceId] as const
+export const subscriptionUsageKey = settingsKeys.subscriptionUsage
 export async function readSubscriptionUsage(workspaceId: string, force = false) {
   const response = await fetch(`${path}/usage?workspace=${encodeURIComponent(workspaceId)}${force ? '&refresh=1' : ''}`, { cache: 'no-store', credentials: 'same-origin' })
-  if (!response.ok) throw new Error('Subscription usage unavailable')
+  if (!response.ok) throw new ReadResponseError(response.status)
   const result = subscriptionUsageSchema.parse(await response.json())
   return new Map(result.connections.map(item => [item.id, item]))
 }
