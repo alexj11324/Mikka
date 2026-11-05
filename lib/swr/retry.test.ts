@@ -39,11 +39,11 @@ test('read retries have exponential equal jitter, a 30-second cap and at most fi
   }
   for (const status of [401, 403, 429]) {
     const error = new ReadResponseError(status)
-    retryRead(error, 'key', retryConfig(error), () => { calls++ }, { retryCount: 1 })
+    retryRead(error, 'key', retryConfig(error), () => { calls++ }, { retryCount: 1, dedupe: true })
   }
   const offline = new Error('offline')
-  retryRead(offline, 'key', retryConfig(offline, { errorRetryCount: 2 }), () => { calls++ }, { retryCount: 3 })
-  retryRead(offline, 'key', retryConfig(offline, { isPaused: () => true }), () => { calls++ }, { retryCount: 1 })
+  retryRead(offline, 'key', retryConfig(offline, { errorRetryCount: 2 }), () => { calls++ }, { retryCount: 3, dedupe: true })
+  retryRead(offline, 'key', retryConfig(offline, { isPaused: () => true }), () => { calls++ }, { retryCount: 1, dedupe: true })
   t.mock.timers.tick(MAX_READ_RETRY_MS)
   assert.equal(calls, MAX_READ_RETRIES)
 })
@@ -70,7 +70,7 @@ test('a queued transient retry cannot repeat a newer rate-limit failure or succe
   const cache = new Map([['key', { error: failure as unknown }]])
   const config = { ...defaultConfig, cache }
   let calls = 0
-  const schedule = () => retryRead(failure, 'key', config, () => { calls++ }, { retryCount: 1 })
+  const schedule = () => retryRead(failure, 'key', config, () => { calls++ }, { retryCount: 1, dedupe: true })
   schedule()
   cache.set('key', { error: new ReadResponseError(429) })
   t.mock.timers.tick(MAX_READ_RETRY_MS)

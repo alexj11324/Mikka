@@ -45,6 +45,20 @@ test('missing named references fail closed instead of guessing action IDs', asyn
   await assert.rejects(discoverReadActions(async () => new Response('<html></html>'), environment, id(1)), { code: 'read_action_reference_missing' })
 })
 
+test('discovery before selecting an existing task uses only the main and settings pages and still requires every read action', async () => {
+  const pages = []
+  const found = await discoverReadActions(async path => {
+    if (path.startsWith('/mikka/en')) {
+      pages.push(path)
+      return new Response('<script src="/mikka/_next/static/chunks/read.js"></script>')
+    }
+    return new Response(READ_ACTIONS.map(name => `createServerReference("${refs[name]}",callServer,void 0,findSourceMapURL,"${name}")`).join(';'))
+  }, environment)
+  assert.deepEqual(pages, ['/mikka/en', '/mikka/en/settings?section=preferences'])
+  assert.deepEqual(found.refs, refs)
+  await assert.rejects(discoverReadActions(async () => new Response('<html></html>'), environment), { code: 'read_action_reference_missing' })
+})
+
 test('Flight decoder preserves large UTF-8 text rows and resolves only the action result', () => {
   const body = '任务正文\n'.repeat(300), bytes = Buffer.byteLength(body)
   const text = `0:{"a":"$@1","f":"","b":"development"}\n1:{"issue":{"content":"$2","at":"$D2026-11-05T00:00:00.000Z","literal":"$$not_a_ref"}}\n2:T${bytes.toString(16)},${body}`

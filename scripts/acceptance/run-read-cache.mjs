@@ -5,10 +5,25 @@ import { resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { loadEnvironment, assertDeploymentIdentity, EnvironmentError } from '../test-accounts/environment.mjs'
-import { runReadCacheAcceptance, publicFailure } from './read-cache.mjs'
+import { runReadCacheAcceptance, publicFailure, ReadCacheAcceptanceError } from './read-cache.mjs'
 
 // This runner owns one development server on the attested disposable origin.
 // It never attaches to a production process or prints raw application output.
+export async function prepareAttestationRoute(environment, fetchImpl = fetch) {
+  // Next's Ready event means the listener exists, not that the first route is
+  // compiled. One anonymous request prepares that route before the unchanged
+  // ten-second HMAC check. No challenge or credential is sent here, so the
+  // published route must refuse it; this cannot establish an identity proof.
+  let response
+  try {
+    response = await fetchImpl(`${environment.origin}${environment.basePath}/api/test-environment`, {
+      method: 'GET', redirect: 'error', credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(120_000),
+    })
+  } catch (error) { throw new ReadCacheAcceptanceError('owned_attestation_prepare_unavailable', { cause: error }) }
+  await response.body?.cancel()
+  if (response.status !== 404 || response.headers.has('set-cookie')) throw new ReadCacheAcceptanceError('owned_attestation_prepare_refused')
+}
+
 async function stop(child) {
   if (!child?.pid) return
   const signal = name => { try { process.kill(-child.pid, name) } catch { /* Already stopped. */ } }
@@ -46,9 +61,12 @@ export async function runOwnedReadCacheAcceptance() {
       })
       server.stderr.on('data', data => { serverStderrBytes += data.length })
     })
+    const preparingAt = Date.now()
+    await prepareAttestationRoute(environment)
+    const initialRouteCompileMs = Date.now() - preparingAt
     await assertDeploymentIdentity(environment)
     const result = await runReadCacheAcceptance()
-    const summary = { ...result, serverStdoutBytes, serverStderrBytes }
+    const summary = { ...result, initialRouteCompileMs, serverStdoutBytes, serverStderrBytes }
     await mkdir('.cache/e2e', { recursive: true, mode: 0o700 })
     await writeFile('.cache/e2e/http-acceptance-summary.json', `${JSON.stringify(summary, null, 2)}\n`, { mode: 0o600 })
     return summary

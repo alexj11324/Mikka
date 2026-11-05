@@ -39,6 +39,8 @@ test('the task list and a task\'s relations read metadata and checklist counts, 
     const estimated = await actAs(owner, () => updateIssueMetadata({ id: ids[0], revision: first, patch: { estimate: 5 } }))
     assert.ok('issue' in estimated && estimated.issue, JSON.stringify(estimated))
 
+    // Initialize the personal workspace and warm its connections outside measurement.
+    await actAs(owner, () => listIssues())
     const list = await measured(() => actAs(owner, () => listIssues()))
     assert.equal(list.value.length, 30)
     const expected = issueChecklist(content(0))
@@ -51,11 +53,11 @@ test('the task list and a task\'s relations read metadata and checklist counts, 
     const snapshot = cold.value
     assert.ok(snapshot.items)
     const quiet = await measured(() => actAs(owner, () => pollIssues(snapshot.version)))
-    assert.equal(quiet.value.unchanged, true)
+    assert.ok('unchanged' in quiet.value && quiet.value.unchanged)
     assert.equal(quiet.value.items, undefined)
     assert.ok(quiet.bytes < list.bytes / 2, `unchanged ${quiet.bytes} B vs full ${list.bytes} B`)
     const restored = await measured(() => actAs(owner, () => pollIssues(snapshot.version, snapshot.positions)))
-    assert.equal(restored.value.unchanged, true)
+    assert.ok('unchanged' in restored.value && restored.value.unchanged)
     await pool.query('update issues set title=$2 where id=$1', [ids[0], 'Renamed without a clock change'])
     const delta = await measured(() => actAs(owner, () => pollIssues(snapshot.version, snapshot.positions)))
     assert.equal(delta.value.delta, true)
@@ -197,7 +199,7 @@ test('workspace task polls keep permission reads bounded and recheck the next re
     assert.deepEqual(full.value.items?.map(row => row.id).sort(), [...firstWorkspace, personal, unlinked].sort())
     assert.ok(full.value.items?.filter(row => firstWorkspace.includes(row.id)).every(row => teams.slice(0, 2).includes(row.teamId!)))
     const quiet = await measured(() => inWorkspace(workspaces[0], () => pollIssues(full.value.version)))
-    assert.equal(quiet.value.unchanged, true)
+    assert.ok('unchanged' in quiet.value && quiet.value.unchanged)
     assert.equal(quiet.value.items, undefined)
     t.diagnostic(JSON.stringify({ linkedTasks: 80, fullWorkspaceListBytes: full.bytes, unchangedWorkspaceListBytes: quiet.bytes }))
 
@@ -233,7 +235,7 @@ test('workspace task polls keep permission reads bounded and recheck the next re
     }
     assert.equal(movedDuringRead, true, 'the concurrent relation edit was exercised')
     const corrected = await inWorkspace(workspaces[0], () => pollIssues(raced.version))
-    assert.notEqual(corrected.unchanged, true, 'a concurrent relation edit is not acknowledged unseen')
+    assert.ok(!('unchanged' in corrected), 'a concurrent relation edit is not acknowledged unseen')
     assert.equal(corrected.items?.find(row => row.id === firstWorkspace[2])?.teamId, teams[1])
 
     await pool.query('update mikka_team_issues set "teamId"=$2 where "issueId"=$1', [firstWorkspace[0], teams[1]])

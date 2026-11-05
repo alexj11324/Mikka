@@ -18,7 +18,7 @@ function successful<T>(result: ActionResult<T>): T {
 test('detail and activity revalidate current access while returning only changed content and history summaries', { skip: !enabled }, async t => {
   const { pool } = await import('../lib/db')
   const { actAs } = await import('../lib/acting-user')
-  const { getIssue, saveIssue, listIssueVersions, pollIssue, pollIssueVersionSummaries } = await import('../app/actions/issues')
+  const { getIssue, saveIssue, listIssueVersions, pollIssue, pollIssueVersionSummaries, promoteIssueToTeam } = await import('../app/actions/issues')
   const { syncCoordinatorChat } = await import('../app/actions/coordinator')
   const owner = `detail-cache-${randomUUID()}`, stranger = `detail-stranger-${randomUUID()}`
   const workspaceId = randomUUID(), teamId = randomUUID(), botId = randomUUID()
@@ -70,6 +70,7 @@ test('detail and activity revalidate current access while returning only changed
     const newVersion = randomUUID()
     await pool.query('insert into issue_versions(id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id) values($1,$2,$3,51,$4,$5,$6,$7,$8,$3)',
       [newVersion, id, owner, 'Newest activity', JSON.stringify(changedBody), 'done', 'normal', 'user'])
+    await pool.query('update issues set revision=51 where id=$1', [id])
     const delta = await measured(() => read(async () => successful(await pollIssueVersionSummaries(id, snapshot.version, snapshot.positions))))
     assert.ok(delta.value.snapshot && !('unchanged' in delta.value.snapshot))
     const changedHistory = delta.value.snapshot
@@ -96,8 +97,11 @@ test('detail and activity revalidate current access while returning only changed
     for (const userId of [owner, stranger]) await pool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$2,$3,$4)',
       [workspaceId, userId, `${userId}@example.invalid`, userId === owner ? 'admin' : 'member'])
     await pool.query('insert into mikka_teams(id,"workspaceId","userId",name,identifier) values($1,$2,$3,$4,$5)', [teamId, workspaceId, owner, 'Cache fixture', 'CACHE'])
-    await pool.query('update issues set scope=\'workspace\',"scopeVersion"="scopeVersion"+1 where id=$1', [id])
-    await pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [id, teamId, workspaceId, owner])
+    // The real human promotion writes the team receipt and passes the database
+    // scope guard; a fixture must not bypass the same authorization boundary.
+    const promotion = await withActivitySession(owner, () => promoteIssueToTeam({ requestId: randomUUID(), issueId: id, revision: 51, teamId, expectedTeamId: null }), workspaceId)
+    assert.ok('issue' in promotion && promotion.issue, JSON.stringify(promotion))
+    assert.equal(promotion.issue.scope, 'workspace')
     const shared = successful(await actAs(stranger, () => pollIssue(id)))
     assert.ok(shared.issue)
     const sharedHistory = successful(await actAs(stranger, () => pollIssueVersionSummaries(id)))
@@ -131,6 +135,8 @@ test('detail and activity revalidate current access while returning only changed
   } finally {
     await pool.query('delete from coordinator_messages where "userId"=$1', [stranger])
     await pool.query('delete from bots where id=$1', [botId])
+    await pool.query('delete from team_issue_promotion_receipts where "ownerId"=$1', [owner])
+    await pool.query('delete from team_issue_promotions where "ownerId"=$1', [owner])
     await pool.query('delete from mikka_team_issues where "teamId"=$1', [teamId])
     await pool.query('delete from mikka_teams where id=$1', [teamId])
     await pool.query('delete from mikka_workspace_members where "workspaceId"=$1', [workspaceId])

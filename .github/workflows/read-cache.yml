@@ -5,7 +5,7 @@ on:
     paths:
       - '.github/workflows/read-cache.yml'
       - 'scripts/acceptance/read-cache*.mjs'
-      - 'scripts/acceptance/run-read-cache.mjs'
+      - 'scripts/acceptance/run-read-cache*.mjs'
       - 'scripts/test-accounts/**'
       - 'lib/swr/**'
       - 'lib/coordinator/chat-read-client*'
@@ -68,7 +68,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
       - name: Verify the bounded read-only driver
-        run: node --test scripts/acceptance/read-cache.test.mjs
+        run: node --test scripts/acceptance/read-cache.test.mjs scripts/acceptance/run-read-cache.test.mjs
       - name: Generate ephemeral test-only authentication secret
         run: |
           node --input-type=commonjs - <<'NODE'

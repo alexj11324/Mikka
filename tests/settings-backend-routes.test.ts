@@ -46,6 +46,7 @@ before(async () => {
   for (const [module, names] of Object.entries({
     '@/app/actions/account': ['getPasswordStatus', 'listSessions'],
     '@/app/actions/preferences': ['getPreferences'],
+    '@/app/actions/issue-prefix': ['getIssuePrefixState'],
     '@/app/actions/settings-activity': ['listSavedLogins'],
     '@/app/actions/workspace-settings': ['getWorkspaceDeletionImpact', 'getWorkspaceGeneral', 'getWorkspaceTransferTargets'],
     '@/app/actions/app-policy': ['getAppPolicy'],
@@ -85,15 +86,15 @@ test('workspace-bots GET preserves the full workspace activity result and delega
 test('workspace-bots GET preserves auth and membership refusals and never substitutes an empty activity list', async () => {
   workspaceBotCalls.length = 0
   workspaceBotFailure = null
-  for (const error of ['authRequired', 'workspaceAccessDenied']) {
+  for (const [error, status] of [['authRequired', 401], ['workspaceAccessDenied', 403], ['workspaceMembershipSuspended', 403]] as const) {
     workspaceBotResult = { error }
     const response = await settingsRoute.GET(new Request('https://mikka.example/api/settings/workspace-bots'),
       { params: Promise.resolve({ read: 'workspace-bots' }) })
-    assert.equal(response.status, 200, 'Settings GET keeps the action result contract')
+    assert.equal(response.status, status, 'access refusals retain their HTTP status so the read cache cannot retry or retain private data')
     assert.deepEqual(await response.json(), { error })
     assert.equal(response.headers.get('cache-control'), 'private, no-store')
   }
-  assert.equal(workspaceBotCalls.length, 2)
+  assert.equal(workspaceBotCalls.length, 3)
   workspaceBotFailure = new Error('private store failure')
   await assert.rejects(settingsRoute.GET(new Request('https://mikka.example/api/settings/workspace-bots'),
     { params: Promise.resolve({ read: 'workspace-bots' }) }), /private store failure/)

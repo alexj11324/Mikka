@@ -145,4 +145,25 @@ node scripts/acceptance/run-read-cache.mjs
 
 The workflow retains only `.cache/e2e/http-acceptance-summary.json`, after the existing evidence audit. It contains scenario names, HTTP/result byte counts and generated trace IDs, not response bodies or credentials. The 6 driver source tests pass; real HTTP acceptance is pending and is not implied by those source tests. Browser persistence, hydration and focus behavior are covered separately by the real SWR/IndexedDB adapter tests and subsequent read-only production observation.
 
-Production acceptance is pending. Record the exact submitted commit, matching CI jobs, production deployment/build ID, authorized read-only test identity allocation, page/trace measurement windows and the four required surfaces (Bot chat, task board, task detail and Settings). Populate actual measurements only from those runs. Production acceptance and issue closure are not established by this draft.
+### First executed post-change database measurements
+
+[CI run 42031092763](https://github.com/alexj11324/Mikka/actions/runs/42031092763) checked out PR merge SHA `e461b55bd5665398348c86b0371dc9c3a1cde12b`, associated with feature head `17605fae372d7429312e6a9cbfd840638e7fd256`. The following diagnostics actually ran against isolated PostgreSQL. This run was not fully green: a later detail fixture incorrectly attempted a workspace promotion without the existing authorization path, and several older mocks/type assertions needed updating. These numbers are partial measurements, not completed acceptance.
+
+| Read / fixture | Cold DB queries / JSON bytes | Warm DB queries / JSON bytes | Restored reload DB queries / JSON bytes | Cold / warm / reload returned JSON bytes |
+| --- | ---: | ---: | ---: | ---: |
+| Task list, 30 tasks | 14 / 19,104 | 8 / 683 | 8 / 683 | 23,592 / 246 / 246 |
+| Thread list, 119 threads | 5 / 90,499 | 3 / 83 | 3 / 83 | 99,379 / 245 / 245 |
+| Bot chat store, 40 messages | 4 / 62,841 | 3 / 167 | 8 / 743 | 64,669 / 103 / 554 |
+| Settings preferences and prefix | 4 / 0 | 4 / 0 | 4 / 0 | 292 / 292 / 292 |
+
+Settings has no durable rows in this fixture, so its zero JSON-result bytes do not mean zero traffic: the corresponding PostgreSQL socket bytes were 1,204 / 599 / 599. Settings without live coverage continues to revalidate. The authenticated namespace gate separately used 1 statement, 100 result bytes and 799 socket bytes. Chat's store measurements exclude the action's session/metadata checks. The initial task-list `legacyReload` mixed in personal-workspace initialization and is excluded from the comparison; fixture setup now performs that initialization before all measured reads. Detail/activity has no final numeric diagnostic from this failed run.
+
+One changed task returned 3,953 database JSON bytes and 3,702 action JSON bytes; one changed thread returned 9,843 and 11,866 respectively. A restored chat performs more small proof/tail queries than a full snapshot. Deleting an old chat message correctly reset the prefix and required a full response (60,418 database JSON bytes, 62,024 returned bytes); a deleted message is never retained just to preserve the savings.
+
+### Production measurement and final evidence
+
+`Read cache production acceptance` runs after a successful exact-main Web deployment while this issue remains open, or by a manual main dispatch with the exact deployed SHA. Its automatic path verifies the GitHub event and the actual successful Web deploy run, checks that issue #1372 is still open, and pins the public application version before any credential is loaded. It uses the existing smoke-owner identity and shared `production-smoke-owner-acceptance` concurrency group. It does not add a production adapter to the isolated account pool or change its guards.
+
+The production driver signs in normally, verifies the expected owner, reads an existing bot and visible task, then signs out only its own session. It creates no fixture and issues no business mutation. It measures the five named read actions and the Settings prefix GET under cold, warm, serialized-cursor reload and scoped catch-up cases, retaining only numeric aggregates and trace IDs. The report explicitly sets `browserCacheVerified: false`: an HTTP cursor replay does not prove IndexedDB, first paint or a browser focus event. Those require the separate cache tests and actual read-only page observation. Production trace sampling stays unchanged; an absent sampled trace is not a zero-query result.
+
+The authoritative final execution record belongs on [PR #1389](https://github.com/alexj11324/Mikka/pull/1389) and [issue #1372](https://github.com/alexj11324/Mikka/issues/1372): exact submitted commit, matching green CI, production deployment/build ID, identity allocation, UTC measurement windows and all four surfaces (Bot chat, task board, task detail and Settings). The owner records actual production observations there after deployment. This implementation document and the preliminary measurements do not themselves establish production acceptance or authorize early issue closure.

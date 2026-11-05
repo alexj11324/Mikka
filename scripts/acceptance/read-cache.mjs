@@ -68,7 +68,7 @@ export async function discoverReadActions(request, environment, issueId) {
     for (const match of source.matchAll(/(?:src|href)\s*=\s*(["'])([^"']+\.js(?:\?[^"']*)?)\1/g)) add(match[2].replaceAll('&amp;', '&'))
     for (const match of source.matchAll(/(["'])((?:static\/chunks\/|\/mikka\/_next\/static\/chunks\/)[^"'\\\r\n]+\.js(?:\?[^"'\\\r\n]*)?)\1/g)) add(match[2])
   }
-  for (const page of [`${environment.basePath}/en`, `${environment.basePath}/en?issue=${issueId}`, `${environment.basePath}/en/settings?section=preferences`]) {
+  for (const page of [`${environment.basePath}/en`, ...(issueId ? [`${environment.basePath}/en?issue=${issueId}`] : []), `${environment.basePath}/en/settings?section=preferences`]) {
     const response = await request(page)
     check(response.ok, 'read_page_unavailable'); scan(await response.text()); diagnostics.pagesRead++
   }
