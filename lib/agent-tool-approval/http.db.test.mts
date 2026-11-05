@@ -123,13 +123,13 @@ test('real HTTP claim carries policy, and its run gate creates no approvals (dec
   assert.equal(changed.status,200)
   assert.equal((await settings('owner=1',{operation:'set',runId,target:'worker',expectedRevision:previous.revision,policy:{}})).status,409)
   await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1',[deviceId,harnesses(false)])
-  const oldDaemon = await fetch(`${origin}/v1/devices/${deviceId}/runs/${runId}/claim`, { method:'POST', headers:{ 'x-mikka-client-version':'0.0.375', authorization:'Bearer synthetic',[REPO_ORIGIN_HEADER]:'1' } })
+  const oldDaemon = await fetch(`${origin}/v1/devices/${deviceId}/runs/${runId}/claim`, { method:'POST', headers:{ 'x-mikka-client-version':'0.0.456', authorization:'Bearer synthetic',[REPO_ORIGIN_HEADER]:'1' } })
   assert.equal(oldDaemon.status,409)
   assert.deepEqual(await oldDaemon.json(),{error:'Run approval capability unavailable.'})
   assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[runId])).rows[0].status,'queued')
   assert.equal((await pool.query('SELECT count(*)::int n FROM run_tokens WHERE "runId"=$1',[runId])).rows[0].n,0)
   await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1',[deviceId,harnesses(true)])
-  const claim = await fetch(`${origin}/v1/devices/${deviceId}/runs/${runId}/claim`, { method:'POST', headers:{ 'x-mikka-client-version':'0.0.375', authorization:'Bearer synthetic',[REPO_ORIGIN_HEADER]:'1',[POLICY_SNAPSHOT_HEADER]:POLICY_SNAPSHOT_VERSION } })
+  const claim = await fetch(`${origin}/v1/devices/${deviceId}/runs/${runId}/claim`, { method:'POST', headers:{ 'x-mikka-client-version':'0.0.456', authorization:'Bearer synthetic',[REPO_ORIGIN_HEADER]:'1',[POLICY_SNAPSHOT_HEADER]:POLICY_SNAPSHOT_VERSION } })
   const claimBody = await claim.json()
   assert.equal(claim.status,200,`the real authenticated claim must pass its scope and lease fences: ${claim.status === 200 ? 'accepted' : JSON.stringify(claimBody)}`)
   assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[runId])).rows[0].status,'preparing')
@@ -183,10 +183,10 @@ test('a changed run policy answers live:false, revokes the real daemon gate, and
     const stale = lines.find(line => line.live === false)
     assert.deepEqual({ ...stale, timestamp: 0, durationMs: 0 }, { level:'info', msg:'tool_approval_check', timestamp:0, runId, live:false, reason:'policy_revision_mismatch', status:200, durationMs:0 })
     // Another device's check for this run: the run row is not its own.
-    const foreign = await fetch(`${origin}/v1/runs/${runId}/tool-approval`, { method:'POST', headers:{'x-mikka-client-version':'0.0.375',authorization:'Bearer synthetic','content-type':'application/json'}, body:JSON.stringify({operation:'check',deviceId:randomUUID(),policyRevision:claimed.policyRevision}) })
+    const foreign = await fetch(`${origin}/v1/runs/${runId}/tool-approval`, { method:'POST', headers:{'x-mikka-client-version':'0.0.456',authorization:'Bearer synthetic','content-type':'application/json'}, body:JSON.stringify({operation:'check',deviceId:randomUUID(),policyRevision:claimed.policyRevision}) })
     assert.equal(foreign.status, 409)
     assert.deepEqual({ ...lines.at(-1), timestamp: 0, durationMs: 0 }, { level:'warn', msg:'tool_approval_check', timestamp:0, runId, live:false, reason:'run_unavailable', status:409, durationMs:0 })
-    const invalid = await fetch(`${origin}/v1/runs/${runId}/tool-approval`, { method:'POST', headers:{'x-mikka-client-version':'0.0.375',authorization:'Bearer synthetic','content-type':'application/json'}, body:'{}' })
+    const invalid = await fetch(`${origin}/v1/runs/${runId}/tool-approval`, { method:'POST', headers:{'x-mikka-client-version':'0.0.456',authorization:'Bearer synthetic','content-type':'application/json'}, body:'{}' })
     assert.equal(invalid.status, 400)
     assert.equal(lines.at(-1)?.reason, 'invalid_request')
     // The log carries no revision, policy or credential.
@@ -200,7 +200,7 @@ test('real authenticated HTTP retains a lease-loss cause but never invents it fo
   const {readCliRunPolicy} = await import('./policy-store')
   const revision = (await readCliRunPolicy(pool,runId,owner)).revision
   const check = (extra: object = {}) => fetch(`${origin}/v1/runs/${runId}/tool-approval`, {
-    method:'POST', headers:{'x-mikka-client-version':'0.0.375',authorization:'Bearer synthetic','content-type':'application/json'},
+    method:'POST', headers:{'x-mikka-client-version':'0.0.456',authorization:'Bearer synthetic','content-type':'application/json'},
     body:JSON.stringify({operation:'check',deviceId,policyRevision:revision,...extra}),
   })
   await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()-interval '1 second' WHERE id=$1`, [runId])
