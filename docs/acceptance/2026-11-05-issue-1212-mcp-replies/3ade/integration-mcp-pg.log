@@ -1,0 +1,131 @@
+(node:50954) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:50954) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-05T00:57:14.382Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+▶ MCP waits use real PostgreSQL writers and the existing workerd channel
+  ✖ nested append waits for the real outer COMMIT; an independent reader sees the reply when notification is scheduled (212.160921ms)
+  ✔ outer rollback and a rolled-back savepoint never wake a reader (30.057874ms)
+  ✖ takeInbox, releaseLease and failTurn notify committed state and stale holders send nothing (26.561082ms)
+  ✖ a separate application writer process reaches the waiting MCP request over real WebSocket (2835.961993ms)
+  ✖ a scheduled assistant report notifies the same original chat after its actual transaction (135.494584ms)
+  ✔ owner and workspace isolation use the real Bot scope, and keys cannot grant data access (302.65557ms)
+  ✔ workspace revocation suppresses producer notifications and a waiter rechecks scope before reading (116.736149ms)
+  ✖ a deferred MCP notification retains its original request database after the request context exits (671.766088ms)
+  ✔ MCP cancellation releases the channel without changing the Coordinator lease or run state (23.078002ms)
+✖ MCP waits use real PostgreSQL writers and the existing workerd channel (8483.720816ms)
+ℹ {"event":"mcp_reply_fixtures_retained","database":"mikka_e2e","ownerIds":["mcp-reply-f5697865-0ef4-4089-bc00-407a78fef39a","mcp-reply-134b65ea-fb2c-44a3-89ce-15a541a4620c","mcp-reply-62e87da7-314b-4c2f-85c2-6907b0bde6a6","mcp-reply-c5a5cfa3-8e73-41f3-ad0b-19dcccc7e3d9","mcp-reply-ab169e53-19fb-464c-baae-7725d8686cda","mcp-reply-8fefa9e8-ad28-483c-ba20-7fe48395d5b1","mcp-reply-08b4e78a-a6de-4bf5-96ab-2fae8372104b","mcp-reply-cba3e987-f973-4e05-beea-94d1203a1577","mcp-reply-4fd0cf00-0b14-400e-9a3e-8ff5d78abc80"]}
+ℹ tests 10
+ℹ suites 0
+ℹ pass 4
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 29106.732792
+
+✖ failing tests:
+
+test at lib/mcp/reply-live.db.test.ts:1:6584
+✖ nested append waits for the real outer COMMIT; an independent reader sees the reply when notification is scheduled (212.160921ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  3 !== 2
+  
+      at TestContext.<anonymous> (/vercel/sandbox/mikka-mcp-main-3ade-egress/lib/mcp/reply-live.db.test.ts:159:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-mcp-main-3ade-egress/lib/mcp/reply-live.db.test.ts:139:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 3,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/mcp/reply-live.db.test.ts:1:9039
+✖ takeInbox, releaseLease and failTurn notify committed state and stale holders send nothing (26.561082ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  8 !== 7
+  
+      at TestContext.<anonymous> (/vercel/sandbox/mikka-mcp-main-3ade-egress/lib/mcp/reply-live.db.test.ts:192:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-mcp-main-3ade-egress/lib/mcp/reply-live.db.test.ts:181:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 8,
+    expected: 7,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/mcp/reply-live.db.test.ts:1:10386
+✖ a separate application writer process reaches the waiting MCP request over real WebSocket (2835.961993ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   notifications: 2,
+  -   notifications: 1,
+      written: true
+    }
+  
+      at TestContext.<anonymous> (/vercel/sandbox/mikka-mcp-main-3ade-egress/lib/mcp/reply-live.db.test.ts:222:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-mcp-main-3ade-egress/lib/mcp/reply-live.db.test.ts:207:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { written: true, notifications: 2 },
+    expected: { written: true, notifications: 1 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at lib/mcp/reply-live.db.test.ts:1:11590
+✖ a scheduled assistant report notifies the same original chat after its actual transaction (135.494584ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  12 !== 11
+  
+      at TestContext.<anonymous> (/vercel/sandbox/mikka-mcp-main-3ade-egress/lib/mcp/reply-live.db.test.ts:253:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-mcp-main-3ade-egress/lib/mcp/reply-live.db.test.ts:228:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 12,
+    expected: 11,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/mcp/reply-live.db.test.ts:1:15889
+✖ a deferred MCP notification retains its original request database after the request context exits (671.766088ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/vercel/sandbox/mikka-mcp-main-3ade-egress/lib/mcp/reply-live.db.test.ts:321:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-mcp-main-3ade-egress/lib/mcp/reply-live.db.test.ts:297:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

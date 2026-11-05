@@ -1,0 +1,19 @@
+✔ an immediate read uses the authoritative final path without opening a channel (1.176452ms)
+✔ the subscription is registered before the first read and a push wakes the waiter (0.460514ms)
+✔ a push during an in-flight stale read is retained and forces a new authoritative read (0.257434ms)
+✔ bursts coalesce while reading, and a later push is not swallowed by that coalescing (0.329313ms)
+✔ a lost push still causes a read after 15 seconds, without the old 2 second polling (0.910776ms)
+✔ the exact deadline performs one last authoritative read, including a shorter wait (1.023172ms)
+✔ an in-flight read crossing the deadline is followed by a final fresh read (0.345442ms)
+✔ cancelling a waiting MCP request immediately disposes its subscriber and timer (0.814627ms)
+✔ cancellation does not wait for a slow query and its late result cannot restart the waiter (0.360078ms)
+✔ an already cancelled request opens no channel and performs no read (0.247711ms)
+✔ an authoritative read failure cleans up its subscription (0.189956ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 248.330757

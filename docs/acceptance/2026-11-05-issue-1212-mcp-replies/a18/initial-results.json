@@ -1,0 +1,126 @@
+{
+  "identity": {
+    "root": "/vercel/sandbox/mikka-mcp-main-a18-egress",
+    "phase": "initial",
+    "role": "mcp_reply_48a03e99ee41",
+    "database": "mcp_reply_48a03e99ee41_e2e",
+    "startedAt": "2026-11-05T00:53:37.710Z",
+    "base": "a18d22a9d4b6b067297a72eb37205493be4f0b2b",
+    "ownCommit": "4cbe8e04e3ce7eb35398fa67321fb70f584081a1",
+    "node": "v24.22.1",
+    "tree": "d5f33184ac584283a0078d5c3dd77fdb0e78148d"
+  },
+  "results": [
+    {
+      "label": "reply-wait",
+      "args": [
+        "exec",
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/mcp/reply-wait.test.ts"
+      ],
+      "log": "/vercel/acceptance/mcp-1255-a18/initial-reply-wait.log",
+      "startedAt": "2026-11-05T00:53:38.285Z",
+      "endedAt": "2026-11-05T00:53:44.256Z",
+      "timedOut": false,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "label": "mcp-pg",
+      "args": [
+        "exec",
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/mcp/reply-live.db.test.ts"
+      ],
+      "log": "/vercel/acceptance/mcp-1255-a18/initial-mcp-pg.log",
+      "startedAt": "2026-11-05T00:53:44.256Z",
+      "endedAt": "2026-11-05T00:54:19.671Z",
+      "timedOut": false,
+      "code": 1,
+      "signal": null
+    },
+    {
+      "label": "schedules-pg",
+      "args": [
+        "test:schedules-db"
+      ],
+      "log": "/vercel/acceptance/mcp-1255-a18/initial-schedules-pg.log",
+      "startedAt": "2026-11-05T00:54:19.672Z",
+      "endedAt": "2026-11-05T00:54:31.250Z",
+      "timedOut": false,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "label": "gateway",
+      "args": [
+        "test:device-gateway"
+      ],
+      "log": "/vercel/acceptance/mcp-1255-a18/initial-gateway.log",
+      "startedAt": "2026-11-05T00:54:31.250Z",
+      "endedAt": "2026-11-05T00:54:40.137Z",
+      "timedOut": false,
+      "code": 1,
+      "signal": null
+    },
+    {
+      "label": "coordinator",
+      "args": [
+        "test:coordinator-events"
+      ],
+      "log": "/vercel/acceptance/mcp-1255-a18/initial-coordinator.log",
+      "startedAt": "2026-11-05T00:54:40.137Z",
+      "endedAt": "2026-11-05T00:55:31.795Z",
+      "timedOut": false,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "label": "schedules",
+      "args": [
+        "test:schedules"
+      ],
+      "log": "/vercel/acceptance/mcp-1255-a18/initial-schedules.log",
+      "startedAt": "2026-11-05T00:55:31.795Z",
+      "endedAt": "2026-11-05T00:55:39.681Z",
+      "timedOut": false,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "label": "typecheck",
+      "args": [
+        "typecheck"
+      ],
+      "log": "/vercel/acceptance/mcp-1255-a18/initial-typecheck.log",
+      "startedAt": "2026-11-05T00:55:39.681Z",
+      "endedAt": "2026-11-05T00:55:48.043Z",
+      "timedOut": false,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "label": "lint",
+      "args": [
+        "lint"
+      ],
+      "log": "/vercel/acceptance/mcp-1255-a18/initial-lint.log",
+      "startedAt": "2026-11-05T00:55:48.044Z",
+      "endedAt": "2026-11-05T00:56:04.171Z",
+      "timedOut": false,
+      "code": 0,
+      "signal": null
+    }
+  ],
+  "ok": false,
+  "cleanup": "/vercel/acceptance/mcp-1255-a18/initial-cleanup.json"
+}

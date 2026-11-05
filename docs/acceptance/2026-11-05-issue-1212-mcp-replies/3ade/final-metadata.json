@@ -1,0 +1,156 @@
+{
+  "base": "3adee90c742b045e0eebd5854eecc6ade1c84aae",
+  "baseTree": "4a291d12049d0e9fc04d82ed1061cdae570229a8",
+  "tree": "03cbf36739520687aa790d4d29ac683e9a1d2d15",
+  "parents": [
+    "4cbe8e04e3ce7eb35398fa67321fb70f584081a1",
+    "3adee90c742b045e0eebd5854eecc6ade1c84aae"
+  ],
+  "ownFileSetEqualsOriginal": true,
+  "entries": [
+    {
+      "path": "app/api/mcp/route.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "448250faccaa23001a9a8f7d1dc9ae42d58147a9",
+      "bytes": 21319,
+      "sha256": "5d0ddf4427a6e76c4aa2b12bef44fc4d86e66811f081f840dde8ca609a4828f7"
+    },
+    {
+      "path": "cloudflare/device-gateway/test/runtime.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2806850418291da09781c71dc89738acde9683c2",
+      "bytes": 11783,
+      "sha256": "ddf0af5bae8308b80404e22f0c1207ee13fcc4e4ea861ee6bfaf954875d922dd"
+    },
+    {
+      "path": "lib/coordinator/credential-masking.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0d50a8764792b2d3636b4cb09ec7ad2253a94ad6",
+      "bytes": 3504,
+      "sha256": "44f7a1fd75d037f19260d23f0a8416872f37772a89db3b9abb1b6f999f952f9f"
+    },
+    {
+      "path": "lib/coordinator/message-safety-handler.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c908581da6b9b223d2a17435fed41f8011b0e4c9",
+      "bytes": 12097,
+      "sha256": "102eb0388f44e47c155bcb8faf366583cc92cd07bd8727a6f00135056d7b8841"
+    },
+    {
+      "path": "lib/coordinator/store.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a8679b770d340618d99f6a0ab2e29da9a831bcf4",
+      "bytes": 47161,
+      "sha256": "74f7f5c492b0f5d840a96e66f6f80da910fab558e12bc9d9e4df7178798db1f7"
+    },
+    {
+      "path": "lib/live/coordinator-session.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e36630f733fa47f7b70abf3ec9c033716505426f",
+      "bytes": 1844,
+      "sha256": "67108baf91e949fe2c0d966318a9e732d6422bd018b315bffb54955c4fe7d4c5"
+    },
+    {
+      "path": "lib/live/events.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d45fe7a24c12e400c984318e285f1184d8828694",
+      "bytes": 2223,
+      "sha256": "8e4b5d9a25e40c1f8449aba4f1b99ffee29a3b3793c5a9aa461c6df61027313c"
+    },
+    {
+      "path": "lib/mcp/reply-live.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "93ae635292c827d4780a267c9ba9122f7a263168",
+      "bytes": 24269,
+      "sha256": "5743037a00c6e35b753f99690c6ce5579d625dcf0ffaa734a0430ecf6db44e9d"
+    },
+    {
+      "path": "lib/mcp/reply-live.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ba3db4d2ebabb4a95b49f0e15f044bc654f43ea2",
+      "bytes": 1347,
+      "sha256": "4ac98e99386cbcd3212acaa12779cf895b0d3618a17b6697c242a76610e84ccb"
+    },
+    {
+      "path": "lib/mcp/reply-wait.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cf516612c7ecac7bdead6ebcca1e22b03e17052d",
+      "bytes": 7428,
+      "sha256": "d6ceb91804d68e0dc0eddd9fd9673c90c9aa5b3a7f0000f7134dac7eae0bdd90"
+    },
+    {
+      "path": "lib/mcp/reply-wait.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a5dc135e42a80156495a368d4ee10d768144e25e",
+      "bytes": 2016,
+      "sha256": "117e387ca273814e5358d4f59586fcc81f8b4e25c16939c156ddbf1b0e664759"
+    },
+    {
+      "path": "lib/mcp/reply-writer.fixture.mts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a3828cc5650b80a30e37fc3eecbb3ad0c5014e69",
+      "bytes": 1185,
+      "sha256": "f577f9e37cb79904909cf7437c380c91690b1b6948c0f7bc9141e41063d5a43e"
+    },
+    {
+      "path": "lib/mcp/tools.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8302a693c3a994150e37075d08b53aede630dc03",
+      "bytes": 11107,
+      "sha256": "daeacea21d0f00d4551d5170be0beed34bfe244efd0aaa98bc4663674d93ba65"
+    },
+    {
+      "path": "lib/schedules/store.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "08377b5dff9ef1b5cd525b2e2c61a8ade0f13a4c",
+      "bytes": 20302,
+      "sha256": "8e0200eaa1d6bac19efa06aeeba9f9cf7e1c48ebf1be9ae643034926bb660bb6"
+    },
+    {
+      "path": "package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "424138fe2824389b84820f4baf8ebfd3529b24bc",
+      "bytes": 63217,
+      "sha256": "219ffeb0c0aa0eb04eee2144c2e8ae2a07d149cec49d669d84594ed3b9fda5df"
+    }
+  ],
+  "dependencies": {
+    "lib/db/commit-effects.ts": {
+      "unchangedFromMain": true,
+      "blob": "5f55d0c87e886422398b6767d62cd5a4cea718a6"
+    },
+    "lib/db/request-scope.ts": {
+      "unchangedFromMain": true,
+      "blob": "741fda5315563b47e752300ed67dcfa819e67a26"
+    },
+    "lib/live/notify.ts": {
+      "unchangedFromMain": true,
+      "blob": "b51bcc38be095a9fe40f1f524a64ae49f9853e86"
+    },
+    "lib/live/channel.ts": {
+      "unchangedFromMain": true,
+      "blob": "1292ddc2431c0e726f74a9e36308aee3c553123f"
+    },
+    "lib/live/channels.ts": {
+      "unchangedFromMain": true,
+      "blob": "6d1eb1fb41dd9c6a061feaf892414e8908b05a3a"
+    }
+  },
+  "status": "M  app/api/mcp/route.ts\nM  cloudflare/device-gateway/test/runtime.test.mjs\nM  lib/coordinator/credential-masking.test.ts\nM  lib/coordinator/message-safety-handler.test.ts\nM  lib/coordinator/store.ts\nA  lib/live/coordinator-session.ts\nM  lib/live/events.ts\nA  lib/mcp/reply-live.db.test.ts\nA  lib/mcp/reply-live.ts\nA  lib/mcp/reply-wait.test.ts\nA  lib/mcp/reply-wait.ts\nA  lib/mcp/reply-writer.fixture.mts\nM  lib/mcp/tools.ts\nM  lib/schedules/store.ts\nM  package.json\n",
+  "diffCheck": 0
+}

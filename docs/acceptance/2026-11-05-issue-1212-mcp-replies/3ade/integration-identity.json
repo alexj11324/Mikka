@@ -1,0 +1,11 @@
+{
+  "root": "/vercel/sandbox/mikka-mcp-main-3ade-egress",
+  "phase": "integration",
+  "role": "mcp_reply_2d64d77818fb",
+  "database": "mcp_reply_2d64d77818fb_e2e",
+  "startedAt": "2026-11-05T00:56:57.551Z",
+  "base": "3adee90c742b045e0eebd5854eecc6ade1c84aae",
+  "ownCommit": "4cbe8e04e3ce7eb35398fa67321fb70f584081a1",
+  "node": "v24.22.1",
+  "tree": "2c484ecbc178f081884977d4cf62d55f0ee19069"
+}

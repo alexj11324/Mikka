@@ -1,0 +1,25 @@
+
+> next-app@0.0.1 test:schedules-db /vercel/sandbox/mikka-mcp-main-3ade-egress
+> node --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test lib/schedules/store.db.test.ts
+
+▶ actual PostgreSQL schedules: lifecycle, concurrent due work, authority and original chat
+  ✔ ten create retries and ten scans produce one occurrence, one chat result and stable operation (99.71143ms)
+  ✔ repeat slots persist across fresh stores; pause, timezone update, resume and cancel (43.249062ms)
+  ✔ a killed claimant recovers the same occurrence; stale lease cannot publish (538.734949ms)
+  ✔ cancel after claim and ten cancel/execute races are serialized by the schedule row (127.594567ms)
+  ✔ owner, bot and human-source bounds; workspace revocation stops execution (18.169086ms)
+2026-11-05T00:57:49.930Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+  ✔ agent reads use a canonical event link; cancel and replacement claims revoke authority (3077.65971ms)
+  ✔ actual Coordinator inbox isolates the scheduled read and preserves user source identity (78.506938ms)
+  ✔ actual cron handler over loopback HTTP executes a persisted real-time reminder (1672.234752ms)
+  ✔ model availability rejects upfront; expired model work exhausts at three attempts (39.720194ms)
+  ✔ skip remains immutable through a report failure and retry (26.4186ms)
+✔ actual PostgreSQL schedules: lifecycle, concurrent due work, authority and original chat (5768.522654ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6640.890315

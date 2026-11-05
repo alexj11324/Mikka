@@ -1,0 +1,36 @@
+
+> next-app@0.0.1 test:schedules /vercel/sandbox/mikka-mcp-main-3ade-egress
+> node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/schedules/time.test.ts lib/schedules/scope.test.ts lib/schedules/workflow.test.ts app/api/cron/schedules/route.test.ts
+
+(node:52652) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:52652) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ missing config refuses without scanning (35.804068ms)
+✔ anonymous and incorrect credentials cannot scan other owners (7.379729ms)
+✔ the existing cron bearer can scan and receives only no-store counts (5.788923ms)
+✔ internal errors produce a bounded safe failure (3.100412ms)
+(node:52653) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:52653) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ scheduled SDK calls use the occurrence authority without manufacturing native identities (246.235412ms)
+✔ scheduled native calls retain the current holder/turn/call fence as well (1.155004ms)
+✔ a stopped native call cannot proceed through a still-valid schedule (0.564026ms)
+✔ cancellation or stale schedule scope refuses both SDK and native calls (1.741552ms)
+✔ DST spring gap skips the absent local date (20.935273ms)
+✔ DST fold selects explicit earlier/later or rejects; Lord Howe half-hour fold (8.187808ms)
+✔ past once/interval starts and invalid zones reject, interval skips backlog (3.50704ms)
+(node:52660) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:52660) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ scheduled SDK turn uses the existing runtime with host-only scope and read catalog (28.816462ms)
+✔ scheduled native relay preserves actual native identity alongside the occurrence scope (0.52657ms)
+✔ a cancelled or stale scheduled turn starts no model and records bounded failure (0.707944ms)
+✔ a truncated scheduled reply uses bounded failure and a later complete reply can publish (0.580241ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1349.44775

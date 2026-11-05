@@ -1,0 +1,24 @@
+(node:54350) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:54350) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-05T01:00:37.533Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+▶ MCP waits use real PostgreSQL writers and the existing workerd channel
+  ✔ nested append waits for the real outer COMMIT; an independent reader sees the reply when notification is scheduled (183.681421ms)
+  ✔ outer rollback and a rolled-back savepoint never wake a reader (36.239777ms)
+  ✔ takeInbox, releaseLease and failTurn notify committed state and stale holders send nothing (149.782349ms)
+  ✔ a separate application writer process reaches the waiting MCP request over real WebSocket (2921.98423ms)
+  ✔ a scheduled assistant report notifies the same original chat after its actual transaction (139.308773ms)
+  ✔ owner and workspace isolation use the real Bot scope, and keys cannot grant data access (310.723592ms)
+  ✔ workspace revocation suppresses producer notifications and a waiter rechecks scope before reading (121.365864ms)
+  ✔ a deferred MCP notification retains its original request database after the request context exits (804.565753ms)
+  ✔ MCP cancellation releases the channel without changing the Coordinator lease or run state (21.586901ms)
+✔ MCP waits use real PostgreSQL writers and the existing workerd channel (7778.955867ms)
+ℹ {"event":"mcp_reply_fixtures_retained","database":"mcp_reply_019b15311942_e2e","ownerIds":["mcp-reply-50e57bde-27e6-4115-b9b5-b1974a707507","mcp-reply-ae61ee17-9f05-456e-9a5f-e60503affea8","mcp-reply-4095f778-d6fa-4ddd-98f8-5b504aa23e5f","mcp-reply-09ac5419-64c1-4956-bb7c-600508d7879c","mcp-reply-997085a3-3643-4d5e-9b96-dd22bc3320cd","mcp-reply-04292d66-43e4-4abc-865f-0338d1f260b8","mcp-reply-05bbfacb-22fe-4711-bdae-57e5e14d514c","mcp-reply-44946cab-45c1-4ce6-ba3f-0a31ce2f9136","mcp-reply-b963108b-0223-48f5-849c-41c4320ffef5"]}
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28314.046115

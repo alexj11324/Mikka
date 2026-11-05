@@ -1,0 +1,63 @@
+(node:48251) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:48251) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-05T00:53:54.947Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+▶ MCP waits use real PostgreSQL writers and the existing workerd channel
+  ✔ nested append waits for the real outer COMMIT; an independent reader sees the reply when notification is scheduled (265.697436ms)
+  ✔ outer rollback and a rolled-back savepoint never wake a reader (27.649958ms)
+  ✔ takeInbox, releaseLease and failTurn notify committed state and stale holders send nothing (150.389954ms)
+  ✔ a separate application writer process reaches the waiting MCP request over real WebSocket (2963.980934ms)
+  ✔ a scheduled assistant report notifies the same original chat after its actual transaction (145.434398ms)
+  ✖ owner and workspace isolation use the real Bot scope, and keys cannot grant data access (196.274554ms)
+  ✔ workspace revocation suppresses producer notifications and a waiter rechecks scope before reading (118.578871ms)
+  ✔ a deferred MCP notification retains its original request database after the request context exits (734.145803ms)
+  ✔ MCP cancellation releases the channel without changing the Coordinator lease or run state (37.778583ms)
+✖ MCP waits use real PostgreSQL writers and the existing workerd channel (9192.628797ms)
+ℹ {"event":"mcp_reply_fixtures_retained","database":"mikka_e2e","ownerIds":["mcp-reply-a63f25d8-6f51-4c14-a8e4-e417c322c82f","mcp-reply-f823a69e-3bb7-4dd2-9d04-2ab6412a4d45","mcp-reply-105a3e5f-b0de-4b21-a1a7-4a1c696a4803","mcp-reply-114a73c2-c050-448f-b820-17c560b0be29","mcp-reply-f6ff05be-cd6f-4488-acad-a128a9297200","mcp-reply-20b4e3c6-1644-48bf-94ef-cc2ddc272cf5","mcp-reply-565df76c-6b1c-4354-8e4f-98a1412b9f85","mcp-reply-ae14ed81-774c-47f6-9462-bee6dc2f3982","mcp-reply-9483204a-798a-428f-a831-0747698b83af"]}
+ℹ tests 10
+ℹ suites 0
+ℹ pass 8
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 29571.848318
+
+✖ failing tests:
+
+test at lib/mcp/reply-live.db.test.ts:1:13223
+✖ owner and workspace isolation use the real Bot scope, and keys cannot grant data access (196.274554ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   {
+  +     kinds: [
+  +       'computer_state',
+  +       'approved_writes',
+  +       'approved_write',
+  +       'pending_actions',
+  +       'factory_task',
+  +       'factory_issue',
+  +       'thread',
+  +       'run',
+  +       'coordinator_session'
+  +     ],
+  +     type: 'live_ready',
+  +     version: 1
+  +   }
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (/vercel/sandbox/mikka-mcp-main-a18-egress/lib/mcp/reply-live.db.test.ts:266:16)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-mcp-main-a18-egress/lib/mcp/reply-live.db.test.ts:254:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { type: 'live_ready', version: 1, kinds: [Array] } ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

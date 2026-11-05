@@ -1,0 +1,63 @@
+{
+  "wholeTree": {
+    "sha": "03cbf36739520687aa790d4d29ac683e9a1d2d15",
+    "baseTree": "4a291d12049d0e9fc04d82ed1061cdae570229a8",
+    "finalLeaves": 4576,
+    "baseLeaves": 4570,
+    "differences": [
+      "app/api/mcp/route.ts",
+      "cloudflare/device-gateway/test/runtime.test.mjs",
+      "lib/coordinator/credential-masking.test.ts",
+      "lib/coordinator/message-safety-handler.test.ts",
+      "lib/coordinator/store.ts",
+      "lib/live/coordinator-session.ts",
+      "lib/live/events.ts",
+      "lib/mcp/reply-live.db.test.ts",
+      "lib/mcp/reply-live.ts",
+      "lib/mcp/reply-wait.test.ts",
+      "lib/mcp/reply-wait.ts",
+      "lib/mcp/reply-writer.fixture.mts",
+      "lib/mcp/tools.ts",
+      "lib/schedules/store.ts",
+      "package.json"
+    ],
+    "matchedOwnBlobs": 15,
+    "wholeTree": true
+  },
+  "mergePackage": {
+    "merge": "5b8c16147bc8fc92e238578b088d682ee1be9c9d",
+    "base": "efef5b5a5a8a55deb3c504b05fb736d4003e942c",
+    "unchangedMainScriptsExcept": [
+      "test:lib-units",
+      "test:live-db"
+    ],
+    "questionWakePreserved": true,
+    "head": "8b1bb0590eb16f0ceec9e4458ae0656b6bacfb25"
+  },
+  "publicHead": "8b1bb0590eb16f0ceec9e4458ae0656b6bacfb25",
+  "parents": [
+    "4cbe8e04e3ce7eb35398fa67321fb70f584081a1",
+    "3adee90c742b045e0eebd5854eecc6ade1c84aae"
+  ],
+  "sourceArchive": {
+    "tree": "03cbf36739520687aa790d4d29ac683e9a1d2d15",
+    "baseTree": "4a291d12049d0e9fc04d82ed1061cdae570229a8",
+    "ownFiles": 15,
+    "sameFileSet": true,
+    "bytes": 74995,
+    "sha256": "a4863254b666fa7b7065b683efa2270f5ba843c154c75eb60525f22f8ff50edf",
+    "path": "/vercel/acceptance/mcp-1255-3ade/final-source.json.gz"
+  },
+  "a18Archive": {
+    "bytes": 49190,
+    "sha256": "fa8ece57d2aec2e59ee8055a9a8854a46585368254f4af6dd0a9da4079dd787e",
+    "files": 18,
+    "path": "/vercel/acceptance/mcp-1255-a18/initial-evidence.tar.gz"
+  },
+  "integrationArchive": {
+    "bytes": 131728,
+    "sha256": "8ea08fb6ffd2ab7b81806df3d0032c61b56e4230fc4d4ec8cbeb37034961236f",
+    "files": 31,
+    "path": "/vercel/acceptance/mcp-1255-3ade/integration-evidence.tar.gz"
+  }
+}

@@ -1,0 +1,667 @@
+
+> next-app@0.0.1 test:coordinator-events /vercel/sandbox/mikka-mcp-main-3ade-egress
+> node --test --experimental-test-isolation=none lib/coordinator/triage-batch.test.mjs tests/workflow-schema-boundary.test.mjs && node --import tsx --test lib/run-retry.test.ts lib/coordinator-events.test.ts lib/coordinator/telegram-pending.test.ts lib/coordinator/context.test.ts lib/coordinator/chat-state.test.ts lib/coordinator/stop.test.ts lib/thread-continuation.test.ts lib/run-prompt.test.ts lib/coordinator/model.test.ts lib/coordinator/triage.test.ts lib/coordinator/decision.test.ts lib/coordinator/group-routing.test.ts lib/coordinator/citations.test.ts lib/coordinator/tool-activity.test.ts lib/coordinator/chat-dedupe.test.ts lib/link-preview-parse.test.ts lib/push-reasons.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/cloud-dispatch-startup.test.ts lib/thread-dispatch.test.ts lib/thread-switch.test.ts lib/coordinator-submission.test.ts lib/coordinator/judgment-integration.test.ts lib/coordinator/scenarios.test.ts lib/coordinator/execution-context.test.ts lib/coordinator/wake-notice.test.ts lib/coordinator/interrupted-turns.test.ts lib/coordinator/credential-masking.test.ts lib/coordinator/compaction-model.test.ts lib/coordinator/compaction-sdk.test.ts lib/coordinator/user-images-entry.test.ts && pnpm test:personal-message-safety && node --import ./tests/support/server-only.mjs --import tsx --test lib/device-agents.test.ts && node --import tsx --test lib/coordinator-client-submission.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test app/api/cron/coordinator-wakes/route.test.ts && pnpm test:coordinator-stream
+
+✔ the production scheduler claims before inference and records only a winning CAS (2.210796ms)
+✔ model failures stay pending after exactly the bounded attempts and never persist a tier (0.347646ms)
+✔ a missing host receipt or invalid tier cannot become a persisted model result (0.425779ms)
+✔ a cancelled wake does not invoke runtime models but still delivers actual user input (0.242141ms)
+✔ cancellation while the model is in flight cannot persist its late result (0.235685ms)
+✔ losing an attempt claim skips inference; losing completion preserves the stale outcome (0.277012ms)
+✔ a slow first attempt does not prevent a later eligible event on the next wake (0.428664ms)
+✔ fast unavailable responses cannot consume an unbounded number of model requests (0.348147ms)
+✔ an uncertain database write is observed separately and never blindly retried (0.686037ms)
+✔ Coordinator schemas cannot bring Node/server modules across the durable Workflow boundary (72.256641ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 372.044236
+✔ Telegram messages keep their linked issue and dedupe by source message (2.194591ms)
+✔ Telegram reply targets are validated and unique per chat (0.349743ms)
+✔ a move to done is an event, keyed by the revision that made it (0.193983ms)
+✔ every other status move is an event too, untiered for triage; a save that keeps the status is not (0.280521ms)
+✔ a finished run is one event per run, with its summary (0.206311ms)
+✔ a finished run includes server-verified PR output in the same deduplicated event (0.144605ms)
+✔ a retry after the device went offline is one event per lost run (1.682852ms)
+✔ worker tool calls become events on the run, each one new (0.378066ms)
+✔ a question keeps only the parts the agent gave (0.581593ms)
+✔ a thread has one card: under the first reply that names it (1.420655ms)
+✔ a thread's repeated event line shows only the latest; other threads and kinds stay (0.254796ms)
+✔ the unread divider moves to the next row shown when its row is hidden, and stays otherwise (0.323323ms)
+✔ new pending input and an active startup claim show work (1.769675ms)
+✔ failed and unacknowledged starts stop the spinner while preserving pending input (0.304951ms)
+✔ back-to-back unconsumed wake claims cannot hide an unconfirmed start (0.217507ms)
+✔ the last live startup retry stays unconfirmed until consumption or exhaustion (0.156045ms)
+✔ a real active turn and new input take precedence over earlier delivery failures (0.157822ms)
+✔ background and handoff inbox rows stay quiet, and completed turns retain existing errors only (0.14527ms)
+✔ once the turn holding the lease has stored its reply, the chat is no longer working (0.197716ms)
+✔ splitCitations keeps text and citations in order (2.672655ms)
+✔ splitCitations reads a bare id as a citation of either kind (0.295266ms)
+✔ citedIds looks bare ids up as both issues and runs (0.290614ms)
+✔ splitCitations reads Markdown links and bare URLs as web sources (0.57632ms)
+✔ remarkCitations links citations for the chip renderer and keeps line breaks (0.458767ms)
+✔ remarkCitations leaves code and Markdown links alone (0.226568ms)
+✔ namedCitations writes cited threads and tasks as their names for a preview (0.444325ms)
+✔ remarkCitations cuts a GFM autolink glued to Chinese text (0.267842ms)
+✔ runThreadName names a thread for its task, as the thread list does, else for what it was asked (0.621246ms)
+✔ watchdog blocker exposes the actual host facts and never invents a successful handoff (1.814269ms)
+✔ unknown approved external writes require readback and prohibit another send (0.387179ms)
+✔ token estimate counts Chinese closer to a token a character (0.320031ms)
+✔ image budgeting applies only to actual message parts, never arbitrary tool JSON (13.081321ms)
+✔ the summary leads the prompt (1.961925ms)
+✔ old tool calls are pruned, recent ones stay (0.517012ms)
+✔ a short history is not compacted (0.257062ms)
+✔ a long history is cut just before a user message, keeping recent turns (66.14432ms)
+✔ the same history always gives the same cut and prompt (24.747082ms)
+✔ memory notes are added as list lines, removed by text, and capped (0.47757ms)
+✔ events read as messages from Mikka (0.306653ms)
+✔ the chat folds one reply's steps together and marks events (1.694259ms)
+✔ a stored reply carries the stream it was first shown from, so the chat keeps that row when it is stored (0.518641ms)
+✔ a stored reply keeps its tools, how each ended and their previews, and whether it thought (0.817518ms)
+✔ a reply that dispatches a run carries it as a thread, once (0.471927ms)
+✔ a failed message retried with 重新发送 is left out; the new attempt carries its own failure (0.728277ms)
+✔ chatItems marks inbox (pending) user messages so they are never reported as read (0.153019ms)
+✔ a report-only run does not claim that separate Factory verification was absent (0.124477ms)
+✔ unrelated and differently scoped inbox events cause no observation read (0.233836ms)
+✔ a blocked predecessor notification carries the accepted repository handoff and current task (0.190355ms)
+✔ a stale review notification reports the current fixed-candidate verification and publication (1.758056ms)
+✔ a delayed completion from an earlier request cannot reuse its event publication as current (0.17513ms)
+✔ finished run publication names the verified PR or missing setup in the existing chat (0.300839ms)
+✔ trusted completion stays in model context while its separate reply preserves the original thread card (1.193301ms)
+✔ a person quoting the same completion instructions remains a visible person message (0.371584ms)
+✔ execution-identity discovery is hidden in the footer without removing dispatch cards or model tool evidence (0.277737ms)
+✔ a person's message counts the photos sent with it, without carrying them in the chat (0.202662ms)
+✔ a turn moved to the API key after the quota ran out shows as one notice line, and the model reads it as runtime data (0.399635ms)
+✔ a turn moved off Mikka 默认 for lack of points shows as one notice line naming the model, and the model reads it as runtime data (0.283043ms)
+✔ a run ended because its daemon is too old tells the Bot to have the person update Mikka on that device, not reconnect GitHub (0.109948ms)
+✔ a preview prints a value as Postgres prints jsonb: its key order, ", " and ": " (0.144709ms)
+✔ a turn that says what it is about to do, calls a tool and then answers is one Coordinator message, the opening first (0.292533ms)
+✔ answers come back by name, without refusals (2.87178ms)
+✔ state reads as key: value lines (0.199487ms)
+✔ an @mention goes straight to that agent, in mention order (1.535184ms)
+✔ mentioning a non-member is an error (0.465362ms)
+✔ the model reads context and past corrections before the message (0.578437ms)
+✔ later members add only what is new, or stay silent (0.313161ms)
+✔ re-@ing someone else or saying "不是你" records a correction (0.621588ms)
+✔ the Coordinator follows the shared round cap (3.094359ms)
+✔ a reply that stopped normally with text has no warning (0.27302ms)
+✔ a cut-off, filtered, failed or empty reply is flagged (0.348538ms)
+✔ the stop hook is named for the run that holds the chat (0.897931ms)
+✔ stopped text is the model call in flight, up to the stop mark of its own turn (1.556142ms)
+✔ a stopped handoff turn that was only starting its quiet sentinel says nothing (0.318781ms)
+✔ stopped messages keep completed calls, add the words in flight once, and end on an assistant message (0.844564ms)
+✔ the chat shows a stopped reply with its words, and a stop before any word as its own stopped reply (2.086952ms)
+✔ only newly staged, valid human Telegram sources become pending (1.598127ms)
+✔ serialized pending receipts survive failed turns and preserve exact event watermarks (0.694299ms)
+✔ invalid receipt versions, settled rows and duplicate sources do not add send authority (0.230237ms)
+✔ a tool that answers an error is a failure, with its code as the reason (1.922197ms)
+✔ a result that only mentions an error further in is not a failure, and an empty result is not either (1.085463ms)
+✔ a call names its object from its input, cut short, even from a truncated preview (1.048181ms)
+✔ every tool has an action; unknown tools are other, never a bare "used a tool" (0.206103ms)
+✔ a summary counts only what succeeded, names side effects first, and counts failures apart (0.377658ms)
+✔ a group in which every call failed has no success parts, only the failed tools (0.177066ms)
+✔ a call that names a task or thread by id gives that id, for the chat to show its name (0.306082ms)
+✔ machine-selected requests get separate turns in inbox order (1.568371ms)
+✔ only direct user delivery has a transport tier; every runtime event needs model judgment (0.265684ms)
+✔ triage projects observed state separately from untrusted claims and asks for a direct choice (0.296007ms)
+✔ the tier reaches the Coordinator but not the chat (1.527531ms)
+✔ a waking message reaches a batch ahead of an older background backlog (0.490717ms)
+✔ worker questions and blockers are not automatically escalated to a person (0.167317ms)
+✔ a worker question tells the Coordinator to relay the answer (0.199824ms)
+✔ the morning briefing is pushed to the person once a day (1.59017ms)
+✔ parsePreview reads Open Graph tags and resolves relative URLs (2.251854ms)
+✔ parsePreview falls back to <title> and /favicon.ico, and drops non-web URLs (0.452379ms)
+✔ isPrivateAddress blocks loopback, private and link-local addresses (6.718748ms)
+✔ whether a reply goes to the phone is the Decisions API's choice, not a table of event kinds (2.28765ms)
+✔ the events and the reply are evidence; a withheld code is never quoted (0.403324ms)
+✔ a queued GitHub task does not contradict the authenticated agent delivery rules (2.004745ms)
+✔ a long issue never removes the current run note, standing instructions or delivery rules (0.528173ms)
+✔ interjections carry their host source id while preserving body bytes and peer provenance (1.236606ms)
+✔ a run that lost its device is queued again as the next attempt (1.640677ms)
+✔ the last attempt fails instead, for the person (0.184068ms)
+✔ a lost question continuation never enters generic device takeover or retry (0.355851ms)
+✔ a run the person asked to stop just stops (0.119729ms)
+✔ a run without its issue or repository cannot be queued again (0.117927ms)
+✔ the retry brief keeps the original and says what happened, once (0.251016ms)
+✔ the retry brief stays within the prompt limit and keeps its note (0.209897ms)
+✔ a resumed session gets only the note on what happened (0.272244ms)
+✔ https and ssh spellings of one remote match (0.972614ms)
+✔ a run goes on another machine with the harness, without registering a repository (0.275021ms)
+✔ no other machine fits: the run waits for its own (0.164306ms)
+✔ a paused run that loses its lease never redispatches on another device (0.087118ms)
+✔ a thread's next run carries the note and how the thread last ended; a resumed session is sent only that part (1.135347ms)
+✔ only a confident Decision API judgment of an explicit request starts a new thread (1.027678ms)
+ℹ tests 115
+ℹ suites 0
+ℹ pass 115
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1327.006007
+(node:51802) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:51802) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ personal input normalizes text and UUID and rejects question/authority fields (315.437202ms)
+✔ concurrent identical submissions use the existing unique target and one immutable event (4.490644ms)
+✔ attachment bytes are part of the existing immutable submission identity (1.426573ms)
+✔ an uncommitted winner blocks retry completion and reading until commit (5.710723ms)
+✔ a rolled-back winner allows the waiting insertion without a duplicate read (0.491629ms)
+✔ an unresolved conflict read never becomes an accepted retry (0.427183ms)
+✔ same submission UUID is isolated by authenticated owner and actual chat identity (0.440574ms)
+✔ quoted body changes conflict and legacy submissions remain independent (0.392016ms)
+✔ unexpected stored scope and database failures are never accepted as a duplicate (0.628983ms)
+✔ reply retry reports unavailable, already working and no failed turn without claiming an enqueue (1.010323ms)
+✔ HTTP handler and action share personal submission identity and expose payload conflicts (11.386607ms)
+✔ the app's photos reach the stored message through the signed-in action (0.875813ms)
+✔ HTTP handler rejects anonymous and unsupported question submissions without writing or waking (0.817823ms)
+✔ HTTP and action propagate unknown SQL errors without an accepted response or wake (0.787532ms)
+✔ legacy HTTP and action calls without IDs remain valid separate submissions (0.745961ms)
+✔ action checks actual Bot ownership before new submissions and duplicate retries (1.09292ms)
+✔ actual action freezes serialized quotes across retries and rejects quote changes (1.977362ms)
+✔ actual action puts validated browser notes after the quote and rejects bad ones (4.369386ms)
+✔ a tapped suggestion is sent as its card alone, quoted, and leaves 建议 in the same step (1.225171ms)
+✔ with the Coordinator off a suggestion is neither sent nor taken off 建议 (0.193423ms)
+✔ a failed dismissal fails the send, so the transaction rolls both back and nothing wakes (0.223952ms)
+✔ only one concurrent tap can claim a suggestion; other owners cannot claim it (0.508863ms)
+✔ a separately dismissed suggestion has no receipt and is never sent (0.300814ms)
+✔ a changed suggestion after sending conflicts with its immutable receipt (0.409648ms)
+✔ new-task machine choice is owner-checked, preserved separately from copy and frozen across retries (5.28601ms)
+✔ with the Coordinator off a new task is refused, not queued silently; a chat message still waits (2.467281ms)
+✔ new-task submission fails closed when the issue-tools kill switch is set (0.470592ms)
+✔ new-task submission is on by default with no issue-tools setting (0.614141ms)
+✔ image bytes and machine destination both participate in immutable submission identity (1.048795ms)
+✔ browser notes and an authorized task destination persist together and remain frozen on retry (1.804629ms)
+✔ host browser session provenance is immutable across replays and cannot upgrade a prior API message (0.606497ms)
+✔ HTTP host provenance requires same-origin Cookie and no Authorization header (3.046176ms)
+✔ actual server action stamps only its authenticated same-origin browser session (1.062286ms)
+(node:51803) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:51803) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ compaction consumes the exact frozen default or subscription selection with no SDK retries (25.7683ms)
+✔ binding refusal, cancellation and empty output cannot produce a default-model summary (1.273985ms)
+✔ partial streaming text is not accepted after abnormal finish (0.965926ms)
+(node:51804) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:51804) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ actual SDK partial-error or unterminated streams cannot become successful compaction text (108.691462ms)
+(node:51810) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:51810) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ assistant text, tool results and the stored warning are saved with GitHub tokens masked (101.415925ms)
+✔ a memory edit never stores a token (1.01103ms)
+✔ every configured fact reaches the prompt, with the rule not to ask about it (1.288695ms)
+✔ nothing connected says what dispatch does instead of inviting a question (0.252642ms)
+✔ the allowed models list names every entry, past three, with Agent, model id, credential and where it runs (1.003398ms)
+✔ executionContextParts gives the list for the prefix and the per-turn rest from one read (0.678436ms)
+✔ a part that fails or is slow is left out, never claimed missing (42.512074ms)
+✔ a failure the person can act on becomes the words the web keeps under the message (1.313964ms)
+✔ every failure kind has one message key, the one the web line reads (0.463471ms)
+✔ the refusal reaches every Telegram chat and the phone; one failure does not stop the rest (0.320541ms)
+{"msg":"coordinator_turn_interrupted","workflowRunId":"wrun_failed","status":"failed","retried":true}
+{"msg":"coordinator_turn_interrupted","workflowRunId":"wrun_cancelled","status":"cancelled","retried":true}
+{"msg":"coordinator_turn_interrupted","workflowRunId":"wrun_done","status":"completed","retried":false}
+2026-11-05T00:58:13.290Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+✔ a lease held by an ended run is let go and its message retried; a live or unreadable run is left alone (2.820496ms)
+Coordinator model judgment observed {
+  eventId: '0',
+  executionId: '9c5857e6-782e-4dc6-9afc-104254e203c1',
+  modelId: 'openai/gpt-6-luna-decisions',
+  providerGenerationId: 'synthetic-generation',
+  startedAt: '2026-11-05T00:58:11.143Z',
+  completedAt: '2026-11-05T00:58:11.153Z',
+  requestDigest: 'ae85870214d45d42e0a39fc20062428a4e0ee7394d96a131de061e635b07b3b6',
+  imageDigests: [],
+  vision: 'no-image-input',
+  application: 'received'
+}
+Coordinator model judgment observed {
+  eventId: '0',
+  executionId: '9c5857e6-782e-4dc6-9afc-104254e203c1',
+  modelId: 'openai/gpt-6-luna-decisions',
+  providerGenerationId: 'synthetic-generation',
+  startedAt: '2026-11-05T00:58:11.143Z',
+  completedAt: '2026-11-05T00:58:11.153Z',
+  requestDigest: 'ae85870214d45d42e0a39fc20062428a4e0ee7394d96a131de061e635b07b3b6',
+  imageDigests: [],
+  vision: 'no-image-input',
+  application: 'applied'
+}
+2026-11-05T00:58:11.163Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+Coordinator model judgment observed {
+  eventId: '1',
+  executionId: '317cec02-872b-408d-be6b-e2244c5d74c6',
+  modelId: 'openai/gpt-6-luna-decisions',
+  providerGenerationId: 'synthetic-generation',
+  startedAt: '2026-11-05T00:58:11.171Z',
+  completedAt: '2026-11-05T00:58:11.173Z',
+  requestDigest: '677eb14e0356401f89078dfc56c4c42b853610de86d33168f4254b49b81fd0b0',
+  imageDigests: [],
+  vision: 'no-image-input',
+  application: 'received'
+}
+Coordinator model judgment observed {
+  eventId: '1',
+  executionId: '317cec02-872b-408d-be6b-e2244c5d74c6',
+  modelId: 'openai/gpt-6-luna-decisions',
+  providerGenerationId: 'synthetic-generation',
+  startedAt: '2026-11-05T00:58:11.171Z',
+  completedAt: '2026-11-05T00:58:11.173Z',
+  requestDigest: '677eb14e0356401f89078dfc56c4c42b853610de86d33168f4254b49b81fd0b0',
+  imageDigests: [],
+  vision: 'no-image-input',
+  application: 'applied'
+}
+Coordinator model judgment observed {
+  eventId: '2',
+  executionId: '631eccaf-78ee-40fb-bf2d-e7ec2d9c41d2',
+  modelId: 'openai/gpt-6-luna-decisions',
+  providerGenerationId: 'synthetic-generation',
+  startedAt: '2026-11-05T00:58:11.177Z',
+  completedAt: '2026-11-05T00:58:11.179Z',
+  requestDigest: '086db783d80cef68108e546730b60c5007dab80af49e90ee3f1e78eb4799e24e',
+  imageDigests: [],
+  vision: 'no-image-input',
+  application: 'received'
+}
+Coordinator model judgment observed {
+  eventId: '2',
+  executionId: '631eccaf-78ee-40fb-bf2d-e7ec2d9c41d2',
+  modelId: 'openai/gpt-6-luna-decisions',
+  providerGenerationId: 'synthetic-generation',
+  startedAt: '2026-11-05T00:58:11.177Z',
+  completedAt: '2026-11-05T00:58:11.179Z',
+  requestDigest: '086db783d80cef68108e546730b60c5007dab80af49e90ee3f1e78eb4799e24e',
+  imageDigests: [],
+  vision: 'no-image-input',
+  application: 'applied'
+}
+Coordinator model judgment observed {
+  eventId: '3',
+  executionId: 'eab1d9d6-40bc-4cb4-9474-588691b389f1',
+  modelId: 'openai/gpt-6-luna-decisions',
+  providerGenerationId: 'synthetic-generation',
+  startedAt: '2026-11-05T00:58:11.183Z',
+  completedAt: '2026-11-05T00:58:11.184Z',
+  requestDigest: 'db0bbfd2a11c1939b20d71155f9f89d2eb5a243184919ecf2dd8086e5d0b8624',
+  imageDigests: [],
+  vision: 'no-image-input',
+  application: 'received'
+}
+Coordinator model judgment observed {
+  eventId: '3',
+  executionId: 'eab1d9d6-40bc-4cb4-9474-588691b389f1',
+  modelId: 'openai/gpt-6-luna-decisions',
+  providerGenerationId: 'synthetic-generation',
+  startedAt: '2026-11-05T00:58:11.183Z',
+  completedAt: '2026-11-05T00:58:11.184Z',
+  requestDigest: 'db0bbfd2a11c1939b20d71155f9f89d2eb5a243184919ecf2dd8086e5d0b8624',
+  imageDigests: [],
+  vision: 'no-image-input',
+  application: 'applied'
+}
+Coordinator wake accepted {
+  workflowRunId: 'synthetic-workflow',
+  eventIds: [ '0', '1', '2', '3' ],
+  attempt: 1
+}
+✔ every runtime event reaches the actual model adapter instead of failed/blocked heuristics (1362.310778ms)
+Coordinator model judgment observed {
+  eventId: 'pending',
+  executionId: 'c6417138-d9da-496a-a10b-d29721d6a2aa',
+  modelId: 'openai/gpt-6-luna-decisions',
+  providerGenerationId: 'synthetic-generation',
+  startedAt: '2026-11-05T00:58:11.212Z',
+  completedAt: '2026-11-05T00:58:11.214Z',
+  requestDigest: 'f3bd2e572623caa85c40c6d53a34524048278a9ee8595734229e6bd1e5468609',
+  imageDigests: [],
+  vision: 'no-image-input',
+  application: 'received'
+}
+Coordinator model judgment observed {
+  eventId: 'pending',
+  executionId: '0f18db1e-b079-48dd-97bb-46a74f1c8e98',
+  modelId: 'openai/gpt-6-luna-decisions',
+  providerGenerationId: 'synthetic-generation',
+  startedAt: '2026-11-05T00:58:11.216Z',
+  completedAt: '2026-11-05T00:58:11.218Z',
+  requestDigest: 'f3bd2e572623caa85c40c6d53a34524048278a9ee8595734229e6bd1e5468609',
+  imageDigests: [],
+  vision: 'no-image-input',
+  application: 'received'
+}
+✔ unavailable or malformed model results leave the event pending and do not wake (147.535384ms)
+Coordinator wake accepted {
+  workflowRunId: 'synthetic-workflow',
+  eventIds: [ 'user' ],
+  attempt: 1
+}
+✔ direct user delivery does not require a semantic classification or a new confirmation layer (4.30258ms)
+Coordinator model judgment observed {
+  eventId: 'visual',
+  executionId: '08addb36-7178-45d2-a9c1-67334463a021',
+  modelId: 'openai/gpt-6-luna-decisions',
+  providerGenerationId: 'synthetic-generation',
+  startedAt: '2026-11-05T00:58:11.344Z',
+  completedAt: '2026-11-05T00:58:11.345Z',
+  requestDigest: '0b8884ed56f2cd322ac11f39d7c0aede318358e6c1457419a18b59e1b7227839',
+  imageDigests: [
+    '2142f54f2bd88700b1fdf7eb233fb97568eaba7a4e1d5faa03a8993eaa320b5a'
+  ],
+  vision: 'image-input-submitted',
+  application: 'received'
+}
+Coordinator model judgment observed {
+  eventId: 'visual',
+  executionId: '08addb36-7178-45d2-a9c1-67334463a021',
+  modelId: 'openai/gpt-6-luna-decisions',
+  providerGenerationId: 'synthetic-generation',
+  startedAt: '2026-11-05T00:58:11.344Z',
+  completedAt: '2026-11-05T00:58:11.345Z',
+  requestDigest: '0b8884ed56f2cd322ac11f39d7c0aede318358e6c1457419a18b59e1b7227839',
+  imageDigests: [
+    '2142f54f2bd88700b1fdf7eb233fb97568eaba7a4e1d5faa03a8993eaa320b5a'
+  ],
+  vision: 'image-input-submitted',
+  application: 'applied'
+}
+Coordinator wake accepted {
+  workflowRunId: 'synthetic-workflow',
+  eventIds: [ 'visual' ],
+  attempt: 1
+}
+✔ actual pixels reach input_image; a visual request without pixels remains pending (17.492648ms)
+✔ a single member is still judged; low confidence alone never creates clarification (8.599262ms)
+✔ group clarification is model-selected; member identity guards remain enforced (6.188939ms)
+✔ validation rejects duplicate/malformed answers; cancellation does not invoke provider (0.32073ms)
+Coordinator model judgment observed {
+  eventId: 'retry',
+  executionId: '703fe78e-6bfe-4571-b36c-1a81f37b53bd',
+  modelId: 'openai/gpt-6-luna-decisions',
+  providerGenerationId: 'synthetic-generation',
+  startedAt: '2026-11-05T00:58:11.378Z',
+  completedAt: '2026-11-05T00:58:11.379Z',
+  requestDigest: '9b8a67b86a848384036d8e34e249c87f039170a905bc0e0083e8f14b1abbefd7',
+  imageDigests: [],
+  vision: 'no-image-input',
+  application: 'received'
+}
+Coordinator model judgment observed {
+  eventId: 'retry',
+  executionId: 'be237f59-cfb7-4e5f-ad61-65d1f4ec9e72',
+  modelId: 'openai/gpt-6-luna-decisions',
+  providerGenerationId: 'synthetic-generation',
+  startedAt: '2026-11-05T00:58:11.382Z',
+  completedAt: '2026-11-05T00:58:11.383Z',
+  requestDigest: '9b8a67b86a848384036d8e34e249c87f039170a905bc0e0083e8f14b1abbefd7',
+  imageDigests: [],
+  vision: 'no-image-input',
+  application: 'received'
+}
+✔ classification retries are bounded; transport receipts bind actual pixels and reject prose-only vision claims (18.568902ms)
+✔ existing monitor-shaped consumer receives provider invocation ID, actual image input and host receipt (3.571694ms)
+✔ receipt binds submitted image bytes even when the caller mutates its image during fetch (4.476959ms)
+✔ response validation keeps the questions actually sent despite in-flight caller mutation (4.338537ms)
+✔ the Decisions call uses the app's one gateway credential: AI_GATEWAY_API_KEY, else the deployment OIDC token (2.8279ms)
+(node:51937) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:51937) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ 「在 Mikka_test 里加 README」: the account is known, the bare name goes to dispatch, nobody is asked which account (187.825229ms)
+✔ Mikka 默认 out of points: the model is told, threads never claim to run on it, and dispatch rules point at the card (33.870123ms)
+✔ 「派给 Codex」: the Agent alone is a valid choice; no model id is asked for (29.379612ms)
+✔ work that needs a screen goes to the Bot computer; everything else to an Agent, without asking which (50.670099ms)
+✔ standalone file work on the Bot computer has a repositoryless route for either subscribed Agent (43.693851ms)
+✔ no rule left that asks for what is already known (2.87545ms)
+✔ how to draw a card is said once, in the prompt; tools and events only point at it (32.130994ms)
+✔ more work on a task goes to its thread; a new thread only when the person asked for one (36.994467ms)
+✔ 「On phones, the How it works section on the Mikka site is cut off. Can you fix it?」: every Mikka repository comes back described; the site goes to mikka-web, judged by description and homepage (28.217415ms)
+✔ 「On phones, the How it works section on the Mikka site is cut off. Can you fix it?」 when the candidates do not settle it: one choice question, nothing dispatched (17.196531ms)
+✔ 「It's in the mikka-web repo」 on a thread working in alexj11324/Mikka: the repository is passed, so the work moves to a new thread there (18.323689ms)
+✔ screen work on a named site still names it to the sub-agent: 「On phones, the How it works section on the Mikka site is cut off. Can you fix it?」 watched on a phone-sized browser (19.827669ms)
+✔ the prompt teaches judgment with neutral names; it never contains the eval's sentences or the real repositories (9.67393ms)
+✔ 「Octo 官网的导航栏在手机上错位了」 with the authorized list in the turn: chosen from the list, no search needed (21.751243ms)
+(node:51959) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:51959) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ real authenticated submission, persistence, inbox and preparePrompt deliver actual pixels to the SDK model (1838.923822ms)
+✔ plain text and image-only inputs work; peer payload images never become authenticated user pixels (26.678524ms)
+✔ authentication, attachment identity and byte budgets reject before persistence (3.650311ms)
+✔ a stored attachment with a changed digest cannot enter model messages (2.039317ms)
+✔ image retention has an explicit pixel budget and source-bound omission references (16.103314ms)
+✔ only the last failed attempt tells the person; earlier ones retry quietly (1.704489ms)
+✔ a last attempt still waiting on triage gives up too; one that starts says nothing (0.27741ms)
+✔ a failing notice never changes the wake outcome (0.232904ms)
+(node:52008) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:52008) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ an unavailable machine releases the task lock so the same task can be retried (41.378695ms)
+✔ a dispatch exception rolls back its lock and preserves the original failure (0.845917ms)
+✔ a failed rollback discards the connection without hiding the dispatch error (0.346328ms)
+✔ a follow-up on a working thread goes to it as a message; no new thread starts (0.389806ms)
+✔ a follow-up on an ended thread runs the same thread again (3.098237ms)
+✔ asking for a new thread is honoured only when the person said so; otherwise the thread is kept (4.622901ms)
+✔ an explicit replacement finishes the old stop even when an epoch already set the stop flag (3.438601ms)
+✔ only a confident judgment that the person asked starts a new thread (0.946087ms)
+✔ no judgment keeps the thread (0.278134ms)
+✔ the person's words go to the judge as data, cut to a bounded length (0.368652ms)
+cloud task dispatch refused { error: 'Error', code: undefined }
+cloud task dispatch refused { error: 'Error', code: undefined }
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+cloud task dispatch refused { error: 'Error', code: undefined }
+(node:52024) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:52024) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ cloud startup succeeds only after both machine preparation and lifecycle launch (496.236331ms)
+✔ model arguments cannot grant local recovery; only the separate host placement argument can (8.474118ms)
+✔ a machine failure uses the unclaimed infrastructure-failure path without requesting a user stop (16.175218ms)
+✔ a lifecycle failure uses the unclaimed infrastructure-failure path without requesting a user stop (7.318202ms)
+✔ a sleeping Bot dispatches codex with its selected subscription, without a separate wake tool (19.602011ms)
+✔ a sleeping Bot dispatches codex with its selected api_key, without a separate wake tool (5.947122ms)
+✔ a sleeping Bot dispatches claude_code with its selected subscription, without a separate wake tool (5.584036ms)
+✔ a sleeping Bot dispatches claude_code with its selected api_key, without a separate wake tool (5.703387ms)
+✔ a owner refusal performs no cloud preparation or queue write (0.541149ms)
+✔ a runtime refusal performs no cloud preparation or queue write (0.352822ms)
+✔ a workspace refusal performs no cloud preparation or queue write (1.043273ms)
+✔ a issue refusal performs no cloud preparation or queue write (0.963041ms)
+✔ a policy refusal performs no cloud preparation or queue write (1.788458ms)
+✔ a suggestion refusal performs no cloud preparation or queue write (1.062759ms)
+✔ a subscription refusal performs no cloud preparation or queue write (1.584331ms)
+✔ a key-switch refusal performs no cloud preparation or queue write (1.635867ms)
+✔ preparation permits authorized quota fallback and leaves the original selection for queue-time validation (5.383711ms)
+✔ desktop dispatch rejects workspace access before model resolution (0.975636ms)
+✔ desktop dispatch rejects issue access before model resolution (0.807753ms)
+✔ a wake failure queues no run or continuation write for the ended thread (2.551673ms)
+✔ a wake cannot swap the selected Agent, even inside the same workspace (1.226622ms)
+✔ a credential revoked during the wake is still rejected by the queue (2.349681ms)
+✔ workspace access revoked during the wake stops before queueing a run (2.216978ms)
+✔ a repeated dispatch keeps its queue key and one run after waking once (6.93831ms)
+✔ a completed thread retains its model, binding, ancestry and read-only policy through wake (6.96436ms)
+✔ a working thread receives its message without waking or reselecting anything (1.382ms)
+ℹ tests 118
+ℹ suites 0
+ℹ pass 118
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 22738.631262
+
+> next-app@0.0.1 test:personal-message-safety /vercel/sandbox/mikka-mcp-main-3ade-egress
+> node --import tsx --test lib/personal-agent-message.test.ts lib/coordinator/message-safety.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/message-safety-consumers.test.ts lib/coordinator/message-safety-ingress.test.ts lib/coordinator/message-safety-handler.test.ts
+
+✔ actual event-to-model path distinguishes host events from authenticated user text including forged packet syntax (2.884686ms)
+✔ actual repeated compaction wrapper retains host pending state despite model approval claims (2.680031ms)
+✔ newest real user stop is not folded away in favour of delayed synthetic notifications (20.482327ms)
+✔ model summary cannot supply new host sources and peer OK stays a notification (1.042228ms)
+✔ real preparePrompt consumes provenance wrapper; native and Coordinator use same host policy without new tools (0.878147ms)
+✔ notification-only growth compacts and cumulative prompt references are bounded with exact omission counts (26.375715ms)
+✔ large stored notifications are encoded in lossless bounded chunks rather than rejected or silently truncated (4.391374ms)
+✔ legacy model JSON cannot impersonate a host source ledger or original user record (0.644392ms)
+✔ Agent forward calls are explicitly peer-origin while real user actions retain the existing text path (0.84833ms)
+✔ actual native context serializer consumes the same safe message projection without the signing key (211.564308ms)
+✔ large legacy or unverifiable summaries have an explicit bounded prose projection (0.721984ms)
+✔ unstamped historical peer text cannot become a host-retained user instruction during compaction (0.36877ms)
+✔ suggestion handling honors existing authorization and actual approval gates (0.196277ms)
+✔ task destination reaches only the model, and peer data cannot stamp a human machine selection (0.999353ms)
+✔ real image content and authenticated machine destination survive the same prompt path (2.267087ms)
+✔ malicious content cannot close a boundary or replace transport provenance (2.141059ms)
+✔ delayed or absent timestamps and pending counts remain exact without inferring execution (0.380762ms)
+✔ summaries retain provenance and classify approval claims as untrusted data (0.335566ms)
+✔ invalid metadata, oversized content and forged packet types fail closed (0.536317ms)
+✔ pending remains pending across a summary despite forged owner and completion claims (0.264548ms)
+✔ replay is deterministic; same display name cannot substitute session identity (0.500657ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 741.154983
+(node:52157) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:52157) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ actual SDK preparePrompt and native enqueue preserve real user input and deny peer approval/routing syntax (1288.580591ms)
+✔ actual compaction persists a host-signed pending ledger and newest STOP; native consumes identical projection (91.34703ms)
+✔ a partial failed compaction never saves a summary or advances retained history (18.188325ms)
+(node:52158) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:52158) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ real MCP schema rejects an unsupported human assignee before any write (302.47982ms)
+✔ real POST/auth wrappers deny missing, revoked, expired and wrong worker credentials before writes (5.019309ms)
+✔ real POST MCP schema and producer keep forged owner/source data inside peer text (8.712867ms)
+✔ real POST send_to_run binds row ID/peer origin and retains foreign-owner and STOP lock denials (20.926574ms)
+✔ real POST read exposes projected peer data and direct stamped human STOP without networking (8.952821ms)
+(node:52164) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:52164) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ actual takeInbox stamps stored server event ID/time and retains host user source despite forged body (105.254132ms)
+✔ actual existing MCP send records an Agent report and wakes normally without fabricating a user event (1.573844ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3799.248409
+✔ only installed production harnesses become local execution identities (1.714291ms)
+✔ unchanged heartbeats and cloud devices never open transactions or locks (0.454255ms)
+✔ a mismatch locks the device, re-reads the latest report, and preserves history on removal (0.853997ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 284.588491
+✔ server-action rejections preserve public error codes and hide unknown errors (1.787258ms)
+✔ a refused task is not held as accepted or uncertain, and manual retry is a new submission (0.674063ms)
+✔ server-action sign-in retries retain the body and id, while conflicts stay terminal (0.489377ms)
+✔ rich submissions freeze all context and keep independent uncertain bodies (0.544995ms)
+✔ regression: a plain retry after a 409 used to get id2; now it makes no request and keeps id1 (20.262523ms)
+✔ regression: a send before the account was known used to go out under owner "" and retry as id2; now nothing is sent until it is known (0.86773ms)
+✔ same content: a retry of an unsettled submission keeps its id; a new submission after it settled gets a new id (0.838732ms)
+✔ concurrent sends of one submission make one request and one event (0.363313ms)
+✔ a lost response is retried with the same id and body, and the server replays it (0.583516ms)
+✔ a 5xx or network failure keeps the id and body for the next send (0.849173ms)
+✔ once accepted, the same text sent again is a new submission with a new id (0.494576ms)
+✔ after a 409 the body is closed: sending it again makes no request and gets no new id (0.46708ms)
+✔ the server answers 409 to the same id with another text or questionId (0.625019ms)
+✔ sending an edited draft never replaces a submission that is still uncertain (0.473415ms)
+✔ questionId is part of the frozen body (0.562278ms)
+✔ after a 401 the same account resends the same submission; another account never does (0.524487ms)
+✔ no request is made while the account is unknown (0.240596ms)
+✔ enabled: false is accepted once and never resent (0.231332ms)
+✔ blank or too long text is refused without a request (0.168274ms)
+✔ reads server responses, including the older server without idempotency (0.588719ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 273.472423
+(node:52287) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:52287) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ cron requires the exact configured bearer before reading or writing the inbox (53.921794ms)
+✔ authenticated sweeps return only counts and never cache them (9.667742ms)
+✔ explicit replay accepts only an event UUID and leaves other events alone (15.577851ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 541.39523
+
+> next-app@0.0.1 test:coordinator-stream /vercel/sandbox/mikka-mcp-main-3ade-egress
+> node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/stream-response.test.ts lib/coordinator/reply-segments.test.ts app/api/coordinator/stream/route.test.ts lib/coordinator-stream-client.test.ts tests/use-coordinator-stream.test.tsx tests/coordinator-streaming-render.test.tsx
+
+(node:52347) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:52347) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ reconnect sends only events after the acknowledged cursor and resets for a changed stream key (94.496055ms)
+✔ authentication and malformed bot IDs fail before any chat or stream lookup (2.34882ms)
+✔ the authenticated owner and no bot select the Coordinator run, ignoring supplied user identity (2.232453ms)
+✔ a peer cannot use a known owner run ID and sees only their own Coordinator lease (2.128559ms)
+✔ a bot stream requires ownership and selects that bot rather than the Coordinator (2.569551ms)
+✔ workspace-scoped API sessions cannot stream an owned bot outside their workspace (1.981539ms)
+✔ missing, expired, non-workflow and mismatched leases never open a supplied run ID (2.37325ms)
+✔ the HTTP stream exposes assistant text and lifecycle without reasoning, tools or provider details (1.37228ms)
+✔ a split saved secret ends with a generic error before secret content reaches HTTP (5.704977ms)
+✔ cancelling the HTTP reader cancels its durable stream reader (2.19345ms)
+✔ JSONL decoding preserves split UTF-8, split records, and an unterminated final line (18.021536ms)
+✔ reset replaces a retried model step; replay rebuilds rather than duplicates rounds (0.826651ms)
+✔ invalid records fail and cancel the reader instead of becoming a completed reply (1.86983ms)
+✔ saved history hides its live reply even before the committed marker arrives (0.737249ms)
+✔ aborting an idle reader cancels it without emitting unfinished content (0.565497ms)
+✔ a live reply keeps each tool in call order with its latest state, and adds up thinking time (1.105826ms)
+✔ tools sit after the words said before they ran, top to bottom (2.279116ms)
+✔ a tool before any words leads; one without an offset counts as before them (0.279105ms)
+✔ while the words are still arriving, a tool waits after what has shown so far (0.217556ms)
+✔ tools out of order never repeat or drop words (0.234855ms)
+✔ text arrives before the turn commits; model internals never leave the stream (11.407705ms)
+✔ tool-backed steps concatenate; a retried step replaces only its partial attempt (1.62435ms)
+✔ a quiet handoff sentinel is never flashed, while an actual notification streams (1.965842ms)
+✔ split saved secrets are blocked before any secret character reaches the browser (2.797546ms)
+✔ each tool streams its name, state and short previews; thinking streams as it goes (1.839841ms)
+✔ a tool call names how much of the reply was said before it, held back or not, so it shows after those words (0.551342ms)
+✔ reasoning streams masked as it goes: no credential or saved secret, whole or in part, ever leaves; encrypted or empty reasoning streams no text (7.152644ms)
+✔ a retried model step drops the reasoning it streamed; earlier steps keep theirs (0.864975ms)
+✔ a hand-off turn that may end quiet streams no tools or thinking (0.397775ms)
+✔ a tool preview that would carry a saved secret or a credential is masked or left out, never streamed (1.378031ms)
+Warning: KaTeX doesn't work in quirks mode. Make sure your website has a suitable doctype.
+(node:52357) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:52357) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a citation still arriving is left out of streamed text, whatever its cut (9632.640289ms)
+✔ streamed tokens, in any batches, never show a chip marker or id; each chip shows once complete (948.196758ms)
+✔ an OpenUI chip whose id is still arriving or unknown holds its place instead of showing the id (35.919303ms)
+✔ a token for the streaming reply leaves finished replies and their chips mounted (250.630415ms)
+✔ the streaming reply keeps its earlier chips mounted as new tokens arrive (42.124199ms)
+✔ a reply draws its thinking and its tools as shadcn Trace rows: several calls are one summary line that opens to a row each (R-83) (129.962025ms)
+✔ readable reasoning opens under 「思考了 N 秒」, live and stored alike; without it the line does not open (26.518872ms)
+✔ a task and its thread in one reply: only the thread is a chip, the task is its number or nothing (R-15) (8.890191ms)
+✔ a thread whose card sits under the same reply is named in the words without a chip (R-66) (5.518031ms)
+✔ 全部展开 opens every tool group, a group clicked alone keeps its own state, 全部收起 closes them all (R-83) (43.954481ms)
+✔ hook keeps one reader, rebuilds reconnects, reconciles history, and cancels on bot switch (44.948649ms)
+ℹ tests 41
+ℹ suites 0
+ℹ pass 41
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15261.523875

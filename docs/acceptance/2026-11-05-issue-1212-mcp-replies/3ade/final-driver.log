@@ -1,0 +1,4 @@
+{"label":"mcp-pg","args":["exec","node","--experimental-test-module-mocks","--import","./scripts/server-test.mjs","--import","tsx","--test","lib/mcp/reply-live.db.test.ts"],"log":"/vercel/acceptance/mcp-1255-3ade/final-mcp-pg.log","startedAt":"2026-11-05T01:00:28.000Z","endedAt":"2026-11-05T01:01:02.315Z","timedOut":false,"code":0,"signal":null}
+{"label":"typecheck","args":["typecheck"],"log":"/vercel/acceptance/mcp-1255-3ade/final-typecheck.log","startedAt":"2026-11-05T01:01:02.316Z","endedAt":"2026-11-05T01:01:08.609Z","timedOut":false,"code":0,"signal":null}
+{"label":"lint","args":["lint"],"log":"/vercel/acceptance/mcp-1255-3ade/final-lint.log","startedAt":"2026-11-05T01:01:08.610Z","endedAt":"2026-11-05T01:01:25.440Z","timedOut":false,"code":0,"signal":null}
+{"complete":true,"phase":"final","ok":true,"ownDatabasesRemaining":[],"roleDropped":true}

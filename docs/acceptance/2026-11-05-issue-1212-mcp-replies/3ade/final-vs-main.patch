@@ -1,0 +1,1035 @@
+diff --git a/app/api/mcp/route.ts b/app/api/mcp/route.ts
+index cf2ff9153..448250fac 100644
+--- a/app/api/mcp/route.ts
++++ b/app/api/mcp/route.ts
+@@ -75,7 +75,7 @@ const handler = createMcpHandler(server => {
+       limit: z.number().int().min(1).max(100).optional().describe('At most this many of the newest messages. Default 20.'),
+       waitSeconds: z.number().int().min(0).max(90).optional().describe('Wait up to this long for a Coordinator reply after `after`.'),
+     }),
+-  }, async (input, ctx) => json(await tools.readCoordinatorMessages(mcpUserId(ctx.http?.authInfo), input)))
++  }, async (input, ctx) => json(await tools.readCoordinatorMessages(mcpUserId(ctx.http?.authInfo), input, ctx.mcpReq.signal)))
+ 
+   server.registerTool('submit_artifact', SUBMIT_ARTIFACT, async (input, ctx) => {
+     const userId = mcpUserId(ctx.http?.authInfo)
+diff --git a/cloudflare/device-gateway/test/runtime.test.mjs b/cloudflare/device-gateway/test/runtime.test.mjs
+index f4665d73e..280685041 100644
+--- a/cloudflare/device-gateway/test/runtime.test.mjs
++++ b/cloudflare/device-gateway/test/runtime.test.mjs
+@@ -261,3 +261,15 @@ test('daemon reconnects retain their one-socket replacement and work signal', as
+     second.close(1000, 'done')
+   } finally { first.terminate() }
+ })
++
++test('Coordinator session invalidation uses the same scoped wire without reply contents', async () => {
++  const channel = liveChannel('mcp-owner', 'personal-workspace')
++  const socket = liveSocket(channel)
++  await event(socket, 'open')
++  assert.ok((await socket.liveReady).kinds.includes('coordinator_session'))
++  const received = event(socket, 'message')
++  const invalidation = { kind: 'coordinator_session', id: deviceId }
++  await pushLive(channel, [invalidation])
++  assert.deepEqual(JSON.parse((await received).data), invalidation)
++  socket.close(1000, 'done')
++})
+diff --git a/lib/coordinator/credential-masking.test.ts b/lib/coordinator/credential-masking.test.ts
+index c1d60fac5..0d50a8764 100644
+--- a/lib/coordinator/credential-masking.test.ts
++++ b/lib/coordinator/credential-masking.test.ts
+@@ -24,7 +24,7 @@ const tx = {
+   },
+   update(table: unknown) {
+     assert.equal(table, coordinatorSessions)
+-    return { set(value: Record<string, unknown>) { updates.push(value); return { where: async () => undefined } } }
++    return { set(value: Record<string, unknown>) { updates.push(value); return { where: () => Object.assign(Promise.resolve(undefined), { returning: async () => [{ userId: 'owner' }] }) } } }
+   },
+ }
+ const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
+@@ -36,6 +36,7 @@ stub('../issue-visibility.ts', { issueVisibility: () => {} })
+ stub('../task-identifier-server.ts', { taskIdentifiers: () => {} })
+ stub('../artifacts/store.ts', { artifactSummaries: () => {} })
+ stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async () => {} })
++stub('../live/coordinator-session.ts', { coordinatorSessionChanged: async () => {} })
+ 
+ let store: typeof import('./store')
+ before(async () => { store = await import('./store') })
+diff --git a/lib/coordinator/message-safety-handler.test.ts b/lib/coordinator/message-safety-handler.test.ts
+index dbfdf0e46..c908581da 100644
+--- a/lib/coordinator/message-safety-handler.test.ts
++++ b/lib/coordinator/message-safety-handler.test.ts
+@@ -72,7 +72,11 @@ const stub = (path: string, exports: Record<string, unknown>) => mock.module(new
+ stub('../factory/queue-local.ts',{queueTaskRun:()=>{throw Error('Dispatch is outside this regression')}})
+ stub('../db/index.ts', { db: database, pool: {
+   connect: () => { throw Error('No database pool in handler regression') },
+-  query: async (sql: string) => {
++  query: async (sql: string, params?: unknown[]) => {
++    if (sql === 'SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2') {
++      assert.deepEqual(params, [coordinator, owner], 'scope lookup uses the authenticated owner and resolved Bot')
++      return { rows: [{ workspaceId: workspace }] }
++    }
+     assert.match(sql, /to_regclass\('credential_secrets'\)/)
+     return { rows: [{ present: false }] }
+   },
+@@ -81,6 +85,12 @@ stub('./store.ts', { editMemory: () => { throw Error('Unrelated tool outside tes
+ stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async () => {} })
+ // The person's Coordinator is an ordinary bot row; MCP resolves it for the authenticated owner.
+ const coordinator = '28700000-0000-4000-8000-0000000c0de1'
++const workspace = '28700000-0000-4000-8000-0000000000a1'
++stub('../workspace-db.ts', { workspacePool: { query: async (sql: string, params: unknown[]) => {
++  assert.equal(sql, `SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active'`)
++  assert.deepEqual(params, [workspace, owner], 'scope membership uses the same authenticated owner')
++  return { rows: [{ allowed: 1 }], rowCount: 1 }
++} } })
+ stub('./coordinator-bot.ts', {
+   coordinatorBot: async (user: string) => { assert.equal(user, owner); return { botId: coordinator, workspaceId: '28700000-0000-4000-8000-0000000000a1' } },
+   chatBotId: async (user: string, chosen: string | null | undefined) => { assert.equal(user, owner); return chosen ?? coordinator },
+@@ -163,6 +173,7 @@ test('real POST send_to_run binds row ID/peer origin and retains foreign-owner a
+ 
+ test('real POST read exposes projected peer data and direct stamped human STOP without networking', async () => {
+   const reply = await result(await request('read_coordinator_messages', { after: 0, waitSeconds: 0 }))
++  assert.equal(reply.isError, undefined, 'read succeeds after authenticated scope checks')
+   const messages = value(reply).messages
+   assert.equal(JSON.parse(messages[0].text).authority, 'coordination_data_only')
+   assert.equal(JSON.parse(messages[0].text).source.messageId, 'actual-peer-id')
+diff --git a/lib/coordinator/store.ts b/lib/coordinator/store.ts
+index 40892a2ae..a8679b770 100644
+--- a/lib/coordinator/store.ts
++++ b/lib/coordinator/store.ts
+@@ -11,6 +11,7 @@ import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
+ import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
+ import type { ModelMessage } from 'ai'
+ import { db } from '@/lib/db'
++import { coordinatorSessionChanged } from '@/lib/live/coordinator-session'
+ import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
+ import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
+ import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
+@@ -118,6 +119,7 @@ export async function takeInbox(userId: string, holder: string, botId: string):
+     // Ordinary renewal is not a broad list update. Only a new/changed turn
+     // or actual message delivery changes the summary that the sidebar shows.
+     if (!coordinatorLeaseActive(previousLease, now) || previousLease?.leaseHolder !== holder) await ownerListChanged(tx, userId, ['bot_chat_list'])
++    await coordinatorSessionChanged(tx, userId, botId)
+     const candidates = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
+       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+     // A schedule is a separate read-only turn. Hydrate its authority through
+@@ -204,6 +206,7 @@ export async function releaseLease(userId: string, holder: string, botId: string
+   const released = await db.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, updatedAt: new Date() })
+     .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
+   if (released.length) await ownerListChanged(db, userId, ['bot_chat_list'])
++  if (released.length) await coordinatorSessionChanged(db, userId, botId)
+   return hasWakingEvents(userId, botId)
+ }
+ 
+@@ -291,8 +294,9 @@ export async function appendMessages(userId: string, holder: string, unmasked: M
+       await ownerListChanged(tx, userId, ['bot_chat_list'])
+     }
+     const now = new Date()
+-    await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning && maskCredentials(warning), lastErrorAt: warning ? now : null, updatedAt: now })
+-      .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder)))
++    const renewed = await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning && maskCredentials(warning), lastErrorAt: warning ? now : null, updatedAt: now })
++      .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
++    if (messages.length || renewed.length) await coordinatorSessionChanged(tx, userId, botId)
+     return first + messages.length - 1
+   })
+ }
+@@ -342,6 +346,7 @@ export async function failTurn(userId: string, holder: string, error: string, bo
+       .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
+     if (!released.length) return
+     await ownerListChanged(tx, userId, ['bot_chat_list'])
++    await coordinatorSessionChanged(tx, userId, botId)
+     await tx.execute(sql`UPDATE coordinator_messages SET message = message || jsonb_build_object('mikkaFailure', ${reason}::text)
+       WHERE "userId"=${userId} AND "botId"=${botId}::uuid AND message->>'role'='user'
+         AND position=(SELECT max(position) FROM coordinator_messages WHERE "userId"=${userId} AND "botId"=${botId}::uuid)`)
+diff --git a/lib/live/coordinator-session.ts b/lib/live/coordinator-session.ts
+new file mode 100644
+index 000000000..e36630f73
+--- /dev/null
++++ b/lib/live/coordinator-session.ts
+@@ -0,0 +1,33 @@
++import type { PoolClient } from 'pg'
++import { afterDatabaseCommit } from '../db/commit-effects'
++import { liveGatewayConfig, type LiveScope } from './scope'
++
++type Database = Pick<PoolClient, 'query'>
++
++/** The authenticated actor owns this persisted Bot; the browser's active
++ * workspace and the member who triggered a reply cannot choose its channel. */
++export async function coordinatorSessionScope(database: Database, workspaceDatabase: Database, ownerId: string, botId: string): Promise<LiveScope | null> {
++  const { rows: [bot] } = await database.query<{ workspaceId: string }>(
++    'SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, ownerId],
++  )
++  if (!bot) return null
++  const member = await workspaceDatabase.query(
++    'SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status=\'active\'', [bot.workspaceId, ownerId],
++  )
++  return member.rowCount ? { ownerId, workspaceId: bot.workspaceId } : null
++}
++
++/** Register on the actual outer transaction, including Drizzle savepoints.
++ * No scope read or network request extends the business transaction. */
++export async function coordinatorSessionChanged(executor: object, ownerId: string, botId: string | null) {
++  if (!botId || !liveGatewayConfig(process.env)) return
++  const { scheduleLive, sendLiveInvalidations } = await import('./notify')
++  afterDatabaseCommit(executor, `coordinator_session:${ownerId}:${botId}`, () => scheduleLive(async () => {
++    const { pool, withoutDatabaseClient } = await import('../db/request-scope')
++    const { workspacePool } = await import('../workspace-db')
++    await withoutDatabaseClient(async () => {
++      const scope = await coordinatorSessionScope(pool, workspacePool, ownerId, botId)
++      if (scope) await sendLiveInvalidations(scope, [{ kind: 'coordinator_session', id: botId }])
++    })
++  }))
++}
+diff --git a/lib/live/events.ts b/lib/live/events.ts
+index f8d546e37..d45fe7a24 100644
+--- a/lib/live/events.ts
++++ b/lib/live/events.ts
+@@ -1,4 +1,4 @@
+-export const LIVE_KINDS = ['thread_list', 'task_run_list', 'bot_chat_list', 'issue_list', 'bot_list', 'group_list', 'workspace_settings', 'computer_state', 'approved_writes', 'approved_write', 'pending_actions', 'factory_task', 'factory_issue', 'thread', 'run'] as const
++export const LIVE_KINDS = ['thread_list', 'task_run_list', 'bot_chat_list', 'issue_list', 'bot_list', 'group_list', 'workspace_settings', 'computer_state', 'approved_writes', 'approved_write', 'pending_actions', 'factory_task', 'factory_issue', 'thread', 'run', 'coordinator_session'] as const
+ export type LiveKind = typeof LIVE_KINDS[number]
+ export type LiveInvalidation = { kind: LiveKind; id: string }
+ export const LIVE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+diff --git a/lib/mcp/reply-live.db.test.ts b/lib/mcp/reply-live.db.test.ts
+new file mode 100644
+index 000000000..93ae63529
+--- /dev/null
++++ b/lib/mcp/reply-live.db.test.ts
+@@ -0,0 +1,369 @@
++import assert from 'node:assert/strict'
++import { randomUUID } from 'node:crypto'
++import { once } from 'node:events'
++import { spawn } from 'node:child_process'
++import { realpathSync } from 'node:fs'
++import { readFile, readdir } from 'node:fs/promises'
++import { createRequire } from 'node:module'
++import { fileURLToPath } from 'node:url'
++import { setTimeout as delay } from 'node:timers/promises'
++import test, { mock } from 'node:test'
++import { Pool } from 'pg'
++import { build } from 'esbuild'
++import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
++import { seedCoordinator } from '../../tests/support/coordinator-bot'
++import { dropTestDatabase } from '../../tests/support/drop-test-database'
++import { orderMigrations } from '../../scripts/migration-order.mjs'
++import { observePoolCommits } from '../db/commit-effects'
++import { coordinatorSessionScope } from '../live/coordinator-session'
++import { liveReady } from '../live/events'
++import { ScheduleStore, type WorkspaceGuard } from '../schedules/store'
++import { ScheduleError, type Definition } from '../schedules/contract'
++
++const target = process.env.E2E_DATABASE_URL
++const valid = target && disposableDatabase(process.env, target)
++  && process.env.MIKKA_DATABASE_URL === target && process.env.DATABASE_URL === target
++if (process.env.REQUIRE_DB === '1') assert.ok(valid, 'matching isolated loopback *_e2e databases are required')
++
++async function eventually(check: () => boolean, label: string, milliseconds = 5_000) {
++  const deadline = Date.now() + milliseconds
++  while (!check()) {
++    if (Date.now() >= deadline) throw new Error(label)
++    await delay(5)
++  }
++}
++
++async function bounded<T>(promise: Promise<T>, milliseconds = 5_000) {
++  let timer: ReturnType<typeof setTimeout> | undefined
++  try {
++    return await Promise.race([promise, new Promise<never>((_resolve, reject) => {
++      timer = setTimeout(() => reject(new Error('Reply did not arrive through the committed push')), milliseconds)
++    })])
++  } finally { clearTimeout(timer) }
++}
++
++test('MCP waits use real PostgreSQL writers and the existing workerd channel', { skip: !valid, timeout: 120_000 }, async t => {
++  const pending: Promise<void>[] = []
++  const deliveries: { ownerId: string; workspaceId: string; events: unknown }[] = []
++  let onSchedule = () => {}
++  let deferredScheduledWork: (() => Promise<void>)[] | null = null
++  const nextServer = await import('next/server')
++  const scheduler = mock.module('next/server', { namedExports: { ...nextServer,
++    after: (work: () => Promise<void>) => { onSchedule(); if (deferredScheduledWork) deferredScheduledWork.push(work); else pending.push(work()) },
++  } })
++  const original = await import('../live/notify')
++  const notification = mock.module('../live/notify', { namedExports: {
++    ...original,
++    sendLiveInvalidations: async (scope: { ownerId: string; workspaceId: string }, events: Parameters<typeof original.sendLiveInvalidations>[1]) => {
++      deliveries.push({ ...scope, events })
++      await original.sendLiveInvalidations(scope, events)
++    },
++  } })
++  const require = createRequire(import.meta.url)
++  const wranglerRequire = createRequire(realpathSync(require.resolve('wrangler/package.json')))
++  const { Miniflare, Log, LogLevel, convertV4MiniflareOptions } = wranglerRequire('miniflare')
++  const bundle = await build({
++    entryPoints: [fileURLToPath(new URL('../../cloudflare/device-gateway/src/index.ts', import.meta.url))],
++    bundle: true, format: 'esm', platform: 'neutral', external: ['cloudflare:workers', 'node:crypto'], write: false,
++  })
++  const secret = 'isolated-mcp-reply-gateway-secret'
++  const options = {
++    workers: [{ name: 'mcp-reply-test', modules: true, script: bundle.outputFiles[0].text,
++      compatibilityDate: '2026-10-22', compatibilityFlags: ['nodejs_compat'],
++      durableObjects: { DEVICE_SESSION: { className: 'DeviceSession', useSQLite: true } },
++      bindings: { GATEWAY_PUSH_SECRET: secret } }],
++    host: '127.0.0.1', port: 0, cf: false, log: new Log(LogLevel.WARN),
++  }
++  const runtime = new Miniflare(convertV4MiniflareOptions ? convertV4MiniflareOptions(options) : options)
++  const origin = (await runtime.ready).origin
++  const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
++  process.env.DEVICE_GATEWAY_URL = origin
++  process.env.DEVICE_GATEWAY_PUSH_SECRET = secret
++  const NativeWebSocket = globalThis.WebSocket
++  const sockets: { socket: WebSocket; received: unknown[]; closes: number; ready: boolean }[] = []
++  globalThis.WebSocket = class extends NativeWebSocket {
++    constructor(url: string | URL, protocols?: string | string[]) {
++      super(url, protocols)
++      const state = { socket: this as WebSocket, received: [] as unknown[], closes: 0, ready: false }
++      sockets.push(state)
++      this.addEventListener('message', message => {
++        if (message.data === 'pong') return
++        const value = JSON.parse(String(message.data))
++        if (value?.type === 'live_ready') {
++          assert.deepEqual(value, liveReady(), 'the deployed Worker explicitly supports the reply kind')
++          state.ready = true
++        } else state.received.push(value)
++      })
++      const close = this.close.bind(this)
++      this.close = (...args) => { state.closes++; close(...args) }
++    }
++  }
++  const independent = new Pool({ connectionString: target, max: 4 })
++  observePoolCommits(independent)
++  const app = await import('../db/request-scope')
++  const store = await import('../coordinator/store')
++  const { readCoordinatorMessages } = await import('./tools')
++  const request = app.createRequestDatabaseScope(target!)
++  const chats: { owner: string; botId: string; workspaceId: string }[] = []
++  const controllers: AbortController[] = []
++  const ordered = (rows: typeof deliveries) => [...rows].sort((a, b) => JSON.stringify(a.events).localeCompare(JSON.stringify(b.events)))
++  function committedChatEvents(identity: { owner: string; workspaceId: string; botId: string }) {
++    return [
++      { ownerId: identity.owner, workspaceId: identity.workspaceId, events: [{ kind: 'bot_chat_list', id: identity.workspaceId }] },
++      { ownerId: identity.owner, workspaceId: identity.workspaceId, events: [{ kind: 'coordinator_session', id: identity.botId }] },
++    ]
++  }
++  async function chat() {
++    const owner = `mcp-reply-${randomUUID()}`
++    return request.run(async () => {
++      await app.pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$2,$3,true,now(),now())', [owner, 'MCP reply fixture', `${owner}@example.invalid`])
++      const identity = { owner, ...await seedCoordinator(owner) }
++      await app.pool.query('INSERT INTO coordinator_sessions("userId","botId","leaseHolder","leaseUntil") VALUES ($1,$2,\'mcp-fixture-holder\',now()+interval \'10 minutes\') ON CONFLICT ("userId","botId") DO UPDATE SET "leaseHolder"=EXCLUDED."leaseHolder","leaseUntil"=EXCLUDED."leaseUntil"', [owner, identity.botId])
++      chats.push(identity)
++      return identity
++    })
++  }
++  function waiting(identity: Awaited<ReturnType<typeof chat>>) {
++    const controller = new AbortController()
++    controllers.push(controller)
++    const before = sockets.length
++    const promise = request.run(() => readCoordinatorMessages(identity.owner, { waitSeconds: 90 }, controller.signal))
++    // A later failure still cancels this local waiter; tests never leave a 90s timer.
++    void promise.catch(() => {})
++    return { controller, promise, open: async () => {
++      await eventually(() => sockets.length > before && sockets[before].socket.readyState === WebSocket.OPEN && sockets[before].ready, 'MCP channel did not become ready')
++      return sockets[before]
++    } }
++  }
++  async function flush() {
++    for (let offset = 0; offset < pending.length;) {
++      const current = pending.slice(offset)
++      offset = pending.length
++      await Promise.all(current)
++    }
++  }
++  try {
++    await t.test('nested append waits for the real outer COMMIT; an independent reader sees the reply when notification is scheduled', async () => {
++      const identity = await chat(), waiter = waiting(identity)
++      await waiter.open()
++      let visible: Promise<unknown> = Promise.resolve()
++      const before = deliveries.length, beforeScheduled = pending.length
++      try {
++        onSchedule = () => {
++          visible = independent.query('SELECT message FROM coordinator_messages WHERE "userId"=$1', [identity.owner]).then(result => {
++            assert.equal(result.rows[0]?.message.content, 'Committed outer reply')
++          })
++        }
++        await request.run(() => app.db.transaction(outer => app.withDatabaseTransaction(outer, async () => {
++          await store.appendMessages(identity.owner, 'mcp-fixture-holder', [{ role: 'assistant', content: 'Committed outer reply' }], null, identity.botId)
++          assert.equal(pending.length, beforeScheduled, 'releasing an inner savepoint must not notify')
++          assert.equal((await independent.query('SELECT id FROM coordinator_messages WHERE "userId"=$1', [identity.owner])).rowCount, 0)
++        })))
++        await visible
++        await flush()
++        const reply = await bounded(waiter.promise)
++        assert.deepEqual(reply.messages.map(value => value.text), ['Committed outer reply'])
++        assert.deepEqual(ordered(deliveries.slice(before)), ordered(committedChatEvents(identity)))
++      } finally { onSchedule = () => {}; waiter.controller.abort() }
++    })
++
++    await t.test('outer rollback and a rolled-back savepoint never wake a reader', async () => {
++      const identity = await chat(), before = pending.length
++      await assert.rejects(request.run(() => app.db.transaction(outer => app.withDatabaseTransaction(outer, async () => {
++        await store.appendMessages(identity.owner, 'mcp-fixture-holder', [{ role: 'assistant', content: 'Rolled back' }], null, identity.botId)
++        throw new Error('rollback outer transaction')
++      }))), /rollback outer transaction/)
++      assert.equal(pending.length, before)
++      assert.equal((await independent.query('SELECT id FROM coordinator_messages WHERE "userId"=$1', [identity.owner])).rowCount, 0)
++      await request.run(() => app.db.transaction(outer => app.withDatabaseTransaction(outer, async () => {
++        await assert.rejects(app.db.transaction(inner => app.withDatabaseTransaction(inner, async () => {
++          await store.appendMessages(identity.owner, 'mcp-fixture-holder', [{ role: 'assistant', content: 'Reverted nested reply' }], null, identity.botId)
++          throw new Error('rollback this savepoint')
++        })), /rollback this savepoint/)
++      })))
++      assert.equal(pending.length, before)
++    })
++
++    await t.test('takeInbox, releaseLease and failTurn notify committed state and stale holders send nothing', async () => {
++      const identity = await chat()
++      const before = pending.length
++      await request.run(() => store.takeInbox(identity.owner, 'mcp-fixture-holder', identity.botId))
++      await flush()
++      assert.equal(pending.length, before + 1)
++      await request.run(() => store.releaseLease(identity.owner, 'wrong-holder', identity.botId))
++      await request.run(() => store.failTurn(identity.owner, 'wrong-holder', 'must not apply', identity.botId))
++      assert.equal(pending.length, before + 1)
++      await request.run(() => store.releaseLease(identity.owner, 'mcp-fixture-holder', identity.botId))
++      await flush()
++      assert.equal(pending.length, before + 3, 'release invalidates both the owner list and this reply waiter')
++      assert.equal((await independent.query('SELECT "leaseHolder" FROM coordinator_sessions WHERE "userId"=$1 AND "botId"=$2', [identity.owner, identity.botId])).rows[0].leaseHolder, null)
++      await request.run(() => store.takeInbox(identity.owner, 'mcp-fixture-holder', identity.botId))
++      const waiter = waiting(identity)
++      try {
++        await waiter.open()
++        await request.run(() => store.failTurn(identity.owner, 'mcp-fixture-holder', 'Controlled turn failure', identity.botId))
++        await flush()
++        const reply = await bounded(waiter.promise)
++        assert.equal(reply.lastError, 'Controlled turn failure')
++        assert.equal(reply.replied, false)
++        assert.equal(reply.working, false)
++      } finally { waiter.controller.abort() }
++    })
++
++    await t.test('a separate application writer process reaches the waiting MCP request over real WebSocket', async () => {
++      const identity = await chat(), waiter = waiting(identity)
++      try {
++        const socket = await waiter.open()
++        const child = spawn(process.execPath, ['--experimental-test-module-mocks', '--import', './scripts/server-test.mjs', '--import', 'tsx', 'lib/mcp/reply-writer.fixture.mts'], {
++          env: { ...process.env, MCP_TEST_OWNER: identity.owner, MCP_TEST_BOT: identity.botId }, stdio: ['ignore', 'pipe', 'pipe'],
++        })
++        let stdout = '', stderr = ''
++        child.stdout.on('data', chunk => { stdout += String(chunk) })
++        child.stderr.on('data', chunk => { stderr += String(chunk) })
++        const exited = once(child, 'exit')
++        const reply = await bounded(waiter.promise, 15_000)
++        const [code, signal] = await bounded(exited, 15_000)
++        assert.equal(code, 0, stderr)
++        assert.equal(signal, null)
++        assert.deepEqual(JSON.parse(stdout.trim()), { written: true, notifications: 2 })
++        assert.ok(socket.received.some(value => JSON.stringify(value) === JSON.stringify({ kind: 'coordinator_session', id: identity.botId })), 'the actual server notification crossed the independent process boundary')
++        assert.deepEqual(reply.messages.map(value => value.text), ['Reply from a separate writer process'])
++      } finally { waiter.controller.abort() }
++    })
++
++    await t.test('a scheduled assistant report notifies the same original chat after its actual transaction', async () => {
++      const identity = await chat(), sourceEventId = randomUUID()
++      await independent.query('INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES ($1,$2,$3,\'user_message\',$4,\'{"text":"Create this controlled reminder"}\')', [sourceEventId, identity.owner, identity.botId, sourceEventId])
++      let now = new Date('2030-01-01T00:00:00Z')
++      const guard: WorkspaceGuard = async (owner, workspace, work) => {
++        const tx = await independent.connect()
++        try {
++          await tx.query('BEGIN')
++          if (!(await tx.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status=\'active\' FOR SHARE', [workspace, owner])).rowCount) throw new ScheduleError('scheduleWorkspaceAccessDenied', 403)
++          const result = await work()
++          await tx.query('COMMIT')
++          return result
++        } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
++      }
++      const schedules = new ScheduleStore(independent, guard, async () => null, async () => {}, () => false, () => now)
++      const definition: Definition = { title: 'Controlled reply report', timezone: 'UTC', timing: { kind: 'once', at: '2030-01-01T00:01:00Z' }, task: { kind: 'reminder', text: 'Scheduled reply body' }, misfire: 'catch_up_once', maxLatenessMinutes: 5 }
++      await schedules.command({ ownerId: identity.owner, workspaceId: identity.workspaceId, botId: identity.botId, sourceEventId }, { action: 'create', requestId: randomUUID(), definition })
++      const waiter = waiting(identity), before = deliveries.length
++      try {
++        await waiter.open()
++        now = new Date('2030-01-01T00:01:00Z')
++        await schedules.tick()
++        await flush()
++        const reply = await bounded(waiter.promise)
++        assert.match(reply.messages.at(-1)!.text, /Scheduled reply body/)
++        assert.deepEqual(ordered(deliveries.slice(before)), ordered(committedChatEvents(identity)))
++        const count = pending.length
++        await schedules.tick()
++        assert.equal(pending.length, count, 'idempotent schedule replay does not republish')
++      } finally { waiter.controller.abort() }
++    })
++
++    await t.test('owner and workspace isolation use the real Bot scope, and keys cannot grant data access', async () => {
++      const identity = await chat(), peer = await chat()
++      assert.equal(await coordinatorSessionScope(independent, independent, peer.owner, identity.botId), null)
++      assert.deepEqual(await coordinatorSessionScope(independent, independent, identity.owner, identity.botId), { ownerId: identity.owner, workspaceId: identity.workspaceId })
++      const waiter = waiting(identity)
++      try {
++        const socket = await waiter.open()
++        await original.sendLiveInvalidations({ ownerId: peer.owner, workspaceId: identity.workspaceId }, [{ kind: 'coordinator_session', id: identity.botId }])
++        await original.sendLiveInvalidations({ ownerId: identity.owner, workspaceId: peer.workspaceId }, [{ kind: 'coordinator_session', id: identity.botId }])
++        await request.run(() => store.appendMessages(peer.owner, 'mcp-fixture-holder', [{ role: 'assistant', content: 'Private peer reply' }], null, peer.botId))
++        await flush()
++        await delay(150)
++        assert.deepEqual(socket.received, [])
++        const peerRead = await request.run(() => readCoordinatorMessages(peer.owner, {}))
++        assert.deepEqual(peerRead.messages.map(value => value.text), ['Private peer reply'])
++        await request.run(() => store.appendMessages(identity.owner, 'mcp-fixture-holder', [{ role: 'assistant', content: 'Own reply only' }], null, identity.botId))
++        const ownRead = await bounded(waiter.promise)
++        assert.deepEqual(ownRead.messages.map(value => value.text), ['Own reply only'])
++      } finally { waiter.controller.abort() }
++    })
++
++    await t.test('workspace revocation suppresses producer notifications and a waiter rechecks scope before reading', async () => {
++      const identity = await chat(), waiter = waiting(identity)
++      try {
++        await waiter.open()
++        await independent.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [identity.workspaceId, identity.owner])
++        assert.equal(await coordinatorSessionScope(independent, independent, identity.owner, identity.botId), null)
++        const before = deliveries.length
++        await request.run(() => store.appendMessages(identity.owner, 'mcp-fixture-holder', [{ role: 'assistant', content: 'Must remain unread' }], null, identity.botId))
++        await flush()
++        assert.equal(deliveries.length, before)
++        const denied = assert.rejects(waiter.promise, /workspaceAccessDenied/)
++        await original.sendLiveInvalidations({ ownerId: identity.owner, workspaceId: identity.workspaceId }, [{ kind: 'coordinator_session', id: identity.botId }])
++        await bounded(denied)
++      } finally { waiter.controller.abort() }
++    })
++
++    await t.test('a deferred MCP notification retains its original request database after the request context exits', async () => {
++      const database = `mcp_context_${randomUUID().replaceAll('-', '')}_e2e`
++      const targetUrl = new URL(target!); targetUrl.pathname = `/${database}`
++      const admin = new Pool({ connectionString: target, max: 1 })
++      await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
++      const isolated = new Pool({ connectionString: targetUrl.toString(), max: 2 })
++      const isolatedRequest = app.createRequestDatabaseScope(targetUrl.toString())
++      const deferred: (() => Promise<void>)[] = []
++      const owner = `mcp-context-${randomUUID()}`, botId = randomUUID(), intended = randomUUID(), wrong = randomUUID()
++      try {
++        const dir = new URL('../../drizzle/', import.meta.url)
++        for (const name of orderMigrations((await readdir(dir)).filter(name => name.endsWith('.sql')))) await isolated.query(await readFile(new URL(name, dir), 'utf8'))
++        for (const connection of [independent, isolated]) await connection.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,\'Context fixture\',$2,true,now(),now())', [owner, `${owner}@example.invalid`])
++        for (const id of [intended, wrong]) {
++          await independent.query('INSERT INTO mikka_workspaces(id,"userId",name,slug) VALUES ($1,$2,\'Context fixture\',$3)', [id, owner, `ctx-${id}`])
++          await independent.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES ($1,$2,\'Context fixture\',$3,\'admin\',\'active\')', [id, owner, `${owner}@example.invalid`])
++        }
++        await independent.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,\'Wrong database Bot\')', [botId, owner, wrong])
++        await isolated.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,\'Original request Bot\')', [botId, owner, intended])
++        await isolated.query('INSERT INTO coordinator_sessions("userId","botId","leaseHolder","leaseUntil") VALUES ($1,$2,\'mcp-fixture-holder\',now()+interval \'10 minutes\')', [owner, botId])
++        const before = deliveries.length
++        deferredScheduledWork = deferred
++        await isolatedRequest.run(() => store.appendMessages(owner, 'mcp-fixture-holder', [{ role: 'assistant', content: 'Only the original request database' }], null, botId))
++        deferredScheduledWork = null
++        assert.equal(deferred.length, 2, 'the main list and reply resolvers both retain the original request')
++        // Simulate after() invoking a queued callback outside the originating ALS scope.
++        await Promise.all(deferred.map(work => work()))
++        assert.deepEqual(deliveries.slice(before), [{ ownerId: owner, workspaceId: intended, events: [{ kind: 'coordinator_session', id: botId }] }])
++        assert.equal((await independent.query('SELECT id FROM coordinator_messages WHERE "userId"=$1', [owner])).rowCount, 0)
++        assert.equal((await isolated.query('SELECT id FROM coordinator_messages WHERE "userId"=$1', [owner])).rowCount, 1)
++      } finally {
++        deferredScheduledWork = null
++        await isolatedRequest.close()
++        await dropTestDatabase(admin, database, isolated)
++        await admin.end()
++      }
++    })
++
++    await t.test('MCP cancellation releases the channel without changing the Coordinator lease or run state', async () => {
++      const identity = await chat(), agentId = randomUUID(), runId = randomUUID()
++      await independent.query('INSERT INTO agents(id,"userId",name,harness) VALUES ($1,$2,\'Cancellation fixture\',\'codex\')', [agentId, identity.owner])
++      await independent.query('INSERT INTO agent_runs(id,"userId","agentId","botId",status,prompt) VALUES ($1,$2,$3,$4,\'running\',\'Isolated fixture, no model\')', [runId, identity.owner, agentId, identity.botId])
++      const waiter = waiting(identity)
++      const socket = await waiter.open()
++      const cancelled = assert.rejects(waiter.promise, /MCP request cancelled/)
++      waiter.controller.abort(new Error('MCP request cancelled'))
++      await cancelled
++      assert.equal(socket.closes, 1)
++      assert.deepEqual((await independent.query('SELECT status,"stopRequestedAt" FROM agent_runs WHERE id=$1', [runId])).rows[0], { status: 'running', stopRequestedAt: null })
++      assert.equal((await independent.query('SELECT "leaseHolder" FROM coordinator_sessions WHERE "userId"=$1 AND "botId"=$2', [identity.owner, identity.botId])).rows[0].leaseHolder, 'mcp-fixture-holder')
++    })
++  } finally {
++    for (const controller of controllers) controller.abort()
++    onSchedule = () => {}
++    await flush()
++    globalThis.WebSocket = NativeWebSocket
++    for (const { socket } of sockets) if (socket.readyState === NativeWebSocket.OPEN) socket.close()
++    await runtime.dispose()
++    notification.restore()
++    scheduler.restore()
++    if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = previous.url
++    if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
++    await request.close()
++    await independent.end()
++    t.diagnostic(JSON.stringify({ event: 'mcp_reply_fixtures_retained', database: new URL(target!).pathname.slice(1), ownerIds: chats.map(value => value.owner) }))
++  }
++})
+diff --git a/lib/mcp/reply-live.ts b/lib/mcp/reply-live.ts
+new file mode 100644
+index 000000000..ba3db4d2e
+--- /dev/null
++++ b/lib/mcp/reply-live.ts
+@@ -0,0 +1,28 @@
++import 'server-only'
++import { pool } from '../db'
++import { workspacePool } from '../workspace-db'
++import { LiveChannel } from '../live/channel'
++import { coordinatorSessionScope } from '../live/coordinator-session'
++import { liveGatewayConfig, liveTicket, type LiveScope } from '../live/scope'
++
++/** A bounded server-side subscriber on the existing private channel. The
++ * ticket stays inside this request and grants no MCP or business write. */
++export function subscribeToCoordinatorReplies(scope: LiveScope, botId: string, changed: () => void) {
++  const config = liveGatewayConfig(process.env)
++  if (!config) return () => {}
++  const channel = new LiveChannel({
++    async ticket(signal) {
++      const current = await coordinatorSessionScope(pool, workspacePool, scope.ownerId, botId)
++      if (signal.aborted || !current || current.workspaceId !== scope.workspaceId) return null
++      return liveTicket(current, config)
++    },
++    socket: ticket => new WebSocket(ticket.url, ticket.protocol),
++    visible: () => true,
++    watchVisibility: () => () => {},
++    now: Date.now,
++    monotonicNow: () => performance.now(),
++    later: (callback, milliseconds) => setTimeout(callback, milliseconds),
++    cancel: timer => clearTimeout(timer as ReturnType<typeof setTimeout>),
++  })
++  return channel.subscribe('coordinator_session', botId, [botId], changed)
++}
+diff --git a/lib/mcp/reply-wait.test.ts b/lib/mcp/reply-wait.test.ts
+new file mode 100644
+index 000000000..cf516612c
+--- /dev/null
++++ b/lib/mcp/reply-wait.test.ts
+@@ -0,0 +1,190 @@
++import assert from 'node:assert/strict'
++import test from 'node:test'
++import { REPLY_FALLBACK_MS, waitForReply, type ReplyRead } from './reply-wait'
++
++const flush = async () => { for (let n = 0; n < 8; n++) await Promise.resolve() }
++function deferred<T>() {
++  let resolve!: (value: T) => void
++  const promise = new Promise<T>(done => { resolve = done })
++  return { promise, resolve }
++}
++function bus() {
++  let listener = () => {}
++  let subscribed = 0, disposed = 0
++  return {
++    subscribe(changed: () => void) { subscribed++; listener = changed; return () => { disposed++; listener = () => {} } },
++    changed() { listener() },
++    get subscribed() { return subscribed },
++    get disposed() { return disposed },
++  }
++}
++
++test('an immediate read uses the authoritative final path without opening a channel', async () => {
++  const events = bus()
++  const value = await waitForReply(async final => {
++    assert.equal(final, true)
++    return { done: true, value: 'current' }
++  }, { deadline: Date.now(), subscribe: events.subscribe })
++  assert.equal(value, 'current')
++  assert.equal(events.subscribed, 0)
++})
++
++test('the subscription is registered before the first read and a push wakes the waiter', async () => {
++  const events = bus()
++  let reads = 0, available = false
++  const pending = waitForReply(async () => {
++    assert.equal(events.subscribed, 1)
++    reads++
++    return available ? { done: true, value: 'committed reply' } : { done: false }
++  }, { deadline: Date.now() + 90_000, subscribe: events.subscribe })
++  await flush()
++  assert.equal(reads, 1)
++  available = true
++  events.changed()
++  assert.equal(await pending, 'committed reply')
++  assert.equal(reads, 2)
++  assert.equal(events.disposed, 1)
++})
++
++test('a push during an in-flight stale read is retained and forces a new authoritative read', async () => {
++  const events = bus(), old = deferred<ReplyRead<string>>()
++  let reads = 0
++  const pending = waitForReply(async () => {
++    reads++
++    return reads === 1 ? old.promise : { done: true, value: 'new commit' }
++  }, { deadline: Date.now() + 90_000, subscribe: events.subscribe })
++  await flush()
++  events.changed()
++  old.resolve({ done: false })
++  assert.equal(await pending, 'new commit')
++  assert.equal(reads, 2)
++  assert.equal(events.disposed, 1)
++})
++
++test('bursts coalesce while reading, and a later push is not swallowed by that coalescing', async () => {
++  const events = bus(), first = deferred<ReplyRead<string>>(), second = deferred<ReplyRead<string>>()
++  let reads = 0, active = 0, maxActive = 0
++  const pending = waitForReply(async () => {
++    reads++; active++; maxActive = Math.max(active, maxActive)
++    try {
++      if (reads === 1) return await first.promise
++      if (reads === 2) return await second.promise
++      return { done: true, value: 'latest' }
++    } finally { active-- }
++  }, { deadline: Date.now() + 90_000, subscribe: events.subscribe })
++  await flush()
++  for (let n = 0; n < 20; n++) events.changed()
++  first.resolve({ done: false })
++  await flush()
++  assert.equal(reads, 2)
++  for (let n = 0; n < 20; n++) events.changed()
++  second.resolve({ done: false })
++  assert.equal(await pending, 'latest')
++  assert.equal(reads, 3)
++  assert.equal(maxActive, 1)
++})
++
++test('a lost push still causes a read after 15 seconds, without the old 2 second polling', async t => {
++  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 1_000_000 })
++  const events = bus()
++  let reads = 0, available = false
++  const pending = waitForReply(async () => {
++    reads++
++    return available ? { done: true, value: 'missed notification' } : { done: false }
++  }, { deadline: Date.now() + 90_000, subscribe: events.subscribe })
++  await flush()
++  t.mock.timers.tick(REPLY_FALLBACK_MS - 1)
++  await flush()
++  assert.equal(reads, 1)
++  available = true
++  t.mock.timers.tick(1)
++  assert.equal(await pending, 'missed notification')
++  assert.equal(reads, 2)
++  assert.equal(events.disposed, 1)
++})
++
++test('the exact deadline performs one last authoritative read, including a shorter wait', async t => {
++  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 2_000_000 })
++  const events = bus(), finals: boolean[] = []
++  let current = 'before'
++  const pending = waitForReply(async final => {
++    finals.push(final)
++    return final ? { done: true, value: current } : { done: false }
++  }, { deadline: Date.now() + 5_000, subscribe: events.subscribe })
++  await flush()
++  t.mock.timers.tick(4_999)
++  await flush()
++  assert.deepEqual(finals, [false])
++  current = 'at deadline'
++  t.mock.timers.tick(1)
++  assert.equal(await pending, 'at deadline')
++  assert.deepEqual(finals, [false, true])
++  assert.equal(events.disposed, 1)
++})
++
++test('an in-flight read crossing the deadline is followed by a final fresh read', async t => {
++  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 3_000_000 })
++  const events = bus(), old = deferred<ReplyRead<string>>(), finals: boolean[] = []
++  const pending = waitForReply(async final => {
++    finals.push(final)
++    return final ? { done: true, value: 'final state' } : old.promise
++  }, { deadline: Date.now() + 5_000, subscribe: events.subscribe })
++  await flush()
++  t.mock.timers.tick(5_000)
++  old.resolve({ done: false })
++  assert.equal(await pending, 'final state')
++  assert.deepEqual(finals, [false, true])
++})
++
++test('cancelling a waiting MCP request immediately disposes its subscriber and timer', async t => {
++  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 4_000_000 })
++  const events = bus(), controller = new AbortController()
++  let reads = 0
++  const pending = waitForReply(async () => { reads++; return { done: false } }, {
++    deadline: Date.now() + 90_000, subscribe: events.subscribe, signal: controller.signal,
++  })
++  const cancelled = assert.rejects(pending, /request cancelled/)
++  await flush()
++  controller.abort(new Error('request cancelled'))
++  await cancelled
++  t.mock.timers.tick(90_000)
++  await flush()
++  assert.equal(reads, 1)
++  assert.equal(events.disposed, 1)
++})
++
++test('cancellation does not wait for a slow query and its late result cannot restart the waiter', async () => {
++  const events = bus(), controller = new AbortController(), old = deferred<ReplyRead<string>>()
++  let reads = 0
++  const pending = waitForReply(async () => { reads++; return old.promise }, {
++    deadline: Date.now() + 90_000, subscribe: events.subscribe, signal: controller.signal,
++  })
++  const cancelled = assert.rejects(pending, /request cancelled/)
++  await flush()
++  controller.abort(new Error('request cancelled'))
++  await cancelled
++  assert.equal(events.disposed, 1)
++  old.resolve({ done: false })
++  events.changed()
++  await flush()
++  assert.equal(reads, 1)
++})
++
++test('an already cancelled request opens no channel and performs no read', async () => {
++  const events = bus(), controller = new AbortController()
++  controller.abort(new Error('already cancelled'))
++  let reads = 0
++  await assert.rejects(waitForReply(async () => { reads++; return { done: false } }, {
++    deadline: Date.now() + 90_000, subscribe: events.subscribe, signal: controller.signal,
++  }), /already cancelled/)
++  assert.equal(reads, 0)
++  assert.equal(events.subscribed, 0)
++})
++
++test('an authoritative read failure cleans up its subscription', async () => {
++  const events = bus()
++  await assert.rejects(waitForReply(async () => { throw new Error('database unavailable') }, {
++    deadline: Date.now() + 90_000, subscribe: events.subscribe,
++  }), /database unavailable/)
++  assert.equal(events.disposed, 1)
++})
+diff --git a/lib/mcp/reply-wait.ts b/lib/mcp/reply-wait.ts
+new file mode 100644
+index 000000000..a5dc135e4
+--- /dev/null
++++ b/lib/mcp/reply-wait.ts
+@@ -0,0 +1,52 @@
++export const REPLY_FALLBACK_MS = 15_000
++export type ReplyRead<T> = { done: false } | { done: true; value: T }
++export type ReplySubscription = (changed: () => void) => () => void
++
++/** A notification is a hint to reread, never a reply or an authorization result.
++ * Register first, then read; a change during a read requires another read. */
++export async function waitForReply<T>(read: (final: boolean) => Promise<ReplyRead<T>>, options: {
++  deadline: number
++  subscribe: ReplySubscription
++  signal?: AbortSignal
++}): Promise<T> {
++  const { deadline, signal } = options
++  signal?.throwIfAborted()
++  let dirty = false
++  let wake: (() => void) | undefined
++  let timer: ReturnType<typeof setTimeout> | undefined
++  let unsubscribe = () => {}
++  let rejectAbort: (reason: unknown) => void = () => {}
++  const aborted = new Promise<never>((_resolve, reject) => { rejectAbort = reject })
++  const onAbort = () => {
++    rejectAbort(signal?.reason ?? new DOMException('The waiting request was cancelled', 'AbortError'))
++  }
++  const changed = () => { dirty = true; wake?.() }
++  signal?.addEventListener('abort', onAbort, { once: true })
++  try {
++    if (Date.now() < deadline) unsubscribe = options.subscribe(changed)
++    for (;;) {
++      signal?.throwIfAborted()
++      dirty = false
++      const began = Date.now()
++      const final = began >= deadline
++      const result = await Promise.race([read(final), aborted])
++      if (result.done) return result.value
++      if (final) throw new Error('The deadline read must return the current reply state')
++      if (dirty || Date.now() >= deadline) continue
++      await Promise.race([
++        new Promise<void>(resolve => {
++          wake = resolve
++          timer = setTimeout(resolve, Math.max(0, Math.min(deadline, began + REPLY_FALLBACK_MS) - Date.now()))
++        }),
++        aborted,
++      ])
++      clearTimeout(timer)
++      timer = undefined
++      wake = undefined
++    }
++  } finally {
++    clearTimeout(timer)
++    signal?.removeEventListener('abort', onAbort)
++    unsubscribe()
++  }
++}
+diff --git a/lib/mcp/reply-writer.fixture.mts b/lib/mcp/reply-writer.fixture.mts
+new file mode 100644
+index 000000000..a3828cc56
+--- /dev/null
++++ b/lib/mcp/reply-writer.fixture.mts
+@@ -0,0 +1,25 @@
++import assert from 'node:assert/strict'
++import { mock } from 'node:test'
++import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
++
++assert.ok(disposableDatabase(process.env, process.env.E2E_DATABASE_URL), 'isolated loopback fixture only')
++const owner = process.env.MCP_TEST_OWNER, botId = process.env.MCP_TEST_BOT
++assert.ok(owner && botId)
++const gateway = new URL(process.env.DEVICE_GATEWAY_URL ?? '')
++assert.equal(gateway.hostname, '127.0.0.1')
++const original = await import('../live/notify')
++const pending: Promise<void>[] = []
++mock.module('../live/notify', { namedExports: {
++  ...original,
++  scheduleLive: (work: () => Promise<void>) => { pending.push(work()) },
++} })
++const { appendMessages } = await import('../coordinator/store')
++const { pool } = await import('../db')
++const { workspacePool } = await import('../workspace-db')
++try {
++  await appendMessages(owner, 'mcp-fixture-holder', [{ role: 'assistant', content: 'Reply from a separate writer process' }], null, botId)
++  await Promise.all(pending)
++  process.stdout.write(JSON.stringify({ written: true, notifications: pending.length }) + '\n')
++} finally {
++  await Promise.all([pool.end(), workspacePool.end()])
++}
+diff --git a/lib/mcp/tools.ts b/lib/mcp/tools.ts
+index cdf907f56..8302a693c 100644
+--- a/lib/mcp/tools.ts
++++ b/lib/mcp/tools.ts
+@@ -8,7 +8,11 @@ import { readRun, visibleRuns } from '@/lib/agent-runs'
+ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
+ import { peerCoordinatorMessageEvent } from '@/lib/coordinator-events'
+ import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
+-import { db } from '@/lib/db'
++import { db, pool } from '@/lib/db'
++import { workspacePool } from '@/lib/workspace-db'
++import { coordinatorSessionScope } from '@/lib/live/coordinator-session'
++import { subscribeToCoordinatorReplies } from './reply-live'
++import { waitForReply } from './reply-wait'
+ import { coordinatorMessages, coordinatorSessions, issueMembers, issues } from '@/lib/db/schema'
+ import { issueForUser } from '@/lib/issue-access'
+ import { readIssueMetadata } from '@/lib/issue-metadata'
+@@ -19,9 +23,6 @@ import { issueAttrsContent } from '@/lib/issue-summary-columns'
+ // What the MCP tools read and write, scoped to one person. The Coordinator's
+ // own tools (workflows/coordinator/steps.ts) read the same tables.
+ 
+-/** How often a waiting read checks for the Coordinator's reply. */
+-const REPLY_POLL_MS = 2000
+-
+ /** The person's Coordinator chat: its bot row (lib/coordinator/coordinator-bot.ts). An MCP client's OAuth grant names
+  * no workspace, so it is the personal workspace's Coordinator. */
+ const coordinatorChat = (userId: string) => chatBotId(userId, null, null)
+@@ -56,16 +57,16 @@ function displayMessage(message: ModelMessage): { role: 'user' | 'assistant'; te
+ }
+ 
+ /** Whether an assistant reply is past `after`. Only the position comes back; the wait does not transfer message bodies. */
+-async function hasAssistantAfter(userId: string, after: number) {
++async function hasAssistantAfter(userId: string, botId: string, after: number) {
+   const [row] = await db.select({ position: coordinatorMessages.position })
+-    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, await coordinatorChat(userId)), gt(coordinatorMessages.position, after), sql`${coordinatorMessages.message}->>'role' = 'assistant'`))
++    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, botId), gt(coordinatorMessages.position, after), sql`${coordinatorMessages.message}->>'role' = 'assistant'`))
+     .limit(1)
+   return Boolean(row)
+ }
+ 
+-async function messagesAfter(userId: string, after: number, limit: number) {
++async function messagesAfter(userId: string, botId: string, after: number, limit: number) {
+   const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
+-    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, await coordinatorChat(userId)), gt(coordinatorMessages.position, after)))
++    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, botId), gt(coordinatorMessages.position, after)))
+     .orderBy(desc(coordinatorMessages.position)).limit(limit)
+   return rows.reverse().flatMap(row => {
+     const shown = displayMessage(row.message as unknown as ModelMessage)
+@@ -74,9 +75,9 @@ async function messagesAfter(userId: string, after: number, limit: number) {
+ }
+ 
+ /** Whether a turn is running, and why the last one failed (cleared when a turn succeeds). */
+-async function turnState(userId: string) {
++async function turnState(userId: string, botId: string) {
+   const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt })
+-    .from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.botId, await coordinatorChat(userId)))).limit(1)
++    .from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.botId, botId))).limit(1)
+   return {
+     working: coordinatorLeaseActive(session),
+     error: session?.lastError ?? null, errorAt: session?.lastErrorAt ?? null,
+@@ -88,24 +89,36 @@ async function turnState(userId: string) {
+  * `waitSeconds`, waits until the Coordinator has replied after `after`, a turn
+  * fails, or the time runs out.
+  */
+-export async function readCoordinatorMessages(userId: string, input: { after?: number; limit?: number; waitSeconds?: number }) {
++type CoordinatorReply = {
++  messages: Awaited<ReturnType<typeof messagesAfter>>
++  replied: boolean
++  last: number
++  working: boolean
++  lastError: string | null
++  coordinatorRunning: boolean
++}
++
++export async function readCoordinatorMessages(userId: string, input: { after?: number; limit?: number; waitSeconds?: number }, signal?: AbortSignal) {
++  signal?.throwIfAborted()
+   const after = input.after ?? 0
+   const limit = input.limit ?? 20
+   const started = new Date()
+   const deadline = started.getTime() + (input.waitSeconds ?? 0) * 1000
+-  const waiting = (input.waitSeconds ?? 0) > 0
+-  for (;;) {
+-    const turn = await turnState(userId)
+-    const due = !waiting || Date.now() + REPLY_POLL_MS > deadline
++  const botId = await coordinatorChat(userId)
++  const scope = await coordinatorSessionScope(pool, workspacePool, userId, botId)
++  if (!scope) throw new Error('workspaceAccessDenied')
++  return waitForReply<CoordinatorReply>(async final => {
++    // A channel key never authorizes the data read. Recheck the persisted scope,
++    // including on a deadline or lost-notification reconciliation.
++    const current = await coordinatorSessionScope(pool, workspacePool, userId, botId)
++    if (!current || current.workspaceId !== scope.workspaceId) throw new Error('workspaceAccessDenied')
++    const turn = await turnState(userId, botId)
+     const failed = Boolean(turn.errorAt && turn.errorAt >= started)
+-    const arrived = !waiting || due || failed || await hasAssistantAfter(userId, after)
+-    if (arrived) {
+-      const messages = await messagesAfter(userId, after, limit)
+-      const replied = messages.some(message => message.role === 'assistant')
+-      return { messages, replied, last: messages.at(-1)?.position ?? after, working: turn.working, lastError: turn.error, coordinatorRunning: coordinatorEnabled() }
+-    }
+-    await new Promise(resolve => { setTimeout(resolve, REPLY_POLL_MS) })
+-  }
++    if (!final && !failed && !await hasAssistantAfter(userId, botId, after)) return { done: false }
++    const messages = await messagesAfter(userId, botId, after, limit)
++    const replied = messages.some(message => message.role === 'assistant')
++    return { done: true, value: { messages, replied, last: messages.at(-1)?.position ?? after, working: turn.working, lastError: turn.error, coordinatorRunning: coordinatorEnabled() } }
++  }, { deadline, signal, subscribe: changed => subscribeToCoordinatorReplies(scope, botId, changed) })
+ }
+ 
+ export async function listIssues(userId: string, input: { status?: string }) {
+diff --git a/lib/schedules/store.ts b/lib/schedules/store.ts
+index 52dffbe68..08377b5df 100644
+--- a/lib/schedules/store.ts
++++ b/lib/schedules/store.ts
+@@ -5,6 +5,7 @@ import { commandSchema, definitionSchema, ScheduleError, type Actor, type Defini
+ import { nextTime, timezone } from './time'
+ import { ownerListChanged } from '../live/lists'
+ import { observePoolCommits } from '../db/commit-effects'
++import { coordinatorSessionChanged } from '../live/coordinator-session'
+ 
+ export type WorkspaceGuard = <T>(ownerId: string, workspaceId: string | null, work: () => Promise<T>) => Promise<T>
+ export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => Promise<void>
+@@ -103,6 +104,7 @@ export class ScheduleStore {
+     await this.lockChat(tx,row)
+     const inserted = await tx.query(`INSERT INTO coordinator_messages(id,"userId","botId",position,message) SELECT $1,$2,$3,COALESCE(MAX(position),0)+1,$4 FROM coordinator_messages WHERE "userId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid ON CONFLICT(id) DO NOTHING`,[o.operation_id,row.owner_id,row.bot_id,{role:'assistant',content:text,...(streamId?{mikkaStreamId:streamId}:{})}])
+     if (inserted.rowCount) await ownerListChanged(tx, row.owner_id, ['bot_chat_list'])
++    if (inserted.rowCount) await coordinatorSessionChanged(tx, row.owner_id, row.bot_id)
+     // A result is already in the chat. Whether it also needs the person (a failure, a skipped or cancelled run, a result they would want flagged)
+     // is triage's call on the Decisions API, not a fixed background tier: the event is left untriaged and undelivered.
+     await tx.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1,$2,$3,'run_report',$4,$5) ON CONFLICT("dedupeKey") DO NOTHING`,[o.id,row.owner_id,row.bot_id,`schedule_result:${o.id}`,{source:'schedule_result',scheduleId:row.id,occurrenceId:o.id,operationId:o.operation_id,status,error}])
+diff --git a/package.json b/package.json
+index 713f58af7..424138fe2 100644
+--- a/package.json
++++ b/package.json
+@@ -42,7 +42,7 @@
+     "test:thread-changes": "node --import tsx --test lib/thread-changes.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/workspace/thread-changes.test.tsx",
+     "test:motion": "node --import tsx --test lib/message-navigation.test.ts lib/hooks/use-arrivals.test.ts",
+     "test:unread": "node --import tsx --test lib/unread.test.ts",
+-    "test:lib-units": "node --import ./scripts/server-test.mjs --import tsx --test lib/device-gateway-ticket.test.ts cloudflare/device-gateway/src/route.test.ts lib/base-path.test.ts && node --experimental-strip-types --test packages/daemon/test/device-gateway.node-test.ts && node --import ./scripts/server-test.mjs --import tsx --test lib/coordinator/chat-poll.test.ts lib/list-poll.test.ts lib/db/egress-sample.test.ts lib/db/transport-sample.test.ts scripts/ops/egress-monitor.test.mjs lib/computer/event-stream.test.ts lib/coordinator/chat-poll-interval.test.ts lib/safe-url.test.ts lib/deployment-switches.test.ts lib/board-start-column.test.ts lib/thread-search.test.ts lib/new-task-bot.test.ts lib/mobile-thread-status.test.ts lib/computer/events.test.ts lib/agent-history.test.ts lib/auth-github-profile.test.ts lib/status-appearance.test.ts scripts/project-input.test.ts scripts/node22-test-compat.test.mjs tests/factory-migration-order.test.mjs && pnpm test:device-gateway",
++    "test:lib-units": "node --import ./scripts/server-test.mjs --import tsx --test lib/device-gateway-ticket.test.ts cloudflare/device-gateway/src/route.test.ts lib/base-path.test.ts lib/mcp/reply-wait.test.ts && node --experimental-strip-types --test packages/daemon/test/device-gateway.node-test.ts && node --import ./scripts/server-test.mjs --import tsx --test lib/coordinator/chat-poll.test.ts lib/list-poll.test.ts lib/db/egress-sample.test.ts lib/db/transport-sample.test.ts scripts/ops/egress-monitor.test.mjs lib/computer/event-stream.test.ts lib/coordinator/chat-poll-interval.test.ts lib/safe-url.test.ts lib/deployment-switches.test.ts lib/board-start-column.test.ts lib/thread-search.test.ts lib/new-task-bot.test.ts lib/mobile-thread-status.test.ts lib/computer/events.test.ts lib/agent-history.test.ts lib/auth-github-profile.test.ts lib/status-appearance.test.ts scripts/project-input.test.ts scripts/node22-test-compat.test.mjs tests/factory-migration-order.test.mjs && pnpm test:device-gateway",
+     "test:i18n": "node --test scripts/check-i18n.test.mjs",
+     "i18n:check": "node scripts/check-i18n.mjs",
+     "test:ssh-target": "node --import tsx --test lib/ssh-target.test.ts",
+@@ -204,7 +204,7 @@
+     "test:view-state": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/hooks/view-state.test.tsx components/nav/thread-view-state.test.tsx",
+     "test:device-gateway": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/device-presence.test.ts lib/device-gateway-notify.test.ts lib/live/ticket.test.ts && node --import tsx --test lib/device-gateway-ticket.test.ts lib/live/scope.test.ts lib/live/channel.test.ts lib/db/commit-effects.test.ts cloudflare/device-gateway/src/route.test.ts cloudflare/device-gateway/src/live-route.test.ts && node --test cloudflare/device-gateway/test/runtime.test.mjs",
+     "test:live-lists": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/use-live-lists.live.test.tsx",
+-    "test:live-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/live/factory.db.test.ts lib/live/store.db.test.ts lib/live/ticket-session.db.test.ts lib/db/request-scope-live.db.test.ts lib/live/notification-context.db.test.ts lib/live/computer-state.db.test.ts lib/live/approved-writes.db.test.ts lib/live/pending-actions.db.test.ts lib/live/lists.db.test.ts",
++    "test:live-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/live/factory.db.test.ts lib/live/store.db.test.ts lib/live/ticket-session.db.test.ts lib/db/request-scope-live.db.test.ts lib/live/notification-context.db.test.ts lib/live/computer-state.db.test.ts lib/live/approved-writes.db.test.ts lib/live/pending-actions.db.test.ts lib/live/lists.db.test.ts lib/mcp/reply-live.db.test.ts",
+     "test:project-decisions-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/project-map/decisions.db.test.ts lib/project-map/http.db.test.ts lib/project-map/sources.db.test.ts",
+     "test:project-decisions": "node --test scripts/acceptance/project-decisions.test.mjs && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/project-map/sources.test.ts",
+     "test:pending-actions-live": "node --import tsx --test lib/live/pending-action-cache.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/pending-actions.live.test.tsx app/api/pending-actions/route.test.ts"
