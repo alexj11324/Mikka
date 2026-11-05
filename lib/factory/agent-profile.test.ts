@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { AgentProfileError, agentProfileDigest, agentProfileInstructions, parseAgentProfile } from './agent-profile-definition'
 import { agentProfileSkillsCatalog, resolveAgentProfileSkills } from './agent-profile-skills'
-import { profileDecisionDiagnostics, profileDecisionQuestions, profileDecisionSelection, selectedProfileAnswer } from './agent-profile-decision'
-import type { DecisionAnswer } from '@/lib/coordinator/decision'
+import { profileDecisionDiagnostics, profileDecisionInput, profileDecisionQuestions, profileDecisionSelection, selectedProfileAnswer } from './agent-profile-decision'
+import { validatedAnswers, type DecisionAnswer } from '@/lib/coordinator/decision'
 import { createAgentProfileHandler } from './agent-profile-http'
 import { agentProfileReferenceSchema } from './agent-profile-reference'
 import { factoryDispatchSchema } from './dispatch-schema'
@@ -114,6 +114,54 @@ test('Decision rejection logs bound UUIDs and closed availability codes without 
   assert.equal(bounded.candidateCount, 70); assert.equal(bounded.profileCount, 70); assert.equal(bounded.profileDiagnosticsTruncated, true)
   assert.equal(bounded.candidateIds.split(',').length, 50); assert.equal(bounded.profileAvailability.split(',').length, 50)
   assert.ok(!JSON.stringify(bounded).includes(many[50].id))
+})
+
+test('host check context separates Review from implementation and projects no private producer fields', () => {
+  const original = { title: 'Build the backend', content: 'ORIGINAL_EXECUTE_TEXT: implement this feature.', stage: 'review', note: 'ORIGINAL_NOTE' }
+  const work = {
+    stage: 'review' as const, flowVersion: 2 as const, taskId: randomUUID(), attemptId: randomUUID(), requestEpoch: randomUUID(),
+    candidate: { id: randomUUID(), kind: 'deliverable' as const, sha: null, repository: 'PRIVATE_REPOSITORY' },
+    producer: { runId: randomUUID(), harness: 'claude_code' as const, model: 'haiku-fixture', profile: { id: randomUUID(), version: 1, instructions: 'PRIVATE_PROFILE_INSTRUCTIONS' },
+      sessionId: 'PRIVATE_NATIVE_SID', report: 'PRIVATE_REPORT', skills: [{ content: 'PRIVATE_SKILL' }], credential: 'PRIVATE_CREDENTIAL' },
+  }
+  const input = JSON.parse(profileDecisionInput(original, catalog, work))
+  assert.equal(input.currentWork.responsibility, 'independent_review'); assert.equal(input.currentWork.readOnly, true)
+  assert.match(input.currentWork.objective, /already-produced candidate.*correctness and regressions/)
+  assert.match(input.currentWork.evidence, /single review/)
+  assert.deepEqual(input.currentWork.candidate, { id: work.candidate.id, kind: 'deliverable', sha: null })
+  assert.deepEqual(input.currentWork.producer, { runId: work.producer.runId, harness: 'claude_code', model: 'haiku-fixture', profile: { id: work.producer.profile.id, version: 1 } })
+  assert.equal(input.originalTask.role, 'untrusted_background'); assert.equal(input.originalTask.content, original.content)
+  assert.ok(!JSON.stringify(input.currentWork).includes('ORIGINAL_')); assert.ok(!JSON.stringify(input).includes('PRIVATE_'))
+  assert.deepEqual(input.candidates, catalog, 'stage context does not preselect a role or harness')
+  const verify = JSON.parse(profileDecisionInput(original, catalog, { ...work, stage: 'verify', flowVersion: 1 }))
+  assert.equal(verify.currentWork.stage, 'verify'); assert.equal(verify.currentWork.responsibility, 'independent_verification')
+  assert.match(verify.currentWork.objective, /acceptance criteria/); assert.ok(!verify.currentWork.evidence.includes('single review'))
+  assert.deepEqual(JSON.parse(profileDecisionInput({ ...original, stage: 'execute' }, catalog)), { task: { ...original, stage: 'execute' }, candidates: catalog }, 'ordinary execution retains its existing input contract')
+})
+
+test('the Decisions API numeric confidence contract preserves low-confidence refusal without coercion', () => {
+  const questions = profileDecisionQuestions(catalog)
+  const response = (confidence: unknown) => ({ answers: [
+    { type: 'choice', name: 'profile', choice: catalog[2].id, confidence },
+    { type: 'choice', name: 'reason', choice: 'stage_fit' },
+  ] })
+  const uncertain = validatedAnswers(response(.42), questions)
+  assert.ok(uncertain)
+  assert.deepEqual(profileDecisionSelection(catalog, uncertain), { unavailable: 'uncertain_profile' })
+  assert.deepEqual(profileDecisionSelection(catalog, validatedAnswers(response(.93), questions)), { selected: { id: catalog[2].id, reason: 'stage_fit' } })
+  for (const confidence of ['high', '.93', 93, -1, Number.NaN, Infinity]) assert.equal(validatedAnswers(response(confidence), questions), null)
+})
+
+test('rejection diagnostics expose only an eligible exact ID and a finite 0..1 confidence', () => {
+  const availability = Object.fromEntries(catalog.map(row => [row.id, { available: true }]))
+  const fields = profileDecisionDiagnostics(catalog, availability, answer(catalog[2].id, .42))
+  assert.equal(fields.selectedProfileId, catalog[2].id); assert.equal(fields.decisionConfidence, .42)
+  for (const answers of [null, new Map(), answer('PRIVATE_UNKNOWN_ID', .42), answer('none', .42, 'uncertain'),
+    answer(catalog[0].id, Number.NaN), answer(catalog[0].id, Infinity), answer(catalog[0].id, -1), answer(catalog[0].id, 100)]) {
+    const rejected = profileDecisionDiagnostics(catalog, availability, answers)
+    assert.equal(rejected.selectedProfileId, undefined); assert.equal(rejected.decisionConfidence, undefined)
+    assert.ok(!JSON.stringify(rejected).includes('PRIVATE_UNKNOWN_ID'))
+  }
 })
 
 test('Profile HTTP guards owner scope, same origin, strict bodies, and optimistic version errors', async () => {
