@@ -30,6 +30,7 @@ import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { harnessLabel } from './issue-threads'
 import { ThreadStatus } from './thread-status-icon'
+import { RunErrorDetails, useRunErrorText } from './run-error-text'
 import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
 import { cn } from '@/lib/utils'
 import { listRunArtifacts } from '@/app/actions/artifacts'
@@ -78,6 +79,7 @@ export function IssueThreadPanel(props: IssueThreadPanelProps) {
 
 function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask, name: listedName }: IssueThreadPanelProps) {
   const t = useTranslations('IssueThreads')
+  const runErrorText = useRunErrorText()
   const format = useFormatter()
   const { mutate: mutateCache, cache } = useSWRConfig()
   const key = ['issue-thread', issueId, runId]
@@ -139,8 +141,12 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const failedStagesId = failure ? [...items].reverse().find(item => item.kind === 'stages' && item.stages.some(stage => !stage.ok))?.id : undefined
   // A message to an ended thread runs it again in the same thread (R-81): 重试 is that message, one tap (N2).
   const canRetry = !!failure && !!data?.thread.detail && data.thread.ownedByCurrentUser && !runIsActive(view?.status ?? '')
+  const failureText = runErrorText(failure)
   const failureLine = failure && !providerExplained && <div className="flex items-start gap-2" data-slot="thread-failure">
-    <p className="line-clamp-2 min-w-0 flex-1 text-xs break-words text-destructive-foreground" title={failure}>{failure}</p>
+    <div className="flex min-w-0 flex-1 flex-col">
+      <p className="line-clamp-2 text-xs break-words text-destructive-foreground" title={failureText.message ?? undefined}>{failureText.message}</p>
+      {failureText.code && <RunErrorDetails code={failureText.code} />}
+    </div>
     {canRetry && <Button variant="outline" size="xs" className="shrink-0 pointer-coarse:h-11" disabled={sending} onClick={() => { void send(t('retry'), true) }}>{t('retry')}</Button>}
   </div>
   useEffect(() => {

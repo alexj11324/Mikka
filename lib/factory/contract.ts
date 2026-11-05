@@ -1,3 +1,4 @@
+import { CodedError, type CodedErrorOptions } from "@mikka/protocol/coded-error";
 import { z } from "zod";
 
 export const FACTORY_CONTRACT_VERSION = 1 as const;
@@ -144,9 +145,10 @@ export const changeSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("revoke"), reason }).strict(),
 ]);
 export type FactoryChange = z.infer<typeof changeSchema>;
-export class FactoryError extends Error {
-  constructor(public code: string) {
-    super(code);
+export class FactoryError extends CodedError {
+  constructor(code: string, options?: CodedErrorOptions) {
+    super(code, options);
+    this.name = "FactoryError";
   }
 }
 /** Frozen by the host on creation, never accepted from route/change input.

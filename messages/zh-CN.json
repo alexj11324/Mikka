@@ -3856,7 +3856,8 @@
         "metered": "Mikka 按量计费",
         "not_applicable": "不适用"
       }
-    }
+    },
+    "errorDetails": "详情"
   },
   "Computer": {
     "status": {
@@ -4885,5 +4886,36 @@
     "continued": "新的要求已交给同一任务；Factory 将按最新要求执行、独立审查并验证。",
     "created": "任务已交给 Factory，后续由我统一汇报执行、独立审查和验证结果。",
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
+  },
+  "RunErrors": {
+    "subscription_local_runtime_unavailable": {
+      "default": "本机订阅运行无法启动",
+      "assignment_invalid": "线程的订阅设置已失效，请重新选择模型",
+      "run_closed": "线程已停止，订阅运行未启动",
+      "lease_refused": "服务器拒绝了订阅授权，请在「模型与订阅」中检查订阅连接",
+      "lease_invalid": "订阅授权已过期或与线程不匹配",
+      "model_mismatch": "订阅不提供线程所选的模型，请换一个模型",
+      "account_changed": "订阅账号在运行中已切换，运行已停止",
+      "env_not_clean": "本机运行环境不符合订阅运行要求，请更新 Mikka",
+      "adapter_start_failed": "Agent 无法用订阅启动"
+    },
+    "subscription_hosted_runtime_unavailable": {
+      "default": "云电脑上的运行无法启动",
+      "runner_missing": "这台电脑不支持订阅运行，请更新 Mikka",
+      "host_unsupported": "云电脑环境不支持此运行",
+      "cli_missing": "云电脑上没有所需的 Agent",
+      "assignment_invalid": "线程的模型或订阅设置已失效，请重新选择模型",
+      "resume_mismatch": "原会话无法继续",
+      "run_closed": "线程已停止，运行未启动",
+      "context_changed": "订阅在启动期间已变化，运行已停止",
+      "workspace_invalid": "云电脑上的工作区无效",
+      "ledger_mismatch": "原会话记录与线程不匹配",
+      "computer_unavailable": "此运行无法操作电脑",
+      "env_not_clean": "云电脑运行环境含有不允许的变量",
+      "credential_mismatch": "模型凭据与运行不匹配",
+      "session_mismatch": "Agent 没有回到原会话",
+      "adapter_start_failed": "Agent 无法在云电脑上启动",
+      "cleanup_failed": "Agent 未启动，清理也未完成"
+    }
   }
 }

@@ -561,9 +561,9 @@ export class CodexAdapter implements AgentAdapter {
             await externalAuth.token(true),
             externalAuth.accountId
           )
-        } catch {
+        } catch (error) {
           void finish({ outcome: "failed", error: SUBSCRIPTION_AUTH_ERROR })
-          throw new Error(SUBSCRIPTION_AUTH_ERROR)
+          throw new Error(SUBSCRIPTION_AUTH_ERROR, { cause: error })
         }
       }
       if (method === "item/commandExecution/requestApproval" || method === "item/fileChange/requestApproval") {
@@ -744,7 +744,7 @@ export class CodexAdapter implements AgentAdapter {
       quota = undefined
       const verify = externalAuth?.verify ?? brokerAuth?.verify
       if (verify) {
-        try { await verify() } catch { throw new Error(SUBSCRIPTION_AUTH_ERROR) }
+        try { await verify() } catch (error) { throw new Error(SUBSCRIPTION_AUTH_ERROR, { cause: error }) }
       }
       const result = rpc.sendRequest<{ turn: { id: string } }>("turn/start", {
         threadId: sessionId,
@@ -816,8 +816,8 @@ export class CodexAdapter implements AgentAdapter {
           )
           if (loggedIn.type !== "chatgptAuthTokens")
             throw new Error(SUBSCRIPTION_AUTH_ERROR)
-        } catch {
-          throw new Error(SUBSCRIPTION_AUTH_ERROR)
+        } catch (error) {
+          throw new Error(SUBSCRIPTION_AUTH_ERROR, { cause: error })
         }
       }
       const thread: Omit<ThreadResumeParams, 'threadId'> = {
@@ -875,7 +875,7 @@ export class CodexAdapter implements AgentAdapter {
       }
       await finish(null)
       if (error instanceof ProviderFailureError) throw error
-      if (managedAuth) throw new Error(turnStartFailure ?? SUBSCRIPTION_AUTH_ERROR)
+      if (managedAuth) throw new Error(turnStartFailure ?? SUBSCRIPTION_AUTH_ERROR, { cause: error })
       throw new Error(
         `Could not start codex app-server: ${errorMessage(error)}. ${child.stderrTail()}`.trim(),
         { cause: error },

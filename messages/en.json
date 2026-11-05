@@ -3856,7 +3856,8 @@
         "metered": "Mikka metered usage",
         "not_applicable": "Not applicable"
       }
-    }
+    },
+    "errorDetails": "Details"
   },
   "Computer": {
     "status": {
@@ -4885,5 +4886,36 @@
     "continued": "The new request was sent to the same task. Factory will execute, independently review and verify the latest requirements.",
     "created": "The task was sent to Factory. I will report its execution, independent review and verification results.",
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
+  },
+  "RunErrors": {
+    "subscription_local_runtime_unavailable": {
+      "default": "The subscription run could not start on this computer",
+      "assignment_invalid": "This thread's subscription setting is no longer valid. Please choose the model again.",
+      "run_closed": "The thread stopped before the subscription run started",
+      "lease_refused": "The server refused the subscription authorization. Please check the connection in Models and subscriptions.",
+      "lease_invalid": "The subscription authorization expired or does not match this thread",
+      "model_mismatch": "The subscription does not offer this thread's model. Please choose another model.",
+      "account_changed": "The subscription account changed during the run, so the run stopped",
+      "env_not_clean": "This computer's run environment does not meet the subscription requirements. Please update Mikka.",
+      "adapter_start_failed": "The Agent could not start on the subscription"
+    },
+    "subscription_hosted_runtime_unavailable": {
+      "default": "The run could not start on the cloud computer",
+      "runner_missing": "This computer cannot run on a subscription. Please update Mikka.",
+      "host_unsupported": "The cloud computer does not support this run",
+      "cli_missing": "The required Agent is not installed on the cloud computer",
+      "assignment_invalid": "This thread's model or subscription setting is no longer valid. Please choose the model again.",
+      "resume_mismatch": "The original session cannot be continued",
+      "run_closed": "The thread stopped before the run started",
+      "context_changed": "The subscription changed while the run was starting, so the run stopped",
+      "workspace_invalid": "The workspace on the cloud computer is invalid",
+      "ledger_mismatch": "The saved session does not match this thread",
+      "computer_unavailable": "Computer use is unavailable for this run",
+      "env_not_clean": "The cloud run environment contains a variable that is not allowed",
+      "credential_mismatch": "The model credential does not match this run",
+      "session_mismatch": "The Agent did not return to the original session",
+      "adapter_start_failed": "The Agent could not start on the cloud computer",
+      "cleanup_failed": "The Agent did not start, and cleanup did not finish"
+    }
   }
 }

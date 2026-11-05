@@ -1,3 +1,4 @@
+import { CodedError, type CodedErrorOptions } from '@mikka/protocol/coded-error'
 /** USD accounting uses integer microdollars; the one-off allowance is fixed. */
 export const FREE_ALLOWANCE_MICRO_USD = 1_000_000
 /**
@@ -27,9 +28,9 @@ export type PaidResourceCode =
   | 'usage_in_progress'
   | 'usage_concurrency_limit'
   | 'usage_cost_unavailable'
-export class PaidResourceError extends Error {
-  constructor(readonly code: PaidResourceCode) {
-    super(code)
+export class PaidResourceError extends CodedError<PaidResourceCode> {
+  constructor(code: PaidResourceCode, options?: CodedErrorOptions) {
+    super(code, options)
     this.name = 'PaidResourceError'
   }
 }
