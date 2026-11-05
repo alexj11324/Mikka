@@ -6,6 +6,7 @@ import { z } from "zod";
 import { othersMayUse, pooledOwners } from "./personal-policy";
 import { HOSTED_CHOICE } from "./bot-model-menu-view";
 import { subscriptionRouteReady } from "./subscription-routes";
+import { executionBinding, executionModelOptions } from "./execution-model-options";
 
 export interface ExecutionSettingsScope {
   ownerId: string;
@@ -29,18 +30,16 @@ export class ExecutionSettings {
     bindingId?: string,
     query: Pick<PoolClient, "query"> = this.pool,
   ) {
-    return (
-      await query.query(
-        `SELECT b.id AS "bindingId",b."ownerId",b."consumerId",b."workspaceId",b."modelId",b.route,c.id AS "connectionId",c.provider,c."accountLabel",c.quota->>'plan' AS plan,c.quota
-       FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId"
-       AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false
-       WHERE b."ownerId"=$1 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc')
-       AND ($3::uuid IS NULL OR b.id=$3)
-       AND ($3::uuid IS NOT NULL OR c."modelCatalog" IS NULL OR c."modelCatalog"->>'revision'<>c.epoch::text OR c."modelCatalog"->'models' ? b."modelId") ORDER BY (b."workspaceId"=$2) DESC,b."createdAt" DESC,b.id`,
-        [ownerId, workspaceId, bindingId ?? null],
-      )
-    ).rows;
+    const scope = { ownerId, workspaceId };
+    if (!bindingId) return executionModelOptions(query, scope);
+    const binding = await executionBinding(query, scope, bindingId);
+    return binding ? [binding] : [];
   }
+  /** Public model identities only: quota is read once per connection by credentialStates. */
+  async modelCandidates(scope: ExecutionSettingsScope, query: Pick<PoolClient, "query"> = this.pool) {
+    return executionModelOptions(query, scope, true);
+  }
+
   /**
    * For a bot whose owner has no subscription here: other members' subscriptions
    * shared with 分享给团队成员 (Alex, 「B」), Claude first, then by the oldest

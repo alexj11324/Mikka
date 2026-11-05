@@ -107,6 +107,11 @@ before(async () => {
   } } } } })
   mock.module('next/headers', { namedExports: { headers: async () => requestHeaders } })
   mock.module('@/lib/db', { namedExports: { db: database, withDatabaseClient: () => { throw Error('Factory dispatch is outside thread-control fixture') }, pool: { async query(sql: string, params: unknown[]) {
+    // These ordinary threads have no machine binding; still verify the scoped stop probe.
+    if (sql === 'SELECT "workspaceId" FROM computer_run_bindings WHERE "runId"=$1 AND "ownerId"=$2') {
+      assert.deepEqual(params, [current.run.id, current.run.userId])
+      return { rows: [] }
+    }
     // Running owner messages first check for a Factory target to advance.
     // These ordinary-thread fixtures have no Factory binding; keep the actual
     // epoch function in the call path and verify its owner/run constraints.

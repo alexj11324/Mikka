@@ -12,10 +12,11 @@ import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding }
 import { configureFactoryCheck, currentFactoryRequest } from './checks'
 import { checkFactoryRepairBudget } from './check-recovery-evidence'
 import { observeFactoryProfileDispatch } from './reconcile'
-import { FactoryError } from './contract'
+import { FactoryError, factoryFlowVersion } from './contract'
 import { notifyDeviceWork } from '../device-gateway-notify'
 import type { FactoryTask, createFactoryStore } from './store'
 import type { FactoryCheckStartRecovery } from './check-start-recovery'
+import type { ProfileCheckWork } from './agent-profile-decision'
 
 /** Provider I/O boundary; no model input selects these callbacks. */
 export const factoryAutomaticRuntime = {
@@ -72,12 +73,33 @@ export function automaticFactoryDispatch(pool: Pool) {
     const inheritedPolicy = checkStart ? { policyCeiling: checkStart.selection.policyCeiling }
       : source.agentDefinition?.policyCeiling ? { policyCeiling: source.agentDefinition.policyCeiling } : {}
     let selection: Partial<RunModel> = checkStart?.selection ?? (selectStageProfile ? inheritedPolicy : threadRunModel(source.agentDefinition) ?? inheritedPolicy)
+    let checkWork: ProfileCheckWork | undefined
+    if (check && !checkStart) {
+      // Select the current check's role from its actual candidate, not from the
+      // original implementation prompt or whichever execution ran most recently.
+      const { rows: [candidate] } = await tx.query<{ id: string; kind: ProfileCheckWork['candidate']['kind']; sha: string | null; runId: string;
+        harness: ProfileCheckWork['producer']['harness']; model: string | null; profileId: string | null; profileVersion: number | null }>(
+        `SELECT c.id,c.kind,c.sha,c."runId",COALESCE(producer."agentDefinition"->>'harness',a.harness) AS harness,
+           producer."agentDefinition"->>'model' AS model,producer."agentDefinition"->'agentProfile'->>'profileId' AS "profileId",
+           producer."agentDefinition"->'agentProfile'->'version' AS "profileVersion"
+         FROM factory_candidates c JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$3 AND producer."issueId"=$4
+         JOIN agents a ON a.id=producer."agentId" AND a."userId"=producer."userId"
+         WHERE c.id=$1 AND c."taskId"=$2`, [task.candidateId, task.id, task.userId, task.issueId])
+      if (!candidate) throw new FactoryError('factoryCheckBindingMismatch')
+      checkWork = {
+        stage: task.stage as 'review' | 'verify', flowVersion: factoryFlowVersion(task), taskId: task.id, attemptId: task.attemptId, requestEpoch: task.sourceEventId,
+        candidate: { id: candidate.id, kind: candidate.kind, sha: candidate.sha },
+        producer: { runId: candidate.runId, harness: candidate.harness, model: candidate.model,
+          ...(candidate.profileId && Number.isInteger(candidate.profileVersion) && candidate.profileVersion! > 0
+            ? { profile: { id: candidate.profileId, version: candidate.profileVersion! } } : {}) },
+      }
+    }
     let profileChoice = selectStageProfile && !checkStart ? await (await import('./agent-profile')).resolveAgentProfileDispatch(pool, {
       ownerId: task.userId, workspaceId: source.workspaceId ?? await (await import('@/lib/execution-settings')).executionWorkspace(task.userId, task.botId), botId: task.botId,
     }, { issueId: task.issueId, stage: task.stage, location: source.deviceKind === 'cloud' ? 'cloud' : 'local',
       defaultHarness: source.harness, cloudPurpose: source.remoteUrl ? 'task' : 'desktop',
       ...(source.agentDefinition?.pinnedDeviceId ? { deviceId: source.agentDefinition.pinnedDeviceId } : {}),
-    }, { transaction: tx,
+    }, { transaction: tx, checkWork,
       ...(checkStage && candidateId ? { independentCheck: async () => ({
         taskId: task.id, requestEpoch: task.sourceEventId, candidateId, stage: checkStage,
         currentOwnerRequest: await currentFactoryRequest(tx, task),

@@ -2,8 +2,8 @@
 
 import useSWR from 'swr'
 import { withBasePath } from '@/lib/base-path'
-import type { AgentProfile, AgentProfileDefinition } from '@/lib/factory/agent-profile-definition'
 import { BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-reference'
+import type { AgentProfile, AgentProfileDefinition } from '@/lib/factory/agent-profile-definition'
 
 export type ProfileModel = Extract<AgentProfileDefinition['model'], { mode: 'fixed' }> & {
   provider: string
@@ -13,14 +13,6 @@ export type ProfileModel = Extract<AgentProfileDefinition['model'], { mode: 'fix
   reason?: string
 }
 export type ProfileAvailability = { available: boolean; reason?: string }
-
-/** A task-form intent may ask Default's normal dispatcher to check allowance.
- * This does not turn the read-only preview into an execution grant. */
-export function taskProfileChoiceAllowed(id: string, availability?: ProfileAvailability) {
-  return availability?.available === true ||
-    (id === BUILTIN_AGENT_PROFILE_ID && availability?.available === false && availability.reason === 'checking')
-}
-
 export type AgentProfilesView = {
   profiles: AgentProfile[]
   catalog: {
@@ -29,6 +21,18 @@ export type AgentProfilesView = {
   }
   availability: Record<string, ProfileAvailability>
   defaultAvailability?: ProfileAvailability
+}
+
+/** A pending allowance check may be requested; only dispatch grants execution.
+ * A missing read or a disabled/archived role never becomes selectable this way. */
+export function taskProfileSelectable(value: string | null | undefined, data?: AgentProfilesView): boolean {
+  if (!value) return true
+  if (!data) return false
+  const builtin = value === BUILTIN_AGENT_PROFILE_ID
+  const profile = builtin ? undefined : data.profiles.find(item => item.id === value)
+  if (!builtin && (!profile?.enabled || profile.archivedAt)) return false
+  const availability = builtin ? data.defaultAvailability : data.availability[value]
+  return availability?.available === true || availability?.reason === 'checking'
 }
 
 export const agentProfilesKey = (workspaceId: string) => ['factory-agent-profiles', workspaceId] as const
