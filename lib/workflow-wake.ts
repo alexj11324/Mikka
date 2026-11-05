@@ -12,15 +12,24 @@ export { wakeTokens } from './workflow-wake-tokens'
  * timer is then its only wake.
  */
 export function workflowWakesEnabled(env: Record<string, string | undefined> = process.env) {
-  return Boolean(env.VERCEL || env.WORKFLOW_TARGET_WORLD || env.NODE_ENV === 'development')
+  return Boolean(wakeTransport.resume || env.VERCEL || env.WORKFLOW_TARGET_WORLD || env.NODE_ENV === 'development')
 }
+
+/** Tests replace resumeHook here to observe wakes without a Workflow world. */
+export const wakeTransport: { resume?: (token: string, payload: Record<string, never>) => Promise<unknown> } = {}
 
 /** Best effort, now. A token nobody holds (the workflow ended, or never waited) is not an error. */
 export async function wakeWorkflow(token: string, resume?: (token: string, payload: Record<string, never>) => Promise<unknown>) {
   try {
-    const resumeHook = resume ?? (await import('workflow/api')).resumeHook
+    const resumeHook = resume ?? wakeTransport.resume ?? (await import('workflow/api')).resumeHook
     await resumeHook(token, {})
   } catch { /* no workflow waiting on this token */ }
+}
+
+/** wakeWorkflow after the current request, for a write that has already committed. */
+export function wakeWorkflowSoon(token: string) {
+  if (!workflowWakesEnabled()) return
+  void import('./background').then(({ afterJob }) => afterJob('after:workflow-wake', () => wakeWorkflow(token), { orRun: true })).catch(() => {})
 }
 
 /** wakeWorkflow once this transaction commits; nothing on rollback. Never fails the write. */

@@ -3,4 +3,6 @@
 export const wakeTokens = {
   /** The lifecycle maintaining a cloud run's thread machine (thread-machine, factory-stage). */
   threadMachine: (runId: string) => 'thread-machine:' + runId,
+  /** A web subagent's workflow (workflows/subagent), woken by any change to its row or its approvals. */
+  subagent: (subagentId: string) => 'subagent:' + subagentId,
 }
