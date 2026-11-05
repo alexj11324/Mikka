@@ -3071,7 +3071,6 @@
       "arguments": "内容",
       "approveRun": "执行"
     },
-    "working": "Coordinator 正在处理…",
     "loadError": "对话加载失败，正在重试。",
     "failedTitle": "回复失败",
     "subscriptionRefusal": {
@@ -3118,6 +3117,7 @@
       "issue": "任务",
       "run": "线程",
       "runOf": "{bot} 派出的线程",
+      "thisTask": "这个任务",
       "openIssue": "打开任务：{title}",
       "openThread": "打开线程：{name}",
       "noIssue": "没有关联的任务",
@@ -3204,9 +3204,9 @@
     },
     "activity": {
       "thinking": "思考中",
+      "running": "正在{tool}",
       "thought": "思考了 {seconds} 秒",
       "thoughtStored": "已思考",
-      "tool": "使用工具",
       "tools": {
         "create_issue": "建任务",
         "create_issue_from_request": "建任务",
@@ -3240,8 +3240,78 @@
         "search_notion_pages": "查看 Notion",
         "read_notion_page_blocks": "查看 Notion",
         "append_notion_paragraph": "写 Notion",
-        "list_drive_files": "查看 Drive"
-      }
+        "list_drive_files": "查看 Drive",
+        "dispatch_factory_task": "派发 Factory 任务",
+        "dispatch_factory_run": "派发线程",
+        "get_factory_task": "查看 Factory 任务",
+        "list_factory_requests": "查看 Factory 请求",
+        "list_factory_questions": "查看 Factory 提问",
+        "get_factory_question": "查看 Factory 提问",
+        "resolve_factory_task": "处理 Factory 任务",
+        "stop_factory_task": "停止 Factory 任务",
+        "intake_factory_request": "建任务",
+        "read_webpage": "打开网页",
+        "wake_bot_computer": "唤醒电脑",
+        "mailbox_send": "发邮件",
+        "mailbox_inbox": "查看邮件",
+        "list_agents": "查看智能体",
+        "schedule_create": "建定时任务",
+        "schedule_update": "改定时任务",
+        "schedule_list": "查看定时任务",
+        "load_skill": "加载技能"
+      },
+      "summary": {
+        "dispatch": "{count, plural, other {派发了 # 个线程}}",
+        "dispatchFactory": "{count, plural, other {派发了 # 个 Factory 任务}}",
+        "wake": "{count, plural, =1 {唤醒了电脑} other {唤醒了 # 次电脑}}",
+        "messageThread": "{count, plural, =1 {给线程发了消息} other {给线程发了 # 条消息}}",
+        "stopThread": "{count, plural, other {停止了 # 个线程}}",
+        "createIssue": "{count, plural, other {建了 # 个任务}}",
+        "updateIssue": "{count, plural, =1 {改了任务} other {改了 # 次任务}}",
+        "sendMail": "{count, plural, other {发了 # 封邮件}}",
+        "sendSlack": "{count, plural, other {发了 # 条 Slack 消息}}",
+        "writeNotion": "{count, plural, =1 {写了 Notion} other {写了 # 次 Notion}}",
+        "writeCalendar": "{count, plural, =1 {改了日程} other {改了 # 次日程}}",
+        "remember": "{count, plural, other {记住了 # 件事}}",
+        "forget": "{count, plural, other {忘掉了 # 件事}}",
+        "schedule": "{count, plural, =1 {改了定时任务} other {改了 # 次定时任务}}",
+        "factory": "{count, plural, =1 {操作了 Factory} other {操作了 # 次 Factory}}",
+        "github": "{count, plural, =1 {调用了 GitHub} other {调用了 # 次 GitHub}}",
+        "viewIssues": "{count, plural, =1 {查看了任务} other {查看了 # 次任务}}",
+        "viewThreads": "{count, plural, =1 {查看了线程} other {查看了 # 次线程}}",
+        "searchWeb": "{count, plural, =1 {搜索了网页} other {搜索了 # 次网页}}",
+        "readWeb": "{count, plural, =1 {打开了网页} other {打开了 # 个网页}}",
+        "readMail": "{count, plural, =1 {查看了邮件} other {查看了 # 次邮件}}",
+        "readSlack": "{count, plural, =1 {查看了 Slack} other {查看了 # 次 Slack}}",
+        "readNotion": "{count, plural, =1 {查看了 Notion} other {查看了 # 次 Notion}}",
+        "viewCalendar": "{count, plural, =1 {查看了日历} other {查看了 # 次日历}}",
+        "viewDrive": "{count, plural, =1 {查看了 Drive} other {查看了 # 次 Drive}}",
+        "viewFactory": "{count, plural, =1 {查看了 Factory} other {查看了 # 次 Factory}}",
+        "findRepository": "{count, plural, =1 {找了仓库} other {找了 # 次仓库}}",
+        "other": "{count, plural, other {另有 # 步}}"
+      },
+      "errors": {
+        "factoryNotFound": "没有找到 Factory 任务",
+        "factoryStale": "Factory 任务已过期",
+        "factoryInvalid": "参数不对",
+        "factoryStopped": "Factory 任务已停止",
+        "factorySourceMismatch": "来源不一致",
+        "factoryRunMismatch": "线程不一致",
+        "factoryQuestionClosed": "提问已关闭",
+        "repositoryNotFound": "没有找到仓库",
+        "repositoryAmbiguous": "仓库不唯一",
+        "githubUnavailable": "GitHub 不可用",
+        "unauthorized": "没有权限",
+        "forbidden": "没有权限",
+        "notFound": "没有找到",
+        "timeout": "超时",
+        "rateLimited": "请求太频繁"
+      },
+      "failedCount": "{count, plural, other {# 个失败}}",
+      "more": "等",
+      "separator": "，",
+      "expandAll": "全部展开",
+      "collapseAll": "全部收起"
     }
   },
   "AgentCopy": {
@@ -4359,7 +4429,9 @@
       "githubMergeClosed": "PR 已关闭",
       "githubUnavailable": "GitHub 暂不可用"
     },
-    "steps": "操作 {count}"
+    "steps": "操作 {count}",
+    "questionCommandSource": "来自提问前的执行",
+    "sourceExecution": "查看执行"
   },
   "AccountEmail": {
     "exportSubject": "你的 Mikka 数据导出",

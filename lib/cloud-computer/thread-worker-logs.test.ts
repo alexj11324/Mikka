@@ -153,3 +153,85 @@ test('runtime refresh failures name their actual phase without logging provider 
     }
   }
 })
+
+test('question wake failures identify the rejecting boundary without exposing provider data or preventing lease cleanup', async () => {
+  const { ensureThreadMachine } = await import('./thread-machines')
+  const id = (n: number) => `41500000-0000-4000-8000-${String(n).padStart(12, '0')}`
+  const actor = { userId: 'fixture-owner', workspaceId: id(2) }
+  const run = { id: id(1), userId: actor.userId, issueId: id(3), deviceId: id(4), deviceRepoId: id(5), runtimeBotId: id(6),
+    status: 'queued', botSandboxId: 'fixture-parent', repoPath: 'v2/github.com/acme/app', remoteUrl: 'https://github.com/acme/app.git',
+    questionContinuation: { requireSessionResume: true, requiredSandboxId: 'fixture-original', originSessionId: 'PRIVATE-NATIVE-SESSION', originRunId: id(7), questionId: id(8) } }
+  const machine = { runId: run.id, ownerId: actor.userId, workspaceId: actor.workspaceId, issueId: run.issueId,
+    deviceId: run.deviceId, repoId: run.deviceRepoId, botId: run.runtimeBotId, state: 'paused', sandboxId: 'fixture-original', snapshotId: 'codex' }
+  const saved = { url: process.env.MIKKA_CLOUD_WORKER_URL, sha: process.env.MIKKA_CLOUD_WORKER_SHA }
+  process.env.MIKKA_CLOUD_WORKER_URL = 'https://fixture.invalid/mikka'
+  process.env.MIKKA_CLOUD_WORKER_SHA = 'a'.repeat(40)
+  try {
+    for (const scenario of ['admission', 'execution_identity', 'question_machine', 'question_source', 'provider_state', 'connect', 'read_worker', 'verify_worker', 'diagnostic_getter', 'diagnostic_sink']) {
+      const phase = scenario.startsWith('diagnostic_') ? 'connect' : scenario
+      const fault = Object.assign(new Error('PRIVATE-CREDENTIAL provider output'), {
+        name: phase === 'provider_state' ? 'AuthenticationError' : 'Error',
+        code: phase === 'read_worker' ? 'ENOENT' : 'PRIVATE-CREDENTIAL', statusCode: 503,
+        stack: 'PRIVATE-CREDENTIAL stack', cause: { token: 'PRIVATE-CREDENTIAL' },
+      })
+      if (scenario === 'diagnostic_getter') Object.defineProperty(fault, 'name', { get: () => { throw new Error('PRIVATE-CREDENTIAL getter') } })
+      const queries: string[] = [], warnings: unknown[][] = []
+      let released = false
+      const warning = mock.method(console, 'warn', (...args: unknown[]) => {
+        if (scenario === 'diagnostic_sink') throw new Error('PRIVATE-CREDENTIAL sink')
+        warnings.push(args)
+      })
+      const query = async (sql: string) => {
+        queries.push(sql)
+        if (sql.startsWith('SELECT r.*')) return { rows: [{ ...run,
+          ...(phase === 'admission' ? { botSandboxId: null } : {}),
+          ...(phase === 'execution_identity' ? { agentDefinition: { executionIdentity: {} } } : {}),
+        }], rowCount: 1 }
+        if (sql.startsWith('SELECT * FROM thread_machines')) return { rows: [{ ...machine,
+          ...(phase === 'question_machine' ? { sandboxId: 'other-vm' } : {}),
+          ...(phase === 'verify_worker' ? { snapshotId: 'legacy-fixture' } : {}),
+        }], rowCount: 1 }
+        if (sql.startsWith('SELECT 1 FROM factory_questions')) return { rows: phase === 'question_source' ? [] : [{}], rowCount: phase === 'question_source' ? 0 : 1 }
+        if (sql.startsWith('SELECT status,"stopRequestedAt"')) return { rows: [{ status: 'queued', stopRequestedAt: null }], rowCount: 1 }
+        if (sql.startsWith('UPDATE thread_machines')) return { rows: [{ runId: run.id }], rowCount: 1 }
+        if (/^(BEGIN|COMMIT|ROLLBACK|SELECT pg_advisory_xact_lock)/.test(sql)) return { rows: [], rowCount: 0 }
+        assert.fail(`Unexpected question diagnostic-fixture SQL: ${sql}`)
+      }
+      const pool = { query, connect: async () => ({ query, release: () => { released = true } }) } as never
+      const provider = {
+        state: async () => { if (phase === 'provider_state') throw fault; return 'paused' },
+        connect: async () => {
+          if (phase === 'connect') throw fault
+          return { sandboxId: machine.sandboxId,
+            files: { read: async () => { if (phase === 'verify_worker') return 'b'.repeat(40); throw fault }, write: async () => assert.fail('no bootstrap credential may be published') },
+            commands: { run: async () => assert.fail('no worker command may run') } }
+        },
+        create: async () => assert.fail('the original VM may not be replaced'),
+        snapshot: async () => assert.fail('no snapshot'), kill: async () => assert.fail('no kill'),
+      } as unknown as Parameters<typeof ensureThreadMachine>[3]
+      try {
+        await assert.rejects(ensureThreadMachine(pool, actor, run.id, provider), error =>
+          ['admission', 'execution_identity', 'question_machine', 'question_source', 'verify_worker'].includes(phase)
+            ? error instanceof Error && /Thread unavailable|executionIdentityUnavailable|Original question machine unavailable|Worker version mismatch/.test(error.message)
+            : error === fault)
+        const beforeProvider = ['admission', 'question_machine', 'question_source'].includes(phase)
+        assert.deepEqual(warnings.map(args => JSON.parse(String(args[0]))), scenario.startsWith('diagnostic_') ? [] : [{
+          event: 'thread_runtime_start_failed', runId: run.id, phase,
+          errorClass: phase === 'execution_identity' ? 'unknown' : phase === 'provider_state' ? 'AuthenticationError' : 'Error',
+          errorCode: phase === 'read_worker' ? 'ENOENT' : 'unknown',
+          ...(['execution_identity', 'verify_worker'].includes(phase) ? {} : { status: beforeProvider ? phase === 'admission' ? 404 : 409 : 503 }),
+        }])
+        assert.doesNotMatch(JSON.stringify(warnings), /PRIVATE-/)
+        assert.ok(queries.includes('ROLLBACK'), 'diagnostics never replace rollback')
+        if (!['admission', 'execution_identity'].includes(phase))
+          assert.ok(queries.some(sql => sql.includes('"workerLeaseId"=NULL') && sql.includes('"workerLeaseId"=$2')), 'cleanup still releases only its own lease')
+        assert.ok(queries.every(sql => !/^(INSERT|DELETE)|^UPDATE (agent_runs|factory_|device_tokens)/.test(sql)), 'diagnostics do not write business history or credentials')
+        assert.equal(released, true)
+      } finally { warning.mock.restore() }
+    }
+  } finally {
+    if (saved.url === undefined) delete process.env.MIKKA_CLOUD_WORKER_URL; else process.env.MIKKA_CLOUD_WORKER_URL = saved.url
+    if (saved.sha === undefined) delete process.env.MIKKA_CLOUD_WORKER_SHA; else process.env.MIKKA_CLOUD_WORKER_SHA = saved.sha
+  }
+})
+

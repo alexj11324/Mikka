@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg'
 import { runChanged } from './live/panels'
+import { runListChanged } from './live/lists'
 
 type Query = Pick<Pool | PoolClient, 'query'>
 
@@ -22,6 +23,6 @@ export async function stopRunsUsingApiKeys(query: Query, scope: { keyId?: string
       AND ($1::uuid IS NULL OR k.id=$1) AND ($2::text IS NULL OR k."ownerId"=$2) AND ($3::text IS NULL OR m."workspaceId"::text=$3)
       AND (NOT $4::boolean OR r."userId"<>k."ownerId") RETURNING r.id`,
   [scope.keyId ?? null, scope.ownerId ?? null, scope.workspaceId ?? null, scope.othersOnly ?? false])
-  for (const { id } of rows) await runChanged(query, id)
+  for (const { id } of rows) { await runListChanged(query, id); await runChanged(query, id) }
   return rowCount ?? 0
 }

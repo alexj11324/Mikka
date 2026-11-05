@@ -9,6 +9,7 @@ import { listIssueConnections, updateIssueRelation } from '@/app/actions/issue-o
 import { moveIssue, type IssueView } from '@/app/actions/issues'
 import { useActionError } from '@/lib/use-action-error'
 import { useRelationSearch } from '@/lib/hooks/use-relation-search'
+import { isIssueListKey } from '@/lib/live/list-read'
 import { Button } from '@/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -57,7 +58,7 @@ export function IssueRelations({ viewerId, task, mode, onOpen, onCreate, onPick,
       if (!latest) return
       const result = await updateIssueRelation({ id: task.id, revision: latest.revision, kind, targetId, remove: true })
       if (!('issue' in result) || !result.issue) throw new Error(actionError(result.error))
-      onSaved(result.issue); await Promise.all([mutate(), refresh(['issues', viewerId])]); toast.success(t('removed'))
+      onSaved(result.issue); await Promise.all([mutate(), refresh(key => isIssueListKey(key, viewerId))]); toast.success(t('removed'))
     } catch (error) { toast.error(error instanceof Error ? error.message : t('removeFailed')) }
     finally { busy.current = false; setPending(false) }
   }

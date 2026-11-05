@@ -15,6 +15,7 @@ import { runCredentialSwitchedEvent, runQuotaPausedEvent, type QuotaApiKey, type
 import { quotaContinuationNote, quotaContinuationPrompt } from '@/lib/run-retry'
 import { tiptapToText } from '@/lib/tiptap-text'
 import type { RunApiKey } from '@/lib/run-credential-source'
+import { runListChanged } from '@/lib/live/lists'
 
 // A subscription's quota ran out mid-run: the daemon or hosted runner reports
 // `quota_exhausted` (packages/daemon/src/runs/quota-exhausted.ts). When
@@ -114,6 +115,7 @@ async function queueDeviceContinuation(tx: Tx, run: Run, key: RunApiKey | null):
     agentDefinition: await continuationDefinition(run, prompt, key), deviceId: run.deviceId, deviceRepoId: run.deviceRepoId,
     status: 'queued', kind: run.kind, baseBranch: run.baseBranch, prompt, attempt: run.attempt, retryOf: run.id,
   })
+  await runListChanged(tx, id)
   await runChanged(tx, id)
   return id
 }
@@ -145,7 +147,8 @@ export async function queueCloudQuotaContinuation(run: Run, cloud: CloudBinding,
       if (!queued) throw new ActionFailureError('runNotFound')
       await db.update(agentRuns).set({ retryOf: run.id, attempt: run.attempt, kind: run.kind, baseBranch: run.baseBranch,
         agentDefinition: await continuationDefinition(run, queued.prompt, key, queued), updatedAt: new Date() }).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId)))
-      await runChanged(db, runId)
+      await runListChanged(client, runId)
+      await runChanged(client, runId)
       return runId
     })
     await client.query('COMMIT')
@@ -158,7 +161,7 @@ export async function queueCloudQuotaContinuation(run: Run, cloud: CloudBinding,
 async function endPausedRun(tx: Tx, runId: string, userId: string): Promise<boolean> {
   const [ended] = await tx.update(agentRuns).set({ status: 'failed', pauseReason: null, finishedAt: new Date(), updatedAt: new Date() })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId), eq(agentRuns.status, 'paused'), eq(agentRuns.pauseReason, 'quota_exhausted'))).returning({ id: agentRuns.id })
-  if (ended) await runChanged(tx, runId)
+  if (ended) { await runListChanged(tx, runId); await runChanged(tx, runId) }
   return Boolean(ended)
 }
 

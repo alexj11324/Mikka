@@ -16,6 +16,8 @@ export const computerStateSchema = z.object({
   machine: machineStateSchema, control: controlStateSchema,
   controlledBy: z.object({ userId: z.string() }).optional(),
   lastAction: lastActionSchema.optional(), pendingApproval: approvalViewSchema.optional(),
+  // A server-derived expiry requests a fresh authorized read; it never changes state locally.
+  live: z.object({ workspaceId: z.uuid(), deadline: z.object({ at: z.iso.datetime(), afterMs: z.number().int().nonnegative() }).optional() }).optional(),
 })
 export const viewerModeSchema = z.enum(['view', 'control'])
 export const viewerRequestSchema = z.object({ mode: viewerModeSchema }).strict()

@@ -9,7 +9,8 @@ import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { adoptProviderContinuation, createFactoryStore } from "./store";
 import { freezeWorkerDefinition } from "../agent-kit/worker";
 import type { ExecutionIdentity } from "../execution-identity";
-import { providerContinuationDefinition } from "../run-provider-fallback";
+import { providerContinuationDefinition, providerContinuationLaunchMatches, providerContinuationMatches, recoverProviderFailure } from "../run-provider-fallback";
+import { providerContinuationPrompt } from "../run-retry";
 import { checkFactoryRepairBudget } from "./check-recovery-evidence";
 import { FactoryError } from "./contract";
 import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding, type FactoryQueue } from "./dispatch";
@@ -101,11 +102,12 @@ test("run completion enters review without the Coordinator; replays do not advan
       const prior = (await query.query('SELECT * FROM agent_runs WHERE id=$1', [sourceId])).rows[0];
       const harness = prior.agentDefinition.harness === 'codex' ? 'claude_code' : 'codex';
       const admitted = providerDefinition(harness, prior.prompt, target?.deviceId ?? prior.deviceId);
-      const definition = { ...providerContinuationDefinition(prior.agentDefinition, admitted, prior.prompt), executionIdentity: admitted.executionIdentity };
+      const prompt = providerContinuationPrompt(prior.prompt);
+      const definition = { ...providerContinuationDefinition(prior.agentDefinition, admitted, prompt), executionIdentity: admitted.executionIdentity };
       const childId = randomUUID();
       await query.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",kind,status,prompt,"baseBranch","agentDefinition","retryOf",attempt)
-        SELECT $2,"userId","issueId",$3,$4,$5,"botId",kind,'queued',prompt,"baseBranch",$6,id,attempt FROM agent_runs WHERE id=$1`,
-        [sourceId, childId, target?.agentId ?? (harness === 'codex' ? agentId : alternateAgentId), target?.deviceId ?? prior.deviceId, target?.deviceRepoId ?? prior.deviceRepoId, JSON.stringify(definition)]);
+        SELECT $2,"userId","issueId",$3,$4,$5,"botId",kind,'queued',$7,"baseBranch",$6,id,attempt FROM agent_runs WHERE id=$1`,
+        [sourceId, childId, target?.agentId ?? (harness === 'codex' ? agentId : alternateAgentId), target?.deviceId ?? prior.deviceId, target?.deviceRepoId ?? prior.deviceRepoId, JSON.stringify(definition), prompt]);
       const fallback = { state: 'switched', fallback: 'balance',
         from: { harness: prior.agentDefinition.harness, model: prior.agentDefinition.model, source: 'api_key' },
         to: { harness, model: definition.model, source: 'api_key' }, retryRunId: childId, nextDefinitionDigest: definition.definitionDigest };
@@ -482,6 +484,63 @@ test("run completion enters review without the Coordinator; replays do not advan
       const child = (await pool.query('SELECT "retryOf","sessionId",prompt FROM agent_runs WHERE id=$1', [childId!])).rows[0];
       assert.deepEqual(child, { retryOf: null, sessionId: null, prompt: original.prompt });
       assert.equal((await pool.query('SELECT result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, factoryEventId('provider-check-continuation', review.runId)])).rows[0].result.runId, childId!);
+      const prior = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [review.runId])).rows[0];
+      const queued = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [childId!])).rows[0];
+      assert.equal(providerContinuationMatches(prior, queued), false, 'an independent check is deliberately not a native-session retry');
+      assert.equal(await providerContinuationLaunchMatches(pool, prior, queued), true, 'the current check and exact host receipt authorize its launch');
+      assert.equal(await providerContinuationLaunchMatches(pool, prior, { ...queued, sessionId: prior.sessionId }), false, 'a check cannot inherit the failed native session');
+      assert.equal(await providerContinuationLaunchMatches(pool, { ...prior, report: { ...prior.report,
+        modelFallback: { ...prior.report.modelFallback, nextDefinitionDigest: 'changed' } } }, queued), false);
+      let recovered = 0, launched = 0;
+      const dependencies = {
+        runtime: () => ({ store, reconcile: { run: (userId: string, runId: string) => sweep.run(userId, runId) } }),
+        dispatch: async () => { throw new Error('A queued independent provider check cannot enter generic repair'); }, wake: async () => {},
+        recoverProvider: async (userId: string, sourceId: string) => {
+          assert.equal(userId, 'owner'); assert.equal(sourceId, review.runId);
+          const continuation = await recoverProviderFailure(pool, userId, sourceId);
+          assert.equal(continuation?.runId, childId!);
+          assert.equal(continuation?.previousRunId, review.runId);
+          recovered++;
+          return async () => { launched++; };
+        },
+      };
+      for (let replay = 0; replay < 2; replay++) {
+        const result = await sweepFactoryWatchdog(pool, dependencies, new Date(), Date.now() + 20_000, { userId: 'owner', runId: childId! });
+        assert.deepEqual({ recovered: result.recovered, blocked: result.blocked, failed: result.failed }, { recovered: 1, blocked: 0, failed: 0 });
+      }
+      assert.deepEqual({ recovered, launched }, { recovered: 2, launched: 2 });
+      const replayed = await store.read('owner', f.task.id);
+      assert.equal(replayed.task.attemptId, after.task.attemptId);
+      assert.equal(replayed.attempts.length, after.attempts.length);
+      assert.deepEqual((await pool.query('SELECT "retryOf","sessionId",prompt FROM agent_runs WHERE id=$1', [childId!])).rows[0], child,
+        'recovery preserves the independent check prompt and empty session binding');
+      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='task_watchdog'`, [f.task.id])).rows[0].n, 0);
+
+      for (const fault of ['receipt', 'epoch', 'attempt'] as const) {
+        const guard = await pool.connect();
+        try {
+          await guard.query('BEGIN');
+          if (fault === 'receipt') await guard.query(`UPDATE factory_events SET result=jsonb_set(result,'{runId}',to_jsonb($3::text)) WHERE "taskId"=$1 AND "eventId"=$2`,
+            [f.task.id, factoryEventId('provider-check-continuation', review.runId), randomUUID()]);
+          if (fault === 'epoch') {
+            const nextEpoch = randomUUID();
+            await guard.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1::uuid,'owner','user_message',$1::text,'{"text":"Changed fixture request"}')`, [nextEpoch]);
+            await guard.query('UPDATE factory_tasks SET "sourceEventId"=$2 WHERE id=$1', [f.task.id, nextEpoch]);
+          }
+          if (fault === 'attempt') {
+            // A real independent check owns a fresh native session before it
+            // can finish, and its run must end before Factory permits retry.
+            await guard.query(`UPDATE agent_runs SET status='failed',"stopReason"='error',"sessionId"=$2 WHERE id=$1`,
+              [childId!, `check-replacement-${randomUUID()}`]);
+            const current = await store.lockTask(guard, 'owner', f.task.id);
+            const failed = await store.apply('owner', factoryBinding(current), randomUUID(), { action: 'finish', status: 'failed', reason: 'Replace fixture check', evidence: [], output: {} }, guard);
+            const replacement = await store.apply('owner', factoryBinding(failed.task), randomUUID(), { action: 'retry', reason: 'New fixture check attempt' }, guard);
+            assert.notEqual(replacement.task.attemptId, after.task.attemptId);
+          }
+          assert.equal(await providerContinuationLaunchMatches(guard, prior, queued), false, fault);
+        } finally { await guard.query('ROLLBACK'); guard.release(); }
+      }
+      assert.equal(await providerContinuationLaunchMatches(pool, prior, queued), true, 'guard mutations are rolled back');
     });
 
     await t.test('provider handoff rejects changed standing scope, repository and monitor placement with no orphan queue row', async () => {
@@ -592,6 +651,37 @@ test("run completion enters review without the Coordinator; replays do not advan
       }, new Date(), Date.now() + 20_000, { userId: 'owner', runId: f.runId });
       assert.deepEqual({ recovered, launched, blocked: result.blocked, failed: result.failed }, { recovered: 1, launched: 1, blocked: 0, failed: 0 });
       assert.equal((await pool.query(`SELECT count(*)::int AS n FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='task_watchdog'`, [f.task.id])).rows[0].n, 0);
+    });
+
+    await t.test('watchdog relaunches the adopted queued provider child from its committed source receipt', async () => {
+      const f = await providerSource();
+      const tx = await pool.connect();
+      let childId: string;
+      try {
+        await tx.query('BEGIN'); childId = await providerChild(tx, f.runId);
+        await adoptProviderContinuation(tx, 'owner', f.runId, childId, () => store);
+        await tx.query('COMMIT');
+      } catch (error) { await tx.query('ROLLBACK'); throw error; } finally { tx.release(); }
+      let recovered = 0, launched = 0;
+      const dependencies = {
+        runtime: () => ({ store, reconcile: { run: (userId: string, runId: string) => sweep.run(userId, runId) } }),
+        dispatch: async () => { throw new Error('An adopted provider child cannot enter generic repair'); }, wake: async () => {},
+        recoverProvider: async (userId: string, sourceId: string) => {
+          assert.equal(userId, 'owner'); assert.equal(sourceId, f.runId); recovered++;
+          assert.equal((await store.read('owner', f.task.id)).attempts.at(-1)!.runId, childId);
+          return async () => { launched++; };
+        },
+      };
+      for (let replay = 0; replay < 2; replay++) {
+        const result = await sweepFactoryWatchdog(pool, dependencies, new Date(), Date.now() + 20_000, { userId: 'owner', runId: childId });
+        assert.deepEqual({ recovered: result.recovered, blocked: result.blocked, failed: result.failed }, { recovered: 1, blocked: 0, failed: 0 });
+      }
+      assert.deepEqual({ recovered, launched }, { recovered: 2, launched: 2 });
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "retryOf"=$1', [f.runId])).rows[0].n, 1);
+      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='task_watchdog'`, [f.task.id])).rows[0].n, 0);
+      await pool.query(`UPDATE agent_runs SET status='running',"leaseExpiresAt"=now()+interval '1 minute' WHERE id=$1`, [childId]);
+      await sweepFactoryWatchdog(pool, dependencies, new Date(), Date.now() + 20_000, { userId: 'owner', runId: childId });
+      assert.deepEqual({ recovered, launched }, { recovered: 2, launched: 2 }, 'a claimed child is not relaunched');
     });
 
     await t.test("G2: reconciling one finished run does not move another task whose run also finished", async () => {

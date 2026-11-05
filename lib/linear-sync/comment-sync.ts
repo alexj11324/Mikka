@@ -1,4 +1,5 @@
 import 'server-only'
+import { issueListChanged } from '../live/lists'
 import { eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { issueDocuments, issues, linearCommentLinks, linearConnections, linearIssueLinks } from '@/lib/db/schema'
@@ -153,6 +154,7 @@ export async function applyLinearCommentToApp(input: {
         .onConflictDoUpdate({ target: issueDocuments.issueId, set: { state, updatedAt: new Date() } })
       await documentChanged(tx, input.issue.id)
       await tx.update(issues).set({ updatedAt: nextUpdatedAt }).where(eq(issues.id, input.issue.id))
+      await issueListChanged(tx, input.issue.id)
       if (currentLink.appSyncedAt && latestIssue.updatedAt <= currentLink.appSyncedAt) {
         await tx.update(linearIssueLinks).set({ appSyncedAt: nextUpdatedAt, updatedAt: nextUpdatedAt }).where(eq(linearIssueLinks.id, input.issueLink.id))
       }

@@ -32,6 +32,12 @@ const transport = {
         }
         return selection
       },
+      async for(mode: string) {
+        assert.equal(table, coordinatorSessions); assert.equal(mode, 'update')
+        const query = dialect.sqlToQuery(condition)
+        assert.ok(query.params.includes(owner) && query.params.includes(bot), 'lease lock must bind the same owner and Bot')
+        return [{ leaseHolder: null, leaseUntil: null }]
+      },
       orderBy() { return selection },
       async limit() {
         const query = dialect.sqlToQuery(condition)
@@ -55,9 +61,9 @@ const transport = {
       }
       return { onConflictDoNothing() {
         if (table === coordinatorEvents) {
-          const row = { id: 'stored-peer-id', createdAt: new Date('2026-10-27T12:00:00Z'), ...value }
-          events.push(row)
-          return { returning: async () => [{ id: row.id }] }
+          const event = { id: 'stored-peer-id', createdAt: new Date('2026-10-27T12:00:00Z'), ...value }
+          events.push(event)
+          return { async returning() { return [{ id: event.id }] } }
         }
         assert.equal(table, coordinatorSessions)
         return Promise.resolve()

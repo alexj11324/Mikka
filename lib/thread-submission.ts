@@ -15,9 +15,12 @@ const resultSchema = z.object({ runId: z.uuid(), continued: z.boolean() }).stric
 
 /** This is the existing owner turn's receipt, not another inbox or dispatcher.
  * A client ID belongs to one owner and immutable thread/payload. An existing
- * intent without a durable outcome is never dispatched a second time. */
+ * intent without a durable outcome is never dispatched a second time. Only
+ * the host's existing question-answer adapter may recover its own transaction. */
 export async function submitThreadOnce(pool: Pool, input: Input,
-  deliver: (sourceEventId: string) => Promise<ThreadSubmissionResult>): Promise<ThreadSubmissionResult> {
+  deliver: (sourceEventId: string) => Promise<ThreadSubmissionResult>,
+  recoverQuestion?: (sourceEventId: string, previousRunId: string, receiptOnly: boolean) => Promise<ThreadSubmissionResult | null>,
+): Promise<ThreadSubmissionResult> {
   const requestId = z.uuid().parse(input.requestId).toLowerCase()
   const id = factoryEventId('thread-submission', JSON.stringify([input.userId, requestId]))
   const binding = { requestId, rootRunId: input.rootRunId, requestedRunId: input.requestedRunId, mode: input.mode }
@@ -97,7 +100,16 @@ export async function submitThreadOnce(pool: Pool, input: Input,
   }
   if (!inserted.length) {
     const outcome = await readOutcome()
-    if (outcome) return outcome
+    if (outcome) {
+      // An answered question can be durable before its VM wake succeeds. A
+      // saved acknowledgement permits replay of that exact receipt only;
+      // it never authorizes answering a new question or dispatching again.
+      if (recorded.mode === 'continuation' && outcome.runId === previousRunId && !outcome.continued)
+        await recoverQuestion?.(id, previousRunId, true)
+      return outcome
+    }
+    const answer = recorded.mode === 'continuation' ? await recoverQuestion?.(id, previousRunId, false) : null
+    if (answer) return saveResult(answer)
     throw new Error('threadSubmissionOutcomeUnconfirmed')
   }
   try { return await saveResult(await deliver(id)) }

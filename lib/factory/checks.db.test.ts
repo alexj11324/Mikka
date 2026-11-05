@@ -338,7 +338,7 @@ test(
         review: reconcileFactoryCheck,
         verify: reconcileFactoryCheck,
       }, coordinatorBot);
-      async function pendingReview() {
+      async function pendingReview(kind: 'repository' | 'report' | 'deliverable' = 'repository') {
         const issueId = randomUUID(),
           sourceEventId = randomUUID();
         await db.query(
@@ -370,6 +370,8 @@ test(
             `execute-${issueId}`,
             JSON.stringify({
               publish: { commit: sha },
+              sourceCommit: sha,
+              ...(kind === 'deliverable' ? { deliverableCommit: sha } : {}),
               verify: { status: "passed" },
             }),
           ],
@@ -377,12 +379,11 @@ test(
         state = await store.apply("owner", execute.binding, randomUUID(), {
           action: "candidate",
           runId: execute.runId,
-          candidate: {
-            sha,
-            repository: "/fixture/repo",
-            environment: `device:${deviceId}`,
-            scope: `issue:${issueId}`,
-          },
+          candidate: kind === 'deliverable'
+            ? { kind, sha: null, repository: "/fixture/repo", environment: `device:${deviceId}`, scope: `issue:${issueId}` }
+            : kind === 'report'
+              ? { kind, sha, repository: "/fixture/repo", environment: `device:${deviceId}`, scope: `issue:${issueId}` }
+              : { sha, repository: "/fixture/repo", environment: `device:${deviceId}`, scope: `issue:${issueId}` },
         });
         state = await store.apply(
           "owner",
@@ -399,7 +400,7 @@ test(
                 runId: execute.runId,
                 sessionId: `execute-${issueId}`,
                 candidateId: state.task.candidateId,
-                sha,
+                sha: kind === 'deliverable' ? null : sha,
                 environment: `device:${deviceId}`,
                 recordedAt: new Date().toISOString(),
               },
@@ -891,6 +892,124 @@ test(
             );
           },
         );
+      for (const kind of ['deliverable', 'report'] as const)
+        for (const phase of ['review', 'verify'] as const)
+          await t.test(`a ${kind} ${phase} question cannot turn an Owner explanation into a verification command`, async () => {
+            const pending = await pendingReview(kind);
+            let running = await start(pending.task);
+            if (phase === 'verify') {
+              await terminal(running.runId, `review-${pending.task.id}`);
+              await reconcile('owner');
+              running = await start((await state(pending.task.id)).task);
+            }
+            const origin = (await db.query('SELECT * FROM agent_runs WHERE id=$1', [running.runId])).rows[0];
+            const sessionId = `artifact-question-${running.runId}`, questionId = randomUUID();
+            const report = { summary: 'Missing recorded evidence, not a missing repository command.',
+              question: { questionId, kind: 'decision', purpose: 'verification_command',
+                question: 'May I continue inspecting this candidate after the evidence becomes available?', options: [] } };
+            await db.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"=$2,
+              "startedAt"=now()-interval '1 second',"finishedAt"=now(),report=$3 WHERE id=$1`,
+              [running.runId, sessionId, JSON.stringify(report)]);
+            const recorded = await questions.record('owner', running.runId);
+            const q = await questions.escalate('owner', { reference: questionReference(recorded), eventId: randomUUID(), reason: 'The Owner decides.' });
+            assert.equal((q.request as any).handoff.purpose, 'verification_command', 'record retains the authentic handoff, including its mistake');
+            const oldAttempt = (await db.query('SELECT * FROM factory_attempts WHERE id=$1', [running.task.attemptId])).rows[0];
+            assert.deepEqual([oldAttempt.output.check.reportOnly, oldAttempt.output.check.inferCommand, oldAttempt.output.check.command],
+              [true, false, null], 'the host configured the artifact check before the model asked');
+            const browserSessionId = randomUUID();
+            await db.query(`INSERT INTO "session"(id,"userId",token,"expiresAt","createdAt","updatedAt")
+              VALUES ($1,'owner',$2,now()+interval '1 hour',now(),now())`, [browserSessionId, randomUUID()]);
+            const answer = { reference: questionReference(q), answerId: randomUUID(),
+              text: phase === 'verify' && kind === 'report' ? 'Continue inspecting the same candidate.\nThis is an explanation, not a command.' : 'Continue inspecting the same candidate. This is an explanation, not a command.' };
+            const post = (userId = 'owner') => handleFactoryQuestion(questions, {
+              actor: { userId, sessionId: browserSessionId }, authorization: null, method: 'POST',
+              questionId, origin: 'http://127.0.0.1', url: 'http://127.0.0.1', body: answer,
+            });
+            const snapshot = async () => (await db.query(`SELECT to_jsonb(t) AS task,to_jsonb(q) AS question,
+              (SELECT count(*)::int FROM agent_runs WHERE "issueId"=t."issueId") AS runs,
+              (SELECT count(*)::int FROM factory_events WHERE "taskId"=t.id) AS events,
+              (SELECT "verifyCommand" FROM device_repos WHERE id=$2) AS command,
+              (SELECT coalesce(jsonb_agg(to_jsonb(s) ORDER BY s."remoteKey"),'[]'::jsonb) FROM repository_settings s WHERE "userId"='owner') AS settings
+              FROM factory_tasks t JOIN factory_questions q ON q."taskId"=t.id AND q.id=$3 WHERE t.id=$1`,
+              [running.task.id, repoId, questionId])).rows[0];
+            const before = await snapshot();
+            await assert.rejects(factoryCheckAssignment(db, 'owner', running.runId), { code: 'factoryCheckBindingMismatch' },
+              'the normal claim reader must still reject waiting checks');
+            assert.equal((await post('other')).status, 404);
+            assert.deepEqual(await snapshot(), before);
+            if (kind === 'report' && phase === 'review') {
+              const rejects = [
+                ['missing', null], ['contradictory inference', { ...oldAttempt.output.check, inferCommand: true }],
+                ['not report-only', { ...oldAttempt.output.check, reportOnly: false }],
+                ['unexpected command', { ...oldAttempt.output.check, command: 'node forbidden.mjs' }],
+                ['wrong stage', { ...oldAttempt.output.check, stage: phase === 'review' ? 'verify' : 'review' }],
+                ['wrong candidate', { ...oldAttempt.output.check, candidateId: randomUUID() }],
+                ['wrong SHA', { ...oldAttempt.output.check, sha: 'b'.repeat(40) }],
+                ['wrong repository', { ...oldAttempt.output.check, repository: '/another/repo' }],
+                ['wrong device repository', { ...oldAttempt.output.check, deviceRepoId: randomUUID() }],
+                ['wrong environment', { ...oldAttempt.output.check, environment: 'device:another' }],
+                ['wrong epoch', { ...oldAttempt.output.check, requestEpoch: randomUUID() }],
+                ['writable policy', { ...oldAttempt.output.check, policy: { ...oldAttempt.output.check.policy, readOnly: false } }],
+              ] as const;
+              for (const [label, check] of rejects) {
+                await db.query('UPDATE factory_attempts SET output=$2 WHERE id=$1', [oldAttempt.id, JSON.stringify({ ...oldAttempt.output, check })]);
+                try {
+                  const response = await post();
+                  assert.equal(response.status, 409, label);
+                  assert.deepEqual(await snapshot(), before, `${label} must roll back without recording an answer or command`);
+                } finally { await db.query('UPDATE factory_attempts SET output=$2 WHERE id=$1', [oldAttempt.id, JSON.stringify(oldAttempt.output)]); }
+              }
+              const otherWorkspaceId = randomUUID(), otherBotId = randomUUID();
+              await db.query(`INSERT INTO mikka_workspaces(id,"userId",name,slug) VALUES($1,'owner','Another owned workspace',$2)`, [otherWorkspaceId, otherWorkspaceId]);
+              await db.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,'owner','Other scope')`, [otherBotId, otherWorkspaceId]);
+              await db.query('UPDATE agent_runs SET "botId"=$2 WHERE id=$1', [running.runId, otherBotId]);
+              try {
+                assert.equal((await post()).status, 409, 'same owner, different workspace runtime must not pass the new reader');
+                assert.deepEqual(await snapshot(), before);
+              } finally { await db.query('UPDATE agent_runs SET "botId"=$2 WHERE id=$1', [running.runId, origin.botId]); }
+              await db.query("UPDATE factory_tasks SET status='running' WHERE id=$1", [running.task.id]);
+              try { assert.equal((await post()).status, 409, 'not a waiting question'); }
+              finally { await db.query("UPDATE factory_tasks SET status='waiting' WHERE id=$1", [running.task.id]); }
+            }
+            const response = await post();
+            assert.equal(response.status, 200, JSON.stringify(response.body));
+            const resumed = response.body as { continuationRunId: string; replayed: boolean };
+            const after = await snapshot();
+            assert.equal(after.command, before.command);
+            assert.deepEqual(after.settings, before.settings, 'even a multiline Owner explanation never becomes repository settings');
+            assert.deepEqual(after.question.request, before.question.request);
+            assert.equal(after.question.originRunId, running.runId);
+            assert.equal(after.question.originSessionId, sessionId);
+            assert.equal(after.task.candidateId, before.task.candidateId);
+            assert.equal(after.task.stage, phase);
+            const child = (await db.query('SELECT * FROM agent_runs WHERE id=$1', [resumed.continuationRunId])).rows[0];
+            assert.equal(child.agentDefinition.definitionDigest, origin.agentDefinition.definitionDigest);
+            assert.equal(child.questionContinuation.originSessionId, sessionId);
+            assert.equal(child.questionContinuation.requireSessionResume, true);
+            assert.deepEqual((await db.query('SELECT report FROM agent_runs WHERE id=$1', [running.runId])).rows[0].report, report);
+            const replay = await post();
+            assert.equal(replay.status, 200);
+            assert.equal((replay.body as typeof resumed).continuationRunId, resumed.continuationRunId);
+            assert.equal((replay.body as typeof resumed).replayed, true);
+            assert.deepEqual(await snapshot(), after, 'same answer replay does not make a second run or update settings');
+            const tx = await db.connect();
+            try {
+              await tx.query('BEGIN');
+              const extras = await claim(tx, 'owner', deviceId, resumed.continuationRunId, new Date(Date.now()+60_000).toISOString());
+              assert.equal(extras.requireSessionResume, true);
+              assert.equal(extras.resumeSessionId, sessionId);
+              assert.equal(extras.verifyCommand, undefined);
+              assert.deepEqual(extras.factoryCheck, { stage: phase, inferCommand: false, reportOnly: true });
+              await tx.query('ROLLBACK');
+            } finally { await tx.query('ROLLBACK'); tx.release(); }
+            await terminal(resumed.continuationRunId, sessionId);
+            await reconcile('owner');
+            assert.equal((await questions.read('owner', questionId)).status, 'resolved');
+            const completed = await state(running.task.id);
+            assert.equal(completed.task.candidateId, before.task.candidateId);
+            assert.equal(completed.attempts.find(a => a.runId === running.runId)!.status, 'waiting', 'old waiting attempt is not rewritten as passed');
+            assert.equal(completed.task.stage, phase === 'review' ? 'verify' : 'approval');
+          });
       for (const phase of ["review", "verify"] as const)
         for (const failed of [false, true])
           await t.test(
@@ -2033,7 +2152,8 @@ test('isolated PG: producer command records bind owner/session/candidate and ret
     // Isolated real SQL/provenance boundaries; the native events themselves
     // are synthetic fixtures, not a live provider acceptance.
     await db.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"sessionId" text,status text,"startedAt" timestamptz,"finishedAt" timestamptz,report jsonb);
-      CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid);
+      CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"candidateId" uuid,"sourceEventId" uuid,"botId" uuid,stage text);
+      CREATE TABLE factory_attempts (id uuid PRIMARY KEY,"taskId" uuid,"runId" uuid,stage text);
       CREATE TABLE factory_candidates (id uuid PRIMARY KEY,"taskId" uuid,"runId" uuid,kind text,sha text);
       CREATE TABLE factory_events ("taskId" uuid,"eventId" uuid,request jsonb,result jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE run_chunks (id uuid PRIMARY KEY,"runId" uuid,seq int,chunk jsonb,"createdAt" timestamptz)`)
@@ -2041,7 +2161,7 @@ test('isolated PG: producer command records bind owner/session/candidate and ret
     const producer = { runId: randomUUID(), sessionId: 'native-fixture-session' }
     const candidate = { id: randomUUID(), executionSha: 'b'.repeat(40), producerExecution: producer }
     await db.query(`INSERT INTO agent_runs VALUES ($1,$2,$3,$4,'succeeded',now()-interval '20 seconds',now()-interval '2 seconds',$5)`, [producer.runId, task.userId, task.issueId, producer.sessionId, JSON.stringify({ deliverableCommit: candidate.executionSha })])
-    await db.query('INSERT INTO factory_tasks VALUES ($1,$2,$3)', [task.id, task.userId, task.issueId])
+    await db.query('INSERT INTO factory_tasks (id,"userId","issueId") VALUES ($1,$2,$3)', [task.id, task.userId, task.issueId])
     await db.query(`INSERT INTO factory_candidates VALUES ($1,$2,$3,'deliverable',NULL)`, [candidate.id, task.id, producer.runId])
     const insert = async (seq: number, chunk: unknown, timing = "now()-interval '10 seconds'") => db.query(`INSERT INTO run_chunks VALUES ($1,$2,$3,$4,${timing})`, [randomUUID(), producer.runId, seq, JSON.stringify(chunk)])
     await insert(1, { type: 'tool-input-available', toolName: 'bash', toolCallId: 'head', input: { command: 'git rev-parse HEAD' } })

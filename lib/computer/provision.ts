@@ -2,6 +2,7 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import * as provider from './e2b-provider'
+import { machineChanged, machineCommitted } from '@/lib/live/computer-state'
 
 type Actor={userId:string;workspaceId:string}
 type Runtime=Pick<typeof provider,'createComputer'|'connectComputer'|'installComputerRuntime'>&Partial<Pick<typeof provider,'computerGone'|'computerWorkerSha'|'killComputer'>>
@@ -20,6 +21,7 @@ export async function ensureCloudMachine(pool:Pool,actor:Actor,runtime:Runtime=p
     if(row.provisionLeaseUntil && new Date(row.provisionLeaseUntil).getTime()>Date.now()) {await client.query('COMMIT');return null}
     machine=row
     await client.query(`UPDATE cloud_machines SET "provisionLeaseId"=$3,"provisionLeaseUntil"=now()+interval '3 minutes',state='waking' WHERE "workspaceId"=$1 AND "ownerId"=$2`,[actor.workspaceId,actor.userId,leaseId])
+    await machineChanged(client, pool, actor.userId, actor.workspaceId)
     await client.query('COMMIT')
   } catch(error) {await client.query('ROLLBACK');throw error} finally {client.release()}
   if(!machine) throw new Error('Owned cloud machine unavailable')
@@ -42,9 +44,11 @@ export async function ensureCloudMachine(pool:Pool,actor:Actor,runtime:Runtime=p
     if(recorded.rows[0]?.provisionLeaseId!==leaseId) return null
     if(!machine.runtimeReady) await runtime.installComputerRuntime(sandbox)
     const completed=await pool.query(`UPDATE cloud_machines SET state='running',"runtimeReady"=true,"lastActiveAt"=now(),"provisionLeaseId"=NULL,"provisionLeaseUntil"=NULL WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "provisionLeaseId"=$3 AND "sandboxId"=$4 RETURNING "sandboxId"`,[actor.workspaceId,actor.userId,leaseId,sandbox.sandboxId])
+    if (completed.rowCount) await machineCommitted(pool, actor.userId, actor.workspaceId)
     return completed.rowCount?sandbox:null
   } catch(error) {
-    await pool.query(`UPDATE cloud_machines SET state='error',"provisionLeaseId"=NULL,"provisionLeaseUntil"=NULL WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "provisionLeaseId"=$3`,[actor.workspaceId,actor.userId,leaseId])
+    const failed = await pool.query(`UPDATE cloud_machines SET state='error',"provisionLeaseId"=NULL,"provisionLeaseUntil"=NULL WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "provisionLeaseId"=$3`,[actor.workspaceId,actor.userId,leaseId])
+    if (failed.rowCount) await machineCommitted(pool, actor.userId, actor.workspaceId)
     throw error
   }
 }

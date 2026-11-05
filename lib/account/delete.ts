@@ -7,6 +7,7 @@ import * as workspaceSchema from '@/lib/db/workspace-schema'
 import * as teamSchema from '@/lib/db/team-schema'
 import * as projectSchema from '@/lib/db/project-schema'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
+import { workspaceListScopesBeforeChange, workspaceListScopeChanged, workspaceListChanged } from '@/lib/live/lists'
 
 const { workspaces, workspaceMembers, workspaceInvitations } = workspaceSchema
 const { teams, teamMembers, teamIssues, teamProjects, teamIssueCreateReceipts, teamIssuePromotionReceipts } = teamSchema
@@ -105,7 +106,7 @@ export interface Plan {
   keptProjectIds: string[]
 }
 
-type WorkspaceTx = Pick<typeof workspaceDb, 'select' | 'delete'>
+type WorkspaceTx = Pick<typeof workspaceDb, 'select' | 'delete' | 'execute'>
 
 /** Checks, then deletes the account and everything it owns. The caller has verified the session and the typed email. */
 export async function deleteAccount(userId: string, email: string, options: import('./deletion-jobs').AccountDeletionOptions = {}): Promise<AccountDeletion> {
@@ -145,6 +146,7 @@ export async function planWorkspaces(wtx: WorkspaceTx, userId: string): Promise<
 }
 
 export async function deleteWorkspaceData(wtx: WorkspaceTx, userId: string, emailHash: string, plan: Plan) {
+  const previousLists = await Promise.all([...plan.solo, ...plan.shared].map(async id => ({ id, scopes: await workspaceListScopesBeforeChange(wtx, id) })))
   if (plan.solo.length) {
     const soloTeams = wtx.select({ id: teams.id }).from(teams).where(inArray(teams.workspaceId, plan.solo))
     await wtx.delete(teamMembers).where(inArray(teamMembers.teamId, soloTeams))
@@ -163,6 +165,7 @@ export async function deleteWorkspaceData(wtx: WorkspaceTx, userId: string, emai
   const kept = plan.keptProjectIds
   await wtx.delete(projectEvents).where(kept.length ? and(eq(projectEvents.userId, userId), sql`not (${projectEvents.projectId} = any(${kept}::uuid[]))`) : eq(projectEvents.userId, userId))
   await wtx.delete(projects).where(kept.length ? and(eq(projects.userId, userId), sql`not (${projects.id} = any(${kept}::uuid[]))`) : eq(projects.userId, userId))
+  for (const previous of previousLists) await workspaceListScopeChanged(wtx, previous.id, previous.scopes)
 }
 
 const ident = (name: string) => `"${name.replaceAll('"', '""')}"`
@@ -200,6 +203,7 @@ export async function deleteMainAccountData(client: PoolClient, userId: string, 
   const { deleteWorkspaceRows } = await import('@/lib/workspace-rows')
   for (const workspaceId of plan.solo) await deleteWorkspaceRows(client, workspaceId)
   await client.query('delete from "user" where id=$1', [userId])
+  for (const workspaceId of plan.shared) await workspaceListChanged(client, workspaceId, ['workspace_settings', 'issue_list', 'bot_list', 'group_list'])
 }
 
 /** Every delete the account needs in the main database, in no particular order. */

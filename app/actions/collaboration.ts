@@ -19,6 +19,7 @@ import { bindCommentAuthorship, snapshotCommentAuthorship } from '@/lib/linear-s
 import { activityActor } from '@/lib/activity-actor'
 import { requireLockedIssueScope } from '@/lib/issue-scope-authorization'
 import { readableIssueContentOnServer as readableIssueContent } from '@/lib/issue-editor-schema-snapshot'
+import { issueListChanged } from '@/lib/live/lists'
 
 const encodedState = z.string().max(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/)
 const syncSchema = z.object({ id: z.uuid(), vector: encodedState.optional(), update: encodedState.optional(), seed: encodedState.optional(), known: z.string().regex(/^[0-9a-f]{32}$/).optional() })
@@ -62,6 +63,7 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>): Promi
         await tx.insert(issueDocuments).values({ issueId: issue.id, userId: issue.userId, state }).onConflictDoUpdate({ target: issueDocuments.issueId, set: { state, updatedAt: new Date() } })
         await tx.update(issues).set({ content, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId)))
         await documentChanged(tx, issue.id)
+        await issueListChanged(tx, issue.id)
       }
       const [link] = locked.scope === 'workspace' && !locked.linearSyncBlocked ? await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(and(eq(linearIssueLinks.issueId, locked.id), eq(linearIssueLinks.ownerId, issue.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1) : []
       return { changed, syncEligible: Boolean(link), version: documentVersion(state), update: Buffer.from(Y.encodeStateAsUpdate(doc, parsed.vector ? Buffer.from(parsed.vector, 'base64') : undefined)).toString('base64') }
@@ -110,6 +112,7 @@ export async function removeMember(id: string, memberId: string): Promise<Action
       if (metadata.assignee?.kind === 'member' && metadata.assignee.id === parsed.data) {
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, assignee: null }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, user.id))).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: user.id, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(user.id) })
+        await issueListChanged(tx, id)
         if (saved.scope !== 'workspace' || saved.linearSyncBlocked) return false
         const [link] = await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(and(eq(linearIssueLinks.issueId, saved.id), eq(linearIssueLinks.ownerId, saved.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1)
         return Boolean(link)

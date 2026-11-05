@@ -1,7 +1,7 @@
 import { policySnapshotHash } from '@mikka/protocol/node-policy-snapshot'
 import { PERSONAL_MESSAGE_INSTRUCTIONS } from '@mikka/protocol/personal-agent-message'
 import { prepareGitHubEnvironment, type RunGitHub } from './github-runtime'
-import { runAppsHost, type RunApps } from './run-apps'
+import { runAppsHost, type RunApps, type RunMcp } from './run-apps'
 // What every real harness adapter needs about one run: its declared policy
 // (what it writes and reaches; runs use no sandbox, decision 2026-11-01-2335),
 // the Mikka MCP server (hand-in tools) and the handoff file it writes, and
@@ -106,6 +106,7 @@ export interface RunContextOptions {
   github?: RunGitHub
   /** The run's app entries; their Mikka server host joins the sandbox's reachable hosts. */
   apps?: RunApps
+  mcp?: RunMcp
   githubRuntime?: { nodeBinary: string; ghBinary: string }
   /** Clean caller PATH, before adding a run-local gh wrapper. */
   childPath?: string
@@ -351,6 +352,7 @@ export class RunContext {
         ...HARNESS_DOMAINS[this.options.harness],
         ...(this.options.harnessDomains ?? []),
         ...(runAppsHost(this.options.apps) ? [runAppsHost(this.options.apps)!] : []),
+        ...(this.options.mcp ? [new URL(this.options.mcp.url).host] : []),
         ...runDomains(
           runPolicy(this.options.policy),
           [...(this.options.networkAllow ?? []), ...(this.options.github ? ['github.com', 'api.github.com', new URL(this.options.github.endpoint).host] : [])],
@@ -381,6 +383,11 @@ export class RunContext {
       .join("\n\n")
   }
 
+  /** Kept in child-process environments; never in a repository or handoff file. */
+  decisionMcpEnv(): Record<string, string> {
+    return this.options.mcp ? { MIKKA_DECISION_MCP_URL: this.options.mcp.url, MIKKA_DECISION_MCP_TOKEN: this.options.mcp.token } : {}
+  }
+
   mcpServer(): McpServerSpec {
     const command = this.options.nodeBinary ?? process.execPath
     const repositoryExecution = !this.options.factoryCheck && ['implement', 'fix'].includes(this.options.kind ?? '')
@@ -394,7 +401,7 @@ export class RunContext {
         ...(repositoryExecution ? ['--repository-selection', this.worktree] : []),
       ],
       // Inside Electron, `process.execPath` is the app; run it as plain Node.
-      env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {},
+      env: { ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}), ...this.decisionMcpEnv() },
     }
   }
 

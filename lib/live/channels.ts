@@ -15,10 +15,10 @@ export class LiveChannels {
     const current = entry
     current.subscribers++
     const unsubscribe = current.channel.subscribe(kind, id, keys, refresh, options)
-    return () => {
+    return Object.assign(() => {
       unsubscribe()
       if (--current.subscribers === 0 && this.channels.get(workspaceId) === current) this.channels.delete(workspaceId)
-    }
+    }, { update: unsubscribe.update })
   }
 
   dispose() {

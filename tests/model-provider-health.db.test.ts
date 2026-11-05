@@ -16,7 +16,7 @@ test('provider health persists across dispatches without changing credential own
   const order = await import('../lib/model-order')
   const keys = await import('../lib/model-api-keys')
   const { resolveModelDispatch } = await import('../lib/model-dispatch')
-  const { planDispatch } = await import('../lib/model-order-plan')
+  const { entryKey, planDispatch } = await import('../lib/model-order-plan')
   const users: string[] = []
   const workspaces: string[] = []
   const now = Date.now()
@@ -109,6 +109,60 @@ test('provider health persists across dispatches without changing credential own
     assert.ok([...refreshed.states.values()].every(state => state.credential.usable), 'an explicit user refresh allows another paid request')
     await run(scope, { kind: 'api_key', keyId: empty.id }, { kind: 'auth', retryable: false, status: 401 }, now - 10_000, { finishedAt: now + 10_000 })
     assert.ok([...(await read(scope)).states.values()].every(state => state.credential.usable), 'a run started before refresh cannot poison the refreshed key by finishing late')
+  })
+
+  await t.test('an already selected Agent skips failed preferences without changing Agent, device or an explicit model', async () => {
+    const scope = await person('provider-selected-agent')
+    const empty = await key(scope, ['fixture-failed'])
+    const ready = await key(scope, ['fixture-next'])
+    await key(scope, ['fixture-not-preferred'])
+    const other = await keys.addApiKey(pool, scope.ownerId, { provider: 'anthropic', apiKey: `fixture-${randomUUID()}` },
+      { fetch: fakeProvider(['fixture-other-agent']) })
+    const wanted = [
+      { harness: 'claude_code', model: 'fixture-other-agent', source: { kind: 'api_key', keyId: other.id } },
+      { harness: 'codex', model: 'fixture-failed', source: { kind: 'api_key', keyId: empty.id } },
+      { harness: 'codex', model: 'fixture-next', source: { kind: 'api_key', keyId: ready.id } },
+    ] satisfies Omit<OrderEntry, 'id'>[]
+    await order.changeOrder(pool, scope, { kind: 'add', entries: wanted })
+    for (const entry of (await order.readOrder(pool, scope)).entries) {
+      if (!wanted.some(item => entryKey(item) === entryKey(entry))) await order.changeOrder(pool, scope, { kind: 'remove', id: entry.id })
+    }
+    const entries = (await order.readOrder(pool, scope)).entries
+    await order.changeOrder(pool, scope, { kind: 'reorder', ids: wanted.map(item => entries.find(entry => entryKey(entry) === entryKey(item))!.id) })
+    const deviceId = randomUUID(), alternateDeviceId = randomUUID()
+    for (const id of [deviceId, alternateDeviceId]) await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses)
+      VALUES ($1,$2,'Fixture device','local',true,now(),$3)`, [id, scope.ownerId,
+      JSON.stringify([{ harness: 'codex', installed: true }, { harness: 'claude_code', installed: true }])])
+    await pool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [scope.agentId, deviceId])
+    for (const [id, harness] of [[deviceId, 'claude_code'], [alternateDeviceId, 'codex'], [alternateDeviceId, 'claude_code']]) {
+      const agentId = await seedAgent(pool, scope.ownerId, harness)
+      await pool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [agentId, id])
+    }
+    await run(scope, { kind: 'api_key', keyId: empty.id }, { kind: 'balance', retryable: false, status: 402 }, now - 20_000, { model: 'fixture-failed' })
+    const { chooseLocalRunModel } = await import('../lib/computer/run-model')
+    const agent = { id: scope.agentId, deviceId, harness: 'codex' as const }
+    for (let task = 0; task < 2; task++) {
+      const chosen = await chooseLocalRunModel(pool, scope, agent)
+      assert.ok(!('error' in chosen), JSON.stringify(chosen))
+      assert.equal(chosen.model, 'fixture-next')
+      assert.equal(chosen.apiKeyId, ready.id)
+      assert.equal(chosen.modelDispatch?.mode, 'preference')
+      assert.equal(chosen.modelDispatch?.entry?.harness, 'codex')
+    }
+    const picked = await chooseLocalRunModel(pool, scope, agent, 'fixture-failed')
+    assert.deepEqual(picked, { error: 'machineUnavailable', reason: 'pickedUnavailable' }, 'an explicit failed model never chooses the healthy preference')
+
+    await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [deviceId])
+    const elsewhere = await resolveModelDispatch(pool, scope, null, 'local')
+    assert.ok(elsewhere.kind === 'device' && elsewhere.deviceId === alternateDeviceId, 'another owned device can run the task')
+    assert.ok('error' in await chooseLocalRunModel(pool, scope, agent), 'an already selected device stays fixed')
+    await pool.query('UPDATE devices SET enabled=true WHERE id=$1', [deviceId])
+
+    await order.changeOrder(pool, scope, { kind: 'remove', id: entries.find(entry => entry.model === 'fixture-next')!.id })
+    const unconstrained = await resolveModelDispatch(pool, scope, null, 'local')
+    assert.ok(unconstrained.kind === 'device' && unconstrained.entry.harness === 'claude_code', 'a different Agent is still usable')
+    assert.deepEqual(await chooseLocalRunModel(pool, scope, agent), { error: 'machineUnavailable', reason: 'unavailable' },
+      'no usable Codex preference: do not borrow another Agent or an unlisted model')
   })
 
   await t.test('outages expire, while an outage cannot clear an unresolved permanent failure', async () => {

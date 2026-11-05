@@ -22,6 +22,11 @@ test('panel notifications follow actual committed writes and persisted owner/wor
   const scheduler = mock.module('next/server', { namedExports: { ...nextServer,
     after: (work: () => Promise<void>) => { pending.push(work) },
   } })
+  // The same writers also refresh owner/workspace lists; lists.db.test.ts covers
+  // those keys. Here count task/thread panel keys only.
+  const lists = await import('./lists')
+  const listMock = mock.module(new URL('./lists.ts', import.meta.url).href, { namedExports: Object.fromEntries(Object.entries(lists).map(([name, value]) =>
+    [name, /ScopesBeforeChange$/.test(name) ? async () => [] : /Changed$/.test(name) ? async () => {} : value])) })
   const channelScopes = new Map<string, LiveScope>(), unexpectedPaths: string[] = []
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   process.env.DEVICE_GATEWAY_URL = 'https://gateway.example.invalid'
@@ -342,7 +347,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
   } finally {
     await scope.close()
     globalDb.workspacePool = previousWorkspace
-    scheduler.restore()
+    scheduler.restore(); listMock.restore()
     if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = previous.url
     if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
     await dropTestDatabase(admin, database, databasePool)

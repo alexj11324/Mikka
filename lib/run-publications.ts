@@ -1,6 +1,7 @@
 import { runChanged } from './live/panels'
 import 'server-only'
 import { isCurrentFactoryDeliverable } from './factory/execution-kind'
+import { issueListChanged, runListChanged } from './live/lists'
 import { and, asc, eq, isNull, lte, ne, or, sql } from 'drizzle-orm'
 import { runStateForStop } from '@mikka/protocol/daemon'
 import { reachesReview, runReport, type RunReport, type RunCompleteRequest } from '@mikka/protocol/run'
@@ -111,6 +112,7 @@ async function finishResult(tx: Transaction, run: Run, publication?: { pullReque
       if (status !== task.status || JSON.stringify(content) !== JSON.stringify(task.content)) {
         const [saved] = await tx.update(issues).set({ content, status, revision: task.revision + 1, updatedAt: new Date() }).where(eq(issues.id, task.id)).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...systemActor('run-result') })
+        await issueListChanged(tx, saved.id)
         if (saved.status === 'review') review = { id: saved.id, scopeVersion: saved.scopeVersion }
       }
     } else if (attachPullRequest && publication?.pullRequest) throw new PublicationError('issue_unavailable')
@@ -206,6 +208,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
       ;[run] = await tx.update(agentRuns).set({ status, pauseReason: paused ? 'quota_exhausted' : null, resumeStatus: null, stopReason: completion.stopReason, report: persistedReport ?? null,
         ...(quota ? { quotaResetsAt: resetsAt ? new Date(resetsAt) : null } : {}),
         ...(paused ? { leaseExpiresAt: null, finishedAt: null } : { finishedAt: sql`clock_timestamp()` }), updatedAt: new Date() }).where(eq(agentRuns.id, runId)).returning()
+      await runListChanged(tx, runId)
       await runChanged(tx, runId)
       await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, runId), isNull(runTokens.revokedAt)))
       await settleRunCompletionEffects(client, run, completion.stopReason, factoryBound, completion.report)

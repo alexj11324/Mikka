@@ -5,21 +5,33 @@ import { factoryAutomaticRuntime } from './automatic-dispatch'
 type Actor = { userId: string; workspaceId: string }
 
 /** Host-only durable work: never called inside the completed worker's request. */
-export async function handoffFactoryCloudStage(pool: Pool, actor: Actor, previousRunId: string | null, runId: string) {
-  const { rows: [handoff] } = await pool.query(`SELECT r.status FROM factory_tasks t
-    JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id
-    JOIN agent_runs r ON r.id=a."runId" AND r."userId"=t."userId" AND r."issueId"=t."issueId"
+export async function handoffFactoryCloudStage(pool: Pool, actor: Actor, previousRunId: string | null, runId: string, providerContinuation = false) {
+  const { rows: [handoff] } = await pool.query(`SELECT r.status,to_jsonb(r) AS run,to_jsonb(previous) AS previous,to_jsonb(i) AS issue
+    FROM agent_runs r
     JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
-    WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND t.status='running'
+    JOIN issues i ON i.id=r."issueId"
+    LEFT JOIN agent_runs previous ON previous.id=$4
+    WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3
+      AND (EXISTS (SELECT 1 FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id
+        WHERE a."runId"=r.id AND t."userId"=r."userId" AND t."issueId"=r."issueId" AND t.status='running')
+        OR ($5::boolean AND NOT EXISTS (SELECT 1 FROM factory_attempts a WHERE a."runId" IN (r.id,$4::uuid))))
       AND r."stopRequestedAt" IS NULL
       AND (r.status='queued' OR (r.status IN ('preparing','running','waiting_input') AND r."leaseExpiresAt">now()
         AND EXISTS(SELECT 1 FROM thread_machines m WHERE m."runId"=r.id AND m."ownerId"=r."userId"
           AND m."workspaceId"=b."workspaceId" AND m."botId"=b."botId" AND m."issueId"=r."issueId"
           AND m."deviceId"=r."deviceId" AND m."repoId"=r."deviceRepoId" AND m.state='running' AND m."sandboxId" IS NOT NULL)))
-      AND ($4::uuid IS NULL OR EXISTS (SELECT 1 FROM agent_runs previous WHERE previous.id=$4
-        AND previous."userId"=r."userId" AND previous."issueId"=r."issueId"
-        AND previous.status IN ('succeeded','failed','stopped','cancelled')))`, [runId, actor.userId, actor.workspaceId, previousRunId])
+      AND ($4::uuid IS NULL OR (previous."userId"=r."userId" AND previous."issueId"=r."issueId"
+        AND previous.status IN ('succeeded','failed','stopped','cancelled')))`, [runId, actor.userId, actor.workspaceId, previousRunId, providerContinuation])
   if (!handoff) return false // A cancelled, superseded or unowned handoff has no work.
+  if (providerContinuation) {
+    const [{ providerContinuationLaunchMatches }, { mayCompleteIssue }] = await Promise.all([import('../run-provider-fallback'), import('../run-completion')])
+    // The same lifecycle can serve a non-Factory provider continuation only
+    // with its immutable host receipt. A superseded Factory attempt cannot use
+    // this path to escape the current-task binding above.
+    if (!handoff.previous || handoff.previous.status !== 'failed' || !await providerContinuationLaunchMatches(pool, handoff.previous, handoff.run) ||
+      handoff.run.agentDefinition?.executionIdentity?.workspaceId !== actor.workspaceId ||
+      ['done', 'cancelled', 'canceled'].includes(handoff.issue.status) || !await mayCompleteIssue(handoff.issue, actor.userId)) return false
+  }
   // A lost step response can replay after the worker claimed. Continue this
   // durable workflow's lifecycle without parking or bootstrapping active work.
   if (handoff.status !== 'queued') return true
@@ -31,7 +43,8 @@ export async function handoffFactoryCloudStage(pool: Pool, actor: Actor, previou
   const started = await factoryAutomaticRuntime.start(actor, runId)
   // Native continuations and later stages retain the task's existing VM on
   // wake failure. Retry this durable step instead of discarding its history.
-  if (started?.state === 'unavailable') throw new Error(started.reason === 'retained_runtime' ? 'Retained task machine unavailable' : 'Original question machine unavailable')
+  if (started?.state === 'unavailable') throw new Error(started.reason === 'retained_runtime' ? 'Retained task machine unavailable'
+    : started.reason === 'provisioning' ? 'Thread provisioning in progress' : 'Original question machine unavailable')
   return started?.state === 'running'
 }
 

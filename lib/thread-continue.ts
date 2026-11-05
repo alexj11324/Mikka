@@ -47,9 +47,93 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
     return submitThreadOnce(pool, { userId, requestId: parsed.data.requestId, rootRunId: chain.rootRunId,
       requestedRunId: parsed.data.runId, previousRunId: chain.latestRunId, issueId: scope.issueId, botId: scope.botId, text: parsed.data.text,
       mode: UNFINISHED_RUN_STATUSES.some(status => status === chain.attempts.find(attempt => attempt.runId === chain.latestRunId)?.status) ? 'message' : 'continuation' },
-    sourceEventId => continueThread(userId, parsed.data.text, source, chain, sourceEventId))
+    sourceEventId => continueThread(userId, parsed.data.text, source, chain, sourceEventId),
+    typeof source === 'object' && source.source === 'human'
+      ? (sourceEventId, previousRunId, receiptOnly) => recoverThreadQuestionAnswer(userId, previousRunId, parsed.data.text, source.sessionId, sourceEventId, scope, receiptOnly)
+      : undefined)
   }
   return continueThread(userId, parsed.data.text, source, chain)
+}
+
+/** Only the question that already existed when this owner submitted may be
+ * retried. Never re-enter ordinary dispatch, target the chain's newer run or
+ * forward an old answer as a mailbox message. */
+async function recoverThreadQuestionAnswer(userId: string, previousRunId: string, text: string,
+  sessionId: string, sourceEventId: string, scope: { issueId: string | null; botId: string | null }, receiptOnly: boolean) {
+  const { rows: [identity] } = await pool.query(`SELECT q.id FROM coordinator_events submission
+    JOIN factory_questions q ON q."originRunId"=$3 AND q."userId"=submission."userId"
+      AND q."issueId"=submission."issueId" AND q."createdAt"<=submission."createdAt"
+    JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=q."userId" AND t."issueId"=q."issueId"
+      AND t."botId" IS NOT DISTINCT FROM submission."botId"
+    JOIN agent_runs origin ON origin.id=q."originRunId" AND origin."userId"=q."userId" AND origin."issueId"=q."issueId"
+    JOIN "session" human ON human.id=$6 AND human."userId"=submission."userId" AND human."expiresAt">clock_timestamp()
+    WHERE submission.id=$1 AND submission."userId"=$2 AND submission."issueId"=$4
+      AND submission."botId" IS NOT DISTINCT FROM $5::uuid`,
+  [sourceEventId, userId, previousRunId, scope.issueId, scope.botId, sessionId])
+  if (!identity) return null
+  const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
+  const { factoryEventId } = await import('@/lib/factory/event-id')
+  const { questionFingerprint, humanQuestionAnswerSchema } = await import('@/lib/factory/questions/contract')
+  const { questionReference } = await import('@/lib/factory/questions/store')
+  const questions = factoryRuntimeForBot(scope.botId).questions
+  const question = await questions.read(userId, identity.id)
+  const answerId = factoryEventId('task-thread-question-answer', questionFingerprint({ questionId: question.id, userId, text }))
+  if (question.answerId) {
+    const saved = question.answer as { source?: string; userId?: string; input?: unknown } | null
+    const parsed = humanQuestionAnswerSchema.safeParse(saved?.input)
+    if (question.answerId !== answerId || question.answerSource !== 'human' || saved?.source !== 'human'
+      || saved.userId !== userId || !parsed.success || parsed.data.answerId !== answerId || parsed.data.text !== text
+      || parsed.data.reference.questionId !== question.id || parsed.data.reference.originRunId !== previousRunId
+      || parsed.data.reference.originSessionId !== question.originSessionId
+      || questionFingerprint(parsed.data.reference.binding) !== questionFingerprint(question.waitingBinding)
+      || question.answerFingerprint !== questionFingerprint({ source: 'human', userId, input: parsed.data })) return null
+    // A committed answer's immutable receipt, not its mutable status, proves
+    // acceptance even after the child has completed or the task has advanced.
+    const { rows: [accepted] } = await pool.query(`SELECT e.result->'task'->>'sourceEventId' AS "requestEpoch",
+        e.result->'task'->>'attemptId' AS "attemptId" FROM factory_events e
+      JOIN agent_runs child ON child.id=$3::uuid AND child."userId"=$4 AND child."issueId"=$5
+        AND child."questionContinuation"->>'questionId'=$6 AND child."questionContinuation"->>'originRunId'=$7
+        AND child."questionContinuation"->>'originSessionId'=$8 AND child."questionContinuation"->>'requireSessionResume'='true'
+      WHERE e."taskId"=$1 AND e."eventId"=$2 AND e.request=$9::jsonb
+        AND e.result->>'questionId'=$6 AND e.result->>'answerId'=$10
+        AND e.result->>'answerFingerprint'=$11 AND e.result->>'originRunId'=$7
+        AND e.result->>'originSessionId'=$8 AND e.result->>'originAttemptId'=$12
+        AND e.result->>'continuationRunId'=$3::text`,
+    [question.taskId, factoryEventId('question-resume', answerId), question.continuationRunId, userId, scope.issueId,
+      question.id, previousRunId, question.originSessionId, JSON.stringify({ kind: 'question_resume', source: 'human', userId, input: parsed.data }),
+      answerId, question.answerFingerprint, question.attemptId])
+    if (!accepted || !z.uuid().safeParse(accepted.requestEpoch).success || !z.uuid().safeParse(accepted.attemptId).success) return null
+    const pendingWake = async () => Boolean((await pool.query(`SELECT 1 FROM factory_questions q
+      JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=q."userId" AND t."issueId"=q."issueId"
+      JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id
+      JOIN agent_runs child ON child.id=q."continuationRunId" AND child.id=a."runId"
+        AND child."userId"=q."userId" AND child."issueId"=q."issueId"
+      WHERE q.id=$1 AND q."userId"=$2 AND q."continuationRunId"=$3 AND q."answerId"=$4
+        AND q.status='resuming' AND (q."expiresAt" IS NULL OR q."expiresAt">clock_timestamp())
+        AND t.status='running' AND a.status='running' AND t.stage=q.stage
+        AND t."sourceEventId"=$5::uuid AND t."attemptId"=$6::uuid AND t."candidateId" IS NOT DISTINCT FROM q."candidateId"
+        AND child.status='queued' AND child."stopRequestedAt" IS NULL`,
+    [question.id, userId, question.continuationRunId, answerId, accepted.requestEpoch, accepted.attemptId])).rowCount)
+    if (await pendingWake()) {
+      try {
+        // Reuse the existing answer replay: it cannot admit another run and
+        // its postcommit hook wakes this same queued native continuation.
+        await questions.answer({ source: 'human', userId, sessionId }, parsed.data)
+      } catch (error) {
+        const { FactoryError } = await import('@/lib/factory/contract')
+        // Cancellation/advance may win after the eligibility read. The exact
+        // receipt stays accepted history; never wake or retry another target.
+        if (!(error instanceof FactoryError) || !['factoryStopped', 'factoryQuestionExpired', 'factoryQuestionStale'].includes(error.code)
+          || await pendingWake()) throw error
+      }
+    }
+    return { runId: previousRunId, continued: false }
+  }
+  if (receiptOnly) return null
+  // answer() locks and revalidates the task/question/session, preserves the
+  // original model and machine, and admits at most one native continuation.
+  await questions.answer({ source: 'human', userId, sessionId }, { reference: questionReference(question), answerId, text })
+  return { runId: previousRunId, continued: false }
 }
 
 async function continueThread(userId: string, text: string, source: Source,

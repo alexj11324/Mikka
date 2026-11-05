@@ -1,4 +1,5 @@
 import 'server-only'
+import { runListChanged } from './live/lists'
 import type { PoolClient } from 'pg'
 import { ActionFailureError } from '@/lib/action-error'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
@@ -140,8 +141,8 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
       }
       const result = await input.start(null, input.note, previous)
       if (!queued(result)) return result
-      await db.execute((await import('drizzle-orm')).sql`UPDATE agent_runs SET "threadReplacedBy"=${result.runId}::uuid,"updatedAt"=now() WHERE id=${threadId}::uuid AND "userId"=${userId}`)
-      await runChanged(db, threadId)
+      const replaced = await db.execute((await import('drizzle-orm')).sql`UPDATE agent_runs SET "threadReplacedBy"=${result.runId}::uuid,"updatedAt"=now() WHERE id=${threadId}::uuid AND "userId"=${userId} RETURNING id`)
+      if (replaced.rowCount) { await runListChanged(db, threadId); await runChanged(db, threadId) }
       return { ...result, thread: 'new' as const, threadId: result.runId, replacedThreadId: threadId }
     }
     if (working) {
@@ -154,8 +155,8 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
     }
     const result = await input.start(previous, continuationNote(input.note, previous))
     if (!queued(result)) return result
-    await db.execute((await import('drizzle-orm')).sql`UPDATE agent_runs SET "continuesRunId"=${previous.id}::uuid,"updatedAt"=now() WHERE id=${result.runId}::uuid AND "userId"=${userId} AND id<>${previous.id}::uuid`)
-    await runChanged(db, result.runId)
+    const continued = await db.execute((await import('drizzle-orm')).sql`UPDATE agent_runs SET "continuesRunId"=${previous.id}::uuid,"updatedAt"=now() WHERE id=${result.runId}::uuid AND "userId"=${userId} AND id<>${previous.id}::uuid RETURNING id`)
+    if (continued.rowCount) { await runListChanged(db, result.runId); await runChanged(db, result.runId) }
     return { ...result, thread: 'continued' as const, threadId, continuesRunId: previous.id }
   })
 }

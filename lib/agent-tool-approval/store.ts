@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg'
 import { lockCliRunPolicy, cliPolicyGuard, realCliMembershipGuard, type CliMembershipGuard } from './policy-store'
 import { writeTransaction } from '@/lib/operations/write-transaction'
 import { runChanged } from '@/lib/live/panels'
+import { runListChanged } from '@/lib/live/lists'
 
 /** No caller identity, policy, decision, or scope comes from the CLI. */
 export type DeviceActor = { userId: string; deviceId: string }
@@ -74,7 +75,7 @@ export class AgentToolApprovalStore {
         FROM computer_run_bindings b JOIN bot_desktops d ON d."botId"=b."botId" AND d."ownerId"=b."ownerId" AND d."workspaceId"=b."workspaceId"
         WHERE r.id=$1 AND b."runId"=r.id AND b."ownerId"=r."userId" AND r.status='paused' AND r."pauseReason"='human_control'
           AND (d.control<>'user' OR d."controlUntil" IS NULL OR d."controlUntil"<=now()) RETURNING r.id`, [runId])
-        if (resumed.rowCount) await runChanged(client, runId)
+        if (resumed.rowCount) { await runListChanged(client, runId); await runChanged(client, runId) }
       }
       const row = current.rows[0]?.status === 'paused'
         ? await client.query('SELECT status FROM agent_runs WHERE id=$1 AND "deviceId"=$2', [runId, actor.deviceId])

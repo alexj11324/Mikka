@@ -73,6 +73,13 @@ for (const [label, source, rule] of [
   ['sparkle icon', 'import { Sparkles } from "lucide-react";', 'icons/no-sparkle'],
 ]) test(label, () => has(`${prefix}\n${source}`, rule))
 
+test('a thread icon never borrows a task\'s circle (R-52)', () => {
+  const rules = text => auditSource('components/workspace/thread-status-icon.tsx', text, policy).map(item => item.rule)
+  assert.ok(rules('import { CircleCheck } from "lucide-react";').includes('icons/thread-not-circle'))
+  assert.ok(!rules('import { MessageCircle } from "lucide-react";').includes('icons/thread-not-circle'))
+  assert.ok(!auditSource('components/workspace/issue-properties.tsx', 'import { CircleCheck } from "lucide-react";', policy).some(item => item.rule === 'icons/thread-not-circle'))
+})
+
 test('local fonts must be registered with their CSS variable', () => {
   const approved = `import localFont from 'next/font/local';
     const fontSans = localFont({ src: '../fonts/InterVariable.woff2', variable: '--font-inter', weight: '100 900' });`

@@ -34,8 +34,13 @@ async function getOwner() {
 
 /** The bot list: the person's bots here, their Coordinator first (lib/coordinator/coordinator-bot.ts listOwnerBots). */
 export async function listBots(): Promise<BotView[]> {
+  return (await pollBots()).items
+}
+
+/** The list cache is bound to this actual authorized Owner/workspace read. */
+export async function pollBots() {
   const { ownerId, workspaceId } = await getOwner()
-  return listOwnerBots(ownerId, workspaceId)
+  return { items: await listOwnerBots(ownerId, workspaceId), live: { ownerId, workspaceId } }
 }
 
 /**

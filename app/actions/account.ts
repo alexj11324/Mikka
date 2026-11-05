@@ -17,6 +17,8 @@ import { accountMailConfigured, sendAccountMail } from '@/lib/account/mail'
 import { listSharedArtifacts, type SharedArtifactLink } from '@/lib/account/shared-links'
 import { AccountAuthenticationError, requireFreshAccountSession } from '@/lib/account/fresh-session'
 import { deleteAccount as deleteAccountData } from '@/lib/account/delete'
+import { pool } from '@/lib/db'
+import { ownerIssueListsChanged, ownerProfileListsChanged } from '@/lib/live/lists'
 
 const displayName = z.string().trim().min(1).max(80)
 // Better Auth's defaults (minPasswordLength 8, maxPasswordLength 128); lib/auth.ts does not change them.
@@ -44,8 +46,10 @@ export async function updateDisplayName(name: string): Promise<ActionResult<{ na
   return runAction(async () => {
     const parsed = displayName.safeParse(name)
     if (!parsed.success) throw new ActionFailureError('validationNameRequired')
-    const { headers: requestHeaders } = await requireSession()
+    const { user, headers: requestHeaders } = await requireSession()
     await auth.api.updateUser({ body: { name: parsed.data }, headers: requestHeaders })
+    await ownerIssueListsChanged(pool, user.id)
+    await ownerProfileListsChanged(pool, user.id)
     return { name: parsed.data }
   })
 }
@@ -65,6 +69,8 @@ export async function uploadAvatar(form: FormData): Promise<ActionResult<{ image
     if (!checked.ok) throw new ActionFailureError(checked.reason === 'size' ? 'avatarTooLarge' : 'avatarInvalidType')
     const image = await saveAvatar(user.id, checked.contentType, checked.bytes)
     await auth.api.updateUser({ body: { image }, headers: requestHeaders })
+    await ownerIssueListsChanged(pool, user.id)
+    await ownerProfileListsChanged(pool, user.id)
     return { image }
   })
 }
