@@ -10,19 +10,31 @@ import { factoryLifecycleEnabled, factoryRuntimeForBot } from './runtime'
 import { notifyQueuedLocalRun } from '../device-gateway-notify'
 import { advanceFactoryRequest, factoryContinuationSource } from './request-epoch'
 
+/** The initial Profile follows the existing route. The queue rechecks it under lock. */
+export async function factoryTaskNeedsSpec(pool: Pool, userId: string, input: {
+  issueId: string; botId: string | null; needsSpec?: boolean
+}) {
+  if (input.needsSpec) return true
+  const { rows: [task] } = await pool.query<{ stage: string; status: string }>(`SELECT stage,status FROM factory_tasks
+    WHERE "userId"=$1 AND "issueId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid
+    ORDER BY "createdAt" DESC,id DESC LIMIT 1`, [userId, input.issueId, input.botId])
+  return task?.stage === 'spec' && !['cancelled','revoked'].includes(task.status)
+}
+
 /** Placement is already decided. Route, attempt, queue and receipt share one commit. */
 export async function queueFactoryTask(pool: Pool, userId: string, input: {
   issueId: string; botId: string | null; agentId: string; deviceRepoId: string; note?: string
-  key?: string; sourceEventId?: string; previousRunId?: string
+  key?: string; sourceEventId?: string; previousRunId?: string; needsSpec?: boolean
   selection?: unknown
   queue: FactoryQueue
 }) {
   if (!factoryLifecycleEnabled()) throw new FactoryError('factoryLifecycleUnavailable')
+  if (input.needsSpec && input.previousRunId) throw new FactoryError('factoryTransition')
   const runtime = factoryRuntimeForBot(input.botId)
   const tx = await pool.connect()
   const key = input.key ?? randomUUID()
   const receiptId = factoryEventId('host-dispatch', `${userId}:${key}`)
-  const digest = createHash('sha256').update(JSON.stringify([input.agentId, input.deviceRepoId, input.note ?? null, input.previousRunId ?? null, input.sourceEventId ?? null, input.selection ?? null])).digest('hex')
+  const digest = createHash('sha256').update(JSON.stringify([input.agentId, input.deviceRepoId, input.note ?? null, input.previousRunId ?? null, input.sourceEventId ?? null, input.selection ?? null, ...(input.needsSpec ? [{ needsSpec: true }] : [])])).digest('hex')
   try {
     await tx.query('BEGIN')
     await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['factory-host-dispatch', userId, input.issueId])])
@@ -36,7 +48,15 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
     }
     const { rows } = await tx.query<import('./store').FactoryTask>(`SELECT * FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid ORDER BY "createdAt" DESC,id DESC LIMIT 1 FOR UPDATE`, [userId, input.issueId, input.botId])
     let task: import('./store').FactoryTask | undefined = rows[0]
-    let sourceEventId = input.sourceEventId
+    const pendingSpec = task?.stage === 'spec' && task.status === 'pending' && !input.previousRunId
+    if (input.needsSpec && task && task.stage !== 'spec' && !['cancelled','revoked'].includes(task.status)) throw new FactoryError('factoryStale')
+    if (task?.stage === 'spec' && !['cancelled','revoked'].includes(task.status)) {
+      // A generic dispatch cannot replace a plan or act as its human approval.
+      if (!pendingSpec) throw new FactoryError('factoryRunStillActive')
+      if (input.sourceEventId && input.sourceEventId !== task.sourceEventId) throw new FactoryError('factorySourceMismatch')
+      if (!input.needsSpec) throw new FactoryError('factoryStale')
+    }
+    let sourceEventId = input.sourceEventId ?? (pendingSpec ? task?.sourceEventId : undefined)
     if (!sourceEventId) {
       sourceEventId = factoryEventId('dispatch-source', `${userId}:${key}`)
       await tx.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1,$2,$3,$4,'user_message',$5,$6) ON CONFLICT DO NOTHING`, [sourceEventId, userId, input.botId, input.issueId, `factory-dispatch:${key}`, JSON.stringify({ text: input.note?.trim() || 'Run this task.', source: 'host_dispatch' })])
@@ -58,7 +78,7 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
         }
       }
     }
-    if (task && !input.previousRunId && !['cancelled','revoked'].includes(task.status)) {
+    if (task && !input.previousRunId && !pendingSpec && !['cancelled','revoked'].includes(task.status)) {
       await runtime.store.apply(userId, factoryBinding(task), factoryEventId('replace-thread', key), { action: 'cancel', reason: 'The person requested a new thread.' }, tx)
       task = undefined
     }
@@ -79,8 +99,8 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
         task = (await runtime.store.apply(userId, factoryBinding(task), factoryEventId('continue-repair', key), { action: 'repair', reason: input.note?.slice(0, 4000) || 'Revise the candidate.' }, tx)).task
       } else if (task.status === 'passed') task = undefined
       if (task && (task.stage !== 'execute' || task.status !== 'pending')) throw new FactoryError('factoryRunStillActive')
-    } else task = undefined
-    if (!task) task = (await runtime.store.route(userId, { issueId: input.issueId, eventId: factoryEventId('host-route', key), sourceEventId, rationale: 'Authenticated task dispatch; placement and model selected by the host.' }, tx)).task
+    } else if (!pendingSpec) task = undefined
+    if (!task) task = (await runtime.store.route(userId, { issueId: input.issueId, eventId: factoryEventId('host-route', key), sourceEventId, needsSpec: Boolean(input.needsSpec), rationale: 'Authenticated task dispatch; placement and model selected by the host.' }, tx)).task
     const dispatch = createFactoryDispatch(pool, runtime.store, input.queue)
     const result = await dispatch(userId, { binding: factoryBinding(task), agentId: input.agentId, deviceRepoId: input.deviceRepoId, ...(input.note ? { note: input.note } : {}) }, tx)
     if (input.previousRunId) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1 AND "userId"=$3', [result.runId, input.previousRunId, userId])
