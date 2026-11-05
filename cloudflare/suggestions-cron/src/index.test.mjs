@@ -29,8 +29,9 @@ test('each schedule calls its endpoints and logs only whitelisted numeric counts
   })
   for (const [schedule, endpoint] of Object.entries(SCHEDULES)) {
     const before = calls.length
-    assert.equal(await runSchedule(schedule, env, fetcher, ONE_PAST_HOUR), 200)
-    const endpoints = schedule === '* * * * *' ? sweepsAt(1) : [endpoint]
+    const minuteTick = schedule === '* * * * *'
+    assert.equal(await runSchedule(schedule, env, fetcher, minuteTick ? HALF_PAST : ONE_PAST_HOUR), 200)
+    const endpoints = minuteTick ? [...sweepsAt(30), ...HALF_PAST_EXTRA] : [endpoint]
     assert.deepEqual(calls.slice(before).map(call => call.url), endpoints.map(path => `https://mikka.example.test/mikka${path}`))
     for (const call of calls.slice(before)) {
       assert.deepEqual(call.headers, { authorization: `Bearer ${env.CRON_SECRET}` })
@@ -38,7 +39,7 @@ test('each schedule calls its endpoints and logs only whitelisted numeric counts
       assert.ok(call.signal instanceof AbortSignal)
     }
   }
-  const endpoints = [...sweepsAt(1), ...Object.entries(SCHEDULES).filter(([cron]) => cron !== '* * * * *').map(([, path]) => path)]
+  const endpoints = [...sweepsAt(30), ...HALF_PAST_EXTRA, ...Object.entries(SCHEDULES).filter(([cron]) => cron !== '* * * * *').map(([, path]) => path)]
   assert.equal(calls.length, endpoints.length)
   assert.deepEqual(logs, endpoints.map(path => `${path} 200 {"zones":2,"due":1,"written":1,"empty":0,"skipped":0,"failed":0,"deferred":3,"pushed":1,"people":4}`))
 })
@@ -169,7 +170,7 @@ test('a complete UTC hour runs each reconciliation sweep and maintenance at its 
   assert.deepEqual(counts, {
     '/api/cron/coordinator-wakes': 12,
     '/api/cron/schedules': 6,
-    '/api/cron/run-recovery': 60,
+    '/api/cron/run-recovery': 4,
     '/api/cron/account-deletions': 1,
     '/api/cron/audit-retention': 1,
     '/api/cron/ops-monitor': 4,
