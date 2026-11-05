@@ -58,7 +58,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
           if (!ready) throw new ComputerError(409, 'Bot computer task is unavailable')
           const source = target.entry.source
           runModel = { model: target.model, agentProfile: picked.agentProfile,
-            modelDispatch: { mode: picked.selectionMode ?? (parsed.data.harness ? 'picked' : 'preference'), location: 'cloud', entry: target.entry },
+            modelDispatch: { mode: picked.selectionMode ?? (parsed.data.harness ? 'picked' : 'preference'), location: 'cloud', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
             ...(source.kind === 'api_key' ? { apiKeyId: source.keyId } : { subscriptionBindingId: await (await import('@/lib/model-dispatch')).bindAgentToConnection(pool, scope, ready.agentId, harness, source.connectionId, target.model) }) }
         }
         const runtime = (await pool.query('SELECT r."agentId",r."repoId",a."deviceId" FROM bot_cloud_runtimes r JOIN agents a ON a.id=r."agentId" WHERE r."botId"=$1 AND r."ownerId"=$2 AND r."workspaceId"=$3 AND r.harness=$4', [botId, session.user.id, context.workspace.id, harness])).rows[0]

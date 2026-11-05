@@ -123,6 +123,20 @@ export async function reconcileFactoryAfterCompletion(db: Queryable, userId: str
       causeCode: typeof cause === 'string' ? cause : undefined,
     })
   }
+  // The next stage may fail to reconcile after this run has already committed.
+  // Record its terminal result independently: preparePrompt recovers the stage
+  // through a different entry point and would not retry this completion hook.
+  // The recorder itself enforces owner/task/terminal scope and the replay key.
+  try {
+    await (await import('./model-routing-outcome')).recordModelRoutingOutcome(db, userId, runId)
+  } catch (error) {
+    const code = (error as { code?: unknown } | null)?.code
+    console.warn('model routing completion outcome unavailable', {
+      runId,
+      error: error instanceof Error ? error.constructor.name : typeof error,
+      code: typeof code === 'string' ? code : 'unknown',
+    })
+  }
   return reconciled
 }
 

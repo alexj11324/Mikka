@@ -2684,7 +2684,8 @@
       "reconnectSubscription": "Reconnect",
       "openApiKey": "Open API key",
       "openSubscription": "Open subscription",
-      "description": "Tasks for Agents pick a model in this order"
+      "description": "Tasks dispatched to an Agent choose from these models",
+      "autoRouting": "Choose models automatically by task difficulty"
     },
     "loadingPage": "Loading settings",
     "modelScope": {
@@ -3832,6 +3833,31 @@
         "provider_unknown": "External cost unknown",
         "metered": "Mikka metered usage",
         "not_applicable": "Not applicable"
+      },
+      "modelRouting": "Model selection",
+      "routingReason": "Selection reason",
+      "previousModel": "Model before escalation",
+      "routingDifficulty": {
+        "easy": "Easy",
+        "medium": "Medium",
+        "hard": "Hard",
+        "unknown": "Difficulty not assessed"
+      },
+      "routingEffort": {
+        "low": "Low reasoning effort",
+        "medium": "Medium reasoning effort",
+        "high": "High reasoning effort",
+        "xhigh": "Extra-high reasoning effort",
+        "max": "Maximum reasoning effort"
+      },
+      "routingReasons": {
+        "difficulty_fit": "Selected by task difficulty",
+        "list_order": "Selected in model list order",
+        "low_confidence": "Difficulty was uncertain; used model list order",
+        "decision_unavailable": "Difficulty assessment was unavailable; used model list order",
+        "invalid_answer": "Difficulty assessment was invalid; used model list order",
+        "no_selection": "No suitable model was selected; used model list order",
+        "escalated": "The lightweight model could not finish the task; retried with a stronger model"
       }
     }
   },

@@ -12,6 +12,7 @@ import { agentRuns, runCaptureShares, runCaptureSteps, runCaptures } from '@/lib
 import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, presignArtifactPut, putArtifactObject } from '@/lib/artifacts/storage'
 import { runArtifactSubmissions } from '@/lib/artifacts/run-submissions'
 import { executionIdentitySchema } from '@/lib/execution-identity'
+import { modelRoutingEvidenceSchema } from '@/lib/thread-execution-identity-view'
 
 // Screenshots and screen recordings in Neon (whose, which run, share links)
 // with their files in the artifacts bucket. Every read is scoped to the run's
@@ -292,6 +293,7 @@ export async function runEvidence(userId: string, runId: string) {
     harness: sql<string | null>`${agentRuns.agentDefinition}->>'harness'`,
     model: sql<string | null>`${agentRuns.agentDefinition}->>'model'`,
     executionIdentity: sql<unknown>`${agentRuns.agentDefinition}->'executionIdentity'`,
+    modelRouting: sql<unknown>`${agentRuns.agentDefinition}->'modelDispatch'->'routing'`,
     agentProfile: sql<RunAgentProfile | null>`case when ${agentRuns.agentDefinition}->'agentProfile' is null then null else jsonb_build_object(
       'profileId',${agentRuns.agentDefinition}->'agentProfile'->'profileId','name',${agentRuns.agentDefinition}->'agentProfile'->'name',
       'version',${agentRuns.agentDefinition}->'agentProfile'->'version','digest',${agentRuns.agentDefinition}->'agentProfile'->'digest',
@@ -303,13 +305,14 @@ export async function runEvidence(userId: string, runId: string) {
   // This is the frozen provenance of completed work, not a live resource
   // authorization check. Schema projection strips private/unknown fields.
   const identity = executionIdentitySchema.safeParse(run.executionIdentity)
+  const routing = modelRoutingEvidenceSchema.safeParse(run.modelRouting)
   const captures = await db.select().from(runCaptures)
     .where(and(eq(runCaptures.runId, runId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'ready'))).orderBy(asc(runCaptures.createdAt))
   const documents = await runArtifactSubmissions(pool, userId, [runId])
   const recording = await db.select({ id: runCaptures.id }).from(runCaptures)
     .where(and(eq(runCaptures.runId, runId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'recording'))).limit(1)
   return {
-    run: { ...run, executionIdentity: identity.success ? identity.data : null },
+    run: { ...run, executionIdentity: identity.success ? identity.data : null, modelRouting: routing.success ? routing.data : null },
     recording: recording.length > 0,
     captures: captures.map(captureView),
     artifacts: documents.map(document => ({ ...document, createdAt: document.createdAt.toISOString() })),

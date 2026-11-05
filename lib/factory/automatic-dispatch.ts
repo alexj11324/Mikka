@@ -54,15 +54,40 @@ export function automaticFactoryDispatch(pool: Pool) {
     const check = task.stage !== 'execute'
     const inheritedPolicy = source.agentDefinition?.policyCeiling ? { policyCeiling: source.agentDefinition.policyCeiling } : {}
     let selection: Partial<RunModel> = check ? inheritedPolicy : threadRunModel(source.agentDefinition) ?? inheritedPolicy
-    const profileChoice = check ? await (await import('./agent-profile')).resolveAgentProfileDispatch(pool, {
+    let profileChoice = check ? await (await import('./agent-profile')).resolveAgentProfileDispatch(pool, {
       ownerId: task.userId, workspaceId: source.workspaceId ?? await (await import('@/lib/execution-settings')).executionWorkspace(task.userId, task.botId), botId: task.botId,
     }, { issueId: task.issueId, stage: task.stage, location: source.deviceKind === 'cloud' ? 'cloud' : 'local',
       defaultHarness: source.harness, cloudPurpose: source.remoteUrl ? 'task' : 'desktop',
       ...(source.agentDefinition?.pinnedDeviceId ? { deviceId: source.agentDefinition.pinnedDeviceId } : {}),
     }) : undefined
     if (profileChoice?.target.kind === 'none') throw new FactoryError('factoryCheckHarnessUnavailable')
-    const { rows: [pending] } = await tx.query('SELECT output FROM factory_attempts WHERE id=$1 AND "taskId"=$2', [task.attemptId, task.id])
+    const { rows: [pending] } = await tx.query('SELECT output,position FROM factory_attempts WHERE id=$1 AND "taskId"=$2', [task.attemptId, task.id])
     const recovery = pending?.output?.watchdogRecovery
+    const previousRouting = source.agentDefinition?.modelDispatch?.routing
+    const frozenProfile = source.agentDefinition?.agentProfile
+    if (!check && !recovery && previousRouting && source.agentDefinition.modelDispatch.mode === 'preference' && frozenProfile?.definition.model.mode !== 'fixed') {
+      // Only the adjacent, persisted failed attempt in this request can raise
+      // a model. A repeated dispatch or a watchdog migration is not a failure.
+      const { rows: [failed] } = await tx.query(`SELECT a.stage,a.output,a."runId" FROM factory_attempts a
+        WHERE a."taskId"=$1 AND a.position=$2-1 AND a.status='failed'
+          AND COALESCE(a.output->>'requestEpoch',$3::text)=$3::text
+          AND ((a.stage IN ('review','verify') AND a.output->'completion'->'trustedFailureProvenance'='true'::jsonb)
+            OR (a.stage='execute' AND a."runId"=$4 AND a.output->>'reasonCode'='run_failed'))`,
+      [task.id, pending?.position, task.sourceEventId, source.id])
+      if (failed) {
+        const target = await (await import('@/lib/model-dispatch')).resolveModelDispatch(pool, {
+          ownerId: task.userId, workspaceId: source.workspaceId ?? await (await import('@/lib/execution-settings')).executionWorkspace(task.userId, task.botId), botId: task.botId,
+        }, null, source.deviceKind === 'cloud' ? 'cloud' : 'local', source.agentDefinition.pinnedDeviceId, {
+          cloudPurpose: source.remoteUrl ? 'task' : 'desktop',
+          ...(frozenProfile?.definition.harness && frozenProfile.definition.harness !== 'auto' ? { harness: frozenProfile.definition.harness } : {}),
+          routing: { issueId: task.issueId, stage: task.stage, previous: previousRouting, escalate: true, effort: frozenProfile?.effort },
+        })
+        // An off switch keeps the existing frozen choice. Preserve the role,
+        // policy and skill digest; only its actual execution target changes.
+        if (target.kind !== 'none' && target.routing) profileChoice = { target, selectionMode: 'preference',
+          ...(frozenProfile ? { agentProfile: { ...structuredClone(frozenProfile), targetEntry: structuredClone(target.entry) } } : {}) }
+      }
+    }
     let agentId = source.agentId, deviceId = source.deviceId, deviceRepoId = source.deviceRepoId
     if (recovery && !check && source.deviceKind !== 'cloud') {
       if (recovery.requestEpoch !== task.sourceEventId || recovery.previousRunId !== source.id || !source.remoteUrl)
@@ -108,7 +133,7 @@ export function automaticFactoryDispatch(pool: Pool) {
         deviceId = target.deviceId
         deviceRepoId = (await ensureDeviceRepository(task.userId, target.deviceId, source.remoteUrl, tx)).id
         selection = { ...inheritedPolicy, model: target.model, agentProfile: profileChoice.agentProfile,
-          modelDispatch: { mode: profileChoice.selectionMode ?? 'preference', location: 'local', entry: target.entry },
+          modelDispatch: { mode: profileChoice.selectionMode ?? 'preference', location: 'local', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
           ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
           ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
       }
@@ -127,7 +152,7 @@ export function automaticFactoryDispatch(pool: Pool) {
       if (target.kind !== 'cloud') throw new FactoryError('factoryCheckHarnessUnavailable')
       const entry = target.entry.source
       model = { model: target.model, agentProfile: profileChoice.agentProfile,
-        modelDispatch: { mode: profileChoice.selectionMode ?? 'preference', location: 'cloud', entry: target.entry },
+        modelDispatch: { mode: profileChoice.selectionMode ?? 'preference', location: 'cloud', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
         ...(entry.kind === 'api_key' ? { apiKeyId: entry.keyId } : { subscriptionBindingId: await (await import('@/lib/model-dispatch')).bindAgentToConnection(tx,
           { ownerId: task.userId, workspaceId: source.workspaceId }, runtime.agentId, target.harness, entry.connectionId, target.model) }) }
     } else if (check) model = await chooseCloudRunModel(pool, { ownerId: task.userId, workspaceId: source.workspaceId, botId: task.botId }, runtime.agentId, source.harness, undefined, source.remoteUrl ? 'task' : 'desktop')

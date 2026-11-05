@@ -9,12 +9,15 @@ import type { RepositoryAdmission } from '../repository-admission'
 import { mcpAuthoritySchema, type McpAuthority } from '../plugins/contracts'
 import type { OrderEntry, RunLocation } from '../model-order-plan'
 import { runPolicySchema, type RunPolicy } from '@mikka/protocol/agent-policy'
+import { modelTier, supportedModelEfforts, type ModelRoutingSnapshot } from '../model-routing'
 
 /** Host-recorded model choice, distinct from the CLI's explicit model argument. */
 export interface WorkerModelDispatch {
   mode: 'preference' | 'picked'
   location?: RunLocation
   entry?: OrderEntry
+  /** Host-validated difficulty choice, frozen with the actual model. */
+  routing?: ModelRoutingSnapshot
 }
 
 export interface WorkerDefinitionSnapshot {
@@ -120,6 +123,11 @@ function apiKeyModelDispatch(dispatch: WorkerModelDispatch | undefined, key: { k
   const entry = frozen.entry
   if (entry && (entry.source.kind !== 'api_key' || entry.source.keyId !== key.keyId || entry.model !== key.model)) {
     frozen.entry = { ...entry, id: `api_key:${entry.harness}:${key.model}:${key.keyId}`, model: key.model, source: { kind: 'api_key', keyId: key.keyId } }
+    if (frozen.routing && frozen.routing.model !== key.model) {
+      const { effort, ...previous } = frozen.routing
+      frozen.routing = { ...previous, model: key.model, harness: entry.harness, tier: modelTier(key.model), reason: 'list_order', previousModel: previous.model,
+        ...(effort && supportedModelEfforts(key.model, entry.harness).includes(effort) ? { effort } : {}) }
+    }
   }
   return frozen
 }

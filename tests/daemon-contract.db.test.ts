@@ -20,7 +20,7 @@ type ReleasedLink = {
   heartbeat(deviceId: string, status: unknown): Promise<{ leases: Record<string, string> }>
   listRepos(deviceId: string): Promise<{ repoId: string }[]>
   pendingRuns(deviceId: string): Promise<string[]>
-  claimRun(deviceId: string, runId: string): Promise<{ runId: string; remoteUrl?: string }>
+  claimRun(deviceId: string, runId: string): Promise<{ runId: string; remoteUrl?: string; effort?: string }>
 }
 
 test(`daemon ${MIN_DAEMON_VERSION} as released works against today's device routes`, { skip: !dbUrl }, async t => {
@@ -90,11 +90,13 @@ test(`daemon ${MIN_DAEMON_VERSION} as released works against today's device rout
   assert.deepEqual((await link.heartbeat(deviceId, { harnesses, runs: [], worktreeDiskBytes: 0 })).leases, {})
   assert.ok((await link.listRepos(deviceId)).some(repo => repo.repoId === repoId))
 
-  const { runId } = await queueRun(owner, { issueId, agentId, repo: remote, model: 'fixture-model' }, botId)
+  const { runId } = await queueRun(owner, { issueId, agentId, repo: remote, model: 'fixture-model',
+    modelDispatch: { mode: 'preference', routing: { version: 1, difficulty: 'hard', model: 'fixture-model', harness: 'claude_code', tier: 'standard', effort: 'high', reason: 'difficulty_fit' } } }, botId)
   assert.deepEqual(await link.pendingRuns(deviceId), [runId])
   const assignment = await link.claimRun(deviceId, runId)
   assert.equal(assignment.runId, runId)
   assert.equal(assignment.remoteUrl, remote)
+  assert.equal(assignment.effort, 'high', 'the released daemon receives the host-frozen routing effort')
   const leased = await link.heartbeat(deviceId, { harnesses, runs: [{ runId, lastProgressAt: new Date().toISOString() }], worktreeDiskBytes: 0 })
   assert.ok(leased.leases[runId], 'the claimed run\'s lease is renewed')
 })

@@ -166,8 +166,9 @@ test('an untouched list is defaultOrder over what was connected, dispatched only
     const p = await person('default-list')
     await subscribe(p, 'claude', ['fx-sonnet', 'fx-opus'])
     await subscribe(p, 'codex', ['fx-codex-top', 'fx-codex-mini'])
-    const expected = defaultOrder(await order.orderCandidates(pool, p)).map(item => `${item.harness}:${item.model}`)
-    assert.deepEqual(expected, ['claude_code:fx-opus', 'codex:fx-codex-top'])
+    const prefix = defaultOrder(await order.orderCandidates(pool, p)).map(item => `${item.harness}:${item.model}`)
+    assert.deepEqual(prefix, ['claude_code:fx-opus', 'codex:fx-codex-top'])
+    const expected = [...prefix, 'claude_code:fx-sonnet', 'codex:fx-codex-mini']
     const stored = await order.readOrder(pool, p)
     assert.equal(stored.customized, false)
     assert.deepEqual(stored.entries.map(entry => `${entry.harness}:${entry.model}`), expected)

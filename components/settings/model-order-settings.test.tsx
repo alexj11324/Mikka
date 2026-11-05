@@ -4,20 +4,39 @@ import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
 import { act, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
-import type { OrderRow, OrderView } from '../../lib/model-order'
+import type { OrderChange, OrderRow, OrderView } from '../../lib/model-order'
 
 const workspaceId = randomUUID(), connectionId = randomUUID(), keyId = randomUUID()
 let data: OrderView
 let configured: boolean | undefined = true
 let refreshFails = false
 let refreshUnconfirmed = false
+let changeFails: 'response' | 'network' | null = null
+let rereadFails = false
+let savedAutoRouting = true
+const changes: OrderChange[] = []
 const events: string[] = []
 const translate = Object.assign((key: string) => key, { has: () => false })
 mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'time' }) } })
-mock.module('swr', { defaultExport: () => ({ data, mutate: async (value?: OrderView) => { events.push(value ? 'order-cache' : 'order'); return data } }) })
+mock.module('swr', { defaultExport: () => ({ data, mutate: async (value?: OrderView) => {
+  events.push(value ? 'order-cache' : 'order')
+  if (value) data = value
+  else {
+    if (rereadFails) throw new Error('fixture offline')
+    data = { ...data, autoModelRouting: savedAutoRouting }
+  }
+  return data
+} }) })
 mock.module('next/link', { defaultExport: ({ children, href }: { children: ReactNode; href: string }) => <a href={href}>{children}</a> })
 mock.module(new URL('../../app/actions/model-order.ts', import.meta.url).href, { namedExports: {
-  changeModelOrder: async () => data,
+  changeModelOrder: async (change: typeof changes[number], workspace: string) => {
+    assert.equal(workspace, workspaceId)
+    changes.push(change)
+    if (changeFails === 'network') throw new Error('fixture offline')
+    if (changeFails === 'response') return { error: 'unavailable' }
+    if (change.kind === 'autoRouting') savedAutoRouting = change.enabled
+    return { ...data, autoModelRouting: savedAutoRouting }
+  },
   checkModelOrderQuota: async (id: string, workspace: string) => {
     assert.equal(workspace, workspaceId)
     assert.ok(data.entries.some(row => row.source.kind === 'subscription' && row.source.connectionId === id))
@@ -56,7 +75,8 @@ before(async () => {
 })
 beforeEach(() => {
   configured = true; refreshFails = false; refreshUnconfirmed = false; events.length = 0
-  data = { location: 'cloud', customized: true, preferredHarness: 'claude_code', credentials: 1, entries: [], candidates: [], devices: 0, cloudReady: true, cloudModels: {}, first: { kind: 'cloud' }, readyDeviceIds: [], deviceModels: {} }
+  changeFails = null; rereadFails = false; savedAutoRouting = true; changes.length = 0
+  data = { location: 'cloud', customized: true, autoModelRouting: true, preferredHarness: 'claude_code', credentials: 1, entries: [], candidates: [], devices: 0, cloudReady: true, cloudModels: {}, first: { kind: 'cloud' }, readyDeviceIds: [], deviceModels: {} }
   container = browser.document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container)
   root = createRoot(container)
@@ -153,4 +173,43 @@ test('an unavailable provider read keeps checking even when the HTTP request suc
   await act(async () => button('checkQuota')!.click())
   assert.ok(container.querySelector('[role="alert"]')?.textContent?.includes('quotaCheckUnconfirmed'))
   assert.equal(container.querySelector('li [role="status"]')?.textContent, 'blocked.checking')
+})
+
+
+test('automatic model routing reflects the saved setting and saves each toggle for the current workspace', async () => {
+  await render()
+  const toggle = () => container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="autoRouting"]')!
+  assert.equal(toggle().getAttribute('aria-checked'), 'true')
+  await act(async () => toggle().click())
+  assert.deepEqual(changes, [{ kind: 'autoRouting', enabled: false }])
+  assert.equal(toggle().getAttribute('aria-checked'), 'false')
+  assert.equal(data.autoModelRouting, false)
+  await act(async () => toggle().click())
+  assert.deepEqual(changes[1], { kind: 'autoRouting', enabled: true })
+  assert.equal(toggle().getAttribute('aria-checked'), 'true')
+  assert.equal(container.querySelector('[role="alert"]'), null)
+})
+
+test('a refused routing change restores the saved setting and retry applies the intended value', async () => {
+  changeFails = 'response'
+  await render()
+  const toggle = () => container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="autoRouting"]')!
+  await act(async () => toggle().click())
+  assert.equal(toggle().getAttribute('aria-checked'), 'true')
+  assert.equal(savedAutoRouting, true)
+  assert.ok(container.querySelector('[role="alert"]'))
+  changeFails = null
+  await act(async () => button('retry')!.click())
+  assert.equal(toggle().getAttribute('aria-checked'), 'false')
+  assert.equal(container.querySelector('[role="alert"]'), null)
+})
+
+test('an offline routing save restores the last saved setting even when revalidation fails', async () => {
+  changeFails = 'network'; rereadFails = true
+  await render()
+  const toggle = container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="autoRouting"]')!
+  await act(async () => toggle.click())
+  assert.equal(data.autoModelRouting, true)
+  assert.equal(toggle.getAttribute('aria-checked'), 'true')
+  assert.ok(container.querySelector('[role="alert"]'))
 })

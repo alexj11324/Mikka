@@ -758,9 +758,36 @@ test("run completion enters review without the Coordinator; replays do not advan
       assert.equal((await pool.query('SELECT count(*)::int n FROM factory_attempts WHERE "taskId"=$1', [routed.task.id])).rows[0].n, events);
     });
 
-    await t.test("reconcile failure is swallowed and left to the fallback", async () => {
-      const n = await reconcileFactoryAfterCompletion(pool, "owner", d.runId, () => async () => { throw Object.assign(new Error("boom secret-ish"), { code: "40P01" }); });
-      assert.equal(n, 0);
+    await t.test("reconcile failure still records one owner-bound terminal routing outcome before the fallback", async () => {
+      const f = await runningTask();
+      const routing = { version: 1, difficulty: 'easy', model: 'gpt-6-luna', harness: 'codex', tier: 'light', effort: 'low', reason: 'difficulty_fit' };
+      await pool.query(`UPDATE agent_runs SET "agentDefinition"="agentDefinition" || $2::jsonb WHERE id=$1`,
+        [f.runId, JSON.stringify({ modelDispatch: { routing } })]);
+      const unavailable = () => async () => { throw Object.assign(new Error("boom secret-ish"), { code: "40P01" }); };
+      const outcomes = async () => (await pool.query(`SELECT "taskId","eventId",result FROM factory_events
+        WHERE request->>'kind'='model_routing_outcome' AND request->>'runId'=$1`, [f.runId])).rows;
+
+      assert.equal(await reconcileFactoryAfterCompletion(pool, 'owner', f.runId, unavailable), 0);
+      assert.deepEqual(await outcomes(), [], 'a still-running run has no terminal outcome');
+      await succeed(f.runId);
+      assert.equal(await reconcileFactoryAfterCompletion(pool, 'different-owner', f.runId, unavailable), 0);
+      assert.deepEqual(await outcomes(), [], "a different owner cannot record another person's outcome");
+
+      assert.deepEqual(await Promise.all([1, 2, 3].map(() => reconcileFactoryAfterCompletion(pool, 'owner', f.runId, unavailable))), [0, 0, 0]);
+      const recorded = await outcomes();
+      assert.equal(recorded.length, 1, 'concurrent failed-reconcile hooks share one routing receipt');
+      assert.equal(recorded[0].taskId, f.task.id);
+      assert.equal(recorded[0].eventId, factoryEventId('model-routing-outcome', f.runId));
+      assert.deepEqual(recorded[0].result.routing, routing);
+      assert.equal(recorded[0].result.outcome.status, 'succeeded');
+      assert.equal(recorded[0].result.outcome.stopReason, 'submitted');
+      assert.equal(recorded[0].result.outcome.stage, 'execute');
+      assert.equal((await store.read('owner', f.task.id)).task.stage, 'execute', 'routing telemetry does not advance the task');
+
+      await sweep.run('owner', f.runId); // preparePrompt uses this independent recovery entry.
+      assert.equal((await store.read('owner', f.task.id)).task.stage, 'review');
+      await reconcileFactoryAfterCompletion(pool, 'owner', f.runId, reconcileFor);
+      assert.deepEqual(await outcomes(), recorded, 'fallback and later completion replay preserve the original outcome');
     });
   } finally {
     if (flags.r === undefined) delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; else process.env.MIKKA_FACTORY_ROUTING_ENABLED = flags.r;

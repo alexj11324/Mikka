@@ -298,7 +298,7 @@ async function factoryRunModel(userId: string, botId: string | null, agentId: st
     { ownerId: userId, workspaceId, botId }, { issueId: issueId!, stage, profileId, agentId: agent.id, deviceId: agent.deviceId, location: 'local', asked: { harness: agent.harness } })
   if (target.kind !== 'device' || target.agentId !== agent.id) throw new ActionFailureError('runModelMissing')
   return { model: target.model, agentProfile,
-    modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry },
+    modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
     ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
     ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}),
     ...(chosen.policyCeiling ? { policyCeiling: chosen.policyCeiling } : {}) }

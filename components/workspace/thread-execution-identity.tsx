@@ -54,6 +54,7 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
   const identity = evidence.executionIdentity
   const profileT = useTranslations('Settings.agentProfiles')
   const profile = evidence.agentProfile
+  const routing = evidence.modelRouting
   async function copyRunId() {
     try { await navigator.clipboard.writeText(evidence.id); toast.success(t('copied')) }
     catch { toast.error(t('copyFailed')) }
@@ -66,6 +67,18 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
       <ValueRow label={t('credential')}>{t(`credentialKinds.${evidence.credentialType}`)}</ValueRow>
       {evidence.credentialType === 'subscription' && <ValueRow label={t('subscriptionRoute')}><span className="break-all">{evidence.subscriptionRoute ?? t('unknown')}</span></ValueRow>}
     </dl>
+    {routing && <section className="flex flex-col gap-3" data-model-routing={routing.reason}>
+      <h3 className="font-medium">{t('modelRouting')}</h3>
+      <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+        <span>{t(`routingDifficulty.${routing.difficulty}`)}</span><span aria-hidden="true">→</span>
+        <span className="min-w-0 wrap-break-word" title={routing.model}><ModelLabel model={routing.model} /></span>
+        {routing.effort && <><span aria-hidden="true">·</span><span>{t(`routingEffort.${routing.effort}`)}</span></>}
+      </p>
+      <dl className="flex flex-col gap-3">
+        <ValueRow label={t('routingReason')}>{t(`routingReasons.${routing.reason}`)}</ValueRow>
+        {routing.previousModel && <ValueRow label={t('previousModel')}><span title={routing.previousModel}><ModelLabel model={routing.previousModel} /></span></ValueRow>}
+      </dl>
+    </section>}
     {profile && <section className="flex flex-col gap-3"><h3 className="font-medium">{profileT('frozenProfile')}</h3><dl className="flex flex-col gap-3">
       <ValueRow label={profileT('name')}>{profile.source === 'default' && profile.profileId === 'default' ? profileT('defaultName') : profile.name}</ValueRow>
       <ValueRow label={profileT('revision')}>{profileT('version', { version: profile.version })}</ValueRow>
