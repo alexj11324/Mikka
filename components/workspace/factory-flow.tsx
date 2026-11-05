@@ -125,7 +125,7 @@ export function FactoryFlowCard({ task, detail, onOpenThread }: { task: FactoryT
 
   return <div className="w-full max-w-[40rem]">
     <Item variant="muted" data-stage={flow.stage} data-needs-you={kind}>
-      <ItemContent className="min-w-0 gap-2">
+      <ItemContent className="min-w-0 basis-64 gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <FlowBadge flow={flow} />
           {flow.acceptance && <CountBadges counts={flow.acceptance.counts} />}
