@@ -251,8 +251,8 @@ waiting for the person; clicking a notification opens the task
 
 ### Native iOS app (for comparison)
 
-Tab bar 对话 · 线程 · 搜索; the avatar's account sheet for 设置, 建议, 任务, 插件 (`mobile.md`).
-Threads are a top-level tab there: the web is the only client where all
+One Stack in a push drawer: the chat list is home with header search; the drawer holds the workspaces, 线程, 任务, 建议, 插件 and 设置 (`mobile.md`).
+Threads are a top-level page there: the web is the only client where all
 threads sit only inside the panel of the bot that dispatched them.
 
 ### Global entries (reachable from anywhere)

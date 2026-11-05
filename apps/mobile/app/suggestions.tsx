@@ -27,7 +27,7 @@ export default function SuggestionsScreen() {
 
   return (
     <View style={styles.screen}>
-      <NavBar title="建议" />
+      <NavBar title="建议" large />
       <FlatList
         data={items}
         keyExtractor={item => item.id}

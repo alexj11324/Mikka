@@ -36,7 +36,7 @@ export default function AttachSheet() {
   const dismiss = () => {
     focused.current = false; focusVersion.current++
     if (router.canGoBack()) router.back()
-    else router.replace('/chats')
+    else router.replace('/')
   }
   const run = async (pick: () => Promise<void>) => {
     if (inFlight.current || !focused.current) return
