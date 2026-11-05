@@ -1,0 +1,49 @@
+go: downloading github.com/jackc/pgx/v5 v5.9.2
+go: downloading github.com/sirupsen/logrus v1.9.3
+go: downloading github.com/tidwall/gjson v1.18.0
+go: downloading github.com/tidwall/sjson v1.2.5
+go: downloading github.com/gin-gonic/gin v1.10.1
+go: downloading github.com/google/uuid v1.6.0
+go: downloading github.com/gorilla/websocket v1.5.3
+go: downloading golang.org/x/sync v0.23.0
+go: downloading github.com/andybalholm/brotli v1.0.6
+go: downloading github.com/refraction-networking/utls v1.8.2
+go: downloading golang.org/x/net v0.60.0
+go: downloading google.golang.org/protobuf v1.34.1
+go: downloading github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
+go: downloading golang.org/x/crypto v0.57.0
+go: downloading gopkg.in/yaml.v3 v3.0.1
+go: downloading golang.org/x/sys v0.48.0
+go: downloading github.com/tidwall/match v1.1.1
+go: downloading github.com/tidwall/pretty v1.2.0
+go: downloading github.com/gin-contrib/sse v0.1.0
+go: downloading github.com/mattn/go-isatty v0.0.20
+go: downloading github.com/redis/go-redis/v9 v9.19.0
+go: downloading github.com/klauspost/compress v1.17.4
+go: downloading gopkg.in/natefinch/lumberjack.v2 v2.2.1
+go: downloading github.com/jackc/pgpassfile v1.0.0
+go: downloading github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
+go: downloading golang.org/x/text v0.42.0
+go: downloading github.com/jackc/puddle/v2 v2.2.2
+go: downloading github.com/go-playground/validator/v10 v10.20.0
+go: downloading github.com/pelletier/go-toml/v2 v2.4.3-0.20260624044523-35f78d5908f1
+go: downloading github.com/ugorji/go/codec v1.2.12
+go: downloading github.com/gabriel-vasile/mimetype v1.4.3
+go: downloading github.com/go-playground/universal-translator v0.18.1
+go: downloading github.com/leodido/go-urn v1.4.0
+go: downloading github.com/cespare/xxhash/v2 v2.3.0
+go: downloading go.uber.org/atomic v1.11.0
+go: downloading github.com/go-playground/locales v0.14.1
+=== RUN   TestIdleAuthorityProviderCancellationDeadline
+=== RUN   TestIdleAuthorityProviderCancellationDeadline/claude-native
+    authority_idle_test.go:85: authority_idle_provider route=claude-native committed=true emitted=0 commitMs=4.379 contextCancelAfterCommitMs=997.248 deadlineMs=1000
+=== RUN   TestIdleAuthorityProviderCancellationDeadline/codex-native
+    authority_idle_test.go:85: authority_idle_provider route=codex-native committed=true emitted=0 commitMs=3.520 contextCancelAfterCommitMs=998.250 deadlineMs=1000
+=== RUN   TestIdleAuthorityProviderCancellationDeadline/claude-cpa
+    authority_idle_test.go:85: authority_idle_provider route=claude-cpa committed=true emitted=0 commitMs=3.821 contextCancelAfterCommitMs=997.758 deadlineMs=1000
+--- PASS: TestIdleAuthorityProviderCancellationDeadline (3.16s)
+    --- PASS: TestIdleAuthorityProviderCancellationDeadline/claude-native (1.10s)
+    --- PASS: TestIdleAuthorityProviderCancellationDeadline/codex-native (1.04s)
+    --- PASS: TestIdleAuthorityProviderCancellationDeadline/claude-cpa (1.03s)
+PASS
+ok  	github.com/alexj11324/Mikka/subscription-worker	3.181s

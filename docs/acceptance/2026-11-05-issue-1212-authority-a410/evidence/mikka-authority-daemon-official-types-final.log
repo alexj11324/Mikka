@@ -1,0 +1,4 @@
+
+> @mikka/daemon@0.0.1 typecheck /vercel/sandbox/mikka-control-authority/authority-worktree-a410/packages/daemon
+> tsgo --noEmit -p tsconfig.json
+

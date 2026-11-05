@@ -1,0 +1,28 @@
+
+> next-app@0.0.1 typecheck /vercel/sandbox/mikka-control-authority/authority-worktree-a410
+> tsrs --noEmit
+
+packages/daemon/src/adapters/claude.ts(402,7): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Property 'NODE_ENV' is missing in type '{ [envVar: string]: string | undefined; }' but required in type 'ProcessEnv'.
+packages/daemon/src/adapters/claude.ts(406,11): error TS2741: Property 'NODE_ENV' is missing in type '{ CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR: string; }' but required in type 'ProcessEnv'.
+packages/daemon/src/adapters/claude.ts(465,9): error TS2741: Property 'NODE_ENV' is missing in type 'Record<string, string>' but required in type 'ProcessEnv'.
+packages/daemon/src/agents/child.ts(168,5): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Property 'NODE_ENV' is missing in type 'Record<string, string>' but required in type 'ProcessEnv'.
+packages/daemon/src/agents/child.ts(172,22): error TS2339: Property 'pid' does not exist on type 'never'.
+  The intersection 'ChildProcessWithoutNullStreams & ChildProcessByStdio<Writable, Readable, Readable> & ... 7 more ... & ChildProcess' was reduced to 'never' because property 'stdin' has conflicting types in some constituents.
+packages/daemon/src/agents/child.ts(179,9): error TS2339: Property 'stderr' does not exist on type 'never'.
+  The intersection 'ChildProcessWithoutNullStreams & ChildProcessByStdio<Writable, Readable, Readable> & ... 7 more ... & ChildProcess' was reduced to 'never' because property 'stdin' has conflicting types in some constituents.
+packages/daemon/src/agents/child.ts(180,9): error TS2339: Property 'stderr' does not exist on type 'never'.
+  The intersection 'ChildProcessWithoutNullStreams & ChildProcessByStdio<Writable, Readable, Readable> & ... 7 more ... & ChildProcess' was reduced to 'never' because property 'stdin' has conflicting types in some constituents.
+packages/daemon/src/agents/child.ts(185,13): error TS2339: Property 'once' does not exist on type 'never'.
+  The intersection 'ChildProcessWithoutNullStreams & ChildProcessByStdio<Writable, Readable, Readable> & ... 7 more ... & ChildProcess' was reduced to 'never' because property 'stdin' has conflicting types in some constituents.
+packages/daemon/src/agents/child.ts(185,28): error TS7006: Parameter 'error' implicitly has an 'any' type.
+packages/daemon/src/agents/child.ts(189,13): error TS2339: Property 'once' does not exist on type 'never'.
+  The intersection 'ChildProcessWithoutNullStreams & ChildProcessByStdio<Writable, Readable, Readable> & ... 7 more ... & ChildProcess' was reduced to 'never' because property 'stdin' has conflicting types in some constituents.
+packages/daemon/src/agents/child.ts(189,27): error TS7006: Parameter 'code' implicitly has an 'any' type.
+packages/daemon/src/agents/child.ts(189,33): error TS7006: Parameter 'signal' implicitly has an 'any' type.
+packages/daemon/src/agents/child.ts(198,9): error TS2339: Property 'stdin' does not exist on type 'never'.
+  The intersection 'ChildProcessWithoutNullStreams & ChildProcessByStdio<Writable, Readable, Readable> & ... 7 more ... & ChildProcess' was reduced to 'never' because property 'stdin' has conflicting types in some constituents.
+ ELIFECYCLE  Command failed with exit code 2.

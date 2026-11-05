@@ -1,0 +1,36 @@
+(node:39137) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:39137) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+Retained fully migrated approval HTTP database: approval_http_8f2a527f0f214492adfd0980f54101fa
+(node:39137) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:11:49.398Z","runId":"5e224fe6-ae6e-484e-ae5a-be7e19ccb086","live":true,"reason":"ok","status":200,"durationMs":8}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:11:50.382Z","runId":"5e224fe6-ae6e-484e-ae5a-be7e19ccb086","live":true,"reason":"ok","status":200,"durationMs":7}
+{"event":"authority_idle_child_deadline","sourceSha":"a410b292cc53cfef43992a91d7696023e3481567","fault":"delayed_http_delivery_no_origin_notification","runId":"5e224fe6-ae6e-484e-ae5a-be7e19ccb086","committedStop":true,"commitDurationMs":2.4289840000001277,"observationAfterCommitMs":1004.7706619999999,"revokedAfterCommitMs":null,"childExitAfterCommitMs":null,"childSignalMarker":null,"authorityHttpRequests":2,"challenges":0,"eventsAfterStop":[],"deadlineMs":1000,"deadlineMet":false}
+✖ idle CLI stops within one second when authority delivery stalls after a committed Stop (5530.329708ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24810.716034
+
+✖ failing tests:
+
+test at lib/agent-tool-approval/http.db.test.mts:6:485
+✖ idle CLI stops within one second when authority delivery stalls after a committed Stop (5530.329708ms)
+  AssertionError [ERR_ASSERTION]: a silent actual CLI must stop by the local one-second authority deadline even when the origin response stalls
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/vercel/sandbox/mikka-control-authority/authority-worktree-a410/lib/agent-tool-approval/http.db.test.mts:324:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

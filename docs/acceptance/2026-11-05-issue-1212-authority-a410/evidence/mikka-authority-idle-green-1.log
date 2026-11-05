@@ -1,0 +1,18 @@
+(node:38860) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:38860) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+Retained fully migrated approval HTTP database: approval_http_f6de77a38d434be7a4a00c2bbab4dc5b
+(node:38860) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:10:17.792Z","runId":"6a3349f4-4031-4ee8-9ed4-c93b99898a27","live":true,"reason":"ok","status":200,"durationMs":22}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:10:17.804Z","runId":"6a3349f4-4031-4ee8-9ed4-c93b99898a27","live":true,"reason":"ok","status":200,"durationMs":6}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:10:18.005Z","runId":"6a3349f4-4031-4ee8-9ed4-c93b99898a27","live":true,"reason":"ok","status":200,"durationMs":6}
+{"event":"authority_idle_child_deadline","sourceSha":"a410b292cc53cfef43992a91d7696023e3481567","fault":"delayed_http_delivery_no_origin_notification","runId":"6a3349f4-4031-4ee8-9ed4-c93b99898a27","committedStop":true,"commitDurationMs":2.1974869999994553,"observationAfterCommitMs":519.8416560000005,"revokedAfterCommitMs":512.5671570000004,"childExitAfterCommitMs":517.7031100000004,"childSignalMarker":"143","authorityHttpRequests":3,"challenges":2,"eventsAfterStop":["exit"],"deadlineMs":1000,"deadlineMet":true}
+✔ idle CLI stops within one second when authority delivery stalls after a committed Stop (4326.388387ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24353.844462

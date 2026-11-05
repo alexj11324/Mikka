@@ -1,0 +1,13 @@
+{
+  "source": "vercel_get_session_command_logs",
+  "commandId": "cmd_223c59131bb7427f8af4b7ca44b7",
+  "observedAfterCleanupCompletedAt": "2026-11-05T00:39:45.946Z",
+  "actualResult": {
+    "unattributedDatabase": "approval_e2e_202611042353000000000001",
+    "userTables": []
+  },
+  "action": "read_only",
+  "creationProvenance": "not_recovered",
+  "databaseDropped": false,
+  "decision": "Preserved; parent will reclaim the shared sandbox when all work finishes."
+}

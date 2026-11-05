@@ -1,0 +1,5 @@
+packages/daemon/test/commands-polling.test.ts(115,71): error TS7031: Binding element 'signal' implicitly has an 'any' type.
+packages/daemon/test/commands-polling.test.ts(160,71): error TS7031: Binding element 'signal' implicitly has an 'any' type.
+packages/daemon/test/commands-polling.test.ts(203,76): error TS7031: Binding element 'signal' implicitly has an 'any' type.
+packages/daemon/test/fs-polling.test.ts(90,86): error TS7031: Binding element 'signal' implicitly has an 'any' type.
+packages/daemon/test/fs-polling.test.ts(134,86): error TS7031: Binding element 'signal' implicitly has an 'any' type.

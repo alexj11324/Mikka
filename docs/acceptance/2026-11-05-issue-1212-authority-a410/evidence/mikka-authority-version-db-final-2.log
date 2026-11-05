@@ -1,0 +1,16 @@
+{"event":"authority_version_databases","app":"authority_app_5490c37c8fc34101bfe33afdb2816831_e2e","workspace":"authority_workspace_5490c37c8fc34101bfe33afdb2816831_e2e","instrumentation":"test-only all public tables"}
+{"event":"authority_complete_snapshot","full":1,"appVersionQueries":2,"workspaceVersionQueries":2,"physicalDatabases":2,"cache":"none"}
+✔ brackets the actual CLI policy and real membership reader across distinct databases (1463.761536ms)
+✔ does not publish a positive snapshot when real Stop commits after the full App read (140.356672ms)
+✔ does not publish a positive snapshot when Workspace membership is revoked after the full read (36.87794ms)
+✔ rolls back the business write and dependency version together (33.361957ms)
+✔ captures a normal FK parent deletion between complete read and publication (26.887456ms)
+✔ re-reads after changes in both databases even when the final values return to their originals (29.35131ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1943.889677

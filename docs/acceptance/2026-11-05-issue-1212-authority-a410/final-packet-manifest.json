@@ -1,0 +1,369 @@
+{
+  "archive": {
+    "base": "a410b292cc53cfef43992a91d7696023e3481567",
+    "tree": "202fe0baf19f3a45f110b16e705085cd364d2726",
+    "parts": 84,
+    "bytes": 117377,
+    "sha256": "b1c66920c3f1ba10f9356837f6e11e1183424ae020d7250717351e55c09fc4ce",
+    "files": 71,
+    "directory": "/vercel/sandbox/mikka-control-authority/authority-analysis-a410/final-packet",
+    "remainingOwnedProcesses": []
+  },
+  "files": [
+    {
+      "path": "candidate/lib/agent-tool-approval/http.db.test.mts",
+      "size": 29094,
+      "sha256": "363a8fa8015efd467c601b8b0bc57af0e1ce3f19b837714d72a830b0ef28c645"
+    },
+    {
+      "path": "candidate/lib/run-authority/source.db.test.ts",
+      "size": 9205,
+      "sha256": "f391c9672def58ea063a55b7d15e97190663c237ccc31cf77e0b67ace76e9d72"
+    },
+    {
+      "path": "candidate/lib/run-authority/source.ts",
+      "size": 3106,
+      "sha256": "522216ce17ecaed2ab3e50f84ae60a683a034517dccbe5eddcaa0b985ac04bfe"
+    },
+    {
+      "path": "candidate/packages/daemon/src/agents/run-authority.ts",
+      "size": 3582,
+      "sha256": "d2b2eeeac6a4038d7620d377d270c6819c3c496fc3ba19f6d407eccc24464281"
+    },
+    {
+      "path": "candidate/packages/daemon/src/agents/tool-approval.ts",
+      "size": 6221,
+      "sha256": "3882d71fb691dd510d044d7f3a54402be616f0fb74fd49bcfe5605cd7262d50f"
+    },
+    {
+      "path": "candidate/packages/daemon/src/server-link-http.ts",
+      "size": 27557,
+      "sha256": "f981ef8a7e4cd55d8f26da0e4d8547b95232d6a2dad82aaed7559667760bbd26"
+    },
+    {
+      "path": "candidate/packages/daemon/test/run-authority.test.ts",
+      "size": 5095,
+      "sha256": "7e1be5b13aa2b28783beb51c3605f9a3ff085eb44a0e1a5e6620eaa7d2526737"
+    },
+    {
+      "path": "candidate/tests/helpers/run-authority-version-fixture.ts",
+      "size": 1164,
+      "sha256": "45382ff4637b9b4ebd4275bbc17bfebbae3e90e038150249ffb5acc6971f96bd"
+    },
+    {
+      "path": "evidence/mikka-authority-idle-red-1.log",
+      "size": 1435,
+      "sha256": "9a04b3e2b1cce6dafcb4c63689ee1983fdb511e6c8077312eee76fc90eae7113"
+    },
+    {
+      "path": "evidence/mikka-authority-idle-red-1.rc",
+      "size": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "evidence/mikka-authority-idle-red-2.log",
+      "size": 2675,
+      "sha256": "5b10065c46f58e1e9f5c9ce9eef004e1f7a479b2df772184f96ec440d682292e"
+    },
+    {
+      "path": "evidence/mikka-authority-idle-red-2.rc",
+      "size": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "evidence/mikka-authority-idle-red-3.log",
+      "size": 2002,
+      "sha256": "eb8cb2e1d414a8783b17d0370ae3edc73c6c25befed677d14e2721055df8469a"
+    },
+    {
+      "path": "evidence/mikka-authority-idle-red-3.rc",
+      "size": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "evidence/mikka-authority-idle-red-4.log",
+      "size": 2447,
+      "sha256": "c2774ddbe9a1fa844d582c5e1c58a2e94672a0739f7ff0313d56570858f281b7"
+    },
+    {
+      "path": "evidence/mikka-authority-idle-red-4.rc",
+      "size": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "evidence/mikka-authority-idle-go-1.log",
+      "size": 3041,
+      "sha256": "5b07fd9b31cf51bf26322d9f9edb7377ae7ee6a0c4fcaeb28bfc6b1705ca71a6"
+    },
+    {
+      "path": "evidence/mikka-authority-idle-go-1.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-idle-green-1.log",
+      "size": 1898,
+      "sha256": "ba4a640cd6933e4b3f9f80eadb09a9b903f56716db1ad28273b7538a56b058f0"
+    },
+    {
+      "path": "evidence/mikka-authority-idle-green-1.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-idle-red-final.log",
+      "size": 2475,
+      "sha256": "a65d10ae6d7992923cd7a8578c1014348a08e72b8518515e049f1ba0164a7270"
+    },
+    {
+      "path": "evidence/mikka-authority-idle-red-final.rc",
+      "size": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "evidence/mikka-authority-consumer-unit-1.log",
+      "size": 2404,
+      "sha256": "5341229a38bd3ce083882e18709b3073d68f108e9e96c3df62f290f03b7b44bd"
+    },
+    {
+      "path": "evidence/mikka-authority-version-db-1.log",
+      "size": 2169,
+      "sha256": "e80e9bf1820f98e78c9b961957f2c37cd1419332cbc83a00f7b82989ff843bbc"
+    },
+    {
+      "path": "evidence/mikka-authority-lint-final.log",
+      "size": 89,
+      "sha256": "01b364be9ab15ca197e90c6b2919956340992e9412e05bd0392abfd45ee4570a"
+    },
+    {
+      "path": "evidence/mikka-authority-version-db-1.rc",
+      "size": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "evidence/mikka-authority-consumer-unit-1.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-full-http-final.log",
+      "size": 4509,
+      "sha256": "0703207f2a05896d7ebe93b0c9bc7f3e4c7c3861f4ef0ed9ebcb0b8f7a5b4a92"
+    },
+    {
+      "path": "evidence/mikka-authority-consumer-unit-final.log",
+      "size": 2511,
+      "sha256": "fa1ad94b25472871bda253026db8f2f00652c10f555db189d39157383436467e"
+    },
+    {
+      "path": "evidence/mikka-authority-consumer-unit-final.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-typecheck-1.log",
+      "size": 3340,
+      "sha256": "6ea689d0eb50c2683fe81fcd7c69f37575347a436aff897916e095dec72ed032"
+    },
+    {
+      "path": "evidence/mikka-authority-typecheck-1.rc",
+      "size": 2,
+      "sha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3"
+    },
+    {
+      "path": "evidence/mikka-authority-lint-1.log",
+      "size": 90,
+      "sha256": "b6fb156b739d333e2aeb62b68a240fbdaa4fd30b100c280123bff59772ad0f3d"
+    },
+    {
+      "path": "evidence/mikka-authority-lint-1.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-full-http-final.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-version-db-final.log",
+      "size": 1516,
+      "sha256": "f4f9d425f1aaadbe2095c222f88ae8a12ccb71930348201c9dd52f23766c73b5"
+    },
+    {
+      "path": "evidence/mikka-authority-version-db-final.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-typecheck-final.log",
+      "size": 109,
+      "sha256": "986366dc6503b5f0692953c60b29a03fb4478719ee29728e9ebce264c2db7e98"
+    },
+    {
+      "path": "evidence/mikka-authority-version-db-final-2.log",
+      "size": 1072,
+      "sha256": "2cad81141e6323d894e32fa4a38685a6fea368576bf671f82ce20c92a6af14df"
+    },
+    {
+      "path": "evidence/mikka-authority-typecheck-final.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-daemon-types-final.log",
+      "size": 5291,
+      "sha256": "00686ac48a8f68fc270c67c03dfbb8deff60da0712dc99f1e9cde84d04bc42ac"
+    },
+    {
+      "path": "evidence/mikka-authority-daemon-types-final.rc",
+      "size": 2,
+      "sha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3"
+    },
+    {
+      "path": "evidence/mikka-authority-lint-final.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-version-db-final-2.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-app-types-review-final.log",
+      "size": 109,
+      "sha256": "986366dc6503b5f0692953c60b29a03fb4478719ee29728e9ebce264c2db7e98"
+    },
+    {
+      "path": "evidence/mikka-authority-app-types-review-final.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-daemon-types-review-final.log",
+      "size": 607,
+      "sha256": "f2c638d85b0688eaba232a896768c2007a9853a43e6dc8e0d614da2b37281915"
+    },
+    {
+      "path": "evidence/mikka-authority-daemon-types-review-final.rc",
+      "size": 2,
+      "sha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3"
+    },
+    {
+      "path": "evidence/mikka-authority-consumer-review-final.log",
+      "size": 2511,
+      "sha256": "d4ccc3498e4c3120196c155c498426366039592a5283f916ab4bee6166f45068"
+    },
+    {
+      "path": "evidence/mikka-authority-consumer-review-final.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-lint-review-final.log",
+      "size": 89,
+      "sha256": "ea66e69b17490280ec3e9e23ae5e1ed85e37918b8d137f170c1f78e8328bf19f"
+    },
+    {
+      "path": "evidence/mikka-authority-lint-review-final.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-daemon-official-types-final.log",
+      "size": 147,
+      "sha256": "969ebc164cdc076a056dc50c735a39eb48ef7feca9ff5736a5fc960e4ccfeaa3"
+    },
+    {
+      "path": "evidence/mikka-authority-daemon-official-types-final.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-http-red-strict-final.log",
+      "size": 2506,
+      "sha256": "6916bfc8a10951c69a475870cad7b733c002b3147fdcd72556824ed389929acd"
+    },
+    {
+      "path": "evidence/mikka-authority-http-red-strict-final.rc",
+      "size": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "evidence/mikka-authority-http-green-strict-final.log",
+      "size": 5975,
+      "sha256": "054b295130231704ab1cf31a23f70769a732231e8ad73bd2117fa967130a0f96"
+    },
+    {
+      "path": "evidence/mikka-authority-http-green-strict-final.rc",
+      "size": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "evidence/mikka-authority-strict-results.json",
+      "size": 208,
+      "sha256": "950fb60f12888a535e9ea5d96e8d99242cd2542b494e959e04fe08580349fd54"
+    },
+    {
+      "path": "evidence/mikka-authority-http-red-strict-final-2.log",
+      "size": 2504,
+      "sha256": "084430d4c29a599daa64228471bc47d40cb6841b2dea0bb3b5386c33c71db2b6"
+    },
+    {
+      "path": "evidence/mikka-authority-http-red-strict-final-2.rc",
+      "size": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "evidence/mikka-authority-http-green-strict-final-2.log",
+      "size": 5599,
+      "sha256": "d909f41c24139fb2b7e375f60051bce7420240624067e2ef47b3d48300350235"
+    },
+    {
+      "path": "evidence/mikka-authority-http-green-strict-final-2.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-final-fixture-lint.log",
+      "size": 88,
+      "sha256": "a2311c7cc46ea19942d7309db9a7e84ed339fa963821c5a661203eabedd9e586"
+    },
+    {
+      "path": "evidence/mikka-authority-final-fixture-lint.rc",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/mikka-authority-strict-final-results.json",
+      "size": 231,
+      "sha256": "d6f5facd2cad0d7d865b9b663fe74898de7bade1335a5679ca4b3910e3064b01"
+    },
+    {
+      "path": "go-baseline/authority_idle_test.go",
+      "size": 3610,
+      "sha256": "36a85bb643bd82c1f1df62929e84393dd551744486b8321d5bae3ad3bf739a28"
+    },
+    {
+      "path": "candidate.patch",
+      "size": 44667,
+      "sha256": "1730e62b8c30f0d5d6b3f54e91bd821fd6c7de70f3db8da006fe35c36dfc755d"
+    },
+    {
+      "path": "candidate-manifest.json",
+      "size": 2063,
+      "sha256": "cef10a93e4abbee4d5a3c904c5ac559e2ead7a7a3551ae84f0e7b60bcbaf5739"
+    },
+    {
+      "path": "candidate-filemap.json",
+      "size": 87252,
+      "sha256": "ae34292d8ddc771046ad3f3233d912b26fdeb0519d4e3ca44b25c08b45ac17a6"
+    },
+    {
+      "path": "owned-process-check.json",
+      "size": 115,
+      "sha256": "5e91c009dbfe2b3f0835d68e069c331d71aa19739eaa929e66500e0ed4f4b15e"
+    }
+  ]
+}

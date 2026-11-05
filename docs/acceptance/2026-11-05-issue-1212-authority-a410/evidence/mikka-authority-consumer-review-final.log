@@ -1,0 +1,27 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90m/vercel/sandbox/mikka-control-authority/authority-worktree-a410/packages/daemon[39m
+
+ [32m✓[39m test/tool-approval-claude.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 114[2mms[22m[39m
+ [32m✓[39m test/run-authority.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/agents/tool-approval.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+[90mstderr[2m | test/tool-approval-liveness.test.ts[2m > [22m[2mends a running run when the server says its policy revision is no longer live
+[22m[39m{"event":"run_liveness_refused","runId":"4d98b46c-15fd-4ce1-8dd2-af340aa9acb0","deviceId":"device-fake","phase":"server_check","reason":"run_not_live","errorClass":null,"status":200}
+
+[90mstderr[2m | test/tool-approval-liveness.test.ts[2m > [22m[2mrecords host lease revocation before Claude exits 143, even before the heartbeat learns it
+[22m[39m{"event":"run_liveness_refused","runId":"d382cc48-2fee-4f73-8f13-158710e88f02","deviceId":"device-fake","phase":"server_check","reason":"run_not_live","errorClass":null,"status":200}
+
+[90mstderr[2m | test/tool-approval-liveness.test.ts[2m > [22m[2mkeeps an unclassified SIGTERM 143 as error instead of inventing lease revocation
+[22m[39m{"event":"run_liveness_refused","runId":"d6ca8080-a237-45be-a208-71b2fef77206","deviceId":"device-fake","phase":"server_check","reason":"run_not_live","errorClass":null,"status":200}
+
+ [32m✓[39m test/tool-approval-liveness.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 10055[2mms[22m[39m
+   [33m[2m✓[22m[39m ends a running run when the server says its policy revision is no longer live[33m 1244[2mms[22m[39m
+   [33m[2m✓[22m[39m records host lease revocation before Claude exits 143, even before the heartbeat learns it[33m 1193[2mms[22m[39m
+   [33m[2m✓[22m[39m keeps an unclassified SIGTERM 143 as error instead of inventing lease revocation[33m 1200[2mms[22m[39m
+   [33m[2m✓[22m[39m a pending host response cannot replace the person's earlier cancellation[33m 1200[2mms[22m[39m
+   [33m[2m✓[22m[39m keeps a running run through a slow cold start of the liveness route[33m 5211[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[32m28 passed[39m[22m[90m (28)[39m
+[2m   Start at [22m 00:22:45
+[2m   Duration [22m 10.77s[2m (tests 91%, import 7%, transform 2%)[22m
+

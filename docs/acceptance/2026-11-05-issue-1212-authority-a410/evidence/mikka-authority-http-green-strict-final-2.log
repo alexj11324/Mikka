@@ -1,0 +1,51 @@
+✔ checkState rejects another device (47.473995ms)
+✔ a stopped run is never live (3.081259ms)
+✔ only the current epoch host watchdog receipt classifies a stopped run as lease-revoked (18.232784ms)
+✔ watchdog cause does not escape owner, device or cancelled-task boundaries (8.720419ms)
+✔ an actually expired lease carries its cause, while a manual stop and terminal run do not (15.144889ms)
+✔ a changed policy revision cannot be hidden by an expired lease or watchdog stop (35.46445ms)
+✔ a changed worker policy ends the live check for the old revision (12.886382ms)
+✔ workspace may narrow agent policy, rejects forged generations, and invalidates a recreated fixture (142.604041ms)
+✔ legacy local runs materialize stable sandbox defaults without changing explicit choices (12.660649ms)
+✔ unbound workers get open network defaults and only owned cloud devices are read (10.064323ms)
+✔ policy changes and live tool checks share run-before-policy lock order (9.704279ms)
+✔ human control preserves the existing lease, then expires through the existing liveness poll (18.712988ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1002.680966
+(node:43896) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:43896) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+Retained fully migrated approval HTTP database: approval_http_c3aabc92a20242f699e344046a58aa6f
+(node:43896) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:29:24.061Z","runId":"8be6e587-abfb-48a3-babd-e261c4e30d76","live":true,"reason":"ok","status":200,"durationMs":7}
+✔ real HTTP claim carries policy, and its run gate creates no approvals (decision 2026-11-01-2335) (3163.919191ms)
+{"event":"run_liveness_refused","runId":"8be6e587-abfb-48a3-babd-e261c4e30d76","deviceId":"d3c4f20a-4e07-4595-8eea-0492bd92e0ff","phase":"server_check","reason":"run_not_live","errorClass":null,"status":200}
+✔ a changed run policy answers live:false, revokes the real daemon gate, and each check logs one line (1063.861292ms)
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:29:25.144Z","runId":"8be6e587-abfb-48a3-babd-e261c4e30d76","live":false,"reason":"lease_revoked","status":200,"durationMs":8}
+{"level":"warn","msg":"tool_approval_check","timestamp":"2026-11-05T00:29:25.152Z","runId":"8be6e587-abfb-48a3-babd-e261c4e30d76","live":false,"reason":"run_unavailable","status":409,"durationMs":5}
+{"level":"warn","msg":"tool_approval_check","timestamp":"2026-11-05T00:29:25.155Z","runId":"8be6e587-abfb-48a3-babd-e261c4e30d76","live":false,"reason":"invalid_request","status":400,"durationMs":1}
+✔ real authenticated HTTP retains a lease-loss cause but never invents it for manual Stop (27.053302ms)
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:29:25.680Z","runId":"56731569-591a-49d3-bdd4-a1557f8017ad","live":true,"reason":"ok","status":200,"durationMs":17}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:29:25.689Z","runId":"56731569-591a-49d3-bdd4-a1557f8017ad","live":true,"reason":"ok","status":200,"durationMs":5}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:29:25.893Z","runId":"56731569-591a-49d3-bdd4-a1557f8017ad","live":true,"reason":"ok","status":200,"durationMs":7}
+{"event":"authority_idle_child_deadline","sourceSha":"a410b292cc53cfef43992a91d7696023e3481567","fault":"http_delivery","runId":"56731569-591a-49d3-bdd4-a1557f8017ad","committedStop":true,"commitDurationMs":2.5018879999997807,"observationAfterCommitMs":526.2726329999996,"revokedAfterCommitMs":518.7115789999998,"childExitAfterCommitMs":525.1169460000001,"childSignalMarker":"143","authorityHttpRequests":3,"challenges":2,"versionQueries":{"app":3,"workspace":3},"postgresBarrierBlocked":false,"eventsAfterStop":["exit"],"deadlineMs":1000,"deadlineMet":true}
+✔ idle CLI stops within one second after committed Stop with stalled HTTP delivery (1270.59427ms)
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:29:26.521Z","runId":"611a4c75-466b-4133-a063-5bf7ae36e0c4","live":true,"reason":"ok","status":200,"durationMs":21}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:29:26.541Z","runId":"611a4c75-466b-4133-a063-5bf7ae36e0c4","live":true,"reason":"ok","status":200,"durationMs":6}
+{"event":"authority_idle_child_deadline","sourceSha":"a410b292cc53cfef43992a91d7696023e3481567","fault":"postgres_barrier","runId":"611a4c75-466b-4133-a063-5bf7ae36e0c4","committedStop":true,"commitDurationMs":2.4037549999993644,"observationAfterCommitMs":656.0611349999999,"revokedAfterCommitMs":652.6766940000007,"childExitAfterCommitMs":656.0307400000002,"childSignalMarker":"143","authorityHttpRequests":2,"challenges":2,"versionQueries":{"app":3,"workspace":3},"postgresBarrierBlocked":true,"eventsAfterStop":["exit"],"deadlineMs":1000,"deadlineMet":true}
+✔ idle CLI stops within one second after committed Stop with an actual blocked PostgreSQL barrier (828.220078ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 25935.983313
+Retained approval test database: approval_e2e_dc9ea0a0d585aad2eae2840b

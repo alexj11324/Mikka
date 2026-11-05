@@ -1,0 +1,246 @@
+{
+  "observedAt": "2026-11-05T00:37:35.598Z",
+  "ownedDatabases": [
+    {
+      "name": "approval_e2e_a63edddbc408f5acdce3c357",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-full-http-final.log"
+      ]
+    },
+    {
+      "name": "approval_e2e_da7899eacf9c2cd52be14d09",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-http-green-strict-final.log"
+      ]
+    },
+    {
+      "name": "approval_e2e_dc9ea0a0d585aad2eae2840b",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-http-green-strict-final-2.log"
+      ]
+    },
+    {
+      "name": "approval_http_051975c32ef54ae09b8ba80ea0b74dc9",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-idle-red-4.log",
+        "/vercel/sandbox/mikka-control-authority/authority-analysis-a410/red-cli/red-4.log"
+      ]
+    },
+    {
+      "name": "approval_http_29204e0701924e9684d465afb88ebc43",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-idle-red-1.log",
+        "/vercel/sandbox/mikka-control-authority/authority-analysis-a410/red-cli/red-1.log"
+      ]
+    },
+    {
+      "name": "approval_http_502e9b45fe2640059e356c76a15e7348",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-idle-red-2.log",
+        "/vercel/sandbox/mikka-control-authority/authority-analysis-a410/red-cli/red-2.log"
+      ]
+    },
+    {
+      "name": "approval_http_7d874531e2f14e09b47f202464a10e95",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-full-http-final.log"
+      ]
+    },
+    {
+      "name": "approval_http_8d847fd65cb0468699feab1e38eebc52",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-idle-red-3.log",
+        "/vercel/sandbox/mikka-control-authority/authority-analysis-a410/red-cli/red-3.log"
+      ]
+    },
+    {
+      "name": "approval_http_8f2a527f0f214492adfd0980f54101fa",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-idle-red-final.log"
+      ]
+    },
+    {
+      "name": "approval_http_b5b9d705ece0460aa9962e77e2a3ab86",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-http-red-strict-final.log"
+      ]
+    },
+    {
+      "name": "approval_http_c3aabc92a20242f699e344046a58aa6f",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-http-green-strict-final-2.log"
+      ]
+    },
+    {
+      "name": "approval_http_cf7caa43fa0848278e03ce3800e23219",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-http-green-strict-final.log"
+      ]
+    },
+    {
+      "name": "approval_http_dc05a95538e940efa9ab427258d3fedc",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-http-red-strict-final-2.log"
+      ]
+    },
+    {
+      "name": "approval_http_f6de77a38d434be7a4a00c2bbab4dc5b",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-idle-green-1.log"
+      ]
+    },
+    {
+      "name": "authority_app_20261104_2210_e2e",
+      "owner": "mikka_test",
+      "provenance": [
+        "/vercel/sandbox/mikka-control-authority/authority-analysis/pg-session-source.mjs"
+      ]
+    },
+    {
+      "name": "authority_app_5490c37c8fc34101bfe33afdb2816831_e2e",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-version-db-final-2.log"
+      ]
+    },
+    {
+      "name": "authority_app_8a94db1f08354341b83aef1003a072d7_e2e",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-version-db-final.log"
+      ]
+    },
+    {
+      "name": "authority_app_90ac77285e0e4be9a9f7e0bd1acf5f5e_e2e",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-version-db-1.log"
+      ]
+    },
+    {
+      "name": "authority_workspace_20261104_2210_e2e",
+      "owner": "mikka_test",
+      "provenance": [
+        "/vercel/sandbox/mikka-control-authority/authority-analysis/pg-session-source.mjs"
+      ]
+    },
+    {
+      "name": "authority_workspace_5490c37c8fc34101bfe33afdb2816831_e2e",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-version-db-final-2.log"
+      ]
+    },
+    {
+      "name": "authority_workspace_8a94db1f08354341b83aef1003a072d7_e2e",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-version-db-final.log"
+      ]
+    },
+    {
+      "name": "authority_workspace_90ac77285e0e4be9a9f7e0bd1acf5f5e_e2e",
+      "owner": "mikka_test",
+      "provenance": [
+        "/tmp/mikka-authority-version-db-1.log"
+      ]
+    },
+    {
+      "name": "authority_ws_086776cf13c940c3bf34126cb55a53e0_e2e",
+      "owner": "mikka_test",
+      "provenance": [
+        "authority-worktree-a410/lib/agent-tool-approval/http.db.test.mts: workspaceName authority_ws_${UUID}_e2e in own isolated fixture"
+      ]
+    },
+    {
+      "name": "authority_ws_1b59b07e04184eebba6d88264e57b42b_e2e",
+      "owner": "mikka_test",
+      "provenance": [
+        "authority-worktree-a410/lib/agent-tool-approval/http.db.test.mts: workspaceName authority_ws_${UUID}_e2e in own isolated fixture"
+      ]
+    },
+    {
+      "name": "authority_ws_5c382c6772914f3c9a692ae6ab41471d_e2e",
+      "owner": "mikka_test",
+      "provenance": [
+        "authority-worktree-a410/lib/agent-tool-approval/http.db.test.mts: workspaceName authority_ws_${UUID}_e2e in own isolated fixture"
+      ]
+    },
+    {
+      "name": "authority_ws_6433c38a9b534e4b970eedf3780752cd_e2e",
+      "owner": "mikka_test",
+      "provenance": [
+        "authority-worktree-a410/lib/agent-tool-approval/http.db.test.mts: workspaceName authority_ws_${UUID}_e2e in own isolated fixture"
+      ]
+    },
+    {
+      "name": "authority_ws_67c2e6e31809480bada1a02b069203e1_e2e",
+      "owner": "mikka_test",
+      "provenance": [
+        "authority-worktree-a410/lib/agent-tool-approval/http.db.test.mts: workspaceName authority_ws_${UUID}_e2e in own isolated fixture"
+      ]
+    },
+    {
+      "name": "authority_ws_a3675102ea8a45999877444a2aeb5124_e2e",
+      "owner": "mikka_test",
+      "provenance": [
+        "authority-worktree-a410/lib/agent-tool-approval/http.db.test.mts: workspaceName authority_ws_${UUID}_e2e in own isolated fixture"
+      ]
+    },
+    {
+      "name": "authority_ws_f08b249817914cbe930d5015af465a00_e2e",
+      "owner": "mikka_test",
+      "provenance": [
+        "authority-worktree-a410/lib/agent-tool-approval/http.db.test.mts: workspaceName authority_ws_${UUID}_e2e in own isolated fixture"
+      ]
+    }
+  ],
+  "unmatchedPotentialDatabases": [
+    {
+      "name": "approval_e2e_202611042353000000000001",
+      "owner": "mikka_test"
+    },
+    {
+      "name": "authority_combined_20261104_2225_e2e",
+      "owner": "mikka_test"
+    }
+  ],
+  "roles": [
+    {
+      "rolname": "mikka_lists_integrate_323b14bda6",
+      "rolsuper": false,
+      "rolcreatedb": true,
+      "rolcreaterole": false,
+      "rolcanlogin": true
+    },
+    {
+      "rolname": "mikka_test",
+      "rolsuper": true,
+      "rolcreatedb": true,
+      "rolcreaterole": false,
+      "rolcanlogin": true
+    },
+    {
+      "rolname": "postgres",
+      "rolsuper": true,
+      "rolcreatedb": true,
+      "rolcreaterole": true,
+      "rolcanlogin": true
+    }
+  ],
+  "roleCreationEvidence": []
+}

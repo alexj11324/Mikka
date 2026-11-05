@@ -1,0 +1,38 @@
+{"event":"authority_version_databases","app":"authority_app_90ac77285e0e4be9a9f7e0bd1acf5f5e_e2e","workspace":"authority_workspace_90ac77285e0e4be9a9f7e0bd1acf5f5e_e2e","instrumentation":"test-only all public tables"}
+{"event":"authority_complete_snapshot","full":1,"appVersionQueries":2,"workspaceVersionQueries":2,"physicalDatabases":2,"cache":"none"}
+✔ brackets the actual CLI policy and real membership reader across distinct databases (1841.414427ms)
+✔ does not publish a positive snapshot when real Stop commits after the full App read (114.677277ms)
+✔ does not publish a positive snapshot when Workspace membership is revoked after the full read (28.412295ms)
+✔ rolls back the business write and dependency version together (28.266888ms)
+✖ captures a normal FK parent deletion between complete read and publication (25.230229ms)
+✔ re-reads after changes in both databases even when the final values return to their originals (33.811613ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2312.301478
+
+✖ failing tests:
+
+test at lib/run-authority/source.db.test.ts:1:8121
+✖ captures a normal FK parent deletion between complete read and publication (25.230229ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /agentPolicyUnavailable/. Input:
+  
+  'Error: approvalUnavailable'
+  
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-control-authority/authority-worktree-a410/lib/run-authority/source.db.test.ts:122:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: approvalUnavailable
+        at <anonymous> (/vercel/sandbox/mikka-control-authority/authority-worktree-a410/lib/agent-tool-approval/store.ts:17:121)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5),
+    expected: /agentPolicyUnavailable/,
+    operator: 'rejects',
+    diff: 'simple'
+  }

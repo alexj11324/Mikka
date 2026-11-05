@@ -1,0 +1,18 @@
+{"event":"authority_version_databases","app":"authority_app_8a94db1f08354341b83aef1003a072d7_e2e","workspace":"authority_workspace_8a94db1f08354341b83aef1003a072d7_e2e","instrumentation":"test-only all public tables"}
+{"event":"authority_complete_snapshot","full":1,"appVersionQueries":2,"workspaceVersionQueries":2,"physicalDatabases":2,"cache":"none"}
+✔ brackets the actual CLI policy and real membership reader across distinct databases (1897.887253ms)
+✔ does not publish a positive snapshot when real Stop commits after the full App read (189.46704ms)
+✔ does not publish a positive snapshot when Workspace membership is revoked after the full read (47.160119ms)
+✔ rolls back the business write and dependency version together (45.295669ms)
+✔ captures a normal FK parent deletion between complete read and publication (41.018884ms)
+✔ re-reads after changes in both databases even when the final values return to their originals (50.119932ms)
+{"event":"authority_pg_stall_child_deadline","committedStop":true,"postgresBarrierBlocked":true,"gateRevokeAfterCommitMs":568.4955420000001,"childExitAfterCommitMs":578.2044310000001,"eventsAfterStop":["exit"],"childSignalMarker":"143","deadlineMs":1000,"deadlineMet":true,"full":2,"appVersionQueries":3,"workspaceVersionQueries":3}
+✔ a genuinely blocked PostgreSQL barrier cannot keep a silent actual child alive after Stop (1238.932684ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3805.858206

@@ -1,0 +1,293 @@
+diff --git a/lib/run-authority/source.ts b/lib/run-authority/source.ts
+new file mode 100644
+index 000000000..9137ca135
+--- /dev/null
++++ b/lib/run-authority/source.ts
+@@ -0,0 +1,68 @@
++import type { Pool } from 'pg'
++import type { RunAuthorityChallenge, RunAuthorityGrant } from '../../packages/daemon/src/agents/run-authority'
++
++type Database = Pick<Pool,'query'>
++type Version = { source: string; revision: string }
++type Vector = { app: Version; workspace: Version }
++export interface CompleteRunAuthority {
++  live: boolean
++  /** A conservative remaining duration, including every relevant natural
++   * expiry, measured no earlier than this complete reader's invocation. */
++  validForMs: number
++}
++
++function active(signal: AbortSignal) {
++  if (signal.aborted) throw new Error('Run authority unavailable')
++}
++
++async function version(database: Database, signal: AbortSignal): Promise<Version> {
++  active(signal)
++  const {rows} = await database.query<{source:string;revision:string}>(
++    'SELECT source::text, revision::text FROM run_authority_version WHERE singleton=true')
++  active(signal)
++  const row=rows[0]
++  if (rows.length!==1 || !row || !/^[0-9a-f-]{36}$/.test(row.source) || !/^(0|[1-9][0-9]*)$/.test(row.revision)) throw new Error('Run authority version unavailable')
++  return row
++}
++
++async function vector(app: Database, workspace: Database, signal: AbortSignal): Promise<Vector> {
++  const [a,w]=await Promise.all([version(app,signal),version(workspace,signal)])
++  return {app:a,workspace:w}
++}
++
++function equal(a:Vector,b:Vector) {
++  return a.app.source===b.app.source && a.app.revision===b.app.revision
++    && a.workspace.source===b.workspace.source && a.workspace.revision===b.workspace.revision
++}
++
++/** This foundation deliberately has no settled-success cache. Before any
++ * cached variant is used, its DB trigger manifest and source placement must
++ * be independently established for the complete reader's dependencies.
++ * Same-transaction versions bracket the entire existing reader, across both
++ * databases. Lost NOTIFY messages cannot manufacture an unchanged version.
++ */
++export function completeRunAuthoritySource(input: {
++  runId: string
++  app: Database
++  workspace: Database
++  read: (signal:AbortSignal)=>Promise<CompleteRunAuthority>
++}) {
++  return async (challenge: RunAuthorityChallenge, signal: AbortSignal):Promise<RunAuthorityGrant> => {
++    if (challenge.runId!==input.runId) throw new Error('Run authority scope unavailable')
++    for(let attempt=0;attempt<3;attempt++) {
++      active(signal)
++      const started=performance.now()
++      const before=await vector(input.app,input.workspace,signal)
++      const result=await input.read(signal)
++      active(signal)
++      // A fresh refusal never needs a positive snapshot or a retry.
++      if (result.live!==true) return {runId:input.runId,nonce:challenge.nonce,live:false,validForMs:0}
++      const after=await vector(input.app,input.workspace,signal)
++      if (!equal(before,after)) continue
++      const validForMs=Math.min(750,result.validForMs-(performance.now()-started))
++      if (!Number.isFinite(validForMs) || validForMs<=0) throw new Error('Run authority expired')
++      return {runId:input.runId,nonce:challenge.nonce,live:true,validForMs}
++    }
++    throw new Error('Run authority changed during snapshot')
++  }
++}
+diff --git a/packages/daemon/src/agents/run-authority.ts b/packages/daemon/src/agents/run-authority.ts
+new file mode 100644
+index 000000000..43e8f64eb
+--- /dev/null
++++ b/packages/daemon/src/agents/run-authority.ts
+@@ -0,0 +1,97 @@
++// Transport-independent authority lease. The source must authenticate the run
++// and complete a fresh dependency barrier for each challenge before answering.
++// Transport health or a delivery ACK is never a grant.
++export interface RunAuthorityChallenge { runId: string; nonce: string }
++export interface RunAuthorityGrant {
++  runId: string
++  nonce: string
++  live: boolean
++  /** Remaining authority at the source's fresh read, also bounded locally. */
++  validForMs: number
++}
++export type RunAuthoritySource = (challenge: RunAuthorityChallenge, signal: AbortSignal) => Promise<RunAuthorityGrant>
++
++// Reserve part of the old one-second check interval for actual child teardown.
++const MAX_AUTHORITY_MS = 750
++const CHALLENGE_INTERVAL_MS = 200
++
++export class RunAuthorityLease {
++  private readonly stop = new AbortController()
++  private deadline = 0
++  private granted = false
++  private pending = false
++  private dirty = false
++  private expiry?: ReturnType<typeof setTimeout>
++  private next?: ReturnType<typeof setTimeout>
++  private resolveReady!: (live: boolean) => void
++  readonly ready = new Promise<boolean>(resolve => { this.resolveReady = resolve })
++
++  constructor(readonly runId: string, private readonly source: RunAuthoritySource, private readonly unavailable: () => void) {}
++
++  get current(): boolean {
++    if (!this.stop.signal.aborted && this.deadline && performance.now() >= this.deadline) this.fail()
++    return this.granted && !this.stop.signal.aborted
++  }
++
++  start() { this.challenge() }
++
++  invalidate() {
++    this.dirty = true
++    clearTimeout(this.next)
++    this.challenge()
++  }
++
++  close() {
++    if (this.stop.signal.aborted) return
++    clearTimeout(this.expiry); clearTimeout(this.next)
++    this.granted = false
++    this.stop.abort()
++    this.resolveReady(false)
++  }
++
++  private fail() {
++    if (this.stop.signal.aborted) return
++    this.close()
++    this.unavailable()
++  }
++
++  private arm() {
++    clearTimeout(this.expiry)
++    const remaining = this.deadline - performance.now()
++    if (remaining <= 0) { this.fail(); return }
++    this.expiry = setTimeout(() => {
++      if (performance.now() >= this.deadline) this.fail()
++      else this.arm()
++    }, remaining)
++    this.expiry.unref()
++  }
++
++  private challenge() {
++    if (this.stop.signal.aborted || this.pending) return
++    this.pending = true
++    this.dirty = false
++    const sentAt = performance.now()
++    const nonce = crypto.randomUUID()
++    // A pending renewal cannot extend the previous grant. The first request
++    // has its own deadline even if the source never answers at all.
++    if (!this.deadline) { this.deadline = sentAt + MAX_AUTHORITY_MS; this.arm() }
++    void Promise.resolve().then(() => this.source({runId:this.runId,nonce},this.stop.signal)).then(grant => {
++      if (this.stop.signal.aborted) return
++      const now = performance.now()
++      if (!grant || now >= this.deadline || now >= sentAt + MAX_AUTHORITY_MS || grant.nonce !== nonce || grant.runId !== this.runId
++        || grant.live !== true || !Number.isFinite(grant.validForMs) || grant.validForMs <= 0) { this.fail(); return }
++      const deadline = sentAt + Math.min(MAX_AUTHORITY_MS,grant.validForMs)
++      if (deadline <= now) { this.fail(); return }
++      this.deadline = deadline
++      this.granted = true
++      this.resolveReady(true)
++      this.arm()
++    }).catch(() => this.fail()).finally(() => {
++      this.pending = false
++      if (this.stop.signal.aborted) return
++      if (this.dirty) { this.challenge(); return }
++      this.next = setTimeout(() => this.challenge(),CHALLENGE_INTERVAL_MS)
++      this.next.unref()
++    })
++  }
++}
+diff --git a/packages/daemon/src/agents/tool-approval.ts b/packages/daemon/src/agents/tool-approval.ts
+index c44dd6a44..3012f0a08 100644
+--- a/packages/daemon/src/agents/tool-approval.ts
++++ b/packages/daemon/src/agents/tool-approval.ts
+@@ -3,6 +3,8 @@
+ // Claude Code in bypassPermissions, Codex with approvals "never"); this gate
+ // only stops a run whose lease, owner or policy is no longer live.
+ 
++import { RunAuthorityLease, type RunAuthoritySource } from './run-authority'
++
+ export interface ToolApprovalHost {
+   /** Must reflect current run lease, owner, and revocation state. */
+   isLive(runId: string): boolean | Promise<boolean>
+@@ -28,13 +30,20 @@ export class ToolApprovalGate {
+   private intervalMs?: number
+   private monitoring?: Promise<void>
+   private dirty = false
+-  constructor(readonly runId: string, private readonly host: ToolApprovalHost) {}
++  private readonly authority?: RunAuthorityLease
++  constructor(readonly runId: string, private readonly host: ToolApprovalHost, source?: RunAuthoritySource) {
++    if (source) {
++      this.authority = new RunAuthorityLease(runId,source,()=>this.revoke())
++      this.authority.start()
++    }
++  }
+   revoke(reason?: 'device_lost') {
+     if (this.revoked) return
+     this.reason = reason
+     clearInterval(this.timer)
+     this.timer = undefined
+     this.monitors.clear()
++    this.authority?.close()
+     this.stop.abort()
+   }
+   get revoked(): boolean { return this.stop.signal.aborted }
+@@ -47,7 +56,13 @@ export class ToolApprovalGate {
+   async checkLive(): Promise<boolean> {
+     if (this.revoked) return false
+     if (!this.checking) {
+-      const work = Promise.resolve().then(() => this.revoked ? false : this.host.isLive(this.runId))
++      const work = Promise.resolve().then(async () => {
++        if (this.revoked || (this.authority && (!await this.authority.ready || !this.authority.current))) return false
++        // Even with a source lease, every operation still gets a fresh answer
++        // from the original host. Only its redundant background poll changes.
++        const live = await this.host.isLive(this.runId)
++        return live && (!this.authority || this.authority.current)
++      })
+       this.checking = abortable(work, this.stop.signal)
+         .then(live => live && !this.revoked, () => false)
+         .finally(() => { this.checking = undefined })
+@@ -67,16 +82,18 @@ export class ToolApprovalGate {
+     return () => { this.monitors.delete(monitor); this.scheduleMonitor() }
+   }
+   private scheduleMonitor() {
+-    const intervalMs = this.monitors.size ? Math.min(...[...this.monitors].map(monitor => monitor.intervalMs)) : undefined
++    const monitored = [...this.monitors].filter(monitor => !this.authority || monitor.check)
++    const intervalMs = monitored.length ? Math.min(...monitored.map(monitor => monitor.intervalMs)) : undefined
+     if (intervalMs === this.intervalMs) return
+     clearInterval(this.timer)
+     this.intervalMs = intervalMs
+     this.timer = intervalMs === undefined ? undefined : setInterval(() => this.requestCheck(false), intervalMs)
+     this.timer?.unref()
+   }
+-  /** A push invalidates an in-flight check as well as a settled one. Generic
+-   * work frames may be lost, so the one-second safety timer stays enabled. */
++  /** Legacy clients retain the one-second safety timer. A negotiated source
++   * handles lost hints using its independent bounded authority challenges. */
+   invalidate() {
++    if (this.authority) this.authority.invalidate()
+     this.requestCheck(true)
+   }
+   private requestCheck(invalidated: boolean) {
+@@ -91,7 +108,7 @@ export class ToolApprovalGate {
+     this.monitoring = (async () => {
+       while (this.dirty && !this.revoked && this.monitors.size) {
+         this.dirty = false
+-        if (!await this.checkLive()) { this.revoke(); return }
++        if (!(this.authority ? await this.authority.ready && this.authority.current : await this.checkLive())) { this.revoke(); return }
+         if (olderOperation) { olderOperation = false; this.dirty = true; continue }
+         for (const monitor of this.monitors) {
+           if (!monitor.check) continue
+@@ -118,3 +135,4 @@ export function requireRunToolApproval(runId: string, gate?: ToolApprovalGate):
+   if (!gate || gate.runId !== runId || gate.revoked) throw new Error('Run tool approval unavailable')
+   return gate
+ }
++
+diff --git a/packages/daemon/src/server-link-http.ts b/packages/daemon/src/server-link-http.ts
+index 93d8538d9..0f6ff83b9 100644
+--- a/packages/daemon/src/server-link-http.ts
++++ b/packages/daemon/src/server-link-http.ts
+@@ -16,6 +16,7 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
+ import { z } from "zod"
+ import { chatFileDownloadSchema, chatFileTransferSchema, CHAT_FILE_MAX_BYTES } from '@mikka/protocol/chat-attachments'
+ import { ToolApprovalGate } from "./agents/tool-approval"
++import type { RunAuthoritySource } from './agents/run-authority'
+ import type { ServerDecide, ServerDecisionAnswer } from "./server-decision"
+ import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
+ import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
+@@ -177,7 +178,7 @@ export class HttpServerLink implements ServerLink {
+     } catch { return null }
+   }
+ 
+-  async prepareRunToolApproval(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
++  async prepareRunToolApproval(assignment: RunAssignment, signal: AbortSignal, check: () => void, _worktree?: string, authority?: RunAuthoritySource) {
+     if (!assignment.policy || !assignment.policyRevision) throw new Error('Run policy unavailable')
+     let context = signal.aborted ? null : await this.verifyRunPolicy(assignment,signal)
+     const policyRevision = assignment.policyRevision
+@@ -238,7 +239,7 @@ export class HttpServerLink implements ServerLink {
+           }
+         } catch (error) { refusal(phase, 'check_failed', error); return false }
+       }
+-    })
++    }, authority)
+     this.runControls.add(gate)
+     const offMonitor = gate.monitor()
+     const abort = () => gate.revoke()

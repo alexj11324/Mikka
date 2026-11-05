@@ -1,0 +1,39 @@
+(node:29887) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29887) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+Retained fully migrated approval HTTP database: approval_http_502e9b45fe2640059e356c76a15e7348
+(node:29887) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-04T23:53:13.088Z","runId":"19b048c6-440c-4293-9992-667895f52e46","live":true,"reason":"ok","status":200,"durationMs":13}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-04T23:53:14.047Z","runId":"19b048c6-440c-4293-9992-667895f52e46","live":true,"reason":"ok","status":200,"durationMs":7}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-04T23:53:15.047Z","runId":"19b048c6-440c-4293-9992-667895f52e46","live":true,"reason":"ok","status":200,"durationMs":7}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-04T23:53:16.049Z","runId":"19b048c6-440c-4293-9992-667895f52e46","live":true,"reason":"ok","status":200,"durationMs":6}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-04T23:53:17.046Z","runId":"19b048c6-440c-4293-9992-667895f52e46","live":true,"reason":"ok","status":200,"durationMs":6}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-04T23:53:18.046Z","runId":"19b048c6-440c-4293-9992-667895f52e46","live":true,"reason":"ok","status":200,"durationMs":6}
+✖ idle CLI stops within one second when authority delivery stalls after a committed Stop (8762.79921ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 29007.103651
+
+✖ failing tests:
+
+test at lib/agent-tool-approval/http.db.test.mts:1:16763
+✖ idle CLI stops within one second when authority delivery stalls after a committed Stop (8762.79921ms)
+  AssertionError [ERR_ASSERTION]: the actual child must be running before fault injection
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/vercel/sandbox/mikka-control-authority/authority-worktree-a410/lib/agent-tool-approval/http.db.test.mts:272:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

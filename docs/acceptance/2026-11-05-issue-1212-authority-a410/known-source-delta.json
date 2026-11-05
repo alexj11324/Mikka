@@ -1,0 +1,61 @@
+{
+  "source": "a410b292cc53cfef43992a91d7696023e3481567",
+  "compared": 162,
+  "unchanged": 153,
+  "changed": [
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "c29": "2535e389020c2e5ae9f0ed15029f75be7d5b25bd",
+      "a410": "9edf663331dc5cd08f0d169f1d746f68ae982dd7",
+      "changed": true
+    },
+    {
+      "path": "lib/cloud-computer/thread-worker-logs.ts",
+      "c29": "182c1e8bafaa2bb493894b253380ad111d9469c2",
+      "a410": "9bfb9f6997945272f06317d3a25f0f1f1887e2a4",
+      "changed": true
+    },
+    {
+      "path": "lib/db/schema.ts",
+      "c29": "f3739beef21c967cb8544e4ff3250c5a8b7cc793",
+      "a410": "0ce413124e2db584b159a8fb16ad7f210950c5be",
+      "changed": true
+    },
+    {
+      "path": "lib/device-link.ts",
+      "c29": "cec5c5e2e4be8c5922f7b81d695a7d4a4722d727",
+      "a410": "0c3fb2f86fbe630e3b7a9dc68b1cde87adcabbf5",
+      "changed": true
+    },
+    {
+      "path": "lib/factory/checks.ts",
+      "c29": "8c178e9681c67679d79b34fd9efff561df606506",
+      "a410": "1b544e672d9500a59b24da72d1ddbe534a1615f9",
+      "changed": true
+    },
+    {
+      "path": "lib/factory/questions/queue-continuation.ts",
+      "c29": "9129d0656a642ac81a6ccbf71c31c33d572d08ad",
+      "a410": "40f509888f8d2cacc6f94e6830c66d485df83d81",
+      "changed": true
+    },
+    {
+      "path": "lib/factory/questions/store.ts",
+      "c29": "324e8e6cf68163000b1294fb0e52be33a43d40b8",
+      "a410": "92db2745c7397c29032daf8fdaf69e5cc37ac6fc",
+      "changed": true
+    },
+    {
+      "path": "lib/workspace-admin/general.ts",
+      "c29": "6d9474038e184ebdf3d46318414cc46a7366db3d",
+      "a410": "d865543c3a517408ecaca50ea2a14133719f470a",
+      "changed": true
+    },
+    {
+      "path": "lib/workspace-admin/teams.ts",
+      "c29": "8bbaedadf21d53c98761f18a5904d4d12c1ead0d",
+      "a410": "b4f21efc376a8c9a01f34311f5a1940f1d43db1e",
+      "changed": true
+    }
+  ]
+}

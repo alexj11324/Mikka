@@ -1,0 +1,33 @@
+(node:29439) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29439) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+Retained fully migrated approval HTTP database: approval_http_29204e0701924e9684d465afb88ebc43
+✖ idle CLI stops within one second when authority delivery stalls after a committed Stop (4047.517026ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24415.455034
+
+✖ failing tests:
+
+test at lib/agent-tool-approval/http.db.test.mts:1:16763
+✖ idle CLI stops within one second when authority delivery stalls after a committed Stop (4047.517026ms)
+  AssertionError [ERR_ASSERTION]: real isolated claim: {"error":"Policy signing unavailable."}
+  
+  503 !== 200
+  
+      at TestContext.<anonymous> (/vercel/sandbox/mikka-control-authority/authority-worktree-a410/lib/agent-tool-approval/http.db.test.mts:238:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 503,
+    expected: 200,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

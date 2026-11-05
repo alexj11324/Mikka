@@ -1,0 +1,47 @@
+✔ checkState rejects another device (57.066753ms)
+✔ a stopped run is never live (3.272569ms)
+✔ only the current epoch host watchdog receipt classifies a stopped run as lease-revoked (21.87895ms)
+✔ watchdog cause does not escape owner, device or cancelled-task boundaries (8.347731ms)
+✔ an actually expired lease carries its cause, while a manual stop and terminal run do not (10.793621ms)
+✔ a changed policy revision cannot be hidden by an expired lease or watchdog stop (34.891507ms)
+✔ a changed worker policy ends the live check for the old revision (13.95737ms)
+✔ workspace may narrow agent policy, rejects forged generations, and invalidates a recreated fixture (139.758685ms)
+✔ legacy local runs materialize stable sandbox defaults without changing explicit choices (16.73562ms)
+✔ unbound workers get open network defaults and only owned cloud devices are read (10.009961ms)
+✔ policy changes and live tool checks share run-before-policy lock order (12.016049ms)
+✔ human control preserves the existing lease, then expires through the existing liveness poll (17.62814ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1130.656516
+(node:40350) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:40350) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+Retained fully migrated approval HTTP database: approval_http_7d874531e2f14e09b47f202464a10e95
+(node:40350) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:16:50.454Z","runId":"cd158594-c5da-46bc-8f21-beccc97dc032","live":true,"reason":"ok","status":200,"durationMs":7}
+✔ real HTTP claim carries policy, and its run gate creates no approvals (decision 2026-11-01-2335) (3639.540344ms)
+{"event":"run_liveness_refused","runId":"cd158594-c5da-46bc-8f21-beccc97dc032","deviceId":"a6f3aa58-e03c-4573-bff0-d2e0659aaff9","phase":"server_check","reason":"run_not_live","errorClass":null,"status":200}
+✔ a changed run policy answers live:false, revokes the real daemon gate, and each check logs one line (1064.859908ms)
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:16:51.537Z","runId":"cd158594-c5da-46bc-8f21-beccc97dc032","live":false,"reason":"lease_revoked","status":200,"durationMs":7}
+{"level":"warn","msg":"tool_approval_check","timestamp":"2026-11-05T00:16:51.545Z","runId":"cd158594-c5da-46bc-8f21-beccc97dc032","live":false,"reason":"run_unavailable","status":409,"durationMs":5}
+{"level":"warn","msg":"tool_approval_check","timestamp":"2026-11-05T00:16:51.549Z","runId":"cd158594-c5da-46bc-8f21-beccc97dc032","live":false,"reason":"invalid_request","status":400,"durationMs":1}
+✔ real authenticated HTTP retains a lease-loss cause but never invents it for manual Stop (27.565648ms)
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:16:52.139Z","runId":"18f84371-37df-427e-8a3e-63d368461d20","live":true,"reason":"ok","status":200,"durationMs":21}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:16:52.150Z","runId":"18f84371-37df-427e-8a3e-63d368461d20","live":true,"reason":"ok","status":200,"durationMs":6}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:16:52.352Z","runId":"18f84371-37df-427e-8a3e-63d368461d20","live":true,"reason":"ok","status":200,"durationMs":7}
+{"event":"authority_idle_child_deadline","sourceSha":"a410b292cc53cfef43992a91d7696023e3481567","fault":"delayed_http_delivery_no_origin_notification","runId":"18f84371-37df-427e-8a3e-63d368461d20","committedStop":true,"commitDurationMs":2.7922749999997905,"observationAfterCommitMs":519.650345,"revokedAfterCommitMs":512.5906300000006,"childExitAfterCommitMs":519.5791070000005,"childSignalMarker":"143","authorityHttpRequests":3,"challenges":2,"eventsAfterStop":["exit"],"deadlineMs":1000,"deadlineMet":true}
+✔ idle CLI stops within one second when authority delivery stalls after a committed Stop (1329.337337ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 25946.559933
+Retained approval test database: approval_e2e_a63edddbc408f5acdce3c357

@@ -1,0 +1,85 @@
+{
+  "reviewer": "egress_1211",
+  "base": "a410b292cc53cfef43992a91d7696023e3481567",
+  "reportedWorktreeTree": "202fe0baf19f3a45f110b16e705085cd364d2726",
+  "verification": {
+    "candidateFiles": 8,
+    "gitBlobMismatches": 0,
+    "candidateDirectoryExtraFiles": [
+      "packages/subscription-worker/authority_idle_test.go"
+    ],
+    "packetFiles": 71,
+    "packetBytesSha256Mismatches": 0,
+    "fullBaseTreeReconstructionPerformed": false
+  },
+  "candidateFiles": [
+    {
+      "path": "lib/agent-tool-approval/http.db.test.mts",
+      "size": 29094,
+      "blob": "177601f27b2d2195497d2a5b7f24203100d25868",
+      "sha256": "363a8fa8015efd467c601b8b0bc57af0e1ce3f19b837714d72a830b0ef28c645"
+    },
+    {
+      "path": "lib/run-authority/source.db.test.ts",
+      "size": 9205,
+      "blob": "349ec34ac674a45199c0085620b581d27b6c1f47",
+      "sha256": "f391c9672def58ea063a55b7d15e97190663c237ccc31cf77e0b67ace76e9d72"
+    },
+    {
+      "path": "lib/run-authority/source.ts",
+      "size": 3106,
+      "blob": "9137ca135fb32d02656b7fdc502c0b2d88c56151",
+      "sha256": "522216ce17ecaed2ab3e50f84ae60a683a034517dccbe5eddcaa0b985ac04bfe"
+    },
+    {
+      "path": "packages/daemon/src/agents/run-authority.ts",
+      "size": 3582,
+      "blob": "43e8f64eb45d34789804534e360f33a6268108b2",
+      "sha256": "d2b2eeeac6a4038d7620d377d270c6819c3c496fc3ba19f6d407eccc24464281"
+    },
+    {
+      "path": "packages/daemon/src/agents/tool-approval.ts",
+      "size": 6221,
+      "blob": "3012f0a08ce1885a75df441fcce49cf07aae4150",
+      "sha256": "3882d71fb691dd510d044d7f3a54402be616f0fb74fd49bcfe5605cd7262d50f"
+    },
+    {
+      "path": "packages/daemon/src/server-link-http.ts",
+      "size": 27557,
+      "blob": "0f6ff83b96596dd06176fe7e5f97c629d39b5ba6",
+      "sha256": "f981ef8a7e4cd55d8f26da0e4d8547b95232d6a2dad82aaed7559667760bbd26"
+    },
+    {
+      "path": "packages/daemon/test/run-authority.test.ts",
+      "size": 5095,
+      "blob": "209e4b41e112fc6bb6ec89eac228a314f4b98210",
+      "sha256": "7e1be5b13aa2b28783beb51c3605f9a3ff085eb44a0e1a5e6620eaa7d2526737"
+    },
+    {
+      "path": "tests/helpers/run-authority-version-fixture.ts",
+      "size": 1164,
+      "blob": "01ebaebf1fed8f0ae5f3f236743dcaef6e7ada15",
+      "sha256": "45382ff4637b9b4ebd4275bbc17bfebbae3e90e038150249ffb5acc6971f96bd"
+    }
+  ],
+  "review": {
+    "path": "INDEPENDENT-EGRESS-A-REVIEW.md",
+    "bytes": 13614,
+    "sha256": "8f3299262b0664c470725b2b361164565e9b5b556c4328b689c3006f74a30226"
+  },
+  "strictFixtureSha256": "363a8fa8015efd467c601b8b0bc57af0e1ce3f19b837714d72a830b0ef28c645",
+  "disposition": "bounded default-off experimental checkpoint; no residual source blockers; not production or egress acceptance",
+  "cleanupAddendum": {
+    "receipt": "cleanup/mikka-authority-cleanup-receipt.json",
+    "receiptSha256": "51c707edab6c22f9ce90d7124ada568081925c52bdcdd31de8a63a64091c001a",
+    "completedAt": "2026-11-05T00:39:45.946Z",
+    "ordinaryDropCount": 30,
+    "preDropConnections": [],
+    "remainingOwnedDatabases": [],
+    "rolesCreated": 0,
+    "rolesDropped": 0,
+    "sharedServicesStopped": false,
+    "unattributedDatabasePreserved": "approval_e2e_202611042353000000000001",
+    "scope": "readonly local receipt review; not a claim that all sandbox databases are absent"
+  }
+}

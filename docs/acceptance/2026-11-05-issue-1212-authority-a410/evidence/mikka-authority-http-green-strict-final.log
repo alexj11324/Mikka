@@ -1,0 +1,77 @@
+✔ checkState rejects another device (46.657993ms)
+✔ a stopped run is never live (3.248911ms)
+✔ only the current epoch host watchdog receipt classifies a stopped run as lease-revoked (14.726701ms)
+✔ watchdog cause does not escape owner, device or cancelled-task boundaries (6.243641ms)
+✔ an actually expired lease carries its cause, while a manual stop and terminal run do not (8.970959ms)
+✔ a changed policy revision cannot be hidden by an expired lease or watchdog stop (26.700604ms)
+✔ a changed worker policy ends the live check for the old revision (10.413006ms)
+✔ workspace may narrow agent policy, rejects forged generations, and invalidates a recreated fixture (110.0602ms)
+✔ legacy local runs materialize stable sandbox defaults without changing explicit choices (11.647927ms)
+✔ unbound workers get open network defaults and only owned cloud devices are read (8.549242ms)
+✔ policy changes and live tool checks share run-before-policy lock order (10.834702ms)
+✔ human control preserves the existing lease, then expires through the existing liveness poll (21.112728ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 971.917639
+(node:42382) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:42382) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+Retained fully migrated approval HTTP database: approval_http_cf7caa43fa0848278e03ce3800e23219
+(node:42382) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:26:54.662Z","runId":"ae627778-4720-48d2-9e94-3f48c5621381","live":true,"reason":"ok","status":200,"durationMs":6}
+✔ real HTTP claim carries policy, and its run gate creates no approvals (decision 2026-11-01-2335) (3114.028717ms)
+{"event":"run_liveness_refused","runId":"ae627778-4720-48d2-9e94-3f48c5621381","deviceId":"be651b20-6063-4dbe-8f49-3e166c6431b8","phase":"server_check","reason":"run_not_live","errorClass":null,"status":200}
+✔ a changed run policy answers live:false, revokes the real daemon gate, and each check logs one line (1036.936086ms)
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:26:55.713Z","runId":"ae627778-4720-48d2-9e94-3f48c5621381","live":false,"reason":"lease_revoked","status":200,"durationMs":5}
+{"level":"warn","msg":"tool_approval_check","timestamp":"2026-11-05T00:26:55.719Z","runId":"ae627778-4720-48d2-9e94-3f48c5621381","live":false,"reason":"run_unavailable","status":409,"durationMs":4}
+{"level":"warn","msg":"tool_approval_check","timestamp":"2026-11-05T00:26:55.721Z","runId":"ae627778-4720-48d2-9e94-3f48c5621381","live":false,"reason":"invalid_request","status":400,"durationMs":1}
+✔ real authenticated HTTP retains a lease-loss cause but never invents it for manual Stop (19.532962ms)
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:26:56.195Z","runId":"7fa12004-de41-4653-a870-2e932262a573","live":true,"reason":"ok","status":200,"durationMs":16}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:26:56.204Z","runId":"7fa12004-de41-4653-a870-2e932262a573","live":true,"reason":"ok","status":200,"durationMs":5}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-05T00:26:56.418Z","runId":"7fa12004-de41-4653-a870-2e932262a573","live":true,"reason":"ok","status":200,"durationMs":18}
+{"event":"authority_idle_child_deadline","sourceSha":"a410b292cc53cfef43992a91d7696023e3481567","fault":"http_delivery","runId":"7fa12004-de41-4653-a870-2e932262a573","committedStop":true,"commitDurationMs":2.382647000000361,"observationAfterCommitMs":517.4926139999998,"revokedAfterCommitMs":509.2108049999997,"childExitAfterCommitMs":514.3756469999998,"childSignalMarker":"143","authorityHttpRequests":3,"challenges":2,"versionQueries":{"app":3,"workspace":3},"postgresBarrierBlocked":false,"eventsAfterStop":["exit"],"deadlineMs":1000,"deadlineMet":true}
+✔ idle CLI stops within one second after committed Stop with stalled HTTP delivery (1220.103442ms)
+✖ idle CLI stops within one second after committed Stop with an actual blocked PostgreSQL barrier (2.045167ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 25148.165176
+
+✖ failing tests:
+
+test at lib/agent-tool-approval/http.db.test.mts:2:5368
+✖ idle CLI stops within one second after committed Stop with an actual blocked PostgreSQL barrier (2.045167ms)
+  error: duplicate key value violates unique constraint "agents_user_name_key"
+      at /vercel/sandbox/mikka-control-authority/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async assertIdleChildDeadline (/vercel/sandbox/mikka-control-authority/authority-worktree-a410/lib/agent-tool-approval/http.db.test.mts:237:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    length: 287,
+    severity: 'ERROR',
+    code: '23505',
+    detail: 'Key ("userId", lower(name))=(synthetic-1b1d94a0-4305-4bb3-b311-f38794a72c5e, synthetic silent cli) already exists.',
+    hint: undefined,
+    position: undefined,
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: 'public',
+    table: 'agents',
+    column: undefined,
+    dataType: undefined,
+    constraint: 'agents_user_name_key',
+    file: 'nbtinsert.c',
+    line: '666',
+    routine: '_bt_check_unique'
+  }
+Retained approval test database: approval_e2e_da7899eacf9c2cd52be14d09

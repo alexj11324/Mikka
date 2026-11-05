@@ -1,0 +1,36 @@
+(node:30104) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:30104) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+Retained fully migrated approval HTTP database: approval_http_8d847fd65cb0468699feab1e38eebc52
+(node:30104) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-04T23:54:12.767Z","runId":"c3aa2ca2-bec1-4430-8d1d-20685e660da3","live":true,"reason":"ok","status":200,"durationMs":8}
+{"level":"info","msg":"tool_approval_check","timestamp":"2026-11-04T23:54:13.752Z","runId":"c3aa2ca2-bec1-4430-8d1d-20685e660da3","live":true,"reason":"ok","status":200,"durationMs":9}
+✖ idle CLI stops within one second when authority delivery stalls after a committed Stop (4215.220749ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24562.396745
+
+✖ failing tests:
+
+test at lib/agent-tool-approval/http.db.test.mts:1:16763
+✖ idle CLI stops within one second when authority delivery stalls after a committed Stop (4215.220749ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/vercel/sandbox/mikka-control-authority/authority-worktree-a410/lib/agent-tool-approval/http.db.test.mts:277:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

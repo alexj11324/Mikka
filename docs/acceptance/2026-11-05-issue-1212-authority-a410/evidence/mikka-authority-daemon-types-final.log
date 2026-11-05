@@ -1,0 +1,28 @@
+packages/daemon/src/cli.ts(212,5): error TS2322: Type 'HttpServerLink' is not assignable to type 'ServerLink'.
+  Types of property 'prepareRunToolApproval' are incompatible.
+    Type '(assignment: { runId: string; issueId: string; deviceId: string; repoId: string; remoteUrl?: string | undefined; baseBranch?: string | undefined; expectedRepoRemote?: string | undefined; harness: "claude_code" | ... 2 more ... | "mock"; ... 31 more ...; benchmark?: ... | undefined; }, signal: AbortSignal, check: ......' is not assignable to type '(assignment: { runId: string; issueId: string; deviceId: string; repoId: string; remoteUrl?: string | undefined; baseBranch?: string | undefined; expectedRepoRemote?: string | undefined; harness: "claude_code" | ... 2 more ... | "mock"; ... 31 more ...; benchmark?: ... | undefined; }, signal: AbortSignal, check: ......'. Two different types with this name exist, but they are unrelated.
+      Types of parameters 'authority' and 'worktree' are incompatible.
+        Type 'string | undefined' is not assignable to type 'RunAuthoritySource | undefined'.
+          Type 'string' is not assignable to type 'RunAuthoritySource'.
+packages/daemon/src/server-link-http.ts(181,9): error TS2416: Property 'prepareRunToolApproval' in type 'HttpServerLink' is not assignable to the same property in base type 'ServerLink'.
+  Type '(assignment: { runId: string; issueId: string; deviceId: string; repoId: string; remoteUrl?: string | undefined; baseBranch?: string | undefined; expectedRepoRemote?: string | undefined; harness: "claude_code" | ... 2 more ... | "mock"; ... 31 more ...; benchmark?: ... | undefined; }, signal: AbortSignal, check: ......' is not assignable to type '(assignment: { runId: string; issueId: string; deviceId: string; repoId: string; remoteUrl?: string | undefined; baseBranch?: string | undefined; expectedRepoRemote?: string | undefined; harness: "claude_code" | ... 2 more ... | "mock"; ... 31 more ...; benchmark?: ... | undefined; }, signal: AbortSignal, check: ......'. Two different types with this name exist, but they are unrelated.
+    Types of parameters 'authority' and 'worktree' are incompatible.
+      Type 'string | undefined' is not assignable to type 'RunAuthoritySource | undefined'.
+        Type 'string' is not assignable to type 'RunAuthoritySource'.
+packages/daemon/test/commands-polling.test.ts(115,71): error TS7031: Binding element 'signal' implicitly has an 'any' type.
+packages/daemon/test/commands-polling.test.ts(160,71): error TS7031: Binding element 'signal' implicitly has an 'any' type.
+packages/daemon/test/commands-polling.test.ts(203,76): error TS7031: Binding element 'signal' implicitly has an 'any' type.
+packages/daemon/test/fs-polling.test.ts(90,86): error TS7031: Binding element 'signal' implicitly has an 'any' type.
+packages/daemon/test/fs-polling.test.ts(134,86): error TS7031: Binding element 'signal' implicitly has an 'any' type.
+packages/daemon/test/policy-distribution.test.ts(123,67): error TS2322: Type 'HttpServerLink' is not assignable to type 'ServerLink'.
+  Types of property 'prepareRunToolApproval' are incompatible.
+    Type '(assignment: { runId: string; issueId: string; deviceId: string; repoId: string; remoteUrl?: string | undefined; baseBranch?: string | undefined; expectedRepoRemote?: string | undefined; harness: "claude_code" | ... 2 more ... | "mock"; ... 31 more ...; benchmark?: ... | undefined; }, signal: AbortSignal, check: ......' is not assignable to type '(assignment: { runId: string; issueId: string; deviceId: string; repoId: string; remoteUrl?: string | undefined; baseBranch?: string | undefined; expectedRepoRemote?: string | undefined; harness: "claude_code" | ... 2 more ... | "mock"; ... 31 more ...; benchmark?: ... | undefined; }, signal: AbortSignal, check: ......'. Two different types with this name exist, but they are unrelated.
+      Types of parameters 'authority' and 'worktree' are incompatible.
+        Type 'string | undefined' is not assignable to type 'RunAuthoritySource | undefined'.
+          Type 'string' is not assignable to type 'RunAuthoritySource'.
+packages/daemon/test/server-link-http.test.ts(423,88): error TS2322: Type 'HttpServerLink' is not assignable to type 'ServerLink'.
+  Types of property 'prepareRunToolApproval' are incompatible.
+    Type '(assignment: { runId: string; issueId: string; deviceId: string; repoId: string; remoteUrl?: string | undefined; baseBranch?: string | undefined; expectedRepoRemote?: string | undefined; harness: "claude_code" | ... 2 more ... | "mock"; ... 31 more ...; benchmark?: ... | undefined; }, signal: AbortSignal, check: ......' is not assignable to type '(assignment: { runId: string; issueId: string; deviceId: string; repoId: string; remoteUrl?: string | undefined; baseBranch?: string | undefined; expectedRepoRemote?: string | undefined; harness: "claude_code" | ... 2 more ... | "mock"; ... 31 more ...; benchmark?: ... | undefined; }, signal: AbortSignal, check: ......'. Two different types with this name exist, but they are unrelated.
+      Types of parameters 'authority' and 'worktree' are incompatible.
+        Type 'string | undefined' is not assignable to type 'RunAuthoritySource | undefined'.
+          Type 'string' is not assignable to type 'RunAuthoritySource'.
