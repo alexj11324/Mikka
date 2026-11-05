@@ -18,7 +18,6 @@ import {
 import { issueDeviceToken } from '@/lib/device-link'
 import { deviceOnlineStates } from '@/lib/device-presence'
 import { DEVICE_ONLINE_WINDOW_MS, isDeviceOnline } from '@mikka/protocol/device'
-import { ownerListRead } from '@/lib/live/list-read-server'
 import { removeOwnedDevice, renameOwnedDevice } from '@/lib/device-removal'
 import { enqueueDeviceCommand, type DeviceCommandKind } from '@/lib/device-management'
 import { listSshHosts } from '@/lib/ssh'
@@ -91,6 +90,7 @@ export async function listDevices(): Promise<DeviceView[]> {
 export async function pollDevices() {
   const userId = await getUserId()
   const { devices: items, expiries, gatewayOnline, observedAt } = await readDevices(userId)
+  const { ownerListRead } = await import('@/lib/live/list-read-server')
   return { devices: items, live: await ownerListRead(userId, expiries, observedAt), presenceFallback: gatewayOnline }
 }
 
