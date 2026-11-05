@@ -1,6 +1,2 @@
-import { Redirect } from 'expo-router'
-
-/** The app opens on 对话, the bots and group chats. */
-export default function Start() {
-  return <Redirect href="/chats" />
-}
+/** The app opens on the chat list, the home screen (#1408 Phase 2). */
+export { HomeScreen as default } from '@/features/home/screens/home-screen'

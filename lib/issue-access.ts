@@ -39,27 +39,29 @@ export async function requireIssueAccessWithoutBody(id: string) {
 
 const { content: _content, ...issueColumnsWithoutBody } = getTableColumns(issues)
 
-async function findIssueForUser(reader: IssueReader, id: string, includeDeleted: boolean, executor: Pick<typeof db, 'select'> = db, withoutBody = false) {
+async function findIssueForUser(reader: IssueReader, id: string, includeDeleted: boolean, executor: Pick<typeof db, 'select'> = db, withoutBody = false, withTeam = true) {
   if (!z.uuid().safeParse(id).success) return null
   const userId = typeof reader === 'string' ? reader : reader.id
   // A bare id inside `actAs` for a token's owner keeps the token's scope (an API route running existing actions).
   const acting = actingContext.getStore()
   const workspaceId = typeof reader === 'string' ? (acting?.userId === reader ? acting.tokenWorkspaceId : undefined) : reader[tokenWorkspace]
-  const access = await issueTeamAccess(id, userId)
+  // The team link is needed for the caller's team id or a token's workspace check; a plain session read skips it.
+  const access = withTeam || workspaceId ? await issueTeamAccess(id, userId) : null
   const visibility = await issueVisibility(reader, includeDeleted, workspaceId, executor, { onlyIssueIds: [id] })
   const [row] = withoutBody
     ? await executor.select({ issue: { ...issueColumnsWithoutBody, content: issueAttrsContent } }).from(issues).where(and(eq(issues.id, id), visibility.predicate)).limit(1)
     : await executor.select({ issue: issues }).from(issues).where(and(eq(issues.id, id), visibility.predicate)).limit(1)
   if (!row || (!includeDeleted && readIssueMetadata(row.issue.content).deletedAt)) return null
   // A workspace token reads its owner's workspace tasks only in that workspace, as its task list does.
-  if (workspaceId && row.issue.scope === 'workspace' && access.linked && access.workspaceId !== workspaceId) return null
-  return { issue: row.issue, teamId: access.teamId }
+  if (workspaceId && row.issue.scope === 'workspace' && access?.linked && access.workspaceId !== workspaceId) return null
+  return { issue: row.issue, teamId: access?.teamId ?? null }
 }
 
 /** The issue this user can access; for callers without a session, like the Coordinator.
  * Pass an API route's session user, not its id, so a workspace token keeps its scope.
  * `withoutBody`: `content` holds only its attrs (the metadata), for callers that show a task's name and state. */
 export async function issueForUser(reader: IssueReader, id: string, includeDeleted = false, executor: Pick<typeof db, 'select'> = db, options: { withoutBody?: boolean } = {}) {
-  const result = await findIssueForUser(reader, id, includeDeleted, executor, options.withoutBody)
+  const result = await findIssueForUser(reader, id, includeDeleted, executor, options.withoutBody, false)
   return result?.issue ?? null
 }
+

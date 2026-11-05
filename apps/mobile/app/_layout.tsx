@@ -13,6 +13,7 @@ import { SignIn } from '@/components/SignIn'
 import { StartupGate } from '@/components/StartupGate'
 import { authClient } from '@/lib/auth'
 import { apiCache } from '@/lib/api-cache'
+import { AppDrawer } from '@/features/shell/components/app-drawer'
 import { HomeProvider } from '@/lib/home'
 import { openPush } from '@/lib/navigate'
 import { colors, screenOptions } from '@/lib/theme'
@@ -52,19 +53,19 @@ function SessionGate() {
   return (
     <HomeProvider key={data.user.id}>
       <PushSetup />
+      {/* One Stack on the drawer's surface (#1408 Phase 2): the chat list is home; the rest is pushed over it. */}
+      <AppDrawer>
       <Stack screenOptions={screenOptions(colors.page)}>
-        {/* 对话 and 线程; chats, threads and the rest are pushed over them. */}
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="index" />
         {/* A long press on a message: its actions as a system sheet, and 选择文本 over the chat. */}
         <Stack.Screen name="message" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.42], sheetGrabberVisible: true, headerShown: false, contentStyle: { backgroundColor: colors.grouped } }} />
         <Stack.Screen name="attach" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.22], sheetGrabberVisible: true, headerShown: false, contentStyle: { backgroundColor: colors.grouped } }} />
         <Stack.Screen name="new-bot" options={{ presentation: 'modal' }} />
         <Stack.Screen name="new-group" options={{ presentation: 'modal' }} />
         <Stack.Screen name="message-text" options={{ presentation: 'modal' }} />
-        {/* The account sheet (#1386 item 8): the system page sheet, swipe down to close. */}
-        <Stack.Screen name="account" options={{ presentation: 'modal', contentStyle: { backgroundColor: colors.grouped } }} />
         <Stack.Screen name="settings" options={{ presentation: 'modal', headerShown: false, ...(Platform.OS === 'ios' ? {} : { animation: 'slide_from_bottom' }) }} />
       </Stack>
+      </AppDrawer>
     </HomeProvider>
   )
 }

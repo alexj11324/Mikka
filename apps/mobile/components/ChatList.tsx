@@ -40,7 +40,7 @@ export function ChatRowView({ row, onPress }: { row: ChatRow; onPress: () => voi
   const line = chatLine(bot ? { bot } : { group: group! })
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
-      {bot ? <BotAvatar color={bot.color} shape={bot.shape} size={52} />
+      {bot ? <BotAvatar color={bot.color} shape={bot.shape} size={54} />
         : <View style={styles.groupIcon}><Symbol name="person.2.fill" size={22} color={colors.secondary} web={<Text style={styles.groupGlyph}>群</Text>} /></View>}
       <View style={styles.body}>
         <View style={styles.top}>
@@ -62,10 +62,10 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 10 },
   body: { flex: 1, minWidth: 0, gap: 3 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  name: { flex: 1, fontSize: 17, fontWeight: '600' },
+  name: { flex: 1, fontSize: 16, lineHeight: 21, fontWeight: '600' },
   when: { fontSize: 13, color: colors.secondary },
-  line: { fontSize: 15, color: colors.secondary },
-  groupIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
+  line: { fontSize: 14, lineHeight: 19, color: colors.secondary },
+  groupIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
   groupGlyph: { fontSize: 18, color: colors.secondary },
   unread: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent },
 })

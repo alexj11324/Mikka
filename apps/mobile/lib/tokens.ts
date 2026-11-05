@@ -19,6 +19,8 @@ export const TOKENS = {
   page: { ios: 'systemBackground', light: '#FFFFFF', dark: '#000000' },
   /** A grouped list's background (settings, a bot's page, sheets). */
   grouped: { ios: 'systemGroupedBackground', light: '#F2F2F7', dark: '#000000' },
+  /** The push drawer under the app (features/shell): grouped grey, and in dark a step above the black app surface. */
+  drawer: { ios: { light: '#F2F2F7', dark: '#141414' }, light: '#F2F2F7', dark: '#141414' },
   /** A card, a row of a grouped list, the composer's field, the title capsule. */
   surface: { ios: 'secondarySystemGroupedBackground', light: '#FFFFFF', dark: '#1C1C1E' },
   /** The bot's message bubble. */

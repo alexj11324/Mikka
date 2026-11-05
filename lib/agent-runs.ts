@@ -1,6 +1,7 @@
 import 'server-only'
 import { runDecisionWarnings, type ProjectDecisionWarning } from './project-decision-warnings'
 import type { ExecutionIdentity } from './execution-identity'
+import type { TeamScope } from './team-access'
 import { personalMailboxEnabled } from './personal-mailbox-config'
 import { byosEnabled } from './cloud-computer-flag'
 import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
@@ -324,14 +325,14 @@ async function localRunCredential<S extends { id: string; ownerId: string; conne
 /** Every surface uses this gate. Workspace membership never grants run control,
  * personal agent/session access, or raw transcript access.
  * `brief`: the list projection (`runBriefViewColumns`), for callers that show a run's name, state and summary only. */
-export async function visibleRuns(userId: string, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number; brief?: boolean } = {}): Promise<RunView[]> {
+export async function visibleRuns(userId: string, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number; brief?: boolean; teams?: readonly TeamScope[] } = {}): Promise<RunView[]> {
   if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
   // Asked about one task or known runs: only their tasks' team links are read.
   const onlyIssueIds = input.issueId ? [input.issueId]
     : input.runIds ? [...new Set((await db.select({ issueId: agentRuns.issueId }).from(agentRuns).where(inArray(agentRuns.id, input.runIds))).flatMap(row => row.issueId ? [row.issueId] : []))]
     : undefined
-  const visibility = await issueVisibility(userId, false, undefined, db, { onlyIssueIds })
+  const visibility = await issueVisibility(userId, false, undefined, db, { onlyIssueIds, teams: input.teams })
   const shared = visibility.allowedIds.length ? and(eq(issues.scope, 'workspace'), inArray(issues.id, visibility.allowedIds)) : sql`false`
   const rows = await db.select({ ...(input.brief ? runBriefViewColumns : runViewColumns), ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))
