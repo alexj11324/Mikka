@@ -115,7 +115,7 @@ export async function runNativeCrypto() {
   const executable = process.env.MIKKA_DESKTOP_EXECUTABLE
   assert.ok(executable, 'NATIVE_CRYPTO_EXECUTABLE_REQUIRED')
   const appPath = dirname(dirname(dirname(resolve(executable))))
-  const output = resolve(process.env.MIKKA_DESKTOP_EVIDENCE ?? '.cache/desktop-evidence')
+  const output = resolve(process.env.MIKKA_DESKTOP_NATIVE_EVIDENCE ?? '.cache/desktop-native-evidence')
   const report = { version: 1, passed: false, platform: process.platform, architecture: process.arch, revision: /^[0-9a-f]{40}$/.test(process.env.MIKKA_TEST_DEPLOYMENT_SHA ?? '') ? process.env.MIKKA_TEST_DEPLOYMENT_SHA : null, launches: [] }
   let directory, application, failure
   const profiles = []

@@ -44,6 +44,44 @@ run proves those paths; a scripted model or provider fixture does not prove a
 real external provider worked. Record those distinctions without making an
 unrelated real-model or OAuth run a prerequisite for a documentation change.
 
+## Historical Factory candidates awaiting checks
+
+For a flow v1 candidate whose verification is waiting, blocked or failed, or
+whose approval is still pending, the Owner can open the existing acceptance
+pane and choose **Retry review**. The host exposes this action only for the
+same unaccepted candidate and request, with no active execution or lease. A
+current unanswered question is superseded atomically. If that exact waiting
+question has expired, it stays expired (or its elapsed deadline is recorded as
+expired in the same Owner transaction); its expiry, answer and continuation
+are never renewed. The new Owner receipt distinguishes expiry from supersession.
+An answered question or failed strict continuation must use its existing
+recovery path. A deadline that crosses the preflight/write boundary refuses as
+stale, so the Owner must review the current state again.
+
+This action appends an independent review and then an independent verification,
+each on its own original frozen native subscription, model and read-only
+policy. Historical reports and receipts remain unchanged, including incomplete
+or failed results. A failed new check stays failed until a separate repair is
+requested. Missing source authority, changed Profiles, unavailable official
+quota or a stale revision cannot select another model or consume the question.
+The Owner receipt also pins provider recovery during the new checks: a rate
+limit or exhausted subscription blocks this round instead of adopting another
+subscription or API key from the current preference order.
+Flow v2 retains its one-review contract and has no such action.
+
+Local acceptance covers both entry states through the normal Owner API, real
+PostgreSQL transactions, independent queued runs, exact-source dispatch and
+event replay. UI review captures both states from a local production build;
+browser screenshots do not establish that an external model ran or that an
+independent check passed.
+
+A lost response replays the committed Owner receipt without creating or starting
+another run. A post-commit cloud startup failure remains a real blocked run;
+it is not a Profile refusal. The existing Owner retry API can create a pending
+attempt, and the normal host dispatcher retains the round's frozen source.
+This action does not add a separate startup-recovery UI or guarantee that every
+historical pending attempt is picked up automatically.
+
 ## OAuth-specific acceptance
 
 For changes involving Google/GitHub OAuth rules, provider linking or OAuth

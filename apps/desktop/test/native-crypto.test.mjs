@@ -14,9 +14,10 @@ async function fixture(t) {
   const key = randomBytes(32)
   const plaintexts = []
   const safeStorage = {
-    async isAsyncEncryptionAvailable() { return true },
+    async isAsyncEncryptionAvailable() { assert.equal(this, safeStorage); return true },
     // This injected cipher tests the harness, not the operating-system store.
     async encryptStringAsync(value) {
+      assert.equal(this, safeStorage)
       plaintexts.push(value)
       const iv = randomBytes(12)
       const cipher = createCipheriv('aes-256-gcm', key, iv)
@@ -24,6 +25,7 @@ async function fixture(t) {
       return Buffer.concat([iv, cipher.getAuthTag(), encrypted])
     },
     async decryptStringAsync(value) {
+      assert.equal(this, safeStorage)
       const decipher = createDecipheriv('aes-256-gcm', key, value.subarray(0, 12))
       decipher.setAuthTag(value.subarray(12, 28))
       return { result: Buffer.concat([decipher.update(value.subarray(28)), decipher.final()]).toString('utf8') }

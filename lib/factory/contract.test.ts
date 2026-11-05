@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { bindingSchema, revisionBindingSchema, routeSchema, routeStage, nextStage, factoryFlowVersion, FactoryError } from "./contract";
+import { bindingSchema, revisionBindingSchema, routeSchema, routeStage, nextStage, factoryFlowVersion, FactoryError, changeSchema } from "./contract";
 import { factoryScopeAllows } from "./scope";
 import { handleFactory } from "./http";
 import type { FactoryStore } from "./http";
@@ -76,6 +76,17 @@ const req = {
   url: "https://preview.invalid/api/factory/tasks/id",
   body: {},
 };
+test('same-candidate recheck is an explicit Owner operation and never a runtime stage-change instruction', async () => {
+  let rechecks = 0, retries = 0, started = 0;
+  const result = { task: { id: req.taskId, stage: 'review', status: 'running' } };
+  const store = { recheckCandidate: async () => { rechecks++; return { result, start: async () => { started++; } }; },
+    apply: async () => { retries++; } } as unknown as FactoryStore;
+  const human = createFactoryHumanStore({ query: async () => ({ rows: [{ botId: null }] }) } as never, () => store);
+  const response = await handleFactory(human, { ...req, body: { binding: { taskId: req.taskId, revision: 12 }, eventId: randomUUID(), action: 'recheck', reason: 'Inspect all criteria again' } });
+  assert.equal(response.status, 200); assert.deepEqual(response.body, result);
+  assert.deepEqual({ rechecks, retries, started }, { rechecks: 1, retries: 0, started: 1 });
+  assert.equal(changeSchema.safeParse({ action: 'recheck', reason: 'Inspect all criteria again' }).success, false);
+});
 test("Owner Retry consumes an admitted completed run before ordinary execution retry", async () => {
   let retried = 0, recovered = 0, started = 0;
   const result = { task: { id: req.taskId, stage: "review", status: "running" } };

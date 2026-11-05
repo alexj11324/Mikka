@@ -257,6 +257,7 @@ jobs:
         env:
           MIKKA_DESKTOP_EXECUTABLE: ${{ github.workspace }}/apps/desktop/release-acceptance/mac-arm64/Mikka Dev.app/Contents/MacOS/Mikka Dev
       - name: Real packaged Apple Silicon native acceptance
+        id: acceptance
         # The idle case measures a full real hour with the registered macOS
         # daemon active, after all other native windows and fixtures are drained.
         run: node apps/desktop/test/environment.mjs -- node apps/desktop/test/run-acceptance.mjs bundled-smoke parity lifecycle idle
@@ -271,17 +272,31 @@ jobs:
       - name: Keep final package integrity evidence
         if: always()
         run: |
-          mkdir -p .cache/desktop-evidence
+          mkdir -p .cache/desktop-native-evidence
           if test -f apps/desktop/release-acceptance/mac-package-verification.json; then
-            cp apps/desktop/release-acceptance/mac-package-verification.json .cache/desktop-evidence/mac-acceptance-package.json
+            cp apps/desktop/release-acceptance/mac-package-verification.json .cache/desktop-native-evidence/mac-acceptance-package.json
           fi
           if test -f apps/desktop/release-dev/mac-package-verification.json; then
-            cp apps/desktop/release-dev/mac-package-verification.json .cache/desktop-evidence/mac-dev-package.json
+            cp apps/desktop/release-dev/mac-package-verification.json .cache/desktop-native-evidence/mac-dev-package.json
           fi
-      - name: Audit native evidence
+      - name: Audit closed package and crypto reports
         if: always()
+        id: package-evidence
+        run: node apps/desktop/scripts/native-evidence.mjs .cache/desktop-native-evidence
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && steps.package-evidence.outcome == 'success'
+        with:
+          name: desktop-package-evidence-${{ github.sha }}
+          path: .cache/desktop-native-evidence
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Audit native evidence
+        if: always() && steps.acceptance.outcome != 'skipped'
         id: evidence
-        run: node scripts/test-accounts/cli.mjs audit-evidence --evidence .cache/desktop-evidence
+        run: |
+          test -f .cache/e2e/environment.json || { echo '::error::NATIVE_ACCOUNT_ENVIRONMENT_MISSING'; exit 1; }
+          node scripts/test-accounts/cli.mjs audit-evidence --evidence .cache/desktop-evidence
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: success()
         with:

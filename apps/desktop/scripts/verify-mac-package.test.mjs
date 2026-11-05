@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
-import { inspectMacPackage, packageFuses, signatureIdentity } from './verify-mac-package.mjs'
+import { checkEntitlements, inspectMacPackage, machOFileType, packageFuses, readMachOBinaryType, signatureIdentity } from './verify-mac-package.mjs'
 
 const appPath = '/owned/Mikka Dev.app'
-const identity = `Executable=/private/path/not-for-evidence
+const identity = `Executable=${appPath}/Contents/MacOS/Mikka Dev
 Identifier=com.aspectlylabs.mikka.dev
 CodeDirectory v=20500 size=100 flags=0x10002(adhoc,runtime) hashes=1+1 location=embedded
 CDHash=${'ab'.repeat(20)}
@@ -20,13 +23,18 @@ function runtime(overrides = {}) {
     platform: 'darwin',
     readFuses: async () => overrides.wire ?? wire,
     listBundles: async () => [appPath, `${appPath}/Contents/Frameworks/Electron Framework.framework`],
+    readBinaryType: async executable => executable.endsWith('/Mikka Dev') ? 'execute' : overrides.libraryType ?? 'dylib',
     run(executable, args, input) {
       calls.push({ executable, args, input })
       if (args[0] === '--verify') return { status: overrides.verifyStatus ?? 0, stdout: '', stderr: 'private-path SECRET' }
-      if (args.includes('--verbose=4')) return { status: 0, stdout: '', stderr: overrides.identity ?? identity }
-      if (args.includes('--entitlements')) return { status: 0, stdout: '<plist/>', stderr: '' }
+      if (args.includes('--verbose=4')) return { status: 0, stdout: '', stderr: (overrides.identity ?? identity).replace(`${appPath}/Contents/MacOS/Mikka Dev`, args.at(-1) === appPath ? `${appPath}/Contents/MacOS/Mikka Dev` : `${args.at(-1)}/Versions/A/Electron Framework`) }
+      if (args.includes('--entitlements')) {
+        // Current codesign defaults to human-readable DER, not XML. macOS 15+
+        // legitimately emits nothing for the framework's MH_DYLIB signature.
+        return { status: 0, stdout: args.at(-1) !== appPath && !overrides.libraryEntitlements ? '' : args.includes('--xml') ? '<plist/>' : '[Dict]\n    [Key] com.apple.security.cs.allow-jit\n    [Value]\n        [Bool] true', stderr: '' }
+      }
       if (executable.endsWith('/lipo')) return { status: 0, stdout: overrides.architecture ?? 'arm64\n', stderr: '' }
-      if (args.at(-1) === '-') return { status: 0, stdout: JSON.stringify(overrides.entitlements ?? entitlements), stderr: '' }
+      if (args.at(-1) === '-') return input?.startsWith('<plist') ? { status: 0, stdout: JSON.stringify(overrides.entitlements ?? entitlements), stderr: '' } : { status: 1, stdout: 'Unexpected character at line 1', stderr: '' }
       return { status: 0, stdout: JSON.stringify(overrides.info ?? { CFBundleIdentifier: 'com.aspectlylabs.mikka.dev', CFBundleExecutable: 'Mikka Dev' }), stderr: '' }
     },
   }
@@ -40,6 +48,8 @@ test('final package verification checks deep strict signatures, nested identitie
   assert.equal(report.fuses.EnableNodeCliInspectArguments, true)
   assert.deepEqual(fixture.calls[0].args, ['--verify', '--strict', '--deep', appPath])
   assert.equal(fixture.calls.filter(call => call.args.includes('--entitlements')).length, 2)
+  assert.ok(fixture.calls.filter(call => call.args.includes('--entitlements')).every(call => call.args.includes('--xml') && !call.args.includes(':-')))
+  assert.deepEqual(report.entitlements, { hardenedRuntime: true, devOnlyLibraryValidationException: true, unexpected: false, executables: 1, libraries: 1, librariesWithoutEntitlements: 1 })
   assert.equal(JSON.stringify(report).includes('/private/'), false)
 })
 
@@ -81,4 +91,55 @@ test('downloadable Dev inspector fuse must be off, and removed or missing securi
 test('identity parsing rejects duplicate fields instead of guessing which signature to trust', () => {
   assert.throws(() => signatureIdentity(`${identity}TeamIdentifier=not set\n`), /MAC_PACKAGE_IDENTITY/)
   assert.throws(() => signatureIdentity(identity.replace('com.aspectlylabs.mikka.dev', 'com.aspectlylabs.mikka'), 'com.aspectlylabs.mikka.dev'), /MAC_PACKAGE_IDENTITY/)
+})
+
+test('empty entitlement is permitted only for a real DYLIB, never a renamed executable', async () => {
+  assert.equal(checkEntitlements({}, 'dylib'), 'absent-library')
+  assert.throws(() => checkEntitlements({}, 'execute'), /MAC_PACKAGE_ENTITLEMENTS/)
+  assert.throws(() => checkEntitlements({ 'com.apple.security.get-task-allow': true }, 'dylib'), /MAC_PACKAGE_ENTITLEMENTS/)
+  const report = await inspectMacPackage(appPath, 'acceptance', runtime({ libraryType: 'execute' }))
+  assert.equal(report.passed, false)
+  assert.equal(report.failure, 'MAC_PACKAGE_ENTITLEMENTS')
+})
+
+function header(type, little = true) {
+  const result = Buffer.alloc(32)
+  const uint32 = (value, offset) => little ? result.writeUInt32LE(value, offset) : result.writeUInt32BE(value, offset)
+  uint32(0xfeedfacf, 0); uint32(0x0100000c, 4); uint32(type, 12)
+  return result
+}
+
+test('Mach-O classification reads actual ARM64 filetype and rejects unknown or truncated headers', () => {
+  for (const little of [true, false]) {
+    assert.equal(machOFileType(header(2, little)), 'execute')
+    assert.equal(machOFileType(header(6, little)), 'dylib')
+  }
+  assert.throws(() => machOFileType(header(8)), /MAC_PACKAGE_MACHO_TYPE/)
+  assert.throws(() => machOFileType(Buffer.alloc(12)), /MAC_PACKAGE_MACHO_TYPE/)
+  const intel = header(6); intel.writeUInt32LE(0x01000007, 4)
+  assert.throws(() => machOFileType(intel), /MAC_PACKAGE_MACHO_TYPE/)
+})
+
+test('actual file reads follow only sealed in-app binaries and bound FAT offsets', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'mikka-macho-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const app = join(root, 'Mikka Dev.app')
+  await mkdir(app)
+  const binary = join(app, 'executable-name-does-not-decide-type')
+  await writeFile(binary, header(6))
+  assert.equal(await readMachOBinaryType(binary, app), 'dylib')
+  const fat = Buffer.alloc(96)
+  fat.writeUInt32BE(0xcafebabe, 0); fat.writeUInt32BE(1, 4)
+  fat.writeUInt32BE(0x0100000c, 8); fat.writeUInt32BE(64, 16); fat.writeUInt32BE(32, 20)
+  header(2).copy(fat, 64)
+  await writeFile(binary, fat)
+  assert.equal(await readMachOBinaryType(binary, app), 'execute')
+  fat.writeUInt32BE(4096, 16)
+  await writeFile(binary, fat)
+  await assert.rejects(readMachOBinaryType(binary, app), /MAC_PACKAGE_MACHO_TYPE/)
+  const outside = join(root, 'outside')
+  await writeFile(outside, header(6))
+  const link = join(app, 'linked')
+  await symlink(outside, link)
+  await assert.rejects(readMachOBinaryType(link, app), /MAC_PACKAGE_MACHO_TYPE/)
 })

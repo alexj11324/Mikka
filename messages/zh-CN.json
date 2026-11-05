@@ -4561,12 +4561,14 @@
     "retry": "重试",
     "checkState": {
       "review": {
+        "waiting": "审阅等待你回答",
         "blocked": "审阅受阻",
         "failed": "审阅未通过",
         "pending": "等待审阅",
         "running": "审阅中"
       },
       "verify": {
+        "waiting": "验证等待你回答",
         "blocked": "验证受阻",
         "failed": "验证未通过",
         "pending": "等待验证",
@@ -4574,6 +4576,7 @@
       }
     },
     "retryReview": "重新审阅",
+    "recheckDescription": "对当前交付物重新进行审阅和验证，此前结果仍保留。",
     "blocked": "受阻",
     "retryVerify": "重新验证",
     "checkRetryUnknown": "重试未确认",

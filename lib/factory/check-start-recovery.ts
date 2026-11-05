@@ -15,13 +15,13 @@ import type { FactoryTask } from './store'
 const profileRefusal = 'The selected Agent Profile changed or is no longer available. Select an available Profile for a new run.'
 const refusalReport = { summary: profileRefusal, filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null }
 
-export type FactoryCheckStartRecovery = {
-  kind: 'unstarted' | 'unsubmitted'
+export type FrozenFactoryCheck = {
   taskId: string; attemptId: string; candidateId: string; sourceEventId: string
   run: Record<string, any>
   check: Record<string, any>
   selection: NonNullable<ReturnType<typeof threadRunModel>>
 }
+export type FactoryCheckStartRecovery = FrozenFactoryCheck & { kind: 'unstarted' | 'unsubmitted' }
 
 /** Only an unclaimed host Profile refusal can start this same check afresh.
  * The caller owns the task/access fence; writes repeat this under the task lock.
@@ -147,7 +147,7 @@ export async function unsubmittedCheckForRecovery(tx: Pick<PoolClient, 'query'>,
 
 /** Configuration may move to a fresh worker, but cannot change this candidate,
  * request, command, source or role. A mismatch aborts the entire Owner action. */
-export function assertRecoveredCheck(source: FactoryCheckStartRecovery, run: Record<string, any>, check: Record<string, any>) {
+export function assertRecoveredCheck(source: FrozenFactoryCheck, run: Record<string, any>, check: Record<string, any>) {
   const before = source.run.agentDefinition, after = run.agentDefinition
   if (run.kind !== 'acceptance' || run.status !== 'queued' || run.baseBranch !== source.run.baseBranch ||
       run.agentId !== source.run.agentId || run.userId !== source.run.userId || run.issueId !== source.run.issueId || run.botId !== source.run.botId ||

@@ -1,8 +1,10 @@
 import { spawnSync } from 'node:child_process'
-import { mkdir, readdir, writeFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { mkdir, open, readdir, realpath, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { validateNativeReport } from './native-evidence.mjs'
 
 const require = createRequire(new URL('../package.json', import.meta.url))
 const builderRequire = createRequire(require.resolve('electron-builder/package.json'))
@@ -21,6 +23,7 @@ const ENTITLEMENTS = [
 const FAILURE_CODES = new Set([
   'MAC_PACKAGE_ARGUMENTS', 'MAC_PACKAGE_PLATFORM', 'MAC_PACKAGE_SIGNATURE',
   'MAC_PACKAGE_IDENTITY', 'MAC_PACKAGE_HARDENED_RUNTIME', 'MAC_PACKAGE_ENTITLEMENTS',
+  'MAC_PACKAGE_ENTITLEMENTS_FORMAT', 'MAC_PACKAGE_MACHO_TYPE',
   'MAC_PACKAGE_INFO', 'MAC_PACKAGE_ARCHITECTURE', 'MAC_PACKAGE_FUSES',
   'MAC_PACKAGE_NESTED_SIGNATURE', 'MAC_PACKAGE_COMMAND_FAILED',
 ])
@@ -40,6 +43,65 @@ function field(text, name) {
   const values = text.split('\n').filter(line => line.startsWith(`${name}=`))
   need(values.length === 1, 'MAC_PACKAGE_IDENTITY')
   return values[0].slice(name.length + 1).trim()
+}
+
+/** ARM64 Mach-O filetype, not a filename convention. Entitlements grant rights
+ * to MH_EXECUTE processes; macOS 15+ normally omits them from MH_DYLIB files. */
+export function machOFileType(header) {
+  need(Buffer.isBuffer(header) && header.length >= 32, 'MAC_PACKAGE_MACHO_TYPE')
+  const little = header.readUInt32LE(0) === 0xfeedfacf
+  need(little || header.readUInt32BE(0) === 0xfeedfacf, 'MAC_PACKAGE_MACHO_TYPE')
+  const uint32 = offset => little ? header.readUInt32LE(offset) : header.readUInt32BE(offset)
+  need(uint32(4) === 0x0100000c, 'MAC_PACKAGE_MACHO_TYPE')
+  const type = uint32(12)
+  need(type === 2 || type === 6, 'MAC_PACKAGE_MACHO_TYPE')
+  return type === 2 ? 'execute' : 'dylib'
+}
+
+export async function readMachOBinaryType(executable, appPath) {
+  const [root, path] = await Promise.all([realpath(appPath), realpath(executable)])
+  const within = relative(root, path)
+  need(within && within !== '..' && !within.startsWith(`..${sep}`) && !isAbsolute(within), 'MAC_PACKAGE_MACHO_TYPE')
+  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
+  try {
+    const info = await file.stat()
+    need(info.isFile() && info.size >= 32, 'MAC_PACKAGE_MACHO_TYPE')
+    const read = async (offset, size) => {
+      need(Number.isSafeInteger(offset) && offset >= 0 && offset + size <= info.size, 'MAC_PACKAGE_MACHO_TYPE')
+      const buffer = Buffer.alloc(size)
+      need((await file.read(buffer, 0, size, offset)).bytesRead === size, 'MAC_PACKAGE_MACHO_TYPE')
+      return buffer
+    }
+    const header = await read(0, 32)
+    const magic = header.readUInt32BE(0)
+    if (![0xcafebabe, 0xbebafeca, 0xcafebabf, 0xbfbafeca].includes(magic)) return machOFileType(header)
+    const little = magic === 0xbebafeca || magic === 0xbfbafeca
+    const fat64 = magic === 0xcafebabf || magic === 0xbfbafeca
+    const uint32 = (buffer, offset) => little ? buffer.readUInt32LE(offset) : buffer.readUInt32BE(offset)
+    const count = uint32(header, 4)
+    need(count > 0 && count <= 32, 'MAC_PACKAGE_MACHO_TYPE')
+    const size = fat64 ? 32 : 20
+    const table = await read(8, count * size)
+    const slices = []
+    for (let index = 0; index < count; index++) {
+      const start = index * size
+      if (uint32(table, start) !== 0x0100000c) continue
+      const offset = fat64 ? Number(little ? table.readBigUInt64LE(start + 8) : table.readBigUInt64BE(start + 8)) : uint32(table, start + 8)
+      const length = fat64 ? Number(little ? table.readBigUInt64LE(start + 16) : table.readBigUInt64BE(start + 16)) : uint32(table, start + 12)
+      need(Number.isSafeInteger(length) && length >= 32 && offset >= 8 + table.length && offset + length <= info.size, 'MAC_PACKAGE_MACHO_TYPE')
+      slices.push(offset)
+    }
+    need(slices.length === 1, 'MAC_PACKAGE_MACHO_TYPE')
+    return machOFileType(await read(slices[0], 32))
+  } finally { await file.close() }
+}
+
+export function checkEntitlements(value, fileType) {
+  need(['execute', 'dylib'].includes(fileType) && value && typeof value === 'object' && !Array.isArray(value), 'MAC_PACKAGE_ENTITLEMENTS')
+  const keys = Object.keys(value).sort()
+  if (fileType === 'dylib' && keys.length === 0) return 'absent-library'
+  need(JSON.stringify(keys) === JSON.stringify(ENTITLEMENTS) && ENTITLEMENTS.every(key => value[key] === true), 'MAC_PACKAGE_ENTITLEMENTS')
+  return 'exact'
 }
 
 /** Parse only fixed identity fields; never retain codesign's executable paths
@@ -91,7 +153,7 @@ async function codeBundles(appPath) {
 /** Read the final package only. This never signs, changes a fuse, launches an
  * executable, inspects a Keychain item, or imports release credentials. */
 export async function inspectMacPackage(appPath, variant, {
-  run = command, readFuses = getCurrentFuseWire, listBundles = codeBundles, platform = process.platform,
+  run = command, readFuses = getCurrentFuseWire, listBundles = codeBundles, readBinaryType = readMachOBinaryType, platform = process.platform,
 } = {}) {
   const report = { version: 1, variant: ['dev', 'acceptance'].includes(variant) ? variant : 'other', passed: false }
   try {
@@ -107,17 +169,25 @@ export async function inspectMacPackage(appPath, variant, {
     report.architecture = arch
     const bundles = await listBundles(appPath)
     need(bundles.length >= 2 && bundles[0] === appPath, 'MAC_PACKAGE_NESTED_SIGNATURE')
+    const types = { executables: 0, libraries: 0, librariesWithoutEntitlements: 0 }
     for (const path of bundles) {
       const result = run('/usr/bin/codesign', ['--display', '--verbose=4', path])
       need(result.status === 0, 'MAC_PACKAGE_IDENTITY')
       const identity = signatureIdentity(result.stderr, path === appPath ? DEV_ID : undefined)
       if (path === appPath) report.identity = identity
-      const plist = output(run, '/usr/bin/codesign', ['--display', '--entitlements', ':-', path], 'MAC_PACKAGE_ENTITLEMENTS')
-      const entitlements = JSON.parse(output(run, '/usr/bin/plutil', ['-convert', 'json', '-o', '-', '-'], 'MAC_PACKAGE_ENTITLEMENTS', plist))
-      need(JSON.stringify(Object.keys(entitlements).sort()) === JSON.stringify(ENTITLEMENTS) && ENTITLEMENTS.every(key => entitlements[key] === true), 'MAC_PACKAGE_ENTITLEMENTS')
+      const fileType = await readBinaryType(field(result.stderr, 'Executable'), appPath)
+      if (path.endsWith('.app')) need(fileType === 'execute', 'MAC_PACKAGE_MACHO_TYPE')
+      // TN3125: the default display is human-readable DER, not a plist. Request
+      // XML explicitly; an unsigned/empty main executable still fails below.
+      const plist = output(run, '/usr/bin/codesign', ['--display', '--entitlements', '-', '--xml', path], 'MAC_PACKAGE_ENTITLEMENTS')
+      const entitlements = plist.trim() ? JSON.parse(output(run, '/usr/bin/plutil', ['-convert', 'json', '-o', '-', '-'], 'MAC_PACKAGE_ENTITLEMENTS_FORMAT', plist)) : {}
+      const checked = checkEntitlements(entitlements, fileType)
+      if (fileType === 'execute') types.executables += 1
+      else types.libraries += 1
+      if (checked === 'absent-library') types.librariesWithoutEntitlements += 1
     }
     report.signedBundleCount = bundles.length
-    report.entitlements = { hardenedRuntime: true, devOnlyLibraryValidationException: true, unexpected: false }
+    report.entitlements = { hardenedRuntime: true, devOnlyLibraryValidationException: true, unexpected: false, ...types }
     report.fuses = packageFuses(await readFuses(appPath), variant)
     report.passed = true
   } catch (error) {
@@ -127,6 +197,7 @@ export async function inspectMacPackage(appPath, variant, {
 }
 
 export async function savePackageVerification(path, report) {
+  validateNativeReport(report, Object.hasOwn(report, 'variant') ? 'package' : 'crypto')
   await mkdir(dirname(path), { recursive: true, mode: 0o700 })
   await writeFile(path, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 })
 }

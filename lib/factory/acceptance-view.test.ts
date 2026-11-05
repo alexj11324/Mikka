@@ -1,12 +1,34 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { bareUrl, candidateCheckRetry, candidateCheckRetryConfirmed, candidateCheckState, criterionGroups, pullNumber, resultRows, visibleAcceptance, type AcceptanceCheck, type AcceptanceTaskView } from './acceptance-view'
+import { bareUrl, candidateCheckRetry, candidateCheckRetryConfirmed, candidateCheckState, candidateRecheck, candidateRecheckConfirmed, criterionGroups, pullNumber, resultRows, visibleAcceptance, type AcceptanceCheck, type AcceptanceTaskView } from './acceptance-view'
 import type { EvidenceEntry } from './evidence-view'
 
 const shot = (id: string, title: string): EvidenceEntry => ({ artifact: `run-capture:${id}`, captureId: id, title, kind: 'screenshot', stage: 'verify', runId: 'verify-run' })
 const log: EvidenceEntry = { artifact: 'run-chunk:7d1c2a40-0000-4000-8000-000000000001', kind: 'log', stage: 'verify', runId: 'verify-run' }
 const report: EvidenceEntry = { artifact: 'run-report:exec', kind: 'report', stage: 'execute', runId: 'exec-run' }
 const check = (patch: Partial<AcceptanceCheck>): AcceptanceCheck => ({ attemptId: 'a', stage: 'verify', status: 'passed', candidateId: 'c1', candidateSha: 'f'.repeat(40), runId: 'verify-run', criteria: [], verify: null, ...patch })
+
+test('same-candidate recheck is reachable while verification awaits an answer and requires matching fresh capability, detail and ledger', () => {
+  for (const state of [{ stage: 'verify', status: 'waiting' }, { stage: 'approval', status: 'pending' }]) {
+    const task = { id: 't', issueId: 'i', attemptId: 'old', candidateId: 'c', revision: 12, ...state }
+    const ledger = { taskId: 't', issueId: 'i', attemptId: 'old', candidateId: 'c', revision: 12 }
+    const detail = { task, candidateRecheck: { binding: { taskId: 't', revision: 12 } } }
+    assert.equal(visibleAcceptance(task), true)
+    assert.deepEqual(candidateRecheck(task, detail, ledger)?.binding, detail.candidateRecheck.binding)
+    assert.equal(candidateRecheck(task, undefined, ledger), null)
+    assert.equal(candidateRecheck(task, { task }, ledger), null)
+    assert.equal(candidateRecheck(task, detail, { ...ledger, revision: 11 }), null)
+    for (const patch of [{ revision: 11 }, { candidateId: 'other' }, { attemptId: 'other' }, { status: 'passed' }, { route: { flowVersion: 2 } }])
+      assert.equal(candidateRecheck(task, { ...detail, task: { ...task, ...patch } }, ledger), null)
+    const next = { ...task, stage: 'review', status: 'running', revision: 14, attemptId: 'new' }
+    const attempt = { id: 'new', taskId: 't', candidateId: 'c', stage: 'review', status: 'running', runId: 'fresh-run' }
+    const response = { contractVersion: 1, task: next, attempts: [attempt], candidates: [{ id: 'c' }] }
+    assert.equal(candidateRecheckConfirmed(task, response), true)
+    for (const patch of [{ stage: 'execute' }, { candidateId: 'other' }, { revision: 13 }, { attemptId: 'old' }, { status: 'passed' }])
+      assert.equal(candidateRecheckConfirmed(task, { ...response, task: { ...next, ...patch } }), false)
+    assert.equal(candidateRecheckConfirmed(task, { ...response, attempts: [{ ...attempt, runId: null }] }), false)
+  }
+})
 
 test('evidence sits under the criterion that names it; the rest stays in a last untitled group', () => {
   const verify = check({

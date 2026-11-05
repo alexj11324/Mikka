@@ -20,6 +20,11 @@ export function createFactoryHumanStore(pool: Pool, forBot: (botId: string | nul
     ...base,
     readTask: async (tx, userId, taskId) => (await taskStore(userId, taskId, tx)).readTask(tx, userId, taskId),
     read: async (userId, taskId) => (await taskStore(userId, taskId)).read(userId, taskId),
+    recheckCandidate: async (userId, binding, eventId, reason) => {
+      const result = await (await taskStore(userId, binding.taskId)).recheckCandidate(userId, binding, eventId, reason, dispatchCompleted)
+      await result.start?.()
+      return result
+    },
     lockTask: async (tx, userId, taskId) => (await taskStore(userId, taskId, tx)).lockTask(tx, userId, taskId),
     apply: async (userId, binding, eventId, change, tx) => {
       const store = await taskStore(userId, binding.taskId, tx ?? pool)

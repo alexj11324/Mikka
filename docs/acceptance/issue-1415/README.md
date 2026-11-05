@@ -28,11 +28,19 @@
 | [缓存恢复与验收脚本回归](hydration-and-harness-regressions.json) | `b5bc6b22` 后的逐文件 SHA-256 增量；真实 SWR 与源码测试 | 分页审计首次读取从 0 恢复为 1；私有审计数据不落盘。共享缓存 18/18、独立时序检查 5/5、focus/navigation 25/25、idle-budget 10/10、诊断与精确清理 6/6；不是完整截图或一小时通过的证据。 |
 | [真实六分钟空闲诊断](idle-b5-six-minute-diagnostic.json) / [修正后的完整短流程清理](idle-b5-cleanup-validation.json) | `b5bc6b22`；独立 UID、真实 PostgreSQL、实际前台 daemon；测试增量哈希见 JSON | 360,000.31 ms：bundled 64 SQL / 11,449 B，web 65 SQL / 12,051 B，live 正常且设备起止在线；整体因默认工作区名称被英语入口改写而失败。统一默认中文入口后，新的 10,004.44 ms 完整流程和精确清理通过。不能替代 Mac 自动安装或正式一小时测量。 |
 
+[9f27 CI 局部记录](ci-9f27-partial.json)：实际 checkout `4eb36650` / main `82789ddf`，10 个独立 workflow 通过。Desktop 的 Linux 冒烟 7/7 通过；Mac 完整 ad-hoc 签名、严格深层验证、arm64 和 hardened runtime 已通过，随后权限声明的输出格式核验失败，尚未执行真实加解密或账户验收。主 CI 的 Factory Profile 数据库矩阵因新增用例后仍共用两分钟父级上限而超时，触发连接池清理及后续连锁失败。修正总时限及打包核验后仍须实际复验，原失败保留。
+
+[Factory Profile 总预算复验](factory-profile-budget-4eb.json)：独立 checkout `4eb36650`，仅将包含完整迁移与顺序子用例的父测试上限从 120 秒改为 240 秒；15 秒 SQL 和 5 秒锁等待上限、全部业务断言保持不变。在既有 Large 的新独立数据库运行该单文件，113/113 通过、0 跳过，42.666 秒，进程退出 0，专属数据库清理通过。此结果不代表原 4 CPU CI 并发分片已经通过；后续正常 CI 仍是必要检查。
+
 字节值是已预热 PostgreSQL 连接的 socket `bytesRead` 差值，范围以各 JSON 为准。上述每次读取的比较不能替代完整一小时空闲测量，也不能推广为所有路由已经验收。
 
 会话缓存复用 Better Auth 原有签名、版本、到期和 bearer 绑定规则；没有额外 TTL。证明只保存在原生主进程的加密账户记录中，刷新由正常请求带回。数据库回归包含跨账号、伪造、到期、撤销、敏感操作重新查库、REST 续签、资料更新、一次性 PKCE 和鉴权审计失败。下一次发布后的 CI 与原生运行结果仍须绑定实际提交。
 
 ## 原生诊断状态
+
+`9f27b28f` 的真实 Mac runner 已完成完整 ad-hoc 签名，`--strict --deep` 通过；包核验器随后在读取 entitlement 时失败，尚未运行三进程加密、账号验收、冷启动或一小时测量。已修正 `codesign --xml` 输出解析，并读取真实 ARM64 Mach-O 类型：只有 `MH_DYLIB` 可以无 entitlement，主程序及所有可执行 helper 仍须精确四项 Dev 权限。独立包/加密证据采用固定文件名与闭集规范 JSON 审计，避免尚无账号环境时丢失早期诊断；原账号审计和生产加密实现不变。[冻结修复记录](mac-verifier-fix.json)的 24 个聚焦测试、lint 和 Workflow 检查通过，真实跨进程 Keychain 结果等待新提交的正常 CI。
+
+固定 `6149eb2b` / `7973afa9` 的[网页迁移前后视觉证据](web-parity-6149-7973.md)已齐备：原 98 项矩阵中 97 项通过，唯一浅色工作区链接因列表尚未完成而失败；原失败保留。仅补该入口的真实列表、摘要及 Computer 标签就绪条件后，浅/深色定点复验分别为 0.00540123% / 0.00478395%，均低于原 0.1% 门槛。四次采集清理通过，完整附件保留 300 张原图/差异图、两份冻结脚本和报告；不把组合证据称为一次新的完整 98/98 运行。
 
 `9fa8be5d` 的真实 Linux Electron 已验证本地 `mikka://app`、renderer 无 Node、CSP 阻断外部 fetch，以及登录后 renderer 可访问状态不包含浏览器凭据。另一个独立的启动器诊断实际完成了 `gnome_libsecret` 加解密，且 Chromium sandbox 开启；它使用 `9fa8be5d` 启动器和此前的应用构建，不代表最终 App 已完整验收。登录交接曾因 Playwright 的 `waitForFunction` 把 Promise 当作已满足条件而过早读取空会话；改为在 Node 端等待实际 IPC 会话值后，真实冒烟通过。该短测试没有注册本机 daemon，不能当作设备在线、一小时空闲或 macOS 打包通过。
 
