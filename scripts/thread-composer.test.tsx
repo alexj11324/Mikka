@@ -32,7 +32,8 @@ mock.module(at('lib/app-build.ts'), { namedExports: { ...actualAppBuild, checkPa
 mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, pollIssueThreads: async () => null, getIssueThread: async () => null, getThreadChanges: async () => ({ state: 'none' }), sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async () => { replyCalls++; return { sent: true } }, stopRun: async () => ({}) } })
 mock.module(at('app/actions/artifacts.ts'), { namedExports: { listRunArtifacts: async () => [] } })
 mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: {
-  useThreadAcceptance: () => acceptance,
+  useThreadAcceptance: (issueId: string | null, runId: string) =>
+    acceptance?.issueId === issueId && acceptance.candidateRunId === runId ? acceptance : null,
   useAcceptanceTasks: () => ({ tasks: acceptance ? [acceptance] : [], allTasks: acceptance ? [acceptance] : [] }),
   AcceptanceStateBadge: () => null,
 } })
@@ -186,6 +187,22 @@ test('an acceptance display cannot grant Send when the server has withheld ordin
   assert.equal(composer?.submitDisabled, true)
   assert.equal(composer?.value, draftText)
   composer?.onSubmit()
+  assert.equal(pageChecks, 0)
+  assert.equal(replyCalls, 0)
+})
+
+test('the root panel resolves its accepted latest continuation without changing the root acceptance pane route', () => {
+  draftText = 'Keep the current continuation draft'
+  thread = { ...base, outcome: 'needs_input', latestRunId: 'run-2',
+    continuation: { id: 'run-2', status: 'succeeded', outcome: 'needs_input', stopping: false } }
+  acceptance = acceptedTask({ candidateRunId: 'run-2' })
+  // Opening a list row still addresses run-1. Its acceptance tab must not be
+  // silently redirected to run-2 just to obtain the current status badge.
+  const html = render({ initialTab: 'acceptance' })
+  expectStatusBadge(html, 'resolved')
+  assert.equal(composer?.value, draftText, 'the existing root conversation remains mounted')
+  assert.equal(composer?.submitDisabled, false, 'display acceptance preserves the host Send permission')
+  assert.equal(thread.outcome, 'needs_input')
   assert.equal(pageChecks, 0)
   assert.equal(replyCalls, 0)
 })

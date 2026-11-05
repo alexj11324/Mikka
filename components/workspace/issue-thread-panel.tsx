@@ -38,7 +38,7 @@ import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { ArtifactKindIcon } from '@/components/artifacts/artifact-card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AcceptanceStateBadge, useThreadAcceptance } from './factory-acceptance'
+import { AcceptanceStateBadge, useAcceptanceTasks } from './factory-acceptance'
 import { FactoryAcceptancePane } from './factory-acceptance-pane'
 import { ChangesTabLabel, ThreadChangesPane } from './thread-changes'
 
@@ -95,7 +95,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   useLiveKeys(liveRuns.map(reference => ({ ...reference, kind: 'run' as const })), liveKeys, null)
   useLiveKey('factory_issue', issueId, liveKeys, data?.live?.issueWorkspaceId ?? null, { deadline: data?.live?.questionDeadline })
   // Frame 06: a thread whose candidate waits for acceptance has 对话 | 验收 in its header.
-  const acceptance = useThreadAcceptance(issueId, runId)
+  const { tasks: acceptanceTasks, allTasks } = useAcceptanceTasks(issueId)
+  // Keep the pane on the addressed producer; its status can follow an accepted continuation.
+  const acceptance = acceptanceTasks.find(task => task.candidateRunId === runId)
   const [tab, setTab] = useViewState<ThreadTab>(`thread:${runId}:tab:${initialTab}`, initialTab)
   const accepting = !bare && Boolean(acceptance) && tab === 'acceptance'
   // 改动 (Figma 820:4843): the agent's work tree diff, read-only, once the run saved one.
@@ -124,7 +126,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   // Once answered it reads as the running thread it continues, with nothing to send or stop yet;
   // as soon as the resumed run starts, messages and stop go to that run.
   const view = data ? threadQuestionView(data.thread) : null
-  const displayOutcome = data ? acceptedProducerOutcome(data.thread, issueId, acceptance ? [acceptance] : []) : null
+  const displayOutcome = data ? acceptedProducerOutcome(data.thread, issueId, allTasks) : null
   const question = view?.question ?? null
   const liveRunId = view?.runId ?? runId
   const active = !!view && question !== 'resuming' && runIsActive(view.status)
