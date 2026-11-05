@@ -35,7 +35,7 @@ import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
 import { claimBenchmarkAssignment, skillAssignments } from '@/lib/self-improvement/server'
 import { ImprovementError } from '@/lib/self-improvement/contract'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
-import { AgentProfileAdmissionError } from '@/lib/factory/profile-admission'
+import { AgentProfileAdmissionError, refreshProfileQuota } from '@/lib/factory/profile-admission'
 import { profileNativeSessionMatches } from '@/lib/factory/profile-native-session'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { FactoryError } from '@/lib/factory/contract'
@@ -272,6 +272,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     }
     const refused = await openRunKey()
     if (refused) return refused
+    if (subscription) await refreshProfileQuota(pool, { ownerId: caller.userId, workspaceId: subscription.workspaceId, agentId: agent.id,
+      model: run.agentDefinition?.model, subscriptionBindingId: subscription.id, selection: run.agentDefinition?.agentProfile })
     let claim: Awaited<ReturnType<typeof claimLocalRun>>
     try { claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id, beforeClaim, afterClaim) }
     catch (error) { if (error instanceof AgentProfileAdmissionError) return rejectProfile(); throw error }

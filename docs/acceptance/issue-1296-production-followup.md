@@ -4,7 +4,7 @@
 
 跟踪：[Mikka #1296](https://github.com/alexj11324/Mikka/issues/1296)。本文补充[主 UI／可用性／motion 审计报告](issue-1296-ui-audit.md)，记录主 PR 上线后的真实生产验收、发现的问题、最小修复与 Docker 回归。本文不修改既有验收规则，也不把模型菜单可选、合成测试、Web 截图或 binary 构建视为其它层次的验收结果。
 
-**当前结论：主 PR #1308 已完成 CI、Web 生产部署、生产 OTA 和 iOS binary 构建。生产验收与后续复现发现五项需要处理的问题；对应源码已发布至修复分支，Docker 的受影响测试、类型检查和 lint 全部通过。跟进修复尚未建立 PR、合并或完成生产复验；iOS 的 App Store Connect 提交和原生设备验收也尚未完成。** 后续发布与生产复验的实际结果继续写入 Issue #1296 正文，不在本文预填成功状态。
+**当前结论：主 PR #1308 已完成 CI、Web 生产部署、生产 OTA 和 iOS binary 构建。生产验收与后续复现发现五项需要处理的问题；对应源码已发布至修复分支，Docker 的受影响测试、类型检查和 lint 全部通过。跟进修复已建立 [PR #1328](https://github.com/alexj11324/Mikka/pull/1328)，尚未合并或完成生产复验；iOS 的 App Store Connect 提交和原生设备验收也尚未完成。** 后续发布与生产复验的实际结果继续写入 Issue #1296 正文，不在本文预填成功状态。
 
 ## 1. 版本与主 PR 发布证据
 
@@ -134,7 +134,7 @@ API Key、已有 `profileOriginRunId` 的原生续跑、question continuation �
 | 已整合部署完成的 main | `2b565c20b4d8af4838d0d37afe4dafece62ea8a8`；整合源码提交 `5982ba022c96c905a55f231c0bd3d5975466931b`，tree `f63697ea5babcc69c319c17741feb9a3e1c6a567` |
 | 范围 | 25 个源码、工作流、测试和文档文件，覆盖上述五项问题 |
 | 执行环境 | Docker Cloud Sandbox；数据库回归使用 loopback 隔离目标，Profile suite 核验 PostgreSQL 17；外部模型／GitHub／发布边界按各测试 fixture 替换 |
-| PR／发布状态 | 源码分支已发布；本记录时尚未建立跟进 PR、合并或取得该修复提交的生产部署回执 |
+| PR／发布状态 | 已建立 PR #1328；最终精确 head CI、合并与生产回执继续记录于 Issue 正文 |
 
 以下为 owning agent 在 Docker 中核对的最终运行结果，全部为实际执行结果，不沿用主 PR 的 145 项结果替代：
 
@@ -190,6 +190,41 @@ REQUIRE_DB=1 node \
 | 跟进 UI 截图 | 本记录保留已存在的 Codex Owner 接受截图。已附本地生产构建的中文 current／history 与恢复菜单截图，并核对菜单关闭后的草稿保留；新增余额分支的 Expo 窄屏／深色截图未完成，不扩大此图的覆盖范围 |
 | App Store Connect／TestFlight | binary 已完成，首次 submit 失败，修复后提交未触发；上传、处理、可安装状态分别核验 |
 | 原生 iOS | VoiceOver、Dynamic Type、系统 Reduce Motion、原生键盘和导航没有真机或模拟器验收证据。Expo Web、类型检查、组件测试或 EAS build 均不能代替 |
-| 资源清理 | 该沙盒的恢复时限触发停止，后续界面请求显示 Port unavailable；管理面观察到 stopping。最终 stopped 回执在 Issue 正文补记；隔离 fixture 未取得精确清理完成回执，不将账户记为已清洁可复用 |
+| 资源清理 | 第一次恢复时限触发停止，04:01:35 管理面确认 stopped；为验证新主线的真实交集再次恢复。已停止旧 UI 服务，核对 environment 身份后完整删除专用临时测试库及账户文件，未复用账户。最终整合回归完成后立即请求停止，最终 stopped 回执写入 Issue 正文 |
 
 若上线后发现新的产品问题，继续返回 Docker 复现、修复、回归，再经 PR／CI／merge 重新部署验收。本文记录的是已取得的证据与当前边界，不将 #1296 的所有 live 和原生完成标准宣告为已满足。
+
+
+## 7. 最新主线整合与最终 Docker 回归（04:11 UTC）
+
+主线又合入 #1326，提交为 `caebc8e6b4f6afb5f3fe3a22b833b32da9c1a7c4`。
+两项修复直接合并会在 cloud route 和 claim 函数内连续查询同一订阅。
+本次保留 #1326 的 queue 准备／local claim 刷新，仅移除 cloud route 的重复入口，
+由 `claimCloudRun` 中冻结 run 的 helper 承担最终刷新。原权限、epoch、stop、
+Profile、60 秒时效和 native continuation 规则均未放宽；未引入其它待合 PR 的展示 TTL 改动。
+
+两个独立复核确认此整合。Docker 新建 worktree 从固定基线应用完整补丁后，
+`git write-tree` 精确得到 `1f22c38fc6530e99597ae9ab41e25fd1a449a02d`。
+以下结果对应此 tree 的代码；此节之后仅添加本验证记录，没有更改被测产品或测试代码。
+
+| 最终集成检查 | 实际结果 |
+| --- | --- |
+| Profile dispatch／claim DB | 23／23 通过，0 fail／skip |
+| Shared subscription／真实 HTTP claim DB | 34／34 通过，0 fail／skip |
+| Factory acceptance DB | 16／16 通过，0 fail／skip |
+| Release security | 75／75 通过，0 fail／skip |
+| Root typecheck、lint | 均退出码 0 |
+| Source tree 还原／diff check | 精确 tree 一致，格式检查通过 |
+
+测试合并也保留两种不同的 I/O 边界：七个 queue case 使用真实 service 的额度解析和
+revision 限定保存，但 worker I/O 已明确替换；最终 claim case 继续使用受控 usageProbe。
+真实 SQL、授权、锁、冻结来源和最终准入均参与回归，没有发起模型请求。
+
+原安全扫描把测试中的固定“缺少环境变量”错误断言标为高熵字符串。
+核对后确认仅由错误代码和变量名组成、没有凭证值；改为由明确字段名数组组成同一期望，
+十项原生发布测试通过，GitGuardian 在更新 head 上通过。安全检查和生产错误逻辑均保留。
+
+本轮专用 UI 数据库 `mikka_1296_followup_e2e` 已在身份核验后完整移除，
+四组自有 UI／租约进程与私密临时账户文件已清理；不将被隔离的测试身份再投入复用。
+最终回归使用同一 Docker 沙盒中的既有独立测试 schemas，完成后立即发出停止请求。
+新的 PR CI、merge、Web／OTA 和生产模型复验仍需各自独立回执，见 Issue #1296 正文。

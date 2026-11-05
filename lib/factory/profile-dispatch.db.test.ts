@@ -38,12 +38,13 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
 
   const subscriptionModule = await import('../subscription-runtime')
   let usageProbe: (ownerId: string, connectionId: string, signal: AbortSignal) => Promise<void> = async () => { throw new Error('Unexpected subscription usage probe') }
+  let useServiceUsage = false
   const usageCalls: { ownerId: string; connectionId: string }[] = []
   // Only existing provider usage I/O is replaced. Membership, authorization,
   // queue admission, frozen definitions and the final claim use real SQL.
   t.mock.module(new URL('../subscription-runtime.ts', import.meta.url).href, { namedExports: {
     ...subscriptionModule,
-    subscriptionRuntime: () => ({
+    subscriptionRuntime: () => useServiceUsage ? subscriptionModule.subscriptionRuntime() : ({
       member: subscriptionModule.authorizeSubscriptionWorkspace,
       workspace: subscriptionModule.authorizeSubscriptionWorkspace,
       usage: async (ownerId: string, connectionId: string, signal: AbortSignal) => {
@@ -179,6 +180,115 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   await t.test('CC implementation selects independent Codex Review with frozen exact Profile and subscription', async () => exercise(true, false))
   await t.test('a prepared sleeping parent gains its missing Codex metadata without provider I/O', async () => exercise(true, true))
   await t.test('no configured Profile retains CC despite Codex being first in model preference', async () => exercise(false, false))
+  for (const quotaResult of ['fresh', 'available', 'exhausted', 'unknown', 'disconnect', 'pause', 'epoch'] as const) await t.test({
+    fresh: 'default Profile admits explicitly named Codex after another preferred Harness',
+    available: 'default Profile refreshes the same Codex quota after cloud preparation outlives its 60-second observation',
+    exhausted: 'a refreshed exhausted allowance still refuses the original Profile without switching sources',
+    unknown: 'a failed allowance read remains unknown and cannot admit the original Profile',
+    disconnect: 'a disconnect during allowance refresh wins over the stale selected binding',
+    pause: 'a pause during allowance refresh still prevents the selected subscription from running',
+    epoch: 'a new connection revision during allowance refresh cannot refresh or reuse the old binding',
+  }[quotaResult], async t => {
+    const slowPreparation = quotaResult !== 'fresh'
+    const f = await fixture(false, false), beforeDecisions = decisionCalls
+    const chatBotId = await seedBot(pool, f.workspaceId, f.ownerId), issueId = await seedIssue(pool, f.ownerId), sourceEventId = randomUUID()
+    await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1::uuid,$2,$3,$4,'user_message',$1::text,'{"text":"Run the explicit Codex task"}')`, [sourceEventId, f.ownerId, chatBotId, issueId])
+    await pool.query('UPDATE model_order_settings SET "preferredHarness"=\'claude_code\' WHERE "ownerId"=$1 AND "workspaceId"=$2', [f.ownerId, f.workspaceId])
+    await pool.query('UPDATE model_order_entries SET position=position+100 WHERE "ownerId"=$1 AND "workspaceId"=$2', [f.ownerId, f.workspaceId])
+    await pool.query('UPDATE model_order_entries SET position=CASE WHEN harness=\'claude_code\' THEN 0 ELSE 1 END WHERE "ownerId"=$1 AND "workspaceId"=$2', [f.ownerId, f.workspaceId])
+    assert.equal((await pool.query('SELECT 1 FROM factory_agent_profiles WHERE "ownerId"=$1 AND "workspaceId"=$2', [f.ownerId, f.workspaceId])).rowCount, 0)
+    const selected = await profiles.resolveAgentProfileDispatch(pool, f.scope, {
+      issueId, stage: 'execute', location: 'cloud', cloudPurpose: 'desktop',
+      asked: { harness: 'codex', model: model.codex },
+    })
+    const target = selected.target
+    assert.equal(target.kind, 'cloud')
+    if (target.kind !== 'cloud') assert.fail('The named Codex source must resolve on the prepared fixture')
+    assert.equal(target.harness, 'codex'); assert.equal(target.model, model.codex)
+    assert.equal(selected.agentProfile?.profileId, 'default'); assert.equal(selected.agentProfile?.source, 'default')
+    assert.equal(selected.selectionMode, 'picked')
+    assert.deepEqual(target.entry.source, { kind: 'subscription', connectionId: f.connections.codex })
+    const subscriptionBindingId = await bindAgentToConnection(pool, f.scope, f.agents.codex, 'codex', f.connections.codex, model.codex)
+    const { SubscriptionWorkerClient } = await import('../../packages/daemon/src/subscription-worker-client')
+    const syntheticRuntime = {
+      MIKKA_BYOS_INFISICAL_ORIGIN: 'http://127.0.0.1:1', MIKKA_BYOS_INFISICAL_PROJECT: 'synthetic-quota',
+      MIKKA_BYOS_INFISICAL_ENVIRONMENT: 'test', MIKKA_BYOS_INFISICAL_PATH: '/synthetic-custody',
+      MIKKA_BYOS_ACCESS_INFISICAL_PATH: '/synthetic-access', MIKKA_BYOS_INFISICAL_TOKEN: 'synthetic-custody-token',
+      MIKKA_BYOS_ACCESS_INFISICAL_TOKEN: 'synthetic-distinct-access-token', MIKKA_BYOS_SHARED_CUSTODY_IDENTITY: '0',
+    }
+    const originalRuntime = Object.fromEntries(Object.keys(syntheticRuntime).map(key => [key, process.env[key]]))
+    Object.assign(process.env, syntheticRuntime)
+    t.after(() => { for (const [key, value] of Object.entries(originalRuntime)) if (value === undefined) delete process.env[key]; else process.env[key] = value })
+    let quotaReads = 0, preflightUnlocked = false
+    t.mock.method(SubscriptionWorkerClient.prototype, 'call', async function<T>(method: string, input: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
+      assert.equal(method, 'usage', 'the quota preflight cannot send inference or acquire a new binding')
+      assert.equal(input.revision, 1); assert.ok(signal); assert.equal(signal.aborted, false)
+      quotaReads++
+      // The actual service/repository parse and save the synthetic provider
+      // response. No provider process runs; all authorization stays real.
+      assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [issueId])).rowCount, 0)
+      assert.equal((await pool.query('SELECT 1 FROM factory_tasks WHERE "issueId"=$1', [issueId])).rowCount, 0)
+      const probe = await pool.connect()
+      try {
+        await probe.query('BEGIN')
+        await probe.query('SELECT 1 FROM byos_connections WHERE id=$1 FOR UPDATE NOWAIT', [f.connections.codex])
+        preflightUnlocked = true
+      } finally { await probe.query('ROLLBACK'); probe.release() }
+      if (quotaResult === 'disconnect') await pool.query(`UPDATE byos_connections SET state='disconnected',epoch=epoch+1 WHERE id=$1`, [f.connections.codex])
+      if (quotaResult === 'pause') await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [f.connections.codex])
+      if (quotaResult === 'epoch') await pool.query('UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1', [f.connections.codex])
+      if (quotaResult === 'unknown') return { status: 503, body: {} } as T
+      return { status: 200, body: { plan_type: 'plus', credits: { has_credits: false, unlimited: false },
+        rate_limit: { primary_window: { used_percent: quotaResult === 'exhausted' ? 100 : 10, limit_window_seconds: 18_000, reset_at: Math.floor(Date.now() / 1000) + 3600 } } } } as T
+    })
+    if (slowPreparation) {
+      const observedAt = new Date(Date.now() - 60_001).toISOString()
+      await pool.query(`UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',to_jsonb($2::text)) WHERE id=$1`, [f.connections.codex, observedAt])
+      const { quota } = (await pool.query('SELECT quota FROM byos_connections WHERE id=$1', [f.connections.codex])).rows[0]
+      assert.equal((await import('../subscription-quota')).subscriptionAvailability(quota, model.codex, 'codex').status, 'checking')
+      await assert.rejects(profiles.assertProfileSelection(pool, f.scope, selected.agentProfile!), { code: 'agentProfileModelUnavailable' })
+    }
+    const { queueFactoryCloudRun } = await import('./queue-cloud')
+    // These queue cases replace worker I/O above; retain the real service's
+    // quota parser and revision-fenced save without the final-claim stub.
+    useServiceUsage = true
+    t.after(() => { useServiceUsage = false })
+    const resultPending = queueFactoryCloudRun(pool, f.actor, {
+      botId: f.botId, factoryBotId: chatBotId, issueId, agentId: f.agents.codex, deviceRepoId: f.repoId,
+      title: 'Synthetic default Codex task', body: 'Validate original default Profile admission without provider I/O.',
+      model: model.codex, subscriptionBindingId, agentProfile: selected.agentProfile,
+      modelDispatch: { mode: 'picked', location: 'cloud', entry: target.entry },
+      idempotencyKey: `coordinator:${randomUUID()}`, sourceEventId,
+    })
+    if (quotaResult !== 'fresh' && quotaResult !== 'available') {
+      await assert.rejects(resultPending, ['disconnect', 'pause', 'epoch'].includes(quotaResult) ? { message: 'Bot subscription unavailable' } : { name: 'AgentProfileAdmissionError', message: 'agentProfileUnavailable' })
+      assert.equal(quotaReads, 1); assert.equal(preflightUnlocked, true)
+      assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [issueId])).rowCount, 0)
+      assert.equal((await pool.query('SELECT 1 FROM factory_tasks WHERE "issueId"=$1', [issueId])).rowCount, 0)
+      assert.deepEqual(selected.agentProfile?.targetEntry.source, { kind: 'subscription', connectionId: f.connections.codex })
+      if (quotaResult === 'disconnect' || quotaResult === 'epoch') {
+        const { quota } = (await pool.query('SELECT quota FROM byos_connections WHERE id=$1', [f.connections.codex])).rows[0]
+        assert.equal((await import('../subscription-quota')).subscriptionAvailability(quota, model.codex, 'codex').status, 'checking', 'the old-revision provider response cannot save a new quota observation')
+      }
+      assert.equal(decisionCalls, beforeDecisions)
+      return
+    }
+    const result = await resultPending
+    const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [result.runId])).rows[0]
+    assert.equal(run.status, 'queued'); assert.equal(run.agentId, f.agents.codex)
+    assert.equal(run.agentDefinition.harness, 'codex'); assert.equal(run.agentDefinition.model, model.codex)
+    assert.equal(run.agentDefinition.modelSource, 'subscription')
+    assert.equal(run.agentDefinition.subscription.bindingId, subscriptionBindingId)
+    assert.equal(run.agentDefinition.agentProfile.profileId, 'default')
+    assert.equal(run.agentDefinition.agentProfile.source, 'default')
+    assert.deepEqual(run.agentDefinition.agentProfile.targetEntry.source, { kind: 'subscription', connectionId: f.connections.codex })
+    await (await import('./profile-admission')).assertRunProfileClaim(pool, result.runId)
+    assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [issueId])).rowCount, 1)
+    assert.equal((await pool.query('SELECT 1 FROM factory_tasks WHERE "issueId"=$1 AND "botId"=$2', [issueId, chatBotId])).rowCount, 1)
+    assert.equal(decisionCalls, beforeDecisions, 'The zero-configuration named model requires no Profile Decision')
+    assert.equal(quotaReads, slowPreparation ? 1 : 0, 'only the selected stale subscription needs one real service refresh')
+    assert.equal(preflightUnlocked, slowPreparation, 'no source row is locked across the provider usage read')
+  })
   await t.test('record initialization rejects foreign scope, unreported Harness and unprepared workspace', async () => {
     const f = await fixture(false, true)
     const invoke = async (actor = f.actor, harness = 'codex') => {

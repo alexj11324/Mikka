@@ -35,6 +35,24 @@ export async function refreshCloudRunProfileClaim(pool: Pool, actor: { userId: s
   await credentialStates(pool, scope, [entry], candidates, undefined, { probe: 'always' })
 }
 
+/** Runtime/publication preparation can outlive a quota observation. Refresh
+ * only the already selected binding before the admission transaction. This is
+ * not admission: the existing transaction still checks current authority and
+ * decides whether an established native session keeps its frozen role. */
+export async function refreshProfileQuota(pool: Pool, input: {
+  ownerId: string; workspaceId: string; agentId: string; model?: string
+  subscriptionBindingId?: string | null; selection?: AgentProfileSelection
+}): Promise<void> {
+  const selection = input.selection, entry = selection?.targetEntry
+  if (!selection || selection.scope?.ownerId !== input.ownerId || selection.scope?.workspaceId !== input.workspaceId ||
+    !entry || entry.source?.kind !== 'subscription' || entry.model !== input.model || !input.subscriptionBindingId) return
+  const { nativeRunBinding } = await import('@/lib/computer/native-run-binding')
+  const binding = await nativeRunBinding(pool, input.ownerId, input.agentId, entry.harness, input.workspaceId, input.subscriptionBindingId)
+  if (!binding || binding.connectionId !== entry.source.connectionId || binding.modelId !== entry.model) return
+  const scope = { ownerId: input.ownerId, workspaceId: input.workspaceId }
+  await credentialStates(pool, scope, [entry], await orderCandidates(pool, scope))
+}
+
 /** A host-supplied source is an exception only for the exact frozen role of an
  * already-started, owned native session. A JSON flag can never grant it. */
 export async function admitProfileSelection(query: Query, input: {
