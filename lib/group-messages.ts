@@ -19,7 +19,7 @@ export type GroupMessage = {
 }
 /** The first page also says which member is answering (`agentStatus`, null when none) and whether the last message found no taker. */
 /** `stopped`: the latest reply was stopped (停止) by a member. */
-export type GroupMessagePage = { messages: GroupMessage[]; nextBefore: string | null; agentStatus?: { status: string } | null; routingError?: { code: string } | null; stopped?: boolean; unchanged?: boolean; appended?: boolean }
+export type GroupMessagePage = { messages: GroupMessage[]; nextBefore: string | null; agentStatus?: { status: string } | null; routingError?: { code: string } | null; stopped?: boolean; unchanged?: boolean; appended?: boolean; /** The group_chat key's revision, read before this newest page. */ revision?: number }
 export type GroupMessagesError = 'unauthorized' | 'not_found' | 'unavailable'
 
 export class GroupMessagesRequestError extends Error {
@@ -73,7 +73,8 @@ export async function stopGroupReply(id: string, fetcher: typeof fetch = fetch):
 /** A poll that already shows the latest message keeps that page. New messages are prepended; a full page replaces it. */
 export function mergeGroupPoll(previous: GroupMessagePage | null, next: GroupMessagePage): GroupMessagePage {
   if (!previous) return next
-  if (next.unchanged) return { ...previous, agentStatus: next.agentStatus ?? null, routingError: next.routingError ?? null, stopped: next.stopped }
+  // Nothing new since the shown page: it is current at this read's revision.
+  if (next.unchanged) return { ...previous, agentStatus: next.agentStatus ?? null, routingError: next.routingError ?? null, stopped: next.stopped, revision: next.revision }
   if (next.appended) {
     const seen = new Set(previous.messages.map(message => message.id))
     const added = next.messages.filter(message => !seen.has(message.id))

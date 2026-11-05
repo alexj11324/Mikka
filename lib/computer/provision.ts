@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import * as provider from './e2b-provider'
 import { machineChanged, machineCommitted } from '@/lib/live/computer-state'
+import { armDueTimerSoon } from '@/lib/due-timer'
 
 type Actor={userId:string;workspaceId:string}
 type Runtime=Pick<typeof provider,'createComputer'|'connectComputer'|'installComputerRuntime'>&Partial<Pick<typeof provider,'computerGone'|'computerWorkerSha'|'killComputer'>>
@@ -45,6 +46,8 @@ export async function ensureCloudMachine(pool:Pool,actor:Actor,runtime:Runtime=p
     if(!machine.runtimeReady) await runtime.installComputerRuntime(sandbox)
     const completed=await pool.query(`UPDATE cloud_machines SET state='running',"runtimeReady"=true,"lastActiveAt"=now(),"provisionLeaseId"=NULL,"provisionLeaseUntil"=NULL WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "provisionLeaseId"=$3 AND "sandboxId"=$4 RETURNING "sandboxId"`,[actor.workspaceId,actor.userId,leaseId,sandbox.sandboxId])
     if (completed.rowCount) await machineCommitted(pool, actor.userId, actor.workspaceId)
+    // A running machine is checked with E2B once idle for an hour (#1212).
+    if (completed.rowCount) armDueTimerSoon('run-recovery')
     return completed.rowCount?sandbox:null
   } catch(error) {
     const failed = await pool.query(`UPDATE cloud_machines SET state='error',"provisionLeaseId"=NULL,"provisionLeaseUntil"=NULL WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "provisionLeaseId"=$3`,[actor.workspaceId,actor.userId,leaseId])

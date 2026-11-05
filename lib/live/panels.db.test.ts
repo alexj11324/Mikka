@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { wireKeys } from './wire-keys.test-support'
 import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import test, { mock } from 'node:test'
@@ -36,7 +37,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
     assert.equal(target.hostname, 'gateway.example.invalid', 'no provider or production request is allowed')
     const scope = channelScopes.get(target.pathname)
     if (!scope) unexpectedPaths.push(target.pathname)
-    sent.push({ scope: scope ?? { ownerId: 'unexpected', workspaceId: target.pathname }, events: JSON.parse(String(options?.body)) })
+    sent.push({ scope: scope ?? { ownerId: 'unexpected', workspaceId: target.pathname }, events: wireKeys(JSON.parse(String(options?.body))) })
     return new Response(null, { status: 204 })
   })
   const admin = new Pool({ connectionString: url, max: 1 })

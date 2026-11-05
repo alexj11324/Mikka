@@ -111,7 +111,9 @@ test('Factory list and duplicate task headers subscribe to their server scopes w
     onclose: LiveSocket['onclose'] = null
     onerror: LiveSocket['onerror'] = null
     readyState: 0 | 1 | 2 | 3 = 0
-    constructor(readonly url: string) { sockets.push(this) }
+    readonly url: string
+    // The channel asks the Worker for revisions; the fixture addresses the socket by its channel path.
+    constructor(url: string) { assert.equal(new URL(url).searchParams.get('revisions'), '1'); this.url = url.split('?')[0]; sockets.push(this) }
     open() { this.readyState = 1; if (this.onopen) Reflect.apply(this.onopen, this, [new Event('open')]) }
     message(value: unknown) { if (this.onmessage) Reflect.apply(this.onmessage, this, [{ data: JSON.stringify(value) }]) }
     send() {}

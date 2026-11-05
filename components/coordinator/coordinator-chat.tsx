@@ -39,6 +39,7 @@ import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
 import { useLiveKey, useLiveKeys, useLiveScope, watchPageVisibility } from '@/hooks/use-live-key'
 import { ListReadScopeError, listReadDeadline, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
+import { heldRevision } from '@/lib/live/revisions'
 import { useLiveCitations } from './use-live-citations'
 import type { CoordinatorLiveReply } from '@/lib/coordinator-stream-client'
 import { ThreadCard } from './thread-card'
@@ -180,8 +181,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // While the channel is down the live layer falls back to one read a minute. The stream still carries a turn.
   const liveOwner = data?.live?.ownerId
   const liveHome = liveOwner ? ownerListWorkspace(data, liveOwner) : null
+  // A push this chat already read (a duplicate, or the echo of this tab's own send) is skipped.
   useLiveKey('bot_chat', unavailable ? null : liveHome && data?.botId ? data.botId : UNRESOLVED_LIST_SCOPE, [unstable_serialize(chatKey)], liveHome,
-    { minIntervalMs: CHAT_MERGE_MS, deadline: liveOwner ? listReadDeadline(data, liveOwner) : undefined })
+    { minIntervalMs: CHAT_MERGE_MS, deadline: liveOwner ? listReadDeadline(data, liveOwner) : undefined, revisions: { [unstable_serialize(chatKey)]: heldRevision(data, 'bot_chat', data?.botId) } })
   // Cards and cited names have no chat write (lib/coordinator/chat-poll.ts). An
   // artifact push or visibility catch-up refreshes metadata using the same cursor.
   const metadataKey = useMemo(() => chatKeys.metadata(botId), [botId])

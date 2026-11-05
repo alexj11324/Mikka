@@ -104,6 +104,7 @@ import type { WorktreeManager } from "../worktrees"
 import type { JournalEntry, RunJournal } from "./journal"
 import type { ToolApprovalGate } from "../agents/tool-approval"
 import { assertMailboxRunAuthority, mailboxNoticeText, type RunMailbox } from '../run-mailbox'
+import { daemonTracer, runIdHash, type SpanHandle } from '../tracing'
 
 export interface SupervisorDeps {
   downloadChatFile?(assignment: RunAssignment, id: string, signal: AbortSignal): Promise<ChatFileDownload>
@@ -194,6 +195,8 @@ const UUID_RE =
 
 interface ActiveRun {
   toolApproval?: ToolApprovalGate
+  /** The run's trace span; its outcome is the stop reason. */
+  span?: SpanHandle
   mailbox?: RunMailbox
   mailboxClosing?: Promise<void>
   session: AgentSession | null
@@ -836,6 +839,7 @@ export class RunSupervisor {
     report: HandoffReport = baseReport(error),
   ) {
     this.active.get(runId)?.toolApproval?.revoke()
+    this.active.get(runId)?.span?.set("mikka.outcome", stopReason)
     // Report collection and capture uploads can await after the provider's
     // terminal event. A stop received in that interval still owns completion.
     const active = this.active.get(runId)
@@ -937,8 +941,9 @@ export class RunSupervisor {
    */
   private async stage<T>(runId: string, stage: RunStage, work: () => Promise<T>): Promise<T> {
     const started = performance.now()
+    const attributes = { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": this.deps.journal.get(runId)?.assignment.harness }
     try {
-      const value = await work()
+      const value = await daemonTracer.span(stage === "agent_start" ? "daemon.adapter.start" : `daemon.run.${stage}`, attributes, () => work())
       this.emit(runId, runStageChunk(stage, performance.now() - started, true))
       return value
     } catch (error) {
@@ -1200,7 +1205,11 @@ export class RunSupervisor {
       abort: new AbortController(),
     }
     this.active.set(runId, run)
-    run.done = this.drive(runId, repo, run)
+    const harness = this.deps.journal.get(runId)?.assignment.harness
+    run.done = daemonTracer.span("daemon.run", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": harness }, span => {
+      run.span = span
+      return this.drive(runId, repo, run)
+    }, { root: true })
       .catch(async (error: unknown) => {
         const message = error instanceof Error ? error.message : String(error)
         this.deps.log.error({ run_id: runId, err: error }, "run failed")
@@ -1351,7 +1360,8 @@ export class RunSupervisor {
     if (this.stopping) return
     if (run.cancelRequested) { this.finish(runId, run.forcedStop ?? 'cancelled'); return }
     if (mailbox) checkMailbox()
-    const toolApproval = await this.deps.prepareRunToolApproval?.(assignment, run.abort.signal, checkMailbox, worktree)
+    const toolApproval = this.deps.prepareRunToolApproval && await daemonTracer.span("daemon.tool_approval", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": assignment.harness },
+      () => this.deps.prepareRunToolApproval!(assignment, run.abort.signal, checkMailbox, worktree))
     run.toolApproval = toolApproval
     // Register before an adapter can attach its cancellation callback. The
     // 1s live gate may learn of a host revocation before the next heartbeat;

@@ -285,7 +285,7 @@ export async function findThreadIssue(runId: string): Promise<{ issueId: string 
 
 export interface IssueThreadDetail {
   /** Authorized scopes for every attempt; browser state never guesses them. */
-  live?: { runs: import('@/lib/live/panels').ThreadLiveReference[]; issueWorkspaceId: string | null; questionDeadline: ThreadQuestionDeadline | null }
+  live?: { runs: import('@/lib/live/panels').ThreadLiveReference[]; issueWorkspaceId: string | null; questionDeadline: ThreadQuestionDeadline | null; revisions?: Record<string, number> }
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
   thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; /** Host projection for the existing controls; mutations still revalidate. */ replyAvailable: boolean; retryAvailable: boolean; feedbackEligible:boolean; /** The latest masked run error or the host's fixed wake failure. */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null; /** Host-confirmed provider recovery, within this owner's thread chain. */ modelFallback?: import('@/lib/run-model-fallback-view').ThreadModelFallbackView[] | null; /** Keep polling while the host prepares a continuation; no uncommitted switch is displayed. */ modelFallbackPending?: boolean }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
@@ -348,6 +348,9 @@ function originalSessionRetryAvailable(question: { recoveryRequest?: unknown; qu
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
 export async function getIssueThread(issueId: string | null, runId: string, after?: ThreadChunkCursor | null): Promise<IssueThreadDetail> {
   const cursor = after ? threadChunkCursor.parse(after) : null
+  // Before any of the thread: this run's keys' revisions (other attempts carry none, so they always read).
+  const { readRevisions } = await import('@/lib/live/revision-read')
+  const revisions = await readRevisions([{ kind: 'thread', id: runId }, { kind: 'run', id: runId }])
   const { row, user } = await readableThread(issueId, runId)
   // The run that resumes this one after an answered question, or runs it again after it ended (R-81), is the same thread: its chain (BE-18).
   const [projected] = projectIssueThreads([row], row.issueId, user.id, new Set([user.id]))
@@ -411,7 +414,7 @@ export async function getIssueThread(issueId: string | null, runId: string, afte
     row.issueId ? documentLiveWorkspace(pool, workspacePool, row.issueId, user.id) : null,
   ])
   return {
-    live: { runs, issueWorkspaceId, questionDeadline },
+    live: { runs, issueWorkspaceId, questionDeadline, ...(Object.keys(revisions).length ? { revisions } : {}) },
     thread: { ...thread, questionWake, prompt: row.prompt, stopRequestedAt, replyAvailable, retryAvailable, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),

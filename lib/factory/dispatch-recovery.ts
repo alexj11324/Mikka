@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { isDeviceOnline } from '@mikka/protocol/device';
 import { deviceIsOnline } from '../device-presence';
+import { wakeCoordinatorAfterCommit } from '../coordinator/wake-after-commit';
 
 /** Why a Factory run cannot start on its assigned device. Frontend (#453) keys copy on these codes. */
 export const FACTORY_DISPATCH_FAILURE_REASONS = ['deviceOffline', 'deviceDisabled', 'harnessUnavailable', 'e2bKeyNotConfigured'] as const;
@@ -79,6 +80,7 @@ async function insertEvent(tx: PoolClient, row: { userId: string; botId: string 
   const { rowCount } = await tx.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey","issueId","runId",payload)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT ("dedupeKey") DO NOTHING`,
   [crypto.randomUUID(), row.userId, row.botId, row.kind, row.dedupeKey, row.issueId, row.runId, JSON.stringify(row.payload)]);
+  if (rowCount === 1) wakeCoordinatorAfterCommit(tx, row.userId);
   return rowCount === 1;
 }
 

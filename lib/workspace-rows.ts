@@ -5,6 +5,7 @@ import * as workspaceSchema from '@/lib/db/workspace-schema'
 import * as teamSchema from '@/lib/db/team-schema'
 import * as projectSchema from '@/lib/db/project-schema'
 import { runToFixpoint } from '@/lib/account/delete'
+import { armDueTimerAfterCommit } from '@/lib/due-timer'
 
 /**
  * A workspace is the tenant (decision 2026-11-02-0231, T1, T5): deleting it
@@ -80,4 +81,6 @@ export async function workspaceDeletionStatements(client: Query, workspaceId: st
 export async function deleteWorkspaceRows(client: Query, workspaceId: string): Promise<void> {
   await runToFixpoint(client, await workspaceDeletionStatements(client, workspaceId))
   await client.query('insert into workspace_deletions (id) values ($1) on conflict (id) do nothing', [workspaceId])
+  // Its audit events expire when the grace period ends, on the audit-retention due timer (#1371).
+  armDueTimerAfterCommit(client, 'audit-retention')
 }

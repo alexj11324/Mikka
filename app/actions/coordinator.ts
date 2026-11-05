@@ -2,6 +2,7 @@
 
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { ownerListRead } from '@/lib/live/list-read-server'
+import { beginOwnerListRead } from '@/lib/live/revision-read'
 import type { ListLiveRead } from '@/lib/live/list-read'
 
 import { cookies, headers } from 'next/headers'
@@ -74,10 +75,12 @@ export async function getCoordinatorChat(botId: string | null = null): Promise<C
   const userId = user.id
   const bot = await ownBot(user, botId)
   const enabled = coordinatorEnabled()
+  // Before the chat: a push at this revision or below is already in what follows.
+  const begun = await beginOwnerListRead(userId, [], [{ kind: 'bot_chat', id: bot.id }])
   const { chat, expiries, observedAt } = await chatStore.chatViewState(userId, 200, bot.id)
   // BotList, the workspace and ArtifactWindow share the live chat's SWR key.
   // Whichever fetcher wins must retain the same authorized home and deadline.
-  const live = await ownerListRead(userId, expiries, observedAt)
+  const live = await ownerListRead(userId, expiries, observedAt, begun)
   // Without a Coordinator here nothing is coming, so do not show one working.
   return { ...chat, botId: bot.id, enabled, working: enabled && chat.working, live }
 }
@@ -105,9 +108,11 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
   const bot = await ownBot(user, botId)
   const enabled = coordinatorEnabled()
   const parsed = versionSchema.safeParse(known)
+  // Before the chat: a push at this revision or below is already in what follows.
+  const begun = await beginOwnerListRead(user.id, [], [{ kind: 'bot_chat', id: bot.id }])
   const { expiries, observedAt, ...current } = await chatVersionState(user.id, 200, bot.id)
   // The owner's home channel says when to read again; a lease running out is the one change with no write.
-  const live = await ownerListRead(user.id, expiries, observedAt)
+  const live = await ownerListRead(user.id, expiries, observedAt, begun)
   const proof = continuationSchema.safeParse(continuation)
   // A message version does not grant continued access to its cited task or
   // artifact. Reauthorize cached decorations even when the transcript itself
@@ -188,8 +193,9 @@ export async function botChatSummaries(): Promise<Record<string, BotChatSummary>
 /** Same owner-wide summaries, including the actual working-state deadline. */
 export async function pollBotChatSummaries() {
   const ownerId = await getUserId()
+  const begun = await beginOwnerListRead(ownerId, ['bot_chat_list'])
   const snapshot = await chatStore.botChatSnapshot(ownerId)
-  return { items: snapshot.items, live: await ownerListRead(ownerId, snapshot.expiries, snapshot.observedAt) }
+  return { items: snapshot.items, live: await ownerListRead(ownerId, snapshot.expiries, snapshot.observedAt, begun) }
 }
 
 /** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact and notes from the browser in front if given; the reply shows up in the chat. */

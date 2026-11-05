@@ -4,7 +4,8 @@ import { pool, withDatabaseClient } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { issueForUser } from '@/lib/issue-access'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
-import { ScheduleStore, type WorkspaceGuard } from './store'
+import { armDueTimerSoon } from '@/lib/due-timer'
+import { nextScheduleDue, ScheduleStore, type WorkspaceGuard } from './store'
 import { ScheduleError, type Actor, type Command, type ScheduledRead } from './contract'
 
 const guard: WorkspaceGuard = async(owner,workspace,work)=>{
@@ -29,6 +30,16 @@ export async function scheduleActor(ownerId:string,botId:string|null,sourceEvent
   if(botId&&!row)throw new ScheduleError('scheduleConversationUnavailable',403)
   return {ownerId,botId,workspaceId:row?.workspaceId??null,...(sourceEventId?{sourceEventId}:{})}
 }
-export async function executeScheduleCommand(owner:string,botId:string|null,sourceEventId:string|undefined,command:Command){return schedules().command(await scheduleActor(owner,botId,sourceEventId),command)}
+/** A committed create, update or resume can move the next due time earlier: the schedules timer re-reads it (#1212). */
+const MOVES_DUE=new Set(['create','update','resume'])
+export async function executeScheduleCommand(owner:string,botId:string|null,sourceEventId:string|undefined,command:Command){
+  const result=await schedules().command(await scheduleActor(owner,botId,sourceEventId),command)
+  if(typeof command==='object'&&command&&MOVES_DUE.has((command as {action?:string}).action??''))armDueTimerSoon('schedules')
+  return result
+}
+/** A scheduled read that failed is retried 30 s later, earlier than the lease the timer sleeps to. */
+export async function failScheduledRead(claim:{id:string;lease_token:string},error:unknown){await schedules().fail(claim,error);armDueTimerSoon('schedules')}
+/** The earliest persisted due time of any schedule work (epoch ms), or null. */
+export function scheduleNextDue(){return nextScheduleDue(pool)}
 export async function sweepSchedules(){const {wakeOwners,...counts}=await schedules().tick();await Promise.allSettled(wakeOwners.map(owner=>wakeCoordinator(owner)));return counts}
 export async function assertScheduledRead(owner:string,botId:string|null,scope:ScheduledRead){return schedules().assertRead(owner,botId,scope)}

@@ -5,13 +5,14 @@ import type { Root } from 'react-dom/client'
 import type { State } from 'swr'
 import { Window } from 'happy-dom'
 import { LIVE_KINDS } from '../lib/live/events'
+import { liveKeyConnection } from '../lib/swr/live-focus'
 
 const home = '10000000-0000-4000-8000-000000000001'
 const team = '20000000-0000-4000-8000-000000000001'
 const otherTeam = '20000000-0000-4000-8000-000000000002'
 const otherHome = '10000000-0000-4000-8000-000000000002'
 type Kind = 'issues' | 'threads' | 'tasks' | 'bots' | 'groups' | 'roster'
-type Read = { items: { id: string; title: string }[]; live: { ownerId: string; workspaceId: string | null; selectedWorkspaceId?: string; deadline?: { at: string; afterMs: number } }; version?: string; positions?: { id: string; version: string }[]; delta?: true; presenceFallback?: boolean }
+type Read = { items: { id: string; title: string }[]; live: { ownerId: string; workspaceId: string | null; selectedWorkspaceId?: string; deadline?: { at: string; afterMs: number }; revisions?: Record<string, number> }; version?: string; positions?: { id: string; version: string }[]; delta?: true; presenceFallback?: boolean }
 const replies = new Map<Kind, () => Promise<Read>>()
 let reads: Kind[]
 let cursors: { kind: Kind; known?: string; positions?: unknown }[]
@@ -46,7 +47,11 @@ class FakeSocket {
   onclose: (() => void) | null = null
   onerror: (() => void) | null = null
   onmessage: ((event: { data: string }) => void) | null = null
-  constructor(readonly url: string) {
+  readonly url: string
+  // The channel asks the Worker for revisions; the fixture addresses the socket by its channel path.
+  constructor(url: string) {
+    assert.equal(new URL(url).searchParams.get('revisions'), '1')
+    this.url = url.split('?')[0]
     sockets.push(this)
     queueMicrotask(() => {
       if (this.readyState !== 0) return
@@ -161,6 +166,43 @@ test('an explicit revoked access response hides a previously visible cached issu
   const deniedReads = cursors.length
   await act(async () => { emit(home, 'issue_list'); emit(team, 'issue_list') }); await wait(350)
   assert.equal(cursors.length, deniedReads, 'terminal access failure retires live invalidation and its disconnected fallback')
+})
+
+test('real list hooks update held revisions after an asynchronous read without losing scoped focus coverage', { timeout: 10_000 }, async () => {
+  let revision = 5
+  for (const kind of ['issues', 'threads'] as const) replies.set(kind, async () => {
+    const value = snapshot(kind), liveKind = kind === 'issues' ? 'issue_list' : 'thread_list'
+    return { ...value, live: { ...value.live, revisions: {
+      [`${liveKind}:${home}`]: revision, ...(kind === 'issues' ? { [`${liveKind}:${team}`]: revision } : {}),
+    } } }
+  })
+  await render(['issues', 'threads']); await settled(); await wait(2_100)
+  for (const socket of sockets) socket.message({ type: 'live_ready', version: 2, kinds: LIVE_KINDS, revisions: ['issue_list', 'thread_list'] })
+  const issueKey = unstableSerialize(['issues', 'owner', team]), threadKey = unstableSerialize(['threads', 'owner'])
+  assert.equal(liveKeyConnection(cache, issueKey), true)
+  assert.equal(liveKeyConnection(cache, threadKey), true)
+  assert.equal(liveKeyConnection(new Map(), issueKey), undefined, 'another provider cannot borrow this live connection')
+  const before = { issues: count('issues'), threads: count('threads'), tickets: tickets.length, sockets: sockets.length }
+  const push = () => {
+    for (const socket of sockets) {
+      const scope = socket.url.endsWith(home) ? home : team
+      socket.message({ kind: 'issue_list', id: scope, rev: revision })
+      if (scope === home) socket.message({ kind: 'thread_list', id: home, rev: revision })
+    }
+  }
+  await act(async () => push()); await wait(200)
+  assert.equal(count('issues'), before.issues)
+  assert.equal(count('threads'), before.threads)
+  revision = 6
+  await act(async () => push()); await settled()
+  assert.equal(count('issues'), before.issues + 1, 'home and selected-workspace pushes share one incremental read')
+  assert.equal(count('threads'), before.threads + 1)
+  await act(async () => push()); await wait(2_100)
+  assert.equal(count('issues'), before.issues + 1, 'the completed read updates the existing subscription before its echo')
+  assert.equal(count('threads'), before.threads + 1)
+  assert.equal(tickets.length, before.tickets)
+  assert.equal(sockets.length, before.sockets)
+  assert.equal(liveKeyConnection(cache, issueKey), true)
 })
 
 test('healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list', { timeout: 80_000 }, async () => {

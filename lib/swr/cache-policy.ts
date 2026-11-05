@@ -21,7 +21,7 @@ const documentAttrs = new Set(['mikka', 'orvilo', 'textAlign', 'id', 'label', 'm
 const issueMetadata = new Set(['number', 'assignee', 'project', 'labels', 'pullRequests', 'parentId', 'blockedByIds', 'relatedIds', 'duplicateOfId', 'dueDate', 'estimate', 'favoriteUserIds', 'subscriberUserIds', 'deletedAt'])
 const activityFields = new Set(['tools', 'thought', 'reasoningAt'])
 const toolFields = new Set(['call', 'name', 'state', 'at'])
-type Projection = { sensitive: boolean; changed: boolean; issue: boolean; chat: boolean }
+type Projection = { sensitive: boolean; changed: boolean; issue: boolean; chat: boolean; issuePrefix: boolean }
 
 /** Return plain structured data only; never serialize SWR errors or functions. */
 function clean(value: unknown, context: Projection, depth = 0, allowed?: ReadonlySet<string>): unknown {
@@ -39,7 +39,10 @@ function clean(value: unknown, context: Projection, depth = 0, allowed?: Readonl
   }
   const result: Record<string, unknown> = {}
   for (const [key, field] of Object.entries(value)) {
-    if (privateField.test(key) || allowed && !allowed.has(key)) {
+    // This read returns public Linear team identifiers, not credential keys.
+    // Keep the exception at its exact root field; each string still gets scanned.
+    const publicTeamKeys = context.issuePrefix && depth === 0 && key === 'teamKeys' && Array.isArray(field) && field.every(item => typeof item === 'string')
+    if (!publicTeamKeys && privateField.test(key) || allowed && !allowed.has(key)) {
       // requestedAt is a page-local monotonic clock, never a server proof.
       if (key !== 'requestedAt' && field !== undefined) context.changed = true
       continue
@@ -57,7 +60,7 @@ function clean(value: unknown, context: Projection, depth = 0, allowed?: Readonl
 export function persistentReadData(key: unknown, data: unknown): unknown {
   if (!persistentReadKey(key) || data === undefined) return undefined
   const family = Array.isArray(key) ? key[0] : key
-  const context: Projection = { sensitive: false, changed: false, issue: ['issue', 'issues', 'issue-activity-versions'].includes(family), chat: family === 'coordinator-chat' }
+  const context: Projection = { sensitive: false, changed: false, issue: ['issue', 'issues', 'issue-activity-versions'].includes(family), chat: family === 'coordinator-chat', issuePrefix: key === 'settings:issue-prefix' }
   let projected = data
   if (family === 'coordinator-chat' && data && typeof data === 'object' && 'items' in data && Array.isArray(data.items)) {
     // The existing continuation proves the server's latest 200-message window.

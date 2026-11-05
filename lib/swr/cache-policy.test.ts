@@ -13,7 +13,34 @@ test('ordinary task documents and history summaries retain their exact hash-cove
   const history = { version: 'b'.repeat(32), positions: [{ id: 'v1', version: 'c'.repeat(32) }], items: [{ id: 'v1', content: { type: 'doc', attrs: content.attrs } }] }
   assert.deepEqual(persistentReadData(['issue', 'task'], issue), issue)
   assert.deepEqual(persistentReadData(['issue-activity-versions', 'task'], history), history)
-  assert.equal(persistentReadData('settings:issue-prefix', 'MK'), 'MK')
+})
+
+test('issue prefix persists its actual read model with public team identifiers', () => {
+  for (const teamKeys of [[], ['MIK', 'TEAM']]) {
+    const data = { prefix: 'ALEX', saved: null, suggested: 'ALEX', teamKeys }
+    assert.deepEqual(persistentReadData('settings:issue-prefix', data), data)
+  }
+  const unresolved = { prefix: null, saved: null, suggested: null, teamKeys: [] }
+  assert.deepEqual(persistentReadData('settings:issue-prefix', unresolved), unresolved)
+})
+
+test('public team identifiers are allowed only in the exact issue prefix root field', () => {
+  const data = { prefix: 'ALEX', saved: null, suggested: 'ALEX', teamKeys: ['MIK'] }
+  assert.equal(persistentReadData('preferences', data), undefined)
+  assert.equal(persistentReadData('settings:issue-prefix', { ...data, nested: { teamKeys: ['MIK'] } }), undefined)
+  for (const teamKeys of [null, 'MIK', [1], ['MIK', 1], [['MIK']], [{ name: 'MIK' }]]) {
+    assert.equal(persistentReadData('settings:issue-prefix', { ...data, teamKeys }), undefined)
+  }
+  for (const field of ['TeamKeys', 'teamKeysExtra', 'keyId', 'apiKey', 'token', 'credentials']) {
+    assert.equal(persistentReadData('settings:issue-prefix', { ...data, [field]: 'opaque-value' }), undefined)
+  }
+})
+
+test('issue prefix team identifiers still reject credential text and URLs', () => {
+  for (const value of ['ghp_abcdefghijklmnopqrstuvwxyz', 'Bearer abcdefghijklmnopqrstuvwxyz', 'https://example.invalid/file?token=opaque-value', 'https://name:password@example.invalid/file']) {
+    const data = { prefix: 'ALEX', saved: null, suggested: 'ALEX', teamKeys: ['MIK', value] }
+    assert.equal(persistentReadData('settings:issue-prefix', data), undefined)
+  }
 })
 
 test('a modified task body or metadata is not persisted under its original version proof', () => {

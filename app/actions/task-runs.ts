@@ -16,6 +16,7 @@ import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { ownerListRead } from '@/lib/live/list-read-server'
 import { changedListIds, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
 import { cacheReadAction } from '@/lib/cache-read-action'
+import { beginOwnerListRead } from '@/lib/live/revision-read'
 
 /** The newest run on each issue, for the right column's 我的任务 groups (MIK-38). */
 export interface TaskRun {
@@ -46,6 +47,7 @@ export async function pollTaskRuns() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
   const observedAt = Date.now()
+  const begun = await beginOwnerListRead(session.user.id, ['task_run_list'])
   // A run whose device went offline is retried (or lands in 等你) by the minute
   // run-recovery cron (sweepExpiredRunLeases), not by this poll.
   const rows = await db.selectDistinctOn([agentRuns.issueId], {
@@ -59,7 +61,7 @@ export async function pollTaskRuns() {
     .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
   const botIds = [...new Set(rows.flatMap(row => row.botId ? [row.botId] : []))]
   const looks = botIds.length ? await db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }).from(bots).where(and(eq(bots.ownerId, session.user.id), inArray(bots.id, botIds))) : []
-  const live = await ownerListRead(session.user.id, rows.map(row => row.expiresAt), observedAt)
+  const live = await ownerListRead(session.user.id, rows.map(row => row.expiresAt), observedAt, begun)
   const items: TaskRun[] = rows.map(({ botId, expiresAt: _expiresAt, ...row }) => ({ ...row, issueId: row.issueId!, finishedAt: row.finishedAt?.toISOString() ?? null, bot: looks.find(look => look.id === botId) ?? null }))
   return { items, live }
 }
@@ -111,6 +113,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
     const observedAt = Date.now()
+    const begun = await beginOwnerListRead(session.user.id, ['thread_list'])
     // Only queued local work can show "waiting for device". Ask the gateway
     // on this user read, so an idle socket affects both the view and its hash.
     const queuedDevices = process.env.DEVICE_GATEWAY_URL && process.env.DEVICE_GATEWAY_PUSH_SECRET
@@ -142,7 +145,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
     const version = createHash('sha256').update(JSON.stringify([session.user.id, signature])).digest('hex').slice(0, 32)
     const visible = snapshot.as('thread_list_expiry')
     const [expiry] = await db.select({ at: sql<Date | null>`min(${visible.createdAt})+interval '30 days'` }).from(visible)
-    const live = await ownerListRead(session.user.id, [expiry?.at], observedAt)
+    const live = await ownerListRead(session.user.id, [expiry?.at], observedAt, begun)
     // Device presence has its own bounded watcher prerequisite. Until that
     // route is ready, queued local work retains the shared slow fallback.
     const presenceFallback = queuedDevices.length > 0

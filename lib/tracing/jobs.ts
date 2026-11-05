@@ -1,5 +1,6 @@
 import { SpanStatusCode, context, isSpanContextValid, trace, type Link, type Span } from '@opentelemetry/api'
 import { routeScope } from './labels'
+import { safeErrorAttributes } from '@mikka/protocol/tracing'
 
 // Background work as its own labelled job (docs/operations/tracing.md,
 // "Background work"). Only @opentelemetry/api: without a registered tracer
@@ -44,16 +45,19 @@ export function runJob<T>(route: string, kind: JobKind, work: () => T, { detach 
     span = trace.getTracer('mikka.jobs').startSpan(route, { root: !nested, links, attributes: { 'mikka.route': route, 'mikka.client_kind': kind } }, scope)
     scope = trace.setSpan(scope, span)
   } catch { span = undefined }
-  const finish = (failed: boolean) => {
+  const finish = (failed: boolean, error?: unknown) => {
     try {
-      if (failed) span?.setStatus({ code: SpanStatusCode.ERROR })
+      if (failed) {
+        span?.setAttributes(safeErrorAttributes(error))
+        span?.setStatus({ code: SpanStatusCode.ERROR })
+      }
       span?.end()
     } catch { /* tracing never breaks the job */ }
   }
   return context.with(scope, () => routeScope.run(route, () => {
     let result: T
-    try { result = work() } catch (error) { finish(true); throw error }
+    try { result = work() } catch (error) { finish(true, error); throw error }
     if (!isThenable(result)) { finish(false); return result }
-    return Promise.resolve(result).then(value => { finish(false); return value }, (error: unknown) => { finish(true); throw error }) as T
+    return Promise.resolve(result).then(value => { finish(false); return value }, (error: unknown) => { finish(true, error); throw error }) as T
   }))
 }

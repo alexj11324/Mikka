@@ -37,6 +37,7 @@ import { teamIssues } from '@/lib/db/team-schema'
 import { issueListChanged } from '@/lib/live/lists'
 import { issueRelationsChanged } from '@/lib/live/issue-detail'
 import { ownerListRead } from '@/lib/live/list-read-server'
+import { beginOwnerListRead } from '@/lib/live/revision-read'
 import { issuePrefixes, linearIssueLinks, linearTeamSyncs } from '@/lib/db/schema'
 import { changedListIds, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
 import { cacheReadAction } from '@/lib/cache-read-action'
@@ -100,7 +101,9 @@ async function readIssues(workspaceId?: string, known?: string, previous?: ListP
 async function readIssueSnapshot(workspaceId?: string, known?: string, previous?: ListPosition[]) {
   const userId = await getUserId()
   const context = await loadWorkspaceContext(workspaceId)
-  const live = { ...await ownerListRead(userId), selectedWorkspaceId: context.workspace.id }
+  // Before the list: the selected workspace's key and the home's key, both of which this list listens to.
+  const begun = await beginOwnerListRead(userId, ['issue_list'], [{ kind: 'issue_list', id: context.workspace.id }])
+  const live = { ...await ownerListRead(userId, [], Date.now(), begun), selectedWorkspaceId: context.workspace.id }
   // Membership is fresh for each poll. Reuse only this operation's narrow
   // identity rows for visibility, workspace filtering and remaining links.
   const allTeams = await accessibleTeamScopes(userId)
