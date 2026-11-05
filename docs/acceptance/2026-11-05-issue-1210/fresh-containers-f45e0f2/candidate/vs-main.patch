@@ -1,0 +1,1725 @@
+diff --git a/lib/cloud-computer/snapshot-credentials.test.ts b/lib/cloud-computer/snapshot-credentials.test.ts
+index 94604b111..90dd95669 100644
+--- a/lib/cloud-computer/snapshot-credentials.test.ts
++++ b/lib/cloud-computer/snapshot-credentials.test.ts
+@@ -6,47 +6,6 @@ import { join } from 'node:path'
+ import { test } from 'node:test'
+ import { credentialProbeCommand, credentialScrubCommand, runCredentialGlobs, SNAPSHOT_CREDENTIAL_GLOBS } from '../../packages/daemon/src/credential-globs'
+ 
+-// Decision 2026-10-31-2225: a cloud snapshot holds software only, never a credential.
+-const actor = { userId: 'owner', workspaceId: '10000000-0000-4000-8000-000000000001' } as never
+-const revision = 'a'.repeat(40)
+-function fixture(found: string[], old?: { snapshotId: string }) {
+-  const calls = { snapshots: 0, inserts: 0, probes: [] as string[] }
+-  const pool = { query: async (sql: string) => {
+-    if (sql.startsWith('SELECT')) return { rows: old ? [{ ...old, sourceRevision: 'b'.repeat(40), lockDigest: 'stale', createdAt: new Date(0) }] : [] }
+-    calls.inserts++
+-    return { rows: [] }
+-  } }
+-  const source = {
+-    commands: { run: async (command: string) => {
+-      if (command.includes('rev-parse')) return { stdout: `${revision}\n` }
+-      if (command.includes('sha256sum')) return { stdout: '' }
+-      calls.probes.push(command)
+-      return { stdout: found.map(path => `${path}\n`).join('') }
+-    } },
+-    createSnapshot: async () => { calls.snapshots++; return { snapshotId: 'fresh' } },
+-  }
+-  return { pool: pool as never, source, calls }
+-}
+-
+-test('a clean bot machine is snapshotted, after the credential probe', async () => {
+-  const { workspaceSnapshot } = await import('./thread-machines')
+-  const { pool, source, calls } = fixture([])
+-  assert.equal(await workspaceSnapshot(pool, actor, source as never, '/repo'), 'fresh')
+-  assert.deepEqual([calls.probes.length, calls.snapshots, calls.inserts], [1, 1, 1])
+-  assert.equal(calls.probes[0], credentialProbeCommand())
+-})
+-
+-test('credentials on the bot machine: no new snapshot; the last clean one is reused, or the thread is refused', async () => {
+-  const { workspaceSnapshot } = await import('./thread-machines')
+-  const present = ['/home/user/.claude/.credentials.json']
+-  const reused = fixture(present, { snapshotId: 'clean-earlier' })
+-  assert.equal(await workspaceSnapshot(reused.pool, actor, reused.source as never, '/repo'), 'clean-earlier')
+-  assert.deepEqual([reused.calls.snapshots, reused.calls.inserts], [0, 0])
+-  const none = fixture(present)
+-  await assert.rejects(workspaceSnapshot(none.pool, actor, none.source as never, '/repo'), { status: 409, message: 'Workspace snapshot unavailable' })
+-  assert.equal(none.calls.snapshots, 0)
+-})
+-
+ test('the probe finds and the scrub removes exactly the credential paths, in a real shell', () => {
+   const root = mkdtempSync(join(tmpdir(), 'snapshot-credentials-'))
+   const state = join(root, 'adapters')
+diff --git a/lib/cloud-computer/thread-machine-stop.db.test.ts b/lib/cloud-computer/thread-machine-stop.db.test.ts
+index b4a249b61..9b79f187c 100644
+--- a/lib/cloud-computer/thread-machine-stop.db.test.ts
++++ b/lib/cloud-computer/thread-machine-stop.db.test.ts
+@@ -53,9 +53,8 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
+     const fake = (onCreate: () => Promise<void> = async () => {}) => {
+       const calls: string[] = [];
+       const provider: typeof threadMachineProvider = {
+-        snapshot: async () => { calls.push("snapshot"); return "snapshot-fixture"; },
+         connect: async (id) => { calls.push(`connect:${id}`); return { sandboxId: id } as never; },
+-        create: async (template, op) => { assert.ok(["desktop", "snapshot-fixture"].includes(template)); calls.push("create"); await onCreate(); return { sandboxId: `sandbox-${op}` } as never; },
++        create: async (template, op) => { assert.equal(template, "desktop"); calls.push("create"); await onCreate(); return { sandboxId: `sandbox-${op}` } as never; },
+         kill: async (id) => { calls.push(`kill:${id}`); },
+       };
+       return { calls, provider };
+@@ -113,11 +112,11 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
+       const { SandboxNotFoundError } = await import("e2b");
+       provider.connect = async (id) => { calls.push(`connect:${id}`); throw new SandboxNotFoundError("gone"); };
+       await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), (e: Error) => !(e instanceof SandboxNotFoundError), "it goes on past the lost sandbox");
+-      assert.deepEqual(calls.slice(0, 2), ["connect:sandbox-gone", "create"], "no snapshot: the thread keeps its workspace snapshot");
++      assert.deepEqual(calls.slice(0, 2), ["connect:sandbox-gone", "create"], "a lost historical snapshot is replaced by the official template");
+       const machine = (await pool.query('SELECT "sandboxId","operationId","snapshotId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
+       assert.notEqual(machine.operationId, oldOperation, "a new operation, so E2B creates a new sandbox");
+       assert.equal(machine.sandboxId, `sandbox-${machine.operationId}`);
+-      assert.equal(machine.snapshotId, "snapshot-fixture");
++      assert.equal(machine.snapshotId, "desktop");
+       assert.equal((await state(runId)).run.status, "queued");
+     });
+ 
+diff --git a/lib/cloud-computer/thread-machine-task.db.test.ts b/lib/cloud-computer/thread-machine-task.db.test.ts
+index 16e94e733..d1cc41fd8 100644
+--- a/lib/cloud-computer/thread-machine-task.db.test.ts
++++ b/lib/cloud-computer/thread-machine-task.db.test.ts
+@@ -77,7 +77,6 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
+       const calls: string[] = [];
+       const sources: string[] = [];
+       const provider: typeof threadMachineProvider = {
+-        snapshot: async () => { calls.push("snapshot"); return "snapshot-fixture"; },
+         // The fake sandbox has no runtime: provisioning stops right after the provider step.
+         connect: async (id) => { calls.push(`connect:${id}`); return { sandboxId: id } as never; },
+         create: async (source, op) => { calls.push("create"); sources.push(source); return { sandboxId: `sandbox-${op}` } as never; },
+@@ -123,6 +122,28 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
+       assert.equal((await machine(f.next)).sandboxId,f.prior.sandboxId);
+       assert.equal((await pool.query('SELECT count(*)::int AS n FROM device_tokens WHERE "boundDeviceId"=$1',[f.prior.device])).rows[0].n,0);
+     });
++    await t.test('retained original question VMs ignore replacement-template configuration', async () => {
++      const savedTemplates = { codex: process.env.E2B_CODEX_TEMPLATE, desktop: process.env.E2B_BYO_COMPUTER_TEMPLATE };
++      process.env.E2B_CODEX_TEMPLATE = 'unavailable-replacement';
++      process.env.E2B_BYO_COMPUTER_TEMPLATE = 'unavailable-replacement';
++      try {
++        for (const state of ['running', 'paused']) {
++          const f = await questionMachine(state), fixture = exactFake(state);
++          if (state === 'running') {
++            assert.deepEqual(await ensureThreadMachine(pool,actor,f.next,fixture.provider),{runId:f.next,state:'running'});
++            assert.deepEqual(fixture.calls,['state']);
++          } else {
++            fixture.provider.connect = async id => {fixture.calls.push(`connect:${id}`); throw new Error('fixture original connection');};
++            await assert.rejects(ensureThreadMachine(pool,actor,f.next,fixture.provider),/fixture original connection/);
++            assert.deepEqual(fixture.calls,['state',`connect:${f.prior.sandboxId}`]);
++          }
++          assert.equal((await machine(f.next)).sandboxId,f.prior.sandboxId);
++        }
++      } finally {
++        if (savedTemplates.codex === undefined) delete process.env.E2B_CODEX_TEMPLATE; else process.env.E2B_CODEX_TEMPLATE = savedTemplates.codex;
++        if (savedTemplates.desktop === undefined) delete process.env.E2B_BYO_COMPUTER_TEMPLATE; else process.env.E2B_BYO_COMPUTER_TEMPLATE = savedTemplates.desktop;
++      }
++    });
+     await t.test('original VM provider loss never creates or adopts a replacement and releases only its own wake lease', async () => {
+       const f = await questionMachine(), fixture = exactFake();
+       fixture.provider.connect = async (id) => {fixture.calls.push(`connect:${id}`); throw {status:404};};
+diff --git a/lib/cloud-computer/thread-machines.ts b/lib/cloud-computer/thread-machines.ts
+index 288b90c47..44d0118c2 100644
+--- a/lib/cloud-computer/thread-machines.ts
++++ b/lib/cloud-computer/thread-machines.ts
+@@ -19,14 +19,12 @@ import type { Actor } from './subagents'
+ import { afterRunEnded } from '@/lib/run-completion-effects'
+ import { secretMaskerFor } from '@/lib/secrets/runtime'
+ import { readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder, logRuntimeRefreshFailure, type RuntimeRefreshPhase } from './thread-worker-logs'
+-import { credentialProbeCommand, credentialScrubCommand } from '../../packages/daemon/src/credential-globs'
+ import { factoryEventId } from '../factory/event-id'
+ import { questionFingerprint } from '../factory/questions/contract'
+ /** A thread machine runs on its owner's own E2B key (orchestration § 2); this module only acts for that owner. */
+ async function options(ownerId: string) {
+   return { apiKey: await e2bApiKey(ownerId, 'Cloud runtime unavailable'), proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
+ }
+-const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
+ /** Register only while this provisioning lease still owns a non-ended row. */
+ export async function recordThreadSandbox(pool: Pick<Pool, 'query'>, runId: string, sandboxId: string, leaseId: string) {
+   return Boolean((await pool.query('UPDATE thread_machines SET "sandboxId"=$2 WHERE "runId"=$1 AND "workerLeaseId"=$3 AND state<>\'ended\' RETURNING "runId"', [runId, sandboxId, leaseId])).rowCount)
+@@ -34,30 +32,6 @@ export async function recordThreadSandbox(pool: Pick<Pool, 'query'>, runId: stri
+ export async function recordCancelledSandbox(pool: Pick<Pool, 'query'>, runId: string, sandboxId: string, operationId: string) {
+   return Boolean((await pool.query('UPDATE thread_machines SET "sandboxId"=$2,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND state=\'ended\' AND "operationId"=$3 AND "sandboxId" IS NULL RETURNING "runId"', [runId, sandboxId, operationId])).rowCount)
+ }
+-/** Capture filesystem only. A cloned memory image would duplicate live daemon
+- * credentials/connections. Cache is always bound to one owner and workspace.
+- * Never captures a credential (decision 2026-10-31-2225): while one is on the
+- * bot machine (a coding-CLI login, a run's GitHub token, a live broker), the
+- * last clean snapshot is reused, or the thread waits with a refusal. */
+-export async function workspaceSnapshot(pool: Pick<Pool, 'query'>, actor: Actor, source: Pick<Sandbox, 'commands' | 'createSnapshot'>, repoPath: string) {
+-  const revision = (await source.commands.run(`git -C ${quote(repoPath)} rev-parse HEAD`, { user: 'user', timeoutMs: 10_000 })).stdout.trim()
+-  if (!/^[a-f0-9]{40}$/.test(revision)) throw new ComputerError(409, 'Workspace source unavailable')
+-  const lock = (await source.commands.run(`cd ${quote(repoPath)} && for f in pnpm-lock.yaml package-lock.json yarn.lock; do if test -f "$f"; then sha256sum "$f"; fi; done`, { user: 'user', timeoutMs: 10_000 })).stdout
+-  const lockDigest = createHash('sha256').update(lock).digest('hex')
+-  const old = (await pool.query('SELECT * FROM workspace_snapshots WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])).rows[0]
+-  if (old && old.sourceRevision === revision && old.lockDigest === lockDigest && Date.now() - new Date(old.createdAt).getTime() < 24 * 60 * 60_000) return old.snapshotId as string
+-  const found = (await source.commands.run(credentialProbeCommand(), { user: 'root', timeoutMs: 10_000 })).stdout.split('\n').filter(Boolean)
+-  if (found.length) {
+-    // Paths only, never contents; the count is enough to find it in logs.
+-    console.warn('Workspace snapshot skipped: credentials present', { count: found.length })
+-    if (old) return old.snapshotId as string
+-    throw new ComputerError(409, 'Workspace snapshot unavailable')
+-  }
+-  const snapshot = await source.createSnapshot({ mode: 'filesystem' })
+-  await pool.query(`INSERT INTO workspace_snapshots ("workspaceId","ownerId","sourceRevision","lockDigest","snapshotId") VALUES ($1,$2,$3,$4,$5)
+-    ON CONFLICT ("workspaceId","ownerId") DO UPDATE SET "sourceRevision"=$3,"lockDigest"=$4,"snapshotId"=$5,"createdAt"=now()`, [actor.workspaceId, actor.userId, revision, lockDigest, snapshot.snapshotId])
+-  return snapshot.snapshotId
+-}
+ /** The provider no longer has this sandbox (deleted, expired or killed outside Mikka). */
+ export function sandboxGone(error: unknown) {
+   if (error instanceof SandboxNotFoundError) return true
+@@ -84,16 +58,14 @@ export function threadMachineStartFailure(error: unknown): FailedThreadStart | n
+  * (orchestration.md § 4): a new operation ID, the running interval closed.
+  * With a lease, only that lease's row is reset.
+  */
+-async function replaceGoneSandbox(query: Pick<Pool, 'query'>, runId: string, leaseId?: string) {
+-  return (await query.query(`UPDATE thread_machines SET "sandboxId"=NULL,"operationId"=$2,state='starting',
++async function replaceGoneSandbox(query: Pick<Pool, 'query'>, runId: string, template: string, leaseId?: string) {
++  return (await query.query(`UPDATE thread_machines SET "sandboxId"=NULL,"operationId"=$2,"snapshotId"=$4,state='starting',
+       "computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL
+-    WHERE "runId"=$1 AND state<>'ended' AND ($3::uuid IS NULL OR "workerLeaseId"=$3) RETURNING *`, [runId, randomUUID(), leaseId ?? null])).rows[0]
++    WHERE "runId"=$1 AND state<>'ended' AND ($3::uuid IS NULL OR "workerLeaseId"=$3) RETURNING *`, [runId, randomUUID(), leaseId ?? null, template])).rows[0]
+ }
+ 
+ /** Provider calls of ensureThreadMachine; tests replace them, production uses E2B. */
+ export const threadMachineProvider = {
+-  snapshot: async (client: PoolClient, actor: Actor, botSandboxId: string, repoPath: string) =>
+-    workspaceSnapshot(client as unknown as Pool, actor, await connectComputer(actor.workspaceId, botSandboxId), repoPath),
+   connect: (sandboxId: string, workspaceId: string, budget?: RuntimeBudget) => connectComputer(workspaceId, sandboxId, undefined, budget),
+   create: async (snapshotId: string, operationId: string, metadata: Record<string, string>, ownerId: string) => {
+     const base = await options(ownerId)
+@@ -320,22 +292,22 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
+     // Recovery takes policy before question/run locks. Acquire its order while
+     // reserving maintenance so a blocked continuation cannot transfer custody.
+     if (refreshRuntime) await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
+-    const run = (await client.query(`SELECT r.*,COALESCE(r."agentDefinition"->>'harness',agent.harness) AS "runHarness",b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand",COALESCE(source_repo."repoPath",repo."repoPath") AS "snapshotRepoPath",m."sandboxId" AS "botSandboxId"
++    const run = (await client.query(`SELECT r.*,COALESCE(r."agentDefinition"->>'harness',agent.harness) AS "runHarness",b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand"
+       FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
+       LEFT JOIN agents agent ON agent.id=r."agentId"
+       JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId"
+       JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId"
+-      LEFT JOIN bot_cloud_runtimes runtime ON runtime."botId"=b."botId" AND runtime."ownerId"=b."ownerId" AND runtime."workspaceId"=b."workspaceId" AND runtime."agentId"=r."agentId"
+-      LEFT JOIN device_repos source_repo ON source_repo.id=runtime."repoId" AND source_repo."userId"=r."userId"
+       WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
+-    if (!run || !run.botSandboxId || !(refreshRuntime ? ['succeeded','failed','stopped','cancelled'] : ['queued', 'preparing', 'running', 'waiting_input']).includes(run.status)) throw new ComputerError(404, 'Thread unavailable')
++    if (!run || !(refreshRuntime ? ['succeeded','failed','stopped','cancelled'] : ['queued', 'preparing', 'running', 'waiting_input']).includes(run.status)) throw new ComputerError(404, 'Thread unavailable')
+     if (!refreshRuntime) {
+       refreshPhase = 'execution_identity'
+       await revalidateExecutionIdentity(client, run)
+       refreshPhase = 'admission'
+     }
++
+     exactQuestionMachine = run.questionContinuation?.requireSessionResume === true
+     const repositoryTask = Boolean(run.remoteUrl)
++    const freshTemplate = () => repositoryTask ? taskTemplate(run.runHarness) : computerTemplate()
+     let machine = (await client.query('SELECT * FROM thread_machines WHERE "runId"=$1 FOR UPDATE', [runId])).rows[0]
+     if (!refreshRuntime && !exactQuestionMachine && run.issueId && machine?.sandboxId && machine.deviceId &&
+       machine.ownerId === actor.userId && machine.workspaceId === actor.workspaceId && machine.issueId === run.issueId &&
+@@ -403,7 +375,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
+         throw error
+       })
+       refreshPhase = 'admission'
+-      if (!state) machine = await replaceGoneSandbox(client, runId)
++      if (!state) machine = await replaceGoneSandbox(client, runId, freshTemplate())
+       else if (state.state !== 'paused' && !refreshRuntime) {
+         const current = await provider.connect(machine.sandboxId, actor.workspaceId)
+         if ((await current.files.read('/opt/mikka/worker-source-sha', {user:'root'})).trim() !== process.env.MIKKA_CLOUD_WORKER_SHA) throw new ComputerError(409, 'Worker version mismatch; refresh the idle task runtime')
+@@ -419,19 +391,18 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
+     }
+     if (machine?.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now() && machine.state !== 'paused') throw new ComputerError(409, 'Thread provisioning in progress')
+     // No Mikka caps: the person's own E2B account sets the limit (orchestration.md § 5).
+-    if (!machine || machine.snapshotId === 'pending') {
++    if (!machine || machine.snapshotId === 'pending' || (!machine.sandboxId && !isOfficialE2BTemplate(machine.snapshotId))) {
+       // A follow-up keeps this task's own machine. A new repository task starts
+       // from the anonymous ready template of its harness (E2B's claude or codex
+       // with Mikka's worker, decision 2026-11-01-2335): the daemon clones its admitted
+       // remote and creates the task worktree from the configured base branch.
+-      // Only non-repository computer work retains the existing desktop snapshot.
+-      const template = repositoryTask ? taskTemplate(run.runHarness) : computerTemplate()
++      // Non-repository work starts from the official desktop template too.
++      const template = freshTemplate()
+       const adopted = run.issueId ? await adoptTaskMachine(client, actor, runId, run, template) : null
+       if (adopted) { machine = adopted; retainedSandboxId = adopted.sandboxId }
+       else {
+-        const snapshotId = template ?? await provider.snapshot(client, actor, run.botSandboxId, run.snapshotRepoPath)
+         machine = (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state)
+-          VALUES ($1,$2,$3,$4,$5,$6,$7,'starting') ON CONFLICT ("runId") DO UPDATE SET "snapshotId"=EXCLUDED."snapshotId","issueId"=EXCLUDED."issueId" RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId ?? null, snapshotId, randomUUID()])).rows[0]
++          VALUES ($1,$2,$3,$4,$5,$6,$7,'starting') ON CONFLICT ("runId") DO UPDATE SET "snapshotId"=EXCLUDED."snapshotId","issueId"=EXCLUDED."issueId" RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId ?? null, template, randomUUID()])).rows[0]
+       }
+     }
+     if (retainedSandboxId && !refreshRuntime) {
+@@ -447,7 +418,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
+       refreshDeadline = Date.now() + 240_000
+       refreshBudget = budgetUntil(refreshDeadline)
+     }
+-    // Persist snapshot and operation ID before provider requests.
++    // Persist the official template and operation ID before provider requests.
+     await client.query(`UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval '15 minutes',
+       state=CASE WHEN $3::boolean AND state='running' THEN 'error' ELSE state END WHERE "runId"=$1`, [runId, leaseId, Boolean(retainedSandboxId)])
+     await client.query('COMMIT')
+@@ -473,8 +444,8 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
+     if (retainedSandboxId && (!connected || connected.sandboxId !== retainedSandboxId)) throw new ComputerError(409, 'Retained task machine unavailable')
+     if (refreshRuntime && !connected) throw new ComputerError(409, 'Original task machine unavailable')
+     if (machine.sandboxId && !connected) {
+-      // The paused sandbox is gone at the provider: the same thread starts a new one from the workspace snapshot.
+-      machine = await replaceGoneSandbox(pool, runId, leaseId)
++      // The sandbox is gone at the provider: recreate this thread from its official template.
++      machine = await replaceGoneSandbox(pool, runId, freshTemplate(), leaseId)
+       if (!machine) throw new ComputerError(409, 'Thread provisioning cancelled')
+     }
+     const sandbox = connected ?? await provider.create(machine.snapshotId, machine.operationId, { application: 'mikka-thread', workspaceId: actor.workspaceId, runId }, actor.userId)
+@@ -511,12 +482,6 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
+       // its registered private workspace a Git base before the daemon starts.
+       await initializeBotWorkspace(sandbox, run.runtimeBotId)
+     }
+-    if (!machine.sandboxId && !repositoryTask && !isOfficialE2BTemplate(machine.snapshotId)) {
+-      // Filesystem snapshots start no old worker process. Remove copied device
+-      // identity/capabilities before a new worker can make any network call.
+-      // A snapshot never holds a credential; scrub the same list again in case an older snapshot did.
+-      await sandbox.commands.run(`rm -rf /home/user/.mikka/worker /home/user/.mikka/bootstrap.json /run/mikka-viewer /run/mikka-subagents; ${credentialScrubCommand()}; install -d -m 700 /run/mikka-viewer`, { user: 'root', timeoutMs: 10_000 })
+-    }
+     refreshPhase = 'runtime_configuration'
+     const deviceId = machine.deviceId ?? randomUUID()
+     const repoId = machine.repoId ?? randomUUID()
+diff --git a/lib/cloud-computer/thread-worker-logs.test.ts b/lib/cloud-computer/thread-worker-logs.test.ts
+index fd9279caa..00241127d 100644
+--- a/lib/cloud-computer/thread-worker-logs.test.ts
++++ b/lib/cloud-computer/thread-worker-logs.test.ts
+@@ -131,7 +131,7 @@ test('runtime refresh failures name their actual phase without logging provider
+         state: async () => { if (phase === 'provider_state') throw fault; return 'paused' },
+         connect: async () => { if (phase === 'connect') throw fault; return sandbox },
+         create: async () => assert.fail('the original VM may not be replaced'),
+-        snapshot: async () => assert.fail('no snapshot'), kill: async () => assert.fail('no kill'),
++        kill: async () => assert.fail('no kill'),
+       } as unknown as Parameters<typeof ensureThreadMachine>[3]
+       try {
+         await assert.rejects(ensureThreadMachine(pool, actor, run.id, provider, undefined, true), error => error === fault)
+@@ -183,10 +183,9 @@ test('question wake failures identify the rejecting boundary without exposing pr
+       })
+       const query = async (sql: string) => {
+         queries.push(sql)
+-        if (sql.startsWith('SELECT r.*')) return { rows: [{ ...run,
+-          ...(phase === 'admission' ? { botSandboxId: null } : {}),
++        if (sql.startsWith('SELECT r.*')) return { rows: phase === 'admission' ? [] : [{ ...run,
+           ...(phase === 'execution_identity' ? { agentDefinition: { executionIdentity: {} } } : {}),
+-        }], rowCount: 1 }
++        }], rowCount: phase === 'admission' ? 0 : 1 }
+         if (sql.startsWith('SELECT * FROM thread_machines')) return { rows: [{ ...machine,
+           ...(phase === 'question_machine' ? { sandboxId: 'other-vm' } : {}),
+           ...(phase === 'verify_worker' ? { snapshotId: 'legacy-fixture' } : {}),
+@@ -207,7 +206,7 @@ test('question wake failures identify the rejecting boundary without exposing pr
+             commands: { run: async () => assert.fail('no worker command may run') } }
+         },
+         create: async () => assert.fail('the original VM may not be replaced'),
+-        snapshot: async () => assert.fail('no snapshot'), kill: async () => assert.fail('no kill'),
++        kill: async () => assert.fail('no kill'),
+       } as unknown as Parameters<typeof ensureThreadMachine>[3]
+       try {
+         await assert.rejects(ensureThreadMachine(pool, actor, run.id, provider), error =>
+diff --git a/lib/computer/auto-runtime.ts b/lib/computer/auto-runtime.ts
+index 060cbf12a..e42b1f98c 100644
+--- a/lib/computer/auto-runtime.ts
++++ b/lib/computer/auto-runtime.ts
+@@ -1,19 +1,16 @@
+ import 'server-only'
+ import { createHash, randomUUID } from 'node:crypto'
+ import type { Pool } from 'pg'
+-import { deviceIsOnline } from '../device-presence'
+ import { botListChanged } from '../live/lists'
+ 
+ type Actor = { userId: string; workspaceId: string }
+ export type BotCloudRuntime = { botId: string; harness: 'codex' | 'claude_code'; agentId: string }
+ 
+-/** Wakes the bot's cloud computer and its worker, which records the bot's
+- * runtime rows (`ensureBotRuntime`). Tests replace it; production uses E2B. */
++/** Task admission needs declared execution identities, not a live parent.
++ * Tests can replace registration; production makes no provider calls here. */
+ export const botRuntimeProvisioner = {
+   provision: async (pool: Pool, actor: Actor, botId: string) => {
+-    const { ComputerStore } = await import('./store')
+-    await new ComputerStore(pool).operate(actor, botId, 'wake')
+-    await (await import('./wake-worker')).ensureCloudBotWorker(pool, actor, botId)
++    await (await import('./task-runtime')).ensureBotTaskRuntime(pool, actor, botId)
+   },
+ }
+ 
+@@ -47,17 +44,15 @@ export async function ensureCoordinatorBot(pool: Pool, actor: Actor) {
+ }
+ 
+ async function findRuntime(pool: Pool, actor: Actor, botId: string, harness: string) {
+-  const rows = (await pool.query<BotCloudRuntime & { deviceId: string; lastSeenAt: Date | null }>(`SELECT r."botId",r.harness,r."agentId",d.id AS "deviceId",d."lastSeenAt" FROM bot_cloud_runtimes r
+-    JOIN agents a ON a.id=r."agentId" AND a."userId"=r."ownerId"
+-    JOIN cloud_machines m ON m."deviceId"=a."deviceId" AND m."ownerId"=r."ownerId" AND m."workspaceId"=r."workspaceId" AND m.state='running'
++  const rows = (await pool.query<BotCloudRuntime>(`SELECT r."botId",r.harness,r."agentId" FROM bot_cloud_runtimes r
++    JOIN bots b ON b.id=r."botId" AND b."ownerId"=r."ownerId" AND b."workspaceId"=r."workspaceId" AND b."archivedAt" IS NULL
++    JOIN bot_desktops desktop ON desktop."botId"=b.id AND desktop."ownerId"=b."ownerId" AND desktop."workspaceId"=b."workspaceId"
++    JOIN agents a ON a.id=r."agentId" AND a."userId"=r."ownerId" AND a.harness=r.harness
++    JOIN cloud_machines m ON m."deviceId"=a."deviceId" AND m."ownerId"=r."ownerId" AND m."workspaceId"=r."workspaceId"
+     JOIN devices d ON d.id=m."deviceId" AND d."ownerId"=r."ownerId" AND d.kind='cloud' AND d.enabled=true
+     WHERE r."botId"=$1 AND r."ownerId"=$2 AND r."workspaceId"=$3 AND ($4='auto' OR r.harness=$4) ORDER BY r.harness`,
+   [botId, actor.userId, actor.workspaceId, harness])).rows
+-  for (const row of rows) {
+-    if (await deviceIsOnline({ id: row.deviceId, lastSeenAt: row.lastSeenAt }))
+-      return { botId: row.botId, harness: row.harness, agentId: row.agentId }
+-  }
+-  return null
++  return rows[0] ?? null
+ }
+ 
+ /** The runtime's Agent uses the owner's own connected subscription for its
+@@ -76,13 +71,11 @@ async function bindOwnSubscription(pool: Pool, actor: Actor, runtime: BotCloudRu
+   [id, actor.userId, actor.workspaceId, runtime.agentId, route, model, provider])
+ }
+ 
+-/**
+- * The bot's own cloud runtime for a run, created on first use with no manual
+- * step: its cloud computer is woken and its runtime recorded. Idempotent; a
+- * second dispatch reuses the runtime. Returns null when the cloud refuses, so
+- * the run takes the next machine (decision 2026-10-31-2200-run-machine-fallback).
+- */
++/** The bot's own task runtime is registered on first use. A fresh official
++ * task container initializes its workspace and receives runtime credentials.
++ * Registration never starts, connects to or changes the parent's VM. */
+ export async function ensureBotCloudRuntime(pool: Pool, actor: Actor, botId: string, target: { harness: string; model?: string }, provisioner = botRuntimeProvisioner) {
++  if (!['auto', 'codex', 'claude_code'].includes(target.harness)) return null
+   let runtime = await findRuntime(pool, actor, botId, target.harness)
+   if (!runtime) {
+     try { await provisioner.provision(pool, actor, botId) } catch { return null }
+diff --git a/lib/computer/bot-runtime.ts b/lib/computer/bot-runtime.ts
+index d8837d877..dbe004d83 100644
+--- a/lib/computer/bot-runtime.ts
++++ b/lib/computer/bot-runtime.ts
+@@ -1,7 +1,7 @@
+ import 'server-only'
+ import { randomUUID } from 'node:crypto'
+ import { z } from 'zod'
+-import type { Pool } from 'pg'
++import type { Pool, PoolClient } from 'pg'
+ import type { Sandbox } from 'e2b'
+ import { initializeBotWorkspace } from './bot-workspace'
+ 
+@@ -24,34 +24,41 @@ export async function ensureBotRuntime(pool: Pool, actor: { userId: string; work
+       (h.harness === 'codex' || h.harness === 'claude_code') && h.installed === true && h.subscriptionBroker === true && h.computerBroker === true)
+     if (!harnesses.length) throw new Error('Bot runtime unavailable')
+     const path = await initializeBotWorkspace(sandbox, botId)
+-    const repo = (await client.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch") VALUES ($1,$2,$3,$4,'main')
+-      ON CONFLICT ("deviceId","repoPath") DO UPDATE SET "repoPath"=EXCLUDED."repoPath" WHERE device_repos."userId"=EXCLUDED."userId" RETURNING id`, [randomUUID(), deviceId, actor.userId, path])).rows[0]
+-    if (!repo) throw new Error('Bot runtime unavailable')
+-    for (const info of harnesses) {
+-      const existing = (await client.query(`SELECT x."agentId",x."repoId",a."deviceId" FROM bot_cloud_runtimes x JOIN agents a ON a.id=x."agentId" AND a."userId"=x."ownerId"
+-        WHERE x."botId"=$1 AND x.harness=$2 AND x."ownerId"=$3 AND x."workspaceId"=$4 FOR UPDATE OF x,a`,
+-      [botId, info.harness, actor.userId, actor.workspaceId])).rows[0]
+-      if (existing) {
+-        // The machine's device can change, or a device removal unbinds the agent
+-        // (lib/device-removal.ts): the bot keeps its runtime and moves it here.
+-        if (existing.deviceId !== deviceId) await client.query('UPDATE agents SET "deviceId"=$3,"updatedAt"=now() WHERE id=$1 AND "userId"=$2', [existing.agentId, actor.userId, deviceId])
+-        if (existing.repoId !== repo.id) await client.query('UPDATE bot_cloud_runtimes SET "repoId"=$4 WHERE "botId"=$1 AND harness=$2 AND "ownerId"=$3', [botId, info.harness, actor.userId, repo.id])
+-        continue
+-      }
+-      const name = `Cloud ${info.harness} ${botId}`
+-      // A runtime row removed without its agent (a bot handed over and back, production 2026-11-02) leaves the
+-      // name taken, so inserting again fails on agents_user_name_key (23505). Take that agent back only when it is
+-      // this owner's hidden runtime agent for this bot on this machine's device, and no other runtime holds it.
+-      const orphan = (await client.query<{ id: string }>(`SELECT a.id FROM agents a
+-        WHERE a."userId"=$1 AND a.name=$2 AND a.harness=$3 AND a."deviceId"=$4 AND a.instructions=''
+-          AND NOT EXISTS (SELECT 1 FROM bot_cloud_runtimes x WHERE x."agentId"=a.id) FOR UPDATE OF a`,
+-      [actor.userId, name, info.harness, deviceId])).rows[0]
+-      const agentId = orphan?.id ?? randomUUID()
+-      if (!orphan) await client.query('INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,$3,$4,$5)', [agentId, actor.userId, info.harness, name, deviceId])
+-      await client.query('INSERT INTO bot_cloud_runtimes ("botId","workspaceId","ownerId",harness,"agentId","repoId") VALUES ($1,$2,$3,$4,$5,$6)', [botId, actor.workspaceId, actor.userId, info.harness, agentId, repo.id])
+-    }
+-    const rows = (await client.query('SELECT harness,"agentId","repoId" FROM bot_cloud_runtimes WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 ORDER BY harness', [botId, actor.userId, actor.workspaceId])).rows
++    const rows = await recordBotRuntime(client, actor, botId, deviceId, path, harnesses)
+     await client.query('COMMIT')
+     return rows as { harness: 'codex' | 'claude_code'; agentId: string; repoId: string }[]
+   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+ }
++
++/** Register execution identities and the declarative private workspace path.
++ * This records no worker heartbeat, installed capability or credential. */
++export async function recordBotRuntime(client: PoolClient, actor: { userId: string; workspaceId: string }, botId: string, deviceId: string, path: string, harnesses: readonly { harness: string }[]) {
++  const repo = (await client.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch") VALUES ($1,$2,$3,$4,'main')
++    ON CONFLICT ("deviceId","repoPath") DO UPDATE SET "repoPath"=EXCLUDED."repoPath" WHERE device_repos."userId"=EXCLUDED."userId" RETURNING id`, [randomUUID(), deviceId, actor.userId, path])).rows[0]
++  if (!repo) throw new Error('Bot runtime unavailable')
++  for (const info of harnesses) {
++    const existing = (await client.query(`SELECT x."agentId",x."repoId",a."deviceId" FROM bot_cloud_runtimes x JOIN agents a ON a.id=x."agentId" AND a."userId"=x."ownerId"
++      WHERE x."botId"=$1 AND x.harness=$2 AND x."ownerId"=$3 AND x."workspaceId"=$4 FOR UPDATE OF x,a`,
++    [botId, info.harness, actor.userId, actor.workspaceId])).rows[0]
++    if (existing) {
++      // The machine's device can change, or a device removal unbinds the agent
++      // (lib/device-removal.ts): the bot keeps its runtime and moves it here.
++      if (existing.deviceId !== deviceId) await client.query('UPDATE agents SET "deviceId"=$3,"updatedAt"=now() WHERE id=$1 AND "userId"=$2', [existing.agentId, actor.userId, deviceId])
++      if (existing.repoId !== repo.id) await client.query('UPDATE bot_cloud_runtimes SET "repoId"=$4 WHERE "botId"=$1 AND harness=$2 AND "ownerId"=$3', [botId, info.harness, actor.userId, repo.id])
++      continue
++    }
++    const name = `Cloud ${info.harness} ${botId}`
++    // A runtime row removed without its agent (a bot handed over and back, production 2026-11-02) leaves the
++    // name taken, so inserting again fails on agents_user_name_key (23505). Take that agent back only when it is
++    // this owner's hidden runtime agent for this bot on this machine's device, and no other runtime holds it.
++    const orphan = (await client.query<{ id: string }>(`SELECT a.id FROM agents a
++      WHERE a."userId"=$1 AND a.name=$2 AND a.harness=$3 AND a."deviceId"=$4 AND a.instructions=''
++        AND NOT EXISTS (SELECT 1 FROM bot_cloud_runtimes x WHERE x."agentId"=a.id) FOR UPDATE OF a`,
++    [actor.userId, name, info.harness, deviceId])).rows[0]
++    const agentId = orphan?.id ?? randomUUID()
++    if (!orphan) await client.query('INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,$3,$4,$5)', [agentId, actor.userId, info.harness, name, deviceId])
++    await client.query('INSERT INTO bot_cloud_runtimes ("botId","workspaceId","ownerId",harness,"agentId","repoId") VALUES ($1,$2,$3,$4,$5,$6)', [botId, actor.workspaceId, actor.userId, info.harness, agentId, repo.id])
++  }
++  const rows = (await client.query('SELECT harness,"agentId","repoId" FROM bot_cloud_runtimes WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 ORDER BY harness', [botId, actor.userId, actor.workspaceId])).rows
++  return rows as { harness: 'codex' | 'claude_code'; agentId: string; repoId: string }[]
++}
+diff --git a/lib/computer/cloud-task-target.ts b/lib/computer/cloud-task-target.ts
+new file mode 100644
+index 000000000..51a9e85e3
+--- /dev/null
++++ b/lib/computer/cloud-task-target.ts
+@@ -0,0 +1,47 @@
++import type { PoolClient } from 'pg'
++import type { Harness } from '@mikka/protocol/harness'
++
++type Actor = { userId: string; workspaceId: string }
++type Input = { botId: string; agentId: string; deviceRepoId: string }
++type Target = { deviceId: string; instructions: string; harness: Harness; baseBranch: string }
++
++/** Task machines use official templates, so parent state and heartbeat are not
++ * admission inputs. Only the owner's enabled runtime metadata and repository
++ * policy are shared by ordinary tasks and independent Factory checks. */
++export async function cloudTaskTarget(tx: Pick<PoolClient, 'query'>, actor: Actor, input: Input): Promise<Target | null> {
++  const { rows: [target] } = await tx.query<Target>(`SELECT m."deviceId",a.instructions,a.harness,repo."baseBranch" FROM bots b
++    JOIN bot_desktops desktop ON desktop."botId"=b.id AND desktop."ownerId"=b."ownerId" AND desktop."workspaceId"=b."workspaceId"
++    JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId"
++    JOIN devices dev ON dev.id=m."deviceId" AND dev."ownerId"=b."ownerId" AND dev.kind='cloud' AND dev.enabled=true
++    JOIN agents a ON a.id=$4 AND a."userId"=b."ownerId" AND a."deviceId"=dev.id
++    JOIN bot_cloud_runtimes runtime ON runtime."botId"=b.id AND runtime."ownerId"=b."ownerId" AND runtime."workspaceId"=b."workspaceId"
++      AND runtime."agentId"=a.id AND runtime.harness=a.harness
++    JOIN device_repos repo ON repo.id=$5 AND repo."deviceId"=dev.id AND repo."userId"=b."ownerId"
++    WHERE b.id=$1 AND b."ownerId"=$2 AND b."workspaceId"=$3 AND b."archivedAt" IS NULL
++      AND (repo."remoteUrl" IS NOT NULL OR repo.id=runtime."repoId")
++      AND (repo."remoteUrl" IS NOT NULL OR NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny'))
++    FOR SHARE OF b,desktop,m,dev,a,runtime,repo`,
++  [input.botId, actor.userId, actor.workspaceId, input.agentId, input.deviceRepoId])
++  return target ?? null
++}
++
++/** A continuation keeps the task VM already transferred to this exact run.
++ * Its recorded custody is independent of the parent runtime's current state. */
++export async function ownedCloudTaskTarget(tx: Pick<PoolClient, 'query'>, actor: Actor, input: Input & { runId: string; issueId: string }): Promise<Target | null> {
++  const { rows: [target] } = await tx.query<Target>(`SELECT dev.id AS "deviceId",a.instructions,a.harness,repo."baseBranch"
++    FROM agent_runs r
++    JOIN computer_run_bindings binding ON binding."runId"=r.id AND binding."ownerId"=r."userId"
++    JOIN bots b ON b.id=binding."botId" AND b."ownerId"=binding."ownerId" AND b."workspaceId"=binding."workspaceId" AND b."archivedAt" IS NULL
++    JOIN thread_machines m ON m."runId"=r.id AND m."ownerId"=b."ownerId" AND m."workspaceId"=b."workspaceId" AND m."botId"=b.id
++      AND m."issueId"=r."issueId" AND m."deviceId"=r."deviceId" AND m."repoId"=r."deviceRepoId"
++    JOIN devices dev ON dev.id=m."deviceId" AND dev."ownerId"=r."userId" AND dev.kind='cloud' AND dev.enabled=true
++    JOIN agents a ON a.id=r."agentId" AND a."userId"=r."userId"
++    JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."deviceId"=dev.id AND repo."userId"=r."userId"
++    WHERE b.id=$1 AND b."ownerId"=$2 AND b."workspaceId"=$3 AND a.id=$4 AND repo.id=$5 AND r.id=$6 AND r."issueId"=$7
++      AND (r."botId" IS NULL OR r."botId"=b.id) AND r.status='queued' AND r."stopRequestedAt" IS NULL
++      AND m.state IN ('running','paused','error') AND m."sandboxId" IS NOT NULL
++      AND (repo."remoteUrl" IS NOT NULL OR NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny'))
++    FOR SHARE OF r,binding,b,m,dev,a,repo`,
++  [input.botId, actor.userId, actor.workspaceId, input.agentId, input.deviceRepoId, input.runId, input.issueId])
++  return target ?? null
++}
+diff --git a/lib/computer/queue-run.ts b/lib/computer/queue-run.ts
+index 6d2b93f12..9f6d5efed 100644
+--- a/lib/computer/queue-run.ts
++++ b/lib/computer/queue-run.ts
+@@ -10,7 +10,7 @@ import type { AgentExecution } from '@/lib/agent-kit/store'
+ import { ComputerError } from './store'
+ import { RunModelMissingError } from './run-model'
+ import { runCredentialSource, type RunApiKey } from '@/lib/run-credential-source'
+-import { sleepingFactoryCloudTarget, type FactoryCloudStageAdmission } from '@/lib/factory/cloud-stage-admission'
++import { cloudTaskTarget } from './cloud-task-target'
+ import { runListChanged } from '@/lib/live/lists'
+ 
+ /** Issue access is checked by the caller. Queue and Bot binding are committed
+@@ -41,7 +41,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
+   /** Internal host placement grant, never a model/tool argument. The current owner source can only narrow it. */
+   allowLocalRecovery?: true
+   sourceEventId?: string
+-}, existing?: PoolClient, factoryStage?: FactoryCloudStageAdmission) {
++}, existing?: PoolClient) {
+   if (input.idempotencyKey !== undefined && (input.idempotencyKey.length < 1 || input.idempotencyKey.length > 256)) throw new ComputerError(400, 'Invalid task request')
+   if (input.subscriptionBindingId !== undefined && (!z.uuid().safeParse(input.subscriptionBindingId).success || input.apiKeyId || input.apiKey)) throw new ComputerError(400, 'Invalid task request')
+   const digest = input.idempotencyKey === undefined ? undefined : createHash('sha256').update(JSON.stringify([actor.userId, input.idempotencyKey])).digest('hex')
+@@ -64,17 +64,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
+     // Absent stays byte-compatible with historical fingerprints; a replay
+     // cannot upgrade an old cloud-only run to a newly inferred permission.
+     const selectionFingerprint = createHash('sha256').update(JSON.stringify([input.subscriptionBindingId ?? null, model, input.apiKeyId ?? null, input.apiKey ?? null, ...(allowLocalRecovery ? [{ allowLocalRecovery }] : []), ...(input.modelDispatch ? [{ modelDispatch: input.modelDispatch }] : []), ...(input.policyCeiling ? [{ policyCeiling: input.policyCeiling }] : [])])).digest('hex')
+-    let target = (await client.query(`SELECT m."deviceId",a.instructions,a.harness,repo."baseBranch" FROM bots b
+-      JOIN bot_desktops d ON d."botId"=b.id AND d."ownerId"=b."ownerId" AND d."workspaceId"=b."workspaceId"
+-      JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId" AND m.state='running'
+-      JOIN devices dev ON dev.id=m."deviceId" AND dev."ownerId"=b."ownerId" AND dev.kind='cloud' AND dev.enabled=true
+-      JOIN agents a ON a.id=$4 AND a."userId"=b."ownerId" AND a."deviceId"=dev.id
+-      JOIN device_repos repo ON repo.id=$5 AND repo."deviceId"=dev.id AND repo."userId"=b."ownerId"
+-      WHERE b.id=$1 AND b."ownerId"=$2 AND b."workspaceId"=$3
+-        AND (repo."remoteUrl" IS NOT NULL OR NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny'))`,
+-    [input.botId, actor.userId, actor.workspaceId, input.agentId, input.deviceRepoId])).rows[0]
+-    if (!target && existing && factoryStage && input.idempotencyKey === `factory:${factoryStage.binding.attemptId}`)
+-      target = await sleepingFactoryCloudTarget(client, actor, input, factoryStage)
++    const target = await cloudTaskTarget(client, actor, input)
+     if (!target) throw new ComputerError(409, 'Bot computer task is unavailable')
+     const prompt = runPrompt(input.title, input.body, target.instructions, input.note)
+     if (digest) {
+diff --git a/lib/computer/store.db.test.ts b/lib/computer/store.db.test.ts
+index b25775239..c7a576e67 100644
+--- a/lib/computer/store.db.test.ts
++++ b/lib/computer/store.db.test.ts
+@@ -256,6 +256,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
+     const cloudRepo = randomUUID()
+     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,instructions,name) VALUES ($1,$2,$3,$4,$5,$6)', [consumer, actor.userId, worker.deviceId, 'codex', 'Follow the task', 'Fixture'])
+     await pool.query('INSERT INTO device_repos (id,"userId","deviceId","baseBranch","repoPath") VALUES ($1,$2,$3,$4,$5)', [cloudRepo, actor.userId, worker.deviceId, 'main', '/tmp/cloud-repo'])
++    await pool.query('UPDATE bot_cloud_runtimes SET "agentId"=$2,"repoId"=$3 WHERE "botId"=$1 AND harness=\'codex\'', [bot.id,consumer,cloudRepo])
+     const cloudInput = { botId: bot.id, issueId: randomUUID(), agentId: consumer, deviceRepoId: cloudRepo, title: 'Task', body: 'Use the desktop', model: 'fixture-model' }
+     // A repository task: its repository has a remote, so it runs on a task machine and the 电脑 policy does not gate it.
+     const remoteRepo = randomUUID()
+diff --git a/lib/computer/task-runtime.db.test.ts b/lib/computer/task-runtime.db.test.ts
+new file mode 100644
+index 000000000..374d03579
+--- /dev/null
++++ b/lib/computer/task-runtime.db.test.ts
+@@ -0,0 +1,93 @@
++// Real PostgreSQL: first task dispatch registers metadata without waking or
++// inspecting a parent VM. No provider or model request is made by this suite.
++import assert from 'node:assert/strict'
++import test from 'node:test'
++import { randomUUID } from 'node:crypto'
++import { readFile, readdir } from 'node:fs/promises'
++import { Pool } from 'pg'
++import { orderMigrations } from '../../scripts/migration-order.mjs'
++import { dropTestDatabase } from '../../tests/support/drop-test-database'
++import { ensureBotCloudRuntime } from './auto-runtime'
++
++const url = process.env.E2E_DATABASE_URL
++if (url) {
++  const parsed = new URL(url)
++  assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(parsed.hostname), 'loopback only')
++  assert.match(parsed.pathname, /^\/[a-z0-9_]+_e2e$/)
++} else if (process.env.REQUIRE_DB === '1') assert.fail('REQUIRE_DB=1 needs E2E_DATABASE_URL')
++
++test('first task runtime is declared without a parent worker or VM and keeps ownership fences', { skip: !url, timeout: 120000 }, async () => {
++  const admin = new Pool({ connectionString: url, max: 1 })
++  const database = `task_runtime_${randomUUID().replaceAll('-', '')}_e2e`
++  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
++  const target = new URL(url!); target.pathname = `/${database}`
++  const pool = new Pool({ connectionString: target.toString(), max: 4 })
++  try {
++    const dir = new URL('../../drizzle/', import.meta.url)
++    for (const file of orderMigrations((await readdir(dir)).filter(file => file.endsWith('.sql')))) await pool.query(await readFile(new URL(file, dir), 'utf8'))
++    const owner = 'first-task-owner', workspaceId = randomUUID()
++    await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Fixture','first-task@example.invalid',true,now(),now())`, [owner])
++    const actor = { userId: owner, workspaceId }
++    const bot = async (label: string, workspace = workspaceId) => {
++      const id = randomUUID()
++      await pool.query('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)', [id, workspace, owner, label])
++      return id
++    }
++    const firstBot = await bot('First Bot'), parentDevice = randomUUID()
++    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt")
++      VALUES ($1,$2,'Existing sleeping parent','cloud',true,'[]',NULL)`, [parentDevice, owner])
++    await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady")
++      VALUES ($1,$2,$3,'untouched-parent',$4,'sleeping',true)`, [workspaceId, owner, randomUUID(), parentDevice])
++    const parent = async () => (await pool.query(`SELECT row_to_json(m) AS machine,row_to_json(d) AS device
++      FROM cloud_machines m JOIN devices d ON d.id=m."deviceId" WHERE m."workspaceId"=$1 AND m."ownerId"=$2`, [workspaceId, owner])).rows[0]
++    const before = await parent()
++    // This is the regression: the previous implementation returns null before
++    // invoking its provider because the parent is sleeping.
++    const first = await ensureBotCloudRuntime(pool, actor, firstBot, { harness: 'codex' })
++    assert.ok(first, 'a first task must not require waking its sleeping parent')
++    assert.deepEqual(await parent(), before, 'existing parent machine and device are byte-for-byte unchanged')
++    const claude = await ensureBotCloudRuntime(pool, actor, firstBot, { harness: 'claude_code' })
++    assert.ok(claude); assert.notEqual(claude.agentId, first.agentId)
++    const concurrent = await Promise.all(Array.from({ length: 3 }, () => ensureBotCloudRuntime(pool, actor, firstBot, { harness: 'codex' })))
++    assert.ok(concurrent.every(runtime => runtime?.agentId === first.agentId), 'repeat registration keeps one exact identity')
++    assert.equal(Number((await pool.query('SELECT count(*) FROM bot_cloud_runtimes WHERE "botId"=$1', [firstBot])).rows[0].count), 2)
++
++    await pool.query(`UPDATE cloud_machines SET state='running' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [workspaceId, owner])
++    const runningBefore = await parent(), secondBot = await bot('Second Bot'), thirdBot = await bot('Third Bot')
++    const created = await Promise.all([secondBot, thirdBot].map(botId => ensureBotCloudRuntime(pool, actor, botId, { harness: 'codex' })))
++    assert.ok(created.every(Boolean))
++    assert.deepEqual(await parent(), runningBefore, 'a running parent is unchanged too')
++    const desktops = (await pool.query('SELECT display FROM bot_desktops WHERE "workspaceId"=$1 AND "ownerId"=$2 ORDER BY display', [workspaceId, owner])).rows
++    assert.deepEqual(desktops.map(row => row.display), [1, 2, 3], 'concurrent new Bots reserve distinct displays')
++
++    const deniedBot = await bot('Denied Bot')
++    await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [parentDevice])
++    const disabledBefore = await parent()
++    assert.equal(await ensureBotCloudRuntime(pool, actor, deniedBot, { harness: 'codex' }), null)
++    assert.deepEqual(await parent(), disabledBefore, 'disabled device is not re-enabled or replaced')
++    assert.equal(Number((await pool.query('SELECT count(*) FROM bot_desktops WHERE "botId"=$1', [deniedBot])).rows[0].count), 0)
++    await pool.query('UPDATE devices SET enabled=true WHERE id=$1', [parentDevice])
++    const wrongWorkspace = randomUUID()
++    assert.equal(await ensureBotCloudRuntime(pool, { ...actor, workspaceId: wrongWorkspace }, firstBot, { harness: 'codex' }), null)
++    assert.equal(await ensureBotCloudRuntime(pool, { ...actor, userId: 'different-owner' }, firstBot, { harness: 'codex' }), null)
++    await pool.query('UPDATE bots SET "archivedAt"=now() WHERE id=$1', [deniedBot])
++    assert.equal(await ensureBotCloudRuntime(pool, actor, deniedBot, { harness: 'codex' }), null)
++    assert.equal(await ensureBotCloudRuntime(pool, actor, firstBot, { harness: 'unsupported' }), null)
++
++    // No parent computer has ever been started in this separate workspace.
++    const newWorkspace = randomUUID(), newBot = await bot('No parent', newWorkspace)
++    const fresh = await ensureBotCloudRuntime(pool, { ...actor, workspaceId: newWorkspace }, newBot, { harness: 'codex' })
++    assert.ok(fresh)
++    const declared = (await pool.query(`SELECT m.state,m."sandboxId",m."runtimeReady",d.enabled,d."lastSeenAt",d.harnesses
++      FROM cloud_machines m JOIN devices d ON d.id=m."deviceId" WHERE m."workspaceId"=$1 AND m."ownerId"=$2`, [newWorkspace, owner])).rows[0]
++    assert.deepEqual(declared, { state: 'sleeping', sandboxId: null, runtimeReady: false, enabled: true, lastSeenAt: null, harnesses: [] })
++    assert.equal(Number((await pool.query('SELECT count(*) FROM device_tokens WHERE "userId"=$1', [owner])).rows[0].count), 0, 'metadata creates no worker credentials')
++    const repos = (await pool.query(`SELECT repo."repoPath",repo."remoteUrl" FROM bot_cloud_runtimes r JOIN device_repos repo ON repo.id=r."repoId" WHERE r."botId"=$1`, [newBot])).rows
++    assert.equal(repos.length, 2)
++    assert.ok(repos.every(row => row.repoPath === `/home/user/.mikka/bot-workspaces/${newBot}` && row.remoteUrl === null))
++    assert.equal(Number((await pool.query('SELECT count(*) FROM cloud_machines WHERE "workspaceId"=$1', [wrongWorkspace])).rows[0].count), 0, 'unauthorized workspace leaves no metadata')
++  } finally {
++    await dropTestDatabase(admin, database, pool)
++    await admin.end()
++  }
++})
+diff --git a/lib/computer/task-runtime.ts b/lib/computer/task-runtime.ts
+new file mode 100644
+index 000000000..c73c1dd8d
+--- /dev/null
++++ b/lib/computer/task-runtime.ts
+@@ -0,0 +1,54 @@
++import 'server-only'
++import { randomUUID } from 'node:crypto'
++import type { Pool } from 'pg'
++import { z } from 'zod'
++import { botWorkspacePath } from './bot-workspace'
++import { recordBotRuntime } from './bot-runtime'
++
++/** Declare the Bot's task identities without allocating or contacting a parent
++ * VM. Official task templates supply their own harnesses; these rows are not
++ * a claim that a parent worker is online or has installed either harness. */
++export async function ensureBotTaskRuntime(pool: Pool, actor: { userId: string; workspaceId: string }, botId: string) {
++  z.uuid().parse(botId)
++  const client = await pool.connect()
++  try {
++    await client.query('BEGIN')
++    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`bot-runtime:${botId}`])
++    const bot = await client.query(`SELECT id FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3
++      AND "archivedAt" IS NULL FOR SHARE`, [botId, actor.userId, actor.workspaceId])
++    if (!bot.rowCount) throw new Error('Bot runtime unavailable')
++    await client.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId")
++      VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [actor.workspaceId, actor.userId, randomUUID()])
++    // This same machine lock serializes desktop numbering with explicit
++    // ComputerStore.operate. Existing state, leases and sandbox are untouched.
++    const machine = (await client.query(`SELECT "deviceId" FROM cloud_machines
++      WHERE "workspaceId"=$1 AND "ownerId"=$2 FOR UPDATE`, [actor.workspaceId, actor.userId])).rows[0]
++    if (!machine) throw new Error('Bot runtime unavailable')
++    let deviceId: string = machine.deviceId
++    if (deviceId) {
++      const device = await client.query(`SELECT id FROM devices WHERE id=$1 AND "ownerId"=$2
++        AND kind='cloud' AND enabled=true FOR SHARE`, [deviceId, actor.userId])
++      if (!device.rowCount) throw new Error('Bot runtime unavailable')
++    } else {
++      deviceId = randomUUID()
++      await client.query(`INSERT INTO devices (id,"ownerId",name,kind,"nameLocked")
++        VALUES ($1,$2,'Cloud computer','cloud',true)`, [deviceId, actor.userId])
++      await client.query(`UPDATE cloud_machines SET "deviceId"=$3 WHERE "workspaceId"=$1 AND "ownerId"=$2`,
++        [actor.workspaceId, actor.userId, deviceId])
++    }
++    const desktop = (await client.query(`SELECT "ownerId","workspaceId" FROM bot_desktops WHERE "botId"=$1 FOR UPDATE`, [botId])).rows[0]
++    if (desktop) {
++      if (desktop.ownerId !== actor.userId || desktop.workspaceId !== actor.workspaceId) throw new Error('Bot runtime unavailable')
++    } else {
++      const next = Number((await client.query(`SELECT coalesce(max(display),0)+1 AS n FROM bot_desktops
++        WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])).rows[0].n)
++      if (next > 999) throw new Error('Desktop limit reached')
++      await client.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,$4)`,
++        [botId, actor.workspaceId, actor.userId, next])
++    }
++    const rows = await recordBotRuntime(client, actor, botId, deviceId, botWorkspacePath(botId),
++      [{ harness: 'claude_code' }, { harness: 'codex' }])
++    await client.query('COMMIT')
++    return rows
++  } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
++}
+diff --git a/lib/factory/automatic-dispatch.ts b/lib/factory/automatic-dispatch.ts
+index 3872e982d..c405d648b 100644
+--- a/lib/factory/automatic-dispatch.ts
++++ b/lib/factory/automatic-dispatch.ts
+@@ -6,10 +6,8 @@ import { chooseCloudRunModel, chooseLocalRunModel, threadRunModel } from '@/lib/
+ import { deviceOnlineStates } from '@/lib/device-presence'
+ import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
+ import { ensureDeviceRepository } from '@/lib/device-repositories'
+-import { withDatabaseClient } from '@/lib/db'
+ import { tiptapToText } from '@/lib/tiptap-text'
+-import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding } from './dispatch'
+-import { configureFactoryCheck } from './checks'
++import { createFactoryDispatch, factoryBinding } from './dispatch'
+ import { checkFactoryRepairBudget } from './check-recovery-evidence'
+ import { FactoryError } from './contract'
+ import { notifyDeviceWork } from '../device-gateway-notify'
+@@ -75,7 +73,7 @@ export function automaticFactoryDispatch(pool: Pool) {
+         if ('error' in model) continue
+         agentId = target.id
+         deviceId = target.deviceId
+-        deviceRepoId = (await withDatabaseClient(tx, () => ensureDeviceRepository(task.userId, target.deviceId, source.remoteUrl))).id
++        deviceRepoId = (await ensureDeviceRepository(task.userId, target.deviceId, source.remoteUrl, tx)).id
+         // This is a same-model recovery, not a new explicit model request.
+         selection = { ...model, modelDispatch: source.agentDefinition?.modelDispatch, ...inheritedPolicy }
+         selected = true
+@@ -95,19 +93,14 @@ export function automaticFactoryDispatch(pool: Pool) {
+     const model = check ? await chooseCloudRunModel(pool, { ownerId: task.userId, workspaceId: source.workspaceId, botId: task.botId }, runtime.agentId, source.harness, undefined, source.remoteUrl ? 'task' : 'desktop') : selection
+     if ('error' in model || !('model' in model) || typeof model.model !== 'string') throw new FactoryError('factoryCheckHarnessUnavailable')
+     const cloudModel = model.model
+-    const repoId = source.remoteUrl ? (await withDatabaseClient(tx, () => ensureDeviceRepository(task.userId, runtime.deviceId, source.remoteUrl))).id : runtime.repoId
++    const repoId = source.remoteUrl ? (await ensureDeviceRepository(task.userId, runtime.deviceId, source.remoteUrl, tx)).id : runtime.repoId
+     const { rows: [issue] } = await tx.query('SELECT title,content FROM issues WHERE id=$1', [task.issueId])
+     const actor = { userId: task.userId, workspaceId: source.workspaceId as string }
+-    const factoryStage = { binding: factoryBinding(task), sourceEventId: task.sourceEventId, sourceRunId: source.id as string }
+     const dispatch = createFactoryDispatch(pool, store, (client, _owner, _input, _bot, context) => queueCloudRun(pool, actor, {
+       botId: source.runtimeBotId, issueId: task.issueId, agentId: runtime.agentId, deviceRepoId: repoId, title: issue.title, body: tiptapToText(issue.content), ...model, model: cloudModel, ...inheritedPolicy,
+       withoutBot: task.botId === null, readOnly: check || source.agentDefinition?.readOnly, idempotencyKey: `factory:${context.attemptId}`,
+       allowLocalRecovery: source.agentDefinition?.allowLocalRecovery, sourceEventId: context.sourceEventId,
+-    }, client, factoryStage), { ...defaultFactoryDispatchAdapters, configure: {
+-      ...defaultFactoryDispatchAdapters.configure,
+-      review: (client, current, id) => configureFactoryCheck(client, current, id, undefined, factoryStage),
+-      verify: (client, current, id) => configureFactoryCheck(client, current, id, undefined, factoryStage),
+-    } })
++    }, client))
+     const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId: runtime.agentId, deviceRepoId: repoId }, tx)
+     if (!check) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
+     return async () => {
+diff --git a/lib/factory/check-observations.test.ts b/lib/factory/check-observations.test.ts
+index 245a4a66e..55b1b0a12 100644
+--- a/lib/factory/check-observations.test.ts
++++ b/lib/factory/check-observations.test.ts
+@@ -11,11 +11,15 @@ test('independent delivery prompt carries host execution observations and usable
+   const tx = { query: async (sql: string, args: unknown[]) => {
+     if (sql.startsWith('SELECT c.*')) return { rows: [{ id: 'candidate', kind: 'deliverable', executionSha: sha,
+       deviceId: 'device', deviceRepoId: 'repo', environment: 'device:device', repository: '/delivery', repoPath: '/delivery',
+-      remoteUrl: null, enabled: true, deviceKind: 'cloud', cloudOnline: true, harness: 'claude_code',
++      remoteUrl: null, enabled: true, deviceKind: 'cloud', runtimeBotId: 'bot', runtimeWorkspaceId: 'workspace', agentId: 'agent', harness: 'claude_code',
+       harnesses: [{ harness: 'claude_code', installed: true }],
+       producerExecution: { runId: 'producer', sessionId: 'native-session', status: 'succeeded', model: 'deepseek-flash', harness: 'claude_code', observedModel: null },
+       producerDefinition: { apiKey: 'private-key-must-not-appear' }, producerReport: { summary: 'Produced the file.' },
+     }] }
++    if (sql.startsWith('SELECT m."deviceId"')) {
++      assert.deepEqual(args, ['bot', 'owner', 'workspace', 'agent', 'repo'])
++      return { rows: [{ deviceId: 'device', harness: 'claude_code' }] }
++    }
+     if (sql.startsWith('SELECT c.id,c.kind')) return { rows: [{ id: 'candidate', kind: 'deliverable', reportedSha: sha }] }
+     if (sql.includes('FROM run_chunks i JOIN run_chunks o')) {
+       assert.deepEqual(args, ['producer', 'native-session', 'owner', 'issue', 'candidate', 'task'])
+diff --git a/lib/factory/checks.db.test.ts b/lib/factory/checks.db.test.ts
+index 13c1d4daa..4fd6999ec 100644
+--- a/lib/factory/checks.db.test.ts
++++ b/lib/factory/checks.db.test.ts
+@@ -33,6 +33,8 @@ import {
+ } from "./dispatch";
+ import { createFactoryClaim } from "./claim";
+ import { createFactoryQuestions, questionReference } from "./questions/store";
++import { queueCloudQuestionContinuation } from "./questions/queue-continuation";
++import { cloudTaskTarget, ownedCloudTaskTarget } from "../computer/cloud-task-target";
+ import { humanQuestionAnswerSchema, questionFingerprint } from './questions/contract';
+ import { factoryEventId } from './event-id';
+ import { handleFactoryQuestion } from "./questions/http";
+@@ -414,12 +416,17 @@ test(
+           reason: "Independent review",
+         });
+       }
+-      const start = async (task: FactoryTask) =>
+-        dispatch("owner", {
++      const start = async (task: FactoryTask) => {
++        // A positive local-device fixture represents a daemon which is still
++        // online. Refresh its real heartbeat for each dispatch, rather than
++        // relying on the suite finishing inside the 60-second presence window.
++        await db.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1 AND "ownerId"=\'owner\' AND kind=\'local\'', [deviceId]);
++        return dispatch("owner", {
+           binding: factoryBinding(task),
+           agentId,
+           deviceRepoId: repoId,
+         });
++      };
+       async function terminal(
+         id: string,
+         session: string,
+@@ -500,6 +507,38 @@ test(
+           );
+       }
+       const state = (id: string) => store.read("owner", id);
++      await t.test('a stale local heartbeat rejects direct dispatch until the same pending check receives a real fresh heartbeat', async () => {
++        const pending = await pendingReview();
++        const before = await state(pending.task.id);
++        const runsBefore = (await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [pending.task.issueId])).rows;
++        const gateway = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET };
++        delete process.env.DEVICE_GATEWAY_URL;
++        delete process.env.DEVICE_GATEWAY_PUSH_SECRET;
++        try {
++          await db.query('UPDATE devices SET "lastSeenAt"=now()-interval \'61 seconds\' WHERE id=$1', [deviceId]);
++          const stale = (await db.query('SELECT "lastSeenAt" FROM devices WHERE id=$1', [deviceId])).rows[0].lastSeenAt;
++          await assert.rejects(dispatch("owner", { binding: factoryBinding(pending.task), agentId, deviceRepoId: repoId }),
++            (error: unknown) => error instanceof FactoryError && error.code === 'factoryCheckHarnessUnavailable');
++          assert.deepEqual(await state(pending.task.id), before, 'failed admission leaves the exact pending check intact');
++          assert.deepEqual((await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [pending.task.issueId])).rows,
++            runsBefore, 'the rejected dispatch cannot commit an orphan run');
++
++          const accepted = await start(pending.task);
++          const heartbeat = (await db.query('SELECT "lastSeenAt","lastSeenAt"<=clock_timestamp() AS "notFuture" FROM devices WHERE id=$1', [deviceId])).rows[0];
++          assert.ok(heartbeat.lastSeenAt.getTime() > stale.getTime());
++          assert.equal(heartbeat.notFuture, true, 'the fixture uses a real current heartbeat, never a future timestamp');
++          assert.ok(accepted.runId);
++          assert.equal((await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1', [pending.task.issueId])).rowCount, runsBefore.length + 1);
++          const admitted = await state(pending.task.id);
++          assert.equal(admitted.task.candidateId, pending.task.candidateId);
++          assert.equal(admitted.task.stage, 'review');
++          await store.apply("owner", factoryBinding(admitted.task), randomUUID(), { action: "cancel", reason: "Presence fixture complete" });
++        } finally {
++          await db.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId]);
++          if (gateway.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = gateway.url;
++          if (gateway.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = gateway.secret;
++        }
++      });
+       for (const stage of ["review", "verify"] as const) {
+         for (const prerequisite of ["harness"] as const) {
+           await t.test(
+@@ -892,6 +931,124 @@ test(
+             );
+           },
+         );
++      for (const phase of ['review', 'verify'] as const) for (const machineState of ['running', 'paused'] as const)
++        await t.test(phase + ' question continuation keeps its owned ' + machineState + ' VM, issue, candidate and original session without a parent runtime', async () => {
++          const pending = await pendingReview();
++          let origin = await start(pending.task);
++          if (phase === 'verify') {
++            await terminal(origin.runId, 'review-' + pending.task.id);
++            await reconcile('owner');
++            origin = await start((await state(pending.task.id)).task);
++          }
++          const childDevice = randomUUID(), childRepo = randomUUID(), connectionId = randomUUID(), credentialId = randomUUID();
++          const nativeSession = 'original-question-' + origin.runId, sandboxId = 'retained-question-' + origin.runId;
++          await db.query("INSERT INTO devices(id,\"ownerId\",name,kind,enabled,\"lastSeenAt\",harnesses) VALUES($1,'owner','Retained task','cloud',true,now()-interval '1 hour','[{\"harness\":\"codex\",\"installed\":true}]')", [childDevice]);
++          await db.query("INSERT INTO device_repos(id,\"deviceId\",\"userId\",\"repoPath\",\"remoteUrl\",\"baseBranch\",\"verifyCommand\") VALUES($1,$2,'owner','/retained','/fixture/repo','main',$3)", [childRepo, childDevice, command]);
++          await db.query("INSERT INTO byos_connections(id,\"ownerId\",\"workspaceId\",state,epoch,provider,\"secretName\",\"providerSubject\",\"secretDigest\") VALUES($1,'owner',$2,'connected',1,'codex','synthetic-retained-question-' || $1::uuid::text,'synthetic-subject',repeat('a',64))", [connectionId, billingWorkspaceId]);
++          await db.query("INSERT INTO byos_bindings(id,\"ownerId\",\"workspaceId\",\"consumerId\",\"connectionId\",\"connectionRevision\",route,\"modelId\") VALUES($1,'owner',$2,$3,$4,1,'codex_cli','fixture-model')", [credentialId, billingWorkspaceId, agentId, connectionId]);
++          const definition = freezeWorkerDefinition({ harness: 'codex', instructions: 'Frozen fixture', prompt: 'Original check', parent: null, executionId: null, model: 'fixture-model', subscription: { id: credentialId, modelId: 'fixture-model', route: 'codex_cli' } });
++          await db.query("UPDATE agent_runs SET \"deviceId\"=$2,\"deviceRepoId\"=$3,\"agentDefinition\"=$4,status='stopped',\"stopReason\"='asked_human',\"sessionId\"=$5,report=$6 WHERE id=$1",
++            [origin.runId, childDevice, childRepo, JSON.stringify(definition), nativeSession, JSON.stringify({ question: { questionId: randomUUID(), kind: 'decision', question: 'Which acceptance path?', options: ['A', 'B'] } })]);
++          await db.query('INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES($1,$2,$3,\'owner\')', [origin.runId, coordinatorBot, billingWorkspaceId]);
++          await db.query('INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId") VALUES($1,$2,\'owner\',$3,$4,\'codex\',$5,$6,$7,$8,$9)',
++            [origin.runId, billingWorkspaceId, coordinatorBot, pending.task.issueId, randomUUID(), machineState, sandboxId, childDevice, childRepo]);
++          // This is the task-device reassignment normally performed when the
++          // first check VM is created. No parent metadata or provider is mocked.
++          await db.query("UPDATE factory_attempts SET output=jsonb_set(jsonb_set(output,'{check,deviceRepoId}',to_jsonb($2::text)),'{check,environment}',to_jsonb($3::text)) WHERE id=$1",
++            [origin.task.attemptId, childRepo, 'device:' + childDevice]);
++          const cloudDispatch = createFactoryDispatch(db, store, async (tx, owner, input, botId, context) => {
++            const result = await queueCloudQuestionContinuation(tx, owner, input, botId, context);
++            assert.ok(result, 'The normal cloud continuation must not use a new-run fallback');
++            return result;
++          });
++          const cloudQuestions = createFactoryQuestions(db, authorize, store, cloudDispatch, assignment);
++          const q = await cloudQuestions.record('owner', origin.runId);
++          const browserSessionId = randomUUID();
++          await db.query('INSERT INTO "session"(id,"userId",token,"expiresAt","createdAt","updatedAt") VALUES($1,\'owner\',$2,now()+interval \'1 hour\',now(),now())', [browserSessionId, randomUUID()]);
++          const beforeRun = (await db.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=$1', [origin.runId])).rows;
++          const beforeCandidate = (await db.query('SELECT to_jsonb(c) AS candidate FROM factory_candidates c WHERE id=$1', [pending.task.candidateId])).rows;
++          const answer = { reference: questionReference(q), answerId: randomUUID(), text: 'A' };
++          // A retained VM relies on its actual worker capabilities, unlike a
++          // fresh task whose official template supplies the harness.
++          await db.query('UPDATE devices SET harnesses=\'[]\' WHERE id=$1', [childDevice]);
++          const waitingBefore = await state(pending.task.id);
++          const runsBefore = (await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [pending.task.issueId])).rows;
++          try {
++            await assert.rejects(cloudQuestions.answer({ source: 'human', userId: 'owner', sessionId: browserSessionId }, answer),
++              (error: unknown) => error instanceof FactoryError && error.code === 'factoryCheckHarnessUnavailable');
++            assert.deepEqual(await state(pending.task.id), waitingBefore);
++            assert.deepEqual((await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [pending.task.issueId])).rows, runsBefore);
++          } finally {
++            await db.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [childDevice, JSON.stringify([{ harness: 'codex', installed: true }])]);
++          }
++          const resumed = await cloudQuestions.answer({ source: 'human', userId: 'owner', sessionId: browserSessionId }, answer);
++          const run = (await db.query('SELECT * FROM agent_runs WHERE id=$1', [resumed.continuationRunId])).rows[0];
++          assert.equal(run.issueId, pending.task.issueId);
++          assert.equal(run.botId, coordinatorBot);
++          assert.equal(run.deviceId, childDevice);
++          assert.equal(run.deviceRepoId, childRepo);
++          assert.equal(run.questionContinuation.originSessionId, nativeSession);
++          assert.equal(run.questionContinuation.requiredSandboxId, sandboxId);
++          assert.equal(run.agentDefinition.definitionDigest, definition.definitionDigest);
++          assert.deepEqual(run.agentDefinition.subscription, definition.subscription);
++          assert.equal((await state(pending.task.id)).task.candidateId, pending.task.candidateId);
++          assert.deepEqual((await db.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=$1', [origin.runId])).rows, beforeRun);
++          assert.deepEqual((await db.query('SELECT to_jsonb(c) AS candidate FROM factory_candidates c WHERE id=$1', [pending.task.candidateId])).rows, beforeCandidate);
++          assert.deepEqual((await db.query('SELECT state,"sandboxId" FROM thread_machines WHERE "runId"=$1', [origin.runId])).rows[0], { state: 'ended', sandboxId: null });
++          assert.deepEqual((await db.query('SELECT state,"sandboxId","deviceId","repoId" FROM thread_machines WHERE "runId"=$1', [run.id])).rows[0], { state: machineState, sandboxId, deviceId: childDevice, repoId: childRepo });
++          const tx = await db.connect();
++          try {
++            await tx.query('BEGIN');
++            const actor = { userId: 'owner', workspaceId: billingWorkspaceId };
++            const input = { botId: coordinatorBot, agentId, deviceRepoId: childRepo, runId: run.id, issueId: run.issueId };
++            assert.equal(await cloudTaskTarget(tx, actor, input), null, 'A task VM cannot be used as a fresh parent runtime');
++            assert.equal((await ownedCloudTaskTarget(tx, actor, input))?.deviceId, childDevice);
++            for (const bad of [{ ...input, botId: randomUUID() }, { ...input, runId: origin.runId }, { ...input, runId: randomUUID() }, { ...input, agentId: randomUUID() }, { ...input, deviceRepoId: repoId }, { ...input, issueId: randomUUID() }])
++              assert.equal(await ownedCloudTaskTarget(tx, actor, bad), null);
++            assert.equal(await ownedCloudTaskTarget(tx, { ...actor, userId: 'other' }, input), null);
++            assert.equal(await ownedCloudTaskTarget(tx, { ...actor, workspaceId: randomUUID() }, input), null);
++            const otherBot = randomUUID();
++            await tx.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,\'owner\',\'Other fixture bot\')', [otherBot, billingWorkspaceId]);
++            for (const [sql, params] of [
++              ['UPDATE computer_run_bindings SET "botId"=$2 WHERE "runId"=$1', [run.id, otherBot]],
++              ['UPDATE thread_machines SET "botId"=$2 WHERE "runId"=$1', [run.id, otherBot]],
++              ['UPDATE agent_runs SET "botId"=$2 WHERE id=$1', [run.id, otherBot]],
++              ['UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [run.id, deviceId]],
++              ['UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1', [run.id, repoId]],
++              ['UPDATE thread_machines SET "deviceId"=$2 WHERE "runId"=$1', [run.id, deviceId]],
++              ['UPDATE thread_machines SET "repoId"=$2 WHERE "runId"=$1', [run.id, repoId]],
++              ['UPDATE devices SET enabled=false WHERE id=$1', [childDevice]],
++              ["UPDATE thread_machines SET state='ended',\"sandboxId\"=NULL WHERE \"runId\"=$1", [run.id]],
++            ] as const) {
++              await tx.query('SAVEPOINT custody');
++              await tx.query(sql, [...params]);
++              assert.equal(await ownedCloudTaskTarget(tx, actor, input), null, sql);
++              await tx.query('ROLLBACK TO SAVEPOINT custody');
++            }
++            // Admission preserves a paused/stale task VM. Its worker still has
++            // to reconnect before claim; this is independent of parent state.
++            const cloudClaim = createFactoryClaim(store, cloudQuestions, assignment);
++            await tx.query('SAVEPOINT worker_not_ready');
++            await assert.rejects(cloudClaim(tx, 'owner', childDevice, run.id, new Date(Date.now() + 60000).toISOString()),
++              (error: unknown) => error instanceof FactoryError && error.code === 'factoryQuestionContinuationUnavailable');
++            await tx.query('ROLLBACK TO SAVEPOINT worker_not_ready');
++            await tx.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [childDevice]);
++            await tx.query("UPDATE thread_machines SET state='running' WHERE \"runId\"=$1", [run.id]);
++            const extras = await cloudClaim(tx, 'owner', childDevice, run.id, new Date(Date.now() + 60000).toISOString());
++            assert.equal(extras.requireSessionResume, true);
++            assert.equal(extras.resumeSessionId, nativeSession);
++            assert.equal(extras.baseBranch, sha);
++            assert.deepEqual(extras.factoryCheck, { stage: phase, inferCommand: false, reportOnly: false });
++            assert.equal(extras.verifyCommand, command);
++          } finally { await tx.query('ROLLBACK'); tx.release(); }
++          const replayed = await cloudQuestions.answer({ source: 'human', userId: 'owner', sessionId: browserSessionId }, answer);
++          assert.equal(replayed.continuationRunId, run.id);
++          assert.equal(replayed.replayed, true);
++          await terminal(run.id, nativeSession);
++          if (phase === 'verify') await toolChunks(run.id);
++          await reconcile('owner');
++          assert.equal((await state(pending.task.id)).task.stage, phase === 'review' ? 'verify' : 'approval');
++        });
+       for (const kind of ['deliverable', 'report'] as const)
+         for (const phase of ['review', 'verify'] as const)
+           await t.test(`a ${kind} ${phase} question cannot turn an Owner explanation into a verification command`, async () => {
+@@ -1010,6 +1167,7 @@ test(
+             assert.equal(completed.attempts.find(a => a.runId === running.runId)!.status, 'waiting', 'old waiting attempt is not rewritten as passed');
+             assert.equal(completed.task.stage, phase === 'review' ? 'verify' : 'approval');
+           });
++
+       for (const phase of ["review", "verify"] as const)
+         for (const failed of [false, true])
+           await t.test(
+@@ -2125,6 +2283,185 @@ test(
+           }
+         },
+       );
++      await t.test('first-use cloud automatic review and verify use fresh task capabilities without waking or installing a parent', async () => {
++        const names = ['WORKSPACE_SECRETS_KEY', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_BYOS_ENABLED', 'NEXT_PUBLIC_POSTHOG_KEY'] as const;
++        const saved = new Map(names.map(name => [name, process.env[name]]));
++        process.env.WORKSPACE_SECRETS_KEY = createHash('sha256').update(randomUUID()).digest('hex');
++        process.env.MIKKA_CLOUD_COMPUTER_TASKS = '1';
++        process.env.MIKKA_BYOS_ENABLED = '1';
++        delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
++        const { fakeThreadMachines } = await import('../../tests/support/thread-machine-fake');
++        const machines = await fakeThreadMachines(db, [{ harness: 'codex', installed: true, toolApproval: true }]);
++        const { factoryAutomaticRuntime, automaticFactoryDispatch } = await import('./automatic-dispatch');
++        const { ensureBotCloudRuntime } = await import('../computer/auto-runtime');
++        const { threadMachineProvider } = await import('../cloud-computer/thread-machines');
++        const { chooseCloudRunModel } = await import('../computer/run-model');
++        const { queueCloudRun } = await import('../computer/queue-run');
++        const { ensureDeviceRepository } = await import('../device-repositories');
++        const { setE2BKey } = await import('../secrets/e2b');
++        const { addApiKey } = await import('../model-api-keys');
++        const { changeOrder } = await import('../model-order');
++        const { workspacePool } = await import('../workspace-db');
++        assert.equal(workspacePool.options.connectionString, url, 'membership uses the same validated loopback service');
++        let membershipFixture: { userId: string; workspaceId: string } | undefined;
++        const taskCreate = threadMachineProvider.create;
++        const createdTaskRuns: string[] = [];
++        threadMachineProvider.create = async (...args) => {
++          assert.equal(typeof args[2].runId, 'string');
++          createdTaskRuns.push(args[2].runId);
++          return taskCreate(...args);
++        };
++        const queuedHandoffs: string[] = [];
++        factoryAutomaticRuntime.enqueue = async (_pool, _actor, _previous, runId) => {
++          assert.equal((await db.query('SELECT status FROM agent_runs WHERE id=$1', [runId])).rows[0]?.status, 'queued');
++          queuedHandoffs.push(runId);
++        };
++        const providerCount = networkRequests.length;
++        try {
++          await modelDatabase!.run(async () => {
++            const userId = `fresh-check-${randomUUID()}`, workspaceId = randomUUID(), botId = randomUUID();
++            const actor = { userId, workspaceId }, scope = { ownerId: userId, workspaceId, botId };
++            membershipFixture = { userId, workspaceId };
++            // App scope is this suite's fresh database; the normal workspace
++            // adapter has its own real loopback PG pool, not the app ALS scope.
++            for (const target of [db, workspacePool]) {
++              await target.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Fresh check',$2,true,now(),now())`, [userId, `${userId}@example.invalid`]);
++              await target.query('INSERT INTO mikka_workspaces(id,"userId",name,slug) VALUES($1,$2,\'Fresh check\',$3)', [workspaceId, userId, `fresh-${workspaceId}`]);
++              await target.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,'Fresh check',$3,'admin','active')`, [workspaceId, userId, `${userId}@example.invalid`]);
++            }
++            await db.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,\'Fresh task Bot\')', [botId, workspaceId, userId]);
++            await setE2BKey(userId, workspaceId, { apiKey: `e2b-offline-fixture-${randomUUID()}` }, { verify: async () => ({ ok: true }) });
++            const key = await addApiKey(db, userId, { provider: 'deepseek', apiKey: `sk-offline-fixture-${randomUUID()}` },
++              { fetch: (async () => Response.json({ data: [{ id: 'deepseek-flash' }] })) as typeof fetch });
++            await changeOrder(db, scope, { kind: 'location', location: 'cloud' });
++            await changeOrder(db, scope, { kind: 'add', entries: [{ harness: 'codex', model: 'deepseek-flash', source: { kind: 'api_key', keyId: key.id } }] });
++            const runtime = await ensureBotCloudRuntime(db, actor, botId, { harness: 'codex' });
++            assert.ok(runtime);
++            const otherBot = randomUUID();
++            await db.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,\'Other owned Bot\')', [otherBot, workspaceId, userId]);
++            assert.ok(await ensureBotCloudRuntime(db, actor, otherBot, { harness: 'codex' }));
++            const parent = async () => (await db.query(`SELECT to_jsonb(m) AS machine,to_jsonb(d) AS device FROM cloud_machines m JOIN devices d ON d.id=m."deviceId"
++              WHERE m."ownerId"=$1 AND m."workspaceId"=$2`, [userId, workspaceId])).rows[0];
++            const beforeParent = await parent(), parentId = beforeParent.device.id;
++            assert.deepEqual([beforeParent.machine.state, beforeParent.machine.sandboxId, beforeParent.machine.runtimeReady,
++              beforeParent.device.lastSeenAt, beforeParent.device.harnesses], ['sleeping', null, false, null, []]);
++            const remote = 'https://github.com/mikka-ci/fresh-cloud-check-fixture.git';
++            const repository = await ensureDeviceRepository(userId, parentId, remote);
++            await db.query('UPDATE device_repos SET "verifyCommand"=$2 WHERE id=$1', [repository.id, command]);
++            const selected = await chooseCloudRunModel(db, scope, runtime.agentId, 'codex', undefined, 'task');
++            assert.ok(!('error' in selected), JSON.stringify(selected));
++            const cloudStore = createFactoryStore(db, authorize, botId, { independent: factoryCheckIndependent, gates: factoryCheckGates });
++            const initialDispatch = createFactoryDispatch(db, cloudStore, (tx, _user, input) => queueCloudRun(db, actor, {
++              botId, issueId: input.issueId, agentId: runtime.agentId, deviceRepoId: repository.id,
++              title: 'Fresh cloud check', body: 'Offline real admission fixture', readOnly: true, ...selected,
++            }, tx));
++            const issueId = randomUUID(), sourceEventId = randomUUID();
++            await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Fresh check','{}','todo','normal')`, [issueId, userId]);
++            await db.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1::uuid,$2,$3,'user_message',$1::text,'{"text":"Fresh cloud check"}')`, [sourceEventId, userId, botId]);
++            let current = await cloudStore.route(userId, { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Fresh task fixture', missingInformation: [], missingPermissions: [], needsSpec: false });
++            const execute = await initialDispatch(userId, { binding: factoryBinding(current.task), agentId: runtime.agentId, deviceRepoId: repository.id });
++            const producerWorker = await machines.start(actor, execute.runId);
++            assert.notEqual(producerWorker.deviceId, parentId);
++            await terminal(execute.runId, `producer-${issueId}`, false, report => { report.publish = { commit: sha }; });
++            current = await cloudStore.apply(userId, execute.binding, randomUUID(), { action: 'candidate', runId: execute.runId,
++              candidate: { sha, repository: remote, environment: `device:${producerWorker.deviceId}`, scope: `issue:${issueId}` } });
++            current = await cloudStore.apply(userId, factoryBinding(current.task), randomUUID(), { action: 'finish', status: 'passed', reason: 'Offline worker report fixture',
++              evidence: [{ artifact: `run-report:${execute.runId}`, kind: 'report', runId: execute.runId, sessionId: `producer-${issueId}`,
++                candidateId: current.task.candidateId, sha, environment: `device:${producerWorker.deviceId}`, recordedAt: new Date().toISOString() }], output: {} });
++            current = await cloudStore.apply(userId, factoryBinding(current.task), randomUUID(), { action: 'advance', stage: 'review', reason: 'Independent check' });
++            const candidateBefore = (await db.query('SELECT to_jsonb(c) AS value FROM factory_candidates c WHERE id=$1', [current.task.candidateId])).rows[0].value;
++            const automatic = automaticFactoryDispatch(db);
++            const cloudQuestions = createFactoryQuestions(db, authorize, cloudStore, initialDispatch, assignment);
++            const cloudReconcile = createFactoryReconciler(db, cloudStore, cloudQuestions, { review: reconcileFactoryCheck, verify: reconcileFactoryCheck }, botId);
++            for (const stage of ['review', 'verify'] as const) {
++              assert.equal(current.task.stage, stage);
++              assert.equal(current.task.status, 'pending');
++              const before = await cloudStore.read(userId, current.task.id);
++              const beforeRuns = (await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [issueId])).rows;
++              const producer = (await db.query('SELECT * FROM agent_runs WHERE id=$1', [execute.runId])).rows[0];
++              // These actual dispatch refusals must roll back the whole queue.
++              for (const [sql, params, code] of [
++                ['UPDATE devices SET enabled=false WHERE id=$1', [parentId], 'Bot computer task is unavailable'],
++                ['DELETE FROM bot_cloud_runtimes WHERE "botId"=$1 AND harness=\'codex\'', [botId], 'factoryRunMismatch'],
++                ['UPDATE factory_candidates SET repository=\'/wrong/repository\' WHERE id=$1', [current.task.candidateId], 'factoryEvidenceMismatch'],
++              ] as const) {
++                const tx = await db.connect();
++                try {
++                  await tx.query('BEGIN');
++                  await tx.query('UPDATE factory_tasks SET reason=\'Uncommitted caller change\' WHERE id=$1', [current.task.id]);
++                  await tx.query(sql, [...params]);
++                  await assert.rejects(automatic(tx, cloudStore, current.task, producer),
++                    (error: unknown) => error instanceof FactoryError ? error.code === code : error instanceof Error && error.message === code);
++                } finally { await tx.query('ROLLBACK'); tx.release(); }
++                assert.deepEqual(await parent(), beforeParent, 'automatic dispatch must not commit the caller\'s disabled parent before rejecting');
++                assert.deepEqual(await cloudStore.read(userId, current.task.id), before);
++                assert.deepEqual((await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [issueId])).rows, beforeRuns);
++              }
++              const tx = await db.connect();
++              let afterCommit: (() => Promise<void>) | void;
++              try {
++                await tx.query('BEGIN');
++                afterCommit = await automatic(tx, cloudStore, current.task, producer);
++                assert.equal(typeof afterCommit, 'function', 'the real automatic dispatcher must reach the independent fresh task');
++                const runId = (await tx.query('SELECT "runId" FROM factory_attempts WHERE id=$1', [current.task.attemptId])).rows[0].runId;
++                const freshTargetInput: Parameters<typeof cloudTaskTarget>[2] = { botId, agentId: runtime.agentId, deviceRepoId: repository.id };
++                assert.equal(await cloudTaskTarget(tx, { ...actor, workspaceId: billingWorkspaceId }, freshTargetInput), null);
++                assert.equal(await cloudTaskTarget(tx, { ...actor, userId: 'owner' }, freshTargetInput), null);
++                await assert.rejects(configureFactoryCheck(tx, { ...before.task, userId: 'owner' }, runId),
++                  (error: unknown) => error instanceof FactoryError && error.code === 'factoryEvidenceMismatch');
++                // The fresh-template exception grants no other Bot, Agent,
++                // workspace, owner or repository authority to this queue.
++                for (const [sql, params, code] of [
++                  ['UPDATE agents SET harness=\'claude_code\' WHERE id=$1', [runtime.agentId], 'factoryCheckHarnessUnavailable'],
++                  ['UPDATE computer_run_bindings SET "botId"=$2 WHERE "runId"=$1', [runId, otherBot], 'factoryCheckHarnessUnavailable'],
++                  ['UPDATE agent_runs SET "questionContinuation"=jsonb_build_object(\'originRunId\',$2::text,\'originSessionId\',$3::text,\'requireSessionResume\',true) WHERE id=$1', [runId, execute.runId, `producer-${issueId}`], 'factoryCheckHarnessUnavailable'],
++                  ['UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1', [runId, repoId], 'factoryEvidenceMismatch'],
++                ] as const) {
++                  await tx.query('SAVEPOINT capability_fence');
++                  await tx.query(sql, [...params]);
++                  await assert.rejects(configureFactoryCheck(tx, before.task, runId),
++                    (error: unknown) => error instanceof FactoryError && error.code === code, sql);
++                  await tx.query('ROLLBACK TO SAVEPOINT capability_fence');
++                }
++                await tx.query('COMMIT');
++              } catch (error) { await tx.query('ROLLBACK'); throw error; } finally { tx.release(); }
++              await afterCommit!();
++              current = await cloudStore.read(userId, current.task.id);
++              const attempt = current.attempts.find(item => item.id === current.task.attemptId)!;
++              const checkRun = (await db.query('SELECT * FROM agent_runs WHERE id=$1', [attempt.runId])).rows[0];
++              assert.equal(checkRun.deviceId, parentId, 'queue binds enabled metadata before independent task startup');
++              assert.equal(checkRun.agentDefinition.model, 'deepseek-flash');
++              assert.deepEqual(checkRun.agentDefinition.apiKey, { keyId: key.id, model: 'deepseek-flash' });
++              assert.equal(checkRun.agentDefinition.readOnly, true);
++              assert.equal(checkRun.kind, 'acceptance');
++              assert.equal(checkRun.baseBranch, sha);
++              assert.equal((attempt.output.check as { stage: string }).stage, stage);
++              const worker = await machines.start(actor, checkRun.id);
++              assert.notEqual(worker.deviceId, parentId);
++              assert.notEqual(worker.deviceId, producerWorker.deviceId);
++              await terminal(checkRun.id, `${stage}-${issueId}`);
++              if (stage === 'verify') await toolChunks(checkRun.id);
++              await cloudReconcile.run(userId, checkRun.id);
++              current = await cloudStore.read(userId, current.task.id);
++              assert.equal(current.task.stage, stage === 'review' ? 'verify' : 'approval');
++              assert.deepEqual((await db.query('SELECT to_jsonb(c) AS value FROM factory_candidates c WHERE id=$1', [current.task.candidateId])).rows[0].value, candidateBefore);
++              assert.deepEqual(await parent(), beforeParent, 'parent state, heartbeat and empty capability report are unchanged');
++            }
++            assert.equal(queuedHandoffs.length, 2);
++            assert.deepEqual(createdTaskRuns, [execute.runId, ...queuedHandoffs], 'only the three independent task VMs are requested');
++            assert.equal(networkRequests.length, providerCount, 'no model request occurred');
++          });
++        } finally {
++          machines.restore();
++          if (membershipFixture) {
++            await workspacePool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [membershipFixture.workspaceId]);
++            await workspacePool.query('DELETE FROM mikka_workspaces WHERE id=$1', [membershipFixture.workspaceId]);
++            await workspacePool.query('DELETE FROM "user" WHERE id=$1', [membershipFixture.userId]);
++          }
++          await workspacePool.end();
++          for (const name of names) { const value = saved.get(name); if (value === undefined) delete process.env[name]; else process.env[name] = value; }
++        }
++      });
+     } finally {
+       if (installedGatewayFixture) delete process.env.AI_GATEWAY_API_KEY;
+       await modelDatabase?.close();
+diff --git a/lib/factory/checks.ts b/lib/factory/checks.ts
+index d8ae0d864..9db4e2d7b 100644
+--- a/lib/factory/checks.ts
++++ b/lib/factory/checks.ts
+@@ -1,6 +1,6 @@
+ import { factoryRunBotMatches } from './run-scope'
++import { cloudTaskTarget, ownedCloudTaskTarget } from '../computer/cloud-task-target'
+ import { runListChanged } from '../live/lists'
+-import type { FactoryCloudStageAdmission } from './cloud-stage-admission'
+ import type { Pool, PoolClient } from "pg";
+ import { isDeepStrictEqual } from 'node:util';
+ import { orchestratorSettings } from '@mikka/protocol/orchestrator';
+@@ -230,7 +230,6 @@ export async function configureFactoryCheck(
+   task: FactoryTask,
+   runId: string,
+   hostPolicy: RunPolicy = defaultRunPolicy(),
+-  factoryStage?: FactoryCloudStageAdmission,
+ ) {
+   if (
+     !["review", "verify"].includes(task.stage) ||
+@@ -245,8 +244,7 @@ export async function configureFactoryCheck(
+        json_build_object('runId',producer.id,'sessionId',producer."sessionId",'status',producer.status,
+          'model',producer."agentDefinition"->>'model','harness',producer."agentDefinition"->>'harness',
+          'observedModel',producer.report->'runtime'->>'observedModel') AS "producerExecution",
+-       r."agentId",r."agentDefinition"->'policyCeiling' AS "policyCeiling",b."botId" AS "runtimeBotId",b."workspaceId" AS "runtimeWorkspaceId",
+-       (EXISTS(SELECT 1 FROM thread_machines tm WHERE tm."deviceId"=d.id AND tm.state='running') OR EXISTS(SELECT 1 FROM cloud_machines cm WHERE cm."deviceId"=d.id AND cm.state='running')) AS "cloudOnline"
++       r."agentId",r."questionContinuation",r."agentDefinition"->'policyCeiling' AS "policyCeiling",b."botId" AS "runtimeBotId",b."workspaceId" AS "runtimeWorkspaceId"
+      FROM factory_candidates c JOIN agent_runs r ON r.id=$3
+      JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$4
+      JOIN device_repos repo ON repo.id=r."deviceRepoId"
+@@ -265,17 +263,23 @@ export async function configureFactoryCheck(
+     row.repository !== (row.remoteUrl ?? row.repoPath)
+   )
+     throw new FactoryError("factoryEvidenceMismatch");
+-  const staged = !row.cloudOnline && row.deviceKind === 'cloud' && factoryStage && row.runtimeBotId && row.runtimeWorkspaceId
+-    ? await (await import('./cloud-stage-admission')).sleepingFactoryCloudTarget(tx, { userId: task.userId, workspaceId: row.runtimeWorkspaceId },
+-      { botId: row.runtimeBotId, issueId: task.issueId, agentId: row.agentId, deviceRepoId: row.deviceRepoId, withoutBot: task.botId === null }, factoryStage, runId)
++  // New task VMs get their harness from the official template. A retained
++  // session must still prove its own VM custody and installed worker capability.
++  const freshCloudTarget = !row.questionContinuation && row.deviceKind === 'cloud' && row.runtimeBotId && row.runtimeWorkspaceId
++    ? await cloudTaskTarget(tx, { userId: task.userId, workspaceId: row.runtimeWorkspaceId },
++      { botId: row.runtimeBotId, agentId: row.agentId, deviceRepoId: row.deviceRepoId })
+     : null
++  const cloudTarget = freshCloudTarget ?? (row.deviceKind === 'cloud' && row.runtimeBotId && row.runtimeWorkspaceId
++      ? await ownedCloudTaskTarget(tx, { userId: task.userId, workspaceId: row.runtimeWorkspaceId },
++        { botId: row.runtimeBotId, agentId: row.agentId, deviceRepoId: row.deviceRepoId, runId, issueId: task.issueId })
++      : null)
+   if (
+     !row.enabled ||
+-    (row.deviceKind === 'cloud' ? !row.cloudOnline && !staged : !await deviceIsOnline({ id: row.deviceId, lastSeenAt: row.lastSeenAt })) ||
+-    !row.harnesses?.some(
++    (row.deviceKind === 'cloud' ? cloudTarget?.deviceId !== row.deviceId || cloudTarget?.harness !== row.harness : !await deviceIsOnline({ id: row.deviceId, lastSeenAt: row.lastSeenAt })) ||
++    (!freshCloudTarget && !row.harnesses?.some(
+       (h: { harness: string; installed: boolean }) =>
+         h.harness === row.harness && h.installed,
+-    )
++    ))
+   )
+     throw new FactoryError("factoryCheckHarnessUnavailable");
+   if (row.verifyCommand?.length > 2000)
+diff --git a/lib/factory/cloud-stage-admission.ts b/lib/factory/cloud-stage-admission.ts
+deleted file mode 100644
+index 1a7bba311..000000000
+--- a/lib/factory/cloud-stage-admission.ts
++++ /dev/null
+@@ -1,77 +0,0 @@
+-import 'server-only'
+-import type { PoolClient } from 'pg'
+-import { computerTemplate, taskTemplate } from '../secrets/e2b-runtime'
+-import type { FactoryBinding } from './contract'
+-
+-/** Host-only context from the locked automatic stage. Never a queue/tool input. */
+-export type FactoryCloudStageAdmission = {
+-  binding: FactoryBinding
+-  sourceEventId: string
+-  sourceRunId: string
+-}
+-
+-type Target = { deviceId: string; instructions: string; harness: string; baseBranch: string; remoteUrl: string | null }
+-
+-/** Stage an independent thread from its prepared, sleeping parent metadata.
+- * The existing durable handoff starts the thread; this never calls a provider
+- * or changes the parent. Ordinary queues still require a running parent. */
+-export async function sleepingFactoryCloudTarget(
+-  tx: Pick<PoolClient, 'query'>,
+-  actor: { userId: string; workspaceId: string },
+-  input: { botId: string; issueId: string; agentId: string; deviceRepoId: string; withoutBot?: boolean },
+-  admission: FactoryCloudStageAdmission,
+-  queuedRunId: string | null = null,
+-): Promise<Target | null> {
+-  if (admission.binding.issueId !== input.issueId) return null
+-  const { rows: [target] } = await tx.query<Target>(`SELECT m."deviceId",a.instructions,a.harness,repo."baseBranch",repo."remoteUrl"
+-    FROM factory_tasks t JOIN factory_attempts pending ON pending.id=t."attemptId" AND pending."taskId"=t.id
+-    JOIN coordinator_events e ON e.id=t."sourceEventId" AND e."userId"=t."userId" AND e.kind='user_message'
+-      AND e."botId" IS NOT DISTINCT FROM t."botId" AND (e."issueId" IS NULL OR e."issueId"=t."issueId")
+-    JOIN factory_attempts previous ON previous."taskId"=t.id AND previous.stage='execute' AND previous."runId"=$12
+-    JOIN agent_runs source ON source.id=previous."runId" AND source."userId"=t."userId" AND source."issueId"=t."issueId"
+-    JOIN computer_run_bindings origin ON origin."runId"=source.id AND origin."ownerId"=t."userId"
+-      AND origin."botId"=$1 AND origin."workspaceId"=$3
+-    JOIN bots b ON b.id=origin."botId" AND b."ownerId"=origin."ownerId" AND b."workspaceId"=origin."workspaceId" AND b."archivedAt" IS NULL
+-    JOIN bot_desktops desktop ON desktop."botId"=b.id AND desktop."ownerId"=b."ownerId" AND desktop."workspaceId"=b."workspaceId"
+-    JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId"
+-    JOIN devices dev ON dev.id=m."deviceId" AND dev."ownerId"=b."ownerId" AND dev.kind='cloud' AND dev.enabled=true
+-    JOIN agents a ON a.id=$4 AND a.id=source."agentId" AND a."userId"=b."ownerId" AND a."deviceId"=dev.id
+-    JOIN bot_cloud_runtimes runtime ON runtime."agentId"=a.id AND runtime.harness=a.harness
+-      AND runtime."botId"=b.id AND runtime."ownerId"=b."ownerId" AND runtime."workspaceId"=b."workspaceId"
+-    JOIN device_repos repo ON repo.id=$5 AND repo."deviceId"=dev.id AND repo."userId"=b."ownerId"
+-    JOIN device_repos original_repo ON original_repo.id=source."deviceRepoId" AND original_repo."userId"=source."userId"
+-      AND original_repo."deviceId"=source."deviceId" AND original_repo."remoteUrl" IS NOT DISTINCT FROM repo."remoteUrl"
+-      AND (repo."remoteUrl" IS NOT NULL OR original_repo."repoPath"=repo."repoPath")
+-    WHERE t.id=$6 AND t."userId"=$2 AND t."issueId"=$7 AND t."attemptId"=$8 AND t.revision=$9
+-      AND t."candidateId" IS NOT DISTINCT FROM $10::uuid AND t."sourceEventId"=$11
+-      AND t.status='pending' AND t.stage IN ('execute','review','verify')
+-      AND pending.status='pending' AND pending."runId" IS NULL AND pending.stage=t.stage
+-      AND pending."candidateId" IS NOT DISTINCT FROM t."candidateId"
+-      AND (pending.output->>'requestEpoch' IS NULL OR pending.output->>'requestEpoch'=t."sourceEventId"::text)
+-      AND (t."botId" IS NULL OR EXISTS(SELECT 1 FROM bots chat WHERE chat.id=t."botId" AND chat."ownerId"=$2 AND chat."workspaceId"=$3 AND chat."archivedAt" IS NULL))
+-      AND source.status IN ('succeeded','failed','stopped','cancelled')
+-      AND source."botId" IS NOT DISTINCT FROM CASE WHEN $13::boolean THEN NULL::uuid ELSE b.id END
+-      AND NOT EXISTS(SELECT 1 FROM factory_attempts newer JOIN agent_runs r ON r.id=newer."runId"
+-        WHERE newer."taskId"=t.id AND newer.stage='execute' AND newer.position>previous.position)
+-      AND m.state='sleeping' AND m."runtimeReady"=true AND m."sandboxId" IS NOT NULL
+-      AND m."provisionLeaseId" IS NULL AND m."provisionLeaseUntil" IS NULL
+-      AND m."workerLeaseId" IS NULL AND m."workerLeaseUntil" IS NULL
+-      AND (repo."remoteUrl" IS NOT NULL OR NOT EXISTS(SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny'))
+-      AND ($14::uuid IS NULL OR EXISTS(SELECT 1 FROM agent_runs queued JOIN computer_run_bindings binding ON binding."runId"=queued.id
+-        JOIN thread_machines machine ON machine."runId"=queued.id AND machine."ownerId"=queued."userId"
+-          AND machine."workspaceId"=binding."workspaceId" AND machine."botId"=binding."botId"
+-        WHERE queued.id=$14 AND queued."userId"=$2 AND queued."issueId"=$7 AND queued."agentId"=$4 AND queued."deviceRepoId"=$5
+-          AND queued."deviceId"=dev.id AND queued.status='queued' AND queued."stopRequestedAt" IS NULL
+-          AND queued."botId" IS NOT DISTINCT FROM CASE WHEN $13::boolean THEN NULL::uuid ELSE b.id END
+-          AND binding."ownerId"=$2 AND binding."workspaceId"=$3 AND binding."botId"=$1
+-          AND machine.state='starting' AND machine."snapshotId"='pending' AND machine."deviceId" IS NULL AND machine."sandboxId" IS NULL))
+-    FOR SHARE OF m,dev,a,repo`, [input.botId, actor.userId, actor.workspaceId, input.agentId, input.deviceRepoId,
+-    admission.binding.taskId, input.issueId, admission.binding.attemptId, admission.binding.revision, admission.binding.candidateId,
+-    admission.sourceEventId, admission.sourceRunId, input.withoutBot === true, queuedRunId])
+-  if (!target) return null
+-  // This admission requires the official template/adoption path. It cannot
+-  // authorize a custom snapshot that depends on a live parent.
+-  if (target.remoteUrl) taskTemplate(target.harness)
+-  else computerTemplate()
+-  return target
+-}
+diff --git a/lib/factory/deliverable-recovery.db.test.ts b/lib/factory/deliverable-recovery.db.test.ts
+index a50cb38cb..933833f50 100644
+--- a/lib/factory/deliverable-recovery.db.test.ts
++++ b/lib/factory/deliverable-recovery.db.test.ts
+@@ -61,6 +61,8 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
+       await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner',$3)`, [repoId, deviceId, repoPath])
+       // The database suite exercises check admission, not provider startup.
+       await pool.query(`INSERT INTO cloud_machines("workspaceId","ownerId","sandboxId","operationId","runtimeReady",state,"deviceId") VALUES($1,'owner',$2,$3,true,'running',$4)`, [workspaceId, `fixture-bot-${botId}`, randomUUID(), deviceId])
++      await pool.query(`INSERT INTO bot_desktops("botId","workspaceId","ownerId",display) VALUES($1,$2,'owner',1)`, [botId,workspaceId])
++      await pool.query(`INSERT INTO bot_cloud_runtimes("botId","workspaceId","ownerId",harness,"agentId","repoId") VALUES($1,$2,'owner','codex',$3,$4)`, [botId,workspaceId,agentId,repoId])
+       await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES($1::uuid,'owner',$2,$3,'user_message',$1::text,'{"text":"Original 56-byte historical request"}')`, [sourceEventId, botId, issueId])
+       const store = createFactoryStore(pool, authorize, botId, { independent: factoryCheckIndependent, gates: factoryCheckGates })
+       const queue: FactoryQueue = async (tx, userId, input, runtimeBot) => {
+diff --git a/lib/factory/inherited-command-observations.db.test.ts b/lib/factory/inherited-command-observations.db.test.ts
+index b8078435f..6258cd79b 100644
+--- a/lib/factory/inherited-command-observations.db.test.ts
++++ b/lib/factory/inherited-command-observations.db.test.ts
+@@ -60,6 +60,8 @@ test('isolated PG: direct question recovery exposes historical native observatio
+       await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner',$3)`, [repoId, deviceId, repoPath])
+       // The database suite exercises check admission, not provider startup.
+       await pool.query(`INSERT INTO cloud_machines("workspaceId","ownerId","sandboxId","operationId","runtimeReady",state,"deviceId") VALUES($1,'owner',$2,$3,true,'running',$4)`, [workspaceId, `fixture-bot-${botId}`, randomUUID(), deviceId])
++      await pool.query(`INSERT INTO bot_desktops("botId","workspaceId","ownerId",display) VALUES($1,$2,'owner',1)`, [botId,workspaceId])
++      await pool.query(`INSERT INTO bot_cloud_runtimes("botId","workspaceId","ownerId",harness,"agentId","repoId") VALUES($1,$2,'owner','codex',$3,$4)`, [botId,workspaceId,agentId,repoId])
+       await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES($1::uuid,'owner',$2,$3,'user_message',$1::text,'{"text":"Original 56-byte historical request"}')`, [sourceEventId, botId, issueId])
+       const bindingId = randomUUID(), connectionId = randomUUID(), alternateBindingId = randomUUID()
+       // A person's connection custody workspace can differ from the execution
+diff --git a/lib/factory/run-end-paths.db.test.ts b/lib/factory/run-end-paths.db.test.ts
+index 2f86ab8fc..23597148d 100644
+--- a/lib/factory/run-end-paths.db.test.ts
++++ b/lib/factory/run-end-paths.db.test.ts
+@@ -201,7 +201,6 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
+       const error = Object.freeze(new ComputerError(503, 'Fixture provider refused startup'));
+       let calls = 0;
+       const provider: typeof threadMachineProvider = {
+-        snapshot: async () => assert.fail('the existing fixture snapshot is used'),
+         connect: async () => assert.fail('no sandbox has been recorded'),
+         create: async () => { calls++; throw error; },
+         kill: async () => assert.fail('an unknown create response has no sandbox to kill'),
+diff --git a/package.json b/package.json
+index 9af0c38a8..afea9c355 100644
+--- a/package.json
++++ b/package.json
+@@ -13,7 +13,7 @@
+     "test:factory-check-independence-db": "node --import tsx --test lib/factory/check-independence.db.test.ts",
+     "test:factory-check-independence": "node --import tsx --test lib/factory/check-independence.test.ts",
+     "test:credential-diagnostics": "TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import ./scripts/server-test.mjs --import tsx --test lib/infisical-workload.test.ts lib/infisical-auth-diagnostics.test.ts",
+-    "test:computer-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts lib/computer/bot-runtime.db.test.ts lib/computer/provision.db.test.ts lib/computer/local-reviews.db.test.ts lib/computer/reconcile.db.test.ts tests/device-computer-migration.test.mjs tests/computer-policy-default-allow-migration.test.mjs",
++    "test:computer-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts lib/computer/bot-runtime.db.test.ts lib/computer/task-runtime.db.test.ts lib/computer/provision.db.test.ts lib/computer/local-reviews.db.test.ts lib/computer/reconcile.db.test.ts tests/device-computer-migration.test.mjs tests/computer-policy-default-allow-migration.test.mjs",
+     "generate:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs",
+     "check:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check",
+     "build": "node scripts/build-subscription-worker.mjs && pnpm generate:agent-ui && next build && pnpm typecheck && node scripts/migrate.mjs",
+diff --git a/tests/api-key-runs.db.test.ts b/tests/api-key-runs.db.test.ts
+index f77320b90..8cd785ffd 100644
+--- a/tests/api-key-runs.db.test.ts
++++ b/tests/api-key-runs.db.test.ts
+@@ -117,6 +117,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
+     await pool.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)`, [p.botId, p.workspaceId, p.id])
+     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'claude_code\',$4)', [agentId, p.id, cloudDevice, `cloud-${agentId.slice(0, 8)}`])
+     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, cloudDevice, p.id, normalizeRepository(p.remote).key, p.remote])
++    await pool.query('INSERT INTO bot_cloud_runtimes ("botId","ownerId","workspaceId",harness,"agentId","repoId") VALUES ($1,$2,$3,\'claude_code\',$4,$5)', [p.botId,p.id,p.workspaceId,agentId,repoId])
+     return { cloudDevice, agentId, repoId }
+   }
+ 
+@@ -400,6 +401,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
+       const { cloudDevice, agentId } = await botComputer(p)
+       const computerRepo = randomUUID(), actor = { userId:p.id, workspaceId:p.workspaceId }
+       await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,$4)', [computerRepo, cloudDevice, p.id, '/home/user/.mikka/bot-workspaces/fixture'])
++      await pool.query('UPDATE bot_cloud_runtimes SET "repoId"=$2 WHERE "botId"=$1', [p.botId,computerRepo])
+       const { runId } = await queueCloudRun(pool, actor, { botId:p.botId, issueId:p.issueId, agentId, deviceRepoId:computerRepo, title:'Inspect files', body:'Read the delivery only', model:'key-model-a', readOnly:true })
+       const machines = await fakeThreadMachines(pool, desktopMachine)
+       const thread = await machines.start(actor,runId).finally(() => machines.restore())
+@@ -429,6 +431,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
+       // A computer task (no remote) needs a desktop: refused at claim, the run stays queued.
+       const computerRepo = randomUUID()
+       await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,$4)', [computerRepo, cloudDevice, p.id, '/home/user/.mikka/bot-workspaces/fixture'])
++      await pool.query('UPDATE bot_cloud_runtimes SET "repoId"=$2 WHERE "botId"=$1', [p.botId,computerRepo])
+       const computerRun = (await queue(computerRepo)).runId
+       const computerThread = await machines.start(actor, computerRun)
+       const refused = await claim(computerThread.deviceId, computerRun, computerThread.token)
+@@ -473,6 +476,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
+     }
+     const computerRepo = randomUUID()
+     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,$4)', [computerRepo, cloudDevice, p.id, '/home/user/.mikka/bot-workspaces/fixture'])
++      await pool.query('UPDATE bot_cloud_runtimes SET "repoId"=$2 WHERE "botId"=$1', [p.botId,computerRepo])
+     const repository = await queue(repoId, taskMachine)
+     const computerTask = await queue(computerRepo, desktopMachine)
+     // An admin denies computer use once both threads are queued on their own machines.
+diff --git a/tests/cloud-device-handoff.db.test.ts b/tests/cloud-device-handoff.db.test.ts
+index 8c5b3ab1e..52bb72795 100644
+--- a/tests/cloud-device-handoff.db.test.ts
++++ b/tests/cloud-device-handoff.db.test.ts
+@@ -65,6 +65,7 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
+       await pool.query('INSERT INTO device_repos(id,"userId","deviceId","repoPath","remoteUrl","baseBranch") VALUES($1,$2,$3,$4,$5,\'main\')', [repoId, userId, parentDevice, remoteKey, remoteUrl])
+       await pool.query('INSERT INTO cloud_machines("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES($1,$2,$3,$4,$5,\'running\',true)', [workspaceId, userId, randomUUID(), `synthetic-parent-${id}`, parentDevice])
+       await pool.query('INSERT INTO bot_desktops("botId","workspaceId","ownerId",display) VALUES($1,$2,$3,1)', [botId, workspaceId, userId])
++      await pool.query('INSERT INTO bot_cloud_runtimes ("botId","ownerId","workspaceId",harness,"agentId","repoId") VALUES ($1,$2,$3,\'codex\',$4,$5)', [botId, userId, workspaceId, agentId, repoId])
+       const e2b = sealSecret('synthetic-provider-fixture', userE2bKeyAad(userId))
+       await pool.query('INSERT INTO user_e2b_keys("userId",ciphertext,iv,"keyVersion",last4) VALUES($1,$2,$3,$4,\'test\')', [userId, e2b.ciphertext, e2b.iv, e2b.keyVersion])
+       const key = sealSecret('synthetic-model-fixture', ['model_api_key', keyId, userId].join('\0'))
+diff --git a/tests/cloud-runtime-auto.db.test.ts b/tests/cloud-runtime-auto.db.test.ts
+index e2f70e4cc..a2ca2b661 100644
+--- a/tests/cloud-runtime-auto.db.test.ts
++++ b/tests/cloud-runtime-auto.db.test.ts
+@@ -175,24 +175,27 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch
+     } finally { httpOwner=null; }
+   });
+ 
+-  await t.test('an existing sleeping or disconnected worker is woken before dispatch', async () => {
++  await t.test('ordinary tasks use existing metadata without waking a sleeping or disconnected parent', async () => {
+     const a = await person('sleeping-runtime')
+     await dispatch(a.id, a.issueId, a.botId)
+     const { ensureBotCloudRuntime } = await import('../lib/computer/auto-runtime')
+-    let wakes = 0
+-    const wake = { provision: async () => {
+-      wakes++
+-      await pool.query(`UPDATE cloud_machines SET state='running' WHERE "ownerId"=$1`, [a.id])
+-      await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE "ownerId"=$1', [a.id])
+-    } }
+-    for (const state of ['sleeping', 'running']) {
++    const parent = (await pool.query('SELECT "deviceId" FROM cloud_machines WHERE "ownerId"=$1 AND "workspaceId"=$2', [a.id, a.workspaceId])).rows[0]
++    const wake = { provision: async () => assert.fail('an existing parent must not be woken') }
++    const beforeProvisioned = provisioned
++    for (const [index, state] of ['sleeping', 'running'].entries()) {
+       await pool.query('UPDATE cloud_machines SET state=$2 WHERE "ownerId"=$1', [a.id, state])
+-      await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '2 minutes' WHERE "ownerId"=$1`, [a.id])
++      await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '2 minutes' WHERE id=$1`, [parent.deviceId])
++      const parentState = async () => (await pool.query(`SELECT row_to_json(m) AS machine,row_to_json(d) AS device FROM cloud_machines m JOIN devices d ON d.id=m."deviceId" WHERE m."ownerId"=$1 AND m."workspaceId"=$2`, [a.id, a.workspaceId])).rows[0]
++      const before = await parentState()
+       assert.ok(await ensureBotCloudRuntime(pool, { userId: a.id, workspaceId: a.workspaceId }, a.botId, { harness: 'codex' }, wake))
++      const result = await dispatch(a.id, await anotherTask(a.id, 80 + index), a.botId) as unknown as { status: string }
++      assert.equal(result.status, 'queued')
++      assert.deepEqual(await parentState(), before, 'ordinary dispatch leaves the parent machine and device unchanged')
++      assert.equal(provisioned, beforeProvisioned)
+     }
+-    assert.equal(wakes, 2)
+-    const result = await dispatch(a.id, await anotherTask(a.id, 8), a.botId) as unknown as { status: string }
+-    assert.equal(result.status, 'queued')
++    await pool.query(`UPDATE cloud_machines SET state='sleeping' WHERE "ownerId"=$1`, [a.id])
++    await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [parent.deviceId])
++    assert.equal(await ensureBotCloudRuntime(pool, { userId: a.id, workspaceId: a.workspaceId }, a.botId, { harness: 'codex' }, wake), null, 'invalid metadata refuses without waking the parent')
+   })
+ 
+   await t.test('concurrent dispatches of one task create only one thread', async () => {
+@@ -380,9 +383,9 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch
+     assert.equal(run.kind, 'cloud')
+     assert.ok(run.remoteUrl, 'the queued run is a repository task')
+   })
+-  await t.test('sleeping parent staging requires the current owned Factory stage and a prepared idle parent', async () => {
++  for (const parentState of ['running', 'sleeping']) await t.test(`ordinary queues and Factory checks share owned metadata admission with a ${parentState} parent`, async () => {
+     const personState = await person('factory-stage-admission')
+-    const unrelated = await dispatch(personState.id, personState.issueId, personState.botId) as { runId: string }
++    await dispatch(personState.id, personState.issueId, personState.botId)
+     const issueId = await seedIssue(pool, personState.id)
+     const producer = await steps.dispatchComputerThread(personState.id, { botId: personState.botId, issueId, harness: 'codex' }, `admission:${randomUUID()}`) as { runId: string }
+     const [{ factoryRuntimeForBot }, { factoryBinding }, { queueCloudRun }, { configureFactoryCheck }] = await Promise.all([
+@@ -403,32 +406,41 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch
+       const finished = await runtime.store.apply(personState.id, factoryBinding(candidate.task), randomUUID(), { action:'finish',status:'passed',reason:'Synthetic completed delivery',output:{runId:producer.runId},
+         evidence:[{artifact:`run-report:${producer.runId}`,kind:'report',runId:producer.runId,sessionId:'producer-session',candidateId:candidate.task.candidateId,sha:null,environment:`device:${source.deviceId}`,recordedAt:new Date().toISOString()}] }, client)
+       const pending = await runtime.store.apply(personState.id, factoryBinding(finished.task), randomUUID(), {action:'advance',stage:'review',reason:'Independent inspection'}, client)
+-      const admission = { binding:factoryBinding(pending.task),sourceEventId:pending.task.sourceEventId,sourceRunId:producer.runId }
+       const input = { botId:personState.botId,issueId,agentId:parent.agentId,deviceRepoId:parent.repoId,title:'Inspect delivery',body:'Read the existing result.',
+         model:source.agentDefinition.model,subscriptionBindingId:source.agentDefinition.subscription.bindingId,readOnly:true,idempotencyKey:`factory:${pending.task.attemptId}` }
+-      await client.query(`UPDATE cloud_machines SET state='sleeping' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
++      await client.query(`UPDATE cloud_machines SET state=$3 WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId, parentState])
++      const otherBot = randomUUID(), otherDevice = randomUUID(), unmappedRepo = randomUUID()
++      await client.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") SELECT $1,"deviceId",$2,$3 FROM agents WHERE id=$4`, [unmappedRepo,actor.userId,`/fixture/unmapped/${unmappedRepo}`,parent.agentId])
++      await client.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled) VALUES ($1,$2,'Other device','cloud',true)`, [otherDevice,actor.userId])
++      await client.query('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)', [otherBot,actor.workspaceId,actor.userId,'Another Bot'])
++      await client.query('INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,2)', [otherBot,actor.workspaceId,actor.userId])
+       const before = (await client.query(`SELECT (SELECT count(*) FROM agent_runs WHERE "userId"=$1)::int AS runs,(SELECT count(*) FROM thread_machines WHERE "ownerId"=$1)::int AS machines`, [actor.userId])).rows[0]
+-      await assert.rejects(queueCloudRun(appPool, actor, input, client), { status:409 }, 'ordinary queue admission remains running-only')
+-      await assert.rejects(queueCloudRun(appPool, {...actor,userId:'foreign-owner'}, input, client, admission), {status:409})
+-      await assert.rejects(queueCloudRun(appPool, {...actor,workspaceId:randomUUID()}, input, client, admission), {status:409})
+-      await assert.rejects(queueCloudRun(appPool, actor, input, client, {...admission,sourceEventId:randomUUID()}), {status:409})
+-      await assert.rejects(queueCloudRun(appPool, actor, input, client, {...admission,sourceRunId:unrelated.runId}), {status:409}, 'another task cannot lend its source')
+-      await assert.rejects(queueCloudRun(appPool, actor, input, client, {...admission,binding:{...admission.binding,revision:admission.binding.revision+1}}), {status:409})
+-      for (const [label, update] of [
+-        ['not prepared', '"runtimeReady"=false'],
+-        ['being provisioned', '"provisionLeaseId"=gen_random_uuid(),"provisionLeaseUntil"=now()+interval \'1 minute\''],
+-        ['worker being provisioned', '"workerLeaseId"=gen_random_uuid(),"workerLeaseUntil"=now()+interval \'1 minute\''],
+-        ['missing parent sandbox', '"sandboxId"=NULL'],
+-      ]) {
+-        await client.query('SAVEPOINT unavailable_parent')
+-        await client.query(`UPDATE cloud_machines SET ${update} WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
+-        await assert.rejects(queueCloudRun(appPool, actor, input, client, admission), {status:409}, label)
+-        await client.query('ROLLBACK TO SAVEPOINT unavailable_parent')
++      await assert.rejects(queueCloudRun(appPool, {...actor,userId:'foreign-owner'}, input, client), {status:409})
++      await assert.rejects(queueCloudRun(appPool, {...actor,workspaceId:randomUUID()}, input, client), {status:409})
++      await assert.rejects(queueCloudRun(appPool, actor, {...input,botId:otherBot}, client), {status:409}, 'a different Bot cannot borrow this runtime')
++      for (const [label, sql, values] of [
++        ['missing Bot runtime', 'DELETE FROM bot_cloud_runtimes WHERE "botId"=$1', [personState.botId]],
++        ['unmapped private repository', 'UPDATE bot_cloud_runtimes SET "repoId"=$2 WHERE "botId"=$1', [personState.botId,unmappedRepo]],
++        ['disabled device', 'UPDATE devices SET enabled=false WHERE id=(SELECT "deviceId" FROM agents WHERE id=$1)', [parent.agentId]],
++        ['different repository device', 'UPDATE device_repos SET "deviceId"=$2 WHERE id=$1', [parent.repoId, otherDevice]],
++        ['archived Bot', 'UPDATE bots SET "archivedAt"=now() WHERE id=$1', [personState.botId]],
++        ['computer policy', `INSERT INTO workspace_computer_policies ("workspaceId",permission,version) VALUES ($1,'deny',1) ON CONFLICT ("workspaceId") DO UPDATE SET permission='deny'`, [actor.workspaceId]],
++      ] as const) {
++        await client.query('SAVEPOINT unavailable_target')
++        await client.query(sql, [...values])
++        await assert.rejects(queueCloudRun(appPool, actor, input, client), {status:409}, label)
++        await client.query('ROLLBACK TO SAVEPOINT unavailable_target')
+       }
+       assert.deepEqual((await client.query(`SELECT (SELECT count(*) FROM agent_runs WHERE "userId"=$1)::int AS runs,(SELECT count(*) FROM thread_machines WHERE "ownerId"=$1)::int AS machines`, [actor.userId])).rows[0], before)
+       const parentBefore = (await client.query('SELECT row_to_json(m) AS value FROM cloud_machines m WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId,actor.userId])).rows[0].value
+-      const queued = await queueCloudRun(appPool, actor, input, client, admission)
+-      await configureFactoryCheck(client, pending.task, queued.runId, undefined, admission)
++      const ordinary = await queueCloudRun(appPool, actor, {...input,idempotencyKey:`ordinary:${randomUUID()}`}, client)
++      assert.equal((await client.query('SELECT status FROM agent_runs WHERE id=$1',[ordinary.runId])).rows[0].status,'queued')
++      const queued = await queueCloudRun(appPool, actor, input, client)
++      await client.query('SAVEPOINT mismatched_check')
++      await client.query('UPDATE computer_run_bindings SET "botId"=$2 WHERE "runId"=$1', [queued.runId,otherBot])
++      await assert.rejects(configureFactoryCheck(client, pending.task, queued.runId), /factoryCheckHarnessUnavailable/, 'Factory checks cannot borrow another Bot runtime')
++      await client.query('ROLLBACK TO SAVEPOINT mismatched_check')
++      await configureFactoryCheck(client, pending.task, queued.runId)
+       const check = (await client.query('SELECT kind,"agentDefinition","sessionId" FROM agent_runs WHERE id=$1',[queued.runId])).rows[0]
+       assert.equal(check.kind,'acceptance')
+       assert.equal(check.sessionId,null,'the checker receives an independent native session')
+@@ -446,8 +458,13 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch
+     const personState = await person(`factory-desktop-${parentState}`)
+     await dispatch(personState.id, personState.issueId, personState.botId)
+     const issueId = await seedIssue(pool, personState.id)
++    await pool.query('UPDATE cloud_machines SET state=$3 WHERE "workspaceId"=$1 AND "ownerId"=$2', [personState.workspaceId,personState.id,parentState])
++    const executeParentBefore = (await pool.query('SELECT row_to_json(m) AS value FROM cloud_machines m WHERE "workspaceId"=$1 AND "ownerId"=$2', [personState.workspaceId,personState.id])).rows[0].value
++    const beforeExecuteProvisioned = provisioned
+     const result = await steps.dispatchComputerThread(personState.id, { botId: personState.botId, issueId, harness: 'codex' }, `desktop:${randomUUID()}`) as { runId?: string; error?: string }
+     assert.ok(result.runId, JSON.stringify(result))
++    assert.deepEqual((await pool.query('SELECT row_to_json(m) AS value FROM cloud_machines m WHERE "workspaceId"=$1 AND "ownerId"=$2', [personState.workspaceId,personState.id])).rows[0].value,executeParentBefore,'execute leaves the parent unchanged')
++    assert.equal(provisioned,beforeExecuteProvisioned)
+     const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
+     const { factoryCheckAssignment } = await import('../lib/factory/checks')
+     const { factoryBinding } = await import('../lib/factory/dispatch')
+diff --git a/tests/run-provider-fallback-cloud.db.test.ts b/tests/run-provider-fallback-cloud.db.test.ts
+index 8638e7eb4..acb86e561 100644
+--- a/tests/run-provider-fallback-cloud.db.test.ts
++++ b/tests/run-provider-fallback-cloud.db.test.ts
+@@ -10,7 +10,7 @@ import type { OrderEntry } from '../lib/model-order-plan'
+ import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
+ import { fakeThreadMachines } from './support/thread-machine-fake'
+ 
+-test('cloud provider recovery preserves scope and uses the runtime placement after waking it', { skip: !dbUrl }, async t => {
++test('cloud provider recovery preserves scope and uses fresh task machines without waking its parent', { skip: !dbUrl }, async t => {
+   const names = ['WORKSPACE_SECRETS_KEY', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED', 'MIKKA_FACTORY_LIFECYCLE_ENABLED', 'NEXT_PUBLIC_POSTHOG_KEY'] as const
+   const saved = new Map(names.map(name => [name, process.env[name]]))
+   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
+@@ -36,7 +36,6 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
+   const workers = ['claude_code', 'codex'].map(harness => ({ harness, installed: true, subscriptionBroker: true, toolApproval: true }))
+   const machines = await fakeThreadMachines(pool, workers)
+   const { threadMachineProvider } = await import('../lib/cloud-computer/thread-machines')
+-  const { ensureBotRuntime } = await import('../lib/computer/bot-runtime')
+   const { botRuntimeProvisioner, ensureBotCloudRuntime } = await import('../lib/computer/auto-runtime')
+   const { chooseCloudRunModel } = await import('../lib/computer/run-model')
+   const { queueCloudRun } = await import('../lib/computer/queue-run')
+@@ -52,7 +51,6 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
+   const order = await import('../lib/model-order')
+   const { entryKey } = await import('../lib/model-order-plan')
+   const users: string[] = [], workspaces: string[] = []
+-  const refuseWake = new Set<string>()
+   const provisions = new Map<string, number>()
+   const realProvision = botRuntimeProvisioner.provision
+   type Placement = { userId: string; botId: string; issueId: string; agentId: string; deviceId: string; deviceRepoId: string }
+@@ -66,21 +64,11 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
+     launchPlacements.set(metadata.runId, placement)
+     return createFixtureMachine(template, operationId, metadata, ownerId)
+   }
+-  // A wake replaces the parent cloud device but calls the real runtime
+-  // reconciler, which retains both Agent ids and moves their repo bindings.
++  // Registration is the real metadata-only implementation. Count calls so a
++  // sleeping parent cannot silently trigger another registration or wake.
+   botRuntimeProvisioner.provision = async (database, actor, botId) => {
+     provisions.set(botId, (provisions.get(botId) ?? 0) + 1)
+-    if (refuseWake.has(botId)) throw new Error('Synthetic E2B capacity refusal')
+-    const deviceId = randomUUID(), sandboxId = `cloud-fixture-${randomUUID()}`
+-    await database.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt")
+-      VALUES ($1,$2,'Cloud fixture','cloud',true,$3,now())`, [deviceId, actor.userId, JSON.stringify(workers.map(worker => ({ ...worker, computerBroker: true })))])
+-    await database.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady")
+-      VALUES ($1,$2,$3,$4,$5,'running',true) ON CONFLICT ("workspaceId","ownerId") DO UPDATE
+-      SET "operationId"=EXCLUDED."operationId","sandboxId"=EXCLUDED."sandboxId","deviceId"=EXCLUDED."deviceId",state='running',"runtimeReady"=true`,
+-    [actor.workspaceId, actor.userId, randomUUID(), sandboxId, deviceId])
+-    await database.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1) ON CONFLICT ("botId") DO NOTHING`, [botId, actor.workspaceId, actor.userId])
+-    const sandbox = { sandboxId, commands: { run: async () => ({ stdout: '', stderr: '', exitCode: 0 }) } }
+-    await ensureBotRuntime(database, actor, botId, sandbox as never, deviceId)
++    await realProvision(database, actor, botId)
+   }
+   t.after(async () => {
+     botRuntimeProvisioner.provision = realProvision
+@@ -117,6 +105,9 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
+   const runtime = async (botId: string, harness: string) => (await pool.query<{ agentId: string; deviceId: string; repoId: string }>(`
+     SELECT rt."agentId",a."deviceId",rt."repoId" FROM bot_cloud_runtimes rt JOIN agents a ON a.id=rt."agentId"
+     WHERE rt."botId"=$1 AND rt.harness=$2`, [botId, harness])).rows[0]
++  const parentSnapshot = async (actor: { userId: string; workspaceId: string }) => (await pool.query(
++    'SELECT to_jsonb(m) AS machine,to_jsonb(d) AS device FROM cloud_machines m JOIN devices d ON d.id=m."deviceId" WHERE m."ownerId"=$1 AND m."workspaceId"=$2',
++    [actor.userId, actor.workspaceId])).rows[0]
+   const row = async (runId: string) => (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0]
+   const children = async (runId: string) => (await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [runId])).rows
+   const fixture = async (label: string) => {
+@@ -173,8 +164,9 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
+       providerFailure: { kind: 'balance', retryable: false, status: 402, code: 'payment_required' } },
+   })
+ 
+-  await t.test('402 crosses harnesses in cloud after wake moves the same Agent to a new device and repository', async () => {
+-    const f = await fixture('provider-cloud-wake')
++  await t.test('402 crosses harnesses using a fresh task container while its sleeping parent stays unchanged', async () => {
++    const f = await fixture('provider-cloud-sleeping')
++    const beforeParent = await parentSnapshot(f.actor)
+     await complete(f.actor, f.runId)
+     const original = await row(f.runId), [queuedChild, ...extra] = await children(f.runId)
+     let child = queuedChild
+@@ -202,9 +194,8 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
+     child = await row(child.id)
+ 
+     const moved = await runtime(f.botId, 'codex')
+-    assert.equal(moved.agentId, f.priorTarget.agentId, 'waking retains the target Agent id')
+-    assert.notEqual(moved.deviceId, f.priorTarget.deviceId)
+-    assert.notEqual(moved.repoId, f.priorTarget.repoId)
++    assert.deepEqual(moved, f.priorTarget, 'sleeping parent execution identities stay unchanged')
++    assert.deepEqual(await parentSnapshot(f.actor), beforeParent, 'no parent VM state, lease, heartbeat or capabilities change')
+     const queued = launchPlacements.get(child.id)
+     assert.ok(queued, 'the durable host step must launch the actual task machine')
+     assert.deepEqual([queued.userId, queued.botId, queued.issueId, queued.agentId, queued.deviceId], [f.actor.userId, f.botId, f.issueId, moved.agentId, moved.deviceId])
+@@ -217,8 +208,9 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
+     assert.equal(child.deviceId, machine.deviceId)
+     assert.equal(child.deviceRepoId, machine.repoId)
+     assert.notEqual(child.deviceId, moved.deviceId, 'a task uses its own machine after admission')
++    assert.notEqual(child.deviceId, f.admitted.deviceId, 'the new harness receives a fresh task machine')
+     assert.notEqual(child.deviceId, f.localDeviceId)
+-    assert.equal(provisions.get(f.botId), 2)
++    assert.equal(provisions.get(f.botId), 1, 'the parent is not reprovisioned for provider recovery')
+     assert.equal(lifecycleStarts.filter(item => item.runId === child.id).length, 1, 'handoff does not start a second lifecycle')
+     assert.equal(networkAttempts, 0)
+   })
+@@ -346,9 +338,11 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
+     } finally { park.mock.restore(); start.mock.restore() }
+   })
+ 
+-  await t.test('a refused cloud wake cannot move a frozen cloud task onto its available local device', async () => {
++  await t.test('disabled cloud execution identity cannot move a frozen cloud task onto its available local device', async () => {
++
+     const f = await fixture('provider-cloud-refused')
+-    refuseWake.add(f.botId)
++    await pool.query('UPDATE devices SET enabled=false WHERE id=$1 AND "ownerId"=$2', [f.priorTarget.deviceId, f.actor.userId])
++    const beforeParent = await parentSnapshot(f.actor)
+     await complete(f.actor, f.runId)
+     const original = await row(f.runId)
+     assert.equal(original.report.modelFallback.state, 'blocked')
+@@ -356,7 +350,8 @@ test('cloud provider recovery preserves scope and uses the runtime placement aft
+     assert.equal(original.report.modelFallback.reasons.find((entry: { choice: { model: string } }) => entry.choice.model === 'fixture-codex-b')?.reason, 'noDevice')
+     assert.deepEqual(await children(f.runId), [])
+     assert.equal((await pool.query('SELECT count(*)::int AS count FROM agent_runs WHERE "userId"=$1 AND "deviceId"=$2', [f.actor.userId, f.localDeviceId])).rows[0].count, 0)
+-    assert.equal(provisions.get(f.botId), 2)
++    assert.equal(provisions.get(f.botId), 2, 'the real registration rejects the disabled identity')
++    assert.deepEqual(await parentSnapshot(f.actor), beforeParent, 'refusal cannot rewrite disabled parent metadata')
+     assert.equal(networkAttempts, 0)
+   })
+ 
+diff --git a/tests/shared-subscription-runs.db.test.ts b/tests/shared-subscription-runs.db.test.ts
+index a6e867336..5ae49f767 100644
+--- a/tests/shared-subscription-runs.db.test.ts
++++ b/tests/shared-subscription-runs.db.test.ts
+@@ -67,7 +67,7 @@ test('shared subscriptions reach local and cloud claims with current membership
+     await pool.query('DELETE FROM agent_runs WHERE "userId"=ANY($1)', [users])
+     await pool.query('DELETE FROM model_api_keys WHERE "ownerId"=ANY($1)', [users])
+     await pool.query('DELETE FROM user_e2b_keys WHERE "userId"=ANY($1)', [users])
+-    for (const table of ['byos_bindings', 'byos_connections', 'workspace_subscription_shares', 'bot_desktops', 'cloud_machines']) await pool.query(`DELETE FROM ${table} WHERE "ownerId"=ANY($1)`, [users])
++    for (const table of ['byos_bindings', 'byos_connections', 'workspace_subscription_shares', 'bot_cloud_runtimes', 'bot_desktops', 'cloud_machines']) await pool.query(`DELETE FROM ${table} WHERE "ownerId"=ANY($1)`, [users])
+     for (const table of ['model_order_entries', 'model_order_settings']) await pool.query(`DELETE FROM ${table} WHERE "ownerId"=ANY($1)`, [users])
+     for (const table of ['device_tokens', 'agents', 'device_repos']) await pool.query(`DELETE FROM ${table} WHERE "${table === 'agents' || table === 'device_repos' || table === 'device_tokens' ? 'userId' : 'ownerId'}"=ANY($1)`, [users])
+     await pool.query('DELETE FROM devices WHERE "ownerId"=ANY($1)', [users])
+@@ -95,6 +95,7 @@ test('shared subscriptions reach local and cloud claims with current membership
+       await pool.query('INSERT INTO user_e2b_keys("userId",ciphertext,iv,"keyVersion",last4) VALUES($1,$2,$3,$4,\'test\')', [userId, sealed.ciphertext, sealed.iv, sealed.keyVersion])
+       await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,'running',true)`, [workspaceId, userId, randomUUID(), `synthetic-${randomUUID()}`, deviceId])
+       await pool.query('INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)', [botId, workspaceId, userId])
++      await pool.query('INSERT INTO bot_cloud_runtimes ("botId","ownerId","workspaceId",harness,"agentId","repoId") VALUES ($1,$2,$3,$4,$5,$6)', [botId, userId, workspaceId, harness, agentId, repoId])
+     }
+     const scope = { ownerId: userId, workspaceId }
+     // An own paid key offering the very same model must not steal an authorized shared subscription.
+diff --git a/tests/support/thread-machine-fake.ts b/tests/support/thread-machine-fake.ts
+index d975446b0..78df487ce 100644
+--- a/tests/support/thread-machine-fake.ts
++++ b/tests/support/thread-machine-fake.ts
+@@ -55,7 +55,6 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
+     }
+   }
+   Object.assign(machines.threadMachineProvider, {
+-    snapshot: async () => 'snapshot-fixture',
+     connect: async (sandboxId: string) => sandbox(sandboxId),
+     create: async (_snapshot: string, operationId: string) => sandbox(`sandbox-${operationId}`),
+     kill: async () => {},

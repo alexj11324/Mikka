@@ -1,0 +1,7 @@
+{
+  "lib/cloud-computer/thread-machines.ts": "44d0118c293ce113f36c28b47e24b732fede7b3b",
+  "lib/computer/auto-runtime.ts": "e42b1f98ca05f7e499a181bc1fae2aecdb4a5dde",
+  "lib/computer/queue-run.ts": "9f6d5efed83f437dbcaa0c9bcebf92b51148b9e2",
+  "lib/factory/checks.ts": "9db4e2d7b894c22b92e85e686f1fb2bac198508d",
+  "lib/cloud-computer/thread-worker-logs.test.ts": "00241127dd85935a6ef1e0fcb4bb62f462a7fa46"
+}

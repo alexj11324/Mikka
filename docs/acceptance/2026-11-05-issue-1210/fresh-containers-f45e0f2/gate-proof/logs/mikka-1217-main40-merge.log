@@ -1,0 +1,14 @@
+Auto-merging lib/cloud-computer/thread-machine-task.db.test.ts
+Auto-merging lib/cloud-computer/thread-machines.ts
+CONFLICT (content): Merge conflict in lib/cloud-computer/thread-machines.ts
+Auto-merging lib/cloud-computer/thread-worker-logs.test.ts
+CONFLICT (content): Merge conflict in lib/cloud-computer/thread-worker-logs.test.ts
+Auto-merging lib/computer/auto-runtime.ts
+CONFLICT (content): Merge conflict in lib/computer/auto-runtime.ts
+Auto-merging lib/computer/queue-run.ts
+CONFLICT (content): Merge conflict in lib/computer/queue-run.ts
+Auto-merging lib/computer/store.db.test.ts
+Auto-merging lib/factory/checks.ts
+CONFLICT (content): Merge conflict in lib/factory/checks.ts
+Auto-merging package.json
+Automatic merge failed; fix conflicts and then commit the result.

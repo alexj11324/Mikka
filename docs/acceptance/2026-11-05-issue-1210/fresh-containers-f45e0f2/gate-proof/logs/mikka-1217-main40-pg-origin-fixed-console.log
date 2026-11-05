@@ -1,0 +1,3 @@
+{"gate":"task-runtime-pg","code":0,"signal":null,"timedOut":false,"seconds":77.922}
+{"gate":"factory-pg","code":0,"signal":null,"timedOut":false,"seconds":23.31}
+{"cleanup":{"ownedDatabases":["factory193_consumers_85a558a9ddaa4575a9b015614810e48b_e2e","mikka_merge1217_33d37277a982_e2e"],"databasesAbsent":true,"roleAbsent":true},"finishedAt":"2026-11-05T01:58:08.312Z"}

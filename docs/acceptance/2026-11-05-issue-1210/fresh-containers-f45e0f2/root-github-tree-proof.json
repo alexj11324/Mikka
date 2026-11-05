@@ -1,0 +1,346 @@
+{
+  "observedAt": "2026-11-05T02:10:18.321Z",
+  "head": "f45e0f268dac28e0a94213a977d6b4ce4aaa31bf",
+  "parents": [
+    "cccef174f7a4e604a820a4b61f8521e8cdba100b",
+    "40d03479ea8260b8934f609b84c7c9cb60a94b3c"
+  ],
+  "tree": "de3b83d85361e39a33ca9e5678d4ed37e6a33fe4",
+  "baseTree": "58f14e63fc36cf12a936b9825604f71162586a84",
+  "baseLeafCount": 4580,
+  "candidateLeafCount": 4582,
+  "changedPaths": [
+    {
+      "path": "lib/cloud-computer/snapshot-credentials.test.ts",
+      "before": {
+        "sha": "94604b111cba8d96c5131c395f178320e4bcd617",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "90dd95669d9c359bda29c0fa034b10dfc826f391",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/cloud-computer/thread-machine-stop.db.test.ts",
+      "before": {
+        "sha": "b4a249b61a1f307825cae8e28ac601d4ac1f0dea",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "9b79f187caec1d3ced410b14a3ddd372a3cc36b7",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/cloud-computer/thread-machine-task.db.test.ts",
+      "before": {
+        "sha": "16e94e73353a70f37481d231cd3e942f059a627d",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "d1cc41fd890974769fc53ea3bd8402868251742b",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "before": {
+        "sha": "288b90c47ba607532c462b634a1978e45781df57",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "44d0118c293ce113f36c28b47e24b732fede7b3b",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/cloud-computer/thread-worker-logs.test.ts",
+      "before": {
+        "sha": "fd9279caac182bfa1165b3fbf7b3adbe2b1d92e7",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "00241127dd85935a6ef1e0fcb4bb62f462a7fa46",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/computer/auto-runtime.ts",
+      "before": {
+        "sha": "060cbf12a05ece71e2e72e564e243dbeebbf3386",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "e42b1f98ca05f7e499a181bc1fae2aecdb4a5dde",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/computer/bot-runtime.ts",
+      "before": {
+        "sha": "d8837d877b19470ecb6cab6fef801e48738d956d",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "dbe004d83c0faf935139e8699e07939dd1d4391c",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/computer/cloud-task-target.ts",
+      "after": {
+        "sha": "51a9e85e34009c14e773acd3ad7f06e70c9269fd",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/computer/queue-run.ts",
+      "before": {
+        "sha": "6d2b93f12d26df653918189ef7ec78ae96f29733",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "9f6d5efed83f437dbcaa0c9bcebf92b51148b9e2",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/computer/store.db.test.ts",
+      "before": {
+        "sha": "b25775239dae78f3ad25aec89d87a58cd2af86e7",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "c7a576e6799330b212ca4609ffb53ff8f7077eb8",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/computer/task-runtime.db.test.ts",
+      "after": {
+        "sha": "374d0357987dff50401014d9c7f8011c1ef69b12",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/computer/task-runtime.ts",
+      "after": {
+        "sha": "c73c1dd8dc4bcbe5cd5940f289068422d7b4226a",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/factory/automatic-dispatch.ts",
+      "before": {
+        "sha": "3872e982d1f97fcfb3b8586681d5e9e6de50f67b",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "c405d648b4eaa0dd2069a38ad5bef81a9a90fced",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/factory/check-observations.test.ts",
+      "before": {
+        "sha": "245a4a66e7937bb8560e9c742a3caf5cb5ceef65",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "55b1b0a126aa59f516379ad2e73dd7ff0080959c",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/factory/checks.db.test.ts",
+      "before": {
+        "sha": "13c1d4daab08f201d2c010cc3cedfd6f663acb94",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "4fd6999ecaadaf5c28a0ecc25d5c2e53e692d4f3",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/factory/checks.ts",
+      "before": {
+        "sha": "d8ae0d86434a1d756424408265bfe3cd8ea84400",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "9db4e2d7b894c22b92e85e686f1fb2bac198508d",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/factory/cloud-stage-admission.ts",
+      "before": {
+        "sha": "1a7bba31115a9ad61317fb41ee7ef262314c0dd8",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/factory/deliverable-recovery.db.test.ts",
+      "before": {
+        "sha": "a50cb38cb6e324ce40a5dcd71b78af9097693de8",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "933833f5064cafa1bff99e5ac64fb651604bf423",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/factory/inherited-command-observations.db.test.ts",
+      "before": {
+        "sha": "b8078435f7d9ecf3eb89341cae7234d3eaab14a9",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "6258cd79b69db07813e3b2bf0a5ea4feebfcd7e1",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "lib/factory/run-end-paths.db.test.ts",
+      "before": {
+        "sha": "2f86ab8fcb412fb7b44271b6c2a642c619b563d1",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "23597148d360504680c71db62e4b5fc9fd9460ca",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "package.json",
+      "before": {
+        "sha": "9af0c38a89e8935ee5e20786aede037b9e5c68da",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "afea9c3556ee14ebdd7bc0717924927207fbdbc3",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "tests/api-key-runs.db.test.ts",
+      "before": {
+        "sha": "f77320b901f10f056d53f6d385901d03682cceee",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "8cd785ffd344f46a2d695028d05c4f52928707fa",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "tests/cloud-device-handoff.db.test.ts",
+      "before": {
+        "sha": "8c5b3ab1e442f987189b7eb2d7eea136fa840fd9",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "52bb7279548ce8bb34187a618ef42cfd3517ff3b",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "tests/cloud-runtime-auto.db.test.ts",
+      "before": {
+        "sha": "e2f70e4ccbe029824c6d4507cdceab576b8167bb",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "a2ca2b6615fe5f6049bb0f4a0b751307d288b8c3",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "tests/run-provider-fallback-cloud.db.test.ts",
+      "before": {
+        "sha": "8638e7eb4c56bbbfbe601ec3719de28bb6f3bbcf",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "acb86e561fe5b038aabbf7082d3748da7741b118",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "tests/shared-subscription-runs.db.test.ts",
+      "before": {
+        "sha": "a6e867336e548750bfe5a5048a0fc9aaa5222ba6",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "5ae49f7676cd813e524310b002017610ffc3c3ba",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": "tests/support/thread-machine-fake.ts",
+      "before": {
+        "sha": "d975446b07906d6e1cd52fb08bd25110882bea04",
+        "mode": "100644",
+        "type": "blob"
+      },
+      "after": {
+        "sha": "78df487ce8b8c106c0cb90c663a8c8817835c439",
+        "mode": "100644",
+        "type": "blob"
+      }
+    }
+  ],
+  "unchangedLeafCount": 4556
+}

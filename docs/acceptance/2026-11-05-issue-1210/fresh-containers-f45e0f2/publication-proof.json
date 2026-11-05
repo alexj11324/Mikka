@@ -1,0 +1,39 @@
+{
+  "publicHead": "f45e0f268dac28e0a94213a977d6b4ce4aaa31bf",
+  "publicTree": "de3b83d85361e39a33ca9e5678d4ed37e6a33fe4",
+  "localCommit": "9441896ad27e0f072d11dc24194351623327a2ac",
+  "parents": [
+    "cccef174f7a4e604a820a4b61f8521e8cdba100b",
+    "40d03479ea8260b8934f609b84c7c9cb60a94b3c"
+  ],
+  "branch": "fix/1210-fresh-task-containers",
+  "casExpected": "cccef174f7a4e604a820a4b61f8521e8cdba100b",
+  "actualGitRefReadback": "f45e0f268dac28e0a94213a977d6b4ce4aaa31bf",
+  "ciRun": 41953008428,
+  "ciStatusAtAssembly": "completed",
+  "mergeAuthorized": false,
+  "paidCloudLegSatisfied": false,
+  "modelCalls": 0,
+  "productionWrites": 0,
+  "ciObservedAt": "2026-11-05 02:13:11 UTC",
+  "ciChecks": {
+    "total": 27,
+    "success": 22,
+    "conditionalSkipped": 5
+  },
+  "workflows": {
+    "total": 7,
+    "success": 7
+  },
+  "prState": "open",
+  "draft": false,
+  "heldUnmerged": true,
+  "mergeableAtReadback": false,
+  "mergeableStateAtReadback": "dirty",
+  "autoMerge": null,
+  "laterMainReportedByParent": {
+    "sha": "514030294dcdc68b2d9ca4a977ce04b298b37e6f",
+    "parent": "0118fe5358a4593d1dfd2aa9127ce6682ea46089",
+    "source": "Parent independently read main after PR head CI completed; large external PR1297 Agent Profiles/Claude-Codex collaboration changes. PR base_sha snapshot still 40d. No integration into 514 was performed."
+  }
+}

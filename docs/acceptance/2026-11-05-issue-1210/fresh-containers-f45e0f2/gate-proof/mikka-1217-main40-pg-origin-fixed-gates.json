@@ -1,0 +1,58 @@
+{
+  "head": "cccef174f7a4e604a820a4b61f8521e8cdba100b",
+  "main": "40d03479ea8260b8934f609b84c7c9cb60a94b3c",
+  "tree": "de3b83d85361e39a33ca9e5678d4ed37e6a33fe4",
+  "role": "mikka_merge1217_33d37277a982",
+  "database": "mikka_merge1217_33d37277a982_e2e",
+  "startedAt": "2026-11-05T01:56:26.426Z",
+  "gates": [
+    {
+      "label": "task-runtime-pg",
+      "cmd": "node",
+      "args": [
+        "--experimental-test-module-mocks",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-concurrency=1",
+        "lib/cloud-computer/thread-machine-task.db.test.ts",
+        "lib/cloud-computer/thread-machine-stop.db.test.ts",
+        "lib/computer/bot-runtime.db.test.ts",
+        "lib/computer/task-runtime.db.test.ts",
+        "tests/cloud-runtime-auto.db.test.ts",
+        "tests/run-provider-fallback-cloud.db.test.ts",
+        "tests/run-machine-fallback.db.test.ts",
+        "lib/factory/run-end-paths.db.test.ts"
+      ],
+      "pid": 63487,
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "seconds": 77.921
+    },
+    {
+      "label": "factory-pg",
+      "cmd": "corepack",
+      "args": [
+        "pnpm",
+        "test:factory-checks-db"
+      ],
+      "pid": 63732,
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "seconds": 23.31
+    }
+  ],
+  "cleanup": {
+    "ownedDatabases": [
+      "factory193_consumers_85a558a9ddaa4575a9b015614810e48b_e2e",
+      "mikka_merge1217_33d37277a982_e2e"
+    ],
+    "databasesAbsent": true,
+    "roleAbsent": true
+  },
+  "finishedAt": "2026-11-05T01:58:08.312Z"
+}

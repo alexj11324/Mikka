@@ -1,0 +1,11 @@
+{
+  "observedAt": "2026-11-05T02:14:07.392Z",
+  "state": "open",
+  "draft": false,
+  "merged": false,
+  "head": "f45e0f268dac28e0a94213a977d6b4ce4aaa31bf",
+  "base": "40d03479ea8260b8934f609b84c7c9cb60a94b3c",
+  "mergeable": false,
+  "mergeable_state": "dirty",
+  "auto_merge": null
+}

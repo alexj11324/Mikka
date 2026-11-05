@@ -1,0 +1,259 @@
+{"event":"thread_runtime_start_failed","runId":"51e7c284-5650-405c-90d2-d9f1b023c76c","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+▶ a stop-requested queued run ends instead of provisioning, at both check points
+  ✔ check 1: a bound queued run stopped before provisioning ends, its old sandbox is killed, nothing is created (28.736808ms)
+{"event":"thread_runtime_start_failed","runId":"cd8973ed-bfa4-4fc1-aaee-8d4ac3395787","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ check 1: a stopped queued run without a machine row creates none (5.755255ms)
+{"event":"thread_runtime_start_failed","runId":"056dd86d-abdf-439f-ba9d-69426afc5d21","phase":"post_connect_admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ check 2: a stop landing while the sandbox is created ends the run before the worker starts (16.774879ms)
+{"event":"thread_runtime_start_failed","runId":"ed31605e-42d5-4ea1-8937-5fa0d952598f","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ a paused thread whose sandbox is gone gets a new sandbox for the same thread (7.605131ms)
+{"event":"thread_runtime_start_failed","runId":"07dbe620-23e9-4139-9ca3-2328328a69a2","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ control: without a stop, provisioning passes both checks (and fails later on the fake sandbox) (5.160348ms)
+✔ a stop-requested queued run ends instead of provisioning, at both check points (1507.394956ms)
+▶ a task's sandbox serves only that task's runs, parks between them and ends with the task
+  ✔ an exact question wake observes a running original worker without bootstrap or token rotation (28.377638ms)
+{"event":"thread_runtime_start_failed","runId":"82e98ce1-cfd5-4c78-bb0e-6afb3e622620","phase":"connect","errorClass":"Error","errorCode":"unknown"}
+  ✔ retained original question VMs ignore replacement-template configuration (21.742405ms)
+{"event":"thread_runtime_start_failed","runId":"aa4b6f25-710c-48a2-b251-2a4aef59d9f4","phase":"connect","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ original VM provider loss never creates or adopts a replacement and releases only its own wake lease (9.595591ms)
+{"event":"thread_runtime_start_failed","runId":"7e00e9e7-84ce-434e-b9a9-97b2a78f11a7","phase":"connect","errorClass":"Error","errorCode":"unknown"}
+  ✔ an exact paused wake uses only the original VM and performs provider I/O after commit (10.174531ms)
+  ✔ a failed question wake records its safe phase while retaining the original VM, SID and committed answer (11.444083ms)
+{"event":"thread_runtime_start_failed","runId":"ff6eb92a-61db-45f9-b4f7-ba28d7314c48","phase":"connect","errorClass":"Error","errorCode":"unknown"}
+  ✔ a resumed provider VM with paused DB placement retries bootstrap instead of falsely returning ready (8.511865ms)
+  ✔ a worker that already claimed the continuation keeps its token and native process on replay (7.511223ms)
+  ✔ a paused question VM resumes and registers on the same device without replacing its native session (13.976387ms)
+{"event":"thread_runtime_start_failed","runId":"040a23c2-e027-49c4-b7eb-bfc0d943f48b","phase":"provider_state","errorClass":"unknown","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"9c1100e9-ce04-42f9-96a8-9bdb869d42fc","phase":"provider_state","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ gone or unknown provider state never creates a replacement or claims readiness (16.149822ms)
+{"event":"thread_runtime_start_failed","runId":"af440213-6789-4c57-b4ca-7536b6d4d2d4","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_start_failed","runId":"cef18e33-8c47-4a9d-9534-91e6718878d1","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_start_failed","runId":"6574183c-3dd1-49a9-af1b-b677987b3955","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_start_failed","runId":"be8d740d-c7de-4426-b1b7-d7d8c69fd0a4","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ source SID, snapshot and transferred sandbox mismatches refuse before provider I/O (30.074441ms)
+  ✖ the normal start wrapper retains an unavailable exact question run and its original VM (2613.219109ms)
+  ✖ durable question handoff retries an unavailable original VM instead of reporting false success (32.16574ms)
+  ✖ a replayed Factory handoff only resumes lifecycle for its current live owned worker (6.487957ms)
+{"event":"thread_runtime_start_failed","runId":"33a16c30-ce81-484c-b611-5a40f8faeb2c","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ required question wake refuses a machine without authoritative question provenance (5.207569ms)
+{"event":"thread_runtime_start_failed","runId":"0a756ad5-3445-4061-b41b-d28a72e5e17c","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ a maintenance lease prevents adoption and replacement of the original VM (6.177668ms)
+{"event":"thread_runtime_refresh_failed","runId":"514566c4-1865-481d-af7f-5aeb85e336a2","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ runtime refresh rejects active native work before any provider call (6.029911ms)
+  ✔ a queued execute question upgrades the old worker on its original VM without changing the answer or native session (50.51937ms)
+  ✔ a queued review question upgrades the old worker on its original VM without changing the answer or native session (31.057251ms)
+  ✔ a queued verify question upgrades the old worker on its original VM without changing the answer or native session (29.751102ms)
+  ✔ a non-repository Codex question upgrades the original official desktop and restores its display lease (31.278787ms)
+  ✔ question worker upgrade refuses epoch drift after staging and leaves the winning state untouched (27.850848ms)
+  ✔ question worker upgrade refuses attempt drift after staging and leaves the winning state untouched (25.126351ms)
+  ✔ question worker upgrade refuses stage drift after staging and leaves the winning state untouched (25.576664ms)
+  ✔ question worker upgrade refuses receipt drift after staging and leaves the winning state untouched (26.806604ms)
+  ✔ question worker upgrade refuses stop drift after staging and leaves the winning state untouched (25.876052ms)
+  ✔ question worker upgrade refuses claim drift after staging and leaves the winning state untouched (24.666255ms)
+  ✔ question worker upgrade refuses lease drift after staging and leaves the winning state untouched (25.367846ms)
+  ✔ question worker upgrade refuses workspace drift after staging and leaves the winning state untouched (26.675065ms)
+  ✔ question worker upgrade rolls back its own release when bootstrap fails and retries the same child (53.037683ms)
+  ✔ a queued stage upgrades its adopted official VM before bootstrap and preserves its completed producer (14.45194ms)
+  ✖ adopted VM wake failures and durable replays preserve custody and never take the generic end path (3.629445ms)
+(node:62825) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:62825) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+  ✖ Factory starts the retained worker without spawning a second lifecycle workflow (5.301215ms)
+{"event":"thread_runtime_start_failed","runId":"bcd92074-61d1-4912-a2e4-ef601fb207cb","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ retained stage maintenance rejects another active run before touching its VM (8.509696ms)
+{"event":"thread_runtime_start_failed","runId":"e9d50210-b999-45d1-957d-0e34df8c605c","phase":"read_worker","errorClass":"TypeError","errorCode":"unknown"}
+  ✔ a queued running retained VM can upgrade without replacing its existing machine (18.384089ms)
+  ✔ a changed maintenance lease prevents switch and cleanup from affecting its new owner (11.309327ms)
+  ✔ a queued adopted stage cannot switch or bootstrap after its run starts elsewhere (11.075379ms)
+{"event":"thread_runtime_start_failed","runId":"7eedfd17-30bb-455d-80f4-102b331999fa","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_refresh_failed","runId":"4ffbd7fe-23a1-47f6-997e-3b936ce34a19","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ explicit runtime refresh updates the paused failed original VM without changing answer or recovery history (22.797361ms)
+{"event":"thread_runtime_start_failed","runId":"fffde3a6-bf59-4db6-8946-0935c82ebffc","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_refresh_failed","runId":"1d84fb1e-0cc8-4ae6-892a-218b8904f1a0","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ explicit runtime refresh updates the running failed original VM without changing answer or recovery history (24.767478ms)
+{"event":"thread_runtime_refresh_failed","runId":"c51d8d7b-8c87-4101-b711-b5ae13aa7a48","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"c4f29b04-8603-4d98-8ca4-d6b84ace1060","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"a2f21dc2-cff7-4cde-8cbe-bfe95057f904","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"160aa4f2-c766-4f06-8429-ccec49b95a83","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"7d437361-9644-44ba-8c99-78524d3608ce","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"61743301-bbfb-4176-9f10-3e1664575e9c","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"401ecfb3-3e29-40b0-96f6-8d9c3b2238ea","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ failed question refresh refuses stale custody, changed sessions and busy work before provider I/O (79.830353ms)
+{"event":"thread_runtime_refresh_failed","runId":"7a669b5c-8c14-472b-a555-b2355043c6d1","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ concurrent explicit refresh cannot take the held maintenance lease or touch question history (28.905239ms)
+{"event":"thread_runtime_refresh_failed","runId":"bceb2e50-8eed-4369-a63c-3daf70bbadf3","phase":"read_refreshed_worker","errorClass":"Error","errorCode":"unknown","status":503}
+  ✔ an expired refresh rolls back with its own budget and leaves a retryable original VM (43.15318ms)
+  ✔ refresh registration failure keeps its log on the VM without rewriting the original failed run (527.050352ms)
+{"event":"thread_runtime_start_failed","runId":"20cf1888-9b8a-4f46-8922-6bd19585c752","phase":"publish_bootstrap","errorClass":"Error","errorCode":"unknown"}
+{"event":"thread_runtime_start_failed","runId":"fef6fb81-86e3-4559-92ee-8c549ab0b1e6","phase":"credential_bootstrap","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ moving a queued repository task binds its existing authority to the owned thread device (16.876816ms)
+  ✔ a preloaded worker authenticating on bootstrap publication is ready before explicit start (48.379207ms)
+{"event":"thread_runtime_start_failed","runId":"07d959ae-3cf4-4423-8c4a-47ecc6de71d6","phase":"publish_bootstrap","errorClass":"Error","errorCode":"unknown"}
+  ✔ a computer task starts display :1 and publishes its lease before the worker is handed a credential (13.230703ms)
+{"event":"thread_runtime_start_failed","runId":"64addc17-05c9-4baf-8c36-f943557bed24","phase":"publish_bootstrap","errorClass":"Error","errorCode":"unknown"}
+  ✔ a fresh official instance initializes its registered private Bot workspace before worktree creation (165.178774ms)
+{"event":"thread_runtime_start_failed","runId":"409f4529-aa0c-40c3-9cc5-405afe70714e","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ the task's next run resumes the paused sandbox: no snapshot, no new sandbox, same device (9.140022ms)
+{"event":"thread_runtime_start_failed","runId":"44d3a996-b484-4d9a-bed9-a11dfc131301","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ another task never gets the task's sandbox: it starts its own from the ready template (8.504021ms)
+{"event":"thread_runtime_start_failed","runId":"c87ce3f1-10c6-4d0a-8ac0-fac18ab65ace","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ another repository on the same task never gets the task's sandbox: it starts its own from the ready template (7.455336ms)
+{"event":"thread_runtime_start_failed","runId":"23fee678-008a-490a-9498-3fb4d97b9506","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ a run with no task never gets the task's sandbox: it starts its own from the ready template (6.306287ms)
+{"event":"thread_runtime_start_failed","runId":"bc2c0420-d9b8-494f-99eb-bcb2ef66e31a","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ the same task sent to another bot still resumes the task's sandbox (it belongs to the task, not the bot) (7.80337ms)
+{"event":"thread_runtime_start_failed","runId":"4ae5e8f7-8602-484c-8ca1-06253b1f5d4d","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ a run on another harness never resumes the task's machine: it starts its own from that harness's template (7.172248ms)
+{"event":"thread_runtime_start_failed","runId":"44ff6afb-a22f-4cbd-8483-604627c620b0","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ a sandbox whose run has not ended is never taken over (6.853486ms)
+{"event":"thread_runtime_start_failed","runId":"b1f06ef1-0fe8-40ad-a764-16eebaa96cff","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ a non-repository computer task retains its explicit desktop filesystem path (5.509135ms)
+{"event":"thread_runtime_start_failed","runId":"09895dfe-3c47-4841-942c-1ae494cc67db","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ a repository identity mismatch refuses before allocating any machine (3.342388ms)
+  ✔ a finished run parks its sandbox: paused, tokens revoked, device kept; a refused pause records nothing (5.105254ms)
+{"event":"thread_runtime_start_failed","runId":"e52567bc-4d23-4b9b-ae01-7cc6bbb2fd3a","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ concurrent lifecycle and Factory parking cannot suspend or revoke the next stage (13.490858ms)
+{"event":"thread_runtime_start_failed","runId":"8fd1bb82-aeb2-499c-baf1-e314e95801b3","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ ending an adopted old stage cannot retire the next stage device or credentials (49.046977ms)
+  ✔ before a kill the worker's tail is kept; a failing read never blocks the kill (4.081318ms)
+  ✔ closed, duplicate and deleted tasks end their paused sandboxes; open ones keep them (17.290932ms)
+✖ a task's sandbox serves only that task's runs, parks between them and ends with the task (5683.148507ms)
+✔ a bot runtime follows its computer to a new device and survives an unbound agent (616.998383ms)
+✔ first task runtime is declared without a parent worker or VM and keeps ownership fences (788.585837ms)
+✖ cancel and thread end reach a terminal run, then afterRunEnded finalizes the Factory task (1725.214305ms)
+(node:63009) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63009) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✖ cloud runs: the bot runtime is created on dispatch, once; the kill switch falls back to the card (1493.661891ms)
+✖ run machine fallback: 本地 a computer that takes part, 云端 own E2B, else an actionable error (2146.989032ms)
+(node:63058) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63058) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✖ cloud provider recovery preserves scope and uses fresh task machines without waking its parent (1362.859043ms)
+ℹ tests 73
+ℹ suites 0
+ℹ pass 63
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 42624.200797
+
+✖ failing tests:
+
+test at lib/cloud-computer/thread-machine-task.db.test.ts:2:10771
+✖ the normal start wrapper retains an unavailable exact question run and its original VM (2613.219109ms)
+  Error: Invalid authentication email origin
+      at createAuthEmail (/vercel/sandbox/mikka-1217-main40-integration/lib/auth-email.ts:38:138)
+      at <anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/auth.ts:30:15)
+      at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/cloud-computer/thread-machine-task.db.test.ts:250:34)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/cloud-computer/thread-machine-task.db.test.ts:247:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at lib/cloud-computer/thread-machine-task.db.test.ts:2:11466
+✖ durable question handoff retries an unavailable original VM instead of reporting false success (32.16574ms)
+  Error: Invalid authentication email origin
+      at createAuthEmail (/vercel/sandbox/mikka-1217-main40-integration/lib/auth-email.ts:38:138)
+      at <anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/auth.ts:30:15)
+      at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/cloud-computer/thread-machine-task.db.test.ts:250:34)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/cloud-computer/thread-machine-task.db.test.ts:247:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at lib/cloud-computer/thread-machine-task.db.test.ts:2:12402
+✖ a replayed Factory handoff only resumes lifecycle for its current live owned worker (6.487957ms)
+  Error: Invalid authentication email origin
+      at createAuthEmail (/vercel/sandbox/mikka-1217-main40-integration/lib/auth-email.ts:38:138)
+      at <anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/auth.ts:30:15)
+      at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/cloud-computer/thread-machine-task.db.test.ts:250:34)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/cloud-computer/thread-machine-task.db.test.ts:247:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at lib/cloud-computer/thread-machine-task.db.test.ts:7:11445
+✖ adopted VM wake failures and durable replays preserve custody and never take the generic end path (3.629445ms)
+  Error: Invalid authentication email origin
+      at createAuthEmail (/vercel/sandbox/mikka-1217-main40-integration/lib/auth-email.ts:38:138)
+      at <anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/auth.ts:30:15)
+      at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/cloud-computer/thread-machine-task.db.test.ts:250:34)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/cloud-computer/thread-machine-task.db.test.ts:247:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at lib/cloud-computer/thread-machine-task.db.test.ts:7:13507
+✖ Factory starts the retained worker without spawning a second lifecycle workflow (5.301215ms)
+  Error: Invalid authentication email origin
+      at createAuthEmail (/vercel/sandbox/mikka-1217-main40-integration/lib/auth-email.ts:38:138)
+      at <anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/auth.ts:30:15)
+      at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/cloud-computer/thread-machine-task.db.test.ts:250:34)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/cloud-computer/thread-machine-task.db.test.ts:247:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at lib/factory/run-end-paths.db.test.ts:1:735
+✖ cancel and thread end reach a terminal run, then afterRunEnded finalizes the Factory task (1725.214305ms)
+  Error: Invalid authentication email origin
+      at createAuthEmail (/vercel/sandbox/mikka-1217-main40-integration/lib/auth-email.ts:38:138)
+      at <anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/auth.ts:30:15)
+      at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/factory/run-end-paths.db.test.ts:37:32)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at tests/cloud-runtime-auto.db.test.ts:1:1172
+✖ cloud runs: the bot runtime is created on dispatch, once; the kill switch falls back to the card (1493.661891ms)
+  Error: Invalid authentication email origin
+      at createAuthEmail (/vercel/sandbox/mikka-1217-main40-integration/lib/auth-email.ts:38:138)
+      at <anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/auth.ts:30:15)
+      at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+      at async node:internal/modules/esm/loader:647:26
+      at async fakeThreadMachines (/vercel/sandbox/mikka-1217-main40-integration/tests/support/thread-machine-fake.ts:21:39)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/tests/cloud-runtime-auto.db.test.ts:30:26)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at tests/run-machine-fallback.db.test.ts:1:651
+✖ run machine fallback: 本地 a computer that takes part, 云端 own E2B, else an actionable error (2146.989032ms)
+  Error: Invalid authentication email origin
+      at createAuthEmail (/vercel/sandbox/mikka-1217-main40-integration/lib/auth-email.ts:38:138)
+      at <anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/auth.ts:30:15)
+      at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/tests/run-machine-fallback.db.test.ts:23:17)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at tests/run-provider-fallback-cloud.db.test.ts:1:434
+✖ cloud provider recovery preserves scope and uses fresh task machines without waking its parent (1362.859043ms)
+  Error: Invalid authentication email origin
+      at createAuthEmail (/vercel/sandbox/mikka-1217-main40-integration/lib/auth-email.ts:38:138)
+      at <anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/auth.ts:30:15)
+      at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+      at async node:internal/modules/esm/loader:647:26
+      at async fakeThreadMachines (/vercel/sandbox/mikka-1217-main40-integration/tests/support/thread-machine-fake.ts:21:39)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/tests/run-provider-fallback-cloud.db.test.ts:37:20)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)

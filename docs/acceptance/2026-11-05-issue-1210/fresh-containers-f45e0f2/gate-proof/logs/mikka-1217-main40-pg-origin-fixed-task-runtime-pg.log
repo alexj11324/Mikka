@@ -1,0 +1,273 @@
+{"event":"thread_runtime_start_failed","runId":"76d21e90-7d43-470c-a6dc-df7bd13e2c05","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+▶ a stop-requested queued run ends instead of provisioning, at both check points
+  ✔ check 1: a bound queued run stopped before provisioning ends, its old sandbox is killed, nothing is created (32.959263ms)
+{"event":"thread_runtime_start_failed","runId":"2d9fc879-5824-4303-8e39-51a4e1e75683","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ check 1: a stopped queued run without a machine row creates none (6.624631ms)
+{"event":"thread_runtime_start_failed","runId":"c5e03d16-e6e4-449f-971e-770697a14bd4","phase":"post_connect_admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ check 2: a stop landing while the sandbox is created ends the run before the worker starts (18.695001ms)
+{"event":"thread_runtime_start_failed","runId":"33f28f1a-122b-4632-8be0-79f04447fc64","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ a paused thread whose sandbox is gone gets a new sandbox for the same thread (8.034118ms)
+{"event":"thread_runtime_start_failed","runId":"5e181eb4-a8d7-4684-b1c4-cde0876ab335","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ control: without a stop, provisioning passes both checks (and fails later on the fake sandbox) (5.922625ms)
+✔ a stop-requested queued run ends instead of provisioning, at both check points (1584.774959ms)
+▶ a task's sandbox serves only that task's runs, parks between them and ends with the task
+  ✔ an exact question wake observes a running original worker without bootstrap or token rotation (35.929286ms)
+{"event":"thread_runtime_start_failed","runId":"b509ae57-2754-46ec-b909-30eb3ac7fd76","phase":"connect","errorClass":"Error","errorCode":"unknown"}
+  ✔ retained original question VMs ignore replacement-template configuration (26.625438ms)
+{"event":"thread_runtime_start_failed","runId":"db42c982-f0e1-407a-9fd1-8f582ceab52a","phase":"connect","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ original VM provider loss never creates or adopts a replacement and releases only its own wake lease (13.504722ms)
+{"event":"thread_runtime_start_failed","runId":"5ae9cdb4-7f9a-4fb2-8045-246c9c07331f","phase":"connect","errorClass":"Error","errorCode":"unknown"}
+  ✔ an exact paused wake uses only the original VM and performs provider I/O after commit (13.506899ms)
+  ✔ a failed question wake records its safe phase while retaining the original VM, SID and committed answer (18.417822ms)
+{"event":"thread_runtime_start_failed","runId":"eaf8a1ae-c46d-4181-99e9-3ba2252d2b78","phase":"connect","errorClass":"Error","errorCode":"unknown"}
+  ✔ a resumed provider VM with paused DB placement retries bootstrap instead of falsely returning ready (13.321031ms)
+  ✔ a worker that already claimed the continuation keeps its token and native process on replay (12.070521ms)
+  ✔ a paused question VM resumes and registers on the same device without replacing its native session (24.876963ms)
+{"event":"thread_runtime_start_failed","runId":"081156fa-b8e8-4aa7-8217-10383fc27af4","phase":"provider_state","errorClass":"unknown","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"5609f6cc-58cd-42c8-b142-ef632894a2f4","phase":"provider_state","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ gone or unknown provider state never creates a replacement or claims readiness (29.668356ms)
+{"event":"thread_runtime_start_failed","runId":"f9283688-b53b-4a7a-b68c-c481b6a8f536","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_start_failed","runId":"ab2a977d-73d9-44c3-9a19-f6ab4f56ef6a","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_start_failed","runId":"dff095f3-f51e-402e-a8de-a10a060fa005","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_start_failed","runId":"999ca802-2a01-4395-aea1-787b06108593","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ source SID, snapshot and transferred sandbox mismatches refuse before provider I/O (51.528647ms)
+{"event":"thread_runtime_start_failed","runId":"09898ff1-7066-4107-8101-f80941919909","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ the normal start wrapper retains an unavailable exact question run and its original VM (2512.096951ms)
+  ✔ durable question handoff retries an unavailable original VM instead of reporting false success (101.666587ms)
+  ✔ a replayed Factory handoff only resumes lifecycle for its current live owned worker (16.208219ms)
+{"event":"thread_runtime_start_failed","runId":"7446bd18-1a8f-4054-a44d-6a717e07cce8","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ required question wake refuses a machine without authoritative question provenance (8.951511ms)
+{"event":"thread_runtime_start_failed","runId":"7be45668-e287-4566-a90d-5576c43e79b5","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ a maintenance lease prevents adoption and replacement of the original VM (12.861037ms)
+{"event":"thread_runtime_refresh_failed","runId":"9123d8bb-2e3a-4385-84ff-89d93e1af377","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ runtime refresh rejects active native work before any provider call (11.731002ms)
+  ✔ a queued execute question upgrades the old worker on its original VM without changing the answer or native session (69.875072ms)
+  ✔ a queued review question upgrades the old worker on its original VM without changing the answer or native session (48.961552ms)
+  ✔ a queued verify question upgrades the old worker on its original VM without changing the answer or native session (44.480701ms)
+  ✔ a non-repository Codex question upgrades the original official desktop and restores its display lease (48.937215ms)
+  ✔ question worker upgrade refuses epoch drift after staging and leaves the winning state untouched (75.637136ms)
+  ✔ question worker upgrade refuses attempt drift after staging and leaves the winning state untouched (38.147094ms)
+  ✔ question worker upgrade refuses stage drift after staging and leaves the winning state untouched (36.933701ms)
+  ✔ question worker upgrade refuses receipt drift after staging and leaves the winning state untouched (35.006523ms)
+  ✔ question worker upgrade refuses stop drift after staging and leaves the winning state untouched (39.182288ms)
+  ✔ question worker upgrade refuses claim drift after staging and leaves the winning state untouched (34.374077ms)
+  ✔ question worker upgrade refuses lease drift after staging and leaves the winning state untouched (40.580161ms)
+  ✔ question worker upgrade refuses workspace drift after staging and leaves the winning state untouched (36.242576ms)
+  ✔ question worker upgrade rolls back its own release when bootstrap fails and retries the same child (63.275332ms)
+  ✔ a queued stage upgrades its adopted official VM before bootstrap and preserves its completed producer (18.610128ms)
+{"event":"thread_runtime_start_failed","runId":"ae7e7ff0-e38d-48de-909e-8a20b806e428","phase":"connect","errorClass":"Error","errorCode":"unknown"}
+{"event":"thread_runtime_start_failed","runId":"ae7e7ff0-e38d-48de-909e-8a20b806e428","phase":"connect","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ adopted VM wake failures and durable replays preserve custody and never take the generic end path (35.528054ms)
+(node:63511) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63511) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+  ✔ Factory starts the retained worker without spawning a second lifecycle workflow (28.46499ms)
+{"event":"thread_runtime_start_failed","runId":"24beba8f-36fe-47ef-bd09-0bd1ee9ffd0c","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ retained stage maintenance rejects another active run before touching its VM (12.149575ms)
+{"event":"thread_runtime_start_failed","runId":"e1fd7613-ec38-4b32-b792-d920c5b81261","phase":"read_worker","errorClass":"TypeError","errorCode":"unknown"}
+  ✔ a queued running retained VM can upgrade without replacing its existing machine (28.326218ms)
+  ✔ a changed maintenance lease prevents switch and cleanup from affecting its new owner (20.11027ms)
+  ✔ a queued adopted stage cannot switch or bootstrap after its run starts elsewhere (17.571789ms)
+{"event":"thread_runtime_start_failed","runId":"73487d4a-4268-49c8-a365-e3ee52475b25","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_refresh_failed","runId":"b0c17014-7638-4bbb-bca1-1fa88eff4058","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ explicit runtime refresh updates the paused failed original VM without changing answer or recovery history (31.860768ms)
+{"event":"thread_runtime_start_failed","runId":"88358a9c-302e-430a-b09b-b1776ec888e4","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_refresh_failed","runId":"5c11d1f7-70f5-49b4-84bd-c97d8e8963ea","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ explicit runtime refresh updates the running failed original VM without changing answer or recovery history (29.811229ms)
+{"event":"thread_runtime_refresh_failed","runId":"fa176d5b-23aa-4b28-be64-b5081ca392ac","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"350de91a-17ff-4058-a88d-75e2319aa295","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"17b987d1-c685-40a7-b45f-a534fde4c476","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"77201a4c-5b40-4eaf-a22e-f08a17d31c4c","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"f011bc09-a93e-4add-b097-2ed4f8eb82d4","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"f9f05a85-8c0f-412b-8f3c-4a4192af0e45","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"49808bf6-c475-4cef-b567-9ec84c82dbab","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ failed question refresh refuses stale custody, changed sessions and busy work before provider I/O (122.353709ms)
+{"event":"thread_runtime_refresh_failed","runId":"7bb24807-b0cf-4e19-95ce-896b572e18ea","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ concurrent explicit refresh cannot take the held maintenance lease or touch question history (37.272067ms)
+{"event":"thread_runtime_refresh_failed","runId":"90717e2f-8929-4a74-8231-4a7ad5d1872d","phase":"read_refreshed_worker","errorClass":"Error","errorCode":"unknown","status":503}
+  ✔ an expired refresh rolls back with its own budget and leaves a retryable original VM (44.586956ms)
+  ✔ refresh registration failure keeps its log on the VM without rewriting the original failed run (532.720167ms)
+{"event":"thread_runtime_start_failed","runId":"bf1a041a-4023-42ed-987a-e9ad24ce54ad","phase":"publish_bootstrap","errorClass":"Error","errorCode":"unknown"}
+{"event":"thread_runtime_start_failed","runId":"d3cf846f-7b27-4a12-af6a-8cd17a5b46a2","phase":"credential_bootstrap","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ moving a queued repository task binds its existing authority to the owned thread device (21.808029ms)
+  ✔ a preloaded worker authenticating on bootstrap publication is ready before explicit start (34.070586ms)
+{"event":"thread_runtime_start_failed","runId":"c17afbb6-ef71-4bd6-9bfb-32d46886cb0d","phase":"publish_bootstrap","errorClass":"Error","errorCode":"unknown"}
+  ✔ a computer task starts display :1 and publishes its lease before the worker is handed a credential (13.90571ms)
+{"event":"thread_runtime_start_failed","runId":"f4a65689-7363-4397-b466-1d2d61c35212","phase":"publish_bootstrap","errorClass":"Error","errorCode":"unknown"}
+  ✔ a fresh official instance initializes its registered private Bot workspace before worktree creation (184.333155ms)
+{"event":"thread_runtime_start_failed","runId":"f928ab4b-9121-41c3-84fc-a8b2934c759d","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ the task's next run resumes the paused sandbox: no snapshot, no new sandbox, same device (12.22776ms)
+{"event":"thread_runtime_start_failed","runId":"a8afb5b1-85fa-47a6-8e09-d24a8f21e0a5","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ another task never gets the task's sandbox: it starts its own from the ready template (9.848565ms)
+{"event":"thread_runtime_start_failed","runId":"6a1e913e-8270-48b0-b69e-86a2a2e86cab","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ another repository on the same task never gets the task's sandbox: it starts its own from the ready template (9.101793ms)
+{"event":"thread_runtime_start_failed","runId":"2b99462d-5fc2-41a8-88f2-5e1a33033ae0","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ a run with no task never gets the task's sandbox: it starts its own from the ready template (8.091255ms)
+{"event":"thread_runtime_start_failed","runId":"58de3193-5e3c-46bd-869b-d497d65c23a0","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ the same task sent to another bot still resumes the task's sandbox (it belongs to the task, not the bot) (9.452482ms)
+{"event":"thread_runtime_start_failed","runId":"d9f02d03-baef-488e-b80f-b9235d8b83cb","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ a run on another harness never resumes the task's machine: it starts its own from that harness's template (9.019456ms)
+{"event":"thread_runtime_start_failed","runId":"9da0eecc-8f17-44d2-a61e-ef5ad52af89f","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ a sandbox whose run has not ended is never taken over (9.061862ms)
+{"event":"thread_runtime_start_failed","runId":"4c4a8398-510f-4074-b27b-092197815fca","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ a non-repository computer task retains its explicit desktop filesystem path (7.801573ms)
+{"event":"thread_runtime_start_failed","runId":"3d51d224-c5f3-463b-ae1b-f53d7c60b4a1","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ a repository identity mismatch refuses before allocating any machine (4.767081ms)
+  ✔ a finished run parks its sandbox: paused, tokens revoked, device kept; a refused pause records nothing (6.555516ms)
+{"event":"thread_runtime_start_failed","runId":"33e88b8c-23de-4392-abb4-a26703e2ddf7","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ concurrent lifecycle and Factory parking cannot suspend or revoke the next stage (19.152683ms)
+{"event":"thread_runtime_start_failed","runId":"e9285b9e-328e-49c3-a308-22851dfd8d4a","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ ending an adopted old stage cannot retire the next stage device or credentials (32.141685ms)
+  ✔ before a kill the worker's tail is kept; a failing read never blocks the kill (4.616953ms)
+  ✔ closed, duplicate and deleted tasks end their paused sandboxes; open ones keep them (21.054032ms)
+✔ a task's sandbox serves only that task's runs, parks between them and ends with the task (6396.744006ms)
+✔ a bot runtime follows its computer to a new device and survives an unbound agent (599.8574ms)
+✔ first task runtime is declared without a parent worker or VM and keeps ownership fences (735.515316ms)
+▶ cancel and thread end reach a terminal run, then afterRunEnded finalizes the Factory task
+  ✔ cancel: the stop request alone is not an end; the daemon's stopped write finalizes the task (145.001211ms)
+  ✔ stopping a queued run ends it as stopped and finalizes the task (no daemon ack) (48.341872ms)
+  ✔ a queued cloud run with a thread machine binding only records the stop request (23.644178ms)
+  ✔ stop on an ended earlier attempt reaches the queued latest: stopped, and afterRunEnded runs under the latest's own runId (BE-18) (42.39249ms)
+  ✔ ending a thread machine stops a Factory run and finalizes its task (54.727342ms)
+{"event":"thread_runtime_start_failed","runId":"4670b522-8966-43bf-ae47-2b491f454bc1","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"4670b522-8966-43bf-ae47-2b491f454bc1","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"4670b522-8966-43bf-ae47-2b491f454bc1","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ an unclaimed cloud startup failure is recoverable infrastructure failure, with machine=true (123.070509ms)
+{"event":"thread_runtime_start_failed","runId":"25ab1d9a-940c-4556-91fe-b72fde9a744d","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"25ab1d9a-940c-4556-91fe-b72fde9a744d","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"25ab1d9a-940c-4556-91fe-b72fde9a744d","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ an unclaimed cloud startup failure is recoverable infrastructure failure, with machine=false (67.793967ms)
+{"event":"thread_runtime_start_failed","runId":"e1627349-ca85-4729-bda1-d910ffbf8cce","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"f147c865-d777-4cb7-9093-53ab113fff50","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"638df4e5-4b49-46da-acd8-d41b3a486c80","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"31fa4873-fe0a-46be-8405-8bf0b93a5ae8","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"40d17bf1-f1fc-4b31-82d1-ff7e8e65f9de","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ a startup-error cleanup cannot overwrite a claimed run, a live lease, or another workspace (113.213199ms)
+{"event":"thread_runtime_start_failed","runId":"65324892-19ae-40bb-8b50-1cf692790748","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ a real Owner stop stays cancelled when a late cloud-start failure arrives (43.441501ms)
+{"event":"thread_runtime_start_failed","runId":"d2e8b863-97ae-445f-bbf3-cbc3add29deb","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+  ✔ a real provider-start failure can settle only its own committed provisioning lease (68.199931ms)
+{"event":"thread_runtime_start_failed","runId":"7ce65859-0f54-460e-9074-48b94e170238","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"event":"thread_runtime_start_failed","runId":"7c48615f-ea88-4e2b-88ad-1aa5cbfeda5b","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"event":"thread_runtime_start_failed","runId":"ce2c7941-28e1-46d9-9a2d-7632c5c69747","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"event":"thread_runtime_start_failed","runId":"400f2a9c-9a7f-440c-956c-7d6f055d2e29","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+  ✔ a captured startup failure cannot overtake a replaced lease, successful provisioning, claim or Owner stop (88.38648ms)
+✔ cancel and thread end reach a terminal run, then afterRunEnded finalizes the Factory task (4134.029686ms)
+(node:63624) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63624) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+(node:63624) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":334,"phases":[{"phase":"resolveRepository","ms":12},{"phase":"issueForUser","ms":15},{"phase":"executionWorkspace","ms":7},{"phase":"resolveModelDispatch","ms":22},{"phase":"ensureBotCloudRuntime","ms":20},{"phase":"bindAgentToConnection","ms":4},{"phase":"authorizeSubscriptionWorkspace","ms":3},{"phase":"issueForUser","ms":3},{"phase":"ensureBotCloudRuntime","ms":17},{"phase":"ensureDeviceRepository","ms":5},{"phase":"queueCloudRun","ms":140},{"phase":"ensureThreadMachine","ms":35},{"phase":"startLifecycle","ms":1},{"phase":"runPlacement","ms":3}],"github":{"requests":3,"ms":6},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":97,"phases":[{"phase":"resolveRepository","ms":3},{"phase":"issueForUser","ms":3},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":8},{"phase":"ensureBotCloudRuntime","ms":1},{"phase":"bindAgentToConnection","ms":1},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":4},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":44},{"phase":"ensureThreadMachine","ms":15},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+▶ cloud runs: the bot runtime is created on dispatch, once; the kill switch falls back to the card
+  ✔ no runtime yet: the run goes to the cloud and the runtime is created; a second dispatch reuses it (604.200551ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":100,"phases":[{"phase":"resolveRepository","ms":3},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":8},{"phase":"ensureBotCloudRuntime","ms":7},{"phase":"bindAgentToConnection","ms":2},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":5},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":40},{"phase":"ensureThreadMachine","ms":17},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ the writable cloud thread composer starts its next task machine and lifecycle on the same repository and model (270.036487ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":110,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":3},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":10},{"phase":"ensureBotCloudRuntime","ms":9},{"phase":"bindAgentToConnection","ms":3},{"phase":"authorizeSubscriptionWorkspace","ms":3},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":5},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":46},{"phase":"ensureThreadMachine","ms":14},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ the readOnly cloud thread composer starts its next task machine and lifecycle on the same repository and model (221.294276ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":127,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":3},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":8},{"phase":"ensureBotCloudRuntime","ms":10},{"phase":"bindAgentToConnection","ms":2},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":1},{"phase":"ensureBotCloudRuntime","ms":5},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":62},{"phase":"ensureThreadMachine","ms":17},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ the mcp cloud thread composer starts its next task machine and lifecycle on the same repository and model (227.813768ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":97,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":6},{"phase":"ensureBotCloudRuntime","ms":7},{"phase":"bindAgentToConnection","ms":2},{"phase":"authorizeSubscriptionWorkspace","ms":1},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":3},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":42},{"phase":"ensureThreadMachine","ms":18},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+  ✔ the public computer API continues a repository thread on its original repository and starts its task machine (244.66832ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":91,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":8},{"phase":"ensureBotCloudRuntime","ms":7},{"phase":"bindAgentToConnection","ms":1},{"phase":"authorizeSubscriptionWorkspace","ms":1},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":3},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":38},{"phase":"ensureThreadMachine","ms":15},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":77,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":6},{"phase":"ensureBotCloudRuntime","ms":1},{"phase":"bindAgentToConnection","ms":0},{"phase":"authorizeSubscriptionWorkspace","ms":1},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":3},{"phase":"ensureDeviceRepository","ms":1},{"phase":"queueCloudRun","ms":36},{"phase":"ensureThreadMachine","ms":13},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":0},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":117,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":6},{"phase":"ensureBotCloudRuntime","ms":2},{"phase":"bindAgentToConnection","ms":1},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":4},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":43},{"phase":"ensureThreadMachine","ms":41},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ ordinary tasks use existing metadata without waking a sleeping or disconnected parent (315.577419ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":137,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":4},{"phase":"resolveModelDispatch","ms":12},{"phase":"ensureBotCloudRuntime","ms":15},{"phase":"bindAgentToConnection","ms":2},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":3},{"phase":"ensureDeviceRepository","ms":3},{"phase":"queueCloudRun","ms":49},{"phase":"ensureThreadMachine","ms":30},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":144,"phases":[{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+  ✔ concurrent dispatches of one task create only one thread (156.992521ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":124,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":9},{"phase":"ensureBotCloudRuntime","ms":9},{"phase":"bindAgentToConnection","ms":3},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":4},{"phase":"ensureDeviceRepository","ms":3},{"phase":"queueCloudRun","ms":56},{"phase":"ensureThreadMachine","ms":18},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":97,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":7},{"phase":"ensureBotCloudRuntime","ms":2},{"phase":"bindAgentToConnection","ms":1},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":1},{"phase":"ensureBotCloudRuntime","ms":5},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":42},{"phase":"ensureThreadMachine","ms":21},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ a cloud run gets its task branch like a local run, with no grant; a read-only run gets none (237.96683ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":111,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":3},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":8},{"phase":"ensureBotCloudRuntime","ms":10},{"phase":"bindAgentToConnection","ms":2},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":4},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":48},{"phase":"ensureThreadMachine","ms":15},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":106,"phases":[{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":5},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":62},{"phase":"ensureThreadMachine","ms":18},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":96,"phases":[{"phase":"authorizeSubscriptionWorkspace","ms":3},{"phase":"issueForUser","ms":3},{"phase":"ensureBotCloudRuntime","ms":5},{"phase":"ensureDeviceRepository","ms":3},{"phase":"queueCloudRun","ms":51},{"phase":"ensureThreadMachine","ms":14},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ read-only sticks when a cloud thread continues: a read-only ask on a writable thread, and a read-only thread asked again (486.353219ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":101,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":6},{"phase":"ensureBotCloudRuntime","ms":8},{"phase":"bindAgentToConnection","ms":2},{"phase":"authorizeSubscriptionWorkspace","ms":1},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":3},{"phase":"ensureDeviceRepository","ms":3},{"phase":"queueCloudRun","ms":48},{"phase":"ensureThreadMachine","ms":15},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":0},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":96,"phases":[{"phase":"authorizeSubscriptionWorkspace","ms":1},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":5},{"phase":"ensureDeviceRepository","ms":1},{"phase":"queueCloudRun","ms":57},{"phase":"ensureThreadMachine","ms":16},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":3,"phases":[],"github":{"requests":0,"ms":0},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":106,"phases":[{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":3},{"phase":"ensureBotCloudRuntime","ms":4},{"phase":"ensureDeviceRepository","ms":1},{"phase":"queueCloudRun","ms":62},{"phase":"ensureThreadMachine","ms":15},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":0,"ms":0},"failed":false}
+  ✔ a cloud thread that stopped to ask continues on its own model and subscription; with none it says so and queues nothing (343.257322ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":17,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":9}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":98,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":11},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ no E2B key of their own: no cloud runtime; with no computer the card offers one or a key, and 云端 then runs on the person's own server (125.834485ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":118,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":9},{"phase":"ensureBotCloudRuntime","ms":10},{"phase":"bindAgentToConnection","ms":2},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":5},{"phase":"ensureDeviceRepository","ms":3},{"phase":"queueCloudRun","ms":52},{"phase":"ensureThreadMachine","ms":17},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":97,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":8},{"phase":"ensureBotCloudRuntime","ms":2},{"phase":"bindAgentToConnection","ms":0},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":3},{"phase":"ensureDeviceRepository","ms":1},{"phase":"queueCloudRun","ms":46},{"phase":"ensureThreadMachine","ms":16},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ the Coordinator: its own bot row gets the runtime, once, and never borrows a bot's (296.973251ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":16,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":9}],"github":{"requests":3,"ms":0},"failed":false}
+  ✔ MIKKA_CLOUD_COMPUTER_TASKS=0: no runtime is created and the bot shows the card (28.246525ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":31,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":8},{"phase":"ensureBotCloudRuntime","ms":3}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ a cloud startup refusal with an existing E2B key does not say the key is missing (41.245557ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":110,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":9},{"phase":"ensureBotCloudRuntime","ms":11},{"phase":"bindAgentToConnection","ms":2},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":1},{"phase":"ensureBotCloudRuntime","ms":5},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":48},{"phase":"ensureThreadMachine","ms":15},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+  ✔ a workspace whose 电脑 policy is deny still runs a repository task in the cloud (121.762263ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":105,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":8},{"phase":"ensureBotCloudRuntime","ms":9},{"phase":"bindAgentToConnection","ms":2},{"phase":"authorizeSubscriptionWorkspace","ms":1},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":5},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":45},{"phase":"ensureThreadMachine","ms":16},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+  ✔ ordinary queues and Factory checks share owned metadata admission with a running parent (447.022035ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":105,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":8},{"phase":"ensureBotCloudRuntime","ms":8},{"phase":"bindAgentToConnection","ms":2},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":1},{"phase":"ensureBotCloudRuntime","ms":5},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":47},{"phase":"ensureThreadMachine","ms":13},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ ordinary queues and Factory checks share owned metadata admission with a sleeping parent (378.447124ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":98,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":7},{"phase":"ensureBotCloudRuntime","ms":6},{"phase":"bindAgentToConnection","ms":2},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":4},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":46},{"phase":"ensureThreadMachine","ms":13},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ a no-repository desktop deliverable gets independent checks and human acceptance with its parent running (846.370736ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":101,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":8},{"phase":"ensureBotCloudRuntime","ms":8},{"phase":"bindAgentToConnection","ms":1},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":4},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":42},{"phase":"ensureThreadMachine","ms":14},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ a no-repository desktop deliverable gets independent checks and human acceptance with its parent sleeping (804.266034ms)
+✔ cloud runs: the bot runtime is created on dispatch, once; the kill switch falls back to the card (8977.698414ms)
+(node:63668) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":168,"phases":[{"phase":"resolveRepository","ms":13},{"phase":"issueForUser","ms":8},{"phase":"executionWorkspace","ms":5},{"phase":"resolveModelDispatch","ms":25},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":7},"failed":false}
+▶ run machine fallback: 本地 a computer that takes part, 云端 own E2B, else an actionable error
+  ✔ an automatically placed device keeps its placement authority through normal Factory admission and recovery (427.57035ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":83,"phases":[{"phase":"resolveRepository","ms":3},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ an explicitly selected device keeps its placement authority through normal Factory admission and recovery (167.69819ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":20,"phases":[{"phase":"resolveRepository","ms":3},{"phase":"issueForUser","ms":3},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":9}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":20,"phases":[{"phase":"resolveRepository","ms":3},{"phase":"issueForUser","ms":3},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":10}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":81,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":10},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":0},"failed":false}
+  ✔ (a) no computer: the card says so, then a computer is picked once it takes part (147.391566ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":96,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":10},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+  ✔ a read-only task and a committing one both run with no push approval or GitHub App check (215.688069ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":83,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":10},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":0},"failed":false}
+  ✔ a committing run is admitted with its task branch whatever the GitHub App says, with no card (108.395635ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":95,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":12},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":93,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":3},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":11},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ (b) 云端 with no E2B key: the online computer takes the run; 本地 too (214.137397ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":39,"phases":[{"phase":"resolveRepository","ms":3},{"phase":"issueForUser","ms":3},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":12},{"phase":"ensureBotCloudRuntime","ms":3}],"github":{"requests":3,"ms":1},"failed":false}
+{"event":"thread_runtime_start_failed","runId":"5eb9d4c5-dd4c-4cbc-85b5-5ae6d00e6e2e","phase":"connect","errorClass":"E2BKeyError","errorCode":"e2b_key_missing"}
+cloud task dispatch refused { error: 'E2BKeyError', code: undefined }
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":326,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":3},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":9},{"phase":"ensureBotCloudRuntime","ms":2},{"phase":"bindAgentToConnection","ms":2},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":3},{"phase":"ensureBotCloudRuntime","ms":8},{"phase":"ensureDeviceRepository","ms":3},{"phase":"queueCloudRun","ms":67},{"phase":"ensureThreadMachine","ms":140}],"github":{"requests":3,"ms":1},"failed":false}
+{"event":"thread_runtime_start_failed","runId":"6371f739-8a1e-43f1-816a-7ead3a426576","phase":"connect","errorClass":"E2BKeyError","errorCode":"e2b_key_missing"}
+cloud task dispatch refused { error: 'E2BKeyError', code: undefined }
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":290,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":3},{"phase":"executionWorkspace","ms":4},{"phase":"resolveModelDispatch","ms":10},{"phase":"ensureBotCloudRuntime","ms":1},{"phase":"bindAgentToConnection","ms":1},{"phase":"authorizeSubscriptionWorkspace","ms":3},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":6},{"phase":"ensureDeviceRepository","ms":3},{"phase":"queueCloudRun","ms":64},{"phase":"ensureThreadMachine","ms":11},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+{"event":"thread_runtime_start_failed","runId":"977c7725-2ab6-4050-875c-e47a4a5fb212","phase":"connect","errorClass":"E2BKeyError","errorCode":"e2b_key_missing"}
+cloud task dispatch refused { error: 'E2BKeyError', code: undefined }
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":116,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":3},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":5},{"phase":"ensureBotCloudRuntime","ms":2},{"phase":"bindAgentToConnection","ms":0},{"phase":"authorizeSubscriptionWorkspace","ms":1},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":3},{"phase":"ensureDeviceRepository","ms":1},{"phase":"queueCloudRun","ms":40},{"phase":"ensureThreadMachine","ms":9}],"github":{"requests":3,"ms":0},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":71,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":3},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":8},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+  ✔ (c) own E2B refuses (cap, quota, key): the cloud run is ended; with no server or computer the card, else 云端 falls back to the server (890.190364ms)
+{"event":"thread_runtime_start_failed","runId":"ecbc25bd-36f9-47fc-81a4-47e13ad30686","phase":"connect","errorClass":"E2BKeyError","errorCode":"e2b_key_missing"}
+  ✔ a server goes offline mid-run: the run moves to the own E2B cloud, which ends it with the card when E2B refuses (81.010122ms)
+{"event":"thread_runtime_start_failed","runId":"31ca9fbd-7a7d-4544-ad57-f5791d2885ef","phase":"connect","errorClass":"E2BKeyError","errorCode":"e2b_key_missing"}
+  ✔ a cloud thread whose sandbox is gone continues on a new sandbox of the same thread (43.821494ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":75,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":9},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":57,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":6},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":0},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":76,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":6},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":80,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":8},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":14,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":8}],"github":{"requests":3,"ms":0},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":4,"phases":[{"phase":"resolveRepository","ms":2}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ own devices: 本地 picks the server that takes part; a computer with 参与调度 off is never picked, even when named (356.97936ms)
+✔ run machine fallback: 本地 a computer that takes part, 云端 own E2B, else an actionable error (5398.630186ms)
+(node:63700) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63700) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ cloud provider recovery preserves scope and uses fresh task machines without waking its parent
+  ✔ 402 crosses harnesses using a fresh task container while its sleeping parent stays unchanged (1452.042982ms)
+  ✔ device-fenced completion hands the retained VM to a host after its old token is revoked (177.732043ms)
+{"event":"thread_runtime_start_failed","runId":"5ae541c6-3973-4986-826c-3f9b4029859b","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ concurrent durable handoffs preserve the first new VM provisioning lease (127.805589ms)
+  ✔ durable provider handoff rejects stopped, terminal, foreign and changed receipts before touching a VM (126.800171ms)
+  ✔ disabled cloud execution identity cannot move a frozen cloud task onto its available local device (92.878523ms)
+  ✔ a later cloud task skips the remembered 402 within its selected Agent and freezes the healthy source (146.578063ms)
+✔ cloud provider recovery preserves scope and uses fresh task machines without waking its parent (3725.240433ms)
+ℹ tests 119
+ℹ suites 0
+ℹ pass 119
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 77873.604781

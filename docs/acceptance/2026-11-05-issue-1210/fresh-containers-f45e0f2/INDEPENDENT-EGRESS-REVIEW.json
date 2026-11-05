@@ -1,0 +1,228 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/egress_1211",
+  "reviewedAt": "2026-11-05T02:05:35.404891+00:00",
+  "decision": "no_new_source_integration_blocker; proceed_with_open_PR_update_and_exact_head_CI_only; hold_unmerged",
+  "mergeAuthorizedByThisReview": false,
+  "paidCloudAcceptancePassed": false,
+  "productionAcceptancePassed": false,
+  "hourAcceptancePassed": false,
+  "baseMainCommit": "40d03479ea8260b8934f609b84c7c9cb60a94b3c",
+  "priorCommit": "cccef174f7a4e604a820a4b61f8521e8cdba100b",
+  "mergeBase": "fc2d401bde7b3f567b1288b01accd6fdeb433d0c",
+  "candidateTree": "de3b83d85361e39a33ca9e5678d4ed37e6a33fe4",
+  "recordedLocalCommit": "9441896ad27e0f072d11dc24194351623327a2ac",
+  "parents": [
+    "cccef174f7a4e604a820a4b61f8521e8cdba100b",
+    "40d03479ea8260b8934f609b84c7c9cb60a94b3c"
+  ],
+  "publicationObservation": "author packet publicBranchChanged=false; local commit not asserted to be published",
+  "independentTreeVerification": {
+    "baseMainCommit": "40d03479ea8260b8934f609b84c7c9cb60a94b3c",
+    "baseMainComputedTree": "58f14e63fc36cf12a936b9825604f71162586a84",
+    "priorCommit": "cccef174f7a4e604a820a4b61f8521e8cdba100b",
+    "priorComputedTree": "b7ace3493dbe0aad258eaaa245b528fdc95fcc32",
+    "expectedCandidateTree": "de3b83d85361e39a33ca9e5678d4ed37e6a33fe4",
+    "computedCandidateTree": "de3b83d85361e39a33ca9e5678d4ed37e6a33fe4",
+    "candidateMatches": true,
+    "contentCount": 26,
+    "deletedCount": 1,
+    "preservedMainBlobs": {
+      ".github/workflows/web-deploy.yml": true,
+      ".github/workflows/e2b-official-runtime.yml": true,
+      "scripts/release/web-deploy.mjs": true,
+      "scripts/release/web-deploy.test.mjs": true,
+      "scripts/e2b/publish-template-env.mjs": true,
+      "scripts/e2b/publish-template-env.test.mjs": true,
+      "docs/operations/web-deploy.md": true,
+      "lib/cloud-computer/thread-worker-logs.ts": true
+    },
+    "sameContentAsPrior": [
+      "lib/cloud-computer/snapshot-credentials.test.ts",
+      "lib/cloud-computer/thread-machine-stop.db.test.ts",
+      "lib/computer/bot-runtime.ts",
+      "lib/computer/cloud-task-target.ts",
+      "lib/computer/task-runtime.db.test.ts",
+      "lib/computer/task-runtime.ts",
+      "lib/factory/automatic-dispatch.ts",
+      "lib/factory/check-observations.test.ts",
+      "lib/factory/checks.db.test.ts",
+      "lib/factory/deliverable-recovery.db.test.ts",
+      "lib/factory/inherited-command-observations.db.test.ts",
+      "lib/factory/run-end-paths.db.test.ts",
+      "tests/api-key-runs.db.test.ts",
+      "tests/cloud-device-handoff.db.test.ts",
+      "tests/cloud-runtime-auto.db.test.ts",
+      "tests/run-provider-fallback-cloud.db.test.ts",
+      "tests/shared-subscription-runs.db.test.ts",
+      "tests/support/thread-machine-fake.ts"
+    ],
+    "changedContentFromPrior": [
+      "lib/cloud-computer/thread-machine-task.db.test.ts",
+      "lib/cloud-computer/thread-machines.ts",
+      "lib/cloud-computer/thread-worker-logs.test.ts",
+      "lib/computer/auto-runtime.ts",
+      "lib/computer/queue-run.ts",
+      "lib/computer/store.db.test.ts",
+      "lib/factory/checks.ts",
+      "package.json"
+    ],
+    "questionRuntimeUpgradeHelperByteEqualToMain": true
+  },
+  "reviewedScope": {
+    "netMainPatchLines": 1725,
+    "conflictFiles": 5,
+    "contentFiles": 26,
+    "deletedFiles": [
+      "lib/factory/cloud-stage-admission.ts"
+    ],
+    "sourceUnchangedBetweenGateRuns": true,
+    "preservedBoundaries": [
+      "fresh task registration without parent VM liveness",
+      "Owner/workspace/Bot/device/repository policy and disabled-device fences",
+      "question continuation retains original VM and native SID",
+      "immutable answer/receipt/epoch/candidate/current attempt gates",
+      "original question lease/claim/Stop/bootstrap rollback fences",
+      "ordinary startup failure restricted to its committed lease proof",
+      "main list invalidations and caller transaction identity",
+      "main runtime/Web publisher files and worker log implementation"
+    ]
+  },
+  "findings": [],
+  "actualLocalGates": {
+    "cloudLimits": {
+      "tests": 29,
+      "pass": 29,
+      "fail": 0,
+      "skip": 0,
+      "exit": 0
+    },
+    "probeAndGlob": {
+      "tests": 11,
+      "pass": 11,
+      "fail": 0,
+      "skip": 0,
+      "exit": 0
+    },
+    "firstTaskRuntimePG": {
+      "tests": 73,
+      "pass": 63,
+      "fail": 10,
+      "skip": 0,
+      "exit": 1
+    },
+    "firstFactoryPG": {
+      "tests": 65,
+      "pass": 62,
+      "fail": 3,
+      "skip": 0,
+      "exit": 1
+    },
+    "correctedTaskRuntimePG": {
+      "tests": 119,
+      "pass": 119,
+      "fail": 0,
+      "skip": 0,
+      "exit": 0
+    },
+    "correctedFactoryPG": {
+      "tests": 138,
+      "pass": 138,
+      "fail": 0,
+      "skip": 0,
+      "exit": 0
+    },
+    "workflowTypegen": {
+      "steps": 149,
+      "workflows": 6,
+      "exit": 0
+    },
+    "typecheckExit": 0,
+    "lintExit": 0,
+    "actualPRBaseDiffCheckExit": 0
+  },
+  "firstFailure": {
+    "reason": "external runner passed BETTER_AUTH_URL with /mikka path; existing auth-email rejects a non-origin URL",
+    "correction": "use https://example.invalid pure origin, new random role/DB, rerun only failed PG gates",
+    "productOrAssertionChange": false,
+    "originalLogsRetained": true
+  },
+  "otherRetainedFailures": [
+    "default pnpm11 ERR_PNPM_IGNORED_BUILDS; corrected by using repository pnpm10.34.3",
+    "old-head diff-check reports inherited main EOF blank lines; actual main-base diff-check passes"
+  ],
+  "cleanup": {
+    "source": "actual author runner receipts; no additional reviewer database query",
+    "adminScope": "existing loopback 127.0.0.1:5432/mikka_e2e bootstrap admin",
+    "databaseSelection": "new random test role ownership AND _e2e name check",
+    "method": "DROP DATABASE WITH(FORCE), then DROP ROLE, catalog absence checks",
+    "testRolePrivilegeEscalation": false,
+    "zeroConnectionsAsserted": false,
+    "ordinaryDropAsserted": false,
+    "firstRun": {
+      "role": "mikka_merge1217_f482a16a973c",
+      "ownedDatabases": [
+        "factory193_consumers_9611bec3aa23418e8a8212a3845ba53e_e2e",
+        "mikka_merge1217_f482a16a973c_e2e"
+      ],
+      "databasesAbsent": true,
+      "roleAbsent": true
+    },
+    "correctedRun": {
+      "role": "mikka_merge1217_33d37277a982",
+      "ownedDatabases": [
+        "factory193_consumers_85a558a9ddaa4575a9b015614810e48b_e2e",
+        "mikka_merge1217_33d37277a982_e2e"
+      ],
+      "databasesAbsent": true,
+      "roleAbsent": true
+    }
+  },
+  "independentEvidenceVerification": {
+    "all15LogBytesAndSHA256Match": true,
+    "archives": [
+      {
+        "path": "final-source.tar.gz",
+        "bytes": 627391,
+        "sha256": "939fea33e1125fa3e83572358d58c6795338383d306d51092a828b37f5b2c9e7"
+      },
+      {
+        "path": "gate-proof.tar.gz",
+        "bytes": 30681,
+        "sha256": "61cb3275f03362b56fdd2f739776aae91f2cc16e96ddebedd37f74786d34945f"
+      }
+    ],
+    "runners": [
+      {
+        "path": "gate-proof/1217-main40-gates.mjs",
+        "bytes": 5687,
+        "sha256": "7f1cdb54e3330f337ba7312142e92f443642ff57e7d0aeb21ab11c6f94c4c11e"
+      },
+      {
+        "path": "gate-proof/1217-main40-pg-origin-fixed.mjs",
+        "bytes": 5427,
+        "sha256": "d19171268d76c1539dbb45f1ebf5aab2a081ea93e5058775d2b6b2f532f4c2a6"
+      }
+    ]
+  },
+  "reviewerActions": {
+    "sourceEdits": 0,
+    "testRuns": 0,
+    "modelCalls": 0,
+    "productionCalls": 0,
+    "gitRefMutations": 0
+  },
+  "limitations": [
+    "new public head CI remains separate from reviewed local tree",
+    "PostgreSQL was real but provider/model behavior used local fixtures",
+    "no full production Next build claimed from next typegen",
+    "no paid cloud leg or production three-path/hour acceptance",
+    "does not waive issue body gates",
+    "cleanup limited to the new random roles and their owned databases"
+  ],
+  "report": {
+    "path": "INDEPENDENT-EGRESS-REVIEW.md",
+    "bytes": 13435,
+    "sha256": "8c6e073ce08f2ea41ef3ba71232a80c0a8c243e44c1b0b2f97465bad3cadcc13"
+  }
+}

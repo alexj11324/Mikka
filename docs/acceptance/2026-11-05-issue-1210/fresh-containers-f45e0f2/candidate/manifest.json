@@ -1,0 +1,205 @@
+{
+  "head": "cccef174f7a4e604a820a4b61f8521e8cdba100b",
+  "main": "40d03479ea8260b8934f609b84c7c9cb60a94b3c",
+  "base": "fc2d401bde7b3f567b1288b01accd6fdeb433d0c",
+  "tree": "de3b83d85361e39a33ca9e5678d4ed37e6a33fe4",
+  "changedPaths": 27,
+  "samePathSetAsPriorPR": true,
+  "files": [
+    {
+      "path": "lib/cloud-computer/snapshot-credentials.test.ts",
+      "bytes": 2399,
+      "sha256": "1779b687795399d4c523d954f97255423163a5de7741eb91ed0ce027b497dab7",
+      "gitBlob": "90dd95669d9c359bda29c0fa034b10dfc826f391"
+    },
+    {
+      "path": "lib/cloud-computer/thread-machine-stop.db.test.ts",
+      "bytes": 10007,
+      "sha256": "8582faa5302b4efd6dd33799fc19c10d1a2ec98228d433a8292375555866e96b",
+      "gitBlob": "9b79f187caec1d3ced410b14a3ddd372a3cc36b7"
+    },
+    {
+      "path": "lib/cloud-computer/thread-machine-task.db.test.ts",
+      "bytes": 90705,
+      "sha256": "22a4b56c3e6486578d3ef7c7c03b202f1d838e77978fc4b11925ae2469b8a1a9",
+      "gitBlob": "d1cc41fd890974769fc53ea3bd8402868251742b"
+    },
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "bytes": 64423,
+      "sha256": "1b29d60a0ea37aca2896233e4c68c973850b35652e8d580883f6d3050598f137",
+      "gitBlob": "44d0118c293ce113f36c28b47e24b732fede7b3b"
+    },
+    {
+      "path": "lib/cloud-computer/thread-worker-logs.test.ts",
+      "bytes": 17218,
+      "sha256": "5d2fcfc955d463ca7d468e6c551f43919ec27edfbca07690f0bc59cc21da4856",
+      "gitBlob": "00241127dd85935a6ef1e0fcb4bb62f462a7fa46"
+    },
+    {
+      "path": "lib/computer/auto-runtime.ts",
+      "bytes": 5630,
+      "sha256": "a3d60c7f5cd73e5f2f2fb340dd186d59ec6f192884fe6a4bc44c1fe4ed64a933",
+      "gitBlob": "e42b1f98ca05f7e499a181bc1fae2aecdb4a5dde"
+    },
+    {
+      "path": "lib/computer/bot-runtime.ts",
+      "bytes": 5362,
+      "sha256": "9569578e0b9680ff80436cff4ec6f9f7c55a693b87b1ee49bc22ce96aa3bb1be",
+      "gitBlob": "dbe004d83c0faf935139e8699e07939dd1d4391c"
+    },
+    {
+      "path": "lib/computer/cloud-task-target.ts",
+      "bytes": 3855,
+      "sha256": "f87d54591db0f7d92a3dcf9e9a824c1f90bfaf9c3afba51887c051443bff77f1",
+      "gitBlob": "51a9e85e34009c14e773acd3ad7f06e70c9269fd"
+    },
+    {
+      "path": "lib/computer/queue-run.ts",
+      "bytes": 11726,
+      "sha256": "abfeb0bbc033be8706a4f4a9637de2ad73f6bce16b81b10607787c10c0713eba",
+      "gitBlob": "9f6d5efed83f437dbcaa0c9bcebf92b51148b9e2"
+    },
+    {
+      "path": "lib/computer/store.db.test.ts",
+      "bytes": 58546,
+      "sha256": "9af5c97d5d3836957b85c82afa883f6b7345eaee9cdcba875791748466734f90",
+      "gitBlob": "c7a576e6799330b212ca4609ffb53ff8f7077eb8"
+    },
+    {
+      "path": "lib/computer/task-runtime.db.test.ts",
+      "bytes": 7371,
+      "sha256": "3eeb006b257f46c8b2b18cd63c3d612651cdb4646cbac760642df6ba5bd89f61",
+      "gitBlob": "374d0357987dff50401014d9c7f8011c1ef69b12"
+    },
+    {
+      "path": "lib/computer/task-runtime.ts",
+      "bytes": 3351,
+      "sha256": "62a47a606fe5eee2a6bc0f4124667878c40a0f6fd6dca3652c886c370292625c",
+      "gitBlob": "c73c1dd8dc4bcbe5cd5940f289068422d7b4226a"
+    },
+    {
+      "path": "lib/factory/automatic-dispatch.ts",
+      "bytes": 9356,
+      "sha256": "479883ed84f2ed3a83a7b6a5690f86ad3a683fc2c9da3ab9763e64c751e14c85",
+      "gitBlob": "c405d648b4eaa0dd2069a38ad5bef81a9a90fced"
+    },
+    {
+      "path": "lib/factory/check-observations.test.ts",
+      "bytes": 9325,
+      "sha256": "62918e06d758d7a6d87afd8fbca771608e9090a18e95073fbe3453902d54eca6",
+      "gitBlob": "55b1b0a126aa59f516379ad2e73dd7ff0080959c"
+    },
+    {
+      "path": "lib/factory/checks.db.test.ts",
+      "bytes": 147302,
+      "sha256": "d818429befced58c014b110bd5e3cd7951a4d3863cd12e8a18dbf69a36cf74d6",
+      "gitBlob": "4fd6999ecaadaf5c28a0ecc25d5c2e53e692d4f3"
+    },
+    {
+      "path": "lib/factory/checks.ts",
+      "bytes": 52866,
+      "sha256": "1508081599893027cc98dd65a0b7d40face35cb812d59cbe31107087c3a66523",
+      "gitBlob": "9db4e2d7b894c22b92e85e686f1fb2bac198508d"
+    },
+    {
+      "path": "lib/factory/cloud-stage-admission.ts",
+      "deleted": true
+    },
+    {
+      "path": "lib/factory/deliverable-recovery.db.test.ts",
+      "bytes": 36053,
+      "sha256": "f07b7d9a18f12ec7ea4b267e14fa6f3b5831a5a4c26cc4741c8f3f306d7b20c4",
+      "gitBlob": "933833f5064cafa1bff99e5ac64fb651604bf423"
+    },
+    {
+      "path": "lib/factory/inherited-command-observations.db.test.ts",
+      "bytes": 37338,
+      "sha256": "feaa1858b1f2397d9b5a09423c6edf4ec47378ccf62dcf3c07a638cea0eb5884",
+      "gitBlob": "6258cd79b69db07813e3b2bf0a5ea4feebfcd7e1"
+    },
+    {
+      "path": "lib/factory/run-end-paths.db.test.ts",
+      "bytes": 21641,
+      "sha256": "a4d8ea02812b3914546301df2672e4fdc63bfd9263c36c2bc5df8d3d6a5e0bb0",
+      "gitBlob": "23597148d360504680c71db62e4b5fc9fd9460ca"
+    },
+    {
+      "path": "package.json",
+      "bytes": 63240,
+      "sha256": "eba0eb4e41879bd7e3c9e1e63e5896c21c49d648ca30f91dfa0946bffe953e9d",
+      "gitBlob": "afea9c3556ee14ebdd7bc0717924927207fbdbc3"
+    },
+    {
+      "path": "tests/api-key-runs.db.test.ts",
+      "bytes": 43690,
+      "sha256": "00df2d4c87c42a59092673c0c72115449b12f2fb58de799fbd10ce96c20ea36a",
+      "gitBlob": "8cd785ffd344f46a2d695028d05c4f52928707fa"
+    },
+    {
+      "path": "tests/cloud-device-handoff.db.test.ts",
+      "bytes": 20761,
+      "sha256": "f0ed350397be48fa916bd27b2a17d8ed8831e6b1017ec3f09605e5380000ff0c",
+      "gitBlob": "52bb7279548ce8bb34187a618ef42cfd3517ff3b"
+    },
+    {
+      "path": "tests/cloud-runtime-auto.db.test.ts",
+      "bytes": 51857,
+      "sha256": "332ed7c47797c4ef39fb5987bbd44779b330328a6e0de8b29c26679661570a8c",
+      "gitBlob": "a2ca2b6615fe5f6049bb0f4a0b751307d288b8c3"
+    },
+    {
+      "path": "tests/run-provider-fallback-cloud.db.test.ts",
+      "bytes": 29936,
+      "sha256": "d8f801f72f570fee66de5744521bf5c981a4944649eafedbabfb5540cd246ac3",
+      "gitBlob": "acb86e561fe5b038aabbf7082d3748da7741b118"
+    },
+    {
+      "path": "tests/shared-subscription-runs.db.test.ts",
+      "bytes": 22988,
+      "sha256": "c9e5291e911495cc9e5736a0455d28e2ed033572da426740752e73e9a50a0441",
+      "gitBlob": "5ae49f7676cd813e524310b002017610ffc3c3ba"
+    },
+    {
+      "path": "tests/support/thread-machine-fake.ts",
+      "bytes": 4685,
+      "sha256": "0455b402f6daae6f4328fb2d67ecba0ea05fa5adfd913e8b269ddc42a98bd12c",
+      "gitBlob": "78df487ce8b8c106c0cb90c663a8c8817835c439"
+    }
+  ],
+  "preservedMainBlobs": [
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "gitBlob": "e97226987c6b9d88ad70340d2f5490b74dab6279"
+    },
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "gitBlob": "d623fe2d05727935bce2eac6468b260c0ff881ac"
+    },
+    {
+      "path": "scripts/release/web-deploy.mjs",
+      "gitBlob": "62a70d9315cb85097f524cb1ca5a9fd438002ea9"
+    },
+    {
+      "path": "scripts/release/web-deploy.test.mjs",
+      "gitBlob": "b9cb09aba0f8b5d36c2d091306e4912b1c12db97"
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "gitBlob": "d04390cffb9c1e14ef452dc9c516dd39d6061f7c"
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "gitBlob": "aa17e3a56b3875a83e64428c27159428e25546da"
+    },
+    {
+      "path": "docs/operations/web-deploy.md",
+      "gitBlob": "80ada4817517fdd279bde34cf3ba4c39f5d47d85"
+    },
+    {
+      "path": "lib/cloud-computer/thread-worker-logs.ts",
+      "gitBlob": "3058e87bc7bee65d635601603eb3f3dac73d1234"
+    }
+  ],
+  "tests": "running; no paid or production acceptance"
+}

@@ -1,0 +1,114 @@
+{
+  "head": "cccef174f7a4e604a820a4b61f8521e8cdba100b",
+  "main": "40d03479ea8260b8934f609b84c7c9cb60a94b3c",
+  "tree": "de3b83d85361e39a33ca9e5678d4ed37e6a33fe4",
+  "role": "mikka_merge1217_f482a16a973c",
+  "database": "mikka_merge1217_f482a16a973c_e2e",
+  "startedAt": "2026-11-05T01:52:48.930Z",
+  "gates": [
+    {
+      "label": "cloud-limits",
+      "cmd": "corepack",
+      "args": [
+        "pnpm",
+        "test:cloud-limits"
+      ],
+      "pid": 62458,
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "seconds": 2.377
+    },
+    {
+      "label": "task-runtime-pg",
+      "cmd": "node",
+      "args": [
+        "--experimental-test-module-mocks",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-concurrency=1",
+        "lib/cloud-computer/thread-machine-task.db.test.ts",
+        "lib/cloud-computer/thread-machine-stop.db.test.ts",
+        "lib/computer/bot-runtime.db.test.ts",
+        "lib/computer/task-runtime.db.test.ts",
+        "tests/cloud-runtime-auto.db.test.ts",
+        "tests/run-provider-fallback-cloud.db.test.ts",
+        "tests/run-machine-fallback.db.test.ts",
+        "lib/factory/run-end-paths.db.test.ts"
+      ],
+      "pid": 62788,
+      "code": 1,
+      "signal": null,
+      "timedOut": false,
+      "seconds": 42.671
+    },
+    {
+      "label": "factory-pg",
+      "cmd": "corepack",
+      "args": [
+        "pnpm",
+        "test:factory-checks-db"
+      ],
+      "pid": 63082,
+      "code": 1,
+      "signal": null,
+      "timedOut": false,
+      "seconds": 9.5
+    },
+    {
+      "label": "typegen",
+      "cmd": "corepack",
+      "args": [
+        "pnpm",
+        "exec",
+        "next",
+        "typegen"
+      ],
+      "pid": 63207,
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "seconds": 3.699
+    },
+    {
+      "label": "typecheck",
+      "cmd": "corepack",
+      "args": [
+        "pnpm",
+        "typecheck"
+      ],
+      "pid": 63282,
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "seconds": 2.973
+    },
+    {
+      "label": "lint",
+      "cmd": "corepack",
+      "args": [
+        "pnpm",
+        "exec",
+        "oxlint",
+        "--deny-warnings"
+      ],
+      "pid": 63324,
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "seconds": 0.458
+    }
+  ],
+  "cleanup": {
+    "ownedDatabases": [
+      "factory193_consumers_9611bec3aa23418e8a8212a3845ba53e_e2e",
+      "mikka_merge1217_f482a16a973c_e2e"
+    ],
+    "databasesAbsent": true,
+    "roleAbsent": true
+  },
+  "finishedAt": "2026-11-05T01:53:51.280Z"
+}

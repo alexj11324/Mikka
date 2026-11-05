@@ -1,0 +1,113 @@
+
+> next-app@0.0.1 test:factory-checks-db /vercel/sandbox/mikka-1217-main40-integration
+> node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/checks.db.test.ts lib/factory/continuity.db.test.ts lib/factory/inherited-command-observations.db.test.ts lib/factory/questions/execution-continuation.db.test.ts
+
+(node:63101) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63101) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✖ actual migrated PG/HTTP: review/verify receipt consumers and bounded repair (1389.376329ms)
+✔ isolated PG: producer command records bind owner/session/candidate and retain actual results, never self-reported success (58.812826ms)
+▶ PG: request epochs, stale completion fences and unattended handoff are durable
+  ✔ concurrent resend keeps one Task/epoch/attempt; old callbacks cannot finish or repair it (93.19818ms)
+  ✔ the direct route entry advances the same Task for its authenticated continuation (38.45536ms)
+  ✔ a foreign parent, a replayed older epoch and cancelled authority cannot advance (37.583367ms)
+  ✔ online heartbeats do not count as progress; a stall emits one durable blocker (33.166459ms)
+  ✖ an older uncertain receipt survives a full handoff window and blocks lease recovery (1385.410218ms)
+  ✔ missing executor admission has bounded, backoff-protected recovery (64.848731ms)
+✖ PG: request epochs, stale completion fences and unattended handoff are durable (1710.605936ms)
+▶ isolated PG: direct question recovery exposes historical native observations without rewriting or passing the producer
+  ✔ an independent check may use the receipt-bound predecessor as the same execution, with frozen source provenance (1.649448ms)
+  ✔ a real migrated legacy graph exposes only the direct inherited pair with explicit failed-source attribution (43.067472ms)
+  ✔ missing receipt provides no inherited evidence (36.771776ms)
+  ✔ duplicate receipt provides no inherited evidence (39.759553ms)
+  ✔ wrong history run provides no inherited evidence (37.383959ms)
+  ✔ wrong original execute attempt provides no inherited evidence (36.94522ms)
+  ✔ wrong explicit epoch provides no inherited evidence (40.792305ms)
+  ✔ wrong source attempt stage provides no inherited evidence (35.526702ms)
+  ✔ wrong source attempt status provides no inherited evidence (36.385977ms)
+  ✔ wrong source attempt session provides no inherited evidence (36.324526ms)
+  ✔ wrong producer attempt session provides no inherited evidence (36.401907ms)
+  ✔ wrong source run session provides no inherited evidence (49.782745ms)
+  ✔ wrong canonical answer provides no inherited evidence (37.690709ms)
+  ✔ missing source actual claim provides no inherited evidence (36.55745ms)
+  ✔ missing producer actual claim provides no inherited evidence (37.755176ms)
+  ✔ wrong actual source binding provides no inherited evidence (39.921007ms)
+  ✔ wrong frozen source binding provides no inherited evidence (36.803512ms)
+  ✔ wrong execution binding owner provides no inherited evidence (36.472247ms)
+  ✔ wrong execution binding workspace provides no inherited evidence (48.540901ms)
+  ✔ wrong execution binding consumer provides no inherited evidence (47.940873ms)
+  ✔ wrong actual bound model provides no inherited evidence (45.235654ms)
+  ✔ wrong connection owner provides no inherited evidence (38.245524ms)
+  ✔ wrong connection revision provides no inherited evidence (43.641283ms)
+  ✔ wrong source device provides no inherited evidence (37.150695ms)
+  ✔ wrong source repository provides no inherited evidence (35.582684ms)
+  ✔ wrong source base provides no inherited evidence (34.623387ms)
+  ✔ wrong source worktree provides no inherited evidence (34.479794ms)
+  ✔ source cancellation provides no inherited evidence (34.843453ms)
+  ✔ different current candidate provides no inherited evidence (34.272493ms)
+  ✔ command predates answer provides no inherited evidence (35.315622ms)
+  ✔ output follows source finish provides no inherited evidence (35.524919ms)
+  ✔ unpaired tool result provides no inherited evidence (36.82339ms)
+  ✔ missing output makes the whole predecessor command collection incomplete (35.804701ms)
+  ✔ duplicate output makes the whole predecessor command collection incomplete (34.237099ms)
+  ✔ truncated native payloads never become usable inherited evidence or disclose their tail (35.462984ms)
+  ✔ more than 32 complete pairs omit the entire inherited collection (48.102ms)
+  ✔ complete pairs whose aggregate exceeds 12k omit the entire inherited collection (37.316573ms)
+  ✔ a reported failed command stays failed data, never a synthesized pass (36.303974ms)
+  ✔ a changed original producer attempt status invalidates the canonical snapshot evidence (7.143769ms)
+  ✔ a corrupted current snapshot is refused before any historical evidence can be relied on (1.975867ms)
+✔ isolated PG: direct question recovery exposes historical native observations without rewriting or passing the producer (3331.512798ms)
+▶ real PG: question receipts preserve one execution without opening a repair-cap bypass
+  ✔ queued question resume uses the same execution: {"native":true} (332.033173ms)
+  ✔ queued question resume uses the same execution: {"native":true,"withoutBot":true} (263.380914ms)
+  ✔ queued question resume uses the same execution: {"native":true,"separateChat":true} (273.62909ms)
+  ✔ queued question resume uses the same execution: {} (273.04543ms)
+  ✔ queued question resume uses the same execution: {"withoutBot":true} (260.627308ms)
+  ✔ queued question resume uses the same execution: {"local":true} (251.776035ms)
+  ✔ watchdog recovers the same unclaimed native question instead of leaving it queued until the generic stop window (62.667159ms)
+  ✔ native question wake generations are bounded, single-winner and preserve the unclaimed child and original session (1821.307387ms)
+  ✔ missing or ended original machines and expired scope remain in the normal watchdog failure path (266.468239ms)
+  ✔ receipt, task, owner, answer, epoch, adjacency and cloud scope mutations fail closed (620.328462ms)
+  ✔ one legacy recovery receipt joins its original, failed source and queued child without admitting another repair (1048.749133ms)
+  ✔ codex: completed command provenance requires actual native resume, fixed SHA and a complete source record set (463.130726ms)
+  ✔ claude_code: completed command provenance requires actual native resume, fixed SHA and a complete source record set (441.368814ms)
+  ✔ only the verified transient answered transaction may bypass the repair cap (107.689571ms)
+✔ real PG: question receipts preserve one execution without opening a repair-cap bypass (7166.7627ms)
+ℹ tests 65
+ℹ suites 0
+ℹ pass 62
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9123.48351
+
+✖ failing tests:
+
+test at lib/factory/checks.db.test.ts:1:2026
+✖ actual migrated PG/HTTP: review/verify receipt consumers and bounded repair (1389.376329ms)
+  Error: Invalid authentication email origin
+      at createAuthEmail (/vercel/sandbox/mikka-1217-main40-integration/lib/auth-email.ts:38:138)
+      at <anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/auth.ts:30:15)
+      at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async Promise.all (index 2)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/factory/checks.db.test.ts:297:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at lib/factory/continuity.db.test.ts:3:5697
+✖ an older uncertain receipt survives a full handoff window and blocks lease recovery (1385.410218ms)
+  Error: Invalid authentication email origin
+      at createAuthEmail (/vercel/sandbox/mikka-1217-main40-integration/lib/auth-email.ts:38:138)
+      at <anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/auth.ts:30:15)
+      at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async factoryRecoveryHandoff (/vercel/sandbox/mikka-1217-main40-integration/lib/factory/handoff.ts:86:38)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/factory/continuity.db.test.ts:146:27)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-1217-main40-integration/lib/factory/continuity.db.test.ts:132:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+ ELIFECYCLE  Command failed with exit code 1.

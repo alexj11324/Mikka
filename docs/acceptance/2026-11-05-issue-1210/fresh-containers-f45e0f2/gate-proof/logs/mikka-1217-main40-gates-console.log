@@ -1,0 +1,7 @@
+{"gate":"cloud-limits","code":0,"signal":null,"timedOut":false,"seconds":2.377}
+{"gate":"task-runtime-pg","code":1,"signal":null,"timedOut":false,"seconds":42.671}
+{"gate":"factory-pg","code":1,"signal":null,"timedOut":false,"seconds":9.5}
+{"gate":"typegen","code":0,"signal":null,"timedOut":false,"seconds":3.699}
+{"gate":"typecheck","code":0,"signal":null,"timedOut":false,"seconds":2.973}
+{"gate":"lint","code":0,"signal":null,"timedOut":false,"seconds":0.458}
+{"cleanup":{"ownedDatabases":["factory193_consumers_9611bec3aa23418e8a8212a3845ba53e_e2e","mikka_merge1217_f482a16a973c_e2e"],"databasesAbsent":true,"roleAbsent":true},"finishedAt":"2026-11-05T01:53:51.280Z"}
