@@ -35,6 +35,10 @@ const flight = value => new Response(`0:{"a":"$@1"}\n1:${JSON.stringify(value)}\
 const row = value => ({ id: value, title: PRIVATE })
 const position = (value, revision = V1) => ({ id: value, version: revision })
 const live = () => ({ ownerId: OWNER, workspaceId: WORKSPACE, selectedWorkspaceId: WORKSPACE })
+const requestCookies = value => new Map((value ?? '').split('; ').filter(Boolean).map(part => {
+  const at = part.indexOf('=')
+  return [part.slice(0, at), part.slice(at + 1)]
+}))
 
 function fixture(options = {}) {
   const calls = [], actions = [], counts = new Map()
@@ -59,7 +63,7 @@ function fixture(options = {}) {
     }
     return { version: current, unchanged: true, live: live() }
   }
-  const fetchImpl = async (input, init = {}) => {
+  const respond = async (input, init = {}) => {
     const url = new URL(input), headers = new Headers(init.headers), method = init.method ?? 'GET'
     calls.push({ path: url.pathname + url.search, method, cookie: headers.get('cookie'), body: init.body })
     assert.equal(url.origin, ORIGIN)
@@ -69,9 +73,10 @@ function fixture(options = {}) {
     if (url.pathname === '/mikka/api/auth/sign-in/email') {
       assert.equal(headers.get('cookie'), null, 'the driver cannot inherit another session')
       assert.deepEqual(JSON.parse(init.body), { email: EMAIL, password: PASSWORD })
-      return json({}, options.loginStatus ?? 200, { 'set-cookie': `better-auth.session_token=${COOKIE}; HttpOnly; Secure` })
+      return json({}, options.loginStatus ?? 200, { 'set-cookie': `better-auth.session_token=${COOKIE}; Path=/; HttpOnly; Secure` })
     }
-    assert.equal(headers.get('cookie'), `better-auth.session_token=${COOKIE}`)
+    assert.equal(requestCookies(headers.get('cookie')).get('better-auth.session_token'), options.sessionCookie?.() ?? COOKIE)
+    if (!options.responseCookies) assert.equal(headers.get('cookie'), `better-auth.session_token=${COOKIE}`)
     if (url.pathname === '/mikka/api/auth/sign-out') return json({}, options.logoutStatus ?? 200)
     if (url.pathname === '/mikka/api/auth/get-session') return json({ user: { id: OWNER, email: options.foreignEmail ? 'other@example.invalid' : EMAIL } })
     if (url.pathname === '/mikka/api/bots') {
@@ -120,7 +125,13 @@ function fixture(options = {}) {
       `createServerReference("${refs[name]}",callServer,void 0,findSourceMapURL,"${name}")`).join(';'))
     assert.fail('unexpected request')
   }
-  return { calls, actions, run: args => runProductionReadCache({ env: env(), event: event(), attestation: attestation(), fetchImpl, now: () => NOW, ...args }) }
+  const fetchImpl = async (input, init = {}) => {
+    const response = await respond(input, init)
+    for (const cookie of options.responseCookies?.({ url: new URL(input), method: init.method ?? 'GET', response }) ?? [])
+      response.headers.append('set-cookie', cookie)
+    return response
+  }
+  return { calls, actions, run: args => runProductionReadCache({ env: env(), event: event(), attestation: attestation(), fetchImpl, now: options.now ?? (() => NOW), ...args }) }
 }
 
 test('manual triggers require main and the same application and driver SHA', () => {
@@ -281,6 +292,118 @@ test('stable production cursors cover four HTTP scenarios with only a normal own
   const evidence = JSON.stringify(report)
   for (const secret of [EMAIL, PASSWORD, COOKIE, PRIVATE, OWNER, WORKSPACE, BOT, TASK, refs.pollIssue]) assert.equal(evidence.includes(secret), false)
   assert.deepEqual(publicFailure(new Error(PASSWORD + COOKIE)), { status: 'fail', code: 'acceptance_failed' })
+})
+
+test('page discovery cookies accompany later chunks, actions, Settings and sign-out', async () => {
+  const f = fixture({ responseCookies: ({ url, method }) => url.pathname === '/mikka' && method === 'GET'
+    ? ['NEXT_LOCALE=zh-CN; Path=/mikka; Secure; SameSite=Lax'] : [] })
+  const report = await f.run()
+  assert.equal(report.status, 'pass'); assert.equal(report.sessionClosed, true)
+  const landing = f.calls.findIndex(call => call.path === '/mikka' && call.method === 'GET')
+  assert.ok(landing > 0)
+  const later = f.calls.slice(landing + 1)
+  for (const path of ['/mikka/settings?section=preferences', '/mikka/_next/static/chunks/read.js', '/mikka',
+    '/mikka/api/settings/issue-prefix', '/mikka/api/auth/sign-out']) assert.ok(later.some(call => call.path === path), path)
+  for (const call of later) {
+    assert.equal(requestCookies(call.cookie).get('NEXT_LOCALE'), 'zh-CN', call.path)
+    assert.equal(requestCookies(call.cookie).get('better-auth.session_token'), COOKIE, call.path)
+  }
+  assert.equal(report.reads.length, 27)
+  assert.equal(JSON.stringify(report).includes('NEXT_LOCALE'), false)
+})
+
+test('response cookies replace the session and nonce, expire, and use Max-Age before Expires', async () => {
+  const rotated = 'SYNTHETIC-ROTATED-SESSION', firstNonce = 'SYNTHETIC-NONCE=FIRST', lastNonce = 'SYNTHETIC-NONCE-LAST'
+  const past = new Date(NOW - 1000).toUTCString(), future = new Date(NOW + 60000).toUTCString()
+  let clock = NOW, sessionCookie = COOKIE
+  const f = fixture({ now: () => clock, sessionCookie: () => sessionCookie, responseCookies: ({ url, method }) => {
+    if (url.pathname === '/mikka/api/auth/get-session' && sessionCookie === COOKIE) {
+      sessionCookie = rotated
+      return [`better-auth.session_token=${rotated}; Path=/; Secure; HttpOnly`,
+        `nonce=${firstNonce}; Path=/mikka; Max-Age=120; Expires=${past}`,
+        'short-lived=SHORT-LIVED-SECRET; Path=/mikka; Max-Age=1',
+        `date-limited=DATE-LIMITED-SECRET; Path=/mikka; Expires=${new Date(NOW + 1000).toUTCString()}`,
+        'drop-by-age=DROP-BY-AGE-SECRET; Path=/mikka; Max-Age=120',
+        'drop-by-date=DROP-BY-DATE-SECRET; Path=/mikka; Max-Age=120']
+    }
+    if (url.pathname === '/mikka' && method === 'GET') {
+      clock += 2000
+      return [`nonce=${lastNonce}; Path=/mikka; Max-Age=120`,
+        `drop-by-age=; Path=/mikka; Max-Age=0; Expires=${future}`, `drop-by-date=; Path=/mikka; Expires=${past}`]
+    }
+    return []
+  } })
+  const report = await f.run()
+  assert.equal(report.status, 'pass'); assert.equal(report.sessionClosed, true)
+  const before = requestCookies(f.calls.find(call => call.path === '/mikka/api/bots').cookie)
+  assert.equal(before.get('better-auth.session_token'), rotated)
+  assert.equal(before.get('nonce'), firstNonce, 'positive Max-Age overrides the past Expires date')
+  assert.equal(before.get('short-lived'), 'SHORT-LIVED-SECRET')
+  assert.equal(before.get('date-limited'), 'DATE-LIMITED-SECRET')
+  const landing = f.calls.findIndex(call => call.path === '/mikka' && call.method === 'GET')
+  for (const call of f.calls.slice(landing + 1)) {
+    const cookies = requestCookies(call.cookie)
+    assert.equal(cookies.get('better-auth.session_token'), rotated, call.path)
+    assert.equal(cookies.get('nonce'), lastNonce, call.path)
+    for (const name of ['short-lived', 'date-limited', 'drop-by-age', 'drop-by-date']) assert.equal(cookies.has(name), false, name)
+  }
+  const logout = f.calls.filter(call => call.path === '/mikka/api/auth/sign-out')
+  assert.equal(logout.length, 1)
+  assert.equal(requestCookies(logout[0].cookie).get('better-auth.session_token'), rotated)
+  const evidence = JSON.stringify(report)
+  for (const secret of [COOKIE, rotated, firstNonce, lastNonce, 'SHORT-LIVED-SECRET', 'DATE-LIMITED-SECRET']) assert.equal(evidence.includes(secret), false)
+})
+
+test('response cookies obey domains, default paths and path boundaries without merging same-name scopes', async () => {
+  const f = fixture({ responseCookies: ({ url, method }) => {
+    if (url.pathname === '/mikka' && method === 'GET') return [
+      'scope=WIDE-SECRET; Domain=.aspectlylabs.com; Path=/mikka; Secure',
+      'scope=NARROW-SECRET; Domain=.aspectlylabs.com; Path=/mikka/api/settings; Secure',
+      'api=API-SECRET; Path=/mikka/api; Secure',
+      'boundary=BOUNDARY-SECRET; Path=/mikka/api/settings/issue',
+      'foreign=FOREIGN-SECRET; Domain=foreign.invalid; Path=/',
+      'suffix=SUFFIX-SECRET; Domain=app.aspectlylabs.com.foreign.invalid; Path=/',
+    ]
+    if (url.pathname === '/mikka/settings') return ['default-path=DEFAULT-PATH-SECRET; Secure']
+    return []
+  } })
+  const report = await f.run()
+  assert.equal(report.status, 'pass'); assert.equal(report.sessionClosed, true)
+  const settings = f.calls.find(call => call.path === '/mikka/api/settings/issue-prefix').cookie
+  assert.ok(settings.includes('scope=NARROW-SECRET')); assert.ok(settings.includes('scope=WIDE-SECRET'))
+  assert.ok(settings.indexOf('scope=NARROW-SECRET') < settings.indexOf('scope=WIDE-SECRET'))
+  assert.equal(requestCookies(settings).get('api'), 'API-SECRET')
+  for (const call of f.calls.filter(call => call.path === '/mikka' && call.method === 'POST' || call.path.includes('/_next/'))) {
+    assert.equal(requestCookies(call.cookie).get('scope'), 'WIDE-SECRET')
+    assert.equal(requestCookies(call.cookie).get('default-path'), 'DEFAULT-PATH-SECRET')
+    assert.equal(requestCookies(call.cookie).has('api'), false)
+    assert.equal(call.cookie.includes('NARROW-SECRET'), false)
+  }
+  for (const call of f.calls) for (const name of ['boundary', 'foreign', 'suffix']) assert.equal(requestCookies(call.cookie).has(name), false, name)
+})
+
+test('a refused redirect or foreign response cannot replace the session used for cleanup', async () => {
+  for (const redirect of [true, false]) {
+    const f = fixture({ redirect, responseCookies: ({ url, response }) => {
+      if (url.pathname !== '/mikka/api/bots') return []
+      if (!redirect) Object.defineProperty(response, 'url', { value: 'https://foreign.invalid/mikka/api/bots' })
+      return ['better-auth.session_token=UNTRUSTED-REDIRECT-COOKIE; Path=/; Secure']
+    } })
+    const report = await f.run()
+    assert.equal(report.code, 'redirect_refused'); assert.equal(report.sessionClosed, true)
+    const logout = f.calls.find(call => call.path === '/mikka/api/auth/sign-out')
+    assert.equal(logout.cookie, `better-auth.session_token=${COOKIE}`)
+    assert.equal(JSON.stringify(report).includes('UNTRUSTED-REDIRECT-COOKIE'), false)
+  }
+})
+
+test('a failed sign-out remains blocked when its response deletes the last cookie', async () => {
+  const f = fixture({ logoutStatus: 500, responseCookies: ({ url }) => url.pathname === '/mikka/api/auth/sign-out'
+    ? ['better-auth.session_token=; Path=/; Max-Age=0; Secure'] : [] })
+  const report = await f.run()
+  assert.equal(report.status, 'blocked'); assert.equal(report.code, 'session_close_failed')
+  assert.equal(report.normalSessionObserved, true); assert.equal(report.sessionClosed, false)
+  assert.equal(f.calls.filter(call => call.path === '/mikka/api/auth/sign-out').length, 1)
 })
 
 test('one-item repairs drop only client-held data and reuse genuine row and chat prefix proofs', async () => {

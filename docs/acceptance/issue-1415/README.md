@@ -16,9 +16,11 @@
 | [更新后的 main 构建](main-1f647-build.json) / [原始测量](main-1f647-build-metrics.txt) | main `1f647ca1`；Large 8 CPU / 16 GiB；独立数据库 | 166.55 秒，峰值 RSS 10,894,488 KiB，退出码 0。`6149eb2b` 合入后需重新固定网页基线。 |
 | [main6149 网页基线构建](main-6149-build.json) / [原始测量](main-6149-build-metrics.txt) | main `6149eb2b`；Large 8 CPU / 16 GiB；独立数据库 | 186.85 秒，峰值 RSS 11,153,512 KiB，退出码 0；生产服务与 live gateway 已就绪。 |
 | [b5 候选生产构建](candidate-b5-build.json) / [原始测量](candidate-b5-build-metrics.txt) | 候选 `b5bc6b22`；Large 8 CPU / 16 GiB；独立数据库 | Next 构建 278.22 秒，峰值 RSS 11,985,344 KiB，退出码 0；随后 bundled renderer 构建和生产服务启动通过。 |
+| [7973 候选生产构建](candidate-7973-build.json) / [原始测量](candidate-7973-build-metrics.txt) | 候选 `7973afa9`；Large 8 CPU / 16 GiB；保留此前 `.next/cache` | Next 构建 105.50 秒，峰值 RSS 7,093,884 KiB，退出码 0；bundled renderer 和独立服务启动通过。不是冷构建、性能提升或 Medium 完整构建证明。 |
 | [实际原生凭证隔离](native-credentials-b5bc6b22.json) | `b5bc6b22`；Linux Electron；外置诊断的源哈希见 JSON | main 真实解密 bearer 与 SDK 缓存；4 份 renderer 状态快照、313 组请求头和 313 组响应头均无实际凭证；退出后 vault 文件删除、公开会话为空，精确清理通过。 |
 | [b5 原版冒烟](native-smoke-b5bc6b22.json) / [运行版本](native-runtime-b5bc6b22.json) | `b5bc6b22`；Linux Electron；实际 887 个编译文件的整体 hash 已记录 | 原版 7 项通过，退出码 0，资源精确清理成功。 |
 | [Mac ARM b5 局部结果](mac-arm-partial-b5bc6b22.json) | 分支 `b5bc6b22`，实际 CI merge/build `33572d6e`；run `42096996544` | 打包 smoke 7 项通过；公共页 8 屏差异 0–0.00903%。随后登录会话等待超时，完整矩阵、生命周期和一小时测量未运行。 |
+| [Mac ARM 7973 局部结果](mac-arm-partial-7973afa9.json) | 分支 `7973afa9`，实际 CI merge/build `f3f72a78`；run `42108050373` | 打包 smoke 7 项和公共页 8 屏通过，随后会话未保存。新诊断证明浏览器回跳、loopback 和 exchange 200 已完成，故障位于后续接收/持久化阶段；精确清理及证据审计通过，完整验收仍未通过。 |
 | [Linux 原序列登录诊断](native-parity-auth-b5bc6b22.json) / [组合顺序诊断](native-combined-auth-b5bc6b22.json) | 固定 `b5bc6b22` 产品和记录哈希的外置测试脚本 | 单独保留共享 profile 与 8 个公共页后的真实 PKCE 通过；同 Node 组合在 hosted 首屏前失败，未重现 Mac 的登录超时，dirty 数据保留隔离。 |
 | [缓存恢复与验收脚本回归](hydration-and-harness-regressions.json) | `b5bc6b22` 后的逐文件 SHA-256 增量；真实 SWR 与源码测试 | 分页审计首次读取从 0 恢复为 1；私有审计数据不落盘。共享缓存 18/18、独立时序检查 5/5、focus/navigation 25/25、idle-budget 10/10、诊断与精确清理 6/6；不是完整截图或一小时通过的证据。 |
 | [真实六分钟空闲诊断](idle-b5-six-minute-diagnostic.json) / [修正后的完整短流程清理](idle-b5-cleanup-validation.json) | `b5bc6b22`；独立 UID、真实 PostgreSQL、实际前台 daemon；测试增量哈希见 JSON | 360,000.31 ms：bundled 64 SQL / 11,449 B，web 65 SQL / 12,051 B，live 正常且设备起止在线；整体因默认工作区名称被英语入口改写而失败。统一默认中文入口后，新的 10,004.44 ms 完整流程和精确清理通过。不能替代 Mac 自动安装或正式一小时测量。 |

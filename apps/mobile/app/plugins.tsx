@@ -37,7 +37,7 @@ export default function PluginsScreen() {
   const [query, setQuery] = useState('')
   return (
     <View style={styles.screen}>
-      <NavBar title="插件" />
+      <NavBar title="插件" large />
       {tab === 'apps' ? <Apps query={query} header={<Header tab={tab} setTab={setTab} query={query} setQuery={setQuery} />} />
         : <Skills query={query} header={<Header tab={tab} setTab={setTab} query={query} setQuery={setQuery} />} />}
     </View>

@@ -43,17 +43,29 @@ export function nativeDiagnosticFailure(error, depth = 0) {
 /** Test inspector only; observes the actual transport without changing any
  * request/response. Stop before further UI work. Publish only on failure. */
 export async function startNativeAuthDiagnostics(application, expected) {
-  const result = await application.evaluate(({ app, BrowserWindow, session }, input) => {
+  const result = await application.evaluate(({ app, BrowserWindow, session, safeStorage }, input) => {
     if (app.getPath('userData') !== input.expected.profile || globalThis.__mikkaAcceptanceAuthDiagnostics) return { started: false }
     const window = BrowserWindow.getAllWindows()[0]
     if (!window || window.isDestroyed()) return { started: false }
     const fs = process.getBuiltinModule('node:fs')
+    const promises = process.getBuiltinModule('node:fs/promises')
     const path = process.getBuiltinModule('node:path')
+    if (!path.isAbsolute(input.expected.profile) || path.resolve(input.expected.profile) !== input.expected.profile) return { started: false }
     const backend = session.fromPartition('persist:mikka-dev-bundled-backend')
     const originalFetch = backend.fetch
     const originalSend = window.webContents.send
+    const originalAvailable = safeStorage.isAsyncEncryptionAvailable
+    const directory = path.join(input.expected.profile, 'credentials')
+    const file = path.join(directory, 'desktop-session.bin')
+    const temporary = `${file}.${process.pid}.tmp`
     const events = []
+    const restorers = []
     let overflow = false
+    let stopped = false
+    let authAttempt = 0
+    let latestBeginState = null
+    let sessionChanges = 0
+    let exchangeIdentity = null
     const classify = value => {
       try {
         const pathname = new URL(value).pathname
@@ -61,32 +73,164 @@ export async function startNativeAuthDiagnostics(application, expected) {
       } catch { return 'other' }
     }
     const add = value => {
+      if (stopped) return
       if (events.length < 200) events.push({ at: Date.now(), ...value })
       else overflow = true
     }
-    backend.fetch = async function (request, init) {
-      const route = classify(typeof request === 'string' ? request : request.url)
-      const method = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].includes(init?.method ?? 'GET') ? (init?.method ?? 'GET') : 'other'
+    const failure = error => {
+      const kinds = ['Error', 'TypeError', 'RangeError', 'SyntaxError', 'AbortError', 'TimeoutError']
+      const codes = ['EACCES', 'EPERM', 'ENOENT', 'ENOTDIR', 'EISDIR', 'EEXIST', 'ELOOP', 'EMFILE', 'ENFILE',
+        'ENOSPC', 'EDQUOT', 'EROFS', 'EIO', 'EBADF', 'EINVAL', 'ERR_INVALID_ARG_TYPE', 'ERR_INVALID_ARG_VALUE',
+        'ERR_FS_FILE_TOO_LARGE', 'ERR_FS_FILE_TOO_LARGE_TO_READ', 'ABORT_ERR']
+      return { kind: kinds.includes(error?.name) ? error.name : 'other', code: codes.includes(error?.code) ? error.code : 'other' }
+    }
+    // Observe the real call without awaiting, substituting a promise, consuming
+    // another body, or converting its exception. Observer failures stay local.
+    const quietly = work => { try { work() } catch { /* Diagnostics cannot change the product result. */ } }
+    const watch = (value, fulfilled, rejected) => {
+      quietly(() => {
+        if (value && typeof value.then === 'function') value.then(
+          result => quietly(() => { if (!stopped) fulfilled(result) }), error => quietly(() => { if (!stopped) rejected(error) }),
+        )
+        else if (!stopped) fulfilled(value)
+      })
+      return value
+    }
+    const replace = (object, name, wrapper, operation) => {
+      const descriptor = Object.getOwnPropertyDescriptor(object, name)
       try {
-        const response = await originalFetch.call(this, request, init)
-        add({ source: 'main-fetch', route, method, status: response.status })
-        return response
-      } catch (error) {
-        add({ source: 'main-fetch', route, method, status: 0 })
+        Object.defineProperty(object, name, descriptor && 'value' in descriptor ? { ...descriptor, value: wrapper }
+          : { value: wrapper, writable: true, configurable: true, enumerable: descriptor?.enumerable ?? false })
+        restorers.push(() => {
+          if (object[name] !== wrapper) return
+          if (descriptor) Object.defineProperty(object, name, descriptor)
+          else delete object[name]
+        })
+      } catch { add({ source: 'observer', operation, phase: 'unavailable' }) }
+    }
+    const observeCall = (source, operation, original, receiver, args, details = () => ({})) => {
+      quietly(() => add({ source, operation, phase: 'start' }))
+      let value
+      try { value = Reflect.apply(original, receiver, args) } catch (error) {
+        quietly(() => add({ source, operation, phase: 'threw', error: failure(error) }))
         throw error
       }
+      return watch(value,
+        result => add({ source, operation, phase: 'fulfilled', ...details(result) }),
+        error => add({ source, operation, phase: 'rejected', error: failure(error) }))
     }
-    const file = path.join(input.expected.profile, 'credentials', 'desktop-session.bin')
-    window.webContents.send = function (channel, ...args) {
-      if (channel === 'bundled:session-changed') add({ source: 'session-change', vaultExists: fs.existsSync(file) })
-      return originalSend.call(this, channel, ...args)
+    const identityChecks = value => {
+      const user = value?.user
+      const session = value?.session
+      const userIdValid = typeof user?.id === 'string' && user.id.length > 0 && user.id.length <= 200
+      const sessionIdValid = typeof session?.id === 'string' && session.id.length > 0 && session.id.length <= 200
+      const emailShapeValid = typeof user?.email === 'string' && user.email.length <= 320
+      const nameShapeValid = typeof user?.name === 'string' && user.name.length <= 500
+      return { userIdValid, sessionIdValid, emailShapeValid, nameShapeValid,
+        identityValid: !!value && typeof value === 'object' && userIdValid && sessionIdValid && emailShapeValid && nameShapeValid,
+        ownerMatches: user?.id === input.expected.ownerId }
     }
+    // These are the production parser's shape checks, reported only as booleans.
+    const tokenValid = value => typeof value === 'string' && value.length >= 16 && value.length <= 4096
+      // oxlint-disable-next-line no-control-regex -- Match the actual main-process credential validation without exporting a credential.
+      && !/[\s\x00-\x1f\x7f]/.test(value)
+    const requestState = init => {
+      try {
+        if (typeof init?.body !== 'string' || init.body.length > 8192) return null
+        const value = JSON.parse(init.body).state
+        return typeof value === 'string' && value.length > 0 && value.length <= 512 ? value : null
+      } catch { return null }
+    }
+    const currentProfile = () => app.getPath('userData') === input.expected.profile
+    const exactBackend = value => {
+      try { return new URL(value).origin === new URL(input.expected.serverUrl).origin } catch { return false }
+    }
+    replace(backend, 'fetch', function (request, init) {
+      const route = classify(typeof request === 'string' ? request : request.url)
+      const method = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].includes(init?.method ?? 'GET') ? (init?.method ?? 'GET') : 'other'
+      const owned = currentProfile() && exactBackend(typeof request === 'string' ? request : request.url)
+      if (owned && method === 'POST' && ['desktop-begin', 'auth-email', 'auth-sign-out'].includes(route)) {
+        authAttempt++
+        latestBeginState = route === 'desktop-begin' ? requestState(init) : null
+      }
+      const attempt = authAttempt
+      const changes = sessionChanges
+      const beginObserved = latestBeginState !== null
+      const stateMatchesLatestBegin = beginObserved && requestState(init) === latestBeginState
+      // Internal BundledAuth.generation is deliberately not inspected. These
+      // facts reveal superseding observed auth requests and aborts, not its value.
+      const attemptChecks = () => ({ beginObserved, stateMatchesLatestBegin,
+        laterAuthRequestObserved: authAttempt !== attempt, sessionChangeObserved: sessionChanges !== changes,
+        requestAborted: init?.signal?.aborted === true })
+      let value
+      try { value = Reflect.apply(originalFetch, this, arguments) } catch (error) {
+        quietly(() => add({ source: 'main-fetch', route, method, status: 0, error: failure(error) }))
+        throw error
+      }
+      return watch(value, response => {
+        add({ source: 'main-fetch', route, method, status: response.status })
+        if (!owned || route !== 'desktop-exchange' || method !== 'POST') return
+        const originalJson = response.json
+        replace(response, 'json', function () {
+          return observeCall('exchange-json', 'parse', originalJson, this, arguments, body => {
+            const checks = { ...identityChecks(body), tokenValid: tokenValid(body?.token), ...attemptChecks() }
+            exchangeIdentity = { attempt, token: body?.token, userId: body?.user?.id, sessionId: body?.session?.id }
+            return checks
+          })
+        }, 'exchange-json')
+      }, error => add({ source: 'main-fetch', route, method, status: 0, error: failure(error) }))
+    }, 'backend-fetch')
+    replace(safeStorage, 'isAsyncEncryptionAvailable', function () {
+      return observeCall('vault-availability', 'available', originalAvailable, this, arguments, result => ({ available: result === true }))
+    }, 'vault-availability')
+    const originalEncrypt = safeStorage.encryptStringAsync
+    replace(safeStorage, 'encryptStringAsync', function (plaintext) {
+      let envelope
+      quietly(() => { if (currentProfile() && typeof plaintext === 'string' && plaintext.length <= 256 * 1024) envelope = JSON.parse(plaintext) })
+      if (envelope?.version !== 2 || envelope.server !== input.expected.serverUrl || !Array.isArray(envelope.value?.accounts)) return Reflect.apply(originalEncrypt, this, arguments)
+      const active = envelope.value.accounts.find(account => account?.identity?.user?.id === envelope.value.activeUserId)
+      const checks = { ...identityChecks(active?.identity), tokenValid: tokenValid(active?.token),
+        accountCountWithinLimit: envelope.value.accounts.length > 0 && envelope.value.accounts.length <= 5,
+        exchangeObserved: exchangeIdentity !== null,
+        exchangeOwnerMatches: exchangeIdentity !== null && exchangeIdentity.userId === active?.identity?.user?.id,
+        exchangeSessionMatches: exchangeIdentity !== null && exchangeIdentity.sessionId === active?.identity?.session?.id,
+        exchangeTokenMatches: exchangeIdentity !== null && exchangeIdentity.token === active?.token,
+        laterAuthRequestObserved: exchangeIdentity !== null && exchangeIdentity.attempt !== authAttempt }
+      add({ source: 'vault-encrypt-input', ...checks })
+      return observeCall('vault-encrypt', 'encrypt', originalEncrypt, this, arguments,
+        result => ({ ciphertextIsBuffer: Buffer.isBuffer(result), ciphertextWithinLimit: Buffer.isBuffer(result) && result.length <= 128 * 1024 }))
+    }, 'vault-encrypt')
+    const wrapFileOperation = (name, matches, operation, fulfilled) => {
+      const original = promises[name]
+      replace(promises, name, function () {
+        if (!currentProfile() || !matches(...arguments)) return Reflect.apply(original, this, arguments)
+        return observeCall('vault-file', operation, original, this, arguments, result => { fulfilled?.(result); return {} })
+      }, operation)
+    }
+    wrapFileOperation('mkdir', target => target === directory, 'mkdir')
+    wrapFileOperation('open', target => target === temporary, 'open-temporary', handle => {
+      for (const [name, operation] of [['writeFile', 'write'], ['sync', 'sync'], ['close', 'close']]) {
+        const original = handle[name]
+        replace(handle, name, function () { return observeCall('vault-file', operation, original, this, arguments) }, operation)
+      }
+    })
+    wrapFileOperation('rename', (source, destination) => source === temporary && destination === file, 'rename')
+    wrapFileOperation('rm', target => target === file, 'remove-final')
+    replace(window.webContents, 'send', function (channel) {
+      quietly(() => {
+        if (channel === 'bundled:session-changed') { sessionChanges++; add({ source: 'session-change', vaultExists: fs.existsSync(file) }) }
+      })
+      return Reflect.apply(originalSend, this, arguments)
+    }, 'session-send')
     globalThis.__mikkaAcceptanceAuthDiagnostics = {
       expected: input.expected, events, file, classify,
       overflow: () => overflow,
+      keychainAvailable: () => Reflect.apply(originalAvailable, safeStorage, []),
       restore() {
-        backend.fetch = originalFetch
-        window.webContents.send = originalSend
+        stopped = true
+        for (const restore of restorers.reverse()) quietly(restore)
+        latestBeginState = null
+        exchangeIdentity = null
         delete globalThis.__mikkaAcceptanceAuthDiagnostics
       },
     }
@@ -151,7 +295,7 @@ export async function readNativeAuthDiagnostics(application) {
       vault.bearerPresent = typeof account?.token === 'string' && account.token.length >= 16
       vault.cachePresent = typeof account?.sessionCache === 'string' && account.sessionCache.length >= 16
     } catch { /* No native error message or secret crosses the inspector. */ }
-    return { available: true, keychainAvailable: await bounded(safeStorage.isAsyncEncryptionAvailable()).catch(() => false), windows, vault,
+    return { available: true, keychainAvailable: await bounded(probe.keychainAvailable()).catch(() => false), windows, vault,
       events: probe.events.slice(), overflow: probe.overflow() }
   })
 }

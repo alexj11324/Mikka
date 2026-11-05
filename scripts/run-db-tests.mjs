@@ -412,4 +412,5 @@ export async function main({ root = '.', env = process.env, run = runScript, clo
     return failed ? 1 : 0
   } catch (error) { console.error(`::error::${error.message}`); return 1 }
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main().then(code => process.exit(code))
+// Let stdout/stderr drain: a failed suite can leave a large diagnostic buffer.
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main().then(code => { process.exitCode = code })
