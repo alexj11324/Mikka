@@ -1,3 +1,4 @@
+import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getLocale } from 'next-intl/server'
@@ -25,6 +26,7 @@ async function onboardingComputer(): Promise<OnboardingComputer> {
 }
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ acceptance?: string; issue?: string; section?: string; app?: string; settings?: string; google?: string }> }) {
+  return withDatabaseOperation('/pages/workspace', async () => {
   const query = await searchParams
   const initialSelected = query.issue && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(query.issue) ? query.issue : null
   const session = await auth.api.getSession({ headers: await headers() })
@@ -40,4 +42,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ a
   const onboarding = !await onboardingDone(user.id).catch(() => true)
   const computer = onboarding ? await onboardingComputer().catch((): OnboardingComputer => 'none') : 'none'
   return <IssueWorkspace key={user.id} onboarding={onboarding ? { computer } : undefined} initialSelected={initialSelected} user={{ id: user.id, name: user.name, email: user.email, image: user.image }} initialSection={sectionFromQuery(query.section)} initialSettingsSection={query.settings === 'account' || (query.settings === 'integrations' && query.google) ? 'account' : query.settings === 'integrations' ? 'integrations' : undefined} googleEnabled={googleEnabled} />
+  })
 }
