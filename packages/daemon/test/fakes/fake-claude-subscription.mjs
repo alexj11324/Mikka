@@ -40,6 +40,8 @@ if (flag('--resume') !== undefined) {
 }
 const sessionId = history.resumeSessionId ?? requestedSession
 writeFileSync(historyFile, JSON.stringify(history))
+// Capture only the official effort flag and session identity, never auth argv/env.
+writeFileSync(join(config, 'fixture-effort.json'), JSON.stringify({ transport: 'cli', sessionId, effort: flag('--effort') ?? null, resumed: flag('--resume') !== undefined }))
 const processReceipt = join(config, 'fixture-process.json')
 let prompts = 0
 writeFileSync(processReceipt, JSON.stringify({ pid: process.pid, prompts }))

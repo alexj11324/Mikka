@@ -40,6 +40,7 @@ export interface ThreadResponse {
 }
 
 export interface TurnStartParams {
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
   threadId: string
   input: UserInput[]
 }

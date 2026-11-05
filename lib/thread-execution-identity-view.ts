@@ -23,6 +23,10 @@ const evidence = z.object({ run: z.object({
   credentialType: z.enum(['subscription', 'api_key', 'unknown']),
   subscriptionRoute: z.enum(['claude_code_cli', 'codex_cli']).nullable().catch(null),
   executionIdentity: identity.nullable(),
+  agentProfile: z.object({
+    profileId: z.string().min(1).max(200), name: z.string().max(80), version: z.number().int().positive(), digest: z.string().max(200),
+    source: z.enum(['explicit', 'decision', 'default']), reason: z.string().max(4000),
+  }).nullable().optional(),
 }) })
 
 /** Presentation-only allowlist over the existing owner evidence API. Never

@@ -1420,6 +1420,7 @@ export class RunSupervisor {
       } : undefined,
       fixture: assignment.fixture,
       model: assignment.model,
+      effort: assignment.effort,
       mailbox,
       // In memory only: the adapter hands it to the run's CLI environment.
       credential: assignment.modelCredential,

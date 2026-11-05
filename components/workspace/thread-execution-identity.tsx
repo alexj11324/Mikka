@@ -51,6 +51,8 @@ function AccountReference({ id }: { id: string }) {
 export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadExecutionEvidence }) {
   const t = useTranslations('IssueThreads.executionIdentity')
   const identity = evidence.executionIdentity
+  const profileT = useTranslations('Settings.agentProfiles')
+  const profile = evidence.agentProfile
   async function copyRunId() {
     try { await navigator.clipboard.writeText(evidence.id); toast.success(t('copied')) }
     catch { toast.error(t('copyFailed')) }
@@ -63,6 +65,13 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
       <ValueRow label={t('credential')}>{t(`credentialKinds.${evidence.credentialType}`)}</ValueRow>
       {evidence.credentialType === 'subscription' && <ValueRow label={t('subscriptionRoute')}><span className="break-all">{evidence.subscriptionRoute ?? t('unknown')}</span></ValueRow>}
     </dl>
+    {profile && <section className="flex flex-col gap-3"><h3 className="font-medium">{profileT('frozenProfile')}</h3><dl className="flex flex-col gap-3">
+      <ValueRow label={profileT('name')}>{profile.source === 'default' && profile.profileId === 'default' ? profileT('defaultName') : profile.name}</ValueRow>
+      <ValueRow label={profileT('revision')}>{profileT('version', { version: profile.version })}</ValueRow>
+      <ValueRow label={profileT('selectedBy')}>{profileT(`selectionSources.${profile.source}`)}</ValueRow>
+      <ValueRow label={profileT('selectionReason')}>{profile.source === 'explicit' ? profileT('explicitReason') : profile.source === 'default' ? profileT('defaultReason') : profile.reason}</ValueRow>
+      <ValueRow label={profileT('digest')}><span className="break-all text-xs">{profile.digest}</span></ValueRow>
+    </dl></section>}
     {!identity ? <p className="text-muted-foreground">{t('snapshotMissing')}</p> : <>
       <section className="flex flex-col gap-3"><h3 className="font-medium">{t('participants')}</h3><dl className="flex flex-col gap-3">
         <ValueRow label={t('workspace')}>{identity.workspaceId ? <span className="break-all">{identity.workspaceId}</span> : t('notRecorded')}</ValueRow>

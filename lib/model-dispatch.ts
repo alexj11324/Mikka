@@ -47,11 +47,19 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   harness?: OrderEntry['harness']
   /** Host-only continuation fence: a task never cycles through failed entries again. */
   excludeEntryKeys?: readonly string[]
+  /** Host-selected profile source; still verified against authorized candidates. */
+  exactEntry?: OrderEntry
+  /** Candidate enumeration is read-only: bind only the selected Agent. */
+  bindSubscription?: boolean
+  probeQuota?: boolean
+  skipCatalogueRefresh?: boolean
+  /** An explicitly named physical Agent is never replaced by another one. */
+  agentId?: string
   /** The cloud already failed to start this run: a server or a computer only. */
   withoutCloud?: boolean
 } = {}): Promise<ModelDispatch> {
   // A subscription never asked for its models offers none yet: ask it first (once per revision).
-  await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
+  if (!dependencies.skipCatalogueRefresh) await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
   const candidates = await orderCandidates(pool, scope)
   const stored = await readOrder(pool, scope, candidates)
   // The person named only the Agent ("派给 Codex"): its first model in 优先使用的模型, else the first one a connected credential offers on it.
@@ -64,14 +72,16 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   const allowedAgent = (entry: Pick<OrderEntry, 'harness'>) => !dependencies.harness || entry.harness === dependencies.harness
   const order = { ...stored, entries: stored.entries.filter(entry => allowedAgent(entry) && !excluded.has(entryKey(entry))), location: places }
   // A model the thread named: the first credential that offers it on that Agent (its own entry if it is listed).
-  const picked = explicit ? order.entries.find(entry => entry.harness === explicit.harness && entry.model === explicit.model)
+  const exact = dependencies.exactEntry
+  if (exact && (!allowedAgent(exact) || (explicit && (explicit.harness !== exact.harness || explicit.model !== exact.model)) || !candidates.some(candidate => entryKey(candidate) === entryKey(exact)))) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', { agent: HARNESS_NAMES[exact.harness], model: exact.model }) }
+  const picked = exact ?? (explicit ? order.entries.find(entry => entry.harness === explicit.harness && entry.model === explicit.model)
     ?? candidates.filter(candidate => allowedAgent(candidate) && candidate.harness === explicit.harness && candidate.model === explicit.model)
-      .map(candidate => ({ id: `thread:${candidate.harness}:${candidate.model}`, harness: candidate.harness, model: candidate.model, source: candidate.source }))[0] : undefined
+      .map(candidate => ({ id: `thread:${candidate.harness}:${candidate.model}`, harness: candidate.harness, model: candidate.model, source: candidate.source }))[0] : undefined)
   const named = explicit && { agent: HARNESS_NAMES[explicit.harness], model: explicit.model }
   // The thread's model is the only one tried: no subscription or key offers it on that Agent, so nothing runs and the card says so.
   if (named && !picked) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', named) }
   const entries = picked ? [picked] : order.entries
-  const states = await credentialStates(pool, scope, entries, candidates, undefined, { refresh: dependencies.refreshQuota })
+  const states = await credentialStates(pool, scope, entries, candidates, undefined, { refresh: dependencies.refreshQuota, probe: dependencies.probeQuota })
   const devices = places !== 'cloudOnly' ? (await poolDevices(pool, scope.ownerId)).filter(device => !deviceId || device.id === deviceId) : []
   const ready = places !== 'local' && await cloudReady(pool, { ownerId: scope.ownerId, workspaceId: scope.workspaceId, botId: scope.botId, harness: entries[0]?.harness ?? 'claude_code' })
   const plan = planDispatch({ entries: picked ? [] : order.entries, explicit: picked ?? null, location: order.location, devices, credential: entry => states.get(entry.id)?.credential ?? { usable: false, reason: 'missing' }, cloudReady: ready, cloudModel: entry => cloudModelSupport(entry, dependencies.cloudPurpose) })
@@ -97,10 +107,10 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   }
   if (plan.kind === 'none') return { kind: 'none', reason: plan.reason, card: modelUnavailableCard(plan.reason), skipped: plan.skipped }
   if (plan.kind === 'cloud') return { kind: 'cloud', harness: plan.entry.harness, model: plan.model, entry: plan.entry, apiKey: plan.entry.source.kind === 'api_key' }
-  const { rows: [agent] } = await pool.query<{ id: string }>('SELECT id FROM agents WHERE "userId"=$1 AND "deviceId"=$2 AND harness=$3 ORDER BY "createdAt",id LIMIT 1',
-    [scope.ownerId, plan.deviceId, plan.entry.harness])
+  const { rows: [agent] } = await pool.query<{ id: string }>('SELECT id FROM agents WHERE "userId"=$1 AND "deviceId"=$2 AND harness=$3 AND ($4::text IS NULL OR id::text=$4) ORDER BY "createdAt",id LIMIT 1',
+    [scope.ownerId, plan.deviceId, plan.entry.harness, dependencies.agentId ?? null])
   if (!agent) return { kind: 'none', reason: 'noDevice', card: modelUnavailableCard('noDevice') }
-  const subscriptionBindingId = plan.entry.source.kind === 'subscription' ? await bindAgentToConnection(pool, scope, agent.id, plan.entry.harness, plan.entry.source.connectionId, plan.entry.model) : undefined
+  const subscriptionBindingId = dependencies.bindSubscription !== false && plan.entry.source.kind === 'subscription' ? await bindAgentToConnection(pool, scope, agent.id, plan.entry.harness, plan.entry.source.connectionId, plan.entry.model) : undefined
   return { kind: 'device', deviceId: plan.deviceId, agentId: agent.id, model: plan.model, entry: plan.entry, ...(subscriptionBindingId ? { subscriptionBindingId } : {}) }
 }
 

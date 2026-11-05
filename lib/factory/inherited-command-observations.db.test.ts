@@ -1,3 +1,4 @@
+import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 // Real isolated PostgreSQL contracts. The VM observation and Harness reports
 // below are explicit synthetic fixtures, never live-provider acceptance.
 import assert from 'node:assert/strict'
@@ -9,7 +10,7 @@ import { Pool, type PoolClient } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { applyApprovalMode, defaultRunPolicy } from '@mikka/protocol/agent-policy'
-import { createFactoryStore } from './store'
+
 import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding, type FactoryQueue } from './dispatch'
 import { createFactoryHumanStore } from './human-store'
 import { handleFactory } from './http'

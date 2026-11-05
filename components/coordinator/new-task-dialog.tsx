@@ -33,6 +33,8 @@ import { useOpenerFocus } from '@/hooks/use-focus-return'
 import { useChatFiles } from '@/components/chat/use-chat-files'
 import { ChatFileCards } from '@/components/chat/chat-file-cards'
 import { CHAT_FILE_ACCEPT } from '@mikka/protocol/chat-attachments'
+import { useAgentProfiles } from '@/components/settings/factory-profiles-data'
+import { TaskProfilePicker } from './task-profile-picker'
 
 const MAX_LENGTH = 8000
 
@@ -61,12 +63,13 @@ function MachineLabel({ machine, cloudBotId }: { machine: Machine; cloudBotId: s
  * for which bot, and that bot (the Coordinator by default) turns it into the task (title, status, assignee…). The
  * request goes into the Coordinator conversation, where its reply shows up.
  */
-export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText = '' }: {
+export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId, initialText = '' }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSent?: () => void
   /** Project page the request came from. */
   project?: string | null
+  workspaceId?: string
   /** Keys typed before the dialog finished opening. */
   initialText?: string
 }) {
@@ -79,6 +82,11 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const { mutate } = useSWRConfig()
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  const [picked, setPicked] = useState<string | null>(null)
+  const profiles = useAgentProfiles(workspaceId, open, picked ? picked === 'cloud' ? { location: 'cloud' } : { location: 'local', deviceId: picked } : undefined)
+  const [profilePick, setProfilePick] = useState<{ workspaceId: string; id: string } | null>(null)
+  const profileId = profilePick?.workspaceId === workspaceId ? profilePick?.id : undefined
+  const profileAllowed = !profileId || (!profiles.error && profiles.data?.availability[profileId]?.available === true)
   const openerFocus = useOpenerFocus(open)
   const [coordinatorUnavailable, setCoordinatorUnavailable] = useState(false)
   const tCoordinator = useTranslations('Coordinator')
@@ -107,7 +115,6 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const own: Machine[] = devices.map(item => ({ value: item.id, label: item.name, usable: taskMachineUsable(item, order?.readyDeviceIds ?? []),
     status: !item.enabled ? t('notParticipating') : !item.online ? t('offline') : !order ? t('loadingPlacement') : !order.readyDeviceIds.includes(item.id) ? quotaUnchecked ? t('quotaUnchecked') : t('modelUnavailable') : t('online') }))
   const machines: Machine[] = [cloud, ...own]
-  const [picked, setPicked] = useState<string | null>(null)
   const inherited = defaultTaskMachine(machines, order)
   const defaults: Machine = { value: 'auto', label: order ? `${t('workspaceDefault')} · ${inherited?.label ?? locationT(order.location)}` : t('workspaceDefault'),
     cloud: inherited?.cloud === true, usable: inherited?.usable ?? false, status: inherited?.status ?? (inherited?.usable ? t('online') : order ? quotaUnchecked ? t('quotaUnchecked') : t('modelUnavailable') : t('loadingPlacement')) }
@@ -135,22 +142,23 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
 
   async function submit() {
     const text = draft.trim()
-    if (!text || sending || attachments.locked || !available) return
+    if (!text || sending || attachments.locked || !available || !profileAllowed) return
     setSending(true)
     setCoordinatorUnavailable(false)
     try {
-      const key = JSON.stringify([text, picked, project ?? null, handler?.id ?? null])
+      const key = JSON.stringify([text, picked, project ?? null, handler?.id ?? null, profileId ?? null])
       if (composed.current?.key !== key) {
         const destination = pickedTaskDestination(picked)
         const context = [destination && device && t('contextDevice', { device: device.label }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
         composed.current = { key, message: context ? t('promptWithContext', { context, text }) : t('prompt', { text }),
           ...(destination ? { taskDestination: destination } : {}) }
       }
-      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null })
+      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId })
       if (outcome.kind === 'rejected' && outcome.error === 'coordinatorUnavailable') { setCoordinatorUnavailable(true); return }
       if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
       setDraft('')
       setPicked(null)
+      setProfilePick(null)
       composed.current = null
       onOpenChange(false)
       onSent?.()
@@ -164,7 +172,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="gap-3 p-5 sm:max-w-2xl" closeLabel={tCommon('close')} finalFocus={openerFocus}>
-      <div className="flex items-center gap-2 pr-8 text-sm">
+      <div className="flex flex-wrap items-center gap-2 pr-8 text-sm">
         {device
           ? <Select value={picked ?? 'auto'} onValueChange={value => { if (value) pick(value) }} items={[defaults, ...machines].map(({ value, label }) => ({ value, label }))}>
             <SelectTrigger size="sm" className="h-7 min-w-32 max-w-56 gap-1.5 rounded-full px-2.5" aria-label={t('device')}><MachineIcon machine={device} cloudBotId={cloudBotId} /><SelectValue className="min-w-0 truncate" /></SelectTrigger>
@@ -189,6 +197,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
         {project && <span className="flex h-7 max-w-40 items-center rounded-full bg-control px-2.5 text-xs text-muted-foreground"><span className="truncate">{project}</span></span>}
       </div>
       <DialogDescription className="sr-only">{t('description')}</DialogDescription>
+      <TaskProfilePicker workspaceId={workspaceId} value={profileId ?? null} onChange={id => setProfilePick(id && workspaceId ? { workspaceId, id } : null)} data={profiles.data} error={profiles.error} onRetry={() => { void profiles.mutate() }} disabled={sending} />
       <FieldGroup onDragOver={event => { if (Array.from(event.dataTransfer.types).includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = sending ? 'none' : 'copy' } }} onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); void attach(Array.from(event.dataTransfer.files)) } }} onPaste={event => { if (event.clipboardData.files.length) { event.preventDefault(); void attach(Array.from(event.clipboardData.files)) } }}>
         <Field>
           <ChatFileCards files={attachments.files} pending={attachments.pending} onRemove={attachments.remove} onRetry={attachments.retry} />
@@ -203,7 +212,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
       {coordinatorUnavailable && <Alert variant="destructive"><AlertTitle>{tCoordinator('unavailable', { name: 'Coordinator' })}</AlertTitle></Alert>}
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Paperclip data-icon="inline-start" /></Button>
-        <Button size="sm" className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" disabled={!available || !draft.trim() || sending || attachments.locked} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => { void submit() }}>{sending ? t('sending') : t('create')}</Button>
+        <Button size="sm" className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" disabled={!available || !profileAllowed || !draft.trim() || sending || attachments.locked} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => { void submit() }}>{sending ? t('sending') : t('create')}</Button>
       </div>
       {keyDialog.value && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAddingKey(false); if (changed) { void e2bKey.mutate(); setPicked(cloud.value) } }} />}
     </DialogContent>

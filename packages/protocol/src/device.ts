@@ -352,6 +352,8 @@ export const runAssignmentSchema = z.object({
    * (zod strips unknown keys), so this needs no version gate.
    */
   model: modelNameSchema.optional(),
+  /** Frozen Profile effort, passed to the native harness unchanged. */
+  effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
   /** Owner-bound selection only; no subscription credential enters the assignment. */
   subscriptionBinding: z.object({
     bindingId: z.uuid(), ownerId: z.string().min(1).max(128), workspaceId: z.uuid(),

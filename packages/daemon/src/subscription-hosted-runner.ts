@@ -303,6 +303,7 @@ export async function createHostedBotRunner(host: {
           (continuation && (continuation.runId !== assignment.continuesRunId || continuation.sessionId !== assignment.resumeSessionId)) ||
           (!continuation && source.questionResumeState !== "accepted") ||
           source.assignment.harness !== kind || source.assignment.model !== assignment.model || options.model !== assignment.model ||
+          source.assignment.effort !== assignment.effort || options.effort !== assignment.effort ||
           source.assignment.deviceId !== assignment.deviceId || source.assignment.issueId !== assignment.issueId ||
           source.assignment.repoId !== assignment.repoId || realpathSync(source.worktree) !== realpathSync(options.cwd) ||
           !binding || binding.bindingId !== selected.bindingId || binding.ownerId !== selected.ownerId ||

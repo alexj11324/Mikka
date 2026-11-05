@@ -122,6 +122,7 @@ export interface SessionOptions {
    * default. A harness that cannot express one ignores it.
    */
   model?: string
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 }
 
 export interface StartOptions extends SessionOptions {
