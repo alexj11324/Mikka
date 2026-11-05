@@ -4,6 +4,9 @@ name: E2B official instance runtime
 on:
   push:
     branches: [main]
+    # An unrelated merge can obsolete an in-flight publication. Recheck the
+    # live worker on every main push; the check job still gates validation.
+  pull_request:
     paths: &runtime_paths
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -26,8 +29,6 @@ on:
       - '.github/workflows/project-decisions-acceptance.yml'
       - 'scripts/acceptance/project-decisions.mjs'
       - 'scripts/acceptance/project-decisions.test.mjs'
-  pull_request:
-    paths: *runtime_paths
   workflow_dispatch:
     inputs:
       runtime-refresh:
