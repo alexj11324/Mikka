@@ -1,0 +1,166 @@
+{
+  "checkpointCommit": "a2c5280934bd5078dc77702e1d3a16f3f4ca4b26",
+  "tree": "4bc8f0a1dbf391a4b20e422b96774ec7593f4d40",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 1423,
+      "sha256": "329c5a3f3b44c2044097c84b291402ff3661f5c6d8768b93444ddb6d8e7476b8"
+    },
+    {
+      "path": "db-receipt.json",
+      "bytes": 1635,
+      "sha256": "d5f1a22ff4684686353c1b7f10566f24336c5aad17620beb9a32cf0c86c135ee"
+    },
+    {
+      "path": "election-regression.ts",
+      "bytes": 1665,
+      "sha256": "54468ee3900c42a5cbfddde2006097c7dbf673187e23980f15c2d0db1461fbb4"
+    },
+    {
+      "path": "logs/issue1284-timer-arm-before.log",
+      "bytes": 6036,
+      "sha256": "1ed9745ee265e5fe9bee58fa76aa146cd7801cfea46faf8e59788f9317f93ff1"
+    },
+    {
+      "path": "logs/issue1284-timer-db-due.log",
+      "bytes": 1611,
+      "sha256": "d93ce89b39471b3302678afdb7c229462724b1854959c3ae600c4c3f3dc528e3"
+    },
+    {
+      "path": "logs/issue1284-timer-db-setup.log",
+      "bytes": 18772,
+      "sha256": "95faffd468dae3d157fdc88273f5a94580ef59d88d7ee893c88c49bc6d069045"
+    },
+    {
+      "path": "logs/issue1284-timer-diff-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "logs/issue1284-timer-election-after.log",
+      "bytes": 1876,
+      "sha256": "0c443b0d59a6ad34a01823903fce14424bac668a177b731752ad2c6a0cc6a70d"
+    },
+    {
+      "path": "logs/issue1284-timer-election-before.log",
+      "bytes": 1622,
+      "sha256": "3a1b6b9839d05c5cc10f61d16f5b60025ee86ed138b2fc0aba480f4e3532d805"
+    },
+    {
+      "path": "logs/issue1284-timer-lint-final.log",
+      "bytes": 89,
+      "sha256": "497435a445172a1d43a0f627edefc6adf169e32abea698bfcee3dc708923cf2d"
+    },
+    {
+      "path": "logs/issue1284-timer-lint.log",
+      "bytes": 1741,
+      "sha256": "a38b2ef237f4e60e955c00e99ccea62a0348d6ab64d8d64c90d1b8a71c8b5f23"
+    },
+    {
+      "path": "logs/issue1284-timer-loop-after-fixed.log",
+      "bytes": 1764,
+      "sha256": "8ce6dfcca521685551edb3aba4bb64332de31a1c1f84d6575f81880ab1d0b48a"
+    },
+    {
+      "path": "logs/issue1284-timer-loop-after.log",
+      "bytes": 2243,
+      "sha256": "4e3365d7e468eedeca328f9dbf33c2f105c78a032aa089db00fdb89768fb6517"
+    },
+    {
+      "path": "logs/issue1284-timer-migration-before.log",
+      "bytes": 2872,
+      "sha256": "16dbbd57e3617c4e361b1d6fa82f5093f4b059f497cd65475519cde2ae74d335"
+    },
+    {
+      "path": "logs/issue1284-timer-policies.log",
+      "bytes": 124,
+      "sha256": "1d833e5a51443c8b49122c34ad34397c730206a06b9f4a61cd0f5a1f2dba1be4"
+    },
+    {
+      "path": "logs/issue1284-timer-recovery-unit.log",
+      "bytes": 2335,
+      "sha256": "8969279806a6678f768322838b3d6c0fc4e9d92ac3e3c31492a33485efbea437"
+    },
+    {
+      "path": "logs/issue1284-timer-schedules-after.log",
+      "bytes": 7733,
+      "sha256": "636e7fe4d161ba3e9a2023226618f58892a5d6d4bf31e020920dcdac0a26600a"
+    },
+    {
+      "path": "logs/issue1284-timer-schedules-final.log",
+      "bytes": 7727,
+      "sha256": "ed981901643e71d4c441ce2115e8a0be22635985526455c592788e365364b96d"
+    },
+    {
+      "path": "logs/issue1284-timer-types-final.log",
+      "bytes": 80,
+      "sha256": "7adc35d68b1780b7156b0da283382588c9e87658534a36a2b9278fcc6f27cb72"
+    },
+    {
+      "path": "logs/issue1284-timer-types.log",
+      "bytes": 1047,
+      "sha256": "309ae385c9a4f0db186472261e95ab1917cf63b3c4ae31eb70c8f42093fb888e"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 3541,
+      "sha256": "e331ba6c5a78b7824135c400b6cb8aeea2a96a832e26f241d32274272208a41b"
+    },
+    {
+      "path": "observability-excerpt.ts",
+      "bytes": 1466,
+      "sha256": "d56ace7678b021eaf0760b71130e95a086fbdb4928679332aa9d894e3ff193c8"
+    },
+    {
+      "path": "source/lib/due-timer-deployment.ts",
+      "bytes": 6978,
+      "sha256": "4e7501c10950aeba401dd49ddfa3b741a1240ef7c0f6f8c10e2c0922e73244b4"
+    },
+    {
+      "path": "source/lib/due-timer.test.ts",
+      "bytes": 16311,
+      "sha256": "48221cf914541c4c2edc2bb5c8128798d2af8956295fc5e646d0a06d47d4c51e"
+    },
+    {
+      "path": "source/lib/due-timer.ts",
+      "bytes": 4728,
+      "sha256": "54c19f09ad198ee97b7bad4c6147003898f4b3bfb4b000148200cb242a680b8e"
+    },
+    {
+      "path": "source/package.json",
+      "bytes": 66952,
+      "sha256": "98f67241e1ee158b0ce8ec745b77c016dc879f998ade5dd02585d2aa86fdad96"
+    },
+    {
+      "path": "source/workflows/due-timer/loop.test.ts",
+      "bytes": 6236,
+      "sha256": "b01e8695bb09a9e149223b2c64cd5aeceb3907c88f2df61ea8dc4d2dec4491c5"
+    },
+    {
+      "path": "source/workflows/due-timer/loop.ts",
+      "bytes": 3309,
+      "sha256": "6db6a4df2e279289e70dc7346118905f12fbd45075c39e92dae2596b4e56977f"
+    },
+    {
+      "path": "source/workflows/due-timer/migration.test.ts",
+      "bytes": 9928,
+      "sha256": "128b398ba62ca2aa2927facedb770ca56ecd62966e3c6e957a6cc868862e506f"
+    },
+    {
+      "path": "source/workflows/due-timer/steps.ts",
+      "bytes": 1222,
+      "sha256": "d711b242c4ac3bd7069db21ba8b57a2442d120575ad93fcef57c49cb11bbc1d4"
+    },
+    {
+      "path": "source/workflows/due-timer/workflow.ts",
+      "bytes": 1261,
+      "sha256": "3eaf95ce60c92263acc0a1d1b39e338145c85434f38fcd9e57f99b99171477e9"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 10358,
+      "sha256": "e5512b21bc761e0d9d7ee2cb963f842754d3f7c3c64dc6a4af12e4192aa8e187"
+    }
+  ]
+}

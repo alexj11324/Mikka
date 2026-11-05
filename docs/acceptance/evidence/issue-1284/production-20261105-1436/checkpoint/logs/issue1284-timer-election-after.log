@@ -1,0 +1,26 @@
+(node:23221) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23221) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ does the due work, sleeps exactly until the next due time, and retains the idle hook (7.474976ms)
+✔ a write while idle wakes the retained hook without a release/re-take window (3.232743ms)
+✔ a second run for the same current token nudges the holder and ends without doing work (0.36646ms)
+✔ work already overdue (a backlog) waits at least one second, so it cannot spin (1.097831ms)
+✔ a write that wakes the hook ends the wait before the timer (0.886641ms)
+✔ a long-lived timer starts its successor at the cap while keeping the global hook (0.951791ms)
+✔ work a pass could not clear waits the job's overdue interval, not one second (0.7318ms)
+(node:23222) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23222) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ an idle latest holder fences an old in-flight pass and its late afterCommit/retake (9.092128ms)
+✔ the lifetime handoff keeps the global token until the identified successor takes it (2.265872ms)
+✔ concurrent latest candidates serialize inspection and never force an already-current holder (0.859051ms)
+✔ a failed predecessor retirement does no business work and releases its election (0.984921ms)
+✔ a lifetime successor that loses the election is retried after the yielding candidate releases it (1.592501ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 264.033952

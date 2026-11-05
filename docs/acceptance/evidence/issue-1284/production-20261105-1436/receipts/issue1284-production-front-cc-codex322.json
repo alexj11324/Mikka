@@ -1,0 +1,107 @@
+{
+  "observedAt": "2026-11-05T14:20:12.290Z",
+  "taskId": "9c1da61e-14e2-4a96-a228-7085bebcfd5a",
+  "issueId": "06c14053-5490-4bd6-90e9-391fc5dca740",
+  "stage": "approval",
+  "status": "pending",
+  "revision": 19,
+  "continuationSentAt": "2026-11-05T14:04:38.209Z",
+  "implementation": {
+    "runId": "51fdcb4b-dca8-43ef-844a-8baf4e54f7ea",
+    "attemptId": "2a3f633a-fd60-4bfd-8236-7ade16ee49f6",
+    "status": "passed",
+    "createdAt": "2026-11-05T14:04:50.254Z",
+    "finishedAt": "2026-11-05T14:07:40.985Z",
+    "profile": {
+      "name": "1284 前端实现",
+      "digest": "3a33e10dff60bf8ae3c5702ab9ce6b30184f9b3c4e65cff1055caea87621c182",
+      "reason": "capability_fit",
+      "source": "decision",
+      "version": 1,
+      "profileId": "55e1952f-0129-43c6-9690-2f1b9d99e6b2"
+    },
+    "harness": "claude_code",
+    "model": "claude-haiku-5-5",
+    "credentialType": "subscription",
+    "subscriptionRoute": "claude_code_cli",
+    "nativeToolExecutionObserved": true
+  },
+  "review": {
+    "runId": "e538ab5f-aa5a-4fdf-830d-2e474a0b7048",
+    "runStatus": "succeeded",
+    "attemptId": "007f0e78-9d7d-43a2-845f-f49c8525e4f8",
+    "attemptStatus": "failed",
+    "createdAt": "2026-11-05T14:07:40.119Z",
+    "finishedAt": "2026-11-05T14:09:45.869Z",
+    "harness": "codex",
+    "model": "gpt-6-luna",
+    "credentialType": "subscription",
+    "subscriptionRoute": "codex_cli",
+    "profile": {
+      "name": "1284 独立审阅",
+      "digest": "a8f543efb2a4e53afc388434788952f8473108dd3f6f762b52f3053ba31dc134",
+      "reason": "stage_fit",
+      "source": "decision",
+      "version": 1,
+      "profileId": "1880144e-4005-4d72-b3e3-6f362fbe8bd8"
+    },
+    "candidateId": "fd5484f5-e833-4db8-9b17-67d3999dddb4",
+    "candidateCommit": "78cbd859ca56d4788b2305db8a6ec7a331bf38c6",
+    "readOnly": true,
+    "permissions": {
+      "network": "allow",
+      "git_push": "deny",
+      "computer_use": "deny",
+      "install_dependency": "deny",
+      "write_outside_repo": "deny"
+    },
+    "independentSession": true,
+    "criteriaPassed": 6,
+    "criteriaUnverified": 1,
+    "failedCriterion": "浏览器实际渲染行为已验证",
+    "failedCriterionEvidence": "未执行浏览器观察。此项未验证，不构成已观察到的内容不匹配。",
+    "reviewCount": 1,
+    "checkCompletionSha": "78cbd859ca56d4788b2305db8a6ec7a331bf38c6"
+  },
+  "repair": {
+    "runId": "dd82f53a-33ee-4bd3-84f0-09ba2802dfe0",
+    "attemptId": "5b400f00-9e3e-42f7-b00f-1e3aaeb47479",
+    "status": "passed",
+    "createdAt": "2026-11-05T14:09:45.145Z",
+    "finishedAt": "2026-11-05T14:12:34.871Z",
+    "profileId": "55e1952f-0129-43c6-9690-2f1b9d99e6b2",
+    "profileVersion": 1,
+    "profileDigest": "3a33e10dff60bf8ae3c5702ab9ce6b30184f9b3c4e65cff1055caea87621c182",
+    "harness": "claude_code",
+    "model": "claude-haiku-5-5",
+    "credentialType": "subscription",
+    "subscriptionRoute": "claude_code_cli",
+    "candidateId": "bf06f13b-9f9e-4f5c-9d26-185409ec3c0b",
+    "nativeToolExecutionObserved": true,
+    "browserValidation": {
+      "status": "unverified",
+      "reason": "Headless Chrome SIGABRT exit -6 on all three launches; observed in real production agent report."
+    }
+  },
+  "artifact": {
+    "path": "status-card.html",
+    "bytes": 1486,
+    "sha256": "ec901cd906938c2d903ac81afa19345f2f05b3a9e23a1659770c7d66d088dad8",
+    "producerStdlibChecks": 13,
+    "producerExitCode": 0,
+    "reviewContentMatchesGit": true,
+    "candidateKind": "deliverable",
+    "candidateShaField": null
+  },
+  "versionEdit": {
+    "saved": false,
+    "reason": "Native repair finished before saving; no in-flight freeze claim."
+  },
+  "ownerAcceptance": "pending",
+  "evidenceBoundaries": [
+    "Normal authenticated Owner UI and GET evidence endpoints only; no production SQL or direct writes.",
+    "Profile private instructions, credentials, account identifiers and native session values excluded.",
+    "Run succeeded means the agent completed; Review business status remains failed and browser validation remains unverified.",
+    "DeepSeek/API coding route not tested or called."
+  ]
+}

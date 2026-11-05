@@ -1,0 +1,30 @@
+
+  ! typescript(no-this-alias): Unexpected aliasing of 'this' to local variable.
+    ,-[workflows/due-timer/loop.test.ts:17:7]
+ 16 |     if (!token.endsWith(':claim')) {
+ 17 |       active = this
+    :       ^^^^^^
+ 18 |       if (wakeNow) { wakeNow = false; this.payloads++ }
+    `----
+  help: Assigning a variable to this instead of properly using arrow lambdas may be a symptom of pre-ES2015 practices or not managing scope well.
+
+  ! unicorn(no-thenable): Do not add `then` to a class.
+    ,-[workflows/due-timer/loop.test.ts:25:3]
+ 24 |   stop() { this.forced = true; for (const next of this.pending.splice(0)) next.reject(new Forced()) }
+ 25 |   then<T>(resolve: (value: unknown) => T, reject: (error: unknown) => T) {
+    :   ^^^^
+ 26 |     const value = this.forced ? Promise.reject(new Forced()) : this.payloads ? (this.payloads--, trace.push('woken'), Promise.resolve({})) : new Promise((yes, no) => { this.pending.push({ resolve: yes, reject: no }) })
+    `----
+  help: If an object is defined as 'thenable', once it's accidentally used in an await expression, it may cause problems
+
+  ! unicorn(no-thenable): Do not add `then` to a class.
+    ,-[workflows/due-timer/migration.test.ts:39:3]
+ 38 |   }
+ 39 |   then<T>(resolve: (value: unknown) => T, reject: (error: unknown) => T) {
+    :   ^^^^
+ 40 |     const promise = this.forced ? Promise.reject(new Forced()) : this.payloads.length ? Promise.resolve(this.payloads.shift()) : new Promise((yes, no) => { this.pending.push({ resolve: yes, reject: no }) })
+    `----
+  help: If an object is defined as 'thenable', once it's accidentally used in an await expression, it may cause problems
+
+Found 3 warnings and 0 errors.
+Finished in 59ms on 8 files with 97 rules using 8 threads.

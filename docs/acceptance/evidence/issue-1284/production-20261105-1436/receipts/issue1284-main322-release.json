@@ -1,0 +1,371 @@
+{
+  "kind": "read-only-main-release-observation",
+  "observedAt": "2026-11-05T14:04:51.487Z",
+  "repository": "alexj11324/Mikka",
+  "commit": {
+    "sha": "322ca496363c493a3bd46be0cbb95d37009737b0",
+    "tree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+    "parents": [
+      "64dbdd7dc735ddc37cb13e38127409f35dbb5909",
+      "864113bdb9a62dcff633c9ce7bc0fd59d93a6641"
+    ]
+  },
+  "allRequestedWorkflowsSucceeded": true,
+  "workflows": [
+    {
+      "id": 42038980019,
+      "name": "Web deploy",
+      "path": ".github/workflows/web-deploy.yml",
+      "headSha": "322ca496363c493a3bd46be0cbb95d37009737b0",
+      "status": "completed",
+      "conclusion": "success",
+      "runAttempt": 1,
+      "createdAt": "2026-11-05T13:48:03Z",
+      "updatedAt": "2026-11-05T13:53:56Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42038980019",
+      "jobs": [
+        {
+          "id": 127284455559,
+          "name": "deploy",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": [
+            {
+              "number": 5,
+              "name": "Refuse an obsolete source before release work",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 9,
+              "name": "Publish the verified official runtime pair inside the deployment queue",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 14,
+              "name": "Build (runs migrations last, as the Vercel build did)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 15,
+              "name": "Upload the prebuilt output to production",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 16,
+              "name": "Verify the public production version before releasing the deployment queue",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 42038979911,
+      "name": "Publish daemon",
+      "path": ".github/workflows/publish-daemon.yml",
+      "headSha": "322ca496363c493a3bd46be0cbb95d37009737b0",
+      "status": "completed",
+      "conclusion": "success",
+      "runAttempt": 1,
+      "createdAt": "2026-11-05T13:48:03Z",
+      "updatedAt": "2026-11-05T13:56:42Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42038979911",
+      "jobs": [
+        {
+          "id": 127284454889,
+          "name": "publish",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": [
+            {
+              "number": 6,
+              "name": "Prepare release version and check registry",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "Run pnpm install --frozen-lockfile",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 8,
+              "name": "Run node --test packages/daemon/test/release.node-test.mjs",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 9,
+              "name": "Run pnpm --filter @mikka/daemon typecheck",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 10,
+              "name": "Run pnpm --filter @mikka/daemon test",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 11,
+              "name": "Run pnpm --filter @mikka/daemon build",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 12,
+              "name": "Pin and inventory the released runtime dependency graph",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 13,
+              "name": "Seal the exact candidate before its package acceptance test",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 14,
+              "name": "Run pnpm --filter @mikka/daemon test:package",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 15,
+              "name": "Require successful checks for this exact main commit",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 16,
+              "name": "Verify the tested candidate was not changed",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 18,
+              "name": "Publish with npm trusted publishing and provenance",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 42038980153,
+      "name": "E2B official instance runtime",
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "headSha": "322ca496363c493a3bd46be0cbb95d37009737b0",
+      "status": "completed",
+      "conclusion": "success",
+      "runAttempt": 1,
+      "createdAt": "2026-11-05T13:48:03Z",
+      "updatedAt": "2026-11-05T14:00:54Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42038980153",
+      "jobs": [
+        {
+          "id": 127284456641,
+          "name": "test",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": []
+        },
+        {
+          "id": 127284539335,
+          "name": "check",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": [
+            {
+              "number": 4,
+              "name": "Refuse an obsolete source before runtime validation",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Check publication-control changes across this push",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "Compare the worker hash with production",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 127284689776,
+          "name": "validate",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": [
+            {
+              "number": 5,
+              "name": "Validate new official instances without template mutation",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 127286735180,
+          "name": "await-web",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": [
+            {
+              "number": 4,
+              "name": "Await this source's actual Web build and public version",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 127287577268,
+          "name": "publish / deploy",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": [
+            {
+              "number": 5,
+              "name": "Refuse an obsolete source before release work",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 9,
+              "name": "Publish the verified official runtime pair inside the deployment queue",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 14,
+              "name": "Build (runs migrations last, as the Vercel build did)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 15,
+              "name": "Upload the prebuilt output to production",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 16,
+              "name": "Verify the public production version before releasing the deployment queue",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 42038979909,
+      "name": "CI",
+      "path": ".github/workflows/ui-policy.yml",
+      "headSha": "322ca496363c493a3bd46be0cbb95d37009737b0",
+      "status": "completed",
+      "conclusion": "success",
+      "runAttempt": 1,
+      "createdAt": "2026-11-05T13:48:03Z",
+      "updatedAt": "2026-11-05T13:54:25Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42038979909"
+    }
+  ],
+  "webDeployments": {
+    "initial": {
+      "id": "dpl_Bgi1aNcuFU8afvFheWjz4ysQg5eU",
+      "readyState": "READY",
+      "target": "production",
+      "url": "https://mikka-d3md4kqwp-mikka-dev.vercel.app",
+      "sourceCommit": "322ca496363c493a3bd46be0cbb95d37009737b0",
+      "createdAt": "2026-11-05T13:53:01.642Z",
+      "readyAt": "2026-11-05T13:53:50.171Z"
+    },
+    "afterOfficialRuntimeRefresh": {
+      "id": "dpl_SJUGmpGYJeJuku7sbKq4ERFg397S",
+      "readyState": "READY",
+      "target": "production",
+      "url": "https://mikka-l8dkdllld-mikka-dev.vercel.app",
+      "sourceCommit": "322ca496363c493a3bd46be0cbb95d37009737b0",
+      "createdAt": "2026-11-05T14:00:00.755Z",
+      "readyAt": "2026-11-05T14:00:47.086Z"
+    }
+  },
+  "daemonPublication": {
+    "package": "@aspectlylabs/mikka",
+    "version": "0.0.470",
+    "tag": "latest",
+    "publicationLog": [
+      {
+        "at": "2026-11-05T13:54:33.3625745Z",
+        "package": "@aspectlylabs/mikka@0.0.470"
+      }
+    ],
+    "provenanceSigned": true,
+    "postPublishVerificationCommandSeen": true,
+    "publicationStepSucceeded": true,
+    "inventory": {
+      "jobId": 127284454889,
+      "stepNumber": 12,
+      "stepName": "Pin and inventory the released runtime dependency graph",
+      "conclusion": "success",
+      "commandsObserved": [
+        {
+          "at": "2026-11-05T13:51:02.3530040Z",
+          "command": "npm --prefix \"$PACKAGE_DIRECTORY\" install --package-lock-only --ignore-scripts --omit=dev --workspaces=false --no-audit --no-fund"
+        }
+      ],
+      "followingOperations": [
+        "npm shrinkwrap",
+        "npm sbom --sbom-format=cyclonedx",
+        "npm audit",
+        "scripts/release/audit-policy.mjs"
+      ]
+    },
+    "logSource": "https://github.com/alexj11324/Mikka/actions/runs/42038979911/job/127284454889"
+  },
+  "officialRuntime": {
+    "workflowId": 42038980153,
+    "allFiveJobsSucceeded": true,
+    "workerContentHash": "808d71e56ec4d00637ba2f3cbb5eef4c85b61c9b",
+    "hashDefinition": "scripts/e2b/build-template.py worker_hash: SHA1 of selected worker/recipe files and package/lock projections; distinct from the Web Git commit.",
+    "validatorDefinition": "scripts/e2b/validate-official-instances.py uses worker_hash(source_commit), validates new desktop/claude/codex official instances, and cleans them up.",
+    "validationLogSummary": {
+      "summary": "Official instance file conservation and measured model capabilities verified; no subscription acceptance claimed.",
+      "observedInSuccessfulJobLog": true
+    },
+    "runtimePublishJobId": 127287577268,
+    "runtimePublishStepSucceeded": true,
+    "postRefreshPublicVersionVerificationStepSucceeded": true,
+    "sourceCommitSeenInSuccessfulPublishLog": true,
+    "logSource": "https://github.com/alexj11324/Mikka/actions/runs/42038980153/job/127287577268"
+  },
+  "monitor": {
+    "firstObservedAt": "2026-11-05T13:52:09.143Z",
+    "githubAndVercelReadOnly": true,
+    "dockerCalls": 0,
+    "productionBrowserOrDomainRequests": 0,
+    "rerunCancelDeployOrMutationCalls": 0,
+    "rawLogsOrHeadersExported": false,
+    "secretValuesExported": false
+  },
+  "limitations": [
+    "Vercel READY and workflow public-version checks are independently read control-plane/CI facts; the root assistant retains normal production-browser acceptance.",
+    "No claim that every existing VM or durable workflow has migrated to this release.",
+    "The official-runtime validation explicitly excludes subscription acceptance. Native CC/Codex Review and Owner acceptance remain separate observations.",
+    "This receipt has not been audited or published by this monitor task."
+  ]
+}

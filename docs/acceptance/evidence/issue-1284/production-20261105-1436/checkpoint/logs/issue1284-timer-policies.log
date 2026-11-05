@@ -1,0 +1,10 @@
+{
+  "polling": {
+    "diagnostics": [],
+    "stale": []
+  },
+  "errorCause": {
+    "diagnostics": [],
+    "stale": []
+  }
+}

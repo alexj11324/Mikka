@@ -1,0 +1,73 @@
+(node:21465) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:21465) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✖ an idle latest holder fences an old in-flight pass and its late afterCommit/retake (11.775879ms)
+✖ the lifetime handoff keeps the global token until the identified successor takes it (3.510623ms)
+✖ concurrent latest candidates serialize inspection and never force an already-current holder (3.046132ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 324.049511
+
+✖ failing tests:
+
+test at workflows/due-timer/migration.test.ts:1:3458
+✖ an idle latest holder fences an old in-flight pass and its late afterCommit/retake (11.775879ms)
+  AssertionError [ERR_ASSERTION]: old deployment is replaced before any latest business work
+  + actual - expected
+  
+  + 'old-08b'
+  - 'latest'
+  
+      at TestContext.<anonymous> (/workspace/Mikka-1284-due-timer864/workflows/due-timer/migration.test.ts:88:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'old-08b',
+    expected: 'latest',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at workflows/due-timer/migration.test.ts:1:4405
+✖ the lifetime handoff keeps the global token until the identified successor takes it (3.510623ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'parent'
+  
+      at TestContext.<anonymous> (/workspace/Mikka-1284-due-timer864/workflows/due-timer/migration.test.ts:111:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'parent',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at workflows/due-timer/migration.test.ts:1:5361
+✖ concurrent latest candidates serialize inspection and never force an already-current holder (3.046132ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'old-08b'
+  - 'latest-one'
+  
+      at TestContext.<anonymous> (/workspace/Mikka-1284-due-timer864/workflows/due-timer/migration.test.ts:140:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'old-08b',
+    expected: 'latest-one',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

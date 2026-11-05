@@ -1,0 +1,151 @@
+(node:21657) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:21657) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a running timer is woken and no second one is started (42.460774ms)
+✔ with no timer holding the token, one is started (0.67017ms)
+✔ a failed start never fails the write that armed it (0.789241ms)
+✖ a hook held by the old deployment starts a latest candidate without waking or cancelling the old holder (4.087643ms)
+✔ a holder already on the latest deployment is only woken (1.419771ms)
+✔ a late caller on an older deployment does not replace a holder already on the latest target (1.215191ms)
+✖ a missing global hook starts the current production target explicitly (3.271262ms)
+✖ legacy hook metadata is resolved from the owning run without loading run data (1.653551ms)
+✖ repeated writes after a latest holder has taken over do not start more candidates (3.101192ms)
+✖ the lifetime handoff starts latest with the real predecessor identity and does not cancel it (1.668532ms)
+✖ an unknown holder lookup failure does not leak private text or fail the write that armed it (1.627461ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 5
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1205.86358
+
+✖ failing tests:
+
+test at lib/due-timer.test.ts:1:5195
+✖ a hook held by the old deployment starts a latest candidate without waking or cancelling the old holder (4.087643ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at assertLatestStart (/workspace/Mikka-1284-due-timer864/lib/due-timer.test.ts:111:10)
+      at TestContext.<anonymous> (/workspace/Mikka-1284-due-timer864/lib/due-timer.test.ts:149:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/due-timer.test.ts:1:6041
+✖ a missing global hook starts the current production target explicitly (3.271262ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - {
+  -   deploymentId: 'latest'
+  - }
+  
+      at assertLatestStart (/workspace/Mikka-1284-due-timer864/lib/due-timer.test.ts:114:10)
+      at TestContext.<anonymous> (/workspace/Mikka-1284-due-timer864/lib/due-timer.test.ts:175:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: { deploymentId: 'latest' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at lib/due-timer.test.ts:1:6223
+✖ legacy hook metadata is resolved from the owning run without loading run data (1.653551ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   {
+  -     options: {
+  -       resolveData: 'none'
+  -     },
+  -     runId: 'wrun_legacy'
+  -   }
+  - ]
+  
+      at TestContext.<anonymous> (/workspace/Mikka-1284-due-timer864/lib/due-timer.test.ts:183:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ { runId: 'wrun_legacy', options: [Object] } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at lib/due-timer.test.ts:1:6583
+✖ repeated writes after a latest holder has taken over do not start more candidates (3.101192ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at assertLatestStart (/workspace/Mikka-1284-due-timer864/lib/due-timer.test.ts:111:10)
+      at TestContext.<anonymous> (/workspace/Mikka-1284-due-timer864/lib/due-timer.test.ts:195:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/due-timer.test.ts:1:6992
+✖ the lifetime handoff starts latest with the real predecessor identity and does not cancel it (1.668532ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      'run-recovery',
+  -   'wrun_lifetime_cap'
+    ]
+  
+      at assertLatestStart (/workspace/Mikka-1284-due-timer864/lib/due-timer.test.ts:113:10)
+      at TestContext.<anonymous> (/workspace/Mikka-1284-due-timer864/lib/due-timer.test.ts:203:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'run-recovery' ],
+    expected: [ 'run-recovery', 'wrun_lifetime_cap' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at lib/due-timer.test.ts:1:7273
+✖ an unknown holder lookup failure does not leak private text or fail the write that armed it (1.627461ms)
+  AssertionError [ERR_ASSERTION]: the metadata failure must actually be exercised
+  + actual - expected
+  
+  + []
+  - [
+  -   'due-timer:run-recovery'
+  - ]
+  
+      at TestContext.<anonymous> (/workspace/Mikka-1284-due-timer864/lib/due-timer.test.ts:219:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ 'due-timer:run-recovery' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

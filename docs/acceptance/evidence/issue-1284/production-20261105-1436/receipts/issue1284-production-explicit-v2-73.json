@@ -1,0 +1,88 @@
+{
+  "recordedAt": "2026-11-05T14:42:35.897Z",
+  "test": "New explicit selection uses current Profile v2 after an older Run remained frozen to v1",
+  "taskLabel": "ALEX-73",
+  "issueId": "7e03b315-9305-4570-a163-7c7946a050fe",
+  "taskId": "fa6b1103-6c13-4f99-a42e-345e387a2e12",
+  "uiSelection": {
+    "createClickedAt": "2026-11-05T14:31:43.378Z",
+    "profileExplicitlySelected": true,
+    "createdOnlyInitially": true,
+    "dispatchClarificationSentAt": "2026-11-05T14:34:41.146Z",
+    "existingIssueReused": true,
+    "explanation": "Coordinator initially interpreted 'create one task' as create only. A normal Owner message then explicitly authorized one dispatch of that existing issue; no duplicate Task was created."
+  },
+  "implementation": {
+    "runId": "66584a3e-3d09-4f45-8e3b-6b92dff16778",
+    "attemptId": "fdd846d1-b4a8-4273-8ef8-7538b3f33c9b",
+    "status": "succeeded",
+    "attemptStatus": "passed",
+    "createdAt": "2026-11-05T14:34:55.497Z",
+    "finishedAt": "2026-11-05T14:37:33.819Z",
+    "harness": "claude_code",
+    "model": "claude-haiku-5-5",
+    "credentialType": "subscription",
+    "subscriptionRoute": "claude_code_cli",
+    "profile": {
+      "profileId": "55e1952f-0129-43c6-9690-2f1b9d99e6b2",
+      "name": "1284 前端实现",
+      "version": 2,
+      "digest": "2d28a80aa6d0fcb94cb912db17f14df6fa7d41adb0a70a0683c60a8e210c69f5",
+      "source": "explicit",
+      "reason": "explicit"
+    },
+    "evidenceObservedAt": "2026-11-05T14:41:33.112Z",
+    "nativeToolExecutionObserved": true
+  },
+  "review": {
+    "runId": "74721245-79b3-427b-8aeb-bc74c9663c55",
+    "attemptId": "53090572-f359-46c8-8ae0-1ac2e3a67282",
+    "runStatus": "succeeded",
+    "attemptStatus": "passed",
+    "createdAt": "2026-11-05T14:37:33.033Z",
+    "finishedAt": "2026-11-05T14:39:22.825Z",
+    "harness": "codex",
+    "model": "gpt-6-luna",
+    "credentialType": "subscription",
+    "subscriptionRoute": "codex_cli",
+    "profile": {
+      "profileId": "1880144e-4005-4d72-b3e3-6f362fbe8bd8",
+      "name": "1284 独立审阅",
+      "version": 1,
+      "digest": "a8f543efb2a4e53afc388434788952f8473108dd3f6f762b52f3053ba31dc134",
+      "source": "decision",
+      "reason": "stage_fit"
+    },
+    "readOnly": true,
+    "independentSession": true,
+    "criteriaPassed": 2,
+    "criteriaTotal": 2,
+    "checkSha": "1ccefd5fc8408769681b86a4ed83e17e57110619",
+    "candidateId": "f4ffbdd4-3be9-4715-8cdb-7914a02bec3b",
+    "candidateShaField": null,
+    "reviewCount": 1,
+    "additionalVerify": "not_run",
+    "runEvidenceObservedAt": "2026-11-05T14:42:00.369Z"
+  },
+  "artifact": {
+    "path": "mikka-1284-explicit-ready.txt",
+    "bytes": 37,
+    "sha256": "e4ce2cb227f4779850093a9135ce4994c50f6d6089852ceaac66e3d5aa27f2e5",
+    "producerExitCode": 0,
+    "producerActualCommand": "python3 -c",
+    "reviewContentMatchesGit": true,
+    "reviewMatchesExpectedUtf8": true
+  },
+  "ownerAcceptance": {
+    "clickedAt": "2026-11-05T14:42:08.125Z",
+    "taskUpdatedAt": "2026-11-05T14:42:08.463Z",
+    "approvalFinishedAt": "2026-11-05T14:42:09.120Z",
+    "status": "passed",
+    "stage": "approval",
+    "revision": 9,
+    "ui": "Accepted",
+    "readbackObservedAt": "2026-11-05T14:42:35.897Z"
+  },
+  "safety": "Normal authenticated Owner UI and read-only evidence endpoints. No account/subscription/model-priority changes, production SQL, replacement account, additional Verify, or DeepSeek/API coding call.",
+  "versionProvenance": "Public serving 325114479cc8ec20beac88f923fc702848347672 observed14:30:25; do not infer a durable Workflow deployment solely from the public page."
+}

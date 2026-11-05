@@ -252,3 +252,14 @@ This group does not include the pending queued-Stop increment, final merged buil
 [冻结manifest](final-integration-8641-manifest.json) SHA256 `19e878b1bacbb1605f8fa0d283c849b8a116e9e0d31e934a1d2176f75d3f32fd`；[本轮fresh-context官方审计](final-integration-8641-audit.json)通过22文件且审计前后字节一致。既有37件历史包保持不动。
 
 ALEX67最新Retry的UI为64，但运行时日志将真正Decision绑定到旧08b dueTimer，结果仍为无Run的uncertain_profile；原始观察及归因补充一并保留。8641可按已完成门禁发布daemon/Stop/Profile修复，timer切换另行fix-forward。#1284保持open，真实CC/Codex Review、Owner Accept及版本冻结尚未宣称完成。
+
+
+## 2026-11-05：双官方订阅、显式 Profile 与 Owner 接受
+
+[本轮完整证据](production-20261105-1436/README.md) 保存 49 个经官方静态审计的文件，包括 ALEX66 的 CC 实现→Codex 审阅→CC 修复、ALEX72 显式 v1/非终态冻结、ALEX73 后续显式 v2 的实际执行，以及三件任务的正常 Owner 接受。实际模型为 `claude-haiku-5-5` 与 `gpt-6-luna`，均使用现有官方订阅。DeepSeek coding API 按用户要求未测试。
+
+ALEX66 的原 Review failed 和原生 Chrome SIGABRT 保持原样；补充检查从正常生产 Changes UI 获取精确匹配的 HTML，在 Docker Chromium 中实际查看 1024/400 两种宽度后完成 Owner 接受。没有强制第二次 Review 或 Verify。候选 `sha:null` 与 Review 的检查 Git SHA 分列。
+
+[Manifest](production-20261105-1436-manifest.json) · [实际审计 PASS](production-20261105-1436-audit.json) · [审计清理收据](production-20261105-1436-cleanup.json)。49 文件共 392,136 bytes，审计前后字节与 SHA 不变；新增元数据报告单独保存。
+
+此增量仍不表示 #1284 全部完成：ALEX67 原候选的正常重试还需要权威修复 [#1403](https://github.com/alexj11324/Mikka/pull/1403) 发布后验收。包内 `a2c52809` 是保留的本地交接检查点，不是另一个生产实现；已另行提供与 #1403 同一实现的 [三文件定点贡献](https://github.com/alexj11324/Mikka/commit/d3ea4c2f8229dd7fb22ddf00e1e33ca1c59b3d19)。

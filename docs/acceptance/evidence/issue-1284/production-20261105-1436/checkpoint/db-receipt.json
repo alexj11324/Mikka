@@ -1,0 +1,58 @@
+{
+  "startedAt": "2026-11-05T14:17:20.071912+00:00",
+  "baseCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+  "workingDiffSha256": "da2106c5d162185bf151c3012163385a8cf6265222444e98c5f5bba7201629e0",
+  "role": "mikka1284_timer_9fa1a17e",
+  "database": "mikka1284_timer_9fa1a17e_e2e",
+  "commands": [
+    {
+      "name": "setup",
+      "argv": [
+        "pnpm",
+        "test:e2e:setup"
+      ],
+      "start": "2026-11-05T14:17:20.227160+00:00",
+      "end": "2026-11-05T14:17:22.538608+00:00",
+      "exitCode": 0,
+      "log": "/tmp/issue1284-timer-db-setup.log",
+      "sha256": "95faffd468dae3d157fdc88273f5a94580ef59d88d7ee893c88c49bc6d069045",
+      "counts": {}
+    },
+    {
+      "name": "due",
+      "argv": [
+        "node",
+        "--test-force-exit",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/schedules/due-timer.db.test.ts",
+        "lib/run-recovery-due.db.test.ts"
+      ],
+      "start": "2026-11-05T14:17:22.538898+00:00",
+      "end": "2026-11-05T14:17:23.908722+00:00",
+      "exitCode": 0,
+      "log": "/tmp/issue1284-timer-db-due.log",
+      "sha256": "d93ce89b39471b3302678afdb7c229462724b1854959c3ae600c4c3f3dc528e3",
+      "counts": {
+        "tests": 15,
+        "pass": 15,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      }
+    }
+  ],
+  "complete": true,
+  "cleanup": {
+    "force": false,
+    "terminate": false,
+    "clientSessionsBeforeDrop": 0,
+    "allBackendsBeforeDrop": 0,
+    "remainingDatabases": 0,
+    "remainingRoles": 0,
+    "finishedAt": "2026-11-05T14:17:24.128870+00:00"
+  }
+}

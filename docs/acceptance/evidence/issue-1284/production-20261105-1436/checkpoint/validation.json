@@ -1,0 +1,298 @@
+{
+  "checkpointCommit": "a2c5280934bd5078dc77702e1d3a16f3f4ca4b26",
+  "checkpointTree": "4bc8f0a1dbf391a4b20e422b96774ec7593f4d40",
+  "baseCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+  "disposition": "superseded candidate; root elected peer PR1403 production-run-recovery-scoped implementation as authoritative",
+  "productionMigrationVerified": false,
+  "fullBuild": "not run for this candidate",
+  "newModelOrProviderCalls": 0,
+  "commands": {
+    "migrationRed": "CI=true node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test workflows/due-timer/migration.test.ts",
+    "armRed": "CI=true node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/due-timer.test.ts",
+    "schedulesIntermediate": "CI=true pnpm test:schedules",
+    "recoveryIntermediate": "CI=true pnpm test:run-recovery",
+    "electionGreen": "CI=true node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test workflows/due-timer/migration.test.ts workflows/due-timer/loop.test.ts",
+    "typesIntermediate": "pnpm typecheck",
+    "lintIntermediate": "pnpm exec oxlint <the 8 changed TS files>",
+    "policiesIntermediate": "Import scripts/polling-policy.mjs and scripts/error-cause-policy.mjs; execute auditRepository() and staleAllowlistEntries() for both"
+  },
+  "versionBoundaries": [
+    {
+      "stage": "initial migration RED",
+      "counts": {
+        "tests": 3,
+        "pass": 0,
+        "fail": 3,
+        "skipped": 0
+      },
+      "scope": "old8641 product plus first3 migration tests"
+    },
+    {
+      "stage": "arm/handoff RED",
+      "counts": {
+        "tests": 11,
+        "pass": 5,
+        "fail": 6,
+        "skipped": 0
+      },
+      "scope": "old8641 product plus UI public-SDK fixture; loader succeeded"
+    },
+    {
+      "stage": "preparation errors retained",
+      "scope": "loop-after.log is a test-title quote transform error; types.log is real Promise<World> misuse caught before release; both corrected"
+    },
+    {
+      "stage": "intermediate async-world GREEN",
+      "counts": {
+        "tests": 70,
+        "pass": 70,
+        "fail": 0,
+        "skipped": 0
+      },
+      "scope": "57 schedules +13 cron/recovery before election liveness and structured diagnostic additions; types/lint/diff/policies0"
+    },
+    {
+      "stage": "real PG GREEN",
+      "counts": {
+        "tests": 15,
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      },
+      "scope": "existing schedule and run-recovery due-time SQL on owned loopback DB; exact initial diff hash and cleanup in db-receipt.json; source2 SQL modules/tests unmodified throughout"
+    },
+    {
+      "stage": "election race RED",
+      "counts": {
+        "tests": 5,
+        "pass": 4,
+        "fail": 1,
+        "skipped": 0
+      },
+      "scope": "cap successor lost election; expected2 child starts but observed1"
+    },
+    {
+      "stage": "election race GREEN",
+      "counts": {
+        "tests": 12,
+        "pass": 12,
+        "fail": 0,
+        "skipped": 0
+      },
+      "scope": "loop7 + migration5 after release-before-nudge and real-wake retry; loop/migration files are exact checkpoint bytes"
+    }
+  ],
+  "pendingNotClaimed": [
+    "The final structured force_unsupported log assertions in lib/due-timer.test.ts (sha25648221cf914541c4c2edc2bb5c8128798d2af8956295fc5e646d0a06d47d4c51e) were not rerun after root selected peer implementation.",
+    "No final whole-tree type/lint/unit reuse is claimed for the later diagnostic additions; peer must validate any port on its own source.",
+    "No production migration, native/model recovery, full build, HTTP or screenshots were executed for this checkpoint."
+  ],
+  "operationalLimit": "Workflow cancellation and terminal readback stop future scheduling, not an already-running old business step; such a step may finish once. Existing business transactions and retained global hook fence its late wake.",
+  "peerReview": {
+    "head": "087e1cf1fd4e422a608893e146d01b1e456a646d",
+    "preferredBasis": "production run-recovery-only; owner/project/environment and generated workflowId checks",
+    "transferableItems": [
+      "election release-before-nudge regression and fix",
+      "trusted SDK $parentRunId proof alongside predecessor argument",
+      "closed code/detail and bounded SDK routing metadata diagnostics without payload/token/text"
+    ]
+  },
+  "logs": [
+    {
+      "name": "migration-before",
+      "path": "logs/issue1284-timer-migration-before.log",
+      "bytes": 2872,
+      "sha256": "16dbbd57e3617c4e361b1d6fa82f5093f4b059f497cd65475519cde2ae74d335",
+      "logModifiedAtUtc": "2026-11-05T13:57:15.158769+00:00",
+      "counts": {
+        "tests": 3,
+        "pass": 0,
+        "fail": 3,
+        "cancelled": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "arm-before",
+      "path": "logs/issue1284-timer-arm-before.log",
+      "bytes": 6036,
+      "sha256": "1ed9745ee265e5fe9bee58fa76aa146cd7801cfea46faf8e59788f9317f93ff1",
+      "logModifiedAtUtc": "2026-11-05T14:04:28.278750+00:00",
+      "counts": {
+        "tests": 11,
+        "pass": 5,
+        "fail": 6,
+        "cancelled": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "loop-after",
+      "path": "logs/issue1284-timer-loop-after.log",
+      "bytes": 2243,
+      "sha256": "4e3365d7e468eedeca328f9dbf33c2f105c78a032aa089db00fdb89768fb6517",
+      "logModifiedAtUtc": "2026-11-05T14:10:35.250734+00:00",
+      "counts": {
+        "tests": 5,
+        "pass": 4,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "loop-after-fixed",
+      "path": "logs/issue1284-timer-loop-after-fixed.log",
+      "bytes": 1764,
+      "sha256": "8ce6dfcca521685551edb3aba4bb64332de31a1c1f84d6575f81880ab1d0b48a",
+      "logModifiedAtUtc": "2026-11-05T14:11:17.502732+00:00",
+      "counts": {
+        "tests": 11,
+        "pass": 11,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "schedules-after",
+      "path": "logs/issue1284-timer-schedules-after.log",
+      "bytes": 7733,
+      "sha256": "636e7fe4d161ba3e9a2023226618f58892a5d6d4bf31e020920dcdac0a26600a",
+      "logModifiedAtUtc": "2026-11-05T14:13:40.990725+00:00",
+      "counts": {
+        "tests": 57,
+        "pass": 57,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "types",
+      "path": "logs/issue1284-timer-types.log",
+      "bytes": 1047,
+      "sha256": "309ae385c9a4f0db186472261e95ab1917cf63b3c4ae31eb70c8f42093fb888e",
+      "logModifiedAtUtc": "2026-11-05T14:13:44.634725+00:00",
+      "counts": {}
+    },
+    {
+      "name": "lint",
+      "path": "logs/issue1284-timer-lint.log",
+      "bytes": 1741,
+      "sha256": "a38b2ef237f4e60e955c00e99ccea62a0348d6ab64d8d64c90d1b8a71c8b5f23",
+      "logModifiedAtUtc": "2026-11-05T14:13:45.122725+00:00",
+      "counts": {}
+    },
+    {
+      "name": "schedules-final",
+      "path": "logs/issue1284-timer-schedules-final.log",
+      "bytes": 7727,
+      "sha256": "ed981901643e71d4c441ce2115e8a0be22635985526455c592788e365364b96d",
+      "logModifiedAtUtc": "2026-11-05T14:15:56.206719+00:00",
+      "counts": {
+        "tests": 57,
+        "pass": 57,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "recovery-unit",
+      "path": "logs/issue1284-timer-recovery-unit.log",
+      "bytes": 2335,
+      "sha256": "8969279806a6678f768322838b3d6c0fc4e9d92ac3e3c31492a33485efbea437",
+      "logModifiedAtUtc": "2026-11-05T14:15:57.106719+00:00",
+      "counts": {
+        "tests": 13,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "types-final",
+      "path": "logs/issue1284-timer-types-final.log",
+      "bytes": 80,
+      "sha256": "7adc35d68b1780b7156b0da283382588c9e87658534a36a2b9278fcc6f27cb72",
+      "logModifiedAtUtc": "2026-11-05T14:15:57.422719+00:00",
+      "counts": {}
+    },
+    {
+      "name": "lint-final",
+      "path": "logs/issue1284-timer-lint-final.log",
+      "bytes": 89,
+      "sha256": "497435a445172a1d43a0f627edefc6adf169e32abea698bfcee3dc708923cf2d",
+      "logModifiedAtUtc": "2026-11-05T14:16:00.050719+00:00",
+      "counts": {}
+    },
+    {
+      "name": "policies",
+      "path": "logs/issue1284-timer-policies.log",
+      "bytes": 124,
+      "sha256": "1d833e5a51443c8b49122c34ad34397c730206a06b9f4a61cd0f5a1f2dba1be4",
+      "logModifiedAtUtc": "2026-11-05T14:16:00.298719+00:00",
+      "counts": {}
+    },
+    {
+      "name": "diff-final",
+      "path": "logs/issue1284-timer-diff-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "logModifiedAtUtc": "2026-11-05T14:16:00.302719+00:00",
+      "counts": {}
+    },
+    {
+      "name": "election-before",
+      "path": "logs/issue1284-timer-election-before.log",
+      "bytes": 1622,
+      "sha256": "3a1b6b9839d05c5cc10f61d16f5b60025ee86ed138b2fc0aba480f4e3532d805",
+      "logModifiedAtUtc": "2026-11-05T14:20:31.406707+00:00",
+      "counts": {
+        "tests": 5,
+        "pass": 4,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "election-after",
+      "path": "logs/issue1284-timer-election-after.log",
+      "bytes": 1876,
+      "sha256": "0c443b0d59a6ad34a01823903fce14424bac668a177b731752ad2c6a0cc6a70d",
+      "logModifiedAtUtc": "2026-11-05T14:24:35.718696+00:00",
+      "counts": {
+        "tests": 12,
+        "pass": 12,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "db-setup",
+      "path": "logs/issue1284-timer-db-setup.log",
+      "bytes": 18772,
+      "sha256": "95faffd468dae3d157fdc88273f5a94580ef59d88d7ee893c88c49bc6d069045",
+      "logModifiedAtUtc": "2026-11-05T14:17:22.530715+00:00",
+      "counts": {}
+    },
+    {
+      "name": "db-due",
+      "path": "logs/issue1284-timer-db-due.log",
+      "bytes": 1611,
+      "sha256": "d93ce89b39471b3302678afdb7c229462724b1854959c3ae600c4c3f3dc528e3",
+      "logModifiedAtUtc": "2026-11-05T14:17:23.902715+00:00",
+      "counts": {
+        "tests": 15,
+        "pass": 15,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      }
+    }
+  ]
+}

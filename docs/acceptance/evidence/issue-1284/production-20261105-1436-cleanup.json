@@ -1,0 +1,29 @@
+{
+  "kind": "static-evidence-audit-cleanup",
+  "observedAt": "2026-11-05T14:54:12.538687+00:00",
+  "evidenceSet": "issue1284-production-1436",
+  "manifestSha256": "a85436feacfe67e3ba4d500e36361a0926400c251781bb5a907904d013ee0764",
+  "auditSha256": "128b91d29ed8e961ed79217a0f3bd9249faedae5fe2552cc4945b78cea83cfdb",
+  "auditProcessExitCode": 0,
+  "auditFiles": 49,
+  "candidateBytes": 392136,
+  "resourcesCreatedByThisAudit": {
+    "applicationServers": 0,
+    "databaseServers": 0,
+    "databaseRoles": 0,
+    "databases": 0,
+    "testAccountLeases": 0,
+    "browserProcesses": 0,
+    "nativeOrModelRuns": 0
+  },
+  "productionOrProviderCalls": 0,
+  "sourceFilesChanged": 0,
+  "remoteTransportArchiveRemoved": true,
+  "publicCandidateAndReportsRetainedForEvidence": true,
+  "auditWrapperRetainedForReproducibility": true,
+  "privateRunnerContextRetained": true,
+  "privateContextWrittenOrExported": false,
+  "otherAgentResourcesUntouched": true,
+  "dockerLifecycleActions": 0,
+  "boundary": "This records only this evidence-packaging/audit task. Other agents own any remaining Docker work and the root owns sandbox shutdown."
+}

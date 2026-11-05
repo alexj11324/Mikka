@@ -1,0 +1,90 @@
+
+> next-app@0.0.1 test:schedules /workspace/Mikka-1284-due-timer864
+> node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/schedules/time.test.ts lib/schedules/scope.test.ts lib/schedules/workflow.test.ts app/api/cron/schedules/route.test.ts lib/schedules/runtime-arm.test.ts lib/due-timer.test.ts workflows/due-timer/loop.test.ts workflows/due-timer/migration.test.ts
+
+(node:22432) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:22432) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ missing config refuses without scanning (132.477087ms)
+✔ anonymous and incorrect credentials cannot scan other owners (12.57776ms)
+✔ the existing cron bearer can scan and receives only no-store counts (13.624671ms)
+✔ internal errors produce a bounded safe failure (2.225482ms)
+✔ the slow sweep re-arms the due timer when work is due later, recovering a lost start (3.241962ms)
+✔ with nothing due the sweep starts no timer (2.359512ms)
+✔ refused callers never arm a timer (2.106362ms)
+(node:22433) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:22433) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a running timer is woken and no second one is started (58.124357ms)
+✔ with no timer holding the token, one is started (0.410661ms)
+✔ a failed start never fails the write that armed it (0.50062ms)
+✔ a hook held by the old deployment starts a latest candidate without waking or cancelling the old holder (1.942822ms)
+✔ a holder already on the latest deployment is only woken (1.518811ms)
+✔ a late caller on an older deployment does not replace a holder already on the latest target (1.455531ms)
+✔ a missing global hook starts the current production target explicitly (1.142451ms)
+✔ legacy hook metadata is resolved from the owning run without loading run data (0.961421ms)
+✔ repeated writes after a latest holder has taken over do not start more candidates (3.067812ms)
+✔ the lifetime handoff starts latest with the real predecessor identity and does not cancel it (0.78572ms)
+✔ an unknown holder lookup failure does not leak private text or fail the write that armed it (0.814261ms)
+✔ a candidate re-reads a latest holder that replaced the old holder observed while arming (1.065031ms)
+✔ an obsolete candidate yields to a latest successor without waking or cancelling the old holder (1.017031ms)
+✔ a caller-supplied predecessor cannot authorize force against a latest holder (0.26266ms)
+✔ a same-deployment lifetime successor needs both the actual holder and its SDK-recorded parent (0.21695ms)
+✔ a candidate refuses takeover when the world or the old hook cannot support atomic force (0.738231ms)
+✔ a candidate that lost the global token cannot cancel its observed predecessor (0.32945ms)
+✔ the token owner confirms terminal status for both the observed and actual atomic displaced predecessors (0.828971ms)
+✔ a predecessor cancellation that throws cannot allow due work to continue (0.34697ms)
+✔ a predecessor cancellation that stays-running cannot allow due work to continue (0.23305ms)
+(node:22439) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:22439) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ create can move the next due time earlier, so it arms the timer after it commits (32.377957ms)
+✔ update can move the next due time earlier, so it arms the timer after it commits (0.18988ms)
+✔ resume can move the next due time earlier, so it arms the timer after it commits (0.16325ms)
+✔ list adds no due work and arms nothing (0.26591ms)
+✔ history adds no due work and arms nothing (0.24759ms)
+✔ pause adds no due work and arms nothing (0.12779ms)
+✔ cancel adds no due work and arms nothing (0.12938ms)
+✔ a failed scheduled read is retried 30 s later, earlier than the lease the timer sleeps to, so it arms (0.21198ms)
+(node:22440) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:22440) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ scheduled SDK calls use the occurrence authority without manufacturing native identities (232.712068ms)
+✔ scheduled native calls retain the current holder/turn/call fence as well (1.088081ms)
+✔ a stopped native call cannot proceed through a still-valid schedule (0.56234ms)
+✔ cancellation or stale schedule scope refuses both SDK and native calls (2.014602ms)
+✔ DST spring gap skips the absent local date (18.123164ms)
+✔ DST fold selects explicit earlier/later or rejects; Lord Howe half-hour fold (9.851108ms)
+✔ past once/interval starts and invalid zones reject, interval skips backlog (4.779454ms)
+(node:22452) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:22452) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ scheduled SDK turn uses the existing runtime with host-only scope and read catalog (30.919385ms)
+✔ scheduled native relay preserves actual native identity alongside the occurrence scope (0.48074ms)
+✔ a cancelled or stale scheduled turn starts no model and records bounded failure (0.647861ms)
+✔ a truncated scheduled reply uses bounded failure and a later complete reply can publish (0.56155ms)
+(node:22458) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:22458) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ does the due work, sleeps exactly until the next due time, and retains the idle hook (8.272007ms)
+✔ a write while idle wakes the retained hook without a release/re-take window (3.744483ms)
+✔ a second run for the same current token nudges the holder and ends without doing work (0.375891ms)
+✔ work already overdue (a backlog) waits at least one second, so it cannot spin (2.664312ms)
+✔ a write that wakes the hook ends the wait before the timer (3.397603ms)
+✔ a long-lived timer starts its successor at the cap while keeping the global hook (4.539533ms)
+✔ work a pass could not clear waits the job's overdue interval, not one second (0.632421ms)
+(node:22582) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:22582) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ an idle latest holder fences an old in-flight pass and its late afterCommit/retake (21.773788ms)
+✔ the lifetime handoff keeps the global token until the identified successor takes it (5.701735ms)
+✔ concurrent latest candidates serialize inspection and never force an already-current holder (1.287351ms)
+✔ a failed predecessor retirement does no business work and releases its election (2.234742ms)
+ℹ tests 57
+ℹ suites 0
+ℹ pass 57
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1721.464605

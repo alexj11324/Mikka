@@ -1,0 +1,115 @@
+{
+  "recordedAt": "2026-11-05T14:35:58.749Z",
+  "test": "Explicit Profile selection and edit during a non-terminal existing Run",
+  "issueId": "a9f325bd-2156-447e-8abe-905cfd8c8fab",
+  "taskId": "8463b558-65a4-4525-a859-1809ca19bdc5",
+  "taskLabel": "ALEX-72",
+  "taskCreatedVia": "Normal Owner New task dialog; Agent profile explicitly selected",
+  "createClickedAt": "2026-11-05T14:22:20.282Z",
+  "implementation": {
+    "runId": "495a2c8f-4e8d-492b-8368-3165e38d802a",
+    "attemptId": "cdc21c7a-f3f6-42e1-8fdd-9093858492c2",
+    "harness": "claude_code",
+    "model": "claude-haiku-5-5",
+    "credentialType": "subscription",
+    "subscriptionRoute": "claude_code_cli",
+    "profile": {
+      "profileId": "55e1952f-0129-43c6-9690-2f1b9d99e6b2",
+      "name": "1284 前端实现",
+      "version": 1,
+      "digest": "3a33e10dff60bf8ae3c5702ab9ce6b30184f9b3c4e65cff1055caea87621c182",
+      "source": "explicit",
+      "reason": "explicit"
+    },
+    "beforeEdit": {
+      "observedAt": "2026-11-05T14:26:30.765Z",
+      "status": "running",
+      "nativeToolsAndFileStabilityCheckObserved": true
+    },
+    "afterEdit": {
+      "observedAt": "2026-11-05T14:26:47.228Z",
+      "status": "finishing",
+      "sameProfileVersionAndDigest": true,
+      "sameHarnessAndModel": true
+    },
+    "createdAt": "2026-11-05T14:22:51.971Z",
+    "finishedAt": "2026-11-05T14:26:48.376Z",
+    "attemptStatus": "passed"
+  },
+  "profileEdit": {
+    "via": "Normal Owner Edit profile dialog",
+    "profileId": "55e1952f-0129-43c6-9690-2f1b9d99e6b2",
+    "saveClickedAt": "2026-11-05T14:26:45.540Z",
+    "confirmation": "Profile saved; v2 Available",
+    "readbackObservedAt": "2026-11-05T14:27:12.149Z",
+    "refreshConfirmed": true,
+    "changedField": "Private instructions; non-secret version marker only",
+    "privateInstructionTextIncluded": false,
+    "boundary": "Existing Run was non-terminal (finishing) after save and still frozen to v1. No claim that the save occurred within the complete 60-second sleep."
+  },
+  "review": {
+    "runId": "eee768dc-56d9-46c1-8ae4-b6a186ba4669",
+    "attemptId": "1356ffdf-4330-4194-9233-d7769009366b",
+    "harness": "codex",
+    "model": "gpt-6-luna",
+    "credentialType": "subscription",
+    "subscriptionRoute": "codex_cli",
+    "profile": {
+      "profileId": "1880144e-4005-4d72-b3e3-6f362fbe8bd8",
+      "name": "1284 独立审阅",
+      "version": 1,
+      "digest": "a8f543efb2a4e53afc388434788952f8473108dd3f6f762b52f3053ba31dc134",
+      "source": "decision",
+      "reason": "stage_fit"
+    },
+    "independentSession": true,
+    "readOnly": true,
+    "createdAt": "2026-11-05T14:26:47.608Z",
+    "finishedAt": "2026-11-05T14:28:37.311Z",
+    "attemptStatus": "passed",
+    "criteriaPassed": 2,
+    "criteriaTotal": 2,
+    "checkSha": "979c1360537fe8d24ec4136d97f8d58d3af20c2f",
+    "candidateId": "0124e711-977a-4ce2-8071-430025368688",
+    "candidateShaField": null,
+    "reviewCount": 1,
+    "additionalVerify": "not_run"
+  },
+  "artifact": {
+    "path": "mikka-1284-profile-freeze.txt",
+    "bytes": 37,
+    "sha256": "b915b138504b2b3e770b66369c0f1888b23f0d147edfd9b7d0f6854510c34ec6",
+    "contentMatchesGit": true,
+    "matchesExpectedUtf8": true,
+    "stabilityCheck": {
+      "actual": true,
+      "oneSleepSeconds": 60,
+      "unchangedBytesAndHash": true,
+      "exitCode": 0,
+      "independentReviewUsedProducerCommandEvidence": true
+    }
+  },
+  "ownerAcceptance": {
+    "clickedAt": "2026-11-05T14:34:24.760Z",
+    "taskUpdatedAt": "2026-11-05T14:34:25.047Z",
+    "approvalFinishedAt": "2026-11-05T14:34:25.651Z",
+    "taskStatus": "passed",
+    "taskStage": "approval",
+    "taskRevision": 9,
+    "ui": "Accepted; Changed status to Done",
+    "finalReadObservedAt": "2026-11-05T14:35:58.749Z"
+  },
+  "screenshot": {
+    "filename": "issue1284-owner-accepted-alex72-1793889302861.jpg",
+    "bytes": 98457,
+    "sha256": "4e6c13bae968a1f9c75a46921249376b3a304e39859807889826adb955a3c96c",
+    "browserSynchronizationVerified": true
+  },
+  "publicServingVersion": {
+    "observedAt": "2026-11-05T14:30:25.411Z",
+    "build": "325114479cc8ec20beac88f923fc702848347672",
+    "boundary": "Public page observation; not a claim about every durable Workflow's execution deployment."
+  },
+  "v2NewRunSelection": "separate follow-up task pending",
+  "safety": "No accounts, subscriptions, model priorities, other Bots/Tasks or native sessions edited. DeepSeek/API coding route excluded."
+}

@@ -1,0 +1,94 @@
+{
+  "purpose": "local checkpoint and handoff to authoritative peer PR1403; not a separate release candidate",
+  "repository": "alexj11324/Mikka",
+  "baseCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+  "commit": {
+    "commit": "a2c5280934bd5078dc77702e1d3a16f3f4ca4b26",
+    "tree": "4bc8f0a1dbf391a4b20e422b96774ec7593f4d40",
+    "parents": [
+      "864113bdb9a62dcff633c9ce7bc0fd59d93a6641"
+    ],
+    "authorName": "Mikka Agent",
+    "authorEmail": "mikka-agent@users.noreply.github.com",
+    "authorDate": "2026-11-05T14:32:44+00:00",
+    "committerName": "Mikka Agent",
+    "committerEmail": "mikka-agent@users.noreply.github.com",
+    "committerDate": "2026-11-05T14:32:44+00:00",
+    "subject": "fix: checkpoint due timer deployment handoff"
+  },
+  "entries": [
+    {
+      "path": "lib/due-timer-deployment.ts",
+      "mode": "100644",
+      "blobSha": "34ab9ff7940805b2a694054d8fbfa05a7ed974e0",
+      "contentFile": "source/lib/due-timer-deployment.ts",
+      "bytes": 6978,
+      "sha256": "4e7501c10950aeba401dd49ddfa3b741a1240ef7c0f6f8c10e2c0922e73244b4"
+    },
+    {
+      "path": "lib/due-timer.test.ts",
+      "mode": "100644",
+      "blobSha": "72ddd771b120a45befdb224c41ff99d5ab93d365",
+      "contentFile": "source/lib/due-timer.test.ts",
+      "bytes": 16311,
+      "sha256": "48221cf914541c4c2edc2bb5c8128798d2af8956295fc5e646d0a06d47d4c51e"
+    },
+    {
+      "path": "lib/due-timer.ts",
+      "mode": "100644",
+      "blobSha": "b28463c8fbe88114d285ae3425b01e3377f47dd1",
+      "contentFile": "source/lib/due-timer.ts",
+      "bytes": 4728,
+      "sha256": "54c19f09ad198ee97b7bad4c6147003898f4b3bfb4b000148200cb242a680b8e"
+    },
+    {
+      "path": "package.json",
+      "mode": "100644",
+      "blobSha": "7022a7f89516d60144c2c74dfd0bbd21a9c0d7da",
+      "contentFile": "source/package.json",
+      "bytes": 66952,
+      "sha256": "98f67241e1ee158b0ce8ec745b77c016dc879f998ade5dd02585d2aa86fdad96"
+    },
+    {
+      "path": "workflows/due-timer/loop.test.ts",
+      "mode": "100644",
+      "blobSha": "b7dea6951b5849be27e19ebe441e5ce1c9fb569d",
+      "contentFile": "source/workflows/due-timer/loop.test.ts",
+      "bytes": 6236,
+      "sha256": "b01e8695bb09a9e149223b2c64cd5aeceb3907c88f2df61ea8dc4d2dec4491c5"
+    },
+    {
+      "path": "workflows/due-timer/loop.ts",
+      "mode": "100644",
+      "blobSha": "993b3108411eb485e88f8d56319e2672ce4d860d",
+      "contentFile": "source/workflows/due-timer/loop.ts",
+      "bytes": 3309,
+      "sha256": "6db6a4df2e279289e70dc7346118905f12fbd45075c39e92dae2596b4e56977f"
+    },
+    {
+      "path": "workflows/due-timer/migration.test.ts",
+      "mode": "100644",
+      "blobSha": "9544497a7d47b61d214c4f6f8d2cbf043ad5af16",
+      "contentFile": "source/workflows/due-timer/migration.test.ts",
+      "bytes": 9928,
+      "sha256": "128b398ba62ca2aa2927facedb770ca56ecd62966e3c6e957a6cc868862e506f"
+    },
+    {
+      "path": "workflows/due-timer/steps.ts",
+      "mode": "100644",
+      "blobSha": "3916df583ed4edce06a2280cf70517e917bf9218",
+      "contentFile": "source/workflows/due-timer/steps.ts",
+      "bytes": 1222,
+      "sha256": "d711b242c4ac3bd7069db21ba8b57a2442d120575ad93fcef57c49cb11bbc1d4"
+    },
+    {
+      "path": "workflows/due-timer/workflow.ts",
+      "mode": "100644",
+      "blobSha": "155346e742fa8531a86b38684a7065a7f7bb2a01",
+      "contentFile": "source/workflows/due-timer/workflow.ts",
+      "bytes": 1261,
+      "sha256": "3eaf95ce60c92263acc0a1d1b39e338145c85434f38fcd9e57f99b99171477e9"
+    }
+  ],
+  "cleanAfterCommit": true
+}

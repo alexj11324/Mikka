@@ -1,0 +1,67 @@
+{
+  "kind": "official-test-account-evidence-audit",
+  "files": 49,
+  "archives": 0,
+  "archiveEntries": 0,
+  "decodedBytes": 0,
+  "result": "passed",
+  "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden",
+  "startedAt": "2026-11-05T14:52:57.023Z",
+  "finishedAt": "2026-11-05T14:52:57.051Z",
+  "evidenceSet": "issue1284-production-1436",
+  "runnerSourceCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+  "runnerSourceTree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+  "evidenceSourceBindings": [
+    {
+      "kind": "observed-production-release",
+      "commit": "322ca496363c493a3bd46be0cbb95d37009737b0",
+      "tree": "579f791c9d5493dd46421350a7d86ec380ad1fe4"
+    },
+    {
+      "kind": "public-page-observation-only",
+      "commit": "325114479cc8ec20beac88f923fc702848347672",
+      "observedAt": "2026-11-05T14:30:25.411Z",
+      "notProofOfDurableWorkflowDeployment": true
+    },
+    {
+      "kind": "unreleased-checkpoint",
+      "commit": "a2c5280934bd5078dc77702e1d3a16f3f4ca4b26",
+      "tree": "4bc8f0a1dbf391a4b20e422b96774ec7593f4d40",
+      "baseCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+      "authoritativeCorrectionPR": 1403,
+      "productionMigrationVerified": false
+    },
+    {
+      "kind": "independent-render-of-actual-delivered-artifact",
+      "sha256": "ec901cd906938c2d903ac81afa19345f2f05b3a9e23a1659770c7d66d088dad8",
+      "bytes": 1486,
+      "environment": "Docker Cloud Sandbox Large; existing offline Chromium",
+      "nativeProductionChromeFixClaimed": false
+    }
+  ],
+  "manifestSha256": "a85436feacfe67e3ba4d500e36361a0926400c251781bb5a907904d013ee0764",
+  "candidateBytes": 392136,
+  "candidateByteIntegrityBeforeAndAfter": true,
+  "helperBindings": [
+    {
+      "path": "scripts/test-accounts/session.mjs",
+      "gitBlobSha1": "36a314187b7580b718c3987d84d0db830eb019a4",
+      "sha256": "0af2d324bdfbfda64c8e4ba791f5668afa943d978b08472eeee78ad30ea5d699"
+    },
+    {
+      "path": "scripts/test-accounts/environment.mjs",
+      "gitBlobSha1": "908a22f0086decf3c654b13558d5b5b715d7894e",
+      "sha256": "967eec59d8c641440eaf03d04a89f6d493930cf824ee1eeaa2c59e3f2dbb426c"
+    }
+  ],
+  "privateContextsExported": false,
+  "databaseOrServerRequired": false,
+  "productionCalls": 0,
+  "modelOrProviderCalls": 0,
+  "helper": "scripts/test-accounts/session.mjs auditEvidence, with retained 8641 environment and secret ledger",
+  "limitations": [
+    "This is a new exact-file audit; prior audit pass reports are not reused.",
+    "The official helper checks known credentials/cookies from its retained isolated test-account context; it does not assert knowledge of unrelated production secrets.",
+    "The evidence records different production observations and an unpublished local checkpoint, not one newly tested or deployed product revision."
+  ]
+}

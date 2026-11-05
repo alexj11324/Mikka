@@ -1,0 +1,338 @@
+{
+  "schema": 1,
+  "evidenceSet": "issue1284-production-1436",
+  "createdAt": "2026-11-05T14:51:45.095004+00:00",
+  "purpose": "Evidence-only production acceptance increment and unpublished checkpoint transfer; no product release or source PR",
+  "auditContext": {
+    "sourceCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+    "sourceTree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+    "retainedPrivateContext": true,
+    "privateContextExported": false
+  },
+  "sourceBindings": [
+    {
+      "kind": "observed-production-release",
+      "commit": "322ca496363c493a3bd46be0cbb95d37009737b0",
+      "tree": "579f791c9d5493dd46421350a7d86ec380ad1fe4"
+    },
+    {
+      "kind": "public-page-observation-only",
+      "commit": "325114479cc8ec20beac88f923fc702848347672",
+      "observedAt": "2026-11-05T14:30:25.411Z",
+      "notProofOfDurableWorkflowDeployment": true
+    },
+    {
+      "kind": "unreleased-checkpoint",
+      "commit": "a2c5280934bd5078dc77702e1d3a16f3f4ca4b26",
+      "tree": "4bc8f0a1dbf391a4b20e422b96774ec7593f4d40",
+      "baseCommit": "864113bdb9a62dcff633c9ce7bc0fd59d93a6641",
+      "authoritativeCorrectionPR": 1403,
+      "productionMigrationVerified": false
+    },
+    {
+      "kind": "independent-render-of-actual-delivered-artifact",
+      "sha256": "ec901cd906938c2d903ac81afa19345f2f05b3a9e23a1659770c7d66d088dad8",
+      "bytes": 1486,
+      "environment": "Docker Cloud Sandbox Large; existing offline Chromium",
+      "nativeProductionChromeFixClaimed": false
+    }
+  ],
+  "fileCount": 49,
+  "totalBytes": 392136,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 6006,
+      "sha256": "4e8c98e6aa7c9da1a13972ea3c7452312e240aedbec04f3f9b2f4f8be12e2f3a",
+      "gitBlobSha1": "995dbcb156e8514acf7f2bbffccb239aef41226f"
+    },
+    {
+      "path": "checkpoint/README.md",
+      "bytes": 1423,
+      "sha256": "329c5a3f3b44c2044097c84b291402ff3661f5c6d8768b93444ddb6d8e7476b8",
+      "gitBlobSha1": "a948efc9522e20305911a6df5f771b1e5a109008"
+    },
+    {
+      "path": "checkpoint/db-receipt.json",
+      "bytes": 1635,
+      "sha256": "d5f1a22ff4684686353c1b7f10566f24336c5aad17620beb9a32cf0c86c135ee",
+      "gitBlobSha1": "0a1a7170f753853551bc05f1af61cc0cc58da551"
+    },
+    {
+      "path": "checkpoint/election-regression.ts",
+      "bytes": 1665,
+      "sha256": "54468ee3900c42a5cbfddde2006097c7dbf673187e23980f15c2d0db1461fbb4",
+      "gitBlobSha1": "e0560de3cb07f473ba4dc6319919866d8a5cfb3d"
+    },
+    {
+      "path": "checkpoint/files.json",
+      "bytes": 5459,
+      "sha256": "ba5245e70cea0cebbef80f0ad2868cf1edac961645aef5ee220a099a3fba2f07",
+      "gitBlobSha1": "b6eb828b14cf87a545b06b85048c5facab21e9bd"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-arm-before.log",
+      "bytes": 6036,
+      "sha256": "1ed9745ee265e5fe9bee58fa76aa146cd7801cfea46faf8e59788f9317f93ff1",
+      "gitBlobSha1": "b8899d29bad5e1d6db860939aa3b15d2c9e00d0f"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-db-due.log",
+      "bytes": 1611,
+      "sha256": "d93ce89b39471b3302678afdb7c229462724b1854959c3ae600c4c3f3dc528e3",
+      "gitBlobSha1": "0d5ce1068547ac055e21fb71a43f3441e6ef97af"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-db-setup.log",
+      "bytes": 18772,
+      "sha256": "95faffd468dae3d157fdc88273f5a94580ef59d88d7ee893c88c49bc6d069045",
+      "gitBlobSha1": "154b99cc4a5b6ed7da1cf30db8843a8ee51a0e8a"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-diff-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-election-after.log",
+      "bytes": 1876,
+      "sha256": "0c443b0d59a6ad34a01823903fce14424bac668a177b731752ad2c6a0cc6a70d",
+      "gitBlobSha1": "a1698057549acf18e74b504b1a83f0ade0b32de6"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-election-before.log",
+      "bytes": 1622,
+      "sha256": "3a1b6b9839d05c5cc10f61d16f5b60025ee86ed138b2fc0aba480f4e3532d805",
+      "gitBlobSha1": "6711b452070029d96d988526665b541314d508e1"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-lint-final.log",
+      "bytes": 89,
+      "sha256": "497435a445172a1d43a0f627edefc6adf169e32abea698bfcee3dc708923cf2d",
+      "gitBlobSha1": "73679c1a5d924f199cb5941804316c2e27436897"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-lint.log",
+      "bytes": 1741,
+      "sha256": "a38b2ef237f4e60e955c00e99ccea62a0348d6ab64d8d64c90d1b8a71c8b5f23",
+      "gitBlobSha1": "7e2913610e170fe5043bbbaa0ac6cffc77455a38"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-loop-after-fixed.log",
+      "bytes": 1764,
+      "sha256": "8ce6dfcca521685551edb3aba4bb64332de31a1c1f84d6575f81880ab1d0b48a",
+      "gitBlobSha1": "50403e670d861a896b9165fa34884c372a870048"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-loop-after.log",
+      "bytes": 2243,
+      "sha256": "4e3365d7e468eedeca328f9dbf33c2f105c78a032aa089db00fdb89768fb6517",
+      "gitBlobSha1": "d92c4cadea17dd20e5e1f29640dd38116b5ee929"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-migration-before.log",
+      "bytes": 2872,
+      "sha256": "16dbbd57e3617c4e361b1d6fa82f5093f4b059f497cd65475519cde2ae74d335",
+      "gitBlobSha1": "96e90bdc35d9c3828b815aa8461300a691a1ad62"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-policies.log",
+      "bytes": 124,
+      "sha256": "1d833e5a51443c8b49122c34ad34397c730206a06b9f4a61cd0f5a1f2dba1be4",
+      "gitBlobSha1": "39a3aad75b104971743fe76ad9fde135992f0028"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-recovery-unit.log",
+      "bytes": 2335,
+      "sha256": "8969279806a6678f768322838b3d6c0fc4e9d92ac3e3c31492a33485efbea437",
+      "gitBlobSha1": "f4734ceb8c341c41c8215e977587280a9ae84305"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-schedules-after.log",
+      "bytes": 7733,
+      "sha256": "636e7fe4d161ba3e9a2023226618f58892a5d6d4bf31e020920dcdac0a26600a",
+      "gitBlobSha1": "d1e3dbe161340f70653280dd3a4678beb0ffc44f"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-schedules-final.log",
+      "bytes": 7727,
+      "sha256": "ed981901643e71d4c441ce2115e8a0be22635985526455c592788e365364b96d",
+      "gitBlobSha1": "d1163cfc845cb9a5dae523ab759516c8728cdfff"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-types-final.log",
+      "bytes": 80,
+      "sha256": "7adc35d68b1780b7156b0da283382588c9e87658534a36a2b9278fcc6f27cb72",
+      "gitBlobSha1": "dfc5f1bf2fb704a5150f56bdf196db74b67d5c4c"
+    },
+    {
+      "path": "checkpoint/logs/issue1284-timer-types.log",
+      "bytes": 1047,
+      "sha256": "309ae385c9a4f0db186472261e95ab1917cf63b3c4ae31eb70c8f42093fb888e",
+      "gitBlobSha1": "149b1f31bbf1cd5836863acf691b7e8246b18722"
+    },
+    {
+      "path": "checkpoint/manifest.json",
+      "bytes": 3541,
+      "sha256": "e331ba6c5a78b7824135c400b6cb8aeea2a96a832e26f241d32274272208a41b",
+      "gitBlobSha1": "edee6068a82cbab076b0b15dde717dbb84fc299e"
+    },
+    {
+      "path": "checkpoint/observability-excerpt.ts",
+      "bytes": 1466,
+      "sha256": "d56ace7678b021eaf0760b71130e95a086fbdb4928679332aa9d894e3ff193c8",
+      "gitBlobSha1": "836cd9ce1240338194123da401094ccc3c85f775"
+    },
+    {
+      "path": "checkpoint/source/lib/due-timer-deployment.ts",
+      "bytes": 6978,
+      "sha256": "4e7501c10950aeba401dd49ddfa3b741a1240ef7c0f6f8c10e2c0922e73244b4",
+      "gitBlobSha1": "34ab9ff7940805b2a694054d8fbfa05a7ed974e0"
+    },
+    {
+      "path": "checkpoint/source/lib/due-timer.test.ts",
+      "bytes": 16311,
+      "sha256": "48221cf914541c4c2edc2bb5c8128798d2af8956295fc5e646d0a06d47d4c51e",
+      "gitBlobSha1": "72ddd771b120a45befdb224c41ff99d5ab93d365"
+    },
+    {
+      "path": "checkpoint/source/lib/due-timer.ts",
+      "bytes": 4728,
+      "sha256": "54c19f09ad198ee97b7bad4c6147003898f4b3bfb4b000148200cb242a680b8e",
+      "gitBlobSha1": "b28463c8fbe88114d285ae3425b01e3377f47dd1"
+    },
+    {
+      "path": "checkpoint/source/package.json",
+      "bytes": 66952,
+      "sha256": "98f67241e1ee158b0ce8ec745b77c016dc879f998ade5dd02585d2aa86fdad96",
+      "gitBlobSha1": "7022a7f89516d60144c2c74dfd0bbd21a9c0d7da"
+    },
+    {
+      "path": "checkpoint/source/workflows/due-timer/loop.test.ts",
+      "bytes": 6236,
+      "sha256": "b01e8695bb09a9e149223b2c64cd5aeceb3907c88f2df61ea8dc4d2dec4491c5",
+      "gitBlobSha1": "b7dea6951b5849be27e19ebe441e5ce1c9fb569d"
+    },
+    {
+      "path": "checkpoint/source/workflows/due-timer/loop.ts",
+      "bytes": 3309,
+      "sha256": "6db6a4df2e279289e70dc7346118905f12fbd45075c39e92dae2596b4e56977f",
+      "gitBlobSha1": "993b3108411eb485e88f8d56319e2672ce4d860d"
+    },
+    {
+      "path": "checkpoint/source/workflows/due-timer/migration.test.ts",
+      "bytes": 9928,
+      "sha256": "128b398ba62ca2aa2927facedb770ca56ecd62966e3c6e957a6cc868862e506f",
+      "gitBlobSha1": "9544497a7d47b61d214c4f6f8d2cbf043ad5af16"
+    },
+    {
+      "path": "checkpoint/source/workflows/due-timer/steps.ts",
+      "bytes": 1222,
+      "sha256": "d711b242c4ac3bd7069db21ba8b57a2442d120575ad93fcef57c49cb11bbc1d4",
+      "gitBlobSha1": "3916df583ed4edce06a2280cf70517e917bf9218"
+    },
+    {
+      "path": "checkpoint/source/workflows/due-timer/workflow.ts",
+      "bytes": 1261,
+      "sha256": "3eaf95ce60c92263acc0a1d1b39e338145c85434f38fcd9e57f99b99171477e9",
+      "gitBlobSha1": "155346e742fa8531a86b38684a7065a7f7bb2a01"
+    },
+    {
+      "path": "checkpoint/validation.json",
+      "bytes": 10358,
+      "sha256": "e5512b21bc761e0d9d7ee2cb963f842754d3f7c3c64dc6a4af12e4192aa8e187",
+      "gitBlobSha1": "1014104547c903dead5216b35ff22e7df596befe"
+    },
+    {
+      "path": "receipts/issue1284-main322-release.json",
+      "bytes": 12765,
+      "sha256": "be5472832cdf9b46238a89fcece75b0c6afc48ea60a229064f86e29306c7c840",
+      "gitBlobSha1": "12e4f2029cfa4a0d577b008b1bec4973724764d0"
+    },
+    {
+      "path": "receipts/issue1284-production-explicit-freeze72.json",
+      "bytes": 4440,
+      "sha256": "7039eadd4b51dec5b0a3004357cd8f5e3bba3eb1ea4d04357994d80029602a18",
+      "gitBlobSha1": "ac60be0770916c6cc67ac3235f15ffdef7aa6943"
+    },
+    {
+      "path": "receipts/issue1284-production-explicit-v2-73.json",
+      "bytes": 3597,
+      "sha256": "91b063e5b5098fd0d45c29555cfbcb05c3ca0595978de87c6c7c74bc79b01618",
+      "gitBlobSha1": "bea9c32638f90455d7bfa78e7fc44e9d69e12f56"
+    },
+    {
+      "path": "receipts/issue1284-production-front-cc-codex322.json",
+      "bytes": 4102,
+      "sha256": "647a4affeabad499e0fe4a4710d89d9c4fb4fd69bdd3006879baa3568966bc14",
+      "gitBlobSha1": "d119d7615df500b53f8dcf3aa4d581e003154753"
+    },
+    {
+      "path": "receipts/issue1284-production-front-stop322.json",
+      "bytes": 2155,
+      "sha256": "e17c295e2b054f25852baa43c973853696561e244d571b60db21af45278932c9",
+      "gitBlobSha1": "f946a53da466321704c856559b0ef586f5b8231f"
+    },
+    {
+      "path": "receipts/issue1284-production-front66-owner-accepted.json",
+      "bytes": 2664,
+      "sha256": "2bef106eae740da88a247aa2cf20d66e8331936a06b067a6786db0ff07871dcc",
+      "gitBlobSha1": "e392deac991337670bed8dc95ec8efa4eec82857"
+    },
+    {
+      "path": "render/capture.mjs",
+      "bytes": 5527,
+      "sha256": "ae684b63d29a2dc06a07b5fe4578aa70785c9a0ac277e99d7679fbe700065aa6",
+      "gitBlobSha1": "2e16f47f9775907fa3b2b6e25773664c3c47b06a"
+    },
+    {
+      "path": "render/captures/capture-manifest.json",
+      "bytes": 3892,
+      "sha256": "1085c45a808947ed683a796e19871f12049e6f578b3be7b66dead3e30be2f397",
+      "gitBlobSha1": "31a6eb6566ee81657f12094c3fd2fa4a36bb40be"
+    },
+    {
+      "path": "render/captures/status-card-ec901cd9-1024x768.png",
+      "bytes": 20498,
+      "sha256": "c2528b4325307c24367b576b91eb142ee05bd92c11227bc87f14f96ab3a6a033",
+      "gitBlobSha1": "bbe219662a1018437edaf7a96ba06796ab15f2c8"
+    },
+    {
+      "path": "render/captures/status-card-ec901cd9-400x800.png",
+      "bytes": 19003,
+      "sha256": "377b2c53984e7592351edcaa910763e66117835de027d1e742a053798ffdff2b",
+      "gitBlobSha1": "68206fcb831c6e801d4072ee5a8cea9f6992f6e7"
+    },
+    {
+      "path": "render/independent-assistant-visual-review.json",
+      "bytes": 3847,
+      "sha256": "5372674bf9e8e59428716af79e7627504685d9e6c54266097691bb42b73baa2a",
+      "gitBlobSha1": "aebbd53159e88234436f64d012a4470840ec1fac"
+    },
+    {
+      "path": "render/manifest.json",
+      "bytes": 1357,
+      "sha256": "c2725fde1bc4649c355dbe60f54b8ef710a003487211acd1a56d4108c47be86f",
+      "gitBlobSha1": "e63c1d682df89f22bec8e7f89fab95a8868df213"
+    },
+    {
+      "path": "render/root-visual-review.json",
+      "bytes": 2196,
+      "sha256": "33584d9ba46d9ebae219271b5a1723c9f872592078e22a98349c5e94b5825630",
+      "gitBlobSha1": "56c4ec14dd976c6b7f1177c4f3df65adab93ff9e"
+    },
+    {
+      "path": "render/source/status-card.html",
+      "bytes": 1486,
+      "sha256": "ec901cd906938c2d903ac81afa19345f2f05b3a9e23a1659770c7d66d088dad8",
+      "gitBlobSha1": "d2365bc31395c6bad13c837af9cc3f6dc7b47300"
+    },
+    {
+      "path": "visual/issue1284-owner-accepted-alex72-1793889302861.jpg",
+      "bytes": 98457,
+      "sha256": "4e6c13bae968a1f9c75a46921249376b3a304e39859807889826adb955a3c96c",
+      "gitBlobSha1": "28d488a0fa7b07bb22df53c1a5a397088f967414"
+    }
+  ]
+}

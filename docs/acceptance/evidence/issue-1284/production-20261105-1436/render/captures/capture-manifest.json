@@ -1,0 +1,129 @@
+{
+  "kind": "isolated-standalone-html-render",
+  "source": {
+    "path": "source/status-card.html",
+    "bytes": 1486,
+    "sha256": "ec901cd906938c2d903ac81afa19345f2f05b3a9e23a1659770c7d66d088dad8",
+    "provenance": "Root supplied the actual file extracted from normal production Changes UI. This capture independently verifies those exact bytes before and after rendering; it does not re-access production."
+  },
+  "startedAt": "2026-11-05T14:43:20.291Z",
+  "screenshotProcessPid": 23601,
+  "renderer": {
+    "name": "Chromium",
+    "version": "156.0.8078.4",
+    "headless": true,
+    "browserProcessIds": []
+  },
+  "method": {
+    "input": "file URL",
+    "deviceScaleFactor": 1,
+    "locale": "zh-CN",
+    "colorScheme": "light",
+    "offline": true,
+    "fullPage": false,
+    "styleOrSourceOverrides": false,
+    "readiness": "load, document.fonts.ready, two ordinary animation frames",
+    "newNextOrDatabaseService": false
+  },
+  "captures": [
+    {
+      "path": "status-card-ec901cd9-1024x768.png",
+      "bytes": 20498,
+      "sha256": "c2528b4325307c24367b576b91eb142ee05bd92c11227bc87f14f96ab3a6a033",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "startedAt": "2026-11-05T14:43:22.258Z",
+      "finishedAt": "2026-11-05T14:43:22.712Z",
+      "dom": {
+        "title": "服务状态",
+        "heading": "服务状态",
+        "documentWidth": 1024,
+        "clientWidth": 1024,
+        "gridColumns": "309.328px 309.328px 309.344px",
+        "cards": [
+          {
+            "text": "网站 状态：正常",
+            "x": 32,
+            "y": 72,
+            "width": 309.328125,
+            "height": 87
+          },
+          {
+            "text": "接口 状态：异常",
+            "x": 357.328125,
+            "y": 72,
+            "width": 309.328125,
+            "height": 87
+          },
+          {
+            "text": "后台作业 状态：维护",
+            "x": 682.65625,
+            "y": 72,
+            "width": 309.34375,
+            "height": 87
+          }
+        ]
+      },
+      "pageErrors": []
+    },
+    {
+      "path": "status-card-ec901cd9-400x800.png",
+      "bytes": 19003,
+      "sha256": "377b2c53984e7592351edcaa910763e66117835de027d1e742a053798ffdff2b",
+      "viewport": {
+        "width": 400,
+        "height": 800
+      },
+      "startedAt": "2026-11-05T14:43:22.755Z",
+      "finishedAt": "2026-11-05T14:43:22.822Z",
+      "dom": {
+        "title": "服务状态",
+        "heading": "服务状态",
+        "documentWidth": 400,
+        "clientWidth": 400,
+        "gridColumns": "352px",
+        "cards": [
+          {
+            "text": "网站 状态：正常",
+            "x": 24,
+            "y": 72,
+            "width": 352,
+            "height": 87
+          },
+          {
+            "text": "接口 状态：异常",
+            "x": 24,
+            "y": 175,
+            "width": 352,
+            "height": 87
+          },
+          {
+            "text": "后台作业 状态：维护",
+            "x": 24,
+            "y": 278,
+            "width": 352,
+            "height": 87
+          }
+        ]
+      },
+      "pageErrors": []
+    }
+  ],
+  "contextsClosed": true,
+  "browserClosed": true,
+  "boundaries": [
+    "Screenshot-only rendering of the actual self-contained HTML, with no browser test suite or app test.",
+    "No production browser, production API, database, model call, account session or app service is used.",
+    "This is isolated Docker Chromium visual evidence. It does not establish that the native-agent Chrome SIGABRT is fixed, and it does not replace the preserved review result."
+  ],
+  "finishedAt": "2026-11-05T14:43:22.851Z",
+  "remainingDirectChildPids": [],
+  "sourceUnchangedAfterCapture": true,
+  "script": {
+    "path": "capture.mjs",
+    "bytes": 5527,
+    "sha256": "ae684b63d29a2dc06a07b5fe4578aa70785c9a0ac277e99d7679fbe700065aa6"
+  }
+}

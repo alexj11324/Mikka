@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "kind": "normal-owner-production-stop-acceptance",
+  "publicSource": {
+    "commit": "322ca496363c493a3bd46be0cbb95d37009737b0",
+    "tree": "579f791c9d5493dd46421350a7d86ec380ad1fe4",
+    "deploymentId": "dpl_Bgi1aNcuFU8afvFheWjz4ysQg5eU",
+    "publicVersionObservedAt": "2026-11-05T13:55:16.731Z"
+  },
+  "taskId": "9c1da61e-14e2-4a96-a228-7085bebcfd5a",
+  "issueId": "06c14053-5490-4bd6-90e9-391fc5dca740",
+  "runId": "bc74cb2f-c209-49c3-819d-2ba28a700dc7",
+  "action": {
+    "source": "Normal authenticated Owner Thread UI",
+    "label": "Try stopping again",
+    "count": 1,
+    "clickedAt": "2026-11-05T13:56:16.201Z"
+  },
+  "result": {
+    "uiObservedAt": "2026-11-05T13:57:12.783Z",
+    "threadState": "Idle",
+    "previousStoppingBannerRemoved": true,
+    "stopButtonsRemoved": true,
+    "runEvidenceObservedAt": "2026-11-05T13:58:34.141Z",
+    "runStatus": "stopped",
+    "captureCount": 0,
+    "artifactCount": 0
+  },
+  "preservedRunConfiguration": {
+    "profileId": "55e1952f-0129-43c6-9690-2f1b9d99e6b2",
+    "version": 1,
+    "digest": "3a33e10dff60bf8ae3c5702ab9ce6b30184f9b3c4e65cff1055caea87621c182",
+    "selectionSource": "decision",
+    "selectionReason": "capability_fit",
+    "harness": "claude_code",
+    "model": "claude-haiku-5-5",
+    "credentialType": "subscription",
+    "subscriptionRoute": "claude_code_cli"
+  },
+  "evidenceSource": "Normal authenticated GET /mikka/api/runs/bc74cb2f-c209-49c3-819d-2ba28a700dc7/evidence and actual normal Thread UI",
+  "boundaries": [
+    "This verifies normal Stop reached terminal state for the previously bound queued Run.",
+    "The frontend implementation has not yet executed successfully; this is not a native CC completion, version-edit-during-execution proof, independent Review or Owner Accept.",
+    "The thread retained its earlier selected-Profile error summary; the new Stop's terminal result was independently verified from the Run evidence.",
+    "The separate official runtime refresh was still in progress; no new native Run was started during this observation.",
+    "No production SQL, direct settings changes or subscription changes were used."
+  ]
+}

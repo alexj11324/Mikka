@@ -1,0 +1,39 @@
+{
+  "kind": "isolated-delivered-html-render-evidence",
+  "sourceSha256": "ec901cd906938c2d903ac81afa19345f2f05b3a9e23a1659770c7d66d088dad8",
+  "fileCount": 6,
+  "totalBytes": 54253,
+  "files": [
+    {
+      "path": "source/status-card.html",
+      "bytes": 1486,
+      "sha256": "ec901cd906938c2d903ac81afa19345f2f05b3a9e23a1659770c7d66d088dad8"
+    },
+    {
+      "path": "capture.mjs",
+      "bytes": 5527,
+      "sha256": "ae684b63d29a2dc06a07b5fe4578aa70785c9a0ac277e99d7679fbe700065aa6"
+    },
+    {
+      "path": "captures/capture-manifest.json",
+      "bytes": 3892,
+      "sha256": "1085c45a808947ed683a796e19871f12049e6f578b3be7b66dead3e30be2f397"
+    },
+    {
+      "path": "captures/status-card-ec901cd9-1024x768.png",
+      "bytes": 20498,
+      "sha256": "c2528b4325307c24367b576b91eb142ee05bd92c11227bc87f14f96ab3a6a033"
+    },
+    {
+      "path": "captures/status-card-ec901cd9-400x800.png",
+      "bytes": 19003,
+      "sha256": "377b2c53984e7592351edcaa910763e66117835de027d1e742a053798ffdff2b"
+    },
+    {
+      "path": "independent-assistant-visual-review.json",
+      "bytes": 3847,
+      "sha256": "5372674bf9e8e59428716af79e7627504685d9e6c54266097691bb42b73baa2a"
+    }
+  ],
+  "boundary": "Original delivered HTML rendered in isolated Docker Chromium; not production browser evidence and not a fix claim for native Chrome SIGABRT."
+}

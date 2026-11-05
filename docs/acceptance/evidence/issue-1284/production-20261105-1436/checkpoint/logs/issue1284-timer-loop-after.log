@@ -1,0 +1,42 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: Transform failed with 1 error:
+/workspace/Mikka-1284-due-timer864/workflows/due-timer/loop.test.ts:108:48: ERROR: Expected ")" but found "s"
+    at failureErrorWithLog (/workspace/Mikka-1284-due-timer864/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1752:15)
+    at /workspace/Mikka-1284-due-timer864/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1019:50
+    at responseCallbacks.<computed> (/workspace/Mikka-1284-due-timer864/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:886:9)
+    at handleIncomingPacket (/workspace/Mikka-1284-due-timer864/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:941:12)
+    at Socket.readFromStdout (/workspace/Mikka-1284-due-timer864/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:864:7)
+    at Socket.emit (node:events:514:28)
+    at addChunk (node:internal/streams/readable:569:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:520:3)
+    at Readable.push (node:internal/streams/readable:400:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:194:23) {
+  name: 'TransformError'
+}
+
+Node.js v24.22.2
+✖ workflows/due-timer/loop.test.ts (194.744516ms)
+(node:21828) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:21828) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ an idle latest holder fences an old in-flight pass and its late afterCommit/retake (8.670007ms)
+✔ the lifetime handoff keeps the global token until the identified successor takes it (2.485942ms)
+✔ concurrent latest candidates serialize inspection and never force an already-current holder (0.90263ms)
+✔ a failed predecessor retirement does no business work and releases its election (0.970021ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 270.713118
+
+✖ failing tests:
+
+test at workflows/due-timer/loop.test.ts:1:1
+✖ workflows/due-timer/loop.test.ts (194.744516ms)
+  'test failed'

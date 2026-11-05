@@ -1,0 +1,35 @@
+(node:23097) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23097) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ an idle latest holder fences an old in-flight pass and its late afterCommit/retake (8.332987ms)
+✔ the lifetime handoff keeps the global token until the identified successor takes it (3.888604ms)
+✔ concurrent latest candidates serialize inspection and never force an already-current holder (1.416621ms)
+✔ a failed predecessor retirement does no business work and releases its election (0.83517ms)
+✖ a lifetime successor that loses the election is retried after the yielding candidate releases it (3.839763ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 236.07198
+
+✖ failing tests:
+
+test at workflows/due-timer/migration.test.ts:1:6525
+✖ a lifetime successor that loses the election is retried after the yielding candidate releases it (3.839763ms)
+  AssertionError [ERR_ASSERTION]: the post-election wake must retry the legitimate handoff
+  
+  1 !== 2
+  
+      at TestContext.<anonymous> (/workspace/Mikka-1284-due-timer864/workflows/due-timer/migration.test.ts:190:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

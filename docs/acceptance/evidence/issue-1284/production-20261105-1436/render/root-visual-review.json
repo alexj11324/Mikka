@@ -1,0 +1,37 @@
+{
+  "reviewer": "root assistant, independent visual inspection",
+  "source": {
+    "origin": "Normal authenticated production Changes UI",
+    "issueId": "06c14053-5490-4bd6-90e9-391fc5dca740",
+    "taskId": "9c1da61e-14e2-4a96-a228-7085bebcfd5a",
+    "path": "status-card.html",
+    "bytes": 1486,
+    "sha256": "ec901cd906938c2d903ac81afa19345f2f05b3a9e23a1659770c7d66d088dad8",
+    "extraction": "Read all rendered source lines from the actual Changes tab DOM; restore final LF; exact bytes/hash match the independent Review's persisted artifact inspection.",
+    "productionBrowserUrl": "https://app.aspectlylabs.com/mikka/en?section=all-issues&issue=06c14053-5490-4bd6-90e9-391fc5dca740&thread=aef86f65-3c9b-4434-8f50-eaaed004678b"
+  },
+  "visuals": [
+    {
+      "path": "captures/status-card-ec901cd9-1024x768.png",
+      "viewport": "1024x768",
+      "observed": "Three cards in one row with visible Chinese title, labels and status text. No clipping or horizontal overflow. Normal/error/maintenance have distinct text as well as color.",
+      "result": "pass"
+    },
+    {
+      "path": "captures/status-card-ec901cd9-400x800.png",
+      "viewport": "400x800",
+      "observed": "Three cards in a single column; full labels/statuses are legible, with no clipping or horizontal overflow.",
+      "result": "pass"
+    }
+  ],
+  "renderEnvironment": "Docker Cloud Sandbox Large, existing Chromium 156.0.8078.4, exact standalone file, offline, no source/style overrides",
+  "boundaries": [
+    "Independent inspection of the real production artifact's verified bytes, not a production Chrome execution.",
+    "Original Codex Review remains failed for missing browser evidence at that time; no second Review was forced.",
+    "Repair candidate sha is null; no new candidate Git SHA is invented.",
+    "Native agent Chrome SIGABRT remains an observed limitation and is not claimed fixed.",
+    "This assistant visual inspection is not an assertion that Alex manually reviewed the images."
+  ],
+  "recordedAt": "2026-11-05T14:48:14.743050+00:00",
+  "timestampBasis": "Actual filesystem creation timestamp of this root visual inspection receipt; captures carry their own renderer timestamps."
+}

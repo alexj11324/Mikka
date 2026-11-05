@@ -1,0 +1,51 @@
+{
+  "recordedAt": "2026-11-05T14:50:14.468Z",
+  "taskId": "9c1da61e-14e2-4a96-a228-7085bebcfd5a",
+  "issueId": "06c14053-5490-4bd6-90e9-391fc5dca740",
+  "taskLabel": "ALEX-66",
+  "acceptedCandidateId": "bf06f13b-9f9e-4f5c-9d26-185409ec3c0b",
+  "candidateShaField": null,
+  "producerRunId": "dd82f53a-33ee-4bd3-84f0-09ba2802dfe0",
+  "ownerCommentSentAt": "2026-11-05T14:48:58.990Z",
+  "ownerCommentSummary": "Preserved original Review failure and native Chrome SIGABRT. Recorded exact production Changes file hash, independent Docker desktop/mobile visual inspection, no second Review/Verify, and accurate null candidate.sha before acceptance.",
+  "visualEvidence": {
+    "source": "Normal authenticated production Changes UI; exact file verified against independent Review artifact inspection and repair report",
+    "path": "status-card.html",
+    "bytes": 1486,
+    "sha256": "ec901cd906938c2d903ac81afa19345f2f05b3a9e23a1659770c7d66d088dad8",
+    "environment": "Docker Cloud Sandbox Large; Chromium156.0.8078.4; offline standalone HTML",
+    "capturedAt": "2026-11-05T14:43:22Z",
+    "viewports": [
+      "1024x768",
+      "400x800"
+    ],
+    "result": "Desktop three columns, mobile one column; title and text/color statuses visible; no visible clipping or horizontal overflow.",
+    "sourceChanged": false,
+    "rootAndIndependentAssistantViewedBothImages": true,
+    "sourceReceipt": "render/captures/capture-manifest.json",
+    "rootReviewReceipt": "render/root-visual-review.json",
+    "nativeChromeCrashFixed": false
+  },
+  "acceptance": {
+    "clickedAt": "2026-11-05T14:49:20.590Z",
+    "taskUpdatedAt": "2026-11-05T14:49:20.891Z",
+    "approvalAttemptId": "3db0c3ce-2283-41a0-9134-16771ad8bd1c",
+    "approvalFinishedAt": "2026-11-05T14:49:21.532Z",
+    "taskStage": "approval",
+    "taskStatus": "passed",
+    "taskRevision": 20,
+    "ui": "Accepted; Changed status to Done",
+    "readbackObservedAt": "2026-11-05T14:50:14.468Z"
+  },
+  "history": {
+    "reviewRunId": "e538ab5f-aa5a-4fdf-830d-2e474a0b7048",
+    "reviewedCandidateId": "fd5484f5-e833-4db8-9b17-67d3999dddb4",
+    "originalReviewBusinessStatus": "failed",
+    "reason": "Missing browser observation at the time of independent Review",
+    "reviewCount": 1,
+    "forcedSecondReview": false,
+    "additionalVerify": false,
+    "boundary": "Owner-side visual evidence supplements the repaired artifact; it does not rewrite the previous Review into a pass or claim production native Chrome was repaired."
+  },
+  "authority": "Explicitly authorized acceptance of marked #1284 test tasks through normal existing Owner account UI; not a claim that Alex manually reviewed the screenshots."
+}

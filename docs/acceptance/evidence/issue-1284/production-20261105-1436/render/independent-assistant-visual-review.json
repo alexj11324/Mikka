@@ -1,0 +1,89 @@
+{
+  "kind": "assistant-isolated-html-visual-review",
+  "reviewer": "ui_impl assistant; not Alex human acceptance",
+  "reviewedAt": "2026-11-05T14:47:54.376313Z",
+  "method": "Each of the two exported PNG files was opened and visually inspected once using view_image. No image editing or source changes were made.",
+  "source": {
+    "path": "source/status-card.html",
+    "bytes": 1486,
+    "sha256": "ec901cd906938c2d903ac81afa19345f2f05b3a9e23a1659770c7d66d088dad8",
+    "provenance": "File supplied by root after normal production Changes UI extraction. Production origin and Codex/commit agreement are root-provided provenance; this review independently verifies the supplied file bytes and isolated render."
+  },
+  "captureManifest": {
+    "path": "captures/capture-manifest.json",
+    "sha256": "1085c45a808947ed683a796e19871f12049e6f578b3be7b66dead3e30be2f397"
+  },
+  "renderer": {
+    "name": "Chromium",
+    "version": "156.0.8078.4",
+    "input": "file://",
+    "environment": "Existing authorized Docker sandbox, headless Chromium, offline context"
+  },
+  "result": "pass_for_the_two_observed_static_viewports",
+  "images": [
+    {
+      "path": "captures/status-card-ec901cd9-1024x768.png",
+      "bytes": 20498,
+      "sha256": "c2528b4325307c24367b576b91eb142ee05bd92c11227bc87f14f96ab3a6a033",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "pngDimensions": [
+        1024,
+        768
+      ],
+      "captureStartedAt": "2026-11-05T14:43:22.258Z",
+      "captureFinishedAt": "2026-11-05T14:43:22.712Z",
+      "visualResult": "no_visible_clipping_or_overflow"
+    },
+    {
+      "path": "captures/status-card-ec901cd9-400x800.png",
+      "bytes": 19003,
+      "sha256": "377b2c53984e7592351edcaa910763e66117835de027d1e742a053798ffdff2b",
+      "viewport": {
+        "width": 400,
+        "height": 800
+      },
+      "pngDimensions": [
+        400,
+        800
+      ],
+      "captureStartedAt": "2026-11-05T14:43:22.755Z",
+      "captureFinishedAt": "2026-11-05T14:43:22.822Z",
+      "visualResult": "no_visible_clipping_or_overflow"
+    }
+  ],
+  "visualFindings": [
+    "At 1024 × 768, all three cards appear in one horizontal row. The title and each Chinese label are readable and complete; no card or text is visibly clipped.",
+    "At 400 × 800, the same three cards stack in the original order with consistent side margins. The title and status lines remain fully visible.",
+    "The labels 网站 / 接口 / 后台作业 and text states 正常 / 异常 / 维护 remain explicit alongside green, red and amber status colors.",
+    "The desktop title uses the narrower centered heading container defined by the supplied source. That visible alignment was preserved without a CSS adjustment."
+  ],
+  "domObservationsDistinctFromVisualReview": {
+    "documentWidths": [
+      1024,
+      400
+    ],
+    "clientWidths": [
+      1024,
+      400
+    ],
+    "noPageErrorsReported": true
+  },
+  "cleanup": {
+    "contextsClosed": true,
+    "browserClosed": true,
+    "remainingDirectChildPids": [],
+    "sourceUnchangedAfterCapture": true,
+    "screenshotProcessPid": 23601,
+    "completedAt": "2026-11-05T14:43:22.851Z",
+    "newAppOrDatabaseServiceStarted": false
+  },
+  "limits": [
+    "These are isolated Docker screenshots of the exact supplied delivered HTML, not screenshots taken in the production browser or the native-agent VM.",
+    "This evidence does not show that the native-agent Chrome SIGABRT is fixed, and it does not change or replace the original failed or unverified review.",
+    "No automated browser test suite, application test, interaction, model request, database access or production API call was performed.",
+    "Only these two static viewports and the visible supplied content were inspected. Alex/Owner acceptance is a separate action and is not claimed here."
+  ]
+}

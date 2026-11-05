@@ -1,0 +1,25 @@
+▶ run-recovery due times match what each sweep selects
+  ✔ an idle database has nothing due, so no timer runs (21.275707ms)
+  ✔ a leased run is due one millisecond after its lease (the sweep selects leaseExpiresAt < now) (20.510767ms)
+  ✔ an ended, unjudged run is due now; an unanswered try an hour later (21.343317ms)
+  ✔ a queued retry is due when its device stops being seen, then re-checked each minute (13.192071ms)
+  ✔ a failed sandbox kill is retried a minute after its last attempt (7.253406ms)
+  ✔ a pending group judgment is due at nextDecisionAt; a queued turn within the minute (12.42396ms)
+  ✔ a running machine is checked with E2B once idle for an hour, then each minute (17.224684ms)
+  ✔ a paused task sandbox is due now once its task closes (12.6635ms)
+  ✔ a Factory task is due a minute after its last write, or at its watchdog nextAt; nothing with the switch off (14.558422ms)
+✔ run-recovery due times match what each sweep selects (188.547602ms)
+▶ schedules due timer: exact due times, no minute sweep
+  ✔ with nothing scheduled there is no due time, so no timer runs (4.734654ms)
+  ✔ a reminder runs at its due time, not a millisecond before, and leaves nothing due (40.668693ms)
+  ✔ a repeating schedule is due again at its next slot; pausing removes it (17.748575ms)
+  ✔ a scheduled read is due again at its lease, and a failed read at its 30 s retry (22.008927ms)
+✔ schedules due timer: exact due times, no minute sweep (154.130844ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1337.119796

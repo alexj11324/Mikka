@@ -1,0 +1,13 @@
+
+> next-app@0.0.1 typecheck /workspace/Mikka-1284-due-timer864
+> tsrs --noEmit
+
+lib/due-timer-deployment.ts(18,16): error TS2339: Property 'resolveLatestDeploymentId' does not exist on type 'Promise<World>'.
+lib/due-timer-deployment.ts(18,50): error TS2339: Property 'resolveLatestDeploymentId' does not exist on type 'Promise<World>'.
+lib/due-timer-deployment.ts(18,86): error TS2339: Property 'getDeploymentId' does not exist on type 'Promise<World>'.
+lib/due-timer-deployment.ts(26,58): error TS2339: Property 'runs' does not exist on type 'Promise<World>'.
+lib/due-timer-deployment.ts(46,56): error TS2339: Property 'runs' does not exist on type 'Promise<World>'.
+lib/due-timer-deployment.ts(58,14): error TS2339: Property 'capabilities' does not exist on type 'Promise<World>'.
+lib/due-timer-deployment.ts(73,38): error TS2339: Property 'runs' does not exist on type 'Promise<World>'.
+lib/due-timer-deployment.ts(75,34): error TS2339: Property 'runs' does not exist on type 'Promise<World>'.
+ ELIFECYCLE  Command failed with exit code 2.
