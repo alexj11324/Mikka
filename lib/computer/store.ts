@@ -9,7 +9,7 @@ import { ensureCloudMachine } from './provision'
 import { computerPermission, type ComputerPermission } from './permission'
 import { computerChanged, computerWorkspaceChanged, machineChanged } from '@/lib/live/computer-state'
 import { computerLiveState } from './state-deadline'
-import { wakeTokens, wakeWorkflowAfterCommit } from '@/lib/workflow-wake'
+import { wakeTokens, wakeWorkflowSoon, workflowWakesEnabled } from '@/lib/workflow-wake'
 
 export class ComputerError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -68,9 +68,6 @@ export class ComputerStore {
           FROM computer_run_bindings b WHERE b."runId"=r.id AND b."workspaceId"=$1
             AND r.status=ANY($2::text[]) RETURNING r.id`, [workspaceId, ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']])
         for (const { id } of stopped.rows) { await runListChanged(client, id); await runChanged(client, id) }
-        // Web tasks waiting on a person or a slot re-check the policy at once and fail (#1212).
-        const tasks = await client.query<{ id: string }>(`SELECT id FROM bot_subagents WHERE "workspaceId"=$1 AND status IN ('queued','running','needs_you')`, [workspaceId])
-        for (const { id } of tasks.rows) wakeWorkflowAfterCommit(client, wakeTokens.subagent(id))
       }
       const sync = async () => {
         for (const machine of machines) {
@@ -93,6 +90,13 @@ export class ComputerStore {
       await sync()
       if (previous !== permission) await computerWorkspaceChanged(client, this.pool, workspaceId)
       await client.query('COMMIT')
+      // Web tasks waiting on a person or a slot re-check the policy at once and fail (#1212).
+      if (permission === 'deny' && workflowWakesEnabled()) {
+        try {
+          const tasks = await this.pool.query<{ id: string }>(`SELECT id FROM bot_subagents WHERE "workspaceId"=$1 AND status IN ('queued','running','needs_you')`, [workspaceId])
+          for (const { id } of tasks.rows) wakeWorkflowSoon(wakeTokens.subagent(id))
+        } catch { /* their 2-minute re-check still sees the denial */ }
+      }
       return { permission }
     } catch (error) {
       await client.query('ROLLBACK')
