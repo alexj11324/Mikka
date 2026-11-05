@@ -1,0 +1,108 @@
+{
+  "issue": 1225,
+  "pr": 1403,
+  "productHead": "a6b0a0e06061d6250ee2aff69d2de0a04355d101",
+  "productTree": "4cd12c56bed507e8cc47ae679e6605b2d54c6aca",
+  "overlayTree": "12e36474a051b6fae739abbcce48fcdcab227f8c",
+  "build": {
+    "id": "SZBuCAxRdSQLI3NCvepK9",
+    "buildIdSha256": "06e55c5c0e4421ef2d5ca2cc484ab8e4eb3a297275aeead5c69fa3677035cd3f",
+    "mtime": "2026-11-05T14:51:36.375049+00:00",
+    "compiledPublicSourceSha": "a6b0a0e06061d6250ee2aff69d2de0a04355d101"
+  },
+  "buildInterval": [
+    {
+      "name": "fixture-typecheck",
+      "startedAt": "2026-11-05T14:48:42.691358+00:00",
+      "finishedAt": "2026-11-05T14:48:46.516246+00:00",
+      "exitCode": 0,
+      "sha256": "f1ab9f08410dbd9283608331eb3dc337f4d84abc5962268adbde33ef62cfde5f"
+    },
+    {
+      "name": "production-build",
+      "startedAt": "2026-11-05T14:48:46.516906+00:00",
+      "finishedAt": "2026-11-05T14:51:49.542916+00:00",
+      "exitCode": 0,
+      "sha256": "fb7d6672c97c20c0dd8c8b3c5de5a15109c18bba58a43fed370849a86af8f3d9"
+    },
+    {
+      "name": "gateway-cli-boundary",
+      "startedAt": "2026-11-05T14:51:49.845494+00:00",
+      "finishedAt": "2026-11-05T14:51:50.155535+00:00",
+      "exitCode": 0,
+      "sha256": "29d3f1b569d6bf27ffd66bbd6f64ec138a59edcb78e754f22943fbf7b13da50a"
+    }
+  ],
+  "productHashesBefore": {
+    "lib/due-timer-owner.ts": "a87ad5dc96950065aa0c26c9bfce565888c606616cfc65220b350c69781d0cc8",
+    "lib/due-timer.ts": "f01470f94141d3eda863b0a8fc5dccf93938e781ac097bfd232a3e2e51bcd0d0",
+    "lib/workflow-wake-tokens.ts": "e26b8fd990f7446ca9fc81a9e1a4c24e3025d5dd9447848735cc0d5e645bb391",
+    "package.json": "44d01108f754fec00793008c0774a3e55fde605f8af70214005e0c2adde6967e",
+    "workflows/due-timer/current.test.ts": "2cab47504772676ae26fac6bb3736d004e1a5ea76dd64ba8be5f0ea57e686080",
+    "workflows/due-timer/loop.ts": "ae44af7b1e6fcb0c16224429dc31286b9dbbd371fa1209d4b7048c53113ce1ad",
+    "workflows/due-timer/steps.ts": "da6bf6c2e28b0ca67ce63e2f42589f5ad4c39609f6ac6ab8dcffa245f33f88e0",
+    "workflows/due-timer/workflow.ts": "7cec7f12dc5296adcf3b00d1d839e99c1dd7175b7ce23eb08017267187b03e54",
+    "lib/factory/check-start-recovery.ts": "8a7617ad728aa9f7c71ca871b51ac4eee1f9d049e40d09a8588787947052bd2c",
+    "lib/factory/store.ts": "a52ae5ac088e872ce6dd14b2a27a3db6024b6e522f1e770b8b847a8f0d1a6f06",
+    "lib/factory/acceptance-view.ts": "b70818ba232208e0cc4aa7fed3eb2d223c6296a9bfd194b4dd8ee77835eca784",
+    "components/workspace/factory-acceptance-pane.tsx": "0ecf4b3ad995ce888bd14938ce60284daea92631527db60f9cbbada68b086ee2",
+    "packages/daemon/src/runs/supervisor.ts": "cf32bec0cf61d1aa8270ce9c91d60a2773f432a578094eae0a39cfe9be097c7c",
+    "lib/factory/profile-dispatch.db.test.ts": "8fcd7c88b244293b0ff03709ce8e1de33bed92e2346aaa08c83e221b3b77a932",
+    "lib/factory/acceptance-view.test.ts": "db573bb8a65a96908a1075de14012cf41e42116859894caa2da4fc16717764b3",
+    "packages/daemon/test/runs.test.ts": "1fb6c8bf521007c1ab2d3eaa919a3d48616c9c05656f6f2dd5795a553af2a477",
+    "scripts/factory-acceptance-ui.test.tsx": "3d995332fe2166c2842572d795f7f8fffd1b851fdb3bc8c8ed44695a59e587ff"
+  },
+  "productHashesAfterBuild": {
+    "lib/due-timer-owner.ts": "a87ad5dc96950065aa0c26c9bfce565888c606616cfc65220b350c69781d0cc8",
+    "lib/due-timer.ts": "f01470f94141d3eda863b0a8fc5dccf93938e781ac097bfd232a3e2e51bcd0d0",
+    "lib/workflow-wake-tokens.ts": "e26b8fd990f7446ca9fc81a9e1a4c24e3025d5dd9447848735cc0d5e645bb391",
+    "package.json": "44d01108f754fec00793008c0774a3e55fde605f8af70214005e0c2adde6967e",
+    "workflows/due-timer/current.test.ts": "2cab47504772676ae26fac6bb3736d004e1a5ea76dd64ba8be5f0ea57e686080",
+    "workflows/due-timer/loop.ts": "ae44af7b1e6fcb0c16224429dc31286b9dbbd371fa1209d4b7048c53113ce1ad",
+    "workflows/due-timer/steps.ts": "da6bf6c2e28b0ca67ce63e2f42589f5ad4c39609f6ac6ab8dcffa245f33f88e0",
+    "workflows/due-timer/workflow.ts": "7cec7f12dc5296adcf3b00d1d839e99c1dd7175b7ce23eb08017267187b03e54",
+    "lib/factory/check-start-recovery.ts": "8a7617ad728aa9f7c71ca871b51ac4eee1f9d049e40d09a8588787947052bd2c",
+    "lib/factory/store.ts": "a52ae5ac088e872ce6dd14b2a27a3db6024b6e522f1e770b8b847a8f0d1a6f06",
+    "lib/factory/acceptance-view.ts": "b70818ba232208e0cc4aa7fed3eb2d223c6296a9bfd194b4dd8ee77835eca784",
+    "components/workspace/factory-acceptance-pane.tsx": "0ecf4b3ad995ce888bd14938ce60284daea92631527db60f9cbbada68b086ee2",
+    "packages/daemon/src/runs/supervisor.ts": "cf32bec0cf61d1aa8270ce9c91d60a2773f432a578094eae0a39cfe9be097c7c",
+    "lib/factory/profile-dispatch.db.test.ts": "8fcd7c88b244293b0ff03709ce8e1de33bed92e2346aaa08c83e221b3b77a932",
+    "lib/factory/acceptance-view.test.ts": "db573bb8a65a96908a1075de14012cf41e42116859894caa2da4fc16717764b3",
+    "packages/daemon/test/runs.test.ts": "1fb6c8bf521007c1ab2d3eaa919a3d48616c9c05656f6f2dd5795a553af2a477",
+    "scripts/factory-acceptance-ui.test.tsx": "3d995332fe2166c2842572d795f7f8fffd1b851fdb3bc8c8ed44695a59e587ff"
+  },
+  "fixtureManifestSha256": "b19bc1df40278157f287f3b95cea3c1ab8fde4af266e84a371c703a5f815e400",
+  "screenshot": {
+    "filename": "dark-unsubmitted.jpg",
+    "browserCaptureFilename": "mikka1225-review-dark-unsubmitted-1793890526717.jpg",
+    "capturedAt": "2026-11-05T14:55:26.717000+00:00",
+    "bytes": 46697,
+    "sha256": "c7dec78c1863cbb15275492ade28408c2ca90484ac1a66b15c041f1bf17777f4",
+    "source": "Cua screenshot JPEG synchronized via documented shared directory; bytes unmodified",
+    "iframeViewport": {
+      "width": 1024,
+      "height": 768
+    }
+  },
+  "observedStates": [
+    "light/unsubmitted/details expanded",
+    "dark/unsubmitted/details expanded",
+    "dark/verdict/no Retry",
+    "light/verdict/no Retry",
+    "dark/unsubmitted/390x844/details opened using Enter",
+    "light/verdict/390x844/no Retry"
+  ],
+  "unavailableAttachments": [
+    "light/unsubmitted",
+    "dark/verdict",
+    "light/verdict",
+    "dark/unsubmitted/390x844",
+    "light/verdict/390x844"
+  ],
+  "attachmentLimitation": "The listed screenshots were inspected but not available in the shared directory after five seconds. No broken or emitted-image links used.",
+  "noAccountOrSession": true,
+  "realProviderCalls": false,
+  "retryClicked": false,
+  "productionAcceptance": false,
+  "reviewer": "Issue owner agent; manual review of actual imported product components"
+}

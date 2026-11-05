@@ -1,0 +1,154 @@
+diff --git a/app/[locale]/preview/1225-check-retry/harness.tsx b/app/[locale]/preview/1225-check-retry/harness.tsx
+new file mode 100644
+index 0000000..dffb663
+--- /dev/null
++++ b/app/[locale]/preview/1225-check-retry/harness.tsx
+@@ -0,0 +1,117 @@
++'use client'
++
++// Synthetic read responses only. The actual pane, retry handler, primitives,
++// translations and styles are imported from the frozen product unchanged.
++import { useEffect, useMemo, useState } from 'react'
++import { useLocale } from 'next-intl'
++import { useTheme } from 'next-themes'
++import { SWRConfig, type Middleware } from 'swr'
++import { FactoryAcceptancePane, type FactoryTask } from '@/components/workspace/factory-acceptance-pane'
++import type { AcceptanceBinding, AcceptanceDetail } from '@/lib/factory/acceptance-view'
++import { Button } from '@/components/ui/button'
++import { withBasePath } from '@/lib/base-path'
++
++type Scenario = 'unsubmitted' | 'verdict'
++type Theme = 'light' | 'dark'
++type Props = { canvas: boolean; scenario: Scenario; theme: Theme }
++type Detail = AcceptanceDetail & { checkSubmissionRecovery?: { binding: { taskId: string; revision: number } } }
++
++const TASK = '12250000-0000-4000-8000-000000000201'
++const ISSUE = '12250000-0000-4000-8000-000000000202'
++const ATTEMPT = '12250000-0000-4000-8000-000000000203'
++const CANDIDATE = '12250000-0000-4000-8000-000000000204'
++const PRODUCER = '12250000-0000-4000-8000-000000000205'
++const CHECK = '12250000-0000-4000-8000-000000000206'
++const SHA = '1'.repeat(40)
++const REVISION = 8
++const PREVIEW = '/preview/1225-check-retry'
++const DETAIL = `/api/factory/tasks/${TASK}`
++const LEDGER = `${DETAIL}/approval?view=ledger`
++
++function fixture(scenario: Scenario) {
++  const status = scenario === 'unsubmitted' ? 'blocked' : 'failed'
++  const task: FactoryTask = {
++    id: TASK, issueId: ISSUE, attemptId: ATTEMPT, candidateId: CANDIDATE, candidateRunId: PRODUCER,
++    stage: 'review', status, revision: REVISION, isSkillCandidate: false,
++    reason: scenario === 'unsubmitted' ? 'Independent check blocked: turn_ended' : 'Independent review failed',
++  }
++  const binding: AcceptanceBinding = {
++    taskId: TASK, issueId: ISSUE, attemptId: ATTEMPT, candidateId: CANDIDATE, revision: REVISION,
++  }
++  const detail: Detail = {
++    task: { ...task, route: { flowVersion: 2 } },
++    liveWorkspaceId: null,
++    checks: [{
++      attemptId: ATTEMPT, stage: 'review', status, candidateId: CANDIDATE, candidateSha: SHA, runId: CHECK,
++      criteria: scenario === 'verdict' ? [{ criterionId: null, text: 'Synthetic fixed-candidate review', passed: false, evidence: null }] : [],
++      verify: { status: scenario === 'verdict' ? 'failed' : 'not_run', command: null, exitCode: null },
++    }],
++    delivery: {
++      candidateSha: SHA, repository: 'synthetic:report', pullRequest: null, previewUrl: null,
++      environment: 'device:synthetic-computer', machine: { name: 'Synthetic thread computer', kind: 'cloud' },
++    },
++    // A visual representation of a host-qualified capability, not an account,
++    // receipt, database admission, or authorization test.
++    ...(scenario === 'unsubmitted' ? { checkSubmissionRecovery: { binding: { taskId: TASK, revision: REVISION } } } : {}),
++  }
++  const ledger = { binding, approvals: [], publications: [], merges: [], capabilities: { reject: false } }
++  return { task, detail, ledger }
++}
++
++function readBoundary(scenario: Scenario): Middleware {
++  const data = fixture(scenario)
++  return useSWRNext => (key, _fetcher, config) => {
++    const fixtureFetcher = (async () => {
++      if (key === DETAIL) return data.detail
++      if (key === LEDGER) return data.ledger
++      throw new Error('VISUAL_FIXTURE_READ_NOT_ALLOWLISTED')
++    }) as typeof _fetcher
++    return useSWRNext(key, fixtureFetcher, {
++      ...config, refreshInterval: 0, revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false,
++    })
++  }
++}
++
++function Canvas({ scenario, theme }: { scenario: Scenario; theme: Theme }) {
++  const { setTheme } = useTheme()
++  const config = useMemo(() => ({ provider: () => new Map(), use: [readBoundary(scenario)] }), [scenario])
++  useEffect(() => { setTheme(theme) }, [setTheme, theme])
++  return <SWRConfig value={config}>
++    <main className="min-h-screen bg-background p-4 text-foreground" data-visual-fixture="1225-check-retry" data-scenario={scenario}>
++      <p className="mb-4 text-xs text-muted-foreground">Synthetic component review · no account · do not click Retry</p>
++      <section className="mx-auto flex min-h-96 max-w-3xl flex-col rounded-xl border bg-background" aria-label="Synthetic independent check">
++        <FactoryAcceptancePane task={fixture(scenario).task} />
++      </section>
++    </main>
++  </SWRConfig>
++}
++
++export function CheckRetryVisualFixture({ canvas, scenario: initialScenario, theme: initialTheme }: Props) {
++  const locale = useLocale()
++  const { setTheme } = useTheme()
++  const [scenario, setScenario] = useState<Scenario>(initialScenario)
++  const [theme, setSelectedTheme] = useState<Theme>(initialTheme)
++  const [narrow, setNarrow] = useState(false)
++  useEffect(() => { setTheme(theme) }, [setTheme, theme])
++  if (canvas) return <Canvas scenario={initialScenario} theme={initialTheme} />
++  const viewport = narrow ? { width: 390, height: 844 } : { width: 1024, height: 768 }
++  const query = new URLSearchParams({ canvas: '1', scenario, theme })
++  return <main className="min-h-screen bg-background p-4 text-foreground" data-visual-review="1225-check-retry">
++    <h1 className="text-lg font-medium">Issue 1225 · independent check visual review</h1>
++    <p className="mt-1 text-sm text-muted-foreground">Two synthetic flow-version-2 states. No account, model, task creation or runtime acceptance. Do not click Retry review.</p>
++    <div className="my-4 flex flex-wrap gap-2" aria-label="Visual fixture controls">
++      <Button type="button" variant={scenario === 'unsubmitted' ? 'default' : 'outline'} onClick={() => setScenario('unsubmitted')}>Unsubmitted · host retry capability</Button>
++      <Button type="button" variant={scenario === 'verdict' ? 'default' : 'outline'} onClick={() => setScenario('verdict')}>Recorded verdict · no retry capability</Button>
++      <Button type="button" variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setSelectedTheme('light')}>Light</Button>
++      <Button type="button" variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setSelectedTheme('dark')}>Dark</Button>
++      <Button type="button" variant={!narrow ? 'default' : 'outline'} onClick={() => setNarrow(false)}>1024 px desktop</Button>
++      <Button type="button" variant={narrow ? 'default' : 'outline'} onClick={() => setNarrow(true)}>390 px mobile</Button>
++    </div>
++    <p className="mb-2 text-xs text-muted-foreground">Actual iframe viewport: {viewport.width} × {viewport.height}; scenario: {scenario}. The embedded pane uses unchanged product UI.</p>
++    <div className="overflow-auto rounded-lg border bg-muted/20 p-2">
++      <iframe key={`${scenario}:${theme}:${narrow}`} src={withBasePath(`/${locale}${PREVIEW}?${query.toString()}`)}
++        title={`Independent review ${scenario}, ${theme}, ${viewport.width} px`}
++        width={viewport.width} height={viewport.height} className="block max-w-none border-0 bg-background" />
++    </div>
++  </main>
++}
+diff --git a/app/[locale]/preview/1225-check-retry/page.tsx b/app/[locale]/preview/1225-check-retry/page.tsx
+new file mode 100644
+index 0000000..46086ec
+--- /dev/null
++++ b/app/[locale]/preview/1225-check-retry/page.tsx
+@@ -0,0 +1,25 @@
++import type { Metadata } from 'next'
++import { notFound } from 'next/navigation'
++import { CheckRetryVisualFixture } from './harness'
++
++// Temporary build-only fixture for issue #1225. Never commit this route.
++export const dynamic = 'force-dynamic'
++export const metadata: Metadata = {
++  title: 'Issue 1225 independent check review',
++  robots: { index: false, follow: false },
++}
++
++type Search = Record<string, string | string[] | undefined>
++
++export default async function CheckRetryPreview({ searchParams }: { searchParams: Promise<Search> }) {
++  if (process.env.NODE_ENV !== 'production' || process.env.MIKKA_1225_VISUAL_REVIEW !== '1') notFound()
++  const search = await searchParams
++  const allowed = new Set(['canvas', 'scenario', 'theme', '_rsc'])
++  if (Object.keys(search).some(key => !allowed.has(key) || Array.isArray(search[key]))) notFound()
++  if (search.canvas !== undefined && search.canvas !== '1') notFound()
++  if (search.scenario !== undefined && search.scenario !== 'unsubmitted' && search.scenario !== 'verdict') notFound()
++  if (search.theme !== undefined && search.theme !== 'light' && search.theme !== 'dark') notFound()
++  return <CheckRetryVisualFixture canvas={search.canvas === '1'}
++    scenario={search.scenario === 'verdict' ? 'verdict' : 'unsubmitted'}
++    theme={search.theme === 'dark' ? 'dark' : 'light'} />
++}
