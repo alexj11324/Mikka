@@ -56,12 +56,27 @@ pnpm desktop:build                 # dist/main.cjs, dist/preload.cjs
 pnpm --filter @mikka/desktop package:dir   # unpacked app under release/
 pnpm --filter @mikka/desktop package:mac   # signed Apple Silicon dmg/zip (release)
 pnpm --filter @mikka/desktop package       # local dmg/zip, never publishes
-# Unsigned isolated test package; requires an explicit non-production backend:
+# Ad-hoc signed isolated test package; requires an explicit non-production backend:
 MIKKA_DESKTOP_APP_URL=https://your-test-backend.example/mikka pnpm --filter @mikka/desktop package:dev:mac
 ```
 
 A production build must use an HTTPS app URL. Signing and notarization
 credentials belong to the release pipeline, never the repository.
+
+`Mikka Dev` has a complete ad-hoc integrity signature after packaging and fuse
+changes. It has **no Developer ID signature or notarization** and is not a
+release artifact. The Dev packaging script removes inherited Apple signing
+credentials and explicitly enables only this ad-hoc signing on pull requests.
+Hardened runtime stays enabled. Because ad-hoc signatures have no Team ID, a
+separate Dev entitlement permits loading the packaged Electron framework;
+production entitlements do not include that library-validation exception.
+See the [electron-builder v26 signing requirements](https://www.electron.build/v26/docs/mac/)
+and [Apple's library-validation policy](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.cs.disable-library-validation).
+
+Every Dev/acceptance package must pass `codesign --verify --strict --deep`,
+actual identity and entitlement checks, and a read of its final Electron fuse
+wire. The downloadable Dev package keeps the inspector disabled. None of these
+checks changes Keychain permissions or enables a plaintext credential fallback.
 
 ## Sign-in
 
@@ -97,8 +112,15 @@ client operation.
 The desktop CI builds the production Next.js backend against an independent
 Postgres and runs Electron with real leased test accounts. Apple Silicon CI
 reuses that compiled backend, then tests an actual packaged App before producing
-the unsigned `Mikka Dev` ZIP. The inspector-enabled acceptance bundle is a
+the ad-hoc signed `Mikka Dev` ZIP. The inspector-enabled acceptance bundle is a
 harness input only; downloadable and release Apps retain the inspector fuse.
+
+Before account acceptance, `test/native-crypto.mjs` launches that same final
+package in three independent macOS processes. Main encrypts random non-credential
+canaries, then later processes must decrypt them across a second profile and a
+hosted-to-bundled restart. The probe uses the real asynchronous OS storage API,
+reports only checks/counts and closed error categories, and never sends plaintext
+or ciphertext to the renderer. Availability alone does not satisfy the check.
 
 `test/environment.mjs` starts the real local live Worker plus production
 backends. `test/db-metrics.cjs` records query counts and PostgreSQL connection

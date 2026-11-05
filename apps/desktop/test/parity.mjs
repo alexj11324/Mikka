@@ -390,9 +390,9 @@ function screens(fixture) {
     const requirements = section ? settingsReadRequirements(section, fixture) : pageReadRequirements(screen.name, fixture)
     const readsFinished = observeReads(target.page, requirements, actionIds, environment.basePath)
     await screen.open(target)
-    await readsFinished()
-    if (section) await settingsReady(target.page, section, fixture, messages)
-    else await pageReady(target.page, screen.name, fixture, messages)
+    const observed = await readsFinished()
+    if (section) await settingsReady(target.page, section, fixture, messages, observed)
+    else await pageReady(target.page, screen.name, fixture, messages, observed)
   } }))
 }
 

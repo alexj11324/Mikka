@@ -1,6 +1,7 @@
-# Unsigned, isolated review artifact. This never invokes the release hooks or
-# publishes an update. The build must use MIKKA_DESKTOP_FLAVOR=dev and an
-# explicitly selected disposable backend; CI supplies both.
+# Isolated review artifact with a complete ad-hoc integrity signature, without
+# Developer ID or notarization. This never invokes release hooks or publishes
+# an update. scripts/package-dev.mjs selects dev flavor, a disposable backend
+# and a signing environment that cannot inherit release credentials.
 extends: electron-builder.yml
 appId: com.aspectlylabs.mikka.dev
 productName: Mikka Dev
@@ -9,7 +10,10 @@ directories:
 publish: null
 afterSign: null
 mac:
-  identity: null
+  identity: '-'
+  hardenedRuntime: true
+  entitlements: build/entitlements.dev.mac.plist
+  entitlementsInherit: build/entitlements.dev.mac.plist
   notarize: false
   target: [zip]
 artifactName: Mikka-Dev-${version}-${os}-${arch}.${ext}

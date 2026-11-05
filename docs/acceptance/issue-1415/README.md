@@ -22,6 +22,7 @@
 | [Mac ARM b5 局部结果](mac-arm-partial-b5bc6b22.json) | 分支 `b5bc6b22`，实际 CI merge/build `33572d6e`；run `42096996544` | 打包 smoke 7 项通过；公共页 8 屏差异 0–0.00903%。随后登录会话等待超时，完整矩阵、生命周期和一小时测量未运行。 |
 | [Mac ARM 7973 局部结果](mac-arm-partial-7973afa9.json) | 分支 `7973afa9`，实际 CI merge/build `f3f72a78`；run `42108050373` | 打包 smoke 7 项和公共页 8 屏通过，随后会话未保存。新诊断证明浏览器回跳、loopback 和 exchange 200 已完成，故障位于后续接收/持久化阶段；精确清理及证据审计通过，完整验收仍未通过。 |
 | [ec9 CI 局部结果](ci-ec9-partial.json) | 分支 `ec9c76a3`，实际 CI merge/build `d1584866`、base `ca256b8b`；run `42114130036` | 10 个关联 workflow 通过；Desktop 的 main 110、helper 55、platform 42 项和两端 smoke 各 7 项通过。Mac parity 在登录前的 hosted 导航阶段失败，0 屏；新的 exchange/加密/文件诊断没有执行，不能据此判断此前登录故障。精确清理通过。 |
+| [1ab9 CI 与 Mac 加密定位](ci-1ab9-partial.json) | 分支 `1ab9d549`，实际 CI merge/build `14ef10d8`、base `565c7dfb`；run `42120570092` | 其余 11 个 workflow 全部通过；两端 smoke 各 7 项通过，Mac 公共页 8 屏最大差异 0.00895%。随后真实 exchange JSON/身份/token 均有效，实际 `safeStorage.encryptStringAsync()` 拒绝，尚未进入 vault 文件写入。精确清理通过；生命周期、冷启动、一小时测量和最终 Dev ZIP 未运行。打包日志明确跳过签名，正在验证修正后的完整包与跨进程钥匙串读取，不能把该线索提前写成已证实根因。 |
 | [清理退出事件回归](native-cleanup-exit-regression.json) | `ec9c76a3` 加记录中的测试补丁；现有 Docker、UID 2002、Node 24.22.1 | 6 通过、0 失败、0 跳过。Linux 已能证明进程停止时，Node 的 `ChildProcess` 退出事件可能尚未送达；测试提前订阅同一进程退出，再检查退出码，保留停止边界的时间断言，产品清理实现不变。 |
 | [Linux 原序列登录诊断](native-parity-auth-b5bc6b22.json) / [组合顺序诊断](native-combined-auth-b5bc6b22.json) | 固定 `b5bc6b22` 产品和记录哈希的外置测试脚本 | 单独保留共享 profile 与 8 个公共页后的真实 PKCE 通过；同 Node 组合在 hosted 首屏前失败，未重现 Mac 的登录超时，dirty 数据保留隔离。 |
 | [缓存恢复与验收脚本回归](hydration-and-harness-regressions.json) | `b5bc6b22` 后的逐文件 SHA-256 增量；真实 SWR 与源码测试 | 分页审计首次读取从 0 恢复为 1；私有审计数据不落盘。共享缓存 18/18、独立时序检查 5/5、focus/navigation 25/25、idle-budget 10/10、诊断与精确清理 6/6；不是完整截图或一小时通过的证据。 |
@@ -49,5 +50,7 @@
 - [ ] 最终提交的全部 CI 通过，提供连隔离 HTTPS 后端的 unsigned Mikka Dev Apple Silicon ZIP。
 
 第二阶段按 [Alex 的追加要求](https://github.com/alexj11324/Mikka/issues/1415#issuecomment-6664526271)，在上述第一阶段完成后继续。目前只有[兼容性研究](../../operations/issue-1415-phase2-feasibility.md)，没有将研究当成迁移实现或验收结果。生产设置、正式签名、发布和生产切换均未执行。
+
+[独立 Workflow 运行验证](workflow-runtime-feasibility.json) 已实际通过重试、5 秒定时、hook 和原任务的进程重启恢复。两次原失败记录保留：缺少 Local World 生命周期关闭，以及打包后 SDK 自身版本元数据丢失。显式接入官方 `start` / `close` 并保留真实包后，同一个停住的任务无需再次 `start` 即恢复完成，SIGTERM 正常退出约 1.016 秒；测试进程和端口均已关闭。这只证明 Hono/Nitro 与当前 Workflow 版本的本地集成可行，不能代替业务 workflow、Vercel 队列、网页迁移或生产验收。
 
 [后续授权](https://github.com/alexj11324/Mikka/issues/1415#issuecomment-6667238449) 已允许自主完成必要的合并、生产切换与验收判断；[资源补充要求](https://github.com/alexj11324/Mikka/issues/1415#issuecomment-6667340920) 要求按需使用并及时停止资源。上述待验收项目继续以实际记录判断，当前阶段不会提前标为通过。

@@ -18,36 +18,62 @@ export async function readActionIds(applicationDirectory) {
 }
 
 export function observeReads(page, requirements, actionIds, basePath) {
-  const waits = requirements.map(requirement => page.waitForResponse(response => {
-    const request = response.request()
-    const pathname = new URL(response.url()).pathname
-    if (requirement.path) return request.method() === 'GET' && pathname === `${basePath}${requirement.path}`
-    if (pathname === `${basePath}/api/desktop/rpc`) {
-      try { return request.postDataJSON()?.action === requirement.action } catch { return false }
-    }
-    return actionIds.get(request.headers()['next-action']) === requirement.action
-  }, { timeout: 45_000 }).then(async response => {
-    assert.equal(response.ok(), true, `Read must succeed: ${requirement.path ?? requirement.action}`)
-    assert.equal(await response.finished(), null, 'Read body must finish before capture')
-    const type = response.headers()['content-type'] ?? ''
-    if (type.includes('application/json')) {
+  const waits = requirements.map(requirement => {
+    let phase = 'response'
+    let timer
+    const read = page.waitForResponse(response => {
+      const request = response.request()
+      const pathname = new URL(response.url()).pathname
+      if (requirement.path) return request.method() === 'GET' && pathname === `${basePath}${requirement.path}`
+      if (request.method() !== 'POST') return false
+      if (pathname === `${basePath}/api/desktop/rpc`) {
+        try { return request.postDataJSON()?.action === requirement.action } catch { return false }
+      }
+      return actionIds.get(request.headers()['next-action']) === requirement.action
+    }, { timeout: 45_000 }).then(async response => {
+      assert.equal(response.ok(), true, `Read must succeed: ${requirement.path ?? requirement.action}`)
+      const headers = response.headers()
+      const serverAction = requirement.action && actionIds.get(response.request().headers()['next-action']) === requirement.action
+      if (serverAction) {
+        // Next awaits the action before generating its Flight response, whose
+        // page stream can remain open after the action result is consumed.
+        // Combine that completed invocation with the caller's positive DOM
+        // checks; ordinary API/RPC JSON must finish and parse below.
+        assert.equal(response.status(), 200, 'The observed action must succeed')
+        assert.ok((headers['content-type'] ?? '').includes('text/x-component'), 'The observed action must use its real Flight response')
+        assert.ok(!headers['x-action-redirect'], 'An auth redirect is not action completion')
+        return { linearUnavailable: false }
+      }
+      assert.ok((headers['content-type'] ?? '').includes('application/json'), 'The observed API/RPC read must return JSON')
+      phase = 'body'
+      assert.equal(await response.finished(), null, 'Read body must finish before capture')
+      phase = 'json'
       const data = await response.json()
       assert.ok(!data?.error && data?.ok !== false, 'Successful transport must contain successful application data')
-    }
-    return true
-  }))
+      // Preserve the isolated environment's explicit unavailable status and its
+      // visible error. This does not permit ignoring any other failed reads.
+      return { linearUnavailable: requirement.path === '/api/integrations/linear/status' && response.status() === 200 && data?.enabled === false && data?.state === 'unavailable' }
+    })
+    // Ordinary JSON headers are not completion. Keep the same total deadline
+    // while waiting for that real body, and report its exact unfinished phase.
+    return Promise.race([read, new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`PARITY_READ_TIMEOUT:${requirement.path ?? requirement.action}:${phase}`)), 45_000)
+    })]).finally(() => clearTimeout(timer))
+  })
   // Attach rejection handlers immediately, including if an earlier DOM check
   // fails. A timed-out observation must never become an unhandled rejection.
   const results = Promise.allSettled(waits)
   return async () => {
-    for (const result of await results) if (result.status === 'rejected') throw result.reason
+    const settled = await results
+    for (const result of settled) if (result.status === 'rejected') throw result.reason
     if (waits.length) await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    return { linearUnavailable: settled.some(result => result.status === 'fulfilled' && result.value.linearUnavailable) }
   }
 }
 
 export function pageReadRequirements(name) {
   if (name === 'coordinator-details') return [{ path: '/api/mobile/bots/coordinator' }]
-  if (name === 'plugins') return [{ path: '/api/integrations/composio/catalog' }, { path: '/api/integrations/composio' }]
+  if (name === 'plugins') return [{ path: '/api/integrations/composio/catalog' }, { path: '/api/integrations/composio' }, { path: '/api/integrations/linear/status' }]
   if (name === 'new-task') return [
     { action: 'coordinator.issueCreationAvailable' }, { action: 'agents.listDevices' },
     { path: '/api/settings/model-order' }, { path: '/api/settings/e2b-key' },
@@ -56,7 +82,7 @@ export function pageReadRequirements(name) {
   return []
 }
 
-export async function pageReady(page, name, fixture, messages) {
+export async function pageReady(page, name, fixture, messages, observed = {}) {
   const text = value => page.getByText(value, { exact: true }).first().waitFor()
   const threadRows = async root => {
     const resolved = root.getByRole('button', { name: messages.Shell.threads.group.resolved.replace('{count}', '1'), exact: true })
@@ -77,7 +103,12 @@ export async function pageReady(page, name, fixture, messages) {
       await apps.getByRole('link', { name: messages.Settings.integrations.openApp.replace('{name}', name), exact: true }).waitFor()
     }
     await expect(apps.locator('[data-slot="app-row-pending"]')).toHaveCount(0, { timeout: 45_000 })
-    await expect(apps.getByRole('alert')).toHaveCount(0)
+    const alerts = apps.getByRole('alert')
+    if (observed.linearUnavailable) {
+      await expect(alerts).toHaveCount(1)
+      await alerts.getByText(messages.Plugins.connectionStatusFailed.replace('{names}', messages.Settings.linear.title), { exact: true }).waitFor()
+      await expect(alerts.getByRole('button', { name: messages.Plugins.retry, exact: true })).toBeEnabled()
+    } else await expect(alerts).toHaveCount(0)
   } else if (name === 'suggestions') {
     await text(messages.SuggestionsPage.empty)
     await page.getByRole('button', { name: messages.SuggestionsPage.connect, exact: true }).waitFor()

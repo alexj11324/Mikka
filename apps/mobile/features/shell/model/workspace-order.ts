@@ -30,3 +30,18 @@ export function parseWorkspaceOrder(raw: string | null): string[] {
     return []
   }
 }
+
+/** The ids after a drag moves the workspace at `from` to `to`, both clamped into the list. */
+export function moveTo(ids: readonly string[], from: number, to: number): string[] {
+  const next = [...ids]
+  if (from < 0 || from >= ids.length) return next
+  const [id] = next.splice(from, 1)
+  next.splice(Math.max(0, Math.min(to, next.length)), 0, id!)
+  return next
+}
+
+/** The place a dragged row reaches: its start plus whole rows of travel, inside the list. */
+export function dragSlot(from: number, travel: number, rowHeight: number, count: number): number {
+  'worklet'
+  return Math.max(0, Math.min(count - 1, from + Math.round(travel / rowHeight)))
+}

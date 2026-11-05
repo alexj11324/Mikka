@@ -45,13 +45,21 @@ The **home screen** is a messaging app's chat list. It has no title.
   ([decision](decisions/2026-11-01-1215-star-is-the-pin.md)).
 - Then come the sections 正在工作, Bot and 群聊. Each row has its last line and
   time, newest first (the web bot list, R-01; R-06).
+- Each chat row taps open with the system's link transition. A long press opens its menu over a live preview. A
+  swipe left pins it, and holding then moving drags it among the pins or the list
+  ([decision](decisions/2026-11-05-2010-ios-home-list-interactions.md)). Sections fold. An avatar shows a waiting
+  mark or its unread count. Hidden chats are listed under 隐藏的聊天 at the foot.
 - 「重启以更新」 shows above the list once an update has downloaded
   ([decision](decisions/2026-10-31-2010-ota-updates.md)).
 
 The **drawer** lies under the app at the left edge. A drag to the right on the
-home screen, or the workspace button, slides the app aside to show it.
+home screen, or the workspace button, slides the app aside to show it. The
+drawer is the system secondary background and its places are one inset group
+on the tertiary background. The open app keeps the page colour, rounded to the
+screen corners, with a soft shadow and a light veil
+([decision](decisions/2026-11-05-2205-drawer-native-surface.md)).
 - At the top is the open workspace. A tap lists the others to switch to, and
-  排序 arranges them on this device.
+  编辑顺序 arranges them on this device by dragging a handle.
 - Then 线程 and 建议, each with its count, and 任务 and 插件.
 - At the foot are the person (→ 个人资料) and 设置.
 The Coordinator gets no other special UI (R-06).

@@ -74,13 +74,13 @@ export function Field({ style, children }: { style: StyleProp<ViewStyle>; childr
   return glass ? <GlassView style={[style, { backgroundColor: undefined }]}>{children}</GlassView> : <View style={[style, lift]}>{children}</View>
 }
 
-/** Grouped list section, iOS inset style, no outline. */
-export function Group({ label, children }: { label?: string; children: ReactNode }) {
+/** Grouped list section, iOS inset style, no outline. `backgroundColor` overrides the card when the section sits on a surface that is already `colors.surface`. */
+export function Group({ label, children, backgroundColor }: { label?: string; children: ReactNode; backgroundColor?: string }) {
   const items = (Array.isArray(children) ? children : [children]).flat().filter(Boolean)
   return (
     <View style={{ marginBottom: 20 }}>
       {label ? <Text style={styles.groupLabel}>{label}</Text> : null}
-      <View style={styles.group}>
+      <View style={[styles.group, backgroundColor ? { backgroundColor } : null]}>
         {items.map((child, index) => (
           <View key={index}>
             {index > 0 ? <View style={styles.separator} /> : null}
@@ -107,6 +107,6 @@ const styles = StyleSheet.create({
   glassRound: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   capsule: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 22, maxWidth: 220 },
   groupLabel: { fontSize: 13, color: colors.secondary, marginLeft: 16, marginBottom: 7 },
-  group: { backgroundColor: colors.surface, borderRadius: 14, overflow: 'hidden' },
+  group: { backgroundColor: colors.surface, borderRadius: 14, borderCurve: 'continuous', overflow: 'hidden' },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginLeft: 16 },
 })

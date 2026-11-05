@@ -164,6 +164,8 @@ export function projectGraph(facts: MapFacts, laneLimit: 2 | 3 = 3, focusBranchI
     const node = addNode('end:' + branch.id, 'branch_end', branch.status, stop?.occurredAt ?? fork.occurredAt, 'unknown', branch.reason)
     node.branchId = branch.id; node.status = branch.status === 'abandoned' ? 'abandoned' : branch.status === 'completed' ? 'completed' : 'unknown'
     addEdge(stop?.id ?? fork.id, node.id, 'continues', 'declared')
+    // A historical stop may precede this branch's fork; its marker must follow both.
+    addEdge(fork.id, node.id, 'continues', 'declared')
   }
   if (nodes.size > MAP_NODE_LIMIT) throw new MapReadError('map_too_large', { detail: 'limit' })
   // Drop corrupt causal cycles rather than silently invent a lineage.
