@@ -57,6 +57,11 @@ export const dueTimerTransport: { start?: (kind: DueKind) => Promise<unknown> } 
 /** Wakes the job's running timer, or starts one. Best effort: the slow sweep re-arms a lost start. */
 export async function armDueTimer(kind: DueKind): Promise<void> {
   if (!workflowWakesEnabled()) return
+  if (kind === 'run-recovery' && process.env.VERCEL_ENV === 'production') {
+    try { await (await import('./due-timer-owner')).armCurrentRecoveryTimer() }
+    catch (error) { console.error('Due timer ownership unavailable', { kind, name: error instanceof Error ? error.name : typeof error }) }
+    return
+  }
   try {
     const resume = wakeTransport.resume ?? (await import('workflow/api')).resumeHook
     await resume(wakeTokens.dueTimer(kind), {})
