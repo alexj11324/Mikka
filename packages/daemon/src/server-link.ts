@@ -33,6 +33,7 @@ import {
   type RunCheckpoint,
   type DaemonVersions,
   type DeviceManagementCommand,
+  type DeviceRegistered,
 } from "@mikka/protocol"
 
 import type { LocalComputerDecision, LocalComputerRequest } from "@mikka/protocol/computer"
@@ -95,7 +96,7 @@ export interface ServerLink {
     credential: string,
     info: DeviceInfo,
     knownDeviceId?: string
-  ): Promise<{ deviceId: string }>
+  ): Promise<{ deviceId: string; tracing?: DeviceRegistered["tracing"] }>
   /** Also renews the leases of the runs listed in `status.runs`. */
   heartbeat(deviceId: string, status: HeartbeatStatus): Promise<HeartbeatResult>
   listRepos(deviceId: string): Promise<DeviceRepo[]>
