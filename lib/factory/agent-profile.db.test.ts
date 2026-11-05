@@ -227,6 +227,80 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
       assert.deepEqual((await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [who.ownerId])).rows, before.rows)
     })
 
+    await t.test('Default management keeps stale allowance checking while real dispatch refreshes without losing provider-failure memory', async () => {
+      // A pure preview must not refresh credentials or pretend a stale quota is
+      // available. The task form may submit that unresolved Default intent;
+      // only the actual dispatcher can check it and admit a source.
+      await order.changeOrder(pool, who, { kind: 'preferred', harness: 'claude_code' })
+      const stale = () => ({ ...quota('claude'), observedAt: new Date(Date.now() - 60_001).toISOString() })
+      await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [claudeSource, JSON.stringify(stale())])
+      const authority = async () => ({
+        order: (await pool.query('SELECT * FROM model_order_entries WHERE "ownerId"=$1 ORDER BY id', [who.ownerId])).rows,
+        settings: (await pool.query('SELECT * FROM model_order_settings WHERE "ownerId"=$1', [who.ownerId])).rows,
+        key: (await pool.query('SELECT id,"updatedAt",models,"modelsError" FROM model_api_keys WHERE id=$1', [key.id])).rows,
+        sources: (await pool.query('SELECT id,epoch,state,paused,"modelCatalog" FROM byos_connections WHERE "ownerId"=$1 ORDER BY id', [who.ownerId])).rows,
+        failure: (await pool.query('SELECT status,"stopReason",report,"startedAt","finishedAt" FROM agent_runs WHERE id=$1', [priorRunId])).rows,
+      })
+      const bindings = async () => (await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [who.ownerId])).rows
+      const snapshot = await authority(), beforeBindings = await bindings()
+      const beforeQuota = (await pool.query('SELECT quota FROM byos_connections WHERE id=$1', [claudeSource])).rows
+      const preview = await profiles.readAgentProfileManagement(pool, who, { location: 'local', deviceId: device })
+      assert.deepEqual(preview.defaultAvailability, { available: false, reason: 'checking' })
+      const settings = await order.orderView(pool, who)
+      assert.equal(settings.entries.find(entry => entry.id === preferred[2].id)?.block, null, 'Settings retains its last positive allowance display')
+      assert.deepEqual(await authority(), snapshot)
+      assert.deepEqual(await bindings(), beforeBindings)
+      assert.deepEqual((await pool.query('SELECT quota FROM byos_connections WHERE id=$1', [claudeSource])).rows, beforeQuota, 'opening the form is not a quota/source refresh')
+      const calls: string[] = []
+      const dispatchWithUsage = (usage: () => Promise<void>) => profiles.resolveAgentProfileDispatch(pool, who,
+        { ...request, profileId: 'default' }, {
+          resolve: (query, scope, asked, location, requestedDevice, dependencies) => resolveModelDispatch(query, scope, asked, location, requestedDevice, {
+            ...dependencies, refreshQuota: async (requester, connectionId, _signal, credentialOwnerId) => {
+              assert.equal(requester.ownerId, who.ownerId); assert.equal(requester.workspaceId, who.workspaceId)
+              assert.equal(credentialOwnerId, who.ownerId); assert.equal(connectionId, claudeSource)
+              calls.push(connectionId); await usage()
+            },
+          }),
+        })
+      try {
+        const selected = await dispatchWithUsage(async () => {
+          await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [claudeSource, JSON.stringify(quota('claude'))])
+        })
+        assert.deepEqual(calls, [claudeSource], 'only the already authorized subscription is checked')
+        if (selected.target.kind !== 'device') assert.fail(JSON.stringify(selected.target))
+        assert.deepEqual(selected.target.entry, preferred[2]); assert.equal(selected.selectionMode, 'preference')
+        assert.equal(selected.target.agentId, runtimeAgents.claude_code)
+        assert.deepEqual(await authority(), snapshot, 'quota preparation does not reset key health or change source generation/order')
+        assert.deepEqual((await order.credentialStates(pool, who, preferred, candidates, undefined, { probe: false })).get(preferred[0].id)?.credential,
+          { usable: false, reason: 'balance' })
+        const admittedBindings = await bindings()
+        for (const outcome of ['unknown', 'exhausted'] as const) {
+          await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [claudeSource, JSON.stringify(stale())])
+          const denied = await dispatchWithUsage(async () => {
+            if (outcome === 'unknown') throw new Error('Synthetic quota transport unavailable')
+            await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [claudeSource, JSON.stringify(quota('claude', 1))])
+          })
+          assert.equal(denied.target.kind, 'none', outcome)
+          assert.equal(denied.agentProfile, undefined, outcome)
+          assert.deepEqual(await bindings(), admittedBindings, outcome)
+          assert.deepEqual(await authority(), snapshot, outcome)
+        }
+        await pool.query('UPDATE byos_connections SET paused=true WHERE id=ANY($1::uuid[])', [[claudeSource, codexSource]])
+        const unavailable = await profiles.readAgentProfileManagement(pool, who, { location: 'local', deviceId: device })
+        assert.equal(unavailable.defaultAvailability.available, false)
+        assert.notEqual(unavailable.defaultAvailability.reason, 'checking', 'known unavailable sources are not pending allowance')
+        const beforePauseCalls = calls.length
+        const stopped = await dispatchWithUsage(async () => { assert.fail('Paused sources cannot be probed or admitted') })
+        assert.equal(stopped.target.kind, 'none')
+        assert.equal(calls.length, beforePauseCalls, 'paused sources are not probed')
+        assert.deepEqual(await bindings(), admittedBindings)
+      } finally {
+        await pool.query('UPDATE byos_connections SET paused=false,quota=$2 WHERE id=$1', [claudeSource, JSON.stringify(quota('claude'))])
+        await pool.query('UPDATE byos_connections SET paused=false,quota=$2 WHERE id=$1', [codexSource, JSON.stringify(quota('codex'))])
+        await order.changeOrder(pool, who, { kind: 'preferred', harness: 'codex' })
+      }
+    })
+
     for (const profileId of [undefined, 'default']) await t.test(`an explicitly named failed model stays unavailable on ${profileId ?? 'automatic'} instead of selecting Haiku`, async () => {
       const picked = { ...request, profileId, asked: { harness: 'claude_code' as const, model: 'deepseek-flash' } }
       const selected = await profiles.resolveAgentProfileDispatch(pool, who, picked)

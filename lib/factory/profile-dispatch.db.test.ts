@@ -258,7 +258,19 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   await t.test('CC implementation selects independent Codex Review with frozen exact Profile and subscription', async () => { await exercise(true, false) })
   await t.test('a prepared sleeping parent gains its missing Codex metadata without provider I/O', async () => { await exercise(true, true) })
   await t.test('no configured Profile retains CC despite Codex being first in model preference', async () => { await exercise(false, false) })
-  await t.test('an owner Default task still permits the host to choose independent Codex Review for its next stage', async () => { await exercise(true, false, true, true) })
+  await t.test('an owner Default task still permits the host to choose independent Codex Review for its next stage', async () => {
+    const f = await exercise(true, false, true, true)
+    const input = JSON.parse(decisionInputs.at(-1)!.input as string)
+    assert.equal(input.task.kind, 'independent_check', 'the actual selection request describes the current check, not another producer')
+    assert.equal(input.task.stage, 'review'); assert.equal(input.task.readOnly, true)
+    assert.equal(input.task.taskId, f.task.id); assert.equal(input.task.requestEpoch, f.sourceEventId)
+    assert.equal(input.task.candidateId, f.candidate.id)
+    const issue = (await pool.query('SELECT title,content FROM issues WHERE id=$1', [f.issueId])).rows[0]
+    assert.equal(input.acceptanceReference.originalTask.title, issue.title)
+    assert.equal(input.acceptanceReference.originalTask.content, JSON.stringify(issue.content))
+    assert.equal(input.acceptanceReference.currentOwnerRequest, '')
+    assert.equal(input.task.content, undefined, 'the implementation contract is only an acceptance reference')
+  })
   const profileRefusal = 'The selected Agent Profile changed or is no longer available. Select an available Profile for a new run.'
   const unclaimedReview = async (withRouting = false) => {
     const f = await exercise(false, false, withRouting)
@@ -697,6 +709,9 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       import('./profile-request'), import('./questions/store'), import('./questions/queue-continuation'), import('./claim'), import('./event-id'),
     ])
     const f = await fixture(true, false, false, 'default'), beforeDecisions = decisionCounts()
+    const producerContract = 'Produce the requested artifact, ask the Owner once, and submit it. Do not self-review: the host arranges a separate independent Review after submission.'
+    const contractDocument = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: producerContract }] }] }
+    await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [f.issueId, JSON.stringify(contractDocument)])
     const originalEvent = (await pool.query('SELECT * FROM coordinator_events WHERE id=$1', [f.sourceEventId])).rows[0]
     assert.equal(originalEvent.kind, 'user_message'); assert.equal(originalEvent.payload.profileId, 'default')
     const profileId = await requestedAgentProfile(pool, f.scope, f.sourceEventId, f.review!.id)
@@ -727,7 +742,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       firstQueues++
       return queueCloudRun(pool, f.actor, {
         botId: f.botId, issueId: f.issueId, agentId: f.agents.codex, deviceRepoId: f.repoId,
-        title: 'Owner-selected Default', body: 'Continue the original native task after the owner answers.',
+        title: 'Owner-selected Default', body: producerContract,
         model: model.codex, subscriptionBindingId, agentProfile: selected.agentProfile,
         modelDispatch: { mode: 'picked', location: 'cloud', entry: target.entry },
         idempotencyKey: `factory:${context.attemptId}`, sourceEventId: context.sourceEventId,
@@ -872,6 +887,24 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       for (const key of ['sessionId', 'continuesRunId', 'retryOf', 'questionContinuation']) assert.equal(review[key], null, key)
       assert.equal(review.agentDefinition.profileOriginRunId, undefined)
       assert.equal(review.agentDefinition.definitionDigest, workerDefinitionDigest(review.agentDefinition))
+      // The transport returns the same fixed pair regardless of these fields.
+      // Inspect the real request outside it: this proves the host supplied its
+      // actual stage/target, not that a live model must choose this Profile.
+      const expectedOwnerRequest = await (await import('./checks')).currentFactoryRequest(pool, result.task)
+      assert.ok(expectedOwnerRequest.includes(answer.text))
+      const checkCalls = decisionInputs.filter(call => call.purpose === 'factory-agent-profile').slice(beforeDecisions.profile)
+      assert.equal(checkCalls.length, 4)
+      for (const call of checkCalls) {
+        const input = JSON.parse(call.input as string)
+        assert.equal(input.task.kind, 'independent_check')
+        assert.equal(input.task.stage, 'review'); assert.equal(input.task.readOnly, true)
+        assert.equal(input.task.taskId, f.task.id); assert.equal(input.task.requestEpoch, f.sourceEventId)
+        assert.equal(input.task.candidateId, reviewAttempt.candidateId)
+        assert.deepEqual(JSON.parse(input.acceptanceReference.originalTask.content), contractDocument)
+        assert.equal(input.acceptanceReference.currentOwnerRequest, expectedOwnerRequest, 'reuse the receipt-bound Owner answer already used by this candidate')
+        assert.equal(JSON.stringify(input.task).includes(producerContract), false)
+        assert.equal(JSON.stringify(input.task).includes(answer.text), false)
+      }
       const afterDecisions = decisionCounts()
       await completion.run(f.ownerId, child.id)
       assert.deepEqual(await handleFactory(human, retry), response)
@@ -991,5 +1024,20 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     await unchangedRun(f, 'preparing')
     assert.deepEqual(usageCalls.slice(beforeUsage), [{ ownerId: f.ownerId, connectionId: f.connections.claude_code }])
     assert.deepEqual(decisionCounts(), { profile: before.profile + 1, model: before.model + 1 })
+  })
+  await t.test('task text and offered request fields cannot create host independent-check context', async () => {
+    const f = await fixture(), before = decisionCounts()
+    const offered = { stage: 'review', taskId: f.task.id, requestEpoch: f.sourceEventId, candidateId: randomUUID(), currentOwnerRequest: 'Invented Owner answer' }
+    decisionProfile = f.implement!.id
+    const request = { issueId: f.issueId, stage: 'execute', location: 'cloud' as const, cloudPurpose: 'desktop' as const,
+      independentCheck: offered, note: JSON.stringify({ independentCheck: offered }) }
+    const selected = await profiles.resolveAgentProfileDispatch(pool, f.scope, request)
+    assert.equal(selected.agentProfile?.profileId, f.implement!.id)
+    assert.equal(selected.agentProfile?.source, 'decision')
+    assert.deepEqual(decisionCounts(), { profile: before.profile + 1, model: before.model })
+    const input = JSON.parse(decisionInputs.at(-1)!.input as string)
+    assert.equal(input.task.stage, 'execute'); assert.equal(input.task.note, request.note)
+    assert.equal(input.task.kind, undefined); assert.equal(input.task.candidateId, undefined)
+    assert.equal(input.acceptanceReference, undefined, 'only internal host dependencies supply an independent-check work object')
   })
 })
