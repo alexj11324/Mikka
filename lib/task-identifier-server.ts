@@ -1,31 +1,26 @@
 import 'server-only'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/core'
 import { db } from '@/lib/db'
-import { issuePrefixes, linearIssueLinks, linearTeamSyncs, users } from '@/lib/db/schema'
+import { linearIssueLinks, users } from '@/lib/db/schema'
 import { issueWithMetadata } from '@/lib/issue-metadata'
 import { resolvePersonalPrefix, taskIdentifier, type TaskScope } from '@/lib/task-identifier'
 
 type Executor = Pick<typeof db, 'select'>
 type TaskRef = { id: string; ownerId: string; scope: TaskScope; number?: number | null }
 
-/** Each owner's resolved personal prefix (null when they still have to choose one). */
+/** Each owner's resolved personal prefix (null when they still have to choose one). One query: the owner's email, saved prefix and Linear team keys. */
 export async function personalPrefixes(ownerIds: string[], executor: Executor = db) {
   const ids = [...new Set(ownerIds)]
   const result = new Map<string, string | null>()
   if (!ids.length) return result
-  const [owners, saved, teams] = await Promise.all([
-    executor.select({ id: users.id, email: users.email }).from(users).where(inArray(users.id, ids)),
-    executor.select({ userId: issuePrefixes.userId, prefix: issuePrefixes.prefix }).from(issuePrefixes).where(inArray(issuePrefixes.userId, ids)),
-    executor.select({ ownerId: linearTeamSyncs.ownerId, key: linearTeamSyncs.linearTeamKey }).from(linearTeamSyncs).where(inArray(linearTeamSyncs.ownerId, ids)),
-  ])
-  for (const owner of owners) {
-    result.set(owner.id, resolvePersonalPrefix({
-      saved: saved.find(row => row.userId === owner.id)?.prefix,
-      email: owner.email,
-      linearTeamKeys: teams.filter(team => team.ownerId === owner.id).map(team => team.key),
-    }))
-  }
+  const owners = await executor.select({
+    id: users.id, email: users.email,
+    // Explicit aliases: inside a selected field drizzle drops table names from column references.
+    saved: sql<string | null>`(select p.prefix from issue_prefixes p where p."userId" = "user".id)`,
+    keys: sql<string[] | null>`(select array_agg(l."linearTeamKey") from linear_team_syncs l where l."ownerId" = "user".id)`,
+  }).from(users).where(inArray(users.id, ids))
+  for (const owner of owners) result.set(owner.id, resolvePersonalPrefix({ saved: owner.saved, email: owner.email, linearTeamKeys: owner.keys ?? [] }))
   return result
 }
 
