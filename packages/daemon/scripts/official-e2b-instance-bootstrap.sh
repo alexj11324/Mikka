@@ -88,6 +88,40 @@ if ! command -v codex >/dev/null; then
   if [[ -x "$mikka_codex_root/codex-path/rg" ]]; then ln -s "$mikka_codex_root/codex-path/rg" /opt/mikka/runtime/harness-bin/rg; fi
   chmod -R go+rX /opt/mikka/harness
 fi
+# Only the fresh install path reaches here: staging exits above, an installed
+# marker returns above, and an unknown private worker installation is refused.
+# Persist an empty journal before registration/claim. A rejected first claim
+# never reaches RunJournal.put(), but a later idle refresh still needs a real
+# journal. Existing/legacy worker data is never repaired or overwritten here.
+python3 - <<'MIKKA_INITIAL_WORKER_JOURNAL'
+import os,pathlib,pwd,stat
+home=pathlib.Path('/home/user/.mikka')
+account=pwd.getpwnam('user')
+try:
+    if home.is_symlink():raise RuntimeError()
+    try:home.mkdir(mode=0o700)
+    except FileExistsError:pass
+    else:os.chown(home,account.pw_uid,account.pw_gid)
+    home_fd=os.open(home,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    try:
+        info=os.fstat(home_fd)
+        if info.st_uid!=account.pw_uid or info.st_mode & 0o022:raise RuntimeError()
+        # mkdir must succeed exclusively, including for a dangling symlink.
+        # The directory remains root-owned until its complete journal is safe.
+        os.mkdir('worker',mode=0o700,dir_fd=home_fd)
+        worker_fd=os.open('worker',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=home_fd)
+        try:
+            fd=os.open('runs.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=worker_fd)
+            with os.fdopen(fd,'w') as handle:
+                handle.write('{"version":1,"runs":{}}\n');handle.flush()
+                os.fchmod(handle.fileno(),0o600);os.fchown(handle.fileno(),account.pw_uid,account.pw_gid);os.fsync(handle.fileno())
+            os.fchown(worker_fd,account.pw_uid,account.pw_gid);os.fsync(worker_fd)
+        finally:os.close(worker_fd)
+        os.fsync(home_fd)
+    finally:os.close(home_fd)
+except Exception:
+    raise SystemExit('runtime_initial_journal_refused')
+MIKKA_INITIAL_WORKER_JOURNAL
 ln -s "$mikka_release/source" /opt/mikka/worker
 if [[ "$mikka_kind" = desktop ]]; then
   mkdir -p /opt/mikka/computer/desktop-config/xfce4/xfconf/xfce-perchannel-xml /opt/mikka/computer/desktop-config/autostart

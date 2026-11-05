@@ -23,7 +23,7 @@ An explicit Default choice enters the existing preferred-model dispatcher, prese
 
 The host-only default continuation selector may retain the same structured Default pin, never a different custom Profile. Question answers keep the original frozen native role and session guards; independent review stages keep their own host-selected Profile.
 
-Task availability is requested for the explicitly selected cloud or device destination. A location change invalidates the previous availability result while the host evaluates the new destination; dispatch revalidates it again.
+Task availability is requested for the explicitly selected cloud or device destination. A location change invalidates the previous availability result while the host evaluates the new destination; dispatch revalidates it again. The read-only `checking` allowance state remains selectable and shows a neutral pending status: it requests the existing authoritative check at dispatch, not permission to run. Confirmed refusals, missing reads, disabled or archived Profiles stay unselectable; enabled/archive state takes precedence even over an available or checking projection. The task form sends only the structured Profile reference, never a client availability grant.
 
 The existing thread execution identity dialog shows the frozen Profile name, version, selection source and reason (stored as a code — `capability_fit`, `stage_fit`, `only_suitable` — and worded in the reader's language; a run frozen before the codes reads as the neutral 按任务能力选择). The configuration digest stays in the snapshot but is not shown beside the run's actual Agent, model and credential kind. Opening a thread from a task uses the same dialog. It never reconstructs historical Profile data from the current settings.
 
