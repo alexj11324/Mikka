@@ -4,6 +4,7 @@ import { daemonTestMode, normalizeRepository, remoteKey, repositoryBindingMatche
 import type { PoolClient } from 'pg'
 import { db, withDatabaseClient } from '@/lib/db'
 import { deviceRepos, repositorySettings } from '@/lib/db/schema'
+import { ownerListChanged } from './live/lists'
 
 /** A scheduling record, not an allow-list or a path on the person's machine. */
 export async function ensureDeviceRepository(userId: string, deviceId: string, input: string, existing?: PoolClient) {
@@ -25,6 +26,7 @@ export async function ensureDeviceRepository(userId: string, deviceId: string, i
       const [updated] = await tx.update(deviceRepos).set({ repoPath: repository.key })
         .where(and(eq(deviceRepos.id, existing.id), eq(deviceRepos.userId, userId))).returning()
       if (!updated) throw new Error('Repository unavailable')
+      await ownerListChanged(tx, userId, ['device_list'])
       return updated
     }
     const [row] = await tx.insert(deviceRepos).values({
@@ -32,6 +34,7 @@ export async function ensureDeviceRepository(userId: string, deviceId: string, i
       remoteUrl: repository.remoteUrl, baseBranch: null, verifyCommand: null,
     }).onConflictDoNothing({ target: [deviceRepos.deviceId, deviceRepos.repoPath] }).returning()
     if (!row) throw new Error('Repository unavailable')
+    await ownerListChanged(tx, userId, ['device_list'])
     return row
   }
   return existing ? withDatabaseClient(existing, () => prepare(db)) : db.transaction(prepare)

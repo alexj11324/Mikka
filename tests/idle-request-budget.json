@@ -13,7 +13,7 @@
       "coordinator.pollCoordinatorChat": { "max": 2, "tracking": "#1212", "why": "chat poll every 30 s while quiet (lib/coordinator/chat-poll-interval.ts)" }
     },
     "devices": {
-      "agents.listDevices": { "max": 11, "tracking": "#1212", "why": "device list, refreshInterval 5 s" }
+      "agents.pollDevices": { "max": 1, "tracking": "#1212", "why": "a device online through the gateway has no write when it goes offline, so the list keeps the shared 60 s live fallback while one is; every other device change is pushed (device_list)" }
     },
     "artifact-viewer": {
       "artifacts.getArtifact": { "max": 4, "tracking": "#1212", "why": "artifact detail, refreshInterval 15 s" }

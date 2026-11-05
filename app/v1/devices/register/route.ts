@@ -7,6 +7,7 @@ import { db, pool } from '@/lib/db'
 import { ensureDeviceAgents } from '@/lib/device-agents'
 import { devices } from '@/lib/db/schema'
 import { authenticateDevice, linkDeviceToken, WORKSPACE_ID } from '@/lib/device-link'
+import { ownerListChanged } from '@/lib/live/lists'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,6 +39,7 @@ async function handlePOST(request: Request) {
     // A name the person chose in settings outlives the daemon's hostname.
     await db.update(devices).set({ ...fields, name: sql`CASE WHEN ${devices.nameLocked} THEN ${devices.name} ELSE ${info.name} END` }).where(eq(devices.id, info.deviceId))
     await ensureDeviceAgents(pool, caller.userId, info.deviceId, info.harnesses)
+    await ownerListChanged(db, caller.userId, ['device_list'])
     return NextResponse.json({ deviceId: info.deviceId, workspaceId: caller.scopeWorkspaceId ?? WORKSPACE_ID })
   }
   if (caller.scopeDeviceId) return NextResponse.json({ error: 'Cloud device is unavailable.' }, { status: 403 })
@@ -45,6 +47,7 @@ async function handlePOST(request: Request) {
   await db.insert(devices).values({ id: deviceId, ownerId: caller.userId, name: info.name, ...fields })
   await linkDeviceToken(caller, deviceId)
   await ensureDeviceAgents(pool, caller.userId, deviceId, info.harnesses)
+  await ownerListChanged(db, caller.userId, ['device_list'])
   return NextResponse.json({ deviceId, workspaceId: caller.scopeWorkspaceId ?? WORKSPACE_ID })
 }
 

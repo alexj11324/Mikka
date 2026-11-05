@@ -17,6 +17,8 @@ import {
 } from '@/lib/db/schema'
 import { issueDeviceToken } from '@/lib/device-link'
 import { deviceOnlineStates } from '@/lib/device-presence'
+import { DEVICE_ONLINE_WINDOW_MS, isDeviceOnline } from '@mikka/protocol/device'
+import { ownerListRead } from '@/lib/live/list-read-server'
 import { removeOwnedDevice, renameOwnedDevice } from '@/lib/device-removal'
 import { enqueueDeviceCommand, type DeviceCommandKind } from '@/lib/device-management'
 import { listSshHosts } from '@/lib/ssh'
@@ -77,7 +79,22 @@ export interface AgentView {
 
 /** Every local device this person owns, with its repository history. */
 export async function listDevices(): Promise<DeviceView[]> {
+  return (await readDevices(await getUserId())).devices
+}
+
+/**
+ * The device list for 设备 settings, with when to read it again. Registration, a rename,
+ * enable/disable, removal, a repository and a device coming back online push `device_list`.
+ * Going offline writes nothing: a heartbeat device's lapse is a deadline, and a device
+ * online through the gateway keeps the 60 s fallback while it is (presenceFallback).
+ */
+export async function pollDevices() {
   const userId = await getUserId()
+  const { devices: items, expiries, gatewayOnline, observedAt } = await readDevices(userId)
+  return { devices: items, live: await ownerListRead(userId, expiries, observedAt), presenceFallback: gatewayOnline }
+}
+
+async function readDevices(userId: string) {
   const rows = await db.select({
     id: devices.id, name: devices.name, deviceType: devices.deviceType, hostname: devices.hostname, platform: devices.platform, arch: devices.arch,
     harnesses: devices.harnesses, lastSeenAt: devices.lastSeenAt, enabled: devices.enabled,
@@ -87,8 +104,12 @@ export async function listDevices(): Promise<DeviceView[]> {
       id: deviceRepos.id, deviceId: deviceRepos.deviceId, repoPath: deviceRepos.repoPath, baseBranch: deviceRepos.baseBranch, verifyCommand: deviceRepos.verifyCommand,
     }).from(deviceRepos).where(inArray(deviceRepos.deviceId, rows.map(row => row.id)))
     : []
-  const presence = await deviceOnlineStates(rows)
-  return rows.map(device => ({
+  const observedAt = Date.now()
+  const presence = await deviceOnlineStates(rows, observedAt)
+  const heartbeat = (device: (typeof rows)[number]) => isDeviceOnline(device.lastSeenAt, observedAt)
+  const expiries = rows.flatMap(device => device.lastSeenAt && heartbeat(device) ? [device.lastSeenAt.getTime() + DEVICE_ONLINE_WINDOW_MS] : [])
+  const gatewayOnline = rows.some(device => presence.get(device.id) && !heartbeat(device))
+  const views: DeviceView[] = rows.map(device => ({
     id: device.id, name: device.name, deviceType: device.deviceType, hostname: device.hostname, platform: device.platform, arch: device.arch,
     harnesses: device.harnesses, lastSeenAt: device.lastSeenAt, enabled: device.enabled,
     online: presence.get(device.id) ?? false,
@@ -96,6 +117,7 @@ export async function listDevices(): Promise<DeviceView[]> {
       id: repo.id, repoPath: repo.repoPath, baseBranch: repo.baseBranch, verifyCommand: repo.verifyCommand,
     })),
   }))
+  return { devices: views, expiries, gatewayOnline, observedAt }
 }
 
 /** Mints a device token. The plaintext is returned once and never stored. */
@@ -127,7 +149,7 @@ export async function setDeviceEnabled(input: { deviceId: string; enabled: boole
     const changed = await db.update(devices)
       .set({ enabled: parsed.data.enabled, updatedAt: new Date() })
       .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt))).returning({ id: devices.id })
-    if (changed.length) await ownerListChanged(db, userId, ['thread_list'])
+    if (changed.length) await ownerListChanged(db, userId, ['thread_list', 'device_list'])
     return { success: true }
   })
 }
