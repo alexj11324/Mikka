@@ -1,0 +1,35 @@
+{
+  "observedAt": "2026-11-05 00:34:44 UTC",
+  "cc": {
+    "issue": "f1cf0a76-55c7-4281-9e4f-45e1aec970b9",
+    "task": "6af27d99-6a87-489b-9fcc-1ab4bb5654eb",
+    "run": "a36b720f-457d-4adb-86d2-764c71895692",
+    "url": "https://app.aspectlylabs.com/mikka/en?thread=a36b720f-457d-4adb-86d2-764c71895692",
+    "model": "claude-haiku-5-5",
+    "route": "claude_code_cli",
+    "file": "mikka-1284-cc-ready.txt",
+    "bytes": 31,
+    "sha256": "2e17c96148b6c268a52d6be7394c4b7ae8f32120933da541492ea7d42492ba4f",
+    "criteria": "5/5",
+    "review": "Merge suggested",
+    "verify": "Passed 5/5",
+    "ownerAccepted": true
+  },
+  "codex": {
+    "issue": "3f3b8609-03c1-4f0f-ad52-a637d94fc561",
+    "task": "102db619-717f-4c42-beec-759092bd50fb",
+    "run": "2254e9cd-29bf-4711-8ac7-03a929ad4cf0",
+    "url": "https://app.aspectlylabs.com/mikka/en?thread=2254e9cd-29bf-4711-8ac7-03a929ad4cf0",
+    "model": "gpt-6-luna",
+    "route": "codex_cli",
+    "file": "mikka-1284-codex-ready.txt",
+    "bytes": 34,
+    "sha256": "759e95464752666d035734902a3b173cd35ce27b82cffe0a4407eaf5d484fc57",
+    "criteria": "1/1",
+    "review": "Merge suggested",
+    "verify": "Passed 1/1",
+    "ownerAccepted": true
+  },
+  "scope": "Existing production subscription connectivity and native execution before Profile deployment; not new feature acceptance.",
+  "api": "Skipped at explicit user request; no balance probe or paid model call."
+}
