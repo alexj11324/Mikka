@@ -113,18 +113,18 @@ test('a shared subscription allowance check uses the authorized row action witho
 
 test('each 运行位置 says the order it tries, then where a new run goes first', async () => {
   await render()
-  assert.ok(container.textContent?.includes('orderCloud · first'))
+  assert.ok(container.textContent?.includes('orderCloudclauseSeparatorfirst'))
   await act(async () => root.unmount())
   root = createRoot(container)
   data = { ...data, location: 'local', cloudReady: false, first: { kind: 'device', id: randomUUID(), name: 'Box', server: true } }
   await render()
-  assert.ok(container.textContent?.includes('orderLocal · first'))
+  assert.ok(container.textContent?.includes('orderLocalclauseSeparatorfirst'))
   assert.ok(button('openDevices') === undefined && container.querySelector('a')?.textContent === 'openDevices', '打开设备 sits on the 运行位置 row when a computer takes the run')
   await act(async () => root.unmount())
   root = createRoot(container)
   data = { ...data, first: null }
   await render()
-  assert.ok(container.textContent?.includes('orderLocal · nowhere'))
+  assert.ok(container.textContent?.includes('orderLocalclauseSeparatornowhereLocal'))
 })
 
 test('云端 without an E2B key: rows stay ready, the 运行位置 line says where runs go instead, and its button opens the key dialog', async () => {
@@ -133,7 +133,7 @@ test('云端 without an E2B key: rows stay ready, the 运行位置 line says whe
   await render()
   assert.equal(container.querySelector('li [role="status"]')?.textContent, 'ready')
   assert.ok(![...container.querySelectorAll('li button')].some(item => item.textContent === 'setE2BKey'), 'the key is the 运行位置 row\'s, not each model\'s')
-  assert.ok(container.textContent?.includes('orderCloud · noKeyFirst'))
+  assert.ok(container.textContent?.includes('orderCloudclauseSeparatornoKeyFirst'))
   await act(async () => button('setE2BKey')!.click())
   assert.equal(container.querySelector('[role="dialog"]')?.textContent, 'E2B key')
 })

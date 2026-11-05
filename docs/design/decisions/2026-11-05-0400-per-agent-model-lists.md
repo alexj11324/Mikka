@@ -41,3 +41,16 @@ response updates the page that sent it.
 minute as unknown. The page shows the last reading for 15 minutes
 (`QUOTA_DISPLAY_MS`), so 检查额度 changes the row at once; older than that,
 or a used-up window whose reset has passed, reads 待检查 again.
+
+**Plain words on this page** (Alex, the same day: he could not follow
+「这个工作区 / 分享给团队成员」 or 「依次用：云端 → 服务器 → 电脑 · 没有能跑的位置」).
+Every row says what it is and what happens when it is on or picked:
+
+- The share switch is 「分享我的订阅给团队成员」 under 「团队共享」. Its line is
+  always shown: 「<工作区> 的成员也能用你的 <Claude、ChatGPT> 订阅跑任务，用量算在你的额度上」,
+  naming the connected subscriptions; on, 「已分享 <…> 订阅 · 成员跑任务时凭据会临时放到他们的电脑上」.
+- 运行位置 reads 「任务先在云端跑，云端不行就换服务器，再不行用你的电脑；现在会先用 <位置>」
+  (本地: 「任务先在你的服务器跑，没有服务器就用你的电脑」); nothing available:
+  「现在三个都没有可用的」 / 「现在两个都没有可用的」.
+- 优先使用的模型: 「任务从上往下选第一个现在能用的模型」; 优先使用的 Agent:
+  「任务先交给它，按它的模型顺序选；它跑不了就换另一个」.

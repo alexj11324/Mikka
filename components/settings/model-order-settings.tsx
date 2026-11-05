@@ -123,7 +123,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   // The order each location tries (decision 2026-11-02-2330), then where a new run goes now (会先用, the same plan as dispatch).
   const first = data.first ? data.first.kind === 'cloud' ? t('cloud') : data.first.name : null
   const noKey = data.location === 'cloud' && e2b.configured === false
-  const locationLine = `${t(data.location === 'cloud' ? 'orderCloud' : 'orderLocal')} · ${first === null ? t('nowhere') : noKey ? t('noKeyFirst', { place: first }) : t('first', { place: first })}`
+  const locationLine = `${t(data.location === 'cloud' ? 'orderCloud' : 'orderLocal')}${t('clauseSeparator')}${first === null ? t(data.location === 'cloud' ? 'nowhere' : 'nowhereLocal') : noKey ? t('noKeyFirst', { place: first }) : t('first', { place: first })}`
   // R1: what fixes or explains the location sits on its row: 填入 E2B Key for 云端 without one; else 打开设备 when a computer would take the run or nothing would.
   const locationAction = noKey
     ? <Button type="button" variant="secondary" size="sm" onClick={() => setKeyOpen(true)}>{t('setE2BKey')}</Button>
@@ -151,7 +151,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
         </span>
       </SettingRow>
       {/* The person's own E2B key, whatever the location: 云端 runs and the bot's own cloud computer both use it (coordinator, 2026-11-02). */}
-      {e2b.configured !== undefined && <SettingRow title={t('e2bKey')}>
+      {e2b.configured !== undefined && <SettingRow title={t('e2bKey')} description={t('e2bKeyHint')}>
         <span className="flex items-center gap-3">
           <span role="status" className="text-sm text-muted-foreground">{e2b.configured ? t('e2bKeySet') : t('e2bKeyMissing')}</span>
           <Button type="button" variant="secondary" size="sm" onClick={() => setKeyOpen(true)}>{e2b.configured ? t('e2bKeyReplace') : t('e2bKeyFill')}</Button>
