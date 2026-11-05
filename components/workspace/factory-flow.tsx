@@ -12,7 +12,8 @@ import { Stepper, StepperIndicator, StepperItem, StepperNav, StepperSeparator, S
 import { InlineLoadError } from '@/components/load-error'
 import { useLiveKey } from '@/hooks/use-live-key'
 import type { AcceptanceDetail } from '@/lib/factory/acceptance-view'
-import { approveSpecConfirmed, approveSpecError, flowKey, flowTone, pullRequestLink, readFlow, type ApproveSpecError, type FactoryFlow, type FlowStage, type NeedsYouKind } from '@/lib/factory/flow-client'
+import { approveSpecConfirmed, approveSpecError, approveSpecErrorCode, approveSpecErrorKey, flowKey, flowTone, pullRequestLink, readFlow, type ApproveSpecFailure, type FactoryFlow, type FlowStage, type NeedsYouKind } from '@/lib/factory/flow-client'
+import { RunErrorDetails } from './run-error-text'
 import { RequestError, request, type FactoryTask } from './factory-acceptance-pane'
 import { navigate, openArtifact } from './workspace-navigation'
 
@@ -69,7 +70,7 @@ function StageList({ flow }: { flow: FactoryFlow }) {
   </Stepper>
 }
 
-type Approval = { busy: boolean; error: { kind: ApproveSpecError; revision: number } | null }
+type Approval = { busy: boolean; error: (ApproveSpecFailure & { revision: number }) | null }
 
 /**
  * A v2 Factory task on its task page (Figma 946:1560, 947:1786): one block
@@ -95,7 +96,7 @@ export function FactoryFlowCard({ task, detail, onOpenThread }: { task: FactoryT
   const specRunId = detail?.attempts?.find(attempt => attempt.id === detail.task?.attemptId)?.runId ?? null
   const pr = pullRequestLink(flow)
   const kind = flow.needsYou?.kind
-  const shownError = approval.error && (approval.error.kind === 'stale' || approval.error.revision === flow.revision) ? approval.error.kind : null
+  const shownError = approval.error && (approval.error.kind === 'stale' || approval.error.revision === flow.revision) ? approval.error : null
 
   async function approve(current: FactoryFlow) {
     if (busy.current) return
@@ -104,18 +105,20 @@ export function FactoryFlowCard({ task, detail, onOpenThread }: { task: FactoryT
     if (!click.current || click.current.revision !== current.revision) click.current = { revision: current.revision, eventId: crypto.randomUUID() }
     const { revision, eventId } = click.current
     setApproval({ busy: true, error: null })
-    let failure: ApproveSpecError | null = null
+    let failure: ApproveSpecFailure | null = null
     try {
       const receipt = await request(key, { operation: 'approve_spec', input: { binding: { taskId: task.id, revision }, eventId } })
       if (approveSpecConfirmed(receipt, task.id)) click.current = null
-      else failure = 'unknown'
+      else failure = approveSpecError(null, null)
     } catch (caught) {
-      failure = caught instanceof RequestError ? approveSpecError(caught.code, caught.status) : 'unknown'
-      // A refusal is final for this click; only an unanswered one is retried as itself.
-      if (failure !== 'unknown') click.current = null
+      failure = caught instanceof RequestError
+        ? approveSpecError(caught.code, caught.status, typeof caught.body.detail === 'string' ? caught.body.detail : null)
+        : approveSpecError(null, null)
+      // A refusal the server gave is final for this click; only an unanswered one is retried as itself.
+      if (failure.kind !== 'unknown') click.current = null
     } finally {
       busy.current = false
-      setApproval({ busy: false, error: failure ? { kind: failure, revision } : null })
+      setApproval({ busy: false, error: failure ? { ...failure, revision } : null })
       await Promise.all([mutate(), revalidate(taskDetailKey(task.id)), revalidate(tasksKey(task.issueId))]).catch(() => undefined)
     }
   }
@@ -129,14 +132,17 @@ export function FactoryFlowCard({ task, detail, onOpenThread }: { task: FactoryT
         </div>
         <StageList flow={flow} />
         {(kind === 'blocked' || kind === 'failed') && task.reason && <ItemDescription>{task.reason}</ItemDescription>}
-        {shownError && <p role="alert" className="flex items-center gap-1.5 text-sm text-destructive-foreground"><CircleAlert aria-hidden="true" className="size-4 shrink-0" />{t(`card.approveError.${shownError}`)}</p>}
+        {shownError && <div role="alert" className="flex flex-col items-start">
+          <p className="flex items-center gap-1.5 text-sm text-destructive-foreground"><CircleAlert aria-hidden="true" className="size-4 shrink-0" />{t(`card.approveError.${approveSpecErrorKey(shownError)}` as 'card.approveError.unknown')}</p>
+          {approveSpecErrorCode(shownError) && <RunErrorDetails code={approveSpecErrorCode(shownError)!} />}
+        </div>}
       </ItemContent>
       <ItemActions className="flex-wrap">
         {kind === 'spec_review' && <>
           {specRunId && <Button size="sm" variant="secondary" onClick={() => onOpenThread(specRunId)}>{t('card.openSpec')}</Button>}
           <Button size="sm" disabled={approval.busy} aria-busy={approval.busy} onClick={() => { void approve(flow) }}>
-            {approval.busy ? <Spinner data-icon="inline-start" /> : shownError === 'unknown' ? <RefreshCw data-icon="inline-start" aria-hidden="true" /> : <Check data-icon="inline-start" aria-hidden="true" />}
-            {shownError === 'unknown' ? t('card.retryApprove') : t('card.approveSpec')}
+            {approval.busy ? <Spinner data-icon="inline-start" /> : shownError?.kind === 'unknown' ? <RefreshCw data-icon="inline-start" aria-hidden="true" /> : <Check data-icon="inline-start" aria-hidden="true" />}
+            {shownError?.kind === 'unknown' ? t('card.retryApprove') : t('card.approveSpec')}
           </Button>
         </>}
         {kind === 'question' && flow.botId && <Button size="sm" onClick={() => navigate({ section: 'coordinator', bot: flow.botId, issue: null })}><MessageCircleQuestion data-icon="inline-start" aria-hidden="true" />{t('card.answer')}</Button>}

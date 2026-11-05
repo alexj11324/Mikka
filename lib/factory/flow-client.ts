@@ -46,23 +46,47 @@ export function flowTone(flow: Pick<FactoryFlow, 'stage' | 'needsYou'>): StatusT
 export const pullRequestLink = (flow: Pick<FactoryFlow, 'pullRequest'>) =>
   flow.pullRequest && /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+$/.test(flow.pullRequest.url) ? flow.pullRequest.url : null
 
+/** The closed set of reasons the host gives with `agentProfileModelUnavailable` (lib/factory/agent-profile.ts). */
+export const PROFILE_MODEL_DETAILS = ['checking', 'quota', 'expired', 'paused', 'missing', 'removed', 'model_gone', 'key_refused', 'balance', 'provider_unavailable'] as const
+export type ProfileModelDetail = typeof PROFILE_MODEL_DETAILS[number]
+
 /**
- * What an `approve_spec` refusal means to the person. `stale`: the task moved
- * on (a newer revision), so the card reloads and a new click is a new event.
- * `unknown`: no answer arrived; the server may have approved, so the same
- * click (same eventId) is retried and its receipt comes back.
+ * What an `approve_spec` answer means to the person. Every answer the server
+ * actually gave is final for that click: `stale` (the task moved on), the
+ * Factory refusals, an executor Profile or its model being unavailable, or any
+ * other coded refusal. Only `unknown` (no answer, or a server error) keeps the
+ * click: the server may have approved, so the same eventId is sent again and
+ * its receipt comes back.
  */
-export type ApproveSpecError = 'stale' | 'transition' | 'evidence' | 'signedOut' | 'notFound' | 'unknown'
-export function approveSpecError(code: string | null, status: number | null): ApproveSpecError {
+export type ApproveSpecError = 'stale' | 'transition' | 'evidence' | 'signedOut' | 'notFound' | 'profileModel' | 'profile' | 'refused' | 'unknown'
+export interface ApproveSpecFailure { kind: ApproveSpecError; code: string | null; detail: string | null }
+
+export function approveSpecError(code: string | null, status: number | null, detail: string | null = null): ApproveSpecFailure {
+  const failure = (kind: ApproveSpecError): ApproveSpecFailure => ({ kind, code, detail: kind === 'unknown' ? null : detail })
   switch (code) {
-    case 'factoryStale': case 'factoryReplayMismatch': return 'stale'
-    case 'factoryTransition': return 'transition'
-    case 'factoryEvidenceRequired': return 'evidence'
-    case 'factoryHumanRequired': case 'originRejected': return 'signedOut'
-    case 'factoryNotFound': return 'notFound'
+    case 'factoryStale': case 'factoryReplayMismatch': return failure('stale')
+    case 'factoryTransition': return failure('transition')
+    case 'factoryEvidenceRequired': return failure('evidence')
+    case 'factoryHumanRequired': case 'originRejected': return failure('signedOut')
+    case 'factoryNotFound': return failure('notFound')
+    case 'agentProfileModelUnavailable': return failure('profileModel')
   }
-  return status === 401 || status === 403 ? 'signedOut' : status === 404 ? 'notFound' : 'unknown'
+  if (status === null || status >= 500) return failure('unknown')
+  if (code?.startsWith('agentProfile')) return failure('profile')
+  if (status === 401 || status === 403) return failure('signedOut')
+  if (status === 404) return failure('notFound')
+  return failure('refused')
 }
+
+/** The message key under `FactoryFlow.card.approveError` for a failure. */
+export function approveSpecErrorKey(failure: ApproveSpecFailure): string {
+  if (failure.kind !== 'profileModel') return failure.kind
+  return `profileModel.${PROFILE_MODEL_DETAILS.includes(failure.detail as ProfileModelDetail) ? failure.detail : 'default'}`
+}
+
+/** A coded refusal shows its code (and detail) under 详情; stale and unknown carry nothing to look up. */
+export const approveSpecErrorCode = (failure: ApproveSpecFailure) =>
+  failure.kind === 'unknown' || failure.kind === 'stale' || !failure.code ? null : failure.detail ? `${failure.code} · ${failure.detail}` : failure.code
 
 /** A successful approval: the host's receipt for this click, now in 实现. */
 export function approveSpecConfirmed(value: unknown, taskId: string): boolean {

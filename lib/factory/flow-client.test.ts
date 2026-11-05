@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { approveSpecConfirmed, approveSpecError, flowTone, pullRequestLink, readFlow } from './flow-client'
+import { approveSpecConfirmed, approveSpecError, approveSpecErrorCode, approveSpecErrorKey, flowTone, pullRequestLink, readFlow } from './flow-client'
 
 const flow = (patch: Record<string, unknown> = {}) => ({ version: 2, id: 't1', issueId: 'i1', botId: 'b1', revision: 4, stage: 'spec', stages: ['spec'], review: null, acceptance: null, pullRequest: null, ...patch })
 
@@ -25,16 +25,33 @@ test('needing the person is amber, a stop is red, a merge is green (R-87)', () =
   assert.equal(flowTone({ stage: 'cancelled' }), 'neutral')
 })
 
-test('an approval refusal is final; only a missing answer keeps the click', () => {
-  assert.equal(approveSpecError('factoryStale', 409), 'stale')
-  assert.equal(approveSpecError('factoryReplayMismatch', 409), 'stale')
-  assert.equal(approveSpecError('factoryTransition', 409), 'transition')
-  assert.equal(approveSpecError('factoryEvidenceRequired', 409), 'evidence')
-  assert.equal(approveSpecError('factoryHumanRequired', 401), 'signedOut')
-  assert.equal(approveSpecError('originRejected', 403), 'signedOut')
-  assert.equal(approveSpecError('factoryNotFound', 404), 'notFound')
-  assert.equal(approveSpecError('factoryUnavailable', 500), 'unknown')
-  assert.equal(approveSpecError(null, null), 'unknown')
+test('every answered refusal is final; only a missing answer keeps the click', () => {
+  const kind = (code: string | null, status: number | null, detail?: string) => approveSpecError(code, status, detail).kind
+  assert.equal(kind('factoryStale', 409), 'stale')
+  assert.equal(kind('factoryReplayMismatch', 409), 'stale')
+  assert.equal(kind('factoryTransition', 409), 'transition')
+  assert.equal(kind('factoryEvidenceRequired', 409), 'evidence')
+  assert.equal(kind('factoryHumanRequired', 401), 'signedOut')
+  assert.equal(kind('originRejected', 403), 'signedOut')
+  assert.equal(kind('factoryNotFound', 404), 'notFound')
+  assert.equal(kind('agentProfileModelUnavailable', 409, 'quota'), 'profileModel')
+  assert.equal(kind('agentProfileDisabled', 409), 'profile')
+  assert.equal(kind('agentProfileDecisionUnavailable', 409, 'decision_unavailable'), 'profile')
+  assert.equal(kind('somethingNew', 409), 'refused')
+  assert.equal(kind('factoryUnavailable', 500), 'unknown')
+  assert.equal(kind(null, null), 'unknown')
+})
+
+test('a model refusal keeps its code and detail for the copy and 详情', () => {
+  const quota = approveSpecError('agentProfileModelUnavailable', 409, 'quota')
+  assert.deepEqual(quota, { kind: 'profileModel', code: 'agentProfileModelUnavailable', detail: 'quota' })
+  assert.equal(approveSpecErrorKey(quota), 'profileModel.quota')
+  assert.equal(approveSpecErrorCode(quota), 'agentProfileModelUnavailable · quota')
+  assert.equal(approveSpecErrorKey(approveSpecError('agentProfileModelUnavailable', 409, 'not-a-detail')), 'profileModel.default')
+  assert.equal(approveSpecErrorKey(approveSpecError('agentProfileDisabled', 409)), 'profile')
+  assert.equal(approveSpecErrorCode(approveSpecError('agentProfileDisabled', 409)), 'agentProfileDisabled')
+  assert.equal(approveSpecErrorCode(approveSpecError('factoryStale', 409)), null)
+  assert.equal(approveSpecErrorCode(approveSpecError(null, null)), null)
 })
 
 test('the receipt must name this task and the implementation stage', () => {

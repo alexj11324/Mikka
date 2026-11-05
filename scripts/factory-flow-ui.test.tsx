@@ -149,6 +149,32 @@ test('a refused approval names why with its own copy', async () => {
   assert.ok(button('批准方案'))
 })
 
+test('a 409 quota refusal names the model problem, shows its code and ends the click', async () => {
+  flow = specFlow()
+  await render()
+  await withFetch([json(409, { error: 'agentProfileModelUnavailable', detail: 'quota' }), json(200, { binding: { taskId: TASK, revision: 6 }, stage: 'implement' })], async sent => {
+    await act(async () => { button('批准方案')!.click() })
+    const alert = document.querySelector('[role="alert"]')?.textContent ?? ''
+    assert.match(alert, /执行模型的额度已用完/)
+    assert.doesNotMatch(alert, /批准未确认/)
+    assert.match(alert, /详情/)
+    assert.equal(button('重新确认'), undefined)
+    // The refusal ended that click; the next one is a new event.
+    await act(async () => { button('批准方案')!.click() })
+    assert.equal(sent.length, 2)
+    assert.notEqual(sent[1].body.input.eventId, sent[0].body.input.eventId)
+  })
+})
+
+test('every Profile model detail has copy in both languages', () => {
+  const en = JSON.parse(readFileSync(new URL('../messages/en.json', import.meta.url), 'utf8'))
+  for (const messages of [zh, en]) {
+    const copy = messages.FactoryFlow.card.approveError
+    for (const key of ['default', 'checking', 'quota', 'expired', 'paused', 'missing', 'removed', 'model_gone', 'key_refused', 'balance', 'provider_unavailable']) assert.equal(typeof copy.profileModel[key], 'string', key)
+    for (const key of ['stale', 'transition', 'evidence', 'signedOut', 'notFound', 'profile', 'refused', 'unknown']) assert.equal(typeof copy[key], 'string', key)
+  }
+})
+
 test('handoff shows the report counts and opens the acceptance Artifact', async () => {
   flow = specFlow({ stage: 'handoff', stages: ['implement', 'review', 'handoff'], needsYou: { kind: 'pr_review', since: '2026-11-05T00:00:00.000Z' },
     acceptance: { artifactId: 'art-1', version: 2, runId: 'r', candidateId: 'c', counts: { passed: 4, unverified: 1, failed: 0 }, media: [] } })
