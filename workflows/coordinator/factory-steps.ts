@@ -1,12 +1,14 @@
 import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
 import { and,desc,eq,isNull } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { coordinatorEvents } from '@/lib/db/schema'
 import { createIssueFromRequest } from '@/lib/coordinator/issue-create'
 import { FactoryError, type FactoryBinding, type FactoryRoute } from '@/lib/factory/contract'
 import type { FactoryDispatchInput } from '@/lib/factory/dispatch'
 import { factoryEventId } from '@/lib/factory/event-id'
+import { readFactoryTaskView } from '@/lib/factory/public-task'
+import { publicFactoryReceipt } from '@/lib/factory/public-receipt'
 import { dispatchFactoryRun, factoryStore, factoryQuestions } from '@/lib/factory/server'
 import type { QuestionReference, ContextQuestionAnswer } from '@/lib/factory/questions/contract'
 import { improvementStore, skillAssignments, improvementFactory, skillRegistry, skillEvaluations } from '@/lib/self-improvement/server'
@@ -27,7 +29,7 @@ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
 export async function dispatchRun(userId: string, input: FactoryDispatchInput, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(() => dispatchFactoryRun(userId, input))
+  return asToolResult(async () => publicFactoryReceipt(await dispatchFactoryRun(userId, input)))
 }
 
 export async function selectBaselineSkill(userId: string, input: { runId:string }, scope?: NativeToolScope) {
@@ -69,7 +71,10 @@ export async function skillEvaluation(userId: string, input: SkillEvaluationComm
 export async function dispatchBaselineRehearsal(userId:string,input:Omit<ImprovementRehearsal,'action'>, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(()=>improvementFactory.rehearse(userId,{action:'rehearse',...input}))
+  return asToolResult(async()=> {
+    const result = await improvementFactory.rehearse(userId,{action:'rehearse',...input})
+    return { ...publicFactoryReceipt(result), selection: result.selection, productionEligible: result.productionEligible }
+  })
 }
 
 export async function recordRunFeedback(userId: string, input: Omit<Feedback,'action'>, scope?: NativeToolScope) {
@@ -93,13 +98,19 @@ export async function readRunImprovements(userId: string, input: { runId:string 
 export async function handoffSkillImprovement(userId: string, input: Omit<ImprovementHandoff,'action'>, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(() => improvementFactory.handoff(userId,{ action:'handoff',...input }))
+  return asToolResult(async () => {
+    const result = await improvementFactory.handoff(userId,{ action:'handoff',...input })
+    return { ...publicFactoryReceipt(result), proposalId: result.proposalId, productionEligible: result.productionEligible }
+  })
 }
 
 export async function getSkillImprovementFactory(userId: string, input: { proposalId:string }, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(() => improvementFactory.status(userId,input.proposalId))
+  return asToolResult(async () => {
+    const result = await improvementFactory.status(userId,input.proposalId)
+    return { ...result, factory: publicFactoryReceipt(result.factory) }
+  })
 }
 
 export async function listFactoryRequests(userId: string, scope?: NativeToolScope) {
@@ -142,7 +153,7 @@ export async function createIssueFromRequestStep(userId: string, input: { source
 export async function routeFactoryTask(userId: string, input: Omit<FactoryRoute,'eventId'>, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(() => factoryStore.route(userId,{...input,eventId:input.sourceEventId}))
+  return asToolResult(async () => publicFactoryReceipt(await factoryStore.route(userId,{...input,eventId:input.sourceEventId})))
 }
 
 type CoordinatorQuestionReference = Pick<QuestionReference, 'questionId' | 'questionRevision'>
@@ -166,7 +177,7 @@ export async function getFactoryTask(
   'use step'
   await assertNativeToolScope(userId,scope)
   return asToolResult(async () => ({
-    ...(await factoryStore.read(userId, input.taskId)),
+    ...(await readFactoryTaskView(pool, factoryStore, userId, input.taskId)),
     questions: (await factoryQuestions.list(userId, input.taskId)).map(coordinatorQuestion),
   }))
 }
@@ -252,11 +263,11 @@ export async function resolveFactoryTask(userId: string, input: { binding: Facto
   'use step'
   await assertNativeToolScope(userId,scope)
   const {binding,...resolution} = input
-  return asToolResult(() => factoryStore.apply(userId,binding,input.sourceEventId,{action:'resolve',...resolution}))
+  return asToolResult(async () => publicFactoryReceipt(await factoryStore.apply(userId,binding,input.sourceEventId,{action:'resolve',...resolution})))
 }
 
 export async function stopFactoryTask(userId: string, input: { binding: FactoryBinding; reason: string; action: 'cancel' | 'revoke' }, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(() => factoryStore.apply(userId,input.binding,factoryEventId(input.action,input.binding.attemptId),{action:input.action,reason:input.reason}))
+  return asToolResult(async () => publicFactoryReceipt(await factoryStore.apply(userId,input.binding,factoryEventId(input.action,input.binding.attemptId),{action:input.action,reason:input.reason})))
 }

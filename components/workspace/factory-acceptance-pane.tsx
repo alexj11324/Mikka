@@ -8,11 +8,10 @@ import { CircleAlert, CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, L
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
-import { withBasePath } from '@/lib/base-path'
 import { useViewState } from '@/lib/hooks/view-state'
 import { cn } from '@/lib/utils'
 import type { PublicationEnvironment } from '@/lib/factory/vercel-target'
-import { acceptanceState, mergeAcceptance, type AcceptanceMerge, type AcceptanceState } from '@/lib/factory/acceptance-state'
+import { acceptanceState, flowMergeAcceptance, mergeAcceptance, type AcceptanceMerge, type AcceptanceState } from '@/lib/factory/acceptance-state'
 import { canReject, closedReject, rejectFlow } from '@/lib/factory/reject-flow'
 import { evidenceEntries, orderEvidence, type EvidenceEntry } from '@/lib/factory/evidence-view'
 import { bareUrl, candidateCheckRetry, candidateCheckRetryConfirmed, candidateCheckState, criterionGroups, pullNumber, resultRows, type AcceptanceDetail, type CriterionGroup, type ResultRow } from '@/lib/factory/acceptance-view'
@@ -23,6 +22,10 @@ import { PullRequestIcon } from './pull-request-icon'
 import { ShortSha, shortSha } from './short-sha'
 import { FieldError } from '@/components/ui/field'
 import { RunErrorDetails } from './run-error-text'
+import { RequestError, request } from '@/lib/factory/browser-request'
+import { isFlowV2, useFactoryFlow } from './factory-flow'
+
+export { RequestError, request } from '@/lib/factory/browser-request'
 
 type Candidate = { sha: string | null; kind?: 'repository' | 'report' | 'deliverable'; repository: string; environment: string; scope: string }
 export type FactoryTask = { id: string; issueId: string; stage: string; status: string; reason: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean; revision?: number; attemptId?: string; completionRecovery?: AcceptanceDetail['completionRecovery'] }
@@ -30,20 +33,6 @@ type Evidence = { binding: { taskId: string; issueId: string; attemptId: string;
 type Approval = { id: string; candidateId: string; candidate: Candidate; action: string; target: string; targetEnvironment: string; expiresAt: string; revokedAt: string | null; createdAt: string }
 type Publication = { id: string; approvalId: string; status: 'reserved' | 'uncertain' | 'succeeded' | 'failed'; request: Record<string, unknown>; receipt?: { verifiedTarget?: { reference?: string } } }
 type Ledger = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; approvals: Approval[]; publications: Publication[]; merges?: AcceptanceMerge[]; capabilities?: { reject?: boolean } }
-
-export class RequestError extends Error {
-  constructor(readonly code: string, readonly status: number, readonly body: Record<string, unknown>) { super(code) }
-}
-
-export async function request(path: string, body?: unknown) {
-  const response = await fetch(withBasePath(path), body === undefined
-    ? { cache: 'no-store' }
-    : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  const value = await response.json().catch(() => ({}))
-  if (response.status === 202) return { ...value, deferred: true }
-  if (!response.ok) throw new RequestError(value.error ?? 'factoryUnavailable', response.status, value)
-  return value
-}
 
 const environmentOf = (candidate: Candidate | undefined): PublicationEnvironment | null =>
   candidate?.environment === 'production' ? 'production' : candidate?.environment === 'preview' ? 'preview' : null
@@ -62,22 +51,25 @@ const APPROVAL_HOURS = 1
 const MERGE_REFUSALS = new Set(['githubMergeAuthorizationRequired', 'githubMergeForbidden', 'githubMergeBlocked', 'githubMergeConflict', 'githubMergeHeadMoved', 'githubMergeClosed', 'githubUnavailable'])
 type Derived = { state: AcceptanceState; active?: unknown; publication?: unknown; superseded?: unknown; refusal?: string }
 
-/** List, header and pane read the same ledger and the same state machine, so they always agree. A code candidate is accepted by merging its PR; a skill is enabled. */
+/** v2 consumers share the public flow; the ledger still binds candidate operations. */
 export function useAcceptance(task: FactoryTask) {
   const ledgerKey = `/api/factory/tasks/${task.id}/approval?view=ledger`
   const detailKey = `/api/factory/tasks/${task.id}`
   const { data: ledger, mutate: reload, error: ledgerError } = useSWR<Ledger>(ledgerKey, request, { refreshInterval: 0 })
-  const { data: detail } = useSWR<AcceptanceDetail>(detailKey, request, { refreshInterval: 0 })
+  const { data: detail, error: detailError } = useSWR<AcceptanceDetail>(detailKey, request, { refreshInterval: 0 })
   useLiveKey('factory_task', task.id, [ledgerKey, detailKey], detail?.liveWorkspaceId ?? null)
+  const v2 = isFlowV2(detail)
+  const { flow, error: flowError, mutate: reloadFlow } = useFactoryFlow(task.id, detail, v2)
   // The list refreshes while a recovered candidate passes its checks. An
   // older cached detail with that same candidate must not hide newer approval.
   const current = detail?.task && detail.task.candidateId === task.candidateId &&
     (typeof task.revision !== 'number' || (typeof detail.task.revision === 'number' && detail.task.revision >= task.revision)) ? detail.task : task
   const derived: Derived | undefined = !ledger ? undefined : task.isSkillCandidate
     ? acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals: Array.isArray(ledger.approvals) ? ledger.approvals : [], publications: Array.isArray(ledger.publications) ? ledger.publications : [], now: Date.now() })
-    : mergeAcceptance({ stage: current.stage, status: current.status, candidateId: current.candidateId, merges: Array.isArray(ledger.merges) ? ledger.merges : [] })
+    : v2 ? flowMergeAcceptance({ flow, candidateId: current.candidateId, merges: Array.isArray(ledger.merges) ? ledger.merges : [] })
+      : mergeAcceptance({ stage: current.stage, status: current.status, candidateId: current.candidateId, merges: Array.isArray(ledger.merges) ? ledger.merges : [] })
   const check = task.completionRecovery || detail?.completionRecovery ? null : candidateCheckState(current)
-  return { ledger, reload, ledgerError, derived, check, current }
+  return { ledger, reload, ledgerError, derived, check, current, detailLoaded: detail !== undefined, detailError, v2, flow, flowError, reloadFlow }
 }
 
 function Label({ children }: { children: string }) {
@@ -194,12 +186,13 @@ function ResultLine({ row, onOpenThread }: { row: ResultRow; onOpenThread?: (run
 export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTask; onOpenThread?: (runId: string) => void }) {
   const t = useTranslations('FactoryAcceptance')
   const { mutate: mutateCache } = useSWRConfig()
-  const { ledger, reload, ledgerError, derived: acceptance, check, current: currentTask } = useAcceptance(task)
+  const { ledger, reload, ledgerError, derived: acceptance, check, current: currentTask, detailLoaded, detailError, v2, flow, flowError, reloadFlow } = useAcceptance(task)
   // A voided approval puts the task back to pending, so the current candidate's evidence is needed to enable it again.
-  const { data: evidence, error: evidenceError } = useSWR<Evidence>(task.stage === 'approval' || acceptance?.superseded || acceptance?.state === 'merged' ? `/api/factory/tasks/${task.id}/approval` : null, request)
+  const needsEvidence = v2 ? flow?.stage === 'handoff' || flow?.stage === 'completed' : task.stage === 'approval' || Boolean(acceptance?.superseded) || acceptance?.state === 'merged'
+  const { data: evidence, error: evidenceError } = useSWR<Evidence>(needsEvidence ? `/api/factory/tasks/${task.id}/approval` : null, request)
   // Checks and the delivery header (B8/B9/B11) are read-only extras; the pane works without them.
   const { data: detail, mutate: reloadDetail } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${task.id}`, request)
-  useLiveKey('factory_task', task.id, task.stage === 'approval' || acceptance?.superseded || acceptance?.state === 'merged' ? [`/api/factory/tasks/${task.id}/approval`] : [], detail?.liveWorkspaceId ?? null)
+  useLiveKey('factory_task', task.id, needsEvidence ? [`/api/factory/tasks/${task.id}/approval`] : [], detail?.liveWorkspaceId ?? null)
   const detailRevision = detail?.task?.revision
   useEffect(() => {
     if (typeof task.revision === 'number' && typeof detailRevision === 'number' && detailRevision < task.revision)
@@ -218,7 +211,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
 
   const approvals = ledger && Array.isArray(ledger.approvals) ? ledger.approvals : []
   const latest = approvals[approvals.length - 1]
-  const derived: Derived = acceptance ?? (task.isSkillCandidate ? acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals, publications: [], now: Date.now() }) : mergeAcceptance({ stage: task.stage, status: task.status, candidateId: task.candidateId, merges: [] }))
+  const derived: Derived = acceptance ?? (v2 ? { state: 'unavailable' } : task.isSkillCandidate ? acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals, publications: [], now: Date.now() }) : mergeAcceptance({ stage: task.stage, status: task.status, candidateId: task.candidateId, merges: [] }))
   const state = derived.state
   const active = derived.active as Approval | undefined
   const publication = derived.publication as Publication | undefined
@@ -228,7 +221,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   const candidate = evidence?.manifest?.candidate ?? active?.candidate ?? current?.candidate
   const environment = environmentOf(candidate)
   const reference = publication?.receipt?.verifiedTarget?.reference
-  const checks = Array.isArray(detail?.checks) ? detail.checks : []
+  const checks = Array.isArray(detail?.checks) ? detail.checks.filter(item => !v2 || item.runId !== null) : []
   const pullRequestUrl = detail?.delivery?.pullRequest?.url ?? null
   const refusal = state === 'pending' ? refused ?? derived.refusal ?? null : null
   const retryCheck = candidateCheckRetry(task, detail, ledger?.binding)
@@ -237,7 +230,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
     setBusy(true); setError(null)
     try {
       const result = await request(`/api/factory/tasks/${task.id}/approval`, { operation, input })
-      await reload()
+      await Promise.all([reload(), ...(v2 ? [reloadFlow()] : [])])
       return result
     } catch (caught) {
       setError(caught instanceof RequestError ? caught.code : 'factoryUnavailable')
@@ -255,7 +248,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       await request(`/api/factory/tasks/${task.id}`, { binding: recovery.binding, eventId: completionRequest.current.eventId, action: 'retry', reason: 'Resume the completed execution' })
     } catch (caught) { setError(caught instanceof RequestError ? caught.code : 'factoryUnavailable') }
     finally {
-      await Promise.all([reload().catch(() => {}), reloadDetail().catch(() => {})])
+      await Promise.all([reload().catch(() => {}), reloadDetail().catch(() => {}), ...(v2 ? [reloadFlow().catch(() => {})] : [])])
       retrying.current = false; setBusy(false)
     }
   }
@@ -275,7 +268,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
     } catch (caught) {
       setCheckError({ key: retryCheck.key, unknown: !(caught instanceof RequestError) || caught.status >= 500 })
     } finally {
-      await Promise.all([reload().catch(() => {}), reloadDetail().catch(() => {}),
+      await Promise.all([reload().catch(() => {}), reloadDetail().catch(() => {}), ...(v2 ? [reloadFlow().catch(() => {})] : []),
         mutateCache(`/api/factory/tasks?issueId=${encodeURIComponent(task.issueId)}`).catch(() => {})])
       retrying.current = false; setBusy(false)
     }
@@ -293,7 +286,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       else setError(code)
     } finally {
       // The candidate card's PR reads merged once the merge lands.
-      await Promise.all([reload().catch(() => {}), reloadDetail().catch(() => {})])
+      await Promise.all([reload().catch(() => {}), reloadDetail().catch(() => {}), ...(v2 ? [reloadFlow().catch(() => {})] : [])])
       setBusy(false)
     }
   }
@@ -330,7 +323,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
     try {
       await request(`/api/factory/tasks/${task.id}/approval`, { operation: 'reject', input: { binding: ledger.binding, eventId: crypto.randomUUID(), note: reject.note.trim() } })
       dispatchReject({ type: 'succeed' })
-      await reload()
+      await Promise.all([reload(), ...(v2 ? [reloadFlow()] : [])])
     } catch { dispatchReject({ type: 'fail' }) }
   }
 
@@ -344,8 +337,8 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   const envChip = task.isSkillCandidate ? t('internalSkill') : environment ? t(`envChip.${environment}`) : null
   const open = viewing ? groups[viewing.group] : undefined
 
-  if (ledgerError || evidenceError) return <FieldError className="px-6 py-6 text-xs">{t('loadError')}</FieldError>
-  if (!ledger || ((task.stage === 'approval' || superseded) && !evidence)) return <div className="flex flex-1 items-center justify-center py-10"><Spinner /></div>
+  if (ledgerError || evidenceError || detailError || (v2 && flowError)) return <FieldError className="px-6 py-6 text-xs">{t('loadError')}</FieldError>
+  if (!detailLoaded || !ledger || (v2 && !flow) || ((v2 ? needsEvidence : task.stage === 'approval' || superseded) && !evidence)) return <div className="flex flex-1 items-center justify-center py-10"><Spinner /></div>
   return <div className="flex min-h-0 flex-1 flex-col">
     <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pt-3 pb-4 sm:px-6">
       <CandidateCard candidate={candidate} detail={detail} environment={envChip} isSkill={task.isSkillCandidate} />
@@ -373,8 +366,8 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
     {retryCheck && <footer className="shrink-0 px-4 pb-4 sm:px-5">
       <Button size="sm" disabled={busy} aria-busy={busy} onClick={() => { void retryCandidateCheck() }}>{busy ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{t(retryCheck.stage === 'review' ? 'retryReview' : 'retryVerify')}</Button>
     </footer>}
-    {!detail?.completionRecovery && !check && state !== 'unavailable' && <footer className="shrink-0 px-4 pb-4 sm:px-5">
-      <ApprovalBar state={state} isSkill={task.isSkillCandidate} isDeliverable={candidate?.kind === 'report' || candidate?.kind === 'deliverable'} busy={busy} canApprove={task.isSkillCandidate ? Boolean(evidence && environment) : Boolean(evidence && (pullRequestUrl || candidate?.kind === 'report' || candidate?.kind === 'deliverable'))}
+    {(v2 && flow || !detail?.completionRecovery && !check && state !== 'unavailable') && <footer className="shrink-0 px-4 pb-4 sm:px-5">
+      <ApprovalBar state={state} flow={v2 ? flow ?? undefined : undefined} isSkill={task.isSkillCandidate} isDeliverable={candidate?.kind === 'report' || candidate?.kind === 'deliverable'} busy={busy} canApprove={task.isSkillCandidate ? Boolean(evidence && environment) : Boolean(evidence && (pullRequestUrl || candidate?.kind === 'report' || candidate?.kind === 'deliverable'))}
         onAccept={task.isSkillCandidate ? undefined : () => { void accept() }} pullRequestUrl={pullRequestUrl ?? undefined} refusal={refusal ?? undefined} canPublish={Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)}
         environment={envChip ?? undefined}
         superseded={superseded?.candidate?.sha ?? undefined}

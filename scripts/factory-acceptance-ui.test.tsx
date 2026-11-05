@@ -25,6 +25,7 @@ let list: Swr
 let ledger: unknown
 let evidence: unknown
 let detail: unknown
+let publicFlow: unknown
 let detailTaskId = 't1'
 let detailReloads = 0
 let ledgerReloads = 0
@@ -33,6 +34,7 @@ let refreshFails = false
 mock.module('swr', { defaultExport: (key: string | null) => {
   if (key === null) return { data: undefined }
   if (key === `/api/factory/tasks/${detailTaskId}`) return { data: detail, mutate: async () => { detailReloads++; if (refreshFails) throw new Error('detail unavailable'); return detail } }
+  if (key === `/api/factory/tasks/${detailTaskId}/flow`) return { data: publicFlow, mutate: async () => publicFlow }
   if (key.includes('view=ledger')) return { data: ledger, mutate: async () => { ledgerReloads++; if (refreshFails) throw new Error('ledger unavailable'); return ledger } }
   if (key.includes('/approval')) return { data: evidence }
   return list
@@ -77,7 +79,7 @@ before(async () => {
 beforeEach(() => {
   cache.clear()
   detailTaskId = 't1'
-  ledger = { binding: {}, approvals: [], publications: [], merges: [] }; evidence = undefined; detail = undefined
+  ledger = { binding: {}, approvals: [], publications: [], merges: [] }; evidence = undefined; detail = {}; publicFlow = undefined
   detailReloads = 0; ledgerReloads = 0; listReloadKeys = []; refreshFails = false
   container = document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container as unknown as Node)
@@ -97,6 +99,40 @@ const task = (patch: Record<string, unknown> = {}) => ({ id: 't1', issueId: 'iss
 const render = async () => { await act(async () => root.render(<FactoryAcceptance issueId="issue-1" />)) }
 const pane = async (patch: Record<string, unknown> = {}) => { await act(async () => root.render(<FactoryAcceptancePane task={task(patch)} />)) }
 const button = (name: string) => [...document.querySelectorAll('button')].find(item => item.textContent?.trim() === name) as unknown as HTMLButtonElement | undefined
+
+test('v2 acceptance keeps the public handoff until a merged flow, with the existing candidate-bound merge action', async () => {
+  const binding = { taskId: 't1', issueId: 'issue-1', attemptId: 'a1', candidateId: 'c1', revision: 8 }
+  const candidate = { sha: 'a'.repeat(40), repository: 'o/r', environment: 'device:fixture', scope: 'repo' }
+  ledger = { binding, approvals: [], publications: [], merges: [] }
+  evidence = { binding, manifest: { candidate, artifacts: [] } }
+  detail = { task: { ...task({ stage: 'publish', status: 'passed' }), route: { flowVersion: 2 }, revision: 8 }, checks: [],
+    delivery: { candidateSha: candidate.sha, pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' } } }
+  const flow = { version: 2, id: 't1', issueId: 'issue-1', botId: 'bot', revision: 8, stage: 'handoff', stages: ['implement', 'review', 'handoff'],
+    needsYou: { kind: 'pr_review', since: '2026-11-05T00:00:00Z' }, review: null, acceptance: null, pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' } }
+  publicFlow = flow
+  await pane({ stage: 'publish', status: 'passed' })
+  assert.match(container.textContent ?? '', /PR 待审/)
+  assert.doesNotMatch(container.textContent ?? '', /已合并/)
+  assert.ok(button('验收并合并'), 'the public handoff keeps normal acceptance reachable')
+  publicFlow = { ...flow, stage: 'completed', needsYou: undefined, stages: [...flow.stages, 'completed'] }
+  await pane({ stage: 'approval', status: 'pending' })
+  assert.match(container.textContent ?? '', /已合并/)
+  assert.equal(button('验收并合并'), undefined, 'a stale legacy pending row cannot reopen acceptance')
+})
+
+test('an accepted v2 report uses the same completed flow without reopening acceptance or claiming a GitHub merge', async () => {
+  const binding = { taskId: 't1', issueId: 'issue-1', attemptId: 'a1', candidateId: 'c1', revision: 9 }
+  detail = { task: { ...task({ stage: 'approval', status: 'passed' }), route: { flowVersion: 2 }, revision: 9 }, checks: [], delivery: { pullRequest: null } }
+  ledger = { binding, approvals: [], publications: [], merges: [] }
+  evidence = { binding, manifest: { candidate: { kind: 'report', sha: 'a'.repeat(40), repository: 'r', environment: 'device:local', scope: 'report' }, artifacts: [] } }
+  publicFlow = { version: 2, id: 't1', issueId: 'issue-1', botId: null, revision: 9, stage: 'completed', completion: 'accepted',
+    stages: ['implement', 'review', 'handoff', 'completed'], review: null, acceptance: null, pullRequest: null }
+  await pane({ stage: 'approval', status: 'passed' })
+  assert.match(container.textContent ?? '', /已验收/)
+  assert.doesNotMatch(container.textContent ?? '', /已合并|PR 待审/)
+  assert.equal(button('验收'), undefined)
+  assert.equal(button('验收并合并'), undefined)
+})
 
 test('Factory list and duplicate task headers subscribe to their server scopes while another workspace is selected', async t => {
   const selected = '11111111-1111-4111-8111-111111111111'
@@ -347,9 +383,16 @@ function retryReceipt(current: ReturnType<typeof failedCandidate>) {
     candidates: [{ id: pending.candidateId, taskId: pending.id }] }
 }
 
+function checkFlow(current: ReturnType<typeof failedCandidate>, kind: 'failed' | 'blocked') {
+  return { version: 2, id: current.id, issueId: current.issueId, botId: null, revision: current.revision,
+    stage: current.stage === 'verify' ? 'implement' : 'review', stages: ['implement', 'review'],
+    needsYou: { kind, since: '2026-11-05T00:00:00Z' }, review: null, acceptance: null, pullRequest: null }
+}
+
 test('single-review failure keeps its result without an impossible generic retry, while legacy and verify remain actionable', async () => {
   const current = failedCandidate()
   detail = { ...(detail as object), task: { ...current, route: { flowVersion: 2 } } }
+  publicFlow = checkFlow(current, 'failed')
   await pane(current)
   assert.equal(Boolean(button('重新审阅')), false, 'the normal retry endpoint rejects a completed flow v2 review')
   assert.match(container.textContent ?? '', /需要修改/)
@@ -362,6 +405,7 @@ test('single-review failure keeps its result without an impossible generic retry
   }
   const verify = failedCandidate('verify')
   detail = { ...(detail as object), task: { ...verify, route: { flowVersion: 2 } } }
+  publicFlow = checkFlow(verify, 'failed')
   await pane(verify)
   assert.ok(button('重新验证'))
 })
@@ -471,6 +515,7 @@ test('host-qualified blocked review retries once and adopts the bound running at
 
 test('unsubmitted review confirms its Owner response when list props omit the detailed route', async () => {
   const current = blockedCandidate()
+  publicFlow = checkFlow(current, 'blocked')
   assert.equal('route' in current, false, 'the production task-list summary deliberately omits route')
   detail = { ...(detail as object), task: { ...current, route: { flowVersion: 2 } },
     checkSubmissionRecovery: { binding: { taskId: current.id, revision: current.revision } } }
@@ -724,6 +769,7 @@ test('a cited pre-question command source shows its localized time and opens tha
 test('a host-qualified no-Run dispatch block retries once without claiming a review was performed', async () => {
   const current = { ...failedCandidate(), status: 'blocked',
     reason: 'Independent check could not select an Agent Profile. Check the available profiles and retry the check.' }
+  publicFlow = checkFlow(current, 'blocked')
   const checkDispatchRecovery = { binding: { taskId: current.id, revision: current.revision } }
   detail = { task: { ...current, route: { flowVersion: 2 } }, checkDispatchRecovery,
     checks: [{ stage: 'review', status: 'blocked', attemptId: current.attemptId,
@@ -731,7 +777,8 @@ test('a host-qualified no-Run dispatch block retries once without claiming a rev
   await pane(current)
   const retry = button('重新审阅')
   assert.ok(retry)
-  assert.match(container.textContent ?? '', /受阻/)
+  assert.match(container.textContent ?? '', /阻塞/)
+  assert.equal(container.querySelector('section[aria-label="独立结果"]'), null, 'an unstarted attempt is not an independent result')
   assert.doesNotMatch(container.textContent ?? '', /需要修改|审阅中|发布失败/)
   assert.equal(container.querySelector('[data-slot="spinner"]'), null)
   assert.equal(button('验收并合并'), undefined)

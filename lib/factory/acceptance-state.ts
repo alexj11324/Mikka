@@ -1,3 +1,5 @@
+import type { FactoryFlow } from './flow-client'
+
 /** Client view of a Factory acceptance (R-56). Pure so every state is testable without a server. */
 export type AcceptanceState = 'pending' | 'approved' | 'publishing' | 'checking' | 'failed' | 'live' | 'revoked' | 'expired' | 'invalidated' | 'unavailable' | 'merging' | 'merged' | 'accepted'
 export type AcceptanceApproval = { id: string; candidateId: string; expiresAt: string; revokedAt: string | null; createdAt: string }
@@ -54,6 +56,17 @@ export function acceptanceState(input: {
 }
 
 export type AcceptanceMerge = { candidateId: string; status: 'merging' | 'merged' | 'failed'; code: string | null; pullRequestUrl: string; createdAt: string }
+
+/** Merge controls follow the public flow. A ledger receipt alone cannot mark a v2 task completed. */
+export function flowMergeAcceptance(input: { flow: Pick<FactoryFlow, 'stage' | 'needsYou' | 'completion'> | null; candidateId: string | null; merges: AcceptanceMerge[] }): { state: AcceptanceState; refusal?: string } {
+  if (input.flow?.stage === 'completed') return { state: input.flow.completion === 'accepted' ? 'accepted' : 'merged' }
+  if (input.flow?.stage !== 'handoff' || input.flow.needsYou?.kind !== 'pr_review' || !input.candidateId) return { state: 'unavailable' }
+  const latest = input.merges.filter(merge => merge.candidateId === input.candidateId)
+    .reduce<AcceptanceMerge | undefined>((last, merge) => !last || Date.parse(merge.createdAt) >= Date.parse(last.createdAt) ? merge : last, undefined)
+  // Until the same flow confirms completion, do not offer another merge or show a second task state.
+  if (latest?.status === 'merging' || latest?.status === 'merged') return { state: 'merging' }
+  return latest?.status === 'failed' && latest.code ? { state: 'pending', refusal: latest.code } : { state: 'pending' }
+}
 
 /**
  * A code candidate (#528): acceptance is the person's merge of its PR. The latest merge on the
