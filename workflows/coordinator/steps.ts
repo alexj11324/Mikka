@@ -133,6 +133,12 @@ export async function releaseLease(userId: string, holder: string, botId: string
 export async function failTurn(userId: string, holder: string, error: string, botId: string) {
   'use step'
   await store.failTurn(userId, holder, error, botId)
+  // Messages that arrived during the failed turn are not part of it: start their turn now
+  // rather than at the next reconciliation sweep (#1212). The failed message itself was delivered.
+  if (await store.hasPendingEvents(userId, botId)) {
+    const { wakeCoordinator } = await import('@/lib/coordinator/wake')
+    await wakeCoordinator(userId)
+  }
 }
 
 export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string, streamId?: string, stopped = false) {
@@ -1092,7 +1098,7 @@ export async function completeScheduleRead(userId:string,botId:string,scope:impo
 }
 export async function failScheduleRead(scope:import('@/lib/schedules/contract').ScheduledRead,denied=false){
   'use step'
-  const {schedules}=await import('@/lib/schedules/runtime')
+  const {failScheduledRead}=await import('@/lib/schedules/runtime')
   const {ScheduleError}=await import('@/lib/schedules/contract')
-  await schedules().fail({id:scope.occurrenceId,lease_token:scope.leaseToken},denied?new ScheduleError('scheduleReadAuthorityLost',403):new Error('scheduledReadFailed'))
+  await failScheduledRead({id:scope.occurrenceId,lease_token:scope.leaseToken},denied?new ScheduleError('scheduleReadAuthorityLost',403):new Error('scheduledReadFailed'))
 }
