@@ -459,9 +459,10 @@ test('provider failure continues the same task through its authorized preferred 
       const target = new URL(String(input))
       assert.equal(target.hostname, 'provider-live.example.invalid', 'only the isolated live gateway is allowed')
       assert.match(target.pathname, /^\/v1\/live\/[^/]+\/push$/)
-      // The same commit also refreshes owner lists (lib/live/lists.db.test.ts
-      // covers those keys); this case checks the existing thread's panel key.
-      const events = (JSON.parse(String(options?.body)) as { kind: string; id: string }[]).filter(event => !event.kind.endsWith('_list'))
+      // The same commit also refreshes owner lists, the bot chat and the issue's
+      // thread list (lib/live/lists, chats and issue-threads DB tests cover those
+      // keys); this case checks the existing thread's panel key.
+      const events = (JSON.parse(String(options?.body)) as { kind: string; id: string }[]).filter(event => !event.kind.endsWith('_list') && !['bot_chat', 'issue_threads'].includes(event.kind))
       if (events.length) sent.push({ path: target.pathname, events })
       return new Response(null, { status: 204 })
     })

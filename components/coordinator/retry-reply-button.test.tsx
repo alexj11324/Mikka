@@ -46,7 +46,7 @@ mock.module(new URL('../../lib/app-build.ts', import.meta.url).href, { namedExpo
 mock.module('next/navigation', { namedExports: { usePathname: () => pathname, useSearchParams: () => new URLSearchParams(search) } })
 mock.module(new URL('../../i18n/navigation.ts', import.meta.url).href, { namedExports: { Link: plain, useRouter: () => ({ push: nothing }), usePathname: () => pathname } })
 mock.module('sonner', { namedExports: { toast: Object.assign((...args: unknown[]) => { notices.push(args) }, { error: nothing }) } })
-mock.module('swr', { defaultExport: () => ({ data: { items: chatItems, enabled: false, working: false, error: null, artifacts: {} }, mutate: async () => {} }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }) } })
+mock.module('swr', { defaultExport: () => ({ data: { items: chatItems, enabled: false, working: false, error: null, artifacts: {} }, mutate: async () => {} }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }), unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 mock.module(new URL('./use-coordinator-submit.ts', import.meta.url).href, { namedExports: { useCoordinatorSubmit: () => ({ submit: async (text: string, context?: { retryOf?: number }) => { submissions++; submitted.push({ text, context }); return { kind: 'accepted' } }, failureMessage: () => 'fixture failed' }) } })
 mock.module(new URL('./use-coordinator-stream.ts', import.meta.url).href, { namedExports: { useCoordinatorStream: () => ({ replies: [], error: false, reconnect: nothing }) } })
 mock.module(new URL('./chat-composer.tsx', import.meta.url).href, { namedExports: { ChatComposer: (props: { value: string; onChange: (value: string) => void; onSubmit: () => void; ref: Ref<HTMLTextAreaElement>; quote?: ReactNode }) => {
