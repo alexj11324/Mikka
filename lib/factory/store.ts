@@ -6,7 +6,7 @@ import { repositoryExecutionMatches } from './execution-receipt'
 import { isDeepStrictEqual } from 'node:util'
 import { completeFactoryExecution } from './completed-execution'
 import { completedRunForRecovery } from './completion-recovery'
-import { unstartedCheckForRecovery, assertRecoveredCheck, type FactoryCheckStartRecovery } from './check-start-recovery'
+import { unstartedCheckForRecovery, unsubmittedCheckForRecovery, assertRecoveredCheck, type FactoryCheckStartRecovery } from './check-start-recovery'
 import { retainedDeliverableForRecovery, type ObserveRetainedDeliverable, type ObservedRetainedDeliverable } from './deliverable-recovery'
 import { snapshotMatchesScope } from './deliverable-snapshot'
 import { apiKeyWorkerDefinition } from "../agent-kit/worker";
@@ -176,7 +176,7 @@ type CompletionRecoveryAuthority = { [completionRecoveryAuthority]: true; tx: Po
 const questionRetryAuthority = Symbol('question-execution-retry');
 type QuestionRetryAuthority = { [questionRetryAuthority]: true; tx: PoolClient; userId: string; taskId: string; attemptId: string; sourceEventId: string; runId: string };
 const checkStartRetryAuthority = Symbol('owner-check-start-retry');
-type CheckStartRetryAuthority = { [checkStartRetryAuthority]: true; tx: PoolClient; userId: string; taskId: string; attemptId: string; candidateId: string; sourceEventId: string; runId: string };
+type CheckStartRetryAuthority = { [checkStartRetryAuthority]: true; kind: FactoryCheckStartRecovery['kind']; tx: PoolClient; userId: string; taskId: string; attemptId: string; candidateId: string; sourceEventId: string; runId: string };
 export type FactoryCompletionDispatch = (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, task: FactoryTask, run: Record<string, any>, checkStart?: FactoryCheckStartRecovery) => Promise<(() => Promise<void>) | undefined>;
 export type FactoryGate = (
   tx: PoolClient,
@@ -464,7 +464,7 @@ export function createFactoryStore(
       }, existing);
     },
     /** Task-detail GET: read-only, no row locks (BE-16). B8/B9 checks and the B11 header are computed, never stored. */
-    async read(userId: string, taskId: string): Promise<FactorySnapshot & Partial<FactoryTaskDetail> & { completionRecovery?: { binding: { taskId: string; revision: number } }; checkStartRecovery?: { binding: { taskId: string; revision: number } }; checkDispatchRecovery?: { binding: { taskId: string; revision: number } } }> {
+    async read(userId: string, taskId: string): Promise<FactorySnapshot & Partial<FactoryTaskDetail> & { completionRecovery?: { binding: { taskId: string; revision: number } }; checkStartRecovery?: { binding: { taskId: string; revision: number } }; checkSubmissionRecovery?: { binding: { taskId: string; revision: number } }; checkDispatchRecovery?: { binding: { taskId: string; revision: number } } }> {
       return transaction(async (tx) => {
         const task = await owned(tx, userId, taskId, false);
         const value = await snapshot(tx, task);
@@ -474,11 +474,12 @@ export function createFactoryStore(
           ...(await factoryTaskDetail(tx, task)),
           ...((await completedRunForRecovery(tx, task)) || (await retainedDeliverableForRecovery(tx, task)) ? { completionRecovery: { binding: { taskId: task.id, revision: task.revision } } } : {}),
           ...(await unstartedCheckForRecovery(tx, task) ? { checkStartRecovery: { binding: { taskId: task.id, revision: task.revision } } } : {}),
+          ...(await unsubmittedCheckForRecovery(tx, task) ? { checkSubmissionRecovery: { binding: { taskId: task.id, revision: task.revision } } } : {}),
           ...(dispatchRecovery ? { checkDispatchRecovery: dispatchRecovery } : {}),
         };
       });
     },
-    /** Owner retry of a host-refused, unclaimed independent check. Refresh only
+    /** Owner retry of a host-qualified unstarted or unsubmitted check. Refresh only
      * its frozen source outside write locks; queue, binding and receipt commit
      * together under the original task/epoch and current admission fences. */
     async retryCheckStart(userId: string, rawBinding: FactoryBindingInput, eventId: string, reason: string, dispatch?: FactoryCompletionDispatch): Promise<{ result: FactorySnapshot; start?: () => Promise<void> } | null> {
@@ -487,7 +488,7 @@ export function createFactoryStore(
       uuid(eventId);
       const receiptFor = async (tx: PoolClient, task: FactoryTask) => {
         const { rows: [receipt] } = await tx.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id,eventId]);
-        if (!receipt || receipt.request.kind !== 'owner_check_start_recovery') return null;
+        if (!receipt || !['owner_check_start_recovery', 'owner_check_submission_recovery'].includes(receipt.request.kind)) return null;
         if (!isDeepStrictEqual(receipt.request.input, { binding, change })) fail('factoryReplayMismatch');
         if (receipt.request.sourceEventId !== task.sourceEventId) fail('factoryStale');
         return receipt.result as FactorySnapshot;
@@ -501,7 +502,7 @@ export function createFactoryStore(
         const other = await tx.query('SELECT 1 FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id,eventId]);
         if (other.rowCount) return null;
         if (task.revision !== binding.revision) fail('factoryStale');
-        const recovery = await unstartedCheckForRecovery(tx, task);
+        const recovery = await unstartedCheckForRecovery(tx, task) ?? await unsubmittedCheckForRecovery(tx, task);
         return recovery ? { recovery } : null;
       });
       if (!prepared) return null;
@@ -520,14 +521,14 @@ export function createFactoryStore(
         const replayed = await receiptFor(tx, task);
         if (replayed) return { result: replayed };
         if (task.revision !== binding.revision) fail('factoryStale');
-        const recovery = await unstartedCheckForRecovery(tx, task, true);
-        if (!recovery || recovery.run.id !== observed.run.id) fail('factoryCheckBindingMismatch');
+        const recovery = await unstartedCheckForRecovery(tx, task, true) ?? await unsubmittedCheckForRecovery(tx, task, true);
+        if (!recovery || recovery.kind !== observed.kind || recovery.run.id !== observed.run.id) fail('factoryCheckBindingMismatch');
         await runFor(tx, task, recovery.run.id);
         // Frozen selection skips the resolver, but still participates in the
         // existing final Profile/source and membership checks at real COMMIT.
         (await import('./transaction')).registerFactoryProfile(tx,
           { ownerId: userId, workspaceId: recovery.run.agentDefinition.executionIdentity.workspaceId }, recovery.selection.agentProfile);
-        const authority: CheckStartRetryAuthority = { [checkStartRetryAuthority]: true, tx, userId,
+        const authority: CheckStartRetryAuthority = { [checkStartRetryAuthority]: true, kind: recovery.kind, tx, userId,
           taskId: task.id, attemptId: task.attemptId, candidateId: recovery.candidateId, sourceEventId: task.sourceEventId, runId: recovery.run.id };
         const next = await store.apply(userId, binding, factoryEventId('owner-check-start-retry', eventId), change, tx, undefined, undefined, authority);
         const start = await dispatch(tx, store, next.task, recovery.run, recovery);
@@ -538,7 +539,7 @@ export function createFactoryStore(
           JOIN agent_runs r ON r.id=a."runId" WHERE a.id=$1 AND a."taskId"=$2 AND a.status='running'`, [final.attemptId,task.id]);
         if (!queued) fail('factoryCheckBindingMismatch');
         assertRecoveredCheck(recovery, queued, queued.checkAssignment);
-        const result = await save(tx, final, eventId, { kind: 'owner_check_start_recovery', input: { binding, change },
+        const result = await save(tx, final, eventId, { kind: recovery.kind === 'unsubmitted' ? 'owner_check_submission_recovery' : 'owner_check_start_recovery', input: { binding, change },
           sourceEventId: task.sourceEventId, attemptId: authority.attemptId, candidateId: task.candidateId, runId: recovery.run.id });
         return { result, start };
       }).catch(async error => {
@@ -794,11 +795,12 @@ export function createFactoryStore(
           completion.taskId === task.id && completion.attemptId === attempt.id && completion.sourceEventId === task.sourceEventId &&
           completion.runId === attempt.runId && task.stage === 'execute' && attempt.status === 'blocked';
         if (completion && (!recovering || (change.action !== 'candidate' && change.action !== 'advance' && !(change.action === 'finish' && change.status === 'passed')))) fail('factoryTransition');
-        const retryingUnstartedCheck = checkStartRetry?.[checkStartRetryAuthority] === true && checkStartRetry.tx === tx && checkStartRetry.userId === userId &&
+        const retryingUnfinishedCheck = checkStartRetry?.[checkStartRetryAuthority] === true && checkStartRetry.tx === tx && checkStartRetry.userId === userId &&
           checkStartRetry.taskId === task.id && checkStartRetry.attemptId === attempt.id && checkStartRetry.candidateId === task.candidateId &&
           checkStartRetry.sourceEventId === task.sourceEventId && checkStartRetry.runId === attempt.runId &&
+          (checkStartRetry.kind === 'unstarted' || (checkStartRetry.kind === 'unsubmitted' && task.stage === 'review' && factoryFlowVersion(task) === 2)) &&
           ['review', 'verify'].includes(task.stage) && task.status === 'blocked' && attempt.status === 'blocked' && change.action === 'retry';
-        if (checkStartRetry && !retryingUnstartedCheck) fail('factoryCheckBindingMismatch');
+        if (checkStartRetry && !retryingUnfinishedCheck) fail('factoryCheckBindingMismatch');
         if (!["cancel", "revoke"].includes(change.action) && attempt.output?.requestEpoch != null && attempt.output.requestEpoch !== task.sourceEventId)
           fail("factoryStale");
         if (!["resolve", "cancel", "revoke"].includes(change.action) && !lifecycle)
@@ -1124,10 +1126,11 @@ export function createFactoryStore(
         } else if (change.action === "retry" || change.action === "repair") {
           if (task.stage === "clarify") fail("factoryTransition");
           // A completed review can lead to repair or human judgment, never a
-          // second review of this task. Its authenticated question continuation
-          // is the same review and keeps the existing custody checks below.
+          // second review of this task. Its authenticated question continuation,
+          // or a host-qualified Owner retry without any submitted result, only
+          // completes that one review and keeps its exact custody checks.
           if (change.action === 'retry' && task.stage === 'review' && factoryFlowVersion(task) === 2 &&
-              !questionRetry && !retryingUnstartedCheck && await factoryReviewPerformed(tx, task)) fail('factoryTransition');
+              !questionRetry && !retryingUnfinishedCheck && await factoryReviewPerformed(tx, task)) fail('factoryTransition');
           const pendingQuestion = await tx.query(
             "SELECT id FROM factory_questions WHERE \"taskId\"=$1 AND \"attemptId\"=$2 AND status IN ('open','waiting_user') LIMIT 1",
             [task.id, attempt.id],

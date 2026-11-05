@@ -49,7 +49,7 @@ export interface AcceptanceTaskView {
   revision?: number
   completionRecovery?: { binding: { taskId: string; revision: number } }
 }
-export interface AcceptanceDetail { task?: AcceptanceTaskView; checks?: AcceptanceCheck[]; delivery?: AcceptanceDelivery; completionRecovery?: AcceptanceTaskView['completionRecovery']; checkStartRecovery?: { binding: { taskId: string; revision: number } }; checkDispatchRecovery?: { binding: { taskId: string; revision: number } }; liveWorkspaceId?: string | null }
+export interface AcceptanceDetail { task?: AcceptanceTaskView; checks?: AcceptanceCheck[]; delivery?: AcceptanceDelivery; completionRecovery?: AcceptanceTaskView['completionRecovery']; checkStartRecovery?: { binding: { taskId: string; revision: number } }; checkSubmissionRecovery?: { binding: { taskId: string; revision: number } }; checkDispatchRecovery?: { binding: { taskId: string; revision: number } }; liveWorkspaceId?: string | null }
 export interface AcceptanceBinding { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }
 export type CandidateCheckState = { stage: 'review' | 'verify'; status: 'failed' | 'pending' | 'running' | 'blocked' }
 
@@ -73,8 +73,10 @@ export function candidateCheckRetry(task: AcceptanceTaskView, detail: Acceptance
   const state = candidateCheckState(task)
   const current = detail?.task
   const recoveringStart = checkRecoveryMatches(task, detail?.checkStartRecovery)
+  const recoveringSubmission = checkRecoveryMatches(task, detail?.checkSubmissionRecovery)
   const recoveringDispatch = checkRecoveryMatches(task, detail?.checkDispatchRecovery)
-  if (!state || (state.status !== 'failed' && !recoveringStart && !recoveringDispatch) || !detail || detail.completionRecovery || !current || !ledger ||
+  if (!state || (state.status !== 'failed' && !recoveringStart && !recoveringSubmission && !recoveringDispatch) ||
+    [recoveringStart, recoveringSubmission, recoveringDispatch].filter(Boolean).length > 1 || !detail || detail.completionRecovery || !current || !ledger ||
     !task.id || !task.issueId || !task.attemptId || typeof task.revision !== 'number' ||
     !Number.isSafeInteger(task.revision) || task.revision < 0) return null
   if (current.id !== task.id || current.issueId !== task.issueId || current.attemptId !== task.attemptId ||
@@ -84,6 +86,7 @@ export function candidateCheckRetry(task: AcceptanceTaskView, detail: Acceptance
     ledger.candidateId !== task.candidateId || ledger.revision !== task.revision) return null
   const latest = latestCheck(Array.isArray(detail.checks) ? detail.checks : [], state.stage, task.candidateId)
   if (!latest || latest.attemptId !== task.attemptId || latest.status !== state.status) return null
+  if (recoveringSubmission && (state.stage !== 'review' || current.route?.flowVersion !== 2 || !latest.runId)) return null
   if (recoveringDispatch && (recoveringStart || latest.runId !== null)) return null
   if (current.route?.flowVersion === 2 && state.stage === 'review' && state.status === 'failed') return null
   return {
@@ -93,26 +96,30 @@ export function candidateCheckRetry(task: AcceptanceTaskView, detail: Acceptance
   }
 }
 
-/** Ordinary retries queue one check; host-qualified start recovery also binds its new run atomically. */
-export function candidateCheckRetryConfirmed(task: AcceptanceTaskView, value: unknown, recovery?: AcceptanceDetail['checkStartRecovery'], dispatchRecovery?: AcceptanceDetail['checkDispatchRecovery']): boolean {
+/** Ordinary retries queue one check; recovery of a frozen check binds its new run atomically. */
+export function candidateCheckRetryConfirmed(task: AcceptanceTaskView, value: unknown, recovery?: AcceptanceDetail['checkStartRecovery'], dispatchRecovery?: AcceptanceDetail['checkDispatchRecovery'], submissionRecovery?: AcceptanceDetail['checkSubmissionRecovery']): boolean {
   const state = candidateCheckState(task)
   const recoveringStart = state?.status === 'blocked' && checkRecoveryMatches(task, recovery)
   const recoveringDispatch = state?.status === 'blocked' && checkRecoveryMatches(task, dispatchRecovery)
-  if (!state || (state.status !== 'failed' && !recoveringStart && !recoveringDispatch) || (recoveringStart && recoveringDispatch) || !task.id || !task.issueId || !task.attemptId ||
+  const recoveringSubmission = state?.status === 'blocked' && checkRecoveryMatches(task, submissionRecovery)
+  const bindingRun = recoveringStart || recoveringSubmission
+  if (!state || (state.status !== 'failed' && !bindingRun && !recoveringDispatch) ||
+    [recoveringStart, recoveringSubmission, recoveringDispatch].filter(Boolean).length > 1 ||
+    (recoveringSubmission && (state.stage !== 'review' || task.route?.flowVersion !== 2)) || !task.id || !task.issueId || !task.attemptId ||
     typeof task.revision !== 'number' || !Number.isSafeInteger(task.revision)) return false
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const receipt = value as Record<string, unknown>
   if (receipt.contractVersion !== 1 || !Array.isArray(receipt.attempts) || !Array.isArray(receipt.candidates) ||
     !receipt.task || typeof receipt.task !== 'object' || Array.isArray(receipt.task)) return false
   const next = receipt.task as Record<string, unknown>
-  const nextStatus = recoveringStart ? 'running' : 'pending'
+  const nextStatus = bindingRun ? 'running' : 'pending'
   return next.id === task.id && next.issueId === task.issueId && next.candidateId === task.candidateId &&
     next.stage === task.stage && next.status === nextStatus && typeof next.revision === 'number' && Number.isSafeInteger(next.revision) &&
-    next.revision === task.revision + (recoveringStart ? 2 : 1) && typeof next.attemptId === 'string' && next.attemptId.length > 0 &&
+    next.revision === task.revision + (bindingRun ? 2 : 1) && typeof next.attemptId === 'string' && next.attemptId.length > 0 &&
     next.attemptId !== task.attemptId && receipt.attempts.some(attempt => attempt && typeof attempt === 'object' &&
       attempt.id === next.attemptId && attempt.taskId === task.id && attempt.candidateId === task.candidateId &&
       attempt.stage === task.stage && attempt.status === nextStatus &&
-      (!recoveringStart || (typeof attempt.runId === 'string' && attempt.runId.length > 0)) &&
+      (!bindingRun || (typeof attempt.runId === 'string' && attempt.runId.length > 0)) &&
       (!recoveringDispatch || attempt.runId === null))
 }
 

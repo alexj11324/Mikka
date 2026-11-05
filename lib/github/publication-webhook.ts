@@ -44,7 +44,8 @@ SELECT gen_random_uuid(), id, "userId", revision, title, content, status, priori
 
 /** Called only after verification of the GitHub webhook signature. Updates only
  * deliveries already associated with this exact repository and PR URL, and the
- * tasks those deliveries belong to. */
+ * tasks those deliveries belong to. A delivery that changes nothing stored
+ * writes nothing; a PR Mikka never delivered costs one statement (#1212). */
 export async function refreshPublishedPullRequest(event: string, payload: unknown, database: Pick<Pool, 'query'> = pool) {
   if (event !== 'pull_request') return
   const parsed = pullRequestEvent.safeParse(payload)
@@ -54,14 +55,18 @@ export async function refreshPublishedPullRequest(event: string, payload: unknow
   if (pr.html_url !== url) return
   const state = pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open'
   const lines = pr.additions !== undefined && pr.deletions !== undefined ? { additions: pr.additions, deletions: pr.deletions } : null
-  const { rows } = await database.query<{ id: string | null; issueId: string | null }>(`WITH saved AS (
+  const { rows } = await database.query<{ id: string | null; issueId: string | null; changed: boolean }>(`WITH matched AS (
+      SELECT "runId","userId","issueId" FROM run_publications WHERE "pullRequest"->>'url'=$1
+    ), saved AS (
       UPDATE run_publications SET "pullRequest"="pullRequest" || $2::jsonb,"updatedAt"=now()
-      WHERE "pullRequest"->>'url'=$1 RETURNING "runId","userId","issueId"
-    ) SELECT DISTINCT t.id,p."issueId" FROM saved p
+      WHERE "pullRequest"->>'url'=$1 AND NOT "pullRequest" @> $2::jsonb RETURNING "runId"
+    ) SELECT DISTINCT t.id,p."issueId",(s."runId" IS NOT NULL) AS changed FROM matched p
+      LEFT JOIN saved s ON s."runId"=p."runId"
       LEFT JOIN factory_candidates c ON c."runId"=p."runId"
       LEFT JOIN factory_tasks t ON t.id=c."taskId" AND t."candidateId"=c.id AND t."userId"=p."userId"`,
     [url, JSON.stringify({ title: pr.title, state, ...lines })])
-  const tasks = [...new Set(rows.flatMap(row => row.id ? [row.id] : []))].map(id => ({ id }))
+  if (!rows.length) return
+  const tasks = [...new Set(rows.flatMap(row => row.id && row.changed ? [row.id] : []))].map(id => ({ id }))
   // The PR badge on each task it was delivered on asks GitHub again (#1212); the state itself never crosses.
   await pullRequestStatusChanged(database, rows.flatMap(row => row.issueId ? [row.issueId] : []))
   try {

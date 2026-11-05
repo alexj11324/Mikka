@@ -16,6 +16,9 @@ const context = new AsyncLocalStorage<Context>()
 const hooks = new Map<string, HookRow>(), byId = new Map<string, HookRow>(), runs = new Map<string, Row>()
 const deliveries = new Map<string, Pending[]>(), buffered = new Map<string, unknown[]>(), lost = new Map<string, Error>()
 const completions: Promise<void>[] = [], failures: unknown[] = []
+const activity = new Map<string, 'running' | 'waiting' | 'done'>()
+const observers = new Set<() => void>()
+let closing = false
 const trace: { event: string; runId?: string; token?: string; deploymentId?: string; force?: boolean }[] = []
 let latest = 'new', caller = 'new', environment = 'production', resolver = true, next: number | null = null
 let serial = 0, jobs = 0, legacyJobs = 0, nextReads = 0, lookupFailure = false, cancelFailure = false, startFailure = false
@@ -35,18 +38,38 @@ function seed(runId: string, deploymentId: string, fields: Partial<HookRow> = {}
   hooks.set(value.token, value); byId.set(value.hookId, value)
   return value
 }
+function note(runId: string, state: 'running' | 'waiting' | 'done') {
+  if (!activity.has(runId)) return
+  activity.set(runId, state)
+  for (const observe of observers) observe()
+}
+function until(observed: () => boolean, description: string): Promise<void> {
+  if (observed()) return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    const finish = () => { clearTimeout(deadline); observers.delete(check); resolve() }
+    const check = () => { if (observed()) finish() }
+    const deadline = setTimeout(() => {
+      observers.delete(check)
+      reject(new Error(`Recorder did not reach ${description}`))
+    }, 10_000)
+    observers.add(check)
+  })
+}
 function deliver(hook: HookRow, value: unknown) {
   const waiting = deliveries.get(hook.hookId)?.shift()
-  if (waiting) waiting.resolve(value)
+  if (waiting) { note(hook.runId, 'running'); waiting.resolve(value) }
   else buffered.set(hook.hookId, [...(buffered.get(hook.hookId) ?? []), value])
 }
 function displace(hook: HookRow) {
   const failure = error('HookForceClaimedError', hook.token)
   lost.set(hook.hookId, failure)
-  for (const pending of deliveries.get(hook.hookId) ?? []) pending.reject(failure)
+  const waiting = deliveries.get(hook.hookId) ?? []
+  if (waiting.length) note(hook.runId, 'running')
+  for (const pending of waiting) pending.reject(failure)
   deliveries.delete(hook.hookId)
 }
 function createHook(options: { token: string; experimental_force?: boolean }) {
+  if (closing) throw error('HookForceClaimedError', options.token)
   const current = context.getStore()!
   if (options.experimental_force) beforeForce?.()
   const previous = hooks.get(options.token)
@@ -65,6 +88,7 @@ function createHook(options: { token: string; experimental_force?: boolean }) {
     const failure = lost.get(value.hookId)
     if (failure) { reject(failure); return }
     deliveries.set(value.hookId, [...(deliveries.get(value.hookId) ?? []), { resolve, reject }])
+    note(value.runId, 'waiting')
   })
   return Object.assign(new Promise<unknown>(() => {}), {
     // The production owner loop consumes the SDK's AsyncIterable interface,
@@ -90,17 +114,21 @@ async function resume(token: string) {
 }
 function launch(runId: string, deploymentId = 'new', kind: Parameters<typeof dueTimer>[0] = 'run-recovery', predecessorRunId?: string) {
   runs.set(runId, row(runId, deploymentId))
+  activity.set(runId, 'running')
   const invoke = dueTimer as (kind: Parameters<typeof dueTimer>[0], predecessorRunId?: string) => Promise<void>
   const completion = context.run({ runId, deploymentId }, () => invoke(kind, predecessorRunId)).catch(cause => {
     if (!(cause instanceof Error) || cause.name !== 'HookForceClaimedError') failures.push(cause)
   }).finally(() => {
     for (const [token, hook] of hooks) if (hook.runId === runId) hooks.delete(token)
+    note(runId, 'done')
   })
   completions.push(completion)
 }
-// All boundaries above resolve synchronously. Drain their finite promise chains;
-// no timer, polling, workflow engine or paid API is involved.
-async function settle() { for (let i = 0; i < 80; i++) await Promise.resolve() }
+// Dynamic imports cross the event loop. Wait for each launched workflow to
+// actually suspend on its recorded hook or finish, rather than counting ticks.
+async function settle() {
+  await until(() => [...activity.values()].every(state => state !== 'running'), 'a hook wait or completion')
+}
 function forced() { return trace.filter(item => item.event === 'create' && item.force) }
 function cancelled() { return trace.filter(item => item.event === 'cancel').map(item => item.runId) }
 function started() { return trace.filter(item => item.event === 'start') }
@@ -134,6 +162,7 @@ mock.module('workflow/api', { namedExports: {
     runs.get(runId)!.status = 'cancelled'
   } }),
   start: async (_workflow: unknown, args: [Parameters<typeof dueTimer>[0], string?], options?: { deploymentId?: string }) => {
+    if (closing) throw error('HookForceClaimedError', TOKEN)
     const deploymentId = options?.deploymentId === 'latest' ? latest : options?.deploymentId ?? context.getStore()?.deploymentId ?? caller
     const runId = `candidate-${++serial}`
     trace.push({ event: 'start', runId, deploymentId: options?.deploymentId })
@@ -143,7 +172,10 @@ mock.module('workflow/api', { namedExports: {
   },
 } })
 mock.module(new URL('../../lib/run-recovery.ts', import.meta.url).href, { namedExports: { recoverRuns: async () => { jobs++; return {} } } })
-mock.module(new URL('../../lib/run-recovery-due.ts', import.meta.url).href, { namedExports: { runRecoveryNextDue: async () => { nextReads++; return next } } })
+mock.module(new URL('../../lib/run-recovery-due.ts', import.meta.url).href, { namedExports: {
+  runRecoveryPass: async () => { jobs++; nextReads++; return next },
+  runRecoveryNextDue: async () => { nextReads++; return next },
+} })
 
 before(async () => {
   ;({ dueTimer } = await import('./workflow'))
@@ -155,17 +187,23 @@ before(async () => {
 beforeEach(() => {
   hooks.clear(); byId.clear(); runs.clear(); deliveries.clear(); buffered.clear(); lost.clear()
   completions.length = 0; failures.length = 0; trace.length = 0
+  activity.clear(); observers.clear(); closing = false
   latest = 'new'; caller = 'new'; environment = 'production'; resolver = true; next = null
   serial = 0; jobs = 0; legacyJobs = 0; nextReads = 0; lookupFailure = false; cancelFailure = false; startFailure = false
   beforeForce = undefined; afterForce = undefined
   process.env.VERCEL = '1'; process.env.VERCEL_ENV = 'production'
 })
 afterEach(async () => {
-  for (const hook of hooks.values()) displace(hook)
-  await settle()
-  await Promise.all(completions)
-  for (const [key, value] of Object.entries(previousEnvironment)) { if (value === undefined) delete process.env[key]; else process.env[key] = value }
-  mock.timers.reset()
+  // Stop late imports from creating a new hook after the cleanup snapshot.
+  closing = true
+  try {
+    for (const hook of hooks.values()) displace(hook)
+    await until(() => [...activity.values()].every(state => state === 'done'), 'cleanup completion')
+    await Promise.all(completions)
+  } finally {
+    for (const [key, value] of Object.entries(previousEnvironment)) { if (value === undefined) delete process.env[key]; else process.env[key] = value }
+    mock.timers.reset()
+  }
 })
 
 test('normal production arm replaces the old deployment timer before the next recovery pass', async () => {

@@ -51,7 +51,15 @@ export async function setAttentionEnabled(userId: string, enabled: boolean): Pro
   })
 }
 
-function context(matter: Matter, id = matter.id): MatterContext {
+/** What a judgment or a handoff brief reads of a matter. Its evidence and assessment (often tens of KB each) stay
+ * in the database: ingest reads up to 11 matters per notification (#1212). */
+const briefColumns = {
+  id: attentionMatters.id, title: attentionMatters.title, level: attentionMatters.level, state: attentionMatters.state, reason: attentionMatters.reason,
+  personAsked: attentionMatters.personAsked, recheck: attentionMatters.recheck, updatedAt: attentionMatters.updatedAt,
+}
+type MatterSummary = Pick<Matter, keyof typeof briefColumns>
+
+function context(matter: MatterSummary, id = matter.id): MatterContext {
   return { id, title: matter.title, level: matter.level, state: matter.state, reason: matter.reason }
 }
 
@@ -64,8 +72,8 @@ const byKey = (userId: string, key: string) => and(eq(attentionMatters.userId, u
  * (m1, m2…) for the `continues` question. `ids` maps a short id back.
  */
 export async function judgmentContext(userId: string, key: string, now = new Date()): Promise<{ same: MatterContext | null; matters: MatterContext[]; ids: Map<string, string> }> {
-  const [same] = await db.select().from(attentionMatters).where(byKey(userId, key)).limit(1)
-  const recent = await db.select().from(attentionMatters)
+  const [same] = await db.select(briefColumns).from(attentionMatters).where(byKey(userId, key)).limit(1)
+  const recent = await db.select(briefColumns).from(attentionMatters)
     .where(and(eq(attentionMatters.userId, userId), gte(attentionMatters.updatedAt, new Date(now.getTime() - MATTERS_DAYS * 86_400_000)), ...(same ? [ne(attentionMatters.id, same.id)] : [])))
     .orderBy(desc(attentionMatters.updatedAt)).limit(MATTERS_FOR_JUDGMENT)
   const ids = new Map(recent.map((matter, index) => [`m${index + 1}`, matter.id]))
@@ -156,7 +164,7 @@ const decisionsCall: AttentionDecide = async (userId, purpose, input, questions)
   try { return await hostedBillingScope.run({ workspaceId: await executionWorkspace(userId, null), ownerId: userId }, () => decide(purpose, input, questions)) } catch { return null }
 }
 
-function brief(matter: Matter, now: Date): MatterBrief {
+function brief(matter: MatterSummary, now: Date): MatterBrief {
   return { id: matter.id, title: matter.title, level: matter.level, reason: matter.reason, personAsked: matter.personAsked, recheck: matter.recheck, minutesWaiting: Math.max(0, Math.round((now.getTime() - matter.updatedAt.getTime()) / 60_000)) }
 }
 
@@ -209,7 +217,7 @@ export async function releaseAttention(userId: string, now = new Date(), call: A
       .where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'snoozed'), lte(attentionMatters.runAt, now)))
     const [inHand] = await tx.select({ id: attentionMatters.id }).from(attentionMatters).where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'handed'))).limit(1)
     if (inHand) return []
-    return tx.select().from(attentionMatters).where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'waiting'))).orderBy(attentionMatters.updatedAt).limit(20)
+    return tx.select(briefColumns).from(attentionMatters).where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'waiting'))).orderBy(attentionMatters.updatedAt).limit(20)
   })
   if (!waiting.length) return false
   const handed = await spends(db, userId, 'handoff', now)

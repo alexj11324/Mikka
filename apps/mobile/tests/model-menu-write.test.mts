@@ -27,6 +27,6 @@ test('a refused write releases the guard so an explicit retry can save', async (
 })
 test('unknown quota and unavailable selections have distinct truthful feedback', () => {
   const current: ModelMenu['current'] = { id: 'fixture', modelId: 'fixture-model', provider: 'claude', kind: 'subscription', available: false, chosen: true }
-  assert.equal(modelStatusLine({ ...current, availability: 'checking' }), 'fixture-model · 额度待检查')
-  assert.equal(modelStatusLine(current), 'fixture-model 现在不可用，请更换模型或刷新。')
+  assert.equal(modelStatusLine({ ...current, availability: 'checking' }), null)
+  assert.deepEqual(modelStatusLine(current), { line: '这个模型现在用不了', change: true })
 })

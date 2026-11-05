@@ -30,8 +30,7 @@ export async function handOffDueTimer(kind: DueKind) {
 async function ownerStep<T>(work: () => Promise<T>): Promise<T> {
   try { return await work() }
   catch {
-    // error-cause: SDK errors may carry URLs or private response bodies. The
-    // Workflow event log receives only this closed internal failure category.
+    // error-cause: SDK errors may carry URLs or private response bodies. The Workflow event log receives only this closed internal failure category.
     throw new RetryableError('due_timer_owner_unavailable', { retryAfter: '1m' })
   }
 }

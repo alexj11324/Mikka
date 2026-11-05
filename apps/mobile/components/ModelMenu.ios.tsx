@@ -1,4 +1,4 @@
-import { Button, Host, Menu, Section, Text, Toggle } from '@expo/ui/swift-ui'
+import { Button, HStack, Host, Image, Menu, Section, Text, Toggle } from '@expo/ui/swift-ui'
 import { buttonStyle, controlSize, disabled, tint } from '@expo/ui/swift-ui/modifiers'
 import { groupTag, groupTitle, modelMenuLabel, modelMenuReadLabel, optionName, type ModelMenuState } from '@/lib/model-menu'
 import { colors } from '@/lib/theme'
@@ -9,17 +9,18 @@ import { colors } from '@/lib/theme'
  * who pays shows under the name; 刷新 re-reads the list. Saved per bot for its next runs;
  * a pick that does not save keeps the saved model here (ModelNotice says why).
  */
-export function ModelMenu({ model, running = false }: { model: ModelMenuState; running?: boolean }) {
+export function ModelMenu({ model, running = false, label: override }: { model: ModelMenuState; running?: boolean; label?: string }) {
   const { menu, choose, refresh, refreshing, refreshFailed, loading, retryRead, busy } = model
   if (!menu) return <Host matchContents>{loading
     ? <Text>{modelMenuReadLabel(true)}</Text>
     : <Button label={modelMenuReadLabel(false)} systemImage="arrow.clockwise" onPress={() => { void retryRead().catch(() => undefined) }} modifiers={[buttonStyle('borderless'), controlSize('small'), tint(colors.secondary)]} />}</Host>
   const { current, groups } = menu
-  const label = modelMenuLabel(current, running)
+  const label = override ?? modelMenuLabel(current, running)
   const unavailable = !current.available && current.availability !== 'checking'
   return (
     <Host matchContents>
-      <Menu label={label} systemImage="chevron.down" modifiers={[buttonStyle('borderless'), controlSize('small'), disabled(busy), tint(unavailable ? colors.secondary : colors.ink)]}>
+      {/* The name first, the chevron after it (「GPT-6 Luna ⌄」, #1386); systemImage would put it before. */}
+      <Menu label={<HStack spacing={3}><Text>{label}</Text><Image systemName="chevron.down" size={10} /></HStack>} modifiers={[buttonStyle('borderless'), controlSize('small'), disabled(busy), tint(override ? colors.accent : unavailable ? colors.secondary : colors.ink)]}>
         {groups.map((group, index) => (
           <Section key={`${group.kind}-${index}`} title={groupTitle(group)}>
             {group.options.map(option => {

@@ -103,11 +103,11 @@ export const ALERTS = [
   { key: 'heartbeat', id: '01a1a144-bcba-0000-00ba-fb44e2874871', insight: 'heartbeat', name: 'Mikka monitoring collection failed or heartbeat absent',
     ...hourly, enabled: true, threshold: { type: 'absolute', bounds: { lower: 0.5 } }, config: { type: 'HogQLAlertConfig', column: 'value', evaluation: 'first_row' } },
   { key: 'source-anomaly', id: '01a1a9eb-1a3a-0000-6f0b-151446674319', insight: 'alert-source-anomaly', name: '[1324] Mikka 来源数据库小时异常',
-    ...hourly, enabled: true, schedule_start_time: '00:15', threshold: { type: 'absolute', bounds: { upper: 0.5 } }, config: { type: 'HogQLAlertConfig', column: 'value', evaluation: 'any_row', label_column: 'source' } },
+    ...hourly, enabled: true, schedule_start_time: '00:15', threshold: { type: 'absolute', bounds: { upper: 0.5 } }, config: { type: 'HogQLAlertConfig', column: 'value', evaluation: 'first_row', label_column: 'source' } },
   { key: 'daily-pace', id: '01a1a144-b4dc-0000-fbbe-edbede0dfdb5', insight: 'alert-daily-pace', name: '[1324] Mikka 日速率外推超过5GB月预算',
-    ...hourly, enabled: true, schedule_start_time: '00:15', threshold: { type: 'absolute', bounds: { upper: 1 } }, config: { type: 'HogQLAlertConfig', column: 'value', evaluation: 'any_row', label_column: 'source' } },
+    ...hourly, enabled: true, schedule_start_time: '00:15', threshold: { type: 'absolute', bounds: { upper: 1 } }, config: { type: 'HogQLAlertConfig', column: 'value', evaluation: 'first_row', label_column: 'source' } },
   { key: 'error-spike', id: '01a1a144-b9d6-0000-6229-896dc85243ec', insight: 'alert-error-spike', name: '[1324] Mikka 错误码小时突增',
-    ...hourly, enabled: true, schedule_start_time: '00:15', threshold: { type: 'absolute', bounds: { upper: 0.5 } }, config: { type: 'HogQLAlertConfig', column: 'value', evaluation: 'any_row', label_column: 'source' } },
+    ...hourly, enabled: true, schedule_start_time: '00:15', threshold: { type: 'absolute', bounds: { upper: 0.5 } }, config: { type: 'HogQLAlertConfig', column: 'value', evaluation: 'first_row', label_column: 'source' } },
 ]
 
 // --- comparison ------------------------------------------------------------

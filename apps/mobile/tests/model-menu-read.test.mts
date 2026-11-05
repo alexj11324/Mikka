@@ -29,8 +29,8 @@ test('a failed initial model read can be retried after the error', async () => {
 })
 test('generation does not add timing text to the collapsed model chip', () => {
   const current: ModelMenu['current'] = { id: 'fixture', modelId: 'chosen-model', provider: 'claude', kind: 'subscription', chosen: true, available: true }
-  assert.equal(modelMenuLabel(current, true), 'chosen-model')
-  assert.equal(modelMenuLabel(current, false), 'chosen-model')
+  assert.equal(modelMenuLabel(current, true), 'Chosen Model')
+  assert.equal(modelMenuLabel(current, false), 'Chosen Model')
 })
 test('the absent-menu chip has explicit loading and retry states', () => {
   assert.equal(modelMenuReadLabel(true), '正在读取模型')

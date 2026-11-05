@@ -1,8 +1,8 @@
 import '../global.css'
 
 import { useEffect } from 'react'
-import { Platform, View } from 'react-native'
-import { Stack } from 'expo-router'
+import { Platform, useColorScheme, View } from 'react-native'
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
@@ -17,7 +17,11 @@ import { openPush } from '@/lib/navigate'
 import { colors, screenOptions } from '@/lib/theme'
 
 export default function RootLayout() {
+  // The navigation bar's title, back button and material follow the system's appearance: without a theme the stack
+  // draws in its light default, a light bar with dark words on a dark app (#1386).
+  const dark = useColorScheme() === 'dark'
   return (
+    <ThemeProvider value={dark ? DarkTheme : DefaultTheme}>
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <KeyboardProvider>
@@ -28,6 +32,7 @@ export default function RootLayout() {
         </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+    </ThemeProvider>
   )
 }
 
@@ -50,6 +55,8 @@ function SessionGate() {
         <Stack.Screen name="new-bot" options={{ presentation: 'modal' }} />
         <Stack.Screen name="new-group" options={{ presentation: 'modal' }} />
         <Stack.Screen name="message-text" options={{ presentation: 'modal' }} />
+        {/* The account sheet (#1386 item 8): the system page sheet, swipe down to close. */}
+        <Stack.Screen name="account" options={{ presentation: 'modal', contentStyle: { backgroundColor: colors.grouped } }} />
         <Stack.Screen name="settings" options={{ presentation: 'modal', headerShown: false, ...(Platform.OS === 'ios' ? {} : { animation: 'slide_from_bottom' }) }} />
       </Stack>
     </HomeProvider>

@@ -77,11 +77,12 @@ WITH
         LEFT JOIN baseline b ON s.service_name = b.service_name AND s.route = b.route
         LEFT JOIN byte_baseline bb ON s.service_name = bb.service_name AND s.route = bb.route
         LEFT JOIN current_hour c ON s.service_name = c.service_name AND s.route = c.route
-    )
+    ),
+    per_source AS (
 SELECT
     if(NOT current_service_observed, NULL,
         if((covered_hours >= 24 AND current_queries > threshold_queries)
-           OR (byte_covered_hours >= 24 AND current_byte_coverage >= 0.95 AND current_bytes > threshold_bytes), 1, 0)) AS value,
+           OR (byte_covered_hours >= 24 AND current_byte_coverage >= 0.95 AND current_bytes > threshold_bytes), 1, 0)) AS row_value,
     concat(service_name, ' ', route, ' | UTC hour=', toString(toTimeZone(evaluated_hour, 'UTC')),
         ' | sampled queries=', if(current_service_observed, toString(current_queries), 'unknown'), ' median=', if(covered_hours > 0, toString(round(median_queries, 1)), 'unavailable'),
         ' threshold=', toString(round(threshold_queries, 1)),
@@ -89,9 +90,17 @@ SELECT
         ' threshold=', toString(round(threshold_bytes, 0)), '; missing bytes=', toString(missing_byte_queries), '/', toString(current_queries),
         ' | history queries=', toString(covered_hours), '/168h bytes=', toString(byte_covered_hours), '/168h',
         if(NOT current_service_observed, ' NO CURRENT TELEMETRY; evaluation suppressed', if(covered_hours < 24, ' WARMUP; monthly 50% and heartbeat remain', '')),
-        ' | x10 estimates at 10%; bytes require 95% coverage and are not provider egress') AS source,
+        ' | x10 estimates at 10%; bytes require 95% coverage and are not provider egress') AS row_source,
     route, current_queries, current_bytes, median_queries, median_bytes, threshold_queries, threshold_bytes,
     covered_hours, byte_covered_hours, current_service_observed, missing_byte_queries, current_byte_coverage, evaluated_hour AS hour_start
 FROM metrics
-ORDER BY value DESC, current_bytes DESC, current_queries DESC
-LIMIT 50
+    )
+SELECT
+    max(row_value) AS value,
+    if(countIf(row_value = 1) > 0,
+        concat(toString(countIf(row_value = 1)), ' breaching: ', arrayStringConcat(arraySlice(groupArrayIf(row_source, row_value = 1), 1, 5), ' || ')),
+        concat('no breach | top: ', argMax(row_source, current_bytes))) AS source,
+    countIf(row_value = 1) AS breaching_sources,
+    count() AS evaluated_sources,
+    any(hour_start) AS hour_start
+FROM (SELECT * FROM per_source ORDER BY row_value DESC, current_bytes DESC, current_queries DESC)
