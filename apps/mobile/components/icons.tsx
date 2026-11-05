@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react'
-import { Animated, Easing, useColorScheme, View } from 'react-native'
+import { Animated, Easing, Platform, useColorScheme, View } from 'react-native'
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg'
 import { Cloud, LoaderCircle, Laptop, MessageCircle, Server } from 'lucide-react-native'
 import type { MachineKind, Source, ThreadStatus } from '@/lib/types'
 import { colors } from '@/lib/theme'
 import { threadDot } from '@/lib/thread-icon'
+import { useReducedMotionPreference } from '@/lib/reduced-motion'
 
 /** The two-line menu mark from the frames (ChatGPT iOS). */
 export function MenuIcon({ size = 22, color = colors.ink }: { size?: number; color?: string }) {
@@ -18,14 +19,17 @@ export function MenuIcon({ size = 22, color = colors.ink }: { size?: number; col
 /** Grey spinner for running work (colour is restrained). */
 export function Spinner({ size = 18, color = colors.secondary }: { size?: number; color?: string }) {
   const turn = useRef(new Animated.Value(0)).current
+  const reduceMotion = useReducedMotionPreference()
   useEffect(() => {
-    const loop = Animated.loop(Animated.timing(turn, { toValue: 1, duration: 1100, easing: Easing.linear, useNativeDriver: true }))
+    turn.setValue(0)
+    if (reduceMotion) return
+    const loop = Animated.loop(Animated.timing(turn, { toValue: 1, duration: 1100, easing: Easing.linear, useNativeDriver: Platform.OS !== 'web' }))
     loop.start()
-    return () => loop.stop()
-  }, [turn])
+    return () => { loop.stop(); turn.setValue(0) }
+  }, [reduceMotion, turn])
   const rotate = turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] })
   return (
-    <Animated.View style={{ width: size, height: size, transform: [{ rotate }] }}>
+    <Animated.View accessible accessibilityRole="progressbar" accessibilityLabel="正在加载" accessibilityState={{ busy: true }} style={{ width: size, height: size, transform: [{ rotate }] }}>
       <LoaderCircle size={size} color={color} strokeWidth={2} />
     </Animated.View>
   )
@@ -39,15 +43,17 @@ export function Spinner({ size = 18, color = colors.secondary }: { size?: number
 export function StatusIcon({ status, size = 18 }: { status: ThreadStatus; size?: number }) {
   const { dot, label } = threadDot(status)
   const pulse = useRef(new Animated.Value(1)).current
+  const reduceMotion = useReducedMotionPreference()
   useEffect(() => {
-    if (dot !== 'running') return
+    pulse.setValue(1)
+    if (dot !== 'running' || reduceMotion) return
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 0.35, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0.35, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(pulse, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: Platform.OS !== 'web' }),
     ]))
     loop.start()
-    return () => loop.stop()
-  }, [dot, pulse])
+    return () => { loop.stop(); pulse.setValue(1) }
+  }, [dot, pulse, reduceMotion])
   const spot = Math.max(6, Math.round(size * 0.4))
   const fill = dot === 'waiting' ? colors.orange : dot === 'blocked' ? colors.danger : dot === 'resolved' ? colors.success : dot === 'idle' ? colors.page : colors.secondary
   return (

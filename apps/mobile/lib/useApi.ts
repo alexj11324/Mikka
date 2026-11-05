@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState } from 'react-native'
 import { api, ApiError, onWorkspaceChange } from '@/lib/api'
 import { apiCache as cache } from './api-cache'
+import { needsForegroundRead } from './api-read-state'
 
 // The last answer per path, so a screen opened again draws at once and refreshes behind (a chat is not blank while it loads).
 // Another workspace's answers are dropped.
@@ -22,8 +23,9 @@ export const clearApiCache = () => cache.clear()
  * polling), and lets the screen reload or patch it after a write. It starts
  * from the path's last answer, when there is one.
  */
-export function useApi<T>(path: string | null, every = 0) {
+export function useApi<T>(path: string | null, every = 0, read: (path: string) => Promise<T> = api) {
   const [data, setStored] = useState<T | null>(() => path ? cache.get<T>(path) : null)
+  const [source, setSource] = useState(() => ({ path, context: cache.context() }))
   const [error, setError] = useState<ApiError | Error | null>(null)
   const [loading, setLoading] = useState(Boolean(path))
   const request = useRef(0)
@@ -31,7 +33,7 @@ export function useApi<T>(path: string | null, every = 0) {
   const setData = useCallback((next: T | null | ((current: T | null) => T | null)) => {
     cache.commit(context, () => {
       // A saved mutation is newer than a read already in flight.
-      request.current++; setLoading(false)
+      request.current++; pending.current = null; setLoading(false); setError(null); failed.current = false
       setStored(current => {
         let value = current
         cache.commit(context, () => {
@@ -44,33 +46,45 @@ export function useApi<T>(path: string | null, every = 0) {
   }, [path, context])
   const alive = useRef(true)
   const loadedAt = useRef(0)
+  const failed = useRef(false)
+  const pending = useRef<{ context: number; path: string; ticket: number; promise: Promise<void> } | null>(null)
 
-  const load = useCallback(async () => {
-    if (!path) return
-    const context = cache.context(), ticket = ++request.current
+  const load = useCallback((): Promise<void> => {
+    if (!path) return Promise.resolve()
+    const context = cache.context()
+    if (pending.current?.context === context && pending.current.path === path) return pending.current.promise
+    const ticket = ++request.current
     const accept = (apply: () => void) => cache.commit(context, () => { if (alive.current && ticket === request.current) apply() })
-    try {
-      const next = await api<T>(path)
-      accept(() => { cache.set(path, next, context); setStored(next); setError(null); loadedAt.current = Date.now() })
-    } catch (failure) {
-      accept(() => setError(failure as Error))
-    } finally {
-      accept(() => setLoading(false))
-    }
-  }, [path])
+    accept(() => setLoading(true))
+    const promise = (async () => {
+      try {
+        const next = await read(path)
+        accept(() => { cache.set(path, next, context); setStored(next); setError(null); failed.current = false; loadedAt.current = Date.now() })
+      } catch (failure) {
+        accept(() => { setError(failure as Error); failed.current = true })
+      } finally {
+        accept(() => setLoading(false))
+        if (pending.current?.ticket === ticket) pending.current = null
+      }
+    })()
+    pending.current = { context, path, ticket, promise }
+    return promise
+  }, [path, read])
 
   useEffect(() => {
     alive.current = true
+    setSource({ path, context: cache.context() })
     setStored(path ? cache.get<T>(path) : null)
     setError(null)
-    loadedAt.current = 0
+    loadedAt.current = 0; failed.current = false; pending.current = null
     setLoading(Boolean(path))
     void load()
     return () => { alive.current = false; request.current++ }
   }, [load, path])
 
   useEffect(() => onWorkspaceChange(() => {
-    setStored(null); setError(null); loadedAt.current = 0; setLoading(Boolean(path))
+    setSource({ path, context: cache.context() })
+    setStored(null); setError(null); loadedAt.current = 0; failed.current = false; pending.current = null; setLoading(Boolean(path))
     void load()
   }), [load, path])
 
@@ -81,14 +95,15 @@ export function useApi<T>(path: string | null, every = 0) {
       if (state === 'active') {
         // Stale-while-revalidate: one silent read only when the data is older than
         // FRESH_FOR_MS; the screen keeps what it shows meanwhile.
-        if (loadedAt.current && Date.now() - loadedAt.current >= FRESH_FOR_MS) void load()
+        if (needsForegroundRead(loadedAt.current, failed.current, Date.now(), FRESH_FOR_MS)) void load()
         if (every && !timer) timer = setInterval(load, every)
       } else if (timer) { clearInterval(timer); timer = null }
     })
     return () => { if (timer) clearInterval(timer); sub.remove() }
   }, [every, load, path])
 
-  return { data, error, loading, reload: load, setData }
+  const sameSource = source.path === path && source.context === context
+  return { data: sameSource ? data : path ? cache.get<T>(path) : null, error: sameSource ? error : null, loading: sameSource ? loading : Boolean(path), reload: load, setData }
 }
 
 /** Pull to refresh for a list (the system's RefreshControl): reloads and shows the spinner until the data is back. */

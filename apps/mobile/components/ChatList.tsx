@@ -23,8 +23,8 @@ export function useChatRows(needle = '') {
       .map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt })),
   ].sort((a, b) => b.at.localeCompare(a.at))
   const reload = async () => { await Promise.all([home.reload(), groups.reload()]) }
-  // Only a list with nothing to show fails; a later poll that fails keeps what was drawn.
-  return { rows, loading: home.loading, error: home.data ? null : home.error, reload }
+  // Keep cached rows visible, but surface either failed source so missing groups are not an empty search result.
+  return { rows, loading: home.loading || groups.loading, error: home.error || groups.error, reload }
 }
 
 export const rowKey = (row: ChatRow) => row.kind === 'bot' ? row.bot.id : row.group.id

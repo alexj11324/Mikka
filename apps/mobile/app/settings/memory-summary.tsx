@@ -1,4 +1,8 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useFocusEffect } from 'expo-router'
+import { uuid } from 'expo'
+import { Spinner } from '@/components/icons'
+import { apiCache } from '@/lib/api-cache'
 import { Pressable, StyleSheet, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ArrowUp } from 'lucide-react-native'
@@ -16,26 +20,44 @@ export default function MemorySummaryScreen() {
   const { data } = useSettings()
   const [text, setText] = useState('')
   const [failed, setFailed] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const sending = useRef(false), mounted = useRef(true), focused = useRef(false)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  useFocusEffect(useCallback(() => {
+    focused.current = true
+    return () => { focused.current = false }
+  }, []))
+  const submission = useRef<{ text: string; id: string; context: number } | null>(null)
   // Asking or updating goes to the Coordinator, which keeps the memory; its answer is in the chat.
   const ask = async () => {
     const value = text.trim()
-    if (!value) return
-    setFailed(false)
-    // The words stay until the server takes them.
-    try { await api('/api/mobile/chat', { method: 'POST', body: { text: `关于你记住的事：${value}` } }) } catch { setFailed(true); return }
-    setText('')
-    openChat('/bots/coordinator')
+    if (!value || sending.current) return
+    const context = apiCache.context()
+    if (submission.current?.text !== value || submission.current.context !== context) submission.current = { text: value, id: uuid.v4(), context }
+    sending.current = true; setBusy(true); setFailed(false)
+    // A retry reuses one submission identity when the response was lost.
+    try {
+      await api('/api/mobile/chat', { method: 'POST', body: { text: `关于你记住的事：${value}`, submissionId: submission.current.id } })
+      apiCache.commit(context, () => {
+        if (!mounted.current) return
+        setText(current => current.trim() === value ? '' : current)
+        submission.current = null
+        // A covered screen can remain mounted; do not replace the newer route.
+        if (focused.current) openChat('/bots/coordinator')
+      })
+    } catch { apiCache.commit(context, () => setFailed(true)) }
+    finally { sending.current = false; setBusy(false) }
   }
   return (
     <SettingsPage
       title="记忆摘要"
       footer={
         <View style={[styles.askWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-          {failed ? <Text style={styles.failed}>没发出去</Text> : null}
+          {failed ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.failed}>发送未确认，内容已保留，请重试。</Text> : null}
           <View style={styles.ask}>
-            <TextInput value={text} onChangeText={setText} onSubmitEditing={() => void ask()} placeholder="提问或更新" placeholderTextColor={colors.secondary} style={styles.input} />
-            <Pressable accessibilityRole="button" accessibilityLabel="发送" onPress={() => void ask()} style={[styles.send, text.trim() ? { backgroundColor: colors.accentFill } : null]}>
-              <ArrowUp size={20} color={colors.onAccent} strokeWidth={2.4} />
+            <TextInput accessibilityLabel="提问或更新记忆" editable={!busy} value={text} onChangeText={setText} onSubmitEditing={() => void ask()} placeholder="提问或更新" placeholderTextColor={colors.secondary} style={styles.input} />
+            <Pressable accessibilityRole="button" accessibilityLabel={busy ? "正在发送" : "发送"} accessibilityState={{ busy, disabled: busy || !text.trim() }} disabled={busy || !text.trim()} onPress={() => void ask()} style={({ pressed }) => [styles.send, text.trim() ? { backgroundColor: colors.accentFill } : null, pressed && { opacity: 0.7 }]}>
+              {busy ? <Spinner size={20} color={colors.onAccent} /> : <ArrowUp size={20} color={colors.onAccent} strokeWidth={2.4} />}
             </Pressable>
           </View>
         </View>
@@ -50,7 +72,7 @@ const styles = StyleSheet.create({
   text: { fontSize: 16, lineHeight: 26 },
   askWrap: { paddingHorizontal: 16, paddingTop: 8, gap: 6 },
   failed: { fontSize: 13, color: colors.danger, marginLeft: 18 },
-  ask: { flexDirection: 'row', alignItems: 'center', height: 52, borderRadius: 26, backgroundColor: colors.surface, paddingLeft: 18, paddingRight: 6, ...lift },
-  input: { flex: 1, minWidth: 0, width: 0, fontFamily: font, fontSize: 16, outlineStyle: 'none' } as never,
-  send: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.tertiary, alignItems: 'center', justifyContent: 'center' },
+  ask: { flexDirection: 'row', alignItems: 'center', minHeight: 56, borderRadius: 26, backgroundColor: colors.surface, paddingLeft: 18, paddingRight: 6, ...lift },
+  input: { flex: 1, minWidth: 0, width: 0, color: colors.text, minHeight: 44, fontFamily: font, fontSize: 16, outlineStyle: 'none' } as never,
+  send: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.tertiary, alignItems: 'center', justifyContent: 'center' },
 })

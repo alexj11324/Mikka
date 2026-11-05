@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
+import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Check, X } from 'lucide-react-native'
-import { BotAvatar } from '@/components/icons'
+import { BotAvatar, Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
+import { ReadNotice } from '@/components/ReadNotice'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { Field, Group } from '@/components/ui'
@@ -37,7 +38,6 @@ export default function NewGroup() {
         workspaceId: home.data.workspace.id, title: title.trim(), members: picked.map(id => ({ memberType: 'bot', memberId: id })),
       } })
       tap()
-      router.back()
       openChat(`/groups/${group.id}`)
     } catch {
       setFailed(true)
@@ -49,19 +49,21 @@ export default function NewGroup() {
   return (
     <View style={styles.screen}>
       <NavBar title="新建群聊"
-        left={{ icon: 'xmark', label: '取消', web: <X size={20} color={colors.ink} />, onPress: () => router.back() }}
-        right={{ icon: 'checkmark', label: '创建', web: <Check size={20} color={colors.ink} />, onPress: () => void create() }} />
+        left={{ icon: 'xmark', label: '取消', disabled: busy, web: <X size={20} color={colors.ink} />, onPress: () => router.back() }}
+        right={{ icon: 'checkmark', label: busy ? '创建中' : '创建', disabled: !ready || busy, busy, web: <Check size={20} color={colors.ink} />, onPress: () => void create() }} />
       <ScrollView {...underBar} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         <Field style={styles.field}>
-          <TextInput value={title} onChangeText={setTitle} placeholder="群名" placeholderTextColor={colors.secondary} maxLength={200} autoFocus
+          <TextInput editable={!busy} value={title} onChangeText={setTitle} placeholder="群名" placeholderTextColor={colors.secondary} maxLength={200} autoFocus
             style={styles.input} accessibilityLabel="群名" />
         </Field>
-        {failed ? <Text style={styles.problem}>没能创建</Text> : null}
+        {failed ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.problem}>没能创建</Text> : null}
+        <ReadNotice error={home.error} hasData={Boolean(home.data)} label="Bot 列表" onRetry={home.reload} />
+        {home.loading && !home.data ? <View style={{ alignItems: 'center', paddingVertical: 16 }}><Spinner /></View> : null}
         <Group label="Bot">
           {bots.map(bot => {
             const on = picked.includes(bot.id)
             return (
-              <Pressable key={bot.id} accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => toggle(bot.id)}
+              <Pressable key={bot.id} accessibilityRole="checkbox" accessibilityLabel={bot.name} accessibilityState={{ checked: on, disabled: busy }} aria-checked={Platform.OS === 'web' ? on : undefined} aria-disabled={Platform.OS === 'web' ? busy : undefined} disabled={busy} onPress={() => toggle(bot.id)}
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
                 <BotAvatar color={bot.color} shape={bot.shape} size={32} />
                 <Text style={styles.name} numberOfLines={1}>{bot.name}</Text>
@@ -80,7 +82,7 @@ export default function NewGroup() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.grouped },
   body: { padding: 16, gap: 20 },
-  field: { height: 50, borderRadius: 14, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: colors.surface },
+  field: { minHeight: 50, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: colors.surface },
   input: { fontSize: 17, fontFamily: font, color: colors.text, outlineStyle: 'none' } as never,
   problem: { color: colors.danger, fontSize: 14, marginTop: -8, marginLeft: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },

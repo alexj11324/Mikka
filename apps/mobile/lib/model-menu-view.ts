@@ -27,7 +27,7 @@ export function optionName(option: Pick<ModelOption, 'id' | 'modelId'>) {
 export function modelMenuLabel(current: BotModelCurrent, _running = false) {
   return optionName(current)
 }
-function modelSourceLabel(current: BotModelCurrent) {
+export function modelSourceLabel(current: BotModelCurrent) {
   const metered = current.kind === 'apiKey' || current.kind === 'shared'
   const status = current.availability === 'checking' ? '待检查' : !current.available ? '不可用' : null
   return [optionName(current), current.credentialLabel, metered ? '按量' : null, current.fallback ? '已切换' : null, status].filter(Boolean).join(' · ')
@@ -42,5 +42,7 @@ export function modelStatusLine(current: BotModelCurrent): string | null {
     const reset = quota.resetsAt ? new Date(quota.resetsAt) : null
     return reset && Number.isFinite(reset.getTime()) ? `${exhausted} · ${reset.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 恢复` : exhausted
   }
+  if (current.availability === 'checking') return `${optionName(current)} · 额度待检查`
+  if (!current.available) return `${optionName(current)} 现在不可用，请更换模型或刷新。`
   return current.fallback ? `下一条使用 ${modelSourceLabel(current)}` : null
 }

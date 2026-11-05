@@ -1,0 +1,89 @@
+name: Mobile native release
+
+# Native configuration changes need a new fingerprint-compatible iOS binary.
+# Reuse the existing Expo signing and App Store Connect credentials; never
+# create or repair credentials in CI. OTA publication remains a separate job.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/app.json'
+      - 'apps/mobile/app.config.ts'
+      - 'apps/mobile/eas.json'
+  workflow_dispatch:
+    inputs:
+      submit:
+        description: Submit this exact completed build to TestFlight
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: mobile-native-production
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: EAS iOS build and TestFlight
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Require the existing Expo credential
+        run: node -e "if (!process.env.EXPO_TOKEN) { console.error('EXPO_TOKEN is missing; no native release was published.'); process.exit(1) }"
+      - run: pnpm install --frozen-lockfile --filter @mikka/mobile...
+      - run: pnpm --filter @mikka/mobile typecheck
+      - name: Require successful checks for this exact main commit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release/ci-gate.mjs
+      - name: Build iOS with existing signing credentials
+        working-directory: apps/mobile
+        run: npx -y eas-cli@27.2.0 build --platform ios --profile production --non-interactive --freeze-credentials --wait --json > "$RUNNER_TEMP/mikka-native-build.json"
+      - name: Verify the completed build and commit
+        id: build
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs'
+          const parsed = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/mikka-native-build.json`, 'utf8'))
+          const builds = Array.isArray(parsed) ? parsed : [parsed]
+          const build = builds.find(item => item.platform === 'IOS')
+          if (!build?.id || build.status !== 'FINISHED' || build.gitCommitHash !== process.env.GITHUB_SHA) {
+            throw new Error('Native build completion or exact commit could not be verified; submission stopped.')
+          }
+          const fields = ['id', 'platform', 'status', 'gitCommitHash', 'appVersion', 'appBuildVersion', 'buildProfile', 'createdAt', 'completedAt']
+          const report = { ...Object.fromEntries(fields.map(key => [key, build[key] ?? null])),
+            runtimeVersion: build.runtime?.version ?? null, fingerprint: build.fingerprint?.hash ?? null }
+          mkdirSync('mobile-native-report', { recursive: true })
+          writeFileSync('mobile-native-report/build.json', JSON.stringify(report, null, 2) + '\n')
+          appendFileSync(process.env.GITHUB_OUTPUT, `id=${build.id}\n`)
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Completed iOS build\n\nBuild: ${build.id}\n\nCommit: ${build.gitCommitHash}\n\nThis confirms the binary build. TestFlight processing and device installation are separate.\n`)
+          JS
+      - name: Submit this build to TestFlight
+        if: github.event_name == 'push' || inputs.submit
+        working-directory: apps/mobile
+        run: npx -y eas-cli@27.2.0 submit --platform ios --profile production --id "${{ steps.build.outputs.id }}" --non-interactive --wait
+      - name: Preserve non-secret build evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mobile-native-${{ github.sha }}
+          path: mobile-native-report/build.json
+          if-no-files-found: ignore
+          retention-days: 14
