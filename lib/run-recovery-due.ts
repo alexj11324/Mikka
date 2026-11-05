@@ -10,17 +10,8 @@ const OUTCOME_RETRY = '1 hour'
 /** How often the old minute sweep re-checked state only an outside service knows (the device gateway, E2B). */
 const RECHECK = '60 seconds'
 
-/**
- * The earliest time any run-recovery work is due (epoch ms, rounded up from
- * PostgreSQL microseconds), or null when none can come due without a new write
- * (#1212 D). Each term matches the condition its sweep selects on
- * (lib/run-recovery.ts), so the run-recovery due timer wakes when the first one
- * flips. Work that depends on outside state (a device the gateway may still see,
- * a sandbox E2B may still run) is re-checked every 60 s while it exists, as the
- * minute sweep did. One statement; at idle every term is empty.
- */
-export async function nextRunRecoveryDue(pool: Pick<Pool, 'query'>, options: { factoryLifecycle: boolean }): Promise<number | null> {
-  const { rows } = await pool.query<{ at: string | null }>(`SELECT ceil(extract(epoch FROM min(at))*1000)::bigint::text AS at FROM (
+/** Each run-recovery due time, as rows of `at`; parameters $1-$4 come from runRecoveryDueParams. */
+export const RUN_RECOVERY_DUE_SQL = `
     -- sweepExpiredRunLeases: a lease is lost once leaseExpiresAt < now.
     SELECT min("leaseExpiresAt") + interval '1 millisecond' AS at FROM agent_runs WHERE status = ANY($1::text[]) AND "leaseExpiresAt" IS NOT NULL
     -- ... and a queued retry whose device stopped being seen (the gateway is asked again each minute).
@@ -52,7 +43,21 @@ export async function nextRunRecoveryDue(pool: Pick<Pool, 'query'>, options: { f
         WHERE e."taskId" = t.id AND e.request->>'kind' = 'task_watchdog' AND e.request->>'attemptId' = t."attemptId"::text) w ON true
       WHERE $4 AND (t.status IN ('pending','running') OR (t.status = 'blocked' AND a.output->'watchdog'->>'reasonCode' = 'task_stalled'))
         AND t.stage IN ('spec','execute','review','verify','monitor') AND (live.status IS NULL OR live.status NOT IN ('paused','waiting_input'))
-  ) due`, [[...LEASED_RUN_STATUSES], `${DEVICE_ONLINE_WINDOW_MS} milliseconds`, [...ENDED_RUN_STATUSES], options.factoryLifecycle])
+`
+
+export const runRecoveryDueParams = (factoryLifecycle: boolean) => [[...LEASED_RUN_STATUSES], `${DEVICE_ONLINE_WINDOW_MS} milliseconds`, [...ENDED_RUN_STATUSES], factoryLifecycle]
+
+/**
+ * The earliest time any run-recovery work is due (epoch ms, rounded up from
+ * PostgreSQL microseconds), or null when none can come due without a new write
+ * (#1212 D). Each term matches the condition its sweep selects on
+ * (lib/run-recovery.ts), so the run-recovery due timer wakes when the first one
+ * flips. Work that depends on outside state (a device the gateway may still see,
+ * a sandbox E2B may still run) is re-checked every 60 s while it exists, as the
+ * minute sweep did. One statement; at idle every term is empty.
+ */
+export async function nextRunRecoveryDue(pool: Pick<Pool, 'query'>, options: { factoryLifecycle: boolean }): Promise<number | null> {
+  const { rows } = await pool.query<{ at: string | null }>(`SELECT ceil(extract(epoch FROM min(at))*1000)::bigint::text AS at FROM (${RUN_RECOVERY_DUE_SQL}) due`, runRecoveryDueParams(options.factoryLifecycle))
   return rows[0]?.at == null ? null : Number(rows[0].at)
 }
 

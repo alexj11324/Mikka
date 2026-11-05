@@ -64,7 +64,7 @@ test('wake recovery exposes started and exhausted counts in existing Worker logs
   assert.deepEqual(logs, [...MINUTE_ENDPOINTS, ...HALF_PAST_EXTRA].map(path => `${path} 200 {"due":3,"failed":1,"deferred":1,"started":1,"exhausted":2}`))
 })
 
-test('a failed wake sweep still waits for schedule execution and lease recovery', async t => {
+test('a failed safety-net sweep still waits for the other endpoints of that minute', async t => {
   t.mock.method(console, 'log', () => {})
   const calls = []
   let finishSchedules
@@ -74,10 +74,10 @@ test('a failed wake sweep still waits for schedule execution and lease recovery'
     const path = new URL(url).pathname.replace('/mikka', '')
     calls.push(path)
     if (path === MINUTE_ENDPOINTS[0]) return new Response(null, { status: 503 })
-    if (path === MINUTE_ENDPOINTS[1]) await held
+    if (path === HALF_PAST_EXTRA[0]) await held
     return Response.json({ owners: 1, materialized: 2, executed: 2, reported: 1 })
   }, HALF_PAST).finally(() => { settled = true })
-  const failure = assert.rejects(tick, /coordinator-wakes answered 503/)
+  const failure = assert.rejects(tick, /reconcile answered 503/)
   await new Promise(resolve => setImmediate(resolve))
   assert.deepEqual(calls, [...MINUTE_ENDPOINTS, ...HALF_PAST_EXTRA])
   assert.equal(settled, false)
@@ -168,9 +168,7 @@ test('a complete UTC hour runs each reconciliation sweep and maintenance at its 
     assert.ok(call.signal instanceof AbortSignal)
   }
   assert.deepEqual(counts, {
-    '/api/cron/coordinator-wakes': 12,
-    '/api/cron/schedules': 6,
-    '/api/cron/run-recovery': 4,
+    '/api/cron/reconcile': 4,
     '/api/cron/account-deletions': 1,
     '/api/cron/audit-retention': 1,
     '/api/cron/subscriptions': 1,
