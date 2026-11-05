@@ -6,6 +6,8 @@ import { scheduleOnRN } from 'react-native-worklets'
 import { AccessibilityInfo, Animated, Image, PanResponder, Platform, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
 import { Check, CircleAlert, Copy, Ellipsis, Reply } from 'lucide-react-native'
 import { CardButton } from '@/components/cards'
+import { MessageMenu, NATIVE_MESSAGE_MENU } from '@/components/MessageMenu'
+import type { HeldMessage } from '@/lib/message-actions'
 import { ENTER, rubberBand, SNAP_BACK } from '@/lib/springs'
 import { StatusIcon } from '@/components/icons'
 import { Symbol } from '@/components/Symbol'
@@ -184,7 +186,7 @@ const QUOTE_AT = 56
  * arrow behind it; letting go past the mark quotes it in the composer, with a
  * tick, as in iMessage and Claude. A spring takes it back on the UI thread.
  */
-export function TimedRow({ time, offset, children, align = 'left', onQuote, onLongPress }: { time?: string; offset: Animated.Value; children: ReactNode; align?: 'left' | 'right'; onQuote?: () => void; onLongPress?: () => void }) {
+export function TimedRow({ time, offset, children, align = 'left', onQuote, onLongPress, menu }: { time?: string; offset: Animated.Value; children: ReactNode; align?: 'left' | 'right'; onQuote?: () => void; onLongPress?: () => void; menu?: HeldMessage }) {
   const drag = useSharedValue(0)
   const reduceMotion = useReducedMotionPreference()
   const quote = useCallback(() => { tap(); onQuote?.() }, [onQuote])
@@ -204,8 +206,10 @@ export function TimedRow({ time, offset, children, align = 'left', onQuote, onLo
     // quotes the message and must not leave its bubble stuck off its baseline.
     .onFinalize(event => { drag.value = reduceMotion ? 0 : withSpring(0, { ...SNAP_BACK, velocity: event.velocityX }) })
   const held = useCallback(() => { press(); onLongPress?.() }, [onLongPress])
-  // A long press opens the message's actions (app/message.tsx).
-  const long = Gesture.LongPress().enabled(Boolean(onLongPress)).minDuration(380).onStart(() => { scheduleOnRN(held) })
+  // A long press opens the message's actions: on iOS the system context menu (MessageMenu), elsewhere the sheet
+  // (app/message.tsx). VoiceOver and the keyboard reach the sheet through the frame below on every platform.
+  const native = NATIVE_MESSAGE_MENU && Boolean(menu)
+  const long = Gesture.LongPress().enabled(Boolean(onLongPress) && !native).minDuration(380).onStart(() => { scheduleOnRN(held) })
   const moved = useAnimatedStyle(() => ({ transform: [{ translateX: drag.value }] }))
   const arrow = useAnimatedStyle(() => ({ opacity: Math.min(1, drag.value / QUOTE_AT), transform: [{ scale: reduceMotion ? 1 : 0.6 + 0.4 * Math.min(1, drag.value / QUOTE_AT) }] }))
   return (
@@ -217,7 +221,7 @@ export function TimedRow({ time, offset, children, align = 'left', onQuote, onLo
         </Reanimated.View>
         <Reanimated.View style={moved}>
           <Animated.View style={{ transform: [{ translateX: offset }], alignItems: align === 'right' ? 'flex-end' : 'stretch' }}>
-            {children}
+            {native ? <MessageMenu message={menu}><View style={{ alignItems: align === 'right' ? 'flex-end' : 'stretch' }}>{children}</View></MessageMenu> : children}
             {time ? <Text style={styles.time}>{time}</Text> : null}
           </Animated.View>
         </Reanimated.View>

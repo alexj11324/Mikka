@@ -20,7 +20,7 @@ import { api } from '@/lib/api'
 import { outgoing, type Attachment } from '@/lib/attachments'
 import { clockTime } from '@/lib/clock'
 import { isOpenUI } from '@/lib/openui'
-import { holdMessage } from '@/lib/message-actions'
+import { holdMessage, type HeldMessage } from '@/lib/message-actions'
 import { plainText, quotable } from '@/lib/quote'
 import { delivered, inFlight, marked, outgoingKey, queued, sendFailureState, submissionBody, unsettled, type Outgoing } from '@/lib/outbox'
 import { apiCache } from '@/lib/api-cache'
@@ -193,9 +193,10 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
   }
 
   // A long press: reactions, then 回复 · 复制 · 选择文本 in a system sheet (app/message.tsx).
+  const message = (words: string, id?: string): HeldMessage => ({ text: plainText(words), onQuote: () => setQuote(quotable(words)),
+    ...(id ? { react: { current: myReaction(reactions[id]), set: emoji => void react(id, emoji) } } : {}) })
   const actions = (words: string, id?: string) => {
-    holdMessage({ text: plainText(words), onQuote: () => setQuote(quotable(words)),
-      ...(id ? { react: { current: myReaction(reactions[id]), set: emoji => void react(id, emoji) } } : {}) })
+    holdMessage(message(words, id))
     router.push('/message')
   }
   const chips = (id: string | undefined, align?: 'right') => id
@@ -232,9 +233,9 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
               <Arrival key={item.pending ? `pending-${item.position}` : item.position} animate={arrived(item.position)}>
                 {question ? <ThreadCard title={question.title} status="waiting" info="在等你回答" action="去回答" onPress={() => router.push(`/thread/${question.runId}`)} />
                   : item.from === 'event' ? <EventLine text={eventText(item.line, sources)} /> : null}
-                {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right" onQuote={item.text ? () => setQuote(quotable(item.text)) : undefined} onLongPress={item.text ? () => actions(item.text, item.id) : undefined}><MyBubble text={item.text} photos={photos(item.id, item.images)} />{chips(item.id, 'right')}</TimedRow> : null}
+                {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right" onQuote={item.text ? () => setQuote(quotable(item.text)) : undefined} onLongPress={item.text ? () => actions(item.text, item.id) : undefined} menu={item.text ? message(item.text, item.id) : undefined}><MyBubble text={item.text} photos={photos(item.id, item.images)} />{chips(item.id, 'right')}</TimedRow> : null}
                 {item.from === 'coordinator' && item.text ? (
-                  <TimedRow time={time} offset={offset} onQuote={() => setQuote(quotable(item.text))} onLongPress={() => actions(item.text, item.id)}>
+                  <TimedRow time={time} offset={offset} onQuote={() => setQuote(quotable(item.text))} onLongPress={() => actions(item.text, item.id)} menu={message(item.text, item.id)}>
                     {isOpenUI(item.text)
                       ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} webPath={webChatPath(data?.botId ?? botId, workspaceId)} sources={sources} onOpen={open} />
                       : <BotBubble><Markdown text={item.text} sources={sources} onOpen={open} /></BotBubble>}

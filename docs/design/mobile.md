@@ -180,7 +180,7 @@ Administration (members, teams, devices) stays on the web.
 
 Wherever iOS has a native control or behavior, the app uses it; we build our own only where nothing native exists
 ([2026-11-05-1230](decisions/2026-11-05-1230-ios-native-first.md)). Native today: the stack header with the system
-material and its back swipe, the header's 更多 (UIMenu via `Stack.Toolbar.Menu`), the account sheet (page sheet, SwiftUI `Form`), the model picker and 「+」 (SwiftUI
+material and its back swipe, the header's 更多 (UIMenu via `Stack.Toolbar.Menu`), a message's long press (the system context menu), the account sheet (page sheet, SwiftUI `Form`), the model picker and 「+」 (SwiftUI
 `Menu`), segmented controls (SwiftUI `Picker`), switches (`UISwitch`), the activity indicator, sheets (`formSheet` with
 detents, `modal` page sheets), and the scroll views' bounce and momentum. The vendored beui kit is not used for any of
 these.
@@ -191,7 +191,7 @@ What is still our own, and why:
 |---|---|
 | Message bubbles, event lines, the thread card (`components/chat.tsx`) | iOS has no chat transcript control. |
 | Swipe right to quote, swipe left for times (`TimedRow`, `useTimeReveal`) | Messages' gestures are not public API; ours follow them, on `lib/springs.ts`. |
-| Long-press message actions (`app/message.tsx`, a native `formSheet`) | The native context menu with a preview (`@expo/ui` `ContextMenu`) needs the bubble hosted in SwiftUI and a device to check it; it moves to its own PR (#1386 follow-up). UIKit has no reaction row on a context menu: the emoji row would sit in the preview, as in Messages. |
+| Reactions in the long-press menu | A long press on iOS is the system context menu (`components/MessageMenu.ios.tsx`, `@expo/ui` `ContextMenu`), lifting the bubble itself. iOS has no reaction bar on a context menu, so the six reactions are two compact `ControlGroup` rows of three at its top. VoiceOver, the keyboard and the web build keep the actions sheet (`app/message.tsx`). |
 | The reply action row (copy · 回复 · 更多) | Not a system control; ChatGPT and Claude draw it the same way. |
 | The composer (`Composer` in `components/ui.tsx`) | iOS has no chat composer; its text field is the system's `UITextView`. |
 | Settings rows (`components/settings.tsx` `Row`) | Drawn as an inset grouped list; moving them to `@expo/ui` `Form` is a separate change. |

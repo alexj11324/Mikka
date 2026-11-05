@@ -21,7 +21,7 @@ import { api } from '@/lib/api'
 import { clockTime } from '@/lib/clock'
 import { mentionsIn } from '@/lib/group'
 import { useHome } from '@/lib/home'
-import { holdMessage } from '@/lib/message-actions'
+import { holdMessage, type HeldMessage } from '@/lib/message-actions'
 import { plainText, quotable } from '@/lib/quote'
 import { myReaction, toggled, withMine } from '@/lib/reactions'
 import type { GroupMember, GroupMessage, GroupPage, GroupSummary, Reaction } from '@/lib/types'
@@ -153,8 +153,9 @@ export default function GroupChat() {
     }
   }
 
+  const held = (words: string, messageId: string): HeldMessage => ({ text: plainText(words), onQuote: () => setQuote(quotable(words)), react: { current: myReaction(reactions[messageId]), set: emoji => void react(messageId, emoji) } })
   const actions = (words: string, messageId: string) => {
-    holdMessage({ text: plainText(words), onQuote: () => setQuote(quotable(words)), react: { current: myReaction(reactions[messageId]), set: emoji => void react(messageId, emoji) } })
+    holdMessage(held(words, messageId))
     router.push('/message')
   }
   const chips = (messageId: string, align?: 'right') => <Reactions reactions={reactions[messageId]} align={align} onToggle={emoji => void react(messageId, toggled(reactions[messageId], emoji))} />
@@ -175,7 +176,7 @@ export default function GroupChat() {
             const time = clockTime(message.createdAt)
             if (message.authorType === 'user' && message.authorId === me) {
               return (
-                <TimedRow key={message.id} time={time} offset={offset} align="right" onQuote={() => setQuote(quotable(message.body))} onLongPress={() => actions(message.body, message.id)}>
+                <TimedRow key={message.id} time={time} offset={offset} align="right" onQuote={() => setQuote(quotable(message.body))} onLongPress={() => actions(message.body, message.id)} menu={held(message.body, message.id)}>
                   <MyBubble text={message.body} />{chips(message.id, 'right')}
                 </TimedRow>
               )
@@ -184,7 +185,7 @@ export default function GroupChat() {
             const previous = messages[index - 1]
             const first = !previous || previous.authorType !== message.authorType || previous.authorId !== message.authorId
             return (
-              <TimedRow key={message.id} time={time} offset={offset} onQuote={() => setQuote(quotable(message.body))} onLongPress={() => actions(message.body, message.id)}>
+              <TimedRow key={message.id} time={time} offset={offset} onQuote={() => setQuote(quotable(message.body))} onLongPress={() => actions(message.body, message.id)} menu={held(message.body, message.id)}>
                 {first ? (
                   <View style={styles.author}>
                     {message.authorType === 'user' ? null : <BotAvatar color={author?.color} shape={author?.shape} size={20} />}
