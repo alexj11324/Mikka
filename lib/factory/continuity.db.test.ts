@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { Pool, type PoolClient } from 'pg'
 import { dbUrl, seedAgent, seedIssue, seedRun, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { cleanAllowedModels, seedAllowedModel } from '../../tests/support/allowed-model'
 import { createFactoryStore, type FactoryTask } from './store'
 import { factoryBinding } from './dispatch'
 import { FactoryError } from './contract'
@@ -11,8 +12,12 @@ import { currentFactoryRequest } from './checks'
 import { factoryRecoveryHandoff, persistFactoryHandoff } from './handoff'
 import { sweepFactoryWatchdog, type WatchdogDependencies } from './watchdog'
 
+process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
+process.env.MIKKA_BYOS_ENABLED = '1'
+
 test('PG: request epochs, stale completion fences and unattended handoff are durable', { skip: !dbUrl, timeout: 120000 }, async t => {
   const pool = new Pool({ connectionString: dbUrl, max: 8 })
+  const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('../db'), import('../workspace-db')])
   const owner = await seedUser(pool, 'factory-continuity')
   const workspace = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
   const agentId = await seedAgent(pool, owner)
@@ -23,9 +28,14 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
     await pool.query('DELETE FROM factory_tasks WHERE id=ANY($1::uuid[])', [taskIds])
     await pool.query('DELETE FROM coordinator_events WHERE "userId"=$1', [owner])
     await pool.query('DELETE FROM agent_runs WHERE "userId"=$1', [owner])
+    await cleanAllowedModels(pool, [owner])
+    await pool.query('DELETE FROM agents WHERE "userId"=$1', [owner])
+    await pool.query('DELETE FROM devices WHERE "ownerId"=$1', [owner])
     await pool.query('DELETE FROM issues WHERE "userId"=$1', [owner])
+    await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [workspace.id])
+    await pool.query('DELETE FROM mikka_workspaces WHERE id=$1', [workspace.id])
     await pool.query('DELETE FROM "user" WHERE id=$1', [owner])
-    await pool.end()
+    await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
   const transaction = async <T>(fn: (tx: PoolClient) => Promise<T>) => {
     const tx = await pool.connect()
@@ -164,5 +174,61 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
     for (const minutes of [0, 0, 3, 8, 17]) await sweepFactoryWatchdog(pool, dependencies, new Date(now.getTime() + minutes * 60_000))
     assert.equal(dispatches, 3)
     assert.equal((await pool.query('SELECT status FROM factory_tasks WHERE id=$1', [pending.id])).rows[0].status, 'blocked')
+  })
+
+  await t.test('commit-time membership revocation rolls back watchdog dispatch without launching or reporting recovery', async () => {
+    const original = await fixture()
+    const pending = await advance(original, await followup(original, 'Continue only while this workspace membership remains active'))
+    const deviceId = randomUUID(), childId = randomUUID()
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt") VALUES ($1,$2,'Watchdog commit fixture','local',true,now())`, [deviceId, owner])
+    await pool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [agentId, deviceId])
+    await seedAllowedModel(pool, owner, { workspaceId: workspace.id, deviceIds: [deviceId] })
+    await pool.query(`UPDATE factory_tasks SET "updatedAt"=now()-interval '2 minutes' WHERE id=$1`, [pending.id])
+    const beforeTask = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [pending.id])).rows[0]
+    const beforeAttempt = (await pool.query('SELECT * FROM factory_attempts WHERE id=$1', [pending.attemptId])).rows[0]
+    const beforeEvents = (await pool.query('SELECT * FROM factory_events WHERE "taskId"=$1 ORDER BY "eventId"', [pending.id])).rows
+    const { resolveAgentProfileDispatch } = await import('./agent-profile')
+    let planned = 0, revoked = false, starts = 0, wakes = 0, reconciles = 0
+    let bindingId: string | undefined
+    const callbacks: WatchdogDependencies = {
+      runtime: () => ({ store, reconcile: { run: async () => { reconciles++ } } }),
+      wake: async () => { wakes++ },
+      dispatch: async (tx, currentStore, task) => {
+        assert.equal(task.id, pending.id)
+        const selected = await resolveAgentProfileDispatch(pool, { ownerId: owner, workspaceId: workspace.id, botId: null },
+          { issueId: task.issueId, location: 'local', agentId }, { transaction: tx })
+        assert.equal(selected.target.kind, 'device')
+        if (selected.target.kind !== 'device') assert.fail('the real subscription catalogue must select the fixture device')
+        assert.equal(selected.agentProfile?.source, 'default')
+        bindingId = selected.target.subscriptionBindingId
+        assert.ok(bindingId)
+        assert.equal((await tx.query('SELECT id FROM byos_bindings WHERE id=$1 AND "consumerId"=$2', [bindingId, agentId])).rowCount, 1)
+        assert.equal((await pool.query('SELECT id FROM byos_bindings WHERE id=$1', [bindingId])).rowCount, 0, 'binding is still uncommitted')
+        // This synthetic queue write isolates the real watchdog owner's commit
+        // boundary; model selection, source binding and membership are real.
+        await tx.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId","issueId",kind,status,prompt,"agentDefinition")
+          VALUES ($1,$2,$3,$4,$5,'implement','queued','Watchdog commit fixture',$6)`,
+          [childId, owner, agentId, deviceId, task.issueId, JSON.stringify({ agentProfile: selected.agentProfile })])
+        await currentStore.apply(owner, factoryBinding(task), randomUUID(), { action: 'bind_run', runId: childId }, tx)
+        planned++
+        await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace.id, owner])
+        revoked = true
+        return async () => { starts++ }
+      },
+    }
+    try {
+      const result = await sweepFactoryWatchdog(pool, callbacks)
+      assert.equal(planned, 1, 'the child and exact subscription binding reached the owning transaction')
+      assert.equal(revoked, true, 'authority changes after planning and before the real COMMIT')
+      assert.deepEqual(result, { scanned: 1, recovered: 0, blocked: 0, deferred: 0, failed: 1 })
+      assert.deepEqual({ starts, wakes, reconciles }, { starts: 0, wakes: 0, reconciles: 0 })
+      assert.equal((await pool.query('SELECT id FROM agent_runs WHERE id=$1', [childId])).rowCount, 0)
+      assert.equal((await pool.query('SELECT id FROM byos_bindings WHERE id=$1', [bindingId])).rowCount, 0)
+      assert.deepEqual((await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [pending.id])).rows[0], beforeTask)
+      assert.deepEqual((await pool.query('SELECT * FROM factory_attempts WHERE id=$1', [pending.attemptId])).rows[0], beforeAttempt)
+      assert.deepEqual((await pool.query('SELECT * FROM factory_events WHERE "taskId"=$1 ORDER BY "eventId"', [pending.id])).rows, beforeEvents)
+    } finally {
+      await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace.id, owner])
+    }
   })
 })
