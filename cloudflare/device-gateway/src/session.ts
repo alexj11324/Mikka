@@ -1,11 +1,13 @@
 import { DurableObject } from 'cloudflare:workers'
-import { liveInvalidations, liveReady, type LiveInvalidation } from '../../../lib/live/events'
+import { LIVE_REVISION_PARAM, liveInvalidations, liveReady, withoutRevisions, type LiveInvalidation } from '../../../lib/live/events'
 
 const ONLINE_WINDOW_MS = 90_000
 
 interface ConnectionAttachment {
   connectedAt: number
   liveExpiresAt?: number
+  /** The socket asked for version 2 keys. Older tabs and the mobile app never do. */
+  liveRevisions?: boolean
 }
 
 /**
@@ -37,7 +39,9 @@ export class DeviceSession extends DurableObject<Record<string, unknown>> {
     const pair = new WebSocketPair()
     const client = pair[0]
     const server = pair[1]
-    const live = new URL(request.url).pathname.startsWith('/v1/live/')
+    const url = new URL(request.url)
+    const live = url.pathname.startsWith('/v1/live/')
+    const revisions = live && url.searchParams.get(LIVE_REVISION_PARAM) === '1'
     // A daemon reconnect replaces its previous socket. Browser tabs share
     // their owner/workspace channel until their individual tickets expire.
     for (const existing of this.ctx.getWebSockets()) {
@@ -46,8 +50,8 @@ export class DeviceSession extends DurableObject<Record<string, unknown>> {
       else if (expiry && expiry <= Date.now()) existing.close(4001, 'ticket expired')
     }
     this.ctx.acceptWebSocket(server)
-    server.serializeAttachment({ connectedAt: Date.now(), ...(live ? { liveExpiresAt: Number(protocol.match(/^mikka-ticket-(\d+)-/)?.[1]) * 1000 } : {}) } satisfies ConnectionAttachment)
-    if (live) server.send(JSON.stringify(liveReady()))
+    server.serializeAttachment({ connectedAt: Date.now(), ...(live ? { liveExpiresAt: Number(protocol.match(/^mikka-ticket-(\d+)-/)?.[1]) * 1000 } : {}), ...(revisions ? { liveRevisions: true } : {}) } satisfies ConnectionAttachment)
+    if (live) server.send(JSON.stringify(liveReady(revisions ? 2 : 1)))
     // The edge authenticated this exact ticket. Node's built-in WebSocket
     // rejects the upgrade unless its offered protocol is selected here.
     return new Response(null, {
@@ -89,12 +93,15 @@ export class DeviceSession extends DurableObject<Record<string, unknown>> {
 
   /** Browser tabs share a channel; an expired ticket never receives another key. */
   async notifyLive(events: LiveInvalidation[]) {
-    const validated = liveInvalidations(events)
+    const validated = liveInvalidations(events, true)
     if (!validated) return
+    const plain = withoutRevisions(validated)
     for (const socket of this.ctx.getWebSockets()) {
-      const expiry = (socket.deserializeAttachment() as ConnectionAttachment | null)?.liveExpiresAt
+      const attachment = socket.deserializeAttachment() as ConnectionAttachment | null
+      const expiry = attachment?.liveExpiresAt
       if (!expiry || expiry <= Date.now()) { socket.close(4001, 'ticket expired'); continue }
-      try { for (const event of validated) socket.send(JSON.stringify(event)) }
+      // A version 1 reader drops any key with a third field, so it gets the plain key.
+      try { for (const event of attachment?.liveRevisions ? validated : plain) socket.send(JSON.stringify(event)) }
       catch { /* a closing tab is dropped by the runtime */ }
     }
   }

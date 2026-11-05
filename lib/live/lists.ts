@@ -113,13 +113,13 @@ type Resolve = (database: Database, workspaceDatabase: Database) => Promise<Targ
  * not publish before the outer COMMIT, and deferred reads retain its database. */
 async function changed(executor: object, key: string, resolve: Resolve) {
   if (!liveGatewayConfig(process.env)) return
-  const { scheduleLive, sendLiveInvalidations } = await import('./notify')
+  const { scheduleLive } = await import('./notify')
   afterDatabaseCommit(executor, `list:${key}`, () => scheduleLive(async () => {
     const { pool, withoutDatabaseClient } = await import('../db/request-scope')
     const { workspacePool } = await import('../workspace-db')
     await withoutDatabaseClient(async () => {
       const targets = mergeTargets(await resolve(pool, workspacePool))
-      await Promise.all(targets.map(value => sendLiveInvalidations(value.scope, value.events)))
+      await (await import('./publish')).sendLiveTargets(pool, targets)
     })
   }))
 }

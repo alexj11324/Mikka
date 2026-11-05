@@ -31,7 +31,11 @@ class FakeSocket {
   onerror: (() => void) | null = null
   onmessage: ((event: { data: string }) => void) | null = null
   readySent = false
-  constructor(readonly url: string, readonly protocol: string) {
+  readonly url: string
+  // The channel asks the Worker for revisions; the fixture addresses the socket by its channel path.
+  constructor(url: string, readonly protocol: string) {
+    assert.equal(new URL(url).searchParams.get('revisions'), '1')
+    this.url = url.split('?')[0]
     sockets.push(this)
     queueMicrotask(() => {
       if (this.readyState !== 0) return

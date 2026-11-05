@@ -78,6 +78,7 @@ import { closeLogger, createLogger, type Logger } from "./log"
 import { Outbox } from "./outbox"
 import { QuotaPoller, type QuotaSource } from "./quota/poller"
 import { DAEMON_VERSION, daemonPaths, type DaemonPaths } from "./paths"
+import { daemonTracer, runIdHash } from "./tracing"
 import { decide, pushDecision, runPolicy } from "./permissions"
 import { judgeComputerAction, noServerDecision } from "./decision-judgments"
 import type { ServerDecide } from "./server-decision"
@@ -779,6 +780,9 @@ export class Daemon {
     if (!mint || this.gatewayUnavailable || performance.now() < this.gatewayRetryAt) return false
     let openedAt: number | undefined
     let failure: unknown
+    // The connect span ends when the socket opens, or with the error that kept it from opening.
+    let gatewayOpened: (() => void) | undefined
+    let gatewayFailed: ((error: unknown) => void) | undefined
     const connection = new AbortController()
     const abort = () => connection.abort()
     signal.addEventListener("abort", abort, { once: true })
@@ -793,9 +797,14 @@ export class Daemon {
       if (!ticket.url || !ticket.protocol) { this.gatewayUnavailable = true; return false }
       if (signal.aborted) return false
       const socket = openDeviceGateway(ticket.url, ticket.protocol)
+      void daemonTracer.span("daemon.gateway.connect", { "mikka.gateway.mode": this.runControlPush ? "push" : "legacy" }, () => new Promise<void>((resolve, reject) => {
+        gatewayOpened = resolve
+        gatewayFailed = reject
+      }), { root: true }).catch(() => undefined)
       await runDeviceGateway(socket, {
         signal: connection.signal,
         onOpen: () => {
+          gatewayOpened?.()
           openedAt = performance.now()
           this.gatewayLive = true
           if (this.runControlPush) this.options.link.setRunControlMode?.('push')
@@ -821,6 +830,7 @@ export class Daemon {
         if (error instanceof SessionRejectedError) await this.syncWithServer().catch(() => undefined)
       }
     } finally {
+      gatewayFailed?.(failure ?? new DeviceGatewayClosedError())
       connection.abort()
       signal.removeEventListener("abort", abort)
       this.gatewayLive = false
@@ -1278,7 +1288,7 @@ export class Daemon {
 
   private async register(credential: string) {
     const { workspaceId, deviceId: knownDeviceId } = this.device
-    const { deviceId } = await this.options.link.registerDevice(
+    const { deviceId, tracing } = await this.options.link.registerDevice(
       credential,
       {
         name: hostname(),
@@ -1303,6 +1313,8 @@ export class Daemon {
       this.saveDevice({ deviceId })
       this.log.info({ device_id: deviceId }, "device registered")
     }
+    // Only Mikka's own daemon operations; the server sends the settings (docs/operations/tracing.md, "Daemon").
+    if (!this.stopped) daemonTracer.configure(tracing, { version: DAEMON_VERSION })
     const computerBroker = this.localComputerBroker ?? this.cloudComputerBroker ?? this.options.computerBroker
     if (computerBroker && !this.options.link.syncComputerReviews) throw new Error("Computer review transport unavailable")
     this.registered = true
@@ -1502,7 +1514,11 @@ export class Daemon {
     if (!isSafeId(runId)) return this.refuseRun(runId)
     const existing = this.journal.get(runId)
     if (existing) return this.supervisor.summary(existing)
-    const assignment = await this.options.link.claimRun(deviceId, runId, this.commandsAbort.signal)
+    const assignment = await daemonTracer.span("daemon.run.lease", { "mikka.run.id_hash": runIdHash(runId) }, async span => {
+      const claimed = await this.options.link.claimRun(deviceId, runId, this.commandsAbort.signal)
+      span.set("mikka.harness", claimed.harness)
+      return claimed
+    }, { root: true })
     if (assignment.runId !== runId) return this.refuseRun(runId)
     // A hosted workspace can be registered after this daemon starts. Resolve
     // that server-owned registration before the synchronous repository check.
@@ -1853,6 +1869,7 @@ export class Daemon {
       await this.cloudComputerBroker?.close()
     }
     await this.outbox?.close()
+    await daemonTracer.shutdown()
     const release = this.releaseLock
     this.releaseLock = null
     await release?.().catch((err: unknown) => {

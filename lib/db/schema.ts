@@ -1215,6 +1215,13 @@ export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
   processedAt: timestamp('processedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
+/** A live key's post-commit revision (lib/live/revisions.ts). No content: kind, ID and a counter. */
+export const liveRevisions = pgTable('live_revisions', {
+  kind: text('kind').notNull(),
+  id: uuid('id').notNull(),
+  revision: bigint('revision', { mode: 'number' }).notNull().default(1),
+}, table => [primaryKey({ columns: [table.kind, table.id] })])
+
 export { projectDecisions, projectDecisionSources } from './project-map-schema.ts'
 
 export { factoryAgentProfiles, factoryAgentProfileVersions } from './agent-profile-schema.ts'

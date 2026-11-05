@@ -156,6 +156,13 @@ export type DeviceRegistration = z.infer<typeof deviceRegistration>
 export const deviceRegistered = z.object({
   deviceId: id,
   workspaceId: z.uuid(),
+  /** Where the daemon sends traces of its own operations (docs/operations/tracing.md, "Daemon"). Only a public project token. */
+  tracing: z.object({
+    endpoint: z.url().max(512),
+    projectToken: z.string().regex(/^phc_[A-Za-z0-9_-]{8,128}$/),
+    sampleRate: z.number().min(0).max(1),
+    environment: z.enum(['production', 'preview', 'dev']).optional(),
+  }).optional().catch(undefined),
 })
 export type DeviceRegistered = z.infer<typeof deviceRegistered>
 

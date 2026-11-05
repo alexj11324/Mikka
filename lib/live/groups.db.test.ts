@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { wireKeys } from './wire-keys.test-support'
 import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import test, { mock } from 'node:test'
@@ -30,8 +31,7 @@ test('group chat keys reach only current members, after the actual writer commit
     assert.equal(target.hostname, 'gateway.example.invalid', 'no provider or production request is allowed')
     const scope = channelScopes.get(target.pathname)
     if (!scope) unexpected.push(target.pathname)
-    const events: LiveInvalidation[] = JSON.parse(String(options?.body))
-    for (const event of events) assert.deepEqual(Object.keys(event).sort(), ['id', 'kind'], 'a key carries a kind and an id, never a message')
+    const events: LiveInvalidation[] = wireKeys(JSON.parse(String(options?.body)), 'a key carries a kind and an id, never a message')
     // An older gateway refuses a kind it does not know per request: group_chat is never batched with another kind.
     if (events.some(event => event.kind === 'group_chat')) assert.ok(events.every(event => event.kind === 'group_chat'))
     // group_list (lists.db.test.ts) and bot chat keys (chats.db.test.ts) are covered there; collect the rest.

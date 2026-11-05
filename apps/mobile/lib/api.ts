@@ -4,6 +4,7 @@ import { authClient } from '@/lib/auth'
 import { API_URL } from '@/lib/config'
 import { endLostSession } from '@/lib/session'
 import { apiCache } from './api-cache'
+import { mobileTraceHeaders } from './tracing'
 
 const WORKSPACE_KEY = 'mikka_workspace'
 
@@ -41,9 +42,10 @@ export async function saveWorkspace(id: string) {
  */
 /** The headers that sign a request as the person (iOS: the session and workspace cookies; the web's browser sends its own). */
 export async function authHeaders(): Promise<Record<string, string>> {
-  if (Platform.OS === 'web') return {}
+  const tracing = mobileTraceHeaders()
+  if (Platform.OS === 'web') return tracing
   const workspace = await savedWorkspace()
-  return { cookie: [await authClient.getCookie(), workspace ? `mikka-workspace=${workspace}` : ''].filter(Boolean).join('; ') }
+  return { ...tracing, cookie: [await authClient.getCookie(), workspace ? `mikka-workspace=${workspace}` : ''].filter(Boolean).join('; ') }
 }
 
 /** A request that has not answered by then fails, so nothing waits on it forever (a send shows 重试). */
