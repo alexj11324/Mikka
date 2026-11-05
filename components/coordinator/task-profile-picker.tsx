@@ -26,7 +26,7 @@ export function TaskProfilePicker({ workspaceId, value, onChange, data, disabled
   return <Select value={value ?? 'auto'} onValueChange={id => { if (id === MANAGE) manage(); else if (id) onChange(id === 'auto' ? null : id) }}
     items={[{ value: 'auto', label: t('automatic') }, ...profiles.map(profile => ({ value: profile.id, label: profile.name })),
       ...(value && !selected ? [{ value, label: t('selectionUnavailable') }] : []), { value: MANAGE, label: t('manage') }]} disabled={disabled || !workspaceId}>
-    <SelectTrigger size="sm" className="h-7 min-w-28 max-w-44 gap-1.5 rounded-full px-2.5" aria-label={t('taskProfile')}><SlidersHorizontal aria-hidden="true" /><SelectValue className="min-w-0 truncate" /></SelectTrigger>
+    <SelectTrigger size="sm" className="h-7 min-w-28 max-w-56 gap-1.5 rounded-full px-2.5" aria-label={t('taskProfile')}><SlidersHorizontal aria-hidden="true" /><SelectValue className="min-w-0 truncate" /></SelectTrigger>
     <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-64 max-w-[calc(100vw-3rem)]">
       <SelectGroup>
         <SelectItem value="auto">{t('automatic')}</SelectItem>
