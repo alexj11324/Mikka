@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { factoryChanged } from '../live/factory'
+import { runControlChanged } from '../device-gateway-notify'
 import type { Pool, PoolClient } from 'pg'
 import { FactoryError } from './contract'
 import { ActionFailureError } from '../action-error'
@@ -190,9 +191,10 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
         } else await runtime.store.apply(task.userId, factoryBinding(task), factoryEventId('watchdog-block', eventId), {
           action: 'finish', status: 'blocked', reason, evidence: [], output,
         }, tx)
-        await tx.query(`UPDATE agent_runs SET "stopRequestedAt"=COALESCE("stopRequestedAt",now()),"updatedAt"=now()
+        const { rows: stoppedRuns } = await tx.query<{ id: string }>(`UPDATE agent_runs SET "stopRequestedAt"=COALESCE("stopRequestedAt",now()),"updatedAt"=now()
           WHERE id IN(SELECT "runId" FROM factory_attempts WHERE "taskId"=$1) AND "userId"=$2
-            AND status IN ('queued','preparing','running','paused','waiting_input','finishing')`, [task.id, task.userId])
+            AND status IN ('queued','preparing','running','paused','waiting_input','finishing') RETURNING id`, [task.id, task.userId])
+        runControlChanged(tx, { runIds: stoppedRuns.map(run => run.id) })
         await tx.query(`UPDATE run_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "userId"=$2
           AND "runId" IN(SELECT "runId" FROM factory_attempts WHERE "taskId"=$1)`, [task.id, task.userId])
         if (!recoverable) await tx.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
