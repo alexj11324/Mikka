@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
-import { armDueTimer, dueTimerTransport } from './due-timer'
+import { armDueTimer, dueTimerTransport, forgetCheckedDueTimers, type DueTimerHolder } from './due-timer'
 import { wakeTransport } from './workflow-wake'
 
-afterEach(() => { delete wakeTransport.resume; delete dueTimerTransport.start })
+const deployment = process.env.VERCEL_DEPLOYMENT_ID
+afterEach(() => {
+  delete wakeTransport.resume; delete dueTimerTransport.start; delete dueTimerTransport.holder; delete dueTimerTransport.cancel
+  forgetCheckedDueTimers()
+  if (deployment === undefined) delete process.env.VERCEL_DEPLOYMENT_ID; else process.env.VERCEL_DEPLOYMENT_ID = deployment
+})
 
 test('a running timer is woken and no second one is started', async () => {
   const calls: string[] = []
@@ -31,13 +36,55 @@ test('a failed start never fails the write that armed it', async () => {
   assert.equal(JSON.stringify(logged).includes('private'), false)
 })
 
-test('the wake names the arming deployment, so a timer on older code hands over (#1410)', async () => {
-  const payloads: unknown[] = []
-  const previous = process.env.VERCEL_DEPLOYMENT_ID
-  process.env.VERCEL_DEPLOYMENT_ID = 'dpl_new'
-  wakeTransport.resume = async (_token, payload) => { payloads.push(payload) }
-  try { await armDueTimer('run-recovery') } finally {
-    if (previous === undefined) delete process.env.VERCEL_DEPLOYMENT_ID; else process.env.VERCEL_DEPLOYMENT_ID = previous
+/** A Workflow world in miniature: one token holder per kind, cancel ends it, a start takes the free token. */
+function world(holder: DueTimerHolder | null) {
+  const calls: string[] = []
+  let live = holder
+  dueTimerTransport.holder = async () => live
+  dueTimerTransport.cancel = async runId => { calls.push(`cancel:${runId}`); if (live?.runId === runId) live = null }
+  dueTimerTransport.start = async kind => {
+    calls.push(`start:${kind}`)
+    if (!live) live = { runId: `run-${calls.length}`, deploymentId: process.env.VERCEL_DEPLOYMENT_ID! }
   }
-  assert.deepEqual(payloads, [{ deploymentId: 'dpl_new' }])
+  wakeTransport.resume = async token => { if (!live) throw new Error('hook not found'); calls.push(`resume:${token}`) }
+  return { calls, live: () => live }
+}
+
+test('a timer run pinned to an older deployment is cancelled and replaced by one here (#1410)', async () => {
+  process.env.VERCEL_DEPLOYMENT_ID = 'dpl_new'
+  const timer = world({ runId: 'run-old', deploymentId: 'dpl_old' })
+  await armDueTimer('run-recovery')
+  assert.deepEqual(timer.calls, ['cancel:run-old', 'start:run-recovery'])
+  assert.equal(timer.live()?.deploymentId, 'dpl_new', 'exactly one live run, on this deployment')
+  // Later arms in this process only wake it: no second cancel, no second start.
+  await armDueTimer('run-recovery')
+  await armDueTimer('run-recovery')
+  assert.deepEqual(timer.calls.slice(2), ['resume:due-timer:run-recovery', 'resume:due-timer:run-recovery'])
+})
+
+test('a timer run on this deployment is woken, never cancelled', async () => {
+  process.env.VERCEL_DEPLOYMENT_ID = 'dpl_new'
+  const timer = world({ runId: 'run-current', deploymentId: 'dpl_new' })
+  await armDueTimer('schedules')
+  assert.deepEqual(timer.calls, ['resume:due-timer:schedules'])
+})
+
+test('outside Vercel no holder is looked up', async () => {
+  delete process.env.VERCEL_DEPLOYMENT_ID
+  const timer = world({ runId: 'run-old', deploymentId: 'dpl_old' })
+  dueTimerTransport.holder = async () => { throw new Error('must not be called') }
+  await armDueTimer('schedules')
+  assert.deepEqual(timer.calls, ['resume:due-timer:schedules'])
+})
+
+test('a failed replacement never fails the arm: the running timer is still woken', async () => {
+  process.env.VERCEL_DEPLOYMENT_ID = 'dpl_new'
+  const timer = world({ runId: 'run-old', deploymentId: 'dpl_old' })
+  dueTimerTransport.cancel = async () => { throw new Error('private transport text') }
+  const logged: unknown[][] = []
+  const original = console.error
+  console.error = (...args: unknown[]) => { logged.push(args) }
+  try { await armDueTimer('schedules') } finally { console.error = original }
+  assert.deepEqual(timer.calls, ['resume:due-timer:schedules'])
+  assert.equal(JSON.stringify(logged).includes('private'), false)
 })

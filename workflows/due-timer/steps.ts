@@ -27,8 +27,3 @@ export async function handOffDueTimer(kind: DueKind) {
   await start(dueTimer, [kind], { deploymentId: 'latest' })
 }
 
-/** The deployment this run executes on; a step, so the workflow reads it once and replays it. */
-export async function dueTimerDeployment() {
-  'use step'
-  return process.env.VERCEL_DEPLOYMENT_ID ?? null
-}
