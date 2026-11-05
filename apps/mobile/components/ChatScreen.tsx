@@ -270,7 +270,7 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
         </ChatScrollView>
       </View>
       </GestureDetector>
-      <ChatScrollToLatest visible={!chatScroll.atEnd} bottom={composerHeight + 8} onPress={() => { setPinned(false); chatScroll.toLatest() }} />
+      <ChatScrollToLatest visible={!chatScroll.atEnd} bottom={composerHeight + 12} onPress={() => { setPinned(false); chatScroll.toLatest() }} />
       <OfflineBanner top={insets.top + 66} />
       <Composer value={text} sendDisabled={serviceUnavailable} onChangeText={setText} placeholder={name ? `给 ${name} 发消息` : '发消息'} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
         quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={<>{serviceUnavailable ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.serviceNotice}><Text style={styles.serviceMessage}>对话服务尚未启用，暂时无法回复。</Text><GlassButton label="重试" busy={serviceRefresh.refreshing} onPress={() => void serviceRefresh.onRefresh()} /></View> : null}{composerNotice}{reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : null}</>} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />

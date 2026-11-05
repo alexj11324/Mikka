@@ -208,7 +208,7 @@ export default function GroupChat() {
         </ChatScrollView>
       </View>
       </GestureDetector>
-      <ChatScrollToLatest visible={!chatScroll.atEnd} bottom={composerHeight + 8} onPress={chatScroll.toLatest} />
+      <ChatScrollToLatest visible={!chatScroll.atEnd} bottom={composerHeight + 12} onPress={chatScroll.toLatest} />
       <OfflineBanner top={insets.top + 66} />
       <Composer value={text} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} attach attachmentScope={{ kind: 'group', id }} overlay onHeight={setComposerHeight}
         notice={reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : undefined}

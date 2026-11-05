@@ -97,7 +97,11 @@ function inline(text: string, sources: Record<string, CitationSource>, onOpen: (
     if (match.index > last) parts.push(text.slice(last, match.index))
     if (match[1]) {
       const source = sources[match[2].toLowerCase()]
-      if (source && !(source.kind === 'issue' && hidden.has(match[2].toLowerCase()))) parts.push(<MentionChip key={key++} source={source} onPress={() => onOpen?.(source)} />)
+      if (source && source.kind === 'issue' && hidden.has(match[2].toLowerCase())) {
+        // Left out, with the space before it, so no gap stays where it was.
+        const previous = parts[parts.length - 1]
+        if (typeof previous === 'string') parts[parts.length - 1] = previous.replace(/\s+$/, '')
+      } else if (source) parts.push(<MentionChip key={key++} source={source} onPress={() => onOpen?.(source)} />)
     } else if (match[3]) parts.push(<Text key={key++} style={{ fontWeight: '600', color }}>{match[3]}</Text>)
     else if (match[4]) parts.push(<Text key={key++} style={styles.code}>{match[4]}</Text>)
     else {
