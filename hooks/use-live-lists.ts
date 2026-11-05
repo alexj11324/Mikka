@@ -63,15 +63,16 @@ export function useLiveThreadList(ownerId: string, paused = false) {
   return { ...result, data: result.error instanceof ListReadScopeError ? undefined : result.data }
 }
 
-export function useLiveTaskRunList(ownerId: string) {
-  const key = ['task-runs', ownerId] as const
+/** `enabled: false` reads nothing and registers no key (the desktop badge on the web). */
+export function useLiveTaskRunList(ownerId: string, enabled = true) {
+  const key = enabled ? ['task-runs', ownerId] as const : null
   const result = useSWR(key, () => observeListRead(async () => {
     const next = await pollTaskRuns()
     if (next.live.ownerId !== ownerId) throw new ListReadScopeError('owner')
     return next
   }), liveListReadOptions)
   const home = result.error instanceof ListReadScopeError ? null : ownerListWorkspace(result.data, ownerId)
-  useLiveKey('task_run_list', home ?? UNRESOLVED_LIST_SCOPE, [unstable_serialize(key)], home, { minIntervalMs: LIST_MERGE_MS, deadline: listReadDeadline(result.data, ownerId) })
+  useLiveKey('task_run_list', key ? home ?? UNRESOLVED_LIST_SCOPE : null, key ? [unstable_serialize(key)] : [], home, { minIntervalMs: LIST_MERGE_MS, deadline: listReadDeadline(result.data, ownerId) })
   return { ...result, data: result.error instanceof ListReadScopeError ? undefined : result.data }
 }
 

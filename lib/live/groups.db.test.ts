@@ -149,6 +149,40 @@ test('group chat keys reach only current members, after the actual writer commit
       assert.ok(delivered().every(value => JSON.stringify(value.events) === JSON.stringify(key)))
     })
 
+    await t.test('a stop with nothing to stop sends nothing; a message whose COMMIT fails sends nothing', async () => {
+      sent.length = 0
+      const again = await scope.run(() => handleGroup(database, directory, { ...base, method: 'POST', resource: 'stop' }, true))
+      assert.deepEqual(again.body, { stopped: 0 })
+      await drain(); assert.deepEqual(sent, [])
+      await database.query(`CREATE FUNCTION reject_group_message() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'group message rejected'; END $$`)
+      await database.query(`CREATE CONSTRAINT TRIGGER reject_group_message AFTER INSERT ON conversation_messages DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION reject_group_message()`)
+      try {
+        await assert.rejects(scope.run(() => handleGroup(database, directory, { ...base, method: 'POST', resource: 'messages', body: JSON.stringify({ body: 'Rolled back' }) }, true)), /group message rejected/)
+        await drain(); assert.deepEqual(sent, [], 'a failed COMMIT discards the registered key')
+      } finally {
+        await database.query('DROP TRIGGER reject_group_message ON conversation_messages')
+        await database.query('DROP FUNCTION reject_group_message()')
+      }
+    })
+
+    await t.test('the reply worker: each committed turn change sends once per member, never twice in one commit', async () => {
+      sent.length = 0
+      // One transaction stores the message and queues its turn: one key per member.
+      const posted = await scope.run(() => handleGroup(database, directory, { ...base, method: 'POST', resource: 'messages', body: JSON.stringify({ body: 'Who can take this?' }) }, true))
+      assert.equal(posted.status, 201)
+      await drain()
+      assert.deepEqual(delivered().map(value => value.scope.ownerId).sort(), ['owner', 'peer'])
+      sent.length = 0
+      // The worker claims the turn, then finds its sender no longer authorized and marks it failed: two commits.
+      const { processGroupTurn } = await import('../coordinator/group-turns')
+      const unused = async () => { throw new Error('unused') }
+      await assert.rejects(scope.run(() => processGroupTurn(database, groupId, { authorized: async () => false, agents: async () => [], route: unused, correction: unused, generate: unused })), /group_actor_no_longer_authorized/)
+      assert.equal((await database.query(`SELECT status FROM group_turns WHERE "messageId"=$1`, [(posted.body as { id: string }).id])).rows[0].status, 'failed')
+      await drain()
+      assert.deepEqual(delivered().map(value => value.scope.ownerId).sort(), ['owner', 'owner', 'peer', 'peer'], 'running, then failed: the spinner comes and goes without a timer')
+      assert.ok(delivered().every(value => value.scope.workspaceId === team && JSON.stringify(value.events) === JSON.stringify(key)))
+    })
+
     await t.test('removing a member: the remaining member re-reads; the removed one never gets the group id again', async () => {
       sent.length = 0
       const removed = await scope.run(() => handleGroup(database, directory, { ...base, method: 'DELETE', resource: 'members', body: JSON.stringify({ memberType: 'user', memberId: 'peer' }) }))
