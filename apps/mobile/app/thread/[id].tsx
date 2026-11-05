@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -19,7 +19,8 @@ import { useStop } from '@/lib/useStop'
 import { composerStops } from '@/lib/stop'
 import { threadSendErrorLine } from '@/lib/thread-send-error'
 import type { ThreadDetail } from '@/lib/types'
-import { useApi } from '@/lib/useApi'
+import { useLiveApi } from '@/lib/useApi'
+import { threadLive } from '@/lib/live-keys'
 import { colors } from '@/lib/theme'
 import { HARNESS } from '@/lib/harness'
 
@@ -30,11 +31,9 @@ export default function ThreadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  // A working thread is read every 4 s; an ended one only changes when it runs again (a message here
-  // reloads at once), so it is read every 30 s instead. Each read is the whole conversation.
-  const [ended, setEnded] = useState(false)
-  const { data, error, reload } = useApi<ThreadDetail>(`/api/mobile/threads/${id}`, ended ? 30_000 : 4000)
-  useEffect(() => { setEnded(data ? !data.active : false) }, [data])
+  // Read again when one of its runs writes text or changes state (the web's thread and run keys); an
+  // ended thread changes only when it runs again. Each read is the whole conversation.
+  const { data, error, reload } = useLiveApi<ThreadDetail>(`/api/mobile/threads/${id}`, current => threadLive(current, id))
   const [sending, setSending] = useState(false)
   // What to say when a message was not sent: the server's reason when it gave one (threadReplaced…).
   const [sendFailed, setSendFailed] = useState<string | null>(null)

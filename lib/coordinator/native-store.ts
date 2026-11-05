@@ -13,7 +13,8 @@ const ACTIVE = `j."userId" = s."userId" AND s."leaseHolder" = j.holder AND s."le
   AND d.id = j."deviceId" AND d."ownerId" = j."userId" AND d.enabled = true AND j."expiresAt" > now()`
 
 export class NativeCoordinatorStore {
-  constructor(private readonly pool: Pool) {}
+  /** `wake` reaches the device after a result is written (lib/device-gateway-notify.ts). */
+  constructor(private readonly pool: Pool, private readonly wake: (deviceId: string) => void = () => {}) {}
 
   async runtime(userId: string): Promise<CoordinatorRuntime> {
     const { rows } = await this.pool.query('SELECT runtime FROM coordinator_runtime_settings WHERE "userId"=$1', [userId])
@@ -119,11 +120,13 @@ export class NativeCoordinatorStore {
   async finishTool(userId: string, holder: string, id: string, callId: string, output: unknown) {
     const result = JSON.stringify(output ?? null)
     if (result.length > 500_000) throw new NativeCoordinatorError(413,'coordinatorToolOutputTooLarge')
-    const { rowCount } = await this.pool.query(`UPDATE native_coordinator_tools t SET status='done',output=$5 FROM native_coordinator_turns j,coordinator_sessions s,devices d
+    const { rows } = await this.pool.query<{ deviceId: string }>(`UPDATE native_coordinator_tools t SET status='done',output=$5 FROM native_coordinator_turns j,coordinator_sessions s,devices d
       WHERE ${ACTIVE} AND j.id=$1 AND j."userId"=$2 AND j.holder=$3
       AND (j.status='running' OR (j.status='completed' AND t.status='done' AND t.output=$5::jsonb))
-      AND t."turnId"=j.id AND t."callId"=$4`,[id,userId,holder,callId,result])
-    if (!rowCount) throw new NativeCoordinatorError(409,'coordinatorExpiredOrLeaseLost')
+      AND t."turnId"=j.id AND t."callId"=$4 RETURNING j."deviceId"`,[id,userId,holder,callId,result])
+    if (!rows.length) throw new NativeCoordinatorError(409,'coordinatorExpiredOrLeaseLost')
+    // The device's waiting tool reads the result on this push, not every 500 ms (#1212).
+    this.wake(rows[0].deviceId)
   }
 
   async close(userId: string, holder: string, id: string) {

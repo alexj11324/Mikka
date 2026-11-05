@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { ComputerError } from '@/lib/computer/store'
 import { SubagentStore, type Actor } from './subagents'
 import { lockBrowserAuthority } from './browser-authority'
+import { wakeTokens, wakeWorkflowSoon } from '@/lib/workflow-wake'
 import { browserEffects, browserMutationSchema, observationMetadata, type BrowserMutation, type VisualObservation } from './visual-contract'
 import { maskFor } from '@/lib/secrets/runtime'
 import type { judgeVisualBrowserAction } from './visual-model'
@@ -66,6 +67,14 @@ export async function browserAction(pool:Pool,actor:Actor,botId:string,id:string
  * SAME stored operation. Recheck live scope/policy and exact payload; gateway
  * receipts prevent a lost response from causing the underlying click twice. */
 export async function executeApprovedBrowserAction(pool:Pool,userId:string,raw:unknown,approved:boolean):Promise<{data:Record<string,unknown>}|{error:string}> {
+  try { return await executeApproved(pool,userId,raw,approved) }
+  finally {
+    // The decision changed the web task's row: its workflow continues now, not on a 30 s tick (#1212).
+    const subagentId=z.object({subagentId:z.uuid()}).safeParse(raw).data?.subagentId
+    if(subagentId) wakeWorkflowSoon(wakeTokens.subagent(subagentId))
+  }
+}
+async function executeApproved(pool:Pool,userId:string,raw:unknown,approved:boolean):Promise<{data:Record<string,unknown>}|{error:string}> {
   let input:z.infer<typeof approvedSchema>|undefined
   const client=await pool.connect()
   let invoking=false, bound=false, released=false

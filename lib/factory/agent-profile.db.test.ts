@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { dbUrl, seedUser, seedWorkspace, seedIssue, seedBot } from '../../tests/support/workspace-admin-db'
-import type { OrderHarness } from '@/lib/model-order-plan'
+import type { OrderEntry, OrderHarness } from '@/lib/model-order-plan'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import type { DecisionAnswer } from '@/lib/coordinator/decision'
 process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
@@ -30,6 +30,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     await pool.query('DELETE FROM byos_bindings WHERE "ownerId"=ANY($1)', [owners])
     await pool.query('DELETE FROM byos_connections WHERE "ownerId"=ANY($1)', [owners])
     await pool.query('DELETE FROM agent_runs WHERE "userId"=ANY($1)', [owners])
+    await pool.query('DELETE FROM model_api_keys WHERE "ownerId"=ANY($1)', [owners])
     await pool.query('DELETE FROM device_repos WHERE "userId"=ANY($1)', [owners])
     await pool.query('DELETE FROM bots WHERE "ownerId"=ANY($1)', [owners])
     await pool.query('DELETE FROM agents WHERE "userId"=ANY($1)', [owners])
@@ -137,6 +138,121 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     await assert.rejects(admitProfileSelection(pool, { ...input, selection: forged }), { message: 'agentProfileUnavailable' })
 
   })
+
+  await t.test('default Profile preserves preferred sources after a remembered provider failure', async t => {
+    const savedKey = process.env.WORKSPACE_SECRETS_KEY
+    process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
+    t.after(() => {
+      if (savedKey === undefined) delete process.env.WORKSPACE_SECRETS_KEY
+      else process.env.WORKSPACE_SECRETS_KEY = savedKey
+    })
+    const order = await import('@/lib/model-order')
+    const keys = await import('@/lib/model-api-keys')
+    const { entryKey } = await import('@/lib/model-order-plan')
+    const who = await person('profiles-default-provider-memory')
+    const taskId = await seedIssue(pool, who.ownerId)
+    const claudeSource = await subscribe(who, 'claude', ['claude-haiku-5-5'])
+    const codexSource = await subscribe(who, 'codex', ['gpt-6-luna'])
+    const key = await keys.addApiKey(pool, who.ownerId, { provider: 'deepseek', apiKey: `fixture-${randomUUID()}` }, {
+      fetch: (async () => Response.json({ data: [{ id: 'deepseek-flash' }] })) as typeof fetch,
+      resolve: async () => ['93.184.216.34'],
+    })
+    const device = randomUUID(), runtimeAgents = { claude_code: randomUUID(), codex: randomUUID() }
+    await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,\'Default Profile fixture\',\'local\',true,now(),$3)', [device, who.ownerId, JSON.stringify([
+      { harness: 'claude_code', installed: true, models: ['deepseek-flash', 'claude-haiku-5-5'], subscriptionBroker: true },
+      { harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true },
+    ])])
+    for (const harness of ['claude_code', 'codex'] as const) await pool.query('INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,$4,$4)', [runtimeAgents[harness], who.ownerId, device, harness])
+    const wanted: Omit<OrderEntry, 'id'>[] = [
+      { harness: 'claude_code', model: 'deepseek-flash', source: { kind: 'api_key', keyId: key.id } },
+      // The preferred Codex Agent is healthy, but cannot replace a named Claude Code Agent.
+      { harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: codexSource } },
+      { harness: 'claude_code', model: 'claude-haiku-5-5', source: { kind: 'subscription', connectionId: claudeSource } },
+    ]
+    await order.changeOrder(pool, who, { kind: 'add', entries: wanted })
+    for (const entry of (await order.readOrder(pool, who)).entries) {
+      if (!wanted.some(item => entryKey(item) === entryKey(entry))) await order.changeOrder(pool, who, { kind: 'remove', id: entry.id })
+    }
+    const added = (await order.readOrder(pool, who)).entries
+    await order.changeOrder(pool, who, { kind: 'reorder', ids: wanted.map(item => added.find(entry => entryKey(entry) === entryKey(item))!.id) })
+    // Each Agent keeps its rows; only the no-harness control follows the preferred Codex list first.
+    await order.changeOrder(pool, who, { kind: 'preferred', harness: 'codex' })
+    const preferred = (await order.readOrder(pool, who)).entries
+    const request = { issueId: taskId, asked: { harness: 'claude_code' as const }, location: 'local' as const }
+    assert.equal((await pool.query('SELECT 1 FROM factory_agent_profiles WHERE "ownerId"=$1 AND "workspaceId"=$2', [who.ownerId, who.workspaceId])).rowCount, 0)
+    const initial = await profiles.resolveAgentProfileDispatch(pool, who, request)
+    if (initial.target.kind !== 'device') assert.fail(JSON.stringify(initial.target))
+    assert.deepEqual(initial.target.entry, preferred[0], 'before the provider failure the actual default entry is first')
+
+    // The health fixture records the same structured terminal history used by
+    // model-provider-health.db.test.ts. No resolver, credential state or quota is stubbed.
+    // The key predates this completed run; no credential refresh follows its 402.
+    await pool.query('UPDATE model_api_keys SET "updatedAt"=now()-interval \'1 hour\' WHERE id=$1', [key.id])
+    const priorRunId = randomUUID()
+    await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId","issueId",status,"stopReason",prompt,"agentDefinition",report,"startedAt","finishedAt","createdAt","updatedAt")
+      VALUES ($1,$2,$3,$4,$5,'failed','provider_failure','Completed fixture provider attempt',$6,$7,now()-interval '1 second',now(),now()-interval '1 second',now())`,
+    [priorRunId, who.ownerId, runtimeAgents.claude_code, device, taskId, JSON.stringify({
+      harness: 'claude_code', model: 'deepseek-flash', apiKey: { keyId: key.id, model: 'deepseek-flash' },
+      executionIdentity: { workspaceId: who.workspaceId },
+    }), JSON.stringify({ providerFailure: { kind: 'balance', retryable: false, status: 402, code: 'payment_required' } })])
+    const candidates = await order.orderCandidates(pool, who)
+    const states = await order.credentialStates(pool, who, preferred, candidates, undefined, { probe: false })
+    assert.deepEqual(states.get(preferred[0].id)?.credential, { usable: false, reason: 'balance' })
+    assert.equal(states.get(preferred[1].id)?.credential.usable, true)
+    assert.equal(states.get(preferred[2].id)?.credential.usable, true)
+
+    for (const defaultOnly of [false, true]) await t.test(defaultOnly
+      ? 'default-only dispatch keeps the same harness and skips its failed first preference'
+      : 'new default dispatch keeps the same harness and skips its failed first preference', async () => {
+      const selected = await profiles.resolveAgentProfileDispatch(pool, who, { ...request, defaultOnly })
+      if (selected.target.kind !== 'device') assert.fail(`Expected the healthy preferred source, got ${JSON.stringify(selected.target)}`)
+      assert.equal(selected.target.agentId, runtimeAgents.claude_code)
+      assert.equal(selected.target.deviceId, device)
+      assert.deepEqual(selected.target.entry, preferred[2])
+      assert.equal(selected.selectionMode, 'preference')
+      assert.equal(selected.agentProfile?.source, 'default')
+      assert.equal(selected.agentProfile?.profileId, 'default')
+      assert.deepEqual(selected.agentProfile?.targetEntry, preferred[2])
+      assert.ok(selected.agentProfile)
+      await profiles.assertProfileSelection(pool, who, selected.agentProfile)
+    })
+
+    await t.test('default availability follows the healthy preferred source without writing bindings', async () => {
+      const before = await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [who.ownerId])
+      assert.deepEqual(await profiles.agentProfileDispatchAvailability(pool, who, request), { available: true })
+      assert.deepEqual((await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [who.ownerId])).rows, before.rows)
+    })
+
+    await t.test('an explicitly named failed model stays unavailable instead of selecting Haiku', async () => {
+      const picked = { ...request, asked: { harness: 'claude_code' as const, model: 'deepseek-flash' } }
+      const selected = await profiles.resolveAgentProfileDispatch(pool, who, picked)
+      assert.equal(selected.target.kind, 'none')
+      if (selected.target.kind !== 'none') assert.fail('An explicit failed source must not dispatch')
+      assert.equal(selected.target.reason, 'pickedUnavailable')
+      assert.equal(selected.selectionMode, 'picked')
+      assert.equal(selected.agentProfile, undefined)
+      assert.deepEqual(await profiles.agentProfileDispatchAvailability(pool, who, picked), { available: false, reason: 'pickedUnavailable' })
+    })
+
+    await t.test('without a named harness the default Profile follows its preferred Agent first', async () => {
+      const selected = await profiles.resolveAgentProfileDispatch(pool, who, { issueId: taskId, location: 'local' })
+      if (selected.target.kind !== 'device') assert.fail(JSON.stringify(selected.target))
+      assert.equal(selected.target.agentId, runtimeAgents.codex)
+      assert.deepEqual(selected.target.entry, preferred[1])
+      assert.equal(selected.selectionMode, 'preference')
+      assert.deepEqual((await order.readOrder(pool, who)).entries, preferred, 'selection does not change the stored model rows')
+    })
+
+    await t.test('a named harness cannot borrow another Agent when no preferred source in that harness is healthy', async () => {
+      await order.changeOrder(pool, who, { kind: 'remove', id: preferred[2].id })
+      const selected = await profiles.resolveAgentProfileDispatch(pool, who, request)
+      assert.equal(selected.target.kind, 'none')
+      assert.equal(selected.selectionMode, 'preference')
+      assert.equal(selected.agentProfile, undefined)
+      assert.equal((await profiles.agentProfileDispatchAvailability(pool, who, request)).available, false)
+    })
+  })
+
   const ui = await store.create(scope, definition('UI', 'claude_code', exactClaude, 'claude-haiku-5-5'), randomUUID())
   const backend = await store.create(scope, definition('Backend', 'codex', codex, 'gpt-6-luna'))
   const review = await store.create(scope, { ...definition('Review', 'codex', codex, 'gpt-6-luna'), roles: ['review'], skills: ['independent-review'] })

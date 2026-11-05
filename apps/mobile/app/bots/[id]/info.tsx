@@ -15,7 +15,8 @@ import { saveOptimistic } from '@/lib/optimistic'
 import { nextWhen, shortWhen } from '@/lib/clock'
 import { useHome } from '@/lib/home'
 import type { BotPage, ComputerStatus } from '@/lib/types'
-import { useApi, useRefresh } from '@/lib/useApi'
+import { useLiveApi, useRefresh } from '@/lib/useApi'
+import { botPageLive, computerLive } from '@/lib/live-keys'
 import { openOnWeb, webChatPath } from '@/lib/web'
 import { colors } from '@/lib/theme'
 
@@ -43,10 +44,11 @@ export default function BotInfo() {
   const bots = useHome().data?.bots
   const bot = bots?.find(item => item.id === id)
   const name = coordinator ? 'Coordinator' : bot?.name ?? ''
-  const page = useApi<BotPage>(`/api/mobile/bots/${id}`, 15_000)
+  const homeData = useHome().data
   // The Coordinator's computer is its bot row's, like any bot's (context-panel.tsx).
   const computerBot = coordinator ? bots?.find(item => item.coordinator)?.id : id
-  const computer = useApi<ComputerStatus>(computerBot ? `/api/bots/${computerBot}/computer` : null, 15_000)
+  const page = useLiveApi<BotPage>(`/api/mobile/bots/${id}`, current => botPageLive(current, computerBot, homeData?.live?.workspaceId, homeData?.workspace.id))
+  const computer = useLiveApi<ComputerStatus>(computerBot ? `/api/bots/${computerBot}/computer` : null, current => computerLive(current, computerBot))
   const refresh = useRefresh(async () => { await Promise.all([page.reload(), computer.reload()]) })
   const threads = page.data?.threads ?? []
   const pullRequests = page.data?.pullRequests ?? []

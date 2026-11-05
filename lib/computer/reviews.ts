@@ -1,6 +1,7 @@
 import 'server-only'
 import type { Pool } from 'pg'
 import { computerChanged } from '@/lib/live/computer-state'
+import { notifyDeviceWork } from '@/lib/device-gateway-notify'
 import { checkedLocalReview } from '@/lib/cua/local-review'
 import { identityMasker, maskDeep, type Masker } from '@/lib/secrets/mask'
 import type { LocalComputerRequest } from '@mikka/protocol/computer'
@@ -67,7 +68,7 @@ export async function decideComputerReview(pool: Pool, actor: { userId: string; 
     await client.query('BEGIN')
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
     // Serialize against sync and cancellation using the same run row lock.
-    const run = (await client.query(`SELECT r.id,b."botId" FROM agent_runs r
+    const run = (await client.query(`SELECT r.id,b."botId",v."deviceId" FROM agent_runs r
       JOIN local_computer_reviews v ON v."runId"=r.id
       JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=$3 AND b."workspaceId"=$4
       LEFT JOIN thread_machines t ON t."runId"=b."runId" AND t."ownerId"=b."ownerId" AND t."workspaceId"=b."workspaceId" AND t."botId"=b."botId"
@@ -85,6 +86,8 @@ export async function decideComputerReview(pool: Pool, actor: { userId: string; 
     if (result.rowCount && scope === 'run') await client.query('UPDATE computer_run_bindings SET "approvedForRun"=true WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3', [run.id, actor.userId, actor.workspaceId])
     if (result.rowCount) await computerChanged(client, pool, run.botId)
     await client.query('COMMIT')
+    // The device applies the decision on this push, not on its next sync (#1212).
+    if (result.rowCount) notifyDeviceWork(run.deviceId)
     return result.rowCount === 1
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
 }
