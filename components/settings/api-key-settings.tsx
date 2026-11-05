@@ -96,7 +96,7 @@ export function useApiKeyList(workspaceId: string) {
   const modelsLine = (key: Key) => {
     const refetchButton = <Button type="button" variant="secondary" size="xs" disabled={pending} aria-label={t('refetchLabel', { name: title(key) })} onClick={() => void refetch(key)}>{t('refetch')}</Button>
     if (key.modelsError) return <span role="status" className="flex flex-wrap items-center gap-2 text-xs text-warning-foreground">
-      <TriangleAlert aria-hidden="true" className="size-3.5 shrink-0 text-warning" />{t(key.modelsError === 'invalid' ? 'modelsInvalid' : 'modelsUnavailable')}{refetchButton}
+      <TriangleAlert aria-hidden="true" className="size-3.5 shrink-0 text-warning-foreground" />{t(key.modelsError === 'invalid' ? 'modelsInvalid' : 'modelsUnavailable')}{refetchButton}
     </span>
     return <span role="status" className="flex flex-wrap items-center gap-2 text-xs">{key.models.length ? t('modelCount', { count: key.models.length }) : t('noModels')}{refetchButton}</span>
   }

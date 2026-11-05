@@ -94,7 +94,7 @@ export function CredentialLoginCard({ prefix, origin, name, onSignedIn }: { pref
   if (step === 'done') return <Item variant="muted" data-testid="credential-login-done">
     <ItemMedia><SiteIcon origin={origin} className="size-5" /></ItemMedia>
     <ItemContent><ItemTitle>{t('signedIn', { site: name })}</ItemTitle></ItemContent>
-    <ItemActions><CircleCheckIcon className="text-success" /></ItemActions>
+    <ItemActions><CircleCheckIcon className="text-success-foreground" /></ItemActions>
   </Item>
 
   const passwordInvalid = view?.kind === 'rejected' && view.field === 'password'

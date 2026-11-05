@@ -115,7 +115,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
           <span className="text-muted-foreground text-xs">{t('orEmail')}</span>
           <Separator className="flex-1" />
         </div>}
-        {error && <p id="auth-error" role="alert" className="text-destructive text-sm">{error}</p>}
+        {error && <p id="auth-error" role="alert" className="text-destructive-foreground text-sm">{error}</p>}
         {/* Only for an email that is not verified yet; a wrong password says nothing about verification (N4). */}
         {error && unverified && <p className="text-muted-foreground text-xs">
           <Link href="/verify-email" className="text-foreground underline underline-offset-4">{t('verifyEmailLink')}</Link>
@@ -156,7 +156,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
             {pending ? <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-end" /> : <ArrowRightIcon aria-hidden="true" data-icon="inline-end" />}
           </Button>
         </form>
-        </> : error && <p id="auth-error" role="alert" className="text-destructive text-sm">{error}</p>}
+        </> : error && <p id="auth-error" role="alert" className="text-destructive-foreground text-sm">{error}</p>}
         {/* The one sign-in / sign-up switch; the page header no longer repeats it (R-32). */}
         <p className="text-muted-foreground text-center text-xs">
           {registering ? t('haveAccount') : t('noAccountShort')}{' '}

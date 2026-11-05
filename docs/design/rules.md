@@ -791,12 +791,27 @@ place, not a licence to pick either.
 | `bg/elevated` | `#ffffff` | `--shell-raised`, `--card`, `--popover` | `#ffffff` | |
 | `text/primary` | `#171717` | `--foreground` | `#0a0a0a` | yes |
 | `text/secondary` | `#737373` | `--muted-foreground` | `#606060` | yes (code darker on purpose, less grey) |
-| `text/tertiary` | `#a3a3a3` | `--ink-3` | mix | check |
+| `text/tertiary` | `#a3a3a3` | `--ink-3` | `--muted-foreground` 90% into `--background` (oklch). Text only in the source list's domain (`streaming-text.tsx`), on `bg-inset`, hovered `--hover`: light 4.62 / 4.74, dark 4.82 / 5.09 | deliberate (Figma lighter; code holds 4.5:1, [decision](decisions/2026-11-05-0040-ink-3-holds-contrast.md)) |
 | `border/default` | `#00000014` | `--border` | `#e5e5e5` | close |
 | `border/rule` | `#e5e5e5` / dark `#383838` | `--rule` | `oklch(0.922 0 0)` / dark `oklch(0.269 0 0)` | |
 | `accent/default` | `#2f6bff` | `--sidebar-primary` | shadcn blue | yes |
-| `status/*` | StatusBadge set | `--success`, `--warning`, `--destructive` | Tailwind palette | check |
+| `status/*` | StatusBadge set | `--success`, `--warning`, `--destructive` | Tailwind palette (500; red 600 light) | check |
+| `status/*` text | — | `--success-foreground`, `--warning-foreground`, `--destructive-foreground`, `--info-foreground` | light: emerald / yellow / violet 900, red 800; dark: emerald / yellow / violet 400, red 300 | |
+| `status/warning` mark | — | `--warning-ink` | light yellow 900, dark `--card`: the 紧急 square's ! on solid amber (R-87) | |
 | `brand/claude` (R-74 mark) | none yet | `--color-brand-claude` | `#D97757`, both themes | Figma to add |
+
+A status word or icon, on a status tint (a badge) or on its own, takes the
+`*-foreground` token, never the status colour itself: the colour is the tint and
+the dot, the foreground is what is read (4.5:1 or more in both themes; amber
+500 on white is 1.9:1). Measured 2026-11-04 on the badge tint (status/15 in
+dark, status/10 in light):
+
+| Text on tint | Light | Dark on page | Dark on card |
+| --- | --- | --- | --- |
+| warning | 8.13 (was the 500 base: 1.79) | 8.44 (was 600: 4.52) | 7.36 (was 600: 3.94) |
+| success | 8.81 (was 500: 2.24) | 7.27 (was 600: 3.84) | 6.38 (was 600: 3.36) |
+| destructive | 7.01 | 7.52 with red 300 (was 600: 3.03) | 6.61 (was 600: 2.66; red 400 would be 4.39) |
+| info | 9.70 | 5.37 with violet 400 (was 600: 2.60) | 4.74 (was 600: 2.30) |
 
 The drift rows are open in `decisions.md`. Until they are settled, the code
 value is what ships and Figma is updated to match.

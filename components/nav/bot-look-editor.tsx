@@ -39,7 +39,7 @@ export function BotLookEditor({ botId, name, color, shape }: { botId: string; na
     </PopoverTrigger>
     <PopoverContent aria-label={t('changeAvatar', { name })} className="w-130 max-w-[calc(100vw-2rem)] gap-3 rounded-xl p-5 shadow-2xl ring-0">
       <BotLookPicker color={tone} shape={form} onColor={next => { void save({ color: next }) }} onShape={next => { void save({ shape: next }) }} />
-      {error && <p role="alert" className="text-center text-xs text-destructive">{error}</p>}
+      {error && <p role="alert" className="text-center text-xs text-destructive-foreground">{error}</p>}
     </PopoverContent>
   </Popover>
 }

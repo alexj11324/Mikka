@@ -156,7 +156,7 @@ function ToolGroup({ tools, live }: { tools: readonly ChatTool[]; live: boolean 
     <div className="group/activity flex min-w-0 items-center gap-1">
       <TraceCollapsibleTrigger>
         <TraceLine status={running ? 'running' : undefined}>
-          <TraceIcon>{running ? <LoaderCircleIcon className="animate-spin" /> : failures ? <CircleAlert className="text-destructive" /> : <LeadIcon />}</TraceIcon>
+          <TraceIcon>{running ? <LoaderCircleIcon className="animate-spin" /> : failures ? <CircleAlert className="text-destructive-foreground" /> : <LeadIcon />}</TraceIcon>
           <TraceTitle>{summary}</TraceTitle>
           {/* The failure count never truncates with the summary: it is what the line must say (R-83, R-87). */}
           {failures > 0 && !running && <Badge data-activity-failed="" variant="destructive-light" size="sm" className="shrink-0">{t('failedCount', { count: failures })}</Badge>}
