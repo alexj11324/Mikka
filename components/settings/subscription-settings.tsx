@@ -32,8 +32,8 @@ type State = ReturnType<typeof subscriptionListSchema.parse>
 type Attempt = ReturnType<typeof parseSubscriptionStart> & { provider: Provider }
 const path = withBasePath('/api/subscriptions')
 const logos = { codex: OpenAI, claude: Claude } as const
-/** Comma re-reads a plan's windows every 5 minutes while the page is watched. */
-const USAGE_EVERY_MS = 5 * 60_000
+/** Meters older than this read again when the page comes back into focus; nothing re-reads them on a timer (#1212). */
+const USAGE_FRESH_FOR_MS = 5 * 60_000
 type Usage = Map<string, SubscriptionUsageView> | 'failed' | null
 /** Shown under the provider's row; `again` restarts that provider's sign-in. */
 type Failure = { provider: Provider; message: string; again?: { connectionId?: string } }
@@ -82,7 +82,9 @@ export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { 
   const { mutate: mutateCached } = useSWRConfig()
   const refresh = useCallback(async () => { await mutate(); void mutateCached(modelOrderKey(workspaceId)) }, [mutate, mutateCached, workspaceId])
   // Connected, paused or removed elsewhere (another tab, the desktop app's sign-in): this list re-reads (no polling).
+  // A quota read that changes what the page shows (额度用完, 待检查) pushes the same key: the meters re-read too.
   useLiveKey('model_settings', workspaceId, [unstable_serialize(subscriptionsKey(workspaceId))], workspaceId, { minIntervalMs: 2_000 })
+  useLiveKey('model_settings', connectedKey ? workspaceId : null, [unstable_serialize(subscriptionUsageKey(workspaceId))], workspaceId, { minIntervalMs: 2_000 })
   /** 刷新模型: the account is asked for its models again; 优先使用的模型 shows the answer, a model gone marked unavailable. */
   const [refreshingModels, setRefreshingModels] = useState<string | null>(null)
   const refreshModels = useCallback(async (connection: { id: string; label: string }) => {
@@ -107,8 +109,9 @@ export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { 
     if (code === 'provider_operation_failed') return t('refusedProvider', { provider: t(provider) })
     return t(key, { provider: t(provider) })
   }, [t])
-  // The meters are cached too, and re-read every five minutes while the page is visible.
-  const usageRead = useSWR(connectedKey ? subscriptionUsageKey(workspaceId) : null, () => readSubscriptionUsage(workspaceId), { revalidateOnFocus: false, refreshInterval: USAGE_EVERY_MS })
+  // The meters are cached too. They re-read on the settings key above, and when the page comes back into focus
+  // with meters older than five minutes; the 30 s clock below only ages their 已更新 label.
+  const usageRead = useSWR(connectedKey ? subscriptionUsageKey(workspaceId) : null, () => readSubscriptionUsage(workspaceId), { focusThrottleInterval: USAGE_FRESH_FOR_MS })
   const usage: Usage = usageRead.error ? 'failed' : usageRead.data ?? null
   const usageLoading = usageRead.isValidating
   const { mutate: mutateUsage } = usageRead

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { ArrowUpRight, LoaderCircle } from 'lucide-react'
@@ -8,7 +8,8 @@ import { toast } from 'sonner'
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
-import { cardVerificationStatus, pollUntil, readCardVerification, startCardVerification, type CardVerificationStatus } from '@/lib/billing/verification-client'
+import { readCardVerification, startCardVerification, type CardVerificationStatus } from '@/lib/billing/verification-client'
+import { useLiveWait } from '@/hooks/use-live-wait'
 import { useActionError } from '@/lib/use-action-error'
 
 export function cardVerificationKey(workspaceId: string) {
@@ -36,21 +37,22 @@ export function FreeAllowanceSection({ workspaceId, onVerified }: { workspaceId:
   const t = useTranslations('Billing.allowance')
   const actionError = useActionError()
   const status = useSWR(cardVerificationKey(workspaceId), () => readCardVerification(workspaceId))
-  const { mutate } = status
   const [confirming, setConfirming] = useState(false)
   const [redirecting, setRedirecting] = useState(false)
 
+  // Back from Checkout: the webhook's commit pushes this workspace's hosted_billing key (#1212); no timer reads it.
+  const verified = useCallback((read: Awaited<ReturnType<typeof readCardVerification>>) => !read.error && read.status === 'verified', [])
+  const waitForWebhook = useLiveWait(status, 'hosted_billing', workspaceId, cardVerificationKey(workspaceId), verified)
   useEffect(() => {
     if (takeReturn('verify') !== 'success') return
     setConfirming(true)
-    void pollUntil(() => cardVerificationStatus(workspaceId), read => !read.error && read.status === 'verified').then(read => {
+    void waitForWebhook().then(read => {
       setConfirming(false)
-      void mutate(read, { revalidate: false })
-      if (read.error || read.status !== 'verified') return
+      if (!read || read.error || read.status !== 'verified') return
       toast.success(read.allowance === 'claimed_elsewhere' ? t('claimedElsewhere') : t('verified'))
       onVerified?.()
     })
-  }, [workspaceId, mutate, onVerified, t])
+  }, [workspaceId, waitForWebhook, onVerified, t])
 
   async function verify() {
     setRedirecting(true)

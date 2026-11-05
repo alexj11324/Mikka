@@ -31,10 +31,6 @@ export const pollingAllowlist = {
   // Web: SWR polling that reads our database.
   'components/workspace/issue-pull-request-link.tsx': db(web, 'linked pull request status re-read every 60 s through our API', 1),
   'hooks/use-computer.ts': db(web, 'computer grant re-read before it expires (at least every 5 s)', 1),
-  'components/settings/subscription-settings.tsx': db(web, 'subscription usage re-read every USAGE_EVERY_MS (5 min); the 30 s setInterval is only the clock that ages the "updated" label', 3),
-  'components/billing/free-allowance-section.tsx': db(web, 'pollUntil after card verification: up to 10 reads, 2 s apart, until the webhook lands', 1),
-  'components/billing/hosted-refusal-notice.tsx': db(web, 'pollUntil after a top-up: up to 10 reads, 2 s apart, until the balance lands', 1),
-  'lib/billing/hosted-usage.ts': db(web, 'pollUntil, the bounded poll helper behind the billing notices', 1),
   // Server: loops that re-query our database.
   'app/api/computer/events/route.ts': db(server, 'the "SSE" route re-queries subagent_events in a loop', 1),
   'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll fallback timer only: with the gateway configured it waits on LISTEN for the device (re-check per NOTIFY, one final check at the deadline); every 5 s without push or if LISTEN drops', 1),
@@ -67,6 +63,7 @@ export const pollingAllowlist = {
   'apps/mobile/components/beui/components/loading-states/agent-progress.tsx': ui('progress animation', 1),
   'apps/mobile/components/beui/components/loading-states/reasoning-text.tsx': ui('reasoning text animation', 2),
   'apps/mobile/components/beui/components/tool-result/tool-result.tsx': ui('elapsed-time clock', 1),
+  'components/settings/subscription-settings.tsx': ui('the 30 s setInterval only ages the meters\' "updated" label; the meters themselves read on the model_settings push and on focus once older than 5 min', 1),
   'apps/mobile/components/ChatScreen.tsx': ui('the 1 s elapsed clock of a reply in progress; the chat and its proposals are pushed (lib/live.ts)', 1),
   'components/version-guard.tsx': ui('checks the public build metadata once a minute (decision 2026-11-03-1437); no database read', 1),
 }
