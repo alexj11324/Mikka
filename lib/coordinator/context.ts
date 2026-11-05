@@ -1,5 +1,3 @@
-import { quotePreview, toolQuote } from './quote-preview'
-export { QUOTE_KEYS, QUOTE_PREVIEW_CHARS, QUOTE_SPACE, quoteText, quotePreview, toolQuoteText, toolQuote } from './quote-preview'
 import { modelMessage, summaryMessage, type SwitchNotice, type SourcedMessage, type SummaryTrust } from './message-safety'
 import { pruneMessages, type ModelMessage } from 'ai'
 import type { RunCompletionObservation } from './run-completion-observation'
@@ -14,6 +12,9 @@ import { splitSuggestion, type SuggestionCard } from '@/lib/suggestions/card'
 import { chatFailure, type ChatFailure } from '@/lib/chat-failure'
 import { eventLine, type EventLine } from './event-line'
 import { projectedToolResult, toolCallMetadata, toolResultMetadata, type ProjectedToolMetadata } from './tool-metadata'
+import { quotePreview, toolQuote } from './tool-quote'
+
+export { QUOTE_KEYS, QUOTE_PREVIEW_CHARS, QUOTE_SPACE, quoteText, quotePreview, toolQuoteText, toolQuote } from './tool-quote'
 
 // What the Coordinator's model sees. Everything here depends only on the
 // stored conversation, never on time or on how long the person was away, so

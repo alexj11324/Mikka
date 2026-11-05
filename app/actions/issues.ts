@@ -1,8 +1,10 @@
 'use server'
 
+import { singleFlight } from '@/lib/single-flight'
+
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { createHash } from 'node:crypto'
-import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
+import { and, desc, eq, getTableColumns, inArray, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionErrorCode, ActionResult } from '@/lib/action-result'
@@ -12,8 +14,8 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { issueTeamScope } from '@/lib/issue-team-access'
 import { db } from '@/lib/db'
-import { issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
-import { requireIssueAccess } from '@/lib/issue-access'
+import { agents, issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
+import { requireIssueAccess, requireIssueAccessWithoutBody } from '@/lib/issue-access'
 import { checklistView, issueAttrsContent, issueChecklistChecked, issueChecklistTotal } from '@/lib/issue-summary-columns'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import type { JSONContent } from '@tiptap/react'
@@ -32,14 +34,15 @@ import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { actingContext, activityActor } from '@/lib/activity-actor'
 import { requireLockedIssueScope } from '@/lib/issue-scope-authorization'
 import { queryVersion } from '@/lib/db/query-version'
-import { singleFlight } from '@/lib/single-flight'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
 import { issueListChanged } from '@/lib/live/lists'
 import { issueRelationsChanged } from '@/lib/live/issue-detail'
 import { ownerListRead } from '@/lib/live/list-read-server'
-import { beginOwnerListRead, type BegunListRead } from '@/lib/live/revision-read'
+import { beginOwnerListRead } from '@/lib/live/revision-read'
 import { issuePrefixes, linearIssueLinks, linearTeamSyncs } from '@/lib/db/schema'
+import { changedListIds, listPositionKey, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
+import { cacheReadAction } from '@/lib/cache-read-action'
 
 type IssueRow = typeof issues.$inferSelect
 export type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null; linearTargetVerified: boolean }
@@ -75,8 +78,16 @@ export async function listIssues() {
 }
 
 /** Auth and visibility are checked on every poll, including unchanged results. */
-export async function pollIssues(known?: string) {
-  return readIssues(undefined, known && /^[0-9a-f]{32}$/.test(known) ? known : undefined)
+export async function pollIssues(known?: string, positions?: readonly ListPosition[]) {
+  const previous = readListPositions(positions, 100)
+  const valid = positions === undefined || previous !== undefined
+  return readIssues(undefined, valid && known && /^[0-9a-f]{32}$/.test(known) ? known : undefined, previous)
+}
+
+/** The browser receives access failures as explicit codes, not a redacted
+ * Server Action exception, so persisted data is cleared on its next sync. */
+export async function syncIssueList(known?: string, positions?: readonly ListPosition[]) {
+  return cacheReadAction(async () => ({ snapshot: await pollIssues(known, positions) }))
 }
 
 /** Explicit API workspace selection, with the same acting-user/membership checks. */
@@ -85,24 +96,19 @@ export async function listWorkspaceIssues(workspaceId: string) {
   return (await readIssues(workspaceId)).items!
 }
 
-async function readIssues(workspaceId?: string, known?: string) {
-  return withDatabaseOperation('/actions/issues/poll', async () => {
-    // Each request is authorized on its own: session, selected workspace and role, and team scopes.
-    const userId = await getUserId()
-    const context = await loadWorkspaceContext(workspaceId)
-    // Before the team scopes and the list: the selected workspace's key and the home's key, both of which this list listens to.
-    const begun = await beginOwnerListRead(userId, ['issue_list'], [{ kind: 'issue_list', id: context.workspace.id }])
-    const allTeams = await accessibleTeamScopes(userId)
-    // Identical concurrent polls of this person (tabs, devices after one push) share one read.
-    return singleFlight(['/actions/issues/poll', userId, context.workspace.id, context.role, allTeams.map(team => `${team.id}:${team.workspaceId}`).sort().join(','), known ?? null],
-      () => readIssueSnapshot(userId, context, allTeams, begun, known))
-  })
+async function readIssues(workspaceId?: string, known?: string, previous?: ListPosition[]) {
+  return withDatabaseOperation('/actions/issues/poll', () => readIssueSnapshot(workspaceId, known, previous))
 }
 
-async function readIssueSnapshot(userId: string, context: Awaited<ReturnType<typeof loadWorkspaceContext>>, allTeams: Awaited<ReturnType<typeof accessibleTeamScopes>>, begun: BegunListRead, known?: string) {
+async function readIssueSnapshot(workspaceId?: string, known?: string, previous?: ListPosition[]) {
+  const userId = await getUserId()
+  const context = await loadWorkspaceContext(workspaceId)
+  // Before the list: the selected workspace's key and the home's key, both of which this list listens to.
+  const begun = await beginOwnerListRead(userId, ['issue_list'], [{ kind: 'issue_list', id: context.workspace.id }])
   const live = { ...await ownerListRead(userId, [], Date.now(), begun), selectedWorkspaceId: context.workspace.id }
   // Membership is fresh for each poll. Reuse only this operation's narrow
   // identity rows for visibility, workspace filtering and remaining links.
+  const allTeams = await accessibleTeamScopes(userId)
   const teams = allTeams.filter(team => team.workspaceId === context.workspace.id)
   // Fingerprint before reading links that will be reused below. A relation
   // moved during this read must invalidate the next poll, never be acknowledged
@@ -112,7 +118,7 @@ async function readIssueSnapshot(userId: string, context: Awaited<ReturnType<typ
   const visibility = await issueVisibility(userId, false, undefined, db, { teams: allTeams })
   const candidates = db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(100).as('task_list')
   // Include identifier dependencies: a prefix, profile or Linear rename can change a list without editing a task.
-  const signature = db.select({ item: sql`to_jsonb(task_list)`.as('item'), identifiers: sql`jsonb_build_array(
+  const signature = db.select({ id: candidates.id, scope: candidates.scope, updatedAt: candidates.updatedAt, item: sql`to_jsonb(task_list)`.as('item'), identifiers: sql`jsonb_build_array(
     (select ${users.email} from ${users} where ${users.id}=${candidates.ownerId}),
     (select ${issuePrefixes.prefix} from ${issuePrefixes} where ${issuePrefixes.userId}=${candidates.ownerId}),
     (select jsonb_agg(${linearTeamSyncs.linearTeamKey} order by ${linearTeamSyncs.linearTeamKey}) from ${linearTeamSyncs} where ${linearTeamSyncs.ownerId}=${candidates.ownerId}),
@@ -120,22 +126,40 @@ async function readIssueSnapshot(userId: string, context: Awaited<ReturnType<typ
   )`.as('identifiers') }).from(candidates)
   const tasksVersion = await queryVersion(signature)
   const version = createHash('sha256').update(JSON.stringify([userId, context.workspace.id, teams.map(team => team.id).sort(), tasksVersion, linksVersion])).digest('hex').slice(0, 32)
-  if (known === version) return { unchanged: true, version, live } as const
+  if (known === version) return { ...unchangedList(version), live }
   // Read the version first: a concurrent change is picked up on the next poll, never acknowledged unseen.
-  const rows = await db.select().from(candidates).orderBy(desc(candidates.updatedAt), desc(candidates.id))
+  const signed = signature.as('task_signatures')
+  const manifest = await db.select({ id: signed.id, scope: signed.scope, signature: sql<string>`md5(to_jsonb(task_signatures)::text)` })
+    .from(signed).orderBy(desc(signed.updatedAt), desc(signed.id))
   const knownLinks = new Map(visibility.links.map(link => [link.issueId, link]))
-  const missingIds = rows.filter(row => !knownLinks.has(row.id)).map(row => row.id)
+  const missingIds = manifest.filter(row => !knownLinks.has(row.id)).map(row => row.id)
   // Visibility already read every accessible team's links. Only owned or
   // unlinked candidates can still need a lookup (including a revoked team).
   const links = [
-    ...rows.flatMap(row => { const link = knownLinks.get(row.id); return link ? [link] : [] }),
+    ...manifest.flatMap(row => { const link = knownLinks.get(row.id); return link ? [link] : [] }),
     ...await issueTeamScope(userId, missingIds, { onlyIssueIds: missingIds, teams: allTeams }),
   ]
-  const visibleRows = rows.filter(row => { const link = links.find(item => item.issueId === row.id); return row.scope === 'personal' || !link || teams.some(team => team.id === link.teamId) })
-  const liveRows = visibleRows.filter(row => !readIssueMetadata(row.content).deletedAt)
-  const identifiers = await taskIdentifiers(liveRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
-  // The body stays in Postgres: only its attrs (metadata) and checklist counts are read, not up to 100 whole bodies per poll.
-  return { version, live, items: liveRows.map(({ content, checklistTotal, checklistChecked, ...issue }) => ({ ...issue, identifier: identifiers.get(issue.id) ?? null, teamId: links.find(link => link.issueId === issue.id)?.teamId ?? null, metadata: readIssueMetadata(content), checklist: checklistView(checklistTotal, checklistChecked) })) }
+  // A timestamp alone misses deletions, membership changes, identifiers and
+  // link moves. Rebuild the small authorized id manifest and read only rows
+  // whose visible projection differs from the caller's held snapshot.
+  const positions = manifest.filter(row => { const link = links.find(item => item.issueId === row.id); return row.scope === 'personal' || !link || teams.some(team => team.id === link.teamId) })
+    .map(row => ({ id: row.id, version: createHash('sha256').update(JSON.stringify([userId, context.workspace.id, row.signature, links.find(link => link.issueId === row.id)?.teamId ?? null])).digest('hex').slice(0, 32) }))
+  // Every request rebuilds visibility and the complete manifest before it may
+  // join. A removed task/link therefore cannot inherit an older flight even
+  // when this person's workspace role and team membership are unchanged.
+  // A workspace token also has a narrower predicate than a browser session.
+  return singleFlight(['/actions/issues/poll', userId, context.workspace.id, context.role,
+    actingContext.getStore()?.tokenWorkspaceId ?? null, allTeams.map(team => `${team.id}:${team.workspaceId}`).sort().join(','),
+    version, known ?? null, listPositionKey(previous), JSON.stringify(positions)], async () => {
+    const changedIds = changedListIds(positions, previous)
+    const rows = changedIds.length ? await db.select().from(candidates).where(inArray(candidates.id, changedIds)).orderBy(desc(candidates.updatedAt), desc(candidates.id)) : []
+    const liveRows = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
+    const identifiers = await taskIdentifiers(liveRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
+    // The leader's revision was read before these rows. Never stamp a joined
+    // response with the joining request's possibly newer live revision.
+    // The body stays in Postgres; only metadata and checklist counts are read.
+    return { version, live, positions, ...(previous ? { delta: true as const } : {}), items: liveRows.map(({ content, checklistTotal, checklistChecked, ...issue }) => ({ ...issue, identifier: identifiers.get(issue.id) ?? null, teamId: links.find(link => link.issueId === issue.id)?.teamId ?? null, metadata: readIssueMetadata(content), checklist: checklistView(checklistTotal, checklistChecked) })) }
+  })
 }
 
 /** A missing, deleted or inaccessible task is an expected answer, not a server error. */
@@ -143,8 +167,31 @@ export async function getIssue(id: string): Promise<ActionResult<{ issue: IssueV
   return runAction(async () => ({ issue: await readIssue(id) }))
 }
 
+const { content: _issueBody, ...issueSummaryColumns } = getTableColumns(issues)
+
+/** A cached detail still checks its current ACL. Its body hash is computed in
+ * Postgres so a warm read returns no document unless the visible view changed. */
+export async function pollIssue(id: string, known?: string): Promise<ActionResult<{ viewerId: string; version: string; issue: IssueView; unchanged?: never } | { viewerId: string; version: string; unchanged: true; issue?: never }>> {
+  return cacheReadAction(() => withDatabaseOperation('/actions/issues/detail', async () => {
+    const { issue, user } = await requireIssueAccessWithoutBody(id)
+    return db.transaction(async tx => {
+      const [locked] = await tx.select({ ...issueSummaryColumns, content: issueAttrsContent, bodyVersion: sql<string>`md5(${issues.content}::text)` }).from(issues).where(eq(issues.id, id)).for('share')
+      requireLockedIssueScope(locked, user.id, issue.scopeVersion)
+      // Same unavailable task as the entry ACL, when deletion committed before
+      // this lock. A cursor never turns a deleted task into an unchanged result.
+      if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
+      const summary = await issueView(locked, tx)
+      const version = createHash('sha256').update(JSON.stringify([user.id, summary])).digest('hex').slice(0, 32)
+      if (known === version) return { viewerId: user.id, version, unchanged: true as const }
+      const [body] = await tx.select({ content: issues.content }).from(issues).where(eq(issues.id, id))
+      const { bodyVersion: _bodyVersion, ...view } = summary
+      return { viewerId: user.id, version, issue: { ...view, content: body.content } }
+    })
+  }))
+}
+
 async function readIssue(id: string) {
-  const { issue, user } = await requireIssueAccess(id)
+  const { issue, user } = await requireIssueAccessWithoutBody(id)
   return db.transaction(async tx => {
     const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
     requireLockedIssueScope(locked, user.id, issue.scopeVersion)
@@ -271,14 +318,48 @@ export async function confirmIssuePersonalScope(input: { id: string; revision: n
 }
 
 export async function listIssueVersions(id: string) {
-  const { issue, user } = await requireIssueAccess(id)
+  const { issue, user } = await requireIssueAccessWithoutBody(id)
   const userId = issue.userId
   const versions = await db.transaction(async tx => {
-    const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
+    const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, scopeVersion: issues.scopeVersion }).from(issues).where(eq(issues.id, id)).for('share')
     requireLockedIssueScope(locked, user.id, issue.scopeVersion)
     return tx.select().from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, userId))).orderBy(desc(issueVersions.revision)).limit(50)
   })
   return enrichActivityActors(versions, userId)
+}
+
+const { content: _versionBody, ...versionSummaryColumns } = getTableColumns(issueVersions)
+
+/** Activity reads metadata only. Complete historical bodies are loaded by
+ * listIssueVersions when the person opens the description-history dialog. */
+export async function pollIssueVersionSummaries(id: string, known?: string, previous?: readonly ListPosition[]) {
+  return cacheReadAction(() => withDatabaseOperation('/actions/issues/activity', async () => {
+    const { issue, user } = await requireIssueAccessWithoutBody(id)
+    const held = readListPositions(previous, 50)
+    const result = await db.transaction(async tx => {
+      const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
+      requireLockedIssueScope(locked, user.id, issue.scopeVersion)
+      // The same deleted-task refusal as pollIssue, after taking the shared lock.
+      if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
+      const summaries = tx.select({ ...versionSummaryColumns, content: sql<JSONContent>`jsonb_build_object('type', 'doc', 'attrs', ${issueVersions.content}->'attrs')`.as('content') })
+        .from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, issue.userId))).orderBy(desc(issueVersions.revision), desc(issueVersions.id)).limit(50).as('activity_versions')
+      const signatures = tx.select({ id: summaries.id, revision: summaries.revision, item: sql`to_jsonb(activity_versions)`.as('item'), actor: sql`jsonb_build_array(
+        (select jsonb_build_array(${users.name}, ${users.image}) from ${users} where ${users.id}=${summaries.actorId} and ${summaries.actorType}='user'),
+        (select ${agents.harness} from ${agents} where ${agents.id}::text=${summaries.actorId} and ${agents.userId}=${issue.userId} and ${summaries.actorType}='agent')
+      )`.as('actor') }).from(summaries)
+      const signature = await queryVersion(signatures, tx)
+      const version = createHash('sha256').update(JSON.stringify([user.id, id, issue.scopeVersion, signature])).digest('hex').slice(0, 32)
+      if ((previous === undefined || held !== undefined) && known === version) return { version, unchanged: true as const }
+      const signed = signatures.as('activity_signatures')
+      const positions = await tx.select({ id: signed.id, version: sql<string>`md5(to_jsonb(activity_signatures)::text)` }).from(signed).orderBy(desc(signed.revision), desc(signed.id))
+      const ids = changedListIds(positions, held)
+      const rows = ids.length ? await tx.select().from(summaries).where(inArray(summaries.id, ids)).orderBy(desc(summaries.revision), desc(summaries.id)) : []
+      return { version, positions, rows, ...(held ? { delta: true as const } : {}) }
+    })
+    if (result.unchanged === true) return { viewerId: user.id, snapshot: result }
+    const { rows, ...snapshot } = result
+    return { viewerId: user.id, snapshot: { ...snapshot, items: await enrichActivityActors(rows, issue.userId) } }
+  }))
 }
 
 /**

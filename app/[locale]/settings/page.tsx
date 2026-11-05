@@ -5,16 +5,19 @@ import { getSession } from '@/lib/session'
 import { googleEnabled } from '@/lib/auth'
 import { WorkspaceApp } from '@/components/workspace-app'
 import { getTranslations } from 'next-intl/server'
+import { authorizedCacheWorkspace } from '@/lib/swr/cache-scope'
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('Metadata')
   return { title: t('settingsTitle'), description: t('settingsDescription') }
 }
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ workspace?: string }> }) {
   return withDatabaseOperation('/pages/settings', async () => {
-  const session = await getSession()
-  if (!session?.user) redirect('/sign-in?next=%2Fsettings')
-  return <WorkspaceApp user={session.user} googleEnabled={googleEnabled} />
+    const query = await searchParams
+    const session = await getSession()
+    if (!session?.user) redirect('/sign-in?next=%2Fsettings')
+    const cacheWorkspace = await authorizedCacheWorkspace(session.user.id, query.workspace)
+    return <WorkspaceApp user={session.user} cacheWorkspace={cacheWorkspace} googleEnabled={googleEnabled} />
   })
 }

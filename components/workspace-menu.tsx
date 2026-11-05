@@ -11,6 +11,7 @@ import { getPathname } from '@/i18n/navigation'
 import { fetchSettingsData } from '@/lib/settings-data'
 import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import { switchWorkspace } from '@/app/actions/workspace'
+import { clearPersistentReadCaches } from '@/lib/swr/persistent-cache'
 import { useShortcutLabel } from '@/components/shortcut-keys'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -105,6 +106,7 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
       try {
         const result = await switchWorkspace({ accountId, workspaceId })
         if (!result.ok) { toast.error(result.error); return }
+        await clearPersistentReadCaches()
         window.location.assign(withBasePath(getPathname({ locale, href: '/' })))
       } catch { toast.error(i18nText("FeatureCopy.c_b8e346ef")) }
       finally { setPending(false) }

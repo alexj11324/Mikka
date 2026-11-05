@@ -7,10 +7,13 @@ import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { useTranslations } from 'next-intl'
-import { pollCoordinatorChat, coordinatorHistory, retryCoordinatorTurn, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { coordinatorHistory, retryCoordinatorTurn, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import { getBotModelMenu } from '@/app/actions/execution-settings'
 import type { BotModelMenu } from '@/lib/bot-model-menu-view'
-import { knownVersion, mergeChat, metadataEntities } from '@/lib/coordinator/chat-poll'
+import { metadataEntities } from '@/lib/coordinator/chat-poll'
+import { readCachedCoordinatorChat } from '@/lib/coordinator/chat-read-client'
+import { CacheReadError } from '@/lib/cache-read-error'
+import { chatKeys } from '@/lib/swr/keys'
 import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
@@ -34,9 +37,9 @@ import { ChatComposer } from './chat-composer'
 import { BotModelPicker, botModelMenuKey, openModelPicker } from './bot-model-picker'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
+import { useLiveKey, useLiveKeys, useLiveScope, watchPageVisibility } from '@/hooks/use-live-key'
+import { ListReadScopeError, listReadDeadline, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { heldRevision } from '@/lib/live/revisions'
-import { useLiveKey, useLiveKeys, watchPageVisibility } from '@/hooks/use-live-key'
-import { listReadDeadline, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { useLiveCitations } from './use-live-citations'
 import type { CoordinatorLiveReply } from '@/lib/coordinator-stream-client'
 import { ThreadCard } from './thread-card'
@@ -98,9 +101,7 @@ const CHAT_MERGE_MS = 2_000
 /** A passing usage limit (another turn running, a cost read): the next send works without anything changing. */
 const TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(['usage_in_progress', 'usage_concurrency_limit', 'usage_cost_unavailable'])
 
-export function coordinatorChatKey(botId?: string | null) {
-  return botId ? ['coordinator-chat', botId] as const : 'coordinator-chat'
-}
+export const coordinatorChatKey = chatKeys.detail
 
 /** A reply still streaming, drawn by the same row as a stored one. */
 function streamedItem(reply: CoordinatorLiveReply): Chat['items'][number] {
@@ -157,25 +158,23 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const avatar = (size: 'pill' | 'profile', mood?: 'thinking') => <BotAvatar {...(bot ? { color: bot.color, shape: bot.shape } : COORDINATOR_AVATAR)} size={size} mood={mood} />
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const actionError = useActionError()
+  const { cache, mutate: mutateAll } = useSWRConfig()
+  const selectedWorkspaceId = useLiveScope()?.workspaceId
   const reconnectStream = useRef<() => void>(() => {})
   // A read names the version it shows; an unchanged chat comes back as its live state only (lib/coordinator/chat-poll.ts).
   const shown = useRef<{ chat?: ChatRead; metadataStale: boolean; fullReadAt: number }>({ metadataStale: false, fullReadAt: -Infinity })
   const chatKey = coordinatorChatKey(botId)
-  const { data, mutate, error: loadError } = useSWR<ChatRead>(chatKey, async () => {
-    const requestedAt = performance.now()
-    const known = knownVersion(shown.current.chat, shown.current.metadataStale)
-    const previous = shown.current.chat
-    const continuation = previous?.continuation && { ...previous.continuation, sourceIds: Object.keys(previous.sources).slice(0, 400), artifactIds: Object.keys(previous.artifacts).slice(0, 400) }
+  const { data: cachedData, mutate, error: loadError } = useSWR<ChatRead>(chatKey, async () => {
+    const refreshMetadata = shown.current.metadataStale
     shown.current.metadataStale = false
-    if (!known) shown.current.fullReadAt = requestedAt
-    let next: Awaited<ReturnType<typeof pollCoordinatorChat>>
-    try { next = await pollCoordinatorChat(botId, known, continuation) }
-    catch (error) { if (!known && previous) shown.current.metadataStale = true; throw error }
-    const merged = mergeChat(shown.current.chat, next)
-    return merged === shown.current.chat ? merged : { ...merged, requestedAt }
+    if (refreshMetadata || !shown.current.chat) shown.current.fullReadAt = performance.now()
+    try { return await readCachedCoordinatorChat(cache, botId, { refreshMetadata }) }
+    catch (error) { if (refreshMetadata) shown.current.metadataStale = true; throw error }
   }, {
     onSuccess: () => reconnectStream.current(),
   })
+  const unavailable = loadError instanceof CacheReadError || loadError instanceof ListReadScopeError
+  const data = unavailable ? undefined : cachedData
   useEffect(() => { shown.current.chat = data }, [data])
   // No timer reads this chat (#1212). A committed message, inbox event, turn change or run change in it pushes
   // its key on the owner's home channel; a turn's lease running out has no write, so its expiry is a deadline.
@@ -183,13 +182,13 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const liveOwner = data?.live?.ownerId
   const liveHome = liveOwner ? ownerListWorkspace(data, liveOwner) : null
   // A push this chat already read (a duplicate, or the echo of this tab's own send) is skipped.
-  useLiveKey('bot_chat', liveHome && data?.botId ? data.botId : UNRESOLVED_LIST_SCOPE, [unstable_serialize(chatKey)], liveHome,
+  useLiveKey('bot_chat', unavailable ? null : liveHome && data?.botId ? data.botId : UNRESOLVED_LIST_SCOPE, [unstable_serialize(chatKey)], liveHome,
     { minIntervalMs: CHAT_MERGE_MS, deadline: liveOwner ? listReadDeadline(data, liveOwner) : undefined, revisions: { [unstable_serialize(chatKey)]: heldRevision(data, 'bot_chat', data?.botId) }, shareAcrossTabs: true })
-  // Cards and cited names have no chat write (lib/coordinator/chat-poll.ts). An artifact's own key marks them
-  // stale and reads the chat once, in full; the read that catches up after the page was hidden is full too.
-  const metadataKey = useMemo(() => ['coordinator-chat-metadata', botId ?? 'coordinator'] as const, [botId])
+  // Cards and cited names have no chat write (lib/coordinator/chat-poll.ts). An
+  // artifact push or visibility catch-up refreshes metadata using the same cursor.
+  const metadataKey = useMemo(() => chatKeys.metadata(botId), [botId])
   useSWR(data ? metadataKey : null, async () => {
-    // Catching up, the chat's own read is already full: one read, not two.
+    // Catching up, the chat's own read already refreshed metadata.
     if (shown.current.metadataStale || performance.now() - shown.current.fullReadAt < 1_000) return true
     shown.current.metadataStale = true; await mutate(); return true
   }, {
@@ -198,6 +197,12 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const artifactsShown = data?.artifacts
   const metadata = useMemo(() => metadataEntities({ artifacts: artifactsShown }), [artifactsShown])
   useLiveKeys(liveHome ? metadata : [], [unstable_serialize(metadataKey)], liveHome, { minIntervalMs: CHAT_MERGE_MS })
+  // Deleting a cited task or changing workspace access need not write a chat
+  // message. Reuse the existing list push; the next cursor read reauthorizes
+  // decorations and removes anything it can no longer return.
+  const hasSources = Boolean(Object.keys(data?.sources ?? {}).length)
+  const sourceScopes = [...new Set([liveHome, selectedWorkspaceId].filter((scope): scope is string => Boolean(scope)))]
+  useLiveKeys(hasSources ? sourceScopes.map(workspaceId => ({ kind: 'issue_list' as const, id: workspaceId, workspaceId })) : [], [unstable_serialize(metadataKey)], null, { minIntervalMs: CHAT_MERGE_MS })
   useEffect(() => watchPageVisibility(() => { if (document.visibilityState === 'hidden' && shown.current.chat) shown.current.metadataStale = true }), [])
   const [loadingHistory, setLoadingHistory] = useState(false)
   async function loadHistory() {
@@ -249,7 +254,6 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const [failed, setFailed] = useState<{ text: string; withNotes: boolean; message: string; after: number; retryOf?: number } | null>(null)
   const [retrying, setRetrying] = useState<ReadonlySet<number>>(() => new Set())
   const { submit, failureMessage } = useCoordinatorSubmit()
-  const { mutate: mutateAll } = useSWRConfig()
   // Notes pinned in the browser wait in this composer while it is the chat on screen (not inside the reader).
   const browser = useBrowserNotesComposer(!embedded)
   const noteCount = browser?.notes.length ?? 0

@@ -1,5 +1,6 @@
 'use client'
 
+import { settingsKeys } from '@/lib/swr/keys'
 import { useCallback, useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -12,9 +13,7 @@ import { readCardVerification, startCardVerification, type CardVerificationStatu
 import { useLiveWait } from '@/hooks/use-live-wait'
 import { useActionError } from '@/lib/use-action-error'
 
-export function cardVerificationKey(workspaceId: string) {
-  return ['card-verification', workspaceId] as const
-}
+export const cardVerificationKey = settingsKeys.cardVerification
 
 /** Drops Checkout's return parameters so a reload does not replay the return. */
 function takeReturn(name: string): string | null {

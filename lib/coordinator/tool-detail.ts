@@ -1,7 +1,7 @@
 // What an opened tool call says before its raw data (R-83): who it went to, what it was asked, what came back, as
 // lines a person reads. Ids are never shown; the raw input and output stay one more click away. Pure, for tests.
 import type { ChatTool } from '@/lib/coordinator/context'
-import { QUOTE_KEYS, quotePreview } from '@/lib/coordinator/quote-preview'
+import { QUOTE_KEYS, quotePreview } from '@/lib/coordinator/tool-quote'
 import { toolAction } from '@/lib/coordinator/tool-activity'
 
 export type ToolDetailLine =

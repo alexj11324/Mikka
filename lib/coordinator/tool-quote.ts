@@ -1,3 +1,6 @@
+// Shared by the browser's tool details and the server's chat projection.
+// Keep this display-only module independent of prompt and message-signing code.
+
 /** The input fields that say in words what a call was asked to do, in the order the chat looks for them. */
 export const QUOTE_KEYS = ['note', 'prompt', 'instruction', 'message', 'request', 'text', 'body'] as const
 export const QUOTE_PREVIEW_CHARS = 1000
@@ -29,4 +32,3 @@ export function toolQuoteText(input: unknown): string | undefined {
 export function toolQuote(input: unknown): string | undefined {
   return quotePreview(toolQuoteText(input))
 }
-

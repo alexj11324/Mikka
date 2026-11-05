@@ -1,10 +1,11 @@
+import { settingsKeys } from '@/lib/swr/keys'
 import type { listTeamMembers, loadTeamDirectory } from '@/app/actions/teams'
 import { withBasePath } from '@/lib/base-path'
 
 export const settingsReadOptions = { revalidateIfStale: false, shouldRetryOnError: false } as const
-export const memberSettingsKey = (workspaceId?: string) => workspaceId ? `/api/workspace?workspace=${encodeURIComponent(workspaceId)}` : '/api/workspace'
-export const teamDirectoryKey = (workspaceId?: string) => ['team-directory', workspaceId ?? null] as const
-export const teamMembersKey = (teamId: string) => ['team-members', teamId] as const
+export const memberSettingsKey = settingsKeys.memberSettings
+export const teamDirectoryKey = settingsKeys.teamDirectory
+export const teamMembersKey = settingsKeys.teamMembers
 export const fetchTeamMembers = ([, teamId]: ReturnType<typeof teamMembersKey>) => fetchSettingsData<Awaited<ReturnType<typeof listTeamMembers>>>(`/api/teams/${encodeURIComponent(teamId)}/members`)
 export const fetchTeamDirectory = ([, workspaceId]: ReturnType<typeof teamDirectoryKey>) => fetchSettingsData<Awaited<ReturnType<typeof loadTeamDirectory>>>(`/api/teams/directory${workspaceId ? `?workspace=${encodeURIComponent(workspaceId)}` : ''}`)
 

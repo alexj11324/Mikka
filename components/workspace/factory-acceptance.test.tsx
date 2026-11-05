@@ -21,9 +21,10 @@ const translationsFor = (namespace = '') => {
 let swr: { data?: unknown; error?: unknown; isLoading: boolean; mutate: () => void }
 let ledger: unknown
 let taskDetail: unknown
+const cache = new Map()
 mock.module('swr', { defaultExport: (key: string) => String(key).includes('view=ledger')
   ? { data: ledger, mutate: () => {} }
-  : key === '/api/factory/tasks/t1' && taskDetail !== undefined ? { data: taskDetail, mutate: () => {} } : swr, namedExports: { useSWRConfig: () => ({ mutate: async () => undefined }) } })
+  : key === '/api/factory/tasks/t1' && taskDetail !== undefined ? { data: taskDetail, mutate: () => {} } : swr, namedExports: { useSWRConfig: () => ({ cache, mutate: async () => undefined }) } })
 mock.module('next-intl', { namedExports: { useTranslations: translationsFor, useFormatter: () => ({ dateTime: () => '' }) } })
 mock.module(new URL('./issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 
@@ -36,7 +37,7 @@ before(async () => {
   ({ FactoryAcceptance, FactoryAcceptancePanel, FactoryListError, useThreadAcceptance } = await import('./factory-acceptance'))
   ;({ ApprovalBar } = await import('./factory-approval-bar'))
 })
-beforeEach(() => { swr = { isLoading: false, mutate: () => {} }; ledger = { approvals: [], publications: [] }; taskDetail = undefined })
+beforeEach(() => { cache.clear(); swr = { isLoading: false, mutate: () => {} }; ledger = { approvals: [], publications: [] }; taskDetail = undefined })
 const list = () => renderToStaticMarkup(<FactoryAcceptance issueId="issue-1" />)
 const task = (patch: Record<string, unknown> = {}) => ({ id: 't1', issueId: 'issue-1', stage: 'approval', status: 'pending', reason: '独立检查通过', candidateId: 'c1', candidateRunId: null, isSkillCandidate: false, ...patch })
 

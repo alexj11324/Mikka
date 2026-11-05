@@ -42,7 +42,7 @@ import { settingsHref, TEAM_ONLY_SECTIONS, type SettingsSectionId } from '@/lib/
 import { useRouter } from '@/i18n/navigation'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
 import type { RailDestination } from '@/components/nav/icon-rail'
-import { prefetchAllSettings, prefetchSettingsSection } from '@/lib/settings-prefetch'
+import { prefetchSettingsSection } from '@/lib/settings-prefetch'
 import { FieldError } from '@/components/ui/field'
 
 export type { SettingsSectionId as SettingsSection } from '@/lib/settings-sections'
@@ -83,15 +83,15 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
     if (activeSection) router.replace(settingsHref('preferences', workspaceId ?? workspace?.workspace.id))
     else setSection('preferences')
   }, [teamOnly, activeSection, router, workspaceId, workspace?.workspace.id])
-  const { cache } = useSWRConfig()
+  const { cache, mutate } = useSWRConfig()
   // Settings opened without ?workspace= still has one: the default the API resolved.
   const resolvedWorkspaceId = workspaceId ?? workspace?.workspace.id
   const roleKnown = workspace !== undefined
-  // Once the role is known, load every section the viewer can open, so none shows a skeleton later.
+  // Read only the open section. Pointer/focus intent warms the next section.
   useEffect(() => {
     if (preview || !roleKnown || !resolvedWorkspaceId) return
-    return prefetchAllSettings(resolvedWorkspaceId, admin, cache, personal)
-  }, [preview, roleKnown, resolvedWorkspaceId, admin, personal, cache])
+    prefetchSettingsSection(section, resolvedWorkspaceId, cache, mutate)
+  }, [preview, roleKnown, resolvedWorkspaceId, section, cache, mutate])
   const title = t(`sections.${section}.title`)
   const routedBody = section === 'members' || section === 'teams'
   // Switching sections fades the new one in briefly; the section the page opened on does not (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md).
@@ -101,7 +101,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const enter = switched.current ? 'animate-in fade-in-0 duration-150 motion-reduce:animate-none' : undefined
 
   return <>
-    <SettingsSidebar section={section} activeSection={activeSection} admin={admin} personal={!team} workspaceName={workspace?.workspace.name} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId, cache) }} onRail={onRail} />
+    <SettingsSidebar section={section} activeSection={activeSection} admin={admin} personal={!team} workspaceName={workspace?.workspace.name} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId, cache, mutate) }} onRail={onRail} />
     <AppShellContent parent={t('title')} title={title} variant="settings">
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6 max-md:pt-1">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent key={section} className={cn('gap-6 max-md:pt-1', enter)}>

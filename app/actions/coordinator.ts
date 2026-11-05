@@ -20,7 +20,7 @@ import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
 import { botChats, chatVersionState, chatView, citationSources, storedReasoning, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import * as chatStore from '@/lib/coordinator/store'
-import type { UnchangedChat } from '@/lib/coordinator/chat-poll'
+import { refreshChatMetadata, type UnchangedChat } from '@/lib/coordinator/chat-poll'
 import type { CitationSource } from '@/lib/coordinator/citations'
 import { reasoningText } from '@/lib/coordinator/stream-response'
 import { credentialChatFingerprints } from '@/lib/credentials/chat-guard'
@@ -37,6 +37,7 @@ import { suggestionMessage } from '@/lib/suggestions/card'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { AgentProfileError } from '@/lib/factory/agent-profile-definition'
 import { agentProfileReferenceSchema, BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-reference'
+import { cacheReadAction } from '@/lib/cache-read-action'
 
 async function getUser() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -66,7 +67,7 @@ async function ownBot(user: Parameters<typeof openChatBotId>[0], botId: string |
   const id = await openChatBotId(user, parsed.data)
   const [bot] = await db.select({ id: bots.id, name: bots.name, coordinator: sql<boolean>`exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})` })
     .from(bots).where(and(eq(bots.id, id), eq(bots.ownerId, userId))).limit(1)
-  if (!bot) throw new ActionFailureError('validationGeneric')
+  if (!bot) throw new ActionFailureError('botNotFound')
   return bot
 }
 
@@ -83,15 +84,15 @@ async function readFullChat(botId: string | null): Promise<CoordinatorChat> {
   // Before the chat: a push at this revision or below is already in what follows.
   const begun = await beginOwnerListRead(userId, [], [{ kind: 'bot_chat', id: bot.id }])
   const { chat, expiries, observedAt } = await chatStore.chatViewState(userId, 200, bot.id)
-  // BotList, the workspace and ArtifactWindow share the live chat's SWR key.
-  // Whichever fetcher wins must retain the same authorized home and deadline.
+  // The legacy/mobile full reader retains the same authorized home and
+  // deadline as incremental reads; web sidebars use chat summaries instead.
   const live = await ownerListRead(userId, expiries, observedAt, begun)
   // Without a Coordinator here nothing is coming, so do not show one working.
   return { ...chat, botId: bot.id, enabled, working: enabled && chat.working, live }
 }
 
 const versionSchema = z.string().regex(/^[0-9a-f]{32}$/).optional()
-const continuationSchema = z.object({ after: z.number().int().min(0), cursor: z.number().int().min(0), prefix: z.string().regex(/^[0-9a-f]{32}$/), sourceIds: z.array(z.uuid()).max(400).optional(), artifactIds: z.array(z.uuid()).max(400).optional() }).optional()
+const continuationSchema = z.object({ after: z.number().int().min(0), cursor: z.number().int().min(0), prefix: z.string().regex(/^[0-9a-f]{32}$/), restoreToolMetadata: z.literal(true).optional(), sourceIds: z.array(z.uuid()).max(400).optional(), artifactIds: z.array(z.uuid()).max(400).optional() }).optional()
 
 /**
  * The chat for a poll that already shows version `known`: only its live state
@@ -101,39 +102,50 @@ export async function pollCoordinatorChat(botId: string | null = null, known?: s
   return withDatabaseOperation('/actions/coordinator/poll', () => readCoordinatorChat(botId, known, continuation))
 }
 
+/** Expected authorization failures cross the Server Action boundary as codes,
+ * so a local cache can erase them instead of retaining data under a redacted
+ * production exception. The established reader and cursor stay unchanged. */
+export async function syncCoordinatorChat(botId: string | null = null, known?: string, continuation?: z.infer<typeof continuationSchema>): Promise<ActionResult<{ chat: CoordinatorChat | UnchangedChat }>> {
+  return cacheReadAction(async () => ({ chat: await pollCoordinatorChat(botId, known, continuation) }))
+}
+
 async function readCoordinatorChat(botId: string | null, known?: string, continuation?: z.infer<typeof continuationSchema>): Promise<CoordinatorChat | UnchangedChat> {
   // Each request is authorized on its own: the session and its ownership of this bot.
   const user = await getUser()
   const bot = await ownBot(user, botId)
-  // The chat is the owner's own: identical concurrent reads (tabs, devices after one push) share one read.
-  return singleFlight(['/actions/coordinator/poll', user.id, bot.id, known ?? null, continuation ? JSON.stringify(continuation) : null],
-    () => readOwnedChat(user, bot, known, continuation))
-}
-
-async function readOwnedChat(user: Awaited<ReturnType<typeof getUser>>, bot: Awaited<ReturnType<typeof ownBot>>, known?: string, continuation?: z.infer<typeof continuationSchema>): Promise<CoordinatorChat | UnchangedChat> {
   const enabled = coordinatorEnabled()
   const parsed = versionSchema.safeParse(known)
+  const proof = continuationSchema.safeParse(continuation)
+  const previous = proof.success && proof.data ? { ...proof.data,
+    sourceIds: [...new Set(proof.data.sourceIds ?? [])].sort(), artifactIds: [...new Set(proof.data.artifactIds ?? [])].sort(),
+  } : undefined
+  const heldVersion = parsed.success ? parsed.data : undefined
   // Before the chat: a push at this revision or below is already in what follows.
   const begun = await beginOwnerListRead(user.id, [], [{ kind: 'bot_chat', id: bot.id }])
   const { expiries, observedAt, ...current } = await chatVersionState(user.id, 200, bot.id)
   // The owner's home channel says when to read again; a lease running out is the one change with no write.
   const live = await ownerListRead(user.id, expiries, observedAt, begun)
-  if (parsed.success && parsed.data === current.version) return { unchanged: true, ...current, botId: bot.id, enabled, working: enabled && current.working, live }
-  const proof = continuationSchema.safeParse(continuation)
-  const chat: ChatView & { after?: number; baseCursor?: number } = await chatStore.chatUpdate(user.id, bot.id, proof.success ? proof.data : undefined)
-  // Refresh card names and authorization independently from historical message bodies.
-  if (!known && proof.success && proof.data) {
+  // Each request observes the current version before joining: a deletion or a
+  // new turn cannot join an older transcript still being read. Normalize only
+  // the validated, bounded cursor; a full read and a saved tail stay distinct.
+  const shared = await singleFlight(['/actions/coordinator/poll', user.id, bot.id, current.version, heldVersion ?? null,
+    previous ? JSON.stringify(previous) : null], async (): Promise<CoordinatorChat | UnchangedChat> => {
+    if (heldVersion === current.version && !previous?.restoreToolMetadata) return { unchanged: true, ...current, botId: bot.id, enabled, working: enabled && current.working, live }
+    const chat = await chatStore.chatUpdate(user.id, bot.id, previous)
+    // Carry the leader's revision, read before its transcript. A joiner's newer
+    // revision must never acknowledge a write absent from this shared data.
+    return { ...chat, version: current.version, botId: bot.id, enabled, working: enabled && chat.working, live }
+  })
+  // This stays outside the flight, after awaiting it: cited task and artifact
+  // access may have changed while another request was reading the transcript.
+  return refreshChatMetadata(shared, previous, async ({ sourceIds, artifactIds }) => {
     const { artifactSummaries } = await import('@/lib/artifacts/store')
-    const ids = proof.data.sourceIds ?? []
     const [sources, artifacts] = await Promise.all([
-      citationSources(user.id, ids.map(id => `[[issue:${id}]] [[run:${id}]]`)),
-      artifactSummaries(user.id, proof.data.artifactIds ?? []),
+      citationSources(user.id, sourceIds.map(id => `[[issue:${id}]] [[run:${id}]]`)),
+      artifactSummaries(user.id, artifactIds),
     ])
-    chat.sources = { ...sources, ...chat.sources }
-    chat.artifacts = { ...artifacts, ...chat.artifacts }
-  }
-  // The version read first: a message stored in between makes the next poll read again, never miss it.
-  return { ...chat, ...(!known ? { metadataRefresh: true } : {}), version: current.version, botId: bot.id, enabled, working: enabled && chat.working, live }
+    return { sources, artifacts }
+  })
 }
 
 /** A bounded older page overlaps the first rendered item, preserving multi-step reply grouping. The app's pages are
