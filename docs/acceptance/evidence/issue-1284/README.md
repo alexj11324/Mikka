@@ -90,3 +90,22 @@ The missing self-improvement transaction owners are now connected to the existin
 - [UI identity proof for c95f9a13](./ui-reuse-c95f9a13.json): all 11 relevant files still match the nine actual screenshots captured at 8608b63. The screenshot source is not relabeled.
 
 The independent suite counts above are not added together as a count of unique scenarios. DeepSeek API remains excluded and `test:local-loop` remains unrun. This head is ready for the repository's coordinated batch process; no new production Profile acceptance is claimed yet. #1284 remains open until the original zero-config task and the real Claude Code → Codex Profile cases complete on the deployed production build.
+
+
+## 最终整合批次 #1345：f4e0a991（生产验收仍待完成）
+
+本节记录最终提交 `f4e0a99143ab924390e8fbd915455c4abc7e21cf`、tree `1fc7e470a4ce8fa6f8cbbb43951140306a7b2544`。GitHub merge candidate `636616f90868accb9afaff03a9259b7769a63e73` 的 tree 完全相同。
+
+批次保留 #1313 原提交的祖先与全部关键产品文件；#1328 已由另一 owner 的 #1336 合入 main122，本批不重复认领其合并或验收。相对当前 main122，净改动为 #1313 的 17 个文件及工作流文档。前一生产版本的 [READY 与公网 SHA 记录](./release-main122-before-merge.json) 单独保留。
+
+- [最终 CI](./ci-f4e0a991.json)：[41973672831](https://github.com/alexj11324/Mikka/actions/runs/41973672831) 成功；18 checks 为 17 success / 1 expected OIDC skip，四组数据库与所有依赖 gate 通过。
+- [最终 Docker PG/静态检查](./gates-f4e0a991.json)：96/96、0 fail/skip/cancel，覆盖 policy-denials、Coordinator 十路并发、最终 Profile claim、共享订阅、Owner acceptance、真实 self-improvement 事务 owner、Issue live 关系和 chat deadline；types、相关 oxlint、diff 均 exit 0。自有角色和数据库正常清理，未使用 FORCE 或 terminate。
+- [最终完整构建与正常 HTTP](./isolated-f4e0a991.json)：全新隔离数据库、严格部署标识、`pnpm build` exit 0、正常注册/登录和 Profile CRUD/隔离/历史/409/归档 **27/27**；清理后 active leases=0、valid sessions=0、3110 无监听。九份 JSON 通过仓库现有凭证/cookie 证据审计。
+- [视觉复用审计](./ui-reuse-f4e0a991.json) / [说明](./ui-reuse-f4e0a991.md)：九张截图仍来自实际 8608 合成组件夹具；相关组件、样式、依赖与实际读取的 28 项翻译子树/键相同。locale 整文件已随主干变化，未声称整文件相同，也未把旧图改称新截图。
+- [19a 整合审计](./integration-audit-19a7094c.json) 保留原本执行版本，不冒充 f4e0 的新测试。
+
+### 19a 本地 routing 的两次清理失败
+
+[首轮](./routing-19a-first-cleanup-failure.json) 与 [一次诊断复核](./routing-19a-diagnostic-cleanup-failure.json) 都保留 **209/210、1 fail、0 skip**，失败位于 fixture 的 `DROP DATABASE … WITH (FORCE)`，错误码 42501。首轮未记录目标 backend 身份；第二轮在错误前 2ms、后 24ms 的采样中，目标 owned 数据库仅剩 autovacuum worker，测试客户端已退出。没有第三次重试，没有加权限或改弱 helper。这两条本地红灯不改写为通过；最终全量 PG 门禁采用实际通过的 f4e0 CI，其他最终本地组的 96/96 另行记录。
+
+上述组存在覆盖重叠，不累加为唯一场景数。DeepSeek API 仍按用户指示排除，`test:local-loop` 未运行。本轮测试服务和 PostgreSQL 已停止，Docker stop 已提交；部署与真实 Profile 生产验收尚待完成，#1284 继续保持 open。

@@ -1,0 +1,142 @@
+{
+  "kind": "exact-pr-head-ci",
+  "recordedAt": "2026-11-05T05:31:31.756Z",
+  "repository": "alexj11324/Mikka",
+  "pr": 1345,
+  "head": "f4e0a99143ab924390e8fbd915455c4abc7e21cf",
+  "tree": "1fc7e470a4ce8fa6f8cbbb43951140306a7b2544",
+  "run": {
+    "id": 41973672831,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "mergeCandidate": {
+    "sha": "636616f90868accb9afaff03a9259b7769a63e73",
+    "tree": "1fc7e470a4ce8fa6f8cbbb43951140306a7b2544",
+    "parents": [
+      "122fd9054b5400569fd2518f55c52cec8f04d28a",
+      "f4e0a99143ab924390e8fbd915455c4abc7e21cf"
+    ]
+  },
+  "checks": [
+    {
+      "name": "UI policy (strict)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127069518528"
+    },
+    {
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127068818821"
+    },
+    {
+      "name": "analytics-ssr",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672764/job/127068718194"
+    },
+    {
+      "name": "Cloud credential access (OIDC)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067543441"
+    },
+    {
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542350"
+    },
+    {
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542299"
+    },
+    {
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542289"
+    },
+    {
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542266"
+    },
+    {
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542234"
+    },
+    {
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542202"
+    },
+    {
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542166"
+    },
+    {
+      "name": "Integration unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542141"
+    },
+    {
+      "name": "Analytics SSR (full)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672764/job/127067522271"
+    },
+    {
+      "name": "Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067464108"
+    },
+    {
+      "name": "Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672764/job/127067464057"
+    },
+    {
+      "name": "Browser tests (before merge)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672896/job/127067464054"
+    },
+    {
+      "name": "custody",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672761/job/127067463696"
+    },
+    {
+      "name": "GitGuardian Security Checks",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/runs/127067444473"
+    }
+  ],
+  "counts": {
+    "success": 17,
+    "skipped": 1,
+    "failure": 0
+  },
+  "productionAcceptance": "Pending; this receipt is CI evidence only",
+  "exclusions": [
+    "DeepSeek API excluded by user; no paid calls or balance probes",
+    "test:local-loop not run"
+  ]
+}

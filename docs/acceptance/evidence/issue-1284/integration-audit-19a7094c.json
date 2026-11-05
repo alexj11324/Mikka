@@ -1,0 +1,182 @@
+{
+  "result": "passed",
+  "kind": "Static integration, Git blob and JSON integrity audit; no runtime/DB tests",
+  "auditedAtUtc": "2026-11-05T05:17:39.429403+00:00",
+  "head": "19a7094c313a6f56c08e37fb1061c5e6c75799a1",
+  "tree": "cb8700bddc963326224fc530a1071dce0626c43a",
+  "worktreeClean": true,
+  "references": {
+    "base": "caebc8e6b4f6afb5f3fe3a22b833b32da9c1a7c4",
+    "main": "89cfb577cecada3087f02222f7a656cae5706977",
+    "pr1313": "c95f9a13996ec12515f30a3a89107f013bae4a94",
+    "pr1328": "3d70bf5886844a52346c621904b2287ccc92adf7"
+  },
+  "changedPathsAgainstMain": 48,
+  "unexpectedPaths": [],
+  "sources": {
+    "1313": {
+      "criticalProductBlobs": {
+        "lib/agent-runs.ts": "d62b1e98de1dd90fdf903c593b6e97069f990e6f",
+        "lib/factory/agent-profile.ts": "3ed31faffc13dea8ae6dce88dafab48adbdcc444",
+        "lib/factory/automatic-dispatch.ts": "e755b680d5cf13ba996f375b177ba03eee6149a6",
+        "lib/factory/dispatch.ts": "de48ddb49830a9de13638ace3295bf9df01c3640",
+        "lib/factory/reconcile.ts": "d5ff8959e03619b57be2caa61a8cf58a3ad557ee",
+        "lib/factory/store.ts": "823bba891c0d3aa8a40efe6fedf49dd98fa3bb22",
+        "lib/factory/transaction.ts": "39c5adb8679fde6f80eaf71abc2bed5abdbfe622",
+        "lib/factory/watchdog.ts": "9d9ee08ab13040e404a352082fd4e18e4d62bbf8",
+        "lib/self-improvement/evaluations.ts": "49c9e8eb8eb34bb5c364bacd4d5ccb7d566183ed",
+        "lib/self-improvement/factory-bridge.ts": "ed62d21dfeafa650dc8ad77a24fd6b28d28d9ecd",
+        "lib/subscription-runtime.ts": "7e7287142b6bd9a41e7bbcd60eab43fac9f0cfea"
+      },
+      "criticalByteIdentity": true,
+      "allOriginalPaths": 17,
+      "originalPathsByteIdentical": 15,
+      "combinedPaths": [
+        "lib/factory/agent-profile.db.test.ts",
+        "tests/factory-admission.db.test.ts"
+      ]
+    },
+    "1328": {
+      "criticalProductBlobs": {
+        "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts": "751ab5e610be60da6c4c3ffed8ff34f7724caed9",
+        "lib/computer/claim.ts": "afb84620e89073f15f8e19a8035dbe09c2785675",
+        "lib/factory/profile-admission.ts": "8a2223b20114ed39368d01025f9c6dc3e1a5ae0d",
+        "lib/factory/merge.ts": "c08cedd2ab9c76f1d1dc2201169f941ea1065d6c"
+      },
+      "criticalByteIdentity": true,
+      "allOriginalPaths": 30,
+      "originalPathsByteIdentical": 23,
+      "combinedPaths": [
+        "components/coordinator/coordinator-chat.tsx",
+        "components/coordinator/failure-reason.tsx",
+        "components/coordinator/retry-reply-button.test.tsx",
+        "lib/model-order.ts",
+        "messages/en.json",
+        "messages/zh-CN.json",
+        "package.json"
+      ]
+    }
+  },
+  "fixtureCombination": "Only exact upstream per-Agent Profile case and run/issue_threads live-event assertion added; c95 transaction/rollback assertions retained.",
+  "mainPreservation": {
+    "pathsChangedByFrontBatch": 145,
+    "unchangedStatesOutsideKnownCombinations": 136,
+    "preservedDeletions": [
+      "lib/coordinator/chat-poll-interval.ts"
+    ],
+    "criticalBlobs": {
+      "lib/model-order-plan.ts": "be476a78a77691f3d5a850c209b5aaf3a0b95363",
+      "lib/model-dispatch.ts": "de1bceccee9e44327beedbc91c16a7bf5638e2c1",
+      "packages/protocol/src/device.ts": "d08fdffa8a6c3db7e09c355a2cea8e78f2cbb1e9",
+      "lib/subscription-quota.ts": "6ad21c384b02db9fce3be15e8195a806e68b83dc",
+      "lib/subscription-access-snapshot.ts": "25cb31a5f23328d5c3adde3a12f657a1872325d3"
+    },
+    "minimumDaemonVersion": "0.0.456"
+  },
+  "modelOrder": {
+    "blob": "1e3541ac9e3678a8c0c43e068872f8d45c170a50",
+    "probeAlwaysAndDisplayBothRetained": true,
+    "displayTtlMinutes": 15,
+    "admissionTtlSeconds": 60,
+    "finalCloudProbeHasNoDisplayOption": true
+  },
+  "translations": {
+    "messages/en.json": {
+      "blob": "987319b8d3705488b920d2b5b8164526023ecf8c",
+      "sha256": "fe14f54a8f0c11ecf7f7d7e42dd0ec2ff64db4ad4f4380ff4999a37b025d6ced",
+      "leafCount": 4224,
+      "duplicateKeys": [],
+      "exactCombinedLeafValues": true,
+      "sources": {
+        "main1335": {
+          "addedRetained": 45,
+          "updatedRetained": 15,
+          "missingOrChanged": []
+        },
+        "1328": {
+          "addedRetained": 1,
+          "updatedRetained": 0,
+          "missingOrChanged": []
+        }
+      }
+    },
+    "messages/zh-CN.json": {
+      "blob": "7730996cc6db4bacd0b01f3f5693d877f928ed5c",
+      "sha256": "8d59847728b55840307874abc47297d0fb9bff4995589ed43a50b1905afe3ec5",
+      "leafCount": 4224,
+      "duplicateKeys": [],
+      "exactCombinedLeafValues": true,
+      "sources": {
+        "main1335": {
+          "addedRetained": 45,
+          "updatedRetained": 15,
+          "missingOrChanged": []
+        },
+        "1328": {
+          "addedRetained": 1,
+          "updatedRetained": 0,
+          "missingOrChanged": []
+        }
+      }
+    }
+  },
+  "documentation": {
+    "blob": "7f399ccfdb8b9619c50eaaf3b9240af75ce401e6",
+    "onlyChangeAfterIntegrationCommit": true,
+    "sections57_58_10Unchanged": true
+  },
+  "combinedFileBlobs": {
+    "components/coordinator/coordinator-chat.tsx": "54f22fa85e4220741a64590be51c7ccaa7bcea4c",
+    "components/coordinator/failure-reason.tsx": "a0827f4c6d1b2c62cd2a8d565158ce4410ca6480",
+    "components/coordinator/retry-reply-button.test.tsx": "1578bfb5c5df93c9f84d34dc67abe832996ce753",
+    "docs/dev-workflow.md": "7f399ccfdb8b9619c50eaaf3b9240af75ce401e6",
+    "lib/factory/agent-profile.db.test.ts": "7ba986c6721eb2fb2a0d7ce8f08241f91d82c248",
+    "lib/model-order.ts": "1e3541ac9e3678a8c0c43e068872f8d45c170a50",
+    "messages/en.json": "987319b8d3705488b920d2b5b8164526023ecf8c",
+    "messages/zh-CN.json": "7730996cc6db4bacd0b01f3f5693d877f928ed5c",
+    "package.json": "dc37fd78a294424feea60c47c0ecf6e00db467fd",
+    "tests/factory-admission.db.test.ts": "52b7153140a69be1c3b186fd6dcf2e92f20db927"
+  },
+  "semanticBoundaries": [
+    "Factory transaction owners, commit-time membership/selection guards, SAVEPOINT rollback/callback/counter behavior and subscription workspace authorization are byte-identical to c95.",
+    "Final cloud claim refresh is before checkout/BEGIN and selects only the original frozen subscription; locked owner/workspace/source/current-version/epoch/stop/native-receipt gates are byte-identical to 3d70.",
+    "Owner acceptance session/candidate/revision/evidence/receipt checks and atomic IssueDone/history are byte-identical to 3d70.",
+    "Per-Agent order and daemon 0.0.456 minimum remain from main; Settings display freshness does not change admission freshness.",
+    "The original PR owners retain outstanding production and iOS acceptance."
+  ],
+  "newMainReadOnlyDelta": {
+    "head": "122fd9054b5400569fd2518f55c52cec8f04d28a",
+    "unchangedBlobs": {
+      "lib/model-order.ts": "1e3541ac9e3678a8c0c43e068872f8d45c170a50",
+      "lib/factory/profile-admission.ts": "8a2223b20114ed39368d01025f9c6dc3e1a5ae0d",
+      "lib/computer/claim.ts": "afb84620e89073f15f8e19a8035dbe09c2785675",
+      "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts": "751ab5e610be60da6c4c3ffed8ff34f7724caed9",
+      "lib/factory/profile-dispatch.db.test.ts": "38a8ee49acfb18ab9d6ccc3dcd61c3b8cc75741c",
+      "tests/shared-subscription-runs.db.test.ts": "39ddbad28a764e006bd587ec0a79ff2a35019393"
+    },
+    "changedBlobs": {
+      "lib/factory/merge.ts": {
+        "main": "1289c73c6b2ead88fc41ba2fb6300e371d42ac0a",
+        "batch": "c08cedd2ab9c76f1d1dc2201169f941ea1065d6c"
+      },
+      "lib/factory/merge.db.test.ts": {
+        "main": "4bb4d103cc9d004690188f3566f25821aa06d049",
+        "batch": "ce5f67ca860d404495e9c1a787642f408ee81ac4"
+      },
+      "lib/live/issue-detail.ts": {
+        "main": "e0ded8dfda207c16e06658ed4c72865589c05475",
+        "batch": "bad50e778f6cada92723ecc220e365c756c6b92e"
+      },
+      "lib/subscription-runtime.ts": {
+        "main": "36a082d528eef2e609b088b937c84a9f05627b55",
+        "batch": "7e7287142b6bd9a41e7bbcd60eab43fac9f0cfea"
+      }
+    },
+    "targetedAdditionalRegression": [
+      "lib/factory/merge.db.test.ts",
+      "lib/live/issue-detail.db.test.ts"
+    ],
+    "ownerAcceptanceDelta": "Only adds issueRelationsChanged import and same-transaction notification after an actual issue status update; current receipt/authorization/state logic unchanged.",
+    "sharedAuthorizationDelta": "Main has not yet incorporated PR1313. Preserve batch subscription-runtime FOR SHARE authorization, not main legacy requireWorkspace."
+  }
+}

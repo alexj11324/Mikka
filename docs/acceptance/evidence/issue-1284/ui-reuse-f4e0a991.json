@@ -1,0 +1,1184 @@
+{
+  "schemaVersion": 1,
+  "kind": "visual-evidence-reuse-audit",
+  "auditedAt": "2026-11-05 05:27:05 UTC",
+  "result": "reusable-for-the-original-synthetic-visual-scope",
+  "target": {
+    "publishedCommit": "f4e0a99143ab924390e8fbd915455c4abc7e21cf",
+    "publishedTree": "1fc7e470a4ce8fa6f8cbbb43951140306a7b2544",
+    "parents": [
+      "19a7094c313a6f56c08e37fb1061c5e6c75799a1",
+      "122fd9054b5400569fd2518f55c52cec8f04d28a"
+    ],
+    "localAuditCommit": "4a5fb6b52602bca4769ca7fd430a2f5275af245f",
+    "localAuditDirectory": "/workspace/Mikka-1345-main122",
+    "localWorkingTreeClean": true,
+    "localTreeEqualsPublishedTree": true,
+    "pullRequest": "https://github.com/alexj11324/Mikka/pull/1345"
+  },
+  "original": {
+    "sourceCommit": "8608b63f522e6bbb8db8fc0caac7f606f17cf218",
+    "sourceTree": "ff973ac99fea66a4d97a757c1475103363fb21c4",
+    "receiptPath": "/workspace/scratch/issue1313-8608b63-visual-receipt.json",
+    "reviewPath": "/workspace/scratch/issue1313-8608b63-visual-review.md",
+    "archivePath": "/workspace/scratch/issue1313-8608b63-visual-evidence.zip",
+    "buildIds": [
+      "fxfe5Eos05LO05IyBFUCD",
+      "m3pSOwiX1xaJ1hJ3_E9MY"
+    ],
+    "desktopViewport": {
+      "width": 1363,
+      "height": 936
+    },
+    "mobileIframeViewport": {
+      "width": 390,
+      "height": 848,
+      "outerWidthIncludingBorders": 392
+    },
+    "screenshotLocale": "zh-CN"
+  },
+  "scope": {
+    "screenshotsWereNotRerendered": true,
+    "realProductionUiComponents": true,
+    "syntheticProps": true,
+    "mockedCatalogAndAvailability": true,
+    "realAccountAcceptance": false,
+    "realApiAcceptance": false,
+    "providerExecutionAcceptance": false,
+    "englishVisualAcceptance": false,
+    "newServicesStarted": false,
+    "productFilesModified": false,
+    "browserUsed": false,
+    "statement": "These are the original 8608 screenshots. Their unchanged UI sources, styles, dependencies, and consumed translations support reuse for the recorded states at f4e0. This is not a new render or authenticated production verification."
+  },
+  "screenshots": [
+    {
+      "filename": "issue1313-8608b63-list-light.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-list-light.jpg",
+      "width": 1363,
+      "height": 936,
+      "bytes": 61463,
+      "sha256": "b5ba873283ec17184938bdc533d31becd9c57df63e1c5b1e90276b7aeb69c636",
+      "check": "列表浅色：内置默认、可运行、已停用、来源移除",
+      "buildId": "fxfe5Eos05LO05IyBFUCD",
+      "verifiedSha256": "b5ba873283ec17184938bdc533d31becd9c57df63e1c5b1e90276b7aeb69c636",
+      "sha256MatchesOriginalReceipt": true
+    },
+    {
+      "filename": "issue1313-8608b63-list-dark.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-list-dark.jpg",
+      "width": 1363,
+      "height": 936,
+      "bytes": 57800,
+      "sha256": "55d96496da21213b32819c4abc8c065a24164a2d7da2afb541812f7ce99256dd",
+      "check": "列表深色：共享状态颜色、图标、文字",
+      "buildId": "fxfe5Eos05LO05IyBFUCD",
+      "verifiedSha256": "55d96496da21213b32819c4abc8c065a24164a2d7da2afb541812f7ce99256dd",
+      "sha256MatchesOriginalReceipt": true
+    },
+    {
+      "filename": "issue1313-8608b63-editor-desktop.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-editor-desktop.jpg",
+      "width": 1363,
+      "height": 936,
+      "bytes": 56158,
+      "sha256": "0fc234b5493dff4d9f301ba48f128c1864bfc5e53c5d88fba34410b8849eddda",
+      "check": "桌面编辑：固定 Agent/模型/来源、角色、强度、私有指令、Skills",
+      "buildId": "fxfe5Eos05LO05IyBFUCD",
+      "verifiedSha256": "0fc234b5493dff4d9f301ba48f128c1864bfc5e53c5d88fba34410b8849eddda",
+      "sha256MatchesOriginalReceipt": true
+    },
+    {
+      "filename": "issue1313-8608b63-editor-390.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-editor-390.jpg",
+      "width": 1353,
+      "height": 981,
+      "bytes": 53394,
+      "sha256": "23ff1b1325f06d7c46458e1d12c197ddbf287428516be4795196c3f525696a9e",
+      "check": "390px 编辑：单列字段与固定保存/取消栏",
+      "buildId": "m3pSOwiX1xaJ1hJ3_E9MY",
+      "verifiedSha256": "23ff1b1325f06d7c46458e1d12c197ddbf287428516be4795196c3f525696a9e",
+      "sha256MatchesOriginalReceipt": true
+    },
+    {
+      "filename": "issue1313-8608b63-editor-390-lower.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-editor-390-lower.jpg",
+      "width": 1353,
+      "height": 981,
+      "bytes": 56345,
+      "sha256": "f047ecce75f299ec0acb55ce9954a3076c4e7559df2c0ad1c694286a044af79b",
+      "check": "390px 编辑滚动：私有指令、Skills 与保存/取消栏",
+      "buildId": "m3pSOwiX1xaJ1hJ3_E9MY",
+      "verifiedSha256": "f047ecce75f299ec0acb55ce9954a3076c4e7559df2c0ad1c694286a044af79b",
+      "sha256MatchesOriginalReceipt": true
+    },
+    {
+      "filename": "issue1313-8608b63-task-picker-390.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-task-picker-390.jpg",
+      "width": 1353,
+      "height": 981,
+      "bytes": 43213,
+      "sha256": "0778920161e224a53764e9c5dd5b513b6be798af296dd4a22928f643aa76ddb4",
+      "check": "390px 新任务：真实标题行与展开菜单；不可用项禁用",
+      "buildId": "m3pSOwiX1xaJ1hJ3_E9MY",
+      "verifiedSha256": "0778920161e224a53764e9c5dd5b513b6be798af296dd4a22928f643aa76ddb4",
+      "sha256MatchesOriginalReceipt": true
+    },
+    {
+      "filename": "issue1313-8608b63-task-selected-390.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-task-selected-390.jpg",
+      "width": 1353,
+      "height": 981,
+      "bytes": 34295,
+      "sha256": "5689f3684f8d1c0775f22fecdc4a24b5656561c6728cb1b90345118eb586930a",
+      "check": "390px 新任务：显式选中前端实现；箭头与标题一起换行",
+      "buildId": "m3pSOwiX1xaJ1hJ3_E9MY",
+      "verifiedSha256": "5689f3684f8d1c0775f22fecdc4a24b5656561c6728cb1b90345118eb586930a",
+      "sha256MatchesOriginalReceipt": true
+    },
+    {
+      "filename": "issue1313-8608b63-run-legacy-reason.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-run-legacy-reason.jpg",
+      "width": 1353,
+      "height": 1066,
+      "bytes": 65162,
+      "sha256": "7487f2979a07da1d2361f4b03a8fd7088890608f0358b7c11e5da6a8cbebc1c2",
+      "check": "旧 Run：v3 冻结数据、按任务能力选择；旧英文 reason 不显示",
+      "buildId": "m3pSOwiX1xaJ1hJ3_E9MY",
+      "verifiedSha256": "7487f2979a07da1d2361f4b03a8fd7088890608f0358b7c11e5da6a8cbebc1c2",
+      "sha256MatchesOriginalReceipt": true
+    },
+    {
+      "filename": "issue1313-8608b63-run-coded-reason.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-run-coded-reason.jpg",
+      "width": 1353,
+      "height": 1098,
+      "bytes": 67629,
+      "sha256": "dcc53e99a17fbcf405df5a41c3f099ac1ebbd03553f201fcc60c5fe62732c008",
+      "check": "新 Run：capability_fit 显示中文“能力最匹配这项工作”",
+      "buildId": "m3pSOwiX1xaJ1hJ3_E9MY",
+      "verifiedSha256": "dcc53e99a17fbcf405df5a41c3f099ac1ebbd03553f201fcc60c5fe62732c008",
+      "sha256MatchesOriginalReceipt": true
+    }
+  ],
+  "sourceFiles": [
+    {
+      "file": "components/coordinator/new-task-dialog.tsx",
+      "baselineSha256": "9eb91b10991d3880001dc8dc0a5b409b83276bd012bcc3ac20de1b024b5b6c2c",
+      "identical": true,
+      "targetSha256": "9eb91b10991d3880001dc8dc0a5b409b83276bd012bcc3ac20de1b024b5b6c2c"
+    },
+    {
+      "file": "components/coordinator/task-profile-picker.tsx",
+      "baselineSha256": "39fde1614e269e25f09a45b1f585ee6492654b8407629c14d99304841eee8615",
+      "identical": true,
+      "targetSha256": "39fde1614e269e25f09a45b1f585ee6492654b8407629c14d99304841eee8615"
+    },
+    {
+      "file": "components/settings/factory-profiles-settings.tsx",
+      "baselineSha256": "d9f9b13d4fb01aff944bf4f8f9f7049199cf2ca65fae2058d1d2644aa415136e",
+      "identical": true,
+      "targetSha256": "d9f9b13d4fb01aff944bf4f8f9f7049199cf2ca65fae2058d1d2644aa415136e"
+    },
+    {
+      "file": "components/settings/factory-profiles-data.ts",
+      "baselineSha256": "adaf9852b7bdfaeda3d2b68510e93f4fd1a607004a4ab054119c767ccd41452f",
+      "identical": true,
+      "targetSha256": "adaf9852b7bdfaeda3d2b68510e93f4fd1a607004a4ab054119c767ccd41452f"
+    },
+    {
+      "file": "components/workspace/thread-execution-identity.tsx",
+      "baselineSha256": "b003c008afdf787f1faacdded487a1aab150f22ac53a3b705b31e8ad8c71e972",
+      "identical": true,
+      "targetSha256": "b003c008afdf787f1faacdded487a1aab150f22ac53a3b705b31e8ad8c71e972"
+    },
+    {
+      "file": "lib/factory/agent-profile-decision.ts",
+      "baselineSha256": "834a175af3dffa09dd94f33ece58e6cb50b72917cde356b7bf99d8a6af59d23d",
+      "identical": true,
+      "targetSha256": "834a175af3dffa09dd94f33ece58e6cb50b72917cde356b7bf99d8a6af59d23d"
+    },
+    {
+      "file": "lib/thread-execution-identity-view.ts",
+      "baselineSha256": "e76a523f06de06e73cf10c60045f7ad395dda7721025ea22d596d6b4b6ea9e39",
+      "identical": true,
+      "targetSha256": "e76a523f06de06e73cf10c60045f7ad395dda7721025ea22d596d6b4b6ea9e39"
+    },
+    {
+      "file": "lib/factory/agent-profile-definition.ts",
+      "baselineSha256": "60b8b053e680bd6a0d2584a09887fecda9d50e96142b1e2d82b026be117c5ae5",
+      "identical": true,
+      "targetSha256": "60b8b053e680bd6a0d2584a09887fecda9d50e96142b1e2d82b026be117c5ae5"
+    },
+    {
+      "file": "app/globals.css",
+      "baselineSha256": "00ccc3f687f114aa3852579cf436944b76dc6a28995370306039b1313243136d",
+      "identical": true,
+      "targetSha256": "00ccc3f687f114aa3852579cf436944b76dc6a28995370306039b1313243136d"
+    }
+  ],
+  "additionalRenderSources": [
+    {
+      "file": "components/settings/primitives.tsx",
+      "baselineSha256": "466c17d66aa422f97cb4e5ae98729a778671e8f87bf340a6260d2236743a0a14",
+      "targetSha256": "466c17d66aa422f97cb4e5ae98729a778671e8f87bf340a6260d2236743a0a14",
+      "identical": true
+    },
+    {
+      "file": "components/labels/entity-labels.tsx",
+      "baselineSha256": "de9d1cf59aff27d360756f8f37c66d4fce83665c062a5e545cdb80c68a3c11b9",
+      "targetSha256": "de9d1cf59aff27d360756f8f37c66d4fce83665c062a5e545cdb80c68a3c11b9",
+      "identical": true
+    },
+    {
+      "file": "components/labels/brand-marks.tsx",
+      "baselineSha256": "ef6c8082afbe8a7f701decc3aadced7a908fcd96906b324bd3e915e5a9181308",
+      "targetSha256": "ef6c8082afbe8a7f701decc3aadced7a908fcd96906b324bd3e915e5a9181308",
+      "identical": true
+    },
+    {
+      "file": "components/brand/mikka-mark.tsx",
+      "baselineSha256": "4c98e5dc9248d1df1193e1df026e797f7a84d56ac2a4b7951df84c7e0435160c",
+      "targetSha256": "4c98e5dc9248d1df1193e1df026e797f7a84d56ac2a4b7951df84c7e0435160c",
+      "identical": true
+    },
+    {
+      "file": "components/load-error.tsx",
+      "baselineSha256": "25eb691044c0a58287c852a26a68a69968f18009b91be039af95f045c0e1aca2",
+      "targetSha256": "25eb691044c0a58287c852a26a68a69968f18009b91be039af95f045c0e1aca2",
+      "identical": true
+    },
+    {
+      "file": "components/devices/device-icon.tsx",
+      "baselineSha256": "a89d9044c3be3a90a5dc3a3a1733ca03226057f9aa565a71fd2f6c2aaaf4054e",
+      "targetSha256": "a89d9044c3be3a90a5dc3a3a1733ca03226057f9aa565a71fd2f6c2aaaf4054e",
+      "identical": true
+    },
+    {
+      "file": "components/nav/bot-avatar.tsx",
+      "baselineSha256": "26ca9f308b586276f1531a9bbe56249223724a04ff3fdd105a328895b56fc439",
+      "targetSha256": "26ca9f308b586276f1531a9bbe56249223724a04ff3fdd105a328895b56fc439",
+      "identical": true
+    },
+    {
+      "file": "components/settings/e2b-key-dialog.tsx",
+      "baselineSha256": "d755f01ec2e360602a95801a69b769f89a2bf194540a5fbb326cebea9a523d25",
+      "targetSha256": "d755f01ec2e360602a95801a69b769f89a2bf194540a5fbb326cebea9a523d25",
+      "identical": true
+    },
+    {
+      "file": "components/chat/chat-file-cards.tsx",
+      "baselineSha256": "5f8ccd7adb4f68ad7579a8fa5d68e4c263afe33a990dccba62408e0974b97a2c",
+      "targetSha256": "5f8ccd7adb4f68ad7579a8fa5d68e4c263afe33a990dccba62408e0974b97a2c",
+      "identical": true
+    },
+    {
+      "file": "components/chat/use-chat-files.ts",
+      "baselineSha256": "cd1320af802043f98675b8cd67272f08ae4f257f147bf233047b055fca54761c",
+      "targetSha256": "cd1320af802043f98675b8cd67272f08ae4f257f147bf233047b055fca54761c",
+      "identical": true
+    },
+    {
+      "file": "components/coordinator/use-coordinator-submit.ts",
+      "baselineSha256": "3003276c7cb3fbabc98ce823809439de500aa327cbbe7709cad7a5ea29b9f5a0",
+      "targetSha256": "3003276c7cb3fbabc98ce823809439de500aa327cbbe7709cad7a5ea29b9f5a0",
+      "identical": true
+    },
+    {
+      "file": "hooks/use-computer.ts",
+      "baselineSha256": "1c7b5bc37b83f0c14cb03b34dfd31b68da2b82dd801fc3fdf5c321c68d499132",
+      "targetSha256": "1c7b5bc37b83f0c14cb03b34dfd31b68da2b82dd801fc3fdf5c321c68d499132",
+      "identical": true
+    },
+    {
+      "file": "hooks/use-focus-return.ts",
+      "baselineSha256": "bc2c63c3e41f41de2206366db6a9c75d010bffedd3c081bb34e0e4061b82e35c",
+      "targetSha256": "bc2c63c3e41f41de2206366db6a9c75d010bffedd3c081bb34e0e4061b82e35c",
+      "identical": true
+    },
+    {
+      "file": "lib/use-presence.ts",
+      "baselineSha256": "5b19ac69a4e3fcf14dde7fc5e401d5c024bcd2f7af323e48f6f1da71c8b75100",
+      "targetSha256": "5b19ac69a4e3fcf14dde7fc5e401d5c024bcd2f7af323e48f6f1da71c8b75100",
+      "identical": true
+    },
+    {
+      "file": "lib/new-task-placement.ts",
+      "baselineSha256": "734e00f560f10039c8a1fe7597558b8733f92d57cbe09c90d096a2db0ec51df1",
+      "targetSha256": "734e00f560f10039c8a1fe7597558b8733f92d57cbe09c90d096a2db0ec51df1",
+      "identical": true
+    },
+    {
+      "file": "lib/new-task-bot.ts",
+      "baselineSha256": "e0c86715f76962436c014880b479b6de5ba767fbda476a2e415b6a7a363488d1",
+      "targetSha256": "e0c86715f76962436c014880b479b6de5ba767fbda476a2e415b6a7a363488d1",
+      "identical": true
+    },
+    {
+      "file": "lib/machine-picker.ts",
+      "baselineSha256": "6c28200db18f56f707a4d2062ff016e8dd03f5f3c4325a112df8a634a2ffc25a",
+      "targetSha256": "6c28200db18f56f707a4d2062ff016e8dd03f5f3c4325a112df8a634a2ffc25a",
+      "identical": true
+    },
+    {
+      "file": "lib/execution-settings-view.ts",
+      "baselineSha256": "c2d0591f7abb082718c3b4619700d6de96c967ec5dfdf2a69b5ccbe998acfbf6",
+      "targetSha256": "c2d0591f7abb082718c3b4619700d6de96c967ec5dfdf2a69b5ccbe998acfbf6",
+      "identical": true
+    },
+    {
+      "file": "lib/utils.ts",
+      "baselineSha256": "e46429536f43f5910f5b2b0c50bb2769b510a4558bb4b5d20a3b0a9091dbf7c3",
+      "targetSha256": "e46429536f43f5910f5b2b0c50bb2769b510a4558bb4b5d20a3b0a9091dbf7c3",
+      "identical": true
+    },
+    {
+      "file": "lib/settings-sections.ts",
+      "baselineSha256": "7a6a11fb8eb21cc78b500e099e2fd8ad4ab0deeef5418d5769b0061ed29737d0",
+      "targetSha256": "7a6a11fb8eb21cc78b500e099e2fd8ad4ab0deeef5418d5769b0061ed29737d0",
+      "identical": true
+    },
+    {
+      "file": "lib/base-path.ts",
+      "baselineSha256": "a631625b71ab151377ef4bff24efc4729f92415d53e3b2eb6bcb62530a387dc1",
+      "targetSha256": "a631625b71ab151377ef4bff24efc4729f92415d53e3b2eb6bcb62530a387dc1",
+      "identical": true
+    }
+  ],
+  "sharedUiDirectories": [
+    {
+      "treePath": "components/ui",
+      "baselineGitTree": "7565c1525c34813acb632c9e70e81f9943fe8722",
+      "targetGitTree": "7565c1525c34813acb632c9e70e81f9943fe8722",
+      "identical": true,
+      "bothAbsent": false
+    },
+    {
+      "treePath": "components/reui",
+      "baselineGitTree": "1079e93b63679ba13bf42561b27fde7c67337169",
+      "targetGitTree": "1079e93b63679ba13bf42561b27fde7c67337169",
+      "identical": true,
+      "bothAbsent": false
+    },
+    {
+      "treePath": "components/motion",
+      "baselineGitTree": "6ffe57e100eb976a2e9ee0784be2cfb38fc571bf",
+      "targetGitTree": "6ffe57e100eb976a2e9ee0784be2cfb38fc571bf",
+      "identical": true,
+      "bothAbsent": false
+    }
+  ],
+  "dependenciesAndTheme": [
+    {
+      "file": "pnpm-lock.yaml",
+      "baselineSha256": "df3280d068ec6210f938f68143b2f82b3fe5451add6d5798f3a95db0e5172eee",
+      "targetSha256": "df3280d068ec6210f938f68143b2f82b3fe5451add6d5798f3a95db0e5172eee",
+      "identical": true
+    },
+    {
+      "file": "components/theme-provider.tsx",
+      "baselineSha256": "79b36c8f491d6f17e389a8278d01cebf4bbaba387929de3dcc623cadbacd260b",
+      "targetSha256": "79b36c8f491d6f17e389a8278d01cebf4bbaba387929de3dcc623cadbacd260b",
+      "identical": true
+    }
+  ],
+  "packageDependencyFields": {
+    "dependencies": true,
+    "devDependencies": true,
+    "peerDependencies": true,
+    "optionalDependencies": true,
+    "packageManager": true,
+    "engines": true
+  },
+  "localeVerification": {
+    "canonicalization": "SHA256 of UTF-8 JSON with ensure_ascii=false, sort_keys=true, separators=(',', ':')",
+    "wholeFilesChanged": true,
+    "wholeFileHashes": [
+      {
+        "file": "messages/en.json",
+        "baselineSha256": "aef8ad02c779d1ae7fe1135701889b5e6fca97fff539cd84826ad17f6e680dfc",
+        "identical": false,
+        "targetSha256": "fe14f54a8f0c11ecf7f7d7e42dd0ec2ff64db4ad4f4380ff4999a37b025d6ced"
+      },
+      {
+        "file": "messages/zh-CN.json",
+        "baselineSha256": "df177fd58c1c30178bf29727c8c887c7f628b030a328ee11bb9bc1232564cc98",
+        "identical": false,
+        "targetSha256": "8d59847728b55840307874abc47297d0fb9bff4995589ed43a50b1905afe3ec5"
+      }
+    ],
+    "consumedSubtreesAndKeys": [
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.agentProfiles",
+        "baselineSha256": "a12dbc00fcf49d48a726b68e9be47f0791dc563bf6429d15e9aeb05c00de10fe",
+        "targetSha256": "a12dbc00fcf49d48a726b68e9be47f0791dc563bf6429d15e9aeb05c00de10fe",
+        "identical": true
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "IssueThreads.executionIdentity",
+        "baselineSha256": "f7957eb7636dae852acdeb1f78552831dd1f3301b159479d770198ecbe47cb95",
+        "targetSha256": "f7957eb7636dae852acdeb1f78552831dd1f3301b159479d770198ecbe47cb95",
+        "identical": true
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Shell.newTaskDialog",
+        "baselineSha256": "220eea475a4bb370f029be63e6046c344f8f2b8e173a3beec32645c32caece98",
+        "targetSha256": "220eea475a4bb370f029be63e6046c344f8f2b8e173a3beec32645c32caece98",
+        "identical": true
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Computer.status",
+        "baselineSha256": "0f5fb74cd726230eb108577adeab0b2925de7000348840d788097af3be9cf6a0",
+        "targetSha256": "0f5fb74cd726230eb108577adeab0b2925de7000348840d788097af3be9cf6a0",
+        "identical": true
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Common.close",
+        "baselineSha256": "d7cf5045c01b2eb981a4b2640ddf66c8de124d3874c0df894afd23a04e256eca",
+        "targetSha256": "d7cf5045c01b2eb981a4b2640ddf66c8de124d3874c0df894afd23a04e256eca",
+        "identical": true
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Common.cancel",
+        "baselineSha256": "c0774c185060fc1366ab0c01488af84eb5e4e1f4f59229431e064de73e0de6c5",
+        "targetSha256": "c0774c185060fc1366ab0c01488af84eb5e4e1f4f59229431e064de73e0de6c5",
+        "identical": true
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Common.retry",
+        "baselineSha256": "1cc2e703cf2437dc481690c22025973b4fbf24ec5e646d7222424ef30c0e5313",
+        "targetSha256": "1cc2e703cf2437dc481690c22025973b4fbf24ec5e646d7222424ef30c0e5313",
+        "identical": true
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Shell.attach",
+        "baselineSha256": "fe01e88e0333911f55970a86d24766f7a682ee72e6b8f4f463f548a0b948d3de",
+        "targetSha256": "fe01e88e0333911f55970a86d24766f7a682ee72e6b8f4f463f548a0b948d3de",
+        "identical": true
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Shell.attachUnsupported",
+        "baselineSha256": "05c5b6b916602153c82bf9fb8d3be0d0538c29d554f5cf0684308fa9ee163937",
+        "targetSha256": "05c5b6b916602153c82bf9fb8d3be0d0538c29d554f5cf0684308fa9ee163937",
+        "identical": true
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Devices.thisMachine",
+        "baselineSha256": "a5b25794928a6225a598df8fa558d11fd41cf8d7c28eb0c49d114bdee4f6ea87",
+        "targetSha256": "a5b25794928a6225a598df8fa558d11fd41cf8d7c28eb0c49d114bdee4f6ea87",
+        "identical": true
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Coordinator.unavailable",
+        "baselineSha256": "7a0cfa024a3d7ee89eb047e7020341a6615b08e4ad14a03951438db0ecf7c40d",
+        "targetSha256": "7a0cfa024a3d7ee89eb047e7020341a6615b08e4ad14a03951438db0ecf7c40d",
+        "identical": true
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.secrets.e2b",
+        "baselineSha256": "2e9746093a166f2ac3e848629fe8c2929f851275910b47da1fe622602aecdc85",
+        "targetSha256": "2e9746093a166f2ac3e848629fe8c2929f851275910b47da1fe622602aecdc85",
+        "identical": true
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.cloud",
+        "baselineSha256": "a6898479ed78fd08ecd130eba18abb9aed7a7e26a1c068922b2e7707d8e6935c",
+        "targetSha256": "a6898479ed78fd08ecd130eba18abb9aed7a7e26a1c068922b2e7707d8e6935c",
+        "identical": true
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.local",
+        "baselineSha256": "e4f82851f6adf0b1acdc10dce3aeaad39ffd684dbd990904476a4aa60d12eee1",
+        "targetSha256": "e4f82851f6adf0b1acdc10dce3aeaad39ffd684dbd990904476a4aa60d12eee1",
+        "identical": true
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.agentProfiles",
+        "baselineSha256": "daaa210ccf9dcd449e602971fe2be0d0fb182a601f75d2970889fb0aee3fc0e3",
+        "targetSha256": "daaa210ccf9dcd449e602971fe2be0d0fb182a601f75d2970889fb0aee3fc0e3",
+        "identical": true
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "IssueThreads.executionIdentity",
+        "baselineSha256": "7838c641f051d448609959b2a68e3f739d75d91fdd8b1afb6eea067409cfd7ef",
+        "targetSha256": "7838c641f051d448609959b2a68e3f739d75d91fdd8b1afb6eea067409cfd7ef",
+        "identical": true
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Shell.newTaskDialog",
+        "baselineSha256": "a83c08d06bf510af763aa25a9799f331b7afb084d620c3d5477a6cc3167a748a",
+        "targetSha256": "a83c08d06bf510af763aa25a9799f331b7afb084d620c3d5477a6cc3167a748a",
+        "identical": true
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Computer.status",
+        "baselineSha256": "461ae27342886e103c2a6acc70389339242cc5971d813d81f3c600d33548a342",
+        "targetSha256": "461ae27342886e103c2a6acc70389339242cc5971d813d81f3c600d33548a342",
+        "identical": true
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Common.close",
+        "baselineSha256": "a1e25e38896d730e70e0e3e364e460a2149a57a21a8879824e2fbea2ae4b164d",
+        "targetSha256": "a1e25e38896d730e70e0e3e364e460a2149a57a21a8879824e2fbea2ae4b164d",
+        "identical": true
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Common.cancel",
+        "baselineSha256": "4fa6cdbf13079926965f04ae1a16b9d6c0d6ba3ca287f399132620e167d1bcdf",
+        "targetSha256": "4fa6cdbf13079926965f04ae1a16b9d6c0d6ba3ca287f399132620e167d1bcdf",
+        "identical": true
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Common.retry",
+        "baselineSha256": "c1e6594c490aeca5130e7d819dcb2496e04a89af11600725f13707a833b1d6b7",
+        "targetSha256": "c1e6594c490aeca5130e7d819dcb2496e04a89af11600725f13707a833b1d6b7",
+        "identical": true
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Shell.attach",
+        "baselineSha256": "a5d07ceda17d9e21dfae99be28e7f608fa4ed21a855bc8434a6a74aed7f28072",
+        "targetSha256": "a5d07ceda17d9e21dfae99be28e7f608fa4ed21a855bc8434a6a74aed7f28072",
+        "identical": true
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Shell.attachUnsupported",
+        "baselineSha256": "0db2ad4dd2a53d032222dd9ac4b2bf51930a9d801103171e67e827058706a12c",
+        "targetSha256": "0db2ad4dd2a53d032222dd9ac4b2bf51930a9d801103171e67e827058706a12c",
+        "identical": true
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Devices.thisMachine",
+        "baselineSha256": "8040e6aaa30e427f656fdf8dd53c36bb1ac409d5764d3ffc11fbdbced1ca9442",
+        "targetSha256": "8040e6aaa30e427f656fdf8dd53c36bb1ac409d5764d3ffc11fbdbced1ca9442",
+        "identical": true
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Coordinator.unavailable",
+        "baselineSha256": "e6520fefa4491de64c4484483f06c22203b01dfae843e08220e336e0971ed5c8",
+        "targetSha256": "e6520fefa4491de64c4484483f06c22203b01dfae843e08220e336e0971ed5c8",
+        "identical": true
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.secrets.e2b",
+        "baselineSha256": "c666a74c26b43c25c9ccc4424c0a3fd14108b4b2fc859aedd1410e54b8f2be88",
+        "targetSha256": "c666a74c26b43c25c9ccc4424c0a3fd14108b4b2fc859aedd1410e54b8f2be88",
+        "identical": true
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.cloud",
+        "baselineSha256": "adc71ec0a432a6610106fd21189f5b3e9d39ad1d55509f24b2d609e991739f76",
+        "targetSha256": "adc71ec0a432a6610106fd21189f5b3e9d39ad1d55509f24b2d609e991739f76",
+        "identical": true
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.local",
+        "baselineSha256": "e572092771d929f8d6ccd16b5b2ca203c9955fa1b132cf876c243eba13c2177a",
+        "targetSha256": "e572092771d929f8d6ccd16b5b2ca203c9955fa1b132cf876c243eba13c2177a",
+        "identical": true
+      }
+    ],
+    "unrelatedChangedPaths": [
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Coordinator.apiBalance"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "IssueThreads.errorDetails"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "RunErrors"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.apiKeys.afterQuotaBilling"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.backup"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.backupList"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.billedByProvider"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.blocked.missing"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.blocked.modelGone"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.blocked.removed"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.clauseSeparator"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.description"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.e2bKeyHint"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.emptyAgent"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.emptyUseOther"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.first"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.noKeyFirst"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.nowhere"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.nowhereLocal"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.onlyAgent"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.orderCloud"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.orderLocal"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.preferredAgentHint"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.modelOrder.switchAgent"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.subscriptionShare.available"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.subscriptionShare.availableState"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.subscriptionShare.blocked"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.subscriptionShare.heading"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.subscriptionShare.others"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.subscriptionShare.othersHint"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.subscriptionShare.othersHintAny"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.subscriptionShare.othersOn"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.subscriptionShare.othersOnAny"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.subscriptionShare.thisWorkspace"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.subscriptions.modelsRefreshFailed"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.subscriptions.modelsRefreshed"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.subscriptions.refreshModels"
+      },
+      {
+        "locale": "messages/en.json",
+        "keyPath": "Settings.subscriptions.refreshingModels"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Coordinator.apiBalance"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "IssueThreads.errorDetails"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "RunErrors"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.apiKeys.afterQuotaBilling"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.backup"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.backupList"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.billedByProvider"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.blocked.missing"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.blocked.modelGone"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.blocked.removed"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.clauseSeparator"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.description"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.e2bKeyHint"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.emptyAgent"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.emptyUseOther"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.first"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.noKeyFirst"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.nowhere"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.nowhereLocal"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.onlyAgent"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.orderCloud"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.orderLocal"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.preferredAgentHint"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.modelOrder.switchAgent"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.subscriptionShare.available"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.subscriptionShare.availableState"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.subscriptionShare.blocked"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.subscriptionShare.heading"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.subscriptionShare.others"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.subscriptionShare.othersHint"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.subscriptionShare.othersHintAny"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.subscriptionShare.othersOn"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.subscriptionShare.othersOnAny"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.subscriptionShare.thisWorkspace"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.subscriptions.modelsRefreshFailed"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.subscriptions.modelsRefreshed"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.subscriptions.refreshModels"
+      },
+      {
+        "locale": "messages/zh-CN.json",
+        "keyPath": "Settings.subscriptions.refreshingModels"
+      }
+    ],
+    "notes": [
+      "Settings.agentProfiles, IssueThreads.executionIdentity, Shell.newTaskDialog and dynamic reason subtrees were compared in full.",
+      "NewTaskDialog reads Settings.modelOrder only through locationT(order.location): cloud/local both unchanged. Other Settings.modelOrder keys did change.",
+      "Both en and zh-CN consumed keys match; the retained nine screenshots themselves are Chinese."
+    ]
+  },
+  "historicalUiTests": {
+    "sourceCommit": "19a7094c313a6f56c08e37fb1061c5e6c75799a1",
+    "sourceTree": "cb8700bddc963326224fc530a1071dce0626c43a",
+    "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/coordinator/retry-reply-button.test.tsx components/coordinator/bot-model-picker.test.tsx components/workspace/thread-execution-identity.test.tsx lib/thread-execution-identity-view.test.ts lib/chat-failure.test.ts",
+    "pass": 43,
+    "fail": 0,
+    "skip": 0,
+    "exitCode": 0,
+    "log": "/tmp/issue1345-ui-19a.log",
+    "historicalTypecheck": {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "log": "/tmp/issue1345-typecheck-19a.log"
+    },
+    "coverageComparison": [
+      {
+        "testCoverageFile": "components/coordinator/coordinator-chat.tsx",
+        "baselineSha256": "c141e0da7ce44303f5ba7c675d3a3d805c878cccdb6ef8ee6feca1a45c4975c2",
+        "targetSha256": "c141e0da7ce44303f5ba7c675d3a3d805c878cccdb6ef8ee6feca1a45c4975c2",
+        "identical": true
+      },
+      {
+        "testCoverageFile": "components/coordinator/bot-model-picker.tsx",
+        "baselineSha256": "b23c9215c16661dd9ff3041888cdfbabbaf8ae253d8140806caf795f7b380986",
+        "targetSha256": "b23c9215c16661dd9ff3041888cdfbabbaf8ae253d8140806caf795f7b380986",
+        "identical": true
+      },
+      {
+        "testCoverageFile": "components/coordinator/bot-model-picker.test.tsx",
+        "baselineSha256": "44921cda1e4bde08cbb933507d8d1f22b717ec17b7d0fc12c6867f41bf2c2d8d",
+        "targetSha256": "44921cda1e4bde08cbb933507d8d1f22b717ec17b7d0fc12c6867f41bf2c2d8d",
+        "identical": true
+      },
+      {
+        "testCoverageFile": "components/coordinator/retry-reply-button.test.tsx",
+        "baselineSha256": "d4edfd1d8e0a777c563055af68e2d60fee6c8b4e9938e352b591c7e3d7d1db51",
+        "targetSha256": "1b75714fc135ac0b413f0b3dd786df33ada8207e4ad52d6d6d1748770f1fb5ac",
+        "identical": false,
+        "normalizedIdenticalIgnoringRelocationOfThreeDeclarations": true,
+        "normalizedSha256": "50e49785277647b5a05746660a1786965307376c6ff85058a149e15d51d31064"
+      },
+      {
+        "testCoverageFile": "components/workspace/thread-execution-identity.tsx",
+        "baselineSha256": "b003c008afdf787f1faacdded487a1aab150f22ac53a3b705b31e8ad8c71e972",
+        "targetSha256": "b003c008afdf787f1faacdded487a1aab150f22ac53a3b705b31e8ad8c71e972",
+        "identical": true
+      },
+      {
+        "testCoverageFile": "components/workspace/thread-execution-identity.test.tsx",
+        "baselineSha256": "8ba503a990dd244a408ce60861a34105f85489b1db5939313a983d679ee7e994",
+        "targetSha256": "8ba503a990dd244a408ce60861a34105f85489b1db5939313a983d679ee7e994",
+        "identical": true
+      },
+      {
+        "testCoverageFile": "lib/thread-execution-identity-view.ts",
+        "baselineSha256": "e76a523f06de06e73cf10c60045f7ad395dda7721025ea22d596d6b4b6ea9e39",
+        "targetSha256": "e76a523f06de06e73cf10c60045f7ad395dda7721025ea22d596d6b4b6ea9e39",
+        "identical": true
+      },
+      {
+        "testCoverageFile": "lib/thread-execution-identity-view.test.ts",
+        "baselineSha256": "444ae1c2f86cc3f25c891e4cf6bd5b10cc3200c2ecaf36f3caa7e24108b17e30",
+        "targetSha256": "444ae1c2f86cc3f25c891e4cf6bd5b10cc3200c2ecaf36f3caa7e24108b17e30",
+        "identical": true
+      },
+      {
+        "testCoverageFile": "lib/chat-failure.ts",
+        "baselineSha256": "7645c58656f3725d48d49fb6e1ada517390342a94b55b563bfc100c2da8c84a6",
+        "targetSha256": "7645c58656f3725d48d49fb6e1ada517390342a94b55b563bfc100c2da8c84a6",
+        "identical": true
+      },
+      {
+        "testCoverageFile": "lib/chat-failure.test.ts",
+        "baselineSha256": "21d2b119d914149bac85df8f72ecf602bea2785e92e05dc652c48b3c1924ed5d",
+        "targetSha256": "21d2b119d914149bac85df8f72ecf602bea2785e92e05dc652c48b3c1924ed5d",
+        "identical": true
+      },
+      {
+        "testCoverageFile": "tsconfig.json",
+        "baselineSha256": "4f7296ae27c5431f350da00c129c5b6b13951ba170cb1e143395f185cacdf0c9",
+        "targetSha256": "4f7296ae27c5431f350da00c129c5b6b13951ba170cb1e143395f185cacdf0c9",
+        "identical": true
+      },
+      {
+        "testCoverageFile": "pnpm-lock.yaml",
+        "baselineSha256": "df3280d068ec6210f938f68143b2f82b3fe5451add6d5798f3a95db0e5172eee",
+        "targetSha256": "df3280d068ec6210f938f68143b2f82b3fe5451add6d5798f3a95db0e5172eee",
+        "identical": true
+      },
+      {
+        "testCoverageFile": "scripts/server-test.mjs",
+        "baselineSha256": "b58352ccee3ea3f88525bbe0acc3b606f3dfbe0f0047d7502b148d13bbf485c5",
+        "targetSha256": "b58352ccee3ea3f88525bbe0acc3b606f3dfbe0f0047d7502b148d13bbf485c5",
+        "identical": true
+      }
+    ],
+    "interpretation": "The tested UI implementations, four test files, type configuration, loader and lockfile match. retry-reply-button.test.tsx only relocates three top-level declarations; after removing exactly those lines the complete text matches, preserving all tests and assertions. This retains version-bound UI evidence; it is not a newly executed 43-test run at f4e0. The old whole-project typecheck is not reused as a new target-wide typecheck."
+  },
+  "freshTargetTypecheck": {
+    "workflowHead": "f4e0a99143ab924390e8fbd915455c4abc7e21cf",
+    "runId": 41973672831,
+    "jobId": 127067542266,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542266",
+    "conclusion": "success",
+    "completedAt": "2026-11-05T05:24:29Z",
+    "verifiedLogCommands": [
+      "pnpm lint:code",
+      "pnpm exec next typegen",
+      "pnpm typecheck",
+      "pnpm --filter @mikka/protocol typecheck",
+      "pnpm --filter @mikka/mobile typecheck"
+    ],
+    "allCiCompleteAtAudit": false
+  },
+  "reproduction": {
+    "sourceComparison": "Read-only git show 8608:path vs target working tree bytes; SHA256 comparison. Shared component directories compared using exact Git tree object IDs. Canonical locale subtree values compared by full equality and SHA256. Original screenshot files rehashed locally.",
+    "sourceLocation": "Docker Cloud Sandbox /workspace/Mikka-1345-main122",
+    "note": "No production browser, test account, database, or service was used by this audit."
+  },
+  "ciFollowup": {
+    "verifiedAt": "2026-11-05 05:30:16 UTC",
+    "head": "f4e0a99143ab924390e8fbd915455c4abc7e21cf",
+    "runId": 41973672831,
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831",
+    "updatedAt": "2026-11-05T05:29:26Z",
+    "counts": {
+      "success": 17,
+      "skipped": 1
+    },
+    "checks": [
+      {
+        "name": "UI policy (strict)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127069518528",
+        "completedAt": "2026-11-05T05:29:25Z"
+      },
+      {
+        "name": "Production build and browser interactions",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127068818821",
+        "completedAt": "2026-11-05T05:27:15Z"
+      },
+      {
+        "name": "analytics-ssr",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672764/job/127068718194",
+        "completedAt": "2026-11-05T05:26:57Z"
+      },
+      {
+        "name": "Cloud credential access (OIDC)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067543441",
+        "completedAt": "2026-11-05T05:23:18Z"
+      },
+      {
+        "name": "Database checks (3/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542350",
+        "completedAt": "2026-11-05T05:25:54Z"
+      },
+      {
+        "name": "Database checks (4/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542299",
+        "completedAt": "2026-11-05T05:26:50Z"
+      },
+      {
+        "name": "Database checks (1/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542289",
+        "completedAt": "2026-11-05T05:27:10Z"
+      },
+      {
+        "name": "Source checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542266",
+        "completedAt": "2026-11-05T05:24:29Z"
+      },
+      {
+        "name": "Database checks (2/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542234",
+        "completedAt": "2026-11-05T05:26:10Z"
+      },
+      {
+        "name": "Core unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542202",
+        "completedAt": "2026-11-05T05:28:21Z"
+      },
+      {
+        "name": "Daemon checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542166",
+        "completedAt": "2026-11-05T05:26:14Z"
+      },
+      {
+        "name": "Integration unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067542141",
+        "completedAt": "2026-11-05T05:29:20Z"
+      },
+      {
+        "name": "Analytics SSR (full)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672764/job/127067522271",
+        "completedAt": "2026-11-05T05:26:51Z"
+      },
+      {
+        "name": "Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672831/job/127067464108",
+        "completedAt": "2026-11-05T05:23:18Z"
+      },
+      {
+        "name": "Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672764/job/127067464057",
+        "completedAt": "2026-11-05T05:23:15Z"
+      },
+      {
+        "name": "Browser tests (before merge)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672896/job/127067464054",
+        "completedAt": "2026-11-05T05:23:09Z"
+      },
+      {
+        "name": "custody",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41973672761/job/127067463696",
+        "completedAt": "2026-11-05T05:28:09Z"
+      },
+      {
+        "name": "GitGuardian Security Checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/runs/127067444473",
+        "completedAt": "2026-11-05T05:23:04Z"
+      }
+    ],
+    "main": "122fd9054b5400569fd2518f55c52cec8f04d28a",
+    "mergeable": true,
+    "mergeableState": "clean",
+    "mergeCandidate": "636616f90868accb9afaff03a9259b7769a63e73"
+  }
+}

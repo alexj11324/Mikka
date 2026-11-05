@@ -1,0 +1,587 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-11-05T05:27:51.478127+00:00",
+  "status": "passed",
+  "source": {
+    "sha": "f4e0a99143ab924390e8fbd915455c4abc7e21cf",
+    "tree": "1fc7e470a4ce8fa6f8cbbb43951140306a7b2544",
+    "cleanBefore": true,
+    "branch": "batch/20261105-1284-1296",
+    "changedFiles": [
+      {
+        "path": ".github/workflows/mobile-native.yml",
+        "sha256": "d8099d7cae38d840b403fe1ab9cb09314e0e71c54c30b1e4fdae7e2e6b71baf3",
+        "gitBlob": "2288de13c33c4f7abbbdd1273065c92a8752754f"
+      },
+      {
+        "path": "app/actions/coordinator.ts",
+        "sha256": "2d1a1a1c1da80e92efd483f1e9b68192241b777efd792cbf888f0ca00ffd0bea",
+        "gitBlob": "32560822da0806d554c27744792cfa521d51ead8"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+        "sha256": "34cbf4eb67799e8eed2649047f61968982dee8bdae617d86862f78031bf60e74",
+        "gitBlob": "751ab5e610be60da6c4c3ffed8ff34f7724caed9"
+      },
+      {
+        "path": "apps/mobile/lib/chat-failure.ts",
+        "sha256": "f64b8e6c27d4d732ab399854f55623cbd150bbe8d95880faef0f95138e071db5",
+        "gitBlob": "d44163a151a137bfe8f9beee77b5470b938e6739"
+      },
+      {
+        "path": "apps/mobile/lib/types.ts",
+        "sha256": "881b3d859016adc2e777400038b75adfd7646290e6003e9aef0f7e0b41ad1cd6",
+        "gitBlob": "d980df4be338d142e04d473ecd5ac1c1be240077"
+      },
+      {
+        "path": "apps/mobile/tests/chat-failure.test.mts",
+        "sha256": "857147bd08ef0da3b22cbdde0274952b8db52ef2755ab7d9131a19a1ca79602a",
+        "gitBlob": "7fb9166d9da500ebcf687594b579a3bf83be97f8"
+      },
+      {
+        "path": "apps/mobile/tests/failed-reply.test.mts",
+        "sha256": "a3878c66d05b25425b6b7b0d8701c60650cf3dbbe0eae4a79c71881f385b8847",
+        "gitBlob": "0c35e664c48b47eca3f5be722b86a1b8b8232db4"
+      },
+      {
+        "path": "components/artifacts/artifact-window.tsx",
+        "sha256": "c085f333093d19b10382b8de54eea99992f5d1b6c390b01c740c38590a2f8540",
+        "gitBlob": "14efc9644462725f7a24be3c641895933400ff7c"
+      },
+      {
+        "path": "components/coordinator/coordinator-chat.tsx",
+        "sha256": "c141e0da7ce44303f5ba7c675d3a3d805c878cccdb6ef8ee6feca1a45c4975c2",
+        "gitBlob": "54f22fa85e4220741a64590be51c7ccaa7bcea4c"
+      },
+      {
+        "path": "components/coordinator/failure-reason.tsx",
+        "sha256": "03a902036eb63b1aa95b62a32d93342ef57b9f78e31c961e9ad6244f0e2e792b",
+        "gitBlob": "a0827f4c6d1b2c62cd2a8d565158ce4410ca6480"
+      },
+      {
+        "path": "components/coordinator/retry-reply-button.test.tsx",
+        "sha256": "1b75714fc135ac0b413f0b3dd786df33ada8207e4ad52d6d6d1748770f1fb5ac",
+        "gitBlob": "d04b17132f959ef4b66501e1ec5302b85925d6c3"
+      },
+      {
+        "path": "components/nav/bot-list.tsx",
+        "sha256": "2d1f35f7e14707e87764276c9c88a3184f3c2070a2decf6676ecccb8e03948ee",
+        "gitBlob": "238fb37d8a2545727fd356f2b2c55fc00d9e54d2"
+      },
+      {
+        "path": "components/workspace/issue-workspace.tsx",
+        "sha256": "50fcc362b029947e6ec54497bf2a20048607a14202ebedd757cc721e3fb23732",
+        "gitBlob": "27a0f8baf935acefc1ea2df7834aeaff9055156b"
+      },
+      {
+        "path": "docs/acceptance/issue-1296-chat-balance.md",
+        "sha256": "611e047f7ca94149054c64b49f4337e40148085bb9d86af26aaae08219e27a02",
+        "gitBlob": "894b476c93f639f3822a1f4aa179eaa715c03d5c"
+      },
+      {
+        "path": "docs/acceptance/issue-1296-evidence/api-balance-before.png",
+        "sha256": "ad3f043c166639fa856100e0d9f57e399528b81507ed144d3cd25e7275eb4995",
+        "gitBlob": "52ce19866b2bfaf34a88f7c971bdbe009b8bc5ad"
+      },
+      {
+        "path": "docs/acceptance/issue-1296-evidence/balance-recovery-menu-local.jpg",
+        "sha256": "5ca9d441e477761984704b08276104cd9defa2f43bc5b4e9cb74990ec1188f2f",
+        "gitBlob": "a63320447602f6a1da9308465c2496fda92ad707"
+      },
+      {
+        "path": "docs/acceptance/issue-1296-evidence/codex-accepted-production.png",
+        "sha256": "c0f903c14ee20c684e999a4a72944447d5dd103312925a3da16b56aaf453a646",
+        "gitBlob": "75e52d3038ba243ff7501880b8c77c1478affbfa"
+      },
+      {
+        "path": "docs/acceptance/issue-1296-evidence/run-error-details-en-dark-430.jpg",
+        "sha256": "ad92e1ffa8e6cdc3d6ae81349799aff96ab9791c9f2686c61f1095ec9faffcd5",
+        "gitBlob": "b14cdcdaa2eb8af35780b9b619cde9468a80cff7"
+      },
+      {
+        "path": "docs/acceptance/issue-1296-evidence/run-error-details-zh-375.jpg",
+        "sha256": "e451f05d6fefb76305147422d0b8f6bd7cabd41e56ec3949173538e363b06c92",
+        "gitBlob": "f1d25c80bca72117774d2b92143c53d1225b77e2"
+      },
+      {
+        "path": "docs/acceptance/issue-1296-production-followup.md",
+        "sha256": "ddbc356d5669e26ad2cf5783e073d29c1f30edaa68f48350c0b2d8418e02a768",
+        "gitBlob": "e9ea4c98f18aab39b3e4f4156d47f0342078b170"
+      },
+      {
+        "path": "docs/dev-workflow.md",
+        "sha256": "f829b0b1ba32eaec4209b4963e20f6073332d624eb8c81bca4ca09cb96c85049",
+        "gitBlob": "7f399ccfdb8b9619c50eaaf3b9240af75ce401e6"
+      },
+      {
+        "path": "lib/agent-runs.ts",
+        "sha256": "938e1aa67f942161bcc17f73e70c7952e2070e7bc3149b64bd9d5c2a84f94484",
+        "gitBlob": "d62b1e98de1dd90fdf903c593b6e97069f990e6f"
+      },
+      {
+        "path": "lib/chat-balance.ts",
+        "sha256": "c0f7bfbd36214d8e447fc31f9d624bf44d691149df59bffb173cf0ef7209496f",
+        "gitBlob": "25f16a84c886dcdaba0fe3cbbe9eb78ba5921102"
+      },
+      {
+        "path": "lib/chat-failure.test.ts",
+        "sha256": "21d2b119d914149bac85df8f72ecf602bea2785e92e05dc652c48b3c1924ed5d",
+        "gitBlob": "ad79ad12a914b4d87c2381a94d943ca36f846b12"
+      },
+      {
+        "path": "lib/chat-failure.ts",
+        "sha256": "7645c58656f3725d48d49fb6e1ada517390342a94b55b563bfc100c2da8c84a6",
+        "gitBlob": "80d4a6bd364b33f538117d7138ee940c637ceae7"
+      },
+      {
+        "path": "lib/computer/claim.ts",
+        "sha256": "f1a9b9b8c9c2a422e92c19bbe6821cc63048a0a67e96bf8d43b82a45fdbe4bfb",
+        "gitBlob": "afb84620e89073f15f8e19a8035dbe09c2785675"
+      },
+      {
+        "path": "lib/coordinator-submission.test.ts",
+        "sha256": "6a2cbc5dcefaa947afe0fb84d07faedfb93d26fa6b8dc800c867f70163462d95",
+        "gitBlob": "fa6aee68e665d8e5a055c3a03bb3a41e3933acd8"
+      },
+      {
+        "path": "lib/coordinator/chat-version.db.test.ts",
+        "sha256": "20ec638154903b6d4624b50b77bfd6b4da82012507c6281a25a13f3f8509305e",
+        "gitBlob": "bc56c4b41d150611af8462f7e215d80b80380588"
+      },
+      {
+        "path": "lib/coordinator/store.ts",
+        "sha256": "9a061c6aa2694a4a8a1b90ee2791ccd5e0c78d6649a9d1acc3e9ce2d5ae6bd72",
+        "gitBlob": "0e369723e75a39c1134eaa13fd1685592526496b"
+      },
+      {
+        "path": "lib/factory/agent-profile.db.test.ts",
+        "sha256": "da6d885b6fa03863176509366dd6c501427d5219c7e90c765792228180312b8b",
+        "gitBlob": "7ba986c6721eb2fb2a0d7ce8f08241f91d82c248"
+      },
+      {
+        "path": "lib/factory/agent-profile.ts",
+        "sha256": "23dc2f806dd3ec12a945dc4ddafc02b1192fa0e16ffda6620dad5359b2f333db",
+        "gitBlob": "3ed31faffc13dea8ae6dce88dafab48adbdcc444"
+      },
+      {
+        "path": "lib/factory/automatic-dispatch.ts",
+        "sha256": "cb62df0b2b00411eff3547fe6e0c1525e488c30fd01c113f573c1ecee9ff97de",
+        "gitBlob": "e755b680d5cf13ba996f375b177ba03eee6149a6"
+      },
+      {
+        "path": "lib/factory/continuity.db.test.ts",
+        "sha256": "e77106cca4d573e0547c8a737d8b6895ff8b1a1de20f293c440e8f75686702de",
+        "gitBlob": "942098baccbdc13f6dae5485b83f82dfc5016bb1"
+      },
+      {
+        "path": "lib/factory/dispatch.ts",
+        "sha256": "bc7d7ce8e5f8d05f868565fe186af3ac6996ebadcf1ecaae99feb1432b7dad37",
+        "gitBlob": "de48ddb49830a9de13638ace3295bf9df01c3640"
+      },
+      {
+        "path": "lib/factory/merge.db.test.ts",
+        "sha256": "2e28628a43af4b75496b6aa1c2aeb07580129e7bb939c4654792944134d258c6",
+        "gitBlob": "4bb4d103cc9d004690188f3566f25821aa06d049"
+      },
+      {
+        "path": "lib/factory/merge.ts",
+        "sha256": "32cf84ac3aa6f8e8ac025ad5c2c076b790758c0ee86dd99bc2dda11499bfef34",
+        "gitBlob": "1289c73c6b2ead88fc41ba2fb6300e371d42ac0a"
+      },
+      {
+        "path": "lib/factory/profile-admission.ts",
+        "sha256": "b1e2c4d1b40d7a8b110fa58f57aa6f40cd44257171bd688929e9ad29d0bfee54",
+        "gitBlob": "8a2223b20114ed39368d01025f9c6dc3e1a5ae0d"
+      },
+      {
+        "path": "lib/factory/profile-dispatch.db.test.ts",
+        "sha256": "0d3a681691179fe87f59ea5a1ee6a4e325329bb1d3fd6662ce1893fe9e09bf7c",
+        "gitBlob": "38a8ee49acfb18ab9d6ccc3dcd61c3b8cc75741c"
+      },
+      {
+        "path": "lib/factory/reconcile.ts",
+        "sha256": "0eb876d5cb7a8e4d5b58bd3a616f4903af7f9c849a334323130d42460cf581a9",
+        "gitBlob": "d5ff8959e03619b57be2caa61a8cf58a3ad557ee"
+      },
+      {
+        "path": "lib/factory/store.ts",
+        "sha256": "1eea35094348600219a9f3a7cee9084ca620eace7ace7ad810fcfe090a2a7628",
+        "gitBlob": "823bba891c0d3aa8a40efe6fedf49dd98fa3bb22"
+      },
+      {
+        "path": "lib/factory/transaction.ts",
+        "sha256": "eb2b9af88119e8b8d965c5ccb618c42abdea901208ad179d5ff1c2b06ad71d6c",
+        "gitBlob": "39c5adb8679fde6f80eaf71abc2bed5abdbfe622"
+      },
+      {
+        "path": "lib/factory/watchdog.ts",
+        "sha256": "73987aa9b0b89da4c6ff305c0b43aaec54279256780df4be63aabd2d56689d7b",
+        "gitBlob": "9d9ee08ab13040e404a352082fd4e18e4d62bbf8"
+      },
+      {
+        "path": "lib/live/issue-detail.db.test.ts",
+        "sha256": "99bd605c0403de9465262da1f234b66eb5e77384e434cd9ef38c9fbfd38e0567",
+        "gitBlob": "06b2aec44504c9652fafe69e47bcdbf127c2141b"
+      },
+      {
+        "path": "lib/live/issue-detail.ts",
+        "sha256": "8db89ca99aa6102596119af7dcd75626c085a198fa090c338d07d44421a91937",
+        "gitBlob": "e0ded8dfda207c16e06658ed4c72865589c05475"
+      },
+      {
+        "path": "lib/model-order.ts",
+        "sha256": "83e32dfbe42a3a2e58f46072be685bde88812e739039899c653af35b05bf2b74",
+        "gitBlob": "1e3541ac9e3678a8c0c43e068872f8d45c170a50"
+      },
+      {
+        "path": "lib/self-improvement/evaluations-postgres.test.ts",
+        "sha256": "2113ee852684b9ef0461ee829abb6cb360ae431f6e4c17626f4ba7af61de1b7d",
+        "gitBlob": "f1eb8943f643bd9815733050b42b56450f3f91ec"
+      },
+      {
+        "path": "lib/self-improvement/evaluations.ts",
+        "sha256": "ee534f6edacb76a1eb3bbc59f4dc10b0c38652615c5021f86bd08c74cf1a9e60",
+        "gitBlob": "49c9e8eb8eb34bb5c364bacd4d5ccb7d566183ed"
+      },
+      {
+        "path": "lib/self-improvement/factory-bridge.ts",
+        "sha256": "26aa0f4834b2ebcb83a1570f0c6892ee1440897597d3b055ddb20fce12a8099e",
+        "gitBlob": "ed62d21dfeafa650dc8ad77a24fd6b28d28d9ecd"
+      },
+      {
+        "path": "lib/self-improvement/wiring-postgres.test.ts",
+        "sha256": "3a294e22f39bba8e0ec3c485ec72315babdb8be37fa8a9627103ded9a925bb99",
+        "gitBlob": "19556d2f53ceeac595fb2119de1e89ce86a0d887"
+      },
+      {
+        "path": "lib/subscription-runtime.ts",
+        "sha256": "1cd6c35b046987aff02512e4ba969a04ab26ce82ef816aa033885c03b7348419",
+        "gitBlob": "7e7287142b6bd9a41e7bbcd60eab43fac9f0cfea"
+      },
+      {
+        "path": "messages/en.json",
+        "sha256": "fe14f54a8f0c11ecf7f7d7e42dd0ec2ff64db4ad4f4380ff4999a37b025d6ced",
+        "gitBlob": "987319b8d3705488b920d2b5b8164526023ecf8c"
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "sha256": "8d59847728b55840307874abc47297d0fb9bff4995589ed43a50b1905afe3ec5",
+        "gitBlob": "7730996cc6db4bacd0b01f3f5693d877f928ed5c"
+      },
+      {
+        "path": "package.json",
+        "sha256": "8c9fef1e111ad4c5ef4eafe6417205f4a5ff45bbe68103bc872a9dfa2d5baaa5",
+        "gitBlob": "0bfcb21963917ac8dd8168a8985d6567ef2cb1c5"
+      },
+      {
+        "path": "scripts/release/mobile-native.mjs",
+        "sha256": "ef1f618f64de6b0debc29cea452b44b4ea4191fdcf93d7993ea1f4c42581df5c",
+        "gitBlob": "9797926b96437798c75871d7b548b46f8c7dc06c"
+      },
+      {
+        "path": "scripts/release/mobile-native.test.mjs",
+        "sha256": "1c6021d84bddf74f90bff668155aa0e20d79903a8120131d8a3177d61f5e41bf",
+        "gitBlob": "04cbfb8161e679f93b30a6d1bb5f0ec14c08b1f0"
+      },
+      {
+        "path": "tests/cloud-dispatch-startup.test.ts",
+        "sha256": "b6bd98d9e57c648da16e8ddd6de98c4296ce3d00a0a6f6d8939ffbe9c2f64c00",
+        "gitBlob": "b05aac838f6d37b71e049783b13b3ec4a049c0c6"
+      },
+      {
+        "path": "tests/factory-admission.db.test.ts",
+        "sha256": "47ff35f2b80a9fd9b52b8f96496e330c3d665cdfd8113029069b077b292ba9ff",
+        "gitBlob": "52b7153140a69be1c3b186fd6dcf2e92f20db927"
+      },
+      {
+        "path": "tests/issue-tool-calls.db.test.ts",
+        "sha256": "c3cd9977f4b8fcf3d083ce833b66705c208b83b82ce9cd4cc6edac4aee964290",
+        "gitBlob": "99aac2d2d2ea39433cc624be0dffbc3a94f494a1"
+      },
+      {
+        "path": "workflows/coordinator/steps.ts",
+        "sha256": "83477bd37f29915e01ea1359548da0fc7fd387c7a4122ae671ece50f554c6310",
+        "gitBlob": "cba708b9f2f516920ceb69979063a89c36a1b9d7"
+      }
+    ],
+    "currentShaAtStop": "f4e0a99143ab924390e8fbd915455c4abc7e21cf",
+    "currentStatusAtStop": "",
+    "lintBaseSha": "89cfb577cecada3087f02222f7a656cae5706977",
+    "cleanAfter": true
+  },
+  "environment": {
+    "kind": "Docker Cloud Sandbox",
+    "node": "v24.22.2",
+    "postgres": "17.11 (Ubuntu 17.11-1.pgdg24.04+2)",
+    "databaseHost": "127.0.0.1",
+    "databasePort": 5432,
+    "anchorDatabase": "mikka1284_gate_f4e0a991_e2e",
+    "isolatedRole": "mikka1284_gate_f4e0a991",
+    "roleCapabilities": [
+      "LOGIN",
+      "CREATEDB"
+    ],
+    "flags": {
+      "CI": "true",
+      "GITHUB_ACTIONS": "true",
+      "REQUIRE_DB": "1",
+      "RUN_DISPATCH_DB_TESTS": "1",
+      "CREDENTIAL_TEST_RETAIN_RESOURCES": "1"
+    },
+    "providerCalls": "synthetic provider/Decision/worker fixtures; no live model requests"
+  },
+  "commands": [
+    {
+      "name": "setup",
+      "command": "pnpm test:e2e:setup",
+      "cwd": "/workspace/Mikka",
+      "startedAt": "2026-11-05T05:27:51.619329+00:00",
+      "logPath": "/tmp/issue1284-f4e0-setup.log",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T05:27:54.825208+00:00",
+      "durationSeconds": 3.205,
+      "logSha256": "3f6b16adee7c661f3ff10ac36bc1df37483d6b23ae788b18e76a6836ac6c6c7c"
+    },
+    {
+      "name": "routing-policy-denials",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test tests/factory-policy-denials.db.test.ts",
+      "cwd": "/workspace/Mikka",
+      "startedAt": "2026-11-05T05:27:54.826734+00:00",
+      "logPath": "/tmp/issue1284-f4e0-routing-policy-denials.log",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T05:28:18.591638+00:00",
+      "durationSeconds": 23.765,
+      "logSha256": "517fc226f2b97dac36271fe3fea1d077c03f5fc479bd5187ce07d04598146386",
+      "counts": {
+        "tests": 5,
+        "suites": 0,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "name": "coordinator-concurrency",
+      "command": "pnpm test:coordinator-issue-tools-db",
+      "cwd": "/workspace/Mikka",
+      "startedAt": "2026-11-05T05:28:18.594601+00:00",
+      "logPath": "/tmp/issue1284-f4e0-coordinator-concurrency.log",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T05:28:24.219668+00:00",
+      "durationSeconds": 5.624,
+      "logSha256": "4cfc67435825d22444520a64ce9d62fa28ac5d90b1c26062a30c66b4a22e67b6",
+      "counts": {
+        "tests": 2,
+        "suites": 0,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "name": "profile-dispatch",
+      "command": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/profile-dispatch.db.test.ts",
+      "cwd": "/workspace/Mikka",
+      "startedAt": "2026-11-05T05:28:24.221379+00:00",
+      "logPath": "/tmp/issue1284-f4e0-profile-dispatch.log",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T05:29:20.666508+00:00",
+      "durationSeconds": 56.445,
+      "logSha256": "4535591c0c311f80c9cc9ca4b6ffb4760dbb7a59af6d5226d03fca72a8bd732d",
+      "counts": {
+        "tests": 23,
+        "suites": 0,
+        "pass": 23,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "name": "shared-subscription",
+      "command": "node --experimental-test-module-mocks --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/shared-subscription-runs.db.test.ts",
+      "cwd": "/workspace/Mikka",
+      "startedAt": "2026-11-05T05:29:20.667660+00:00",
+      "logPath": "/tmp/issue1284-f4e0-shared-subscription.log",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T05:29:30.817372+00:00",
+      "durationSeconds": 10.149,
+      "logSha256": "aa151d80d6ff493db216b4192890abf96f2b597ad665904e7bf5adbc2c0ca80b",
+      "counts": {
+        "tests": 34,
+        "suites": 0,
+        "pass": 34,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "name": "owner-acceptance",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/factory/merge.db.test.ts",
+      "cwd": "/workspace/Mikka",
+      "startedAt": "2026-11-05T05:29:30.818559+00:00",
+      "logPath": "/tmp/issue1284-f4e0-owner-acceptance.log",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T05:29:32.282875+00:00",
+      "durationSeconds": 1.464,
+      "logSha256": "70d52d87a5f3e38580f22336d5c7bdcc4bc9497b401e5ea4259d4f3cb6a33772",
+      "counts": {
+        "tests": 17,
+        "suites": 0,
+        "pass": 17,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "name": "self-improvement-owners",
+      "command": "node --import ./scripts/server-test.mjs --import tsx --test lib/self-improvement/wiring-postgres.test.ts lib/self-improvement/evaluations-postgres.test.ts",
+      "cwd": "/workspace/Mikka",
+      "startedAt": "2026-11-05T05:29:32.283861+00:00",
+      "logPath": "/tmp/issue1284-f4e0-self-improvement-owners.log",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T05:29:36.148723+00:00",
+      "durationSeconds": 3.864,
+      "logSha256": "82e66cf3b2dbcad79b4835aa6cc186872c7439a07afee1a408baeb4a2f29529e",
+      "counts": {
+        "tests": 7,
+        "suites": 0,
+        "pass": 7,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "name": "live-issue-detail",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/live/issue-detail.db.test.ts",
+      "cwd": "/workspace/Mikka",
+      "startedAt": "2026-11-05T05:29:36.150398+00:00",
+      "logPath": "/tmp/issue1284-f4e0-live-issue-detail.log",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T05:29:58.797181+00:00",
+      "durationSeconds": 22.646,
+      "logSha256": "8e61a59ac0747e28875f27ada555d53c3eea29edb4d5fd58213239ce6a99bfb6",
+      "counts": {
+        "tests": 6,
+        "suites": 0,
+        "pass": 6,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "name": "chat-version",
+      "command": "node --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/chat-version.db.test.ts",
+      "cwd": "/workspace/Mikka",
+      "startedAt": "2026-11-05T05:29:58.798857+00:00",
+      "logPath": "/tmp/issue1284-f4e0-chat-version.log",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T05:30:23.262644+00:00",
+      "durationSeconds": 24.463,
+      "logSha256": "02c61fc0f755067000d2a272db90827935a998cb28fde0a547c0c4cfa82ee7e6",
+      "counts": {
+        "tests": 2,
+        "suites": 0,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "name": "types",
+      "command": "pnpm typecheck",
+      "cwd": "/workspace/Mikka",
+      "startedAt": "2026-11-05T05:30:23.264659+00:00",
+      "logPath": "/tmp/issue1284-f4e0-types.log",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T05:30:24.118492+00:00",
+      "durationSeconds": 0.853,
+      "logSha256": "b596a9bc9e34b58c60cfe208ccde07260bea3b2007d83c0b73f85344f7fcee07"
+    },
+    {
+      "name": "related-lint",
+      "command": "pnpm exec oxlint --deny-warnings app/actions/coordinator.ts 'app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts' apps/mobile/lib/chat-failure.ts apps/mobile/lib/types.ts apps/mobile/tests/chat-failure.test.mts apps/mobile/tests/failed-reply.test.mts components/artifacts/artifact-window.tsx components/coordinator/coordinator-chat.tsx components/coordinator/failure-reason.tsx components/coordinator/retry-reply-button.test.tsx components/nav/bot-list.tsx components/workspace/issue-workspace.tsx lib/agent-runs.ts lib/chat-balance.ts lib/chat-failure.test.ts lib/chat-failure.ts lib/computer/claim.ts lib/coordinator-submission.test.ts lib/coordinator/chat-version.db.test.ts lib/coordinator/store.ts lib/factory/agent-profile.db.test.ts lib/factory/agent-profile.ts lib/factory/automatic-dispatch.ts lib/factory/continuity.db.test.ts lib/factory/dispatch.ts lib/factory/merge.db.test.ts lib/factory/merge.ts lib/factory/profile-admission.ts lib/factory/profile-dispatch.db.test.ts lib/factory/reconcile.ts lib/factory/store.ts lib/factory/transaction.ts lib/factory/watchdog.ts lib/live/issue-detail.db.test.ts lib/live/issue-detail.ts lib/model-order.ts lib/self-improvement/evaluations-postgres.test.ts lib/self-improvement/evaluations.ts lib/self-improvement/factory-bridge.ts lib/self-improvement/wiring-postgres.test.ts lib/subscription-runtime.ts scripts/release/mobile-native.mjs scripts/release/mobile-native.test.mjs tests/cloud-dispatch-startup.test.ts tests/factory-admission.db.test.ts tests/issue-tool-calls.db.test.ts workflows/coordinator/steps.ts",
+      "cwd": "/workspace/Mikka",
+      "startedAt": "2026-11-05T05:32:29.995063+00:00",
+      "completedAt": "2026-11-05T05:32:30.477578+00:00",
+      "durationSeconds": 0.483,
+      "exitCode": 0,
+      "logPath": "/tmp/issue1284-f4e0-related-lint.log",
+      "logSha256": "2306206790a7fe978cbdddb7235092b4ccf09dadfd5288ddea1c44b6beea1b4b"
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check 89cfb577cecada3087f02222f7a656cae5706977 f4e0a99143ab924390e8fbd915455c4abc7e21cf",
+      "cwd": "/workspace/Mikka",
+      "startedAt": "2026-11-05T05:32:30.478302+00:00",
+      "completedAt": "2026-11-05T05:32:30.502521+00:00",
+      "durationSeconds": 0.024,
+      "exitCode": 0,
+      "logPath": "/tmp/issue1284-f4e0-diff-check.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "cleanup": {
+    "startedAt": "2026-11-05T05:32:30.589420+00:00",
+    "ownedDatabases": [
+      "mikka1284_gate_f4e0a991_e2e",
+      "mikka_fixture_7f10414989264769b529739e9dc52260",
+      "mikka_fixture_90c12bee8e0d4d7eb3ff4d1a267aa550"
+    ],
+    "sessionsBeforeDrop": 0,
+    "remainingTestProcessesBeforeDrop": [],
+    "usedForce": false,
+    "usedTerminate": false,
+    "allStartedCommandsExited": true,
+    "completed": true,
+    "completedAt": "2026-11-05T05:32:30.892265+00:00",
+    "remainingRoleCount": 0,
+    "remainingOwnedDatabaseCount": 0
+  },
+  "previousLocalRoutingAttempts": [
+    {
+      "receiptPath": "/tmp/issue1284-19a-gates.json",
+      "receiptSha256": "ec825c2ad40e2bf34b789678551ed1d78ab9fe146508a584e284bcc0428ce7db",
+      "outcome": "failed_fixture_cleanup_42501"
+    },
+    {
+      "receiptPath": "/tmp/issue1284-19a-r2-gates.json",
+      "receiptSha256": "1d93728855432047d17ea0ca24f94e8bff655059f6af7f0be72c7e33cfd3bc86",
+      "outcome": "failed_fixture_cleanup_42501"
+    }
+  ],
+  "scopeNote": "Routing main group is not rerun; its two 19a local teardown failures remain recorded. This run covers remaining authorized groups and actual main122 increments.",
+  "completedAt": "2026-11-05T05:32:30.938085+00:00",
+  "driverInterruptions": [
+    {
+      "at": "2026-11-05T05:30:24.122529+00:00",
+      "reason": "Command '['git', 'rev-parse', '89cf']' returned non-zero exit status 128.",
+      "kind": "temporary_driver_ambiguous_short_sha",
+      "resolution": "Use full immutable base 89cfb577cecada3087f02222f7a656cae5706977 for remaining lint/diff only; no PG command repeated",
+      "sourceChanged": false
+    }
+  ],
+  "totals": {
+    "tests": 96,
+    "pass": 96,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  }
+}

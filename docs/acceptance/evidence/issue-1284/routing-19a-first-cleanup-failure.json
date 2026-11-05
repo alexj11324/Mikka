@@ -1,0 +1,296 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-11-05T05:14:47.705487+00:00",
+  "status": "failed",
+  "source": {
+    "sha": "19a7094c313a6f56c08e37fb1061c5e6c75799a1",
+    "tree": "cb8700bddc963326224fc530a1071dce0626c43a",
+    "cleanBefore": true,
+    "branch": "batch/20261105-1284-1296",
+    "currentShaAtStop": "19a7094c313a6f56c08e37fb1061c5e6c75799a1",
+    "currentStatusAtStop": "",
+    "changedFiles": [
+      {
+        "path": ".github/workflows/mobile-native.yml",
+        "sha256": "d8099d7cae38d840b403fe1ab9cb09314e0e71c54c30b1e4fdae7e2e6b71baf3"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+        "sha256": "34cbf4eb67799e8eed2649047f61968982dee8bdae617d86862f78031bf60e74"
+      },
+      {
+        "path": "apps/mobile/lib/chat-failure.ts",
+        "sha256": "f64b8e6c27d4d732ab399854f55623cbd150bbe8d95880faef0f95138e071db5"
+      },
+      {
+        "path": "apps/mobile/lib/types.ts",
+        "sha256": "881b3d859016adc2e777400038b75adfd7646290e6003e9aef0f7e0b41ad1cd6"
+      },
+      {
+        "path": "apps/mobile/tests/chat-failure.test.mts",
+        "sha256": "857147bd08ef0da3b22cbdde0274952b8db52ef2755ab7d9131a19a1ca79602a"
+      },
+      {
+        "path": "apps/mobile/tests/failed-reply.test.mts",
+        "sha256": "a3878c66d05b25425b6b7b0d8701c60650cf3dbbe0eae4a79c71881f385b8847"
+      },
+      {
+        "path": "components/coordinator/coordinator-chat.tsx",
+        "sha256": "c141e0da7ce44303f5ba7c675d3a3d805c878cccdb6ef8ee6feca1a45c4975c2"
+      },
+      {
+        "path": "components/coordinator/failure-reason.tsx",
+        "sha256": "03a902036eb63b1aa95b62a32d93342ef57b9f78e31c961e9ad6244f0e2e792b"
+      },
+      {
+        "path": "components/coordinator/retry-reply-button.test.tsx",
+        "sha256": "d4edfd1d8e0a777c563055af68e2d60fee6c8b4e9938e352b591c7e3d7d1db51"
+      },
+      {
+        "path": "docs/acceptance/issue-1296-chat-balance.md",
+        "sha256": "611e047f7ca94149054c64b49f4337e40148085bb9d86af26aaae08219e27a02"
+      },
+      {
+        "path": "docs/acceptance/issue-1296-evidence/api-balance-before.png",
+        "sha256": "ad3f043c166639fa856100e0d9f57e399528b81507ed144d3cd25e7275eb4995"
+      },
+      {
+        "path": "docs/acceptance/issue-1296-evidence/balance-recovery-menu-local.jpg",
+        "sha256": "5ca9d441e477761984704b08276104cd9defa2f43bc5b4e9cb74990ec1188f2f"
+      },
+      {
+        "path": "docs/acceptance/issue-1296-evidence/codex-accepted-production.png",
+        "sha256": "c0f903c14ee20c684e999a4a72944447d5dd103312925a3da16b56aaf453a646"
+      },
+      {
+        "path": "docs/acceptance/issue-1296-production-followup.md",
+        "sha256": "d6033d74cf5928996ed99af708acc8216c6e816e1d0dee7b6bf858525b1a91ea"
+      },
+      {
+        "path": "docs/dev-workflow.md",
+        "sha256": "f829b0b1ba32eaec4209b4963e20f6073332d624eb8c81bca4ca09cb96c85049"
+      },
+      {
+        "path": "lib/agent-runs.ts",
+        "sha256": "938e1aa67f942161bcc17f73e70c7952e2070e7bc3149b64bd9d5c2a84f94484"
+      },
+      {
+        "path": "lib/chat-balance.ts",
+        "sha256": "c0f7bfbd36214d8e447fc31f9d624bf44d691149df59bffb173cf0ef7209496f"
+      },
+      {
+        "path": "lib/chat-failure.test.ts",
+        "sha256": "21d2b119d914149bac85df8f72ecf602bea2785e92e05dc652c48b3c1924ed5d"
+      },
+      {
+        "path": "lib/chat-failure.ts",
+        "sha256": "7645c58656f3725d48d49fb6e1ada517390342a94b55b563bfc100c2da8c84a6"
+      },
+      {
+        "path": "lib/computer/claim.ts",
+        "sha256": "f1a9b9b8c9c2a422e92c19bbe6821cc63048a0a67e96bf8d43b82a45fdbe4bfb"
+      },
+      {
+        "path": "lib/factory/agent-profile.db.test.ts",
+        "sha256": "da6d885b6fa03863176509366dd6c501427d5219c7e90c765792228180312b8b"
+      },
+      {
+        "path": "lib/factory/agent-profile.ts",
+        "sha256": "23dc2f806dd3ec12a945dc4ddafc02b1192fa0e16ffda6620dad5359b2f333db"
+      },
+      {
+        "path": "lib/factory/automatic-dispatch.ts",
+        "sha256": "cb62df0b2b00411eff3547fe6e0c1525e488c30fd01c113f573c1ecee9ff97de"
+      },
+      {
+        "path": "lib/factory/continuity.db.test.ts",
+        "sha256": "e77106cca4d573e0547c8a737d8b6895ff8b1a1de20f293c440e8f75686702de"
+      },
+      {
+        "path": "lib/factory/dispatch.ts",
+        "sha256": "bc7d7ce8e5f8d05f868565fe186af3ac6996ebadcf1ecaae99feb1432b7dad37"
+      },
+      {
+        "path": "lib/factory/merge.db.test.ts",
+        "sha256": "144a7d538f1656d12932eaa78b58bf6402e0469c341356d5bc215c5a32491bfe"
+      },
+      {
+        "path": "lib/factory/merge.ts",
+        "sha256": "57e10aadb59f09c829514e9f6bba988fdd7d04f3c1e5c993f6a789f6137932ad"
+      },
+      {
+        "path": "lib/factory/profile-admission.ts",
+        "sha256": "b1e2c4d1b40d7a8b110fa58f57aa6f40cd44257171bd688929e9ad29d0bfee54"
+      },
+      {
+        "path": "lib/factory/profile-dispatch.db.test.ts",
+        "sha256": "0d3a681691179fe87f59ea5a1ee6a4e325329bb1d3fd6662ce1893fe9e09bf7c"
+      },
+      {
+        "path": "lib/factory/reconcile.ts",
+        "sha256": "0eb876d5cb7a8e4d5b58bd3a616f4903af7f9c849a334323130d42460cf581a9"
+      },
+      {
+        "path": "lib/factory/store.ts",
+        "sha256": "1eea35094348600219a9f3a7cee9084ca620eace7ace7ad810fcfe090a2a7628"
+      },
+      {
+        "path": "lib/factory/transaction.ts",
+        "sha256": "eb2b9af88119e8b8d965c5ccb618c42abdea901208ad179d5ff1c2b06ad71d6c"
+      },
+      {
+        "path": "lib/factory/watchdog.ts",
+        "sha256": "73987aa9b0b89da4c6ff305c0b43aaec54279256780df4be63aabd2d56689d7b"
+      },
+      {
+        "path": "lib/model-order.ts",
+        "sha256": "83e32dfbe42a3a2e58f46072be685bde88812e739039899c653af35b05bf2b74"
+      },
+      {
+        "path": "lib/self-improvement/evaluations-postgres.test.ts",
+        "sha256": "2113ee852684b9ef0461ee829abb6cb360ae431f6e4c17626f4ba7af61de1b7d"
+      },
+      {
+        "path": "lib/self-improvement/evaluations.ts",
+        "sha256": "ee534f6edacb76a1eb3bbc59f4dc10b0c38652615c5021f86bd08c74cf1a9e60"
+      },
+      {
+        "path": "lib/self-improvement/factory-bridge.ts",
+        "sha256": "26aa0f4834b2ebcb83a1570f0c6892ee1440897597d3b055ddb20fce12a8099e"
+      },
+      {
+        "path": "lib/self-improvement/wiring-postgres.test.ts",
+        "sha256": "3a294e22f39bba8e0ec3c485ec72315babdb8be37fa8a9627103ded9a925bb99"
+      },
+      {
+        "path": "lib/subscription-runtime.ts",
+        "sha256": "1cd6c35b046987aff02512e4ba969a04ab26ce82ef816aa033885c03b7348419"
+      },
+      {
+        "path": "messages/en.json",
+        "sha256": "fe14f54a8f0c11ecf7f7d7e42dd0ec2ff64db4ad4f4380ff4999a37b025d6ced"
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "sha256": "8d59847728b55840307874abc47297d0fb9bff4995589ed43a50b1905afe3ec5"
+      },
+      {
+        "path": "package.json",
+        "sha256": "d4db5d6d7cb761b1d724dbcffd5d6317c8c579476f2de0ed913933a1b48a7025"
+      },
+      {
+        "path": "scripts/release/mobile-native.mjs",
+        "sha256": "ef1f618f64de6b0debc29cea452b44b4ea4191fdcf93d7993ea1f4c42581df5c"
+      },
+      {
+        "path": "scripts/release/mobile-native.test.mjs",
+        "sha256": "1c6021d84bddf74f90bff668155aa0e20d79903a8120131d8a3177d61f5e41bf"
+      },
+      {
+        "path": "tests/cloud-dispatch-startup.test.ts",
+        "sha256": "b6bd98d9e57c648da16e8ddd6de98c4296ce3d00a0a6f6d8939ffbe9c2f64c00"
+      },
+      {
+        "path": "tests/factory-admission.db.test.ts",
+        "sha256": "47ff35f2b80a9fd9b52b8f96496e330c3d665cdfd8113029069b077b292ba9ff"
+      },
+      {
+        "path": "tests/issue-tool-calls.db.test.ts",
+        "sha256": "c3cd9977f4b8fcf3d083ce833b66705c208b83b82ce9cd4cc6edac4aee964290"
+      },
+      {
+        "path": "workflows/coordinator/steps.ts",
+        "sha256": "83477bd37f29915e01ea1359548da0fc7fd387c7a4122ae671ece50f554c6310"
+      }
+    ],
+    "shaVerifiedAtDiagnosis": "19a7094c313a6f56c08e37fb1061c5e6c75799a1"
+  },
+  "environment": {
+    "kind": "Docker Cloud Sandbox",
+    "node": "v24.22.2",
+    "postgres": "17.11 (Ubuntu 17.11-1.pgdg24.04+2)",
+    "databaseHost": "127.0.0.1",
+    "databasePort": 5432,
+    "anchorDatabase": "mikka1284_gate_19a7094c_e2e",
+    "isolatedRole": "mikka1284_gate_19a7094c",
+    "roleCapabilities": [
+      "LOGIN",
+      "CREATEDB"
+    ],
+    "flags": {
+      "CI": "true",
+      "GITHUB_ACTIONS": "true",
+      "REQUIRE_DB": "1",
+      "RUN_DISPATCH_DB_TESTS": "1",
+      "CREDENTIAL_TEST_RETAIN_RESOURCES": "1"
+    },
+    "providerCalls": "synthetic provider/Decision/worker fixtures; no live model requests"
+  },
+  "commands": [
+    {
+      "name": "setup",
+      "command": "pnpm test:e2e:setup",
+      "cwd": "/workspace/Mikka",
+      "startedAt": "2026-11-05T05:14:47.759066+00:00",
+      "logPath": "/tmp/issue1284-19a-setup.log",
+      "exitCode": 0,
+      "completedAt": "2026-11-05T05:14:51.076790+00:00",
+      "durationSeconds": 3.317,
+      "logSha256": "3f6b16adee7c661f3ff10ac36bc1df37483d6b23ae788b18e76a6836ac6c6c7c"
+    },
+    {
+      "name": "routing",
+      "command": "pnpm test:factory-routing-db",
+      "cwd": "/workspace/Mikka",
+      "startedAt": "2026-11-05T05:14:51.077361+00:00",
+      "logPath": "/tmp/issue1284-19a-routing.log",
+      "exitCode": 1,
+      "completedAt": "2026-11-05T05:15:41.492018+00:00",
+      "durationSeconds": 50.415,
+      "logSha256": "0a82a7c24856cb353d7191baa4b795ac63b24f23afc9f0b8bb4f0ee1be4dfaf6",
+      "counts": {
+        "tests": 210,
+        "suites": 0,
+        "pass": 209,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    }
+  ],
+  "cleanup": {
+    "completed": true,
+    "completedAt": "2026-11-05T05:21:49.921726+00:00",
+    "ownedDatabases": [
+      "fac_list_0ef90e4e11f24ddd8fd7f6b27c7bf10f_e2e",
+      "mikka1284_gate_19a7094c_e2e",
+      "mikka_fixture_b0f526762ef7428da63edd5f81c0abaa"
+    ],
+    "sessionsBeforeDrop": 0,
+    "usedForce": false,
+    "usedTerminate": false,
+    "allStartedCommandsExited": true,
+    "remainingRoleCount": 0,
+    "remainingOwnedDatabaseCount": 0
+  },
+  "currentCommand": "routing",
+  "failure": "Command failed: routing",
+  "completedAt": "2026-11-05T05:15:41.495812+00:00",
+  "diagnosis": {
+    "phase": "fixture cleanup",
+    "failedTest": "lib/factory/list.db.test.ts: list: candidate sha + newest publication of the current candidate only",
+    "callSite": "tests/support/drop-test-database.ts:42",
+    "postgresCode": "42501",
+    "postgresRoutine": "TerminateOtherDBBackends",
+    "statementKind": "DROP DATABASE WITH (FORCE)",
+    "targetDatabase": "fac_list_0ef90e4e11f24ddd8fd7f6b27c7bf10f_e2e",
+    "observedAt": "2026-11-05T05:14:55.321Z",
+    "callerPid": 2817,
+    "targetBackendIdentity": "not recorded; attribution unconfirmed",
+    "currentRoleSessions": 0,
+    "productAssertionsReportedFailing": false,
+    "permissionChanges": false,
+    "automaticRetry": false
+  }
+}

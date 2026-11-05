@@ -1,0 +1,8 @@
+{
+  "checkedAt": "2026-11-05T05:25:45.751Z",
+  "httpStatus": 200,
+  "build": "122fd9054b5400569fd2518f55c52cec8f04d28a",
+  "url": "https://app.aspectlylabs.com/mikka/api/version",
+  "deploymentId": "dpl_5WPTnbuYQUe67QEfkkM9mdCQDyqj",
+  "deploymentState": "READY"
+}
