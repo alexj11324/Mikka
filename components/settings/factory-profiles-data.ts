@@ -3,6 +3,7 @@
 import useSWR from 'swr'
 import { withBasePath } from '@/lib/base-path'
 import type { AgentProfile, AgentProfileDefinition } from '@/lib/factory/agent-profile-definition'
+import { BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-reference'
 
 export type ProfileModel = Extract<AgentProfileDefinition['model'], { mode: 'fixed' }> & {
   provider: string
@@ -12,6 +13,14 @@ export type ProfileModel = Extract<AgentProfileDefinition['model'], { mode: 'fix
   reason?: string
 }
 export type ProfileAvailability = { available: boolean; reason?: string }
+
+/** A task-form intent may ask Default's normal dispatcher to check allowance.
+ * This does not turn the read-only preview into an execution grant. */
+export function taskProfileChoiceAllowed(id: string, availability?: ProfileAvailability) {
+  return availability?.available === true ||
+    (id === BUILTIN_AGENT_PROFILE_ID && availability?.available === false && availability.reason === 'checking')
+}
+
 export type AgentProfilesView = {
   profiles: AgentProfile[]
   catalog: {
