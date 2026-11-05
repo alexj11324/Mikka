@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { ChatMessageList, type ChatListHandle } from '@/features/chat/components/chat-message-list'
 import { groupPagePath, mergeGroupHistory, mergeGroupRead, type GroupRead } from '@/features/chat/model/chat-pages'
+import { latestOwnIndex } from '@/features/chat/model/chat-layout'
+import { useReducedMotionPreference } from '@/lib/reduced-motion'
 import { GestureDetector } from 'react-native-gesture-handler'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -44,6 +46,7 @@ export default function GroupChat() {
   const me = home.data?.user.id
   const list = useRef<ChatListHandle>(null)
   const [atLatest, setAtLatest] = useState(true)
+  const reduceMotion = useReducedMotionPreference()
   const { offset, gesture: timeReveal, scrollLocked } = useTimeReveal()
   const apiContext = apiCache.context()
   const [composerHeight, setComposerHeight] = useState(90)
@@ -118,7 +121,7 @@ export default function GroupChat() {
   // The composer has put the quote ahead of the words and clears both once this returns true.
   const send = async (body: string) => {
     setSendFailed(false)
-    list.current?.toLatest()
+    list.current?.toLatest(!reduceMotion)
     try {
       await api(`/api/conversations/${id}/messages`, { method: 'POST', body: { body, mentions: mentionsIn(body, bots) } })
       await page.reload()
@@ -187,7 +190,7 @@ export default function GroupChat() {
       <GestureDetector gesture={timeReveal}>
       <View style={{ flex: 1, overflow: 'hidden' }}>
         <ChatMessageList ref={list} testID="group-chat-scroll" data={messages} scrollEnabled={!scrollLocked} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
-          keyOf={message => message.id} renderItem={renderMessage}
+          keyOf={message => message.id} renderItem={renderMessage} anchorIndex={latestOwnIndex(messages, message => message.authorType === 'user' && message.authorId === me)}
           onStartReached={before ? () => void loadEarlier() : undefined}
           header={<>
             {!page.data && !page.error ? <View style={styles.loading}><Spinner /></View> : null}

@@ -49,6 +49,7 @@ A secondary button is filled and has no outline.
 - Use glass only for controls that float over content: the composer and the jump-to-latest button.
 - Bars and tab bars get their glass from the system.
 - Without Liquid Glass, or with Reduce Transparency on, the control is a solid lifted surface.
+- `useLiquidGlass()` (`lib/glass.ts`) says whether to draw glass: iOS 26 with Reduce Transparency off. Every glass control uses it.
 - Never imitate glass with blur.
 - To hide a glass control, animate its effect style to `none`. Animating opacity doesn't work: glass stops drawing
   under a fully transparent parent.

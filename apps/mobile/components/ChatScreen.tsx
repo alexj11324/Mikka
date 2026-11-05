@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { ChatMessageList, type ChatListHandle } from '@/features/chat/components/chat-message-list'
 import { chatHistoryPath, chatUpdatePath, mergeChatHistory, mergeChatRead, olderThrough, type ChatHistoryPage, type ChatRead } from '@/features/chat/model/chat-pages'
+import { latestOwnIndex } from '@/features/chat/model/chat-layout'
 import { GestureDetector } from 'react-native-gesture-handler'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -155,7 +156,8 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
 
   const send = async (words: string, attachments: Attachment[] = []) => {
     if (serviceUnavailable) return false
-    list.current?.toLatest()
+    // The sent message rises to the top of the chat, blank space under it for the reply (v0).
+    list.current?.toLatest(!reduceMotion)
     const { text: message, images } = outgoing(words, attachments)
     const context = apiCache.context()
     const targetBotId = data?.botId ?? botId
@@ -263,7 +265,7 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
       <View style={{ flex: 1, overflow: 'hidden' }}>
         {/* The system scroll: momentum, and a bounce at both ends even while the chat is shorter than the screen. */}
         <ChatMessageList ref={list} testID="bot-chat-scroll" data={items} scrollEnabled={!scrollLocked} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
-          keyOf={item => item.pending ? `pending-${item.position}` : String(item.position)} renderItem={renderItem}
+          keyOf={item => item.pending ? `pending-${item.position}` : String(item.position)} renderItem={renderItem} anchorIndex={latestOwnIndex(items, item => item.from === 'person')}
           onStartReached={data?.historyBefore ? () => void loadOlder() : undefined}
           header={loadingOlder ? <View style={styles.older}><Spinner size={16} /></View> : null}
           footer={<>

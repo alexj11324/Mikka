@@ -1,10 +1,10 @@
 import { Platform, Pressable, StyleSheet } from 'react-native'
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect'
+import { GlassView } from 'expo-glass-effect'
+import { useLiquidGlass } from '@/lib/glass'
 import { Text } from '@/components/Text'
 import { Spinner } from '@/components/icons'
 import { colors, lift } from '@/lib/theme'
 
-const glass = Platform.OS === 'ios' && isLiquidGlassAvailable()
 
 /**
  * A text action that floats over or beside content (重试): a capsule of the system's interactive Liquid Glass on
@@ -12,6 +12,7 @@ const glass = Platform.OS === 'ios' && isLiquidGlassAvailable()
  */
 export function GlassButton({ label, onPress, busy = false, disabled = false }: { label: string; onPress: () => void; busy?: boolean; disabled?: boolean }) {
   const blocked = disabled || busy
+  const glass = useLiquidGlass()
   const content = <>{busy ? <Spinner size={14} color={colors.secondary} /> : null}<Text style={styles.glassLabel}>{label}</Text></>
   const a11y = { accessibilityRole: 'button' as const, accessibilityState: { disabled: blocked, busy }, 'aria-disabled': Platform.OS === 'web' ? blocked : undefined, 'aria-busy': Platform.OS === 'web' ? busy : undefined, disabled: blocked, onPress }
   if (glass) return <Pressable {...a11y} style={blocked ? { opacity: 0.4 } : undefined}><GlassView isInteractive={!blocked} style={styles.glassCapsule}>{content}</GlassView></Pressable>
