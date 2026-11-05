@@ -1,0 +1,130 @@
+import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
+import { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { openSync, closeSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const root = '/vercel/sandbox/mikka-wake-deadline'
+const scripts = dirname(fileURLToPath(import.meta.url))
+const require = createRequire(`${root}/package.json`)
+const directory = `/tmp/mikka-wake-runtime-${Date.now()}`
+const dataDir = join(directory, 'data')
+await mkdir(dataDir, { recursive: true })
+const env = { ...process.env }
+for (const key of ['VERCEL', 'VERCEL_URL', 'VERCEL_ENV', 'VERCEL_OIDC_TOKEN', 'AI_GATEWAY_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'COMPOSIO_API_KEY', 'E2B_API_KEY', 'EXPO_ACCESS_TOKEN', 'POSTHOG_SECRET_KEY', 'RESEND_API_KEY']) delete env[key]
+Object.assign(env, {
+  WORKFLOW_TARGET_WORLD: 'local', WORKFLOW_LOCAL_DATA_DIR: dataDir,
+  WORKFLOW_LOCAL_BASE_URL: 'http://localhost:3118/mikka',
+  WORKFLOW_LOCAL_RECOVER_ACTIVE_RUNS: 'true', PORT: '3118',
+  NEXT_TELEMETRY_DISABLED: '1', NO_PROXY: 'localhost,127.0.0.1,::1',
+  AI_GATEWAY_API_KEY: 'offline-proof-marker-not-a-provider-key',
+  NODE_OPTIONS: `--import ${join(scripts, 'loopback-only.mjs')}`,
+})
+const children = new Set()
+function child(name, args) {
+  const fd = openSync(join(directory, `${name}.log`), 'a')
+  const p = spawn(process.execPath, args, { cwd: root, env, detached: true, stdio: ['ignore', fd, fd] })
+  closeSync(fd)
+  children.add(p)
+  return p
+}
+async function stop(p) {
+  if (p.exitCode !== null || p.signalCode !== null) return
+  const done = new Promise(resolve => p.once('exit', resolve))
+  process.kill(-p.pid, 'SIGKILL')
+  await done
+}
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
+async function waitUntil(fn, timeout = 90_000) {
+  const end = Date.now() + timeout
+  while (Date.now() < end) { if (await fn()) return; await pause(150) }
+  throw new Error('runtime_wait_timeout')
+}
+async function healthy() {
+  try {
+    const response = await fetch('http://localhost:3118/mikka/.well-known/workflow/v1/flow?__health', { signal: AbortSignal.timeout(5000) })
+    return response.ok
+  } catch { return false }
+}
+async function jsonFiles(path) {
+  const result = []
+  for (const entry of await readdir(path, { withFileTypes: true }).catch(() => [])) {
+    const file = join(path, entry.name)
+    if (entry.isDirectory()) result.push(...await jsonFiles(file))
+    else if (entry.name.endsWith('.json')) {
+      try { result.push({ file, value: JSON.parse(await readFile(file, 'utf8')) }) } catch { /* atomic writes may be in flight */ }
+    }
+  }
+  return result
+}
+let receipt = { directory, workflowId: 'workflow//./workflows/coordinator-wake-recovery/workflow//coordinatorWakeDeadline' }
+const receiptPath = join(directory, 'receipt.json')
+await writeFile('/tmp/mikka-wake-runtime-latest.json', JSON.stringify({ directory, receiptPath }))
+try {
+  const firstServer = child('server-before', [require.resolve('next/dist/bin/next'), 'dev', '--hostname', '127.0.0.1', '--port', '3118'])
+  await waitUntil(healthy)
+  const at = new Date(Date.now() + 90_000).toISOString()
+  receipt.ticket = { userId: `wake-runtime-${randomUUID()}`, botId: randomUUID(), at, events: [{ id: randomUUID(), attempt: 1, nextWakeAt: at, leaseUntil: at }] }
+  const { Pool } = require('pg')
+  const db = new Pool({ connectionString: env.E2E_DATABASE_URL, max: 1 })
+  const readBatch = async () => (await db.query('SELECT count(*)::int AS events,coalesce(sum("wakeAttempts"),0)::int AS attempts FROM coordinator_events WHERE "userId"=$1 AND "botId"=$2::uuid', [receipt.ticket.userId, receipt.ticket.botId])).rows[0]
+  receipt.databaseBefore = await readBatch()
+  assert.deepEqual(receipt.databaseBefore, { events: 0, attempts: 0 })
+  await writeFile(receiptPath, JSON.stringify(receipt, null, 2))
+  const starter = child('sdk-before', [join(scripts, 'sdk-stage.mjs'), 'start', receiptPath])
+  await waitUntil(async () => {
+    receipt = JSON.parse(await readFile(receiptPath, 'utf8'))
+    if (!receipt.runId) return false
+    return (await jsonFiles(join(dataDir, 'events', receipt.runId))).some(x => x.value.eventType === 'wait_created')
+  }, 50_000)
+  const before = await jsonFiles(dataDir)
+  receipt.beforeRestartAt = new Date().toISOString()
+  receipt.firstPids = { server: firstServer.pid, sdk: starter.pid }
+  await writeFile(join(directory, 'events-before-restart.json'), JSON.stringify(before, null, 2))
+  assert(Date.now() < Date.parse(at), 'the original durable wait must still be future')
+  await stop(starter)
+  await stop(firstServer)
+  receipt.allOriginalQueueOwnersStoppedAt = new Date().toISOString()
+  await writeFile(receiptPath, JSON.stringify(receipt, null, 2))
+  // No queue owner survives this interval; the same durable run must be recovered.
+  await pause(700)
+  const secondServer = child('server-after', [require.resolve('next/dist/bin/next'), 'dev', '--hostname', '127.0.0.1', '--port', '3118'])
+  await waitUntil(healthy)
+  assert(Date.now() < Date.parse(at), 'restart must complete before the original deadline')
+  const afterRestart = await jsonFiles(dataDir)
+  assert(!afterRestart.some(x => x.value.eventType === 'wait_completed'), 'restart must not complete the sleep early')
+  receipt.restartedBeforeDeadlineAt = new Date().toISOString()
+  receipt.secondServerPid = secondServer.pid
+  await writeFile(receiptPath, JSON.stringify(receipt, null, 2))
+  const observer = child('sdk-after', [join(scripts, 'sdk-stage.mjs'), 'resume', receiptPath])
+  const code = await new Promise(resolve => observer.once('exit', resolve))
+  assert.equal(code, 0, 'recovered real workflow must complete')
+  receipt = JSON.parse(await readFile(receiptPath, 'utf8'))
+  assert(Date.parse(receipt.finalObservedAt) >= Date.parse(at), 'completion must follow original absolute deadline')
+  const after = await jsonFiles(dataDir)
+  await writeFile(join(directory, 'events-after-completion.json'), JSON.stringify(after, null, 2))
+  const events = after.filter(x => x.value.runId === receipt.runId && x.value.eventType).map(x => x.value)
+  assert.equal(events.filter(x => x.eventType === 'wait_created').length, 1)
+  assert.equal(events.filter(x => x.eventType === 'wait_completed').length, 1)
+  assert(events.some(x => x.eventType === 'step_completed'))
+  assert(events.some(x => x.eventType === 'run_completed'))
+  receipt.databaseAfter = await readBatch()
+  assert.deepEqual(receipt.databaseAfter, { events: 0, attempts: 0 })
+  await db.end()
+  receipt.eventTypes = events.map(x => x.eventType)
+  receipt.waitCreated = events.find(x => x.eventType === 'wait_created')
+  receipt.waitCompleted = events.find(x => x.eventType === 'wait_completed')
+  receipt.stepCompleted = events.find(x => x.eventType === 'step_completed')
+  receipt.result = 'passed'
+  await writeFile(receiptPath, JSON.stringify(receipt, null, 2))
+  console.log(JSON.stringify(receipt, null, 2))
+} catch (error) {
+  await writeFile(join(directory, 'failure.txt'), String(error.stack))
+  console.error(JSON.stringify({ directory, error: String(error) }))
+  process.exitCode = 1
+} finally {
+  for (const p of children) await stop(p)
+}

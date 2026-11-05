@@ -1,0 +1,93 @@
+{
+  "receipts": [
+    {
+      "status": "fulfilled",
+      "value": {
+        "label": "integrated-compile-types",
+        "command": {
+          "id": "cmd_0855b1266058479bb2d7c11558e5",
+          "name": "bash",
+          "args": [
+            "-lc",
+            "unset AI_GATEWAY_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY COMPOSIO_API_KEY E2B_API_KEY POSTHOG_SECRET_KEY RESEND_API_KEY VERCEL VERCEL_ENV\nnpx --yes pnpm@10.34.3 exec next typegen && npx --yes pnpm@10.34.3 typecheck > /tmp/mikka-wake-integrated-compile-types.log 2>&1\nresult=$?\nprintf '%s\\n' \"$result\" > /tmp/mikka-wake-integrated-compile-types.exit\nexit \"$result\""
+          ],
+          "cwd": "/vercel/sandbox/mikka-wake-deadline",
+          "sessionId": "sbx_5x2oLaIP0UGMlfzq0MmpJv1OOMGu",
+          "startedAt": 1793836538692,
+          "exitCode": 0,
+          "durationMs": 22385
+        }
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "label": "integrated-coordinator",
+        "command": {
+          "id": "cmd_66266862292145208e3f18412aa7",
+          "name": "bash",
+          "args": [
+            "-lc",
+            "unset AI_GATEWAY_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY COMPOSIO_API_KEY E2B_API_KEY POSTHOG_SECRET_KEY RESEND_API_KEY VERCEL VERCEL_ENV\nnpx --yes pnpm@10.34.3 test:coordinator-events && node --import tsx --test lib/coordinator/wake-recovery.db.test.ts > /tmp/mikka-wake-integrated-coordinator.log 2>&1\nresult=$?\nprintf '%s\\n' \"$result\" > /tmp/mikka-wake-integrated-coordinator.exit\nexit \"$result\""
+          ],
+          "cwd": "/vercel/sandbox/mikka-wake-deadline",
+          "sessionId": "sbx_5x2oLaIP0UGMlfzq0MmpJv1OOMGu",
+          "startedAt": 1793836539485,
+          "exitCode": 0,
+          "durationMs": 50194
+        }
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "label": "integrated-lint",
+        "command": {
+          "id": "cmd_c0f32295102b453695f9fb3bc0ed",
+          "name": "bash",
+          "args": [
+            "-lc",
+            "unset AI_GATEWAY_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY COMPOSIO_API_KEY E2B_API_KEY POSTHOG_SECRET_KEY RESEND_API_KEY VERCEL VERCEL_ENV\nnpx --yes pnpm@10.34.3 lint > /tmp/mikka-wake-integrated-lint.log 2>&1\nresult=$?\nprintf '%s\\n' \"$result\" > /tmp/mikka-wake-integrated-lint.exit\nexit \"$result\""
+          ],
+          "cwd": "/vercel/sandbox/mikka-wake-deadline",
+          "sessionId": "sbx_5x2oLaIP0UGMlfzq0MmpJv1OOMGu",
+          "startedAt": 1793836539129,
+          "exitCode": 0,
+          "durationMs": 17652
+        }
+      }
+    }
+  ],
+  "nativeLogs": {
+    "integrated-compile-types": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"result\": {\n    \"logs\": [\n      {\n        \"data\": \"✓ Compiled workflows in 6.9s (148 steps, 7 workflows)\\nGenerating route types...\\n✓ Types generated successfully\\n\",\n        \"stream\": \"stdout\"\n      }\n    ],\n    \"context\": {\n      \"totalItems\": 1,\n      \"returnedItems\": 1,\n      \"truncated\": false\n    }\n  }\n}"
+        }
+      ],
+      "structuredContent": null,
+      "isError": false
+    },
+    "integrated-coordinator": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"result\": {\n    \"logs\": [\n      {\n        \"data\": \"\\n> next-app@0.0.1 test:coordinator-events /vercel/sandbox/mikka-wake-deadline\\n> node --test --experimental-test-isolation=none lib/coordinator/triage-batch.test.mjs tests/workflow-schema-boundary.test.mjs && node --import tsx --test lib/run-retry.test.ts lib/coordinator-events.test.ts lib/coordinator/telegram-pending.test.ts lib/coordinator/context.test.ts lib/coordinator/chat-state.test.ts lib/coordinator/stop.test.ts lib/thread-continuation.test.ts lib/run-prompt.test.ts lib/coordinator/model.test.ts lib/coordinator/triage.test.ts lib/coordinator/decision.test.ts lib/coordinator/group-routing.test.ts lib/coordinator/citations.test.ts lib/coordinator/tool-activity.test.ts lib/coordinator/chat-dedupe.test.ts lib/link-preview-parse.test.ts lib/push-reasons.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/cloud-dispatch-startup.test.ts lib/thread-dispatch.test.ts lib/thread-switch.test.ts lib/coordinator-submission.test.ts lib/coordinator/judgment-integration.test.ts lib/coordinator/scenarios.test.ts lib/coordinator/execution-context.test.ts lib/coordinator/wake-notice.test.ts lib/coordinator/wake-deadline.test.ts lib/coordinator/interrupted-turns.test.ts lib/coordinator/credential-masking.test.ts lib/coordinator/compaction-model.test.ts lib/coordinator/compaction-sdk.test.ts lib/coordinator/user-images-entry.test.ts && pnpm test:personal-message-safety && node --import ./tests/support/server-only.mjs --import tsx --test lib/device-agents.test.ts && node --import tsx --test lib/coordinator-client-submission.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test app/api/cron/coordinator-wakes/route.test.ts && pnpm test:coordinator-stream\\n\\n✔ the production scheduler claims before inference and records only a winning CAS (2.141455ms)\\n✔ model failures stay pending after exactly the bounded attempts and never persist a tier (0.320638ms)\\n✔ a missing host...[truncated]\",\n        \"stream\": \"stdout\"\n      }\n    ],\n    \"context\": {\n      \"totalItems\": 1,\n      \"returnedItems\": 1,\n      \"truncated\": false\n    }\n  },\n  \"truncated\": true,\n  \"truncation\": {\n    \"arrays\": 0,\n    \"omittedArrayItems\": 0,\n    \"objects\": 0,\n    \"omittedObjectKeys\": 0,\n    \"strings\": 1,\n    \"omittedStringChars\": 47282,\n    \"depth\": 0,\n    \"budget\": 0\n  }\n}"
+        }
+      ],
+      "structuredContent": null,
+      "isError": false
+    },
+    "integrated-lint": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"result\": {\n    \"logs\": [],\n    \"context\": {\n      \"totalItems\": 0,\n      \"returnedItems\": 0,\n      \"truncated\": false\n    }\n  }\n}"
+        }
+      ],
+      "structuredContent": null,
+      "isError": false
+    }
+  }
+}

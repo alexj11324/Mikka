@@ -1,0 +1,19 @@
+{
+  "knownCredentialPatternMatches": 0,
+  "artifacts": [
+    {
+      "path": "mikka-wake-deadline-review/preintegration.tar.gz",
+      "name": "preintegration.tar.gz",
+      "bytes": 72090,
+      "sha256": "2f7478d5601dd48436ecd5bde7df66a76cca982768859f6aab4ad916b5a6103b",
+      "gitBlob": "85ac23de0e0e0cc361e2b1f9948cd13a223be873"
+    },
+    {
+      "path": "mikka-wake-deadline-review/final-export.tar.gz",
+      "name": "final-export.tar.gz",
+      "bytes": 141028,
+      "sha256": "0047b603ea16f5031ba63a6b0c26323302aa8d15bfa1770285f6a7386097e01a",
+      "gitBlob": "3ded38022c1a215c5839df93e5d7daf38ae372cc"
+    }
+  ]
+}

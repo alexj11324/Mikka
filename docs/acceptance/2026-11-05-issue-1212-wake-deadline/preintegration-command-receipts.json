@@ -1,0 +1,98 @@
+[
+  {
+    "status": "fulfilled",
+    "value": {
+      "name": "bash",
+      "id": "cmd_2e87d7ef0c524c5487d1c981c858",
+      "args": [
+        "-lc",
+        "set +e\nnpx --yes pnpm@10.34.3 typecheck > /tmp/mikka-wake-types.log 2>&1\nresult=$?\nprintf '%s\\n' \"$result\" > /tmp/mikka-wake-types.exit\nexit \"$result\""
+      ],
+      "cwd": "/vercel/sandbox/mikka-wake-deadline",
+      "sessionId": "sbx_5x2oLaIP0UGMlfzq0MmpJv1OOMGu",
+      "startedAt": 1793836156995,
+      "exitCode": 0,
+      "durationMs": 17181
+    }
+  },
+  {
+    "status": "fulfilled",
+    "value": {
+      "name": "bash",
+      "id": "cmd_12db22dfe0264253b6d9fa44539e",
+      "args": [
+        "-lc",
+        "set +e\nnpx --yes pnpm@10.34.3 lint > /tmp/mikka-wake-lint.log 2>&1\nresult=$?\nprintf '%s\\n' \"$result\" > /tmp/mikka-wake-lint.exit\nexit \"$result\""
+      ],
+      "cwd": "/vercel/sandbox/mikka-wake-deadline",
+      "sessionId": "sbx_5x2oLaIP0UGMlfzq0MmpJv1OOMGu",
+      "startedAt": 1793836158296,
+      "exitCode": 0,
+      "durationMs": 25273
+    }
+  },
+  {
+    "status": "fulfilled",
+    "value": {
+      "name": "bash",
+      "id": "cmd_a1a25a752e8e4bfc88156f6231c4",
+      "args": [
+        "-lc",
+        "set +e\nnpx --yes pnpm@10.34.3 test:bot-chats-db > /tmp/mikka-wake-bot-chats-db.log 2>&1\nresult=$?\nprintf '%s\\n' \"$result\" > /tmp/mikka-wake-bot-chats-db.exit\nexit \"$result\""
+      ],
+      "cwd": "/vercel/sandbox/mikka-wake-deadline",
+      "sessionId": "sbx_5x2oLaIP0UGMlfzq0MmpJv1OOMGu",
+      "startedAt": 1793836157386,
+      "exitCode": 0,
+      "durationMs": 40224
+    }
+  },
+  {
+    "status": "fulfilled",
+    "value": {
+      "name": "bash",
+      "id": "cmd_80e32a88b49c4317861cd0bd3a43",
+      "args": [
+        "-lc",
+        "unset AI_GATEWAY_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY COMPOSIO_API_KEY E2B_API_KEY POSTHOG_SECRET_KEY RESEND_API_KEY VERCEL VERCEL_ENV\nnpx --yes pnpm@10.34.3 exec next typegen > /tmp/mikka-wake-workflow-typegen.log 2>&1\nresult=$?\nprintf '%s\\n' \"$result\" > /tmp/mikka-wake-workflow-typegen.exit\nexit \"$result\""
+      ],
+      "cwd": "/vercel/sandbox/mikka-wake-deadline",
+      "sessionId": "sbx_5x2oLaIP0UGMlfzq0MmpJv1OOMGu",
+      "startedAt": 1793835198567,
+      "exitCode": 0,
+      "durationMs": 10325
+    }
+  },
+  {
+    "status": "fulfilled",
+    "value": {
+      "name": "bash",
+      "id": "cmd_b87d936b35284354bf70b93ed0a7",
+      "args": [
+        "-lc",
+        "npx --yes pnpm@10.34.3 test:coordinator-events > /tmp/mikka-wake-coordinator-regression.log 2>&1\nresult=$?\nprintf '%s\\n' \"$result\" > /tmp/mikka-wake-coordinator-regression.exit\nexit \"$result\""
+      ],
+      "cwd": "/vercel/sandbox/mikka-wake-deadline",
+      "sessionId": "sbx_5x2oLaIP0UGMlfzq0MmpJv1OOMGu",
+      "startedAt": 1793835129636,
+      "exitCode": 0,
+      "durationMs": 34388
+    }
+  },
+  {
+    "status": "fulfilled",
+    "value": {
+      "name": "bash",
+      "id": "cmd_307b3c5381af48b49904c61812c2",
+      "args": [
+        "-lc",
+        "node --import tsx --test lib/coordinator/wake-recovery.db.test.ts > /tmp/mikka-wake-microsecond-green.log 2>&1\nresult=$?\nprintf '%s\\n' \"$result\" > /tmp/mikka-wake-microsecond-green.exit\nexit \"$result\""
+      ],
+      "cwd": "/vercel/sandbox/mikka-wake-deadline",
+      "sessionId": "sbx_5x2oLaIP0UGMlfzq0MmpJv1OOMGu",
+      "startedAt": 1793835040557,
+      "exitCode": 0,
+      "durationMs": 615
+    }
+  }
+]
