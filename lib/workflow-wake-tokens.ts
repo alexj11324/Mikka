@@ -5,4 +5,6 @@ export const wakeTokens = {
   threadMachine: (runId: string) => 'thread-machine:' + runId,
   /** A web subagent's workflow (workflows/subagent), woken by any change to its row or its approvals. */
   subagent: (subagentId: string) => 'subagent:' + subagentId,
+  /** A Bot chat's pending Coordinator wake deadline (workflows/coordinator-wake-recovery), woken when a lease it waits behind is released. */
+  coordinatorWake: (userId: string, botId: string) => 'coordinator-wake:' + JSON.stringify([userId, botId]),
 }
