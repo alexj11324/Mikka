@@ -1,0 +1,222 @@
+{
+  "first": {
+    "kind": "synthetic-visual-fixture",
+    "controllerPid": 21269,
+    "origin": "http://127.0.0.1:3111",
+    "publicOrigin": "https://3111-001m6mcf2kr0phmx737s6js1e0r.sbx.sandboxes-cloud.docker.com/mikka",
+    "realComponents": true,
+    "realAccounts": false,
+    "realApi": false,
+    "modelCalls": false,
+    "buildLog": "/shared/issue1313-visual-8608b63/build.log",
+    "runtimeLog": "/shared/issue1313-visual-8608b63/runtime.log",
+    "phase": "ready",
+    "startedAt": "2026-11-05T03:18:20.584Z",
+    "sourceCommit": "8608b63f522e6bbb8db8fc0caac7f606f17cf218",
+    "sourceTree": "ff973ac99fea66a4d97a757c1475103363fb21c4",
+    "sourceDirty": false,
+    "sourceFiles": {
+      "components/coordinator/new-task-dialog.tsx": "9eb91b10991d3880001dc8dc0a5b409b83276bd012bcc3ac20de1b024b5b6c2c",
+      "components/coordinator/task-profile-picker.tsx": "39fde1614e269e25f09a45b1f585ee6492654b8407629c14d99304841eee8615",
+      "components/settings/factory-profiles-settings.tsx": "d9f9b13d4fb01aff944bf4f8f9f7049199cf2ca65fae2058d1d2644aa415136e",
+      "components/settings/factory-profiles-data.ts": "adaf9852b7bdfaeda3d2b68510e93f4fd1a607004a4ab054119c767ccd41452f",
+      "components/workspace/thread-execution-identity.tsx": "b003c008afdf787f1faacdded487a1aab150f22ac53a3b705b31e8ad8c71e972",
+      "lib/factory/agent-profile-decision.ts": "834a175af3dffa09dd94f33ece58e6cb50b72917cde356b7bf99d8a6af59d23d",
+      "lib/thread-execution-identity-view.ts": "e76a523f06de06e73cf10c60045f7ad395dda7721025ea22d596d6b4b6ea9e39",
+      "messages/zh-CN.json": "df177fd58c1c30178bf29727c8c887c7f628b030a328ee11bb9bc1232564cc98",
+      "app/globals.css": "00ccc3f687f114aa3852579cf436944b76dc6a28995370306039b1313243136d"
+    },
+    "buildStartedAt": "2026-11-05T03:18:20.602Z",
+    "buildId": "fxfe5Eos05LO05IyBFUCD",
+    "buildFinishedAt": "2026-11-05T03:18:36.148Z",
+    "appPid": 21411,
+    "readyAt": "2026-11-05T03:18:37.416Z"
+  },
+  "final": {
+    "kind": "synthetic-visual-fixture",
+    "controllerPid": 21819,
+    "origin": "http://127.0.0.1:3111",
+    "publicOrigin": "https://3111-001m6mcf2kr0phmx737s6js1e0r.sbx.sandboxes-cloud.docker.com/mikka",
+    "realComponents": true,
+    "realAccounts": false,
+    "realApi": false,
+    "modelCalls": false,
+    "buildLog": "/shared/issue1313-visual-8608b63/build.log",
+    "runtimeLog": "/shared/issue1313-visual-8608b63/runtime.log",
+    "phase": "ready",
+    "startedAt": "2026-11-05T03:21:53.971Z",
+    "sourceCommit": "8608b63f522e6bbb8db8fc0caac7f606f17cf218",
+    "sourceTree": "ff973ac99fea66a4d97a757c1475103363fb21c4",
+    "sourceDirty": false,
+    "sourceFiles": {
+      "components/coordinator/new-task-dialog.tsx": "9eb91b10991d3880001dc8dc0a5b409b83276bd012bcc3ac20de1b024b5b6c2c",
+      "components/coordinator/task-profile-picker.tsx": "39fde1614e269e25f09a45b1f585ee6492654b8407629c14d99304841eee8615",
+      "components/settings/factory-profiles-settings.tsx": "d9f9b13d4fb01aff944bf4f8f9f7049199cf2ca65fae2058d1d2644aa415136e",
+      "components/settings/factory-profiles-data.ts": "adaf9852b7bdfaeda3d2b68510e93f4fd1a607004a4ab054119c767ccd41452f",
+      "components/workspace/thread-execution-identity.tsx": "b003c008afdf787f1faacdded487a1aab150f22ac53a3b705b31e8ad8c71e972",
+      "lib/factory/agent-profile-decision.ts": "834a175af3dffa09dd94f33ece58e6cb50b72917cde356b7bf99d8a6af59d23d",
+      "lib/thread-execution-identity-view.ts": "e76a523f06de06e73cf10c60045f7ad395dda7721025ea22d596d6b4b6ea9e39",
+      "messages/zh-CN.json": "df177fd58c1c30178bf29727c8c887c7f628b030a328ee11bb9bc1232564cc98",
+      "app/globals.css": "00ccc3f687f114aa3852579cf436944b76dc6a28995370306039b1313243136d"
+    },
+    "buildStartedAt": "2026-11-05T03:21:53.991Z",
+    "buildId": "m3pSOwiX1xaJ1hJ3_E9MY",
+    "buildFinishedAt": "2026-11-05T03:21:57.784Z",
+    "appPid": 22077,
+    "readyAt": "2026-11-05T03:21:59.071Z"
+  },
+  "reviewScope": "manual synthetic component visual review; no authenticated account, real API, or provider execution acceptance",
+  "desktopViewport": {
+    "width": 1363,
+    "height": 936
+  },
+  "mobileIframeViewport": {
+    "width": 390,
+    "height": 848,
+    "outerWidthIncludingBorders": 392
+  },
+  "screenshots": [
+    {
+      "filename": "issue1313-8608b63-list-light.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-list-light.jpg",
+      "width": 1363,
+      "height": 936,
+      "bytes": 61463,
+      "sha256": "b5ba873283ec17184938bdc533d31becd9c57df63e1c5b1e90276b7aeb69c636",
+      "check": "列表浅色：内置默认、可运行、已停用、来源移除",
+      "buildId": "fxfe5Eos05LO05IyBFUCD"
+    },
+    {
+      "filename": "issue1313-8608b63-list-dark.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-list-dark.jpg",
+      "width": 1363,
+      "height": 936,
+      "bytes": 57800,
+      "sha256": "55d96496da21213b32819c4abc8c065a24164a2d7da2afb541812f7ce99256dd",
+      "check": "列表深色：共享状态颜色、图标、文字",
+      "buildId": "fxfe5Eos05LO05IyBFUCD"
+    },
+    {
+      "filename": "issue1313-8608b63-editor-desktop.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-editor-desktop.jpg",
+      "width": 1363,
+      "height": 936,
+      "bytes": 56158,
+      "sha256": "0fc234b5493dff4d9f301ba48f128c1864bfc5e53c5d88fba34410b8849eddda",
+      "check": "桌面编辑：固定 Agent/模型/来源、角色、强度、私有指令、Skills",
+      "buildId": "fxfe5Eos05LO05IyBFUCD"
+    },
+    {
+      "filename": "issue1313-8608b63-editor-390.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-editor-390.jpg",
+      "width": 1353,
+      "height": 981,
+      "bytes": 53394,
+      "sha256": "23ff1b1325f06d7c46458e1d12c197ddbf287428516be4795196c3f525696a9e",
+      "check": "390px 编辑：单列字段与固定保存/取消栏",
+      "buildId": "m3pSOwiX1xaJ1hJ3_E9MY"
+    },
+    {
+      "filename": "issue1313-8608b63-editor-390-lower.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-editor-390-lower.jpg",
+      "width": 1353,
+      "height": 981,
+      "bytes": 56345,
+      "sha256": "f047ecce75f299ec0acb55ce9954a3076c4e7559df2c0ad1c694286a044af79b",
+      "check": "390px 编辑滚动：私有指令、Skills 与保存/取消栏",
+      "buildId": "m3pSOwiX1xaJ1hJ3_E9MY"
+    },
+    {
+      "filename": "issue1313-8608b63-task-picker-390.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-task-picker-390.jpg",
+      "width": 1353,
+      "height": 981,
+      "bytes": 43213,
+      "sha256": "0778920161e224a53764e9c5dd5b513b6be798af296dd4a22928f643aa76ddb4",
+      "check": "390px 新任务：真实标题行与展开菜单；不可用项禁用",
+      "buildId": "m3pSOwiX1xaJ1hJ3_E9MY"
+    },
+    {
+      "filename": "issue1313-8608b63-task-selected-390.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-task-selected-390.jpg",
+      "width": 1353,
+      "height": 981,
+      "bytes": 34295,
+      "sha256": "5689f3684f8d1c0775f22fecdc4a24b5656561c6728cb1b90345118eb586930a",
+      "check": "390px 新任务：显式选中前端实现；箭头与标题一起换行",
+      "buildId": "m3pSOwiX1xaJ1hJ3_E9MY"
+    },
+    {
+      "filename": "issue1313-8608b63-run-legacy-reason.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-run-legacy-reason.jpg",
+      "width": 1353,
+      "height": 1066,
+      "bytes": 65162,
+      "sha256": "7487f2979a07da1d2361f4b03a8fd7088890608f0358b7c11e5da6a8cbebc1c2",
+      "check": "旧 Run：v3 冻结数据、按任务能力选择；旧英文 reason 不显示",
+      "buildId": "m3pSOwiX1xaJ1hJ3_E9MY"
+    },
+    {
+      "filename": "issue1313-8608b63-run-coded-reason.jpg",
+      "path": "/workspace/scratch/issue1313-8608b63-run-coded-reason.jpg",
+      "width": 1353,
+      "height": 1098,
+      "bytes": 67629,
+      "sha256": "dcc53e99a17fbcf405df5a41c3f099ac1ebbd03553f201fcc60c5fe62732c008",
+      "check": "新 Run：capability_fit 显示中文“能力最匹配这项工作”",
+      "buildId": "m3pSOwiX1xaJ1hJ3_E9MY"
+    }
+  ],
+  "uiSourceDigest": "99b443a0f559a762bc3286355f434dbcc8faf8d09683a5526f7661d317529731",
+  "reuseSourceFilesAt8608b63": {
+    "components/coordinator/new-task-dialog.tsx": {
+      "sha256": "9eb91b10991d3880001dc8dc0a5b409b83276bd012bcc3ac20de1b024b5b6c2c",
+      "currentMatches": true
+    },
+    "components/coordinator/task-profile-picker.tsx": {
+      "sha256": "39fde1614e269e25f09a45b1f585ee6492654b8407629c14d99304841eee8615",
+      "currentMatches": true
+    },
+    "components/settings/factory-profiles-settings.tsx": {
+      "sha256": "d9f9b13d4fb01aff944bf4f8f9f7049199cf2ca65fae2058d1d2644aa415136e",
+      "currentMatches": true
+    },
+    "components/settings/factory-profiles-data.ts": {
+      "sha256": "adaf9852b7bdfaeda3d2b68510e93f4fd1a607004a4ab054119c767ccd41452f",
+      "currentMatches": true
+    },
+    "components/workspace/thread-execution-identity.tsx": {
+      "sha256": "b003c008afdf787f1faacdded487a1aab150f22ac53a3b705b31e8ad8c71e972",
+      "currentMatches": true
+    },
+    "lib/factory/agent-profile-decision.ts": {
+      "sha256": "834a175af3dffa09dd94f33ece58e6cb50b72917cde356b7bf99d8a6af59d23d",
+      "currentMatches": true
+    },
+    "lib/thread-execution-identity-view.ts": {
+      "sha256": "e76a523f06de06e73cf10c60045f7ad395dda7721025ea22d596d6b4b6ea9e39",
+      "currentMatches": true
+    },
+    "messages/zh-CN.json": {
+      "sha256": "df177fd58c1c30178bf29727c8c887c7f628b030a328ee11bb9bc1232564cc98",
+      "currentMatches": true
+    },
+    "app/globals.css": {
+      "sha256": "00ccc3f687f114aa3852579cf436944b76dc6a28995370306039b1313243136d",
+      "currentMatches": true
+    },
+    "messages/en.json": {
+      "sha256": "aef8ad02c779d1ae7fe1135701889b5e6fca97fff539cd84826ad17f6e680dfc",
+      "currentMatches": true
+    },
+    "lib/factory/agent-profile-definition.ts": {
+      "sha256": "60b8b053e680bd6a0d2584a09887fecda9d50e96142b1e2d82b026be117c5ae5",
+      "currentMatches": true
+    }
+  },
+  "cleanup": {
+    "fixturePhase": "stopped",
+    "browserTab17": "closed",
+    "productionTab8": "untouched"
+  }
+}

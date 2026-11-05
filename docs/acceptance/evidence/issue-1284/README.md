@@ -41,3 +41,15 @@ The zero-custom-Profile task ALEX-59 failed at dispatch with `Workspace membersh
 - [First production failure and isolated reproduction](./production-first-failure-514030294.json)
 
 DeepSeek API remains excluded by the user's instruction; no funded/API success is claimed.
+
+
+## #1313 exact-source UI review (8608b63)
+
+The follow-up batch includes #1307 UI changes. Nine manually inspected screenshots were produced from the real production components at `8608b63f522e6bbb8db8fc0caac7f606f17cf218` (tree `ff973ac99fea66a4d97a757c1475103363fb21c4`). Desktop and exact 390 × 848 CSS-pixel iframe layouts were checked in Docker Large; synthetic props only, no real account/API/model execution. The independent fixture and browser tab were stopped/closed after capture.
+
+- [Visual report and nine screenshots](./issue1313-8608b63-visual-review.md)
+- [Build, source-file hashes and screenshot receipt](./issue1313-8608b63-visual-receipt.json)
+
+The original #1307 screenshots predated that PR's final head and are historical only. These captures cover the integrated follow-up UI. Later backend-only commits may reuse this layout evidence only after the recorded 11 relevant source files are byte-identical; the screenshot source remains `8608b63`.
+
+CI for `8608b63` is not green: the real ten-way dispatch test exposed an additional pool checkout in Profile finalization. Docker reproduction confirmed the pool timeout precedes the cleanup deadlock. The batch remains unmerged while this transaction regression is repaired; the screenshots do not claim production acceptance.
