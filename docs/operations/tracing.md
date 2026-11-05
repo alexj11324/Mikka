@@ -166,6 +166,77 @@ get the database spans themselves rather than their traces:
 and values; `apm-trace-get` returns one trace's tree. Counts are sampled:
 multiply by `1 / MIKKA_TRACE_SAMPLE_RATE` for totals.
 
+## Dashboard and alerts
+
+The [「Mikka 数据库与错误」 dashboard](https://us.posthog.com/project/670821/dashboard/2306506)
+answers "who drives database transfer, and what fails" without SQL. Its
+collection health lives on the
+[monitoring dashboard](https://us.posthog.com/project/670821/dashboard/2297143).
+
+Read every number on it this way:
+
+- **Counts are sampled.** Traces are kept at 10% (`MIKKA_TRACE_SAMPLE_RATE`).
+  `sampled_*` columns are what arrived; `estimated_*_x10` multiply by 10 and
+  are what the charts draw. If the sample rate changes, the ×10 is wrong.
+- **Bytes are not Neon's bytes.** `mikka.db.response_bytes_approx` is the
+  JSON size of the returned rows, estimated from the first 50 rows. It ranks
+  routes and statements; it is not network transfer and not the bill. The
+  budget tiles and alerts use Neon's own numbers from the ops snapshot
+  ([database transfer](database-egress.md)).
+- **Hours are UTC**; the project's time zone is Asia/Shanghai. Hours with no
+  spans are left out, not drawn as zero.
+- **Error counts are spans** with `status_code = 2`, grouped by
+  `mikka.error.code` (else `error.type`); one failed request can produce
+  several.
+
+| Tile | Source |
+| --- | --- |
+| Reading note | `scripts/ops/posthog/dashboard-note.md` |
+| Daily / billing-period transfer budget | Ops snapshot (`daily-budget.sql`, `monthly-budget.sql`) |
+| 7d coverage and missing attributes | `coverage.sql` |
+| DB queries per hour by route, top 15, 24h and 7d | `route-queries.sql` |
+| DB response JSON bytes per hour by route, top 15, 24h and 7d | `route-bytes.sql` |
+| Queries and bytes by `mikka.client_kind` | `client-kinds.sql` |
+| Heaviest 20 statements, with parameterized SQL | `statements.sql` |
+| Error causes by code / detail; errors by route / code / detail | `error-causes.sql`, `errors.sql` |
+
+### Alerts
+
+Five alerts, the plan's limit. All check hourly and email the subscribed
+users (Alex). In each alert's email, the `source` column names the route or
+error code and its numbers.
+
+| Alert | Fires when | Tune |
+| --- | --- | --- |
+| Mikka transfer reaches 50% of 5 GB operating budget | The billing period's Neon transfer reaches 50% of 5 GB (`monthly-budget.sql`) | The threshold `upper: 0.5` in `ALERTS` |
+| Mikka monitoring collection failed or heartbeat absent | No healthy ops snapshot in the last hour (`heartbeat.sql`) | — |
+| [1324] Mikka 来源数据库小时异常 | One `mikka-web` route's sampled DB queries in the last full UTC hour exceed `max(3 × its 7-day hourly median, 200)` (≈2,000 real queries), or its sampled JSON bytes exceed `max(3 × median, 1 MB)` (≈10 MB). Needs 24 observed hours of history; bytes only when ≥95% of the hour's queries carry a size (`alert-source-anomaly.sql`) | `3 *` (the multiple) and the floors `200` / `1000000` in `metrics`; `covered_hours >= 24` for warm-up |
+| [1324] Mikka 日速率外推超过5GB月预算 | Today's Neon transfer so far, scaled to 24 h and to the month's days, exceeds 5 GB. Only from 03:00 UTC, with a snapshot ≤60 min and provider data ≤180 min old (`alert-daily-pace.sql`) | `5000000000` (the budget) and `utc_hours >= 3` |
+| [1324] Mikka 错误码小时突增 | One service's error spans for one code in the last full UTC hour exceed `max(3 × its 7-day hourly median, 5)` (≈50 real spans), after 24 observed hours (`alert-error-spike.sql`) | `3 *` and the floor `5` in `metrics` |
+
+An alert that evaluates `any_row` reads at most 50 rows: the two hourly
+queries end in `LIMIT 50` and sort firing rows first. No current telemetry
+returns `NULL` (not firing); the heartbeat alert covers collection.
+
+### Changing them
+
+`scripts/ops/posthog-observability.mjs` holds the dashboard, its insights
+and the alerts; the SQL is in `scripts/ops/posthog/`. It finds each object by
+its production id, else its `key:<name>` tag, else its exact name, and
+changes only what differs, so running it twice changes nothing.
+
+```sh
+# POSTHOG_PERSONAL_API_KEY: a personal API key (phx_…) with insight, dashboard
+# and alert write access, kept in Infisical prod:/platform; never in a file.
+infisical run --env=prod --path=/platform -- node scripts/ops/posthog-observability.mjs           # plan, read-only
+infisical run --env=prod --path=/platform -- node scripts/ops/posthog-observability.mjs --check   # exit 1 on drift
+infisical run --env=prod --path=/platform -- node scripts/ops/posthog-observability.mjs --apply
+```
+
+Edit the definitions or SQL in a PR, then apply once it merges. A change made
+in the PostHog app shows as drift in the next `--check`; copy it back into the
+repository or it is overwritten on the next `--apply`.
+
 ## Sampling and cost
 
 - Head sampling per trace, `MIKKA_TRACE_SAMPLE_RATE` (0–1), default `0.1`. A
