@@ -738,7 +738,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       const bypass = await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', sourceEventId, needsSpec: false, note: 'Continue without clicking spec approval.', requestKey: `bypass:${randomUUID()}` }, undefined, who.botId) as { error?: string; runId?: string }
       assert.ok(bypass.error, JSON.stringify(bypass))
       assert.equal(bypass.runId, undefined)
-      await assert.rejects(sendThreadMessage(who.id, result.runId!, 'Begin implementation now.'), /factory_spec_approval_required|factoryRunStillActive|factoryTransition/)
+      await assert.rejects(sendThreadMessage(who.id, result.runId!, 'Begin implementation now.'), { code: 'runInvalid' })
       const stillWaiting = await specState(who)
       assert.deepEqual([stillWaiting.task.id, stillWaiting.task.attemptId, stillWaiting.task.sourceEventId, stillWaiting.task.stage, stillWaiting.task.status], [ready.task.id, ready.task.attemptId, ready.task.sourceEventId, 'spec', 'passed'])
       assert.deepEqual(stillWaiting.counts, ready.counts, 'a generic retry or Owner follow-up cannot manufacture approval or an executor')
