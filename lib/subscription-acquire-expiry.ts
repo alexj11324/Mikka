@@ -38,3 +38,16 @@ export async function expireSubscriptionAcquisitions(pool: Pick<Pool, 'query'>, 
   // OAuth epoch fencing stops late exchanges; retain their artifact cleanup ledger.
   return { expired: rows.length, ownerIds: [...new Set(rows.map(row => row.ownerId))].sort() }
 }
+
+/** Secret artifacts and enrollment sources the cleanup worker still has to delete (connectionId, last attempt). */
+export const CLEANUP_DUE_SQL = `select a."connectionId",a."deletingAt" as attempted from byos_secret_artifacts a join byos_connections c on c.id=a."connectionId" where a."deletedAt" is null and (a."publishedAt" is not null or a."notBefore"<=now()) and a.name not in (coalesce(c."secretName",''),coalesce(c."accessSecretName",''),coalesce(c."stagedSecretName",''),coalesce(c."stagedAccessName",'')) union all select a."connectionId",a."lastAttemptAt" from byos_enrollment_sources a join byos_enrollment_transfers t on t."enrollmentId"=a."enrollmentId" join byos_connections c on c.id=a."connectionId" where a."deletedAt" is null and (t."canonicalPublishedAt" is not null or t."boundAt" is not null or c.epoch>t.epoch)`
+
+/** One statement: whether the hourly cleanup has anything to do (#1371): an abandoned sign-in that
+ * expireSubscriptionAcquisitions would expire, or an artifact still to delete. An idle hour costs only this. */
+export async function subscriptionCleanupDue(pool: Pick<Pool, 'query'>): Promise<boolean> {
+  const { rows } = await pool.query<{ due: boolean }>(`SELECT EXISTS (SELECT 1 FROM byos_connections c WHERE c.state='pending' AND c."operationKind"='acquire' AND c."operationDeadline"<now()
+      AND NOT EXISTS (SELECT 1 FROM byos_enrollment_transfers transfer
+        WHERE transfer."connectionId"=c.id AND transfer.epoch=c.epoch AND transfer."operationId"=c."operationId"))
+    OR EXISTS (${CLEANUP_DUE_SQL}) AS due`)
+  return Boolean(rows[0]?.due)
+}

@@ -6,6 +6,7 @@ import { nextTime, timezone } from './time'
 import { botChatChanged } from '../live/chats'
 import { observePoolCommits } from '../db/commit-effects'
 import { coordinatorSessionChanged } from '../live/coordinator-session'
+import { wakeCoordinatorAfterCommit } from '../coordinator/wake-after-commit'
 
 export type WorkspaceGuard = <T>(ownerId: string, workspaceId: string | null, work: () => Promise<T>) => Promise<T>
 export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => Promise<void>
@@ -14,6 +15,17 @@ export type Schedule = { id: string; owner_id: string; workspace_id: string | nu
 export type Occurrence = { id: string; schedule_id: string; operation_id: string; event_id: string | null; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string | null; lease_until: Date; error: string | null; execution_decision: 'execute' | 'skip'; report_next_at: Date; report_attempts: number }
 export const SCHEDULE_LEASE_MS = 5 * 60_000
 const MAX_ATTEMPTS = 3
+
+/** The earliest persisted due time of any schedule work (epoch ms, rounded up from PostgreSQL microseconds), or null. */
+/** Each persisted due time of schedule work, as rows of `at` (no parameters). */
+export const SCHEDULE_DUE_SQL=`SELECT min(next_at) AS at FROM user_schedules WHERE status='active'
+    UNION ALL SELECT min(next_retry_at) FROM schedule_occurrences WHERE status='pending'
+    UNION ALL SELECT min(lease_until) FROM schedule_occurrences WHERE status='running'
+    UNION ALL SELECT min(report_next_at) FROM schedule_occurrences WHERE status='failed' AND reported_at IS NULL`
+export async function nextScheduleDue(executor:Pick<Pool,'query'>):Promise<number|null>{
+  const {rows}=await executor.query<{at:string|null}>(`SELECT ceil(extract(epoch FROM min(at))*1000)::bigint::text AS at FROM (${SCHEDULE_DUE_SQL}) due`)
+  return rows[0]?.at==null?null:Number(rows[0].at)
+}
 
 export function scheduledInbox(row: Occurrence | undefined, now: Date): { eventId: string; scope: ScheduledRead | null } | null {
   if(!row?.event_id)return null
@@ -108,6 +120,7 @@ export class ScheduleStore {
     // A result is already in the chat. Whether it also needs the person (a failure, a skipped or cancelled run, a result they would want flagged)
     // is triage's call on the Decisions API, not a fixed background tier: the event is left untriaged and undelivered.
     await tx.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1,$2,$3,'run_report',$4,$5) ON CONFLICT("dedupeKey") DO NOTHING`,[o.id,row.owner_id,row.bot_id,`schedule_result:${o.id}`,{source:'schedule_result',scheduleId:row.id,occurrenceId:o.id,operationId:o.operation_id,status,error}])
+    wakeCoordinatorAfterCommit(tx,row.owner_id)
     await tx.query('UPDATE schedule_occurrences SET reported_at=$2,report_attempts=report_attempts+1 WHERE id=$1',[o.id,this.clock()])
   }
   async execute(claim:Occurrence){
