@@ -150,6 +150,8 @@ const refreshOrderQuota = (query: Query): RefreshOrderQuota => async (scope, con
 export async function credentialStates(query: Query, scope: OrderScope, entries: readonly OrderEntry[], candidates: readonly (OrderCandidate & { provider: string; credentialOwnerId?: string })[], now?: number, options: { probe?: boolean; refresh?: RefreshOrderQuota } = {}) {
   let checkedAt = now ?? Date.now()
   const available = new Set(candidates.map(entryKey))
+  // Subscriptions whose account catalogue lists anything: only those can say a model has gone away.
+  const listing = new Set(candidates.flatMap(candidate => candidate.source.kind === 'subscription' ? [candidate.source.connectionId] : []))
   const wanted = new Set(entries.map(entryKey))
   const authorizedCandidates = candidates.filter(candidate => wanted.has(entryKey(candidate)))
   const connectionIds = [...new Set(entries.flatMap(entry => entry.source.kind === 'subscription' ? [entry.source.connectionId] : []))]
@@ -203,7 +205,7 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
           : row.paused ? { usable: false, reason: 'paused' }
             : row.state !== 'connected' ? { usable: false, reason: 'missing' }
               // Connected, but its account no longer reports this model (刷新模型): unavailable, kept in the list.
-              : !available.has(entryKey(entry)) ? { usable: false, reason: 'modelGone' }
+              : !available.has(entryKey(entry)) ? { usable: false, reason: entry.source.kind === 'subscription' && listing.has(entry.source.connectionId) ? 'modelGone' : 'missing' }
               : health.get(providerSourceKey(entry.source)) ?? health.get(entryKey(entry)) ?? (
                 availability.status === 'exhausted' ? { usable: false, reason: 'quota', resetsAt: availability.resetsAt }
                 : availability.status === 'checking' ? { usable: false, reason: 'checking' }
