@@ -20,12 +20,12 @@ export async function prefetch(path: string) {
 export const clearApiCache = () => { cache.clear(); live.reset() }
 
 /**
- * Loads `path`, reloads it every `every` ms while the app is in front (0: no
- * polling), and lets the screen reload or patch it after a write. It starts
- * from the path's last answer, when there is one.
+ * Loads `path` once, and lets the screen reload or patch it after a write. It
+ * starts from the path's last answer, when there is one. It never polls: data
+ * that changes on its own uses useLiveApi (decision 2026-11-05-0200-no-new-polling).
  */
-export function useApi<T>(path: string | null, every = 0, read: (path: string) => Promise<T> = api) {
-  return useApiRead<T>(path, every, read, false)
+export function useApi<T>(path: string | null) {
+  return useApiRead<T>(path, api, false)
 }
 
 /**
@@ -35,12 +35,12 @@ export function useApi<T>(path: string | null, every = 0, read: (path: string) =
  * back. The keys are the ones the web listens to for the same data.
  */
 export function useLiveApi<T>(path: string | null, spec: (data: T | null) => LiveSpec, read: (path: string) => Promise<T> = api) {
-  const state = useApiRead<T>(path, 0, read, true)
+  const state = useApiRead<T>(path, read, true)
   useLive(path ? spec(state.data) : { refs: [] }, state.reload, state.requestedAt)
   return state
 }
 
-function useApiRead<T>(path: string | null, every: number, read: (path: string) => Promise<T>, pushed: boolean) {
+function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, pushed: boolean) {
   const [data, setStored] = useState<T | null>(() => path ? cache.get<T>(path) : null)
   const [source, setSource] = useState(() => ({ path, context: cache.context() }))
   const [error, setError] = useState<ApiError | Error | null>(null)
@@ -110,18 +110,16 @@ function useApiRead<T>(path: string | null, every: number, read: (path: string) 
 
   useEffect(() => {
     if (!path) return
-    let timer: ReturnType<typeof setInterval> | null = every ? setInterval(load, every) : null
     const sub = AppState.addEventListener('change', state => {
       if (state === 'active') {
         // Stale-while-revalidate: one silent read only when the data is older than
         // FRESH_FOR_MS; the screen keeps what it shows meanwhile. A pushed screen's
         // catch-up read is the live channel's; here only a failed read recovers.
         if (pushed ? failed.current || loadedAt.current === 0 : needsForegroundRead(loadedAt.current, failed.current, Date.now(), FRESH_FOR_MS)) void load()
-        if (every && !timer) timer = setInterval(load, every)
-      } else if (timer) { clearInterval(timer); timer = null }
+      }
     })
-    return () => { if (timer) clearInterval(timer); sub.remove() }
-  }, [every, load, path, pushed])
+    return () => sub.remove()
+  }, [load, path, pushed])
 
   const sameSource = source.path === path && source.context === context
   return { data: sameSource ? data : path ? cache.get<T>(path) : null, error: sameSource ? error : null, loading: sameSource ? loading : Boolean(path), reload: load, setData, requestedAt: sameSource ? requestedAt : null }

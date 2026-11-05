@@ -94,6 +94,8 @@ export interface GroupSummary {
   createdAt: string
   lastMessage: GroupMessage | null
   unreadCount: string
+  /** The workspace it lives in: its members' live keys arrive on that channel. */
+  workspaceId?: string
 }
 
 /** One message in a group chat; `position` is a string (a bigint). */

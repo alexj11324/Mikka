@@ -39,9 +39,6 @@ export const pollingAllowlist = {
   'components/billing/free-allowance-section.tsx': db(web, 'pollUntil after card verification: up to 10 reads, 2 s apart, until the webhook lands', 1),
   'components/billing/hosted-refusal-notice.tsx': db(web, 'pollUntil after a top-up: up to 10 reads, 2 s apart, until the balance lands', 1),
   'lib/billing/hosted-usage.ts': db(web, 'pollUntil, the bounded poll helper behind the billing notices', 1),
-  // Mobile: useApi polling that reads our database.
-  'apps/mobile/lib/useApi.ts': db(web, 'the useApi polling timer (every screen that passes an interval)', 2),
-  'apps/mobile/app/groups/[id].tsx': db(web, 'group messages every 2.5 s while answering (8 s otherwise), members every 60 s, reactions every 15 s', 3),
   // Server: loops that re-query our database.
   'app/api/computer/events/route.ts': db(server, 'the "SSE" route re-queries subagent_events in a loop', 1),
   'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll re-checks device commands until the deadline', 1),
