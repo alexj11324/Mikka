@@ -33,7 +33,7 @@ export function FailureReason({ failure, botId, onResend, sending = false, retry
     ? <Button variant="link" size="xs" className={ACTION} nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{failure.code === 'verification_required' ? refusal('verifyCard') : balance('topUp')}</Button>
     : recovery === 'settings'
       ? <Button variant="link" size="xs" className={ACTION} nativeButton={false} role="link" render={<Link href={settingsHref('models')} />}>{chat('subscriptionRefusal.open')}</Button>
-      : recovery === 'model' || (failure.kind === 'hosted' && failure.code === 'platform_paused')
+      : recovery === 'model' || (failure.kind === 'hosted' && failure.code === 'platform_paused') || (failure.kind === 'failed' && failure.reason === 'balance')
       ? <Button variant="link" size="xs" className={ACTION} onClick={() => openModelPicker(botId)}>{picker('changeModel')}</Button>
       : <Button variant="link" size="xs" className={ACTION} disabled={sending} onClick={onResend}>{retry ? common('retry') : chat('resend')}</Button>
   return <p data-message-failure="past" className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">

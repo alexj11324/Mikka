@@ -75,7 +75,7 @@ export type ChatFailure =
   | { kind: 'hosted'; code: string }
   | { kind: 'subscription'; notice: SubscriptionRefusalNotice }
   | { kind: 'wake'; code: 'wake_failed' | 'wake_start_unconfirmed' | 'wake_exhausted' }
-  | { kind: 'failed' }
+  | { kind: 'failed'; reason?: 'balance' }
 
 /** Reactions on a message, by emoji (lib/reactions.ts on the server). */
 export interface Reaction { emoji: string; count: number; mine: boolean }
