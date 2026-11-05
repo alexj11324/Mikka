@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { runInNewContext } from 'node:vm'
 import test from 'node:test'
 import { transpileModule, ModuleKind } from 'typescript'
+import * as codedErrorProtocol from '@mikka/protocol/coded-error'
 import * as daemonProtocol from '@mikka/protocol/daemon'
 import * as deviceProtocol from '@mikka/protocol/device'
 import * as policySnapshotProtocol from '@mikka/protocol/policy-snapshot'
@@ -42,6 +43,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/background':{afterJob:()=>{calls.push('wakeScheduled')}},
     'next/server':{NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
     'drizzle-orm':{and:(...args:unknown[])=>args,eq:(...args:unknown[])=>args,isNull:(value:unknown)=>value},
+    '@mikka/protocol/coded-error':codedErrorProtocol,
     '@mikka/protocol/device':deviceProtocol,
     '@mikka/protocol/daemon':daemonProtocol,
     '@mikka/protocol/repository':repositoryProtocol,
