@@ -405,7 +405,7 @@ export async function personalMcp(userId: string, botId: string, executionId: st
   return runPersonalMcp(userId, execution ? execution.snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined, input, async () => {
     await assertNativeToolScope(userId, scope)
     const currentScope = await agentScope(userId, botId)
-    if (currentScope.workspaceId !== ownerScope.workspaceId || executionId && (await agentKitStore.readExecution(currentScope, executionId)).status !== 'running') throw new (await import('@/lib/plugins/contracts')).PluginError('agentExecutionClosed', 403)
+    if (currentScope.workspaceId !== ownerScope.workspaceId || executionId && await agentKitStore.executionStatus(currentScope, executionId) !== 'running') throw new (await import('@/lib/plugins/contracts')).PluginError('agentExecutionClosed', 403)
   })
 }
 // Remote tools may have side effects and no idempotency key. The workflow must

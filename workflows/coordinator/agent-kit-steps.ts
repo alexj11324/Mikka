@@ -56,12 +56,11 @@ export async function finishAgentExecution(userId: string, botId: string, execut
   'use step'
   if (!executionId) return
   const scope = await agentScope(userId,botId)
-  await agentKitStore.finishExecution(scope,executionId,failure ? 'failed' : 'completed',failure)
-  const execution = await agentKitStore.readExecution(scope,executionId)
-  if (!execution.snapshot.definition.hooks.includes('failure_cases')) return
+  const finished = await agentKitStore.finishExecution(scope,executionId,failure ? 'failed' : 'completed',failure)
+  if (!finished.failureCases) return
   // A stable revision key yields at most one automatic guidance candidate, never activation.
   try {
-    await agentKitStore.propose(scope,execution.snapshot.revision,execution.snapshot.revisionId,agentKitDefaults())
+    await agentKitStore.propose(scope,finished.revision,finished.revisionId,agentKitDefaults())
   } catch (error) {
     if (error instanceof AgentKitError && ['agentImprovementInsufficientEvidence','agentImprovementNoChange','agentVersionConflict'].includes(error.code)) return
     console.error('Agent improvement proposal unavailable; existing definition remains active')
