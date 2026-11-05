@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg';
 import { loadIssueDocument, encodedIssueDocument, upsertLinearComment } from '../linear-sync/document';
 import { documentChanged } from '../live/panels';
 import { withBasePath } from '../base-path';
+import { workspaceLink } from '@/components/workspace/workspace-navigation';
 import { factoryEventId } from './event-id';
 import { readFactoryFlow } from './public-flow';
 import { factoryFlowVersion } from './contract';
@@ -30,7 +31,7 @@ export async function syncFactoryPresentation(tx: PoolClient, task: FactoryTask)
     const { counts, artifactId } = flow.acceptance;
     body = en ? `${counts.passed ?? 0} verified, ${counts.unverified ?? 0} unverified.` : `${counts.passed ?? 0} 项已验证，${counts.unverified ?? 0} 项未验证。`;
     if (counts.failed) body += en ? ` ${counts.failed} failed.` : ` ${counts.failed} 项失败。`;
-    body += ` [${en ? 'Acceptance' : '验收'}](${withBasePath(`/?artifact=${artifactId}`)})`;
+    body += ` [${en ? 'Acceptance' : '验收'}](${withBasePath(workspaceLink({ artifact: artifactId }))})`;
   }
   if (flow.pullRequest?.url && /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+$/.test(flow.pullRequest.url)) body += ` [PR](${flow.pullRequest.url})`;
   const hash = createHash('sha256').update(body).digest('hex');

@@ -5,13 +5,18 @@ create table if not exists factory_acceptance_artifacts (
   "taskId" uuid primary key references factory_tasks(id) on delete cascade,
   "artifactId" uuid not null unique references artifacts(id) on delete cascade,
   "candidateId" uuid not null,
-  "runId" uuid not null references agent_runs(id),
+  -- Historical receipt, like factory_candidates.runId: live run cleanup must
+  -- not remove the task's Artifact index or its recorded execution identity.
+  "runId" uuid not null,
   sha256 text not null,
   media jsonb not null default '[]'::jsonb check (jsonb_typeof(media)='array' and jsonb_array_length(media)<=40),
   counts jsonb not null default '{}'::jsonb,
   "updatedAt" timestamptz not null default now(),
   foreign key ("taskId","candidateId") references factory_candidates("taskId",id)
 );
+-- Also repair a local/preview database that applied the earlier draft of this
+-- new migration. No historical receipt or Artifact content is deleted.
+alter table factory_acceptance_artifacts drop constraint if exists "factory_acceptance_artifacts_runId_fkey";
 create table if not exists factory_stage_updates (
   "taskId" uuid not null references factory_tasks(id) on delete cascade,
   stage text not null check (stage in ('triage','spec','implement','review','handoff','completed','cancelled')),

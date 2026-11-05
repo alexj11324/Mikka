@@ -650,6 +650,33 @@ test(
         } finally { emitPresentation=false; }
       });
 
+      await t.test('acceptance history survives live run cleanup and keeps task and Artifact deletion semantics', async () => {
+        emitPresentation=true;
+        try {
+          const pending=await pendingReview('repository',false,async runId=>{
+            await db.query('UPDATE agent_runs SET report=$2 WHERE id=$1',[runId,JSON.stringify({summary:'Retained acceptance receipt',filesChanged:[],sourceCommit:sha,publish:{commit:sha,pushed:true},verify:{status:'passed'},
+              criteria:[{text:'Retained observation',passed:true,status:'passed',evidence:'Observed before live run cleanup.'}]})]);
+          });
+          const before=await readFactoryFlow(db,pending.task);
+          assert.ok(before.acceptance);
+          const {artifactId,runId,candidateId}=before.acceptance;
+          const versions=(await db.query('SELECT id,version,sha256,"inlineContent","executionIdentity" FROM artifact_versions WHERE "artifactId"=$1 ORDER BY version',[artifactId])).rows;
+          assert.ok(versions.length>0);
+          await db.query('DELETE FROM agent_runs WHERE id=$1',[runId]);
+          assert.equal((await db.query('SELECT id FROM agent_runs WHERE id=$1',[runId])).rowCount,0);
+          assert.deepEqual((await db.query('SELECT "runId","candidateId" FROM factory_acceptance_artifacts WHERE "taskId"=$1',[pending.task.id])).rows,[{runId,candidateId}]);
+          assert.equal((await db.query('SELECT "runId" FROM artifacts WHERE id=$1',[artifactId])).rows[0].runId,null);
+          assert.deepEqual((await readFactoryFlow(db,pending.task)).acceptance,before.acceptance,'a retained receipt identifies the historical source without requiring a live run');
+          assert.deepEqual((await db.query('SELECT id,version,sha256,"inlineContent","executionIdentity" FROM artifact_versions WHERE "artifactId"=$1 ORDER BY version',[artifactId])).rows,versions);
+          await db.query('DELETE FROM factory_tasks WHERE id=$1',[pending.task.id]);
+          assert.equal((await db.query('SELECT 1 FROM factory_acceptance_artifacts WHERE "taskId"=$1',[pending.task.id])).rowCount,0);
+          assert.equal((await db.query('SELECT 1 FROM factory_stage_updates WHERE "taskId"=$1',[pending.task.id])).rowCount,0);
+          assert.deepEqual((await db.query('SELECT id,version,sha256,"inlineContent","executionIdentity" FROM artifact_versions WHERE "artifactId"=$1 ORDER BY version',[artifactId])).rows,versions,'task deletion retains the independently owned Artifact history');
+          await db.query('DELETE FROM artifacts WHERE id=$1',[artifactId]);
+          assert.equal((await db.query('SELECT 1 FROM artifact_versions WHERE "artifactId"=$1',[artifactId])).rowCount,0);
+        } finally {emitPresentation=false;}
+      });
+
       await t.test('current review-only missing observations update handoff counts; repairs never expose an earlier candidate as current acceptance', async () => {
         emitPresentation=true;
         try {
