@@ -349,7 +349,7 @@ function originalSessionRetryAvailable(question: { recoveryRequest?: unknown; qu
 export async function getIssueThread(issueId: string | null, runId: string, after?: ThreadChunkCursor | null): Promise<IssueThreadDetail> {
   const cursor = after ? threadChunkCursor.parse(after) : null
   // Before any of the thread: this run's keys' revisions (other attempts carry none, so they always read).
-  const { readRevisions } = await import('@/lib/live/list-read-server')
+  const { readRevisions } = await import('@/lib/live/revision-read')
   const revisions = await readRevisions([{ kind: 'thread', id: runId }, { kind: 'run', id: runId }])
   const { row, user } = await readableThread(issueId, runId)
   // The run that resumes this one after an answered question, or runs it again after it ended (R-81), is the same thread: its chain (BE-18).

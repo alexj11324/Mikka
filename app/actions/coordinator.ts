@@ -1,7 +1,8 @@
 'use server'
 
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
-import { beginOwnerListRead, ownerListRead } from '@/lib/live/list-read-server'
+import { ownerListRead } from '@/lib/live/list-read-server'
+import { beginOwnerListRead } from '@/lib/live/revision-read'
 import type { ListLiveRead } from '@/lib/live/list-read'
 
 import { cookies, headers } from 'next/headers'

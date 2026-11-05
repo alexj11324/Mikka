@@ -36,7 +36,8 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
 import { issueListChanged } from '@/lib/live/lists'
 import { issueRelationsChanged } from '@/lib/live/issue-detail'
-import { beginOwnerListRead, ownerListRead } from '@/lib/live/list-read-server'
+import { ownerListRead } from '@/lib/live/list-read-server'
+import { beginOwnerListRead } from '@/lib/live/revision-read'
 import { issuePrefixes, linearIssueLinks, linearTeamSyncs } from '@/lib/db/schema'
 
 type IssueRow = typeof issues.$inferSelect

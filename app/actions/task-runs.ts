@@ -13,7 +13,8 @@ import { runAgentName, runBotId, runBotName } from '@/lib/run-bot-name'
 import { replyLine } from '@/lib/thread-groups'
 import { queryVersion } from '@/lib/db/query-version'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
-import { beginOwnerListRead, ownerListRead } from '@/lib/live/list-read-server'
+import { ownerListRead } from '@/lib/live/list-read-server'
+import { beginOwnerListRead } from '@/lib/live/revision-read'
 
 /** The newest run on each issue, for the right column's 我的任务 groups (MIK-38). */
 export interface TaskRun {
