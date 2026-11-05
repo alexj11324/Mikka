@@ -455,6 +455,24 @@ it('recovers a transient post-start context outage before admitting another nati
   } finally { fixture.gate.revoke(); await session?.cancel(); log.mockRestore() }
 }, 45000)
 
+it('an idle cloud run re-reads its subscription context on a push, not on each one-second tick', async () => {
+  // Production: about one context read (90 statements) every 3 s per cloud run.
+  const fixture = await revocationFixture()
+  let session: AgentSession | undefined
+  try {
+    session = await fixture.runner.start(fixture.assignment, fixture.options)
+    expect(fixture.gate.controlMode).toBe('legacy')
+    const started = fixture.link.nativeContext.mock.calls.length
+    await new Promise(done => setTimeout(done, 4_500))
+    // At most the first tick's read; the next timed one is 20 s later.
+    expect(fixture.link.nativeContext.mock.calls.length - started).toBeLessThanOrEqual(1)
+    const idle = fixture.link.nativeContext.mock.calls.length
+    fixture.gate.invalidate()
+    await vi.waitFor(() => expect(fixture.link.nativeContext.mock.calls.length).toBe(idle + 1))
+    expect(fixture.gate.revoked).toBe(false)
+  } finally { fixture.gate.revoke(); await session?.cancel() }
+}, 45000)
+
 it('blocks a broker request until fresh authority succeeds after a transient context outage', async () => {
   const fixture = await revocationFixture()
   let session: AgentSession | undefined

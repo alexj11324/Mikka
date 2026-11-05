@@ -20,6 +20,8 @@ type Token = {
 }
 
 const TOKENS = {
+  /** Dims the screen behind a modal while keeping its content readable. */
+  scrim: { ios: { light: 'rgba(0, 0, 0, 0.35)', dark: 'rgba(0, 0, 0, 0.6)' }, light: 'rgba(0, 0, 0, 0.35)', dark: 'rgba(0, 0, 0, 0.6)' },
   /** A screen's background. */
   page: { ios: 'systemBackground', light: '#FFFFFF', dark: '#000000' },
   /** A grouped list's background (settings, a bot's page, sheets). */
@@ -36,7 +38,8 @@ const TOKENS = {
   text: { ios: 'label', light: '#000000', dark: '#FFFFFF' },
   /** On an ink button (its words, a tick): the page's colour, so the pair inverts in dark mode. */
   onInk: { ios: 'systemBackground', light: '#FFFFFF', dark: '#000000' },
-  secondary: { ios: 'secondaryLabel', light: 'rgba(60, 60, 67, 0.6)', dark: 'rgba(235, 235, 245, 0.6)' },
+  // Web small text clears 4.5:1 on page, grouped, surface and bubble; iOS keeps its dynamic system label.
+  secondary: { ios: 'secondaryLabel', light: 'rgba(60, 60, 67, 0.75)', dark: 'rgba(235, 235, 245, 0.6)', contrast: { light: 'rgba(60, 60, 67, 0.9)', dark: 'rgba(235, 235, 245, 0.85)' } },
   /** Icons and disabled fills only; it is under 4.5:1, so no words (placeholders take `secondary`). */
   tertiary: { ios: 'tertiaryLabel', light: 'rgba(60, 60, 67, 0.3)', dark: 'rgba(235, 235, 245, 0.3)' },
   separator: { ios: 'separator', light: 'rgba(60, 60, 67, 0.29)', dark: 'rgba(84, 84, 88, 0.65)' },
@@ -53,7 +56,7 @@ const TOKENS = {
   objectChip: { ios: { light: 'rgba(0, 122, 255, 0.10)', dark: 'rgba(10, 132, 255, 0.22)', highContrastLight: 'rgba(0, 64, 221, 0.16)', highContrastDark: 'rgba(64, 156, 255, 0.30)' }, light: 'rgba(0, 122, 255, 0.10)', dark: 'rgba(10, 132, 255, 0.22)' },
   unread: { ios: 'systemBlue', light: '#007AFF', dark: '#0A84FF', contrast: { light: '#0040DD', dark: '#409CFF' } },
   success: { ios: 'systemGreen', light: '#34C759', dark: '#30D158', contrast: { light: '#248A3D', dark: '#30DB5B' } },
-  danger: { ios: 'systemRed', light: '#FF3B30', dark: '#FF453A', contrast: { light: '#D70015', dark: '#FF6961' } },
+  danger: { ios: 'systemRed', light: '#D70015', dark: '#FF453A', contrast: { light: '#D70015', dark: '#FF6961' } },
   merged: { ios: 'systemPurple', light: '#AF52DE', dark: '#BF5AF2' },
   prOpen: { ios: 'systemGreen', light: '#34C759', dark: '#30D158' },
   orange: { ios: 'systemOrange', light: '#FF9500', dark: '#FF9F0A', contrast: { light: '#C93400', dark: '#FFB340' } },
@@ -80,6 +83,7 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
   style.textContent = `:root { ${vars('light')} color-scheme: light dark; } @media (prefers-color-scheme: dark) { :root { ${vars('dark')} } }`
     + ` @media (prefers-contrast: more) { :root { ${vars('light', true)} } } @media (prefers-contrast: more) and (prefers-color-scheme: dark) { :root { ${vars('dark', true)} } }`
     + ' body { background: var(--mk-page); }'
+    + ' :is(input, textarea, button, [tabindex]):focus-visible { outline: 2px solid var(--mk-accent) !important; outline-offset: 3px; }'
   document.head.appendChild(style)
 }
 

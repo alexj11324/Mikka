@@ -1,9 +1,11 @@
 'use server'
 
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
+import { ownerListRead } from '@/lib/live/list-read-server'
+import type { ListLiveRead } from '@/lib/live/list-read'
 
 import { cookies, headers } from 'next/headers'
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
@@ -13,7 +15,7 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
-import { botChats, chatVersion, chatView, citationSources, storedReasoning, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import { botChats, chatVersionState, chatView, citationSources, storedReasoning, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import * as chatStore from '@/lib/coordinator/store'
 import type { UnchangedChat } from '@/lib/coordinator/chat-poll'
 import type { CitationSource } from '@/lib/coordinator/citations'
@@ -30,6 +32,8 @@ import { coordinatorWelcome } from '@/lib/agent-welcome'
 import { claimSuggestion, readClaimedSuggestion } from '@/lib/suggestions/store'
 import { suggestionMessage } from '@/lib/suggestions/card'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
+import { AgentProfileError } from '@/lib/factory/agent-profile-definition'
+import { agentProfileReferenceSchema, BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-reference'
 
 async function getUser() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -42,7 +46,7 @@ async function getUserId(): Promise<string> {
 }
 
 /** `botId` is the chat's bot row, the Coordinator's included. */
-export type CoordinatorChat = ChatView & { botId: string; enabled: boolean; version?: string; after?: number; baseCursor?: number; metadataRefresh?: boolean }
+export type CoordinatorChat = ChatView & { botId: string; enabled: boolean; version?: string; after?: number; baseCursor?: number; metadataRefresh?: boolean; live?: ListLiveRead }
 
 const botIdSchema = z.uuid().nullable()
 
@@ -69,9 +73,12 @@ export async function getCoordinatorChat(botId: string | null = null): Promise<C
   const userId = user.id
   const bot = await ownBot(user, botId)
   const enabled = coordinatorEnabled()
-  const chat = await chatView(userId, 200, bot.id)
+  const { chat, expiries, observedAt } = await chatStore.chatViewState(userId, 200, bot.id)
+  // BotList, the workspace and ArtifactWindow share the live chat's SWR key.
+  // Whichever fetcher wins must retain the same authorized home and deadline.
+  const live = await ownerListRead(userId, expiries, observedAt)
   // Without a Coordinator here nothing is coming, so do not show one working.
-  return { ...chat, botId: bot.id, enabled, working: enabled && chat.working }
+  return { ...chat, botId: bot.id, enabled, working: enabled && chat.working, live }
 }
 
 const versionSchema = z.string().regex(/^[0-9a-f]{32}$/).optional()
@@ -90,8 +97,10 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
   const bot = await ownBot(user, botId)
   const enabled = coordinatorEnabled()
   const parsed = versionSchema.safeParse(known)
-  const current = await chatVersion(user.id, 200, bot.id)
-  if (parsed.success && parsed.data === current.version) return { unchanged: true, ...current, botId: bot.id, enabled, working: enabled && current.working }
+  const { expiries, observedAt, ...current } = await chatVersionState(user.id, 200, bot.id)
+  // The owner's home channel says when to read again; a lease running out is the one change with no write.
+  const live = await ownerListRead(user.id, expiries, observedAt)
+  if (parsed.success && parsed.data === current.version) return { unchanged: true, ...current, botId: bot.id, enabled, working: enabled && current.working, live }
   const proof = continuationSchema.safeParse(continuation)
   const chat: ChatView & { after?: number; baseCursor?: number } = await chatStore.chatUpdate(user.id, bot.id, proof.success ? proof.data : undefined)
   // Refresh card names and authorization independently from historical message bodies.
@@ -106,7 +115,7 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
     chat.artifacts = { ...artifacts, ...chat.artifacts }
   }
   // The version read first: a message stored in between makes the next poll read again, never miss it.
-  return { ...chat, ...(!known ? { metadataRefresh: true } : {}), version: current.version, botId: bot.id, enabled, working: enabled && chat.working }
+  return { ...chat, ...(!known ? { metadataRefresh: true } : {}), version: current.version, botId: bot.id, enabled, working: enabled && chat.working, live }
 }
 
 /** A bounded older page overlaps the first rendered item, preserving multi-step reply grouping. */
@@ -162,8 +171,15 @@ export async function botChatSummaries(): Promise<Record<string, BotChatSummary>
   return botChats(await getUserId())
 }
 
+/** Same owner-wide summaries, including the actual working-state deadline. */
+export async function pollBotChatSummaries() {
+  const ownerId = await getUserId()
+  const snapshot = await chatStore.botChatSnapshot(ownerId)
+  return { items: snapshot.items, live: await ownerListRead(ownerId, snapshot.expiries, snapshot.observedAt) }
+}
+
 /** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact and notes from the browser in front if given; the reply shows up in the chat. */
-export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number): Promise<ActionResult<{ queued: true }>> {
+export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number, profileId?: string): Promise<ActionResult<{ queued: true }>> {
   return runAction(async () => {
     const requestHeaders=await headers()
     const session=await auth.api.getSession({headers:requestHeaders})
@@ -186,10 +202,19 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     if (withNotes === null) throw new ActionFailureError('messageTooLong')
     const destination = taskDestinationSchema.optional().safeParse(taskDestination)
     if (!destination.success) throw new ActionFailureError('validationGeneric')
-    if (destination.data && !issueMutationsEnabled()) throw new ActionFailureError('issueToolsDisabled')
+    const profile = agentProfileReferenceSchema.optional().safeParse(profileId)
+    if (!profile.success) throw new ActionFailureError('validationGeneric')
+    const taskSubmission = Boolean(destination.data || profile.data)
+    if (profile.data && profile.data !== BUILTIN_AGENT_PROFILE_ID) {
+      try {
+        const row = await (await import('@/lib/factory/agent-profile-store')).readProfileRow((await import('@/lib/db')).pool, { ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, bot.id) }, profile.data)
+        if (row.archivedAt || !row.definition.enabled) throw new ActionFailureError('runInvalid')
+      } catch (error) { if (error instanceof AgentProfileError) throw new ActionFailureError('runInvalid'); throw error }
+    }
+    if (taskSubmission && !issueMutationsEnabled()) throw new ActionFailureError('issueToolsDisabled')
     // A new task is handed to the Coordinator to create; with no Coordinator here, say so instead of queueing it silently.
-    if (destination.data && !coordinatorEnabled()) throw new ActionFailureError('coordinatorUnavailable')
-    if (destination.data && !parsed.data.submissionId) throw new ActionFailureError('validationGeneric')
+    if (taskSubmission && !coordinatorEnabled()) throw new ActionFailureError('coordinatorUnavailable')
+    if (taskSubmission && !parsed.data.submissionId) throw new ActionFailureError('validationGeneric')
     if (destination.data?.kind === 'device') {
       const [device] = await db.select({ id: devices.id }).from(devices)
         .where(and(eq(devices.id, destination.data.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'), eq(devices.enabled, true))).limit(1)
@@ -201,7 +226,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     const message = withQuote(withNotes, quoted?.data)
     // Validate files before a retry holds its message row/connection; concurrent retries must not exhaust the pool.
     if (message.includes('[mikka-file:')) { const { validateChatFiles } = await import('@/lib/chat-attachments/store'); try { await validateChatFiles(userId, { kind: 'bot', id: bot.id }, message) } catch { throw new ActionFailureError('messageRequired') } }
-    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) })
+    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, profileId: profile.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) })
     try {
       // Already retried (a double click, two sends at once): nothing more is sent.
       if (retried.success && retried.data !== undefined) { if (await sendRetryOf(userId, bot.id, retried.data, record) === null) return { queued: true as const } }
@@ -211,7 +236,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
       throw error
     }
-    after(() => wakeCoordinator(userId))
+    afterJob('after:coordinator-wake', () => wakeCoordinator(userId))
     return { queued: true as const }
   })
 }
@@ -231,7 +256,7 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
     if (chat.items.length || chat.working || chat.error) return { queued: false }
     const locale = (await cookies()).get('NEXT_LOCALE')?.value ?? 'zh-CN'
     await recordCoordinatorEvent(db, userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot.coordinator ? undefined : bot.name), { botId: bot.id }))
-    after(() => wakeCoordinator(session.user.id))
+    afterJob('after:coordinator-wake', () => wakeCoordinator(session.user.id))
     return { queued: true }
   })
 }
@@ -255,7 +280,7 @@ export async function retryCoordinatorTurn(botId: string | null = null): Promise
     if (!coordinatorEnabled()) return { queued: false as const, reason: 'unavailable' as const }
     const queued = await retryFailedTurn(session.user.id, bot.id)
     if (queued) {
-      after(() => wakeCoordinator(session.user.id))
+      afterJob('after:coordinator-wake', () => wakeCoordinator(session.user.id))
       return { queued: true as const }
     }
     const current = await chatView(session.user.id, 1, bot.id)
@@ -291,7 +316,7 @@ export async function sendSuggestion(suggestionId: string): Promise<ActionResult
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
       throw error
     }
-    after(() => wakeCoordinator(userId))
+    afterJob('after:coordinator-wake', () => wakeCoordinator(userId))
     return { queued: true as const }
   })
 }

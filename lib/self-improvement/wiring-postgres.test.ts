@@ -21,7 +21,7 @@ import { factoryCheckGates } from '../factory/checks'
 import { approvalGate,publishGate,createFactoryApprovals } from '../factory/approval'
 import { handleFactoryApproval } from '../factory/approval-http'
 import { insertRunOnce } from '../run-dispatch'
-import { factoryDispatchDatabase } from '../factory/transaction'
+import { assertFactoryTransaction, factoryDispatchDatabase } from '../factory/transaction'
 import { digest } from './contract'
 import { verifySkillAssignment } from '../../packages/daemon/src/agents/skill-artifact'
 
@@ -55,7 +55,10 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!databa
   const proposeYes=async()=>new Map([['propose',{type:'predicate' as const,name:'propose',probability:0.9}]])
   const assignments=createSkillAssignments(pool,authorize),scores=createImprovementStore(pool,authorize,qualityProvider,proposeYes)
   const factory=createFactoryStore(pool,authorize,null,{...factoryTestLifecycle,gates:{...factoryCheckGates,approval:approvalGate,publish:publishGate}})
-  const dispatch=createFactoryDispatch(pool,factory,(tx,u,input)=>insertRunOnce(factoryDispatchDatabase(tx),u,input,{deviceId,baseBranch:'main',prompt:input.note??'Synthetic actual queue gate'}))
+  const dispatch=createFactoryDispatch(pool,factory,(tx,u,input)=>{
+    assertFactoryTransaction(tx)
+    return insertRunOnce(factoryDispatchDatabase(tx),u,input,{deviceId,baseBranch:'main',prompt:input.note??'Synthetic actual queue gate'})
+  })
   const bridge=createImprovementFactoryBridge(pool,factory,dispatch,assignments,qualityProvider)
   const approvals=createFactoryApprovals(pool,authorize,factory,[])
   const binding=(task:FactoryTask)=>({taskId:task.id,issueId,attemptId:task.attemptId,revision:task.revision,candidateId:task.candidateId})

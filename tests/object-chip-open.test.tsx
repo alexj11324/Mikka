@@ -47,11 +47,12 @@ test('a thread chip shows its status and opens the thread beside the chat (?thre
     const chips = [...container.querySelectorAll('[data-slot="inline-citation-trigger"]')] as HTMLElement[]
     assert.equal(chips.length, 4)
     const [taskChip, ...threadChips] = chips
-    // Each thread chip leads with the thread's group (R-52), the same marks as the thread card and the list.
+    // Each thread chip leads with a bubble, its group a dot on it (R-52), the same marks as the thread card and the list.
     assert.deepEqual(threadChips.map(chip => chip.querySelector('[role="img"]')?.getAttribute('aria-label')), ['Running', 'Blocked', 'Resolved'])
-    assert.ok(threadChips[0].querySelector('svg')?.getAttribute('class')?.includes('animate-spin'))
-    assert.ok(threadChips[1].querySelector('svg')?.getAttribute('class')?.includes('text-destructive'))
-    assert.ok(threadChips[2].querySelector('svg')?.getAttribute('class')?.includes('text-success'))
+    // Only a state that needs the person shows on the chip, as a dot and its word together (R-87); the rest is in the hover card.
+    assert.deepEqual(threadChips.map(chip => chip.querySelector('[data-thread-dot]')?.getAttribute('data-thread-dot') ?? null), [null, 'blocked', null])
+    assert.deepEqual(threadChips.map(chip => chip.querySelector('[data-thread-attention]')?.textContent ?? null), [null, 'Blocked', null])
+    for (const chip of threadChips) assert.ok(chip.querySelector('svg')?.getAttribute('class')?.includes('lucide-message-circle'), 'a thread is a bubble, never a task\'s circle')
     assert.equal(threadChips[0].getAttribute('aria-label'), 'Open thread: ZHIX-4 Rebuild the shell')
     await act(async () => { threadChips[1].click() })
     // The thread's address, written through the navigation module; the workspace shows it in the right column (R-80).
@@ -60,6 +61,10 @@ test('a thread chip shows its status and opens the thread beside the chat (?thre
     assert.deepEqual(opened.issues, [], 'a thread chip never opens the task')
     await act(async () => { taskChip.click() })
     assert.deepEqual(opened.issues, [TASK])
+    // An object chip is an inline span so a long title wraps (R-15); Enter still opens it, as a button's would.
+    assert.equal(taskChip.getAttribute('role'), 'button')
+    await act(async () => { taskChip.dispatchEvent(new browser.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }) as unknown as Event) })
+    assert.deepEqual(opened.issues, [TASK, TASK])
     assert.equal(opened.moves, 1)
   } finally {
     browser.removeEventListener('mikka:navigate', counted)

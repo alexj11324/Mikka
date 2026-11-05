@@ -1,3 +1,5 @@
+import { reportedCandidateShaSql, resolveFactoryCandidateSha } from './deliverable-snapshot';
+import { questionExecutionContinuation } from './questions/execution-continuation';
 import type { PoolClient } from "pg";
 import { isDeepStrictEqual } from "node:util";
 import { createHash } from "node:crypto";
@@ -40,9 +42,12 @@ export async function readFactoryCheckFailure(
   const {
     rows: [candidate],
   } = await tx.query(
-    'SELECT * FROM factory_candidates WHERE id=$1 AND "taskId"=$2',
-    [task.candidateId, task.id],
+    `SELECT c.*,${reportedCandidateShaSql()} AS "executionSha" FROM factory_candidates c
+      JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$3 AND producer."issueId"=$4
+      WHERE c.id=$1 AND c."taskId"=$2`,
+    [task.candidateId, task.id, task.userId, task.issueId],
   );
+  const sha = candidate ? await resolveFactoryCandidateSha(tx, task, candidate, candidate.executionSha) : null;
   const check = attempt?.output?.check,
     report = run?.report,
     receipt = finish?.result?.task;
@@ -74,19 +79,16 @@ export async function readFactoryCheckFailure(
     (attempt.output?.requestEpoch != null && attempt.output.requestEpoch !== task.sourceEventId) ||
     check.candidateId !== candidate.id ||
     run.kind !== "acceptance" ||
-    run.baseBranch !== candidate.sha ||
-    check.sha !== candidate.sha ||
+    run.baseBranch !== sha ||
+    check.sha !== sha ||
     check.repository !== candidate.repository ||
-    check.environment !== candidate.environment ||
+    check.environment !== `device:${run.deviceId}` ||
+    (check.candidateEnvironment ?? check.environment) !== candidate.environment ||
     check.deviceRepoId !== run.deviceRepoId ||
-    !check.command ||
-    report?.check?.sha !== candidate.sha ||
+    report?.check?.sha !== sha ||
     report.check.readOnly !== true ||
-    report.verify?.command !== check.command ||
-    !(
-      Number.isFinite(report.verify?.exitCode) ||
-      report.verify?.exitCode === null
-    ) ||
+    (check.reportOnly !== true && (!check.command || report.verify?.command !== check.command ||
+      !(Number.isFinite(report.verify?.exitCode) || report.verify?.exitCode === null))) ||
     !isDeepStrictEqual(
       attempt.output,
       finish.result.attempts.find((a: { id: string }) => a.id === attempt.id)
@@ -133,19 +135,37 @@ export async function checkFactoryRecoveryBudget(
     throw new FactoryError("factoryRecoveryBudgetExceeded");
   if (choice === "repair_code") await checkFactoryRepairBudget(tx, task);
 }
-/** The repair cap shared by check recovery and human reject: at most
- * maxFixAttempts execute attempts beyond the first per authenticated request. */
+/** At most maxFixAttempts new execute attempts beyond the first per
+ * authenticated request. Host-verified question resume/recovery segments are
+ * one execution; unreceipted legacy attempts keep counting conservatively. */
 export async function checkFactoryRepairBudget(tx: PoolClient, task: Pick<FactoryTask, "id">) {
-  const {
-    rows: [count],
-  } = await tx.query(
-    `SELECT count(*)::int AS count FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId"
+  const { rows } = await tx.query<Pick<FactoryTask, 'id' | 'userId' | 'issueId' | 'sourceEventId' | 'botId'> & { attemptId: string; continuation: boolean }>(
+    `SELECT t.id,t."userId",t."issueId",t."sourceEventId",t."botId",a.id AS "attemptId",r."questionContinuation" IS NOT NULL AS continuation
+      FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" LEFT JOIN agent_runs r ON r.id=a."runId"
       WHERE a."taskId"=$1 AND a.stage='execute' AND COALESCE(a.output->>'requestEpoch',t."sourceEventId"::text)=t."sourceEventId"::text
         AND NOT (COALESCE(a.output->>'recovery','')='provider_failure' AND EXISTS (
-          SELECT 1 FROM agent_runs r WHERE r.id=a."runId" AND r."userId"=t."userId" AND r."issueId"=t."issueId"
-            AND r.status='failed' AND r."stopReason"='provider_failure' AND r."stopRequestedAt" IS NULL))`,
-    [task.id],
-  );
-  if (count.count > orchestratorSettings({}).maxFixAttempts)
+          SELECT 1 FROM agent_runs failed WHERE failed.id=a."runId" AND failed."userId"=t."userId" AND failed."issueId"=t."issueId"
+            AND failed.status='failed' AND failed."stopReason"='provider_failure' AND failed."stopRequestedAt" IS NULL))`, [task.id]);
+  const parents = new Map(rows.map(row => [row.attemptId, row.attemptId]));
+  const root = (id: string): string => {
+    const parent = parents.get(id)!;
+    if (parent === id) return id;
+    const result = root(parent);
+    parents.set(id, result);
+    return result;
+  };
+  for (const row of rows) {
+    if (!row.continuation) continue;
+    const edge = await questionExecutionContinuation(tx, row, row.attemptId);
+    if (!edge) continue;
+    // Legacy recovery binds the original question, failed direct predecessor
+    // and recovered child. This union affects budget only, never command reads.
+    const group = [edge.questionOriginAttemptId, edge.originAttemptId, edge.continuationAttemptId];
+    if (group.some(id => !parents.has(id))) continue;
+    const first = root(group[0]);
+    for (const id of group.slice(1)) parents.set(root(id), first);
+  }
+  const executions = new Set([...parents.keys()].map(root)).size;
+  if (executions > orchestratorSettings({}).maxFixAttempts)
     throw new FactoryError("factoryRecoveryBudgetExceeded");
 }

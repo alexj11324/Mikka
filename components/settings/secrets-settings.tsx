@@ -130,7 +130,7 @@ export function E2BKeySettings({ workspaceId }: { workspaceId: string }) {
       {(status.error || status.data?.error) && <FieldError className="px-5 py-4">{actionError(status.data?.error)}</FieldError>}
       {data && state && <SettingRow title="E2B API Key" icon={<Cloud aria-hidden="true" className="size-4 text-muted-foreground" />}>
         <div className="flex items-center gap-3">
-          <span role="status" className={cn(data.lastErrorCode ? 'text-destructive' : 'text-muted-foreground')}>{t(state as 'missing')}</span>
+          <span role="status" className={cn(data.lastErrorCode ? 'text-destructive-foreground' : 'text-muted-foreground')}>{t(state as 'missing')}</span>
           {data.canEdit && <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>{data.configured ? t('replace') : t('set')}</Button>}
         </div>
       </SettingRow>}
@@ -347,7 +347,7 @@ function BulkSheet({ workspaceId, workspaceName, role, onClose, open = true, onO
               <span className="font-medium">{t('willAdd', { count })}</span>
               <ul className="flex max-h-48 flex-col gap-0.5 overflow-y-auto">
                 {preview.entries.map(entry => <li key={entry.line} className="truncate font-mono text-xs">{entry.name}</li>)}
-                {preview.errors.map(problem => <li key={`e${problem.line}`} className="text-xs text-destructive">{t(`lineError.${problem.reason}`, { line: problem.line, name: 'name' in problem ? problem.name ?? '' : '' })}</li>)}
+                {preview.errors.map(problem => <li key={`e${problem.line}`} className="text-xs text-destructive-foreground">{t(`lineError.${problem.reason}`, { line: problem.line, name: 'name' in problem ? problem.name ?? '' : '' })}</li>)}
               </ul>
             </div>)}
           <Field orientation="horizontal" className="justify-between border-t pt-4">

@@ -17,6 +17,7 @@ import * as worker from '@/lib/mcp/worker'
 import * as artifacts from '@/lib/mcp/artifacts'
 import { ARTIFACT_KINDS } from '@/lib/db/schema'
 import { ARTIFACT_TITLE_MAX } from '@/lib/artifacts/limits'
+import { recordDecisionSchema, ProjectMapError } from '@/lib/project-map/contracts'
 
 export const dynamic = 'force-dynamic'
 // Leaves room for read_coordinator_messages to wait for a reply.
@@ -74,7 +75,7 @@ const handler = createMcpHandler(server => {
       limit: z.number().int().min(1).max(100).optional().describe('At most this many of the newest messages. Default 20.'),
       waitSeconds: z.number().int().min(0).max(90).optional().describe('Wait up to this long for a Coordinator reply after `after`.'),
     }),
-  }, async (input, ctx) => json(await tools.readCoordinatorMessages(mcpUserId(ctx.http?.authInfo), input)))
+  }, async (input, ctx) => json(await tools.readCoordinatorMessages(mcpUserId(ctx.http?.authInfo), input, ctx.mcpReq.signal)))
 
   server.registerTool('submit_artifact', SUBMIT_ARTIFACT, async (input, ctx) => {
     const userId = mcpUserId(ctx.http?.authInfo)
@@ -280,6 +281,24 @@ function createWorkerHandler(mailbox: readonly MailboxToolName[]) { return creat
       return { isError: result.status !== 200, content: [{ type: 'text' as const, text: JSON.stringify(result.body) }] }
     })
   }
+
+  // Only a Mikka-issued run token grants this capability; the generic OAuth handler has no live decision writer.
+  server.registerTool('record_decision', {
+    title: 'Record a project decision',
+    description: 'Record a meaningful choice, change of direction, stopped route, merge or human confirmation in this Mikka task. Explain alternatives, reasons and original Mikka evidence. Keep a stable idempotencyKey for exact retries. This stores the decision only in Mikka, never in the code repository.',
+    inputSchema: recordDecisionSchema,
+    annotations: { idempotentHint: true },
+  }, async (input, ctx) => {
+    const auth = ctx.http?.authInfo
+    const run = worker.workerRun(auth)
+    try {
+      const { recordProjectDecision } = await import('@/lib/project-map/decisions')
+      return json(await recordProjectDecision({ kind: 'run', userId: run.userId, runId: run.id, token: auth!.token }, input))
+    } catch (error) {
+      if (error instanceof ProjectMapError) return outcome({ error: error.code })
+      throw error
+    }
+  })
 
   server.registerTool('report', {
     title: 'Report progress',

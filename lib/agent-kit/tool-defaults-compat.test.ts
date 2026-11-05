@@ -16,7 +16,7 @@ const capture = (name: string) => async (...args: unknown[]) => { calls.push({na
 const forbidden = () => { throw Error('No DB, provider or device in catalogue tests') }
 stub('../db/index.ts', {db: {select: forbidden}, pool: {connect: forbidden}})
 stub('../workspace-db.ts', {workspaceDb: {select: forbidden}})
-stub('../../workflows/coordinator/steps.ts', {composioAction: capture('read'), accountWrite: capture('write'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch'), listFactoryRequestsScoped: capture('factory-read-scoped'), listFactoryRequests: capture('factory-read-legacy'), githubMcp: capture('github'), findRepository: capture('find-repository')})
+stub('../../workflows/coordinator/steps.ts', {recordProjectDecisionStep: capture('project-decision'), composioAction: capture('read'), accountWrite: capture('write'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch'), listFactoryRequestsScoped: capture('factory-read-scoped'), listFactoryRequests: capture('factory-read-legacy'), githubMcp: capture('github'), findRepository: capture('find-repository')})
 stub('../../workflows/coordinator/agent-kit-steps.ts', { beforeAgentTool: async () => {}, afterAgentTool: async () => {}, loadAgentSkill: async () => ({ error: 'notAssigned' }) })
 let registry: typeof import('../../workflows/coordinator/tools')
 let service: typeof import('./service')
@@ -274,4 +274,21 @@ test('tools a saved version gets from the ledger keep the scheduled read-only an
     {name: 'github', args: [owner, {name: 'get_me', arguments: {}}, scope]},
     {name: 'find-repository', args: [owner, {name: 'mikka'}, scope]},
   ])
+})
+
+
+test('project decisions use the same host-bound step in hosted and native Coordinator turns', async () => {
+  const input = { kind: 'confirm', title: 'Keep route', summary: 'Keep the current route', reason: 'Meets the constraints', idempotencyKey: 'decision-1' }
+  for (const nativeScope of [undefined, scope]) {
+    calls.length = 0
+    const run = execution()
+    const tools = registry.coordinatorTools(owner, bot, nativeScope, { execution: run })
+    assert.ok(tools.record_decision)
+    assert.equal((await asSchema(tools.record_decision.inputSchema).validate!({ ...input, actor: { userId: 'forged' } })).success, false)
+    await invoke(tools, 'record_decision', input)
+    assert.deepEqual(calls, [{ name: 'project-decision', args: [owner, bot, run.id, input, nativeScope] }])
+    const old = execution({ ...DEFAULT_AGENT_DEFINITION, tools: DEFAULT_AGENT_DEFINITION.tools.filter(name => name !== 'record_decision') })
+    assert.equal(registry.coordinatorTools(owner, bot, nativeScope, { execution: old }).record_decision, undefined)
+    assert.equal(registry.coordinatorTools(owner, bot, nativeScope, { execution: run, readOnly: true }).record_decision, undefined)
+  }
 })

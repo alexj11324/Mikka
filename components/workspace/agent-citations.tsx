@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, type ComponentProps } from 'react'
+import { createContext, useContext, useState, type ComponentProps, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { Globe } from 'lucide-react'
 import { GitHubIcon } from '@/components/icons/brand-icons'
@@ -9,15 +9,14 @@ import { getLinkPreview } from '@/app/actions/link-preview'
 import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource, runThreadName } from '@/lib/coordinator/citations'
 import type { LinkPreview } from '@/lib/link-preview-parse'
 import { cn } from 'cn'
-import { HarnessMark } from '@/components/labels/entity-labels'
 import { InlineCitation, InlineCitationBody, InlineCitationContent, InlineCitationDescription, InlineCitationFavicon, InlineCitationFooter, InlineCitationImage, InlineCitationLabel, InlineCitationMeta, InlineCitationSource, InlineCitationTitle, InlineCitationTrigger } from '@/components/ui/inline-citation'
 import { SourceAvatar, SourcesList, SourcesSummary, sourceTileClassName, type StreamingSource } from '@/components/ui/streaming-text'
 import { Claude } from '@/components/ui/svgs/claude'
 import { Mikka } from '@/components/ui/svgs/mikka'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { statusIconTints } from '@/lib/status-appearance'
-import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier } from '@/components/workspace/issue-properties'
-import { ThreadStatus, ThreadStatusIcon } from '@/components/workspace/thread-status-icon'
+import { ISSUE_PRIORITIES, ISSUE_STATUSES } from '@/components/workspace/issue-properties'
+import { ThreadStatus, ThreadStatusIcon, threadGroupOfRun } from '@/components/workspace/thread-status-icon'
 import { openThread } from '@/components/workspace/workspace-navigation'
 
 export type LinkPreviews = Record<string, LinkPreview | null>
@@ -33,12 +32,41 @@ export interface AgentCitations {
   onOpenIssue: (id: string) => void
   /** A reply still arriving, or its cited issues and runs still being looked up: a chip not known yet holds its place. */
   pending?: boolean
+  /**
+   * Tasks whose thread the same reply cites: a task and its thread are one piece of work (R-81), so only the thread
+   * is a chip and the task is its number in the sentence, or 「这个任务」 without one (R-15).
+   */
+  covered?: ReadonlySet<string>
+  /** Threads whose card sits under this same reply: the card is the object, so the words name it without a second chip (R-66). */
+  carded?: ReadonlySet<string>
+}
+
+/** The tasks in `text` whose thread `text` also cites, for AgentCitations.covered. */
+export function coveredIssues(text: string, sources: Record<string, CitationSource>): ReadonlySet<string> {
+  const covered = new Set<string>()
+  for (const part of splitCitations(text)) {
+    if (part.type !== 'citation') continue
+    const source = sources[part.id]
+    if (source?.kind === 'run' && source.issue) covered.add(source.issue.id)
+  }
+  return covered
 }
 
 export const AgentCitationsContext = createContext<AgentCitations | null>(null)
 
 export function useAgentCitations() {
   return useContext(AgentCitationsContext)
+}
+
+/**
+ * A chip's icon and title. The icon and the title's first character are held together, so a chip that wraps with the
+ * sentence never leaves its icon alone at a line's end (R-15); the rest of the title wraps like words.
+ */
+function ChipHead({ icon, title }: { icon: ReactNode; title: string }) {
+  const [first = '', ...rest] = Array.from(title)
+  return <InlineCitationLabel>
+    <span data-slot="chip-head" className="whitespace-nowrap [&>[role=img]]:mr-1 [&>[role=img]]:inline-flex [&>[role=img]]:align-[-0.125em] [&>svg]:mr-1 [&>svg]:inline [&>svg]:align-[-0.125em]">{icon}{first}</span>{rest.join('')}
+  </InlineCitationLabel>
 }
 
 /** One empty value, so a chat with no web links keeps the same citations across renders. */
@@ -57,40 +85,36 @@ export function useLinkPreviews(texts: readonly string[]): LinkPreviews {
 /** Markdown `a`: a citation or web link as a source chip when the conversation provides citations. */
 export function CitationAnchor({ href, children, className: _className, ...props }: ComponentProps<'a'>) {
   const citations = useAgentCitations()
+  const t = useTranslations('Coordinator.citation')
   if (citations && href?.startsWith(CITATION_HREF)) {
     const [kind, id] = href.slice(CITATION_HREF.length).split('/') as [CitationKind | 'any', string]
     const source = citations.sources[id]
     if (!source && citations.pending) return <PendingCitation />
     if (!source || (kind !== 'any' && kind !== source.kind)) return <>{children}</>
+    // The thread chip already carries the task's title: the task is its number, or 「这个任务」 when it has none, so the
+    // sentence still reads (「这个任务的线程 …」, never 「的线程 …」).
+    if (source.kind === 'issue' && citations.covered?.has(id)) return <span data-citation-covered="">{source.identifier ?? t('thisTask')}</span>
+    if (source.kind === 'run' && citations.carded?.has(id)) return <span data-citation-carded="">{runThreadName(source)}</span>
     return <CitationChip id={id} kind={source.kind} />
   }
   if (citations && href && /^https?:\/\//i.test(href)) return <WebCitation url={href} label={typeof children === 'string' && children !== href ? children : null} />
   return <a {...props} href={href} className="text-primary underline underline-offset-4" target="_blank" rel="noopener noreferrer">{children}</a>
 }
 
-/** The "N sources" toggle under a reply, listing every issue, run and page it cites. */
+/**
+ * The "N sources" toggle under a reply, listing the web pages it cites. Tasks and threads are not listed: they are
+ * already chips in the words, and the thread has its card (R-15). Nothing when it cites no page.
+ */
 export function CitationSources({ text }: { text: string }) {
   const t = useTranslations('Coordinator.citation')
   const citations = useAgentCitations()
   const [open, setOpen] = useState(false)
   if (!citations) return null
-  const { sources, previews, onOpenIssue } = citations
   const listed = new Map<string, StreamingSource>()
-  for (const part of splitCitations(text)) {
-    if (part.type === 'link') listed.set(part.url, linkSource(part.url, part.label, previews[part.url]))
-    else if (part.type === 'citation') {
-      const source = sources[part.id]
-      if (!source || (part.kind && part.kind !== source.kind)) continue
-      if (source.kind === 'issue') listed.set(source.id, { name: source.title, domain: issueIdentifier(source, 'Mikka'), icon: <Mikka />, onSelect: () => onOpenIssue(source.id) })
-      else {
-        const issue = source.issue
-        listed.set(source.id, { name: source.name, domain: source.agentName, icon: <HarnessMark harness={source.harness} />, onSelect: issue ? () => openThread(source.id) : undefined })
-      }
-    }
-  }
+  for (const part of splitCitations(text)) if (part.type === 'link') listed.set(part.url, linkSource(part.url, part.label, citations.previews[part.url]))
   if (!listed.size) return null
   return <div className="flex flex-col">
-    <SourcesSummary sources={[...listed.values()]} label={t('sources', { count: listed.size })} open={open} onOpenChange={setOpen} className="-ml-1 self-start" />
+    <SourcesSummary sources={[...listed.values()]} label={t('sources', { count: listed.size })} open={open} onOpenChange={setOpen} className="self-start" />
     <SourcesList sources={[...listed.values()]} open={open} />
   </div>
 }
@@ -109,8 +133,7 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
   const identifier = issue.identifier
   return <InlineCitation>
     <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} onClick={() => onOpen(issue.id)}>
-      <status.icon aria-hidden="true" className={cn('size-3.5 shrink-0', statusIconTints[status.tone])} />
-      <InlineCitationLabel>{issue.title}</InlineCitationLabel>
+      <ChipHead icon={<status.icon aria-hidden="true" className={cn('size-3.5 shrink-0', statusIconTints[status.tone])} />} title={issue.title} />
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>
@@ -149,17 +172,21 @@ export function RunCitation({ run }: { run: RunSource }) {
   const format = useFormatter()
   const HarnessIcon = run.harness === 'claude_code' ? Claude : OpenAI
   const harness = run.harness === 'claude_code' ? 'Claude Code' : 'Codex'
-  // The chip shows the thread's state, as the thread card and the Threads list do; the coding agent's mark is in the hover card (R-78).
+  // A thread is a bubble in the chip's accent, its state a dot on it, as on the thread card and the Threads list; the coding agent's mark is in the hover card (R-78).
   const issue = run.issue
   const name = runThreadName(run)
+  const group = threadGroupOfRun(run.status, run.outcome)
+  const attention = group === 'waiting' || group === 'blocked'
   return <InlineCitation>
     <InlineCitationTrigger
       variant="object"
       aria-label={issue ? t('openThread', { name }) : t('runOf', { bot: run.agentName })}
       onClick={issue ? () => openThread(run.id) : undefined}
     >
-      <ThreadStatusIcon status={run.status} outcome={run.outcome} small />
-      <InlineCitationLabel>{name}</InlineCitationLabel>
+      <ChipHead icon={<ThreadStatusIcon status={run.status} outcome={run.outcome} small accent dot={attention} />} title={name} />
+      {/* Waiting for you or blocked: the dot, its colour and its word together (R-87); other states are in the hover card. */}
+      {/* The same state badge as the thread card and an open thread (R-90), its word on its tint. */}
+      {attention && <span data-thread-attention={group} className="ml-1 inline-flex align-[-0.125em] whitespace-nowrap"><ThreadStatus status={run.status} outcome={run.outcome} icon={false} /></span>}
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>

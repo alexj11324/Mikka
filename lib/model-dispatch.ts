@@ -3,9 +3,14 @@ import { createHash } from 'node:crypto'
 import { cloudModelSupport } from './cloud-template-models'
 import type { Pool } from 'pg'
 import { defaultAgentCopy } from './agent-copy'
+import messages from '@/messages/zh-CN.json'
+import type { SubscriptionPreflightFailure } from '@mikka/protocol/harness'
 import { cloudReady } from './rule-dispatch'
-import { credentialStates, orderCandidates, poolDevices, readOrder, type OrderScope, type RefreshOrderQuota } from './model-order'
+import { credentialStates, dispatchOrder, orderCandidates, poolDevices, readOrder, type OrderScope, type RefreshOrderQuota } from './model-order'
 import { deviceSupport, entryKey, planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type OrderEntry, type RunLocation, type SkippedEntry } from './model-order-plan'
+import { modelTier, supportedModelEfforts, type ModelRoutingSnapshot } from './model-routing'
+import { routeModelCandidates, type ModelRoutingContext } from './model-routing-server'
+import type { invokeDecision } from './coordinator/decide'
 
 /**
  * Where a new run goes and on which model (decision 2026-11-02-1400): the
@@ -24,8 +29,8 @@ import { deviceSupport, entryKey, planDispatch, whyNoDevice, type NoDeviceWhy, t
 /** Why nothing runs: the list's reasons, or the model the thread named (decision 2026-11-02-1400). */
 export type DispatchNothingReason = NothingReason | 'cloudTemporarilyUnavailable' | 'notOffered' | 'namedDevice' | 'pickedNoDevice' | 'pickedUnavailable'
 export type ModelDispatch =
-  | { kind: 'device'; deviceId: string; agentId: string; model: string; entry: OrderEntry; subscriptionBindingId?: string }
-  | { kind: 'cloud'; harness: OrderEntry['harness']; model: string; entry: OrderEntry; apiKey: boolean }
+  | { kind: 'device'; deviceId: string; agentId: string; model: string; entry: OrderEntry; subscriptionBindingId?: string; routing?: ModelRoutingSnapshot }
+  | { kind: 'cloud'; harness: OrderEntry['harness']; model: string; entry: OrderEntry; apiKey: boolean; routing?: ModelRoutingSnapshot }
   | { kind: 'none'; reason: DispatchNothingReason; card: ReturnType<typeof modelUnavailableCard>; skipped?: SkippedEntry[] }
 
 /**
@@ -41,9 +46,28 @@ export async function modelNotAllowed(pool: Pool, scope: OrderScope, asked?: { h
   return { error: 'modelNotAllowed', asked, allowed: entries.map(entry => ({ harness: entry.harness, model: entry.model })) }
 }
 
-export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, asked?: { harness: OrderEntry['harness']; model?: string } | null, location?: RunLocation, deviceId?: string, dependencies: { cloudPurpose?: 'task' | 'desktop'; refreshQuota?: RefreshOrderQuota; /** Host-only continuation fence: a task never cycles through failed entries again. */ excludeEntryKeys?: readonly string[]; /** The cloud already failed to start this run: a server or a computer only. */ withoutCloud?: boolean } = {}): Promise<ModelDispatch> {
+export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, asked?: { harness: OrderEntry['harness']; model?: string } | null, location?: RunLocation, deviceId?: string, dependencies: {
+  cloudPurpose?: 'task' | 'desktop'; refreshQuota?: RefreshOrderQuota
+  /** Host-only placement constraint: the Agent is already chosen, but its model still follows preferences. */
+  harness?: OrderEntry['harness']
+  /** Host-only continuation fence: a task never cycles through failed entries again. */
+  excludeEntryKeys?: readonly string[]
+  /** Host-selected profile source; still verified against authorized candidates. */
+  exactEntry?: OrderEntry
+  /** Candidate enumeration is read-only: bind only the selected Agent. */
+  bindSubscription?: boolean
+  probeQuota?: boolean
+  skipCatalogueRefresh?: boolean
+  /** An explicitly named physical Agent is never replaced by another one. */
+  agentId?: string
+  /** The cloud already failed to start this run: a server or a computer only. */
+  withoutCloud?: boolean
+  /** Actual task dispatch only. Catalogue/settings/availability reads omit it. */
+  routing?: ModelRoutingContext
+  decision?: typeof invokeDecision
+} = {}): Promise<ModelDispatch> {
   // A subscription never asked for its models offers none yet: ask it first (once per revision).
-  await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
+  if (!dependencies.skipCatalogueRefresh) await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
   const candidates = await orderCandidates(pool, scope)
   const stored = await readOrder(pool, scope, candidates)
   // The person named only the Agent ("派给 Codex"): its first model in 优先使用的模型, else the first one a connected credential offers on it.
@@ -53,26 +77,82 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   // A named computer, or a run the person put in the cloud, goes only there.
   const places = deviceId || dependencies.withoutCloud ? 'local' as const : location === 'cloud' ? 'cloudOnly' as const : location ?? stored.location
   const excluded = new Set(dependencies.excludeEntryKeys)
-  const order = { ...stored, entries: stored.entries.filter(entry => !excluded.has(entryKey(entry))), location: places }
+  const allowedAgent = (entry: Pick<OrderEntry, 'harness'>) => (!dependencies.harness || entry.harness === dependencies.harness)
+    && (!asked?.harness || entry.harness === asked.harness)
+  // With no Agent named, the 优先使用的 Agent's own list first, then the other's (decision 2026-11-05-0400).
+  const order = { ...stored, entries: dispatchOrder(stored.entries, stored.preferredHarness).filter(entry => allowedAgent(entry) && !excluded.has(entryKey(entry))), location: places }
   // A model the thread named: the first credential that offers it on that Agent (its own entry if it is listed).
-  const picked = explicit ? order.entries.find(entry => entry.harness === explicit.harness && entry.model === explicit.model)
-    ?? candidates.filter(candidate => candidate.harness === explicit.harness && candidate.model === explicit.model)
-      .map(candidate => ({ id: `thread:${candidate.harness}:${candidate.model}`, harness: candidate.harness, model: candidate.model, source: candidate.source }))[0] : undefined
-  const named = explicit && { agent: HARNESS_NAMES[explicit.harness], model: explicit.model }
+  const exact = dependencies.exactEntry
+  if (exact && (!allowedAgent(exact) || (explicit && (explicit.harness !== exact.harness || explicit.model !== exact.model)) || !candidates.some(candidate => entryKey(candidate) === entryKey(exact)))) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', { agent: HARNESS_NAMES[exact.harness], model: exact.model }) }
+  const canRoute = Boolean(dependencies.routing && stored.autoModelRouting && !asked?.model && !exact)
+  // Naming an Agent alone has always permitted its first reported model when
+  // its list is empty. Routing must not turn that explicit request into noModels.
+  if (canRoute && asked && !asked.model && !order.entries.length) {
+    const fallback = candidates.find(candidate => allowedAgent(candidate) && candidate.model === agentModel)
+    if (fallback) order.entries.push({ id: `thread:${fallback.harness}:${fallback.model}`, harness: fallback.harness, model: fallback.model, source: fallback.source })
+  }
+  const picked = exact ?? (explicit && !canRoute ? order.entries.find(entry => entry.harness === explicit.harness && entry.model === explicit.model)
+    ?? candidates.filter(candidate => allowedAgent(candidate) && candidate.harness === explicit.harness && candidate.model === explicit.model)
+      .map(candidate => ({ id: `thread:${candidate.harness}:${candidate.model}`, harness: candidate.harness, model: candidate.model, source: candidate.source }))[0] : undefined)
+  const named = explicit && !canRoute ? { agent: HARNESS_NAMES[explicit.harness], model: explicit.model } : null
   // The thread's model is the only one tried: no subscription or key offers it on that Agent, so nothing runs and the card says so.
   if (named && !picked) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', named) }
   const entries = picked ? [picked] : order.entries
-  const states = await credentialStates(pool, scope, entries, candidates, undefined, { refresh: dependencies.refreshQuota })
+  const states = await credentialStates(pool, scope, entries, candidates, undefined, { refresh: dependencies.refreshQuota, probe: dependencies.probeQuota })
   const devices = places !== 'cloudOnly' ? (await poolDevices(pool, scope.ownerId)).filter(device => !deviceId || device.id === deviceId) : []
   const ready = places !== 'local' && await cloudReady(pool, { ownerId: scope.ownerId, workspaceId: scope.workspaceId, botId: scope.botId, harness: entries[0]?.harness ?? 'claude_code' })
-  const plan = planDispatch({ entries: picked ? [] : order.entries, explicit: picked ?? null, location: order.location, devices, credential: entry => states.get(entry.id)?.credential ?? { usable: false, reason: 'missing' }, cloudReady: ready, cloudModel: entry => cloudModelSupport(entry, dependencies.cloudPurpose) })
+  let plan = planDispatch({ entries: picked ? [] : order.entries, explicit: picked ?? null, location: order.location, devices, credential: entry => states.get(entry.id)?.credential ?? { usable: false, reason: 'missing' }, cloudReady: ready, cloudModel: entry => cloudModelSupport(entry, dependencies.cloudPurpose) })
+  let routing: ModelRoutingSnapshot | undefined
+  if (canRoute && dependencies.routing) {
+    const harnesses = [...new Set(entries.map(entry => entry.harness))]
+    const readiness = new Map(await Promise.all(harnesses.map(async harness => [harness,
+      harness === entries[0]?.harness ? ready : places !== 'local' && await cloudReady(pool, { ...scope, harness })] as const)))
+    const { rows: agents } = devices.length ? await pool.query<{ id: string; deviceId: string; harness: string }>(
+      'SELECT id,"deviceId",harness FROM agents WHERE "userId"=$1 AND "deviceId"=ANY($2::uuid[]) AND ($3::text IS NULL OR id::text=$3)',
+      [scope.ownerId, devices.map(device => device.id), dependencies.agentId ?? null]) : { rows: [] }
+    // Preserve planDispatch's spending fence: an unchecked subscription is
+    // not evidence that a later paid key should be used instead.
+    const checkingAt = entries.findIndex(entry => {
+      const credential = states.get(entry.id)?.credential
+      return credential && !credential.usable && credential.reason === 'checking'
+    })
+    const eligibleEntries = checkingAt < 0 ? entries : entries.slice(0, checkingAt)
+    const runnable = eligibleEntries.flatMap(entry => {
+      const candidate = planDispatch({ entries: [], explicit: entry, location: order.location,
+        devices: devices.filter(device => agents.some(agent => agent.deviceId === device.id && agent.harness === entry.harness)),
+        credential: item => states.get(item.id)?.credential ?? { usable: false, reason: 'missing' },
+        cloudReady: readiness.get(entry.harness) ?? false, cloudModel: item => cloudModelSupport(item, dependencies.cloudPurpose) })
+      return candidate.kind === 'none' ? [] : [{ entry, plan: candidate }]
+    })
+    // An inherited preferred Agent is tried first; the other Agent's list is
+    // a fallback. Explicit/profile harness constraints were applied above.
+    const preferred = runnable.filter(item => item.entry.harness === stored.preferredHarness)
+    const routingPool = preferred.length ? preferred : runnable
+    const selected = await routeModelCandidates(pool, scope, routingPool.map(item => item.entry), dependencies.routing, stored.autoModelRouting, dependencies.decision)
+    if (selected) {
+      const position = Number(selected.id.slice('candidate:'.length))
+      // A failed/uncertain judge preserves the existing placement preference
+      // too: a later model on a server still precedes one on a laptop.
+      const orderedEntry = plan.kind === 'none' ? undefined : plan.entry
+      const ordered = orderedEntry && runnable.find(item => entryKey(item.entry) === entryKey(orderedEntry))
+      const keepOrdered = selected.snapshot.reason !== 'difficulty_fit' && selected.snapshot.reason !== 'escalated'
+        && !(dependencies.routing.escalate && dependencies.routing.previous)
+        && ordered && (!dependencies.routing.effort || supportedModelEfforts(ordered.entry.model, ordered.entry.harness).includes(dependencies.routing.effort))
+      const chosen = keepOrdered ? ordered : routingPool[position]
+      if (chosen) {
+        plan = chosen.plan
+        routing = { ...selected.snapshot, model: plan.model, harness: chosen.entry.harness, tier: modelTier(plan.model) }
+      }
+    }
+  }
   if (plan.kind === 'none' && deviceId && devices[0] && plan.reason === 'noDevice') {
     // What the named computer lacks for the model that would otherwise run (the thread's own model when it named one).
     const wanted = picked ?? plan.skipped.find(item => item.block.reason === 'noDevice')?.entry ?? order.entries[0]
     const installed = devices[0].harnesses.some(item => item.harness === wanted.harness && item.installed)
     // Its daemon reported its models and this one is not among them (an older daemon that reported none needs an update).
     const unreported = installed && deviceSupport(devices[0], wanted) === 'modelNotReported'
-    return { kind: 'none', reason: 'namedDevice', card: modelUnavailableCard('namedDevice', { agent: HARNESS_NAMES[wanted.harness], model: wanted.model, installed, unreported }) }
+    const detail = wanted.source.kind === 'subscription' ? devices[0].harnesses.find(info => info.harness === wanted.harness)?.subscriptionPreflight : undefined
+    return { kind: 'none', reason: 'namedDevice', card: modelUnavailableCard('namedDevice', { agent: HARNESS_NAMES[wanted.harness], model: wanted.model, installed, unreported, detail }) }
   }
   if (plan.kind === 'none' && plan.reason === 'noDevice' && !named) {
     // 云端 with a key that should run: the cloud being off is the news, not the computers.
@@ -84,15 +164,15 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   }
   if (plan.kind === 'none' && named && plan.reason !== 'cloudNotConfigured' && plan.reason !== 'checking' && plan.reason !== 'cloudModelsUnknown' && plan.reason !== 'cloudModelNotReported') {
     const reason = plan.reason === 'noDevice' ? 'pickedNoDevice' : 'pickedUnavailable'
-    return { kind: 'none', reason, card: modelUnavailableCard(reason, named) }
+    return { kind: 'none', reason, card: modelUnavailableCard(reason, { ...named, ...(plan.reason === 'noDevice' && picked ? { device: whyNoDevice(devices, picked) } : {}) }) }
   }
   if (plan.kind === 'none') return { kind: 'none', reason: plan.reason, card: modelUnavailableCard(plan.reason), skipped: plan.skipped }
-  if (plan.kind === 'cloud') return { kind: 'cloud', harness: plan.entry.harness, model: plan.model, entry: plan.entry, apiKey: plan.entry.source.kind === 'api_key' }
-  const { rows: [agent] } = await pool.query<{ id: string }>('SELECT id FROM agents WHERE "userId"=$1 AND "deviceId"=$2 AND harness=$3 ORDER BY "createdAt",id LIMIT 1',
-    [scope.ownerId, plan.deviceId, plan.entry.harness])
+  if (plan.kind === 'cloud') return { kind: 'cloud', harness: plan.entry.harness, model: plan.model, entry: plan.entry, apiKey: plan.entry.source.kind === 'api_key', ...(routing ? { routing } : {}) }
+  const { rows: [agent] } = await pool.query<{ id: string }>('SELECT id FROM agents WHERE "userId"=$1 AND "deviceId"=$2 AND harness=$3 AND ($4::text IS NULL OR id::text=$4) ORDER BY "createdAt",id LIMIT 1',
+    [scope.ownerId, plan.deviceId, plan.entry.harness, dependencies.agentId ?? null])
   if (!agent) return { kind: 'none', reason: 'noDevice', card: modelUnavailableCard('noDevice') }
-  const subscriptionBindingId = plan.entry.source.kind === 'subscription' ? await bindAgentToConnection(pool, scope, agent.id, plan.entry.harness, plan.entry.source.connectionId, plan.entry.model) : undefined
-  return { kind: 'device', deviceId: plan.deviceId, agentId: agent.id, model: plan.model, entry: plan.entry, ...(subscriptionBindingId ? { subscriptionBindingId } : {}) }
+  const subscriptionBindingId = dependencies.bindSubscription !== false && plan.entry.source.kind === 'subscription' ? await bindAgentToConnection(pool, scope, agent.id, plan.entry.harness, plan.entry.source.connectionId, plan.entry.model) : undefined
+  return { kind: 'device', deviceId: plan.deviceId, agentId: agent.id, model: plan.model, entry: plan.entry, ...(subscriptionBindingId ? { subscriptionBindingId } : {}), ...(routing ? { routing } : {}) }
 }
 
 /**
@@ -144,7 +224,7 @@ async function e2bKeyWouldFix(query: Pick<Pool, 'query'>, ownerId: string) {
 const HARNESS_NAMES: Record<OrderEntry['harness'], string> = { claude_code: 'Claude Code', codex: 'Codex' }
 
 /** 没有能跑这个任务的模型: the reason, and the rows that fix it. A model or computer the thread named is named in it. */
-export function modelUnavailableCard(reason: DispatchNothingReason, named?: { agent: string; model: string; installed?: boolean; unreported?: boolean; device?: NoDeviceWhy }, place: { /** 云端 without a cloud that runs: an E2B key would also fix it. */ offerE2B?: boolean } = {}) {
+export function modelUnavailableCard(reason: DispatchNothingReason, named?: { agent: string; model: string; installed?: boolean; unreported?: boolean; device?: NoDeviceWhy; detail?: SubscriptionPreflightFailure }, place: { /** 云端 without a cloud that runs: an E2B key would also fix it. */ offerE2B?: boolean } = {}) {
   const copy = defaultAgentCopy
   const line = {
     noModels: copy.needsModelNoModels, cloudNotConfigured: copy.needsModelCloud, cloudModelsUnknown: copy.needsModelCloudModelsUnknown, cloudModelNotReported: copy.needsModelCloudModelNotReported, cloudTemporarilyUnavailable: copy.needsModelCloudUnavailable, noDevice: noDeviceLine(named?.device), checking: copy.needsModelChecking, unavailable: copy.needsModelUnavailable,
@@ -152,7 +232,9 @@ export function modelUnavailableCard(reason: DispatchNothingReason, named?: { ag
     notOffered: copy.needsModelNotOffered, namedDevice: named?.unreported ? copy.needsModelDeviceModel : named?.installed ? copy.needsModelDeviceUpdate : copy.needsModelDeviceAgent,
     pickedNoDevice: copy.needsModelPickedNoDevice, pickedUnavailable: copy.needsModelPickedUnavailable,
   }[reason]
-  const description = (reason === 'notOffered' && named && !named.model ? copy.needsModelAgentNotOffered : line).replace('{agent}', named?.agent ?? '').replace('{model}', named?.model ?? '')
+  const detail = named?.detail ?? (named?.device?.why === 'subscriptionRuntimeUnavailable' ? named.device.detail : undefined)
+  const description = (detail ? messages.RunErrors.subscription_local_runtime_unavailable[detail]
+    : reason === 'notOffered' && named && !named.model ? copy.needsModelAgentNotOffered : line).replace('{agent}', named?.agent ?? '').replace('{model}', named?.model ?? '')
     .replace('{device}', named?.device && named.device.why !== 'none' ? named.device.device : '')
   const options = reason === 'cloudNotConfigured'
     ? [{ value: 'e2b', label: copy.needsMachineE2B, action: 'e2bKey' as const }, { value: 'models', label: copy.needsModelSettings, action: 'modelSettings' as const }]
@@ -169,6 +251,7 @@ function noDeviceLine(device?: NoDeviceWhy) {
   const copy = defaultAgentCopy
   if (!device) return copy.needsModelNoDevice
   if (device.why === 'none') return copy.needsModelNoComputer
+  if (device.why === 'subscriptionRuntimeUnavailable') return device.detail ? messages.RunErrors.subscription_local_runtime_unavailable[device.detail] : messages.RunErrors.subscription_local_runtime_unavailable.default
   if (device.count !== 1) return copy.needsModelNoDevice
   return { off: copy.needsModelNamedOff, offline: copy.needsModelNamedOffline, notInstalled: copy.needsModelNamedAgent, modelNotReported: copy.needsModelNamedModel, needsUpdate: copy.needsModelNamedUpdate }[device.why]
 }

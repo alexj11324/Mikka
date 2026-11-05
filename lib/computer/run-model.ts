@@ -1,5 +1,6 @@
 import 'server-only'
 import type { Pool } from 'pg'
+import type { OrderEntry } from '@/lib/model-order-plan'
 import type { WorkerDefinitionSnapshot, WorkerModelDispatch } from '@/lib/agent-kit/worker'
 import { runPolicySchema } from '@mikka/protocol/agent-policy'
 import { intersectRunPolicy } from '@/lib/run-assignment-policy'
@@ -10,7 +11,7 @@ import { intersectRunPolicy } from '@/lib/run-assignment-policy'
  * subscription's own model, so no run is ever frozen without one (decision: model is required,
  * a missing one fails at dispatch instead of being filled in).
  */
-export type RunModel = { model: string; subscriptionBindingId?: string; apiKeyId?: string; modelDispatch?: WorkerModelDispatch; policyCeiling?: WorkerDefinitionSnapshot['policyCeiling'] }
+export type RunModel = { model: string; subscriptionBindingId?: string; apiKeyId?: string; modelDispatch?: WorkerModelDispatch; agentProfile?: WorkerDefinitionSnapshot['agentProfile']; policyCeiling?: WorkerDefinitionSnapshot['policyCeiling'] }
 
 /** Changing a model or placement within the same owned task is not a new
  * permission grant. The queue retains its source ceiling even if a caller
@@ -34,10 +35,10 @@ export class RunModelMissingError extends Error {
 }
 
 /** A thread's next run keeps the model and credential its earlier run was frozen with; null when that run has none. */
-export function threadRunModel(definition: Pick<WorkerDefinitionSnapshot, 'model' | 'subscription' | 'apiKey' | 'modelDispatch' | 'policyCeiling'> | null | undefined): RunModel | null {
+export function threadRunModel(definition: Pick<WorkerDefinitionSnapshot, 'model' | 'subscription' | 'apiKey' | 'modelDispatch' | 'agentProfile' | 'policyCeiling'> | null | undefined): RunModel | null {
   const model = definition?.model?.trim()
   if (!model) return null
-  const provenance = { ...(definition?.modelDispatch ? { modelDispatch: structuredClone(definition.modelDispatch) } : {}),
+  const provenance = { ...(definition?.agentProfile ? { agentProfile: structuredClone(definition.agentProfile) } : {}), ...(definition?.modelDispatch ? { modelDispatch: structuredClone(definition.modelDispatch) } : {}),
     ...(definition?.policyCeiling ? { policyCeiling: structuredClone(definition.policyCeiling) } : {}) }
   if (definition?.apiKey) return { model, apiKeyId: definition.apiKey.keyId, ...provenance }
   if (definition?.subscription) return { model, subscriptionBindingId: definition.subscription.bindingId, ...provenance }
@@ -56,15 +57,15 @@ export async function latestThreadRunModel(pool: Pick<Pool, 'query'>, userId: st
 }
 
 /**
- * A new cloud run's model by 优先使用的模型 (decision 2026-11-02-1400): the first cloud entry for
+ * A new cloud run's model by 优先使用的模型 (decision 2026-11-02-1400): the first usable cloud entry for
  * this harness. A subscription entry is bound to the Agent so the run uses that account.
  */
 export async function chooseCloudRunModel(pool: Pool, scope: { ownerId: string; workspaceId: string; botId: string | null }, agentId: string, harness: 'claude_code' | 'codex', asked?: string, purpose: 'task' | 'desktop' = 'desktop'): Promise<RunModel | { error: 'machineUnavailable'; reason?: string }> {
   const { resolveModelDispatch, bindAgentToConnection } = await import('@/lib/model-dispatch')
-  const target = await resolveModelDispatch(pool, scope, { harness, ...(asked ? { model: asked } : {}) }, 'cloud', undefined, { cloudPurpose: purpose })
+  const target = await resolveModelDispatch(pool, scope, asked ? { harness, model: asked } : null, 'cloud', undefined, { cloudPurpose: purpose, harness })
   if (target.kind !== 'cloud') return { error: 'machineUnavailable', ...(target.kind === 'none' ? { reason: target.reason } : {}) }
   const source = target.entry.source
-  const modelDispatch: WorkerModelDispatch = { mode: asked ? 'picked' : 'preference', location: 'cloud', entry: target.entry }
+  const modelDispatch: WorkerModelDispatch = { mode: asked ? 'picked' : 'preference', location: 'cloud', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) }
   if (source.kind === 'api_key') return { model: target.model, apiKeyId: source.keyId, modelDispatch }
   return { model: target.model, subscriptionBindingId: await bindAgentToConnection(pool, { ownerId: scope.ownerId, workspaceId: scope.workspaceId }, agentId, harness, source.connectionId, target.model), modelDispatch }
 }
@@ -73,9 +74,9 @@ export async function chooseCloudRunModel(pool: Pool, scope: { ownerId: string; 
  * A new run's model on one computer by 优先使用的模型: the first entry that computer's Agent can run.
  * A local run is frozen with its model like a cloud one; it is no longer left to the CLI to choose.
  */
-export async function chooseLocalRunModel(pool: Pool, scope: { ownerId: string; workspaceId: string; botId: string | null }, agent: { id: string; deviceId: string; harness: 'claude_code' | 'codex' }, asked?: string): Promise<RunModel | { error: 'machineUnavailable'; reason?: string }> {
+export async function chooseLocalRunModel(pool: Pool, scope: { ownerId: string; workspaceId: string; botId: string | null }, agent: { id: string; deviceId: string; harness: 'claude_code' | 'codex' }, asked?: string, exactEntry?: OrderEntry): Promise<RunModel | { error: 'machineUnavailable'; reason?: string }> {
   const { resolveModelDispatch } = await import('@/lib/model-dispatch')
-  const target = await resolveModelDispatch(pool, scope, { harness: agent.harness, ...(asked ? { model: asked } : {}) }, 'local', agent.deviceId)
+  const target = await resolveModelDispatch(pool, scope, asked ? { harness: agent.harness, model: asked } : null, 'local', agent.deviceId, { harness: agent.harness, ...(exactEntry ? { exactEntry } : {}) })
   if (target.kind !== 'device' || target.agentId !== agent.id) return { error: 'machineUnavailable', ...(target.kind === 'none' ? { reason: target.reason } : {}) }
-  return { model: target.model, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}), ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}), modelDispatch: { mode: asked ? 'picked' : 'preference', location: 'local', entry: target.entry } }
+  return { model: target.model, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}), ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}), modelDispatch: { mode: asked ? 'picked' : 'preference', location: 'local', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) } }
 }

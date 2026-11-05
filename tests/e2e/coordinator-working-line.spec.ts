@@ -3,7 +3,7 @@ import type { Page, TestInfo } from '@playwright/test'
 import { Pool } from 'pg'
 import { test, expect, register } from './fixtures'
 
-// 「Coordinator 正在处理…」 is for work the person is waiting on. After the turn
+// The Thinking row (「思考中」) is for work the person is waiting on. After the turn
 // stores its reply, the workflow still finishes up (execution record, phone
 // push decision, next inbox read, lease release) for a few seconds; the line
 // must not stay under the finished reply. A message sent meanwhile is still
@@ -25,7 +25,7 @@ function isolatedPool() {
 const HOLDER = 'e2e-finishing-turn'
 const ASKED = 'test'
 const REPLY = '收到，测试消息已收到。'
-const WORKING = 'Coordinator 正在处理…'
+const WORKING = '思考中'
 
 /** The person asked, the turn stored its reply, and it still holds its lease while it finishes up. */
 async function seedFinishingTurn(email: string, { queued }: { queued?: string } = {}) {

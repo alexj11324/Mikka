@@ -2,6 +2,7 @@ import 'server-only'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { deviceIsOnline } from '../device-presence'
+import { botListChanged } from '../live/lists'
 
 type Actor = { userId: string; workspaceId: string }
 export type BotCloudRuntime = { botId: string; harness: 'codex' | 'claude_code'; agentId: string }
@@ -38,6 +39,7 @@ export async function ensureCoordinatorBot(pool: Pool, actor: Actor) {
       botId = randomUUID()
       await client.query('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)', [botId, actor.workspaceId, actor.userId, name])
       await client.query('INSERT INTO coordinator_bots ("ownerId","workspaceId","botId") VALUES ($1,$2,$3)', [actor.userId, actor.workspaceId, botId])
+      await botListChanged(client, botId)
     }
     await client.query('COMMIT')
     return botId

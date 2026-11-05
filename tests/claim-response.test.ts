@@ -11,6 +11,8 @@ import { policyDistributionContext } from '../lib/agent-tool-approval/policy-dis
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { POST } from '../app/v1/devices/[deviceId]/runs/[runId]/claim/route'
 import { overrideDeploymentSwitch } from '../lib/deployment-switches'
+import { AgentProfileAdmissionError } from '../lib/factory/profile-admission'
+import { AgentProfileError } from '../lib/factory/agent-profile-definition'
 
 function fixture() {
   const repository = normalizeRepository('https://github.com/synthetic/claim-fixture.git')
@@ -53,6 +55,27 @@ test('revoked task access keeps issue_unavailable ahead of policy and claim prep
   assert.deepEqual(await response.json(), { error: 'The task is no longer available to this thread.', code: 'issue_unavailable' })
   assert.equal(probe.run.status, 'queued')
   assert.equal(probe.run.leaseExpiresAt, null)
+})
+
+test('a failed local subscription preflight ends the queued claim before policy, leases or credentials', async () => {
+  overrideDeploymentSwitch('byos', true)
+  try {
+    for (const detail of ['env_not_clean', 'cli_missing', 'cli_version_mismatch', 'adapter_start_failed'] as const) {
+      const probe = fixture()
+      Object.assign(probe.run, { agentDefinition: { harness: 'codex', subscription: { bindingId: 'binding', modelId: 'fixture-model', route: 'codex_cli' } } })
+      Object.assign(probe, { cloud: { subscription: { id: 'binding', modelId: 'fixture-model', route: 'codex_cli', consumerId: 'agent', workspaceId: 'ws' } } })
+      Object.assign(probe.device.harnesses[0], { installed: detail !== 'cli_missing', subscriptionBroker: true, subscriptionPreflight: detail })
+      const response = await claim(probe, ['skill-preflight', 'subscription-preflight'])
+      assert.equal(response.status, 409)
+      const body = await response.json()
+      assert.equal(body.code, 'subscription_local_runtime_unavailable')
+      assert.equal(body.detail, detail)
+      assert.doesNotMatch(body.error, /subscription_local_runtime_unavailable|env_not_clean|cli_missing|cli_version_mismatch|adapter_start_failed/)
+      assert.equal(probe.run.status, 'failed')
+      assert.equal(probe.run.leaseExpiresAt, null)
+      assert.equal(probe.preparation.includes('token'), false)
+    }
+  } finally { overrideDeploymentSwitch('byos', undefined) }
 })
 
 test('task access database errors are not misclassified as a permission denial', async () => {
@@ -380,4 +403,67 @@ test('capable workers receive the signed final composed policy, not the earlier 
     assert.equal(probe.cliPolicy.policy.permissions.git_push,'allow','the CLI layer is unchanged by the claim')
     assert.equal(body.policySnapshotRequired,true)
   } finally {if(before===undefined)delete process.env.BETTER_AUTH_SECRET;else process.env.BETTER_AUTH_SECRET=before}
+})
+
+
+test('Profile model, source or version changes keep ancestry but start a fresh native session', async () => {
+  const profile = { profileId: 'default', version: 1, digest: 'frozen-role', targetEntry: { id: 'first', harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: 'source-a' } } }
+  const definition = { harness: 'codex' as 'codex' | 'claude_code', model: 'gpt-6-luna', subscription: { bindingId: 'binding-a', modelId: 'gpt-6-luna', route: 'codex_cli' }, agentProfile: profile }
+  overrideDeploymentSwitch('byos', true)
+  try { for (const lineage of ['retry', 'thread'] as const) {
+    for (const change of ['same', 'model', 'source', 'version', 'harness'] as const) {
+      const probe = fixture()
+      Object.assign(probe.run, { agentDefinition: structuredClone(definition), ...(lineage === 'retry' ? { retryOf: 'profile-parent' } : { continuesRunId: 'profile-parent' }) })
+      probe.lost = { deviceId: 'device', sessionId: 'old-native-session', agentId: 'agent', agentDefinition: structuredClone(definition) }
+      if (lineage === 'retry') probe.checkpoint = validCheckpoint()
+      const target = (probe.run as typeof probe.run & { agentDefinition: typeof definition }).agentDefinition
+      if (change === 'model') target.model = target.agentProfile.targetEntry.model = 'other-currently-authorized-model'
+      if (change === 'source') { target.agentProfile.targetEntry.source.connectionId = 'source-b'; target.subscription.bindingId = 'binding-b' }
+      if (change === 'version') target.agentProfile.version++
+      if (change === 'harness') target.harness = target.agentProfile.targetEntry.harness = 'claude_code'
+      target.subscription.modelId = target.model
+      Object.assign(probe, { cloud: { subscription: { id: target.subscription.bindingId, modelId: target.model, route: target.subscription.route, consumerId: 'agent', workspaceId: 'ws' } } })
+      probe.device.harnesses = [{ harness: target.harness, installed: true, toolApproval: true, subscriptionBroker: true } as typeof probe.device.harnesses[number]]
+      const preparation = ['skill-preflight','policy','model-admission','publication','claim','skill-claim','benchmark-claim','token','settings']
+      if (lineage === 'retry') preparation.unshift('question-retry','checkpoint')
+      const response = await claim(probe, preparation)
+      assert.equal(response.status, 200, `${lineage}:${change}`)
+      const body = await response.json()
+      assert.equal(body.continuesRunId, 'profile-parent', `${lineage}:${change}`)
+      assert.equal(body.resumeSessionId, change === 'same' ? 'old-native-session' : undefined, `${lineage}:${change}`)
+    }
+  } } finally { overrideDeploymentSwitch('byos', undefined) }
+})
+
+test('Profile claim rejection preserves its cause and safe diagnostic while fencing the queued row', async t => {
+  const lines: string[] = []
+  t.mock.method(console, 'warn', (line: string) => { lines.push(line) })
+  for (const concurrentClaim of [false, true]) {
+    const probe = fixture()
+    const cause = new AgentProfileError('agentProfileModelUnavailable', 409, { detail: 'checking' })
+    cause.message = 'PRIVATE_PROFILE instructions; Bearer synthetic-secret; private Skill content'
+    const error = new AgentProfileAdmissionError({ detail: 'current_profile', cause })
+    assert.equal(error.cause, cause)
+    assert.equal(error.message, 'agentProfileUnavailable')
+    Object.assign(probe, { claimError: error, ...(concurrentClaim ? { beforeUpdate: async () => {
+      probe.run.status = 'preparing'; probe.run.leaseExpiresAt = new Date(Date.now() + 30_000)
+    } } : {}) })
+    const response = await claim(probe, ['skill-preflight', 'policy', 'publication', 'claim-rejected'])
+    assert.equal(response.status, 409)
+    const body = await response.json()
+    assert.equal(body.code, 'agentProfileUnavailable')
+    assert.equal(probe.run.status, concurrentClaim ? 'preparing' : 'failed')
+    assert.equal(probe.run.stopReason, concurrentClaim ? null : 'blocked')
+    assert.deepEqual((probe as typeof probe & { endedRuns?: unknown[] }).endedRuns ?? [], concurrentClaim ? [] : [{ ownerId: 'member', runId: 'run' }])
+    if (!concurrentClaim) assert.equal(probe.run.leaseExpiresAt, null)
+    const logged = JSON.parse(lines.at(-1)!)
+    assert.equal(logged.runId, 'run'); assert.equal(logged.code, 'agentProfileUnavailable'); assert.equal(logged.detail, 'current_profile')
+    assert.deepEqual(logged.causes, [{ name: 'AgentProfileError', code: 'agentProfileModelUnavailable', detail: 'checking' }])
+    for (const secret of ['PRIVATE_PROFILE', 'synthetic-secret', 'private Skill', probe.run.prompt]) {
+      assert.ok(!JSON.stringify(body).includes(secret))
+      assert.ok(!lines.at(-1)!.includes(secret))
+    }
+    for (const field of ['prompt', 'mcp', 'skills', 'skillReceipt', 'modelCredential']) assert.equal(Object.hasOwn(body, field), false)
+  }
+  assert.equal(lines.length, 2)
 })

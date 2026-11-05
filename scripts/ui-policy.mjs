@@ -131,6 +131,8 @@ export function auditSource(file, text, policy) {
       if (/^(?:@base-ui\/|@radix-ui\/|radix-ui$|react\/jsx-runtime|react\/jsx-dev-runtime)/.test(from)) add(node, 'components/no-primitive-bypass', '业务代码只组合已下载组件，不直接使用底层 primitives 或 JSX runtime。')
       if (/^(?:@tabler\/icons|@heroicons\/|react-icons\/|@phosphor-icons\/)/.test(from) && from !== policy.iconLibrary) add(node, 'icons/library', `仅使用配置的 ${policy.iconLibrary}。`)
       // R-71 (unslop): no sparkle for "AI"; thinking is Brain, a bot is Bot.
+      // R-52 (Alex 2026-11-04): a circle is a task, a bubble is a thread; the thread's icon never borrows a circle.
+      if (from === policy.iconLibrary && file === 'components/workspace/thread-status-icon.tsx') for (const spec of clause?.namedBindings?.elements ?? []) if (/^(?:Circle|LoaderCircle|Hand)/.test(spec.propertyName?.text ?? spec.name.text)) add(spec, 'icons/thread-not-circle', '线程用对话气泡加状态色点，不用圆圈图标；圆圈只表示任务（R-52）。')
       if (from === policy.iconLibrary) for (const spec of clause?.namedBindings?.elements ?? []) if (/^(?:Sparkles?|WandSparkles)(?:Icon)?$/.test(spec.propertyName?.text ?? spec.name.text)) add(spec, 'icons/no-sparkle', 'AI 不用闪光图标（R-71）：思考用 Brain，Bot 用 Bot。')
     }
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {

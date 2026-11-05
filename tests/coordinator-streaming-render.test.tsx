@@ -136,35 +136,76 @@ test('the streaming reply keeps its earlier chips mounted as new tokens arrive',
   } finally { await view.unmount() }
 })
 
-test('a reply shows its thinking and each tool by name and state with AI Elements; previews open on demand', async () => {
-  const { ReplyActivity } = await import('../components/coordinator/reply-activity')
+test('a reply draws its thinking and its tools as shadcn Trace rows: several calls are one summary line that opens to a row each (R-83)', async () => {
+  const { ReplyActivity, ReplyWaiting } = await import('../components/coordinator/reply-activity')
   const view = await mount()
+  const text = () => view.container.textContent ?? ''
+  const rows = () => [...view.container.querySelectorAll('[data-activity-tool]')].map(row => [row.getAttribute('data-activity-tool'), row.querySelector('[data-slot="trace-title"]')?.textContent, row.querySelector('[data-slot="trace-line"]')?.getAttribute('data-status') ?? null])
+  const group = () => view.container.querySelector('[data-activity-group]')
+  const settle = async (done: () => boolean) => { for (let tries = 0; tries < 100 && !done(); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20))) }
   try {
     const tools = [
       { call: 'c1', name: 'create_issue', state: 'done' as const, input: '{"title":"Fix login"}', output: '{"id":"i1"}' },
       { call: 'c2', name: 'dispatch_run', state: 'running' as const },
-      { call: 'c3', name: 'some_internal_tool', state: 'error' as const, output: 'no device' },
+      { call: 'c3', name: 'dispatch_factory_task', state: 'done' as const, output: '{"error":"factoryNotFound"}' },
     ]
-    await view.render(<ReplyActivity tools={tools} thinking={{ active: true, seconds: 1 }} />)
-    const text = () => view.container.textContent ?? ''
-    assert.equal(view.container.querySelector('[data-activity-thinking]')?.getAttribute('data-activity-thinking'), 'active')
-    assert.match(view.container.querySelector('[data-activity-thinking]')?.textContent ?? '', /^Thinking$/)
-    // AI Elements Tool: our label as its title, the AI SDK state as its badge; internal names never show.
-    assert.deepEqual([...view.container.querySelectorAll('[data-activity-tool]')].map(row => [row.getAttribute('data-activity-tool'), row.querySelector('[data-slot="collapsible-trigger"], button')?.textContent]),
-      [['done', 'Create taskDone'], ['running', 'Start threadRunning'], ['error', 'Use a toolFailed']])
-    assert.doesNotMatch(text(), /some_internal_tool|Fix login/, 'previews start closed')
-    await act(async () => { (view.container.querySelector('[data-activity-tool="done"] button') as HTMLButtonElement).click() })
-    for (let tries = 0; tries < 100 && !/i1/.test(text()); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20)))
-    assert.match(text(), /Input[\s\S]*Fix login[\s\S]*Result[\s\S]*i1/)
-    const thinkingTrigger = view.container.querySelector('[data-activity-thinking] button') as HTMLButtonElement
-    assert.ok(thinkingTrigger.disabled, 'reasoning text is never shown, so thinking does not open')
+    // Live: thinking runs and is open as its words stream in; the group is open on the call running now.
+    await view.render(<ReplyActivity live tools={tools} thinking={{ active: true, seconds: 1, text: 'Check the login' }} />)
+    const thinking = view.container.querySelector('[data-activity-thinking]')
+    assert.equal(thinking?.getAttribute('data-activity-thinking'), 'active')
+    assert.equal(thinking?.querySelector('[data-slot="trace-title"]')?.textContent, 'Thinking')
+    assert.equal(thinking?.querySelector('[data-slot="trace-line"]')?.getAttribute('data-status'), 'running')
+    assert.ok(thinking?.querySelector('svg.lucide-loader-circle.animate-spin'), 'a spinner while it thinks')
+    await settle(() => /Check the login/.test(text()))
+    assert.match(text(), /Check the login/, 'the running row is open, so its words show as they stream')
+    assert.equal(group()?.getAttribute('data-activity-group'), 'running')
+    await settle(() => rows().length === 3)
+    assert.deepEqual(rows(), [['done', 'Create taskFix login', null], ['running', 'Start thread', 'running'], ['error', 'Dispatch Factory task· Factory task not found', 'error']],
+      'verb and object; an answered error is a failure with its reason')
+    assert.doesNotMatch(text(), /dispatch_factory_task|i1|factoryNotFound/, 'raw input and output start closed')
+    // Opened, a call says what it did in words first; its raw data is one more click away, under 「Raw data」.
+    const click = (selector: string) => act(async () => { (view.container.querySelector(selector) as HTMLButtonElement).click() })
+    await click('[data-activity-tool="done"] button')
+    await settle(() => Boolean(view.container.querySelector('[data-activity-tool="done"] [data-activity-detail]')))
+    assert.equal(view.container.querySelector('[data-activity-tool="done"] [data-activity-detail]')?.textContent, 'TitleFix login')
+    assert.doesNotMatch(text(), /i1/, 'the raw output starts folded')
+    await click('[data-activity-tool="done"] [data-activity-raw] button')
+    await settle(() => /i1/.test(text()))
+    assert.equal(view.container.querySelectorAll('[data-activity-tool="done"] [data-slot="code-block"]')[1]?.textContent, '{"id":"i1"}', 'the output in a code block, after the input')
+    await click('[data-activity-tool="error"] button')
+    await click('[data-activity-tool="error"] [data-activity-raw] button')
+    await settle(() => /factoryNotFound/.test(text()))
+    assert.equal(view.container.querySelector('[data-activity-tool="error"] [data-slot="code-block"]')?.getAttribute('data-variant'), 'destructive')
+
+    // Stored: one summary line, closed, side effects first, with how many failed; a call that never returned failed too.
+    await view.render(<ReplyActivity tools={[tools[2], { ...tools[2], call: 'c9' }]} />)
+    assert.equal(group()?.querySelector('[data-slot="trace-title"]')?.textContent, 'Dispatch Factory task', 'nothing succeeded: the line names the failed call')
+    await view.render(<ReplyActivity tools={[...tools, { call: 'c5', name: 'get_issue', state: 'done' as const }]} />)
+    assert.equal(group()?.getAttribute('data-activity-group'), 'error')
+    assert.ok(group()?.querySelector('svg.lucide-circle-alert'), 'a failure is an icon, a colour and a word together (R-87)')
+    // Only what succeeded is said as done: the dispatch that never returned and the Factory call that answered an error
+    // are only in the failure count, never 「Dispatched」 (R-83).
+    assert.equal(group()?.querySelector('[data-slot="trace-title"]')?.textContent, 'Created 1 task · Looked up tasks')
+    assert.equal(group()?.querySelector('[data-activity-failed]')?.textContent, '2 failed', 'the failure count sits outside the summary, so it never truncates')
+    // Stored, a tool that never returned failed: the docs' row for a call that is not streaming.
+    await view.render(<ReplyActivity tools={[tools[1]]} />)
+    assert.deepEqual(rows(), [['error', 'Start thread', 'error']])
+    // A tool with nothing to show is a line that does not open.
+    await view.render(<ReplyActivity tools={[{ call: 'c4', name: 'create_issue', state: 'done' }]} />)
+    assert.equal(view.container.querySelector('[data-activity-tool] button'), null)
 
     await view.render(<ReplyActivity tools={[]} thinking={{ active: false, seconds: 3 }} />)
+    assert.equal(view.container.querySelector('[data-activity-thinking]')?.getAttribute('data-activity-thinking'), 'done')
     assert.equal(text(), 'Thought for 3 seconds')
+    assert.ok(view.container.querySelector('[data-activity-thinking] svg.lucide-circle-check'), 'a check once it stops')
     await view.render(<ReplyActivity tools={[]} thought />)
     assert.equal(text(), 'Thought', 'a stored reply knows only that it thought')
     await view.render(<ReplyActivity tools={[]} />)
     assert.equal(view.container.innerHTML, '')
+    // Before the reply has anything: the same Thinking row, running.
+    await view.render(<ReplyWaiting />)
+    assert.equal(text(), 'Thinking')
+    assert.equal(view.container.querySelector('[data-slot="trace-line"]')?.getAttribute('data-status'), 'running')
   } finally { await view.unmount() }
 })
 
@@ -172,14 +213,13 @@ test('readable reasoning opens under 「思考了 N 秒」, live and stored alik
   const { ReplyActivity } = await import('../components/coordinator/reply-activity')
   const view = await mount()
   const trigger = () => view.container.querySelector('[data-activity-thinking] button') as HTMLButtonElement
-  const content = () => view.container.querySelector('[data-activity-thinking] [data-slot="collapsible-content"]')?.textContent ?? ''
+  const content = () => view.container.querySelector('[data-activity-thinking] [data-slot="trace-collapsible-content"]')?.textContent ?? ''
   const settle = async (done: () => boolean) => { for (let tries = 0; tries < 100 && !done(); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20))) }
   try {
-    // Live, with what the model thought: AI Elements' trigger with its chevron, closed until opened.
+    // Live, finished, with what the model thought: the Trace row's trigger with its chevron, closed until opened.
     await view.render(<ReplyActivity tools={[]} thinking={{ active: false, seconds: 4, text: 'Check the login redirect first.' }} />)
     assert.equal(view.container.querySelector('[data-activity-thinking]')?.getAttribute('data-reasoning'), 'readable')
-    assert.equal(trigger().disabled, false)
-    assert.ok(trigger().querySelector('svg.lucide-chevron-down'), 'it shows the chevron')
+    assert.ok(trigger().querySelector('svg.lucide-chevron-right'), 'it shows the chevron')
     assert.doesNotMatch(content(), /login redirect/, 'closed by default')
     await act(async () => { trigger().click() })
     await settle(() => /login redirect/.test(content()))
@@ -191,11 +231,11 @@ test('readable reasoning opens under 「思考了 N 秒」, live and stored alik
     const stored = await mount()
     await stored.render(<ReplyActivity tools={[]} thought reasoningAt={[7, 9]} botId="bot-1" />)
     const storedTrigger = stored.container.querySelector('[data-activity-thinking] button') as HTMLButtonElement
-    assert.equal(storedTrigger.disabled, false)
+    assert.ok(storedTrigger)
     assert.equal(reasoningCalls.length, 0, 'nothing is fetched until it is opened')
     await act(async () => { storedTrigger.click() })
     for (let tries = 0; tries < 100 && !/login redirect/.test(stored.container.textContent ?? ''); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20)))
-    assert.match(stored.container.querySelector('[data-slot="collapsible-content"]')?.textContent ?? '', /Check the login redirect first\./, 'stored reads as live did')
+    assert.match(stored.container.querySelector('[data-slot="trace-collapsible-content"]')?.textContent ?? '', /Check the login redirect first\./, 'stored reads as live did')
     assert.deepEqual(reasoningCalls, [['bot-1', [7, 9]]])
     await stored.unmount()
 
@@ -203,12 +243,158 @@ test('readable reasoning opens under 「思考了 N 秒」, live and stored alik
     for (const props of [{ thinking: { active: false, seconds: 2 } }, { thought: true }]) {
       const plain = await mount()
       await plain.render(<ReplyActivity tools={[]} {...props} />)
-      const button = plain.container.querySelector('[data-activity-thinking] button') as HTMLButtonElement
       assert.equal(plain.container.querySelector('[data-activity-thinking]')?.getAttribute('data-reasoning'), 'none')
-      assert.ok(button.disabled)
-      assert.equal(button.querySelector('svg.lucide-chevron-down'), null, 'no chevron')
-      assert.equal(plain.container.querySelector('[data-slot="collapsible-content"]'), null)
+      assert.equal(plain.container.querySelector('[data-activity-thinking] button'), null, 'no trigger')
+      assert.equal(plain.container.querySelector('svg.lucide-chevron-right'), null, 'no chevron')
+      assert.equal(plain.container.querySelector('[data-slot="trace-collapsible-content"]'), null)
       await plain.unmount()
     }
   } finally { try { await view.unmount() } catch { /* already unmounted */ } }
+})
+
+test('an opened dispatch reads 「Handed to」 its coding agent and its thread chip, then the note as a quote; never ids, JSON or the task (R-83)', async () => {
+  const { ReplyActivity } = await import('../components/coordinator/reply-activity')
+  const { AgentCitationsContext } = await import('../components/workspace/agent-citations')
+  const { jsonbText } = await import('../lib/coordinator/context')
+  const view = await mount()
+  const settle = async (done: () => boolean) => { for (let tries = 0; tries < 100 && !done(); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20))) }
+  const open = async (selector = '[data-activity-tool] button') => {
+    await act(async () => { (view.container.querySelector(selector) as HTMLButtonElement).click() })
+    await settle(() => Boolean(view.container.querySelector('[data-activity-detail]')))
+  }
+  // A long note, in jsonb's key order and cut at 200 characters as the chat gets it: the note comes first and is cut.
+  const note = 'Reproduce the redirect loop on sign-in with a fresh account, check the callback URL the provider sends back against the one we register, fix the mismatch, add a regression test for it, and open a PR.'
+  const input = jsonbText({ issueId: TASK, botId: '3c3aa707-0000-4c22-b322-0000000000d4', note }).slice(0, 200)
+  const dispatch = { call: 'd1', name: 'dispatch_run', state: 'done' as const, input, quote: note, output: jsonbText({ runId: THREAD, status: 'queued' }) }
+  const citations = { ...base, sources: { ...known, [THREAD]: thread } }
+  try {
+    await view.render(<AgentCitationsContext value={citations}><ReplyActivity tools={[dispatch]} /></AgentCitationsContext>)
+    await open()
+    const detail = () => view.container.querySelector('[data-activity-detail]')
+    assert.match(detail()?.textContent ?? '', /^Handed toClaude Code/, 'who it went to first: the coding agent, never the bot')
+    const chip = detail()?.querySelector('[data-activity-thread] [data-slot="inline-citation-trigger"]')
+    assert.match(chip?.textContent ?? '', /Fix sign-in redirect/, 'the thread as its chip')
+    assert.equal(detail()?.querySelectorAll('[data-slot="inline-citation-trigger"]').length, 1, 'one chip: the thread; the task is not drawn (R-15)')
+    assert.equal(detail()?.querySelectorAll('[data-slot="badge"]').length, 0, 'no second state badge beside the chip')
+    const quote = detail()?.querySelector('[data-activity-quote]')
+    assert.equal(quote?.textContent, note, 'the whole note, from the call\'s own quote, though the input preview cut it')
+    assert.match(quote?.querySelector('span')?.className ?? '', /line-clamp-3/)
+    const shown = view.container.textContent ?? ''
+    assert.doesNotMatch(shown, /"runId"|\{/, 'no raw JSON until 「Raw data」 is opened')
+    assert.doesNotMatch(shown, MARKUP, 'no ids')
+    assert.ok(view.container.querySelector('[data-activity-raw]'), 'the raw data is there, folded')
+
+    // A thread the chat has not loaded: who it went to and its state in words, as the thread list groups it (R-52).
+    await view.render(<AgentCitationsContext value={{ ...base, sources: known }}><ReplyActivity key="unloaded" tools={[{ ...dispatch, output: jsonbText({ runId: THREAD, status: 'queued', harness: 'codex' }) }]} /></AgentCitationsContext>)
+    await open()
+    assert.equal(detail()?.querySelector('[data-activity-thread]')?.textContent, 'Handed toCodex· Running')
+
+    // A failed call says nothing in words and draws no quote: its row names the reason.
+    const failed = { call: 'm1', name: 'send_email', state: 'done' as const, input: jsonbText({ to: 'a@example.com', subject: 'Hi', body: 'Hello there' }), output: '{"error": "forbidden"}' }
+    await view.render(<AgentCitationsContext value={citations}><ReplyActivity key="failed" tools={[failed]} /></AgentCitationsContext>)
+    await act(async () => { (view.container.querySelector('[data-activity-tool="error"] button') as HTMLButtonElement).click() })
+    await settle(() => Boolean(view.container.querySelector('[data-activity-raw]')))
+    assert.equal(view.container.querySelector('[data-activity-detail]'), null)
+    assert.doesNotMatch(view.container.querySelector('[data-activity-tool="error"]')?.textContent ?? '', /a@example\.com|Hello there|error: forbidden/)
+
+    // Inside a group, an opened row reads the same.
+    await view.render(<AgentCitationsContext value={citations}><ReplyActivity key="group" tools={[{ call: 'g1', name: 'get_issue', state: 'done' as const, input: '{"identifier": "MIK-1"}' }, dispatch]} /></AgentCitationsContext>)
+    await act(async () => { (view.container.querySelector('[data-activity-group] button') as HTMLButtonElement).click() })
+    await settle(() => view.container.querySelectorAll('[data-activity-tool]').length === 2)
+    await open('[data-activity-tool]:nth-child(2) button')
+    assert.match(detail()?.textContent ?? '', /^Handed toClaude Code/)
+    assert.equal(detail()?.querySelector('[data-activity-quote]')?.textContent, note)
+  } finally { await view.unmount() }
+})
+
+test('a quote cut at three lines is a button that opens the rest; one that fits is plain text (R-83)', async () => {
+  const { ReplyActivity } = await import('../components/coordinator/reply-activity')
+  const view = await mount()
+  const proto = browser.HTMLElement.prototype as unknown as object
+  const stub = (height: number) => {
+    Object.defineProperty(proto, 'scrollHeight', { configurable: true, get() { return height } })
+    Object.defineProperty(proto, 'clientHeight', { configurable: true, get() { return 60 } })
+  }
+  const settle = async (done: () => boolean) => { for (let tries = 0; tries < 100 && !done(); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20))) }
+  const quote = () => view.container.querySelector('[data-activity-quote]')
+  const tool = { call: 'q1', name: 'dispatch_run', state: 'done' as const, input: '{"note": "Long"}', quote: 'A long note. '.repeat(40).trim() }
+  try {
+    stub(200)
+    await view.render(<ReplyActivity tools={[tool]} />)
+    await act(async () => { (view.container.querySelector('[data-activity-tool] button') as HTMLButtonElement).click() })
+    await settle(() => quote()?.tagName === 'BUTTON')
+    assert.equal(quote()?.tagName, 'BUTTON', 'cut: a button')
+    assert.equal(quote()?.getAttribute('aria-expanded'), 'false')
+    await act(async () => { (quote() as HTMLButtonElement).click() })
+    assert.equal(quote()?.getAttribute('aria-expanded'), 'true')
+    assert.doesNotMatch(quote()?.querySelector('span')?.className ?? '', /line-clamp-3/, 'opened, the whole note')
+    stub(60)
+    await view.render(<ReplyActivity key="fits" tools={[{ ...tool, call: 'q2', quote: 'Short.' }]} />)
+    await act(async () => { (view.container.querySelector('[data-activity-tool] button') as HTMLButtonElement).click() })
+    await settle(() => Boolean(quote()))
+    assert.equal(quote()?.tagName, 'DIV', 'fits: plain text, nothing to open')
+    assert.equal(quote()?.hasAttribute('aria-expanded'), false)
+  } finally {
+    delete (proto as Record<string, unknown>).scrollHeight
+    delete (proto as Record<string, unknown>).clientHeight
+    await view.unmount()
+  }
+})
+
+test('a task and its thread in one reply: only the thread is a chip, the task is its number or nothing (R-15)', async () => {
+  const view = await mount()
+  const chips = () => [...view.container.querySelectorAll('[data-slot="inline-citation-trigger"]')]
+  const text = () => view.container.textContent ?? ''
+  const ownThread: CitationSource = { ...thread, issue: { id: TASK, number: 1, identifier: 'MIK-1', title: 'Release checklist' } }
+  try {
+    await view.render(<CoordinatorReply text={`[[issue:${TASK}]] 的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: { ...known, [THREAD]: ownThread } }} />)
+    assert.equal(chips().length, 1, 'one chip: the thread')
+    assert.match(chips()[0].getAttribute('aria-label') ?? '', /thread/i)
+    assert.match(text(), /^MIK-1 的线程/, 'the task reads as its number')
+    assert.equal(text().match(/Release checklist/g)?.length, 1, 'the title is said once, in the thread chip')
+    // A task with no number reads as 「the task」: the thread chip carries its title, and the sentence never starts at 「的线程」.
+    const unnumbered = { [TASK]: { ...issue(TASK, 'Release checklist'), identifier: null }, [THREAD]: ownThread }
+    await view.render(<CoordinatorReply text={`[[issue:${TASK}]]的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: unnumbered }} />)
+    assert.equal(chips().length, 1)
+    assert.equal(text().match(/Release checklist/g)?.length, 1)
+    assert.doesNotMatch(text(), /^\s*的线程/, 'the sentence keeps its subject')
+    assert.match(text(), /^the task的线程/)
+    assert.doesNotMatch(text(), MARKUP)
+  } finally { await view.unmount() }
+})
+
+test('a thread whose card sits under the same reply is named in the words without a chip (R-66)', async () => {
+  const view = await mount()
+  try {
+    const citations = { ...base, sources: { ...known, [THREAD]: thread } }
+    await view.render(<CoordinatorReply text={`已派出线程 [[run:${THREAD}]]。`} citations={citations} carded={THREAD} />)
+    assert.equal(view.container.querySelectorAll('[data-slot="inline-citation-trigger"]').length, 0)
+    assert.equal(view.container.querySelector('[data-citation-carded]')?.textContent, 'Fix sign-in redirect')
+    await view.render(<CoordinatorReply text={`已派出线程 [[run:${THREAD}]]。`} citations={citations} />)
+    assert.equal(view.container.querySelectorAll('[data-slot="inline-citation-trigger"]').length, 1, 'without its card here, it is a chip')
+  } finally { await view.unmount() }
+})
+
+test('全部展开 opens every tool group, a group clicked alone keeps its own state, 全部收起 closes them all (R-83)', async () => {
+  const { ActivityExpansionContext, ReplyActivity, useActivityExpansion } = await import('../components/coordinator/reply-activity')
+  const view = await mount()
+  const tools = (n: string) => [{ call: `${n}1`, name: 'get_issue', state: 'done' as const }, { call: `${n}2`, name: 'list_runs', state: 'done' as const }]
+  function Chat() {
+    const expansion = useActivityExpansion()
+    return <ActivityExpansionContext value={expansion}><ReplyActivity tools={tools('a')} /><ReplyActivity tools={tools('b')} /></ActivityExpansionContext>
+  }
+  const groups = () => [...view.container.querySelectorAll('[data-activity-group]')]
+  const opened = () => groups().map(group => group.querySelector('[data-slot="trace-collapsible-trigger"]')?.getAttribute('aria-expanded'))
+  const expandAll = () => view.container.querySelector('[data-activity-expand-all]') as HTMLButtonElement
+  try {
+    await view.render(<Chat />)
+    assert.deepEqual(opened(), ['false', 'false'], 'closed by default')
+    assert.equal(view.container.querySelectorAll('[data-activity-expand-all]').length, 2, 'the control is on every group, always shown')
+    await act(async () => { expandAll().click() })
+    assert.deepEqual(opened(), ['true', 'true'])
+    await act(async () => { (groups()[0].querySelector('[data-slot="trace-collapsible-trigger"]') as HTMLButtonElement).click() })
+    assert.deepEqual(opened(), ['false', 'true'], 'the reader\'s own click wins for that group')
+    await act(async () => { expandAll().click() })
+    assert.deepEqual(opened(), ['false', 'false'], '全部收起 closes every group, the one set alone included')
+  } finally { await view.unmount() }
 })

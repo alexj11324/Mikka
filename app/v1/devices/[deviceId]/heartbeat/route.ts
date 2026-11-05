@@ -1,6 +1,7 @@
 import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
 import { withDeviceRoute } from '@/lib/device-route'
-import { after, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { sql } from 'drizzle-orm'
 import { deviceHeartbeatSchema, isDeviceOnline } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
@@ -15,6 +16,7 @@ import { factoryLifecycleEnabled } from '@/lib/factory/runtime'
 import { factoryDispatchRecovery } from '@/lib/factory/dispatch-recovery-server'
 import { factoryDeviceOnline } from '@/lib/factory/dispatch-recovery'
 import { daemonVersions, daemonRequestTooOld } from '@/lib/daemon-release'
+import { ownerListChanged } from '@/lib/live/lists'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,6 +74,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   // device comes back online (registration checks them too), not on every beat.
   if (prior && (prior.harnessesChanged || !isDeviceOnline(prior.lastSeenAt, now.getTime()))) await ensureDeviceAgents(pool, caller.userId, deviceId, harnesses, { reported: true })
   if (prior?.harnessesChanged) await db.execute(sql`UPDATE devices SET harnesses=${JSON.stringify(harnesses)}::jsonb WHERE id=${deviceId}`)
+  // The device list shows presence and harnesses: an ordinary beat changes neither, coming back online or a new harness does.
+  if (prior && (prior.harnessesChanged || !isDeviceOnline(prior.lastSeenAt, now.getTime()))) await ownerListChanged(db, caller.userId, ['device_list'])
   const runIds = parsed.data.runs.map(run => run.runId)
   // An idle device holds no leases: nothing to renew or revoke.
   const selected = runIds.length
@@ -83,7 +87,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   const cloudCredential = caller.scopeDeviceId === deviceId && caller.scopeWorkspaceId
     ? await renewCloudDeviceToken(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId, deviceId, tokenId: caller.tokenId }).catch(() => null)
     : null
-  if (factoryOn) after(() => factoryDispatchRecovery.deviceOnline(caller.userId, deviceId, !prior || !factoryDeviceOnline(prior)).catch((error: unknown) => console.error('Could not resume Factory dispatch', error instanceof Error ? error.message : error)))
+  if (factoryOn) afterJob('after:factory-dispatch-recovery', () => factoryDispatchRecovery.deviceOnline(caller.userId, deviceId, !prior || !factoryDeviceOnline(prior)).catch((error: unknown) => console.error('Could not resume Factory dispatch', error instanceof Error ? error.message : error)))
   return NextResponse.json({ ...result, deviceCommands: await pendingDeviceCommands(deviceId, parsed.data.completedDeviceCommands ?? [], parsed.data.failedDeviceCommands ?? []), ...(cloudCredential ? { cloudCredential } : {}), daemonVersions: await daemonVersions() }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
 

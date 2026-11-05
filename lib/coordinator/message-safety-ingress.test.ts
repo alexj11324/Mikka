@@ -16,6 +16,8 @@ const transport = {
     const statement = dialect.sqlToQuery(query)
     // The event's credential check reads through the executor it was given.
     if (/to_regclass\('credential_secrets'\)/.test(statement.sql)) return { rows: [{ present: false }] }
+    // Taking the chat's lease wakes a waiting 停止 (stop-turn.ts); its payload is the Bot ID only.
+    if (statement.sql.startsWith('SELECT pg_notify(')) { assert.deepEqual(statement.params, ['mikka_coordinator_lease', bot]); return [] }
     assert.match(statement.sql, /pg_advisory_xact_lock/)
     assert.ok(statement.params.includes(`bot-chat:${owner}:${bot}`), 'chat lock must bind the owner and Bot')
     return []
@@ -31,6 +33,12 @@ const transport = {
           return Promise.resolve([{ last: messages.length }])
         }
         return selection
+      },
+      async for(mode: string) {
+        assert.equal(table, coordinatorSessions); assert.equal(mode, 'update')
+        const query = dialect.sqlToQuery(condition)
+        assert.ok(query.params.includes(owner) && query.params.includes(bot), 'lease lock must bind the same owner and Bot')
+        return [{ leaseHolder: null, leaseUntil: null }]
       },
       orderBy() { return selection },
       async limit() {
@@ -53,9 +61,14 @@ const transport = {
         messages.push(...(value as Array<{ position: number; message: StoredMessage['message'] }>))
         return Promise.resolve()
       }
-      return { async onConflictDoNothing() {
-        if (table === coordinatorEvents) events.push({ id: 'stored-peer-id', createdAt: new Date('2026-10-27T12:00:00Z'), ...value })
-        else assert.equal(table, coordinatorSessions)
+      return { onConflictDoNothing() {
+        if (table === coordinatorEvents) {
+          const event = { id: 'stored-peer-id', createdAt: new Date('2026-10-27T12:00:00Z'), ...value }
+          events.push(event)
+          return { async returning() { return [{ id: event.id }] } }
+        }
+        assert.equal(table, coordinatorSessions)
+        return Promise.resolve()
       } }
     } }
   },

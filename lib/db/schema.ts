@@ -1214,3 +1214,7 @@ export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
   type: text('type').notNull(),
   processedAt: timestamp('processedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+export { projectDecisions, projectDecisionSources } from './project-map-schema.ts'
+
+export { factoryAgentProfiles, factoryAgentProfileVersions } from './agent-profile-schema.ts'

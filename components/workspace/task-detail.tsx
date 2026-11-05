@@ -1,7 +1,8 @@
 'use client'
 
 import { Component, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import useSWR from 'swr'
+import useSWR, { unstable_serialize } from 'swr'
+import { useLiveKey } from '@/hooks/use-live-key'
 import { useTranslations } from 'next-intl'
 import type { JSONContent } from '@tiptap/react'
 import { ArrowLeft } from 'lucide-react'
@@ -18,7 +19,7 @@ import { DocumentSync } from '@/lib/document-sync'
 import { useActionError } from '@/lib/use-action-error'
 import { IssueMembers } from './issue-members'
 import { IssueDetailProperties } from './issue-detail-properties'
-import { IssueThreads, ThreadEvents } from './issue-threads'
+import { IssueThreads } from './issue-threads'
 import { IssueThreadPanel } from './issue-thread-panel'
 import { navigate } from './workspace-navigation'
 import { cn } from '@/lib/utils'
@@ -88,7 +89,7 @@ class EditorErrorBoundary extends Component<{ children: ReactNode; title: string
   }
 }
 
-const READ_ONLY_SNAPSHOT = { ready: false, pending: false, error: false, syncing: false }
+const READ_ONLY_SNAPSHOT = { ready: false, pending: false, error: false, syncing: false, workspaceId: null }
 const readOnlySnapshot = () => READ_ONLY_SNAPSHOT
 const noSubscribe = () => () => {}
 
@@ -105,7 +106,11 @@ function TaskForm({ initial, thread: openThread, origin, user, onSaved, onDirty,
   // Read-only never constructs a DocumentSync: no Y.Doc, no provider, no exchange.
   const [sync] = useState(() => seed ? new DocumentSync(initial.id, seed) : null)
   const syncState = useSyncExternalStore(sync?.subscribe ?? noSubscribe, sync?.getSnapshot ?? readOnlySnapshot, sync?.getSnapshot ?? readOnlySnapshot)
-  const { mutate: retrySync } = useSWR(sync ? ['document-sync', saved.id, sync.doc.clientID] : null, () => sync?.exchange(saved.id), { refreshInterval: 1500, shouldRetryOnError: true, errorRetryInterval: 3000 })
+  const syncKey = sync ? ['document-sync', saved.id, sync.doc.clientID] : null
+  const { mutate: retrySync } = useSWR(syncKey, () => sync?.exchange(saved.id), { refreshInterval: 0, revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false })
+  // A committed acceptance changes the issue and its history without editing
+  // the Yjs body. All three reads follow the same authorized document event.
+  useLiveKey('issue_document', sync ? saved.id : null, syncKey ? [unstable_serialize(syncKey), unstable_serialize(['issue', saved.id]), unstable_serialize(['versions', saved.id])] : [], syncState.workspaceId ?? null, { minIntervalMs: 1500 })
   useEffect(() => {
     // Delay disposal so React Strict Mode's immediate effect replay retains this document.
     if (!sync) return
@@ -155,6 +160,22 @@ function TaskForm({ initial, thread: openThread, origin, user, onSaved, onDirty,
   const [replacement, setReplacement] = useState<{ content: JSONContent; version: number }>()
   const { data: versions, error: historyError, mutate: refreshVersions } = useSWR(['versions', saved.id], () => listIssueVersions(saved.id))
   const { data: connections } = useSWR(['issue-connections', saved.id], () => listIssueConnections(saved.id))
+  useEffect(() => {
+    const previous = savedRef.current
+    if (initial.id !== previous.id || initial.revision <= previous.revision) return
+    const current = draft.current
+    const next = { ...current }
+    // Only fields unchanged since the last server snapshot adopt its newer
+    // value. Updating the draft too keeps a later text save from reopening Done.
+    if (current.title === previous.title && !composing.current) { next.title = initial.title; setTitle(initial.title) }
+    if (current.status === previous.status) { next.status = initial.status; setStatus(initial.status) }
+    if (current.priority === previous.priority) { next.priority = initial.priority; setPriority(initial.priority) }
+    if (JSON.stringify(current.content) === JSON.stringify(previous.content)) { next.content = initial.content; setContent(initial.content) }
+    draft.current = next
+    savedRef.current = initial
+    setSaved(initial)
+    // This is a read, not an edit: keep generation, selection and the Y.Doc.
+  }, [initial])
   const hasUnsavedChanges = dirty
   useEffect(() => { onDirty(hasUnsavedChanges || pending) }, [hasUnsavedChanges, pending, onDirty])
   useEffect(() => {
@@ -184,16 +205,22 @@ function TaskForm({ initial, thread: openThread, origin, user, onSaved, onDirty,
       try {
         do {
           const snapshot = { ...draft.current }
+          const revision = savedRef.current.revision
           if (!snapshot.title.trim()) { setError(saveMessages.current.t('titleRequired')); return false }
           const yjs = sync?.getSnapshot() ?? readOnlySnapshot()
           const bodyDirty = JSON.stringify(snapshot.content) !== JSON.stringify(savedRef.current.content)
           if (sync && (yjs.pending || bodyDirty) && yjs.ready) await sync.flush(initial.id)
           else if (bodyDirty && !yjs.ready) { setError(saveMessages.current.t('documentNotConnected')); return false }
+          // A live update during the flush must be included in the next
+          // snapshot, never paired with fields captured at an older revision.
+          if (savedRef.current.revision !== revision) continue
           if (snapshot.generation !== acknowledged.current) {
-            const result = await saveIssue({ id: initial.id, revision: savedRef.current.revision, title: snapshot.title, content: snapshot.content, status: snapshot.status, priority: snapshot.priority })
+            const result = await saveIssue({ id: initial.id, revision, title: snapshot.title, content: snapshot.content, status: snapshot.status, priority: snapshot.priority })
             if (!('issue' in result) || !result.issue) { setError(saveMessages.current.actionError(result.error ?? 'issueSaveFailed')); return false }
-            savedRef.current = result.issue
-            setSaved(result.issue)
+            if (result.issue.revision >= savedRef.current.revision) {
+              savedRef.current = result.issue
+              setSaved(result.issue)
+            }
             acknowledged.current = snapshot.generation
             setDirty(draft.current.generation !== acknowledged.current)
             void refreshVersions().catch(() => {})
@@ -218,6 +245,7 @@ function TaskForm({ initial, thread: openThread, origin, user, onSaved, onDirty,
     return () => clearTimeout(timer)
   }, [editSequence, syncState.ready, save])
   function adopt(issue: Issue) {
+    if (issue.revision < savedRef.current.revision) return
     savedRef.current = issue; setSaved(issue); setStatus(issue.status); setPriority(issue.priority)
     draft.current = { ...draft.current, status: issue.status, priority: issue.priority }
     void refreshVersions().catch(() => {}); onSaved(issue.id)
@@ -244,11 +272,12 @@ function TaskForm({ initial, thread: openThread, origin, user, onSaved, onDirty,
   function requestAction(kind: IssueActionRequest['kind']) { setActionRequest(value => ({ kind, sequence: (value?.sequence ?? 0) + 1 })) }
   function requestProperty(target: MetadataRequest['target']) { setPropertyRequest(value => ({ target, sequence: (value?.sequence ?? 0) + 1 })) }
   const subtasks = (connections ?? []).filter(row => row.metadata.parentId === saved.id).map(row => ({ id: row.id, title: row.title, createdAt: row.createdAt }))
-  const activity = historyError
-    ? <Button variant="ghost" size="sm" type="button" onClick={() => { void refreshVersions() }}>{t('activityFailed')}</Button>
-    : <IssueActivityFeed versions={versions ?? []} children={subtasks} />
+  const activity = <>
+    {historyError && <Button variant="ghost" size="sm" type="button" onClick={() => { void refreshVersions() }}>{t('activityFailed')}</Button>}
+    <IssueActivityFeed issueId={saved.id} versions={historyError ? [] : versions ?? []} children={historyError ? [] : subtasks} onOpenThread={showThread} />
+  </>
 
-  const properties = <IssueDetailProperties task={saved} onMetadataSaved={adopt} metadataDisabled={false} onMetadataBusy={setMetadataSaving} status={status} priority={priority} pending={false} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} request={propertyRequest} onDate={() => requestAction('dueDate')} onEstimate={() => requestAction('estimate')} relations={<IssueRelations viewerId={user.id} mode="sidebar" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} />} />
+  const properties = <IssueDetailProperties task={saved} onMetadataSaved={adopt} metadataDisabled={false} onMetadataBusy={setMetadataSaving} status={status} priority={priority} pending={false} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} request={propertyRequest} onDate={() => requestAction('dueDate')} onEstimate={() => requestAction('estimate')} relations={<IssueRelations liveWorkspaceId={syncState.workspaceId ?? null} viewerId={user.id} mode="sidebar" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} />} />
   const threadPanel = openThread
     ? <IssueThreadPanel key={`${openThread}:${threadTab}`} issueId={saved.id} runId={openThread} initialTab={threadTab} onOpenThread={showThread} onBack={() => showThread(null)} />
     : openAcceptance && <FactoryAcceptancePanel key={openAcceptance.id} task={openAcceptance} onOpenThread={showThread} onClose={() => setOpenAcceptance(null)} />
@@ -265,7 +294,7 @@ function TaskForm({ initial, thread: openThread, origin, user, onSaved, onDirty,
           <div className="flex min-w-0 flex-col gap-7">
             <FieldGroup><Field><FieldLabel htmlFor="task-title" className="sr-only">{t('titleLabel')}</FieldLabel><Textarea id="task-title" aria-label={t('titleLabel')} rows={1} placeholder={t('titleLabel')} value={title} onChange={event => changed({ title: event.target.value })} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false; setEditSequence(value => value + 1) }} onBlur={() => { if (title.trim() && title !== saved.title) void save() }} maxLength={200} className="field-sizing-content min-h-10 w-full resize-none rounded-sm border-none bg-transparent px-0 py-0 text-2xl font-semibold tracking-tight shadow-none md:text-2xl outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring dark:bg-transparent" onKeyDown={event => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }} /></Field></FieldGroup>
             {documentTools && <div><Button size="sm" variant="ghost" onClick={() => setDocumentTools(false)}><ArrowLeft data-icon="inline-start" />{t('backToSimple')}</Button></div>}
-    <SectionBoundary onClose={onClose}>{syncState.ready || readOnly ? <>{readOnly && <Alert><AlertDescription>{t('invalidContentReadOnly')}</AlertDescription></Alert>}<IssueEditor persisted content={content} disabled={readOnly} layout={documentTools ? 'document' : 'issue'} activity={activity} threadEvents={<ThreadEvents issueId={saved.id} onOpen={showThread} />} afterDescription={<><IssueRelations viewerId={user.id} mode="subissues" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} /><IssueThreads issueId={saved.id} openId={openThread} onOpen={showThread} /><FactoryAcceptance issueId={saved.id} onOpen={showAcceptance} /></>} sharedDoc={sync?.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={readOnly ? '' : syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /></> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
+    <SectionBoundary onClose={onClose}>{syncState.ready || readOnly ? <>{readOnly && <Alert><AlertDescription>{t('invalidContentReadOnly')}</AlertDescription></Alert>}<IssueEditor persisted content={content} disabled={readOnly} layout={documentTools ? 'document' : 'issue'} activity={activity} afterDescription={<><IssueRelations liveWorkspaceId={syncState.workspaceId ?? null} viewerId={user.id} mode="subissues" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} /><IssueThreads issueId={saved.id} openId={openThread} onOpen={showThread} /><FactoryAcceptance issueId={saved.id} onOpen={showAcceptance} /></>} sharedDoc={sync?.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={readOnly ? '' : syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /></> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
           </div>
           {syncState.error && <FieldError className="text-xs">{t('syncRetryNotice')}</FieldError>}
         </div>

@@ -17,8 +17,8 @@ import { AgentMarks, installedAgents } from './agent-marks'
 import { DaemonCommandList } from './connect-device-dialog'
 
 function StepIcon({ state }: { state: StepState }) {
-  if (state === 'done') return <Check aria-hidden="true" className="size-4 text-success" />
-  if (state === 'failed') return <X aria-hidden="true" className="size-4 text-destructive" />
+  if (state === 'done') return <Check aria-hidden="true" className="size-4 text-success-foreground" />
+  if (state === 'failed') return <X aria-hidden="true" className="size-4 text-destructive-foreground" />
   if (state === 'running') return <Loader2 aria-hidden="true" className="size-4 animate-spin text-muted-foreground" />
   return <Circle aria-hidden="true" className="size-4 text-muted-foreground/60" />
 }
@@ -135,7 +135,7 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
               <StepIcon state={state} />
               <span className={cn('shrink-0', state === 'pending' && 'text-muted-foreground')}>{t(`steps.${step}`)}</span>
               <span className="sr-only">{t(`stepState.${state}`)}</span>
-              {state === 'failed' && install.reason && <span className="ml-auto min-w-0 truncate text-xs text-destructive" title={install.reason}>{install.reason === 'cancelled' ? t('cancelled') : install.reason}</span>}
+              {state === 'failed' && install.reason && <span className="ml-auto min-w-0 truncate text-xs text-destructive-foreground" title={install.reason}>{install.reason === 'cancelled' ? t('cancelled') : install.reason}</span>}
               {step === 'online' && added && <span className="ml-auto flex items-center gap-2"><AgentMarks agents={installedAgents(added.harnesses)} /></span>}
             </li>
           })}

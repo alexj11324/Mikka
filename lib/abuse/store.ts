@@ -71,10 +71,16 @@ export class HostedUsageStore {
       if (!verified.rowCount) {
         if (fingerprint) {
           const filled = await tx.query('UPDATE hosted_verifications SET "customerId"=$2,fingerprint=$3,last4=$4 WHERE "workspaceId"=$1 AND (fingerprint IS NULL OR (fingerprint=$3 AND last4 IS NULL AND $4::text IS NOT NULL)) RETURNING "workspaceId"', [workspaceId, customerId, fingerprint, last4])
-          if (filled.rowCount) await tx.query('INSERT INTO hosted_card_claims (fingerprint,"workspaceId") VALUES ($1,$2) ON CONFLICT DO NOTHING', [fingerprint, workspaceId])
+          if (filled.rowCount) {
+            await tx.query('INSERT INTO hosted_card_claims (fingerprint,"workspaceId") VALUES ($1,$2) ON CONFLICT DO NOTHING', [fingerprint, workspaceId])
+            // The card's last four digits now show (#1212: the page waiting on the webhook reads on this key).
+            await (await import('../live/billing')).hostedBillingChanged(tx, workspaceId)
+          }
         }
         return false
       }
+      // Verified (and perhaps the allowance granted): the page waiting on the webhook reads again (#1212).
+      await (await import('../live/billing')).hostedBillingChanged(tx, workspaceId)
       const first =
         !fingerprint ||
         Boolean(

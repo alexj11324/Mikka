@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
-import { InvalidAuthorization, parseSubscriptionStart, planName, subscriptionListSchema } from './subscription-ui'
+import { InvalidAuthorization, parseSubscriptionStart, planName, subscriptionListSchema, subscriptionSignInState } from './subscription-ui'
 
 test('subscription consent opens only the fixed provider page for its own flow', () => {
   const state = 'a'.repeat(43)
@@ -32,4 +32,24 @@ test('a selected chat preserves its workspace identity', () => {
   const list = { enabled: true, providers: [], connections: [{ id: randomUUID(), provider: 'claude', state: 'connected', revision: 1, bots: [bot] }] }
   assert.deepEqual(subscriptionListSchema.parse(list).connections[0].bots, [bot])
   assert.equal(subscriptionListSchema.safeParse({ ...list, connections: [{ ...list.connections[0], bots: [{ ...bot, workspaceId: 'not-a-workspace' }] }] }).success, false)
+})
+
+test('an interrupted sign-in retains the same validated attempt and becomes reconnectable at its deadline', () => {
+  const id = randomUUID()
+  const now = Date.now()
+  const activeAttempt = { connectionId: id, state: 'a'.repeat(43), revision: 3, expiresAt: new Date(now + 60_000).toISOString(), flow: 'device', authorizationUrl: 'https://auth.openai.com/codex/device', userCode: 'ABCD-EFGH', interval: 5 }
+  const body = { enabled: true, providers: [], connections: [{ id, provider: 'codex', state: 'pending', revision: 3, activeAttempt, lastErrorCode: null }] }
+  const connection = subscriptionListSchema.parse(body).connections[0]
+  assert.deepEqual(connection.activeAttempt, activeAttempt)
+  assert.equal(subscriptionSignInState(connection, now), 'resume')
+  assert.equal(subscriptionSignInState(connection, now + 60_000), 'expired')
+  assert.equal(subscriptionSignInState({ ...connection, state: 'reconnect_required', activeAttempt: null, lastErrorCode: 'acquire_expired' }, now), 'expired')
+  // A start still publishing its presentation is resumable; it must not create another row.
+  assert.equal(subscriptionSignInState({ ...connection, activeAttempt: null }, now), 'resume')
+  assert.equal(subscriptionSignInState({ ...connection, state: 'connected', activeAttempt: null }, now), 'connected')
+  for (const invalid of [
+    { ...activeAttempt, connectionId: randomUUID() },
+    { ...activeAttempt, revision: 2 },
+    { ...activeAttempt, authorizationUrl: 'https://evil.test/codex/device' },
+  ]) assert.equal(subscriptionListSchema.safeParse({ ...body, connections: [{ ...body.connections[0], activeAttempt: invalid }] }).success, false)
 })

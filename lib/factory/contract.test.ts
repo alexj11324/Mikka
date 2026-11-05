@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { bindingSchema, revisionBindingSchema, routeSchema, routeStage, FactoryError } from "./contract";
+import { bindingSchema, revisionBindingSchema, routeSchema, routeStage, nextStage, factoryFlowVersion, FactoryError } from "./contract";
 import { factoryScopeAllows } from "./scope";
 import { handleFactory } from "./http";
 import type { FactoryStore } from "./http";
@@ -79,7 +79,7 @@ const req = {
 test("Owner Retry consumes an admitted completed run before ordinary execution retry", async () => {
   let retried = 0, recovered = 0, started = 0;
   const result = { task: { id: req.taskId, stage: "review", status: "running" } };
-  const store = { apply: async () => { retried++; return {}; }, retryCompletion: async () => {
+  const store = { retryCheckStart: async () => null, apply: async () => { retried++; return {}; }, retryCompletion: async () => {
     recovered++; return { result, start: async () => { started++; } };
   } } as unknown as FactoryStore;
   const pool = { query: async () => ({ rows: [{ botId: null }] }) };
@@ -93,7 +93,7 @@ test("Owner Retry consumes an admitted completed run before ordinary execution r
 });
 test("an unavailable completion recovery cannot fall through to ordinary Retry", async () => {
   let retries = 0;
-  const store = { apply: async () => { retries++; }, retryCompletion: async () => { throw new FactoryError('factoryCompletionRecoveryUnavailable'); } } as unknown as FactoryStore;
+  const store = { retryCheckStart: async () => null, apply: async () => { retries++; }, retryCompletion: async () => { throw new FactoryError('factoryCompletionRecoveryUnavailable'); } } as unknown as FactoryStore;
   const human = createFactoryHumanStore({ query: async () => ({ rows: [{ botId: null }] }) } as never, () => store);
   const response = await handleFactory(human, { ...req, body: {
     binding: { taskId: req.taskId, revision: 16 }, eventId: randomUUID(), action: 'retry', reason: 'Retry',
@@ -103,7 +103,7 @@ test("an unavailable completion recovery cannot fall through to ordinary Retry",
 });
 test("ordinary failed-run Retry keeps its existing store path", async () => {
   let retries = 0;
-  const store = { apply: async () => { retries++; return { normalRetry: true }; }, retryCompletion: async () => null } as unknown as FactoryStore;
+  const store = { retryCheckStart: async () => null, apply: async () => { retries++; return { normalRetry: true }; }, retryCompletion: async () => null } as unknown as FactoryStore;
   const human = createFactoryHumanStore({ query: async () => ({ rows: [{ botId: null }] }) } as never, () => store);
   const response = await handleFactory(human, { ...req, body: {
     binding: { taskId: req.taskId, revision: 16 }, eventId: randomUUID(), action: 'retry', reason: 'Retry',
@@ -148,4 +148,17 @@ test("API rejects missing session, invalid ids, cross origin, missing origin and
     ).status,
     422,
   );
+});
+
+
+test("the host flow version keeps old Verify history while new tasks hand off after one review", () => {
+  assert.equal(factoryFlowVersion({}), 1);
+  assert.equal(factoryFlowVersion({ route: { flowVersion: 2 } }), 2);
+  assert.equal(nextStage('review'), 'verify');
+  assert.equal(nextStage('verify'), 'approval');
+  assert.equal(nextStage('review', 2), 'approval');
+  assert.equal(nextStage('execute', 2, false), 'review');
+  assert.equal(nextStage('execute', 2, true), 'approval');
+  const input = { issueId: randomUUID(), eventId: randomUUID(), sourceEventId: randomUUID(), rationale: 'Task requested' };
+  for (const flowVersion of [1, 2, 3]) assert.equal(routeSchema.safeParse({ ...input, flowVersion }).success, false);
 });

@@ -9,6 +9,39 @@ const databaseURL = process.env.E2E_DATABASE_URL
 const disposable = disposableDatabase(process.env, databaseURL)
 if (process.env.REQUIRE_DB === '1' && !disposable) throw new Error('Subscription selection tests require an isolated local database')
 
+test('concurrent Connect reserves one bounded owner/workspace/provider acquisition', { skip: !disposable }, async () => {
+  const admin = new Pool({ connectionString: databaseURL })
+  const schema = `subscription_acquire_${randomUUID().replaceAll('-', '')}`
+  await admin.query(`CREATE SCHEMA ${schema}`)
+  const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
+  try {
+    await pool.query(`CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text NOT NULL,"workspaceId" text NOT NULL,provider text NOT NULL,state text NOT NULL,epoch bigint DEFAULT 1,"operationId" uuid,"operationKind" text,"operationDeadline" timestamptz,"removedAt" timestamptz,"createdAt" timestamptz DEFAULT now(),CHECK (("operationId" IS NULL)=("operationKind" IS NULL)),CHECK (("operationId" IS NULL)=("operationDeadline" IS NULL)))`)
+    await pool.query(`CREATE TABLE byos_enrollment_transfers ("connectionId" uuid PRIMARY KEY,epoch bigint NOT NULL,"operationId" uuid NOT NULL)`)
+    const repo = new SubscriptionRepository(pool), workspace = randomUUID()
+    const starts = await Promise.all(Array.from({ length: 6 }, () => repo.acquire('alice', workspace, 'codex')))
+    assert.equal(new Set(starts.map(start => start.connectionId)).size, 1)
+    assert.equal(starts.filter(start => start.created).length, 1)
+    const { rows: [reserved] } = await pool.query(`SELECT state,"operationKind","operationId",epoch,"operationDeadline">now() AND "operationDeadline"<=now()+interval '5 minutes' AS bounded FROM byos_connections WHERE id=$1`, [starts[0].connectionId])
+    assert.equal(reserved.state, 'pending')
+    assert.equal(reserved.operationKind, 'acquire')
+    assert.ok(reserved.operationId)
+    assert.equal(reserved.epoch, '1')
+    assert.equal(reserved.bounded, true)
+    for (const other of [await repo.acquire('bob', workspace, 'codex'), await repo.acquire('alice', randomUUID(), 'codex'), await repo.acquire('alice', workspace, 'claude')]) assert.notEqual(other.connectionId, starts[0].connectionId)
+    await pool.query(`UPDATE byos_connections SET "operationDeadline"=now()-interval '1 second' WHERE id=$1`, [starts[0].connectionId])
+    assert.notEqual((await repo.acquire('alice', workspace, 'codex')).connectionId, starts[0].connectionId)
+    const enrollment = await repo.acquire('alice', workspace, 'codex')
+    await pool.query(`INSERT INTO byos_enrollment_transfers SELECT id,epoch,"operationId" FROM byos_connections WHERE id=$1`, [enrollment.connectionId])
+    const before = (await pool.query('SELECT * FROM byos_connections WHERE id=$1', [enrollment.connectionId])).rows
+    assert.notEqual((await repo.acquire('alice', workspace, 'codex')).connectionId, enrollment.connectionId, 'web sign-in does not take over a recoverable desktop enrollment')
+    assert.deepEqual((await pool.query('SELECT * FROM byos_connections WHERE id=$1', [enrollment.connectionId])).rows, before)
+  } finally {
+    await pool.end()
+    await admin.query(`DROP SCHEMA ${schema} CASCADE`)
+    await admin.end()
+  }
+})
+
 test('subscription selections are current saved chats in the authorized workspace, never binding history', { skip: !disposable }, async () => {
   const admin = new Pool({ connectionString: databaseURL })
   const schema = `subscription_selections_${randomUUID().replaceAll('-', '')}`

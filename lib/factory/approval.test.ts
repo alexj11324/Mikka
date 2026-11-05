@@ -1,3 +1,4 @@
+import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -19,7 +20,7 @@ import {
 import { createFactoryTestAuthority } from "../../tests/helpers/factory-test-authority";
 import { handleFactoryApproval } from "./approval-http";
 import { approvalRequest } from "./approval-contract";
-import { createFactoryStore, type FactoryTask } from "./store";
+import { type FactoryTask } from "./store";
 import { redactArtifact } from "./evidence";
 import { factoryBrowserHuman } from "./browser-human";
 import { createLocalPublicationAdapter } from "./local-publication";

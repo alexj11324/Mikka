@@ -1,3 +1,4 @@
+import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 // BE-9: run completion drives Factory reconcile without a Coordinator turn.
 // Real migrations, store, dispatch and reconciler over a disposable *_e2e PG.
 import assert from "node:assert/strict";
@@ -6,10 +7,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { Pool, type PoolClient } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
-import { adoptProviderContinuation, createFactoryStore } from "./store";
+import { adoptProviderContinuation, createFactoryStore as createCurrentFactoryStore } from "./store";
 import { freezeWorkerDefinition } from "../agent-kit/worker";
 import type { ExecutionIdentity } from "../execution-identity";
-import { providerContinuationDefinition } from "../run-provider-fallback";
+import { providerContinuationDefinition, providerContinuationLaunchMatches, providerContinuationMatches, recoverProviderFailure } from "../run-provider-fallback";
+import { providerContinuationPrompt } from "../run-retry";
 import { checkFactoryRepairBudget } from "./check-recovery-evidence";
 import { FactoryError } from "./contract";
 import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding, type FactoryQueue } from "./dispatch";
@@ -21,7 +23,9 @@ import { approvalEvidence } from './evidence';
 import { factoryEventId } from './event-id';
 import { questionFingerprint, humanQuestionAnswerSchema } from './questions/contract';
 import { createFactoryQuestions } from "./questions/store";
-import { createFactoryReconciler } from "./reconcile";
+import { createFactoryReconciler, observeFactoryProfileDispatch } from "./reconcile";
+import { AgentProfileError } from "./agent-profile-definition";
+import { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction, registerFactoryProfile } from "./transaction";
 import { factoryCheckIndependent } from "./check-independence";
 import { reconcileFactoryAfterCompletion } from "../run-completion-effects";
 import { orchestratorSettings } from "@mikka/protocol/orchestrator";
@@ -101,11 +105,12 @@ test("run completion enters review without the Coordinator; replays do not advan
       const prior = (await query.query('SELECT * FROM agent_runs WHERE id=$1', [sourceId])).rows[0];
       const harness = prior.agentDefinition.harness === 'codex' ? 'claude_code' : 'codex';
       const admitted = providerDefinition(harness, prior.prompt, target?.deviceId ?? prior.deviceId);
-      const definition = { ...providerContinuationDefinition(prior.agentDefinition, admitted, prior.prompt), executionIdentity: admitted.executionIdentity };
+      const prompt = providerContinuationPrompt(prior.prompt);
+      const definition = { ...providerContinuationDefinition(prior.agentDefinition, admitted, prompt), executionIdentity: admitted.executionIdentity };
       const childId = randomUUID();
       await query.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",kind,status,prompt,"baseBranch","agentDefinition","retryOf",attempt)
-        SELECT $2,"userId","issueId",$3,$4,$5,"botId",kind,'queued',prompt,"baseBranch",$6,id,attempt FROM agent_runs WHERE id=$1`,
-        [sourceId, childId, target?.agentId ?? (harness === 'codex' ? agentId : alternateAgentId), target?.deviceId ?? prior.deviceId, target?.deviceRepoId ?? prior.deviceRepoId, JSON.stringify(definition)]);
+        SELECT $2,"userId","issueId",$3,$4,$5,"botId",kind,'queued',$7,"baseBranch",$6,id,attempt FROM agent_runs WHERE id=$1`,
+        [sourceId, childId, target?.agentId ?? (harness === 'codex' ? agentId : alternateAgentId), target?.deviceId ?? prior.deviceId, target?.deviceRepoId ?? prior.deviceRepoId, JSON.stringify(definition), prompt]);
       const fallback = { state: 'switched', fallback: 'balance',
         from: { harness: prior.agentDefinition.harness, model: prior.agentDefinition.model, source: 'api_key' },
         to: { harness, model: definition.model, source: 'api_key' }, retryRunId: childId, nextDefinitionDigest: definition.definitionDigest };
@@ -153,6 +158,158 @@ test("run completion enters review without the Coordinator; replays do not advan
       assert.equal(queried, 0);
     });
     process.env.MIKKA_FACTORY_ROUTING_ENABLED = "1"; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = "1";
+
+    await t.test('Profile Decision refusal preserves the submitted candidate, isolates Coordinator sweeps and retries only the unstarted check', async () => {
+      const currentStore = createCurrentFactoryStore(pool, authorize, null, { independent: factoryCheckIndependent });
+      const execute = createFactoryDispatch(pool, currentStore, queue, { configure: { execute: async () => {} },
+        freeze: async (tx, _task, id) => { await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [id, JSON.stringify({ schemaVersion: 1, definitionDigest: 'fixture', harness: 'codex' })]); } });
+      const review = createFactoryDispatch(pool, currentStore, queue, defaultFactoryDispatchAdapters);
+      const completed = async () => {
+        const issue = randomUUID(), source = randomUUID();
+        await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Profile Decision fixture','{"type":"doc","content":[]}','todo','normal')`, [issue]);
+        await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [source, source]);
+        const routed = await currentStore.route('owner', { issueId: issue, sourceEventId: source, eventId: randomUUID(), rationale: 'Task requested', missingInformation: [], missingPermissions: [], needsSpec: false });
+        const result = await execute('owner', { binding: factoryBinding(routed.task), agentId, deviceRepoId: repoId });
+        await succeed(result.runId);
+        return { task: result.task, runId: result.runId };
+      };
+      const refusals = new Map<string, Error>();
+      const decisions = new Map<string, number>();
+      const rolledBackRuns: string[] = [];
+      let starts = 0;
+      const next = observeFactoryProfileDispatch(async (tx, targetStore, prior) => {
+        const current = await targetStore.lockTask(tx, prior.userId, prior.id);
+        if (current.status !== 'pending' || current.stage !== 'review') return;
+        decisions.set(current.id, (decisions.get(current.id) ?? 0) + 1);
+        const refusal = refusals.get(current.id);
+        if (refusal) {
+          if (refusal instanceof AgentProfileError && refusal.code === 'agentProfileDecisionUnavailable') {
+            // Any work registered inside a failed dispatch must be discarded;
+            // the completed producer/candidate outside it must still commit.
+            const queued = await queue(tx, current.userId, { issueId: current.issueId, agentId, deviceRepoId: repoId }, current.botId, { sourceEventId: current.sourceEventId, attemptId: current.attemptId });
+            rolledBackRuns.push(queued.runId);
+            registerFactoryProfile(tx, { ownerId: current.userId, workspaceId: randomUUID() });
+          }
+          throw refusal;
+        }
+        await review(current.userId, { binding: factoryBinding(current), agentId, deviceRepoId: repoId }, tx);
+        return async () => { starts++; };
+      });
+      const reconcile = createFactoryReconciler(pool, currentStore, undefined, {}, null, next);
+      const failed = await completed(), healthy = await completed();
+      const originalRun = (await pool.query('SELECT to_jsonb(r) AS value FROM agent_runs r WHERE id=$1', [failed.runId])).rows[0].value;
+      refusals.set(failed.task.id, new AgentProfileError('agentProfileDecisionUnavailable'));
+      await reconcile('owner');
+      const blocked = await currentStore.read('owner', failed.task.id);
+      assert.deepEqual({ stage: blocked.task.stage, status: blocked.task.status }, { stage: 'review', status: 'blocked' });
+      assert.equal(blocked.task.route.flowVersion, 2);
+      assert.ok(blocked.task.candidateId);
+      assert.deepEqual(blocked.attempts.map(a => ({ stage: a.stage, status: a.status, runId: a.runId })), [
+        { stage: 'execute', status: 'passed', runId: failed.runId }, { stage: 'review', status: 'blocked', runId: null },
+      ]);
+      assert.equal(blocked.candidates.length, 1);
+      assert.equal(blocked.candidates[0].id, blocked.task.candidateId);
+      assert.equal(blocked.candidates[0].runId, failed.runId);
+      assert.equal(blocked.candidates[0].sha, 'b'.repeat(40));
+      assert.deepEqual(blocked.attempts[1].output.dispatch, { code: 'agentProfileDecisionUnavailable' });
+      assert.match(blocked.task.reason, /could not select an Agent Profile/);
+      assert.deepEqual(blocked.checks?.map(check => ({ attemptId: check.attemptId, status: check.status, candidateId: check.candidateId, runId: check.runId })),
+        [{ attemptId: blocked.task.attemptId, status: 'blocked', candidateId: blocked.task.candidateId, runId: null }]);
+      assert.deepEqual((blocked as unknown as { checkDispatchRecovery?: unknown }).checkDispatchRecovery,
+        { binding: { taskId: blocked.task.id, revision: blocked.task.revision } });
+      assert.deepEqual((await pool.query('SELECT to_jsonb(r) AS value FROM agent_runs r WHERE id=$1', [failed.runId])).rows[0].value, originalRun);
+      assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE id=ANY($1::uuid[])', [rolledBackRuns])).rowCount, 0);
+      assert.equal((await currentStore.read('owner', healthy.task.id)).task.status, 'running', 'an unrelated task still queues its independent review');
+      assert.equal(starts, 1);
+      await reconcile('owner');
+      assert.equal(decisions.get(failed.task.id), 1, 'normal Coordinator sweeps do not retry a known blocked Decision');
+      assert.deepEqual(await currentStore.read('owner', failed.task.id), blocked, 'a read/sweep does not rewrite the blocked receipt');
+
+      const human = createFactoryHumanStore(pool, () => currentStore, next);
+      const retry = async () => {
+        const current = (await currentStore.read('owner', failed.task.id)).task;
+        const result = await handleFactory(human, { userId: 'owner', method: 'POST', taskId: current.id,
+          origin: 'https://fixture.invalid', url: `https://fixture.invalid/api/factory/tasks/${current.id}`,
+          body: { binding: { taskId: current.id, revision: current.revision }, eventId: randomUUID(), action: 'retry', reason: 'Retry the independent review' } });
+        assert.equal(result.status, 200);
+        const pending = (await currentStore.read('owner', current.id)).task;
+        assert.equal(pending.status, 'pending');
+        assert.equal(pending.stage, 'review');
+        assert.equal(pending.candidateId, blocked.task.candidateId);
+        assert.notEqual(pending.attemptId, current.attemptId);
+        const tx = await pool.connect();
+        try {
+          await beginFactoryTransaction(tx);
+          const start = await next(tx, currentStore, pending, {});
+          await commitFactoryTransaction(tx);
+          await start?.();
+        } catch (error) { await rollbackFactoryTransaction(tx); throw error; }
+        finally { forgetFactoryTransaction(tx); tx.release(); }
+      };
+      await retry();
+      assert.equal((await currentStore.read('owner', failed.task.id)).task.status, 'blocked', 'Owner retry does not bypass the next strict Decision');
+      assert.equal(decisions.get(failed.task.id), 2);
+      assert.equal(starts, 1);
+      refusals.delete(failed.task.id);
+      await retry();
+      const resumed = await currentStore.read('owner', failed.task.id);
+      assert.equal(resumed.task.status, 'running');
+      assert.equal(resumed.task.stage, 'review');
+      assert.equal(resumed.task.candidateId, blocked.task.candidateId);
+      assert.equal(decisions.get(failed.task.id), 3);
+      assert.equal(resumed.attempts.filter(a => a.stage === 'execute').length, 1);
+      assert.equal(resumed.attempts.filter(a => a.stage === 'review' && a.runId).length, 1);
+      assert.equal(resumed.attempts.filter(a => a.stage === 'verify').length, 0);
+      const resumedRun = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [resumed.attempts.at(-1)!.runId])).rows[0];
+      assert.equal(resumedRun.kind, 'acceptance');
+      assert.equal(resumedRun.sessionId, null);
+      assert.equal(resumedRun.retryOf, null);
+      assert.equal((await factoryCheckAssignment(pool, 'owner', resumedRun.id)).policy.readOnly, true);
+      assert.equal(starts, 2);
+
+      // ALEX67 already reached this older watchdog state before the fix. Owner
+      // recovery must consume its submitted run, never re-run the producer.
+      const exhausted = await completed();
+      const clock = Date.now();
+      for (const minutes of [0, 3, 8, 17]) await sweepFactoryWatchdog(pool, {
+        runtime: () => ({ store: currentStore, reconcile: { run: async () => { throw new AgentProfileError('agentProfileDecisionUnavailable'); } } }),
+        dispatch: async () => { throw new Error('A successful producer must not be dispatched again'); }, wake: async () => {},
+      }, new Date(clock + minutes * 60_000), Date.now() + 20_000, { userId: 'owner', runId: exhausted.runId });
+      const old = await currentStore.read('owner', exhausted.task.id);
+      assert.deepEqual({ stage: old.task.stage, status: old.task.status, candidateId: old.task.candidateId }, { stage: 'execute', status: 'blocked', candidateId: null });
+      assert.ok(old.completionRecovery);
+      const oldHistory = await history(old.task.id, exhausted.runId, old.task.attemptId);
+      refusals.set(old.task.id, new AgentProfileError('agentProfileDecisionUnavailable'));
+      const ownerRequest = { userId: 'owner', method: 'POST', taskId: old.task.id, origin: 'https://fixture.invalid', url: `https://fixture.invalid/api/factory/tasks/${old.task.id}`,
+        body: { binding: old.completionRecovery!.binding, eventId: randomUUID(), action: 'retry', reason: 'Resume the completed execution' } };
+      const recovered = await handleFactory(human, ownerRequest);
+      assert.equal(recovered.status, 200);
+      assert.deepEqual(await handleFactory(human, ownerRequest), recovered, 'Owner completion receipt replays without another Decision');
+      const after = await currentStore.read('owner', old.task.id);
+      assert.deepEqual({ stage: after.task.stage, status: after.task.status }, { stage: 'review', status: 'blocked' });
+      assert.equal(after.candidates.length, 1);
+      assert.equal(after.candidates[0].runId, exhausted.runId);
+      assert.equal(after.attempts.filter(a => a.stage === 'execute').length, 1);
+      assert.equal(after.attempts.filter(a => a.runId).length, 1);
+      assert.equal(after.attempts.at(-1)!.runId, null);
+      assert.deepEqual(await history(old.task.id, exhausted.runId, old.task.attemptId), oldHistory, 'recovery preserves the original blocked history and completed native run');
+      assert.equal(decisions.get(old.task.id), 1);
+      assert.equal(starts, 2);
+      assert.equal(after.completionRecovery, undefined);
+      assert.deepEqual((after as unknown as { checkDispatchRecovery?: unknown }).checkDispatchRecovery,
+        { binding: { taskId: after.task.id, revision: after.task.revision } });
+
+      for (const refusal of [new Error('Unexpected dispatch error'), Object.assign(new Error('Untrusted Decision code'), { code: 'agentProfileDecisionUnavailable' }), new AgentProfileError('agentProfileScopeNotFound', 404)]) {
+        const denied = await completed();
+        refusals.set(denied.task.id, refusal);
+        await assert.rejects(reconcile.run('owner', denied.runId), error => error === refusal);
+        const unchanged = await currentStore.read('owner', denied.task.id);
+        assert.equal(unchanged.task.stage, 'execute');
+        assert.equal(unchanged.task.status, 'running');
+        assert.equal(unchanged.task.candidateId, null);
+        assert.equal(unchanged.attempts.length, 1);
+      }
+    });
 
     await t.test('Owner Retry consumes exhausted successful completion once, keeps history and queues only fresh independent review', async () => {
       const f = await exhaustedCompletion();
@@ -455,8 +612,23 @@ test("run completion enters review without the Coordinator; replays do not advan
       const reviewDispatch = createFactoryDispatch(pool, store, queue, defaultFactoryDispatchAdapters);
       const review = await reviewDispatch('owner', { binding: factoryBinding(pending), agentId, deviceRepoId: providerRepoId });
       const original = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [review.runId])).rows[0];
-      await pool.query(`UPDATE agent_runs SET status='running',"agentDefinition"=$2,"sessionId"='provider-check-original' WHERE id=$1`,
-        [review.runId, JSON.stringify(providerDefinition('codex', original.prompt))]);
+      const profileApi = await import('./agent-profile');
+      const { assertRunProfileClaim } = await import('./profile-admission');
+      const profileId = randomUUID();
+      const role = profileApi.parseAgentProfile({ name: 'Independent review', harness: 'auto', model: { mode: 'inherit' }, instructions: 'Keep the frozen independent review responsibility.' });
+      const beforeDefinition = providerDefinition('codex', original.prompt);
+      const selectedProfile = { profileId, version: 1, digest: profileApi.agentProfileDigest(role, []), name: role.name,
+        source: 'decision' as const, reason: 'Fixture role selection', scope: { ownerId: 'owner', workspaceId: providerWorkspaceId },
+        definition: role, skills: [], instructions: role.instructions, targetEntry: beforeDefinition.modelDispatch!.entry! };
+      const frozenDefinition = { ...beforeDefinition, instructions: `${beforeDefinition.instructions}\n\n${role.instructions}`, agentProfile: selectedProfile };
+      frozenDefinition.definitionDigest = (await import('../agent-kit/worker-digest')).workerDefinitionDigest(frozenDefinition);
+      await pool.query(`INSERT INTO factory_agent_profiles (id,"ownerId","workspaceId",version,definition,skills,digest) VALUES ($1,'owner',$2,1,$3,'[]',$4)`, [profileId, providerWorkspaceId, JSON.stringify(role), selectedProfile.digest]);
+      await pool.query(`UPDATE agent_runs SET status='running',"startedAt"=now(),"agentDefinition"=$2,"sessionId"='provider-check-original' WHERE id=$1`,
+        [review.runId, JSON.stringify(frozenDefinition)]);
+      // Editing or disabling a role affects future selections, not the role
+      // already frozen in the host-authorized provider recovery of this check.
+      const editedRole = { ...role, enabled: false, instructions: 'Changed after the original review started.' };
+      await pool.query('UPDATE factory_agent_profiles SET version=2,definition=$2,digest=$3 WHERE id=$1', [profileId, JSON.stringify(editedRole), profileApi.agentProfileDigest(editedRole, [])]);
       const checkBefore = (await store.read('owner', f.task.id)).attempts.at(-1)!.output.check;
       const nextDevice = randomUUID(), nextAgent = randomUUID(), nextRepo = randomUUID();
       await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,'owner','Next provider device',now(),'[{"harness":"claude_code","installed":true}]')`, [nextDevice]);
@@ -482,6 +654,67 @@ test("run completion enters review without the Coordinator; replays do not advan
       const child = (await pool.query('SELECT "retryOf","sessionId",prompt FROM agent_runs WHERE id=$1', [childId!])).rows[0];
       assert.deepEqual(child, { retryOf: null, sessionId: null, prompt: original.prompt });
       assert.equal((await pool.query('SELECT result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, factoryEventId('provider-check-continuation', review.runId)])).rows[0].result.runId, childId!);
+      const prior = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [review.runId])).rows[0];
+      const queued = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [childId!])).rows[0];
+      assert.equal(providerContinuationMatches(prior, queued), false, 'an independent check is deliberately not a native-session retry');
+      assert.equal(await providerContinuationLaunchMatches(pool, prior, queued), true, 'the current check and exact host receipt authorize its launch');
+      await assertRunProfileClaim(pool, childId!);
+      assert.equal(queued.agentDefinition.agentProfile.version, 1);
+      assert.equal(queued.agentDefinition.agentProfile.instructions, role.instructions);
+      assert.equal(await providerContinuationLaunchMatches(pool, prior, { ...queued, sessionId: prior.sessionId }), false, 'a check cannot inherit the failed native session');
+      assert.equal(await providerContinuationLaunchMatches(pool, { ...prior, report: { ...prior.report,
+        modelFallback: { ...prior.report.modelFallback, nextDefinitionDigest: 'changed' } } }, queued), false);
+      let recovered = 0, launched = 0;
+      const dependencies = {
+        runtime: () => ({ store, reconcile: { run: (userId: string, runId: string) => sweep.run(userId, runId) } }),
+        dispatch: async () => { throw new Error('A queued independent provider check cannot enter generic repair'); }, wake: async () => {},
+        recoverProvider: async (userId: string, sourceId: string) => {
+          assert.equal(userId, 'owner'); assert.equal(sourceId, review.runId);
+          const continuation = await recoverProviderFailure(pool, userId, sourceId);
+          assert.equal(continuation?.runId, childId!);
+          assert.equal(continuation?.previousRunId, review.runId);
+          recovered++;
+          return async () => { launched++; };
+        },
+      };
+      for (let replay = 0; replay < 2; replay++) {
+        const result = await sweepFactoryWatchdog(pool, dependencies, new Date(), Date.now() + 20_000, { userId: 'owner', runId: childId! });
+        assert.deepEqual({ recovered: result.recovered, blocked: result.blocked, failed: result.failed }, { recovered: 1, blocked: 0, failed: 0 });
+      }
+      assert.deepEqual({ recovered, launched }, { recovered: 2, launched: 2 });
+      const replayed = await store.read('owner', f.task.id);
+      assert.equal(replayed.task.attemptId, after.task.attemptId);
+      assert.equal(replayed.attempts.length, after.attempts.length);
+      assert.deepEqual((await pool.query('SELECT "retryOf","sessionId",prompt FROM agent_runs WHERE id=$1', [childId!])).rows[0], child,
+        'recovery preserves the independent check prompt and empty session binding');
+      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='task_watchdog'`, [f.task.id])).rows[0].n, 0);
+
+      for (const fault of ['receipt', 'epoch', 'attempt'] as const) {
+        const guard = await pool.connect();
+        try {
+          await guard.query('BEGIN');
+          if (fault === 'receipt') await guard.query(`UPDATE factory_events SET result=jsonb_set(result,'{runId}',to_jsonb($3::text)) WHERE "taskId"=$1 AND "eventId"=$2`,
+            [f.task.id, factoryEventId('provider-check-continuation', review.runId), randomUUID()]);
+          if (fault === 'epoch') {
+            const nextEpoch = randomUUID();
+            await guard.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1::uuid,'owner','user_message',$1::text,'{"text":"Changed fixture request"}')`, [nextEpoch]);
+            await guard.query('UPDATE factory_tasks SET "sourceEventId"=$2 WHERE id=$1', [f.task.id, nextEpoch]);
+          }
+          if (fault === 'attempt') {
+            // A real independent check owns a fresh native session before it
+            // can finish, and its run must end before Factory permits retry.
+            await guard.query(`UPDATE agent_runs SET status='failed',"stopReason"='error',"sessionId"=$2 WHERE id=$1`,
+              [childId!, `check-replacement-${randomUUID()}`]);
+            const current = await store.lockTask(guard, 'owner', f.task.id);
+            const failed = await store.apply('owner', factoryBinding(current), randomUUID(), { action: 'finish', status: 'failed', reason: 'Replace fixture check', evidence: [], output: {} }, guard);
+            const replacement = await store.apply('owner', factoryBinding(failed.task), randomUUID(), { action: 'retry', reason: 'New fixture check attempt' }, guard);
+            assert.notEqual(replacement.task.attemptId, after.task.attemptId);
+          }
+          assert.equal(await providerContinuationLaunchMatches(guard, prior, queued), false, fault);
+          await assert.rejects(assertRunProfileClaim(guard, childId!), { message: 'agentProfileUnavailable' }, `${fault} cannot authorize the stale frozen role`);
+        } finally { await guard.query('ROLLBACK'); guard.release(); }
+      }
+      assert.equal(await providerContinuationLaunchMatches(pool, prior, queued), true, 'guard mutations are rolled back');
     });
 
     await t.test('provider handoff rejects changed standing scope, repository and monitor placement with no orphan queue row', async () => {
@@ -594,6 +827,37 @@ test("run completion enters review without the Coordinator; replays do not advan
       assert.equal((await pool.query(`SELECT count(*)::int AS n FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='task_watchdog'`, [f.task.id])).rows[0].n, 0);
     });
 
+    await t.test('watchdog relaunches the adopted queued provider child from its committed source receipt', async () => {
+      const f = await providerSource();
+      const tx = await pool.connect();
+      let childId: string;
+      try {
+        await tx.query('BEGIN'); childId = await providerChild(tx, f.runId);
+        await adoptProviderContinuation(tx, 'owner', f.runId, childId, () => store);
+        await tx.query('COMMIT');
+      } catch (error) { await tx.query('ROLLBACK'); throw error; } finally { tx.release(); }
+      let recovered = 0, launched = 0;
+      const dependencies = {
+        runtime: () => ({ store, reconcile: { run: (userId: string, runId: string) => sweep.run(userId, runId) } }),
+        dispatch: async () => { throw new Error('An adopted provider child cannot enter generic repair'); }, wake: async () => {},
+        recoverProvider: async (userId: string, sourceId: string) => {
+          assert.equal(userId, 'owner'); assert.equal(sourceId, f.runId); recovered++;
+          assert.equal((await store.read('owner', f.task.id)).attempts.at(-1)!.runId, childId);
+          return async () => { launched++; };
+        },
+      };
+      for (let replay = 0; replay < 2; replay++) {
+        const result = await sweepFactoryWatchdog(pool, dependencies, new Date(), Date.now() + 20_000, { userId: 'owner', runId: childId });
+        assert.deepEqual({ recovered: result.recovered, blocked: result.blocked, failed: result.failed }, { recovered: 1, blocked: 0, failed: 0 });
+      }
+      assert.deepEqual({ recovered, launched }, { recovered: 2, launched: 2 });
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "retryOf"=$1', [f.runId])).rows[0].n, 1);
+      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='task_watchdog'`, [f.task.id])).rows[0].n, 0);
+      await pool.query(`UPDATE agent_runs SET status='running',"leaseExpiresAt"=now()+interval '1 minute' WHERE id=$1`, [childId]);
+      await sweepFactoryWatchdog(pool, dependencies, new Date(), Date.now() + 20_000, { userId: 'owner', runId: childId });
+      assert.deepEqual({ recovered, launched }, { recovered: 2, launched: 2 }, 'a claimed child is not relaunched');
+    });
+
     await t.test("G2: reconciling one finished run does not move another task whose run also finished", async () => {
       const a = await runningTask(), b = await runningTask();
       await succeed(a.runId); await succeed(b.runId); // b's hook has not fired yet
@@ -648,9 +912,36 @@ test("run completion enters review without the Coordinator; replays do not advan
       assert.equal((await pool.query('SELECT count(*)::int n FROM factory_attempts WHERE "taskId"=$1', [routed.task.id])).rows[0].n, events);
     });
 
-    await t.test("reconcile failure is swallowed and left to the fallback", async () => {
-      const n = await reconcileFactoryAfterCompletion(pool, "owner", d.runId, () => async () => { throw Object.assign(new Error("boom secret-ish"), { code: "40P01" }); });
-      assert.equal(n, 0);
+    await t.test("reconcile failure still records one owner-bound terminal routing outcome before the fallback", async () => {
+      const f = await runningTask();
+      const routing = { version: 1, difficulty: 'easy', model: 'gpt-6-luna', harness: 'codex', tier: 'light', effort: 'low', reason: 'difficulty_fit' };
+      await pool.query(`UPDATE agent_runs SET "agentDefinition"="agentDefinition" || $2::jsonb WHERE id=$1`,
+        [f.runId, JSON.stringify({ modelDispatch: { routing } })]);
+      const unavailable = () => async () => { throw Object.assign(new Error("boom secret-ish"), { code: "40P01" }); };
+      const outcomes = async () => (await pool.query(`SELECT "taskId","eventId",result FROM factory_events
+        WHERE request->>'kind'='model_routing_outcome' AND request->>'runId'=$1`, [f.runId])).rows;
+
+      assert.equal(await reconcileFactoryAfterCompletion(pool, 'owner', f.runId, unavailable), 0);
+      assert.deepEqual(await outcomes(), [], 'a still-running run has no terminal outcome');
+      await succeed(f.runId);
+      assert.equal(await reconcileFactoryAfterCompletion(pool, 'different-owner', f.runId, unavailable), 0);
+      assert.deepEqual(await outcomes(), [], "a different owner cannot record another person's outcome");
+
+      assert.deepEqual(await Promise.all([1, 2, 3].map(() => reconcileFactoryAfterCompletion(pool, 'owner', f.runId, unavailable))), [0, 0, 0]);
+      const recorded = await outcomes();
+      assert.equal(recorded.length, 1, 'concurrent failed-reconcile hooks share one routing receipt');
+      assert.equal(recorded[0].taskId, f.task.id);
+      assert.equal(recorded[0].eventId, factoryEventId('model-routing-outcome', f.runId));
+      assert.deepEqual(recorded[0].result.routing, routing);
+      assert.equal(recorded[0].result.outcome.status, 'succeeded');
+      assert.equal(recorded[0].result.outcome.stopReason, 'submitted');
+      assert.equal(recorded[0].result.outcome.stage, 'execute');
+      assert.equal((await store.read('owner', f.task.id)).task.stage, 'execute', 'routing telemetry does not advance the task');
+
+      await sweep.run('owner', f.runId); // preparePrompt uses this independent recovery entry.
+      assert.equal((await store.read('owner', f.task.id)).task.stage, 'review');
+      await reconcileFactoryAfterCompletion(pool, 'owner', f.runId, reconcileFor);
+      assert.deepEqual(await outcomes(), recorded, 'fallback and later completion replay preserve the original outcome');
     });
   } finally {
     if (flags.r === undefined) delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; else process.env.MIKKA_FACTORY_ROUTING_ENABLED = flags.r;

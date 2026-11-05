@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
+import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 import { Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { colors, lift } from '@/lib/theme'
@@ -21,7 +21,7 @@ export function CardButton({ label, onPress, primary, disabled, busy, destructiv
   label: string; onPress: () => void; primary?: boolean; disabled?: boolean; busy?: boolean; destructive?: boolean
 }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ disabled: Boolean(disabled), busy: Boolean(busy) }} disabled={disabled || busy} onPress={onPress}
+    <Pressable accessibilityRole="button" accessibilityState={{ disabled: Boolean(disabled || busy), busy: Boolean(busy) }} aria-disabled={Platform.OS === 'web' ? Boolean(disabled || busy) : undefined} aria-busy={Platform.OS === 'web' ? Boolean(busy) : undefined} disabled={disabled || busy} onPress={onPress}
       style={({ pressed }) => [styles.button, primary ? styles.primary : styles.secondary, pressed && { opacity: 0.8 }, disabled && { opacity: 0.4 }]}>
       {busy ? <Spinner size={14} color={primary ? colors.onInk : colors.secondary} /> : null}
       <Text style={[styles.buttonText, primary ? { color: colors.onInk } : destructive ? { color: colors.danger } : null]}>{label}</Text>
@@ -50,7 +50,7 @@ export const cardText = StyleSheet.create({
 const styles = StyleSheet.create({
   card: { alignSelf: 'stretch', backgroundColor: colors.surface, borderRadius: 14, padding: 16, gap: 12, ...lift },
   highlighted: { shadowColor: colors.accent, shadowOpacity: 0.35, shadowRadius: 14 },
-  button: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 40, paddingHorizontal: 18, borderRadius: 20 },
+  button: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22 },
   primary: { backgroundColor: colors.ink },
   secondary: { backgroundColor: colors.bubble },
   buttonText: { fontSize: 15, fontWeight: '600' },

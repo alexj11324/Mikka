@@ -306,12 +306,50 @@ export function instructionsWithPersonal(instructions: string, personal: string)
 
 /** One entry in the chat the person sees. */
 /** A tool a reply used, as the chat shows it: `running` until its result is stored. */
-export interface ChatTool { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string }
+/** `at`: how much of the reply's text came before this tool ran, so the chat draws it after those words. */
+/** `quote`: what the call was asked to do in words (a dispatch's note), whole up to QUOTE_PREVIEW_CHARS, sent apart from `input` so a cut preview never loses it. */
+export interface ChatTool { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string; quote?: string; at?: number }
 /** `reasoningAt`: the stored rows whose reasoning is readable text, fetched only when the person opens it (chat-projection.ts keeps its length). */
 export interface ChatActivity { tools: ChatTool[]; thought: boolean; reasoningAt?: number[] }
 
+/** The input fields that say in words what a call was asked to do, in the order the chat looks for them. */
+export const QUOTE_KEYS = ['note', 'prompt', 'instruction', 'message', 'request', 'text', 'body'] as const
+export const QUOTE_PREVIEW_CHARS = 1000
+
+/** The whitespace a quote is trimmed of, the same set the compact projection's SQL trims (chat-projection.ts). */
+export const QUOTE_SPACE = ' \\t\\n\\r\\f\\v'
+const EDGE_SPACE = /^[ \t\n\r\f\v]+|[ \t\n\r\f\v]+$/g
+
+/** A call's words trimmed of edge whitespace, whole; nothing when empty or not text. */
+export function quoteText(text: unknown): string | undefined {
+  return typeof text === 'string' ? text.replace(EDGE_SPACE, '') || undefined : undefined
+}
+
+/** A quote as the chat may show it: trimmed, and cut with an ellipsis past QUOTE_PREVIEW_CHARS. */
+export function quotePreview(text: unknown): string | undefined {
+  const whole = quoteText(text)
+  if (!whole) return undefined
+  return whole.length > QUOTE_PREVIEW_CHARS ? `${whole.slice(0, QUOTE_PREVIEW_CHARS).trimEnd()}…` : whole
+}
+
+/** The first of QUOTE_KEYS a tool input holds as text, whole and trimmed: what the chat quotes. */
+export function toolQuoteText(input: unknown): string | undefined {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return undefined
+  for (const key of QUOTE_KEYS) { const words = quoteText((input as Record<string, unknown>)[key]); if (words) return words }
+  return undefined
+}
+
+/** A tool input's words as the chat's quote, cut past QUOTE_PREVIEW_CHARS. */
+export function toolQuote(input: unknown): string | undefined {
+  return quotePreview(toolQuoteText(input))
+}
+
 function withPreview<K extends 'input' | 'output'>(key: K, text: string | undefined): Partial<Record<K, string>> {
   return text ? { [key]: text } as Record<K, string> : {}
+}
+
+function withQuote(quote: string | undefined): { quote?: string } {
+  return quote ? { quote } : {}
 }
 
 /** A tool input or output as the chat's short preview: the compact projection's, or the start of the full value. */
@@ -377,6 +415,8 @@ export interface ChatItem {
   stopped?: true
   /** Why the turn answering this message of the person's failed; it stays after later turns and reloads. */
   failure?: ChatFailure
+  /** The Bot's welcome failed (`failure` says why); shown on the Bot's side until a reply follows. */
+  welcome?: true
 }
 
 /** The run id a successful local or Bot-computer dispatch carries. */
@@ -425,8 +465,18 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       // 重新发送 retried this failed message in place (store.sendRetryOf): the new attempt stands for it.
       if ((message as { mikkaRetried?: unknown }).mikkaRetried === true) continue
       const raw = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
-      // The request for its welcome is for the Coordinator only.
-      if (raw.startsWith(COORDINATOR_WELCOME_MARK)) continue
+      // The request for its welcome is for the Coordinator only. When the turn answering it failed (store.failTurn),
+      // the Bot's side says why, with 重试, until a reply follows (the welcome request had no other trace in the chat).
+      if (raw.startsWith(COORDINATOR_WELCOME_MARK)) {
+        const reason = (message as { mikkaFailure?: unknown }).mikkaFailure
+        const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason }) : null
+        if (failure) {
+          flush()
+          items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: '', tools: [], threads: [], createdAt: createdAt.toISOString(), artifacts: [], welcome: true, failure })
+          briefingBoundary = true
+        }
+        continue
+      }
       // Evidence the person has not seen (lib/attention): only what the Coordinator decides to tell them shows, as its own message.
       if (raw.startsWith(HANDOFF_PREFIX)) {
         briefingBoundary = true
@@ -465,7 +515,8 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       const cited = takeArtifacts(parts.flatMap(part => part.type === 'text' && part.text.trim() && part.text.trim() !== QUIET_REPLY ? [part.text.trim()] : []).join('\n\n'))
       const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) ? [part.toolName] : [])
       const steps = parts.flatMap((part): ChatTool[] => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName)
-        ? [{ call: part.toolCallId, name: part.toolName, state: 'running', ...withPreview('input', toolPreview((part as { inputPreview?: unknown }).inputPreview, part.input)) }] : [])
+        ? [{ call: part.toolCallId, name: part.toolName, state: 'running', ...withPreview('input', toolPreview((part as { inputPreview?: unknown }).inputPreview, part.input)),
+          ...withQuote(part.input === undefined ? quotePreview((part as { quotePreview?: unknown }).quotePreview) : toolQuote(part.input)) }] : [])
       // Any reasoning means it thought; only readable text (not encrypted or empty) can be opened.
       const thought = parts.some(part => part.type === 'reasoning')
       const readable = parts.some(part => part.type === 'reasoning' && (Number((part as { chars?: unknown }).chars) > 0 || Boolean((part as { text?: unknown }).text?.toString().trim())))
@@ -477,7 +528,11 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       const stream = (message as { mikkaStreamId?: unknown }).mikkaStreamId
       const streamId = typeof stream === 'string' ? stream : undefined
       const shows = Boolean(cited.text || steps.length || thought)
-      if (last?.from === 'coordinator' && !waiting.ids.length && !briefingBoundary) {
+      const merges = last?.from === 'coordinator' && !waiting.ids.length && !briefingBoundary
+      // A step's tools run after its words: they sit after the reply's text so far, this step's included.
+      const at = (merges ? [last.text, cited.text].filter(Boolean).join('\n\n') : cited.text).length
+      for (const step of steps) step.at = at
+      if (last && merges) {
         if (!last.streamId && shows && streamId) last.streamId = streamId
         if (steps.length || thought) last.activity = { tools: [...last.activity?.tools ?? [], ...steps], thought: Boolean(last.activity?.thought || thought),
           ...(last.activity?.reasoningAt || readable ? { reasoningAt: [...last.activity?.reasoningAt ?? [], ...(readable ? [position] : [])] } : {}) }
@@ -508,5 +563,6 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
     }
   }
   flush()
-  return items
+  // A welcome that failed and was answered later (重试 worked): the reply stands for it.
+  return items.filter((item, index) => !item.welcome || !items.slice(index + 1).some(next => next.from === 'coordinator'))
 }

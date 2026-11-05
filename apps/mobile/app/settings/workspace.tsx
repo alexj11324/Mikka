@@ -33,8 +33,8 @@ export default function WorkspaceScreen() {
   }
   return (
     <SettingsPage title="工作区">
-      <Group>{(data?.workspaces ?? []).map(w => <ChoiceRow key={w.id} label={w.name} selected={w.id === data?.workspace.id} busy={switching === w.id} onPress={() => void pick(w)} />)}</Group>
-      {problem ? <Text style={styles.problem}>{problem}</Text> : null}
+      <Group>{(data?.workspaces ?? []).map(w => <ChoiceRow key={w.id} label={w.name} selected={w.id === data?.workspace.id} busy={switching === w.id} disabled={Boolean(switching)} onPress={() => void pick(w)} />)}</Group>
+      {problem ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.problem}>{problem}</Text> : null}
     </SettingsPage>
   )
 }

@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { artifacts, artifactVersions } from '@/lib/db/schema'
 import { withAccountWrite } from '@/lib/account/write-guard'
 import { deleteArtifactObject } from '@/lib/artifacts/storage'
+import { artifactChanged } from '@/lib/live/artifacts'
 
 /**
  * Deletes one of the person's own artifacts (资料库, R-51): the row, and with it
@@ -23,6 +24,7 @@ export async function deleteOwnArtifact(userId: string, artifactId: string): Pro
       .where(and(eq(artifactVersions.artifactId, own.id), isNotNull(artifactVersions.storageKey), isNull(artifactVersions.inlineContent)))).map(row => row.key!)
     for (const key of keys) await db.execute(sql`insert into account_storage_retirements("userId","storageKey") values(${userId},${key}) on conflict do nothing`)
     await db.delete(artifacts).where(and(eq(artifacts.id, own.id), eq(artifacts.userId, userId)))
+    await artifactChanged(db, userId, own.id)
     return keys
   })
   if (!retired) return false

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState, type ReactNode } from 'react'
-import useSWR from 'swr'
+import useSWR, { unstable_serialize } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ChevronDown, Download, Globe, History, MessageSquare, SquareDashedMousePointer, X } from 'lucide-react'
 import { getArtifact, getArtifactText } from '@/app/actions/artifacts'
@@ -17,13 +17,14 @@ import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { ArtifactQuote } from '@/lib/artifacts/quote'
-import type { ArtifactDetail } from '@/lib/artifacts/types'
 import { withBasePath } from '@/lib/base-path'
 import { cn } from '@/lib/utils'
 import { ArtifactAuthorAvatar, ArtifactKindIcon } from './artifact-card'
 import { ArtifactDocument } from './artifact-document'
 import { ArtifactFrame } from './artifact-frame'
 import { ArtifactShare } from './artifact-share'
+import { useLiveKey } from '@/hooks/use-live-key'
+import { ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 
 /** What the reader hands the chat beside it. */
 export interface ArtifactChatSlot {
@@ -55,7 +56,13 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
 }) {
   const t = useTranslations('Artifact')
   const format = useFormatter()
-  const { data: detail, error, mutate } = useSWR<ArtifactDetail | null>(['artifact', artifactId], () => getArtifact(artifactId), { refreshInterval: 15000 })
+  const detailKey = ['artifact', artifactId] as const
+  const { data: detail, error, mutate } = useSWR(detailKey, () => getArtifact(artifactId))
+  // No timer (#1212): a new version, a share link or deletion pushes `artifact` on the owner's home
+  // channel. A missing artifact waits for nothing; without a channel it is read once a minute.
+  const liveOwner = detail?.live.ownerId
+  const liveHome = liveOwner ? ownerListWorkspace(detail, liveOwner) : null
+  useLiveKey('artifact', detail === null ? null : liveHome ? artifactId : UNRESOLVED_LIST_SCOPE, [unstable_serialize(detailKey)], liveHome, { minIntervalMs: 2_000 })
   const [picked, setPicked] = useState<{ id: string; version: number } | null>(null)
   const [showDiff, setShowDiff] = useState(true)
   const [selecting, setSelecting] = useState(false)

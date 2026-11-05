@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg'
-import { FactoryError } from './contract'
+import { FactoryError, factoryFlowVersion } from './contract'
 import { factoryEventId } from './event-id'
 import { questionFingerprint } from './questions/contract'
 import type { RetainedDeliverableScope, RetainedDeliverableSnapshot } from './deliverable-recovery'
@@ -42,7 +42,8 @@ export async function completedRecoveryEvidence(tx: Query, task: Scope, candidat
       AND receipt.request#>>'{input,binding,taskId}'=t.id::text AND receipt.request#>>'{input,change,action}'='retry'
       AND receipt.result#>>'{task,id}'=t.id::text AND receipt.result#>>'{task,userId}'=t."userId" AND receipt.result#>>'{task,issueId}'=t."issueId"::text
       AND receipt.result#>>'{task,sourceEventId}'=t."sourceEventId"::text AND receipt.result#>>'{task,candidateId}'=c.id::text
-      AND receipt.result#>>'{task,stage}'='review' AND receipt.result#>>'{task,status}' IN ('pending','running')
+      AND (receipt.result#>>'{task,stage}'='review' OR (t.route->>'flowVersion'='2' AND receipt.result#>>'{task,route,flowVersion}'='2' AND receipt.result#>>'{task,stage}'='approval'))
+      AND receipt.result#>>'{task,status}' IN ('pending','running')
       AND completion.request#>>'{binding,taskId}'=t.id::text AND completion.request#>>'{change,action}'='finish'
       AND completion.request#>>'{change,status}'='passed' AND completion.request#>>'{change,output,runId}'=r.id::text
       AND completion.result#>>'{task,id}'=t.id::text AND completion.result#>>'{task,userId}'=t."userId" AND completion.result#>>'{task,issueId}'=t."issueId"::text
@@ -80,7 +81,7 @@ export async function readDeliverableSnapshotReceipt(tx: Query, task: Scope, can
   const scope = request?.scope as RetainedDeliverableScope | undefined
   const snapshot = result?.snapshotRecovery?.snapshot as RetainedDeliverableSnapshot | undefined
   if (!scope || !snapshot || !snapshotMatchesScope(scope, snapshot)) fail()
-  const { rows: [row] } = await tx.query(`SELECT t."sourceEventId",to_jsonb(c) AS candidate,to_jsonb(previous) AS previous,
+  const { rows: [row] } = await tx.query(`SELECT t."sourceEventId",t.route,to_jsonb(c) AS candidate,to_jsonb(previous) AS previous,
       producer.id AS "producerRunId",producer."sessionId",producer.report,producer."worktreePath",producer."deviceId",producer."deviceRepoId",
       producer.status,producer."stopReason",producer."stopRequestedAt",repo."repoPath",repo."remoteUrl",
       q.id AS "questionId",q.revision AS "questionRevision",to_jsonb(q) AS question
@@ -109,7 +110,8 @@ export async function readDeliverableSnapshotReceipt(tx: Query, task: Scope, can
     request.input?.binding?.taskId !== task.id || request.input?.binding?.revision !== scope!.revision || request.input?.change?.action !== 'retry' ||
     !Number.isInteger(scope!.revision) || scope!.revision < 1 ||
     result.task?.id !== task.id || result.task?.userId !== task.userId || result.task?.issueId !== task.issueId ||
-    result.task?.sourceEventId !== scope!.sourceEventId || result.task?.candidateId !== candidate.id || result.task?.stage !== 'review' ||
+    result.task?.sourceEventId !== scope!.sourceEventId || result.task?.candidateId !== candidate.id ||
+    !(result.task?.stage === 'review' || (factoryFlowVersion(row) === 2 && factoryFlowVersion(result.task) === 2 && result.task?.stage === 'approval')) ||
     !['pending', 'running'].includes(result.task?.status) || result.task?.revision <= scope!.revision ||
     result.task?.attemptId === scope!.attemptId ||
     !savedCandidate || (['id', 'taskId', 'sha', 'repository', 'environment', 'scope', 'runId', 'kind'] as const).some(key => savedCandidate[key] !== candidate[key]) ||

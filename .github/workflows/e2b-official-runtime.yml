@@ -13,20 +13,35 @@ on:
       - 'packages/config/**'
       - 'patches/**'
       - 'scripts/e2b/**'
+      - 'scripts/e2b/publish-template-env.mjs'
       - 'lib/computer/official-runtime.ts'
       - '.github/workflows/e2b-official-runtime.yml'
+      - '.github/workflows/web-deploy.yml'
+      - 'scripts/release/web-deploy.mjs'
+      - 'scripts/release/web-deploy.test.mjs'
       # This issue's acceptance requires a same-application-SHA runtime proof.
       - '.github/workflows/model-provider-fallback-acceptance.yml'
       - 'scripts/acceptance/model-provider-fallback.mjs'
       - 'scripts/acceptance/model-provider-fallback.test.mjs'
+      - '.github/workflows/project-decisions-acceptance.yml'
+      - 'scripts/acceptance/project-decisions.mjs'
+      - 'scripts/acceptance/project-decisions.test.mjs'
   pull_request:
     paths: *runtime_paths
   workflow_dispatch:
+    inputs:
+      runtime-refresh:
+        description: Validate and publish even when the configured worker hash matches
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('e2b-official-runtime-{0}', github.ref) || 'e2b-official-runtime-release' }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # An old rerun must not replace the latest main's pending runtime validation.
+  # PRs have their own group and only run the offline test job; retain those too.
+  cancel-in-progress: false
+  queue: max
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -37,11 +52,11 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - run: node --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs
+      - run: node --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs
       - run: python3 -m py_compile scripts/e2b/validate-official-instances.py
       - run: bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh
-  # Same comparison as the historical template workflow. A commit that leaves the
-  # daemon install and the runtime recipe alone does not validate or redeploy.
+  # Unchanged runtime content skips validation unless its release-control path
+  # changed in this push, or an operator explicitly requested a full refresh.
   check:
     needs: test
     if: github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -55,10 +70,20 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
+      - name: Refuse an obsolete source before runtime validation
+        run: node scripts/release/web-deploy.mjs main
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Check publication-control changes across this push
+        id: control
+        run: node scripts/release/web-deploy.mjs runtime-refresh
+        env:
+          RUNTIME_REFRESH: ${{ inputs.runtime-refresh }}
       - name: Read the Vercel team token through Infisical workload identity
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
@@ -76,7 +101,9 @@ jobs:
           wanted="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
           live="$(node scripts/e2b/publish-template-env.mjs --current)"
           echo "worker hash $wanted; production $live"
-          if [ "$wanted" = "$live" ]; then echo "changed=false" >> "$GITHUB_OUTPUT"; else echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+          if [ "$RUNTIME_REFRESH" = true ] || [ "$wanted" != "$live" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; else echo "changed=false" >> "$GITHUB_OUTPUT"; fi
+        env:
+          RUNTIME_REFRESH: ${{ steps.control.outputs.refresh }}
   validate:
     needs: [test, check]
     if: needs.check.outputs.changed == 'true'
@@ -124,13 +151,15 @@ jobs:
           }
           appendFileSync(process.env.GITHUB_OUTPUT, `source-sha=${report.workerSha}\ntemplate-models=${JSON.stringify(models)}\n`)
           JS
-  publish:
+  # Do not take web-deploy-production here: the matching Web job needs that
+  # queue to finish its GitHub build and upload while this read-only job waits.
+  await-web:
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
-      id-token: write
+      actions: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -138,23 +167,17 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Read the existing Vercel release token
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /platform
-          secret-name: VERCEL_TEAM_TOKEN
-          include-imports: false
-      - name: Publish the verified official runtime pair
-        run: node scripts/e2b/publish-template-env.mjs
+      - name: Await this source's actual Web build and public version
+        run: node scripts/release/web-deploy.mjs await-web
         env:
-          DESKTOP_TEMPLATE_ID: desktop
-          CLAUDE_TEMPLATE_ID: claude
-          CODEX_TEMPLATE_ID: codex
-          SOURCE_SHA: ${{ needs.validate.outputs.source-sha }}
-          MIKKA_CLOUD_WORKER_SOURCE_COMMIT: ${{ github.sha }}
-          TEMPLATE_MODELS: ${{ needs.validate.outputs.template-models }}
+          GITHUB_TOKEN: ${{ github.token }}
+  publish:
+    needs: [validate, await-web]
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/web-deploy.yml
+    with:
+      runtime-refresh: true
+      runtime-worker-sha: ${{ needs.validate.outputs.source-sha }}
+      runtime-template-models: ${{ needs.validate.outputs.template-models }}

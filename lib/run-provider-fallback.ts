@@ -1,4 +1,5 @@
 import 'server-only'
+import { runListChanged } from './live/lists'
 import { isDeepStrictEqual } from 'node:util'
 import type { Pool, PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
@@ -12,8 +13,9 @@ import { workerDefinitionDigest } from './agent-kit/worker-digest'
 import { digest } from './agent-kit/definition'
 import { executionIdentitySchema, freezeExecutionIdentity, type ExecutionIdentity } from './execution-identity'
 import { entryKey, type OrderEntry, type SkippedEntry } from './model-order-plan'
-import { credentialStates, orderCandidates, readOrder } from './model-order'
+import { credentialStates, dispatchOrder, orderCandidates, readOrder } from './model-order'
 import { bindAgentToConnection, modelUnavailableCard, resolveModelDispatch, type ModelDispatch } from './model-dispatch'
+import type { ModelRoutingSnapshot } from './model-routing'
 import { modelFallbackRecordSchema, type ModelFallbackChoice, type ModelFallbackRecord } from './run-model-fallback-view'
 import { lockFactoryCompletionTasks } from './run-completion-effects'
 import { lockCliAgentPolicy, lockCliTaskScope, providerContinuationPolicy } from './agent-tool-approval/policy-store'
@@ -24,11 +26,12 @@ import { runFinishedEvent } from './coordinator-events'
 import { defaultAgentCopy } from './agent-copy'
 import { ActionFailureError } from './action-error'
 import { ComputerError } from './computer/store'
+import { runChanged } from './live/panels'
 
 type Run = typeof agentRuns.$inferSelect
 type Query = Pick<Pool | PoolClient, 'query'>
 type Scope = { ownerId: string; workspaceId: string; botId: string | null }
-type Continuation = { runId: string; deviceId: string; cloud: boolean; workspaceId: string }
+type Continuation = { runId: string; previousRunId: string; deviceId: string; cloud: boolean; workspaceId: string }
 // JSONB cannot store NUL separators used by the in-memory dispatch key.
 const attemptKey = (entry: OrderEntry) => encodeURIComponent(entryKey(entry))
 const choice = (entry: OrderEntry): ModelFallbackChoice => ({ harness: entry.harness, model: entry.model, source: entry.source.kind })
@@ -70,11 +73,14 @@ const standingIdentity = (identity: ExecutionIdentity) => ({ requester: identity
  * newly admitted model, credential, placement and repository receipt. */
 export function providerContinuationDefinition(source: WorkerDefinitionSnapshot, admitted: WorkerDefinitionSnapshot, prompt: string, policyCeiling?: RunPolicy): WorkerDefinitionSnapshot {
   const { apiKey: _key, subscription: _subscription, executionIdentity: _identity, repositoryAdmission: _admission,
-    allowLocalRecovery: _local, ...standing } = structuredClone(source)
+    allowLocalRecovery: _local, profileOriginRunId: _profileOrigin, ...standing } = structuredClone(source)
+  const { routing: _previousRouting, ...dispatch } = source.modelDispatch!
   const definition: WorkerDefinitionSnapshot = { ...standing, harness: admitted.harness, model: admitted.model,
     modelSource: admitted.modelSource, cliModelSelection: 'explicit', promptDigest: digest(prompt),
+    ...(source.agentProfile && admitted.modelDispatch?.entry ? { agentProfile: { ...structuredClone(source.agentProfile), targetEntry: structuredClone(admitted.modelDispatch.entry) } } : {}),
     ...(policyCeiling ? { policyCeiling: source.policyCeiling ? intersectRunPolicy(policyCeiling, source.policyCeiling) : policyCeiling } : {}),
-    modelDispatch: { ...source.modelDispatch!, mode: 'preference', entry: admitted.modelDispatch?.entry },
+    modelDispatch: { ...dispatch, mode: 'preference', entry: admitted.modelDispatch?.entry,
+      ...(admitted.modelDispatch?.routing ? { routing: structuredClone(admitted.modelDispatch.routing) } : {}) },
     ...(admitted.apiKey ? { apiKey: admitted.apiKey } : {}), ...(admitted.subscription ? { subscription: admitted.subscription } : {}),
     ...(admitted.repositoryAdmission ? { repositoryAdmission: admitted.repositoryAdmission } : {}),
     ...(source.allowLocalRecovery && admitted.allowLocalRecovery ? { allowLocalRecovery: true } : {}) }
@@ -97,6 +103,31 @@ export function providerContinuationMatches(prior: Run, next: Run): boolean {
   return isDeepStrictEqual(actual, providerContinuationDefinition(before, after, next.prompt, after.policyCeiling))
 }
 
+/** Independent Factory checks intentionally discard the failed native session
+ * and continuation prompt. Only their exact current host adoption event can
+ * authorize that transformation; the worker cannot supply this receipt. */
+export async function providerContinuationLaunchMatches(query: Query, prior: Run, next: Run): Promise<boolean> {
+  if (providerContinuationMatches(prior, next)) return true
+  const definition = next.agentDefinition
+  if (next.retryOf !== null || !definition || next.prompt !== prior.prompt || definition.promptDigest !== digest(prior.prompt) ||
+    (next.status === 'queued' && next.sessionId !== null) || (next.sessionId && next.sessionId === prior.sessionId)) return false
+  const prompt = providerContinuationPrompt(prior.prompt)
+  if (!providerContinuationMatches(prior, { ...next, retryOf: prior.id, prompt,
+    agentDefinition: { ...definition, promptDigest: digest(prompt) } })) return false
+  const { factoryEventId } = await import('./factory/event-id')
+  const { rowCount } = await query.query(`SELECT 1 FROM factory_tasks t
+    JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id AND a.stage=t.stage
+    JOIN factory_attempts previous ON previous."taskId"=t.id AND previous."runId"=$1 AND previous.stage=a.stage AND previous.status='failed'
+    JOIN factory_events e ON e."taskId"=t.id AND e."eventId"=$4
+    WHERE t."userId"=$3 AND t."issueId"=$5 AND t.status='running' AND t.stage IN ('review','verify','monitor')
+      AND a."runId"=$2 AND a.output->>'requestEpoch'=t."sourceEventId"::text
+      AND previous.output->>'requestEpoch'=t."sourceEventId"::text
+      AND a."candidateId" IS NOT DISTINCT FROM t."candidateId" AND previous."candidateId" IS NOT DISTINCT FROM t."candidateId"
+      AND e.request->>'priorRunId'=$1::text AND e.result->>'runId'=$2::text`,
+    [prior.id, next.id, prior.userId, factoryEventId('provider-check-continuation', prior.id), prior.issueId])
+  return Boolean(rowCount)
+}
+
 async function readSource(query: Query, userId: string, runId: string) {
   return (await query.query<Run>('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2', [runId, userId])).rows[0]
 }
@@ -109,7 +140,7 @@ async function fallbackScope(query: Query, run: Run): Promise<Scope> {
   return { ownerId: run.userId, workspaceId: scope?.workspaceId ?? await (await import('./execution-settings')).executionWorkspace(run.userId, run.botId), botId: scope?.botId ?? run.botId }
 }
 
-async function attemptedEntries(query: Query, run: Run, entries: OrderEntry[]): Promise<Set<string>> {
+async function attemptedEntries(query: Query, run: Run, entries: OrderEntry[], smartRouting: boolean): Promise<Set<string>> {
   // A bounded recursive chain is owner/task scoped and contains only earlier
   // provider continuations; old tasks cannot exhaust this task's order.
   const { rows } = await query.query<{ report: unknown; entry: OrderEntry | null }>(`WITH RECURSIVE chain AS (
@@ -126,7 +157,10 @@ async function attemptedEntries(query: Query, run: Run, entries: OrderEntry[]): 
   }
   const current = run.agentDefinition?.modelDispatch?.entry
   const index = current ? entries.findIndex(entry => attemptKey(entry) === attemptKey(current)) : -1
-  for (const entry of entries.slice(0, index + 1)) attempted.add(attemptKey(entry))
+  // Difficulty routing may deliberately start later in the preference list.
+  // Earlier, stronger entries have not been attempted by that run.
+  if (!smartRouting || !run.agentDefinition?.modelDispatch?.routing)
+    for (const entry of entries.slice(0, index + 1)) attempted.add(attemptKey(entry))
   return attempted
 }
 
@@ -164,6 +198,7 @@ async function unavailableRecord(pool: Pool, scope: Scope, run: Run, attempted: 
  * as admission/Factory. A worker replay can safely finish an interrupted handoff. */
 async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, target?: {
   agentId: string; deviceId: string; deviceRepoId: string; model: string; entry: OrderEntry;
+  routing?: ModelRoutingSnapshot;
   subscriptionBindingId?: string; cloud: boolean; botId: string | null; workspaceId: string;
 }): Promise<Continuation | null> {
   const client = await pool.connect()
@@ -183,7 +218,8 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
     if (prior?.state !== 'pending') {
       const next = prior?.retryRunId ? await readSource(client, source.userId, prior.retryRunId) : null
       await client.query('COMMIT')
-      return next?.deviceId ? { runId: next.id, deviceId: next.deviceId, cloud: next.agentDefinition?.executionIdentity?.billingAccount.runtime.kind === 'e2b', workspaceId: next.agentDefinition?.executionIdentity?.workspaceId ?? '' } : null
+      return next?.deviceId && next.status === 'queued' && !next.stopRequestedAt && await providerContinuationLaunchMatches(client, source, next)
+        ? { runId: next.id, previousRunId: source.id, deviceId: next.deviceId, cloud: next.agentDefinition?.executionIdentity?.billingAccount.runtime.kind === 'e2b', workspaceId: next.agentDefinition?.executionIdentity?.workspaceId ?? '' } : null
     }
     const stopped = async () => {
       // Retirement, cancellation and a replaced Factory request are terminal
@@ -191,6 +227,8 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
       // longer be authorized, and do not emit a model-setup request for it.
       await client.query(`UPDATE agent_runs SET report=report||jsonb_build_object('modelFallback',$3::jsonb),"updatedAt"=now()
         WHERE id=$1 AND "userId"=$2`, [source.id, source.userId, JSON.stringify({ ...prior, state: 'stopped' })])
+      await runListChanged(client, source.id)
+      await runChanged(client, source.id)
       await client.query('COMMIT')
       return null
     }
@@ -203,7 +241,9 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
     await withDatabaseClient(client, async () => {
       if (target && source.agentDefinition && source.issueId) {
         const policyCeiling = await providerContinuationPolicy(client, source.userId, source.id)
-        const modelDispatch = { ...source.agentDefinition.modelDispatch!, mode: 'preference' as const, entry: target.entry }
+        const { routing: _previousRouting, ...dispatch } = source.agentDefinition.modelDispatch!
+        const modelDispatch = { ...dispatch, mode: 'preference' as const, entry: target.entry,
+          ...(target.routing ? { routing: target.routing } : {}) }
         const selection = { model: target.model, modelDispatch, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
           ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
         let runId: string
@@ -213,7 +253,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
           const queued = await queueCloudRun(pool, { userId: source.userId, workspaceId: target.workspaceId }, {
             ...selection, botId: target.botId, issueId: source.issueId, agentId: target.agentId, deviceRepoId: target.deviceRepoId,
             title: issue.title, body: tiptapToText(issue.content), readOnly: source.agentDefinition.readOnly,
-            withoutBot: source.botId === null, idempotencyKey: `provider:${source.id}`, threadRunId: source.id,
+            withoutBot: source.botId === null, idempotencyKey: `provider:${source.id}`,
             allowLocalRecovery: source.agentDefinition.allowLocalRecovery,
             sourceEventId: source.agentDefinition.repositoryAdmission?.requestEventId,
           }, client)
@@ -233,9 +273,11 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
         await client.query(`UPDATE agent_runs SET "retryOf"=$2,attempt=$3,kind=$4,"baseBranch"=$5,prompt=$6,"agentDefinition"=$7,"source"=$8,"updatedAt"=now() WHERE id=$1`,
           [runId, source.id, source.attempt, source.kind, source.baseBranch, prompt, JSON.stringify(definition), source.source])
         receipt = { ...receipt, state: 'switched', to: choice(target.entry), retryRunId: runId, nextDefinitionDigest: definition.definitionDigest }
-        continuation = { runId, deviceId: target.deviceId, cloud: target.cloud, workspaceId: target.workspaceId }
+        continuation = { runId, previousRunId: source.id, deviceId: target.deviceId, cloud: target.cloud, workspaceId: target.workspaceId }
       }
       await client.query(`UPDATE agent_runs SET report=COALESCE(report,'{}'::jsonb)||jsonb_build_object('modelFallback',$3::jsonb),"updatedAt"=now() WHERE id=$1 AND "userId"=$2`, [source.id, source.userId, JSON.stringify(receipt)])
+      await runListChanged(client, source.id)
+      await runChanged(client, source.id)
       if (receipt.state === 'switched' && receipt.retryRunId)
         await (await import('./factory/store')).adoptProviderContinuation(client, source.userId, source.id, receipt.retryRunId)
       const event = receipt.state === 'switched' ? {
@@ -255,7 +297,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
 }
 
 /** The existing dispatcher retains all owner, workspace, location and device
- * constraints. Only entries after this task's failed entries are eligible. */
+ * constraints. Attempted entries cannot re-enter the same recovery chain. */
 export async function recoverProviderFailure(pool: Pool, userId: string, runId: string): Promise<Continuation | null> {
   const source = await readSource(pool, userId, runId)
   if (!source || source.stopReason !== 'provider_failure' || source.status !== 'failed') return null
@@ -264,12 +306,15 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
   if (source.stopRequestedAt) return initial.state === 'pending' ? settle(pool, source, initial) : null
   if (initial.state === 'switched' && initial.retryRunId) {
     const next = await readSource(pool, userId, initial.retryRunId)
-    return next?.deviceId && !next.stopRequestedAt && next.status === 'queued' ? { runId: next.id, deviceId: next.deviceId, cloud: next.agentDefinition?.executionIdentity?.billingAccount.runtime.kind === 'e2b', workspaceId: next.agentDefinition?.executionIdentity?.workspaceId ?? '' } : null
+    return next?.deviceId && !next.stopRequestedAt && next.status === 'queued' && await providerContinuationLaunchMatches(pool, source, next)
+      ? { runId: next.id, previousRunId: source.id, deviceId: next.deviceId, cloud: next.agentDefinition?.executionIdentity?.billingAccount.runtime.kind === 'e2b', workspaceId: next.agentDefinition?.executionIdentity?.workspaceId ?? '' } : null
   }
   if (initial.state !== 'pending') return null
-  const scope = await fallbackScope(pool, source), { entries } = await readOrder(pool, scope)
-  const attempted = await attemptedEntries(pool, source, entries)
-  if (source.agentDefinition?.modelDispatch?.mode !== 'preference' || source.questionContinuation)
+  // The order dispatch tried (优先使用的 Agent's list first, decision 2026-11-05-0400), so what came before this run is what was tried.
+  const scope = await fallbackScope(pool, source), stored = await readOrder(pool, scope)
+  const { autoModelRouting } = stored
+  const attempted = await attemptedEntries(pool, source, dispatchOrder(stored.entries, stored.preferredHarness), autoModelRouting)
+  if (source.agentDefinition?.modelDispatch?.mode !== 'preference' || source.questionContinuation || source.agentDefinition?.agentProfile?.definition.model.mode === 'fixed')
     return settle(pool, source, await unavailableRecord(pool, scope, source, attempted))
   const { rows: [origin] } = await pool.query<{ kind: string; remoteUrl: string | null }>(`SELECT d.kind,repo."remoteUrl" FROM devices d
     LEFT JOIN device_repos repo ON repo.id=$3 AND repo."userId"=$2 WHERE d.id=$1 AND d."ownerId"=$2`, [source.deviceId, source.userId, source.deviceRepoId])
@@ -281,9 +326,12 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
     WHERE t."userId"=$1 AND a."runId"=$2 AND t.stage='monitor'`, [userId, source.id])).rowCount !== 0
   const checkpointUnavailable = source.report?.providerCheckpoint === 'unavailable'
   const skipped: SkippedEntry[] = []
-  for (let index = 0; index <= entries.length; index++) {
+  for (let index = 0; index <= stored.entries.length; index++) {
     const selected: ModelDispatch = await resolveModelDispatch(pool, scope, null, location, source.agentDefinition.pinnedDeviceId ?? ((monitor || checkpointUnavailable) && origin.kind === 'local' ? source.deviceId ?? undefined : undefined),
-      { excludeEntryKeys: [...attempted].map(key => decodeURIComponent(key)), cloudPurpose: origin.remoteUrl ? 'task' : 'desktop' })
+      { excludeEntryKeys: [...attempted].map(key => decodeURIComponent(key)), cloudPurpose: origin.remoteUrl ? 'task' : 'desktop',
+        ...(autoModelRouting && source.agentDefinition.modelDispatch.routing ? { routing: { issueId: source.issueId ?? undefined,
+          previous: source.agentDefinition.modelDispatch.routing, escalate: true, effort: source.agentDefinition.agentProfile?.effort } } : {}),
+        ...(source.agentDefinition.agentProfile?.definition.harness && source.agentDefinition.agentProfile.definition.harness !== 'auto' ? { harness: source.agentDefinition.agentProfile.definition.harness } : {}) })
     if (selected.kind === 'none') return settle(pool, source, await unavailableRecord(pool, scope, source, attempted, [...skipped, ...selected.skipped ?? []]))
     attempted.add(attemptKey(selected.entry))
     let target: Parameters<typeof settle>[3]
@@ -313,6 +361,7 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
           if (!current) { skipped.push({ entry: selected.entry, block: { usable: false, reason: 'noDevice' } }); continue }
           const repoId = origin.remoteUrl ? (await (await import('./device-repositories')).ensureDeviceRepository(userId, current.deviceId, origin.remoteUrl)).id : current.repoId
           target = { agentId: ready.agentId, deviceId: current.deviceId, deviceRepoId: repoId, model: selected.model, entry: selected.entry,
+            ...(selected.routing ? { routing: selected.routing } : {}),
             ...(binding ? { subscriptionBindingId: binding } : {}), cloud: true, botId, workspaceId: scope.workspaceId }
         }
       }
@@ -339,10 +388,14 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
   return settle(pool, source, await unavailableRecord(pool, scope, source, attempted, skipped))
 }
 
-/** Launch only after Factory has adopted the committed continuation. The
- * existing queue/claim authority and idempotent cloud launcher remain in charge. */
+/** Commit the handoff before acknowledging the completed worker. Parking the
+ * previous VM revokes its device token, so only the durable host workflow may
+ * do the next run's database work and retry a retained-machine wake. */
 export async function launchProviderContinuation(userId: string, continuation: Continuation | null) {
   if (!continuation) return
-  if (continuation.cloud) await (await import('./run-leases')).startThreadMachine({ userId, workspaceId: continuation.workspaceId }, continuation.runId)
+  if (continuation.cloud) {
+    const [{ start }, { factoryCloudStageHandoff }] = await Promise.all([import('workflow/api'), import('@/workflows/factory-stage/workflow')])
+    await start(factoryCloudStageHandoff, [{ userId, workspaceId: continuation.workspaceId }, continuation.previousRunId, continuation.runId, true])
+  }
   else (await import('./device-gateway-notify')).notifyDeviceWork(continuation.deviceId)
 }

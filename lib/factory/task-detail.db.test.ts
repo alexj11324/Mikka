@@ -6,6 +6,8 @@ import { Pool } from 'pg';
 import { orderMigrations } from '../../scripts/migration-order.mjs';
 import { createFactoryStore } from './store';
 import { factoryCriteria } from './task-detail';
+import { runDecisionWarnings, factoryDecisionWarnings, reviewDecisionExplanation } from '../project-decision-warnings';
+import { citedQuestionCommandSources } from './question-command-sources';
 import { refreshPublishedPullRequest } from '../github/publication-webhook';
 import { dropTestDatabase } from '../../tests/support/drop-test-database';
 
@@ -75,6 +77,77 @@ test('task detail GET exposes criteria and delivery without unused fields or wri
     assert.equal(review.criteria[1].criterionId, null);
     assert.deepEqual(review.verify, { status: 'passed', command: 'pnpm test', exitCode: 0 });
     assert.deepEqual(detail.delivery, { candidateSha: sha, previewDatabaseBranch: 'preview/ac-7', machineName: 'Build server', repository: 'o/r', environment: 'device:x', pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' }, previewUrl: null, deploymentEnvironment: null }, 'no receipt: deploymentEnvironment null');
+
+    assert.deepEqual(detail.decisionWarnings, [], 'ordinary completed work has no decision warning');
+    const successor = randomUUID(), decisionId = randomUUID(), changedCandidate = randomUUID(), rejectionEvent = randomUUID();
+    await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","issueId",status,kind,prompt,"retryOf","agentDefinition",error)
+      VALUES ($1,'owner',$2,$3,'succeeded','implement','Retry after provider capacity changed',$4,'{"model":"changed-model"}','provider quota')`,
+      [successor, agentId, issueId, implRun]);
+    assert.deepEqual(await runDecisionWarnings(pool, 'owner', implRun), [], 'retry and provider/model changes alone are not decisions');
+    await pool.query('UPDATE agent_runs SET "threadReplacedBy"=$2 WHERE id=$1', [implRun, successor]);
+    const warned = await store.read('owner', taskId);
+    assert.equal(warned.decisionWarnings?.length, 1);
+    assert.equal(warned.decisionWarnings![0].severity, 'warning');
+    assert.deepEqual(warned.decisionWarnings![0].sourceRefs, [{ type: 'run', id: implRun }, { type: 'run', id: successor }]);
+    assert.equal(warned.checks![0].status, 'passed', 'a missing decision never changes a check verdict');
+    assert.equal((await runDecisionWarnings(pool, 'owner', implRun)).length, 1, 'normal run inspection sees the same host signal');
+    assert.deepEqual(await runDecisionWarnings(pool, 'other', implRun), [], 'a caller without the source run cannot see its warning');
+
+    await pool.query(`INSERT INTO project_decisions
+      (id,"workspaceId","projectId","ownerId","issueId","runId",kind,title,summary,reason,provenance,"captureMode","decidedBy","recordedBy","occurredAt","idempotencyKey","payloadHash")
+      VALUES ($1,$2,$3,'owner',$4,$5,'confirm','Recorded route','Recorded route','Explicit owner choice','recorded','live','{"kind":"human","id":"owner"}','{"kind":"bot","id":"fixture"}',now(),'warning-fixture','fixture')`,
+      [decisionId, randomUUID(), randomUUID(), issueId, successor]);
+    assert.deepEqual(await runDecisionWarnings(pool, 'owner', implRun), [], 'the linked active decision prevents repeated reminders');
+    assert.deepEqual((await store.read('owner', taskId)).decisionWarnings, []);
+    await pool.query('DELETE FROM project_decisions WHERE id=$1', [decisionId]);
+    await pool.query('UPDATE agent_runs SET "threadReplacedBy"=NULL WHERE id=$1', [implRun]);
+    await pool.query(`INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId")
+      VALUES ($1,$2,$3,'o/r','device:x','repo',$4)`, [changedCandidate, taskId, 'c'.repeat(40), successor]);
+    await pool.query(`INSERT INTO factory_approval_controls ("taskId","eventId","userId","principalId",request,result)
+      VALUES ($1,$2,'owner','owner',$3,'{}')`, [taskId, rejectionEvent, JSON.stringify({ operation: 'reject', candidateId })]);
+    assert.deepEqual((await store.read('owner', taskId)).decisionWarnings, [], 'owner rejection with unchanged candidate is not a changed-route observation');
+    await pool.query('UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1', [taskId, changedCandidate]);
+    const changed = await store.read('owner', taskId);
+    assert.deepEqual(changed.decisionWarnings?.[0].sourceRefs, [{ type: 'candidate', id: candidateId }, { type: 'candidate', id: changedCandidate }]);
+    assert.equal(changed.decisionWarnings?.[0].code, 'possible_unrecorded_decision');
+    await pool.query('UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1', [taskId, candidateId]);
+    await pool.query('DELETE FROM factory_approval_controls WHERE "taskId"=$1 AND "eventId"=$2', [taskId, rejectionEvent]);
+    await pool.query('DELETE FROM factory_candidates WHERE id=$1', [changedCandidate]);
+
+    await pool.query('UPDATE factory_attempts SET output=$2 WHERE id=$1', [reviewAttempt, JSON.stringify({ check: { candidateId, sha } })]);
+    await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1', [reviewRun, JSON.stringify({ ...report, summary: 'Review completed.\npossible_unrecorded_decision: The person changed the target without a linked decision; token=secret-fixture' })]);
+    const semantic = await store.read('owner', taskId);
+    assert.equal(semantic.decisionWarnings?.length, 1, 'explicit existing review output is a semantic warning');
+    assert.deepEqual(semantic.decisionWarnings![0].sourceRefs, [{ type: 'run', id: reviewRun }, { type: 'candidate', id: candidateId }], 'sources come only from the frozen host binding');
+    assert.match(semantic.decisionWarnings![0].explanation, /token=\[REDACTED\]/);
+    assert.equal(semantic.checks![0].status, 'passed');
+    assert.deepEqual((await store.read('owner', taskId)).decisionWarnings, semantic.decisionWarnings, 'reading again does not duplicate a review warning');
+    assert.deepEqual(await factoryDecisionWarnings(pool, { id: taskId, userId: 'other', issueId }), []);
+    await pool.query('UPDATE factory_attempts SET output=$2 WHERE id=$1', [reviewAttempt, JSON.stringify({ check: { candidateId: randomUUID(), sha } })]);
+    assert.deepEqual((await store.read('owner', taskId)).decisionWarnings, [], 'a mismatched candidate cannot attribute model output');
+    await pool.query('UPDATE factory_attempts SET output=$2 WHERE id=$1', [reviewAttempt, JSON.stringify({ check: { candidateId, sha } })]);
+    await pool.query(`INSERT INTO project_decisions
+      (id,"workspaceId","projectId","ownerId","issueId","runId",kind,title,summary,reason,provenance,"captureMode","decidedBy","recordedBy","occurredAt","idempotencyKey","payloadHash")
+      VALUES ($1,$2,$3,'owner',$4,$5,'confirm','Recorded route','Recorded route','Explicit owner choice','recorded','live','{"kind":"human","id":"owner"}','{"kind":"bot","id":"fixture"}',now(),'warning-fixture','fixture')`,
+      [decisionId, randomUUID(), randomUUID(), issueId, implRun]);
+    assert.deepEqual((await store.read('owner', taskId)).decisionWarnings, [], 'recording the producer decision suppresses an old semantic reminder');
+    await pool.query('DELETE FROM project_decisions WHERE id=$1', [decisionId]);
+    await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1', [reviewRun, JSON.stringify(report)]);
+    await pool.query("UPDATE factory_attempts SET output='{}' WHERE id=$1", [reviewAttempt]);
+
+    const source = { runId: randomUUID(), sessionId: 'prior-question-session', status: 'stopped',
+      recoveryEventId: randomUUID(), candidateSha: sha, outputChunkId: randomUUID(), observedAt: '2026-11-04T12:03:04.000Z' };
+    await pool.query('UPDATE factory_attempts SET output=$2 WHERE id=$1', [reviewAttempt,
+      JSON.stringify({ check: { candidateId, sha, questionCommandSources: [source] } })]);
+    await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1', [reviewRun,
+      JSON.stringify({ ...report, criteria: [{ text: 'Producer command', passed: true, evidence: 'Checked run-chunk:' + source.outputChunkId }] })]);
+    const attributed = await store.read('owner', taskId);
+    assert.deepEqual(attributed.checks?.[0].commandSources, [{ runId: source.runId, sessionId: source.sessionId, status: source.status,
+      recoveryEventId: source.recoveryEventId, observedAt: source.observedAt }], 'GET joins the actual citation to host-frozen candidate provenance');
+    assert.equal(attributed.checks?.[0].status, 'passed', 'attribution never changes a verdict');
+    await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1', [reviewRun, JSON.stringify(report)]);
+    assert.equal((await store.read('owner', taskId)).checks?.[0].commandSources, undefined, 'an uncited source is not represented as used');
+    await pool.query("UPDATE factory_attempts SET output='{}' WHERE id=$1", [reviewAttempt]);
 
     await refreshPublishedPullRequest('pull_request', { repository: { full_name: 'o/r' }, pull_request: { number: 7, html_url: 'https://github.com/o/r/pull/7', title: 'Updated PR title', state: 'open', draft: false, merged_at: null } }, pool);
     assert.equal((await store.read('owner', taskId)).delivery?.pullRequest?.title, 'Updated PR title');
@@ -154,4 +227,31 @@ test('criterion command and exit code stay paired; legacy entries use the run fa
     { passed: true },
   ] });
   assert.deepEqual(out.map(c => [c.command, c.exitCode]), [['pnpm test:one', 3], ['pnpm test:two', null], ['pnpm test:all', 0]]);
+});
+
+test('question command attribution accepts only cited host records for the same fixed candidate', () => {
+  const candidateId = randomUUID(), sha = 'c'.repeat(40), outputChunkId = randomUUID();
+  const source = { runId: randomUUID(), sessionId: 'native-before-question', status: 'failed',
+    recoveryEventId: randomUUID(), candidateSha: sha, outputChunkId, observedAt: '2026-11-04T12:03:04.000Z' };
+  const check = { candidateId, sha, questionCommandSources: [source] };
+  const criteria = [{ evidence: 'Observed run-chunk:' + outputChunkId + ' after checking the fixed file.' }];
+  assert.deepEqual(citedQuestionCommandSources(check, criteria, candidateId, sha),
+    [{ runId: source.runId, sessionId: source.sessionId, status: 'failed', recoveryEventId: source.recoveryEventId, observedAt: source.observedAt }]);
+  assert.deepEqual(citedQuestionCommandSources(check, [{ evidence: 'The producer said it passed.' }], candidateId, sha), []);
+  assert.deepEqual(citedQuestionCommandSources(check, criteria, randomUUID(), sha), []);
+  assert.deepEqual(citedQuestionCommandSources(check, criteria, candidateId, 'd'.repeat(40)), []);
+  for (const malformed of [
+    { ...source, outputChunkId: randomUUID() }, { ...source, candidateSha: 'e'.repeat(40) },
+    { ...source, observedAt: 'not-a-date' }, { ...source, runId: 'not-a-run-id' },
+    { ...source, status: 'passed' }, { ...source, sessionId: '' },
+  ]) assert.deepEqual(citedQuestionCommandSources({ ...check, questionCommandSources: [malformed] }, criteria, candidateId, sha), []);
+  assert.deepEqual(citedQuestionCommandSources({ ...check, questionCommandSources: Array.from({ length: 33 }, () => source) }, criteria, candidateId, sha), []);
+});
+
+test('review warning markers are explicit standalone bounded output, not user-text keyword guesses', () => {
+  assert.equal(reviewDecisionExplanation('There was a retry, fallback, formatting change or pivot.'), null);
+  assert.equal(reviewDecisionExplanation('Quoted possible_unrecorded_decision: change'), null);
+  assert.equal(reviewDecisionExplanation('possible_unrecorded_decision: ' + 'x'.repeat(501)), null);
+  assert.equal(reviewDecisionExplanation('possible_unrecorded_decision: '), null);
+  assert.equal(reviewDecisionExplanation('Review passed.\npossible_unrecorded_decision: Explain the changed target.'), 'Explain the changed target.');
 });

@@ -75,7 +75,7 @@ export function BotPublicRoleEditor({ botId, workspaceId }: { botId: string; wor
           </div>
         </div>
         <div id={statusId} aria-live="polite" className="px-2 text-xs">
-          {error ? <p role="alert" className="text-destructive">{t('saveError')} {error}</p>
+          {error ? <p role="alert" className="text-destructive-foreground">{t('saveError')} {error}</p>
             : saved ? <p className="text-muted-foreground">{t('saved')}</p> : null}
         </div>
       </form>}

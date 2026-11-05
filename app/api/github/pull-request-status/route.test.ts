@@ -16,6 +16,11 @@ const readPr = mock.fn(async (_headers: Headers, _url: string) => githubResult()
 mock.module(new URL('../../../../lib/auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async () => userId ? { user: { id: userId } } : null } } } })
 mock.module(new URL('../../../../lib/issue-access.ts', import.meta.url).href, { namedExports: { issueForUser: issueLookup } })
 mock.module(new URL('../../../../lib/github/user-access.ts', import.meta.url).href, { namedExports: { GitHubAccessError, readAuthorizedPullRequest: readPr } })
+const liveWorkspaceId = '00000000-0000-4000-8000-0000000000aa'
+const liveLookup = mock.fn(async (_database: unknown, _workspaceDatabase: unknown, _issueId: string, _viewerId: string) => liveWorkspaceId)
+mock.module(new URL('../../../../lib/live/panels.ts', import.meta.url).href, { namedExports: { documentLiveWorkspace: liveLookup } })
+mock.module(new URL('../../../../lib/db/index.ts', import.meta.url).href, { namedExports: { pool: {} } })
+mock.module(new URL('../../../../lib/workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: {} } })
 let POST: typeof import('./route')['POST']
 before(async () => { ({ POST } = await import('./route')) })
 beforeEach(() => {
@@ -57,7 +62,9 @@ test('only minimal viewer-authorized state is returned and shared metadata is un
   const response = await call({ issueId, url: `${url}/` })
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
-  assert.deepEqual(await response.json(), { viewerId: 'viewer', url, state: 'merged', updatedAt: '2026-10-27T12:00:00Z' })
+  assert.deepEqual(await response.json(), { viewerId: 'viewer', url, state: 'merged', updatedAt: '2026-10-27T12:00:00Z', live: { workspaceId: liveWorkspaceId } })
+  // The channel is the viewer's own for this task (#1212), looked up only after the task and GitHub checks.
+  assert.deepEqual(liveLookup.mock.calls.at(-1)!.arguments.slice(2), [issueId, 'viewer'])
   assert.equal(readPr.mock.calls[0].arguments[1], url)
   assert.equal(JSON.stringify(content), beforeContent)
 })

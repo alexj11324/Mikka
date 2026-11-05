@@ -64,7 +64,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
 
   if (!general.data && !general.error) return <SettingsLoading label={t('loading')} rows={3} />
   if (!data) return <div role="alert" className="flex flex-col items-start gap-3 text-sm">
-    <p className="text-destructive">{actionError(general.data?.error)}</p>
+    <p className="text-destructive-foreground">{actionError(general.data?.error)}</p>
     <Button variant="outline" size="sm" onClick={() => void general.mutate()}>{commonT('retry')}</Button>
   </div>
   const current = data

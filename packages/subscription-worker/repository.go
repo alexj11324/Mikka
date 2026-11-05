@@ -172,11 +172,11 @@ func (r *Repository) Disconnect(ctx context.Context, s Scope, epoch int64) error
 	if !validScope(s) {
 		return ErrUnavailable
 	}
-	result, err := r.DB.ExecContext(ctx, `update byos_connections set state='disconnected',epoch=epoch+1,quota=null,"secretName"=null,"secretDigest"=null,"accessSecretName"=null,"accessDigest"=null,"providerSubject"=null,"operationId"=null,"operationKind"=null,"operationDeadline"=null,"stagedSecretName"=null,"stagedDigest"=null,"stagedAccessName"=null,"stagedAccessDigest"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$5`, s.ConnectionID, s.OwnerID, s.WorkspaceID, s.Provider, epoch)
+	var n int
+	err := r.DB.QueryRowContext(ctx, `with disconnected as (update byos_connections set state='disconnected',epoch=epoch+1,quota=null,"secretName"=null,"secretDigest"=null,"accessSecretName"=null,"accessDigest"=null,"providerSubject"=null,"operationId"=null,"operationKind"=null,"operationDeadline"=null,"stagedSecretName"=null,"stagedDigest"=null,"stagedAccessName"=null,"stagedAccessDigest"=null,"lastErrorCode"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$5 returning id), invalidated as (update byos_oauth_attempts set "consumedAt"=coalesce("consumedAt",now()) where "connectionId" in (select id from disconnected) and "ownerId"=$2 and "workspaceId"=$3) select count(*) from disconnected`, s.ConnectionID, s.OwnerID, s.WorkspaceID, s.Provider, epoch).Scan(&n)
 	if err != nil {
 		return ErrDatabase
 	}
-	n, _ := result.RowsAffected()
 	if n != 1 {
 		return ErrStale
 	}

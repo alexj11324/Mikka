@@ -15,10 +15,14 @@ export type CoordinatorStreamEvent =
    * A tool the reply is using: its name, how it stands, and the first characters of its input and output
    * (`TOOL_PREVIEW_CHARS`, masked; left out when they would carry a saved secret), as the stored chat keeps them.
    */
-  | { type: 'tool'; id: string; call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string }
+  /** `at` (on the call): the length of the reply's text when it ran, so the chat draws it after those words. */
+  | { type: 'tool'; id: string; call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string; quote?: string; at?: number }
   /**
-   * The model started or stopped thinking. At the end comes what it thought, masked, when the model returned
-   * readable reasoning; none for encrypted or empty reasoning, or when it would hold a saved secret.
+   * The model started or stopped thinking, and what it thinks as it goes: each `delta` is the next masked piece of
+   * readable reasoning (none for encrypted or empty reasoning; nothing past a saved secret). `reset` replaces the
+   * turn's reasoning so far with `text` when a retried model step drops its partial attempt.
    */
-  | { type: 'thinking'; id: string; state: 'start' | 'end'; text?: string }
+  | { type: 'thinking'; id: string; state: 'start' | 'end' }
+  | { type: 'thinking'; id: string; state: 'delta'; text: string }
+  | { type: 'thinking'; id: string; state: 'reset'; text: string }
   | { type: 'error' }

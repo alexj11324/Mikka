@@ -1,27 +1,31 @@
-import { type ComponentType, useMemo, useState } from 'react'
+import { ReadNotice } from '@/components/ReadNotice'
+import { type ComponentType, useEffect, useMemo, useState } from 'react'
 import { FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Check, CircleCheck, Hand, List, LoaderCircle, Plus, SlidersHorizontal } from 'lucide-react-native'
+import { Check, List, Plus, SlidersHorizontal } from 'lucide-react-native'
 import { MachineIcon, Spinner, StatusIcon } from '@/components/icons'
 import { GROUP_ICON } from '@/lib/thread-icon'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Dot } from '@/components/ui'
-import { CardButton } from '@/components/cards'
 import type { BotPage, Thread, ThreadGroup, Threads } from '@/lib/types'
 import { openChat } from '@/lib/navigate'
-import { useApi, useRefresh } from '@/lib/useApi'
+import { useLiveApi, useRefresh } from '@/lib/useApi'
+import { botPageLive, threadsLive } from '@/lib/live-keys'
+import { useHome } from '@/lib/home'
 import { colors, lift } from '@/lib/theme'
 import { HARNESS } from '@/lib/harness'
 
 // 待审阅 and 已归档 (Figma 03b) wait for the server to track reviews and archiving.
 type Filter = 'all' | 'waiting' | 'running' | 'resolved'
-const filters: { id: Filter; label: string; icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>; symbol: 'list.bullet' | 'hand.raised' | 'arrow.triangle.2.circlepath' | 'checkmark.circle' }[] = [
+/** A thread group's menu icon: the same bubble and dot its rows show (R-52), never a task's circle. */
+const groupIcon = (group: ThreadGroup) => function GroupIcon({ size = 18 }: { size?: number }) { return <StatusIcon status={GROUP_ICON[group]} size={size} /> }
+const filters: { id: Filter; label: string; icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>; symbol: 'list.bullet' | 'bubble.left' }[] = [
   { id: 'all', label: '全部', icon: List, symbol: 'list.bullet' },
-  { id: 'waiting', label: '等待你', icon: Hand, symbol: 'hand.raised' },
-  { id: 'running', label: '进行中', icon: LoaderCircle, symbol: 'arrow.triangle.2.circlepath' },
-  { id: 'resolved', label: '已解决', icon: CircleCheck, symbol: 'checkmark.circle' },
+  { id: 'waiting', label: '等待你', icon: groupIcon('waiting'), symbol: 'bubble.left' },
+  { id: 'running', label: '进行中', icon: groupIcon('running'), symbol: 'bubble.left' },
+  { id: 'resolved', label: '已解决', icon: groupIcon('resolved'), symbol: 'bubble.left' },
 ]
 
 /** The server's group (R-52); an older server sends none, so its status stands in, never as resolved. */
@@ -48,12 +52,24 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
   // `bot`: one bot's threads, pushed over its chat; otherwise the 线程 tab.
   const pushed = bot !== undefined
   const insets = useSafeAreaInsets()
-  const { data, loading, error, reload } = useApi<Threads | BotPage>(bot ? `/api/mobile/bots/${bot.id}` : '/api/mobile/threads', 10_000)
+  const home = useHome().data
+  const own = home?.live?.workspaceId
+  // The Coordinator's page is addressed as `coordinator`; its key is its bot row's id.
+  const botId = bot?.id === 'coordinator' ? home?.bots.find(item => item.coordinator)?.id : bot?.id
+  const { data, loading, error, reload } = useLiveApi<Threads | BotPage>(bot ? `/api/mobile/bots/${bot.id}` : '/api/mobile/threads',
+    current => bot ? botPageLive(current as BotPage | null, botId, own, home?.workspace.id) : threadsLive(current as Threads | null, own))
   const devices = data && 'devices' in data ? data.devices : []
   const refresh = useRefresh(reload)
   const [machine, setMachine] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [menu, setMenu] = useState(false)
+
+  // A workspace change or removed device must not leave an invisible filter.
+  useEffect(() => {
+    if (!data || !machine) return
+    const available = 'devices' in data ? data.devices : []
+    if (!available.some(device => device.id === machine)) setMachine(null)
+  }, [data, machine])
 
   const list = useMemo(() => (data?.threads ?? [])
     .filter(t => matches(t, filter) && (!machine || t.device?.id === machine))
@@ -81,12 +97,13 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         ListHeaderComponent={
           <View>
+            <ReadNotice error={error} hasData={Boolean(data)} label="线程" onRetry={reload} />
             {devices.length ? <Text style={styles.section}>设备</Text> : null}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
               {devices.map(m => {
                 const active = machine === m.id
                 return (
-                  <Pressable key={m.id} accessibilityRole="button" onPress={() => setMachine(active ? null : m.id)} style={[styles.chip, active && styles.chipActive]}>
+                  <Pressable key={m.id} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => setMachine(active ? null : m.id)} style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && { opacity: 0.7 }]}>
                     <MachineIcon machine={m.kind} size={16} color={active ? colors.onInk : colors.ink} />
                     <Text style={[styles.chipText, active && { color: colors.onInk }]}>{m.name}</Text>
                     {m.online ? <View style={styles.online} /> : null}
@@ -97,12 +114,7 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
             {filter === 'all' ? null : <Text style={styles.section}>{filters.find(f => f.id === filter)?.label}</Text>}
           </View>
         }
-        ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : error ? (
-          <View style={styles.failed}>
-            <Text style={styles.error}>线程加载失败。</Text>
-            <CardButton label="重试" onPress={() => void reload()} />
-          </View>
-        ) : <Text style={styles.empty}>没有线程</Text>}
+        ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : error ? undefined : <Text style={styles.empty}>没有线程</Text>}
         renderItem={({ item }) => 'title' in item ? <Text style={styles.section}>{item.title}</Text> : <ThreadRow thread={item} onPress={() => router.push(`/thread/${item.id}`)} />}
       />
       <Modal visible={menu} transparent animationType="fade" onRequestClose={() => setMenu(false)}>
@@ -143,7 +155,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
   section: { fontSize: 13, color: colors.secondary, marginLeft: 20, marginTop: 12, marginBottom: 8 },
   chips: { paddingHorizontal: 16, gap: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 7, height: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: colors.bubble },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 44, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: colors.bubble },
   chipActive: { backgroundColor: colors.ink },
   chipText: { fontSize: 15 },
   online: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.success },
@@ -156,5 +168,5 @@ const styles = StyleSheet.create({
   failed: { alignItems: 'center', gap: 10, marginTop: 40 },
   error: { fontSize: 13, color: colors.danger },
   menu: { position: 'absolute', right: 16, width: 220, backgroundColor: colors.surface, borderRadius: 18, paddingVertical: 6, ...lift, shadowOpacity: 0.16, shadowRadius: 24 },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, height: 44 },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, minHeight: 44, paddingVertical: 10 },
 })

@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers'
-import { liveInvalidations, type LiveInvalidation } from '../../../lib/live/events'
+import { liveInvalidations, liveReady, type LiveInvalidation } from '../../../lib/live/events'
 
 const ONLINE_WINDOW_MS = 90_000
 
@@ -47,6 +47,7 @@ export class DeviceSession extends DurableObject<Record<string, unknown>> {
     }
     this.ctx.acceptWebSocket(server)
     server.serializeAttachment({ connectedAt: Date.now(), ...(live ? { liveExpiresAt: Number(protocol.match(/^mikka-ticket-(\d+)-/)?.[1]) * 1000 } : {}) } satisfies ConnectionAttachment)
+    if (live) server.send(JSON.stringify(liveReady()))
     // The edge authenticated this exact ticket. Node's built-in WebSocket
     // rejects the upgrade unless its offered protocol is selected here.
     return new Response(null, {

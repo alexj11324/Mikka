@@ -1,5 +1,5 @@
 import 'server-only'
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 
 /**
  * When runs end, however they end, stop the screen recordings they left
@@ -18,5 +18,5 @@ export function stopRecordingsAfter(runIds: readonly string[]) {
     }
   }
   // Outside a request (a script, a test) there is no `after`; run it detached.
-  try { after(stop) } catch { void stop() }
+  afterJob('after:stop-recordings', stop, { orRun: true })
 }

@@ -23,16 +23,19 @@ export async function reactionsFor(userId: string, messageIds: readonly string[]
  * when the message is not theirs to react to.
  */
 export async function setReaction(userId: string, messageId: string, emoji: string | null): Promise<boolean> {
-  const { rowCount } = await pool.query(
-    `SELECT 1 FROM coordinator_messages WHERE id=$1::uuid AND "userId"=$2
+  const { rows: [message] } = await pool.query<{ inGroup: boolean; botId: string | null }>(
+    `SELECT false AS "inGroup", "botId" FROM coordinator_messages WHERE id=$1::uuid AND "userId"=$2
      UNION ALL
-     SELECT 1 FROM conversation_messages m JOIN conversation_members cm ON cm."conversationId"=m."conversationId"
+     SELECT true AS "inGroup", NULL FROM conversation_messages m JOIN conversation_members cm ON cm."conversationId"=m."conversationId"
        AND cm."memberType"='user' AND cm."memberId"=$2 AND cm."leftAt" IS NULL
      WHERE m.id=$1::uuid LIMIT 1`, [messageId, userId])
-  if (!rowCount) return false
+  if (!message) return false
   if (emoji === null) await pool.query('DELETE FROM message_reactions WHERE "userId"=$1 AND "messageId"=$2', [userId, messageId])
   else await pool.query(`INSERT INTO message_reactions ("userId","messageId",emoji) VALUES ($1,$2,$3)
     ON CONFLICT ("userId","messageId") DO UPDATE SET emoji=EXCLUDED.emoji, "createdAt"=now()`, [userId, messageId, emoji])
+  // Every member's open group page re-reads its reactions; a bot chat's are its owner's other screens'.
+  if (message.inGroup) await (await import('@/lib/live/groups')).groupMessagesChanged(pool, [messageId])
+  else await (await import('@/lib/live/chats')).botChatChanged(pool, userId, message.botId)
   return true
 }
 

@@ -6,6 +6,7 @@ import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { createShare, listArtifacts as listOwnArtifacts, listRunArtifacts as listOwnRunArtifacts, readArtifact, readArtifactContent, revokeShares, type ArtifactDetail, type ArtifactListItem } from '@/lib/artifacts/store'
+import type { ListLiveRead } from '@/lib/live/list-read'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -26,8 +27,13 @@ export async function listRunArtifacts(runId: string): Promise<ArtifactListItem[
 }
 
 /** One of the person's artifacts with its versions, or null. */
-export async function getArtifact(artifactId: string): Promise<ArtifactDetail | null> {
-  return readArtifact(await getUserId(), artifactId)
+export async function getArtifact(artifactId: string): Promise<(ArtifactDetail & { live: ListLiveRead }) | null> {
+  const userId = await getUserId()
+  const found = await readArtifact(userId, artifactId)
+  // The owner's home channel carries this artifact's key (lib/live/artifacts.ts).
+  if (!found) return null
+  const { ownerListRead } = await import('@/lib/live/list-read-server')
+  return { ...found, live: await ownerListRead(userId) }
 }
 
 /** A Markdown artifact's text at `version`, for the reader. HTML is only ever served through its sandboxed frame. */

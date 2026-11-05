@@ -3,6 +3,9 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
+import { createServer } from 'node:http'
+import { once } from 'node:events'
+import { observePoolCommits } from '../db/commit-effects'
 import { ComputerStore } from './store'
 import { bindComputerRun } from './run-binding'
 import { claimCloudRun, claimLocalRun } from './claim'
@@ -92,19 +95,24 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     }
     const store = new ComputerStore(pool, runtime)
     const bot = await store.createBot(actor, 'Desktop')
-    assert.deepEqual(await store.state(actor, bot.id), { machine: 'sleeping', control: 'idle' })
+    async function stateView() {
+      const { live, ...view } = await store.state(actor, bot.id)
+      assert.equal(live?.workspaceId, actor.workspaceId, 'freshness metadata keeps the authorized workspace')
+      return view
+    }
+    assert.deepEqual(await stateView(), { machine: 'sleeping', control: 'idle' })
     await assert.rejects(store.state(bob, bot.id), { status: 404 })
     await assert.rejects(store.operate(otherWorkspace, bot.id, 'wake'), { status: 404 })
     await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId",state,"provisionLeaseId","provisionLeaseUntil") VALUES ($1,$2,$3,'waking',$4,now()+interval '3 minutes')`, [actor.workspaceId, actor.userId, randomUUID(), randomUUID()])
-    assert.deepEqual(await store.state(actor, bot.id), { machine: 'waking', control: 'idle' }, 'provisioning is visible before the first desktop exists')
+    assert.deepEqual(await stateView(), { machine: 'waking', control: 'idle' }, 'provisioning is visible before the first desktop exists')
     await assert.rejects(store.operate(actor, bot.id, 'wake'), { status: 409, message: 'Computer provisioning in progress' })
     await pool.query(`UPDATE cloud_machines SET "sandboxId"='sandbox-provisioning' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
-    assert.deepEqual(await store.state(actor, bot.id), { machine: 'waking', control: 'idle' }, 'provider state cannot replace an unfinished runtime installation')
+    assert.deepEqual(await stateView(), { machine: 'waking', control: 'idle' }, 'provider state cannot replace an unfinished runtime installation')
     await pool.query(`UPDATE cloud_machines SET state='running' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
-    assert.deepEqual(await store.state(actor, bot.id), { machine: 'sleeping', control: 'idle' }, 'an unallocated desktop stays sleeping when its owner machine is already running')
+    assert.deepEqual(await stateView(), { machine: 'sleeping', control: 'idle' }, 'an unallocated desktop stays sleeping when its owner machine is already running')
     await pool.query('DELETE FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])
     await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId",state) VALUES ($1,$2,$3,'waking'),($4,$5,$6,'waking')`, [actor.workspaceId, bob.userId, randomUUID(), otherWorkspace.workspaceId, actor.userId, randomUUID()])
-    assert.deepEqual(await store.state(actor, bot.id), { machine: 'sleeping', control: 'idle' }, 'another owner or workspace machine is not exposed')
+    assert.deepEqual(await stateView(), { machine: 'sleeping', control: 'idle' }, 'another owner or workspace machine is not exposed')
     await pool.query('DELETE FROM cloud_machines')
     const wakes=await Promise.allSettled([store.operate(actor, bot.id, 'wake'), store.operate(actor, bot.id, 'wake')])
     assert.ok(wakes.some(result=>result.status==='fulfilled'))
@@ -112,7 +120,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await store.operate(actor,bot.id,'wake')
     assert.equal(created, 1)
     await pool.query(`UPDATE cloud_machines SET state='waking' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
-    assert.deepEqual(await store.state(actor, bot.id), { machine: 'waking', control: 'idle' }, 'a resumed desktop stays waking until provisioning completes')
+    assert.deepEqual(await stateView(), { machine: 'waking', control: 'idle' }, 'a resumed desktop stays waking until provisioning completes')
     await pool.query(`UPDATE cloud_machines SET state='running' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
     const leaseA = randomUUID(), leaseB = randomUUID()
     const leaseClaims = await Promise.all([claimWorkerLease(pool, actor, 'sandbox-test', leaseA), claimWorkerLease(pool, actor, 'sandbox-test', leaseB)])
@@ -369,7 +377,28 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal((await store.state(actor, another.id)).pendingApproval, undefined)
     assert.equal(await decideComputerReview(pool, otherWorkspace, review.id, review.digest, true), false)
     assert.equal(await decideComputerReview(pool, actor, review.id, '0'.repeat(64), true), false)
-    assert.equal(await decideComputerReview(pool, actor, review.id, review.digest, true), true)
+    // #1212: the decision pushes the device through its gateway, so the daemon applies it now instead of syncing every second.
+    const pushes: string[] = []
+    const gateway = createServer((request, response) => { pushes.push(`${request.method} ${request.url}`); response.writeHead(204).end() })
+    gateway.listen(0, '127.0.0.1')
+    await once(gateway, 'listening')
+    const saved = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
+    process.env.DEVICE_GATEWAY_URL = `http://127.0.0.1:${(gateway.address() as { port: number }).port}`
+    process.env.DEVICE_GATEWAY_PUSH_SECRET = 'computer-review-test-only'
+    // With the gateway configured, live invalidations ride along; they need commit tracking, as the app's pool has.
+    observePoolCommits(pool)
+    const devicePush = `POST /v1/devices/${deviceId}/push`
+    try {
+      assert.equal(await decideComputerReview(pool, actor, review.id, review.digest, true), true)
+      for (let i = 0; i < 100 && !pushes.includes(devicePush); i++) await new Promise(resolve => setTimeout(resolve, 10))
+      assert.equal(pushes.filter(push => push === devicePush).length, 1)
+    } finally {
+      for (const [name, value] of [['DEVICE_GATEWAY_URL', saved.url], ['DEVICE_GATEWAY_PUSH_SECRET', saved.secret]] as const) {
+        if (value === undefined) delete process.env[name]; else process.env[name] = value
+      }
+      gateway.closeAllConnections()
+      await new Promise<void>(resolve => gateway.close(() => resolve()))
+    }
     assert.equal((await store.state(actor, bot.id)).pendingApproval, undefined)
     assert.equal(await decideComputerReview(pool, actor, review.id, review.digest, true), false)
     assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, [review]), [{ id: review.id, digest: review.digest, approve: true }])

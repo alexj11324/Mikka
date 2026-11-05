@@ -461,6 +461,85 @@ describe("HttpServerLink", () => {
   })
 })
 
+describe('run control without polling while the gateway pushes (#1212)', () => {
+  const run = () => ({ ...assignment('run-1'), harness: 'codex' as const, policy: defaultRunPolicy(), policyRevision: 'a'.repeat(64) })
+  const checks = (calls: { path: string }[]) => calls.filter(call => call.path.endsWith('/tool-approval')).length
+  afterEach(() => vi.useRealTimers())
+
+  it('connected: an idle run makes no liveness request; a push checks once and a stop revokes', async () => {
+    vi.useFakeTimers()
+    let live = true
+    const { fetch, calls } = scripted(() => json({ live }))
+    const link = new HttpServerLink('http://server.test', fetch)
+    link.setRunControlMode('push')
+    const gate = await link.prepareRunToolApproval(run(), new AbortController().signal, () => {})
+    try {
+      await vi.advanceTimersByTimeAsync(10 * 60_000)
+      expect(checks(calls)).toBe(0)
+      link.invalidateRunControls()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(checks(calls)).toBe(1)
+      expect(gate.revoked).toBe(false)
+      live = false
+      link.invalidateRunControls()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(checks(calls)).toBe(2)
+      expect(gate.revoked).toBe(true)
+    } finally { gate.revoke() }
+  })
+
+  it('disconnected: falls back to one liveness request every 20 s, and back to none on reconnect', async () => {
+    vi.useFakeTimers()
+    const { fetch, calls } = scripted(() => json({ live: true }))
+    const link = new HttpServerLink('http://server.test', fetch)
+    link.setRunControlMode('push')
+    const gate = await link.prepareRunToolApproval(run(), new AbortController().signal, () => {})
+    try {
+      link.setRunControlMode('fallback')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(checks(calls)).toBe(1)
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(checks(calls)).toBe(4)
+      link.setRunControlMode('push')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(checks(calls)).toBe(5)
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(checks(calls)).toBe(5)
+    } finally { gate.revoke() }
+  })
+
+  it('a paused run waits for the push that resumes it instead of asking every second', async () => {
+    vi.useFakeTimers()
+    let paused = true
+    const { fetch, calls } = scripted(() => json({ live: true, paused }))
+    const link = new HttpServerLink('http://server.test', fetch)
+    link.setRunControlMode('push')
+    const gate = await link.prepareRunToolApproval(run(), new AbortController().signal, () => {})
+    try {
+      let allowed: boolean | undefined
+      const pending = gate.checkLive().then(value => { allowed = value })
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(checks(calls)).toBe(1)
+      expect(allowed).toBeUndefined()
+      paused = false
+      link.invalidateRunControls()
+      await vi.advanceTimersByTimeAsync(0)
+      await pending
+      expect(allowed).toBe(true)
+    } finally { gate.revoke() }
+  })
+
+  it('an older server (legacy mode) keeps the one-second check', async () => {
+    vi.useFakeTimers()
+    const { fetch, calls } = scripted(() => json({ live: true }))
+    const gate = await new HttpServerLink('http://server.test', fetch).prepareRunToolApproval(run(), new AbortController().signal, () => {})
+    try {
+      await vi.advanceTimersByTimeAsync(3000)
+      expect(checks(calls)).toBe(3)
+    } finally { gate.revoke() }
+  })
+})
+
 describe("mikka daemon login (device authorization)", () => {
   const grant = {
     device_code: "dc-1",

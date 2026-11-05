@@ -34,6 +34,9 @@ import { requireLockedIssueScope } from '@/lib/issue-scope-authorization'
 import { queryVersion } from '@/lib/db/query-version'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
+import { issueListChanged } from '@/lib/live/lists'
+import { issueRelationsChanged } from '@/lib/live/issue-detail'
+import { ownerListRead } from '@/lib/live/list-read-server'
 import { issuePrefixes, linearIssueLinks, linearTeamSyncs } from '@/lib/db/schema'
 
 type IssueRow = typeof issues.$inferSelect
@@ -87,6 +90,7 @@ async function readIssues(workspaceId?: string, known?: string) {
 async function readIssueSnapshot(workspaceId?: string, known?: string) {
   const userId = await getUserId()
   const context = await loadWorkspaceContext(workspaceId)
+  const live = { ...await ownerListRead(userId), selectedWorkspaceId: context.workspace.id }
   // Membership is fresh for each poll. Reuse only this operation's narrow
   // identity rows for visibility, workspace filtering and remaining links.
   const allTeams = await accessibleTeamScopes(userId)
@@ -107,7 +111,7 @@ async function readIssueSnapshot(workspaceId?: string, known?: string) {
   )`.as('identifiers') }).from(candidates)
   const tasksVersion = await queryVersion(signature)
   const version = createHash('sha256').update(JSON.stringify([userId, context.workspace.id, teams.map(team => team.id).sort(), tasksVersion, linksVersion])).digest('hex').slice(0, 32)
-  if (known === version) return { unchanged: true, version } as const
+  if (known === version) return { unchanged: true, version, live } as const
   // Read the version first: a concurrent change is picked up on the next poll, never acknowledged unseen.
   const rows = await db.select().from(candidates).orderBy(desc(candidates.updatedAt), desc(candidates.id))
   const knownLinks = new Map(visibility.links.map(link => [link.issueId, link]))
@@ -122,7 +126,7 @@ async function readIssueSnapshot(workspaceId?: string, known?: string) {
   const liveRows = visibleRows.filter(row => !readIssueMetadata(row.content).deletedAt)
   const identifiers = await taskIdentifiers(liveRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
   // The body stays in Postgres: only its attrs (metadata) and checklist counts are read, not up to 100 whole bodies per poll.
-  return { version, items: liveRows.map(({ content, checklistTotal, checklistChecked, ...issue }) => ({ ...issue, identifier: identifiers.get(issue.id) ?? null, teamId: links.find(link => link.issueId === issue.id)?.teamId ?? null, metadata: readIssueMetadata(content), checklist: checklistView(checklistTotal, checklistChecked) })) }
+  return { version, live, items: liveRows.map(({ content, checklistTotal, checklistChecked, ...issue }) => ({ ...issue, identifier: identifiers.get(issue.id) ?? null, teamId: links.find(link => link.issueId === issue.id)?.teamId ?? null, metadata: readIssueMetadata(content), checklist: checklistView(checklistTotal, checklistChecked) })) }
 }
 
 /** A missing, deleted or inaccessible task is an expected answer, not a server error. */
@@ -176,6 +180,9 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         }
         if (!issue) return { error: 'issueStale' }
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...activityActor(userId) })
+        await issueListChanged(tx, id, latest.title !== issue.title)
+        // Title, status and priority show in every connected task's relations panel.
+        await issueRelationsChanged(tx, [id])
         return { issue: await issueView(issue, tx) }
       })
       if ('issue' in result && result.issue?.scope === 'workspace' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })

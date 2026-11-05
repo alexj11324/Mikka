@@ -153,7 +153,7 @@ function Questions({ value }: { value: Component }) {
   const [custom, setCustom] = useState<Record<string, string>>({})
   if (!questions.length) return null
   const [only] = questions
-  if (questions.length === 1 && !only.multiple && only.options.length) {
+  if (questions.length === 1 && !only.multiple && !only.allowCustom && only.options.length) {
     const choice = picked[only.id]?.[0] ?? only.options.find(option => option.label === reply?.trim())?.value
     return (
       <ChatCard>

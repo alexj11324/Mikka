@@ -44,6 +44,8 @@ function polling(fetchCommands = vi.fn<ServerLink['fetchCommands']>().mockResolv
   deviceGateway?: NonNullable<ServerLink['deviceGateway']>
   commandsWaitSeconds?: number
   invalidateRunControls?: () => void
+  setRunControlMode?: ServerLink['setRunControlMode']
+  hostedSubscriptions?: boolean
 } = {}) {
   const deviceGateway = vi.fn<NonNullable<ServerLink['deviceGateway']>>(options.deviceGateway ?? (async () => ({ url: 'wss://fixture.invalid', protocol: 'fixture-ticket' })))
   const ackCommands = vi.fn(async () => {})
@@ -51,8 +53,8 @@ function polling(fetchCommands = vi.fn<ServerLink['fetchCommands']>().mockResolv
   let active = false
   const daemon = new Daemon({
     dataDir: tempDir('mikka-gateway-'), flavor: 'dev', commandsWaitSeconds: options.commandsWaitSeconds ?? 1,
-    link: { ...new MemoryServer('device-1').link(), fetchCommands, deviceGateway, ackCommands, invalidateRunControls: options.invalidateRunControls },
-    log: createLogger({ level: 'silent' }),
+    link: { ...new MemoryServer('device-1').link(), fetchCommands, deviceGateway, ackCommands, invalidateRunControls: options.invalidateRunControls, setRunControlMode: options.setRunControlMode },
+    log: createLogger({ level: 'silent' }), ...(options.hostedSubscriptions ? { hostedSubscriptions: true } : {}),
   })
   Reflect.set(daemon, 'device', { deviceId: 'device-1', credential: 'fixture' })
   Reflect.set(daemon, 'registered', true)
@@ -319,6 +321,46 @@ it('wires reconnect, work and disconnect to fresh checks without treating pong a
   Socket.instances[0]!.emit('close')
   await vi.advanceTimersByTimeAsync(0)
   expect(invalidateRunControls).toHaveBeenCalledTimes(3)
+})
+
+it('drops the periodic run check only while a run-control push server holds the socket (#1212)', async () => {
+  const setRunControlMode = vi.fn<NonNullable<ServerLink['setRunControlMode']>>()
+  polling(undefined, { setRunControlMode, deviceGateway: async () => ({ url: 'wss://fixture.invalid', protocol: 'fixture-ticket', runControl: 'push' }) })
+  await vi.advanceTimersByTimeAsync(0)
+  expect(setRunControlMode.mock.calls.map(([mode]) => mode)).toEqual(['fallback', 'push'])
+  Socket.instances[0]!.emit('close')
+  await vi.advanceTimersByTimeAsync(0)
+  expect(setRunControlMode).toHaveBeenLastCalledWith('fallback')
+})
+
+it('keeps the one-second run check against an older server that does not push run control', async () => {
+  const setRunControlMode = vi.fn<NonNullable<ServerLink['setRunControlMode']>>()
+  polling(undefined, { setRunControlMode })
+  await vi.advanceTimersByTimeAsync(0)
+  Socket.instances[0]!.emit('close')
+  await vi.advanceTimersByTimeAsync(0)
+  expect(new Set(setRunControlMode.mock.calls.map(([mode]) => mode))).toEqual(new Set(['legacy']))
+})
+
+it('a cloud computer that cannot get a gateway ticket checks its runs every 20 s, never every second', async () => {
+  // A cloud device token could not mint a ticket (401), so cloud runs stayed on
+  // the one-second check and re-read their subscription about every 3 s.
+  const setRunControlMode = vi.fn<NonNullable<ServerLink['setRunControlMode']>>()
+  const { deviceGateway } = polling(undefined, { setRunControlMode, hostedSubscriptions: true, deviceGateway: async () => { throw new SessionRejectedError() } })
+  await vi.advanceTimersByTimeAsync(0)
+  expect(deviceGateway).toHaveBeenCalled()
+  expect(setRunControlMode).toHaveBeenCalled()
+  expect(new Set(setRunControlMode.mock.calls.map(([mode]) => mode))).toEqual(new Set(['fallback']))
+})
+
+it('a cloud computer on the gateway drops the periodic run check like a local daemon', async () => {
+  const setRunControlMode = vi.fn<NonNullable<ServerLink['setRunControlMode']>>()
+  polling(undefined, { setRunControlMode, hostedSubscriptions: true, deviceGateway: async () => ({ url: 'wss://fixture.invalid', protocol: 'fixture-ticket', runControl: 'push' }) })
+  await vi.advanceTimersByTimeAsync(0)
+  expect(setRunControlMode.mock.calls.map(([mode]) => mode)).toEqual(['fallback', 'push'])
+  Socket.instances[0]!.emit('close')
+  await vi.advanceTimersByTimeAsync(0)
+  expect(setRunControlMode).toHaveBeenLastCalledWith('fallback')
 })
 
 it('keeps the uninstall grace credential through gateway command rejection, heartbeat receipt and deferred stop', async () => {

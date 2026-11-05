@@ -1,5 +1,7 @@
 import 'server-only'
 import type { Pool, PoolClient } from 'pg'
+import { ownerListChanged } from '@/lib/live/lists'
+import { botChatChanged } from '@/lib/live/chats'
 
 /**
  * The person's Coordinator is an ordinary bot (glossary), one per person per
@@ -142,7 +144,7 @@ async function moveChat(client: PoolClient, ownerId: string, botId: string) {
   await client.query('SELECT 1 FROM coordinator_sessions WHERE "userId"=$1 AND ("botId" IS NULL OR "botId"=$2) FOR UPDATE', [ownerId, botId])
   const target = (await client.query<{ last: number }>('SELECT coalesce(max(position),0)::int AS last FROM coordinator_messages WHERE "userId"=$1 AND "botId"=$2', [ownerId, botId])).rows[0].last
   // Positions stay as they were when the row holds no messages yet, so the session's summaryThrough still points at the same message.
-  await client.query(`UPDATE coordinator_messages m SET "botId"=$2, position=$3 + n.rank
+  const messages = await client.query(`UPDATE coordinator_messages m SET "botId"=$2, position=$3 + n.rank
     FROM (SELECT id, CASE WHEN $3=0 THEN position ELSE row_number() OVER (ORDER BY position) END AS rank
       FROM coordinator_messages WHERE "userId"=$1 AND "botId" IS NULL) n
     WHERE m.id=n.id`, [ownerId, botId, target])
@@ -164,9 +166,11 @@ async function moveChat(client: PoolClient, ownerId: string, botId: string) {
   }
   await client.query('UPDATE coordinator_events SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
   // The Coordinator's threads: every run of the person's with no bot (an MCP client's too), except a group chat's own.
-  await client.query(`UPDATE agent_runs r SET "botId"=$2 WHERE r."userId"=$1 AND r."botId" IS NULL
+  const runs = await client.query(`UPDATE agent_runs r SET "botId"=$2 WHERE r."userId"=$1 AND r."botId" IS NULL
       AND r.kind <> 'group_chat'
       AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)`, [ownerId, botId])
+  if (messages.rowCount || old) await botChatChanged(client, ownerId, botId)
+  if (runs.rowCount) await ownerListChanged(client, ownerId, ['thread_list', 'task_run_list'])
 }
 
 /**

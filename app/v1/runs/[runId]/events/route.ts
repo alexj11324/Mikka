@@ -1,3 +1,4 @@
+import { runChanged } from '@/lib/live/panels'
 import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { and, eq, sql } from 'drizzle-orm'
@@ -8,6 +9,7 @@ import { authenticateDevice } from '@/lib/device-link'
 import { computerEventsMatch } from '@/lib/computer/events'
 import { secretMaskerFor } from '@/lib/secrets/runtime'
 import { persistRunEventBatch } from '@/lib/secrets/run-events'
+import { runListChanged } from '@/lib/live/lists'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,9 +46,10 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
   // Identity when the deployment has no workspace encryption key or the workspace has no secret of 8+ characters.
   const mask = await secretMaskerFor({ workspaceId: caller.scopeWorkspaceId, ownerId: caller.userId })
   await persistRunEventBatch(runId, parsed.data.fromSeq, parsed.data.chunks, mask)
-  await db.update(agentRuns)
+  const started = await db.update(agentRuns)
     .set({ status: 'running', updatedAt: new Date() })
-    .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'preparing')))
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'preparing'))).returning({ id: agentRuns.id })
+  if (started.length) { await runListChanged(db, runId); await runChanged(db, runId) }
   const [tail] = await db
     .select({ seq: sql<number | null>`max(${runChunks.seq})` })
     .from(runChunks)

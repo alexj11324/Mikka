@@ -3,12 +3,14 @@ import { digest } from './definition'
 /** The exact standing policy/credential identity shared by producers and mailbox admission.
  * Prompt/retry metadata and parent references have their own separate checks. */
 export function workerDefinitionDigest(value: {
-  harness: string; instructions: string; model?: unknown; modelDispatch?: unknown; pinnedDeviceId?: unknown; allowLocalRecovery?: unknown;
+  harness: string; instructions: string; model?: unknown; modelDispatch?: unknown; agentProfile?: unknown; profileOriginRunId?: unknown; pinnedDeviceId?: unknown; allowLocalRecovery?: unknown;
   subscription?: unknown; apiKey?: unknown; mailbox?: unknown; customMcp?: unknown; readOnly?: unknown; policyCeiling?: unknown;
 }) {
   return digest({ harness: value.harness, instructions: value.instructions,
     ...(value.model ? { model: value.model } : {}),
     ...(value.modelDispatch ? { modelDispatch: value.modelDispatch } : {}),
+    ...(value.agentProfile ? { agentProfile: value.agentProfile } : {}),
+    ...(value.profileOriginRunId ? { profileOriginRunId: value.profileOriginRunId } : {}),
     ...(value.pinnedDeviceId ? { pinnedDeviceId: value.pinnedDeviceId } : {}),
     ...(value.allowLocalRecovery === true ? { allowLocalRecovery: true } : {}),
     ...(value.subscription ? { subscription: value.subscription } : {}),

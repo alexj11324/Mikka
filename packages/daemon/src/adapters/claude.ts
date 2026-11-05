@@ -488,8 +488,8 @@ export class ClaudeAdapter implements AgentAdapter {
           throw new Error(SUBSCRIPTION_ERROR)
         nativeToken = token.accessToken
         if(externalAuth.brokered && nativeToken!==NATIVE_AUTH_PLACEHOLDER)throw new Error(SUBSCRIPTION_ERROR)
-      } catch {
-        throw new Error(SUBSCRIPTION_ERROR)
+      } catch (error) {
+        throw new Error(SUBSCRIPTION_ERROR, { cause: error })
       }
     }
     // Never the host's login or config. This is config isolation only; a
@@ -509,6 +509,7 @@ export class ClaudeAdapter implements AgentAdapter {
     const ctx = new RunContext({
       harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
+      mcp: options.mcp,
       apps: options.apps,
       githubRuntime: options.githubRuntime,
       childPath: options.env.PATH,
@@ -573,7 +574,7 @@ export class ClaudeAdapter implements AgentAdapter {
     const gone = new Promise<void>((resolve) => (finished = resolve))
 
     if(externalAuth && this.options.onHostedSession) {
-      try{await this.options.onHostedSession(sessionId)}catch{throw new Error(SUBSCRIPTION_ERROR)}
+      try{await this.options.onHostedSession(sessionId)}catch(error){throw new Error(SUBSCRIPTION_ERROR, { cause: error })}
     }
     // No sandbox: the CLI starts directly. A revoked run gate stops it.
     const spawnLocal = (config: SpawnOptions): SpawnedProcess & { stderr?: Readable } => {
@@ -618,6 +619,7 @@ export class ClaudeAdapter implements AgentAdapter {
         allowDangerouslySkipPermissions: true,
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
+        ...(options.effort ? { effort: options.effort } : {}),
         // A hosted run spawns through the hosted runner; an API-key run there holds the placeholder too.
         spawnClaudeCodeProcess: (config: SpawnOptions) => {
           const child = this.options.spawnHosted
@@ -817,7 +819,7 @@ export class ClaudeAdapter implements AgentAdapter {
         try { log.warn({ event: 'claude_subscription_startup_failed', phase: authPhase, reason: authReason }, 'Subscription startup failed') } catch { /* Keep the original refusal. */ }
         await end(null)
         if (authPhase === 'initialization') throw error instanceof ClaudeInitializationError ? error : new ClaudeInitializationError(false)
-        throw new Error(SUBSCRIPTION_ERROR)
+        throw new Error(SUBSCRIPTION_ERROR, { cause: error })
       } finally {
         clearTimeout(timer)
         offRevoke?.()
@@ -852,7 +854,7 @@ export class ClaudeAdapter implements AgentAdapter {
       async send(text) {
         if (ending) throw new Error("The Claude session already ended")
         if (externalAuth?.verify) {
-          try { await externalAuth.verify() } catch { await end({ outcome: 'failed', error: SUBSCRIPTION_ERROR }); throw new Error(SUBSCRIPTION_ERROR) }
+          try { await externalAuth.verify() } catch (error) { await end({ outcome: 'failed', error: SUBSCRIPTION_ERROR }); throw new Error(SUBSCRIPTION_ERROR, { cause: error }) }
         }
         if (externalAuth && !externalAuth.brokered && Date.now() >= expiresAt) {
           await end({ outcome: "failed", error: SUBSCRIPTION_ERROR })

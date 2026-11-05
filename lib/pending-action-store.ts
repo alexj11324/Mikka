@@ -1,4 +1,5 @@
 import 'server-only'
+import { pendingActionsChanged } from './live/pending-actions'
 import { and, desc, eq, gt } from 'drizzle-orm'
 import { appToolCallSchema, APP_TOOL_ACTION, type AppToolCall } from '@/lib/app-tools'
 import { COMPOSIO_ACTIONS, isApprovalAction, parseActionInput } from '@/lib/composio-actions'
@@ -66,6 +67,7 @@ export async function proposeAction(userId: string, action: string, input: unkno
   }
   const id = crypto.randomUUID()
   await db.insert(pendingActions).values({ id, userId, botId, action, input: parsed, context, connectedAccountId: accountId })
+  await pendingActionsChanged(db, id, userId)
   return { status: 'awaiting_approval', actionId: id }
 }
 
@@ -80,6 +82,7 @@ export async function proposeAppToolCall(userId: string, call: AppToolCall, acco
   if (waiting >= MAX_PENDING) return { error: 'tooManyPendingActions: ask the person to approve or decline the waiting ones first' }
   const id = crypto.randomUUID()
   await db.insert(pendingActions).values({ id, userId, botId, action: APP_TOOL_ACTION, input: parsed.data, connectedAccountId: accountId })
+  await pendingActionsChanged(db, id, userId)
   return { status: 'awaiting_approval', actionId: id }
 }
 

@@ -1,8 +1,10 @@
 import 'server-only'
+import { assertRunProfileClaim, refreshCloudRunProfileClaim } from '@/lib/factory/profile-admission'
 import { executionIdentityForRun, ExecutionIdentityError } from '../execution-identity'
 import type { Pool, PoolClient } from 'pg'
 import { computerPermission, type ComputerPermission } from './permission'
 import { runMayUseCredentialSql } from '@/lib/personal-policy'
+import { runListChanged } from '@/lib/live/lists'
 
 /** The existing local daemon cannot operate a Bot's cloud desktop. Keep its
  * claim serialized with Bot binding and fail closed until a cloud worker with
@@ -15,8 +17,11 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
     if (beforeClaim && (await beforeClaim(client)) === false) { await client.query('ROLLBACK'); return 'unavailable' }
     const run = (await client.query('SELECT id FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND status=$3 AND "stopRequestedAt" IS NULL FOR UPDATE', [runId, deviceId, 'queued'])).rows[0]
     if (!run) { await client.query('COMMIT'); return 'unavailable' }
+    await assertRunProfileClaim(client, runId)
     if(await prepareLocalClaimBinding(client,runId,subscriptionBindingId)==='cloud-required'){await client.query('COMMIT');return 'cloud-required'}
     await client.query('UPDATE agent_runs SET status=$2,"startedAt"=now(),"leaseExpiresAt"=$3,"updatedAt"=now() WHERE id=$1', [runId, 'preparing', leaseExpiresAt])
+    await runListChanged(client, runId)
+    await runChanged(client, runId)
     if (afterClaim) await afterClaim(client)
     await client.query('COMMIT')
     return 'claimed'
@@ -32,6 +37,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
  * A run frozen on an API key has no subscription binding (null): its key
  * was checked and recorded for it by `apiKeyForRun` before the claim. */
 export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string | null, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>, desktop = true): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number; permission: ComputerPermission } | null> {
+  await refreshCloudRunProfileClaim(pool, actor, runId, deviceId, subscriptionBindingId)
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -49,6 +55,7 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
     if (beforeClaim && (await beforeClaim(client)) === false) { await client.query('ROLLBACK'); return null }
     const run = (await client.query('SELECT id,"agentId" FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND "userId"=$3 AND status=$4 AND "stopRequestedAt" IS NULL FOR UPDATE', [runId, deviceId, actor.userId, 'queued'])).rows[0]
     if (!run) { await client.query('COMMIT'); return null }
+    await assertRunProfileClaim(client, runId)
     // Every cloud thread runs on its own thread machine; the Bot's computer serves only the Bot.
     const binding = (await client.query(`SELECT b."botId",1 AS display FROM computer_run_bindings b
       JOIN thread_machines m ON m."runId"=b."runId" AND m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId" AND m."deviceId"=$2
@@ -63,6 +70,8 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
       await client.query('INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)', [runId, subscriptionBindingId])
     } else if (!(await client.query('SELECT 1 FROM model_api_key_runs WHERE "runId"=$1', [runId])).rowCount) { await client.query('COMMIT'); return null }
     await client.query('UPDATE agent_runs SET status=$2,"startedAt"=now(),"leaseExpiresAt"=$3,"updatedAt"=now() WHERE id=$1', [runId, 'preparing', leaseExpiresAt])
+    await runListChanged(client, runId)
+    await runChanged(client, runId)
     if (afterClaim) await afterClaim(client)
     await client.query('COMMIT')
     return { botId: binding.botId, ownerId: actor.userId, display: `:${binding.display}`, policyVersion: policy?.version ?? 0, permission }
@@ -76,3 +85,5 @@ export async function prepareLocalClaimBinding(client:PoolClient,runId:string,su
   if(subscriptionBindingId)await client.query('INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)',[runId,subscriptionBindingId])
   return 'ready'
 }
+
+import { runChanged } from '../live/panels'

@@ -1,5 +1,6 @@
 import { withRequestLog } from '@/lib/request-log'
-import { after, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { cookies } from 'next/headers'
 import { requireUser } from '@/lib/issue-access'
 import { exchangeLinearCode, LINEAR_OAUTH_CALLBACK_PATH, LINEAR_OAUTH_STATE_COOKIE } from '@/lib/linear-sync/oauth'
@@ -27,7 +28,7 @@ async function handleGET(request: Request) {
     const user = await requireUser()
     await exchangeLinearCode(state, code, user.id)
     const timeZone = request.headers.get('x-vercel-ip-timezone')
-    after(() => bootstrapSuggestions(user.id, 'linear', timeZone))
+    afterJob('after:suggestions-bootstrap', () => bootstrapSuggestions(user.id, 'linear', timeZone))
     return redirect(new URL(withBasePath('/?linear=connected'), url.origin))
   } catch {
     return redirect(failure)

@@ -16,7 +16,7 @@ export async function summarizeConversation(ownerId: string, botId: string | nul
     }, undefined, { instructions: options.instructions, maxOutputTokens: options.maxOutputTokens })
     return { text }
   } catch (error) {
-    if (runtime.modelSelection && error instanceof Error && error.message === 'compactionModelUnavailable') throw new Error('subscription_generation_failed')
+    if (runtime.modelSelection && error instanceof Error && error.message === 'compactionModelUnavailable') throw new Error('subscription_generation_failed', { cause: error })
     throw error
   }
 }

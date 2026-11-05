@@ -65,6 +65,20 @@ test('独立结果 lists the latest review then verify with their counts', () =>
   assert.deepEqual(rows.map(row => [row.stage, row.status, row.runId, row.passed, row.total]), [['review', 'failed', 'review-run', 0, 1], ['verify', 'passed', 'verify-run', 2, 2]])
 })
 
+test('command origins belong only to the latest check of the current candidate and never change its verdict', () => {
+  const origin = { runId: 'pre-question-run', sessionId: 'original-native-session', status: 'stopped' as const,
+    recoveryEventId: 'immutable-answer-receipt', observedAt: '2026-11-04T09:12:34.000Z' }
+  const rows = resultRows([
+    check({ stage: 'review', candidateId: 'old-candidate', commandSources: [origin] }),
+    check({ stage: 'review', commandSources: [origin] }),
+    check({ stage: 'review', status: 'failed', criteria: [{ criterionId: 'k', text: 'Current file', passed: false, evidence: null }] }),
+    check({ stage: 'verify', status: 'failed', commandSources: [origin] }),
+  ], 'c1')
+  assert.equal(rows[0].commandSources, undefined, 'an earlier check cannot label a new result')
+  assert.deepEqual(rows[1].commandSources, [origin], 'preserve the host-provided run, SID, status, receipt and time')
+  assert.deepEqual(rows.map(row => [row.stage, row.status, row.passed, row.total]), [['review', 'failed', 0, 1], ['verify', 'failed', 0, 0]])
+})
+
 test('PR numbers and bare preview hosts', () => {
   assert.equal(pullNumber('https://github.com/alexj11324/Mikka/pull/418'), '418')
   assert.equal(pullNumber('https://github.com/alexj11324/Mikka/pull/418/files'), '418')
@@ -117,6 +131,79 @@ test('fixed candidates stay visible for failed, pending and running checks, with
   }
 })
 
+test('a blocked independent check retains its fixed candidate without widening other acceptance stages', () => {
+  for (const stage of ['review', 'verify'] as const) {
+    const task = failedTask({ stage, status: 'blocked' })
+    assert.equal(visibleAcceptance(task), true, `${stage}: a retained candidate must remain reachable`)
+    assert.deepEqual(candidateCheckState(task), { stage, status: 'blocked' })
+    assert.equal(visibleAcceptance({ ...task, candidateId: null }), false)
+  }
+  assert.equal(visibleAcceptance(failedTask({ stage: 'execute', status: 'blocked' })), false)
+  const recovery = failedTask({ status: 'blocked', completionRecovery: { binding: { taskId: 't1', revision: 24 } } })
+  assert.equal(visibleAcceptance(recovery), true)
+  assert.equal(candidateCheckState(recovery), null, 'host completion recovery retains its own presentation')
+})
+
+test('a blocked label and matching identities alone never authorize candidate retry', () => {
+  for (const stage of ['review', 'verify'] as const) {
+    const { task, detail, ledger } = retryFixture(stage)
+    const blocked = { ...task, status: 'blocked' }
+    const blockedDetail = { ...detail, task: blocked, checks: [check({ stage, attemptId: 'a1', status: 'blocked' })] }
+    assert.equal(candidateCheckRetry(blocked, blockedDetail, ledger), null,
+      'visibility must not grant recovery to an unqualified blocked attempt')
+    assert.equal(candidateCheckRetry(blocked, detail, ledger), null, 'an older failed detail cannot grant retry')
+    const pending = { ...blocked, attemptId: 'a2', revision: 25, status: 'pending' }
+    assert.equal(candidateCheckRetryConfirmed(blocked, { contractVersion: 1, task: pending,
+      attempts: [{ id: 'a2', taskId: 't1', candidateId: 'c1', stage, status: 'pending' }],
+      candidates: [{ id: 'c1', taskId: 't1' }] }), false)
+  }
+})
+
+test('blocked start recovery requires the exact host capability and coherent current reads', () => {
+  for (const stage of ['review', 'verify'] as const) {
+    const { task, ledger } = retryFixture(stage)
+    const blocked = { ...task, status: 'blocked' }
+    const checkStartRecovery = { binding: { taskId: 't1', revision: 24 } }
+    const detail = { task: blocked, checkStartRecovery, checks: [check({ stage, attemptId: 'a1', status: 'blocked' })] }
+    assert.deepEqual(candidateCheckRetry(blocked, detail, ledger)?.binding, checkStartRecovery.binding)
+    for (const capability of [undefined, { binding: { taskId: 'other', revision: 24 } },
+      { binding: { taskId: 't1', revision: 23 } }, { binding: { taskId: 't1', revision: 25 } }])
+      assert.equal(candidateCheckRetry(blocked, { ...detail, checkStartRecovery: capability }, ledger), null)
+    for (const patch of [{ id: 'other' }, { issueId: 'other' }, { attemptId: 'other' }, { candidateId: 'other' },
+      { revision: 23 }, { stage: stage === 'review' ? 'verify' : 'review' }, { status: 'failed' }])
+      assert.equal(candidateCheckRetry(blocked, { ...detail, task: { ...blocked, ...patch } }, ledger), null)
+    assert.equal(candidateCheckRetry(blocked, detail, { ...ledger, attemptId: 'older' }), null)
+    assert.equal(candidateCheckRetry(blocked, { ...detail, checks: [check({ stage, attemptId: 'a1', status: 'failed' })] }, ledger), null)
+    assert.equal(candidateCheckRetry(blocked, { ...detail, checks: [...detail.checks, check({ stage, attemptId: 'a2', status: 'pending' })] }, ledger), null)
+    assert.equal(candidateCheckRetry(blocked, { ...detail, completionRecovery: checkStartRecovery }, ledger), null)
+  }
+})
+
+test('host-qualified start recovery confirms only its same-candidate bound running receipt', () => {
+  for (const stage of ['review', 'verify'] as const) {
+    const task = failedTask({ stage, status: 'blocked' })
+    const capability = { binding: { taskId: 't1', revision: 24 } }
+    const next = { ...task, revision: 26, attemptId: 'a2', status: 'running' }
+    const attempt = { id: 'a2', taskId: 't1', candidateId: 'c1', stage, status: 'running', runId: 'new-check-run' }
+    const receipt = { contractVersion: 1, task: next, attempts: [attempt], candidates: [{ id: 'c1', taskId: 't1' }] }
+    assert.equal(candidateCheckRetryConfirmed(task, receipt, capability), true)
+    assert.equal(candidateCheckRetryConfirmed(task, receipt), false)
+    assert.equal(candidateCheckRetryConfirmed(task, receipt, { binding: { taskId: 'other', revision: 24 } }), false)
+    assert.equal(candidateCheckRetryConfirmed(task, receipt, { binding: { taskId: 't1', revision: 23 } }), false)
+    for (const patch of [{ id: 'other' }, { issueId: 'other' }, { candidateId: 'other' }, { stage: 'execute' },
+      { status: 'pending' }, { revision: 25 }, { revision: 27 }, { attemptId: 'a1' }])
+      assert.equal(candidateCheckRetryConfirmed(task, { ...receipt, task: { ...next, ...patch } }, capability), false)
+    for (const patch of [{ id: 'other' }, { taskId: 'other' }, { candidateId: 'other' }, { stage: 'execute' },
+      { status: 'pending' }, { runId: null }, { runId: '' }])
+      assert.equal(candidateCheckRetryConfirmed(task, { ...receipt, attempts: [{ ...attempt, ...patch }] }, capability), false)
+    const pending = { ...next, revision: 25, status: 'pending' }
+    assert.equal(candidateCheckRetryConfirmed(task, { ...receipt, task: pending,
+      attempts: [{ ...attempt, status: 'pending', runId: null }] }, capability), false, 'retry without a bound run is not a completed start recovery')
+    assert.equal(candidateCheckRetryConfirmed({ ...task, stage: 'execute' }, receipt, capability), false)
+    assert.equal(candidateCheckRetryConfirmed({ ...task, completionRecovery: capability }, receipt, capability), false)
+  }
+})
+
 test('candidate retry returns only the existing revision binding for one exact failed attempt', () => {
   for (const stage of ['review', 'verify'] as const) {
     const { task, detail, ledger } = retryFixture(stage)
@@ -124,6 +211,20 @@ test('candidate retry returns only the existing revision binding for one exact f
     assert.equal(retry?.stage, stage)
     assert.deepEqual(retry?.binding, { taskId: 't1', revision: 24 })
     assert.equal(retry?.key, JSON.stringify(['t1', 'issue-1', 'a1', 'c1', 24]))
+  }
+})
+
+test('an explicit single-review flow never offers the rejected generic failed-review retry', () => {
+  for (const stage of ['review', 'verify'] as const) {
+    const { task, detail, ledger } = retryFixture(stage)
+    const singleReview = { ...task, route: { flowVersion: 2 } }
+    const retry = candidateCheckRetry(task, { ...detail, task: singleReview }, ledger)
+    if (stage === 'review') assert.equal(retry, null, 'canonical flow v2 has already consumed its bound review')
+    else assert.ok(retry, 'the verification path keeps its existing retry')
+    for (const route of [undefined, { flowVersion: 1 }]) {
+      const legacy = { ...task, route }
+      assert.ok(candidateCheckRetry(task, { ...detail, task: legacy }, ledger), 'missing or legacy flow remains unchanged')
+    }
   }
 })
 
@@ -165,5 +266,55 @@ test('retry confirmation requires the canonical same-candidate pending transitio
     for (const patch of [{ id: 'other' }, { issueId: 'other' }, { candidateId: 'other' }, { stage: 'execute' },
       { status: 'running' }, { revision: 26 }, { revision: 24 }, { attemptId: task.attemptId }, { attemptId: '' }])
       assert.equal(candidateCheckRetryConfirmed(task, { ...receipt, task: { ...next, ...patch } }), false)
+  }
+})
+
+test('host-qualified dispatch retry requires the same blocked attempt with no Run', () => {
+  for (const stage of ['review', 'verify'] as const) {
+    const { task, ledger } = retryFixture(stage)
+    const blocked = { ...task, status: 'blocked', route: { flowVersion: 2 } }
+    const capability = { binding: { taskId: 't1', revision: 24 } }
+    const latest = check({ stage, attemptId: 'a1', status: 'blocked', runId: null })
+    const detail = { task: blocked, checkDispatchRecovery: capability, checks: [latest] }
+    assert.deepEqual(candidateCheckRetry(blocked, detail, ledger)?.binding, capability.binding)
+    for (const checkDispatchRecovery of [undefined, { binding: { taskId: 'other', revision: 24 } },
+      { binding: { taskId: 't1', revision: 23 } }, { binding: { taskId: 't1', revision: 25 } }])
+      assert.equal(candidateCheckRetry(blocked, { ...detail, checkDispatchRecovery }, ledger), null)
+    for (const patch of [{ id: 'other' }, { issueId: 'other' }, { attemptId: 'other' }, { candidateId: 'other' },
+      { revision: 23 }, { stage: stage === 'review' ? 'verify' : 'review' }, { status: 'failed' }])
+      assert.equal(candidateCheckRetry(blocked, { ...detail, task: { ...blocked, ...patch } }, ledger), null)
+    assert.equal(candidateCheckRetry(blocked, detail, { ...ledger, attemptId: 'older' }), null)
+    assert.equal(candidateCheckRetry(blocked, { ...detail, checks: [{ ...latest, runId: 'existing-run' }] }, ledger), null,
+      'a dispatch capability must never be reused for an existing Run')
+    assert.equal(candidateCheckRetry(blocked, { ...detail, checks: [{ ...latest, status: 'failed' }] }, ledger), null)
+    assert.equal(candidateCheckRetry(blocked, { ...detail, checks: [...detail.checks, { ...latest, attemptId: 'newer' }] }, ledger), null)
+    assert.equal(candidateCheckRetry(blocked, { ...detail, completionRecovery: capability }, ledger), null)
+    assert.equal(candidateCheckRetry(blocked, { ...detail, checkStartRecovery: capability }, ledger), null,
+      'conflicting recovery capabilities are not a safe retry signal')
+  }
+})
+
+test('dispatch recovery confirms only the same candidate queued without a Run at revision plus one', () => {
+  for (const stage of ['review', 'verify'] as const) {
+    const task = failedTask({ stage, status: 'blocked' })
+    const capability = { binding: { taskId: 't1', revision: 24 } }
+    const next = { ...task, revision: 25, attemptId: 'a2', status: 'pending' }
+    const attempt = { id: 'a2', taskId: 't1', candidateId: 'c1', stage, status: 'pending', runId: null }
+    const receipt = { contractVersion: 1, task: next, attempts: [attempt], candidates: [{ id: 'c1', taskId: 't1' }] }
+    assert.equal(candidateCheckRetryConfirmed(task, receipt, undefined, capability), true)
+    assert.equal(candidateCheckRetryConfirmed(task, receipt), false)
+    assert.equal(candidateCheckRetryConfirmed(task, receipt, capability), false,
+      'ordinary dispatch retry is distinct from recovery of a frozen Run')
+    assert.equal(candidateCheckRetryConfirmed(task, receipt, capability, capability), false)
+    assert.equal(candidateCheckRetryConfirmed(task, receipt, undefined, { binding: { taskId: 'other', revision: 24 } }), false)
+    assert.equal(candidateCheckRetryConfirmed(task, receipt, undefined, { binding: { taskId: 't1', revision: 23 } }), false)
+    for (const patch of [{ id: 'other' }, { issueId: 'other' }, { candidateId: 'other' }, { stage: 'execute' },
+      { status: 'running' }, { revision: 24 }, { revision: 26 }, { attemptId: 'a1' }])
+      assert.equal(candidateCheckRetryConfirmed(task, { ...receipt, task: { ...next, ...patch } }, undefined, capability), false)
+    for (const patch of [{ id: 'other' }, { taskId: 'other' }, { candidateId: 'other' }, { stage: 'execute' },
+      { status: 'running' }, { runId: 'unexpected-run' }, { runId: undefined }])
+      assert.equal(candidateCheckRetryConfirmed(task, { ...receipt, attempts: [{ ...attempt, ...patch }] }, undefined, capability), false)
+    assert.equal(candidateCheckRetryConfirmed({ ...task, stage: 'execute' }, receipt, undefined, capability), false)
+    assert.equal(candidateCheckRetryConfirmed({ ...task, completionRecovery: capability }, receipt, undefined, capability), false)
   }
 })

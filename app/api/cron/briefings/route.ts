@@ -1,4 +1,5 @@
 import { withRequestLog } from '@/lib/request-log'
+import { cronJob } from '@/lib/background'
 import { cronUnauthorized } from '@/lib/cron-auth'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { writeDueBriefings } from '@/lib/suggestions/store'
@@ -22,4 +23,4 @@ async function handleGET(request: Request) {
   return Response.json({ ...result, pushed: pushed.length }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
-export const GET = withRequestLog('/api/cron/briefings', handleGET)
+export const GET = withRequestLog('/api/cron/briefings', cronJob('briefings', handleGET))

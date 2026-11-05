@@ -1,13 +1,12 @@
 import { Fragment, type ReactNode, useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, View, type ScrollViewInstance } from 'react-native'
-import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
+import { ChatScrollView } from '@/components/ChatScrollView'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ellipsis } from 'lucide-react-native'
 import { uuid } from 'expo'
 import { BotAvatar, Spinner } from '@/components/icons'
 import { runIcon } from '@/lib/thread-icon'
-import { CardButton } from '@/components/cards'
 import { BotBubble, CopyButton, EventLine, MyBubble, OutgoingBubble, Reactions, ThreadCard, TimedRow, useChatPhotos, useTimeReveal } from '@/components/chat'
 import { myReaction, toggled, withMine } from '@/lib/reactions'
 import { Markdown } from '@/components/Markdown'
@@ -30,9 +29,16 @@ import { runTitle, type Chat, type CitationSource, type PendingAction } from '@/
 import { FailedReply } from '@/components/FailedReply'
 import { eventText } from '@/lib/event-line'
 import { waitingLabel } from '@/lib/waiting'
-import { useApi } from '@/lib/useApi'
+import { useLiveApi, useRefresh } from '@/lib/useApi'
+import { listRef, UNRESOLVED_LIVE_ID } from '@/lib/live'
+import { pendingActionsDeadline } from '@/lib/live-client'
 import { useStop } from '@/lib/useStop'
 import { StopFailed } from '@/components/StopFailed'
+import { ReadNotice } from '@/components/ReadNotice'
+import { CardButton } from '@/components/cards'
+import { ChatScrollToLatest } from '@/components/ChatScrollToLatest'
+import { useChatScroll } from '@/lib/useChatScroll'
+import { useReducedMotionPreference } from '@/lib/reduced-motion'
 import { runInfoLine } from '@/lib/run-info'
 import { webChatPath } from '@/lib/web'
 import { useHome } from '@/lib/home'
@@ -40,8 +46,8 @@ import { colors } from '@/lib/theme'
 
 /**
  * A chat with a bot; the Coordinator is one (R-06): the bot's name in a pill,
- * the threads behind the right button, the composer at the bottom. Polls while
- * a reply is coming. Below the messages sit the proposals waiting for the
+ * the threads behind the right button, the composer at the bottom. Reads again
+ * when the server pushes the chat's key (a message, a turn, a run it cites). Below the messages sit the proposals waiting for the
  * person (approve or decline, as on the web); `focus` marks the one a push
  * was about. OpenUI cards are drawn natively (components/OpenUI.tsx).
  */
@@ -57,9 +63,19 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   // The composer floats over the end of the list; the list leaves room for it.
   const [composerHeight, setComposerHeight] = useState(90)
   const path = `/api/mobile/chat${botId ? `?bot=${botId}` : ''}`
-  const [fast, setFast] = useState(false)
-  const { data, error, reload, setData } = useApi<Chat>(path, fast ? 3750 : 45000)
-  const pending = useApi<PendingAction[]>('/api/pending-actions', 10000)
+  const home = useHome().data?.live?.workspaceId
+  // The web's chat key (components/coordinator/coordinator-chat.tsx) on the person's home channel; a turn's lease
+  // running out has no write, so the server names it as a deadline.
+  const { data, error, reload, setData } = useLiveApi<Chat>(path, chat => ({
+    refs: [{ kind: 'bot_chat', id: chat?.botId && chat.live?.workspaceId ? chat.botId : UNRESOLVED_LIVE_ID, scope: chat?.live?.workspaceId ?? null }],
+    minIntervalMs: 2_000, deadline: chat?.live?.deadline,
+  }))
+  const serviceUnavailable = data?.enabled === false
+  const serviceRefresh = useRefresh(reload)
+  // The person's proposals: the web's key (components/coordinator/pending-actions.tsx), on the same home channel.
+  const pending = useLiveApi<PendingAction[]>('/api/pending-actions', items => ({
+    refs: [listRef('pending_actions', home)], deadline: pendingActionsDeadline(items),
+  }))
   const [outbox, setOutbox] = useState<Outgoing[]>([])
   const pendingSends = useRef<Outgoing[]>([])
   const delivering = useRef(new Map<string, Promise<boolean>>())
@@ -75,15 +91,17 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   // Opened from a push about a proposal: its card is scrolled into view once, instead of the chat's end.
   const pendingTop = useRef(0)
   const [pinned, setPinned] = useState(false)
+  const chatScroll = useChatScroll(scroll, `${self}:${apiContext}`, pinned)
+  const reduceMotion = useReducedMotionPreference()
   const showFocus = (y: number) => {
     if (pinned) return
     setPinned(true)
+    chatScroll.pause()
     // After this frame's layout, so the list's own offset (measured after its children) is known.
-    setTimeout(() => scroll.current?.scrollTo({ y: Math.max(0, pendingTop.current + y - insets.top - 84), animated: true }), 0)
+    setTimeout(() => scroll.current?.scrollTo({ y: Math.max(0, pendingTop.current + y - insets.top - 84), animated: !reduceMotion }), 0)
   }
   useEffect(() => { setPinned(false) }, [focus])
 
-  useEffect(() => { setFast(working) }, [working])
   useEffect(() => { if (draft) setText(draft) }, [draft])
 
   const items = data?.items ?? []
@@ -120,7 +138,9 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   }
 
   const send = async (words: string, attachments: Attachment[] = []) => {
+    if (serviceUnavailable) return false
     setPinned(false)
+    chatScroll.toLatest()
     const { text: message, images } = outgoing(words, attachments)
     const context = apiCache.context()
     const targetBotId = data?.botId ?? botId
@@ -143,10 +163,26 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   const stopper = useStop(() => api('/api/mobile/chat/stop', { method: 'POST', body: { botId } }), Boolean(data?.working), reload)
 
   const reactions = data?.reactions ?? {}
-  // Drawn at once, then saved; the next load has the server's word.
+  const reactionPending = useRef(new Map<string, object>())
+  const [reactionFailure, setReactionFailure] = useState<{ id: string; emoji: string | null } | null>(null)
+  useEffect(() => { reactionPending.current.clear(); setReactionFailure(null) }, [self, apiContext])
+  // Optimistic feedback is rolled back if saving fails, even when the subsequent read is offline too.
   const react = async (id: string, emoji: string | null) => {
-    setData(current => current && { ...current, reactions: { ...current.reactions, [id]: withMine(current.reactions?.[id], emoji) } })
-    try { await api('/api/mobile/reactions', { method: 'POST', body: { messageId: id, emoji } }) } finally { void reload() }
+    if (reactionPending.current.has(id)) return
+    const request = {}; reactionPending.current.set(id, request)
+    const accept = (apply: () => void) => apiCache.commit(apiContext, () => { if (reactionPending.current.get(id) === request) apply() })
+    const previous = reactions[id] ?? []
+    setReactionFailure(null)
+    setData(current => current && { ...current, reactions: { ...current.reactions, [id]: withMine(previous, emoji) } })
+    try { await api('/api/mobile/reactions', { method: 'POST', body: { messageId: id, emoji } }) }
+    catch {
+      accept(() => {
+        setData(current => current && { ...current, reactions: { ...current.reactions, [id]: previous } })
+        setReactionFailure({ id, emoji })
+      })
+    } finally {
+      if (reactionPending.current.get(id) === request) { reactionPending.current.delete(id); void reload() }
+    }
   }
 
   // A long press: reactions, then 回复 · 复制 · 选择文本 in a system sheet (app/message.tsx).
@@ -180,7 +216,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
       />
       {/* The message list comes first, so the iOS bar finds it and blurs what scrolls under (scroll-edge effect). */}
       <View style={{ flex: 1, overflow: 'hidden' }} {...handlers}>
-        <KeyboardChatScrollView ref={scroll} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={[styles.list, { paddingBottom: composerHeight + 16 }]} onContentSizeChange={() => { if (!pinned) scroll.current?.scrollToEnd({ animated: false }) }}>
+        <ChatScrollView ref={scroll} testID="bot-chat-scroll" {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={[styles.list, { paddingBottom: composerHeight + 16 }]} onScroll={event => { if (chatScroll.onScroll(event)) setPinned(false) }} scrollEventThrottle={16} onContentSizeChange={chatScroll.onContentSizeChange}>
           {items.map((item, index) => {
             const time = clockTime(item.createdAt)
             return (
@@ -210,24 +246,21 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
           {working ? <WaitingLine since={outbox.length ? null : waitingSince(items)} /> : null}
           {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
           {!data && !error ? <View style={styles.loading}><Spinner /></View> : null}
-          {data && !items.length && !working ? <Text style={styles.empty}>有什么要我做的，直接说。</Text> : null}
-          {error && !data ? (
-            <View style={styles.failed}>
-              <Text style={styles.error}>连不上 Mikka。</Text>
-              <CardButton label="重试" onPress={() => void reload()} />
-            </View>
-          ) : null}
+          {data && data.enabled !== false && !items.length && !working ? <Text style={styles.empty}>有什么要我做的，直接说。</Text> : null}
+          <ReadNotice error={error} hasData={Boolean(data)} label="对话" onRetry={reload} />
+          <ReadNotice error={pending.error} hasData={Boolean(pending.data)} label="待处理事项" onRetry={pending.reload} />
           {data?.failure && !working ? <FailedReply key={`${botId}:${JSON.stringify(data.failure)}`} failure={data.failure} botId={botId} onQueued={reload} modelChoice={typeof composerAccessory === 'function' ? composerAccessory(false) : composerAccessory} /> : null}
           {pending.data ? (
             <View onLayout={event => { pendingTop.current = event.nativeEvent.layout.y }}>
               <PendingActions items={pending.data} focus={focus} reload={pending.reload} onFocusLayout={focus ? showFocus : undefined} />
             </View>
           ) : null}
-        </KeyboardChatScrollView>
+        </ChatScrollView>
       </View>
+      <ChatScrollToLatest visible={!chatScroll.atEnd} bottom={composerHeight + 8} onPress={() => { setPinned(false); chatScroll.toLatest() }} />
       <OfflineBanner top={insets.top + 66} />
-      <Composer value={text} onChangeText={setText} placeholder={name ? `给 ${name} 发消息` : '发消息'} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
-        quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={composerNotice} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />
+      <Composer value={text} sendDisabled={serviceUnavailable} onChangeText={setText} placeholder={name ? `给 ${name} 发消息` : '发消息'} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
+        quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={<>{serviceUnavailable ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.serviceNotice}><Text style={styles.serviceMessage}>对话服务尚未启用，暂时无法回复。</Text><CardButton label="重试" busy={serviceRefresh.refreshing} onPress={() => void serviceRefresh.onRefresh()} /></View> : null}{composerNotice}{reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><CardButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : null}</>} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />
     </View>
   )
 }
@@ -257,6 +290,9 @@ function WaitingLine({ since }: { since: number | null }) {
 }
 
 const styles = StyleSheet.create({
+  serviceNotice: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, marginBottom: 8 },
+  serviceMessage: { flex: 1, fontSize: 13, lineHeight: 18, color: colors.secondary },
+  reactionNotice: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 8 },
   screen: { flex: 1, backgroundColor: colors.page },
   titleText: { fontSize: 17, fontWeight: '600' },
   // Space above the composer (适度留白).

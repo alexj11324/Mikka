@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { CardButton } from '@/components/cards'
 import { StyleSheet, TextInput, View } from 'react-native'
 import { Avatar, Row, SettingsPage } from '@/components/settings'
 import { Text } from '@/components/Text'
@@ -11,13 +12,24 @@ import { colors, font } from '@/lib/theme'
 export default function ProfileScreen() {
   const { data, setData } = useSettings()
   const [name, setName] = useState(data?.user.name ?? '')
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
+  const saving = useRef(false), dirty = useRef(false)
+  useEffect(() => { if (!dirty.current && !saving.current) setName(data?.user.name ?? '') }, [data?.user.name])
   if (!data) return <SettingsPage title="个人资料"><View /></SettingsPage>
   const save = async () => {
+    if (saving.current) return
     const next = name.trim()
-    if (!next || next === data.user.name) return setName(data.user.name)
-    const result = await authClient.updateUser({ name: next })
-    if (result.error) return setName(data.user.name)
-    setData(current => current && { ...current, user: { ...current.user, name: next } })
+    if (!next) { setProblem('请输入名字'); return }
+    if (next === data.user.name) { dirty.current = false; setName(next); setProblem(null); return }
+    saving.current = true; setBusy(true); setProblem(null)
+    try {
+      const result = await authClient.updateUser({ name: next })
+      if (result.error) throw new Error('name_save_failed')
+      setData(current => current && { ...current, user: { ...current.user, name: next } })
+      dirty.current = false; setName(next)
+    } catch { setProblem('名字未保存，修改已保留。') }
+    finally { saving.current = false; setBusy(false) }
   }
   return (
     <SettingsPage title="个人资料">
@@ -25,10 +37,12 @@ export default function ProfileScreen() {
       <Group>
         <View style={styles.row}>
           <Text style={styles.label}>名字</Text>
-          <TextInput value={name} onChangeText={setName} onBlur={() => void save()} onSubmitEditing={() => void save()} returnKeyType="done" style={styles.input} />
+          <TextInput accessibilityLabel="名字" accessibilityState={{ busy, disabled: busy }} editable={!busy} value={name} onChangeText={value => { dirty.current = true; setName(value); setProblem(null) }} onBlur={() => void save()} onSubmitEditing={() => void save()} returnKeyType="done" style={styles.input} />
         </View>
         <Row label="邮箱" value={data.user.email} trailing={null} />
       </Group>
+      {busy ? <Text accessibilityLiveRegion="polite">正在保存名字</Text> : null}
+      {problem ? <View accessibilityRole="alert" style={{ gap: 10 }}><Text style={{ color: colors.danger }}>{problem}</Text><CardButton label="重试保存" onPress={() => void save()} /></View> : null}
     </SettingsPage>
   )
 }

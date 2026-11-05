@@ -1,7 +1,10 @@
 import { deploymentSwitch } from '@/lib/deployment-switches'
+import { logCodedError } from '@mikka/protocol/coded-error'
 import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { withDeviceRoute } from '@/lib/device-route'
-import { after, NextResponse } from 'next/server'
+import { runListChanged } from '@/lib/live/lists'
+import { NextResponse } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { and, eq, isNull } from 'drizzle-orm'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { applyApprovalMode } from '@mikka/protocol/agent-policy'
@@ -17,13 +20,16 @@ import { readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
 import { assertUnmanagedModelTransport, assertSubscriptionModelTransport } from '@/lib/model-admission/runtime'
 import { ModelAdmissionError } from '@/lib/model-admission/contract'
 import { db, pool } from '@/lib/db'
+import { runChanged } from '@/lib/live/panels'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
 import { authenticateDevice, ownedDeviceWithReport } from '@/lib/device-link'
 import { withBasePath } from '@/lib/base-path'
 import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
 import { issueForUser } from '@/lib/issue-access'
-import { failRunForDaemonUpgrade, latestCheckpoint } from '@/lib/run-leases'
+import { failRunForDaemonUpgrade, failQueuedSubscriptionRuntime, latestCheckpoint } from '@/lib/run-leases'
+import { subscriptionPreflightSchema } from '@mikka/protocol/harness'
+import messages from '@/messages/zh-CN.json'
 import { continuationFollowUp } from '@/lib/thread-continuation'
 import { checkpointRecoveryError, providerContinuationNote, quotaContinuationNote, retryNote } from '@/lib/run-retry'
 import { constrainedAssignmentPolicy, intersectRunPolicy } from '@/lib/run-assignment-policy'
@@ -32,6 +38,8 @@ import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
 import { claimBenchmarkAssignment, skillAssignments } from '@/lib/self-improvement/server'
 import { ImprovementError } from '@/lib/self-improvement/contract'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
+import { AgentProfileAdmissionError, refreshProfileQuota } from '@/lib/factory/profile-admission'
+import { profileNativeSessionMatches } from '@/lib/factory/profile-native-session'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { FactoryError } from '@/lib/factory/contract'
 import { blockQuestionRetry } from '@/lib/factory/questions/retry'
@@ -78,19 +86,32 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if ((agent && agent.userId !== caller.userId) || (repo && (repo.userId !== caller.userId || repo.deviceId !== deviceId)))
     return NextResponse.json({ error: 'Run ownership unavailable.' }, { status: 409 })
   if (!agent || !repo || !run.issueId) {
-    await db.update(agentRuns)
+    const failed = await db.update(agentRuns)
       .set({ status: 'failed', stopReason: 'error', error: 'Run is missing its agent, repository or issue.', finishedAt: new Date(), updatedAt: new Date() })
-      .where(eq(agentRuns.id, runId))
+      .where(eq(agentRuns.id, runId)).returning({ id: agentRuns.id })
+    if (failed.length) { await runListChanged(db, runId); await runChanged(db, runId) }
     await afterRunEnded(caller.userId, runId)
     return NextResponse.json({ error: 'Run is missing its agent, repository or issue.' }, { status: 409 })
   }
   if (run.userId !== caller.userId || agent.userId !== caller.userId || repo.userId !== caller.userId || repo.deviceId !== deviceId) return NextResponse.json({ error: 'Run owner mismatch.' }, { status: 409 })
   if (device.kind === 'local' && !repositoryBindingMatches(repo.repoPath, repo.remoteUrl, { allowFile: daemonTestMode(process.env) })) return NextResponse.json({ error: 'Repository identity must be confirmed before scheduling a new thread.' }, { status: 409 })
   if (repo.remoteUrl && request.headers.get(REPO_ORIGIN_HEADER) !== '1') return NextResponse.json({ error: 'Device update required for repository verification.' }, { status: 409 })
+  const rejectProfile = async (error: AgentProfileAdmissionError) => {
+    logCodedError(error, { runId })
+    const summary = 'The selected Agent Profile changed or is no longer available. Select an available Profile for a new run.'
+    // The claim transaction has rolled back. Only its still-unclaimed row may
+    // be settled; a concurrent claim/stop must never be overwritten.
+    const rejected = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: summary,
+      report: { summary, filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null }, finishedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
+      .returning({ id: agentRuns.id })
+    if (rejected.length) await afterRunEnded(caller.userId, runId)
+    return NextResponse.json({ error: summary, code: 'agentProfileUnavailable' }, { status: 409 })
+  }
   const rejectPublication = async (error: PublicationError) => {
     const { persistRunCompletion } = await import('@/lib/run-publications')
     await persistRunCompletion(caller.userId, runId, { stopReason: 'error', report: { summary: error.message, filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } })
-    after(async () => { const { wakeCoordinator } = await import('@/lib/coordinator/wake'); await wakeCoordinator(caller.userId) })
+    afterJob('after:coordinator-wake', async () => { const { wakeCoordinator } = await import('@/lib/coordinator/wake'); await wakeCoordinator(caller.userId) })
     return NextResponse.json({ error: error.message, code: error.code }, { status: 409 })
   }
   // Preserve the task-access denial before narrower policy parsing or any
@@ -115,7 +136,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if (recoveryError && !requireWorktreeContinuation) {
     const { persistRunCompletion } = await import('@/lib/run-publications')
     await persistRunCompletion(caller.userId, runId, { stopReason: 'blocked', report: { summary: recoveryError, filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } }, caller.scopeDeviceId)
-    after(async () => { const { wakeCoordinator } = await import('@/lib/coordinator/wake'); await wakeCoordinator(caller.userId) })
+    afterJob('after:coordinator-wake', async () => { const { wakeCoordinator } = await import('@/lib/coordinator/wake'); await wakeCoordinator(caller.userId) })
     return NextResponse.json({ error: recoveryError, code: 'checkpointRecoveryUnavailable' }, { status: 409 })
   }
   const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'
@@ -125,8 +146,6 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     return NextResponse.json({ error: error.code }, { status: error.code === 'notFound' ? 404 : 409 })
   }
   const harness = run.agentDefinition?.harness ?? agent.harness
-  if (device.kind === 'local' && (!repo.remoteUrl || !localExecutionHarnesses(device.harnesses).includes(harness))) return NextResponse.json({ error: 'Repository or execution harness unavailable.' }, { status: 409 })
-  if ((harness === 'codex' || harness === 'claude_code') && !device.harnesses.some(info => info.harness === harness && info.installed && info.toolApproval === true)) return NextResponse.json({ error: 'Run approval capability unavailable.' }, { status: 409 })
   const pinned = run.agentDefinition?.subscription
   let subscription: Awaited<ReturnType<ReturnType<typeof subscriptionRuntime>['repository']['nativeBinding']>>
   try { subscription = deploymentSwitch('byos')
@@ -135,7 +154,17 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
       : pinned ? await nativeRunBinding(pool, caller.userId, agent.id, harness, undefined, pinned.bindingId) : await localRunBinding(caller.userId, agent.id, harness, run.botId ?? null) : null
   } catch { return NextResponse.json({ error:'Subscription unavailable.' },{ status:409 }) }
   if (pinned && (!subscription || subscription.id !== pinned.bindingId || subscription.modelId !== pinned.modelId || subscription.route !== pinned.route || subscription.consumerId !== agent.id)) return NextResponse.json({ error:'Pinned subscription unavailable.' },{ status:409 })
-  if (subscription && !device.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
+  if (subscription && !device.harnesses.some(info => info.harness === harness && info.installed && info.toolApproval && info.subscriptionBroker && !info.subscriptionPreflight)) {
+    if (device.kind === 'local' && (harness === 'codex' || harness === 'claude_code')) {
+      const info = device.harnesses.find(info => info.harness === harness)
+      const detail = subscriptionPreflightSchema.safeParse(info?.subscriptionPreflight).data ?? (!info?.installed ? 'cli_missing' : 'adapter_start_failed')
+      await failQueuedSubscriptionRuntime(runId, deviceId, caller.userId, { harness, bindingId: subscription.id })
+      return NextResponse.json({ error: messages.RunErrors.subscription_local_runtime_unavailable[detail ?? 'default'], code: 'subscription_local_runtime_unavailable', ...(detail ? { detail } : {}) }, { status: 409 })
+    }
+    return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
+  }
+  if (device.kind === 'local' && (!repo.remoteUrl || !localExecutionHarnesses(device.harnesses).includes(harness))) return NextResponse.json({ error: 'Repository or execution harness unavailable.' }, { status: 409 })
+  if ((harness === 'codex' || harness === 'claude_code') && !device.harnesses.some(info => info.harness === harness && info.installed && info.toolApproval === true)) return NextResponse.json({ error: 'Run approval capability unavailable.' }, { status: 409 })
   // A run frozen on the person's API key goes only to a daemon that injects it; nothing is opened yet.
   const frozenKey = run.agentDefinition?.apiKey
   if (frozenKey && (subscription || pinned)) return NextResponse.json({ error: 'Run credential unavailable.' }, { status: 409 })
@@ -187,7 +216,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     const refuse = async () => {
       const { persistRunCompletion } = await import('@/lib/run-publications')
       await persistRunCompletion(caller.userId, runId, { stopReason: 'blocked', report: { summary: 'API key unavailable.', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } }, caller.scopeDeviceId)
-      after(async () => { const { wakeCoordinator } = await import('@/lib/coordinator/wake'); await wakeCoordinator(caller.userId) })
+      afterJob('after:coordinator-wake', async () => { const { wakeCoordinator } = await import('@/lib/coordinator/wake'); await wakeCoordinator(caller.userId) })
       return NextResponse.json({ error: 'API key unavailable.', code: 'apiKeyUnavailable' }, { status: 409 })
     }
     let opened: Awaited<ReturnType<typeof apiKeyForRun>>
@@ -237,7 +266,9 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     // Read-only checks inspect the retained files; they cannot use an
     // interactive desktop. Its policy must not gate their file-only claim.
     const useComputer = desktop && run.agentDefinition?.readOnly !== true
-    const claimed = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim, useComputer)
+    let claimed: Awaited<ReturnType<typeof claimCloudRun>>
+    try { claimed = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim, useComputer) }
+    catch (error) { if (error instanceof AgentProfileAdmissionError) return rejectProfile(error); throw error }
     if (!claimed) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
     // Without a desktop the run gets none (the daemon refuses a `computer` it cannot serve).
     computer = useComputer ? claimed : null
@@ -253,7 +284,11 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     }
     const refused = await openRunKey()
     if (refused) return refused
-    const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id, beforeClaim, afterClaim)
+    if (subscription) await refreshProfileQuota(pool, { ownerId: caller.userId, workspaceId: subscription.workspaceId, agentId: agent.id,
+      model: run.agentDefinition?.model, subscriptionBindingId: subscription.id, selection: run.agentDefinition?.agentProfile })
+    let claim: Awaited<ReturnType<typeof claimLocalRun>>
+    try { claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id, beforeClaim, afterClaim) }
+    catch (error) { if (error instanceof AgentProfileAdmissionError) return rejectProfile(error); throw error }
     if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: 409 })
   }
   if (device.kind !== 'cloud' && device.computerUse?.installed) {
@@ -266,8 +301,9 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     skillAssignment = await skillAssignments.recordClaim(caller.userId, deviceId, runId, leaseExpiresAt, supportsSkillArtifacts, supportsTeamSkills)
     benchmarkAssignment = await claimBenchmarkAssignment(caller.userId, deviceId, runId, leaseExpiresAt)
   } catch (error) {
-    await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: 'Skill assignment provenance unavailable.', finishedAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.status, 'preparing'), eq(agentRuns.leaseExpiresAt, new Date(leaseExpiresAt))))
+    const failed = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: 'Skill assignment provenance unavailable.', finishedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.status, 'preparing'), eq(agentRuns.leaseExpiresAt, new Date(leaseExpiresAt)))).returning({ id: agentRuns.id })
+    if (failed.length) { await runListChanged(db, runId); await runChanged(db, runId) }
     await afterRunEnded(caller.userId, runId)
     if (!(error instanceof ImprovementError)) throw error
     return NextResponse.json({ error: error.code }, { status: 409 })
@@ -302,7 +338,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
       continuesRunId: run.retryOf, followUp: lost?.stopReason === 'provider_failure' ? providerContinuationNote() : lost?.stopReason === 'quota_exhausted' ? quotaContinuationNote() : retryNote(run.attempt),
       // A fallback keeps the worktree across harnesses, but native session
       // identifiers belong only to the harness that created them.
-      ...(lost?.sessionId && lost.deviceId === deviceId && retryHarness === harness ? { resumeSessionId: lost.sessionId } : {}),
+      ...(lost?.sessionId && lost.deviceId === deviceId && retryHarness === harness && profileNativeSessionMatches(lost.agentDefinition, run.agentDefinition) ? { resumeSessionId: lost.sessionId } : {}),
       ...(resumeFrom && !requireWorktreeContinuation ? { resumeFrom } : {}),
       ...(requireWorktreeContinuation ? { requireWorktreeContinuation: true as const } : {}),
     }
@@ -310,11 +346,12 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   // The next run of a thread after a new dispatch (lib/thread-dispatch.ts) goes on in the thread's last worktree and,
   // on the same device, its session, sent only the new note; elsewhere it starts fresh with the full brief.
   const [earlier] = !run.retryOf && run.continuesRunId
-    ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId }).from(agentRuns).where(and(eq(agentRuns.id, run.continuesRunId), eq(agentRuns.userId, caller.userId))).limit(1)
+    ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId, agentId: agentRuns.agentId, agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, run.continuesRunId), eq(agentRuns.userId, caller.userId), eq(agentRuns.issueId, run.issueId))).limit(1)
     : []
+  const earlierHarness = earlier?.agentDefinition?.harness ?? (earlier?.agentDefinition == null && earlier?.agentId === run.agentId ? agent.harness : undefined)
   const followUp = earlier ? continuationFollowUp(run.prompt) : null
   const threadContinuation = earlier && run.continuesRunId
-    ? { continuesRunId: run.continuesRunId, ...(followUp ? { followUp } : {}), ...(earlier.sessionId && earlier.deviceId === deviceId ? { resumeSessionId: earlier.sessionId } : {}) }
+    ? { continuesRunId: run.continuesRunId, ...(followUp ? { followUp } : {}), ...(earlier.sessionId && earlier.deviceId === deviceId && earlierHarness === harness && profileNativeSessionMatches(earlier.agentDefinition, run.agentDefinition) ? { resumeSessionId: earlier.sessionId } : {}) }
     : {}
   const settings = repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
   const verifyCommand = settings ? settings.verifyCommand : device.kind === 'cloud' ? repo.verifyCommand : null
@@ -359,6 +396,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
       ? { github: { endpoint: mcp.url.replace(/\/api\/mcp\/?$/, '/api/runs/github-token'), repository: repo.repoPath.slice('v2/github.com/'.length),
         ...(publication?.pushBranch && ['implement', 'fix'].includes(current.kind) && !assignmentPolicy.readOnly ? { branch: publication.pushBranch } : {}) } } : {}),
     ...(run.agentDefinition?.model ? {model:run.agentDefinition.model} : {}),
+    ...((run.agentDefinition?.agentProfile?.effort ?? run.agentDefinition?.modelDispatch?.routing?.effort)
+      ? { effort: run.agentDefinition?.agentProfile?.effort ?? run.agentDefinition?.modelDispatch?.routing?.effort } : {}),
     ...(modelCredential ? { modelCredential } : {}),
     ...(subscription ? { ...(run.agentDefinition?.cliModelSelection ? {} : {model:subscription.modelId}), subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
     ...(computer && assignmentPolicy.permissions.computer_use !== 'deny' ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion } } : {}),

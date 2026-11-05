@@ -23,6 +23,8 @@ export function createFactoryHumanStore(pool: Pool, forBot: (botId: string | nul
     apply: async (userId, binding, eventId, change, tx) => {
       const store = await taskStore(userId, binding.taskId, tx ?? pool)
       if (!tx && change.action === 'retry') {
+        const check = await store.retryCheckStart(userId, binding, eventId, change.reason, dispatchCompleted)
+        if (check) { await check.start?.(); return check.result }
         if (observeRetained) {
           const recovered = await store.retryDeliverableSnapshot(userId, binding, eventId, change.reason, observeRetained, dispatchCompleted)
           if (recovered) { await recovered.start?.(); return recovered.result }

@@ -88,20 +88,55 @@ describe("local subscription runs", () => {
     const failure = await started.catch((error: unknown) => error)
     expect(failure).toBeInstanceOf(Error)
     expect(failure).not.toBeInstanceOf(SessionRejectedError)
-    expect((failure as Error).message).toBe("subscription_local_runtime_unavailable")
+    expect((failure as Error).message).toBe("subscription_local_runtime_unavailable (lease_refused)")
+    // The server's refusal is kept as the cause, not swallowed.
+    expect(failure).toMatchObject({ code: "subscription_local_runtime_unavailable", detail: "lease_refused" })
+    expect((failure as Error).cause).toBeInstanceOf(SessionRejectedError)
   })
 
   it.each([
-    ["a lease for another route", lease({ route: "codex_cli" })],
-    ["an expired lease", lease({ expiresAt: new Date(Date.now() - 1000).toISOString() })],
-    ["a lease for another model", lease({ modelId: "other" })],
-  ])("refuses to start on %s", async (_name, value) => {
+    ["a lease for another route", lease({ route: "codex_cli" }), "lease_invalid"],
+    ["an expired lease", lease({ expiresAt: new Date(Date.now() - 1000).toISOString() }), "lease_invalid"],
+    ["a lease for another model", lease({ modelId: "other" }), "model_mismatch"],
+  ])("refuses to start on %s, saying which check failed", async (_name, value, detail) => {
     const stateDir = join(tempDir(), "adapters")
     const runner = createLocalSubscriptionRunner({
       stateDir, link: { nativeLease: async () => value },
       claude: { sandbox: new NoSandbox(), stateDir }, codex: { sandbox: new NoSandbox(), stateDir },
     })
     await expect(runner.start(assignment, { runId: RUN, cwd: await makeRepo(), prompt: "x", model: "claude-test", env: buildChildEnv(),
-      log: createLogger({ level: "silent" }), toolApproval: gate() })).rejects.toThrow("subscription_local_runtime_unavailable")
+      log: createLogger({ level: "silent" }), toolApproval: gate() })).rejects.toMatchObject({
+      code: "subscription_local_runtime_unavailable", detail, message: `subscription_local_runtime_unavailable (${detail})` })
+  })
+
+  it("gives each distinct cause its own detail and keeps the original error", async () => {
+    const stateDir = join(tempDir(), "adapters")
+    type Patch = { link?: () => Promise<NativeLease>; assignment?: RunAssignment; env?: Record<string, string>; binary?: string }
+    const start = async (patch: Patch = {}) => {
+      const runner = createLocalSubscriptionRunner({
+        stateDir, link: { nativeLease: patch.link ?? (async () => lease()) },
+        claude: { sandbox: new NoSandbox(), stateDir, ...(patch.binary ? { binary: patch.binary } : {}) }, codex: { sandbox: new NoSandbox(), stateDir },
+      })
+      return runner.start(patch.assignment ?? assignment, { runId: RUN, cwd: await makeRepo(), prompt: "x", model: "claude-test", env: patch.env ?? buildChildEnv(),
+        log: createLogger({ level: "silent" }), toolApproval: gate() })
+        .then(() => null, (error: unknown) => error as Error & { code?: string; detail?: string })
+    }
+    const refused = new Error("lease endpoint said no")
+    const failures = {
+      assignment_invalid: await start({ assignment: { ...assignment, subscriptionBinding: undefined } as unknown as RunAssignment }),
+      lease_refused: await start({ link: async () => { throw refused } }),
+      lease_invalid: await start({ link: async () => lease({ route: "codex_cli" }) }),
+      model_mismatch: await start({ link: async () => lease({ modelId: "other" }) }),
+      env_not_clean: await start({ env: { ...buildChildEnv(), ANTHROPIC_API_KEY: "not-allowed" } }),
+      adapter_start_failed: await start({ binary: join(tempDir(), "missing-claude") }),
+    }
+    for (const [detail, failure] of Object.entries(failures)) {
+      expect(failure, detail).toMatchObject({ code: "subscription_local_runtime_unavailable", detail })
+      // The message is the code and detail only, never the cause's text.
+      expect(failure?.message, detail).toBe(`subscription_local_runtime_unavailable (${detail})`)
+    }
+    expect(failures.lease_refused?.cause).toBe(refused)
+    expect(failures.adapter_start_failed?.cause).toBeInstanceOf(Error)
+    expect(new Set(Object.values(failures).map(failure => failure?.detail)).size).toBe(Object.keys(failures).length)
   })
 })

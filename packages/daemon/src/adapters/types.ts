@@ -72,6 +72,8 @@ export interface SessionOptions {
   github?: { endpoint: string; repository: string; branch?: string; runToken: string; issueId: string }
   /** Trusted server-issued app entries (one MCP server each), never model-selected. */
   apps?: RunApps
+  /** Trusted claimed run MCP; independent of optional app connections. */
+  mcp?: import('../agents/run-apps').RunMcp
   /** Fixed container paths supplied by the hosted runner, never by the assignment. */
   githubRuntime?: { nodeBinary: string; ghBinary: string }
   /** Trusted, run-bound host gate. Never populated from model input. */
@@ -120,6 +122,7 @@ export interface SessionOptions {
    * default. A harness that cannot express one ignores it.
    */
   model?: string
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 }
 
 export interface StartOptions extends SessionOptions {

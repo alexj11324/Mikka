@@ -1,4 +1,5 @@
 'use server'
+import { ownerIssueListsChanged } from '@/lib/live/lists'
 
 import { cookies } from 'next/headers'
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
@@ -74,6 +75,7 @@ export async function enableLinearTeam(input: { teamId: string }) {
     await tx.update(linearTeamSyncs).set({ active: false, updatedAt: now }).where(eq(linearTeamSyncs.ownerId, user.id))
     if (existing) await tx.update(linearTeamSyncs).set({ linearTeamKey: team.key, linearTeamName: team.name, active: true, lastError: null, lastErrorAt: null, updatedAt: now }).where(eq(linearTeamSyncs.id, existing.id))
     else await tx.insert(linearTeamSyncs).values({ id: crypto.randomUUID(), ownerId: user.id, linearTeamId: team.id, linearTeamKey: team.key, linearTeamName: team.name, active: true, updatedAt: now })
+    if (!existing || existing.linearTeamKey !== team.key) await ownerIssueListsChanged(tx, user.id)
   })
   return { success: true as const }
 }

@@ -1,15 +1,25 @@
+import type { ListLiveRead } from '@/lib/live/list-read'
+
 /** A poll whose version matched: only the chat's live state, the conversation itself is as before. */
-export type UnchangedChat = { unchanged: true; version: string; cursor: number; streamRunId?: string; working: boolean; error: string | null; botId: string; enabled: boolean }
+export type UnchangedChat = { unchanged: true; version: string; cursor: number; streamRunId?: string; working: boolean; error: string | null; botId: string; enabled: boolean; live?: ListLiveRead }
 
 /**
- * At most this long between decoration refreshes: cited names and artifact
- * cards can change independently. The server still uses the history cursor.
+ * Cited task names and artifact cards change without a chat write, so a read
+ * with the known version keeps them. No timer refreshes them (#1212): an
+ * artifact's own live key, or the page coming back into view, marks them stale,
+ * and the next read omits the version so the server refreshes them. The server
+ * still uses the history cursor.
  */
-export const FULL_READ_EVERY_MS = 60_000
+export function knownVersion(previous: { version?: string } | undefined, metadataStale: boolean): string | undefined {
+  return previous?.version && !metadataStale ? previous.version : undefined
+}
 
-/** Omit the known version when card metadata needs refreshing; retain the history continuation. */
-export function knownVersion(previous: { version?: string } | undefined, fullReadAt: number, now: number): string | undefined {
-  return previous?.version && now - fullReadAt < FULL_READ_EVERY_MS ? previous.version : undefined
+/** At most this many artifact cards listen for their own change; the rest refresh with the next full read. */
+export const METADATA_KEYS_MAX = 100
+
+/** The live keys whose change makes the chat's decorations stale: each artifact card, on the owner's home channel. */
+export function metadataEntities(chat: { artifacts?: Record<string, unknown> } | undefined) {
+  return Object.keys(chat?.artifacts ?? {}).sort().slice(0, METADATA_KEYS_MAX).map(id => ({ kind: 'artifact' as const, id }))
 }
 
 /** The chat to show after a poll: the full chat it returned, or the previous one with the poll's live state. */

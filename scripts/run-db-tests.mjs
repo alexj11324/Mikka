@@ -11,6 +11,7 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/project-map/decisions.ts', file: 'lib/project-map/decisions.db.test.ts', script: 'test:project-decisions-db' },
   { marker: 'lib/chat-attachments/store.ts', file: 'lib/chat-attachments/store.db.test.ts', script: 'test:chat-attachments-db' },
   { marker: 'lib/plugins/store.ts', file: 'lib/plugins/store.db.test.ts', script: 'test:plugins-db' },
   { marker: 'lib/schedules/store.ts', file: 'lib/schedules/store.db.test.ts', script: 'test:schedules-db' },
@@ -27,6 +28,7 @@ export const REQUIRED_SUITES = [
   { marker:'lib/execution-settings.ts',file:'lib/execution-settings.db.test.ts',script:'test:execution-settings-db' },
   { marker: 'lib/rule-dispatch.ts', file: 'tests/run-machine-fallback.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/thread-dispatch.ts', file: 'tests/one-thread-per-task.db.test.ts', script: 'test:bot-threads-db' },
+  { marker: 'lib/factory/questions/queue-local-continuation.ts', file: 'tests/factory-local-question.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/coordinator/coordinator-bot.ts', file: 'tests/coordinator-bot.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/run-credential-source.ts', file: 'tests/api-key-runs.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/model-order.ts', file: 'tests/model-order.db.test.ts', script: 'test:bot-threads-db' },
@@ -48,6 +50,9 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/self-improvement/store.ts', file: 'lib/self-improvement/postgres.test.ts', script: 'test:self-improvement-db' },
   { marker: 'lib/self-improvement/team-skills.ts', file: 'lib/self-improvement/team-skills.db.test.ts', script: 'test:self-improvement-db' },
   { marker: 'lib/factory/checks.ts', file: 'lib/factory/checks.db.test.ts', script: 'test:factory-checks-db' },
+  { marker: 'lib/factory/automatic-dispatch.ts', file: 'lib/factory/profile-dispatch.db.test.ts', script: 'test:factory-checks-db' },
+  { marker: 'lib/computer/bot-runtime-records.ts', file: 'lib/factory/profile-dispatch.db.test.ts', script: 'test:factory-checks-db' },
+  { marker: 'lib/factory/agent-profile.ts', file: 'lib/factory/agent-profile.db.test.ts', script: 'test:factory-routing-db' },
   { marker: 'lib/factory/request-epoch.ts', file: 'lib/factory/continuity.db.test.ts', script: 'test:factory-checks-db' },
   { marker: 'lib/factory/watchdog.ts', file: 'lib/factory/continuity.db.test.ts', script: 'test:factory-checks-db' },
   { marker: 'lib/factory/monitor-v2-binding.ts', file: 'lib/factory/monitor-v2-binding.db.test.ts', script: 'test:factory-monitor-db' },
@@ -92,6 +97,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/run-outcome-judge.ts', file: 'tests/run-outcomes.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/billing/service.ts', file: 'tests/billing.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/audit/query.ts', file: 'tests/audit-query.db.test.ts', script: 'test:workspace-admin-db' },
+  { marker: 'lib/subscription-acquire-expiry.ts', file: 'lib/subscription-acquire-expiry.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/issue-relation-cycle.db.test.ts', file: 'lib/issue-relation-cycle.db.test.ts', script: 'test:relation-cycle' },
   { marker: 'lib/audit/record.ts', file: 'tests/audit-record.db.test.ts', script: 'test:audit-db' },
   { marker: 'lib/audit/authentication.ts', file: 'tests/authentication-audit.db.test.ts', script: 'test:audit-db' },

@@ -4,7 +4,7 @@ import { useViewScroll } from '@/lib/hooks/view-state'
 import { useState, type ComponentProps, type ReactNode, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { Box, CalendarDays, Circle, CircleUserRound, Ellipsis, EyeOff, Flag, Hand, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2 } from 'lucide-react'
+import { Box, CalendarDays, Circle, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay } from '@/components/reui/kanban'
@@ -61,7 +61,7 @@ export function assigneeGroupOf({ assignee, owner }: { assignee: IssueMetadata['
 }
 
 const AGENT_STATE_BADGES = { running: 'success-light', waiting: 'warning-light', blocked: 'destructive-light' } as const satisfies Record<AgentState, string>
-const AGENT_STATE_DOTS = { running: 'bg-success', waiting: 'bg-warning', blocked: 'bg-destructive' } as const satisfies Record<AgentState, string>
+const AGENT_STATE_DOTS = { running: 'bg-muted-foreground motion-safe:animate-pulse', waiting: 'bg-warning', blocked: 'bg-destructive' } as const satisfies Record<AgentState, string>
 
 export type CardHandlers = {
   onOpen: (id: string) => void
@@ -123,8 +123,8 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
     show('project') && metadata.project && <span key="project" className={cn(meta, 'min-w-0')}><Box /><span className="max-w-28 truncate">{metadata.project}</span></span>,
     pullRequest && <span key="pr" className="flex items-center gap-1"><CardControlBoundary><IssuePullRequestLink issueId={task.id} pr={pullRequest} compact /></CardControlBoundary>{metadata.pullRequests.length > 1 && <span className="text-xs text-muted-foreground/70 tabular-nums">+{metadata.pullRequests.length - 1}</span>}</span>,
     show('subtasks') && subtasks && subtasks.total > 0 && <span key="subtasks" className={meta} title={tCard('subtasks')}><ListChecks />{subtasks.done}/{subtasks.total}</span>,
-    show('agentState') && agentState && <Badge key="agent" variant={AGENT_STATE_BADGES[agentState]} size="lg">{/* 等待你 raises a hand, as every thread status does (R-52). */}{agentState === 'waiting' ? <Hand aria-hidden="true" /> : <span aria-hidden="true" className={cn('size-1.5 rounded-full', AGENT_STATE_DOTS[agentState])} />}{tCard(`agent.${agentState}`)}</Badge>,
-    show('dueDate') && metadata.dueDate && <span key="due" className={cn(meta, overdue && 'text-destructive')}><CalendarDays />{formatDateOnly(format, metadata.dueDate, { month: 'short', day: 'numeric' })}</span>,
+    show('agentState') && agentState && <Badge key="agent" variant={AGENT_STATE_BADGES[agentState]} size="lg">{/* The thread's state is a dot, the same colours as on its bubble (R-52). */}<span aria-hidden="true" className={cn('size-1.5 rounded-full', AGENT_STATE_DOTS[agentState])} />{tCard(`agent.${agentState}`)}</Badge>,
+    show('dueDate') && metadata.dueDate && <span key="due" className={cn(meta, overdue && 'text-destructive-foreground')}><CalendarDays />{formatDateOnly(format, metadata.dueDate, { month: 'short', day: 'numeric' })}</span>,
   ].filter(Boolean)
 
   // Figma 看板/任务卡片: filled, no stroke (R-31); radius 8, padding 12, rows 8 apart.

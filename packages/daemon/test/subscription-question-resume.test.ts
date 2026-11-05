@@ -26,7 +26,7 @@ import { runPaths } from '../src/agents/run-context'
 import { cleanupTempDirs, makeRepo, tempDir, waitFor } from './helpers'
 
 afterEach(cleanupTempDirs)
-async function fixture(harness: 'codex' | 'claude_code') {
+async function fixture(harness: 'codex' | 'claude_code', effort?: RunAssignment['effort']) {
   const root = tempDir('question-native-'), stateDir = join(root, 'adapters'), cwd = await makeRepo()
   mkdirSync(stateDir)
   const journal = new RunJournal(join(root, 'runs.json')), deviceId = randomUUID(), runId = randomUUID()
@@ -38,10 +38,10 @@ async function fixture(harness: 'codex' | 'claude_code') {
   chmodSync(binary, 0o700)
   const runner = await createHostedBotRunner({ stateDir, link, binaries: { [harness]: binary }, journal })
   const assignment = { runId, deviceId, issueId: randomUUID(), repoId: randomUUID(), baseBranch: 'main', harness,
-    prompt: 'ORIGINAL_QUESTION', model: 'fixture-model', subscriptionBinding: { bindingId: randomUUID(), ownerId: 'owner',
+    prompt: 'ORIGINAL_QUESTION', model: 'fixture-model', ...(effort ? { effort } : {}), subscriptionBinding: { bindingId: randomUUID(), ownerId: 'owner',
       workspaceId: randomUUID(), consumerId: randomUUID(), route: context.route } } as RunAssignment
   const options = (id: string) => ({ runId: id, toolApproval: new ToolApprovalGate(id, { isLive: () => true }), cwd,
-    model: assignment.model, prompt: 'ORIGINAL_QUESTION', env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: tempDir() } }), log: createLogger({ level: 'silent' }) })
+    model: assignment.model, ...(effort ? { effort } : {}), prompt: 'ORIGINAL_QUESTION', env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: tempDir() } }), log: createLogger({ level: 'silent' }) })
   const original = await runner.start(assignment, options(runId))
   for await (const _event of original.events()) { /* actual adapter process */ }
   journal.put({ assignment, state: 'stopped', sessionId: original.sessionId, worktree: cwd, lastSeq: 0, error: null,
@@ -54,7 +54,8 @@ async function fixture(harness: 'codex' | 'claude_code') {
   const history = (id: string) => harness === 'codex'
     ? join(runPaths(stateDir, id).runDir, 'codex-home', 'sessions', 'fixture-subscription-thread.json')
     : join(runPaths(stateDir, id).runDir, 'native-home', '.claude', 'projects', 'fixture-question.json')
-  return { runner, assignment, next, resumedOptions, journal, stateDir, history, original, context, cwd }
+  const observedEffort = (id: string) => JSON.parse(readFileSync(join(runPaths(stateDir, id).runDir, harness === 'codex' ? 'codex-home' : 'native-home/.claude', 'fixture-effort.json'), 'utf8'))
+  return { runner, assignment, next, resumedOptions, journal, stateDir, history, original, context, cwd, observedEffort }
 }
 for (const harness of ['codex', 'claude_code'] as const) {
   it(`${harness}: required subscription answer resumes original native history and session`, async () => {
@@ -71,6 +72,26 @@ for (const harness of ['codex', 'claude_code'] as const) {
       await expect(f.runner.start(f.next, { ...f.resumedOptions, toolApproval: new ToolApprovalGate(f.next.runId, { isLive: () => true }) })).rejects.toThrow()
       expect(JSON.parse(readFileSync(f.history(f.next.runId), 'utf8')).messages).toEqual(history.messages)
     } finally { await session.cancel() }
+  }, 45000)
+  it.each(['low', 'medium', 'high', 'xhigh', 'max'] as const)(`${harness}: frozen Profile effort reaches the native protocol and survives resume: %s`, async effort => {
+    const f = await fixture(harness, effort)
+    expect(f.observedEffort(f.assignment.runId)).toMatchObject({ transport: harness === 'codex' ? 'turn/start' : 'cli', effort, sessionId: f.original.sessionId })
+    const session = await f.runner.start(f.next, f.resumedOptions)
+    try {
+      for await (const _event of session.events()) { /* actual official protocol / SDK process */ }
+      expect(session.sessionId).toBe(f.original.sessionId)
+      expect(f.observedEffort(f.next.runId)).toMatchObject({ effort, sessionId: f.original.sessionId })
+      if (harness === 'claude_code') expect(f.observedEffort(f.next.runId).resumed).toBe(true)
+      expect(JSON.parse(readFileSync(f.history(f.next.runId), 'utf8')).messages).toEqual(['ORIGINAL_QUESTION', 'OWNER_ANSWER'])
+    } finally { await session.cancel() }
+  }, 45000)
+  it.each(['assignment', 'options', 'both'] as const)(`${harness}: rejects changed Profile effort on native resume: %s`, async drift => {
+    const f = await fixture(harness, 'high')
+    if (drift !== 'options') f.next.effort = 'low'
+    if (drift !== 'assignment') f.resumedOptions.effort = 'low'
+    await expect(f.runner.start(f.next, f.resumedOptions)).rejects.toThrow('subscription_hosted_runtime_unavailable')
+    expect(existsSync(join(f.stateDir, 'native-ledgers', f.next.runId + '.json'))).toBe(false)
+    expect(JSON.parse(readFileSync(f.history(f.assignment.runId), 'utf8')).messages).toEqual(['ORIGINAL_QUESTION'])
   }, 45000)
   it.each(['session', 'binding', 'owner', 'workspace', 'model', 'worktree', 'harness', 'ledger-account', 'ledger-revision', 'native-session', 'missing-history'] as const)(`${harness}: rejects question source drift: %s`, async drift => {
     const f = await fixture(harness)
@@ -112,7 +133,7 @@ for (const harness of ['codex', 'claude_code'] as const) {
     const binary = resolve(import.meta.dirname, 'fakes', harness === 'codex' ? 'fake-codex-subscription.mjs' : 'fake-claude-subscription.mjs')
     const daemon = await new Daemon({ dataDir, flavor: 'dev', link, credential: 'synthetic', hostedSubscriptions: true,
       harnessBinaries: { [harness]: binary }, quotaSource: null, heartbeatMs: 50, log: createLogger({ level: 'silent' }) }).start()
-    const input = { issueId: randomUUID(), repoId, baseBranch: 'main', harness, prompt: 'ORIGINAL_QUESTION', model: 'fixture-model',
+    const input = { issueId: randomUUID(), repoId, baseBranch: 'main', harness, prompt: 'ORIGINAL_QUESTION', model: 'fixture-model', effort: 'high' as const,
       preserveQuestionWorktree: true, subscriptionBinding: { bindingId: randomUUID(), ownerId: 'owner', workspaceId: randomUUID(),
         consumerId: randomUUID(), route: harness === 'codex' ? 'codex_cli' as const : 'claude_code_cli' as const } }
     const finish = async (runId: string) => {
@@ -130,6 +151,7 @@ for (const harness of ['codex', 'claude_code'] as const) {
       expect(resumed).toMatchObject({ sessionId: original.sessionId, worktree: original.worktree })
       expect(new RunJournal(join(dataDir, 'runs.json')).get(next)?.questionResumeState).toBe('accepted')
       const runDir = runPaths(join(dataDir, 'adapters'), next).runDir
+      expect(JSON.parse(readFileSync(join(runDir, harness === 'codex' ? 'codex-home' : 'native-home/.claude', 'fixture-effort.json'), 'utf8'))).toMatchObject({ effort: 'high', sessionId: original.sessionId })
       const historyPath = harness === 'codex' ? join(runDir, 'codex-home', 'sessions', 'fixture-subscription-thread.json')
         : join(runDir, 'native-home', '.claude', 'projects', 'fixture-question.json')
       const history = JSON.parse(readFileSync(historyPath, 'utf8'))

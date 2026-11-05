@@ -1,3 +1,4 @@
+import { runMessagePrompt } from './run-message-prompt'
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -10,6 +11,8 @@ import type { RunCommand } from '@mikka/protocol/device'
 import type { DeviceCommandKind } from '@/lib/device-management'
 import { deviceRequestCaller } from '@/lib/device-request-context'
 import { ackMailboxNotices, pendingMailboxNotices } from '@/lib/device-mailbox-notices'
+import { DEVICE_WORK_CHANNEL, subscribeShared } from '@/lib/db/listen'
+import { deviceGatewayEndpoint } from '@/lib/device-gateway-client'
 
 /**
  * The single workspace this MVP serves. The protocol's register answer
@@ -160,6 +163,18 @@ export async function linkDeviceToken(caller: Pick<DeviceCaller, 'userId' | 'tok
  */
 export const longPollIdleCheck = { ms: 5_000 }
 
+/**
+ * LISTEN for this device's work and for its credential's revocation, on one
+ * shared session per process (#1212). Only with the gateway configured: then
+ * every write that gives a device work calls notifyDeviceWork, which also
+ * NOTIFYs here. Null without it, or when LISTEN is unavailable; the long poll
+ * then keeps its longPollIdleCheck timer.
+ */
+export async function deviceWorkSubscription(deviceId: string, tokenId: string) {
+  if (!deviceGatewayEndpoint(deviceId, 'push')) return null
+  return subscribeShared(pool, DEVICE_WORK_CHANNEL, [deviceId, `token:${tokenId}`]).catch(() => null)
+}
+
 export async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   try { await delay(ms, undefined, { signal }) }
   catch (error) {
@@ -230,13 +245,13 @@ export async function deviceWork(deviceId: string, skip: readonly string[], opti
   const queuedRuns = options.queued ? live.filter(run => run.status === 'queued').map(run => run.id).slice(0, 100) : []
   if (live.length === 0) return { commands: [], queuedRuns }
   const messages = await db
-    .select({ id: runMessages.id, runId: runMessages.runId, text: runMessages.text })
+    .select({ id: runMessages.id, runId: runMessages.runId, text: runMessages.text, origin: runMessages.origin })
     .from(runMessages)
     .where(and(isNull(runMessages.deliveredAt), inArray(runMessages.runId, live.map(run => run.id))))
     .orderBy(asc(runMessages.createdAt))
     .limit(500)
   // The runId filter above excludes mailbox messages, whose runId is null.
-  const inputs: RunCommand[] = messages.flatMap(({ id, runId, text }) => runId ? [{ kind: 'input' as const, runId, messageId: id, text }] : [])
+  const inputs: RunCommand[] = messages.flatMap(({ id, runId, text, origin }) => runId ? [{ kind: 'input' as const, runId, messageId: id, text: runMessagePrompt({ id, runId, origin, text }) }] : [])
   const stops: RunCommand[] = live.filter(run => run.stopRequestedAt).map(run => ({ kind: 'stop', runId: run.id }))
   const notices = options.mailboxNotices ? await pendingMailboxNotices(deviceId, live.filter(run => !run.stopRequestedAt).map(run => run.id)) : []
   return { commands: [...stops, ...notices, ...inputs].slice(0, 500), queuedRuns }
