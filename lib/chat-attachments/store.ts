@@ -14,6 +14,7 @@ import {
   type ChatFileScope,
 } from '@mikka/protocol/chat-attachments'
 import { pool } from '@/lib/db'
+import { armDueTimerAfterCommit, armDueTimerSoon } from '@/lib/due-timer'
 import { workspacePool } from '@/lib/workspace-db'
 import {
   artifactStorage,
@@ -156,6 +157,8 @@ export async function beginChatFile(
       expiresAt,
     ],
   )
+  // An unused upload is cleaned up a day later by the account-deletions due timer (#1371).
+  armDueTimerSoon('account-deletions')
   return { id, chunkSize: CHAT_FILE_CHUNK_BYTES }
 }
 
@@ -344,6 +347,8 @@ export async function removeChatFile(userId: string, id: string, tokenWorkspaceI
       await client.query('UPDATE chat_attachments SET "removedAt"=now() WHERE id=$1 AND "usedAt" IS NULL', [
         id,
       ])
+      // A removed draft is cleaned up once its upload grant expires (#1371).
+      armDueTimerAfterCommit(client, 'account-deletions')
     }
     await client.query('COMMIT')
   } catch (error) {

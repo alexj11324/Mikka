@@ -38,6 +38,7 @@ import { teamIssues } from '@/lib/db/team-schema'
 import { issueListChanged } from '@/lib/live/lists'
 import { issueRelationsChanged } from '@/lib/live/issue-detail'
 import { ownerListRead } from '@/lib/live/list-read-server'
+import { beginOwnerListRead, type BegunListRead } from '@/lib/live/revision-read'
 import { issuePrefixes, linearIssueLinks, linearTeamSyncs } from '@/lib/db/schema'
 
 type IssueRow = typeof issues.$inferSelect
@@ -89,15 +90,17 @@ async function readIssues(workspaceId?: string, known?: string) {
     // Each request is authorized on its own: session, selected workspace and role, and team scopes.
     const userId = await getUserId()
     const context = await loadWorkspaceContext(workspaceId)
+    // Before the team scopes and the list: the selected workspace's key and the home's key, both of which this list listens to.
+    const begun = await beginOwnerListRead(userId, ['issue_list'], [{ kind: 'issue_list', id: context.workspace.id }])
     const allTeams = await accessibleTeamScopes(userId)
     // Identical concurrent polls of this person (tabs, devices after one push) share one read.
     return singleFlight(['/actions/issues/poll', userId, context.workspace.id, context.role, allTeams.map(team => `${team.id}:${team.workspaceId}`).sort().join(','), known ?? null],
-      () => readIssueSnapshot(userId, context, allTeams, known))
+      () => readIssueSnapshot(userId, context, allTeams, begun, known))
   })
 }
 
-async function readIssueSnapshot(userId: string, context: Awaited<ReturnType<typeof loadWorkspaceContext>>, allTeams: Awaited<ReturnType<typeof accessibleTeamScopes>>, known?: string) {
-  const live = { ...await ownerListRead(userId), selectedWorkspaceId: context.workspace.id }
+async function readIssueSnapshot(userId: string, context: Awaited<ReturnType<typeof loadWorkspaceContext>>, allTeams: Awaited<ReturnType<typeof accessibleTeamScopes>>, begun: BegunListRead, known?: string) {
+  const live = { ...await ownerListRead(userId, [], Date.now(), begun), selectedWorkspaceId: context.workspace.id }
   // Membership is fresh for each poll. Reuse only this operation's narrow
   // identity rows for visibility, workspace filtering and remaining links.
   const teams = allTeams.filter(team => team.workspaceId === context.workspace.id)

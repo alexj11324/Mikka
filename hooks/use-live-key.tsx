@@ -76,18 +76,25 @@ export function useLiveKey(kind: LiveKind, id: string | null | undefined, keys: 
   useLiveKeys(id ? [{ kind, id }] : [], keys, workspaceId, options)
 }
 
+type LiveEntity = { kind: LiveKind; id: string; workspaceId?: string | null; /** This entity's held revision per key; see LiveSubscriptionOptions. */ revisions?: LiveSubscriptionOptions['revisions'] }
+
 /** A thread's attempts share one read and one owner/workspace connection. */
-export function useLiveKeys(entities: readonly { kind: LiveKind; id: string; workspaceId?: string | null }[], keys: readonly string[], workspaceId?: string | null, options?: LiveKeyOptions) {
+export function useLiveKeys(entities: readonly LiveEntity[], keys: readonly string[], workspaceId?: string | null, options?: LiveKeyOptions) {
   const context = useContext(LiveContext)
   const channels = context?.channels
   const scope = workspaceId === undefined ? context?.workspaceId ?? null : workspaceId
   const { mutate } = useSWRConfig()
   const share = options?.shareAcrossTabs ? context?.share : undefined
   const serialized = JSON.stringify(keys)
-  const references = JSON.stringify(entities)
+  // A new revision updates the existing handle; it is not a new subscription or initial read.
+  const references = JSON.stringify(entities.map(({ kind, id, workspaceId: entityScope }) => ({ kind, id, workspaceId: entityScope })))
+  const revisions = useRef(entities)
+  revisions.current = entities
+  const revisionKey = JSON.stringify([options?.revisions ?? null, entities.map(entity => entity.revisions ?? null)])
   const minIntervalMs = options?.minIntervalMs ?? 0
-  const timing = useRef({ minIntervalMs, deadline: options?.deadline })
-  timing.current = { minIntervalMs, deadline: options?.deadline }
+  const timing = useRef<LiveSubscriptionOptions>({ minIntervalMs, deadline: options?.deadline, revisions: options?.revisions })
+  timing.current = { minIntervalMs, deadline: options?.deadline, revisions: options?.revisions }
+  const optionsFor = (index: number): LiveSubscriptionOptions => ({ ...timing.current, revisions: { ...timing.current.revisions, ...revisions.current[index]?.revisions } })
   // Renders do not reanchor an expiry. A newer HTTP observation can arrange a
   // final check if the conservative timer fired before the server's deadline.
   const deadlineKey = options?.deadline?.at ?? null
@@ -95,11 +102,11 @@ export function useLiveKeys(entities: readonly { kind: LiveKind; id: string; wor
   const active = useRef<LiveSubscription[]>([])
   useEffect(() => {
     if (!channels) return
-    const subscriptions = (JSON.parse(references) as { kind: LiveKind; id: string; workspaceId?: string | null }[]).map(({ kind, id, workspaceId: entityScope }) => {
+    const subscriptions = (JSON.parse(references) as LiveEntity[]).map(({ kind, id, workspaceId: entityScope }, index) => {
       const channelScope = entityScope === undefined ? scope : entityScope
       // Another tab of this person reading the same key in the same scope serves this one too.
       const refresh = share ? (key: string) => share(channelScope).run(key, () => mutate(key), data => mutate(key, data, { revalidate: false })) : (key: string) => mutate(key)
-      return channels.subscribe(channelScope, kind, id, JSON.parse(serialized) as string[], refresh, timing.current)
+      return channels.subscribe(channelScope, kind, id, JSON.parse(serialized) as string[], refresh, optionsFor(index))
     })
     active.current = subscriptions
     return () => {
@@ -110,6 +117,7 @@ export function useLiveKeys(entities: readonly { kind: LiveKind; id: string; wor
     // entity, cache key or refresh owner change needs a new initial read.
   }, [channels, scope, references, serialized, mutate, share])
   useEffect(() => {
-    for (const subscription of active.current) subscription.update(timing.current)
-  }, [minIntervalMs, deadlineKey, deadlineObservation])
+    active.current.forEach((subscription, index) => subscription.update(optionsFor(index)))
+    // optionsFor reads the refs set above.
+  }, [minIntervalMs, deadlineKey, deadlineObservation, revisionKey])
 }

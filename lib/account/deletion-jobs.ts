@@ -11,6 +11,7 @@ import type { AccountCleanupReport } from './cleanup-result'
 import { cleanupAccountConnections } from './external-cleanup'
 import { AccountDeletionBusy, AccountDeletionLockLost, acquireAccountDeletionLock } from './deletion-lock'
 import { teardownWorkspaceMachines } from '@/lib/cloud-computer/workspace-teardown'
+import { armDueTimerSoon } from '@/lib/due-timer'
 
 export type DeletionStage = 'preparing' | 'requested' | 'external_pending' | 'main_deleted' | 'workspace_deleted' | 'storage_pending' | 'completed' | 'cancelled'
 export interface AccountDeletionJob {
@@ -79,7 +80,8 @@ export async function requestAccountDeletion(userId: string, email: string, requ
       if (refused) return { ok: false, soleAdminOf: refused }
     }
   } catch (error) { return await rethrow(error) } finally { await close() }
-
+  // The deletion itself runs on the account-deletions due timer, now (#1371).
+  armDueTimerSoon('account-deletions')
   return { ok: true, id }
 }
 

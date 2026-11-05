@@ -278,12 +278,15 @@ async function dispatchStandaloneTask(userId:string,input:Parameters<GroupFactor
   }})
 }
 
+/** Bound tasks with a reportable revision their group has not been told (b: group_task_bindings, t: factory_tasks). */
+export const pendingTaskReportsSql=`FROM group_task_bindings b
+    JOIN factory_tasks t ON t."issueId"=b."issueId" AND t."userId"=b."userId" AND t."botId"=b."executionBotId" AND t."sourceEventId"=b."sourceEventId"
+    WHERE t.revision>b."lastReportedRevision" AND (t.status IN ('failed','blocked','waiting','cancelled','revoked') OR (t.stage='approval' AND t.status='pending') OR (t.status='passed' AND t.stage='monitor') OR ${acceptedDeliverableSql} OR ${mergedCandidateSql})`
+
 /** The existing minute worker and group reads publish confirmed lifecycle
  * milestones directly. No extra model is allowed to suppress a real result. */
 export async function groupsWithPendingTaskReports(client:Query):Promise<string[]> {
-  return (await client.query<{conversationId:string}>(`SELECT DISTINCT b."conversationId" FROM group_task_bindings b
-    JOIN factory_tasks t ON t."issueId"=b."issueId" AND t."userId"=b."userId" AND t."botId"=b."executionBotId" AND t."sourceEventId"=b."sourceEventId"
-    WHERE t.revision>b."lastReportedRevision" AND (t.status IN ('failed','blocked','waiting','cancelled','revoked') OR (t.stage='approval' AND t.status='pending') OR (t.status='passed' AND t.stage='monitor') OR ${acceptedDeliverableSql} OR ${mergedCandidateSql}) LIMIT 20`)).rows.map(row=>row.conversationId)
+  return (await client.query<{conversationId:string}>(`SELECT DISTINCT b."conversationId" ${pendingTaskReportsSql} LIMIT 20`)).rows.map(row=>row.conversationId)
 }
 
 export async function reconcileGroupTaskReports(conversationId:string, dependencies?:{pool:Pool;authorize:GroupFactoryAdapters['authorize']}):Promise<number> {

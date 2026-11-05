@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { deviceGatewayTicketValid } from '../device-gateway-ticket'
-import { liveInvalidation, liveInvalidations } from './events'
+import { liveInvalidation, liveInvalidations, liveReadiness, liveReady, withoutRevisions } from './events'
 import { liveChannelId, liveGatewayConfig, liveTicket } from './scope'
 
 const workspace = '19df8afd-0f8c-4c6b-bc9c-20df0b046a72'
@@ -32,6 +32,22 @@ test('the wire format refuses data, credentials and arbitrary entity kinds', () 
   }
   assert.equal(liveInvalidations([]), null)
   assert.equal(liveInvalidations(Array(17).fill(value)), null)
+})
+
+test('a revision is a third field only a version 2 reader accepts, and only a positive integer on a revision kind', () => {
+  const plain = { kind: 'bot_chat' as const, id: workspace }
+  const revised = { ...plain, rev: 7 }
+  // A version 1 reader (an older tab, the mobile app, an older Worker) refuses the extra field.
+  assert.equal(liveInvalidation(revised), null)
+  assert.deepEqual(liveInvalidation(revised, true), revised)
+  assert.deepEqual(liveInvalidation(plain, true), plain)
+  for (const invalid of [{ ...plain, rev: 0 }, { ...plain, rev: -1 }, { ...plain, rev: 1.5 }, { ...plain, rev: '7' }, { ...plain, rev: 2 ** 53 },
+    { ...plain, revision: 7 }, { kind: 'factory_task', id: workspace, rev: 7 }, { ...revised, extra: 1 }]) assert.equal(liveInvalidation(invalid, true), null)
+  assert.deepEqual(withoutRevisions([revised, plain]), [plain, plain])
+  assert.deepEqual(liveReadiness(liveReady()), { kinds: liveReady().kinds, revisions: [] })
+  assert.deepEqual(liveReadiness(liveReady(2))?.revisions, liveReady(2).revisions)
+  assert.equal(liveReadiness({ ...liveReady(), revisions: ['bot_chat'] }), null, 'version 1 has exactly three fields')
+  assert.equal(liveReadiness({ type: 'live_ready', version: 2, kinds: ['bot_chat'] }), null)
 })
 
 test('gateway configuration uses the existing origin and refuses credential-bearing URLs', () => {

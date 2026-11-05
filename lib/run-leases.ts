@@ -28,6 +28,7 @@ import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
 import { subscriptionPreflightSchema } from '@mikka/protocol/harness'
 import type { RunReport } from '@mikka/protocol/run'
 import messages from '@/messages/zh-CN.json'
+import { armDueTimerSoon } from '@/lib/due-timer'
 
 const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -75,6 +76,8 @@ export async function renewRunLeases(deviceId: string, runIds: readonly string[]
       // The daemon receives revoked on this heartbeat and removes injected credentials.
       const stopped = await db.update(agentRuns).set({ stopRequestedAt: now, leaseExpiresAt: now, updatedAt: now }).where(and(eq(agentRuns.id, run.id), eq(agentRuns.deviceId, deviceId), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]))).returning({ id: agentRuns.id })
       if (stopped.length && !run.stopRequestedAt) { await runListChanged(db, run.id); await runChanged(db, run.id) }
+      // Its lease ended now: reclaimed by the run-recovery due timer if the daemon never reports it (#1212).
+      if (stopped.length) armDueTimerSoon('run-recovery')
     }
   }
   const renewed = authorized.length ? await db.update(agentRuns)

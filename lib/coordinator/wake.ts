@@ -5,11 +5,12 @@ import { claimTriageAttempt, completeTriageAttempt, hasWakingEvents, setEventTie
 import { invokeDecision } from '@/lib/coordinator/decide'
 import { tierFromDecision, triageQuestions, triageInput } from '@/lib/coordinator/triage'
 import { coordinatorTurn } from '@/workflows/coordinator/workflow'
+import { coordinatorWakeDeadline } from '@/workflows/coordinator-wake-recovery/workflow'
 import { runTestFixture } from '@/lib/run-test-fixture'
 import { runTriageBatch, TRIAGE_BATCH_BUDGET_MS } from './triage-batch'
 import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
-import { createWakeRecovery, deliverWake, type WakeClaim, type WakeScope } from './wake-recovery'
+import { createWakeRecovery, deliverWake, type DeadlineWakeClaim, type WakeClaim, type WakeDeadlineTicket, type WakeScope } from './wake-recovery'
 import { failureLine } from './refusal-line'
 import { pushByDecision } from './push-decision'
 import type { InboxEvent } from '@/lib/push-reasons'
@@ -53,8 +54,8 @@ export async function triageInbox(userId: string, botId: string): Promise<void> 
  * due included) to the Coordinator, then triages the inbox and starts a turn
  * for each of the person's chats (the Coordinator's and any bot's) unless all
  * that waits there is background. Call it after the event is committed.
- * The inbox is also the durable wake outbox. An independent sweep retries a
- * failed start without requiring another user message or external event.
+ * Claimed batches also get a durable deadline. The independent sweep still
+ * repairs the commit-to-start gap and workflow infrastructure failures.
  */
 export async function wakeCoordinator(userId: string): Promise<void> {
   if (!coordinatorEnabled()) return
@@ -75,6 +76,18 @@ export async function wakeCoordinator(userId: string): Promise<void> {
 async function wakeChat(scope: WakeScope) {
   const claim = await recovery.claim(scope)
   if (!claim) return 'deferred' as const
+  const delivered = await deliverClaim(claim)
+  if (delivered.ticket) {
+    // Both claim and failure tickets are returned only after their real COMMIT.
+    // An unknown start outcome is not retried here; the inbox/sweep retains it.
+    try { await start(coordinatorWakeDeadline, [delivered.ticket]) }
+    catch { console.error('Coordinator wake deadline scheduling failed', { eventIds: claim.ids, attempt: claim.attempt }) }
+  }
+  return delivered.result
+}
+
+async function deliverClaim(claim: DeadlineWakeClaim) {
+  let ticket = claim.ticket
   const result = await deliverWake(claim, {
     triage: value => triageInbox(value.userId, value.botId),
     hasWaking: value => hasWakingEvents(value.userId, value.botId),
@@ -82,12 +95,22 @@ async function wakeChat(scope: WakeScope) {
       const run = await start(coordinatorTurn, [value.userId, value.botId])
       console.info('Coordinator wake accepted', { workflowRunId: run.runId, eventIds: claim.ids, attempt: claim.attempt })
     },
-    failed: recovery.failed,
+    failed: async (value, code) => { ticket = await recovery.failed(value, code) },
     // The last attempt gave up: no turn will run to say so, so the phone gets the line the chat shows (回复重试已停止).
     exhausted: value => noticeWakeExhausted(value).catch(() => console.error('Wake failure notice failed', { eventIds: value.ids })),
   })
   if (result === 'failed') console.error('Coordinator wake delivery failed', { eventIds: claim.ids, attempt: claim.attempt })
-  return result
+  return { result, ticket }
+}
+
+/** Internal durable step: preserve the bounded batch instead of waking an unrestricted chat. */
+export async function recoverWakeDeadline(ticket: WakeDeadlineTicket): Promise<{ ticket: WakeDeadlineTicket; at: string } | null> {
+  if (!coordinatorEnabled()) return null
+  const next = await recovery.resume(ticket)
+  if (next.kind === 'obsolete') return null
+  if (next.kind === 'wait') return { ticket, at: next.at }
+  const delivered = await deliverClaim(next.claim)
+  return delivered.ticket ? { ticket: delivered.ticket, at: delivered.ticket.at } : null
 }
 
 async function noticeWakeExhausted(claim: WakeClaim) {

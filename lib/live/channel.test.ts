@@ -488,3 +488,78 @@ test('a fresh server-future observation whose conservative remaining time is zer
   assert.equal(f.ticketCalls(), 1); assert.equal(f.sockets.length, 1)
   stop()
 })
+
+function revisionFixture() {
+  const f = fixture()
+  const urls: string[] = []
+  const socket = f.runtime.socket
+  f.runtime.socket = ticket => { urls.push(ticket.url); return socket(ticket) }
+  const ready = (version: 1 | 2) => f.sockets.at(-1)!.message(JSON.stringify(version === 2
+    ? { type: 'live_ready', version: 2, kinds: LIVE_KINDS, revisions: ['bot_chat'] }
+    : { type: 'live_ready', version: 1, kinds: LIVE_KINDS }))
+  return { ...f, urls, ready }
+}
+
+test('a version 2 channel asks for revisions and skips a push its data already holds, reading every newer or unknown one', async () => {
+  const f = revisionFixture()
+  const subscription = f.channel.subscribe('bot_chat', task, ['chat'], key => { f.reads.push(key) }, { revisions: { chat: 5 } })
+  await f.open(); f.ready(2)
+  assert.equal(new URL(f.urls[0]).searchParams.get('revisions'), '1')
+  f.reads.length = 0
+  const push = (value: object) => f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, ...value }))
+  push({ rev: 5 }); push({ rev: 4 })
+  await f.advance(1_000)
+  assert.deepEqual(f.reads, [], 'a duplicate or older push is already shown')
+  push({ rev: 6 })
+  await f.advance(1_000)
+  assert.deepEqual(f.reads, ['chat'], 'a newer revision reads')
+  push({})
+  await f.advance(1_000)
+  assert.deepEqual(f.reads, ['chat', 'chat'], 'a key with no revision always reads')
+  // The echo of this tab's own write: the push lands first, its re-read returns the revision before the flush.
+  push({ rev: 9 })
+  subscription.update({ revisions: { chat: 9 } })
+  await f.advance(1_000)
+  assert.deepEqual(f.reads, ['chat', 'chat'])
+  subscription.update({ revisions: { chat: 3 } })
+  push({ rev: 8 })
+  await f.advance(1_000)
+  assert.deepEqual(f.reads, ['chat', 'chat'], 'an older response does not lower the held revision')
+  assert.equal(f.channel.skippedReads, 4)
+})
+
+test('a revision never skips a key it does not cover, a version 1 Worker, or a kind the Worker did not list', async () => {
+  const f = revisionFixture()
+  f.channel.subscribe('bot_chat', task, ['chat', 'members'], key => { f.reads.push(key) }, { revisions: { chat: 5 } })
+  await f.open(); f.ready(2); f.reads.length = 0
+  f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev: 5 }))
+  await f.advance(1_000)
+  assert.deepEqual(f.reads, ['members'], 'only the key whose own data holds the revision is skipped')
+
+  const older = revisionFixture()
+  older.channel.subscribe('bot_chat', task, ['chat'], key => { older.reads.push(key) }, { revisions: { chat: 5 } })
+  await older.open(); older.ready(1); older.reads.length = 0
+  older.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev: 5 }))
+  await older.advance(1_000)
+  assert.deepEqual(older.reads, [], 'a version 1 channel refuses the unexpected field, as before')
+  older.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task }))
+  await older.advance(1_000)
+  assert.deepEqual(older.reads, ['chat'])
+
+  const unlisted = revisionFixture()
+  unlisted.channel.subscribe('thread', task, ['thread'], key => { unlisted.reads.push(key) }, { revisions: { thread: 5 } })
+  await unlisted.open(); unlisted.ready(2); unlisted.reads.length = 0
+  unlisted.sockets[0].message(JSON.stringify({ kind: 'thread', id: task, rev: 5 }))
+  await unlisted.advance(3_000)
+  assert.deepEqual(unlisted.reads, ['thread'], 'a revision on a kind this Worker did not list is ignored, and the key reads')
+})
+
+test('an unconditional push merged with a covered one still reads', async () => {
+  const f = revisionFixture()
+  f.channel.subscribe('bot_chat', task, ['chat'], key => { f.reads.push(key) }, { revisions: { chat: 5 }, minIntervalMs: 2_000 })
+  await f.open(); f.ready(2); f.reads.length = 0
+  f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task, rev: 6 }))
+  f.sockets[0].message(JSON.stringify({ kind: 'bot_chat', id: task }))
+  await f.advance(3_000)
+  assert.deepEqual(f.reads, ['chat'])
+})
