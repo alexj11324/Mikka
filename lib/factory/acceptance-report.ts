@@ -1,3 +1,5 @@
+import chineseMessages from '@/messages/zh-CN.json';
+import englishMessages from '@/messages/en.json';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { recordCoordinatorEvent } from '../coordinator-event-store';
 import { artifactSubmittedEvent } from '../coordinator-events';
@@ -48,12 +50,13 @@ type ReportCriterion = { criterion: RunCriterion; implementation?: RunCriterion;
  * immutable, and the implementation's observation stays visible alongside a
  * current review finding. At most 200 + 200 observations enter this union. */
 function reportCriteria(source: Source, review: Review | null): ReportCriterion[] {
+  const copy = (source.locale === 'en' ? englishMessages : chineseMessages).FactoryFlow.report;
   const entries: ReportCriterion[] = source.report.criteria.slice(0,200).flatMap(value => {
     const parsed = runCriterion.safeParse(value);
     return parsed.success ? [{criterion:parsed.data}] : [];
   });
-  if (!entries.length) entries.push({criterion:{text:source.locale === 'en' ? 'Acceptance observations' : '验收观察',passed:false,status:'unverified',
-    reason:source.locale === 'en' ? 'The implementation did not record per-criterion observations.' : '实现未记录逐项验收观察。'}});
+  if (!entries.length) entries.push({criterion:{text:copy.observations,passed:false,status:'unverified',
+    reason:copy.missingObservations}});
   if (review?.candidateId === source.candidateId) for (const value of review.report.criteria.slice(0,200)) {
     const parsed = runCriterion.safeParse(value);
     if (!parsed.success || criterionVerificationStatus(parsed.data) === 'passed') continue;
@@ -80,42 +83,43 @@ function reportCriteria(source: Source, review: Review | null): ReportCriterion[
 
 /** All claims come from the implementation/review report; host provenance is shown separately. */
 export function acceptanceMarkdown(source: Source, review: Review | null, media: FactoryAcceptanceMedia[]) {
-  const en = source.locale === 'en';
+  const messages = (source.locale === 'en' ? englishMessages : chineseMessages).FactoryFlow;
+  const copy = messages.report;
   const entries = reportCriteria(source,review);
   const criteria = entries.map(entry => entry.criterion);
   const counts = { passed: 0, failed: 0, unverified: 0 };
   for (const criterion of criteria) counts[criterionVerificationStatus(criterion)]++;
   const ordered = entries.map((entry,index) => ({...entry,index})).sort((a,b) => Number(criterionVerificationStatus(b.criterion)==='unverified') - Number(criterionVerificationStatus(a.criterion)==='unverified'));
-  const parts = [`# ${en ? 'Acceptance' : '验收'} · ${plain(source.title)}`, plain(bounded(source.report.summary,4000))];
+  const parts = [`# ${messages.acceptance} · ${plain(source.title)}`, plain(bounded(source.report.summary,4000))];
   const shownCaptures = new Set<string>();
   const captureMarkup = (capture: FactoryAcceptanceMedia) => {
     if (shownCaptures.size >= 40 || shownCaptures.has(capture.captureId)) return '';
     shownCaptures.add(capture.captureId);
     return capture.kind === 'image' ? `![${plain(bounded(capture.title,800))}](${capture.url})`
-      : `[${en ? 'Recording' : '录屏'}: ${plain(bounded(capture.title,800))}](${capture.url})`;
+      : `[${copy.recording}: ${plain(bounded(capture.title,800))}](${capture.url})`;
   };
   const perCriterion = Math.min(8500, Math.floor(210000 / Math.max(1,criteria.length)));
-  const labels = en ? { passed: 'Verified', failed: 'Failed', unverified: 'Unverified' } : { passed: '已验证', failed: '失败', unverified: '未验证' };
+  const labels = copy.status;
   for (const {criterion,index,implementation,reviewObservation} of ordered) {
     const key = criterion.criterionId ?? `criterion-${index + 1}`;
     parts.push(`## ${index + 1}. ${plain(bounded(criterion.text ?? criterion.criterionId ?? '',Math.floor(perCriterion * .15)))} · ${labels[criterionVerificationStatus(criterion)]}`);
     if (criterion.reason) parts.push(plain(bounded(criterion.reason,Math.floor(perCriterion * .25))));
     if (reviewObservation) {
-      parts.push(en ? `Review observation: ${labels[criterionVerificationStatus(reviewObservation)]}.` : `审阅观察：${labels[criterionVerificationStatus(reviewObservation)]}。`);
+      parts.push(copy.reviewObservation.replace('{status}', () => labels[criterionVerificationStatus(reviewObservation)]));
       if (implementation) {
-        parts.push(en ? `Implementation reported: ${labels[criterionVerificationStatus(implementation)]}.` : `实现记录为${labels[criterionVerificationStatus(implementation)]}。`);
+        parts.push(copy.implementationObservation.replace('{status}', () => labels[criterionVerificationStatus(implementation)]));
         if (implementation.reason && implementation.reason !== criterion.reason) parts.push(plain(bounded(implementation.reason,Math.floor(perCriterion * .15))));
       }
       if (reviewObservation.evidence && reviewObservation.evidence !== criterion.evidence) parts.push(block(bounded(reviewObservation.evidence,Math.floor(perCriterion * .2))));
     }
-    if (criterion.command) parts.push(block(bounded(`${criterion.command}\nexit: ${criterion.exitCode ?? 'unrecorded'}`,Math.floor(perCriterion * .15))));
+    if (criterion.command) parts.push(block(bounded(`${criterion.command}\n${copy.exit}: ${criterion.exitCode ?? copy.unrecorded}`,Math.floor(perCriterion * .15))));
     if (criterion.evidence) parts.push(block(bounded(criterion.evidence,Math.floor(perCriterion * .35))));
-    if (criterion.resolution) parts.push(`${en ? 'Implementation resolution' : '实现记录的处理'}: ${plain(bounded(criterion.resolution,Math.floor(perCriterion * .25)))}`);
+    if (criterion.resolution) parts.push(`${copy.implementationResolution}: ${plain(bounded(criterion.resolution,Math.floor(perCriterion * .25)))}`);
     for (const capture of media.filter(item => item.criterion === key)) parts.push(captureMarkup(capture));
   }
   if (review) {
-    parts.push(`## ${en ? 'Review' : '审阅'}`, plain(bounded(review.report.summary,4000)));
-    if (review.candidateId !== source.candidateId) parts.push(en ? 'This review inspected the earlier candidate. The implementation below records the repair; it has not received a second review.' : '审阅针对先前候选。修复由实现记录，没有再次审阅。');
+    parts.push(`## ${copy.review}`, plain(bounded(review.report.summary,4000)));
+    if (review.candidateId !== source.candidateId) parts.push(copy.priorReview);
     const findings = review.report.criteria.filter(c => c.passed === false).slice(0,200);
     const findingBudget = Math.min(2000,Math.floor(70000 / Math.max(1,findings.length)));
     for (const finding of findings) {
@@ -123,22 +127,22 @@ export function acceptanceMarkdown(source: Source, review: Review | null, media:
       if (finding.reason) parts.push(plain(bounded(finding.reason,Math.floor(findingBudget / 4))));
       if (finding.evidence?.trim()) parts.push(block(bounded(finding.evidence,Math.floor(findingBudget / 4))));
       const resolution = source.report.criteria.find(c => finding.criterionId ? c.criterionId === finding.criterionId : c.text === finding.text)?.resolution;
-      parts.push(resolution ? plain(bounded(resolution,Math.floor(findingBudget / 4))) : en ? 'Resolution not recorded; needs your judgment.' : '未记录处理结果，需要你判断。');
+      parts.push(resolution ? plain(bounded(resolution,Math.floor(findingBudget / 4))) : copy.resolutionMissing);
     }
   }
   const extra = media.filter(item => !item.criterion);
   if (extra.length) {
-    parts.push(`## ${en ? 'Additional observations' : '其他观察'}`);
+    parts.push(`## ${copy.additionalObservations}`);
     for (const capture of extra) parts.push(captureMarkup(capture));
   }
-  parts.push(`## ${en ? 'Changes' : '改动'}`);
+  parts.push(`## ${copy.changes}`);
   const pr = safePr(source.pullRequest?.url);
-  if (pr) parts.push(`[PR diff](${pr}/files)`);
+  if (pr) parts.push(`[${copy.prDiff}](${pr}/files)`);
   const additions = source.pullRequest?.additions, deletions = source.pullRequest?.deletions;
   if (Number.isSafeInteger(additions) && Number.isSafeInteger(deletions)) parts.push(`+${additions} / −${deletions}`);
-  else parts.push(en ? 'Line counts were not recorded.' : '未记录行数统计。');
+  else parts.push(copy.lineCountsMissing);
   parts.push(block(source.report.filesChanged.slice(0,100).map(file => bounded(file,300)).join('\n')));
-  parts.push(`Run: ${source.id}\n\nCandidate: ${source.candidateId}${source.sha ? `\n\nSHA: ${source.sha}` : ''}`);
+  parts.push(`${copy.run}: ${source.id}\n\n${copy.candidate}: ${source.candidateId}${source.sha ? `\n\nSHA: ${source.sha}` : ''}`);
   return { content: parts.filter(Boolean).join('\n\n'), counts };
 }
 
@@ -170,7 +174,7 @@ export async function syncFactoryAcceptanceArtifact(tx: PoolClient, task: Factor
   if (existing?.sha256 === hash) return;
   const identity = await executionIdentityForRun(tx,source.id,task.userId);
   const artifactId = existing?.artifactId ?? randomUUID(), version = (existing?.latestVersion ?? 0) + 1;
-  const title = `${source.locale === 'en' ? 'Acceptance' : '验收'} · ${redactFactoryCheckText(source.title)}`.slice(0,200);
+  const title = `${(source.locale === 'en' ? englishMessages : chineseMessages).FactoryFlow.acceptance} · ${redactFactoryCheckText(source.title)}`.slice(0,200);
   const storage = artifactStorage(), storageKey = `${task.userId}/${artifactId}/v${version}-${hash.slice(0,12)}.md`;
   // Immutable bytes precede their committed metadata, exactly like submitArtifact.
   if (storage === 'r2') await putArtifactObject(storageKey,rendered.content,'text/markdown; charset=utf-8');

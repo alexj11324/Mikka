@@ -1,3 +1,5 @@
+import chineseMessages from '@/messages/zh-CN.json';
+import englishMessages from '@/messages/en.json';
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { loadIssueDocument, encodedIssueDocument, upsertLinearComment } from '../linear-sync/document';
@@ -20,18 +22,16 @@ export async function syncFactoryPresentation(tx: PoolClient, task: FactoryTask)
   const { rows: [bot] } = await tx.query<{ name: string; locale: string }>(`SELECT left(b.name,200) AS name,COALESCE(s.locale,'zh-CN') AS locale FROM bots b
     LEFT JOIN attention_settings s ON s."userId"=$2 WHERE b.id=$1 AND b."ownerId"=$2 LIMIT 1`,[task.botId,task.userId]);
   if (!bot) return;
-  const en = bot.locale === 'en';
-  const stages = en ? { triage: 'Triage', spec: 'Specification', implement: 'Implementation', review: 'Review', handoff: 'Ready for you', completed: 'Merged', cancelled: 'Cancelled' }
-    : { triage: '分诊', spec: '方案', implement: '实现', review: '审阅', handoff: '交给你', completed: '已合并', cancelled: '已取消' };
-  let body = stages[flow.stage];
-  if (flow.needsYou?.kind === 'spec_review') body = en ? 'Specification ready for your review.' : '方案待审。';
-  else if (flow.needsYou?.kind === 'question') body = en ? 'A question needs your answer.' : '有问题需要你回答。';
-  else if (flow.needsYou?.kind === 'blocked' || flow.needsYou?.kind === 'failed') body = `${en ? flow.needsYou.kind === 'blocked' ? 'Blocked' : 'Failed' : flow.needsYou.kind === 'blocked' ? '阻塞' : '失败'}: ${redactFactoryCheckText(task.reason).slice(0,500)}`;
+  const copy = (bot.locale === 'en' ? englishMessages : chineseMessages).FactoryFlow;
+  let body = copy.stages[flow.stage];
+  if (flow.needsYou?.kind === 'spec_review') body = copy.specReady;
+  else if (flow.needsYou?.kind === 'question') body = copy.questionReady;
+  else if (flow.needsYou?.kind === 'blocked' || flow.needsYou?.kind === 'failed') body = copy[flow.needsYou.kind].replace('{reason}', () => redactFactoryCheckText(task.reason).slice(0,500));
   else if (flow.stage === 'handoff' && flow.acceptance) {
     const { counts, artifactId } = flow.acceptance;
-    body = en ? `${counts.passed ?? 0} verified, ${counts.unverified ?? 0} unverified.` : `${counts.passed ?? 0} 项已验证，${counts.unverified ?? 0} 项未验证。`;
-    if (counts.failed) body += en ? ` ${counts.failed} failed.` : ` ${counts.failed} 项失败。`;
-    body += ` [${en ? 'Acceptance' : '验收'}](${withBasePath(workspaceLink({ artifact: artifactId }))})`;
+    body = copy.acceptanceCounts.replace('{passed}', String(counts.passed ?? 0)).replace('{unverified}', String(counts.unverified ?? 0));
+    if (counts.failed) body += ` ${copy.failedCount.replace('{failed}', String(counts.failed))}`;
+    body += ` [${copy.acceptance}](${withBasePath(workspaceLink({ artifact: artifactId }))})`;
   }
   if (flow.pullRequest?.url && /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+$/.test(flow.pullRequest.url)) body += ` [PR](${flow.pullRequest.url})`;
   const hash = createHash('sha256').update(body).digest('hex');

@@ -88,3 +88,22 @@ test('browser spec approval preserves known profile refusal status/code/detail a
   const unknown=new Error('original unexpected failure',{cause});
   await assert.rejects(handleFactoryFlow(noDatabase,noDatabase,async()=>{throw unknown;},req),error=>error instanceof Error&&error===unknown&&error.cause===cause);
 });
+
+
+test('acceptance presentation uses the selected locale and retains original observation reasons', () => {
+  const candidateId=randomUUID();
+  const source={id:randomUUID(),candidateId,sha:null,author:'Agent',title:'Locale fixture',locale:'en',pullRequest:null,
+    report:{summary:'Original summary',filesChanged:[],verify:{status:'not_run'},criteria:[]}};
+  for (const [locale,expected] of [['en', ['Acceptance observations','The implementation did not record per-criterion observations.','Line counts were not recorded.']],
+    ['zh-CN', ['验收观察','实现未记录逐项验收观察。','未记录行数统计。']]] as const) {
+    const empty=acceptanceMarkdown({...source,locale},null,[]);
+    assert.deepEqual(empty.counts,{passed:0,failed:0,unverified:1});
+    for (const text of expected) assert.ok(empty.content.includes(text));
+    assert.ok(!empty.content.includes('{status}'));
+    const reason='Original observation $& {status}: needs an external environment.';
+    const criterion={text:'Observed boundary',passed:false,status:'unverified' as const,reason};
+    const observed=acceptanceMarkdown({...source,locale,report:{...source.report,criteria:[criterion]}},{candidateId,report:{...source.report,criteria:[criterion]}},[]);
+    assert.ok(observed.content.includes(String.raw`Original observation $& \{status\}: needs an external environment.`));
+    assert.deepEqual(observed.counts,{passed:0,failed:0,unverified:1});
+  }
+});

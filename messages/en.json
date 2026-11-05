@@ -4963,5 +4963,47 @@
     "factory_spec_approval_required": {
       "default": "Review and approve the specification before implementation starts."
     }
+  },
+  "FactoryFlow": {
+    "acceptance": "Acceptance",
+    "stages": {
+      "triage": "Triage",
+      "spec": "Specification",
+      "implement": "Implementation",
+      "review": "Review",
+      "handoff": "Ready for you",
+      "completed": "Merged",
+      "cancelled": "Cancelled"
+    },
+    "specReady": "Specification ready for your review.",
+    "questionReady": "A question needs your answer.",
+    "blocked": "Blocked: {reason}",
+    "failed": "Failed: {reason}",
+    "acceptanceCounts": "{passed} verified, {unverified} unverified.",
+    "failedCount": "{failed} failed.",
+    "report": {
+      "observations": "Acceptance observations",
+      "missingObservations": "The implementation did not record per-criterion observations.",
+      "recording": "Recording",
+      "status": {
+        "passed": "Verified",
+        "failed": "Failed",
+        "unverified": "Unverified"
+      },
+      "reviewObservation": "Review observation: {status}.",
+      "implementationObservation": "Implementation reported: {status}.",
+      "implementationResolution": "Implementation resolution",
+      "review": "Review",
+      "priorReview": "This review inspected the earlier candidate. The implementation below records the repair; it has not received a second review.",
+      "resolutionMissing": "Resolution not recorded; needs your judgment.",
+      "additionalObservations": "Additional observations",
+      "changes": "Changes",
+      "lineCountsMissing": "Line counts were not recorded.",
+      "prDiff": "PR diff",
+      "run": "Run",
+      "candidate": "Candidate",
+      "exit": "exit",
+      "unrecorded": "unrecorded"
+    }
   }
 }
