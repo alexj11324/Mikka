@@ -1,7 +1,8 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 import { Pool } from 'pg'
-import { assertDatabaseIdentity, loadEnvironment } from '../test-accounts/environment.mjs'
+import { assertDatabaseIdentity, EnvironmentError, loadEnvironment } from '../test-accounts/environment.mjs'
+import { TestAccountError } from '../test-accounts/pool.mjs'
 import { withTestAccounts } from '../test-accounts/session.mjs'
 
 export const READ_ACTIONS = Object.freeze(['syncCoordinatorChat', 'syncIssueList', 'syncThreadList', 'pollIssue', 'pollIssueVersionSummaries'])
@@ -11,7 +12,57 @@ export class ReadCacheAcceptanceError extends Error {
   constructor(code, options) { super(code, options); this.name = 'ReadCacheAcceptanceError'; this.code = code }
 }
 const check = (condition, code) => { if (!condition) throw new ReadCacheAcceptanceError(code) }
-export const publicFailure = error => ({ status: 'fail', code: error instanceof ReadCacheAcceptanceError ? error.code : 'read_cache_acceptance_failed' })
+// Public diagnostics are closed labels, never messages, stacks, SQL, response
+// bodies or identity fields. An unregistered dependency code stays generic.
+const accountFailureCodes = new Set(`ACCOUNT_ALREADY_EXISTS ACCOUNT_ALREADY_RESERVED ACCOUNT_BASELINE_FORBIDDEN ACCOUNT_DIRTY
+ACCOUNT_FOOTPRINT_UNPROVEN ACCOUNT_IDENTITY_MISMATCH ACCOUNT_IDENTITY_UNVERIFIED ACCOUNT_INITIALIZATION_FAILED ACCOUNT_LOGIN_FAILED
+ACCOUNT_POOL_DATABASE_ERROR ACCOUNT_PROVISIONING_FAILED ACCOUNT_PROVISIONING_NOT_AUTHORIZED ACCOUNT_RESERVATION_MISMATCH
+ACCOUNT_SESSION_INVALID ACCOUNT_SESSION_STILL_ACTIVE ACCOUNT_SLOTS_INVALID ACTIVE_LEASE_PROTECTED ALREADY_CLEANED
+CREDENTIAL_ENVIRONMENT_MISMATCH CREDENTIAL_REFERENCE_INVALID INCOMPLETE_PROVISIONING_QUARANTINED INVALID_REQUEST
+LEASE_ALREADY_ATTACHED LEASE_ALREADY_COMPLETED LEASE_CLOSED LEASE_EXPIRED_UNPROVEN_STOP LEASE_LOST PARTIAL_PROVISIONING POOL_EXHAUSTED
+PRIVATE_DIRECTORY_UNSAFE PRIVATE_FILE_UNSAFE QUARANTINED_ACCOUNT_PROTECTED REQUEST_CONFLICT RESOURCES_NOT_CLEANED
+RESOURCE_ALREADY_EXISTS RESOURCE_NOT_OWNED RESOURCE_OWNERSHIP_UNPROVEN RESOURCE_OWNER_MISMATCH RESOURCE_STILL_PRESENT RESOURCE_TYPE_FORBIDDEN
+SESSION_REVOCATION_NOT_AUTHORIZED SESSION_STATE_RETENTION_FAILED STALE_LEASE TEST_ACCOUNT_COOKIE_INVALID TEST_ACCOUNT_COOKIE_ORIGIN_MISMATCH
+TEST_ACCOUNT_CREDENTIAL_OVERRIDE_FORBIDDEN TEST_ACCOUNT_FOREIGN_ORIGIN TEST_ACCOUNT_HTTP_FAILED TEST_ACCOUNT_RESPONSE_INCOMPLETE
+TEST_ACCOUNT_RESPONSE_TOO_LARGE TEST_ACCOUNT_SESSION_FAILED`.split(/\s+/))
+const environmentFailureCodes = new Set(`ACTUAL_DATABASE_MISMATCH ATTESTATION_CHALLENGE_INVALID AUTH_ORIGIN_MISMATCH
+DATABASE_ATTESTATION_UNAVAILABLE DATABASE_FALLBACK_MISMATCH DATABASE_IDENTITY_MISMATCH DATABASE_IDENTITY_UNAVAILABLE
+DATABASE_TARGET_CONFIGURATION_REQUIRED DATABASE_TARGET_INVALID DATABASE_TARGET_MISMATCH DATABASE_URL_INVALID DATABASE_URL_REQUIRED
+DEPLOYED_ENVIRONMENT_REQUIRES_APPROVAL DEPLOYMENT_ATTESTATION_REJECTED DEPLOYMENT_IDENTITY_MISMATCH DEPLOYMENT_IDENTITY_UNAVAILABLE
+DEPLOYMENT_SHA_MISMATCH ENVIRONMENT_CAPABILITIES_INVALID ENVIRONMENT_DATABASE_FORBIDDEN ENVIRONMENT_DESCRIPTOR_INVALID
+ENVIRONMENT_FILE_REQUIRED ENVIRONMENT_FILE_UNREADABLE ENVIRONMENT_FILE_UNSAFE ENVIRONMENT_KIND_FORBIDDEN ENVIRONMENT_ORIGIN_FORBIDDEN
+ENVIRONMENT_ORIGIN_INVALID EXTERNAL_MAIL_FORBIDDEN EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN LOCAL_DATABASE_REQUIRED PREVIEW_APPROVAL_REQUIRED
+HTTP_RUNNER_REQUIRES_HTTP_ORIGIN OWNED_HTTP_SERVER_START_TIMEOUT OWNED_HTTP_SERVER_EXITED`.split(/\s+/))
+const sqlStates = new Set(['08001', '08006', '22P02', '23502', '23503', '23505', '23514', '40001', '40P01', '42601', '42703', '42P01', '53300', '55000', '57014'])
+const stages = new Set(['environment', 'accounts', 'version-before', 'workspace', 'fixture-setup', 'action-discovery', 'read-cases', 'version-after', 'fixture-cleanup', 'database-close'])
+
+export class ReadCacheDiagnosticError extends Error {
+  constructor(cause, evidence) {
+    super('read_cache_acceptance_failed', { cause })
+    this.name = 'ReadCacheDiagnosticError'
+    this.evidence = {
+      stage: stages.has(evidence.stage) ? evidence.stage : 'unknown',
+      completedReads: Number.isSafeInteger(evidence.completedReads) && evidence.completedReads >= 0 ? evidence.completedReads : 0,
+      fixtureCleanup: ['not-started', 'pending', 'succeeded', 'failed'].includes(evidence.fixtureCleanup) ? evidence.fixtureCleanup : 'unobserved',
+      // A callback/finally existing is not evidence of a released lease.
+      leaseCleanup: evidence.leaseCleanup === 'released-clean' ? 'released-clean' : 'unobserved',
+    }
+  }
+}
+
+export function publicFailure(error) {
+  const evidence = error instanceof ReadCacheDiagnosticError ? error.evidence : {}
+  if (error instanceof ReadCacheDiagnosticError) error = error.cause
+  let code = 'read_cache_acceptance_failed'
+  if (error instanceof ReadCacheAcceptanceError
+    || error instanceof TestAccountError && accountFailureCodes.has(error.code)
+    || error instanceof EnvironmentError && environmentFailureCodes.has(error.code)) code = error.code
+  const result = { status: 'fail', code, ...evidence }
+  if (error instanceof Error && sqlStates.has(error.code)) result.sqlState = error.code
+  for (const kind of [TypeError, SyntaxError, RangeError, ReferenceError]) if (error instanceof kind) result.errorType = kind.name
+  if (error instanceof DOMException && ['AbortError', 'TimeoutError'].includes(error.name)) result.errorType = error.name
+  return result
+}
 
 function chunkPath(value, environment) {
   try {
@@ -283,32 +334,69 @@ function isolatedFixture(database, environment, scope, workspaceId) {
 
 /** Attach only to an existing, exact-SHA, attested disposable environment. */
 export async function runReadCacheAcceptance() {
-  const environment = await loadEnvironment(), runId = `read-cache-${randomUUID()}`, reads = []
-  const startedAt = new Date().toISOString()
-  const database = new Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 4, connectionTimeoutMillis: 5000, statement_timeout: 10000 })
+  const reads = [], evidence = { stage: 'environment', fixtureCleanup: 'not-started', leaseCleanup: 'unobserved' }
   try {
-    return await withTestAccounts({ environment, database, runId, workerId: 'read-cache', requestId: randomUUID() }, async scope => {
-      const refs = {}, owner = createReadClient(scope.owner, environment, 'owner', reads, refs)
-      const peer = createReadClient(scope.peer, environment, 'peer', reads, refs)
-      const pin = async scenario => check((await owner.json(`${environment.basePath}/api/version`, 'environment', scenario)).build === environment.deploymentSha, 'application_build_changed')
-      await pin('before')
-      const workspace = await owner.json(`${environment.basePath}/api/workspace/switcher`, 'environment', 'scope')
-      check(workspace.live?.ownerId === scope.owner.userId && uuid(workspace.workspace?.id), 'workspace_scope_invalid')
-      const fixture = isolatedFixture(database, environment, scope, workspace.workspace.id)
-      let discovery
-      try {
-        await fixture.setup()
-        discovery = await discoverReadActions(owner.request, environment, fixture.issueIds[0])
-        Object.assign(refs, discovery.refs)
-        await exerciseReadCases({ owner, peer, fixture, environment })
-        await pin('after')
-      } finally { await fixture.cleanup() }
-      return { version: 1, issue: 1372, status: 'pass', environment: { id: environment.id, origin: environment.origin, deploymentSha: environment.deploymentSha }, runId,
-        startedAt, finishedAt: new Date().toISOString(), discovery: discovery.diagnostics, reads,
-        fixtures: { issues: 3, threads: 3, chatMessages: 12, activityVersions: 3 },
-        boundaries: { businessRequestWrites: false, modelExecution: false, browserExecution: false } }
-    })
-  } finally { await database.end() }
+    const environment = await loadEnvironment(), runId = `read-cache-${randomUUID()}`
+    const startedAt = new Date().toISOString()
+    const database = new Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 4, connectionTimeoutMillis: 5000, statement_timeout: 10000 })
+    let callbackError
+    try {
+      evidence.stage = 'accounts'
+      const result = await withTestAccounts({ environment, database, runId, workerId: 'read-cache', requestId: randomUUID() }, async scope => {
+        try {
+          const refs = {}, owner = createReadClient(scope.owner, environment, 'owner', reads, refs)
+          const peer = createReadClient(scope.peer, environment, 'peer', reads, refs)
+          const pin = async scenario => check((await owner.json(`${environment.basePath}/api/version`, 'environment', scenario)).build === environment.deploymentSha, 'application_build_changed')
+          evidence.stage = 'version-before'
+          await pin('before')
+          evidence.stage = 'workspace'
+          const workspace = await owner.json(`${environment.basePath}/api/workspace/switcher`, 'environment', 'scope')
+          check(workspace.live?.ownerId === scope.owner.userId && uuid(workspace.workspace?.id), 'workspace_scope_invalid')
+          const fixture = isolatedFixture(database, environment, scope, workspace.workspace.id)
+          let discovery
+          try {
+            evidence.stage = 'fixture-setup'
+            evidence.fixtureCleanup = 'pending'
+            await fixture.setup()
+            evidence.stage = 'action-discovery'
+            discovery = await discoverReadActions(owner.request, environment, fixture.issueIds[0])
+            Object.assign(refs, discovery.refs)
+            evidence.stage = 'read-cases'
+            await exerciseReadCases({ owner, peer, fixture, environment })
+            evidence.stage = 'version-after'
+            await pin('after')
+          } finally {
+            const interruptedStage = evidence.stage
+            evidence.stage = 'fixture-cleanup'
+            let cleaned = false
+            try { await fixture.cleanup(); cleaned = true }
+            finally { evidence.fixtureCleanup = cleaned ? 'succeeded' : 'failed' }
+            evidence.stage = interruptedStage
+          }
+          evidence.stage = 'accounts'
+          return { version: 1, issue: 1372, status: 'pass', environment: { id: environment.id, origin: environment.origin, deploymentSha: environment.deploymentSha }, runId,
+            startedAt, finishedAt: new Date().toISOString(), discovery: discovery.diagnostics, reads,
+            fixtures: { issues: 3, threads: 3, chatMessages: 12, activityVersions: 3 },
+            boundaries: { businessRequestWrites: false, modelExecution: false, browserExecution: false } }
+        } catch (error) { callbackError = error; throw error }
+      })
+      // withTestAccounts has now awaited and verified the clean release.
+      evidence.leaseCleanup = 'released-clean'
+      return { ...result, cleanup: { fixtures: evidence.fixtureCleanup, lease: evidence.leaseCleanup } }
+    } catch (error) {
+      // The account finalizer can fail after a callback error. Keep that actual
+      // failure and its cause; do not mislabel it as a completed fixture read.
+      if (callbackError && error !== callbackError) evidence.stage = 'accounts'
+      throw error
+    } finally {
+      const interruptedStage = evidence.stage
+      evidence.stage = 'database-close'
+      await database.end()
+      evidence.stage = interruptedStage
+    }
+  } catch (error) {
+    throw new ReadCacheDiagnosticError(error, { ...evidence, completedReads: reads.length })
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

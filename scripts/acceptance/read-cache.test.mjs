@@ -1,11 +1,43 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { READ_ACTIONS, ReadCacheAcceptanceError, actionResult, createReadClient, discoverReadActions, exerciseReadCases, publicFailure, requestAllowed } from './read-cache.mjs'
+import { EnvironmentError } from '../test-accounts/environment.mjs'
+import { TestAccountError } from '../test-accounts/pool.mjs'
+import { READ_ACTIONS, ReadCacheAcceptanceError, ReadCacheDiagnosticError, actionResult, createReadClient, discoverReadActions, exerciseReadCases, publicFailure, requestAllowed } from './read-cache.mjs'
 
 const environment = { origin: 'http://127.0.0.1:3110', basePath: '/mikka' }
 const id = number => `00000000-0000-4000-8000-${String(number).padStart(12, '0')}`
 const refs = Object.fromEntries(READ_ACTIONS.map((name, index) => [name, String(index + 1).repeat(40)]))
 const actionInit = name => ({ method: 'POST', headers: { 'next-action': refs[name], 'content-type': 'application/json', accept: 'text/x-component' }, body: '[]' })
+
+test('failure evidence preserves registered account and environment codes without private diagnostics', () => {
+  const privateText = 'private account, response and SQL parameter'
+  for (const error of [new TestAccountError('TEST_ACCOUNT_HTTP_FAILED'), new TestAccountError('ACCOUNT_INITIALIZATION_FAILED'), new EnvironmentError('DEPLOYMENT_IDENTITY_MISMATCH')]) {
+    error.message = privateText
+    error.cause = new Error(privateText)
+    assert.deepEqual(publicFailure(error), { status: 'fail', code: error.code })
+  }
+  for (const error of [new TestAccountError(privateText), new EnvironmentError(privateText), Object.assign(new Error(privateText), { code: privateText })]) {
+    assert.deepEqual(publicFailure(error), { status: 'fail', code: 'read_cache_acceptance_failed' })
+  }
+  assert.deepEqual(publicFailure(Object.assign(new Error(privateText), { code: '23503', detail: privateText })), { status: 'fail', code: 'read_cache_acceptance_failed', sqlState: '23503' })
+  assert.deepEqual(publicFailure(new TypeError(privateText)), { status: 'fail', code: 'read_cache_acceptance_failed', errorType: 'TypeError' })
+})
+
+test('driver stage evidence retains the original cause and never claims an unobserved lease cleanup', () => {
+  const privateText = 'private account, response and SQL parameter'
+  const cause = new TestAccountError('ACCOUNT_INITIALIZATION_FAILED')
+  cause.message = privateText
+  const error = new ReadCacheDiagnosticError(cause, { stage: 'accounts', completedReads: 0, fixtureCleanup: 'not-started', userId: privateText, body: privateText })
+  assert.equal(error.cause, cause)
+  assert.deepEqual(publicFailure(error), { status: 'fail', code: 'ACCOUNT_INITIALIZATION_FAILED', stage: 'accounts', completedReads: 0, fixtureCleanup: 'not-started', leaseCleanup: 'unobserved' })
+  const afterCleanup = new ReadCacheDiagnosticError(new ReadCacheAcceptanceError('read_action_reference_missing'), {
+    stage: 'action-discovery', completedReads: 2, fixtureCleanup: 'succeeded', leaseCleanup: 'dirty', privateText,
+  })
+  assert.deepEqual(publicFailure(afterCleanup), { status: 'fail', code: 'read_action_reference_missing', stage: 'action-discovery', completedReads: 2, fixtureCleanup: 'succeeded', leaseCleanup: 'unobserved' })
+  const unknown = new ReadCacheDiagnosticError(new Error(privateText), { stage: privateText, completedReads: privateText, fixtureCleanup: privateText, leaseCleanup: privateText })
+  assert.deepEqual(publicFailure(unknown), { status: 'fail', code: 'read_cache_acceptance_failed', stage: 'unknown', completedReads: 0, fixtureCleanup: 'unobserved', leaseCleanup: 'unobserved' })
+  assert.equal(JSON.stringify([publicFailure(error), publicFailure(afterCleanup), publicFailure(unknown)]).includes(privateText), false)
+})
 
 test('the request allowlist admits only scoped GETs and published read actions', () => {
   for (const path of ['/mikka/api/version', '/mikka/api/auth/get-session', '/mikka/api/workspace/switcher', '/mikka/api/settings/issue-prefix', '/mikka/en', '/mikka/en/settings?section=preferences', `/mikka/en?issue=${id(1)}`, '/mikka/_next/static/chunks/read.js?v=2'])

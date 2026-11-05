@@ -79,7 +79,7 @@ export async function runOwnedReadCacheAcceptance() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   runOwnedReadCacheAcceptance().then(result => console.log(JSON.stringify(result))).catch(error => {
-    console.error(JSON.stringify(error instanceof EnvironmentError ? { status: 'fail', code: error.code } : publicFailure(error)))
+    console.error(JSON.stringify(publicFailure(error)))
     process.exitCode = 1
   })
 }

@@ -8,7 +8,7 @@ const sources = new Map([
 ])
 const files = new Map([
   ['/lib/acting-user.ts', 'export async function currentUser(){return {id:"owner",name:"Owner",email:"owner@example.invalid"}};export function actAs(_id,fn){return fn()}'],
-  ['/lib/issue-access.ts', 'export async function requireUser(){return {id:"owner",name:"Owner",email:"owner@example.invalid"}};export async function requireIssueAccess(id){return {issue:{id,userId:globalThis.scopeActionProbe.issueOwner},user:{id:"owner"}}};export async function issueForUser(){return null}'],
+  ['/lib/issue-access.ts', 'export async function requireUser(){return {id:"owner",name:"Owner",email:"owner@example.invalid"}};export async function requireIssueAccess(id){return {issue:{id,userId:globalThis.scopeActionProbe.issueOwner},user:{id:"owner"}}};export {requireIssueAccess as requireIssueAccessWithoutBody};export async function issueForUser(){return null}'],
   ['/lib/issue-scope-store.ts', 'export async function changeIssueScopeLocally(){globalThis.scopeActionProbe.writes++;return {error:"unexpected"}};export async function previewPersonalScope(){throw new Error("unexpected preview")}'],
   ['/lib/linear-sync/dispatch.ts', 'export function dispatchLinearIssueSync(){globalThis.scopeActionProbe.dispatch++};export function dispatchLinearWork(){}'],
   ['/lib/coordinator/wake.ts', 'export async function wakeCoordinator(){};export function coordinatorEnabled(){return false}'],
