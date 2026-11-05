@@ -155,6 +155,7 @@ jobs:
       - run: pnpm test:mvp-fixtures
       - run: pnpm test:credentials
       - run: pnpm test:run-publication
+      - run: pnpm test:workflow-wakes
       - name: Factory daemon check regressions and shared report contract
         run: |
           pnpm --filter @mikka/protocol exec vitest run src/run.test.ts
