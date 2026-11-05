@@ -1,0 +1,27 @@
+{
+  "base": "fc2d401bde7b3f567b1288b01accd6fdeb433d0c",
+  "prior": "c60850bf3e44228869485e4157832865f160e9d0",
+  "database": "mikka_root1217_fc2_8b19295c7e94_e2e",
+  "results": [
+    {
+      "label": "setup",
+      "exitCode": 0,
+      "seconds": 0.766
+    },
+    {
+      "label": "startup-integration",
+      "exitCode": 0,
+      "seconds": 10.387
+    },
+    {
+      "label": "diff-check",
+      "exitCode": 2,
+      "seconds": 0.032
+    },
+    {
+      "label": "cleanup",
+      "exitCode": 0,
+      "seconds": 0.114
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+2026-11-04T23:54:56.397Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+▶ cancel and thread end reach a terminal run, then afterRunEnded finalizes the Factory task
+  ✔ cancel: the stop request alone is not an end; the daemon's stopped write finalizes the task (110.700017ms)
+  ✔ stopping a queued run ends it as stopped and finalizes the task (no daemon ack) (40.722794ms)
+  ✔ a queued cloud run with a thread machine binding only records the stop request (20.465816ms)
+  ✔ stop on an ended earlier attempt reaches the queued latest: stopped, and afterRunEnded runs under the latest's own runId (BE-18) (46.91303ms)
+  ✔ ending a thread machine stops a Factory run and finalizes its task (49.800051ms)
+{"event":"thread_runtime_start_failed","runId":"67ff6f71-dfb5-40a1-a968-b5b9b67f1af2","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"67ff6f71-dfb5-40a1-a968-b5b9b67f1af2","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"67ff6f71-dfb5-40a1-a968-b5b9b67f1af2","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ an unclaimed cloud startup failure is recoverable infrastructure failure, with machine=true (87.40947ms)
+{"event":"thread_runtime_start_failed","runId":"efad7c0d-4fac-4b7e-acfc-78462c3af86a","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"efad7c0d-4fac-4b7e-acfc-78462c3af86a","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"efad7c0d-4fac-4b7e-acfc-78462c3af86a","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ an unclaimed cloud startup failure is recoverable infrastructure failure, with machine=false (60.813453ms)
+{"event":"thread_runtime_start_failed","runId":"c5bb2d95-6f6d-43a4-a528-fa13224b63ef","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"a55bbf28-2d98-450d-95c3-b8ea0c5ab407","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"604f69cf-7e22-41b3-abe2-0de263ed980d","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"cca366c8-f9d7-4ecc-b12d-cd42a10ad35d","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"7ae1fa4e-ad6e-40db-bb97-5000835134b2","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ a startup-error cleanup cannot overwrite a claimed run, a live lease, or another workspace (91.344872ms)
+{"event":"thread_runtime_start_failed","runId":"f5a43c05-4b99-4e6c-ad0f-e37d1a198614","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ a real Owner stop stays cancelled when a late cloud-start failure arrives (44.642867ms)
+{"event":"thread_runtime_start_failed","runId":"d10059be-7a2d-47c6-9463-4041f21c1656","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+  ✔ a real provider-start failure can settle only its own committed provisioning lease (66.781422ms)
+{"event":"thread_runtime_start_failed","runId":"b1f059b7-e499-44b9-af95-f55d72883cf7","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"event":"thread_runtime_start_failed","runId":"ef7f8650-d562-4753-b53a-63edf2960618","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"event":"thread_runtime_start_failed","runId":"af4d9cd4-6694-4e24-8c77-f838340a2dad","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"event":"thread_runtime_start_failed","runId":"c1fef483-e984-4452-90b2-01f294a5fbba","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+  ✔ a captured startup failure cannot overtake a replaced lease, successful provisioning, claim or Owner stop (87.247061ms)
+✔ cancel and thread end reach a terminal run, then afterRunEnded finalizes the Factory task (5165.721355ms)
+cloud task dispatch refused { error: 'Error', code: undefined }
+cloud task dispatch refused { error: 'Error', code: undefined }
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+cloud task dispatch refused { error: 'Error', code: undefined }
+(node:30258) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:30258) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ cloud startup succeeds only after both machine preparation and lifecycle launch (507.150144ms)
+✔ model arguments cannot grant local recovery; only the separate host placement argument can (9.795321ms)
+✔ a machine failure uses the unclaimed infrastructure-failure path without requesting a user stop (23.259204ms)
+✔ a lifecycle failure uses the unclaimed infrastructure-failure path without requesting a user stop (5.935906ms)
+✔ a sleeping Bot dispatches codex with its selected subscription, without a separate wake tool (12.515998ms)
+✔ a sleeping Bot dispatches codex with its selected api_key, without a separate wake tool (5.675289ms)
+✔ a sleeping Bot dispatches claude_code with its selected subscription, without a separate wake tool (5.471132ms)
+✔ a sleeping Bot dispatches claude_code with its selected api_key, without a separate wake tool (6.187631ms)
+✔ a owner refusal performs no cloud preparation or queue write (0.520198ms)
+✔ a runtime refusal performs no cloud preparation or queue write (0.360685ms)
+✔ a workspace refusal performs no cloud preparation or queue write (0.982436ms)
+✔ a issue refusal performs no cloud preparation or queue write (0.939363ms)
+✔ a policy refusal performs no cloud preparation or queue write (1.879453ms)
+✔ a suggestion refusal performs no cloud preparation or queue write (1.23757ms)
+✔ a subscription refusal performs no cloud preparation or queue write (1.66701ms)
+✔ a key-switch refusal performs no cloud preparation or queue write (1.884219ms)
+✔ preparation permits authorized quota fallback and leaves the original selection for queue-time validation (5.546668ms)
+✔ desktop dispatch rejects workspace access before model resolution (0.958912ms)
+✔ desktop dispatch rejects issue access before model resolution (0.863786ms)
+✔ a wake failure queues no run or continuation write for the ended thread (2.722204ms)
+✔ a wake cannot swap the selected Agent, even inside the same workspace (1.50287ms)
+✔ a credential revoked during the wake is still rejected by the queue (2.765939ms)
+✔ workspace access revoked during the wake stops before queueing a run (2.560732ms)
+✔ a repeated dispatch keeps its queue key and one run after waking once (8.921852ms)
+✔ a completed thread retains its model, binding, ancestry and read-only policy through wake (16.808343ms)
+✔ a working thread receives its message without waking or reselecting anything (1.594598ms)
+2026-11-04T23:54:57.788Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+(node:30264) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":144,"phases":[{"phase":"resolveRepository","ms":8},{"phase":"issueForUser","ms":6},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":20},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":5},"failed":false}
+▶ run machine fallback: 本地 a computer that takes part, 云端 own E2B, else an actionable error
+  ✔ an automatically placed device keeps its placement authority through normal Factory admission and recovery (366.139156ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":80,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ an explicitly selected device keeps its placement authority through normal Factory admission and recovery (151.327701ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":16,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":8}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":34,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":17},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":10}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":62,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":9},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ (a) no computer: the card says so, then a computer is picked once it takes part (133.511557ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":63,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":10},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ a read-only task and a committing one both run with no push approval or GitHub App check (144.432766ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":60,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":8},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":0},"failed":false}
+  ✔ a committing run is admitted with its task branch whatever the GitHub App says, with no card (80.639248ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":68,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":8},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":62,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":9},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ (b) 云端 with no E2B key: the online computer takes the run; 本地 too (153.67959ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":41,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":21},{"phase":"ensureBotCloudRuntime","ms":2}],"github":{"requests":3,"ms":0},"failed":false}
+{"event":"thread_runtime_start_failed","runId":"74cbc580-1f78-4738-8c6a-99ac077efab2","phase":"connect","errorClass":"E2BKeyError","errorCode":"e2b_key_missing"}
+cloud task dispatch refused { error: 'E2BKeyError', code: undefined }
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":156,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":7},{"phase":"ensureBotCloudRuntime","ms":1},{"phase":"bindAgentToConnection","ms":2},{"phase":"authorizeSubscriptionWorkspace","ms":1},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":5},{"phase":"ensureDeviceRepository","ms":2},{"phase":"queueCloudRun","ms":47},{"phase":"ensureThreadMachine","ms":36}],"github":{"requests":3,"ms":1},"failed":false}
+{"event":"thread_runtime_start_failed","runId":"7eb7d453-905d-4638-8557-9f294bbaef9e","phase":"connect","errorClass":"E2BKeyError","errorCode":"e2b_key_missing"}
+cloud task dispatch refused { error: 'E2BKeyError', code: undefined }
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":149,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":6},{"phase":"ensureBotCloudRuntime","ms":2},{"phase":"bindAgentToConnection","ms":1},{"phase":"authorizeSubscriptionWorkspace","ms":2},{"phase":"issueForUser","ms":1},{"phase":"ensureBotCloudRuntime","ms":3},{"phase":"ensureDeviceRepository","ms":1},{"phase":"queueCloudRun","ms":32},{"phase":"ensureThreadMachine","ms":7},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+{"event":"thread_runtime_start_failed","runId":"af4f82ff-29de-4b33-8a44-d2fadb4cc97c","phase":"connect","errorClass":"E2BKeyError","errorCode":"e2b_key_missing"}
+cloud task dispatch refused { error: 'E2BKeyError', code: undefined }
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":104,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":5},{"phase":"ensureBotCloudRuntime","ms":1},{"phase":"bindAgentToConnection","ms":1},{"phase":"authorizeSubscriptionWorkspace","ms":1},{"phase":"issueForUser","ms":2},{"phase":"ensureBotCloudRuntime","ms":4},{"phase":"ensureDeviceRepository","ms":1},{"phase":"queueCloudRun","ms":42},{"phase":"ensureThreadMachine","ms":7}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":68,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":6},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ (c) own E2B refuses (cap, quota, key): the cloud run is ended; with no server or computer the card, else 云端 falls back to the server (556.177552ms)
+{"event":"thread_runtime_start_failed","runId":"0cb2fb78-00cb-4ee9-8269-93eac8c595d2","phase":"connect","errorClass":"E2BKeyError","errorCode":"e2b_key_missing"}
+  ✔ a server goes offline mid-run: the run moves to the own E2B cloud, which ends it with the card when E2B refuses (69.52809ms)
+{"event":"thread_runtime_start_failed","runId":"a0e8f8ed-da72-4b65-9c54-c3021d08fc42","phase":"connect","errorClass":"E2BKeyError","errorCode":"e2b_key_missing"}
+  ✔ a cloud thread whose sandbox is gone continues on a new sandbox of the same thread (38.683422ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":61,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":9},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":52,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":6},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":50,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":6},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":0},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":50,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":7},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":0},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":14,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":6}],"github":{"requests":3,"ms":0},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":3,"phases":[{"phase":"resolveRepository","ms":2}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ own devices: 本地 picks the server that takes part; a computer with 参与调度 off is never picked, even when named (276.969423ms)
+✔ run machine fallback: 本地 a computer that takes part, 云端 own E2B, else an actionable error (5896.086541ms)
+ℹ tests 49
+ℹ suites 0
+ℹ pass 49
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10317.096611

@@ -1,0 +1,59 @@
+diff --git a/lib/cloud-computer/thread-machines.ts b/lib/cloud-computer/thread-machines.ts
+index b5b8c8231..2fe2367d6 100644
+--- a/lib/cloud-computer/thread-machines.ts
++++ b/lib/cloud-computer/thread-machines.ts
+@@ -40,6 +40,15 @@ export class RetainedTaskMachineUnavailable extends ComputerError {
+   constructor() { super(503, 'Retained task machine unavailable') }
+ }
+ 
++type FailedThreadStart = Readonly<{ userId: string; workspaceId: string; runId: string; leaseId: string }>
++// Only this module can attest the lease that actually failed. Keep the proof
++// off the original error: callers retain ComputerError semantics, and neither
++// public error fields nor serialized/replayed errors can authorize cleanup.
++const failedThreadStarts = new WeakMap<object, FailedThreadStart>()
++export function threadMachineStartFailure(error: unknown): FailedThreadStart | null {
++  return error && typeof error === 'object' ? failedThreadStarts.get(error) ?? null : null
++}
++
+ /**
+  * Forgets a thread's lost sandbox so a new one is created for the same thread
+  * (orchestration.md § 4): a new operation ID, the running interval closed.
+@@ -212,6 +221,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
+   let exactQuestionMachine = false
+   let retainedSandboxId: string | undefined
+   let upgradeRetainedRuntime = false
++  let reservedStartLease = false
+   let runtimeRollback: (() => Promise<void>) | undefined
+   let verifyRefreshedRuntime: (() => Promise<unknown>) | undefined
+   try {
+@@ -351,6 +361,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
+     await client.query(`UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval '15 minutes',
+       state=CASE WHEN $3::boolean AND state='running' THEN 'error' ELSE state END WHERE "runId"=$1`, [runId, leaseId, Boolean(retainedSandboxId)])
+     await client.query('COMMIT')
++    reservedStartLease = true
+     if (exactQuestionMachine) {
+       // Provider I/O happens after the lease transaction. A running original VM
+       // already has its worker; only a paused VM needs bootstrap after connect.
+@@ -573,6 +584,9 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
+         "workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "sandboxId"=$4 AND "workerLeaseId"=$5 AND state<>'ended'`, [runId,actor.userId,actor.workspaceId,retainedSandboxId,leaseId]).catch(()=>undefined)
+       throw new RetainedTaskMachineUnavailable()
+     }
++    else if (reservedStartLease && error && typeof error === 'object') {
++      failedThreadStarts.set(error, Object.freeze({ userId: actor.userId, workspaceId: actor.workspaceId, runId, leaseId }))
++    }
+     throw error
+   } finally { client.release() }
+ }
+diff --git a/package.json b/package.json
+index 418e45725..b2f646035 100644
+--- a/package.json
++++ b/package.json
+@@ -48,7 +48,7 @@
+     "test:ssh-target": "node --import tsx --test lib/ssh-target.test.ts",
+     "test:linear-sync": "node --import tsx --test lib/linear-sync/flags.test.ts lib/linear-sync/oauth-revocation-core.test.ts lib/db/request-scope.test.ts lib/linear-sync/mapping.test.ts lib/linear-sync/markdown.test.ts lib/linear-sync/webhook.test.ts lib/cron-auth.test.ts cloudflare/linear-sync/src/index.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/linear-sync/kill-switch.test.ts lib/linear-sync/suggestions-gate.test.ts",
+     "test:coordinator-stream": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/stream-response.test.ts lib/coordinator/reply-segments.test.ts app/api/coordinator/stream/route.test.ts lib/coordinator-stream-client.test.ts tests/use-coordinator-stream.test.tsx tests/coordinator-streaming-render.test.tsx",
+-    "test:coordinator-events": "node --test --experimental-test-isolation=none lib/coordinator/triage-batch.test.mjs tests/workflow-schema-boundary.test.mjs && node --import tsx --test lib/run-retry.test.ts lib/coordinator-events.test.ts lib/coordinator/telegram-pending.test.ts lib/coordinator/context.test.ts lib/coordinator/chat-state.test.ts lib/coordinator/stop.test.ts lib/thread-continuation.test.ts lib/run-prompt.test.ts lib/coordinator/model.test.ts lib/coordinator/triage.test.ts lib/coordinator/decision.test.ts lib/coordinator/group-routing.test.ts lib/coordinator/citations.test.ts lib/link-preview-parse.test.ts lib/push-reasons.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/cloud-dispatch-startup.test.ts lib/thread-dispatch.test.ts lib/thread-switch.test.ts lib/coordinator-submission.test.ts lib/coordinator/judgment-integration.test.ts lib/coordinator/scenarios.test.ts lib/coordinator/execution-context.test.ts lib/coordinator/wake-notice.test.ts lib/coordinator/interrupted-turns.test.ts lib/coordinator/credential-masking.test.ts lib/coordinator/compaction-model.test.ts lib/coordinator/compaction-sdk.test.ts lib/coordinator/user-images-entry.test.ts && pnpm test:personal-message-safety && node --import ./tests/support/server-only.mjs --import tsx --test lib/device-agents.test.ts && node --import tsx --test lib/coordinator-client-submission.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test app/api/cron/coordinator-wakes/route.test.ts && pnpm test:coordinator-stream",
++    "test:coordinator-events": "node --test --experimental-test-isolation=none lib/coordinator/triage-batch.test.mjs tests/workflow-schema-boundary.test.mjs && node --import tsx --test lib/run-retry.test.ts lib/coordinator-events.test.ts lib/coordinator/telegram-pending.test.ts lib/coordinator/context.test.ts lib/coordinator/chat-state.test.ts lib/coordinator/stop.test.ts lib/thread-continuation.test.ts lib/run-prompt.test.ts lib/coordinator/model.test.ts lib/coordinator/triage.test.ts lib/coordinator/decision.test.ts lib/coordinator/group-routing.test.ts lib/coordinator/citations.test.ts lib/coordinator/tool-activity.test.ts lib/coordinator/chat-dedupe.test.ts lib/link-preview-parse.test.ts lib/push-reasons.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/cloud-dispatch-startup.test.ts lib/thread-dispatch.test.ts lib/thread-switch.test.ts lib/coordinator-submission.test.ts lib/coordinator/judgment-integration.test.ts lib/coordinator/scenarios.test.ts lib/coordinator/execution-context.test.ts lib/coordinator/wake-notice.test.ts lib/coordinator/interrupted-turns.test.ts lib/coordinator/credential-masking.test.ts lib/coordinator/compaction-model.test.ts lib/coordinator/compaction-sdk.test.ts lib/coordinator/user-images-entry.test.ts && pnpm test:personal-message-safety && node --import ./tests/support/server-only.mjs --import tsx --test lib/device-agents.test.ts && node --import tsx --test lib/coordinator-client-submission.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test app/api/cron/coordinator-wakes/route.test.ts && pnpm test:coordinator-stream",
+     "test:integrations": "pnpm test:approved-writes && pnpm test:write-transactions && node --import tsx --test lib/auth-callback.test.ts lib/composio-actions.test.ts lib/app-tools.test.ts lib/run-app-mcp.test.ts lib/pending-action-view.test.ts lib/composio-pagination.test.ts lib/composio-accounts.test.ts lib/composio-connect.test.ts lib/skills-search.test.ts lib/search/search.test.ts lib/federated-search/input.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/pending-account-binding.test.ts lib/composio-disconnect.test.ts app/api/integrations/composio/route.test.ts app/api/integrations/composio/callback/route.test.ts && pnpm test:plugins",
+     "test:e2e": "playwright test",
+     "test:performance": "playwright test tests/e2e/navigation-performance.spec.ts tests/e2e/agent-performance.spec.ts --grep @performance",

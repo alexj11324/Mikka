@@ -1,0 +1,39 @@
+2026-11-05T00:07:44.867Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+▶ cancel and thread end reach a terminal run, then afterRunEnded finalizes the Factory task
+  ✔ cancel: the stop request alone is not an end; the daemon's stopped write finalizes the task (114.10573ms)
+  ✔ stopping a queued run ends it as stopped and finalizes the task (no daemon ack) (43.588368ms)
+  ✔ a queued cloud run with a thread machine binding only records the stop request (18.825945ms)
+  ✔ stop on an ended earlier attempt reaches the queued latest: stopped, and afterRunEnded runs under the latest's own runId (BE-18) (36.992371ms)
+  ✔ ending a thread machine stops a Factory run and finalizes its task (61.177715ms)
+{"event":"thread_runtime_start_failed","runId":"66c2200a-08a2-4059-a452-f0ce3433a9d4","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"66c2200a-08a2-4059-a452-f0ce3433a9d4","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"66c2200a-08a2-4059-a452-f0ce3433a9d4","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ an unclaimed cloud startup failure is recoverable infrastructure failure, with machine=true (91.552508ms)
+{"event":"thread_runtime_start_failed","runId":"809d6be2-1414-46d6-a02f-e00690745faf","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"809d6be2-1414-46d6-a02f-e00690745faf","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"809d6be2-1414-46d6-a02f-e00690745faf","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ an unclaimed cloud startup failure is recoverable infrastructure failure, with machine=false (74.023287ms)
+{"event":"thread_runtime_start_failed","runId":"b484dcb0-358f-428f-8fcf-7c17bd869393","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"90465fd5-c3dc-4a6c-9f59-8349c6465626","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"1e48deb1-e88f-4a53-bf6a-d75333c35399","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"5d8f877c-b231-4d55-872b-5c121fa6cccc","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"6f83f1a0-315f-4d30-93ac-8dfa9492ebb2","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ a startup-error cleanup cannot overwrite a claimed run, a live lease, or another workspace (93.358765ms)
+{"event":"thread_runtime_start_failed","runId":"7c7cc308-3c10-48c2-99e8-aa151df870c5","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+  ✔ a real Owner stop stays cancelled when a late cloud-start failure arrives (39.068653ms)
+{"event":"thread_runtime_start_failed","runId":"5183f9b1-6b2b-41c4-beb8-d7dc714dfee3","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+  ✔ a real provider-start failure can settle only its own committed provisioning lease (77.196605ms)
+{"event":"thread_runtime_start_failed","runId":"4c01a7cc-7a69-419e-b3be-284d11800f90","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"event":"thread_runtime_start_failed","runId":"ecababc9-f105-4238-b3a7-c3991f5ad158","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"event":"thread_runtime_start_failed","runId":"bda9ef05-c16a-4dc6-91ca-a44ccbc1f3c5","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"event":"thread_runtime_start_failed","runId":"11d965d5-5a71-4551-8fa3-55a0fdd6b7f2","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+  ✔ a captured startup failure cannot overtake a replaced lease, successful provisioning, claim or Owner stop (77.546888ms)
+✔ cancel and thread end reach a terminal run, then afterRunEnded finalizes the Factory task (4633.043685ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9835.45344

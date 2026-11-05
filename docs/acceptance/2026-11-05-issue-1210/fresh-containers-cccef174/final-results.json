@@ -1,0 +1,32 @@
+{
+  "tree": "b7ace3493dbe0aad258eaaa245b528fdc95fcc32",
+  "changedBlob": "23597148d360504680c71db62e4b5fc9fd9460ca",
+  "database": "mikka_root1217_final_a0ea269c84fa_e2e",
+  "results": [
+    {
+      "label": "typecheck",
+      "exitCode": 0,
+      "seconds": 8.385
+    },
+    {
+      "label": "setup",
+      "exitCode": 0,
+      "seconds": 0.665
+    },
+    {
+      "label": "run-end",
+      "exitCode": 0,
+      "seconds": 9.887
+    },
+    {
+      "label": "pr-diff-check",
+      "exitCode": 0,
+      "seconds": 0.016
+    },
+    {
+      "label": "cleanup",
+      "exitCode": 0,
+      "seconds": 0.114
+    }
+  ]
+}

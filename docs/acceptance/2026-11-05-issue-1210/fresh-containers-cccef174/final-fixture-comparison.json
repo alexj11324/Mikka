@@ -1,0 +1,14 @@
+{
+  "base": "aaf5256a726e57a4611cee3f9736d08fafcfb9ab",
+  "head": "cccef174f7a4e604a820a4b61f8521e8cdba100b",
+  "files": [
+    {
+      "filename": "lib/factory/run-end-paths.db.test.ts",
+      "status": "modified",
+      "sha": "23597148d360504680c71db62e4b5fc9fd9460ca",
+      "additions": 0,
+      "deletions": 1,
+      "patch": "@@ -201,7 +201,6 @@ test(\"cancel and thread end reach a terminal run, then afterRunEnded finalizes t\n       const error = Object.freeze(new ComputerError(503, 'Fixture provider refused startup'));\n       let calls = 0;\n       const provider: typeof threadMachineProvider = {\n-        snapshot: async () => assert.fail('the existing fixture snapshot is used'),\n         connect: async () => assert.fail('no sandbox has been recorded'),\n         create: async () => { calls++; throw error; },\n         kill: async () => assert.fail('an unknown create response has no sandbox to kill'),"
+    }
+  ]
+}

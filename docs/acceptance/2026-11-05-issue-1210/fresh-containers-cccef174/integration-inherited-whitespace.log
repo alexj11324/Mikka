@@ -1,0 +1,2 @@
+components/coordinator/retry-reply-button.test.tsx:69: trailing whitespace.
++  ['./coordinator-reply.tsx', ['CoordinatorReply']], ['./chat-event-line.tsx', ['ChatEventLine']], ['./thread-card.tsx', ['ThreadCard']], 

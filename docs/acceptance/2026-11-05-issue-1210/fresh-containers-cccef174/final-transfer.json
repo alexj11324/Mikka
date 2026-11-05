@@ -1,0 +1,13 @@
+{
+  "archivePath": "/tmp/mikka-root-1217-fc2-final-export.tar.gz",
+  "bytes": 2103,
+  "sha256": "f8090d0a0945753bbfc59c58ed887ecf013a2f532f3a6d4f2f3f49dec3e8107e",
+  "files": [
+    "typecheck.log",
+    "setup.log",
+    "run-end.log",
+    "pr-diff-check.log",
+    "cleanup.log",
+    "results.json"
+  ]
+}
