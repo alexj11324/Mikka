@@ -1,3 +1,4 @@
+import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
@@ -11,7 +12,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function SettingsPage() {
+  return withDatabaseOperation('/pages/settings', async () => {
   const session = await getSession()
   if (!session?.user) redirect('/sign-in?next=%2Fsettings')
   return <WorkspaceApp user={session.user} googleEnabled={googleEnabled} />
+  })
 }

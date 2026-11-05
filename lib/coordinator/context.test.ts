@@ -155,7 +155,7 @@ test('a stored reply keeps its tools, how each ended and their previews, and whe
   const at = new Date('2026-10-22T00:00:00Z')
   const compact = [
     { role: 'user', content: 'make a task and start it' },
-    { role: 'assistant', content: [{ type: 'reasoning', chars: 120 }, { type: 'tool-call', toolCallId: 'c1', toolName: 'create_issue', inputPreview: '{"title": "Fix login"}' },
+    { role: 'assistant', content: [{ type: 'reasoning', chars: 120 }, { type: 'tool-call', toolCallId: 'c1', toolName: 'create_issue', inputPreview: '{"title": "Fix login"}', target: 'Fix login' },
       { type: 'tool-call', toolCallId: 'c2', toolName: 'record_attention' }] },
     { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'create_issue', status: 'done', outputPreview: '{"id": "i1"}' }] },
     { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c3', toolName: 'dispatch_run', inputPreview: '{"issueId": "i1"}' }] },
@@ -166,17 +166,17 @@ test('a stored reply keeps its tools, how each ended and their previews, and whe
   const [, reply] = chatItems(compact.map((message, index) => ({ position: index + 1, message, createdAt: at })))
   assert.equal(reply.text, 'Made it; the thread could not start.')
   assert.deepEqual(reply.activity, { thought: true, reasoningAt: [2], tools: [
-    { call: 'c1', name: 'create_issue', state: 'done', input: '{"title": "Fix login"}', output: '{"id": "i1"}', at: 0 },
-    { call: 'c3', name: 'dispatch_run', state: 'error', input: '{"issueId": "i1"}', output: 'no device', at: 0 },
+    { call: 'c1', name: 'create_issue', state: 'done', displayName: 'Create issue', target: 'Fix login', input: '{"title": "Fix login"}', output: '{"id": "i1"}', at: 0 },
+    { call: 'c3', name: 'dispatch_run', state: 'error', displayName: 'Dispatch run', input: '{"issueId": "i1"}', output: 'no device', at: 0 },
     // No result stored yet: still running.
-    { call: 'c4', name: 'web_search', state: 'running', at: 0 },
+    { call: 'c4', name: 'web_search', state: 'running', displayName: 'Web search', at: 0 },
   ] })
   // Full stored messages (not the compact projection) read the same way.
   const full = chatItems([
     { position: 1, createdAt: at, message: { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c1', toolName: 'list_issues', input: { query: 'login' } }] } as ModelMessage },
     { position: 2, createdAt: at, message: { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'list_issues', output: { type: 'error-text', value: 'boom' } }] } as ModelMessage },
   ])
-  assert.deepEqual(full[0].activity?.tools, [{ call: 'c1', name: 'list_issues', state: 'error', input: '{"query": "login"}', output: 'boom', at: 0 }])
+  assert.deepEqual(full[0].activity?.tools, [{ call: 'c1', name: 'list_issues', state: 'error', displayName: 'List issues', target: 'login', errorCode: 'boom', input: '{"query": "login"}', output: 'boom', at: 0 }])
   // A call's words come whole, apart from the cut input preview: from the compact projection's quotePreview, or the full input.
   const note = 'Reproduce the redirect loop and fix it. '.repeat(8).trim()
   const quoted = chatItems([

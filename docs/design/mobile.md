@@ -32,16 +32,17 @@ briefing in the morning and see what is waiting on me.
 
 The system tab bar holds **对话**, **线程** and the system search tab
 ([decision](decisions/2026-10-31-2345-mobile-bot-home.md),
-[top bar and drawer](decisions/2026-11-01-0045-mobile-home-bar.md)); the app
+[top bar](decisions/2026-11-01-0045-mobile-home-bar.md),
+[no drawer](decisions/2026-11-05-1300-ios-no-drawer.md)); the app
 opens on 对话. A chat, a thread, 设置, 插件, 建议 and 任务 open over the tabs,
 with the system back button and edge swipe.
 
 **对话** is a messaging app's chat list (Alex's Grok screenshot): no title and
-no search field at the top. The person's avatar (top left) opens the
-**drawer**: the person and workspace (→ 设置), 建议, 任务, 插件, 设置, and
-「重启以更新」 once an update has downloaded
-([decision](decisions/2026-10-31-2010-ota-updates.md)); a swipe right on a
-tab's root opens it too. 「+」 (top right) opens 新建 Bot and 新建群聊. The
+no search field at the top. The person's avatar, on the left of every tab
+root's bar, opens the **account sheet** (`app/account.tsx`), a system page
+sheet with the system grouped list: the person (→ 个人资料), 工作区, 建议 with
+its count, 任务, 插件, 设置, and 「重启以更新」 once an update has downloaded
+([decision](decisions/2026-10-31-2010-ota-updates.md)). There is no drawer. 「+」 (top right) opens 新建 Bot and 新建群聊. The
 pinned bots sit on top, each with a star (the star is the pin, the same for
 every bot; the Coordinator is pinned until the person unpins it,
 [decision](decisions/2026-11-01-1215-star-is-the-pin.md)), then every other
@@ -150,7 +151,7 @@ What reaches the person and when is R-20. On mobile:
 
 ## Settings
 
-Opened from 设置 in the drawer. A hierarchy (R-70): the
+Opened from 设置 in the account sheet. A hierarchy (R-70): the
 top screen holds categories, each opens its own page. Every row cites its
 precedent. Figma frames 07, 07a–07e.
 
@@ -175,6 +176,30 @@ precedent. Figma frames 07, 07a–07e.
 Left out: sign-in provider, push-device list, explanatory footers, counts.
 Administration (members, teams, devices) stays on the web.
 
+## Native first
+
+Wherever iOS has a native control or behavior, the app uses it; we build our own only where nothing native exists
+([2026-11-05-1230](decisions/2026-11-05-1230-ios-native-first.md)). Native today: the stack header with the system
+material and its back swipe, the header's 更多 (UIMenu via `Stack.Toolbar.Menu`), a message's long press (the system context menu), the account sheet (page sheet, SwiftUI `Form`), the model picker and 「+」 (SwiftUI
+`Menu`), segmented controls (SwiftUI `Picker`), switches (`UISwitch`), the activity indicator, sheets (`formSheet` with
+detents, `modal` page sheets), and the scroll views' bounce and momentum. The vendored beui kit is not used for any of
+these.
+
+What is still our own, and why:
+
+| Control | Why it is ours |
+|---|---|
+| Message bubbles, event lines, the thread card (`components/chat.tsx`) | iOS has no chat transcript control. |
+| Swipe right to quote, swipe left for times (`TimedRow`, `useTimeReveal`) | Messages' gestures are not public API; ours follow them, on `lib/springs.ts`. |
+| Reactions in the long-press menu | A long press on iOS is the system context menu (`components/MessageMenu.ios.tsx`, `@expo/ui` `ContextMenu`), lifting the bubble itself. iOS has no reaction bar on a context menu, so the six reactions are two compact `ControlGroup` rows of three at its top. VoiceOver, the keyboard and the web build keep the actions sheet (`app/message.tsx`). |
+| The reply action row (copy · 回复 · 更多) | Not a system control; ChatGPT and Claude draw it the same way. |
+| The composer (`Composer` in `components/ui.tsx`) | iOS has no chat composer; its text field is the system's `UITextView`. |
+| Settings rows (`components/settings.tsx` `Row`) | Drawn as an inset grouped list; moving them to `@expo/ui` `Form` is a separate change. |
+| Reactions, mention chips, cards (`cards.tsx`) | No system equivalent. |
+
+Motion: `apps/mobile/lib/springs.ts` holds the one spring family (snap back ζ≈0.73, a new message
+rising 8 pt at ζ≈0.8). Every animation keeps its Reduce Motion branch.
+
 ## Layout and states
 
 To draw for each screen: empty, loading, normal, error, offline, dark mode,
@@ -184,7 +209,7 @@ large Dynamic Type. Plus:
   snoozed), thread card (running / waiting / failed / done).
 - Push: lock screen and banner, one per kind (mail, CI, run finished,
 - 对话: the bot list with the pinned bots on top, search, and 重启以更新.
-- Drawer: open over the Coordinator chat, with unread dots.
+- Account sheet: with and without 建议, with 重启以更新.
 - 线程: each filter, running / waiting / failed / done rows.
 - 建议: no apps connected (connect CTA), nothing today, briefing generating.
 - Sign in: Google, GitHub (R-40 copy rules).

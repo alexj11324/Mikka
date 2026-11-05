@@ -2,10 +2,12 @@ import type { PoolClient } from 'pg'
 import type { FactoryTask } from './store'
 
 /** Read-only eligibility, shared by the owner control and its locked transaction.
- * A model-supplied finish/output cannot manufacture the host watchdog receipt. */
+ * A model-supplied finish/output cannot manufacture the host watchdog receipt.
+ * List/detail reads need only eligibility; the locked recovery action alone
+ * reads the full producer required to reconstruct its candidate. */
 export async function completedRunForRecovery(tx: Pick<PoolClient, 'query'>, task: FactoryTask, lock = false) {
   if (task.stage !== 'execute' || task.status !== 'blocked' || task.candidateId !== null) return null
-  const { rows: [run] } = await tx.query(`SELECT r.*,repo."remoteUrl",repo."repoPath" FROM factory_tasks t
+  const { rows: [run] } = await tx.query(`SELECT ${lock ? 'r.*,repo."remoteUrl",repo."repoPath"' : 'r.id'} FROM factory_tasks t
     JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id
     JOIN agent_runs r ON r.id=a."runId" AND r."userId"=t."userId" AND r."issueId"=t."issueId"
     JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId" AND repo."deviceId"=r."deviceId"

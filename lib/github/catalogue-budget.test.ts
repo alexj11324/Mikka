@@ -91,7 +91,7 @@ test('an exact tool lookup returns its complete original schema without the rest
   const github = createGitHubMcpRuntime(async () => ({ token: 'offline-token' }), { connect, transport })
   const result = await github('owner', { tool: 'actions_run_trigger' }) as { tools: unknown[]; nextCursor: string | null }
   assert.equal(result.tools.length, 1)
-  assert.deepEqual(result.tools[0], remote.tools[1])
+  assert.deepEqual(result.tools[0], { ...remote.tools[1], displayName: 'Actions run trigger' })
   assert.equal(result.nextCursor, null)
   assert.ok(Buffer.byteLength(JSON.stringify(result)) <= 32 * 1024)
 })
@@ -128,7 +128,7 @@ test('bounded discovery pages retain every tool across local and remote cursors 
   assert.ok(cursors.slice(0, -1).every(value => value === undefined))
   assert.ok(owners.every(value => value === 'owner'))
   const exact = await github('owner', { cursor: lastPageCursor, tool: last.name }) as { tools: unknown[] }
-  assert.deepEqual(exact.tools, [last])
+  assert.deepEqual(exact.tools, [{ ...last, displayName: 'Remote last' }])
 
   const requests = owners.length
   assert.deepEqual(await github('peer', { cursor: firstCursor }), { error: 'githubToolCursorInvalid' })
@@ -141,7 +141,7 @@ test('a schema larger than one page is explicitly refused while its summary rema
   const connect = (async () => ({ listTools: async () => remote, close: async () => {} })) as unknown as typeof createMCPClient
   const transport = () => ({ fetch: (async () => { throw new Error('unexpected network') }) as typeof fetch, close: async () => {} })
   const github = createGitHubMcpRuntime(async () => ({ token: 'offline-token' }), { connect, transport })
-  assert.deepEqual(await github('owner', {}), { tools: [{ name: 'large_tool' }], nextCursor: null })
+  assert.deepEqual(await github('owner', {}), { tools: [{ name: 'large_tool', displayName: 'Large tool' }], nextCursor: null })
   assert.deepEqual(await github('owner', { tool: 'large_tool' }), { error: 'githubToolSchemaTooLarge' })
 })
 

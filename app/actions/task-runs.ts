@@ -1,5 +1,6 @@
 'use server'
 
+import { singleFlight } from '@/lib/single-flight'
 import { createHash } from 'node:crypto'
 import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
 import { headers } from 'next/headers'
@@ -42,6 +43,10 @@ export async function listTaskRuns(): Promise<TaskRun[]> {
 
 /** Same owner-wide reader, with server-observed scope and window expiry. */
 export async function pollTaskRuns() {
+  return withDatabaseOperation('/actions/task-runs/read', readTaskRuns)
+}
+
+async function readTaskRuns() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
   const observedAt = Date.now()
@@ -76,7 +81,6 @@ export interface Thread {
   issueId: string | null
   prompt: string
   status: RunStatus
-  error: string | null
   createdAt: string
   updatedAt: string
   /** The opening of the agent's last reply on one plain line; null before it says anything (and for runs from before it was stored). */
@@ -104,14 +108,21 @@ async function readThreads(known?: string) {
   return withDatabaseOperation('/actions/threads/poll', async () => {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
+    // The list is the session user's own runs only: identical concurrent polls share one read.
+    return singleFlight(['/actions/threads/poll', session.user.id, known ?? null], () => readThreadSnapshot(session.user.id, known))
+  })
+}
+
+async function readThreadSnapshot(userId: string, known?: string) {
+  {
     const observedAt = Date.now()
-    const begun = await beginOwnerListRead(session.user.id, ['thread_list'])
+    const begun = await beginOwnerListRead(userId, ['thread_list'])
     // Only queued local work can show "waiting for device". Ask the gateway
     // on this user read, so an idle socket affects both the view and its hash.
     const queuedDevices = process.env.DEVICE_GATEWAY_URL && process.env.DEVICE_GATEWAY_PUSH_SECRET
       ? await db.selectDistinct({ id: devices.id, lastSeenAt: devices.lastSeenAt }).from(devices)
         .innerJoin(agentRuns, eq(agentRuns.deviceId, devices.id))
-        .where(and(eq(agentRuns.userId, session.user.id), eq(devices.ownerId, session.user.id),
+        .where(and(eq(agentRuns.userId, userId), eq(devices.ownerId, userId),
           eq(devices.kind, 'local'), eq(devices.enabled, true), eq(agentRuns.status, 'queued'),
           sql`${agentRuns.createdAt} > now() - interval '30 days'`))
       : []
@@ -122,22 +133,25 @@ async function readThreads(known?: string) {
     // heartbeat must not invalidate every historic thread on that machine.
     const waitingForDevice = sql<boolean>`${devices.kind}='local' and ${agentRuns.status}='queued' and
       (${devices.enabled} is false or (${gatewayOffline} and (${devices.lastSeenAt} is null or
-       ${devices.lastSeenAt}<statement_timestamp()-(${DEVICE_ONLINE_WINDOW_MS} * interval '1 millisecond'))))`.as('waitingForDevice')
+       ${devices.lastSeenAt}<statement_timestamp()-(${DEVICE_ONLINE_WINDOW_MS} * interval '1 millisecond'))))`
     const snapshot = db.select({
       id: agentRuns.id, botId: agentRuns.botId, agentName: runBotName.as('agentName'), issueId: agentRuns.issueId, prompt: sql<string>`left(${agentRuns.prompt}, 200)`.as('prompt'),
-      status: agentRuns.status, error: agentRuns.error, createdAt: agentRuns.createdAt, updatedAt: agentRuns.updatedAt,
+      status: agentRuns.status, createdAt: agentRuns.createdAt, updatedAt: agentRuns.updatedAt,
       lastReply: agentRuns.lastReply, lastReplyAt: agentRuns.lastReplyAt, source: agentRuns.source,
-      deviceId: sql<string | null>`${devices.id}`.as('deviceId'), deviceName: devices.name, deviceType: devices.deviceType, waitingForDevice,
+      deviceId: sql<string | null>`case when ${waitingForDevice} then ${devices.id} end`.as('deviceId'),
+      deviceName: sql<string | null>`case when ${waitingForDevice} then ${devices.name} end`.as('deviceName'),
+      deviceType: sql<'laptop' | 'server' | null>`case when ${waitingForDevice} then ${devices.deviceType} end`.as('deviceType'),
+      waitingForDevice: waitingForDevice.as('waitingForDevice'),
       harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`.as('harness'),
       outcome: agentRuns.outcome,
     }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
-      .where(and(eq(agentRuns.userId, session.user.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
+      .where(and(eq(agentRuns.userId, userId), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
       .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt)).limit(200)
     const signature = await queryVersion(snapshot)
-    const version = createHash('sha256').update(JSON.stringify([session.user.id, signature])).digest('hex').slice(0, 32)
+    const version = createHash('sha256').update(JSON.stringify([userId, signature])).digest('hex').slice(0, 32)
     const visible = snapshot.as('thread_list_expiry')
     const [expiry] = await db.select({ at: sql<Date | null>`min(${visible.createdAt})+interval '30 days'` }).from(visible)
-    const live = await ownerListRead(session.user.id, [expiry?.at], observedAt, begun)
+    const live = await ownerListRead(userId, [expiry?.at], observedAt, begun)
     // Device presence has its own bounded watcher prerequisite. Until that
     // route is ready, queued local work retains the shared slow fallback.
     const presenceFallback = queuedDevices.length > 0
@@ -152,5 +166,5 @@ async function readThreads(known?: string) {
       lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
     }))
     return { version, items, live, presenceFallback }
-  })
+  }
 }

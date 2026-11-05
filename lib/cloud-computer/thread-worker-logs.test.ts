@@ -235,3 +235,18 @@ test('question wake failures identify the rejecting boundary without exposing pr
   }
 })
 
+
+
+test('runtime guard diagnostics keep their closed phase and never emit a provider payload', () => {
+  const lines: string[] = []
+  logRuntimeRefreshFailure('run-guard', 'switch_release', {
+    name: 'RuntimeRefreshError', code: 'runtime_journal_missing', runtimePhase: 'journal_before_stop', exitCode: 1,
+    message: 'PRIVATE-CREDENTIAL', stderr: 'PRIVATE-CREDENTIAL', cause: { token: 'PRIVATE-CREDENTIAL' },
+  }, line => lines.push(line))
+  assert.deepEqual(JSON.parse(lines[0]), { event: 'thread_runtime_refresh_failed', runId: 'run-guard', phase: 'switch_release',
+    errorClass: 'RuntimeRefreshError', errorCode: 'runtime_journal_missing', runtimePhase: 'journal_before_stop', exitCode: 1 })
+  logRuntimeRefreshFailure('run-guard', 'rollback', { name: 'RuntimeRefreshError', code: 'runtime_PRIVATE_CREDENTIAL', runtimePhase: 'PRIVATE-CREDENTIAL', exitCode: 1 }, line => lines.push(line))
+  assert.deepEqual(JSON.parse(lines[1]), { event: 'thread_runtime_refresh_failed', runId: 'run-guard', phase: 'rollback',
+    errorClass: 'RuntimeRefreshError', errorCode: 'unknown', exitCode: 1 })
+  assert.doesNotMatch(lines.join('\n'), /PRIVATE.CREDENTIAL/)
+})

@@ -6,7 +6,7 @@ import { listRef } from '@/lib/live'
 type HomeState = ReturnType<typeof useLiveApi<Home>>
 const HomeContext = createContext<HomeState | null>(null)
 
-/** The live keys behind the drawer, the same the web's lists listen to (hooks/use-live-lists.ts). */
+/** The live keys behind the tabs and the account sheet, the same the web's lists listen to (hooks/use-live-lists.ts). */
 export function homeLive(home: Home | null) {
   // Until the first answer (or after a failed one) it reads once a minute, as before.
   if (!home) return { refs: [listRef('bot_chat_list', null)] }
@@ -25,7 +25,7 @@ export function homeLive(home: Home | null) {
   }
 }
 
-/** The drawer's data (the person, workspace, bots, counts), loaded once for every screen and read again when it changes. */
+/** The home data (the person, workspace, bots, counts), loaded once for every screen and read again when it changes. */
 export function HomeProvider({ children }: { children: ReactNode }) {
   const state = useLiveApi<Home>('/api/mobile/home', homeLive)
   return <HomeContext.Provider value={state}>{children}</HomeContext.Provider>
