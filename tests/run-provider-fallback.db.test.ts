@@ -459,9 +459,10 @@ test('provider failure continues the same task through its authorized preferred 
       const target = new URL(String(input))
       assert.equal(target.hostname, 'provider-live.example.invalid', 'only the isolated live gateway is allowed')
       assert.match(target.pathname, /^\/v1\/live\/[^/]+\/push$/)
-      // The same commit also refreshes owner lists (lib/live/lists.db.test.ts
-      // covers those keys); this case checks the existing thread's panel key.
-      const events = (JSON.parse(String(options?.body)) as { kind: string; id: string }[]).filter(event => !event.kind.endsWith('_list'))
+      // The same commit also refreshes owner lists, the bot chat and the issue's
+      // thread list (lib/live/lists, chats and issue-threads DB tests cover those
+      // keys); this case checks the existing thread's panel key.
+      const events = (JSON.parse(String(options?.body)) as { kind: string; id: string }[]).filter(event => !event.kind.endsWith('_list') && !['bot_chat', 'issue_threads'].includes(event.kind))
       if (events.length) sent.push({ path: target.pathname, events })
       return new Response(null, { status: 204 })
     })
@@ -489,10 +490,10 @@ test('provider failure continues the same task through its authorized preferred 
       assert.ok(scheduled.length > 0, 'post-COMMIT work is scheduled for the existing thread')
       assert.equal(sent.length, 0, 'delivery waits for the actual Next after callback')
       await drain()
-      assert.deepEqual(sent.splice(0), [{
-        path: `/v1/live/${liveChannelId({ ownerId: p.id, workspaceId: homeId })}/push`,
-        events: [{ kind: 'run', id: runId }],
-      }])
+      // The continuation's own writer also wakes its new run, whose key names its parent.
+      const delivered = sent.splice(0), path = `/v1/live/${liveChannelId({ ownerId: p.id, workspaceId: homeId })}/push`
+      assert.ok(delivered.every(value => value.path === path && value.events.every(event => event.kind === 'run')), 'only the owner’s home receives run keys')
+      assert.ok(delivered.some(value => value.events.some(event => event.id === runId)), 'the existing thread is woken')
       await recoverProviderFailure(pool, p.id, runId)
       assert.equal(scheduled.length, 0, 'a replay cannot notify an unchanged receipt')
     }
