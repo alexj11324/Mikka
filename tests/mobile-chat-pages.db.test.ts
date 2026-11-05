@@ -39,7 +39,7 @@ test('the app reads a chat a page at a time: 50 first, older pages by `through`,
     // A push after one new message: the read continues from the first page's continuation.
     await add(201)
     const update = await store.chatUpdate(owner, botId, first.continuation)
-    assert.equal(update.after, first.continuation!.after, 'an update read')
+    assert.ok('after' in update && update.after === first.continuation!.after, 'an update read')
     assert.deepEqual(update.items.map(item => item.position), [200, 201], 'the last shown item again, and the new one')
 
     const bytes = { full200: bodyBytes(before), firstPage50: bodyBytes(first), olderPage50: bodyBytes(older), updateOneMessage: bodyBytes(update) }
