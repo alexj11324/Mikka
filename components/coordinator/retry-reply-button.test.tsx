@@ -14,14 +14,14 @@ let buildCheck = async () => currentBuild
 let submissions = 0, removedNotes = 0
 const submitted: { text: string; context: { retryOf?: number } | undefined }[] = []
 let chatItems: import('@/lib/coordinator/context').ChatItem[] = []
+let chatError: string | null = null
+let chatEnabled = false
+const modelPicks: (string | null)[] = []
 // A chat whose welcome failed: its read, the model menu's 可用, the refusal code and whether the tab is visible.
 let chatData: Record<string, unknown> | null = null
 let menu: unknown = undefined
 let refusalCode: string | null = null
 let visibility: 'visible' | 'hidden' = 'visible'
-let chatError: string | null = null
-let chatEnabled = false
-const modelPicks: (string | null)[] = []
 let versionReads = 0
 let pathname = '/mikka/en', search = ''
 let serverVersion: { build: string } = { build: 'fixture-current' }

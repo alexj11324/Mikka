@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { factoryChanged, factoryCommitted } from '../live/factory';
 import { issueListChanged } from '../live/lists';
 import { documentChanged } from '../live/panels';
+import { issueRelationsChanged } from '../live/issue-detail';
 import { userActor } from '../activity-actor';
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
@@ -234,6 +235,7 @@ export function createFactoryMerges(
     if (rows.length) {
       await issueListChanged(tx, task.issueId);
       await documentChanged(tx, task.issueId);
+      await issueRelationsChanged(tx, [task.issueId]);
     }
   }
 

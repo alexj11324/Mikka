@@ -42,7 +42,7 @@ import { PanelRight } from 'lucide-react'
 import { ISSUE_STATUSES, type IssueStatus, type IssueView } from './issue-properties'
 import type { listIssues } from '@/app/actions/issues'
 import { useLiveBotRoster, useLiveGroupList, useLiveIssueList, useLiveThreadList } from '@/hooks/use-live-lists'
-import { ListReadScopeError, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
+import { ListReadScopeError, observeListRead, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { endSession } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -205,7 +205,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   }, [listsPaused, mutate, refreshThreads])
   const [creatingBot, setCreatingBot] = useState(false)
   const [createdBot, setCreatedBot] = useState<BotView>()
-  const { data: coordinatorChat } = useSWR<CoordinatorChatView>('coordinator-chat', () => getCoordinatorChat(), { ...whileSettings })
+  const { data: coordinatorChat } = useSWR<CoordinatorChatView>('coordinator-chat', () => observeListRead(() => getCoordinatorChat()), { ...whileSettings })
   const [panelOpen, setPanelOpen] = useState(true)
   useEffect(() => { try { if (window.localStorage.getItem('mikka:context-panel') === '0') setPanelOpen(false) } catch { /* storage unavailable */ } }, [])
   // Below xl the column has no room, so 打开右栏 shows it in a Sheet instead.

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import test from "node:test";
+import test, { mock } from "node:test";
 import { factory194Fixture } from "../../tests/helpers/factory194";
 import { factory194Target } from "../../tests/helpers/factory194-target";
 import { FactoryError } from "./approval-contract";
@@ -10,6 +10,9 @@ import { handleFactoryApproval } from "./approval-http";
 import { createFactoryMerges, FactoryMergeRefused, type GitHubMergePort, type GitHubPullRequestView } from "./merge";
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { threadGroup } from '../thread-groups'
+import { observePoolCommits } from '../db/commit-effects'
+import type { LiveInvalidation } from '../live/events'
+import type { LiveScope } from '../live/scope'
 
 // #528: acceptance is the person's own merge of the candidate PR. Real
 // PostgreSQL (isolated schema); GitHub is a fixture that records every call.
@@ -158,6 +161,86 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
         SELECT $2,"userId","issueId",$3,1,'execute','pending',"createdAt"+interval '1 second' FROM factory_tasks WHERE id=$1`,
       [task.id, randomUUID(), randomUUID()]);
     }
+
+    await t.test('accepted deliverables refresh connected panels only after COMMIT, with no replay, rollback or unchanged-status notification', async () => {
+      const pending: (() => Promise<void>)[] = [];
+      const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = [];
+      const notify = await import('../live/notify');
+      const requestScope = await import('../db/request-scope');
+      const workspace = await import('../workspace-db');
+      const mocks = [
+        mock.module(new URL('../live/notify.ts', import.meta.url).href, { namedExports: { ...notify,
+          scheduleLive: (work: () => Promise<void>) => { pending.push(work); },
+          sendLiveInvalidations: async (scope: LiveScope, events: LiveInvalidation[]) => { sent.push({ scope, events }); },
+        } }),
+        mock.module(new URL('../db/request-scope.ts', import.meta.url).href, { namedExports: { ...requestScope, pool } }),
+        mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { ...workspace, workspacePool: pool } }),
+      ];
+      const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET };
+      process.env.DEVICE_GATEWAY_URL = 'https://gateway.example.invalid';
+      process.env.DEVICE_GATEWAY_PUSH_SECRET = 'isolated-factory-relations-fixture';
+      observePoolCommits(pool);
+      const drain = async () => { await Promise.all(pending.splice(0).map(work => work())); };
+      try {
+        await pool.query(`
+          CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,"userId" text,kind text);
+          CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,status text);
+          CREATE TABLE mikka_team_issues ("issueId" uuid,"workspaceId" uuid);
+        `);
+        const home = randomUUID();
+        await pool.query(`INSERT INTO mikka_workspaces VALUES ($1,$2,'personal')`, [home, actor.userId]);
+        await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,$2,'active')`, [home, actor.userId]);
+        const x = await preparedDeliverable();
+        const parent = randomUUID(), blocked = randomUUID();
+        for (const [id, metadata] of [[parent, {}], [blocked, { blockedByIds: [x.task.issueId] }]] as const) {
+          await pool.query(`INSERT INTO issues(id,"userId",title,content,revision) VALUES($1,$2,'Connected fixture',$3,1)`,
+            [id, actor.userId, JSON.stringify({ type: 'doc', attrs: { mikka: metadata }, content: [] })]);
+        }
+        await pool.query(`UPDATE issues SET content=$2 WHERE id=$1`, [x.task.issueId,
+          JSON.stringify({ type: 'doc', attrs: { mikka: { parentId: parent } }, content: [] })]);
+        const eventId = randomUUID();
+        const accepted = await x.accept(eventId, null);
+        assert.equal(accepted.status, 'accepted');
+        assert.equal((await x.issue()).status, 'done', 'the status is committed before deferred readers run');
+        assert.equal(sent.length, 0, 'no transport runs ahead of the deferred after-COMMIT work');
+        await drain();
+        const relations = sent.flatMap(value => value.events.filter(event => event.kind === 'issue_relations').map(event => event.id)).sort();
+        assert.deepEqual(relations, [x.task.issueId, parent, blocked].sort(), 'the accepted child, parent progress and blocked task all refresh');
+        assert.ok(sent.every(value => value.scope.ownerId === actor.userId && value.scope.workspaceId === home));
+        const delivered = sent.length;
+        assert.deepEqual(await x.accept(eventId, null), accepted);
+        assert.equal(pending.length, 0, 'an idempotent acceptance does not emit another invalidation');
+
+        const rolledBack = await preparedDeliverable();
+        await pool.query(`
+          CREATE FUNCTION reject_live_completion_fixture() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN RAISE EXCEPTION 'reject_live_completion_fixture'; END $$;
+          CREATE CONSTRAINT TRIGGER reject_live_completion_fixture AFTER UPDATE ON issues
+            DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.status='done')
+            EXECUTE FUNCTION reject_live_completion_fixture();
+        `);
+        try {
+          await assert.rejects(() => rolledBack.accept(randomUUID(), null), /reject_live_completion_fixture/);
+        } finally {
+          await pool.query('DROP TRIGGER reject_live_completion_fixture ON issues; DROP FUNCTION reject_live_completion_fixture()');
+        }
+        assert.equal((await rolledBack.issue()).status, 'review');
+        assert.equal((await rolledBack.receipts()).length, 0);
+        assert.equal(pending.length, 0, 'a failed COMMIT drops all registered panel notifications');
+
+        const unchanged = await preparedDeliverable();
+        await successor(unchanged.task);
+        assert.equal((await unchanged.accept(randomUUID(), null)).status, 'accepted');
+        assert.equal((await unchanged.issue()).status, 'review');
+        assert.equal(pending.length, 0, 'accepting older work does not refresh unchanged relation panels');
+        assert.equal(sent.length, delivered);
+      } finally {
+        pending.splice(0);
+        for (const module of mocks.reverse()) module.restore();
+        if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = previous.url;
+        if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret;
+      }
+    });
 
     await t.test('accepting an older deliverable does not complete a later Factory task on the same issue', async () => {
       const x = await preparedDeliverable();

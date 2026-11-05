@@ -495,8 +495,23 @@ function withImages(text: string, images: unknown): ModelMessage['content'] {
   return [{ type: 'text', text }, ...images.map(() => ({ type: 'file' as const, data: '', mediaType: 'image/jpeg' }))]
 }
 
+type ChatReadObservation = { expiries: Date[]; observedAt: number }
+
+/** Both full and version reads derive their deadline from the session/inbox they already read. */
+function chatReadObservation(session: Parameters<typeof coordinatorChatState>[0], waiting: Parameters<typeof coordinatorChatState>[1], now: Date): ChatReadObservation {
+  return { expiries: [
+    ...(coordinatorLeaseActive(session, now) && session?.leaseUntil ? [session.leaseUntil] : []),
+    ...waiting.flatMap(event => event.tier !== 'background' && event.kind !== 'matter_handoff' && event.wakeAttempts === 1 && event.wakeLeaseUntil && event.wakeLeaseUntil > now ? [event.wakeLeaseUntil] : []),
+  ], observedAt: now.getTime() }
+}
+
 /** The latest of the conversation for the chat, oldest first. */
 export async function chatView(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}): Promise<ChatView> {
+  return (await chatViewState(userId, limit, botId, window)).chat
+}
+
+/** Full readers sharing the live chat cache need its deadline, without a second version/body read. */
+export async function chatViewState(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}): Promise<{ chat: ChatView } & ChatReadObservation> {
   const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
   // Compact parts: the chat never shows reasoning text or whole tool inputs and outputs (chat-projection.ts).
   const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: compactChatMessage, createdAt: coordinatorMessages.createdAt })
@@ -518,12 +533,13 @@ export async function chatView(userId: string, limit = 200, botId: string, windo
   // An older page (history): a welcome failure there was answered by what came after it, so it is not shown.
   const items = window.through !== undefined ? read.filter(item => !item.welcome) : read
   const after = Math.max(0, (items.findLast(item => !item.pending)?.position ?? 1) - 1)
-  return {
+  const now = new Date()
+  const chat: ChatView = {
     items,
     cursor: last,
     persistedStreamIds: [...new Set(rows.flatMap(({message}) => message.role === 'assistant' && typeof message.mikkaStreamId === 'string' ? [message.mikkaStreamId] : []))],
     ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
-    ...coordinatorChatState(session, waiting, new Date(), lastMessage),
+    ...coordinatorChatState(session, waiting, now, lastMessage),
     // An event line names its thread or task as a chip (C1); its stored text is the model's, never shown.
     sources: await citationSources(userId, [...items.filter(item => item.from === 'coordinator').map(item => item.text),
       ...items.flatMap(item => item.line ? [item.line.runId && `[[run:${item.line.runId}]]`, item.line.issueId && `[[issue:${item.line.issueId}]]`].filter((text): text is string => !!text) : [])], items.flatMap(item => item.threads)),
@@ -531,6 +547,7 @@ export async function chatView(userId: string, limit = 200, botId: string, windo
     continuation: { after, prefix: await chatPrefix(userId, botId, after), cursor: last },
     ...(hasMore && rows[0] ? { historyBefore: rows[0].position } : {}),
   }
+  return { chat, ...chatReadObservation(session, waiting, now) }
 }
 
 /** Hash only the bounded prefix that preceded the last rendered item; no message body crosses the wire. */
@@ -565,7 +582,7 @@ export interface ChatVersion {
 }
 
 /** The version plus when `working` changes with no write: the active turn's or a first wake's lease runs out. */
-export type ChatVersionState = ChatVersion & { expiries: Date[]; observedAt: number }
+export type ChatVersionState = ChatVersion & ChatReadObservation
 
 /**
  * The chat's version, computed in the database from the same latest `limit`
@@ -593,16 +610,12 @@ export async function chatVersionState(userId: string, limit = 200, botId: strin
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
   const lastMessage = stored.role ? { role: stored.role, ...(stored.streamId ? { streamId: stored.streamId } : {}) } : undefined
   const now = new Date()
-  const expiries = [
-    ...(coordinatorLeaseActive(session, now) && session?.leaseUntil ? [session.leaseUntil] : []),
-    ...waiting.flatMap(event => event.tier !== 'background' && event.kind !== 'matter_handoff' && event.wakeAttempts === 1 && event.wakeLeaseUntil && event.wakeLeaseUntil > now ? [event.wakeLeaseUntil] : []),
-  ]
   return {
     version: createHash('sha256').update(`${limit}|${stored.hash}|${waiting.map(event => `${event.id}:${event.payloadVersion}`).join(',')}`).digest('hex').slice(0, 32),
     cursor: stored.last,
     ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
     ...coordinatorChatState(session, waiting, now, lastMessage),
-    expiries, observedAt: now.getTime(),
+    ...chatReadObservation(session, waiting, now),
   }
 }
 
