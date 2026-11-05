@@ -2,7 +2,7 @@
 
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import useSWR, { useSWRConfig } from 'swr'
+import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
@@ -31,10 +31,11 @@ import { AgentThemeProvider } from '@/components/workspace/agent-theme'
 import { openThread } from '@/components/workspace/workspace-navigation'
 import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
-import { BotModelPicker, botModelMenuKey } from './bot-model-picker'
+import { BotModelPicker, botModelMenuKey, openModelPicker } from './bot-model-picker'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
-import { chatPollInterval } from '@/lib/coordinator/chat-poll-interval'
+import { useLiveKey } from '@/hooks/use-live-key'
+import { listReadDeadline, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { useLiveCitations } from './use-live-citations'
 import type { CoordinatorLiveReply } from '@/lib/coordinator-stream-client'
 import { ThreadCard } from './thread-card'
@@ -62,6 +63,7 @@ import { SentSuggestion } from '@/components/suggestions/mobile-card'
 import { HostedRefusalNotice } from '@/components/billing/hosted-refusal-notice'
 import { hostedRefusal } from '@/lib/billing/verification-client'
 import { subscriptionRefusal } from '@/lib/subscription-refusal'
+import { chatBalanceRefusal } from '@/lib/chat-balance'
 import { SubscriptionRefusalNotice } from './subscription-refusal-notice'
 import { HostedUnavailableNotice } from './hosted-unavailable-notice'
 import { FailureReason } from './failure-reason'
@@ -85,6 +87,11 @@ const HEADER_FADE = 'md:[--scroll-fade-mask:linear-gradient(to_bottom,transparen
 
 /** Text put into the composer from elsewhere; `suggestionId` when it came from a 建议 item. */
 export type CoordinatorPrefill = { text: string; nonce: number; suggestionId?: string }
+
+/** A chat read and when it was asked for, which anchors its live deadline (lib/live/list-read.ts). */
+type ChatRead = Chat & { requestedAt?: number }
+/** Pushes closer together than this share one read; the stream shows a turn's words meanwhile. */
+const CHAT_MERGE_MS = 2_000
 
 /** The SWR key of a chat: the Coordinator's, or one bot's. */
 /** A passing usage limit (another turn running, a cost read): the next send works without anything changing. */
@@ -150,25 +157,29 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const actionError = useActionError()
   const reconnectStream = useRef<() => void>(() => {})
-  // A poll names the version it shows; an unchanged chat comes back as its live state only (lib/coordinator/chat-poll.ts).
-  const shown = useRef<{ chat?: Chat; fullReadAt: number }>({ fullReadAt: 0 })
-  // SWR re-reads a function interval only when its running timer fires, so a send would wait out the quiet 30 s
-  // before the turn's stream connects. A number from the latest chat restarts the timer as soon as the turn starts,
-  // whichever hook read it: the bot list and the workspace read this same key with their own fetchers, and a
-  // revalidation they win never calls this hook's onSuccess.
-  const [pollEvery, setPollEvery] = useState(() => chatPollInterval(undefined))
-  const { data, mutate, error: loadError } = useSWR<Chat>(coordinatorChatKey(botId), async () => {
+  // A read names the version it shows; an unchanged chat comes back as its live state only (lib/coordinator/chat-poll.ts).
+  const shown = useRef<{ chat?: ChatRead; fullReadAt: number }>({ fullReadAt: 0 })
+  const chatKey = coordinatorChatKey(botId)
+  const { data, mutate, error: loadError } = useSWR<ChatRead>(chatKey, async () => {
+    const requestedAt = performance.now()
     const known = knownVersion(shown.current.chat, shown.current.fullReadAt, Date.now())
     const previous = shown.current.chat
     const continuation = previous?.continuation && { ...previous.continuation, sourceIds: Object.keys(previous.sources).slice(0, 400), artifactIds: Object.keys(previous.artifacts).slice(0, 400) }
     const next = await pollCoordinatorChat(botId, known, continuation)
     if (!('unchanged' in next) && (next.metadataRefresh || next.after === undefined)) shown.current.fullReadAt = Date.now()
-    return mergeChat(shown.current.chat, next)
+    const merged = mergeChat(shown.current.chat, next)
+    return merged === shown.current.chat ? merged : { ...merged, requestedAt }
   }, {
-    refreshInterval: pollEvery,
     onSuccess: () => reconnectStream.current(),
   })
-  useEffect(() => { shown.current.chat = data; setPollEvery(chatPollInterval(data)) }, [data])
+  useEffect(() => { shown.current.chat = data }, [data])
+  // No timer reads this chat (#1212). A committed message, inbox event, turn change or run change in it pushes
+  // its key on the owner's home channel; a turn's lease running out has no write, so its expiry is a deadline.
+  // While the channel is down the live layer falls back to one read a minute. The stream still carries a turn.
+  const liveOwner = data?.live?.ownerId
+  const liveHome = liveOwner ? ownerListWorkspace(data, liveOwner) : null
+  useLiveKey('bot_chat', liveHome && data?.botId ? data.botId : UNRESOLVED_LIST_SCOPE, [unstable_serialize(chatKey)], liveHome,
+    { minIntervalMs: CHAT_MERGE_MS, deadline: liveOwner ? listReadDeadline(data, liveOwner) : undefined })
   const [loadingHistory, setLoadingHistory] = useState(false)
   async function loadHistory() {
     if (!data?.historyBefore || loadingHistory) return
@@ -267,6 +278,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const refusal = data?.working ? null : hostedRefusal(data?.error)
   // The chosen subscription refused it: the mapped line, never the raw step error.
   const declined = data?.working || refusal ? null : subscriptionRefusal(data?.error)
+  const apiBalance = !data?.working && !refusal && !declined && chatBalanceRefusal(data?.error)
   // 重试 on any failed reply, never on a wake still being retried by the server.
   const retry = <RetryReplyButton botId={botId} onQueued={mutate} />
   const wakeError = data?.error === 'wake_failed' || data?.error === 'wake_start_unconfirmed' || data?.error === 'wake_exhausted' ? data.error : null
@@ -308,7 +320,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const failureNotice = <>
     {refusal && <HostedRefusalNotice code={refusal} botId={botId} retry={retry} onQueued={mutate} />}
     {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} botId={botId} />}
-    {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive" className={COMPOSER_NOTICE}>{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="failed">{t('failedTitle')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">{retry}</span></>}</Alert>}
+    {apiBalance && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="balance">{t('apiBalance')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1"><Button size="sm" onClick={() => openModelPicker(botId)}>{t('modelPicker.changeModel')}</Button></span></Alert>}
+    {data?.error && !data.working && !refusal && !declined && !apiBalance && <Alert variant="destructive" className={COMPOSER_NOTICE}>{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="failed">{t('failedTitle')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">{retry}</span></>}</Alert>}
   </>
   const sentCount = useMemo(() => Math.max(0, ...items.filter(item => item.from === 'person').map(item => item.position)), [items])
   // The newest reply keeps its actions in view, as Claude's does; older ones show them on hover.

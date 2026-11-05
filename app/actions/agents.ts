@@ -190,17 +190,30 @@ const threadColumns = {
 
 /** The issue's threads, as much of each as this viewer may see (R-62). */
 export async function listIssueThreads(issueId: string): Promise<IssueThread[]> {
+  return (await readIssueThreads(issueId)).threads
+}
+
+/** The same list, plus the channel its `issue_threads` key arrives on: the issue's
+ * workspace, or the owner's home for a personal issue; null reads once a minute. */
+export async function pollIssueThreads(issueId: string): Promise<{ threads: IssueThread[]; live: { workspaceId: string | null } }> {
+  const { threads, issue, user } = await readIssueThreads(issueId)
+  const [{ documentLiveWorkspace }, { workspacePool }] = await Promise.all([import('@/lib/live/panels'), import('@/lib/workspace-db')])
+  return { threads, live: { workspaceId: await documentLiveWorkspace(pool, workspacePool, issue.id, user.id) } }
+}
+
+async function readIssueThreads(issueId: string) {
   const { issue, user, memberIds } = await issueThreadAccess(issueId)
-  if (!memberIds.has(user.id)) return []
+  const result = (threads: IssueThread[]) => ({ threads, issue, user })
+  if (!memberIds.has(user.id)) return result([])
   // BE-18: fold continuation chains by root first, then take the newest ISSUE_THREAD_LIMIT
   // roots, so continuations never use up a slot (lib/run-chain.ts). Read-only, no locks.
   const chains = await listIssueRunChains(pool, issue.id, [...memberIds], ISSUE_THREAD_LIMIT)
-  if (!chains.length) return []
+  if (!chains.length) return result([])
   const rows = await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
     .where(and(eq(agentRuns.issueId, issue.id), inArray(agentRuns.userId, [...memberIds]), inArray(agentRuns.id, chains.map(chain => chain.rootRunId))))
     .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(ISSUE_THREAD_LIMIT)
   const byRoot = new Map(chains.map(chain => [chain.rootRunId, chain]))
-  return (await threadQuestions(projectIssueThreads(rows, issue.id, user.id, memberIds).map(thread => withRunChain(thread, byRoot.get(thread.id))), user.id)).threads
+  return result((await threadQuestions(projectIssueThreads(rows, issue.id, user.id, memberIds).map(thread => withRunChain(thread, byRoot.get(thread.id))), user.id)).threads)
 }
 
 /**

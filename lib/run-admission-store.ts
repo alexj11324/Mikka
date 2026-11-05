@@ -2,6 +2,7 @@ import { workerDefinitionDigest } from './agent-kit/worker-digest'
 import 'server-only'
 import { admitProfileSelection } from './factory/profile-admission'
 import { runListChanged } from './live/lists'
+import { runChanged } from './live/panels'
 import { freezeExecutionIdentity, revalidateExecutionIdentity, ExecutionIdentityError } from './execution-identity'
 import type { PoolClient } from 'pg'
 import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
@@ -124,6 +125,7 @@ export async function acceptLocalRun(input: {
     if (readOnly) {
       await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, prompt: input.prompt, agentDefinition: definition, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
       await runListChanged(tx, input.id)
+      await runChanged(tx, input.id)
       return input.dispatch?.requestKey ? { runId: input.id, status: 'queued' as const, replayed: false } : { runId: input.id }
     }
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'issue-publication:' + task.id}, 0))`)
@@ -140,6 +142,7 @@ export async function acceptLocalRun(input: {
     await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, prompt: input.prompt, agentDefinition: { ...definition, repositoryAdmission: admission }, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
     await tx.insert(runPublications).values({ runId: input.id, userId: input.userId, issueId: task.id, scopeVersion: task.scopeVersion, issueTitle: task.title, remoteUrl: repo.remoteUrl, remoteKey: repo.repoPath, identifier, branch, baseBranch: repo.baseBranch, pushApproved: true })
     await runListChanged(tx, input.id)
+    await runChanged(tx, input.id)
     return input.dispatch?.requestKey ? { runId: input.id, status: 'queued' as const, replayed: false } : { runId: input.id }
     })
     if (!existing) await client.query('COMMIT')

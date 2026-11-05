@@ -100,6 +100,27 @@ export async function runLiveTargets(database: Database, workspaceDatabase: Data
   return [...targets.values()]
 }
 
+/** An issue's thread list includes teammates' threads, so a run change goes to
+ * every member who can see the issue, by the same rule as its body, re-checked
+ * when sent. The key carries the issue ID only. */
+export async function issueThreadTargets(database: Database, workspaceDatabase: Database, issueId: string) {
+  const targets = await documentLiveTargets(database, workspaceDatabase, issueId)
+  return targets.map(target => ({ scope: target.scope, events: [{ kind: 'issue_threads', id: issueId }] as LiveInvalidation[] }))
+}
+
+/** A run's panels (its owner) and its issue's thread list (the issue's members), one request per channel. */
+export async function runChangeTargets(database: Database, workspaceDatabase: Database, runId: string) {
+  const targets = await runLiveTargets(database, workspaceDatabase, runId, 'run')
+  const { rows: [run] } = await database.query<{ issueId: string | null }>('SELECT "issueId" FROM agent_runs WHERE id=$1', [runId])
+  const merged = new Map(targets.map(target => [JSON.stringify(target.scope), target]))
+  if (run?.issueId) for (const target of await issueThreadTargets(database, workspaceDatabase, run.issueId)) {
+    const key = JSON.stringify(target.scope)
+    const current = merged.get(key)
+    if (current) current.events.push(...target.events); else merged.set(key, target)
+  }
+  return [...merged.values()]
+}
+
 async function changed(executor: object, kind: 'issue_document' | 'run' | 'thread', id: string) {
   if (!liveGatewayConfig(process.env)) return
   const { scheduleLive, sendLiveInvalidations } = await import('./notify')
@@ -108,8 +129,8 @@ async function changed(executor: object, kind: 'issue_document' | 'run' | 'threa
     const { pool, withoutDatabaseClient } = await import('../db/request-scope')
     const { workspacePool } = await import('../workspace-db')
     await withoutDatabaseClient(async () => {
-      const targets = kind === 'issue_document'
-        ? await documentLiveTargets(pool, workspacePool, id)
+      const targets = kind === 'issue_document' ? await documentLiveTargets(pool, workspacePool, id)
+        : kind === 'run' ? await runChangeTargets(pool, workspacePool, id)
         : await runLiveTargets(pool, workspacePool, id, kind)
       await Promise.all(targets.map(target => sendLiveInvalidations(target.scope, target.events)))
     })
@@ -120,7 +141,8 @@ async function changed(executor: object, kind: 'issue_document' | 'run' | 'threa
 }
 
 export const documentChanged = (executor: object, issueId: string) => changed(executor, 'issue_document', issueId)
-/** A semantic run write also wakes the already mounted immediate parent of a new continuation. */
+/** A semantic run write also wakes the already mounted immediate parent of a new continuation,
+ * and its issue's thread list for every member who can see the issue. */
 export const runChanged = (executor: object, runId: string) => changed(executor, 'run', runId)
 /** Stream chunks use a separate key so one final state change need not wait for the text cadence. */
 export const threadChanged = (executor: object, runId: string) => changed(executor, 'thread', runId)

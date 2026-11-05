@@ -6,6 +6,7 @@ import { bots, coordinatorEvents, devices } from './db/schema'
 import type { TaskDestination } from './task-destination'
 import { personalSubmissionInput, recordPersonalSubmission, SubmissionConflictError } from './coordinator-submission'
 import { overrideDeploymentSwitch } from './deployment-switches'
+import { listReadDeadline, observeListRead, ownerListWorkspace } from './live/list-read'
 
 const submissionId = 'a4000000-0000-4000-8000-000000000001'
 /** The owner's Coordinator: an ordinary bot row, resolved where a message enters. */
@@ -180,6 +181,15 @@ let POST: (request: Request) => Promise<Response>
 let sendCoordinatorMessage: typeof import('../app/actions/coordinator').sendCoordinatorMessage
 let sendSuggestion: typeof import('../app/actions/coordinator').sendSuggestion
 let retryCoordinatorTurn: typeof import('../app/actions/coordinator').retryCoordinatorTurn
+let getCoordinatorChat: typeof import('../app/actions/coordinator').getCoordinatorChat
+let pollCoordinatorChat: typeof import('../app/actions/coordinator').pollCoordinatorChat
+const CHAT_HOME = 'a4000000-0000-4000-8000-0000000c0de3'
+const CHAT_VERSION = '0123456789abcdef0123456789abcdef'
+const chatReadTrace: string[] = []
+let chatHome: string | null = CHAT_HOME
+const chatObservedAt = Date.parse('2026-11-05T04:00:00Z')
+const chatExpiry = new Date(chatObservedAt + 30_000)
+const chatSnapshot = () => ({ items: [], sources: {}, artifacts: {}, cursor: 0, working: retryWorking, error: null })
 let enabled = true
 let retryQueued = false
 let retryWorking = false
@@ -209,14 +219,63 @@ before(async () => {
   } })
   mock.module('@/lib/coordinator/coordinator-bot', { namedExports: { coordinatorBot: async () => ({ botId: COORDINATOR_BOT, workspaceId: 'a4000000-0000-4000-8000-0000000c0de2' }), chatBotId: async (_owner: string, botId: string | null | undefined) => botId ?? COORDINATOR_BOT, openChatBotId: async (_user: unknown, botId: string | null | undefined) => botId ?? COORDINATOR_BOT } })
   mock.module('@/lib/request-log', { namedExports: { noteLogUser: () => undefined, withRequestLog: (_path: string, handler: unknown) => handler } })
-  mock.module('@/lib/coordinator/store', { namedExports: { chatView: async () => ({ working: retryWorking }), chatVersion: async () => ({ version: '', cursor: 0, working: retryWorking, error: null }), botChats: async () => ({}), retryFailedTurn: async () => retryQueued, sendRetryOf: async () => null, citationSources: async () => ({}), storedReasoning: async () => [] } })
+  mock.module('@/lib/coordinator/store', { namedExports: {
+    chatView: async () => { chatReadTrace.push('view'); return chatSnapshot() },
+    chatViewState: async (owner: string, limit: number, bot: string) => {
+      assert.equal(owner, 'owner'); assert.equal(limit, 200); assert.equal(bot, COORDINATOR_BOT)
+      chatReadTrace.push('view-state'); return { chat: chatSnapshot(), expiries: [chatExpiry], observedAt: chatObservedAt }
+    },
+    chatUpdate: async () => { chatReadTrace.push('update'); return chatSnapshot() },
+    chatVersion: async () => ({ version: CHAT_VERSION, cursor: 0, working: retryWorking, error: null }),
+    chatVersionState: async () => { chatReadTrace.push('version'); return { version: CHAT_VERSION, cursor: 0, working: retryWorking, error: null, expiries: [chatExpiry], observedAt: chatObservedAt } },
+    botChats: async () => ({}), retryFailedTurn: async () => retryQueued, sendRetryOf: async () => null, citationSources: async () => ({}), storedReasoning: async () => [],
+  } })
+  mock.module('@/lib/live/list-read-server', { namedExports: { ownerListRead: async (owner: string, expiries: Date[], observedAt: number) => {
+    assert.equal(owner, 'owner'); assert.deepEqual(expiries, [chatExpiry]); assert.equal(observedAt, chatObservedAt)
+    chatReadTrace.push('live'); return { ownerId: owner, workspaceId: chatHome, deadline: { at: chatExpiry.toISOString(), afterMs: chatExpiry.getTime() - observedAt } }
+  } } })
   mock.module('@/lib/coordinator/wake', { namedExports: { coordinatorEnabled: () => enabled, wakeCoordinator: () => { throw new Error('test must not execute wake') } } })
   mock.module('next/server', { namedExports: { NextResponse: { json: (body: unknown, options?: ResponseInit) => Response.json(body, options) }, after: (callback: () => unknown) => callbacks.push(callback) } })
   mock.module('next/headers', { namedExports: { headers: async () => actionHeaders, cookies: async () => ({ get: () => undefined }) } })
   ;({ POST } = await import('../app/api/coordinator/messages/route'))
-  ;({ sendCoordinatorMessage, sendSuggestion, retryCoordinatorTurn } = await import('../app/actions/coordinator'))
+  ;({ sendCoordinatorMessage, sendSuggestion, retryCoordinatorTurn, getCoordinatorChat, pollCoordinatorChat } = await import('../app/actions/coordinator'))
 })
 const request = (body: unknown) => new Request('https://synthetic.example/api/coordinator/messages', { method: 'POST', body: JSON.stringify(body) })
+
+test('both shared chat readers keep the owner live scope and an observed lease without duplicate body reads', async () => {
+  current = fixture(); userId = 'owner'; enabled = true; retryWorking = true; chatHome = CHAT_HOME; chatReadTrace.length = 0
+  const full = await observeListRead(() => getCoordinatorChat())
+  assert.deepEqual(chatReadTrace, ['view-state', 'live'], 'the full reader reuses its session/inbox observation instead of reading a second version')
+  assert.equal(ownerListWorkspace(full, 'owner'), CHAT_HOME)
+  assert.deepEqual(listReadDeadline(full, 'owner', full.requestedAt + 250), { at: chatExpiry.toISOString(), afterMs: 29_750, observation: full.requestedAt })
+  chatReadTrace.length = 0
+  const unchanged = await observeListRead(() => pollCoordinatorChat(null, CHAT_VERSION))
+  assert.deepEqual(chatReadTrace, ['version', 'live'], 'an unchanged read does not load the body')
+  assert.deepEqual(unchanged.live, full.live, 'either fetcher may populate the same SWR key without removing its transport or deadline')
+  retryWorking = false
+})
+
+test('shared full chat reads do not guess a live workspace when the owned home is absent', async () => {
+  current = fixture(); userId = 'owner'; chatHome = null; chatReadTrace.length = 0
+  try {
+    const full = await observeListRead(() => getCoordinatorChat())
+    assert.equal(full.live?.workspaceId, null)
+    assert.equal(ownerListWorkspace(full, 'owner'), null)
+    assert.deepEqual(chatReadTrace, ['view-state', 'live'])
+  } finally { chatHome = CHAT_HOME }
+})
+
+test('both chat readers reject foreign bots and anonymous requests before resolving live scope', async () => {
+  current = fixture(); userId = 'owner'; chatReadTrace.length = 0
+  const foreign = 'b4000000-0000-4000-8000-000000000099'
+  current.botRows.set(foreign, { id: foreign, name: 'Other Bot', ownerId: 'foreign' })
+  for (const read of [() => getCoordinatorChat(foreign), () => pollCoordinatorChat(foreign)]) await assert.rejects(read)
+  userId = null
+  try {
+    for (const read of [() => getCoordinatorChat(), () => pollCoordinatorChat()]) await assert.rejects(read)
+    assert.deepEqual(chatReadTrace, [], 'no chat or live scope is read before the ordinary authentication and ownership checks')
+  } finally { userId = 'owner' }
+})
 
 test('reply retry reports unavailable, already working and no failed turn without claiming an enqueue', async () => {
   current = fixture(); userId = 'owner'; callbacks.length = 0; retryQueued = false

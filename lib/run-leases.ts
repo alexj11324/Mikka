@@ -121,7 +121,7 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
     if (target) {
       const moved = await db.update(agentRuns).set({ deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, agentDefinition: await rebindExecutionDevice(pool, run, target.deviceId), updatedAt: now })
         .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt))).returning({ id: agentRuns.id })
-      if (moved.length) await runListChanged(db, run.id)
+      if (moved.length) { await runListChanged(db, run.id); await runChanged(db, run.id) }
       notifyDeviceWork(target.deviceId)
       continue
     }
@@ -268,6 +268,7 @@ async function reclaimLostRun(run: Run, now: Date) {
       prompt: recovery.prompt, attempt: outcome.attempt, retryOf: run.id,
     })
     await runListChanged(tx, retryId)
+    await runChanged(tx, retryId)
     if (bound) {
       // Same thread, new sandbox: the retry gets its own thread machine, built from the workspace snapshot.
       await tx.execute(sql`insert into computer_run_bindings ("runId","botId","workspaceId","ownerId") select ${retryId},"botId","workspaceId","ownerId" from computer_run_bindings where "runId"=${run.id} and "ownerId"=${run.userId}`)
@@ -431,6 +432,7 @@ export async function failUnclaimedCloudStart(actor: { userId: string; workspace
     await recordCoordinatorEvent(tx, { ...event, payload: { ...event.payload, noMachine } })
     // The terminal row changed even when its durable completion event already exists.
     await runListChanged(tx, ended.id)
+    await runChanged(tx, ended.id)
     return ended
   })
   if (!failed) return false

@@ -13,7 +13,7 @@ import { prepareThreadReply, type ThreadReplySubmission } from '@/lib/thread-sub
 import { mergeThreadChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
 import { ThreadExecutionIdentity } from './thread-execution-identity'
-import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
+import { threadQuestionView } from '@/lib/issue-threads'
 import { threadComposerHarness } from '@/lib/run-model-fallback-view'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { QuoteChip, QuoteLine } from '@/components/artifacts/artifact-quote'
@@ -28,7 +28,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Skeleton } from '@/components/ui/skeleton'
 import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
-import { harnessLabel } from './issue-threads'
+import { harnessLabel, type IssueThreadsRead } from './issue-threads'
 import { ThreadStatus } from './thread-status-icon'
 import { RunErrorDetails, useRunErrorText } from './run-error-text'
 import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
@@ -185,7 +185,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     const attempt = Date.now()
     stopAttemptRef.current = attempt
     setStopAttempt(attempt); setStopFailed(false)
-    void mutateCache<IssueThread[]>(['issue-threads', issueId], threads => threads?.map(thread => thread.id === runId ? { ...thread, stopping: true, continuation: thread.continuation && { ...thread.continuation, stopping: true } } : thread), { revalidate: false })
+    void mutateCache<IssueThreadsRead>(['issue-threads', issueId], read => read && { ...read, threads: read.threads.map(thread => thread.id === runId ? { ...thread, stopping: true, continuation: thread.continuation && { ...thread.continuation, stopping: true } } : thread) }, { revalidate: false })
     try { await stopRun(liveRunId); void mutate(); void mutateCache(['issue-threads', issueId]) }
     catch {
       // A late response from an earlier request must not cancel a retry.

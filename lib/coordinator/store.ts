@@ -36,7 +36,7 @@ import type { TriageJudgment } from './triage-batch'
 import type { DecisionExecution } from './decide'
 import type { ScheduledRead } from '@/lib/schedules/contract'
 import { scheduledInbox, type Occurrence } from '@/lib/schedules/store'
-import { ownerListChanged } from '../live/lists'
+import { botChatChanged } from '../live/chats'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -121,7 +121,7 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
     // Ordinary renewal is not a broad list update. Only a new/changed turn
     // or actual message delivery changes the summary that the sidebar shows.
     if (!coordinatorLeaseActive(previousLease, now) || previousLease?.leaseHolder !== holder) {
-      await ownerListChanged(tx, userId, ['bot_chat_list'])
+      await botChatChanged(tx, userId, botId)
       // 停止 for a turn that is about to start waits on this (stop-turn.ts); delivered on COMMIT.
       await tx.execute(sql`SELECT pg_notify(${COORDINATOR_LEASE_CHANNEL}, ${botId})`)
     }
@@ -171,7 +171,7 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       // A GitHub or other token in an event (a run's summary, a tool's text) never reaches the chat.
       message: maskDeep(sourcedEventMessage({ ...event, deliveredAt: now }, scheduledRead ? `[Scheduled read-only task] The person requested this stored task for now: ${scheduledRead.prompt}\nUse only the available allowed read tools. Do not create or change anything, request approval, schedule more work, or claim an external write. Return the result for this original chat.` : eventPrompt(event, event.runId ? completionObservations.get(event.runId) : undefined)), credentialMasker),
     })))
-    if (chatEvents.length) await ownerListChanged(tx, userId, ['bot_chat_list'])
+    if (chatEvents.length) await botChatChanged(tx, userId, botId)
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
     for (const event of events) {
       const payload = markTelegramPending(event)
@@ -211,7 +211,7 @@ function carriesCode(event: { payload: Record<string, unknown> }): boolean {
 export async function releaseLease(userId: string, holder: string, botId: string): Promise<boolean> {
   const released = await db.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, updatedAt: new Date() })
     .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
-  if (released.length) await ownerListChanged(db, userId, ['bot_chat_list'])
+  if (released.length) await botChatChanged(db, userId, botId)
   if (released.length) await coordinatorSessionChanged(db, userId, botId)
   return hasWakingEvents(userId, botId)
 }
@@ -234,7 +234,7 @@ export async function untriagedEvents(userId: string, botId: string) {
 
 export async function setEventTier(id: string, tier: CoordinatorEventTier, scope: { userId: string; botId: string }): Promise<boolean> {
   const applied = await db.update(coordinatorEvents).set({ tier }).where(and(eq(coordinatorEvents.id, id), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier), eventsOf(scope.userId, scope.botId))).returning({ id: coordinatorEvents.id })
-  if (applied.length) await ownerListChanged(db, scope.userId, ['bot_chat_list'])
+  if (applied.length) await botChatChanged(db, scope.userId, scope.botId)
   return applied.length === 1
 }
 
@@ -266,7 +266,7 @@ export async function completeTriageAttempt(event: TriageEventRecord & { observe
       eq(coordinatorEvents.payload, event.payload), eq(coordinatorEvents.lastTriageAttemptAt, attemptedAt),
       isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier)))
     .returning({ id: coordinatorEvents.id })
-  if (applied.length) await ownerListChanged(db, scope.userId, ['bot_chat_list'])
+  if (applied.length) await botChatChanged(db, scope.userId, scope.botId)
   return applied.length === 1
 }
 
@@ -297,7 +297,7 @@ export async function appendMessages(userId: string, holder: string, unmasked: M
         return { id: crypto.randomUUID(), userId, botId, position: first + index,
           message: { ...plain, ...(message.role === 'assistant' && streamId ? { mikkaStreamId: streamId } : {}), ...(stop ? { mikkaStopped: true } : {}) } }
       }))
-      await ownerListChanged(tx, userId, ['bot_chat_list'])
+      await botChatChanged(tx, userId, botId)
     }
     const now = new Date()
     const renewed = await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning && maskCredentials(warning), lastErrorAt: warning ? now : null, updatedAt: now })
@@ -335,7 +335,7 @@ export async function retryFailedTurn(userId: string, botId: string): Promise<bo
       dedupeKey: `turn_retry:${userId}:${botId}:${failure}`,
       payload: { text: '', postedToChat: true, retry: true },
     }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
-    if (inserted.length) await ownerListChanged(tx, userId, ['bot_chat_list'])
+    if (inserted.length) await botChatChanged(tx, userId, botId)
     return inserted.length === 1
   })
 }
@@ -351,7 +351,7 @@ export async function failTurn(userId: string, holder: string, error: string, bo
     const released = await tx.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, lastError: reason, lastErrorAt: new Date(), updatedAt: new Date() })
       .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
     if (!released.length) return
-    await ownerListChanged(tx, userId, ['bot_chat_list'])
+    await botChatChanged(tx, userId, botId)
     await coordinatorSessionChanged(tx, userId, botId)
     await tx.execute(sql`UPDATE coordinator_messages SET message = message || jsonb_build_object('mikkaFailure', ${reason}::text)
       WHERE "userId"=${userId} AND "botId"=${botId}::uuid AND message->>'role'='user'
@@ -495,8 +495,23 @@ function withImages(text: string, images: unknown): ModelMessage['content'] {
   return [{ type: 'text', text }, ...images.map(() => ({ type: 'file' as const, data: '', mediaType: 'image/jpeg' }))]
 }
 
+type ChatReadObservation = { expiries: Date[]; observedAt: number }
+
+/** Both full and version reads derive their deadline from the session/inbox they already read. */
+function chatReadObservation(session: Parameters<typeof coordinatorChatState>[0], waiting: Parameters<typeof coordinatorChatState>[1], now: Date): ChatReadObservation {
+  return { expiries: [
+    ...(coordinatorLeaseActive(session, now) && session?.leaseUntil ? [session.leaseUntil] : []),
+    ...waiting.flatMap(event => event.tier !== 'background' && event.kind !== 'matter_handoff' && event.wakeAttempts === 1 && event.wakeLeaseUntil && event.wakeLeaseUntil > now ? [event.wakeLeaseUntil] : []),
+  ], observedAt: now.getTime() }
+}
+
 /** The latest of the conversation for the chat, oldest first. */
 export async function chatView(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}): Promise<ChatView> {
+  return (await chatViewState(userId, limit, botId, window)).chat
+}
+
+/** Full readers sharing the live chat cache need its deadline, without a second version/body read. */
+export async function chatViewState(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}): Promise<{ chat: ChatView } & ChatReadObservation> {
   const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
   // Compact parts: the chat never shows reasoning text or whole tool inputs and outputs (chat-projection.ts).
   const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: compactChatMessage, createdAt: coordinatorMessages.createdAt })
@@ -518,12 +533,13 @@ export async function chatView(userId: string, limit = 200, botId: string, windo
   // An older page (history): a welcome failure there was answered by what came after it, so it is not shown.
   const items = window.through !== undefined ? read.filter(item => !item.welcome) : read
   const after = Math.max(0, (items.findLast(item => !item.pending)?.position ?? 1) - 1)
-  return {
+  const now = new Date()
+  const chat: ChatView = {
     items,
     cursor: last,
     persistedStreamIds: [...new Set(rows.flatMap(({message}) => message.role === 'assistant' && typeof message.mikkaStreamId === 'string' ? [message.mikkaStreamId] : []))],
     ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
-    ...coordinatorChatState(session, waiting, new Date(), lastMessage),
+    ...coordinatorChatState(session, waiting, now, lastMessage),
     // An event line names its thread or task as a chip (C1); its stored text is the model's, never shown.
     sources: await citationSources(userId, [...items.filter(item => item.from === 'coordinator').map(item => item.text),
       ...items.flatMap(item => item.line ? [item.line.runId && `[[run:${item.line.runId}]]`, item.line.issueId && `[[issue:${item.line.issueId}]]`].filter((text): text is string => !!text) : [])], items.flatMap(item => item.threads)),
@@ -531,6 +547,7 @@ export async function chatView(userId: string, limit = 200, botId: string, windo
     continuation: { after, prefix: await chatPrefix(userId, botId, after), cursor: last },
     ...(hasMore && rows[0] ? { historyBefore: rows[0].position } : {}),
   }
+  return { chat, ...chatReadObservation(session, waiting, now) }
 }
 
 /** Hash only the bounded prefix that preceded the last rendered item; no message body crosses the wire. */
@@ -564,6 +581,9 @@ export interface ChatVersion {
   error: string | null
 }
 
+/** The version plus when `working` changes with no write: the active turn's or a first wake's lease runs out. */
+export type ChatVersionState = ChatVersion & ChatReadObservation
+
 /**
  * The chat's version, computed in the database from the same latest `limit`
  * messages `chatView` shows (a hash of each message), plus its waiting inbox
@@ -571,6 +591,11 @@ export interface ChatVersion {
  * sends the messages themselves.
  */
 export async function chatVersion(userId: string, limit = 200, botId: string): Promise<ChatVersion> {
+  const { expiries: _expiries, observedAt: _observedAt, ...version } = await chatVersionState(userId, limit, botId)
+  return version
+}
+
+export async function chatVersionState(userId: string, limit = 200, botId: string): Promise<ChatVersionState> {
   const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
   const latest = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message })
     .from(coordinatorMessages).where(messagesOf(userId, botId)).orderBy(desc(coordinatorMessages.position)).limit(limit).as('latest')
@@ -584,11 +609,13 @@ export async function chatVersion(userId: string, limit = 200, botId: string): P
     .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt)))
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
   const lastMessage = stored.role ? { role: stored.role, ...(stored.streamId ? { streamId: stored.streamId } : {}) } : undefined
+  const now = new Date()
   return {
     version: createHash('sha256').update(`${limit}|${stored.hash}|${waiting.map(event => `${event.id}:${event.payloadVersion}`).join(',')}`).digest('hex').slice(0, 32),
     cursor: stored.last,
     ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
-    ...coordinatorChatState(session, waiting, new Date(), lastMessage),
+    ...coordinatorChatState(session, waiting, now, lastMessage),
+    ...chatReadObservation(session, waiting, now),
   }
 }
 

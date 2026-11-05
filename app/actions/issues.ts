@@ -35,6 +35,7 @@ import { queryVersion } from '@/lib/db/query-version'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
 import { issueListChanged } from '@/lib/live/lists'
+import { issueRelationsChanged } from '@/lib/live/issue-detail'
 import { ownerListRead } from '@/lib/live/list-read-server'
 import { issuePrefixes, linearIssueLinks, linearTeamSyncs } from '@/lib/db/schema'
 
@@ -180,6 +181,8 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         if (!issue) return { error: 'issueStale' }
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...activityActor(userId) })
         await issueListChanged(tx, id, latest.title !== issue.title)
+        // Title, status and priority show in every connected task's relations panel.
+        await issueRelationsChanged(tx, [id])
         return { issue: await issueView(issue, tx) }
       })
       if ('issue' in result && result.issue?.scope === 'workspace' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })

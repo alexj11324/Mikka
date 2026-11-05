@@ -1,17 +1,10 @@
 {
   "$comment": "Server calls each page makes in one idle, visible minute with a healthy live channel (tests/idle-request-budget.test.tsx). A call not listed is allowed 0. Budgets only go down: the test fails when a page goes over, and when it measures at or below half a budget, so lower the number (remove the entry at 0).",
   "pages": {
-    "board": {
-      "coordinator.pollCoordinatorChat": { "max": 2, "tracking": "#1212", "why": "the Coordinator sidebar polls its chat every 30 s while quiet" }
-    },
+    "board": {},
     "task-detail": {
-      "agents.listIssueThreads": { "max": 12, "tracking": "#1212", "why": "issue thread list, refreshInterval 5 s while a thread is active (runListRefreshInterval); it includes teammates' threads, whose run changes have no live key yet" },
-      "collaboration.listMembers": { "max": 6, "tracking": "#1212", "why": "issue members, refreshInterval 10 s" },
-      "issue-operations.listIssueConnections": { "max": 6, "tracking": "#1212", "why": "issue relations, refreshInterval 10 s" }
     },
-    "bot-chat": {
-      "coordinator.pollCoordinatorChat": { "max": 2, "tracking": "#1212", "why": "chat poll every 30 s while quiet (lib/coordinator/chat-poll-interval.ts)" }
-    },
+    "bot-chat": {},
     "devices": {
       "agents.listDevices": { "max": 11, "tracking": "#1212", "why": "device list, refreshInterval 5 s" }
     },

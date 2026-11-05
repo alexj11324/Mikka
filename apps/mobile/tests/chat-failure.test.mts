@@ -31,6 +31,14 @@ test('hosted billing and model refusals open their corresponding recovery', () =
   assert.equal(failureLine({ kind: 'hosted', code: 'usage_concurrency_limit' }).retry, true)
 })
 
+test('API balance uses the shared fixed copy and model action, while ordinary failures retain retry', () => {
+  const messages = JSON.parse(readFileSync(new URL('../../../messages/zh-CN.json', import.meta.url), 'utf8'))
+  assert.deepEqual(failureLine({ kind: 'failed', reason: 'balance' }), {
+    text: messages.Coordinator.apiBalance, retry: false, recovery: 'model',
+  })
+  assert.deepEqual(failureLine({ kind: 'failed' }), { text: messages.Coordinator.failedTitle, retry: true, recovery: null })
+})
+
 test('billing recovery retains the selected workspace rather than a browser default', () => {
   const workspace = 'F778B9A0-ECEC-4ADE-97A6-B7AA4221A177'
   assert.equal(failureSettingsPath('billing', workspace), `/settings?section=billing&workspace=${workspace.toLowerCase()}`)

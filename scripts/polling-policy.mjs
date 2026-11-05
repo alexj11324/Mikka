@@ -30,14 +30,10 @@ const local = (reason, hits) => ({ kind: 'local', reason, hits })
 export const pollingAllowlist = {
   // Web: SWR polling that reads our database.
   'components/artifacts/artifact-viewer.tsx': db(web, 'artifact detail re-read every 15 s', 1),
-  'components/coordinator/coordinator-chat.tsx': db(web, 'chat re-read on chatPollInterval while a turn runs', 1),
   'components/desktop/desktop-integration.tsx': db(web, 'desktop link status re-read every POLL_MS', 1),
   'components/devices/devices-settings.tsx': db(web, 'device list re-read every 5 s', 1),
   'components/workspace/group-chat-view.tsx': db(web, 'group chat re-read every ANSWER_POLL_MS while an agent answers', 2),
-  'components/workspace/issue-members.tsx': db(web, 'issue members re-read every 10 s', 1),
   'components/workspace/issue-pull-request-link.tsx': db(web, 'linked pull request status re-read every 60 s through our API', 1),
-  'components/workspace/issue-relations.tsx': db(web, 'issue connections re-read every 10 s', 1),
-  'components/workspace/issue-threads.tsx': db(web, 'issue thread list re-read on runListRefreshInterval', 1),
   'hooks/use-computer.ts': db(web, 'computer grant re-read before it expires (at least every 5 s)', 1),
   'components/swr-defaults.tsx': db(web, 'LIST_POLL_MS, the 60 s list poll interval', 1),
   'lib/coordinator/chat-poll.ts': db(web, 'FULL_READ_EVERY_MS: the chat poll does a full read every 60 s', 1),

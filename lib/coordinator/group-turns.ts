@@ -13,6 +13,7 @@ import { recordGroupFeedback } from './group-decision-feedback'
 import { groupCopy, readGroupLocale } from './group-copy'
 import { openGroupTurnSession } from './group-turn-session'
 import { groupListChanged, runListChanged } from '@/lib/live/lists'
+import { runChanged } from '@/lib/live/panels'
 import { GROUP_TURN_STOP_CHANNEL, listenOn, notifyChannel, type Listener } from '@/lib/db/listen'
 
 export const GROUP_MAX_ROUNDS = GROUP_MAX_RESPONDERS
@@ -69,7 +70,7 @@ export async function stopGroupTurns(client: Pick<PoolClient, 'query'>, conversa
   const runs = rows.flatMap(row => row.activeRunId ? [row.activeRunId] : [])
   if (runs.length) {
     const stopped = await client.query<{ id: string }>(`UPDATE agent_runs SET status='stopped',"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now() WHERE id=ANY($1::uuid[]) AND kind='group_chat' AND status='running' RETURNING id`, [runs])
-    for (const row of stopped.rows) await runListChanged(client, row.id)
+    for (const row of stopped.rows) { await runListChanged(client, row.id); await runChanged(client, row.id) }
   }
   return rows.length
 }
@@ -109,7 +110,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     await client.query(`UPDATE group_turns SET status='queued',error=NULL,"nextDecisionAt"=NULL WHERE "conversationId"=$1 AND status='failed' AND error='group_judgment_pending' AND "nextDecisionAt"<=now()`,[conversationId])
     // Recover only this group's linked chat runs; never alter daemon/issue runs.
     const interruptedRuns = await client.query<{ id: string }>(`UPDATE agent_runs SET status='failed',"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now() WHERE id IN (SELECT "activeRunId" FROM group_turns WHERE "conversationId"=$1 AND status='running') AND kind='group_chat' AND status='running' RETURNING id`, [conversationId])
-    for (const row of interruptedRuns.rows) await runListChanged(client, row.id)
+    for (const row of interruptedRuns.rows) { await runListChanged(client, row.id); await runChanged(client, row.id) }
     await client.query(`UPDATE group_turns SET "activeRunId"=NULL,status='failed',"agentId"=NULL,"botId"=NULL,error='interrupted_generation_not_replayed',trace=trace || '{"status":"failed"}'::jsonb,"updatedAt"=now() WHERE "conversationId"=$1 AND status='running'`, [conversationId])
     const { rows } = await client.query(`SELECT t.*, m.body,m.mentions,m.position,c."workspaceId",c."createdBy",c."leadAgentId",c."leadBotId" FROM group_turns t
       JOIN conversation_messages m ON m.id=t."messageId" JOIN conversations c ON c.id=t."conversationId"

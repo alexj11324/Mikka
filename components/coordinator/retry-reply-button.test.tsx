@@ -14,6 +14,9 @@ let buildCheck = async () => currentBuild
 let submissions = 0, removedNotes = 0
 const submitted: { text: string; context: { retryOf?: number } | undefined }[] = []
 let chatItems: import('@/lib/coordinator/context').ChatItem[] = []
+let chatError: string | null = null
+let chatEnabled = false
+const modelPicks: (string | null)[] = []
 // A chat whose welcome failed: its read, the model menu's 可用, the refusal code and whether the tab is visible.
 let chatData: Record<string, unknown> | null = null
 let menu: unknown = undefined
@@ -52,7 +55,7 @@ mock.module(new URL('../../lib/app-build.ts', import.meta.url).href, { namedExpo
 mock.module('next/navigation', { namedExports: { usePathname: () => pathname, useSearchParams: () => new URLSearchParams(search) } })
 mock.module(new URL('../../i18n/navigation.ts', import.meta.url).href, { namedExports: { Link: plain, useRouter: () => ({ push: nothing }), usePathname: () => pathname } })
 mock.module('sonner', { namedExports: { toast: Object.assign((...args: unknown[]) => { notices.push(args) }, { error: nothing }) } })
-mock.module('swr', { defaultExport: (key: unknown) => Array.isArray(key) && key[0] === 'bot-model-menu' ? { data: menu, mutate: async () => {} } : ({ data: chatData ?? { items: chatItems, enabled: false, working: false, error: null, artifacts: {} }, mutate: async () => {} }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }) } })
+mock.module('swr', { defaultExport: (key: unknown) => Array.isArray(key) && key[0] === 'bot-model-menu' ? { data: menu, mutate: async () => {} } : ({ data: chatData ?? { items: chatItems, enabled: chatEnabled, working: false, error: chatError, artifacts: {} }, mutate: async () => {} }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }), unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 mock.module(new URL('./use-coordinator-submit.ts', import.meta.url).href, { namedExports: { useCoordinatorSubmit: () => ({ submit: async (text: string, context?: { retryOf?: number }) => { submissions++; submitted.push({ text, context }); return { kind: 'accepted' } }, failureMessage: () => 'fixture failed' }) } })
 mock.module(new URL('./use-coordinator-stream.ts', import.meta.url).href, { namedExports: { useCoordinatorStream: () => ({ replies: [], error: false, reconnect: nothing }) } })
 mock.module(new URL('./chat-composer.tsx', import.meta.url).href, { namedExports: { ChatComposer: (props: { value: string; onChange: (value: string) => void; onSubmit: () => void; ref: Ref<HTMLTextAreaElement>; quote?: ReactNode }) => {
@@ -78,7 +81,7 @@ for (const [file, names] of [
   ['../billing/hosted-refusal-notice.tsx', ['HostedRefusalNotice']], ['../nav/bot-avatar.tsx', ['BotAvatar', 'COORDINATOR_AVATAR']],
   ['../suggestions/mobile-card.tsx', ['SentSuggestion']], ['../artifacts/artifact-card.tsx', ['ArtifactCard', 'ArtifactChip']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, nothing])) })
-mock.module(new URL('./bot-model-picker.tsx', import.meta.url).href, { namedExports: { BotModelPicker: nothing, openModelPicker: nothing, botModelMenuKey: (botId: string | null) => ['bot-model-menu', botId ?? 'coordinator'] } })
+mock.module(new URL('./bot-model-picker.tsx', import.meta.url).href, { namedExports: { BotModelPicker: nothing, openModelPicker: (botId: string | null) => { modelPicks.push(botId) }, botModelMenuKey: (botId: string | null) => ['bot-model-menu', botId ?? 'coordinator'] } })
 let quoteReply: (text: string) => void = nothing
 let quoteRemovals = 0
 mock.module(new URL('../chat/selection-quote.tsx', import.meta.url).href, { namedExports: { QUOTE_SOURCE_ATTR: 'data-quote-source', SelectionQuote: ({ onQuote }: { onQuote: (text: string) => void }) => { quoteReply = onQuote; return null } } })
@@ -106,11 +109,42 @@ before(async () => {
   ;({ VersionGuard } = await import('../version-guard'))
   Object.defineProperty(browser.document, 'visibilityState', { configurable: true, get: () => visibility })
 })
-beforeEach(() => { chatData = null; menu = undefined; refusalCode = null; visibility = 'visible'; calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; submitted.length = 0; chatItems = []; removedNotes = 0; versionReads = 0; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
+beforeEach(() => { chatData = null; menu = undefined; refusalCode = null; visibility = 'visible'; calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; submitted.length = 0; chatItems = []; chatError = null; chatEnabled = false; modelPicks.length = 0; removedNotes = 0; versionReads = 0; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 after(() => browser.happyDOM.close())
 const render = async (onQueued = async () => {}) => { await act(async () => root.render(<RetryReplyButton botId={null} onQueued={onQueued} />)) }
 const click = async () => { await act(async () => (container.querySelector('button') as HTMLButtonElement).click()) }
+
+for (const live of [true, false]) test(`a ${live ? 'current' : 'historical'} API balance refusal opens the same Bot model picker without retrying`, async () => {
+  chatEnabled = true
+  chatError = live ? 'Step "step//@ai-sdk/workflow@2.0.80//doStreamStep" failed after 0 retries: Insufficient Balance (request_id: 11111111-1111-4111-8111-111111111111)' : null
+  chatItems = [{ id: 'fixture-balance-message', position: 84, from: 'person', text: 'fixture API balance check', tools: [], threads: [], artifacts: [], createdAt: '2026-11-05T03:07:28Z', failure: { kind: 'failed', reason: 'balance' } }]
+  const bot = { id: 'fixture-bot', name: 'fixture-bot' } as NonNullable<Parameters<typeof CoordinatorChat>[0]['bot']>
+  await act(async () => root.render(<CoordinatorChat bot={bot} onOpenIssue={nothing} userId="fixture-owner" />))
+  const notice = container.querySelector(`[data-message-failure="${live ? 'live' : 'past'}"]`)!
+  assert.ok(notice)
+  assert.match(notice.textContent ?? '', /Coordinator.apiBalance/)
+  assert.doesNotMatch(notice.textContent ?? '', /Common.retry|Coordinator.resend|request_id|doStreamStep|11111111|Billing/)
+  assert.equal(notice.querySelectorAll('button').length, 1)
+  assert.equal(notice.querySelector('button')?.textContent, 'Coordinator.modelPicker.changeModel')
+  await act(async () => notice.querySelector<HTMLButtonElement>('button')!.click())
+  assert.deepEqual(modelPicks, ['fixture-bot'])
+  assert.equal(calls, 0)
+  assert.equal(submissions, 0)
+})
+
+test('a generic current reply failure retains its explicit retry action', async () => {
+  chatEnabled = true
+  chatError = 'model timed out'
+  chatItems = [{ id: 'fixture-generic-message', position: 85, from: 'person', text: 'fixture generic check', tools: [], threads: [], artifacts: [], createdAt: '2026-11-05T03:08:00Z', failure: { kind: 'failed' } }]
+  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  const notice = container.querySelector('[data-message-failure="live"]')!
+  assert.match(notice.textContent ?? '', /Coordinator.failedTitle/)
+  assert.equal(notice.querySelector('button')?.textContent, 'Common.retry')
+  await act(async () => notice.querySelector<HTMLButtonElement>('button')!.click())
+  assert.equal(calls, 1)
+  assert.deepEqual(modelPicks, [])
+})
 
 test('existing window drafts migrate once and survive a chat remount in the scoped store', async () => {
   browser.sessionStorage.clear()
