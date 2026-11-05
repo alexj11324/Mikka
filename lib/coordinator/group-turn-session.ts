@@ -1,5 +1,6 @@
 import { Pool, type PoolConfig } from 'pg'
 import { directPoolOptions } from '../../scripts/postgres-connection.mjs'
+import { observePoolCommits } from '../db/commit-effects'
 
 /** A group worker holds a session lock across provider I/O. Neon's transaction
  * pooler may lend the same backend to another logical client during that I/O,
@@ -14,9 +15,11 @@ export function groupTurnSessionOptions(options: PoolConfig): PoolConfig {
  * an advisory-locked backend to a reusable pool, including on errors. */
 export async function openGroupTurnSession(database: Pool) {
   const sessions = new Pool(groupTurnSessionOptions(database.options))
+  observePoolCommits(sessions)
   const client = await sessions.connect().catch(async error => { await sessions.end(); throw error })
   let lost = false, closed: Promise<void> | undefined
-  const invalidate = () => { lost = true }
+  const losses = new Set<() => void>()
+  const invalidate = () => { lost = true; for (const callback of losses) callback() }
   client.on('error', invalidate); client.on('end', invalidate)
   sessions.on('error', invalidate)
   const assertHeld = () => { if (lost) throw new Error('group_turn_session_lost') }
@@ -27,5 +30,11 @@ export async function openGroupTurnSession(database: Pool) {
       client.off('error', invalidate); client.off('end', invalidate)
     }
   })()
-  return { client, assertHeld, isLost: () => lost, close }
+  /** Called once the physical session is gone (its locks with it). */
+  const onLost = (callback: () => void) => {
+    if (lost) queueMicrotask(callback)
+    losses.add(callback)
+    return () => { losses.delete(callback) }
+  }
+  return { client, assertHeld, isLost: () => lost, onLost, close }
 }

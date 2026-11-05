@@ -8,6 +8,7 @@ import { issueView } from '@/lib/task-identifier-server'
 import type { ActivityActor } from '@/lib/activity-actor'
 import { readableIssueContentOnServer as readableIssueContent } from '@/lib/issue-editor-schema-snapshot'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
+import { issueListChanged } from './live/lists'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -45,5 +46,6 @@ export async function createIssueForUserInTransaction(tx: Transaction, userId: s
     priority: issue.priority,
     ...actor,
   })
+  await issueListChanged(tx, id)
   return issueView(issue, tx)
 }

@@ -13,6 +13,7 @@ import { emptyRunReport } from '@mikka/protocol/run'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { recordPushGrant } from './support/github-app-stub'
 import { ALLOWED_MODEL, codexWithModel, seedAllowedModel } from './support/allowed-model'
+import type { DecisionAnswer } from '../lib/coordinator/decision'
 
 test('provider failure continues the same task through its authorized preferred models', { skip: !dbUrl }, async t => {
   const names = ['WORKSPACE_SECRETS_KEY', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED'] as const
@@ -22,7 +23,10 @@ test('provider failure continues the same task through its authorized preferred 
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
   delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
   const next = await import('next/server')
-  mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
+  let captureAfter: (() => Promise<void>)[] | undefined
+  mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse,
+    after: (work: () => Promise<void>) => { captureAfter?.push(work) },
+  } })
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 4 })
   const { pool: appPool } = await import('../lib/db')
@@ -45,6 +49,7 @@ test('provider failure continues the same task through its authorized preferred 
       if (value === undefined) delete process.env[name]; else process.env[name] = value
     }
     try {
+      await pool.query('DELETE FROM factory_tasks WHERE "userId" = ANY($1)', [users])
       await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
       await pool.query('DELETE FROM model_api_key_runs m USING agent_runs r WHERE r.id=m."runId" AND r."userId" = ANY($1)', [users])
       await pool.query('DELETE FROM byos_native_runs n USING agent_runs r WHERE r.id=n."runId" AND r."userId" = ANY($1)', [users])
@@ -54,6 +59,8 @@ test('provider failure continues the same task through its authorized preferred 
       await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [users])
       await pool.query('DELETE FROM model_order_entries WHERE "ownerId" = ANY($1)', [users])
       await pool.query('DELETE FROM model_order_settings WHERE "ownerId" = ANY($1)', [users])
+      await pool.query('DELETE FROM factory_agent_profile_versions WHERE "ownerId" = ANY($1)', [users])
+      await pool.query('DELETE FROM factory_agent_profiles WHERE "ownerId" = ANY($1)', [users])
       await pool.query('DELETE FROM bot_model_choices WHERE "ownerId" = ANY($1)', [users])
       await pool.query('DELETE FROM model_api_keys WHERE "ownerId" = ANY($1)', [users])
       await pool.query('DELETE FROM byos_bindings WHERE "ownerId" = ANY($1)', [users])
@@ -97,7 +104,7 @@ test('provider failure continues the same task through its authorized preferred 
   type Person = Awaited<ReturnType<typeof person>>
   const scope = (p: Person) => ({ ownerId: p.id, workspaceId: p.workspaceId, botId: p.botId })
   /** Use the same add/remove/reorder operations as Settings; no SQL snapshot edits. */
-  const preferences = async (p: Person, entries: Entry[]) => {
+  const preferences = async (p: Person, entries: (Entry | { harness: Harness; model: string; source: { kind: 'subscription'; connectionId: string } })[]) => {
     await order.changeOrder(pool, scope(p), { kind: 'location', location: 'local' })
     await order.changeOrder(pool, scope(p), { kind: 'add', entries })
     const wanted = new Set(entries.map(entryKey))
@@ -121,6 +128,38 @@ test('provider failure continues the same task through its authorized preferred 
       ...(options.pinned ? { pinnedDeviceId: p.deviceId } : {}),
     }, p.botId)
     // Device lifecycle fields are the only run fields seeded after admission.
+    await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"worktreePath"=$3,
+      "startedAt"=now(),"leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [runId, `session-${runId}`, `/tmp/provider-${runId}`])
+    return runId
+  }
+  const routedSelection = async (p: Person, model: string, issueId: string, profileId?: string, harness: Harness = 'claude_code') => {
+    const decision: typeof import('../lib/coordinator/decide').invokeDecision = async (_purpose, input) => {
+      const body = JSON.parse(typeof input === 'string' ? input : input.text) as { candidates: { id: string; model: string }[] }
+      const candidate = body.candidates.find(item => item.model === model)
+      assert.ok(candidate, 'the light model must be a real runnable candidate')
+      const answers = new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>(
+        Object.entries({ difficulty: 'easy', model: candidate.id, effort: 'low', reason: 'difficulty_fit' })
+          .map(([name, choice]) => [name, { name, type: 'choice', choice, confidence: .99 }]))
+      return { answers, execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'fixture-routing',
+        startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
+    }
+    const { resolveAgentProfileDispatch } = await import('../lib/factory/agent-profile')
+    const picked = await resolveAgentProfileDispatch(pool, scope(p), { issueId, stage: 'execute', location: 'local',
+      deviceId: p.deviceId, defaultHarness: harness, ...(profileId ? { profileId } : { defaultOnly: true }) }, { modelDecision: decision })
+    const target = picked.target
+    assert.equal(target.kind, 'device')
+    if (target.kind !== 'device') assert.fail('The fixture must select its real local executor')
+    assert.equal(target.model, model)
+    assert.equal(target.entry.source.kind, 'api_key')
+    if (target.entry.source.kind !== 'api_key') assert.fail('The fixture must select its admitted key')
+    return { model: target.model,
+      apiKeyId: target.entry.source.keyId, agentProfile: picked.agentProfile,
+      modelDispatch: { mode: 'preference' as const, location: 'local' as const, entry: target.entry, routing: target.routing } }
+  }
+  const routedRunning = async (p: Person, model: string) => {
+    const issueId = await task(p.id)
+    const selected = await routedSelection(p, model, issueId)
+    const { runId } = await queueRun(p.id, { issueId, agentId: p.agents.claude_code, repo: p.remote, ...selected }, p.botId)
     await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"worktreePath"=$3,
       "startedAt"=now(),"leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [runId, `session-${runId}`, `/tmp/provider-${runId}`])
     return runId
@@ -151,6 +190,262 @@ test('provider failure continues the same task through its authorized preferred 
     await preferences(p, entries)
     return { p, first, second, entries }
   }
+
+  const automaticFailure = async (label: string, options: { subscription?: boolean; onlyLight?: boolean } = {}) => {
+    const [{ AgentProfileStore }, { createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun },
+      { automaticFactoryDispatch }, { createFactoryReconciler }, { factoryCheckGates }, { factoryCheckIndependent },
+      { ensureDeviceRepository }] = await Promise.all([
+      import('../lib/factory/agent-profile'), import('../lib/factory/store'), import('../lib/factory/dispatch'), import('../lib/agent-runs'),
+      import('../lib/factory/automatic-dispatch'), import('../lib/factory/reconcile'), import('../lib/factory/checks'),
+      import('../lib/factory/check-independence'), import('../lib/device-repositories'),
+    ])
+    const p = await person(label), issueId = await task(p.id), epoch = randomUUID()
+    const harness = options.subscription ? 'codex' : 'claude_code'
+    const light = options.subscription ? 'gpt-6-luna' : 'claude-haiku-5-5'
+    const standard = options.subscription ? 'gpt-6-sol' : 'claude-sonnet-5-5'
+    const credential = await addKey(p.id, options.subscription ? 'openai' : 'anthropic',
+      options.subscription || options.onlyLight ? [light] : [standard, light])
+    if (options.subscription) {
+      const { connectionId } = await seedAllowedModel(pool, p.id, { workspaceId: p.workspaceId })
+      await pool.query('UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1',
+        [connectionId, JSON.stringify({ revision: '1', models: [standard] })])
+      await pool.query('UPDATE byos_bindings SET "modelId"=$2 WHERE "connectionId"=$1', [connectionId, standard])
+      await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [p.deviceId, JSON.stringify([
+        { harness: 'codex', installed: true, subscriptionBroker: true, toolApproval: true,
+          modelSlots: [{ slot: standard, model: standard, name: standard }] },
+      ])])
+      await preferences(p, [{ harness, model: standard, source: { kind: 'subscription', connectionId } }, entry(harness, light, credential.id)])
+    } else await preferences(p, (options.onlyLight ? [light] : [standard, light]).map(model => entry(harness, model, credential.id)))
+    const profiles = new AgentProfileStore(pool)
+    const profile = await profiles.create(scope(p), { name: `Frozen ${label} role`, roles: ['implementation'],
+      harness, model: { mode: 'inherit' }, effort: 'low', instructions: 'Keep this frozen responsibility through the existing repair path.' })
+    const selected = await routedSelection(p, light, issueId, profile.id, harness)
+    await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
+      VALUES ($1,$2,$3,$4,'user_message',$5,'{"text":"Retry the existing implementation within its original authority"}')`,
+    [epoch, p.id, p.botId, issueId, `cascade:${epoch}`])
+    const repo = await ensureDeviceRepository(p.id, p.deviceId, p.remote)
+    const factory = createFactoryStore(pool, async (owner, id, tx) =>
+      (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [id, owner])).rowCount === 1, p.botId,
+    { independent: factoryCheckIndependent, gates: factoryCheckGates })
+    const routed = await factory.route(p.id, { issueId, sourceEventId: epoch, eventId: randomUUID(), rationale: 'Automatic repair transaction boundary fixture' })
+    const dispatch = createFactoryDispatch(pool, factory, (tx, owner, input, bot, context) =>
+      queueFactoryRun(tx, owner, input, bot, context, undefined, { ...selected, readOnly: true }))
+    const first = await dispatch(p.id, { binding: factoryBinding(routed.task), agentId: p.agents[harness], deviceRepoId: repo.id })
+    await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='agent_error',"startedAt"=now()-interval '1 second',
+      "finishedAt"=now(),"sessionId"=$2,report=$3 WHERE id=$1`,
+    [first.runId, `automatic-source-${first.runId}`, JSON.stringify(emptyRunReport('Synthetic terminal implementation failure'))])
+    const original = await row(first.runId), automatic = automaticFactoryDispatch(pool)
+    const bindings = async () => (await pool.query(`SELECT id,"consumerId","connectionId","connectionRevision","modelId","createdAt"
+      FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id`, [p.id])).rows
+    const currentRun = async (query: Pick<import('pg').PoolClient, 'query'> = pool) => {
+      const { rows: [run] } = await query.query(`SELECT r.* FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId"
+        JOIN agent_runs r ON r.id=a."runId" WHERE t.id=$1`, [routed.task.id])
+      return run
+    }
+    return { p, profile, profiles, factory, first, original, automatic, createFactoryReconciler, bindings, currentRun, light, standard }
+  }
+
+  for (const enabled of [true, false]) await t.test(`routed light failure ${enabled ? 'raises one tier before the failed list position' : 'respects a disabled routing switch'}`, async () => {
+    const p = await person(`provider-routing-${enabled}`)
+    const stronger = await addKey(p.id, 'anthropic', ['claude-opus-5-5', 'claude-sonnet-5-5'])
+    const light = await addKey(p.id, 'deepseek', ['claude-haiku-5-5'])
+    await preferences(p, [entry('claude_code', 'claude-opus-5-5', stronger.id),
+      entry('claude_code', 'claude-sonnet-5-5', stronger.id), entry('claude_code', 'claude-haiku-5-5', light.id)])
+    const runId = await routedRunning(p, 'claude-haiku-5-5')
+    const admitted = await row(runId)
+    assert.equal(admitted.agentDefinition.modelDispatch.routing.tier, 'light')
+    if (!enabled) await order.changeOrder(pool, scope(p), { kind: 'autoRouting', enabled: false })
+    await end(p, runId, balance)
+    const original = await row(runId), continuations = await children(runId)
+    if (!enabled) {
+      assert.equal(continuations.length, 0)
+      assert.equal(original.report.modelFallback.state, 'blocked')
+      return
+    }
+    assert.equal(continuations.length, 1)
+    const continuation = continuations[0]
+    assert.equal(continuation.agentDefinition.model, 'claude-sonnet-5-5')
+    assert.deepEqual(continuation.agentDefinition.modelDispatch.routing, { version: 1, difficulty: 'easy',
+      model: 'claude-sonnet-5-5', harness: 'claude_code', tier: 'standard', effort: 'low', reason: 'escalated', previousModel: 'claude-haiku-5-5' })
+    assert.deepEqual(continuation.agentDefinition.agentProfile,
+      { ...admitted.agentDefinition.agentProfile, targetEntry: continuation.agentDefinition.modelDispatch.entry })
+    assert.equal(providerContinuationMatches(original, continuation), true, 'the frozen definition and host receipt must agree')
+    assert.equal(original.report.modelFallback.nextDefinitionDigest, continuation.agentDefinition.definitionDigest)
+    assert.equal(original.report.modelFallback.attempted.length, 2, 'only the light source and selected standard entry have been tried')
+    const assignment = await claim(p, continuation.id)
+    assert.equal(assignment.effort, 'low')
+    assert.equal(assignment.resumeSessionId, undefined, 'a changed Profile target starts a fresh native session')
+    await recoverProviderFailure(pool, p.id, runId)
+    assert.equal((await children(runId)).length, 1, 'completion replay cannot spend another tier or add a child')
+  })
+
+  for (const failure of ['execute', 'review'] as const) await t.test(`automatic ${failure} repair raises the inherited Profile one tier through real Factory admission`, async () => {
+    const [{ AgentProfileStore }, { createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun },
+      { automaticFactoryDispatch }, { createFactoryReconciler }, { factoryCheckGates }, { factoryCheckIndependent },
+      { admitProfileSelection }, { profileNativeSessionMatches }, { ensureDeviceRepository }, { workerDefinitionDigest }] = await Promise.all([
+      import('../lib/factory/agent-profile'), import('../lib/factory/store'), import('../lib/factory/dispatch'), import('../lib/agent-runs'),
+      import('../lib/factory/automatic-dispatch'), import('../lib/factory/reconcile'), import('../lib/factory/checks'), import('../lib/factory/check-independence'),
+      import('../lib/factory/profile-admission'), import('../lib/factory/profile-native-session'), import('../lib/device-repositories'), import('../lib/agent-kit/worker-digest'),
+    ])
+    const p = await person(`automatic-routing-${failure}`), issueId = await task(p.id), epoch = randomUUID()
+    const credential = await addKey(p.id, 'anthropic', ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'])
+    await preferences(p, ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'].map(model => entry('claude_code', model, credential.id)))
+    const profile = await new AgentProfileStore(pool).create(scope(p), { name: `Frozen ${failure} role`, roles: ['implementation'],
+      harness: 'claude_code', model: { mode: 'inherit' }, effort: 'low', instructions: 'Preserve this exact implementation responsibility.' })
+    const selected = await routedSelection(p, 'claude-haiku-5-5', issueId, profile.id)
+    await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
+      VALUES ($1,$2,$3,$4,'user_message',$5,'{"text":"Fix the acceptance fixture and retain its standing constraints"}')`, [epoch, p.id, p.botId, issueId, `cascade:${epoch}`])
+    const repo = await ensureDeviceRepository(p.id, p.deviceId, p.remote)
+    const factory = createFactoryStore(pool, async (owner, id, tx) =>
+      (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [id, owner])).rowCount === 1, p.botId,
+    { independent: factoryCheckIndependent, gates: factoryCheckGates })
+    const routed = await factory.route(p.id, { issueId, sourceEventId: epoch, eventId: randomUUID(), rationale: 'Real automatic routing cascade fixture' })
+    const dispatch = createFactoryDispatch(pool, factory, (tx, owner, input, bot, context) =>
+      queueFactoryRun(tx, owner, input, bot, context, undefined, { ...selected, readOnly: true }))
+    const first = await dispatch(p.id, { binding: factoryBinding(routed.task), agentId: p.agents.claude_code, deviceRepoId: repo.id })
+    const sha = 'a'.repeat(40), sessionId = `automatic-source-${first.runId}`
+    await pool.query(`UPDATE agent_runs SET status=$2,"stopReason"=$3,"startedAt"=now()-interval '1 second',"finishedAt"=now(),
+      "sessionId"=$4,report=$5 WHERE id=$1`, [first.runId, failure === 'execute' ? 'failed' : 'succeeded', failure === 'execute' ? 'agent_error' : 'submitted', sessionId,
+      JSON.stringify(failure === 'execute' ? emptyRunReport('Synthetic terminal implementation failure') : { ...emptyRunReport('Synthetic candidate'), sourceCommit: sha, publish: { commit: sha }, verify: { status: 'passed' } })])
+    const original = await row(first.runId)
+    const automatic = automaticFactoryDispatch(pool)
+    if (failure === 'execute') {
+      const reconciler = createFactoryReconciler(pool, factory, undefined, {}, p.botId, async (tx, store, prior, run) => {
+        const pending = await store.lockTask(tx, p.id, prior.id)
+        const target = await resolveModelDispatch(pool, scope(p), null, 'local', p.deviceId, { harness: 'claude_code',
+          routing: { issueId, stage: 'execute', previous: original.agentDefinition.modelDispatch.routing, escalate: true, effort: 'low' } })
+        assert.equal(target.kind, 'device')
+        if (target.kind !== 'device' || target.entry.source.kind !== 'api_key') assert.fail('The authorized standard target must be runnable')
+        const admission = { ownerId: p.id, workspaceId: p.workspaceId, issueId, sourceRunId: first.runId,
+          harness: 'claude_code', model: target.model, apiKeyId: target.entry.source.keyId,
+          selection: { ...selected.agentProfile!, targetEntry: target.entry } }
+        await assert.rejects(admitProfileSelection(tx, admission), { message: 'agentProfileUnavailable' }, 'copied role without a Factory context grants no new target')
+        await assert.rejects(admitProfileSelection(tx, { ...admission, factoryContext: { attemptId: randomUUID(), sourceEventId: epoch } }),
+          { message: 'agentProfileUnavailable' }, 'another attempt cannot authorize this repair')
+        await assert.rejects(admitProfileSelection(tx, { ...admission, factoryContext: { attemptId: pending.attemptId, sourceEventId: randomUUID() } }),
+          { message: 'agentProfileUnavailable' }, 'another request epoch cannot authorize this repair')
+        assert.equal(await admitProfileSelection(tx, { ...admission, factoryContext: { attemptId: pending.attemptId, sourceEventId: epoch } }), undefined,
+          'the current host repair admits a fresh session without an origin grant')
+        return automatic(tx, store, prior, run)
+      })
+      await reconciler.run(p.id, first.runId)
+    } else {
+      let state = await factory.apply(p.id, first.binding, randomUUID(), { action: 'candidate', runId: first.runId,
+        candidate: { sha, repository: p.remote, environment: `device:${p.deviceId}`, scope: `issue:${issueId}` } })
+      state = await factory.apply(p.id, factoryBinding(state.task), randomUUID(), { action: 'finish', status: 'passed', reason: 'Synthetic completed implementation',
+        evidence: [{ artifact: `run-report:${first.runId}`, kind: 'report', runId: first.runId, sessionId, candidateId: state.task.candidateId,
+          sha, environment: `device:${p.deviceId}`, recordedAt: new Date().toISOString() }], output: {} })
+      state = await factory.apply(p.id, factoryBinding(state.task), randomUUID(), { action: 'advance', stage: 'review', reason: 'Independent review' })
+      const checkModel = await chooseLocalRunModel(pool, scope(p), { id: p.agents.claude_code, deviceId: p.deviceId, harness: 'claude_code' })
+      assert.ok(!('error' in checkModel))
+      const checkDispatch = createFactoryDispatch(pool, factory, (tx, owner, input, bot, context) =>
+        queueFactoryRun(tx, owner, input, bot, context, undefined, { ...checkModel, readOnly: true }))
+      const check = await checkDispatch(p.id, { binding: factoryBinding(state.task), agentId: p.agents.claude_code, deviceRepoId: repo.id })
+      const reviewSession = `review-changes-${check.runId}`
+      await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"startedAt"=now()-interval '1 second',"finishedAt"=now(),"sessionId"=$2,report=$3 WHERE id=$1`,
+        [check.runId, reviewSession, JSON.stringify({ ...emptyRunReport('Changes requested'), check: { sha, readOnly: true },
+          filesChanged: [], criteria: [{ text: 'Acceptance fixture needs a correction', passed: false, evidence: 'Synthetic independent check observation' }] })])
+      const { reconcileFactoryCheck } = await import('../lib/factory/reconcile-check')
+      const reconciler = createFactoryReconciler(pool, factory, undefined,
+        { review: reconcileFactoryCheck, verify: reconcileFactoryCheck }, p.botId, automatic)
+      await reconciler.run(p.id, check.runId)
+    }
+    const current = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [routed.task.id])).rows[0]
+    assert.equal(current.stage, 'execute'); assert.equal(current.status, 'running', current.reason)
+    const attempt = (await pool.query('SELECT * FROM factory_attempts WHERE id=$1', [current.attemptId])).rows[0]
+    const repaired = await row(attempt.runId)
+    assert.notEqual(repaired.id, first.runId)
+    assert.equal(repaired.agentDefinition.model, 'claude-sonnet-5-5')
+    assert.deepEqual(repaired.agentDefinition.modelDispatch.routing, { version: 1, difficulty: 'easy', model: 'claude-sonnet-5-5',
+      harness: 'claude_code', tier: 'standard', effort: 'low', reason: 'escalated', previousModel: 'claude-haiku-5-5' })
+    assert.deepEqual(repaired.agentDefinition.agentProfile, { ...original.agentDefinition.agentProfile, targetEntry: repaired.agentDefinition.modelDispatch.entry })
+    assert.equal(repaired.agentDefinition.readOnly, true)
+    assert.equal(repaired.continuesRunId, first.runId)
+    assert.equal(repaired.agentDefinition.profileOriginRunId, undefined)
+    assert.equal(repaired.agentDefinition.definitionDigest, workerDefinitionDigest(repaired.agentDefinition))
+    assert.equal(profileNativeSessionMatches(original.agentDefinition, repaired.agentDefinition), false)
+    const assignment = await claim(p, repaired.id)
+    assert.equal(assignment.resumeSessionId, undefined)
+    assert.equal(assignment.effort, 'low')
+    assert.equal((await pool.query(`SELECT 1 FROM factory_attempts WHERE "taskId"=$1 AND stage='execute'`, [routed.task.id])).rowCount, 2)
+  })
+
+  await t.test('automatic escalation rolls its subscription binding back with the real Factory transaction', async () => {
+    const setup = await automaticFailure('automatic-binding-rollback', { subscription: true })
+    const before = await setup.bindings(), failure = new Error('fixture_after_automatic_queue')
+    let queuedRunId: string | undefined
+    const reconciler = setup.createFactoryReconciler(pool, setup.factory, undefined, {}, setup.p.botId, async (tx, store, prior, run) => {
+      await setup.automatic(tx, store, prior, run)
+      const queued = await setup.currentRun(tx)
+      queuedRunId = queued.id
+      assert.notEqual(queued.id, setup.first.runId)
+      assert.equal(queued.agentDefinition.model, setup.standard)
+      assert.ok(queued.agentDefinition.subscription?.bindingId)
+      assert.equal((await tx.query('SELECT 1 FROM byos_bindings WHERE id=$1', [queued.agentDefinition.subscription.bindingId])).rowCount, 1)
+      throw failure
+    })
+    await assert.rejects(reconciler.run(setup.p.id, setup.first.runId), error => error === failure)
+    assert.ok(queuedRunId, 'the failure must occur after the real upgraded run and binding were queued')
+    assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE id=$1', [queuedRunId])).rowCount, 0)
+    assert.deepEqual(await setup.bindings(), before, 'no new binding or latest-binding timestamp may escape the outer rollback')
+    assert.equal((await setup.currentRun()).id, setup.first.runId, 'Factory binding and run rollback together')
+  })
+
+  await t.test('disabled automatic routing does not publish an unused subscription binding', async () => {
+    const setup = await automaticFailure('automatic-binding-off', { subscription: true })
+    await order.changeOrder(pool, scope(setup.p), { kind: 'autoRouting', enabled: false })
+    const before = await setup.bindings()
+    const reconciler = setup.createFactoryReconciler(pool, setup.factory, undefined, {}, setup.p.botId, setup.automatic)
+    await reconciler.run(setup.p.id, setup.first.runId)
+    const repaired = await setup.currentRun()
+    assert.notEqual(repaired.id, setup.first.runId)
+    assert.equal(repaired.agentDefinition.model, setup.light)
+    assert.deepEqual(repaired.agentDefinition.modelDispatch, setup.original.agentDefinition.modelDispatch)
+    assert.equal(repaired.agentDefinition.profileOriginRunId, setup.first.runId)
+    assert.deepEqual(await setup.bindings(), before, 'the ignored normal-order target must never write a binding')
+  })
+
+  await t.test('fresh automatic escalation rechecks workspace membership at the real outer commit', async () => {
+    const setup = await automaticFailure('automatic-membership-commit')
+    let queuedRunId: string | undefined
+    const reconciler = setup.createFactoryReconciler(pool, setup.factory, undefined, {}, setup.p.botId, async (tx, store, prior, run) => {
+      const start = await setup.automatic(tx, store, prior, run)
+      const queued = await setup.currentRun(tx)
+      queuedRunId = queued.id
+      assert.equal(queued.agentDefinition.model, setup.standard)
+      assert.equal(queued.agentDefinition.profileOriginRunId, undefined, 'an upgraded model is fresh admission')
+      await workspacePool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2',
+        [setup.p.workspaceId, setup.p.id])
+      return start
+    })
+    try {
+      await assert.rejects(reconciler.run(setup.p.id, setup.first.runId), { message: 'agentProfileScopeNotFound' })
+    } finally {
+      await workspacePool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2',
+        [setup.p.workspaceId, setup.p.id])
+    }
+    assert.ok(queuedRunId, 'membership is revoked after queue admission, before its owner commits')
+    assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE id=$1', [queuedRunId])).rowCount, 0)
+    assert.equal((await setup.currentRun()).id, setup.first.runId, 'the fresh attempt cannot outlive its revoked authority')
+  })
+
+  await t.test('same-target automatic repair preserves a started native session after its Profile is archived', async () => {
+    const setup = await automaticFailure('automatic-native-frozen-role', { onlyLight: true })
+    await setup.profiles.archive(scope(setup.p), setup.profile.id, setup.profile.version)
+    const reconciler = setup.createFactoryReconciler(pool, setup.factory, undefined, {}, setup.p.botId, setup.automatic)
+    await reconciler.run(setup.p.id, setup.first.runId)
+    const repaired = await setup.currentRun()
+    assert.notEqual(repaired.id, setup.first.runId)
+    assert.equal(repaired.agentDefinition.model, setup.light)
+    assert.equal(repaired.agentDefinition.modelDispatch.routing.reason, 'list_order')
+    assert.deepEqual(repaired.agentDefinition.agentProfile, setup.original.agentDefinition.agentProfile)
+    assert.equal(repaired.agentDefinition.profileOriginRunId, setup.first.runId, 'only the DB-validated exact native origin exempts the old role')
+    assert.equal(repaired.continuesRunId, setup.first.runId)
+    const { profileNativeSessionMatches } = await import('../lib/factory/profile-native-session')
+    assert.equal(profileNativeSessionMatches(setup.original.agentDefinition, repaired.agentDefinition), true)
+    const assignment = await claim(setup.p, repaired.id)
+    assert.equal(assignment.effort, 'low', 'first claim still admits the frozen native role')
+  })
 
   await t.test('an untouched default order persists its source and subscription continuation with the same entry identities', async () => {
     const p = await person('provider-default-order')
@@ -228,6 +523,24 @@ test('provider failure continues the same task through its authorized preferred 
     assert.equal(assignment.followUp, providerContinuationNote())
     assert.equal(assignment.modelCredential.protocol, 'openai')
     assert.equal(assignment.subscriptionBinding, undefined)
+  })
+
+  await t.test('the 优先使用的 Agent\'s list runs first, so a failure there still falls back to the other Agent\'s list', async () => {
+    // Decision 2026-11-05-0400: stored [codexA, codexB, claudeX], 优先使用的 Agent Claude Code. claudeX runs first;
+    // when it fails, codexA comes next. Taking the stored order would count codexA/B as already tried.
+    const p = await person('provider-agent-order')
+    const codexKey = await addKey(p.id, 'openai', ['fixture-codex-a', 'fixture-codex-b'])
+    const claudeKey = await addKey(p.id, 'anthropic', ['fixture-claude-x'])
+    await preferences(p, [entry('codex', 'fixture-codex-a', codexKey.id), entry('codex', 'fixture-codex-b', codexKey.id), entry('claude_code', 'fixture-claude-x', claudeKey.id)])
+    await order.changeOrder(pool, scope(p), { kind: 'preferred', harness: 'claude_code' })
+    const runId = await running(p)
+    assert.equal((await row(runId)).agentDefinition.modelDispatch.entry.model, 'fixture-claude-x')
+    await end(p, runId, balance)
+    const [continuation, ...extra] = await children(runId)
+    assert.ok(continuation, 'the Codex list is the fallback after the preferred list is exhausted')
+    assert.equal(extra.length, 0)
+    assert.equal(continuation.agentDefinition.harness, 'codex')
+    assert.equal(continuation.agentDefinition.modelDispatch.entry.model, 'fixture-codex-a')
   })
 
   for (const status of [429, 502]) await t.test(`terminal HTTP ${status} advances after native short retries, and the same harness resumes its session`, async () => {
@@ -442,4 +755,92 @@ test('provider failure continues the same task through its authorized preferred 
     assert.equal((await children(otherRun)).length, 0)
     assert.equal((await row(otherRun)).report.modelFallback.state, 'blocked')
   })
+  await t.test('committed provider recovery wakes its existing thread; rollback and replay stay silent', async liveTest => {
+    const { observePoolCommits } = await import('../lib/db/commit-effects')
+    const { liveChannelId } = await import('../lib/live/scope')
+    const { pendingProviderFallback } = await import('../lib/run-provider-fallback')
+    observePoolCommits(pool)
+    const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
+    process.env.DEVICE_GATEWAY_URL = 'https://provider-live.example.invalid'
+    process.env.DEVICE_GATEWAY_PUSH_SECRET = 'synthetic-live-fixture'
+    const scheduled: (() => Promise<void>)[] = [], sent: { path: string; events: { kind: string; id: string }[] }[] = []
+    captureAfter = scheduled
+    liveTest.mock.method(globalThis, 'fetch', async (input: string | URL | Request, options?: RequestInit) => {
+      const target = new URL(String(input))
+      assert.equal(target.hostname, 'provider-live.example.invalid', 'only the isolated live gateway is allowed')
+      assert.match(target.pathname, /^\/v1\/live\/[^/]+\/push$/)
+      // The same commit also refreshes owner lists, the bot chat and the issue's
+      // thread list (lib/live/lists, chats and issue-threads DB tests cover those
+      // keys); this case checks the existing thread's panel key.
+      const events = (JSON.parse(String(options?.body)) as { kind: string; id: string }[]).filter(event => !event.kind.endsWith('_list') && !['bot_chat', 'issue_threads'].includes(event.kind))
+      if (events.length) sent.push({ path: target.pathname, events })
+      return new Response(null, { status: 204 })
+    })
+    const drain = async () => { await Promise.all(scheduled.splice(0).map(work => work())) }
+    // A normal admission remains intact. This lifecycle-only fixture is the
+    // durable crash boundary: completion committed pending, then the host died
+    // before recoverProviderFailure. No provider call or worker success is faked.
+    const interrupted = async (label: string, kind: 'preference' | 'picked' = 'preference') => {
+      const setup = await twoModels(label)
+      const home = await seedWorkspace(pool, setup.p.id, [{ userId: setup.p.id, role: 'admin' }])
+      await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [home.id])
+      const runId = await running(setup.p, 'claude_code', kind === 'picked' ? { asked: 'fixture-claude-a' } : {})
+      const source = await row(runId)
+      await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='provider_failure',"finishedAt"=now(),report=$2 WHERE id=$1`,
+        [runId, JSON.stringify({ ...emptyRunReport(), providerFailure: balance, modelFallback: pendingProviderFallback(source, balance) })])
+      scheduled.length = 0; sent.length = 0
+      const { runLiveTargets } = await import('../lib/live/panels')
+      assert.deepEqual(await runLiveTargets(appPool, workspacePool, runId, 'run'), [{
+        scope: { ownerId: setup.p.id, workspaceId: home.id }, events: [{ kind: 'run', id: runId }],
+      }], 'the personal issue has the same authorized home channel as a normally registered owner')
+      return { ...setup, runId, homeId: home.id }
+    }
+    const assertSent = async (p: Person, homeId: string, runId: string, state: string) => {
+      assert.equal((await row(runId)).report.modelFallback.state, state, 'independent connection sees the committed receipt')
+      assert.ok(scheduled.length > 0, 'post-COMMIT work is scheduled for the existing thread')
+      assert.equal(sent.length, 0, 'delivery waits for the actual Next after callback')
+      await drain()
+      // The continuation's own writer also wakes its new run, whose key names its parent.
+      const delivered = sent.splice(0), path = `/v1/live/${liveChannelId({ ownerId: p.id, workspaceId: homeId })}/push`
+      assert.ok(delivered.every(value => value.path === path && value.events.every(event => event.kind === 'run')), 'only the owner’s home receives run keys')
+      assert.ok(delivered.some(value => value.events.some(event => event.id === runId)), 'the existing thread is woken')
+      await recoverProviderFailure(pool, p.id, runId)
+      assert.equal(scheduled.length, 0, 'a replay cannot notify an unchanged receipt')
+    }
+    try {
+      const setup = await interrupted('provider-live-switch')
+      const functionName = `live_rollback_${randomUUID().replaceAll('-', '')}`
+      // Force a real PG error after the receipt write and notification
+      // registration, before COMMIT. Its queued effect must roll back too.
+      await pool.query(`CREATE FUNCTION "${functionName}"() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN IF NEW."runId"='${setup.runId}'::uuid THEN RAISE EXCEPTION 'fixture_provider_event_rollback'; END IF; RETURN NEW; END $$`)
+      await pool.query(`CREATE TRIGGER "${functionName}" BEFORE INSERT ON coordinator_events FOR EACH ROW EXECUTE FUNCTION "${functionName}"()`)
+      try {
+        await assert.rejects(recoverProviderFailure(pool, setup.p.id, setup.runId), error => error instanceof Error && error.cause instanceof Error
+          && error.cause.message === 'fixture_provider_event_rollback' && (error.cause as Error & { code?: string }).code === 'P0001')
+        assert.equal((await row(setup.runId)).report.modelFallback.state, 'pending')
+        assert.equal((await children(setup.runId)).length, 0)
+        assert.equal(scheduled.length, 0, 'the failed recovery transaction emits no live event')
+      } finally {
+        await pool.query(`DROP TRIGGER "${functionName}" ON coordinator_events`)
+        await pool.query(`DROP FUNCTION "${functionName}"()`)
+      }
+      const continued = await recoverProviderFailure(pool, setup.p.id, setup.runId)
+      assert.ok(continued)
+      await assertSent(setup.p, setup.homeId, setup.runId, 'switched')
+      for (const state of ['picked', 'blocked', 'stopped'] as const) {
+        const current = await interrupted(`provider-live-${state}`, state === 'picked' ? 'picked' : 'preference')
+        if (state === 'blocked') await preferences(current.p, [current.entries[0]])
+        if (state === 'stopped') await pool.query(`UPDATE issues SET status='done' WHERE id=$1`, [(await row(current.runId)).issueId])
+        assert.equal(await recoverProviderFailure(pool, current.p.id, current.runId), null)
+        assert.equal((await children(current.runId)).length, 0)
+        await assertSent(current.p, current.homeId, current.runId, state)
+      }
+    } finally {
+      captureAfter = undefined
+      if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = previous.url
+      if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
+    }
+  })
+
 })

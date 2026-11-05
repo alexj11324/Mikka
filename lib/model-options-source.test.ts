@@ -28,12 +28,25 @@ function sources(dir: string): string[] {
   })
 }
 
-function modelLiterals(path: string): string[] {
-  const file = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true, path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+/** Issue #1329 permits exact tier/effort metadata for reported models. Only
+ * property keys in these two top-level tables are exempt; they never supply
+ * selectable models, and an unknown model remains standard. Model options or
+ * defaults anywhere else, even in this file, still fail the global guard. */
+function routingMetadataKey(path: string, node: ts.StringLiteralLike): boolean {
+  if (relative(ROOT, path) !== 'lib/model-routing.ts' || !ts.isPropertyAssignment(node.parent) || node.parent.name !== node) return false
+  let ancestor: ts.Node | undefined = node.parent
+  while (ancestor && !ts.isVariableDeclaration(ancestor)) ancestor = ancestor.parent
+  return Boolean(ancestor && ts.isVariableDeclaration(ancestor) && ts.isIdentifier(ancestor.name)
+    && ['MODEL_TIERS', 'EFFORT_MODELS'].includes(ancestor.name.text)
+    && ts.isVariableStatement(ancestor.parent.parent) && ts.isSourceFile(ancestor.parent.parent.parent))
+}
+
+function modelLiterals(path: string, source = readFileSync(path, 'utf8')): string[] {
+  const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
   const found: string[] = []
   const visit = (node: ts.Node) => {
     if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) && MODEL_NAME.test(node.text.trim())
-      && !NOT_MODEL_OPTIONS.has(`${relative(ROOT, path)} ${JSON.stringify(node.text)}`)) {
+      && !NOT_MODEL_OPTIONS.has(`${relative(ROOT, path)} ${JSON.stringify(node.text)}`) && !routingMetadataKey(path, node)) {
       found.push(`${relative(ROOT, path)}:${file.getLineAndCharacterOfPosition(node.getStart()).line + 1} ${JSON.stringify(node.text)}`)
     }
     ts.forEachChild(node, visit)
@@ -43,7 +56,7 @@ function modelLiterals(path: string): string[] {
 }
 
 test('no model name is written into lib/ or components/: model options come only from what was reported', () => {
-  const found = DIRS.flatMap(dir => sources(join(ROOT, dir))).flatMap(modelLiterals)
+  const found = DIRS.flatMap(dir => sources(join(ROOT, dir))).flatMap(path => modelLiterals(path))
   assert.deepEqual(found, [])
 })
 
@@ -53,4 +66,15 @@ test('the guard catches a written model name and ignores comments', () => {
   const visit = (node: ts.Node) => { if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) && MODEL_NAME.test(node.text)) texts.push(node.text); ts.forEachChild(node, visit) }
   visit(probe)
   assert.deepEqual(texts, ['opus', 'gpt-5'])
+})
+
+test('routing metadata exemption cannot hide model options, defaults or another file', () => {
+  const metadata = "const MODEL_TIERS = Object.freeze({ 'gpt-6-luna': 'light' }); const EFFORT_MODELS = { codex: { 'gpt-6-luna': ['low'] } }"
+  const path = join(ROOT, 'lib/model-routing.ts')
+  assert.deepEqual(modelLiterals(path, metadata), [])
+  assert.equal(modelLiterals(join(ROOT, 'lib/another-model-list.ts'), metadata).length, 2)
+  for (const source of ["const options = ['gpt-6-luna']", "const fallback = 'gpt-6-luna'", "const OTHER_MODELS = { 'gpt-6-luna': 'light' }",
+    "const MODEL_TIERS = { fallback: 'gpt-6-luna' }", "function list() { const MODEL_TIERS = { 'gpt-6-luna': 'light' }; return MODEL_TIERS }"]) {
+    assert.equal(modelLiterals(path, source).length, 1, source)
+  }
 })

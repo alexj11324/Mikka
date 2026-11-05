@@ -1,13 +1,20 @@
 'use client'
 
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useSWRConfig } from 'swr'
 import { withBasePath } from '@/lib/base-path'
-import { type LiveRuntime, type LiveTicket } from '@/lib/live/channel'
+import { type LiveRuntime, type LiveTicket, type LiveSubscriptionOptions, type LiveSubscription } from '@/lib/live/channel'
 import { LiveChannels } from '@/lib/live/channels'
 import type { LiveKind } from '@/lib/live/events'
 
 const LiveContext = createContext<{ channels: LiveChannels; workspaceId?: string } | null>(null)
+
+/** Shared visibility subscription for live transport and local display clocks.
+ * Subscribers decide their own catch-up; this helper never reads application data. */
+export function watchPageVisibility(changed: () => void) {
+  document.addEventListener('visibilitychange', changed)
+  return () => document.removeEventListener('visibilitychange', changed)
+}
 
 function browserRuntime(workspaceId: string | null): LiveRuntime {
   return {
@@ -24,11 +31,12 @@ function browserRuntime(workspaceId: string | null): LiveRuntime {
     socket: ticket => new WebSocket(ticket.url, ticket.protocol),
     visible: () => document.visibilityState === 'visible',
     watchVisibility(changed) {
-      document.addEventListener('visibilitychange', changed)
+      const unwatch = watchPageVisibility(changed)
       window.addEventListener('online', changed)
-      return () => { document.removeEventListener('visibilitychange', changed); window.removeEventListener('online', changed) }
+      return () => { unwatch(); window.removeEventListener('online', changed) }
     },
     now: Date.now,
+    monotonicNow: () => performance.now(),
     later: (callback, milliseconds) => setTimeout(callback, milliseconds),
     cancel: timer => clearTimeout(timer as ReturnType<typeof setTimeout>),
   }
@@ -42,14 +50,39 @@ export function LiveProvider({ ownerId, workspaceId, children }: { ownerId: stri
 }
 
 /** Register the SWR keys invalidated by a committed entity change. */
-export function useLiveKey(kind: LiveKind, id: string | null | undefined, keys: readonly string[], workspaceId?: string | null) {
+export function useLiveKey(kind: LiveKind, id: string | null | undefined, keys: readonly string[], workspaceId?: string | null, options?: LiveSubscriptionOptions) {
+  useLiveKeys(id ? [{ kind, id }] : [], keys, workspaceId, options)
+}
+
+/** A thread's attempts share one read and one owner/workspace connection. */
+export function useLiveKeys(entities: readonly { kind: LiveKind; id: string; workspaceId?: string | null }[], keys: readonly string[], workspaceId?: string | null, options?: LiveSubscriptionOptions) {
   const context = useContext(LiveContext)
   const channels = context?.channels
   const scope = workspaceId === undefined ? context?.workspaceId ?? null : workspaceId
   const { mutate } = useSWRConfig()
   const serialized = JSON.stringify(keys)
+  const references = JSON.stringify(entities)
+  const minIntervalMs = options?.minIntervalMs ?? 0
+  const timing = useRef({ minIntervalMs, deadline: options?.deadline })
+  timing.current = { minIntervalMs, deadline: options?.deadline }
+  // Renders do not reanchor an expiry. A newer HTTP observation can arrange a
+  // final check if the conservative timer fired before the server's deadline.
+  const deadlineKey = options?.deadline?.at ?? null
+  const deadlineObservation = options?.deadline?.observation
+  const active = useRef<LiveSubscription[]>([])
   useEffect(() => {
-    if (!channels || !id) return
-    return channels.subscribe(scope, kind, id, JSON.parse(serialized) as string[], key => mutate(key))
-  }, [channels, scope, kind, id, serialized, mutate])
+    if (!channels) return
+    const subscriptions = (JSON.parse(references) as { kind: LiveKind; id: string; workspaceId?: string | null }[]).map(({ kind, id, workspaceId: entityScope }) =>
+      channels.subscribe(entityScope === undefined ? scope : entityScope, kind, id, JSON.parse(serialized) as string[], key => mutate(key), timing.current))
+    active.current = subscriptions
+    return () => {
+      for (const stop of subscriptions) stop()
+      if (active.current === subscriptions) active.current = []
+    }
+    // Timing options update the existing handles below. Only an actual scope,
+    // entity, cache key or refresh owner change needs a new initial read.
+  }, [channels, scope, references, serialized, mutate])
+  useEffect(() => {
+    for (const subscription of active.current) subscription.update(timing.current)
+  }, [minIntervalMs, deadlineKey, deadlineObservation])
 }

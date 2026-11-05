@@ -11,7 +11,7 @@ const timestamp = z.iso.datetime({ precision: 6 })
 const cursorSchema = z.object({ v: z.literal(1), binding: z.string().regex(/^[a-f0-9]{64}$/), asOf: timestamp, after: z.object({ at: timestamp, id: z.uuid() }).strict() }).strict()
 export const discoveryInput = z.object({ cursor: z.string().min(1).max(1024).optional(), limit: z.number().int().min(1).max(50).default(20), unresolvedOnly: z.boolean().default(false) }).strict()
 export interface WriteAttention { id: string; action: WriteActionName; createdAt: string; status: 'attention'; error: 'operationBindingConflict' | 'operationIntentAmbiguous' }
-export interface WritePage { items: (ApprovedWriteView | WriteAttention)[]; nextCursor: string | null; asOf: string }
+export interface WritePage { items: (ApprovedWriteView | WriteAttention)[]; nextCursor: string | null; asOf: string; observedAt?: string; requestedAt?: number }
 interface DiscoveryRow extends StoredWriteProposal { cursorCreatedAt: string; aliasCount: string; execution: (OperationRecord & { invokedAt: string | null }) | null }
 const formatTime = `'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'`
 

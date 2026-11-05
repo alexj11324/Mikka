@@ -6,6 +6,8 @@ import { authenticateDevice, ownsDevice } from '@/lib/device-link'
 import { nativeCoordinatorEnabled, nativeCoordinatorStore } from '@/lib/coordinator/native'
 import { NativeCoordinatorError } from '@/lib/coordinator/native-store'
 import { maskFor } from '@/lib/secrets/runtime'
+import { resumeHook } from 'workflow/api'
+import { nativeTurnToken } from '@/workflows/coordinator/native-wake'
 
 export const dynamic = 'force-dynamic'
 const bodySchema = z.discriminatedUnion('operation', [
@@ -32,6 +34,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     if (body.operation === 'result') return NextResponse.json(await nativeCoordinatorStore.result(caller.userId,deviceId,body.turnId,body.callId))
     // 4e2 item 4: a coordinator command from a cloud worker is persisted; masked with the worker's workspace set.
     await nativeCoordinatorStore.submit(caller.userId,deviceId,body.turnId,await maskFor({ workspaceId: caller.scopeWorkspaceId, ownerId: caller.userId }, body.command))
+    // The turn's workflow reads the call or reply now, not on a 1 s re-read (#1212).
+    try { await resumeHook(nativeTurnToken(body.turnId), {}) } catch { /* the turn already ended, or has not waited yet */ }
     return NextResponse.json({ accepted: true })
   } catch (error) {
     if (error instanceof NativeCoordinatorError) return NextResponse.json({ error: error.message }, { status: error.status })

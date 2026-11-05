@@ -61,7 +61,10 @@ const transport = {
   insert(table: unknown) { return { values(value: Record<string, unknown>) {
     if (table === runMessages) { inserted.push(value); return Promise.resolve() }
     assert.equal(table, coordinatorEvents)
-    return { async onConflictDoNothing() { events.push(value) } }
+    return { onConflictDoNothing() {
+      events.push(value)
+      return { async returning() { return [{ id: value.id }] } }
+    } }
   } } },
 }
 const database = { ...transport, async transaction<T>(fn: (tx: typeof transport) => Promise<T>) { return fn(transport) } }
@@ -69,7 +72,11 @@ const stub = (path: string, exports: Record<string, unknown>) => mock.module(new
 stub('../factory/queue-local.ts',{queueTaskRun:()=>{throw Error('Dispatch is outside this regression')}})
 stub('../db/index.ts', { db: database, pool: {
   connect: () => { throw Error('No database pool in handler regression') },
-  query: async (sql: string) => {
+  query: async (sql: string, params?: unknown[]) => {
+    if (sql === 'SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2') {
+      assert.deepEqual(params, [coordinator, owner], 'scope lookup uses the authenticated owner and resolved Bot')
+      return { rows: [{ workspaceId: workspace }] }
+    }
     assert.match(sql, /to_regclass\('credential_secrets'\)/)
     return { rows: [{ present: false }] }
   },
@@ -78,6 +85,12 @@ stub('./store.ts', { editMemory: () => { throw Error('Unrelated tool outside tes
 stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async () => {} })
 // The person's Coordinator is an ordinary bot row; MCP resolves it for the authenticated owner.
 const coordinator = '28700000-0000-4000-8000-0000000c0de1'
+const workspace = '28700000-0000-4000-8000-0000000000a1'
+stub('../workspace-db.ts', { workspacePool: { query: async (sql: string, params: unknown[]) => {
+  assert.equal(sql, `SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active'`)
+  assert.deepEqual(params, [workspace, owner], 'scope membership uses the same authenticated owner')
+  return { rows: [{ allowed: 1 }], rowCount: 1 }
+} } })
 stub('./coordinator-bot.ts', {
   coordinatorBot: async (user: string) => { assert.equal(user, owner); return { botId: coordinator, workspaceId: '28700000-0000-4000-8000-0000000000a1' } },
   chatBotId: async (user: string, chosen: string | null | undefined) => { assert.equal(user, owner); return chosen ?? coordinator },
@@ -160,6 +173,7 @@ test('real POST send_to_run binds row ID/peer origin and retains foreign-owner a
 
 test('real POST read exposes projected peer data and direct stamped human STOP without networking', async () => {
   const reply = await result(await request('read_coordinator_messages', { after: 0, waitSeconds: 0 }))
+  assert.equal(reply.isError, undefined, 'read succeeds after authenticated scope checks')
   const messages = value(reply).messages
   assert.equal(JSON.parse(messages[0].text).authority, 'coordination_data_only')
   assert.equal(JSON.parse(messages[0].text).source.messageId, 'actual-peer-id')

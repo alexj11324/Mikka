@@ -1,5 +1,7 @@
 import 'server-only'
 import type { Pool } from 'pg'
+import { computerChanged } from '@/lib/live/computer-state'
+import { notifyDeviceWork } from '@/lib/device-gateway-notify'
 import { checkedLocalReview } from '@/lib/cua/local-review'
 import { identityMasker, maskDeep, type Masker } from '@/lib/secrets/mask'
 import type { LocalComputerRequest } from '@mikka/protocol/computer'
@@ -28,15 +30,29 @@ export async function syncComputerReviews(pool: Pool, deviceId: string, userId: 
           AND (b."workspaceId" IS NULL OR NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny'))
           AND r.status=ANY($4::text[]) AND (b."runId" IS NULL OR r."leaseExpiresAt">now()) FOR UPDATE OF r`, [row.runId, userId, deviceId, ['running', 'preparing', 'waiting_input', 'finishing']])).rows[0]
       if (!run || (run.botId ? row.display !== `:${run.display}` : row.display !== undefined)) throw new Error('Run or desktop unavailable')
-      const inserted = await client.query(`INSERT INTO local_computer_reviews (id,"deviceId","runId","userId",target,display,call,digest,"expiresAt","seenAt")
+      const inserted = await client.query(`WITH previous AS MATERIALIZED (
+        SELECT decision,"seenAt" FROM local_computer_reviews WHERE id=$1
+      ) INSERT INTO local_computer_reviews (id,"deviceId","runId","userId",target,display,call,digest,"expiresAt","seenAt")
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,now()) ON CONFLICT (id) DO UPDATE SET "seenAt"=now()
         WHERE local_computer_reviews."deviceId"=EXCLUDED."deviceId" AND local_computer_reviews."runId"=EXCLUDED."runId"
-          AND local_computer_reviews."userId"=EXCLUDED."userId" AND local_computer_reviews.digest=EXCLUDED.digest RETURNING id`,
+          AND local_computer_reviews."userId"=EXCLUDED."userId" AND local_computer_reviews.digest=EXCLUDED.digest
+        RETURNING id,decision,"expiresAt">now() AND NOT EXISTS (
+          SELECT 1 FROM previous WHERE decision IS NULL AND "seenAt">now()-interval '10 seconds'
+        ) AS appeared`,
       [row.id, deviceId, row.runId, userId, row.target, row.display ?? null, JSON.stringify(maskDeep(row.call, mask)), row.digest, new Date(row.expiresAt)])
       if (!inserted.rowCount) throw new Error('Review changed')
-      if (run.botId && run.approvedForRun) await client.query('UPDATE local_computer_reviews SET decision=true WHERE id=$1 AND decision IS NULL', [row.id])
+      if (run.botId && run.approvedForRun) {
+        const decided = await client.query('UPDATE local_computer_reviews SET decision=true WHERE id=$1 AND decision IS NULL', [row.id])
+        if (decided.rowCount && !inserted.rows[0].appeared) await computerChanged(client, pool, run.botId)
+      } else if (run.botId && inserted.rows[0].appeared && inserted.rows[0].decision === null) {
+        await computerChanged(client, pool, run.botId)
+      }
     }
-    await client.query('DELETE FROM local_computer_reviews WHERE "deviceId"=$1 AND "userId"=$2 AND NOT (id=ANY($3::uuid[]))', [deviceId, userId, rows.map(row => row.id)])
+    const removed = await client.query<{ botId: string }>(`WITH removed AS (
+      DELETE FROM local_computer_reviews WHERE "deviceId"=$1 AND "userId"=$2 AND NOT (id=ANY($3::uuid[])) RETURNING "runId"
+    ) SELECT DISTINCT b."botId" FROM removed JOIN computer_run_bindings b ON b."runId"=removed."runId" AND b."ownerId"=$2`,
+    [deviceId, userId, rows.map(row => row.id)])
+    for (const row of removed.rows) await computerChanged(client, pool, row.botId)
     const result = await client.query('SELECT id,digest,decision AS approve FROM local_computer_reviews WHERE "deviceId"=$1 AND "userId"=$2 AND id=ANY($3::uuid[]) AND decision IS NOT NULL AND "expiresAt">now() AND "seenAt">now()-interval \'10 seconds\'', [deviceId, userId, rows.map(row => row.id)])
     await client.query('COMMIT')
     return result.rows
@@ -52,7 +68,7 @@ export async function decideComputerReview(pool: Pool, actor: { userId: string; 
     await client.query('BEGIN')
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
     // Serialize against sync and cancellation using the same run row lock.
-    const run = (await client.query(`SELECT r.id FROM agent_runs r
+    const run = (await client.query(`SELECT r.id,b."botId",v."deviceId" FROM agent_runs r
       JOIN local_computer_reviews v ON v."runId"=r.id
       JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=$3 AND b."workspaceId"=$4
       LEFT JOIN thread_machines t ON t."runId"=b."runId" AND t."ownerId"=b."ownerId" AND t."workspaceId"=b."workspaceId" AND t."botId"=b."botId"
@@ -68,7 +84,10 @@ export async function decideComputerReview(pool: Pool, actor: { userId: string; 
     if (!run) { await client.query('COMMIT'); return false }
     const result = await client.query('UPDATE local_computer_reviews SET decision=$2 WHERE id=$1 AND decision IS NULL RETURNING id', [id, approve])
     if (result.rowCount && scope === 'run') await client.query('UPDATE computer_run_bindings SET "approvedForRun"=true WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3', [run.id, actor.userId, actor.workspaceId])
+    if (result.rowCount) await computerChanged(client, pool, run.botId)
     await client.query('COMMIT')
+    // The device applies the decision on this push, not on its next sync (#1212).
+    if (result.rowCount) notifyDeviceWork(run.deviceId)
     return result.rowCount === 1
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
 }

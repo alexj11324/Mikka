@@ -3,6 +3,7 @@ import type { Pool } from 'pg'
 import { z } from 'zod'
 import { ActionFailureError } from './action-error'
 import { factoryEventId } from './factory/event-id'
+import { runChanged } from './live/panels'
 
 export type ThreadSubmissionResult = { runId: string; continued: boolean }
 type Input = {
@@ -43,10 +44,11 @@ export async function submitThreadOnce(pool: Pool, input: Input,
   const showOnce = async (result: ThreadSubmissionResult) => {
     // A recovered Factory acceptance can precede the original response's
     // display row. This is history only: the target already reached its epoch.
-    await pool.query(`INSERT INTO run_messages(id,"runId","userId",text,origin,"mailboxWakeDepth","deliveredAt")
+    const shown = await pool.query(`INSERT INTO run_messages(id,"runId","userId",text,origin,"mailboxWakeDepth","deliveredAt")
       SELECT $1,id,$2,$3,'owner',-1,now() FROM agent_runs
       WHERE id=$4 AND "userId"=$2 AND "issueId" IS NOT DISTINCT FROM $5::uuid
-      ON CONFLICT DO NOTHING`, [id, input.userId, input.text, result.runId, input.issueId])
+      ON CONFLICT DO NOTHING RETURNING id`, [id, input.userId, input.text, result.runId, input.issueId])
+    if (shown.rowCount) await runChanged(pool, result.runId)
   }
   const saveResult = async (result: ThreadSubmissionResult) => {
     const { rows: [saved] } = await pool.query(`UPDATE coordinator_events

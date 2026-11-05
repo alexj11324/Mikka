@@ -5,7 +5,9 @@ import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactM
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { Bot, PanelLeft, Plus, Users } from 'lucide-react'
-import { botChatSummaries, getCoordinatorChat, type CoordinatorChat } from '@/app/actions/coordinator'
+import { getCoordinatorChat, type CoordinatorChat } from '@/app/actions/coordinator'
+import { useLiveBotChatList, useLiveGroupList } from '@/hooks/use-live-lists'
+import { observeListRead } from '@/lib/live/list-read'
 import type { BotView } from '@/app/actions/bots'
 import type { Thread } from '@/app/actions/task-runs'
 import type { listIssues } from '@/app/actions/issues'
@@ -21,11 +23,9 @@ import { cn } from '@/lib/utils'
 import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { ResizeHandle } from '@/components/ui/resizable-pane'
 import { chatPreview } from '@/lib/agent-history'
-import { fetchGroups } from '@/lib/group-messages'
 import { namedCitations } from '@/lib/coordinator/citations'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
 import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
-import { LIST_POLL_MS } from '@/components/swr-defaults'
 
 /**
  * What the center column shows: the Coordinator, a bot's chat (both on the
@@ -47,7 +47,7 @@ type ListProps = {
   onNewBot: () => void
   rail: RailDestination | null
   onRail: (destination: RailDestination) => void
-  user: { name: string; email: string; image?: string | null }
+  user: { id: string; name: string; email: string; image?: string | null }
   onSettings: (href?: string) => void
   onSignOut: () => void
   signingOut: boolean
@@ -120,11 +120,12 @@ export function BotList({ phoneOnly = false, ...props }: ListProps) {
 function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: Omit<ListProps, 'phoneOnly'>) {
   const i18nText = useTranslations()
   const { toggleSidebar, setOpenMobile, open, openMobile, isMobile } = useSidebar()
-  const { data: coordinator } = useSWR<CoordinatorChat>('coordinator-chat', () => getCoordinatorChat())
+  const { data: coordinator } = useSWR<CoordinatorChat>('coordinator-chat', () => observeListRead(() => getCoordinatorChat()))
   // Each bot's latest line gives its row the preview and its place in the list.
-  const { data: chats = {} } = useSWR('bot-chats', () => botChatSummaries(), { refreshInterval: LIST_POLL_MS })
+  const { data: chatList } = useLiveBotChatList(user.id)
+  const chats = chatList?.items ?? {}
   // Group chats sit among the bots (R-01), ordered by their latest message.
-  const { data: groups = [], mutate: reloadGroups } = useSWR(workspaceId ? ['bot-list-groups', workspaceId] : null, ([, id]: [string, string]) => fetchGroups(id), { refreshInterval: LIST_POLL_MS })
+  const { data: groups = [], mutate: reloadGroups } = useLiveGroupList(user.id, workspaceId)
   const [creatingGroupIn, setCreatingGroupIn] = useState<string | null>(null)
   useEffect(() => { setCreatingGroupIn(null) }, [workspaceId])
   // The Coordinator's bot row is the entry pinned on top; the rest are the person's other bots.

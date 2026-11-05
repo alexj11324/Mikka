@@ -1,5 +1,6 @@
 import { withRequestLog } from '@/lib/request-log'
 import { getTelegramBot, isTelegramConfigured } from '@/lib/telegram/bot'
+// oxlint-disable-next-line no-restricted-imports -- the chat SDK hands over a task that is already running under this webhook's label
 import { after } from 'next/server'
 
 export const runtime = 'nodejs'

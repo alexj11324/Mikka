@@ -28,7 +28,7 @@ const client = {
 let dispatchToTask: typeof import('./thread-dispatch').dispatchToTask
 before(async () => {
   mock.module(new URL('./agent-run-statuses.ts', import.meta.url).href, { namedExports: { UNFINISHED_RUN_STATUSES: ['queued', 'running'] } })
-  mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db: { execute: async (statement: { queryChunks?: unknown[] }) => { executed.push(JSON.stringify(statement.queryChunks ?? statement).includes('threadReplacedBy') ? 'replaced' : 'continues') } }, pool: { connect: async () => client, query: async () => ({ rows: latest ? [latest] : [] }) } } })
+  mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db: { execute: async (statement: { queryChunks?: unknown[] }) => { executed.push(JSON.stringify(statement.queryChunks ?? statement).includes('threadReplacedBy') ? 'replaced' : 'continues'); return { rows: [], rowCount: 1 } } }, pool: { connect: async () => client, query: async () => ({ rows: latest ? [latest] : [] }) } } })
   mock.module(new URL('./run-chain.ts', import.meta.url).href, { namedExports: { readRunChain: async () => null } })
   mock.module(new URL('./run-control.ts', import.meta.url).href, { namedExports: { sendOwnedRunMessage: async (_db: unknown, _user: string, message: { runId: string; text: string }) => { messages.push(message) } } })
   mock.module(new URL('./agent-runs.ts', import.meta.url).href, { namedExports: { requestRunStop: async (_user: string, runId: string) => { stops.push(runId) } } })

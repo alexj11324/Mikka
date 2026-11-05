@@ -127,6 +127,8 @@ jobs:
       - run: pnpm test:self-improvement-semantic-source
       - run: node --test scripts/ci-docs-only.test.mjs
       - run: pnpm test:ui-policy
+      - name: Idle request budget (main pages, no browser)
+        run: pnpm test:idle-budget
       - run: pnpm test:motion
       - run: pnpm test:i18n
       - run: pnpm i18n:check
@@ -153,11 +155,13 @@ jobs:
       - run: pnpm test:mvp-fixtures
       - run: pnpm test:credentials
       - run: pnpm test:run-publication
+      - run: pnpm test:workflow-wakes
       - name: Factory daemon check regressions and shared report contract
         run: |
           pnpm --filter @mikka/protocol exec vitest run src/run.test.ts
           pnpm --filter @mikka/daemon exec vitest run test/factory-check.test.ts test/runs.test.ts test/hardening.test.ts src/permissions.test.ts
       - run: pnpm test:mobile-push
+      - run: pnpm test:mobile
       - run: pnpm test:coordinator-native-relay
       - run: pnpm test:coordinator-native-scope
       - run: pnpm test:coordinator-issue-tools
@@ -202,6 +206,7 @@ jobs:
       - name: Authentication email integration tests (isolated Postgres)
         run: node scripts/test-auth-email.mjs
       - run: pnpm test:groups
+      - run: pnpm test:live-lists
       - run: pnpm test:group-turns
       - run: pnpm test:integrations
       - run: pnpm test:github

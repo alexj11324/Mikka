@@ -1,4 +1,5 @@
 import type { Pool } from 'pg'
+import { botChatChanged } from '../live/chats'
 
 export const MAX_WAKE_ATTEMPTS = 8
 export const WAKE_LEASE_MS = 120_000
@@ -72,6 +73,7 @@ export function createWakeRecovery(pool: Pick<Pool, 'connect' | 'query'>, clock:
         WHERE target.id IN (SELECT e.id FROM coordinator_events e WHERE e."userId"=$1 AND e."botId"=$2::uuid
           AND ${pending} AND e."nextWakeAt" <= $3 ${ticket ? matchesTicket(5) : ''} ORDER BY e."createdAt",e.id LIMIT 50 FOR UPDATE)
         RETURNING target.id,target."wakeAttempts",target."nextWakeAt",target."wakeLeaseUntil",target.tier`, values)).rows
+      if (rows.length) await botChatChanged(tx, scope.userId, scope.botId)
       await tx.query('COMMIT')
       return rows.length ? { kind: 'claimed', claim: { userId: scope.userId, botId: scope.botId, ids: rows.map(row => row.id), leaseUntil,
         attempt: Math.max(...rows.map(row => row.wakeAttempts)), ticket: ticketFor(scope, rows) } } : { kind: 'obsolete' }
@@ -107,6 +109,7 @@ export function createWakeRecovery(pool: Pick<Pool, 'connect' | 'query'>, clock:
           WHERE "userId"=$1 AND id=ANY($2::uuid[]) AND "wakeLeaseUntil"=$3 AND "deliveredAt" IS NULL AND "botId"=$6::uuid
           RETURNING id,"wakeAttempts","nextWakeAt","wakeLeaseUntil",tier`,
         [claim.userId, claim.ids, claim.leaseUntil, next, claim.attempt >= MAX_WAKE_ATTEMPTS ? 'wake_exhausted' : code, claim.botId])
+        if (rows.rowCount) await botChatChanged(tx, claim.userId, claim.botId)
         await tx.query('COMMIT')
         return ticketFor(claim, rows.rows)
       } catch (error) {
@@ -117,9 +120,11 @@ export function createWakeRecovery(pool: Pick<Pool, 'connect' | 'query'>, clock:
     /** Operator-triggered replay resets only a still-pending event. It does
      * not restore cancelled runs, revoked access, or already-consumed events. */
     async replay(id: string): Promise<boolean> {
-      return Boolean((await pool.query(`UPDATE coordinator_events SET "wakeAttempts"=0,"nextWakeAt"=$2,"wakeLastError"=NULL
+      const result = await pool.query<{ userId: string; botId: string | null }>(`UPDATE coordinator_events SET "wakeAttempts"=0,"nextWakeAt"=$2,"wakeLastError"=NULL
         WHERE id=$1 AND "deliveredAt" IS NULL AND "wakeAttempts">= $3
-        AND ("wakeLeaseUntil" IS NULL OR "wakeLeaseUntil" <= $2) RETURNING id`, [id, clock(), MAX_WAKE_ATTEMPTS])).rowCount)
+        AND ("wakeLeaseUntil" IS NULL OR "wakeLeaseUntil" <= $2) RETURNING "userId","botId"`, [id, clock(), MAX_WAKE_ATTEMPTS])
+      if (result.rows[0]) await botChatChanged(pool, result.rows[0].userId, result.rows[0].botId)
+      return Boolean(result.rowCount)
     },
   }
 }

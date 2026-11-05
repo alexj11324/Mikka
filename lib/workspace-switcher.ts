@@ -6,6 +6,7 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers, workspaces } from '@/lib/db/workspace-schema'
 import type { ApiSession } from '@/lib/api-auth'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { ownerListRead } from '@/lib/live/list-read-server'
 
 export async function loadWorkspaceSwitcher(apiSession?: ApiSession) {
   const context = await loadWorkspaceContext(undefined, apiSession?.user)
@@ -18,6 +19,7 @@ export async function loadWorkspaceSwitcher(apiSession?: ApiSession) {
   }))
   return {
     workspace: context.workspace,
+    live: await ownerListRead(context.currentUserId),
     accounts: [{ id: context.currentUserId, email: context.currentUser.email, choices: context.choices }, ...accounts],
   }
 }

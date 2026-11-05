@@ -3,7 +3,7 @@ import { QUIET_REPLY } from '@/lib/attention/handoff'
 import { credentialMasker, identityMasker, maskDeep, maskStreamStep, withCredentialMasking } from '@/lib/secrets/mask'
 import type { CoordinatorStreamEvent, CoordinatorWorkflowStreamPart } from './stream'
 import { TOOL_PREVIEW_CHARS } from './chat-projection'
-import { HIDDEN_TOOLS, jsonbText } from './context'
+import { HIDDEN_TOOLS, jsonbText, quotePreview, toolQuoteText } from './context'
 
 /**
  * The start of a tool's input or output as text, masked as stored messages are; nothing when it would still
@@ -17,6 +17,15 @@ function preview(userId: string, value: unknown, fingerprints: SecretFingerprint
   if (!text) return undefined
   try { assertNoSecret(userId, text, fingerprints) } catch { return undefined }
   return text
+}
+
+/** A call's words (a dispatch's note) as the chat's quote, masked like the previews; nothing when it holds a saved secret. */
+function quote(userId: string, input: unknown, fingerprints: SecretFingerprint[]): string | undefined {
+  // Checked whole, before the cut: a saved secret straddling it must not leave even its start.
+  const text = toolQuoteText(maskDeep(input, credentialMasker))
+  if (!text) return undefined
+  try { assertNoSecret(userId, text, fingerprints) } catch { return undefined }
+  return quotePreview(text)
 }
 
 /** A stored thinking block as the chat may show it: masked like stored messages; nothing if it holds a saved secret. */
@@ -123,7 +132,8 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
         const state = part.type === 'tool-call' ? 'running' : part.type === 'tool-result' ? 'done' : 'error'
         const input = part.type === 'tool-call' ? preview(userId, part.input, fingerprints) : undefined
         const output = part.type === 'tool-result' ? preview(userId, part.output, fingerprints) : undefined
-        controller.enqueue({ type: 'tool', id, call: part.toolCallId, name: part.toolName, state, ...(input ? { input } : {}), ...(output ? { output } : {}), ...(part.type === 'tool-call' ? { at: text.length } : {}) })
+        const words = part.type === 'tool-call' ? quote(userId, part.input, fingerprints) : undefined
+        controller.enqueue({ type: 'tool', id, call: part.toolCallId, name: part.toolName, state, ...(input ? { input } : {}), ...(output ? { output } : {}), ...(words ? { quote: words } : {}), ...(part.type === 'tool-call' ? { at: text.length } : {}) })
       } else if (id && part.type === 'reasoning-start') {
         reasoning.set(part.id, { pending: '', buf: '', sent: 0, blocked: false })
         if (!quietEligible) controller.enqueue({ type: 'thinking', id, state: 'start' })

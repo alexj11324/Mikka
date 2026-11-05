@@ -8,6 +8,7 @@ import { getIssueThread } from '@/app/actions/agents'
 import { getArtifact } from '@/app/actions/artifacts'
 import { listBots } from '@/app/actions/bots'
 import { getCoordinatorChat } from '@/app/actions/coordinator'
+import { observeListRead } from '@/lib/live/list-read'
 import { CoordinatorChat, coordinatorChatKey } from '@/components/coordinator/coordinator-chat'
 import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -54,7 +55,7 @@ export function ArtifactWindow({ artifactId }: { artifactId: string }) {
   const bot = botId ? bots?.find(item => item.id === botId && !item.coordinator) : undefined
   // The chat beside it underlines what it already quoted; the same key as that chat, so one request.
   const chatBotId = bot?.id ?? null
-  const { data: chat } = useSWR(detail && !threadMade ? coordinatorChatKey(chatBotId) : null, () => chatBotId ? getCoordinatorChat(chatBotId) : getCoordinatorChat())
+  const { data: chat } = useSWR(detail && !threadMade ? coordinatorChatKey(chatBotId) : null, () => observeListRead(() => getCoordinatorChat(chatBotId)))
   const quotes = chat?.items.flatMap(item => item.quote ? [item.quote] : []) ?? []
   const shared = { artifactId, onArtifactChange: openArtifact, onClose: closeArtifact }
   // Until the artifact says where it came from (or when it is not the person's), the reader shows its own loading or error.

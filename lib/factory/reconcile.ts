@@ -2,11 +2,12 @@ import type { Pool, PoolClient } from "pg";
 import { FactoryError, type FactoryBinding } from "./contract";
 import { completeFactoryExecution } from "./completed-execution";
 import { factoryEventId } from "./event-id";
-import type { FactoryTask, createFactoryStore } from "./store";
+import type { FactoryCompletionDispatch, FactoryTask, createFactoryStore } from "./store";
 import { MAX_RUN_ATTEMPTS } from "../run-retry";
 import type { createFactoryQuestions } from "./questions/store";
 import { checkFactoryRepairBudget } from "./check-recovery-evidence";
 import { modelFallbackRecordSchema } from "../run-model-fallback-view";
+import { AgentProfileError } from "./agent-profile-definition";
 
 /** A failed run or a failed verify gate is a visible failed attempt that
  * re-enters the existing repair loop (retry at execute, repair from
@@ -53,6 +54,43 @@ const binding = (task: FactoryTask): FactoryBinding => ({
   candidateId: task.candidateId,
 });
 
+/** A rejected role Decision blocks only the unstarted independent check.
+ * Preserve the complete host tuple, including optional recovery authority. */
+export function observeFactoryProfileDispatch(dispatch: FactoryCompletionDispatch): FactoryCompletionDispatch {
+  return async (...args: Parameters<FactoryCompletionDispatch>) => {
+    const [tx, store, prior] = args;
+    const before = await store.lockTask(tx, prior.userId, prior.id);
+    if (before.status !== 'pending' || !['review', 'verify'].includes(before.stage)) return dispatch(...args);
+    const { factoryAuthorizationCheckpoint } = await import('./transaction');
+    const restoreAuthority = factoryAuthorizationCheckpoint(tx);
+    await tx.query('SAVEPOINT factory_profile_dispatch');
+    try {
+      const start = await dispatch(...args);
+      await tx.query('RELEASE SAVEPOINT factory_profile_dispatch');
+      return start;
+    } catch (error) {
+      // Keep completed execution/candidate evidence outside this savepoint,
+      // but never commit a partial queue or its pending authorization leases.
+      await tx.query('ROLLBACK TO SAVEPOINT factory_profile_dispatch');
+      restoreAuthority();
+      await tx.query('RELEASE SAVEPOINT factory_profile_dispatch');
+      if (!(error instanceof AgentProfileError) || error.code !== 'agentProfileDecisionUnavailable') throw error;
+      const current = await store.lockTask(tx, prior.userId, prior.id);
+      if (current.status !== 'pending' || current.stage !== before.stage || current.attemptId !== before.attemptId ||
+          current.revision !== before.revision || current.sourceEventId !== before.sourceEventId ||
+          !current.candidateId || current.candidateId !== before.candidateId) throw error;
+      const { rows: [attempt] } = await tx.query('SELECT * FROM factory_attempts WHERE id=$1 AND "taskId"=$2 FOR UPDATE', [current.attemptId, current.id]);
+      if (!attempt || attempt.status !== 'pending' || attempt.stage !== current.stage || attempt.candidateId !== current.candidateId ||
+          attempt.runId !== null || attempt.sessionId !== null || attempt.output?.requestEpoch !== current.sourceEventId) throw error;
+      await store.apply(current.userId, binding(current), factoryEventId('check-dispatch-decision-unavailable', current.attemptId), {
+        action: 'finish', status: 'blocked',
+        reason: 'Independent check could not select an Agent Profile. Check the available profiles and retry the check.',
+        evidence: [], output: { dispatch: { code: 'agentProfileDecisionUnavailable' } },
+      }, tx);
+    }
+  };
+}
+
 /** Consume existing durable run state during a Coordinator turn. #176 owns wake delivery. */
 export function createFactoryReconciler(
   pool: Pool,
@@ -70,9 +108,10 @@ export function createFactoryReconciler(
   const reconcileTasks = async (userId: string, pending: { id: string; attemptId?: string; completedRunId?: string }[]) => {
     let recovered = 0;
     for (const item of pending) {
+      const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('./transaction');
       const tx = await pool.connect();
       try {
-        await tx.query("BEGIN");
+        await beginFactoryTransaction(tx);
         // Monitor evidence updates the issue document. Take its owner lock
         // before store.lockTask acquires issue SHARE locks to avoid upgrades
         // deadlocking across concurrently reconciled Bot tasks.
@@ -81,12 +120,12 @@ export function createFactoryReconciler(
         // A run completion is bound to the attempt that was current when it was
         // selected; if a reject/retry/repair replaced it meanwhile, that old
         // run must not move the task (QA #449-5).
-        if (!["pending", "running", "failed"].includes(task.status) || (item.attemptId && task.attemptId !== item.attemptId)) { await tx.query("COMMIT"); continue; }
+        if (!["pending", "running", "failed"].includes(task.status) || (item.attemptId && task.attemptId !== item.attemptId)) { await commitFactoryTransaction(tx); continue; }
         if (task.status === 'pending') {
           const { rows: active } = await tx.query(`SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId"
             WHERE a."taskId"=$1 AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing') LIMIT 1`, [task.id]);
           const start = active.length ? undefined : await dispatchNext?.(tx, store, task, { id: item.completedRunId });
-          await tx.query('COMMIT');
+          await commitFactoryTransaction(tx);
           await start?.();
           if (!active.length && dispatchNext) recovered++;
           continue;
@@ -125,7 +164,7 @@ export function createFactoryReconciler(
             },
             tx,
           );
-          await tx.query("COMMIT");
+          await commitFactoryTransaction(tx);
           recovered++;
           continue;
         }
@@ -164,14 +203,14 @@ export function createFactoryReconciler(
           if (!provider) transportRetries++;
         }
         if (task.status === "failed") {
-          await tx.query("COMMIT");
+          await commitFactoryTransaction(tx);
           continue;
         }
         if (
           !run ||
           !["succeeded", "failed", "stopped", "cancelled"].includes(run.status)
         ) {
-          await tx.query("COMMIT");
+          await commitFactoryTransaction(tx);
           continue;
         }
         if (run.status === "failed" && run.stopReason === "provider_failure") {
@@ -181,14 +220,14 @@ export function createFactoryReconciler(
             await store.apply(userId, binding(task), factoryEventId("provider-stopped", run.id), {
               action: "cancel", reason: "The original request ended before model recovery could continue.",
             }, tx);
-            await tx.query("COMMIT");
+            await commitFactoryTransaction(tx);
             recovered++;
             continue;
           }
           if (fallback?.state === "pending") {
             // Recovery owns this durable intent. A completion replay or the
             // recovery sweep will settle it before checks or repair can run.
-            await tx.query("COMMIT");
+            await commitFactoryTransaction(tx);
             continue;
           }
           await store.apply(userId, binding(task), factoryEventId("provider-blocked", run.id), {
@@ -198,7 +237,7 @@ export function createFactoryReconciler(
               : "No authorized preferred model can continue this task. Restore a model or update the preferred order.")).slice(0, 4000),
             evidence: [], output: { runId: run.id, recovery: "provider_failure", reasonCode: fallback?.state === "picked" ? "model_picked_unavailable" : "model_unavailable", ...(fallback ? { modelFallback: fallback } : {}) },
           }, tx);
-          await tx.query("COMMIT");
+          await commitFactoryTransaction(tx);
           recovered++;
           continue;
         }
@@ -216,18 +255,17 @@ export function createFactoryReconciler(
             }, tx);
           }
           await tx.query('RELEASE SAVEPOINT repository_selection');
-          await tx.query('COMMIT');
+          await commitFactoryTransaction(tx);
           await start?.();
           recovered++;
           continue;
         }
         if (questions) await questions.settle(userId, run.id, tx);
         task = await store.lockTask(tx, userId, task.id);
-        if (task.status !== "running") { await tx.query("COMMIT"); continue; }
+        if (task.status !== "running") { await commitFactoryTransaction(tx); continue; }
         const eventId = factoryEventId("run-completion", run.id);
         if (
-          !
-          run.stopRequestedAt &&
+          run.status === 'stopped' && !run.stopRequestedAt &&
           ["asked_human", "blocked"].includes(run.stopReason)
         ) {
           if (questions) {
@@ -271,7 +309,7 @@ export function createFactoryReconciler(
               tx,
             );
           }
-          await tx.query("COMMIT");
+          await commitFactoryTransaction(tx);
           recovered++;
           continue;
         }
@@ -280,7 +318,7 @@ export function createFactoryReconciler(
           if (!consumer) throw new FactoryError("factoryDispatchAdapterRequired");
           await consumer(tx, store, task, run);
           const start = await dispatchNext?.(tx, store, task, run);
-          await tx.query("COMMIT");
+          await commitFactoryTransaction(tx);
           await start?.();
           recovered++;
           continue;
@@ -316,17 +354,17 @@ export function createFactoryReconciler(
           await completeFactoryExecution(tx, store, task, run);
         }
         const start = await dispatchNext?.(tx, store, task, run);
-        await tx.query("COMMIT");
+        await commitFactoryTransaction(tx);
         await start?.();
         recovered++;
       } catch (error) {
-        await tx.query("ROLLBACK");
+        await rollbackFactoryTransaction(tx);
         if (!(error instanceof FactoryError)) throw error;
         // One blocked consumer must not prevent unrelated tasks from progressing.
         // Never mutate a task whose permission or cancellation fence denied access.
         if (!["factoryNotFound", "factoryStopped", "factoryStale"].includes(error.code)) {
           try {
-            await tx.query("BEGIN");
+            await beginFactoryTransaction(tx);
             const current = await store.lockTask(tx, userId, item.id);
             if (current.status === "running" && error.code === "factoryEvidenceMismatch")
               // Like a failed required check: visible failure with a reason code, back into the capped repair loop.
@@ -335,15 +373,15 @@ export function createFactoryReconciler(
               factoryEventId(`reconcile-blocked:${error.code}`,current.attemptId),
               {action:"finish",status:"blocked",reason:`Reconciliation blocked: ${error.code}`,evidence:[],output:{errorCode:error.code}},tx);
             const start = await dispatchNext?.(tx, store, current, {});
-            await tx.query("COMMIT");
+            await commitFactoryTransaction(tx);
             await start?.();
           } catch (blockedError) {
-            await tx.query("ROLLBACK");
+            await rollbackFactoryTransaction(tx);
             if (!(blockedError instanceof FactoryError)) throw blockedError;
           }
         }
       } finally {
-        tx.release();
+        forgetFactoryTransaction(tx); tx.release();
       }
     }
     return { recovered };

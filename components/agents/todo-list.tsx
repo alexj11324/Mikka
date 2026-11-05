@@ -126,7 +126,7 @@ function TodoStatusIcon({
       className={cn(
         "mx-0.5 size-5 shrink-0 overflow-visible text-muted-foreground",
         status === "in-progress" && "text-foreground",
-        status === "cancelled" && "text-destructive",
+        status === "cancelled" && "text-destructive-foreground",
       )}
     >
       <motion.circle

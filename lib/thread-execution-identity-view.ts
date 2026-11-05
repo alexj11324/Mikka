@@ -1,5 +1,18 @@
 import { z } from 'zod'
 import { withBasePath } from './base-path'
+import { MODEL_ROUTING_DIFFICULTIES, MODEL_ROUTING_EFFORTS, MODEL_ROUTING_REASONS, MODEL_ROUTING_TIERS } from './model-routing'
+
+/** Shared allowlist for the server evidence projection and its client reader. */
+export const modelRoutingEvidenceSchema = z.object({
+  version: z.literal(1),
+  difficulty: z.enum([...MODEL_ROUTING_DIFFICULTIES, 'unknown']),
+  model: z.string().min(1).max(200),
+  harness: z.enum(['claude_code', 'codex']),
+  tier: z.enum(MODEL_ROUTING_TIERS),
+  effort: z.enum(MODEL_ROUTING_EFFORTS).optional(),
+  reason: z.enum(MODEL_ROUTING_REASONS),
+  previousModel: z.string().min(1).max(200).optional(),
+})
 
 const reference = z.string().min(1).max(200)
 const resource = z.object({
@@ -23,6 +36,11 @@ const evidence = z.object({ run: z.object({
   credentialType: z.enum(['subscription', 'api_key', 'unknown']),
   subscriptionRoute: z.enum(['claude_code_cli', 'codex_cli']).nullable().catch(null),
   executionIdentity: identity.nullable(),
+  modelRouting: modelRoutingEvidenceSchema.nullable().optional().catch(null),
+  agentProfile: z.object({
+    profileId: z.string().min(1).max(200), name: z.string().max(80), version: z.number().int().positive(), digest: z.string().max(200),
+    source: z.enum(['explicit', 'decision', 'default']), reason: z.string().max(4000),
+  }).nullable().optional(),
 }) })
 
 /** Presentation-only allowlist over the existing owner evidence API. Never

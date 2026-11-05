@@ -34,6 +34,7 @@ import { AuditLogSettings } from '@/components/settings/audit-log-settings'
 import { UsageSettings } from '@/components/settings/usage-settings'
 import { BillingSettings } from '@/components/settings/billing-settings'
 import { ModelOrderSettings } from '@/components/settings/model-order-settings'
+import { FactoryProfilesSettings } from '@/components/settings/factory-profiles-settings'
 import { ArchivedBotsSettings } from '@/components/settings/archived-bots-settings'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
@@ -159,7 +160,8 @@ function ApiAndSubscriptions({ workspaceId, workspaceName, team }: { workspaceId
     <section aria-labelledby="workspace-models-scope" className="flex flex-col gap-6">
       <h2 id="workspace-models-scope" className="pl-1 text-sm font-medium text-muted-foreground">{scopeT('workspace', { name: workspaceName ?? scopeT('currentWorkspace') })}</h2>
       <ModelOrderSettings key={`order-${workspaceId}`} workspaceId={workspaceId} />
-      {team && <SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} />}
+      <FactoryProfilesSettings key={`profiles-${workspaceId}`} workspaceId={workspaceId} />
+      {team && <SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} workspaceName={workspaceName} />}
     </section>
   </>
 }

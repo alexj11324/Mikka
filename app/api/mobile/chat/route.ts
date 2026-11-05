@@ -1,10 +1,11 @@
 import { ChatFileError } from '@/lib/chat-attachments/extract'
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
 import { tokenWorkspace } from '@/lib/tokens/principal'
-import { chatView } from '@/lib/coordinator/store'
+import { chatVersionState, chatView } from '@/lib/coordinator/store'
+import { ownerListRead } from '@/lib/live/list-read-server'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { reactionsFor } from '@/lib/reactions'
 import { chatFailure } from '@/lib/chat-failure'
@@ -32,6 +33,14 @@ async function tokenBotAllowed(user: { id: string; [tokenWorkspace]?: string }, 
 /** Reactions on the chat's stored messages (a message still waiting has no id yet). */
 const reactionsOf = (userId: string, items: readonly { id?: string }[]) => reactionsFor(userId, items.flatMap(item => item.id ? [item.id] : []))
 
+/** Where this chat's live key arrives (the owner's home channel) and, while a reply is coming, when its lease runs out:
+ * the one change with no write, so the app reads once more then (as the web's chat does). */
+async function chatLive(userId: string, botId: string, working: boolean) {
+  if (!working) return ownerListRead(userId)
+  const { expiries, observedAt } = await chatVersionState(userId, 200, botId)
+  return ownerListRead(userId, expiries, observedAt)
+}
+
 /** `GET /api/mobile/chat?bot=<id>`: the chat with the Coordinator (no `bot`) or one of the person's bots. */
 async function handleGET(request: Request) {
   const user = await mobileUser(request)
@@ -43,12 +52,16 @@ async function handleGET(request: Request) {
     if (typeof user[tokenWorkspace] === 'string') {
       if (!await tokenBotAllowed(user, bot.data)) return json({ error: 'botNotFound' }, 404)
       const enabled = coordinatorEnabled()
-      const chat = await chatView(user.id, 200, await openChatBotId(user, bot.data))
+      const view = await chatView(user.id, 200, await openChatBotId(user, bot.data))
+      // The app shows a failed welcome through `failure`; the empty Bot item is no message (nor unread, nor reactable).
+      const chat = { ...view, items: view.items.filter(item => !item.welcome) }
       const working = enabled && chat.working
       return json({ ...chat, enabled, working, failure: enabled ? chatFailure({ working, error: chat.error, items: chat.items }) : null, reactions: await reactionsOf(user.id, chat.items) })
     }
-    const chat = await getCoordinatorChat(bot.data)
-    return json({ ...chat, failure: chat.enabled ? chatFailure(chat) : null, reactions: await reactionsOf(user.id, chat.items) })
+    const read = await getCoordinatorChat(bot.data)
+    const chat = { ...read, items: read.items.filter(item => !item.welcome) }
+    const [reactions, live] = await Promise.all([reactionsOf(user.id, chat.items), chatLive(user.id, read.botId, chat.working)])
+    return json({ ...chat, failure: chat.enabled ? chatFailure(chat) : null, reactions, live })
   } catch (error) {
     if (error instanceof ActionFailureError) return json({ error: error.code }, 404)
     throw error
@@ -75,7 +88,7 @@ async function handlePOST(request: Request) {
       if (error instanceof SubmissionConflictError) return json({ error: 'submissionConflict' }, 409)
       throw error
     }
-    after(() => wakeCoordinator(user.id))
+    afterJob('after:coordinator-wake', () => wakeCoordinator(user.id))
     return json({ queued: true }, 202)
   }
   const result = await sendCoordinatorMessage(parsed.data.text, null, parsed.data.botId ?? null, parsed.data.submissionId, undefined, null, images)

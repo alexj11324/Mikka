@@ -54,7 +54,7 @@ export function EmailRequestForm({ title, description, submitLabel, send, turnst
   }
   return <Auth label={title}>
     <AuthCard title={title} description={processed ? t('requestProcessed') : description}>
-      {error && <p id="recovery-error" role="alert" className="text-destructive text-sm">{error}</p>}
+      {error && <p id="recovery-error" role="alert" className="text-destructive-foreground text-sm">{error}</p>}
       <form className="flex flex-col gap-5" onSubmit={submit} aria-busy={pending} aria-describedby={error ? 'recovery-error' : undefined}>
         <FieldGroup>
           <Field data-disabled={pending} className="gap-2">

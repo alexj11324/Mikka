@@ -20,6 +20,13 @@ test('dispatch keys are optional, bounded and normalized with caller parameters'
   assert.deepEqual(dispatchInput.parse({ ...input, requestKey: ' work-1 ', note: ' hello ' }), { ...input, requestKey: 'work-1', note: 'hello' })
 })
 
+test('local dispatch accepts the closed task Profile reference without accepting a host continuation selector', () => {
+  const input = { issueId: randomUUID(), agentId: randomUUID(), deviceRepoId: randomUUID() }
+  for (const profileId of ['default', randomUUID()]) assert.equal(dispatchInput.parse({ ...input, profileId }).profileId, profileId)
+  for (const profileId of ['Default', 'auto', 'legacy', ' default', 'not-a-profile']) assert.equal(dispatchInput.safeParse({ ...input, profileId }).success, false)
+  assert.equal('defaultOnly' in dispatchInput.parse({ ...input, defaultOnly: true }), false)
+})
+
 // Explicit disposable target only; never fall back to application credentials.
 test('real Postgres dispatch transactions and recovery', {
   skip: process.env.RUN_DISPATCH_DB_TESTS !== '1', timeout: 90000,

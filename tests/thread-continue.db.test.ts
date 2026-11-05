@@ -137,21 +137,26 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
     const { questionReference } = await import('../lib/factory/questions/store')
     const { freezeWorkerDefinition } = await import('../lib/agent-kit/worker')
-    const { factoryAutomaticRuntime } = await import('../lib/factory/automatic-dispatch')
-    const wake = mock.method(factoryAutomaticRuntime, 'enqueue', async (..._args: Parameters<typeof factoryAutomaticRuntime.enqueue>) => undefined)
-    t.after(() => wake.mock.restore())
+    const { questionWakeRuntime, claimQuestionWake, finishQuestionWake } = await import('../lib/factory/questions/wake')
+    const wake = mock.method(questionWakeRuntime, 'enqueue', async (..._args: Parameters<typeof questionWakeRuntime.enqueue>) => 'fixture-workflow')
+    const workflowStatus = mock.method(questionWakeRuntime, 'status', async () => 'completed')
+    t.after(() => { wake.mock.restore(); workflowStatus.mock.restore() })
     for (const scope of ['bot', 'legacy', 'separate-runtime'] as const) await t.test(scope === 'legacy' ? 'legacy task without a Bot' : scope === 'bot' ? 'Bot-owned task' : 'Coordinator task on another Bot computer in the same workspace', async () => {
       const legacyNullScope = scope === 'legacy'
       const b = await person()
       let wakeAvailable = false
       const woken: string[] = []
-      wake.mock.mockImplementation(async (database, actor, _previousRunId, runId) => {
+      wake.mock.mockImplementation(async (actor, runId, intent) => {
         assert.equal(actor.userId, b.id)
-        const question = (await database.query('SELECT status FROM factory_questions WHERE "continuationRunId"=$1', [runId])).rows[0]
+        const question = (await pool.query('SELECT status FROM factory_questions WHERE "continuationRunId"=$1', [runId])).rows[0]
         assert.equal(question?.status, 'resuming', 'the answer committed before the wake boundary')
         if (!wakeAvailable) throw new Error('Synthetic interruption after answer commit, before VM wake')
+        const workflowId = `fixture-workflow-${randomUUID()}`
+        assert.equal(await claimQuestionWake(pool, actor, runId, intent, workflowId), true)
         woken.push(runId)
-        await database.query(`UPDATE thread_machines SET state='running' WHERE "runId"=$1`, [runId])
+        await pool.query(`UPDATE thread_machines SET state='running' WHERE "runId"=$1`, [runId])
+        await finishQuestionWake(pool, actor, runId, intent, workflowId, false)
+        return workflowId
       })
       const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `question:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
       assert.ok(initial.runId, JSON.stringify(initial))
@@ -264,7 +269,8 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       assert.equal(next.questionContinuation.requireSessionResume, true)
       assert.equal(next.questionContinuation.requiredSandboxId, sandboxId)
       assert.equal((await pool.query('SELECT "sandboxId" FROM thread_machines WHERE "runId"=$1', [next.id])).rows[0].sandboxId, sandboxId)
-      assert.ok(wake.mock.calls.some(call => call.arguments[3] === next.id))
+      assert.equal(wake.mock.calls.filter(call => call.arguments[1] === next.id).length, 1,
+        'concurrent answer replays share the one reserved wake generation')
       assert.deepEqual(woken, [], 'the simulated postcommit interruption did not wake the VM')
       assert.equal((await pool.query('SELECT state FROM thread_machines WHERE "runId"=$1', [next.id])).rows[0].state, 'paused')
       assert.equal((await pool.query('SELECT "botId" FROM factory_tasks WHERE id=$1', [task.id])).rows[0].botId, legacyNullScope ? null : b.botId)
@@ -280,6 +286,12 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       assert.ok(submission)
       const loseAcknowledgement = () => pool.query(`UPDATE coordinator_events SET payload=payload #- '{threadSubmission,result}' WHERE id=$1`, [submission.id])
       wakeAvailable = true
+      const expireWakeDeadline = () => pool.query(`UPDATE factory_events SET result=result || jsonb_build_object('nextAt',$2::text)
+        WHERE "taskId"=$1 AND request->>'kind'='question_wake' AND request->>'runId'=$3`, [task.id, new Date(0).toISOString(), next.id])
+      await loseAcknowledgement()
+      assert.deepEqual(await sendThreadMessage(b.id, initial.runId, text, human, requestId), accepted)
+      assert.deepEqual(woken, [], 'an unknown enqueue acknowledgement keeps its deadline before another wake')
+      await expireWakeDeadline()
       // A historical acceptance is still acknowledged when cancellation or an
       // owner stop prevents the queued child from running. It grants no wake.
       await pool.query(`UPDATE factory_tasks SET status='cancelled' WHERE id=$1`, [task.id])
@@ -302,6 +314,9 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       // same accepted submission still retries only its pending native wake.
       await pool.query(`UPDATE thread_machines SET state='paused' WHERE "runId"=$1`, [next.id])
       const wakesBeforeSavedReplay = woken.length
+      assert.deepEqual(await sendThreadMessage(b.id, initial.runId, text, human, requestId), accepted)
+      assert.equal(woken.length, wakesBeforeSavedReplay, 'a saved acknowledgement cannot bypass the current wake deadline')
+      await expireWakeDeadline()
       assert.deepEqual(await sendThreadMessage(b.id, initial.runId, text, human, requestId), accepted)
       assert.ok(woken.length > wakesBeforeSavedReplay, 'a saved outer acknowledgement must not strand its queued native continuation')
       assert.ok(woken.every(runId => runId === next.id))
@@ -489,15 +504,29 @@ test('a message to an ended thread runs it again in the same thread; only its ow
 
   await t.test('generic thread dispatch cannot bypass the current Factory repair budget', async t => {
     const { queueTaskRun } = await import('../lib/factory/queue-local')
-    const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
+    const { factoryRuntimeForBot, factoryAuthorize } = await import('../lib/factory/runtime')
+    const { createLegacyFactoryStore } = await import('./helpers/factory-legacy')
     const { factoryBinding } = await import('../lib/factory/dispatch')
     const { latestThreadRunModel } = await import('../lib/computer/run-model')
     const { latestTaskRun } = await import('../lib/thread-dispatch')
-    const fixture = async (executeCount: number, atExecution = false) => {
+    const fixture = async (executeCount: number, atExecution = false, legacyReview = false) => {
       const b = await person()
       const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `budget:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
       assert.ok(initial.runId, JSON.stringify(initial))
       const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [initial.runId])).rows[0]
+      if (legacyReview) {
+        // Only the three old review-retry budget scenarios use pre-upgrade
+        // task semantics. Materialize them before any synthetic execution;
+        // the real queue and Owner/source authorization remain unchanged.
+        const queued = (await pool.query('SELECT status,"startedAt","sessionId" FROM agent_runs WHERE id=$1', [initial.runId])).rows[0]
+        assert.deepEqual(queued, { status: 'queued', startedAt: null, sessionId: null })
+        const route = { ...task.route }; delete route.flowVersion
+        const legacy = await createLegacyFactoryStore(pool, factoryAuthorize, b.botId).route(b.id, route)
+        assert.equal(legacy.task.id, task.id)
+        task.route = legacy.task.route
+      }
+      assert.equal(task.route.flowVersion, legacyReview ? undefined : 2)
+
       // These completed executions are synthetic history, not real model
       // turns. Give them a past chronology so a fast local DB cannot put
       // several executions in one JS millisecond and let random UUIDs choose
@@ -551,7 +580,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     }
 
     for (const status of ['failed', 'pending'] as const) await t.test(`exhausted ${status} review cannot be replaced by a generic thread continuation`, async () => {
-      const f = await fixture(4)
+      const f = await fixture(4, false, status === 'pending')
       if (status === 'pending') await f.retryReview()
       const before = await f.snapshot()
       await assert.rejects(queueTaskRun(f.b.id, f.request, f.b.botId, undefined, status === 'pending' ? f.task.sourceEventId : undefined), { code: 'factoryRecoveryBudgetExceeded' })
@@ -568,8 +597,8 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       assert.deepEqual(await f.snapshot(), before, 'a retry cannot add a fifth execute attempt, source, receipt or run')
     })
 
-    await t.test('direct Owner repair cannot replace a pending review after the same-epoch cap', async () => {
-      const f = await fixture(4)
+    await t.test('direct Owner repair cannot replace a legacy pending review after the same-epoch cap', async () => {
+      const f = await fixture(4, false, true)
       const current = await f.retryReview()
       const before = await f.snapshot()
       const { handleFactory } = await import('../lib/factory/http')
@@ -593,8 +622,8 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       assert.deepEqual(await f.snapshot(), before)
     })
 
-    await t.test('same-epoch continuation within budget queues the fourth execution once', async () => {
-      const f = await fixture(3)
+    await t.test('same-epoch legacy continuation within budget queues the fourth execution once', async () => {
+      const f = await fixture(3, false, true)
       await f.retryReview()
       const before = await f.snapshot()
       const result = await queueTaskRun(f.b.id, f.request, f.b.botId)

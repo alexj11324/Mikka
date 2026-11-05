@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { bots, WORKSPACE_BOT_MODELS } from '@/lib/db/schema'
 import { BOT_COLORS, BOT_SHAPES } from '@/lib/bot-shapes'
 import { repositoryAvailable, workspaceBotDefaults } from '@/lib/workspace-admin/bots'
+import { botListChanged } from './live/lists'
 
 /**
  * 新建 Bot, for the web's action and the iOS app's route: a name, a colour and
@@ -29,5 +30,6 @@ export async function createOwnedBot(owner: { ownerId: string; workspaceId: stri
     if ((error as { code?: string }).code === '23505') throw new ActionFailureError('botDuplicateName')
     throw new ActionFailureError('validationGeneric')
   }
+  await botListChanged(db, bot.id)
   return bot
 }

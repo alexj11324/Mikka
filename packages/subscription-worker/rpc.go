@@ -98,6 +98,8 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 				result, err = w.Cleanup(callCtx)
 			case "oauthStart":
 				result, err = w.StartOAuth(callCtx, request.Revision, request.SessionID)
+			case "oauthResume":
+				result, err = w.ResumeOAuth(callCtx, request.SessionID)
 			case "oauthPoll":
 				result, err = w.PollOAuth(callCtx, request.SessionID, request.State)
 			case "oauthHandoff":

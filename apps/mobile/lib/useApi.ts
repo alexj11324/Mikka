@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState } from 'react-native'
 import { api, ApiError, onWorkspaceChange } from '@/lib/api'
 import { apiCache as cache } from './api-cache'
+import { needsForegroundRead } from './api-read-state'
+import { live, useLive, type LiveSpec } from './live'
 
 // The last answer per path, so a screen opened again draws at once and refreshes behind (a chat is not blank while it loads).
 // Another workspace's answers are dropped.
@@ -14,16 +16,33 @@ export async function prefetch(path: string) {
   await cache.prefetch(path, api)
 }
 
-/** On signing out: nothing of this account is drawn for the next. */
-export const clearApiCache = () => cache.clear()
+/** On signing out: nothing of this account is drawn for the next, and its live connections close. */
+export const clearApiCache = () => { cache.clear(); live.reset() }
 
 /**
- * Loads `path`, reloads it every `every` ms while the app is in front (0: no
- * polling), and lets the screen reload or patch it after a write. It starts
- * from the path's last answer, when there is one.
+ * Loads `path` once, and lets the screen reload or patch it after a write. It
+ * starts from the path's last answer, when there is one. It never polls: data
+ * that changes on its own uses useLiveApi (decision 2026-11-05-0200-no-new-polling).
  */
-export function useApi<T>(path: string | null, every = 0) {
+export function useApi<T>(path: string | null) {
+  return useApiRead<T>(path, api, false)
+}
+
+/**
+ * Loads `path` and reads it again when the server pushes one of the keys `spec`
+ * returns for the current data (lib/live.ts): no timer while connected, one read
+ * a minute while disconnected, nothing in the background and one read on coming
+ * back. The keys are the ones the web listens to for the same data.
+ */
+export function useLiveApi<T>(path: string | null, spec: (data: T | null) => LiveSpec, read: (path: string) => Promise<T> = api) {
+  const state = useApiRead<T>(path, read, true)
+  useLive(path ? spec(state.data) : { refs: [] }, state.reload, state.requestedAt)
+  return state
+}
+
+function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, pushed: boolean) {
   const [data, setStored] = useState<T | null>(() => path ? cache.get<T>(path) : null)
+  const [source, setSource] = useState(() => ({ path, context: cache.context() }))
   const [error, setError] = useState<ApiError | Error | null>(null)
   const [loading, setLoading] = useState(Boolean(path))
   const request = useRef(0)
@@ -31,7 +50,7 @@ export function useApi<T>(path: string | null, every = 0) {
   const setData = useCallback((next: T | null | ((current: T | null) => T | null)) => {
     cache.commit(context, () => {
       // A saved mutation is newer than a read already in flight.
-      request.current++; setLoading(false)
+      request.current++; pending.current = null; setLoading(false); setError(null); failed.current = false
       setStored(current => {
         let value = current
         cache.commit(context, () => {
@@ -44,51 +63,66 @@ export function useApi<T>(path: string | null, every = 0) {
   }, [path, context])
   const alive = useRef(true)
   const loadedAt = useRef(0)
+  // When the last successful read started (performance clock): a pushed deadline counts from it.
+  const [requestedAt, setRequestedAt] = useState<number | null>(null)
+  const failed = useRef(false)
+  const pending = useRef<{ context: number; path: string; ticket: number; promise: Promise<void> } | null>(null)
 
-  const load = useCallback(async () => {
-    if (!path) return
-    const context = cache.context(), ticket = ++request.current
+  const load = useCallback((): Promise<void> => {
+    if (!path) return Promise.resolve()
+    const context = cache.context()
+    if (pending.current?.context === context && pending.current.path === path) return pending.current.promise
+    const ticket = ++request.current
     const accept = (apply: () => void) => cache.commit(context, () => { if (alive.current && ticket === request.current) apply() })
-    try {
-      const next = await api<T>(path)
-      accept(() => { cache.set(path, next, context); setStored(next); setError(null); loadedAt.current = Date.now() })
-    } catch (failure) {
-      accept(() => setError(failure as Error))
-    } finally {
-      accept(() => setLoading(false))
-    }
-  }, [path])
+    accept(() => setLoading(true))
+    const started = typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()
+    const promise = (async () => {
+      try {
+        const next = await read(path)
+        accept(() => { cache.set(path, next, context); setStored(next); setError(null); failed.current = false; loadedAt.current = Date.now(); setRequestedAt(started) })
+      } catch (failure) {
+        accept(() => { setError(failure as Error); failed.current = true })
+      } finally {
+        accept(() => setLoading(false))
+        if (pending.current?.ticket === ticket) pending.current = null
+      }
+    })()
+    pending.current = { context, path, ticket, promise }
+    return promise
+  }, [path, read])
 
   useEffect(() => {
     alive.current = true
+    setSource({ path, context: cache.context() })
     setStored(path ? cache.get<T>(path) : null)
     setError(null)
-    loadedAt.current = 0
+    loadedAt.current = 0; failed.current = false; pending.current = null; setRequestedAt(null)
     setLoading(Boolean(path))
     void load()
     return () => { alive.current = false; request.current++ }
   }, [load, path])
 
   useEffect(() => onWorkspaceChange(() => {
-    setStored(null); setError(null); loadedAt.current = 0; setLoading(Boolean(path))
+    setSource({ path, context: cache.context() })
+    setStored(null); setError(null); loadedAt.current = 0; failed.current = false; pending.current = null; setRequestedAt(null); setLoading(Boolean(path))
     void load()
   }), [load, path])
 
   useEffect(() => {
     if (!path) return
-    let timer: ReturnType<typeof setInterval> | null = every ? setInterval(load, every) : null
     const sub = AppState.addEventListener('change', state => {
       if (state === 'active') {
         // Stale-while-revalidate: one silent read only when the data is older than
-        // FRESH_FOR_MS; the screen keeps what it shows meanwhile.
-        if (loadedAt.current && Date.now() - loadedAt.current >= FRESH_FOR_MS) void load()
-        if (every && !timer) timer = setInterval(load, every)
-      } else if (timer) { clearInterval(timer); timer = null }
+        // FRESH_FOR_MS; the screen keeps what it shows meanwhile. A pushed screen's
+        // catch-up read is the live channel's; here only a failed read recovers.
+        if (pushed ? failed.current || loadedAt.current === 0 : needsForegroundRead(loadedAt.current, failed.current, Date.now(), FRESH_FOR_MS)) void load()
+      }
     })
-    return () => { if (timer) clearInterval(timer); sub.remove() }
-  }, [every, load, path])
+    return () => sub.remove()
+  }, [load, path, pushed])
 
-  return { data, error, loading, reload: load, setData }
+  const sameSource = source.path === path && source.context === context
+  return { data: sameSource ? data : path ? cache.get<T>(path) : null, error: sameSource ? error : null, loading: sameSource ? loading : Boolean(path), reload: load, setData, requestedAt: sameSource ? requestedAt : null }
 }
 
 /** Pull to refresh for a list (the system's RefreshControl): reloads and shows the spinner until the data is back. */

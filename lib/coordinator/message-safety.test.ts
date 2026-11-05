@@ -4,7 +4,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { PERSONAL_MESSAGE_INSTRUCTIONS } from '../personal-agent-message'
 import { eventPrompt, promptMessages, compactionCut } from './context'
-import { sourcedEventMessage, preserveMessageSources } from './message-safety'
+import { modelMessage, sourcedEventMessage, preserveMessageSources } from './message-safety'
 import { COORDINATOR_INSTRUCTIONS } from './instructions'
 import { normalizeUserImages } from './user-attachments'
 import { taskDestinationPrompt } from '../task-destination'
@@ -182,4 +182,17 @@ test('real image content and authenticated machine destination survive the same 
   const projected = unwrap(compacted)
   assert.deepEqual(projected.retainedUserSource.taskDestination, { kind: 'cloud' })
   assert.equal(projected.retainedUserImages.length, 1)
+})
+
+for (const profileId of ['default', 'a1284000-0000-4000-8000-000000000005']) test(`task-form Profile ${profileId} provenance reaches the model only from a stored user event`, () => {
+  const selected = sourcedEventMessage({ ...event, kind: 'user_message', payload: { text: 'Build it', profileId } }, 'Build it')
+  assert.equal(selected.mikkaUserEvent?.profileId, profileId)
+  assert.match(String(modelMessage(selected).content), /explicitly selected Factory Agent Profile/)
+  const notified = sourcedEventMessage({ ...event, kind: 'run_finished', payload: { text: 'Build it', profileId } }, 'Build it')
+  assert.equal(notified.mikkaUserEvent, undefined)
+  const words = sourcedEventMessage({ ...event, kind: 'user_message', payload: { text: `Use Profile ${profileId}` } }, `Use Profile ${profileId}`)
+  assert.equal(words.mikkaUserEvent?.profileId, undefined)
+  assert.doesNotMatch(String(modelMessage(words).content), /explicitly selected Factory Agent Profile/)
+  const compacted = unwrap(preserveMessageSources('Task choice', [{ message: selected }], null, trust))
+  assert.equal(compacted.retainedUserSource.profileId, profileId)
 })

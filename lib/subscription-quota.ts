@@ -16,6 +16,36 @@ export function subscriptionAvailability(quota: unknown, modelId: string, provid
   return { status: state === 'unknown' ? 'checking' : state, resetsAt: times[0] ?? null }
 }
 
+/** How long Settings shows the last read allowance before it says 待检查 again. */
+export const QUOTA_DISPLAY_MS = 15 * 60_000
+
+/**
+ * The last read allowance as Settings shows it. Dispatch reads it fresh (60 s, `subscriptionAvailability`); the
+ * page shows what the account last answered, for QUOTA_DISPLAY_MS, so a read a minute ago is not 待检查 again.
+ * A used-up window whose reset has passed needs another read: that one is 待检查.
+ */
+export function shownSubscriptionAvailability(quota: unknown, modelId: string, provider: 'claude' | 'codex', now = Date.now()): ReturnType<typeof subscriptionAvailability> {
+  const parsed = quotaSnapshotSchema.safeParse(quota)
+  const observed = parsed.success ? Date.parse(parsed.data.observedAt) : NaN
+  if (!Number.isFinite(observed) || observed > now || now - observed > QUOTA_DISPLAY_MS) return { status: 'checking', resetsAt: null }
+  const shown = subscriptionAvailability(quota, modelId, provider, observed)
+  if (shown.status === 'exhausted' && shown.resetsAt && Date.parse(shown.resetsAt) <= now) return { status: 'checking', resetsAt: null }
+  return shown
+}
+
+/**
+ * What Settings would show for a stored reading, as a comparable key: 待检查 (missing or too old), the read status, and
+ * each window that is used up with when it resets. A new reading that leaves the key the same changes nothing on
+ * screen, so it is not pushed (a meter reads about every 45 s while a subscription is in use).
+ */
+export function quotaDisplayKey(quota: unknown, now = Date.now()): string {
+  const parsed = quotaSnapshotSchema.safeParse(quota)
+  const observed = parsed.success ? Date.parse(parsed.data.observedAt) : NaN
+  if (!parsed.success || !Number.isFinite(observed) || observed > now || now - observed > QUOTA_DISPLAY_MS) return 'checking'
+  const used = parsed.data.windows.filter(window => window.used >= 1).map(window => `${window.kind}:${window.resetsAt ?? ''}`).sort()
+  return JSON.stringify([parsed.data.status, used])
+}
+
 /** A subscription is out of quota while an account-wide window is fully used and has not reset. */
 export function quotaExhausted(quota: unknown, now = Date.now()) {
   const parsed = z.object({ windows: z.array(quotaWindowSchema) }).safeParse(quota);

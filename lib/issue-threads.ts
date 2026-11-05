@@ -33,6 +33,8 @@ export interface IssueThread {
    * its answer is resuming it (`resuming`). Read for the chain's live end (threadQuestionRunId).
    */
   question: ThreadQuestion
+  /** Owner-only failure of this queued question child's host wake; its run is unchanged. */
+  questionWake?: { generation: string; error: string } | null
   /**
    * The chain's newest attempt when it is not this thread's own run: the run that resumes
    * the thread after its question was answered (lib/factory/questions/store.ts answer →
@@ -85,13 +87,27 @@ export function threadQuestionRunId(thread: Pick<IssueThread, 'attempts'>) {
  * status, send and stop follow it. An answered question whose continuation has not started
  * shows as the run it is about to continue: the same running state, nothing new.
  */
-export function threadQuestionView(thread: { id: string; status: string; outcome?: string | null; stopping?: boolean; question: ThreadQuestion; continuation?: IssueThread['continuation'] }) {
+export function threadQuestionView(thread: { id: string; status: string; outcome?: string | null; stopping?: boolean; question: ThreadQuestion; questionWake?: IssueThread['questionWake']; continuation?: IssueThread['continuation'] }) {
   const next = thread.continuation ?? null
-  // Answered, continuation not started yet: still running, nothing to send or stop.
-  if (next?.status === 'queued' && thread.question === 'resuming') return { question: 'resuming' as const, waiting: false, status: 'running', outcome: null, runId: next.id, stopping: false }
+  // A failed wake offers Retry on this child. The committed answer stays in
+  // resuming, so ordinary Send cannot replay it or create another run.
+  if (next?.status === 'queued' && thread.question === 'resuming') return { question: 'resuming' as const, waiting: false, status: thread.questionWake ? 'failed' : 'running', outcome: null, runId: next.id, stopping: false }
   const live = next ?? { id: thread.id, status: thread.status, outcome: thread.outcome ?? null, stopping: !!thread.stopping }
+  if (live.status === 'queued' && thread.question === 'resuming' && thread.questionWake)
+    return { question: 'resuming' as const, waiting: false, status: 'failed', outcome: null, runId: live.id, stopping: false }
   const question = runIsActive(live.status) ? null : thread.question
   return { question, waiting: question === 'waiting', status: question === 'resuming' ? 'running' : live.status, outcome: live.outcome ?? null, runId: live.id, stopping: runIsActive(live.status) && live.stopping }
+}
+
+/** Human acceptance resolves only its current candidate's still-waiting producer.
+ * This is a display value; run outcomes, historical checks and send authority stay intact. */
+export function acceptedProducerOutcome(thread: Pick<IssueThread, 'id' | 'status' | 'outcome' | 'stopping' | 'question' | 'questionWake' | 'continuation' | 'latestRunId'>,
+  issueId: string | null, tasks: readonly { issueId: string; stage: string; status: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean }[]) {
+  const view = threadQuestionView(thread)
+  if (!issueId || view.status !== 'succeeded' || view.question || thread.questionWake || thread.stopping || thread.continuation?.stopping ||
+    view.runId !== thread.latestRunId || (view.outcome !== null && view.outcome !== 'needs_input')) return view.outcome
+  return tasks.some(task => task.issueId === issueId && task.stage === 'approval' && task.status === 'passed' &&
+    !task.isSkillCandidate && !!task.candidateId && task.candidateRunId === thread.latestRunId) ? 'done' : view.outcome
 }
 
 /** When the row last changed, never after `now`: clock skew with the server must not read as 「1秒钟后」. */

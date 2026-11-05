@@ -82,6 +82,6 @@ export function BotNameEditor({ botId, name }: { botId: string; name: string }) 
         if (event.key === 'Enter') { event.preventDefault(); void save(true) }
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(true) }
       }} />
-    {error && <p id={errorId} role="alert" className="text-xs text-destructive">{error}</p>}
+    {error && <p id={errorId} role="alert" className="text-xs text-destructive-foreground">{error}</p>}
   </div>
 }

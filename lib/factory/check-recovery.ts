@@ -12,7 +12,9 @@ import {
   type DecisionImage,
   type DecisionQuestion,
 } from "../coordinator/decision";
-import { bindingSchema, type FactoryBinding } from "./contract";
+import type { FactoryBinding } from "./contract";
+import { factoryCheckRecoverySchema } from "./check-recovery-schema";
+export { factoryCheckRecoverySchema } from "./check-recovery-schema";
 import { factoryEventId } from "./event-id";
 import { factoryBinding } from "./dispatch";
 import { redactFactoryCheckText } from "./checks";
@@ -25,10 +27,6 @@ import {
 import type { createFactoryStore, FactorySnapshot, FactoryTask } from "./store";
 
 export const FACTORY_CHECK_RECOVERY_CONTRACT_VERSION = 2 as const;
-/** Outer planning tools supply only a binding, never the model answer/receipt. */
-export const factoryCheckRecoverySchema = z
-  .object({ binding: bindingSchema })
-  .strict();
 export type FactoryCheckRecoveryInput = z.infer<
   typeof factoryCheckRecoverySchema
 >;

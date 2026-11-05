@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import useSWR from 'swr'
 
-import { listTaskRuns } from '@/app/actions/task-runs'
 import { listDevices } from '@/app/actions/agents'
 import { localSetupAction } from '@/lib/local-device-setup'
 import { getPreferences } from '@/app/actions/preferences'
@@ -13,8 +12,7 @@ import { desktopRunUpdate, type DesktopRun } from '@/lib/platform/desktop-notifi
 import { pushAllowed } from '@/lib/push-allowed'
 import { usePlatform } from '@/lib/platform/use-platform'
 import { openAppLink } from '@/components/workspace/workspace-navigation'
-
-const POLL_MS = 15_000
+import { useLiveTaskRunList } from '@/hooks/use-live-lists'
 
 function appHref(href: string): string | null {
   return href.startsWith('/') && !href.startsWith('//') ? href : null
@@ -31,11 +29,10 @@ export function DesktopIntegration({ userId }: { userId: string }) {
   const platform = usePlatform()
   const desktop = platform.runtime === 'desktop'
   const router = useRouter()
-  const { data } = useSWR(
-    desktop ? 'task-runs' : null,
-    () => listTaskRuns(),
-    { refreshInterval: POLL_MS, shouldRetryOnError: false },
-  )
+  // The board's own run list and live key (#1212): a run entering 等你, failing or finishing pushes
+  // task_run_list on the owner's home channel; a lease running out is its read deadline. No timer reads it.
+  const runs = useLiveTaskRunList(userId, desktop)
+  const data = runs.data?.items
   // Same key as Settings › 通知, so a change there applies here at once.
   const { data: preferences } = useSWR(desktop ? 'preferences' : null, getPreferences, { shouldRetryOnError: false })
   const finished = preferences !== undefined && pushAllowed(preferences, ['finished'])

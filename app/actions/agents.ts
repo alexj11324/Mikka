@@ -1,5 +1,6 @@
 'use server'
 import { deploymentSwitch } from '@/lib/deployment-switches'
+import { ownerListChanged } from '@/lib/live/lists'
 
 import { createHash } from 'node:crypto'
 import { gunzipSync } from 'node:zlib'
@@ -16,6 +17,7 @@ import {
 } from '@/lib/db/schema'
 import { issueDeviceToken } from '@/lib/device-link'
 import { deviceOnlineStates } from '@/lib/device-presence'
+import { DEVICE_ONLINE_WINDOW_MS, isDeviceOnline } from '@mikka/protocol/device'
 import { removeOwnedDevice, renameOwnedDevice } from '@/lib/device-removal'
 import { enqueueDeviceCommand, type DeviceCommandKind } from '@/lib/device-management'
 import { listSshHosts } from '@/lib/ssh'
@@ -31,7 +33,8 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, taskFreeThreadMembers, threadQuestionRunId, withRunChain, type IssueThread } from '@/lib/issue-threads'
-import { threadQuestionStates } from '@/lib/issue-thread-questions'
+import { readThreadQuestionState, type ThreadQuestionDeadline } from '@/lib/issue-thread-questions'
+import { runIsActive } from '@/lib/issue-run-conversation'
 import { listIssueRunChains, readRunChain } from '@/lib/run-chain'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import { parseUnifiedDiff, type ThreadChangesResult } from '@/lib/thread-changes'
@@ -76,7 +79,23 @@ export interface AgentView {
 
 /** Every local device this person owns, with its repository history. */
 export async function listDevices(): Promise<DeviceView[]> {
+  return (await readDevices(await getUserId())).devices
+}
+
+/**
+ * The device list for 设备 settings, with when to read it again. Registration, a rename,
+ * enable/disable, removal, a repository and a device coming back online push `device_list`.
+ * Going offline writes nothing: a heartbeat device's lapse is a deadline, and a device
+ * online through the gateway keeps the 60 s fallback while it is (presenceFallback).
+ */
+export async function pollDevices() {
   const userId = await getUserId()
+  const { devices: items, expiries, gatewayOnline, observedAt } = await readDevices(userId)
+  const { ownerListRead } = await import('@/lib/live/list-read-server')
+  return { devices: items, live: await ownerListRead(userId, expiries, observedAt), presenceFallback: gatewayOnline }
+}
+
+async function readDevices(userId: string) {
   const rows = await db.select({
     id: devices.id, name: devices.name, deviceType: devices.deviceType, hostname: devices.hostname, platform: devices.platform, arch: devices.arch,
     harnesses: devices.harnesses, lastSeenAt: devices.lastSeenAt, enabled: devices.enabled,
@@ -86,8 +105,12 @@ export async function listDevices(): Promise<DeviceView[]> {
       id: deviceRepos.id, deviceId: deviceRepos.deviceId, repoPath: deviceRepos.repoPath, baseBranch: deviceRepos.baseBranch, verifyCommand: deviceRepos.verifyCommand,
     }).from(deviceRepos).where(inArray(deviceRepos.deviceId, rows.map(row => row.id)))
     : []
-  const presence = await deviceOnlineStates(rows)
-  return rows.map(device => ({
+  const observedAt = Date.now()
+  const presence = await deviceOnlineStates(rows, observedAt)
+  const heartbeat = (device: (typeof rows)[number]) => isDeviceOnline(device.lastSeenAt, observedAt)
+  const expiries = rows.flatMap(device => device.lastSeenAt && heartbeat(device) ? [device.lastSeenAt.getTime() + DEVICE_ONLINE_WINDOW_MS] : [])
+  const gatewayOnline = rows.some(device => presence.get(device.id) && !heartbeat(device))
+  const views: DeviceView[] = rows.map(device => ({
     id: device.id, name: device.name, deviceType: device.deviceType, hostname: device.hostname, platform: device.platform, arch: device.arch,
     harnesses: device.harnesses, lastSeenAt: device.lastSeenAt, enabled: device.enabled,
     online: presence.get(device.id) ?? false,
@@ -95,6 +118,7 @@ export async function listDevices(): Promise<DeviceView[]> {
       id: repo.id, repoPath: repo.repoPath, baseBranch: repo.baseBranch, verifyCommand: repo.verifyCommand,
     })),
   }))
+  return { devices: views, expiries, gatewayOnline, observedAt }
 }
 
 /** Mints a device token. The plaintext is returned once and never stored. */
@@ -123,9 +147,10 @@ export async function setDeviceEnabled(input: { deviceId: string; enabled: boole
     const userId = await getUserId()
     const parsed = z.object({ deviceId: z.uuid(), enabled: z.boolean() }).safeParse(input)
     if (!parsed.success) return { error: 'deviceNotFound' }
-    await db.update(devices)
+    const changed = await db.update(devices)
       .set({ enabled: parsed.data.enabled, updatedAt: new Date() })
-      .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt)))
+      .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt))).returning({ id: devices.id })
+    if (changed.length) await ownerListChanged(db, userId, ['thread_list', 'device_list'])
     return { success: true }
   })
 }
@@ -188,17 +213,30 @@ const threadColumns = {
 
 /** The issue's threads, as much of each as this viewer may see (R-62). */
 export async function listIssueThreads(issueId: string): Promise<IssueThread[]> {
+  return (await readIssueThreads(issueId)).threads
+}
+
+/** The same list, plus the channel its `issue_threads` key arrives on: the issue's
+ * workspace, or the owner's home for a personal issue; null reads once a minute. */
+export async function pollIssueThreads(issueId: string): Promise<{ threads: IssueThread[]; live: { workspaceId: string | null } }> {
+  const { threads, issue, user } = await readIssueThreads(issueId)
+  const [{ documentLiveWorkspace }, { workspacePool }] = await Promise.all([import('@/lib/live/panels'), import('@/lib/workspace-db')])
+  return { threads, live: { workspaceId: await documentLiveWorkspace(pool, workspacePool, issue.id, user.id) } }
+}
+
+async function readIssueThreads(issueId: string) {
   const { issue, user, memberIds } = await issueThreadAccess(issueId)
-  if (!memberIds.has(user.id)) return []
+  const result = (threads: IssueThread[]) => ({ threads, issue, user })
+  if (!memberIds.has(user.id)) return result([])
   // BE-18: fold continuation chains by root first, then take the newest ISSUE_THREAD_LIMIT
   // roots, so continuations never use up a slot (lib/run-chain.ts). Read-only, no locks.
   const chains = await listIssueRunChains(pool, issue.id, [...memberIds], ISSUE_THREAD_LIMIT)
-  if (!chains.length) return []
+  if (!chains.length) return result([])
   const rows = await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
     .where(and(eq(agentRuns.issueId, issue.id), inArray(agentRuns.userId, [...memberIds]), inArray(agentRuns.id, chains.map(chain => chain.rootRunId))))
     .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(ISSUE_THREAD_LIMIT)
   const byRoot = new Map(chains.map(chain => [chain.rootRunId, chain]))
-  return threadQuestions(projectIssueThreads(rows, issue.id, user.id, memberIds).map(thread => withRunChain(thread, byRoot.get(thread.id))), user.id)
+  return result((await threadQuestions(projectIssueThreads(rows, issue.id, user.id, memberIds).map(thread => withRunChain(thread, byRoot.get(thread.id))), user.id)).threads)
 }
 
 /**
@@ -246,8 +284,10 @@ export async function findThreadIssue(runId: string): Promise<{ issueId: string 
 }
 
 export interface IssueThreadDetail {
+  /** Authorized scopes for every attempt; browser state never guesses them. */
+  live?: { runs: import('@/lib/live/panels').ThreadLiveReference[]; issueWorkspaceId: string | null; questionDeadline: ThreadQuestionDeadline | null }
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
-  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean; /** The latest run's failure reason, stored masked (agent_runs.error). */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null; /** Host-confirmed provider recovery, within this owner's thread chain. */ modelFallback?: import('@/lib/run-model-fallback-view').ThreadModelFallbackView[] | null; /** Keep polling while the host prepares a continuation; no uncommitted switch is displayed. */ modelFallbackPending?: boolean }
+  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; /** Host projection for the existing controls; mutations still revalidate. */ replyAvailable: boolean; retryAvailable: boolean; feedbackEligible:boolean; /** The latest masked run error or the host's fixed wake failure. */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null; /** Host-confirmed provider recovery, within this owner's thread chain. */ modelFallback?: import('@/lib/run-model-fallback-view').ThreadModelFallbackView[] | null; /** Keep polling while the host prepares a continuation; no uncommitted switch is displayed. */ modelFallbackPending?: boolean }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
   /** Where `chunks` ends; passed back, the next read returns only later chunks. */
@@ -262,15 +302,47 @@ export interface IssueThreadDetail {
  * is on; the answer itself goes through sendIssueThreadMessage to the chain's latestRunId.
  * A teammate's thread or a live run never carries a question.
  */
-async function threadQuestions(threads: readonly IssueThread[], viewerId: string): Promise<IssueThread[]> {
+async function threadQuestions(threads: readonly IssueThread[], viewerId: string): Promise<{ threads: IssueThread[]; deadline: ThreadQuestionDeadline | null }> {
   // Keyed by the chain's live end (threadQuestionRunId), so an earlier attempt's answered question never resurfaces.
   const asked = new Map(threads.flatMap(thread => {
     const runId = thread.ownedByCurrentUser ? threadQuestionRunId(thread) : null
     return runId ? [[thread.id, runId] as const] : []
   }))
-  if (!asked.size || !deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return [...threads]
-  const byRun = await threadQuestionStates(pool, [...new Set(asked.values())], viewerId)
-  return threads.map(thread => ({ ...thread, question: byRun.get(asked.get(thread.id) ?? '') ?? null }))
+  if (!asked.size || !deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return { threads: [...threads], deadline: null }
+  const { states, deadline } = await readThreadQuestionState(pool, [...new Set(asked.values())], viewerId)
+  return { threads: await Promise.all(threads.map(async thread => {
+    const question = states.get(asked.get(thread.id) ?? '') ?? null
+    // The list and detail share the owner's host-confirmed wake projection;
+    // the queued run and its committed answer remain unchanged.
+    const questionWake = thread.ownedByCurrentUser && question === 'resuming' && (thread.continuation?.status ?? thread.status) === 'queued'
+      ? await (await import('@/lib/factory/questions/wake')).questionWakeFailure(pool, viewerId, thread.latestRunId)
+      : null
+    return { ...thread, question, questionWake }
+  })), deadline }
+}
+
+/** Shared with the explicit owner Retry action: a check can recover its own
+ * strict question, never become an ordinary task continuation. */
+async function originalSessionRetry(userId: string, runId: string, issueId: string) {
+  const requestId=factoryEventId('question-owner-retry',runId)
+  const eventId=factoryEventId('question-recover',requestId)
+  const {rows:[question]}=await pool.query(`SELECT q.id AS "questionId",q.revision AS "questionRevision",
+    q.status AS "questionStatus",q."continuationRunId",q."originRunId",q."originSessionId",t."botId",t.status AS "taskStatus",r.status AS "runStatus",
+    jsonb_build_object('taskId',t.id,'issueId',t."issueId",'attemptId',t."attemptId",'candidateId',t."candidateId",'revision',t.revision) AS binding,
+    e.request AS "recoveryRequest"
+    FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=$1
+    JOIN agent_runs r ON r.id=$2 AND r."userId"=$1 AND r."issueId"=$3
+    LEFT JOIN factory_events e ON e."taskId"=t.id AND e."eventId"=$4 AND e.request->>'kind'='question_recover'
+      AND e.request->>'userId'=$1 AND e.request->'input'->>'expectedFailedRunId'=r.id::text
+      AND e.request->'input'->'reference'->>'questionId'=q.id::text
+    WHERE q."userId"=$1 AND q."issueId"=$3 AND t."issueId"=$3
+      AND r."questionContinuation"->>'requireSessionResume'='true'
+      AND (q."continuationRunId"=r.id OR e."eventId" IS NOT NULL OR q.id::text=r."questionContinuation"->>'questionId')`,[userId,runId,issueId,eventId])
+  return { requestId, question }
+}
+
+function originalSessionRetryAvailable(question: { recoveryRequest?: unknown; questionStatus: string; taskStatus: string; runStatus: string; continuationRunId: string | null } | undefined, runId: string) {
+  return !!question && (!!question.recoveryRequest || (question.questionStatus === 'blocked' && question.taskStatus === 'blocked' && question.runStatus === 'failed' && question.continuationRunId === runId))
 }
 
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
@@ -283,13 +355,13 @@ export async function getIssueThread(issueId: string | null, runId: string, afte
   // The conversation is the thread's, across its runs from this one on, oldest first.
   const from = chain ? Math.max(0, chain.attempts.findIndex(attempt => attempt.runId === row.id)) : 0
   const runIds = chain ? chain.attempts.slice(from).map(attempt => attempt.runId) : [row.id]
-  // A live run is polled every 2 s; only the chunks after the caller's cursor are read, not the whole chain again.
+  // Invalidation reads retain the cursor: only later chunks, not the whole chain again.
   const read = await readThreadChunks(runIds, cursor)
   const chunks = read.chunks
   const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
     .where(inArray(runMessages.runId, runIds)).orderBy(asc(runMessages.createdAt))
-  const [thread] = projected ? await threadQuestions([withRunChain(projected, chain)], user.id) : []
+  const { threads: [thread], deadline: questionDeadline } = projected ? await threadQuestions([withRunChain(projected, chain)], user.id) : { threads: [], deadline: null }
   if (!thread) throw new ActionFailureError('runNotFound')
   // A stop request belongs to the live run that send and stop address, not to an earlier attempt.
   const live = chain?.attempts.find(attempt => attempt.runId === thread.latestRunId)
@@ -306,14 +378,41 @@ export async function getIssueThread(issueId: string | null, runId: string, afte
       error = failed?.error ?? null
     }
   }
+  const questionWake = thread.questionWake ?? null
+  if (questionWake) error = questionWake.error
+  const liveStatus = live?.status ?? row.status
+  let replyAvailable = true
+  let retryAvailable = !!questionWake || liveStatus === 'failed'
+  if (!runIsActive(liveStatus)) {
+    // Independent checks cannot enter ordinary continuation (latestTaskRun).
+    // Read the latest run's host binding, never a report or the root's stage.
+    const { rows: [target] } = await pool.query<{ independentCheck: boolean }>(`SELECT EXISTS (
+      SELECT 1 FROM factory_attempts a WHERE a."runId"=r.id AND a.stage IN ('review','verify','monitor')
+      ) AS "independentCheck" FROM agent_runs r
+      WHERE r.id=$1 AND r."userId"=$2 AND r."issueId" IS NOT DISTINCT FROM $3::uuid`, [thread.latestRunId, user.id, row.issueId])
+    replyAvailable = !!target && (!target.independentCheck || thread.question === 'waiting')
+    if (!target) retryAvailable = false
+    else if (target.independentCheck) {
+      const recovery = liveStatus === 'failed' && row.issueId
+        ? await originalSessionRetry(user.id, thread.latestRunId, row.issueId) : null
+      retryAvailable = originalSessionRetryAvailable(recovery?.question, thread.latestRunId)
+    }
+  }
   const quota = row.userId === user.id
     ? await (await import('@/lib/run-quota-view')).threadQuotaView(user.id, chain?.attempts.map(attempt => attempt.runId) ?? [row.id], thread.latestRunId)
     : null
   const modelFallback = row.userId === user.id
     ? await (await import('@/lib/run-quota-view')).threadModelFallbackState(user.id, chain?.attempts.map(attempt => attempt.runId) ?? [row.id], thread.latestRunId)
     : null
+  const { threadLiveReferences, documentLiveWorkspace } = await import('@/lib/live/panels')
+  const { workspacePool } = await import('@/lib/workspace-db')
+  const [runs, issueWorkspaceId] = await Promise.all([
+    threadLiveReferences(pool, workspacePool, runIds, user.id),
+    row.issueId ? documentLiveWorkspace(pool, workspacePool, row.issueId, user.id) : null,
+  ])
   return {
-    thread: { ...thread, prompt: row.prompt, stopRequestedAt, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
+    live: { runs, issueWorkspaceId, questionDeadline },
+    thread: { ...thread, questionWake, prompt: row.prompt, stopRequestedAt, replyAvailable, retryAvailable, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
     chunkCursor: read.cursor,
@@ -353,7 +452,7 @@ function safeHttpUrl(value: string) {
 }
 
 /** Something a person says in a running thread; the daemon delivers it to the agent. */
-export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true }): Promise<{ runId: string; continued: boolean }> {
+export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<{ runId: string; continued: boolean }> {
   const text = z.string().trim().min(1).max(10_000).safeParse(input.text)
   if (!text.success) throw new ActionFailureError('messageRequired')
   const { row, user } = await readableThread(input.issueId, input.runId)
@@ -365,25 +464,23 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
   if(input.retryOriginalSession!==undefined && input.retryOriginalSession!==true)throw new ActionFailureError('runInvalid')
   if(input.requestId!==undefined && !z.uuid().safeParse(input.requestId).success)throw new ActionFailureError('validationGeneric')
   if(input.requestId!==undefined && input.retryOriginalSession)throw new ActionFailureError('validationGeneric')
+  if(input.questionWakeGeneration!==undefined && (!input.retryOriginalSession || !z.uuid().safeParse(input.questionWakeGeneration).success))throw new ActionFailureError('validationGeneric')
+  if(input.questionWakeGeneration!==undefined) {
+    if(!row.issueId)throw new ActionFailureError('threadCannotContinue')
+    try {
+      const {retryQueuedQuestionWake}=await import('@/lib/factory/questions/wake')
+      return await retryQueuedQuestionWake(pool,{userId:user.id,sessionId:session.session.id},row.id,input.questionWakeGeneration)
+    } catch(error) {
+      if(error instanceof FactoryError)throw new ActionFailureError(error.code==='factoryNotFound'?'runNotFound':'threadRecoveryUnavailable')
+      throw error
+    }
+  }
   if(input.retryOriginalSession && row.issueId) {
     // Only the existing owner Retry control requests recovery. A typed label,
     // Bot message or ordinary send never acquires this authority.
-    const requestId=factoryEventId('question-owner-retry',row.id)
-    const eventId=factoryEventId('question-recover',requestId)
-    const {rows:[question]}=await pool.query(`SELECT q.id AS "questionId",q.revision AS "questionRevision",
-      q.status AS "questionStatus",q."continuationRunId",q."originRunId",q."originSessionId",t."botId",t.status AS "taskStatus",r.status AS "runStatus",
-      jsonb_build_object('taskId',t.id,'issueId',t."issueId",'attemptId',t."attemptId",'candidateId',t."candidateId",'revision',t.revision) AS binding,
-      e.request AS "recoveryRequest"
-      FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=$1
-      JOIN agent_runs r ON r.id=$2 AND r."userId"=$1 AND r."issueId"=$3
-      LEFT JOIN factory_events e ON e."taskId"=t.id AND e."eventId"=$4 AND e.request->>'kind'='question_recover'
-        AND e.request->>'userId'=$1 AND e.request->'input'->>'expectedFailedRunId'=r.id::text
-        AND e.request->'input'->'reference'->>'questionId'=q.id::text
-      WHERE q."userId"=$1 AND q."issueId"=$3 AND t."issueId"=$3
-        AND r."questionContinuation"->>'requireSessionResume'='true'
-        AND (q."continuationRunId"=r.id OR e."eventId" IS NOT NULL OR q.id::text=r."questionContinuation"->>'questionId')`,[user.id,row.id,row.issueId,eventId])
+    const { requestId, question } = await originalSessionRetry(user.id, row.id, row.issueId)
     if(question) {
-      if(!question.recoveryRequest && (question.questionStatus!=='blocked'||question.taskStatus!=='blocked'||question.runStatus!=='failed'||question.continuationRunId!==row.id))throw new ActionFailureError('threadCannotContinue')
+      if(!originalSessionRetryAvailable(question, row.id))throw new ActionFailureError('threadCannotContinue')
       // One SQL snapshot selects either the original receipt input or the
       // current reference. Concurrent clicks therefore send the same request.
       const input=question.recoveryRequest?.input ?? {requestId,expectedFailedRunId:row.id,reference:{questionId:question.questionId,questionRevision:question.questionRevision,binding:question.binding,originRunId:question.originRunId,originSessionId:question.originSessionId}}
@@ -407,7 +504,7 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
  * dispatch with no machine or model) returned as its code, so the thread says
  * why instead of 「发送失败」. Other failures still throw.
  */
-export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
+export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
   return runAction(async () => { const result=await sendIssueThreadMessage(input); return { sent: true as const,...result } })
 }
 

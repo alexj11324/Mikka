@@ -68,7 +68,7 @@ stub('../issue-team-access.ts',{issueTeamAccess:async()=>{throw Error('owner cla
 stub('../mcp/resource.ts',{mcpResourceURL:null})
 stub('../device-repositories.ts',{readRepositorySettings:async()=>null})
 stub('../run-publications.ts',{prepareRunPublication:prepared,persistRunCompletion:completed})
-stub('../run-leases.ts',{latestCheckpoint:async()=>null,failRunForDaemonUpgrade:async()=>false})
+stub('../run-leases.ts',{latestCheckpoint:async()=>null,failRunForDaemonUpgrade:async()=>false,failQueuedSubscriptionRuntime:async()=>{throw Error('Healthy claim fixture must not fail its subscription runtime')}})
 let githubAccount:string|null=null
 stub('../github/repository-installation.ts',{linkedGitHubAccountId:async()=>githubAccount})
 stub('../computer/local-authority.ts',{localComputerAuthority:async()=>({botId,ownerId:owner,workspaceId:workspace,policyVersion:3,permission:'allow'})})

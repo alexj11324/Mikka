@@ -8,6 +8,8 @@ import { remoteKey } from '@mikka/protocol/repository'
 import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 import type { db } from './db'
 import { notifyDeviceWork } from './device-gateway-notify'
+import { runChanged } from './live/panels'
+import { runListChanged } from './live/lists'
 
 export type RunControlDatabase = Pick<typeof db, 'transaction'>
 
@@ -45,6 +47,7 @@ export async function sendOwnedRunMessage(database: RunControlDatabase, userId: 
     const id = input.messageId ?? crypto.randomUUID()
     await tx.insert(runMessages).values({ id, runId: run.id, userId, text: personalRunMessageText(id, input.text, origin),
       origin: origin === 'user' ? 'owner' : 'peer', mailboxWakeDepth: origin === 'user' ? -1 : MAILBOX_NOTIFICATION_LIMIT })
+    await runChanged(tx, run.id)
     return run.deviceId
   })
   notifyDeviceWork(deviceId)
@@ -75,13 +78,17 @@ export async function stopOwnedRun(database: RunControlDatabase, userId: string,
     if ((run.status === 'queued' && !machineBound) || quotaPaused) {
       await tx.update(agentRuns).set({ status: 'stopped', pauseReason: null, stopRequestedAt: run.stopRequestedAt ?? now, finishedAt: now, updatedAt: now })
         .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId)))
+      await runListChanged(tx, runId)
       ended = true
+      await runChanged(tx, runId)
       return true
     }
     if (run.stopRequestedAt) return false
     await tx.update(agentRuns).set({ stopRequestedAt: now, updatedAt: now })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId)))
+    await runListChanged(tx, runId)
     wake = run.deviceId
+    await runChanged(tx, runId)
     return false
   })
   notifyDeviceWork(wake)

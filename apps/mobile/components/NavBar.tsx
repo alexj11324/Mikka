@@ -1,12 +1,14 @@
 import type { ComponentProps, ReactNode } from 'react'
-import { Platform, Pressable } from 'react-native'
-import { Stack, useRouter } from 'expo-router'
+import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native'
+import { Stack, usePathname, useRouter } from 'expo-router'
 import { BackButton, Header, RoundButton } from '@/components/ui'
+import { colors, font } from '@/lib/theme'
+import { WebBarMenu } from '@/components/WebBarMenu'
 
 /** An SF Symbol name, as the toolbar takes it. */
 type SFSymbol = Extract<NonNullable<ComponentProps<typeof Stack.Toolbar.MenuAction>['icon']>, string>
 
-export type BarButton = { icon: SFSymbol; label: string; onPress: () => void; web: ReactNode }
+export type BarButton = { icon: SFSymbol; label: string; onPress: () => void; web: ReactNode; disabled?: boolean; busy?: boolean }
 export type BarMenu = { icon: SFSymbol; label: string; web: ReactNode; onOpen: () => void; items: { label: string; icon: SFSymbol; on?: boolean; onPress: () => void }[] }
 /** A drawn item, such as the person's avatar; it fills its own circle, without the bar's glass behind it. */
 export type BarView = { label: string; view: ReactNode; onPress: () => void }
@@ -21,7 +23,7 @@ function nativeItem(item: BarItem) {
   if ('view' in item) {
     return (
       <Stack.Toolbar.View key={item.label} hidesSharedBackground>
-        <Pressable accessibilityRole="button" accessibilityLabel={item.label} onPress={item.onPress} hitSlop={6}>{item.view}</Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={item.label} onPress={item.onPress} style={styles.viewButton}>{item.view}</Pressable>
       </Stack.Toolbar.View>
     )
   }
@@ -32,12 +34,14 @@ function nativeItem(item: BarItem) {
       </Stack.Toolbar.Menu>
     )
   }
-  return <Stack.Toolbar.Button key={item.label} icon={item.icon} accessibilityLabel={item.label} onPress={item.onPress} />
+  return <Stack.Toolbar.Button key={item.label} icon={item.busy ? 'hourglass' : item.icon} accessibilityLabel={item.label} disabled={item.disabled || item.busy} onPress={item.onPress} />
 }
 
 const webItem = (item: BarItem) => 'view' in item
-  ? <Pressable key={item.label} accessibilityRole="button" accessibilityLabel={item.label} onPress={item.onPress}>{item.view}</Pressable>
-  : <RoundButton key={item.label} label={item.label} onPress={'items' in item ? item.onOpen : item.onPress}>{item.web}</RoundButton>
+  ? <Pressable key={item.label} accessibilityRole="button" accessibilityLabel={item.label} onPress={item.onPress} style={styles.viewButton}>{item.view}</Pressable>
+  : 'items' in item && Platform.OS === 'web'
+    ? <WebBarMenu key={item.label} item={item} />
+    : <RoundButton key={item.label} label={item.label} disabled={'disabled' in item && item.disabled} busy={'busy' in item && item.busy} onPress={'items' in item ? item.onOpen : item.onPress}>{item.web}</RoundButton>
 
 /**
  * The screen's top bar. On iOS it is the system navigation bar: transparent
@@ -63,15 +67,31 @@ export function NavBar({ title, titleView, left, right, back, large, search, mat
   material?: boolean
 }) {
   const router = useRouter()
+  const pathname = usePathname()
+  // Expo Web already names these roots in its floating native-tab fallback.
+  const webTabRoot = Platform.OS === 'web' && ['/chats', '/threads', '/search'].includes(pathname)
   const lefts = list(left), rights = list(right)
   if (!ios) {
-    const goBack = back ?? (() => router.back())
+    const goBack = back ?? (() => {
+      if (Platform.OS === 'web' && !router.canGoBack()) router.replace('/chats')
+      else router.back()
+    })
+    // The Web router's history availability is not reactive. Keep an exit on pushed/deep-linked pages.
+    const showBack = Platform.OS === 'web' || back !== undefined || router.canGoBack()
     return (
-      <Header
-        left={lefts.length ? lefts.map(webItem) : back !== undefined || router.canGoBack() ? <BackButton onPress={goBack} /> : undefined}
-        title={titleView ?? title}
-        right={rights.length ? rights.map(webItem) : <></>}
-      />
+      <>
+        <Header
+          style={webTabRoot ? styles.webTabHeader : undefined}
+          left={lefts.length ? lefts.map(webItem) : webTabRoot ? <View style={styles.viewButton} /> : showBack ? <BackButton onPress={goBack} /> : undefined}
+          title={webTabRoot ? undefined : titleView ?? title}
+          right={rights.length ? rights.map(webItem) : <></>}
+        />
+        {search ? <View style={styles.search}>
+          <TextInput accessibilityLabel={search.placeholder} role="searchbox" placeholder={search.placeholder}
+            placeholderTextColor={colors.secondary} onChangeText={search.onChange} autoCapitalize="none" autoCorrect={false}
+            returnKeyType="search" clearButtonMode="while-editing" style={styles.searchInput} />
+        </View> : null}
+      </>
     )
   }
   return (
@@ -91,3 +111,10 @@ export function NavBar({ title, titleView, left, right, back, large, search, mat
 
 /** Scroll view props that put content below a transparent iOS bar; the web bar takes its own space. */
 export const underBar = ios ? { contentInsetAdjustmentBehavior: 'automatic' as const } : {}
+
+const styles = StyleSheet.create({
+  webTabHeader: { paddingBottom: 24 },
+  viewButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  search: { paddingHorizontal: 16, paddingBottom: 12 },
+  searchInput: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, backgroundColor: colors.bubble, color: colors.text, fontFamily: font, fontSize: 16 },
+})

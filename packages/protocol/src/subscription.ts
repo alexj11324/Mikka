@@ -2,6 +2,7 @@
 // both the execution harness and the computer a run's tools operate (#172).
 import { z } from "zod"
 
+import { CodedError, type CodedErrorOptions } from "./coded-error"
 import { quotaSnapshotSchema, type QuotaSnapshot, type QuotaWindow } from "./quota"
 
 const id = z.string().min(1).max(128)
@@ -140,9 +141,9 @@ export type SubscriptionRefusalCode =
   | "isolation_required"
   | "billing_unverified"
 
-export class SubscriptionRefusal extends Error {
-  constructor(readonly code: SubscriptionRefusalCode) {
-    super(code)
+export class SubscriptionRefusal extends CodedError<SubscriptionRefusalCode> {
+  constructor(code: SubscriptionRefusalCode, options?: CodedErrorOptions) {
+    super(code, options)
     this.name = "SubscriptionRefusal"
   }
 }

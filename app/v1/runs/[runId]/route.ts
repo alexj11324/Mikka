@@ -6,6 +6,8 @@ import { db } from '@/lib/db'
 import { agentRuns, devices } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
 import { maskFor } from '@/lib/secrets/runtime'
+import { runChanged } from '@/lib/live/panels'
+import { runListChanged } from '@/lib/live/lists'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,13 +38,16 @@ async function handlePATCH(request: Request, { params }: { params: Promise<{ run
     // The end itself comes through `/complete`, which carries no error. A
     // failed run's reason arrives here, just before it: keep it (the first one
     // wins) without letting this patch move the run's state.
-    if (patch.state === 'failed' && patch.error)
-      await db.update(agentRuns)
+    if (patch.state === 'failed' && patch.error) {
+      const changed = await db.update(agentRuns)
         .set({ error: patch.error, updatedAt: new Date() })
         .where(and(eq(agentRuns.id, runId), isNull(agentRuns.error), inArray(agentRuns.status, [...LIVE_STATES, 'paused', 'failed'])))
+        .returning({ id: agentRuns.id })
+      if (changed.length) { await runListChanged(db, runId); await runChanged(db, runId) }
+    }
     return new NextResponse(null, { status: 204 })
   }
-  await db.update(agentRuns)
+  const changed = await db.update(agentRuns)
     .set({
       status: sql`CASE WHEN ${agentRuns.status}='paused' THEN 'paused' ELSE ${patch.state} END`,
       resumeStatus: sql`CASE WHEN ${agentRuns.status}='paused' THEN ${patch.state} ELSE NULL END`,
@@ -53,6 +58,10 @@ async function handlePATCH(request: Request, { params }: { params: Promise<{ run
     })
     // A run paused on its quota has ended on the daemon; a late patch does not move it.
     .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...LIVE_STATES, 'paused']), or(isNull(agentRuns.pauseReason), ne(agentRuns.pauseReason, 'quota_exhausted'))))
+    .returning({ id: agentRuns.id })
+  // Supervisor state transitions use this route. Its periodic device lease
+  // heartbeat and streaming chunks have separate writers and send no list key.
+  if (changed.length) { await runListChanged(db, runId); await runChanged(db, runId) }
   return new NextResponse(null, { status: 204 })
 }
 

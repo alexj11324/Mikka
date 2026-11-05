@@ -1,7 +1,7 @@
 // Real local PostgreSQL regression for an Owner answer continuing one Factory
 // question. Provider credentials and CLI handoff are synthetic; no model runs.
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import type { RunPolicy } from '@mikka/protocol/agent-policy'
@@ -12,7 +12,7 @@ mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, {
   namedExports: { invokeDecision: async () => null },
 })
 
-test('a local Factory question preserves the original worker definition and native session', { skip: !dbUrl }, async t => {
+test('a local Factory question preserves the original Profile, worker definition and native session', { skip: !dbUrl }, async t => {
   const previous = process.env.MIKKA_BYOS_ENABLED
   process.env.MIKKA_BYOS_ENABLED = '1'
   t.after(() => { if (previous === undefined) delete process.env.MIKKA_BYOS_ENABLED; else process.env.MIKKA_BYOS_ENABLED = previous })
@@ -21,6 +21,7 @@ test('a local Factory question preserves the original worker definition and nati
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   const { queueTaskRun } = await import('../lib/factory/queue-local')
+  const { AgentProfileStore, resolveAgentProfileDispatch } = await import('../lib/factory/agent-profile')
   const { factoryQuestions } = await import('../lib/factory/server')
   const { questionReference } = await import('../lib/factory/questions/store')
   const { sendThreadMessage } = await import('../lib/thread-continue')
@@ -34,7 +35,9 @@ test('a local Factory question preserves the original worker definition and nati
     await pool.query('DELETE FROM run_messages WHERE "userId"=$1', [owner])
     await pool.query('DELETE FROM coordinator_events WHERE "userId"=$1', [owner])
     await pool.query('UPDATE agent_runs SET "continuesRunId"=NULL,"threadReplacedBy"=NULL WHERE "userId"=$1', [owner])
+    await pool.query('DELETE FROM byos_native_runs WHERE "runId" IN (SELECT id FROM agent_runs WHERE "userId"=$1)', [owner])
     await pool.query('DELETE FROM agent_runs WHERE "userId"=$1', [owner])
+    await pool.query('DELETE FROM factory_agent_profiles WHERE "ownerId"=$1', [owner])
     await pool.query('DELETE FROM agents WHERE "userId"=$1', [owner])
     await pool.query('DELETE FROM byos_bindings WHERE "ownerId"=$1', [owner])
     await pool.query('DELETE FROM byos_connections WHERE "ownerId"=$1', [owner])
@@ -71,27 +74,50 @@ test('a local Factory question preserves the original worker definition and nati
   const issueId = await seedIssue(pool, owner)
   await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1',
     [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1256 } } })])
+  const profileScope = { ownerId: owner, workspaceId: workspace.id, botId: null }
+  const profiles = new AgentProfileStore(pool)
+  const profile = await profiles.create(profileScope, {
+    name: 'Frozen question role', description: 'Retain the admitted role across an Owner answer.',
+    roles: ['execute'], enabled: true, harness: 'codex',
+    model: { mode: 'fixed', harness: 'codex', model, source: { kind: 'subscription', connectionId } },
+    instructions: 'Version one: preserve the original task constraints.', skills: [], effort: 'low',
+  })
+  const selection = await resolveAgentProfileDispatch(pool, profileScope, {
+    issueId, profileId: profile.id, stage: 'execute', location: 'local', deviceId,
+  })
+  assert.equal(selection.target.kind, 'device')
+  if (selection.target.kind !== 'device' || !selection.agentProfile) assert.fail('the owned local Profile must be runnable')
+  assert.equal(selection.target.agentId, agentId)
+  assert.equal(selection.target.subscriptionBindingId, bindingId)
   // Use the real null-Bot admission path, rather than rewriting a Bot run into
   // an incompatible historical identity. The original service supports it.
   const policyCeiling: RunPolicy = { permissions: { install_dependency: 'deny', write_outside_repo: 'deny',
     git_push: 'deny', network: 'ask', computer_use: 'deny' }, networkAllow: ['github.com'], networkCeiling: ['github.com'] }
   const initial = await queueTaskRun(owner, { issueId, agentId, repo: 'octo/repo',
     requestKey: `local-question:${randomUUID()}`, model, subscriptionBindingId: bindingId,
-    modelDispatch: { mode: 'picked', location: 'local' }, policyCeiling }, null)
+    modelDispatch: { mode: 'picked', location: 'local', entry: selection.target.entry }, agentProfile: selection.agentProfile, policyCeiling }, null)
   const original = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [initial.runId])).rows[0]
   assert.equal(original.botId, null)
   assert.equal(original.agentDefinition.model, model)
   assert.equal(original.agentDefinition.subscription.bindingId, bindingId)
+  assert.equal(original.agentDefinition.agentProfile.profileId, profile.id)
+  assert.equal(original.agentDefinition.agentProfile.version, 1)
   const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [initial.runId])).rows[0]
   assert.equal(task.botId, null)
   const questionId = randomUUID(), webSessionId = randomUUID(), nativeSessionId = `native:${initial.runId}`
   await pool.query(`INSERT INTO "session"(id,"userId",token,"expiresAt","createdAt","updatedAt")
     VALUES ($1,$2,$3,now()+interval '1 hour',now(),now())`, [webSessionId, owner, `synthetic-${randomUUID()}`])
   await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"=$2,
-    "finishedAt"=now(),report=$3 WHERE id=$1`, [initial.runId, nativeSessionId,
+    "startedAt"=now()-interval '1 second',"finishedAt"=now(),report=$3 WHERE id=$1`, [initial.runId, nativeSessionId,
     JSON.stringify({ summary: 'Synthetic CLI handoff', question: { questionId, kind: 'decision', question: 'Continue with the same worker?', options: [] } })])
   const question = await factoryQuestions.record(owner, initial.runId)
   await factoryQuestions.escalate(owner, { reference: questionReference(question), eventId: randomUUID(), reason: 'The Owner decides.' })
+  const edited = await profiles.update(profileScope, profile.id, profile.version, {
+    ...selection.agentProfile.definition, enabled: false, instructions: 'Version two: future selections only.',
+  })
+  assert.equal(edited.version, 2)
+  assert.equal(edited.enabled, false)
+  assert.notEqual(edited.digest, original.agentDefinition.agentProfile.digest)
   const text = 'Continue once in the original native session with the original task constraints.'
   const human = { source: 'human' as const, sessionId: webSessionId }
   const snapshot = async () => (await pool.query(`SELECT to_jsonb(q) AS question,to_jsonb(t) AS task,
@@ -133,6 +159,9 @@ test('a local Factory question preserves the original worker definition and nati
   await denied('a missing original native SID cannot create a fresh session',
     () => pool.query('UPDATE agent_runs SET "sessionId"=NULL WHERE id=$1', [initial.runId]),
     () => pool.query('UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1', [initial.runId, nativeSessionId]))
+  await denied('an unstarted Profile cannot inherit the frozen-role exception',
+    () => pool.query('UPDATE agent_runs SET "startedAt"=NULL WHERE id=$1', [initial.runId]),
+    () => pool.query(`UPDATE agent_runs SET "startedAt"=now()-interval '1 second' WHERE id=$1`, [initial.runId]))
   await t.test('another owner cannot answer this question', async () => {
     await assert.rejects(sendThreadMessage(other, initial.runId, text, human, randomUUID()), { code: 'runNotFound' })
     assert.deepEqual(await snapshot(), before)
@@ -166,7 +195,22 @@ test('a local Factory question preserves the original worker definition and nati
   for (const field of ['agentId', 'deviceId', 'deviceRepoId', 'baseBranch', 'botId'])
     assert.equal(next[field], original[field], field)
   assert.equal(next.agentDefinition.definitionDigest, original.agentDefinition.definitionDigest)
+  assert.deepEqual(next.agentDefinition.agentProfile, original.agentDefinition.agentProfile,
+    'editing and disabling the Profile does not rewrite a started native session')
+  assert.equal(next.agentDefinition.agentProfile.version, 1)
+  assert.equal(next.agentDefinition.profileOriginRunId, original.agentDefinition.profileOriginRunId,
+    'the durable question proof does not add a new JSON origin grant')
+  assert.equal(next.agentDefinition.harness, original.agentDefinition.harness)
   assert.equal(next.agentDefinition.model, original.agentDefinition.model)
+  assert.ok(next.prompt.includes(text), 'the continuation prompt contains the authenticated answer')
+  // Worker digests hash canonical JSON; a string is encoded by JSON.stringify.
+  assert.equal(next.agentDefinition.promptDigest, createHash('sha256').update(JSON.stringify(next.prompt)).digest('hex'))
+  const { acceptedAt: originalAdmissionAt, ...originalAdmission } = original.agentDefinition.repositoryAdmission
+  const { acceptedAt: continuedAdmissionAt, ...continuedAdmission } = next.agentDefinition.repositoryAdmission
+  assert.deepEqual(continuedAdmission, originalAdmission, 'repository revalidation preserves the exact publication authority')
+  assert.ok(Number.isFinite(Date.parse(continuedAdmissionAt)))
+  assert.ok(Date.parse(continuedAdmissionAt) >= Date.parse(originalAdmissionAt))
+  assert.ok(Date.parse(continuedAdmissionAt) <= Date.now())
   assert.deepEqual(next.agentDefinition.subscription, original.agentDefinition.subscription)
   assert.deepEqual(next.agentDefinition.modelDispatch, original.agentDefinition.modelDispatch)
   assert.deepEqual(next.agentDefinition.policyCeiling, policyCeiling)
@@ -178,6 +222,59 @@ test('a local Factory question preserves the original worker definition and nati
   assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [owner])).rows[0].n, 2)
   assert.deepEqual(await sendThreadMessage(owner, initial.runId, text, { source: 'human', sessionId: webSessionId }, requestId), accepted)
   assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [owner])).rows[0].n, 2)
+
+  const { claimLocalRun } = await import('../lib/computer/claim')
+  const { questionExecutionContinuation } = await import('../lib/factory/questions/execution-continuation')
+  const continuedTask = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [task.id])).rows[0]
+  const edge = await questionExecutionContinuation(pool, continuedTask, continuedTask.attemptId)
+  assert.equal(edge?.sourceRunId, initial.runId)
+  assert.equal(edge?.originSessionId, nativeSessionId)
+  const receipt = (await pool.query(`SELECT "eventId",request,result FROM factory_events
+    WHERE "taskId"=$1 AND request->>'kind'='question_resume' AND result->>'continuationRunId'=$2`, [task.id, next.id])).rows[0]
+  assert.ok(receipt)
+  const claimState = async () => (await pool.query(`SELECT status,"startedAt","leaseExpiresAt","sessionId","agentDefinition",
+    (SELECT count(*)::int FROM byos_native_runs WHERE "runId"=$1) AS natives FROM agent_runs WHERE id=$1`, [next.id])).rows[0]
+  const beforeClaim = await claimState()
+  const claim = () => claimLocalRun(pool, next.id, deviceId, new Date(Date.now() + 90_000), bindingId)
+  const deniedClaim = async (label: string, mutate: () => Promise<unknown>, restore: () => Promise<unknown>) => {
+    await t.test(label, async () => {
+      await mutate()
+      try {
+        await assert.rejects(claim(), { message: 'agentProfileUnavailable' })
+        assert.deepEqual(await claimState(), beforeClaim, 'a refused claim retains the queued snapshot and creates no native binding')
+      } finally { await restore() }
+    })
+  }
+  await deniedClaim('a forged question receipt cannot authorize the frozen Profile at first claim',
+    () => pool.query(`UPDATE factory_events SET request=jsonb_set(request,'{userId}',to_jsonb($3::text)) WHERE "taskId"=$1 AND "eventId"=$2`, [task.id, receipt.eventId, other]),
+    () => pool.query('UPDATE factory_events SET request=$3 WHERE "taskId"=$1 AND "eventId"=$2', [task.id, receipt.eventId, receipt.request]))
+  await deniedClaim('a stale question request epoch cannot authorize the frozen Profile at first claim',
+    () => pool.query(`UPDATE factory_events SET result=jsonb_set(result,'{task,sourceEventId}',to_jsonb($3::text)) WHERE "taskId"=$1 AND "eventId"=$2`, [task.id, receipt.eventId, randomUUID()]),
+    () => pool.query('UPDATE factory_events SET result=$3 WHERE "taskId"=$1 AND "eventId"=$2', [task.id, receipt.eventId, receipt.result]))
+  await deniedClaim('an expired question cannot authorize the frozen Profile at first claim',
+    () => pool.query(`UPDATE factory_questions SET "expiresAt"=now()-interval '1 second' WHERE id=$1`, [questionId]),
+    () => pool.query('UPDATE factory_questions SET "expiresAt"=$2 WHERE id=$1', [questionId, answered.expiresAt]))
+  await t.test('a revoked subscription still refuses the native question claim', async () => {
+    await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [connectionId])
+    try {
+      assert.equal(await claim(), 'unavailable')
+      assert.deepEqual(await claimState(), beforeClaim)
+    } finally { await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [connectionId]) }
+  })
+  await t.test('the real local subscription claim keeps Profile v1 and the original native-session requirement', async () => {
+    assert.equal(await claim(), 'claimed')
+    const claimed = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [next.id])).rows[0]
+    assert.equal(claimed.status, 'preparing')
+    assert.equal(claimed.sessionId, null, 'claim preparation does not fabricate an actual resumed native SID')
+    assert.deepEqual(claimed.agentDefinition, next.agentDefinition, 'claim preserves the exact queued continuation definition')
+    assert.deepEqual(claimed.agentDefinition.agentProfile, original.agentDefinition.agentProfile)
+    assert.equal(claimed.agentDefinition.agentProfile.version, 1)
+    assert.equal(claimed.agentDefinition.definitionDigest, original.agentDefinition.definitionDigest)
+    assert.equal(claimed.questionContinuation.originRunId, initial.runId)
+    assert.equal(claimed.questionContinuation.originSessionId, nativeSessionId)
+    assert.equal(claimed.questionContinuation.requireSessionResume, true)
+    assert.equal((await pool.query('SELECT "bindingId" FROM byos_native_runs WHERE "runId"=$1', [next.id])).rows[0].bindingId, bindingId)
+  })
 
   await t.test('a normally admitted Bot-owned local task resumes through its scoped runtime', async () => {
     const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
@@ -220,4 +317,5 @@ test('a local Factory question preserves the original worker definition and nati
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1 AND "issueId"=$2',
       [owner, scopedIssueId])).rows[0].n, 2, 'one original and one continuation')
   })
+
 })

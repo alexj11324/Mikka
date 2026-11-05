@@ -1,5 +1,7 @@
+import { workerDefinitionDigest } from '@/lib/agent-kit/worker-digest'
 import { personalMailboxEnabled } from '../personal-mailbox-config'
 import 'server-only'
+import { admitProfileSelection } from '@/lib/factory/profile-admission'
 import { freezeExecutionIdentity, revalidateExecutionIdentity, ExecutionIdentityError } from '../execution-identity'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
@@ -11,6 +13,8 @@ import { ComputerError } from './store'
 import { RunModelMissingError } from './run-model'
 import { runCredentialSource, type RunApiKey } from '@/lib/run-credential-source'
 import { sleepingFactoryCloudTarget, type FactoryCloudStageAdmission } from '@/lib/factory/cloud-stage-admission'
+import { runListChanged } from '@/lib/live/lists'
+import { runChanged } from '@/lib/live/panels'
 
 /** Issue access is checked by the caller. Queue and Bot binding are committed
  * together so the cloud worker never observes an unbound queued run. The
@@ -25,6 +29,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   model: string
   /** Host-recorded preference or explicit choice; the resolved model alone grants no fallback. */
   modelDispatch?: WorkerModelDispatch
+  agentProfile?: Parameters<typeof freezeWorkerDefinition>[0]['agentProfile']
   policyCeiling?: Parameters<typeof freezeWorkerDefinition>[0]['policyCeiling']
   /** The run this one continues, named in the error when the model is missing. */
   threadRunId?: string
@@ -62,7 +67,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     const allowLocalRecovery = request && request.destination == null ? true as const : undefined
     // Absent stays byte-compatible with historical fingerprints; a replay
     // cannot upgrade an old cloud-only run to a newly inferred permission.
-    const selectionFingerprint = createHash('sha256').update(JSON.stringify([input.subscriptionBindingId ?? null, model, input.apiKeyId ?? null, input.apiKey ?? null, ...(allowLocalRecovery ? [{ allowLocalRecovery }] : []), ...(input.modelDispatch ? [{ modelDispatch: input.modelDispatch }] : []), ...(input.policyCeiling ? [{ policyCeiling: input.policyCeiling }] : [])])).digest('hex')
+    const selectionFingerprint = createHash('sha256').update(JSON.stringify([input.subscriptionBindingId ?? null, model, input.apiKeyId ?? null, input.apiKey ?? null, ...(allowLocalRecovery ? [{ allowLocalRecovery }] : []), ...(input.modelDispatch ? [{ modelDispatch: input.modelDispatch }] : []), ...(input.agentProfile ? [{ agentProfile: input.agentProfile }] : []), ...(input.policyCeiling ? [{ policyCeiling: input.policyCeiling }] : [])])).digest('hex')
     let target = (await client.query(`SELECT m."deviceId",a.instructions,a.harness,repo."baseBranch" FROM bots b
       JOIN bot_desktops d ON d."botId"=b.id AND d."ownerId"=b."ownerId" AND d."workspaceId"=b."workspaceId"
       JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId" AND m.state='running'
@@ -75,7 +80,8 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     if (!target && existing && factoryStage && input.idempotencyKey === `factory:${factoryStage.binding.attemptId}`)
       target = await sleepingFactoryCloudTarget(client, actor, input, factoryStage)
     if (!target) throw new ComputerError(409, 'Bot computer task is unavailable')
-    const prompt = runPrompt(input.title, input.body, target.instructions, input.note)
+    const instructions = [target.instructions, input.agentProfile?.instructions].filter(Boolean).join('\n\n')
+    const prompt = runPrompt(input.title, input.body, instructions, input.note)
     if (digest) {
       const priorRun = (await client.query(`SELECT r."userId",r."issueId",r."agentId",r."deviceId",r."deviceRepoId",r.prompt,r."agentDefinition",r."dispatchFingerprint",r."botId" AS "runBotId",b."botId",b."workspaceId"
         FROM agent_runs r LEFT JOIN computer_run_bindings b ON b."runId"=r.id WHERE r.id=$1`, [runId])).rows[0]
@@ -100,8 +106,11 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     if (!subscription && !apiKey) throw new ComputerError(409,'Bot subscription unavailable')
     // The hosted runner starts a subscription run only on that subscription's own model: a different one is refused here, not at startup.
     if (subscription && subscription.modelId !== model) throw new ComputerError(409, 'Bot subscription unavailable')
-    const frozen = freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model,modelDispatch:input.modelDispatch,policyCeiling:input.policyCeiling,allowLocalRecovery,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
+    const frozen = freezeWorkerDefinition({ harness:target.harness,instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model,modelDispatch:input.modelDispatch,agentProfile:input.agentProfile,policyCeiling:input.policyCeiling,allowLocalRecovery,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
     frozen.executionIdentity = await freezeExecutionIdentity(client, { userId: actor.userId, botId: runBotId, deviceId: target.deviceId, agentDefinition: frozen }, undefined, actor.workspaceId)
+    const profileOriginRunId = await admitProfileSelection(client, { ownerId: actor.userId, workspaceId: actor.workspaceId, issueId: input.issueId, harness: target.harness, model: frozen.model, apiKeyId: frozen.apiKey?.keyId, subscriptionBindingId: frozen.subscription?.bindingId, selection: input.agentProfile, sourceRunId: input.threadRunId,
+      ...(factoryStage ? { factoryContext: { attemptId: factoryStage.binding.attemptId, sourceEventId: factoryStage.sourceEventId } } : {}) })
+    if (profileOriginRunId) { frozen.profileOriginRunId = profileOriginRunId; frozen.definitionDigest = workerDefinitionDigest(frozen) }
     // A writable github.com run gets its task branch here, like a local run's (decision 2026-11-02-1600).
     const github = input.readOnly ? false : (await client.query('SELECT 1 FROM device_repos WHERE id=$1 AND "userId"=$2 AND "repoPath" LIKE \'v2/github.com/%\'', [input.deviceRepoId, actor.userId])).rowCount === 1
     const push = !github ? null : await (await import('./cloud-push')).admitCloudPush(client, { userId: actor.userId, issueId: input.issueId, agentId: input.agentId, deviceId: target.deviceId, deviceRepoId: input.deviceRepoId, ...(runBotId ? { workspaceId: actor.workspaceId } : {}), now: new Date() })
@@ -112,6 +121,8 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true)`, [runId, push.publication.userId, push.publication.issueId, push.publication.scopeVersion, push.publication.issueTitle, push.publication.remoteUrl, push.publication.remoteKey, push.publication.identifier, push.publication.branch, push.publication.baseBranch])
     await client.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [runId, input.botId, actor.workspaceId, actor.userId])
     await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'pending',$5,'starting') ON CONFLICT DO NOTHING`, [runId, actor.workspaceId, actor.userId, input.botId, randomUUID()])
+    await runListChanged(client, runId)
+    await runChanged(client, runId)
     if (!existing) await client.query('COMMIT')
     return { runId }
   } catch (error) { if (!existing) await client.query('ROLLBACK'); if (error instanceof ExecutionIdentityError) throw new ComputerError(409, 'Execution identity or resource unavailable'); throw error } finally { if (!existing) client.release() }

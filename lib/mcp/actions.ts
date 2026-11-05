@@ -6,6 +6,8 @@ import { createHash } from 'node:crypto'
 import { and, asc, desc, eq, gt, or, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { FactoryError } from '@/lib/factory/contract'
+import { AgentProfileError } from '@/lib/factory/agent-profile-definition'
+import { AgentProfileAdmissionError } from '@/lib/factory/profile-admission'
 import { issueForUser } from '@/lib/issue-access'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { actAs } from '@/lib/acting-user'
@@ -43,7 +45,8 @@ async function attempt<T>(fn: () => Promise<T>): Promise<T | Failure> {
   try {
     return await fn()
   } catch (error) {
-    if (error instanceof ActionFailureError || error instanceof FactoryError) return { error: error.code }
+    if (error instanceof ActionFailureError || error instanceof FactoryError || error instanceof AgentProfileError) return { error: error.code }
+    if (error instanceof AgentProfileAdmissionError) return { error: 'agentProfileUnavailable' }
     throw error
   }
 }
@@ -202,7 +205,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
 
 /** A thread's next run keeps its own model; a new one takes 优先使用的模型 on the named Agent's computer. */
 async function mcpRunModel(userId: string, input: { issueId: string; agentId: string }, previous: { id: string; agentId: string } | null) {
-  const { chooseLocalRunModel, latestThreadRunModel } = await import('@/lib/computer/run-model')
+  const { latestThreadRunModel } = await import('@/lib/computer/run-model')
   const { pool } = await import('@/lib/db')
   if (previous) {
     const kept = await latestThreadRunModel(pool, userId, input.issueId, previous.agentId)
@@ -213,9 +216,13 @@ async function mcpRunModel(userId: string, input: { issueId: string; agentId: st
   if (!agent?.deviceId || (agent.harness !== 'codex' && agent.harness !== 'claude_code')) throw new ActionFailureError('agentNoDevice')
   const { executionWorkspace } = await import('@/lib/execution-settings')
   const botId = await chatBotId(userId, null, MCP_WORKSPACE)
-  const chosen = await chooseLocalRunModel(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, { id: agent.id, deviceId: agent.deviceId, harness: agent.harness })
-  if ('error' in chosen) throw new ActionFailureError('runModelMissing')
-  return chosen
+  const { target, agentProfile, selectionMode } = await (await import('@/lib/factory/agent-profile')).resolveAgentProfileDispatch(pool,
+    { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId },
+    { issueId: input.issueId, stage: 'execute', location: 'local', agentId: agent.id, deviceId: agent.deviceId, asked: { harness: agent.harness } })
+  if (target.kind !== 'device' || target.agentId !== agent.id) throw new ActionFailureError('runModelMissing')
+  return { model: target.model, agentProfile, modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
+    ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
+    ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
 }
 
 export async function sendToRun(userId: string, input: { runId: string; text: string }) {
