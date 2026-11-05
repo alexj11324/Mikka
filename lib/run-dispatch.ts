@@ -11,6 +11,7 @@ export const dispatchRequestKey = z.string().trim().min(1).max(200)
 export const dispatchInput = z.object({
   issueId: z.uuid(), agentId: z.uuid(), deviceRepoId: z.uuid(),
   note: z.string().trim().max(10_000).optional(),
+  profileId: z.uuid().optional(),
   requestKey: dispatchRequestKey.optional(),
 })
 export type DispatchInput = z.infer<typeof dispatchInput>
@@ -25,6 +26,7 @@ export function dispatchFingerprint(input: DispatchInput & DispatchCredential): 
   const identity: unknown[] = [
     input.issueId, input.agentId, input.deviceRepoId, input.note ?? '',
   ]
+  if (input.profileId) identity.push({ profileId: input.profileId })
   if (input.subscriptionBindingId) identity.push({ subscriptionBindingId: input.subscriptionBindingId })
   return createHash('sha256').update(JSON.stringify(identity)).digest('hex')
 }

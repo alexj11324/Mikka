@@ -10,7 +10,7 @@ import { intersectRunPolicy } from '@/lib/run-assignment-policy'
  * subscription's own model, so no run is ever frozen without one (decision: model is required,
  * a missing one fails at dispatch instead of being filled in).
  */
-export type RunModel = { model: string; subscriptionBindingId?: string; apiKeyId?: string; modelDispatch?: WorkerModelDispatch; policyCeiling?: WorkerDefinitionSnapshot['policyCeiling'] }
+export type RunModel = { model: string; subscriptionBindingId?: string; apiKeyId?: string; modelDispatch?: WorkerModelDispatch; agentProfile?: WorkerDefinitionSnapshot['agentProfile']; policyCeiling?: WorkerDefinitionSnapshot['policyCeiling'] }
 
 /** Changing a model or placement within the same owned task is not a new
  * permission grant. The queue retains its source ceiling even if a caller
@@ -34,10 +34,10 @@ export class RunModelMissingError extends Error {
 }
 
 /** A thread's next run keeps the model and credential its earlier run was frozen with; null when that run has none. */
-export function threadRunModel(definition: Pick<WorkerDefinitionSnapshot, 'model' | 'subscription' | 'apiKey' | 'modelDispatch' | 'policyCeiling'> | null | undefined): RunModel | null {
+export function threadRunModel(definition: Pick<WorkerDefinitionSnapshot, 'model' | 'subscription' | 'apiKey' | 'modelDispatch' | 'agentProfile' | 'policyCeiling'> | null | undefined): RunModel | null {
   const model = definition?.model?.trim()
   if (!model) return null
-  const provenance = { ...(definition?.modelDispatch ? { modelDispatch: structuredClone(definition.modelDispatch) } : {}),
+  const provenance = { ...(definition?.agentProfile ? { agentProfile: structuredClone(definition.agentProfile) } : {}), ...(definition?.modelDispatch ? { modelDispatch: structuredClone(definition.modelDispatch) } : {}),
     ...(definition?.policyCeiling ? { policyCeiling: structuredClone(definition.policyCeiling) } : {}) }
   if (definition?.apiKey) return { model, apiKeyId: definition.apiKey.keyId, ...provenance }
   if (definition?.subscription) return { model, subscriptionBindingId: definition.subscription.bindingId, ...provenance }

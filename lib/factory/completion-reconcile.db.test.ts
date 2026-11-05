@@ -1,3 +1,4 @@
+import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 // BE-9: run completion drives Factory reconcile without a Coordinator turn.
 // Real migrations, store, dispatch and reconciler over a disposable *_e2e PG.
 import assert from "node:assert/strict";
@@ -6,7 +7,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { Pool, type PoolClient } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
-import { adoptProviderContinuation, createFactoryStore } from "./store";
+import { adoptProviderContinuation } from "./store";
 import { freezeWorkerDefinition } from "../agent-kit/worker";
 import type { ExecutionIdentity } from "../execution-identity";
 import { providerContinuationDefinition, providerContinuationLaunchMatches, providerContinuationMatches, recoverProviderFailure } from "../run-provider-fallback";
@@ -457,8 +458,23 @@ test("run completion enters review without the Coordinator; replays do not advan
       const reviewDispatch = createFactoryDispatch(pool, store, queue, defaultFactoryDispatchAdapters);
       const review = await reviewDispatch('owner', { binding: factoryBinding(pending), agentId, deviceRepoId: providerRepoId });
       const original = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [review.runId])).rows[0];
-      await pool.query(`UPDATE agent_runs SET status='running',"agentDefinition"=$2,"sessionId"='provider-check-original' WHERE id=$1`,
-        [review.runId, JSON.stringify(providerDefinition('codex', original.prompt))]);
+      const profileApi = await import('./agent-profile');
+      const { assertRunProfileClaim } = await import('./profile-admission');
+      const profileId = randomUUID();
+      const role = profileApi.parseAgentProfile({ name: 'Independent review', harness: 'auto', model: { mode: 'inherit' }, instructions: 'Keep the frozen independent review responsibility.' });
+      const beforeDefinition = providerDefinition('codex', original.prompt);
+      const selectedProfile = { profileId, version: 1, digest: profileApi.agentProfileDigest(role, []), name: role.name,
+        source: 'decision' as const, reason: 'Fixture role selection', scope: { ownerId: 'owner', workspaceId: providerWorkspaceId },
+        definition: role, skills: [], instructions: role.instructions, targetEntry: beforeDefinition.modelDispatch!.entry! };
+      const frozenDefinition = { ...beforeDefinition, instructions: `${beforeDefinition.instructions}\n\n${role.instructions}`, agentProfile: selectedProfile };
+      frozenDefinition.definitionDigest = (await import('../agent-kit/worker-digest')).workerDefinitionDigest(frozenDefinition);
+      await pool.query(`INSERT INTO factory_agent_profiles (id,"ownerId","workspaceId",version,definition,skills,digest) VALUES ($1,'owner',$2,1,$3,'[]',$4)`, [profileId, providerWorkspaceId, JSON.stringify(role), selectedProfile.digest]);
+      await pool.query(`UPDATE agent_runs SET status='running',"startedAt"=now(),"agentDefinition"=$2,"sessionId"='provider-check-original' WHERE id=$1`,
+        [review.runId, JSON.stringify(frozenDefinition)]);
+      // Editing or disabling a role affects future selections, not the role
+      // already frozen in the host-authorized provider recovery of this check.
+      const editedRole = { ...role, enabled: false, instructions: 'Changed after the original review started.' };
+      await pool.query('UPDATE factory_agent_profiles SET version=2,definition=$2,digest=$3 WHERE id=$1', [profileId, JSON.stringify(editedRole), profileApi.agentProfileDigest(editedRole, [])]);
       const checkBefore = (await store.read('owner', f.task.id)).attempts.at(-1)!.output.check;
       const nextDevice = randomUUID(), nextAgent = randomUUID(), nextRepo = randomUUID();
       await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,'owner','Next provider device',now(),'[{"harness":"claude_code","installed":true}]')`, [nextDevice]);
@@ -488,6 +504,9 @@ test("run completion enters review without the Coordinator; replays do not advan
       const queued = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [childId!])).rows[0];
       assert.equal(providerContinuationMatches(prior, queued), false, 'an independent check is deliberately not a native-session retry');
       assert.equal(await providerContinuationLaunchMatches(pool, prior, queued), true, 'the current check and exact host receipt authorize its launch');
+      await assertRunProfileClaim(pool, childId!);
+      assert.equal(queued.agentDefinition.agentProfile.version, 1);
+      assert.equal(queued.agentDefinition.agentProfile.instructions, role.instructions);
       assert.equal(await providerContinuationLaunchMatches(pool, prior, { ...queued, sessionId: prior.sessionId }), false, 'a check cannot inherit the failed native session');
       assert.equal(await providerContinuationLaunchMatches(pool, { ...prior, report: { ...prior.report,
         modelFallback: { ...prior.report.modelFallback, nextDefinitionDigest: 'changed' } } }, queued), false);
@@ -538,6 +557,7 @@ test("run completion enters review without the Coordinator; replays do not advan
             assert.notEqual(replacement.task.attemptId, after.task.attemptId);
           }
           assert.equal(await providerContinuationLaunchMatches(guard, prior, queued), false, fault);
+          await assert.rejects(assertRunProfileClaim(guard, childId!), { message: 'agentProfileUnavailable' }, `${fault} cannot authorize the stale frozen role`);
         } finally { await guard.query('ROLLBACK'); guard.release(); }
       }
       assert.equal(await providerContinuationLaunchMatches(pool, prior, queued), true, 'guard mutations are rolled back');

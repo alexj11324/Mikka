@@ -254,12 +254,14 @@ async function dispatchStandaloneTask(userId:string,input:Parameters<GroupFactor
   return dispatchToTask(userId,input.issueId,{note:input.note,sourceEventId:input.sourceEventId,start:async(previous,note)=>{
     const {executionWorkspace}=await import('@/lib/execution-settings')
     const workspaceId=await executionWorkspace(userId,botId)
-    const {resolveModelDispatch,bindAgentToConnection}=await import('@/lib/model-dispatch')
+    const {bindAgentToConnection}=await import('@/lib/model-dispatch')
+    const {resolveAgentProfileDispatch}=await import('@/lib/factory/agent-profile')
     const {ensureBotCloudRuntime}=await import('@/lib/computer/auto-runtime')
     const {latestThreadRunModel}=await import('@/lib/computer/run-model')
     const kept=previous ? await latestThreadRunModel(pool,userId,input.issueId,previous.agentId) : null
     if (previous && !kept) return {error:'threadModelUnavailable' as const}
-    const target=previous ? null : await resolveModelDispatch(pool,{ownerId:userId,workspaceId,botId},null,'cloud',undefined,{cloudPurpose:'desktop'})
+    const choice=previous ? null : await resolveAgentProfileDispatch(pool,{ownerId:userId,workspaceId,botId},{issueId:input.issueId,stage:'execute',note,location:'cloud',cloudPurpose:'desktop'})
+    const target=choice?.target
     if (target && target.kind!=='cloud') return {error:'machineUnavailable' as const}
     const harness=previous?.harness ?? (target?.kind==='cloud' ? target.harness : null)
     if (harness!=='codex' && harness!=='claude_code') return {error:'machineUnavailable' as const}
@@ -267,7 +269,7 @@ async function dispatchStandaloneTask(userId:string,input:Parameters<GroupFactor
     if (!runtime) return {error:'cloudComputerUnavailable' as const}
     const source=target?.kind==='cloud' ? target.entry.source : null
     const subscriptionBindingId=source?.kind==='subscription' && target?.kind==='cloud' ? await bindAgentToConnection(pool,{ownerId:userId,workspaceId},runtime.agentId,harness,source.connectionId,target.model) : undefined
-    const selection:RunModel|null=kept ?? (target?.kind==='cloud' ? {model:target.model,modelDispatch:{mode:'preference',location:'cloud',entry:target.entry},...(subscriptionBindingId?{subscriptionBindingId}:{}),...(source?.kind==='api_key'?{apiKeyId:source.keyId}:{})} : null)
+    const selection:RunModel|null=kept ?? (target?.kind==='cloud' ? {model:target.model,agentProfile:choice?.agentProfile,modelDispatch:{mode:choice?.selectionMode ?? 'preference',location:'cloud',entry:target.entry},...(subscriptionBindingId?{subscriptionBindingId}:{}),...(source?.kind==='api_key'?{apiKeyId:source.keyId}:{})} : null)
     if (!selection) return {error:'threadModelUnavailable' as const}
     const {dispatchComputerTask}=await import('@/workflows/coordinator/steps')
     return dispatchComputerTask(userId,{botId,issueId:input.issueId,harness,note,...selection,sourceEventId:input.sourceEventId,factoryBotId:botId,...(previous?{threadRunId:previous.id}:{}),...(previous?.readOnly?{readOnly:true}:{})},`group:${input.sourceEventId}`)

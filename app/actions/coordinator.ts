@@ -30,6 +30,7 @@ import { coordinatorWelcome } from '@/lib/agent-welcome'
 import { claimSuggestion, readClaimedSuggestion } from '@/lib/suggestions/store'
 import { suggestionMessage } from '@/lib/suggestions/card'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
+import { AgentProfileError } from '@/lib/factory/agent-profile-definition'
 
 async function getUser() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -163,7 +164,7 @@ export async function botChatSummaries(): Promise<Record<string, BotChatSummary>
 }
 
 /** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact and notes from the browser in front if given; the reply shows up in the chat. */
-export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number): Promise<ActionResult<{ queued: true }>> {
+export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number, profileId?: string): Promise<ActionResult<{ queued: true }>> {
   return runAction(async () => {
     const requestHeaders=await headers()
     const session=await auth.api.getSession({headers:requestHeaders})
@@ -186,10 +187,19 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     if (withNotes === null) throw new ActionFailureError('messageTooLong')
     const destination = taskDestinationSchema.optional().safeParse(taskDestination)
     if (!destination.success) throw new ActionFailureError('validationGeneric')
-    if (destination.data && !issueMutationsEnabled()) throw new ActionFailureError('issueToolsDisabled')
+    const profile = z.uuid().optional().safeParse(profileId)
+    if (!profile.success) throw new ActionFailureError('validationGeneric')
+    const taskSubmission = Boolean(destination.data || profile.data)
+    if (profile.data) {
+      try {
+        const row = await (await import('@/lib/factory/agent-profile-store')).readProfileRow((await import('@/lib/db')).pool, { ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, bot.id) }, profile.data)
+        if (row.archivedAt || !row.definition.enabled) throw new ActionFailureError('runInvalid')
+      } catch (error) { if (error instanceof AgentProfileError) throw new ActionFailureError('runInvalid'); throw error }
+    }
+    if (taskSubmission && !issueMutationsEnabled()) throw new ActionFailureError('issueToolsDisabled')
     // A new task is handed to the Coordinator to create; with no Coordinator here, say so instead of queueing it silently.
-    if (destination.data && !coordinatorEnabled()) throw new ActionFailureError('coordinatorUnavailable')
-    if (destination.data && !parsed.data.submissionId) throw new ActionFailureError('validationGeneric')
+    if (taskSubmission && !coordinatorEnabled()) throw new ActionFailureError('coordinatorUnavailable')
+    if (taskSubmission && !parsed.data.submissionId) throw new ActionFailureError('validationGeneric')
     if (destination.data?.kind === 'device') {
       const [device] = await db.select({ id: devices.id }).from(devices)
         .where(and(eq(devices.id, destination.data.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'), eq(devices.enabled, true))).limit(1)
@@ -201,7 +211,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     const message = withQuote(withNotes, quoted?.data)
     // Validate files before a retry holds its message row/connection; concurrent retries must not exhaust the pool.
     if (message.includes('[mikka-file:')) { const { validateChatFiles } = await import('@/lib/chat-attachments/store'); try { await validateChatFiles(userId, { kind: 'bot', id: bot.id }, message) } catch { throw new ActionFailureError('messageRequired') } }
-    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) })
+    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, profileId: profile.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) })
     try {
       // Already retried (a double click, two sends at once): nothing more is sent.
       if (retried.success && retried.data !== undefined) { if (await sendRetryOf(userId, bot.id, retried.data, record) === null) return { queued: true as const } }

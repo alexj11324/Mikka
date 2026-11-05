@@ -13,6 +13,7 @@ export type CoordinatorMessageContext = {
   quote?: ArtifactQuote | null
   botId?: string | null
   taskDestination?: TaskDestination
+  profileId?: string
   notes?: readonly BrowserNote[] | null
   /** 重新发送 on a failed message: its position, so the server retries it in place. */
   retryOf?: number
@@ -35,7 +36,7 @@ export function useCoordinatorSubmit() {
   const submit = useCallback((text: string, context?: CoordinatorMessageContext) => {
     submitter.current ??= createCoordinatorSubmitter({ currentOwner, transport: async submission => {
       const details = submission.context as CoordinatorMessageContext | undefined
-      const result = await sendCoordinatorMessage(submission.text, details?.quote, details?.botId ?? null, submission.submissionId, details?.taskDestination, details?.notes, undefined, details?.retryOf)
+      const result = await sendCoordinatorMessage(submission.text, details?.quote, details?.botId ?? null, submission.submissionId, details?.taskDestination, details?.notes, undefined, details?.retryOf, details?.profileId)
       return readActionOutcome(result)
     } })
     return submitter.current.submit(text, undefined, context)

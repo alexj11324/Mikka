@@ -21,6 +21,8 @@ export interface FactoryTask extends Omit<
 > {
   id: string;
   userId: string;
+  /** Host-frozen task flow; absent on historical tasks. */
+  route?: { flowVersion?: number };
   stage: string;
   status: string;
 }

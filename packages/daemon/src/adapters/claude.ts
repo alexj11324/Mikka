@@ -619,6 +619,7 @@ export class ClaudeAdapter implements AgentAdapter {
         allowDangerouslySkipPermissions: true,
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
+        ...(options.effort ? { effort: options.effort } : {}),
         // A hosted run spawns through the hosted runner; an API-key run there holds the placeholder too.
         spawnClaudeCodeProcess: (config: SpawnOptions) => {
           const child = this.options.spawnHosted

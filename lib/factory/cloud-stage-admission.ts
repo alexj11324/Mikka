@@ -35,7 +35,7 @@ export async function sleepingFactoryCloudTarget(
     JOIN bot_desktops desktop ON desktop."botId"=b.id AND desktop."ownerId"=b."ownerId" AND desktop."workspaceId"=b."workspaceId"
     JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId"
     JOIN devices dev ON dev.id=m."deviceId" AND dev."ownerId"=b."ownerId" AND dev.kind='cloud' AND dev.enabled=true
-    JOIN agents a ON a.id=$4 AND a.id=source."agentId" AND a."userId"=b."ownerId" AND a."deviceId"=dev.id
+    JOIN agents a ON a.id=$4 AND (a.id=source."agentId" OR pending.stage IN ('review','verify')) AND a."userId"=b."ownerId" AND a."deviceId"=dev.id
     JOIN bot_cloud_runtimes runtime ON runtime."agentId"=a.id AND runtime.harness=a.harness
       AND runtime."botId"=b.id AND runtime."ownerId"=b."ownerId" AND runtime."workspaceId"=b."workspaceId"
     JOIN device_repos repo ON repo.id=$5 AND repo."deviceId"=dev.id AND repo."userId"=b."ownerId"

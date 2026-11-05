@@ -1,4 +1,6 @@
+import { workerDefinitionDigest } from './agent-kit/worker-digest'
 import 'server-only'
+import { admitProfileSelection } from './factory/profile-admission'
 import { freezeExecutionIdentity, revalidateExecutionIdentity, ExecutionIdentityError } from './execution-identity'
 import type { PoolClient } from 'pg'
 import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
@@ -24,7 +26,7 @@ import type { RunInvalidReason } from './run-invalid-reason'
 export async function acceptLocalRun(input: {
   id: string; userId: string; issueId: string; agentId: string; deviceId: string; deviceRepoId: string
   source?: 'mcp' | null; botId: string | null; prompt: string; definition: WorkerDefinitionSnapshot; requestEventId?: string
-  dispatch?: DispatchInput & DispatchCredential; continuation?: boolean; sourceRunId?: string
+  dispatch?: DispatchInput & DispatchCredential; continuation?: boolean; sourceRunId?: string; profileSourceRunId?: string
 }, existing?: PoolClient): Promise<{ runId: string; status?: typeof agentRuns.$inferSelect.status; replayed?: boolean }> {
   const client = existing ?? await pool.connect()
   try {
@@ -71,7 +73,9 @@ export async function acceptLocalRun(input: {
       ? revalidateExecutionIdentity(client, authority)
       : freezeExecutionIdentity(client, authority)).catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
     if (!executionIdentity) throw new ActionFailureError('executionAccountUnavailable')
-    const definition = { ...input.definition, executionIdentity }
+    const profileOriginRunId = await admitProfileSelection(client, { ownerId: input.userId, workspaceId: executionIdentity.workspaceId ?? '', issueId: task.id, harness: input.definition.harness, model: input.definition.model, apiKeyId: input.definition.apiKey?.keyId, subscriptionBindingId: input.definition.subscription?.bindingId, selection: input.definition.agentProfile, sourceRunId: input.profileSourceRunId })
+    const definition = { ...input.definition, executionIdentity, ...(profileOriginRunId ? { profileOriginRunId } : {}) }
+    if (profileOriginRunId) definition.definitionDigest = workerDefinitionDigest(definition)
     const context = { ...(bot ? { workspaceId: bot.workspaceId } : {}), ...(input.requestEventId ? { requestEventId: input.requestEventId } : {}) }
     const replayMatches = async (prior: typeof agentRuns.$inferSelect) => {
       await revalidateExecutionIdentity(client, prior)

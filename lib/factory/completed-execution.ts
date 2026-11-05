@@ -1,3 +1,4 @@
+import { factoryNextStage } from './flow'
 import type { PoolClient } from 'pg'
 import type { FactoryEvidence, FactoryBinding } from './contract'
 import { runCaptureEvidence } from './evidence'
@@ -82,17 +83,20 @@ export async function completeFactoryExecution(tx: PoolClient, store: Pick<Retur
       },
       tx,
     );
+    const stage = await factoryNextStage(tx, next.task);
     const advanced = await store.apply(
       userId,
       binding(next.task),
       factoryEventId("run-advance", run.id),
       {
         action: "advance",
-        stage: task.stage === "spec" ? "execute" : "review",
+        stage: stage!,
         reason:
           task.stage === "spec"
             ? "Spec run complete; execution pending"
-            : "Exact candidate awaits independent review",
+            : stage === "approval"
+              ? "Implementation and its validation are ready for the person; this task was already reviewed"
+              : "Exact candidate awaits independent review",
       },
       tx,
     );

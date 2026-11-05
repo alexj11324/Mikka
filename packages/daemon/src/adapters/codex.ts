@@ -742,7 +742,8 @@ export class CodexAdapter implements AgentAdapter {
       }
       const result = rpc.sendRequest<{ turn: { id: string } }>("turn/start", {
         threadId: sessionId,
-        input: text(message)
+        input: text(message),
+        ...(options.effort ? { effort: options.effort } : {}),
       })
       const response = result.catch((error: unknown) => {
         providerFailure = codexProviderFailure(error)

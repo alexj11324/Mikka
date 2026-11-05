@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { bindingSchema, revisionBindingSchema, routeSchema, routeStage, FactoryError } from "./contract";
+import { bindingSchema, revisionBindingSchema, routeSchema, routeStage, nextStage, factoryFlowVersion, FactoryError } from "./contract";
 import { factoryScopeAllows } from "./scope";
 import { handleFactory } from "./http";
 import type { FactoryStore } from "./http";
@@ -148,4 +148,17 @@ test("API rejects missing session, invalid ids, cross origin, missing origin and
     ).status,
     422,
   );
+});
+
+
+test("the host flow version keeps old Verify history while new tasks hand off after one review", () => {
+  assert.equal(factoryFlowVersion({}), 1);
+  assert.equal(factoryFlowVersion({ route: { flowVersion: 2 } }), 2);
+  assert.equal(nextStage('review'), 'verify');
+  assert.equal(nextStage('verify'), 'approval');
+  assert.equal(nextStage('review', 2), 'approval');
+  assert.equal(nextStage('execute', 2, false), 'review');
+  assert.equal(nextStage('execute', 2, true), 'approval');
+  const input = { issueId: randomUUID(), eventId: randomUUID(), sourceEventId: randomUUID(), rationale: 'Task requested' };
+  for (const flowVersion of [1, 2, 3]) assert.equal(routeSchema.safeParse({ ...input, flowVersion }).success, false);
 });

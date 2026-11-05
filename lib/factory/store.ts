@@ -1,3 +1,4 @@
+import { factoryNextStage, factoryReviewPerformed } from './flow'
 import { checkFactoryRepairBudget } from './check-recovery-evidence'
 import { assertQuestionExecutionRetry } from './questions/execution-continuation'
 import { repositoryExecutionMatches } from './execution-receipt'
@@ -23,7 +24,7 @@ import { daemonTestMode, normalizeRepository, repositoryBindingMatches } from '@
 import {
   revisionBindingSchema,
   factoryCandidateSchema,
-  nextStage,
+  factoryFlowVersion,
   changeSchema,
   FactoryError,
   routeSchema,
@@ -70,7 +71,7 @@ export interface FactoryTask {
   issueId: string;
   scopeVersion: number | null;
   sourceEventId: string;
-  route: z.infer<typeof routeSchema>;
+  route: z.infer<typeof routeSchema> & { flowVersion?: 2 };
   stage: FactoryStage;
   status: FactoryStatus;
   revision: number;
@@ -399,7 +400,7 @@ export function createFactoryStore(
           issueId: route.issueId,
           scopeVersion: issue.scopeVersion,
           sourceEventId: route.sourceEventId,
-          route,
+          route: { ...route, flowVersion: 2 },
           stage: routeStage(route),
           status: routeStage(route) === "clarify" ? "waiting" : "pending",
           revision: 1,
@@ -414,7 +415,7 @@ export function createFactoryStore(
             userId,
             task.issueId,
             task.sourceEventId,
-            JSON.stringify(route),
+            JSON.stringify(task.route),
             task.stage,
             task.status,
             task.attemptId,
@@ -535,10 +536,11 @@ export function createFactoryStore(
           if (inserted.rowCount !== 1) fail('factoryDeliverableSnapshotUnavailable');
           task.candidateId = candidateId;
           task.reason = reason;
-          await freshAttempt(tx, task, 'review', reason);
+          const next = factoryFlowVersion(task) === 2 && await factoryReviewPerformed(tx, task) ? 'approval' : 'review';
+          await freshAttempt(tx, task, next, reason);
           task.revision++;
-          await tx.query(`UPDATE factory_tasks SET stage='review',status='pending',revision=$2,"attemptId"=$3,"candidateId"=$4,reason=$5,"updatedAt"=now() WHERE id=$1`,
-          [task.id, task.revision, task.attemptId, candidateId, reason]);
+          await tx.query(`UPDATE factory_tasks SET stage=$6,status='pending',revision=$2,"attemptId"=$3,"candidateId"=$4,reason=$5,"updatedAt"=now() WHERE id=$1`,
+          [task.id, task.revision, task.attemptId, candidateId, reason, next]);
           // A changed candidate derives the old check question as superseded.
           // Its row, its failed run, the producer and old receipts stay untouched.
           const request = { kind: 'owner_deliverable_snapshot_recovery', input, scope: checked.scope };
@@ -552,11 +554,11 @@ export function createFactoryStore(
             WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "sandboxId"=$4 AND "workerLeaseId"=$5 AND "workerLeaseUntil">now() AND state='paused'`,
           [checked.scope.machineRunId, userId, checked.scope.workspaceId, checked.scope.sandboxId, observation.leaseId]);
           if (released.rowCount !== 1) fail('factoryDeliverableSnapshotUnavailable');
-          const start = await dispatch?.(tx, store, task, checked.review);
+          const start = next === 'review' ? await dispatch?.(tx, store, task, checked.review) : undefined;
           const final = await owned(tx, userId, task.id);
           const result = { ...await snapshot(tx, final), snapshotRecovery };
           // Both versions are inside this uncommitted transaction. The one
-          // immutable receipt exposed to replays includes the queued review.
+          // immutable receipt exposed to replays includes the queued review or human handoff.
           await tx.query('UPDATE factory_events SET result=$3 WHERE "taskId"=$1 AND "eventId"=$2', [task.id, eventId, JSON.stringify(result)]);
           await factoryChanged(tx, final);
           return { result, start };
@@ -986,7 +988,7 @@ export function createFactoryStore(
         } else if (change.action === "advance") {
           if (
             task.status !== "passed" ||
-            change.stage !== nextStage(task.stage)
+            change.stage !== await factoryNextStage(tx, task)
           )
             fail("factoryTransition");
           task.reason = change.reason;
@@ -1001,6 +1003,11 @@ export function createFactoryStore(
           await freshAttempt(tx, task, 'approval', change.reason);
         } else if (change.action === "retry" || change.action === "repair") {
           if (task.stage === "clarify") fail("factoryTransition");
+          // A completed review can lead to repair or human judgment, never a
+          // second review of this task. Its authenticated question continuation
+          // is the same review and keeps the existing custody checks below.
+          if (change.action === 'retry' && task.stage === 'review' && factoryFlowVersion(task) === 2 &&
+              !questionRetry && await factoryReviewPerformed(tx, task)) fail('factoryTransition');
           const pendingQuestion = await tx.query(
             "SELECT id FROM factory_questions WHERE \"taskId\"=$1 AND \"attemptId\"=$2 AND status IN ('open','waiting_user') LIMIT 1",
             [task.id, attempt.id],
