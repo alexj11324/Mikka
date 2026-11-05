@@ -127,6 +127,8 @@ jobs:
       - run: pnpm test:self-improvement-semantic-source
       - run: node --test scripts/ci-docs-only.test.mjs
       - run: pnpm test:ui-policy
+      - name: Idle request budget (main pages, no browser)
+        run: pnpm test:idle-budget
       - run: pnpm test:motion
       - run: pnpm test:i18n
       - run: pnpm i18n:check
