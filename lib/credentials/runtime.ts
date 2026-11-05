@@ -1,4 +1,6 @@
 import 'server-only'
+import { notifySubagentEvents } from '@/lib/computer/event-log'
+import type { LiveScope } from '@/lib/live/scope'
 import { getVercelOidcToken } from '@vercel/oidc'
 import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
@@ -55,7 +57,7 @@ async function brokerErrorCode(response: Response): Promise<unknown> {
   } catch { return null } finally { reader.releaseLock() }
 }
 
-export async function executeCredentialLease(lease: string, origin: string) {
+export async function executeCredentialLease(lease: string, origin: string, scope: LiveScope) {
   const broker = new URL(process.env.CREDENTIAL_BROKER_URL ?? '')
   if (broker.protocol !== 'https:' || !broker.hostname.endsWith('.vercel.app') || broker.pathname !== '/' || broker.username || broker.password || broker.search || broker.hash) throw new CredentialError()
   let dispatched = false, responseReceived = false
@@ -77,6 +79,9 @@ export async function executeCredentialLease(lease: string, origin: string) {
     // Do not forward arbitrary responses from another process to the model.
     const result = await response.json().catch(() => null)
     if (!result || !['submitted', 'session_applied', 'guarded'].includes(result.status) || result.origin !== origin) throw new CredentialError('credential_outcome_unknown', 409)
+    // The broker's success response follows its event COMMIT. Keep the gateway
+    // credential and Next lifecycle in the app; the isolated broker needs neither.
+    if (result.status !== 'guarded') notifySubagentEvents(scope)
     return { status: result.status as 'submitted' | 'session_applied' | 'guarded', origin }
   } catch (error) {
     if (error instanceof CredentialError && error.code === 'credential_outcome_unknown') throw error

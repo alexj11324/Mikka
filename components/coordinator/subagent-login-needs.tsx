@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useSubagentUpdates } from '@/hooks/use-subagent-updates'
 import { CredentialLoginCard } from '@/components/credentials/credential-login-card'
-import { applySubagentUpdate, loginNeeds, subscribeSubagentUpdates, type SubagentUpdate } from '@/lib/subagents/login-needs'
+import { loginNeeds } from '@/lib/subagents/login-needs'
 
 /** A sub-agent of this bot is waiting on a site login: offer the secure login card in the chat. */
 export function SubagentLoginNeeds({ botId }: { botId: string }) {
-  const [updates, setUpdates] = useState<ReadonlyMap<string, SubagentUpdate>>(() => new Map())
-  useEffect(() => subscribeSubagentUpdates(update => setUpdates(state => applySubagentUpdate(state, update))), [])
+  const updates = useSubagentUpdates()
   // Sub-agents whose login went through: the card stays on 已登录 until the sub-agent moves on.
   const [signedIn, setSignedIn] = useState<ReadonlySet<string>>(() => new Set())
   const needs = loginNeeds(updates, botId)

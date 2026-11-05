@@ -167,16 +167,19 @@ test('legacy pending producers invalidate only their committed owner-personal li
       const subagentId = await subagent('Pending approval fixture'), caller = { userId: owner, workspaceId, botId, subagentId }
       const before = sent.length
       assert.equal((await proposeCredentialOperation(database, caller, target, 'fill')).status, 'needs_approval')
-      await drain(); assert.deepEqual(sent.slice(before), [expected(owner)])
+      const subagentEvents = { path: expected(owner).path, events: [{ kind: 'subagent_events', id: workspaceId }] }
+      const byKind = (items: typeof sent) => [...items].sort((a, b) => JSON.stringify(a.events).localeCompare(JSON.stringify(b.events)))
+      // One committed credential proposal changes both the pending list and its subagent event stream.
+      await drain(); assert.deepEqual(byKind(sent.slice(before)), byKind([expected(owner), subagentEvents]))
       assert.equal((await proposeCredentialOperation(database, caller, target, 'fill')).status, 'needs_approval')
-      await drain(); assert.equal(sent.length, before + 1)
+      await drain(); assert.equal(sent.length, before + 2)
       await database.query(`CREATE FUNCTION reject_pending_live_fixture() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
         IF NEW.event->'data'->>'task'='pending-live-must-rollback' THEN RAISE EXCEPTION 'fixture event write rejected'; END IF; RETURN NEW; END $$;
         CREATE TRIGGER reject_pending_live_fixture BEFORE INSERT ON subagent_events FOR EACH ROW EXECUTE FUNCTION reject_pending_live_fixture()`)
       const rejected = await subagent('pending-live-must-rollback')
       const count = (await database.query('SELECT count(*) FROM pending_actions')).rows[0].count
       await assert.rejects(proposeCredentialOperation(database, { ...caller, subagentId: rejected }, target, 'fill'), /fixture event write rejected/)
-      await drain(); assert.equal(sent.length, before + 1)
+      await drain(); assert.equal(sent.length, before + 2)
       assert.equal((await database.query('SELECT count(*) FROM pending_actions')).rows[0].count, count)
       assert.equal((await database.query('SELECT status FROM bot_subagents WHERE id=$1', [rejected])).rows[0].status, 'running')
     })

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { Pool } from 'pg'
+import { observePoolCommits } from '@/lib/db/commit-effects'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { SubagentStore } from './subagents'
 import { wakeTokens, wakeTransport } from '@/lib/workflow-wake'
@@ -32,6 +33,8 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
   const admin = new Pool({ connectionString: databaseURL })
   await admin.query(`CREATE SCHEMA ${schema}`)
   const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
+  // Like the app's pool (lib/db/request-scope.ts): wakes and live notices run after COMMIT.
+  observePoolCommits(pool)
   const alice = { userId: 'alice', workspaceId: randomUUID() }
   const bob = { ...alice, userId: 'bob' }
   const stranger = { ...alice, workspaceId: randomUUID() }
