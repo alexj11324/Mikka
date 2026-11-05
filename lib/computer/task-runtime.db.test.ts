@@ -8,6 +8,7 @@ import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { ensureBotCloudRuntime } from './auto-runtime'
+import { ensureRecordedBotHarnessRuntime } from './bot-runtime-records'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) {
@@ -48,6 +49,19 @@ test('first task runtime is declared without a parent worker or VM and keeps own
     assert.deepEqual(await parent(), before, 'existing parent machine and device are byte-for-byte unchanged')
     const claude = await ensureBotCloudRuntime(pool, actor, firstBot, { harness: 'claude_code' })
     assert.ok(claude); assert.notEqual(claude.agentId, first.agentId)
+    // Main's cross-Harness registration must use fresh task capabilities too.
+    // Its default remains strict for callers using a prepared parent worker.
+    assert.equal(await ensureRecordedBotHarnessRuntime(pool, actor, firstBot, 'codex'), null)
+    const tx = await pool.connect()
+    try {
+      await tx.query('BEGIN')
+      await tx.query('DELETE FROM bot_cloud_runtimes WHERE "botId"=$1 AND harness=$2', [firstBot, 'codex'])
+      const recorded = await ensureRecordedBotHarnessRuntime(tx, actor, firstBot, 'codex', { freshTask: true })
+      assert.equal(recorded?.agentId, first.agentId, 'a missing slot recovers only this exact hidden executor')
+      assert.equal(await ensureRecordedBotHarnessRuntime(tx, { ...actor, userId: 'other-owner' }, firstBot, 'codex', { freshTask: true }), null)
+      assert.equal(await ensureRecordedBotHarnessRuntime(tx, { ...actor, workspaceId: randomUUID() }, firstBot, 'codex', { freshTask: true }), null)
+    } finally { await tx.query('ROLLBACK'); tx.release() }
+    assert.deepEqual(await parent(), before, 'automatic task metadata never starts or installs on the parent')
     const concurrent = await Promise.all(Array.from({ length: 3 }, () => ensureBotCloudRuntime(pool, actor, firstBot, { harness: 'codex' })))
     assert.ok(concurrent.every(runtime => runtime?.agentId === first.agentId), 'repeat registration keeps one exact identity')
     assert.equal(Number((await pool.query('SELECT count(*) FROM bot_cloud_runtimes WHERE "botId"=$1', [firstBot])).rows[0].count), 2)

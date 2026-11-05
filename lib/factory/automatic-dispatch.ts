@@ -184,7 +184,7 @@ export function automaticFactoryDispatch(pool: Pool) {
       return async () => { notifyDeviceWork(deviceId) }
     }
     const selectedHarness = checkStart?.run.agentDefinition.harness ?? (profileChoice?.target.kind === 'cloud' ? profileChoice.target.harness : source.harness)
-    const runtime = await ensureRecordedBotHarnessRuntime(tx, { userId: task.userId, workspaceId: source.workspaceId }, source.runtimeBotId, selectedHarness)
+    const runtime = await ensureRecordedBotHarnessRuntime(tx, { userId: task.userId, workspaceId: source.workspaceId }, source.runtimeBotId, selectedHarness, { freshTask: true })
     if (!runtime || (checkStart && runtime.agentId !== checkStart.run.agentId)) throw new FactoryError('factoryCheckHarnessUnavailable')
     let model: Partial<RunModel> | { error: string } = selection
     if (profileChoice) {

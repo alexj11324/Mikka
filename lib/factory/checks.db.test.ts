@@ -2359,7 +2359,7 @@ test(
           }
         },
       );
-      await t.test('first-use cloud automatic review and verify use fresh task capabilities without waking or installing a parent', async () => {
+      await t.test('first-use cloud single-review flow uses fresh task capabilities without waking or installing a parent', async () => {
         const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction } = await import('./transaction');
         const names = ['WORKSPACE_SECRETS_KEY', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_BYOS_ENABLED', 'NEXT_PUBLIC_POSTHOG_KEY'] as const;
         const saved = new Map(names.map(name => [name, process.env[name]]));
@@ -2450,7 +2450,7 @@ test(
             const automatic = automaticFactoryDispatch(db);
             const cloudQuestions = createFactoryQuestions(db, authorize, cloudStore, initialDispatch, assignment);
             const cloudReconcile = createFactoryReconciler(db, cloudStore, cloudQuestions, { review: reconcileFactoryCheck, verify: reconcileFactoryCheck }, botId);
-            for (const stage of ['review', 'verify'] as const) {
+            for (const stage of ['review'] as const) {
               assert.equal(current.task.stage, stage);
               assert.equal(current.task.status, 'pending');
               const before = await cloudStore.read(userId, current.task.id);
@@ -2459,7 +2459,7 @@ test(
               // These actual dispatch refusals must roll back the whole queue.
               for (const [sql, params, code] of [
                 ['UPDATE devices SET enabled=false WHERE id=$1', [parentId], 'factoryCheckHarnessUnavailable'],
-                ['DELETE FROM bot_cloud_runtimes WHERE "botId"=$1 AND harness=\'codex\'', [botId], 'factoryCheckHarnessUnavailable'],
+                ['UPDATE agents SET harness=\'claude_code\' WHERE id=$1', [runtime.agentId], 'factoryCheckHarnessUnavailable'],
                 ['UPDATE factory_candidates SET repository=\'/wrong/repository\' WHERE id=$1', [current.task.candidateId], 'factoryEvidenceMismatch'],
               ] as const) {
                 const tx = await db.connect();
@@ -2517,16 +2517,20 @@ test(
               assert.notEqual(worker.deviceId, parentId);
               assert.notEqual(worker.deviceId, producerWorker.deviceId);
               await terminal(checkRun.id, `${stage}-${issueId}`);
-              if (stage === 'verify') await toolChunks(checkRun.id);
               await cloudReconcile.run(userId, checkRun.id);
               current = await cloudStore.read(userId, current.task.id);
-              assert.equal(current.task.stage, stage === 'review' ? 'verify' : 'approval');
+              assert.equal(current.task.stage, 'approval');
               assert.deepEqual((await db.query('SELECT to_jsonb(c) AS value FROM factory_candidates c WHERE id=$1', [current.task.candidateId])).rows[0].value, candidateBefore);
               assert.deepEqual(await parent(), beforeParent, 'parent state, heartbeat and empty capability report are unchanged');
             }
-            assert.equal(queuedHandoffs.length, 2);
-            assert.deepEqual(createdTaskRuns, [execute.runId, ...queuedHandoffs], 'only the three independent task VMs are requested');
-            assert.equal(networkRequests.length, providerCount, 'no model request occurred');
+            assert.equal(queuedHandoffs.length, 1);
+            assert.equal(current.task.route.flowVersion, 2);
+            assert.equal(current.attempts.filter(attempt => attempt.stage === 'review').length, 1);
+            assert.equal(current.attempts.filter(attempt => attempt.stage === 'verify').length, 0);
+            assert.deepEqual(createdTaskRuns, [execute.runId, ...queuedHandoffs], 'only the independent producer and single-review task VMs are requested');
+            const taskDecisions = networkRequests.slice(providerCount) as { model?: unknown }[];
+            assert.ok(taskDecisions.every(request => request.model === DECISION_MODEL),
+              'only the existing loopback Decision fixture runs; the global fetch guard rejects every external coding provider');
           });
         } finally {
           machines.restore();
