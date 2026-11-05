@@ -39,6 +39,7 @@
 
 - #1332：8/8 workflows 成功，23 checks 成功、5 skipped；[CI 41967837171](https://github.com/alexj11324/Mikka/actions/runs/41967837171)。
 - #1333：10/10 workflows 成功，27 checks 成功、5 skipped；[CI 41968276691](https://github.com/alexj11324/Mikka/actions/runs/41968276691)。
+- 两个 PR 转为可评审后，追加的 Browser gate 均通过（[#1332](https://github.com/alexj11324/Mikka/actions/runs/41972975653)、[#1333](https://github.com/alexj11324/Mikka/actions/runs/41972978241)）。该 gate 保留 required check 名称，不运行浏览器自动化测试。
 - #1318 新增 claim 依赖后，CI 发现两组旧 fixture 未同步；最小补丁补齐模块映射，不改业务逻辑或原授权断言。上列 CI 是该补丁后的最新 HEAD。
 - 临时合并版本：compat 52/52、model 82/82、benchmark 90/90、订阅 99/99、usability 118/118，共 441 项通过，0 skipped；typecheck、UI policy、error-cause policy 和 i18n 全部通过。
 - 构建前逐文件核对合并 tree 中全部 4,690 个受版本控制的文件：Git blob hash 不匹配数为 0。截图 route 为额外临时 fixture，未混入发布源码。
@@ -73,7 +74,7 @@
 
 ## 运行资源收尾
 
-Medium 的 PostgreSQL 已正常停止，sandbox 已确认停止。Large 的生产预览已退出；PostgreSQL 于 2026-11-05 05:11:11 UTC 正常停止，sandbox 停止请求于 05:11:49 UTC 被管理面接受。最终云环境状态在 PR 交接记录中确认。临时预览地址不作为交付入口。
+Medium 的 PostgreSQL 已正常停止，sandbox 已确认停止。Large 的生产预览已退出；PostgreSQL 于 2026-11-05 05:11:11 UTC 正常停止，sandbox 停止请求于 05:11:49 UTC 被管理面接受，并于 05:18:47 UTC 确认状态为 stopped。两套环境均已停止，临时预览地址不作为交付入口。
 
 ## 合并与上线边界
 
