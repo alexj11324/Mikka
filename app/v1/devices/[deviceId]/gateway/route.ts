@@ -5,6 +5,9 @@ import { deviceGatewayTicket } from '@/lib/device-gateway-ticket'
 
 export const dynamic = 'force-dynamic'
 
+/** The waits this server pushes for (packages/protocol deviceGatewaySchema). */
+const PUSHED = { runControl: 'push', computerReviews: 'push' } as const
+
 /**
  * `GET /v1/devices/:deviceId/gateway`: one ticket for this device's push socket.
  * Null when the gateway is not configured; the daemon keeps long-polling.
@@ -19,13 +22,15 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
   const secret = process.env.DEVICE_GATEWAY_PUSH_SECRET
   // runControl: every write that ends, pauses or revokes a run wakes its device
   // (notifyRunControl), so a connected daemon drops its periodic check (#1212).
-  if (!base || !secret) return NextResponse.json({ url: null, protocol: null, runControl: 'push' })
+  // computerReviews: a web decision on a computer review wakes its device
+  // (decideComputerReview), so the daemon stops syncing reviews every second.
+  if (!base || !secret) return NextResponse.json({ url: null, protocol: null, ...PUSHED })
   let url: URL
-  try { url = new URL(`/v1/devices/${encodeURIComponent(deviceId)}/socket`, base) } catch { return NextResponse.json({ url: null, protocol: null, runControl: 'push' }) }
+  try { url = new URL(`/v1/devices/${encodeURIComponent(deviceId)}/socket`, base) } catch { return NextResponse.json({ url: null, protocol: null, ...PUSHED }) }
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
   url.search = ''
   const { protocol } = deviceGatewayTicket(deviceId, secret)
-  return NextResponse.json({ url: url.toString(), protocol, runControl: 'push' }, { headers: { 'Cache-Control': 'private, no-store' } })
+  return NextResponse.json({ url: url.toString(), protocol, ...PUSHED }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
 
 export const GET = withDeviceRoute(handleGET)
