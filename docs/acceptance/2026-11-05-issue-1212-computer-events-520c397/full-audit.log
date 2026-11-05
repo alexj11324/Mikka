@@ -1,0 +1,1 @@
+{"audit":{"files":24,"archives":0,"archiveEntries":0,"decodedBytes":0,"result":"passed","checked":"known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"},"cleanup":{"at":"2026-11-05T01:21:24.161Z","sha":"520c397e2f58cdc69dd5c6d75f6e8d83ffe2b103","privateStateRemoved":true,"descriptorDirectoryRemoved":true}}

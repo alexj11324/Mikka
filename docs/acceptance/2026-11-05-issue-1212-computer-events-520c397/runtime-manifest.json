@@ -1,0 +1,53 @@
+{
+  "sha": "520c397e2f58cdc69dd5c6d75f6e8d83ffe2b103",
+  "tree": "c342a69139192ce077a7738707aec788579c51e1",
+  "database": "mikka_c520_ui_29205cadff_e2e",
+  "role": "mikka_c520_ui_29205cadff",
+  "origin": "http://localhost:3387",
+  "descriptor": "/vercel/acceptance/private-c520-environment/descriptor.json",
+  "startedAt": "2026-11-05T01:19:12.171Z",
+  "captureScriptSha256": "9df60704a1fb6c29b55a425c67e131946f11bbd01dd91ff5184b30b5277f35df",
+  "commands": [
+    {
+      "name": "setup",
+      "startedAt": "2026-11-05T01:19:12.204Z",
+      "finishedAt": "2026-11-05T01:19:14.162Z",
+      "exitCode": 0,
+      "log": "/vercel/acceptance/capture-c520-egress/setup.log"
+    },
+    {
+      "name": "bootstrap",
+      "startedAt": "2026-11-05T01:19:14.162Z",
+      "finishedAt": "2026-11-05T01:19:14.286Z",
+      "exitCode": 0,
+      "log": "/vercel/acceptance/capture-c520-egress/bootstrap.log"
+    },
+    {
+      "name": "build",
+      "startedAt": "2026-11-05T01:19:14.287Z",
+      "finishedAt": "2026-11-05T01:20:19.691Z",
+      "exitCode": 0,
+      "log": "/vercel/acceptance/capture-c520-egress/build.log"
+    },
+    {
+      "name": "capture",
+      "startedAt": "2026-11-05T01:20:21.469Z",
+      "finishedAt": "2026-11-05T01:20:34.169Z",
+      "exitCode": 0,
+      "log": "/vercel/acceptance/capture-c520-egress/capture.log"
+    }
+  ],
+  "status": "completed",
+  "serverPid": 58106,
+  "versionVerifiedAt": "2026-11-05T01:20:21.366Z",
+  "displayPid": 58123,
+  "preDropConnections": [],
+  "cleanup": {
+    "databaseAbsent": true,
+    "roleAbsent": true,
+    "serverExited": true,
+    "displayExited": true,
+    "at": "2026-11-05T01:20:34.249Z"
+  },
+  "finishedAt": "2026-11-05T01:20:34.249Z"
+}

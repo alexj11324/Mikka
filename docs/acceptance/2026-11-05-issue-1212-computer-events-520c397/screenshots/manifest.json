@@ -1,0 +1,175 @@
+{
+  "commit": "520c397e2f58cdc69dd5c6d75f6e8d83ffe2b103",
+  "environmentId": "local-24e8f208-5e93-42d5-b51b-71453ea8d8f1",
+  "origin": "http://localhost:3387",
+  "startedAt": "2026-11-05T01:20:23.077Z",
+  "fixture": {
+    "workspaceId": "00000000-0000-4000-8000-0000000000c0",
+    "botId": "00000000-0000-4000-8000-0000000000b0",
+    "subagentId": "00000000-0000-4000-8000-0000000000a1",
+    "ownerId": "N0fpn5iZwMNFHLXl473ggVvTlfzUGcQ2"
+  },
+  "captures": [
+    {
+      "name": "zh-login-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "at": "2026-11-05T01:20:27.752Z",
+      "sha256": "225d77bcf16fda1a30a2555cc486048b7f2a065287125c68e031f5c7b7f7331d",
+      "text": "登录 example.test"
+    },
+    {
+      "name": "zh-login-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "at": "2026-11-05T01:20:27.849Z",
+      "sha256": "5823376860c08684928d1b412d80c2a383a07fc8a6033516b143e01035ec57b3",
+      "text": "登录 example.test"
+    },
+    {
+      "name": "zh-login-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "at": "2026-11-05T01:20:27.933Z",
+      "sha256": "9cd90b1934517ed1c5eda3d7b3fe942cf019d8720a2db27b77ee4566fd4082f8",
+      "text": "登录 example.test"
+    },
+    {
+      "name": "zh-login-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "at": "2026-11-05T01:20:28.000Z",
+      "sha256": "6c0495b473f5a90bbc5c2cb224d3f1357f92a2c020677a90b924d4da8914abce",
+      "text": "登录 example.test"
+    },
+    {
+      "name": "en-login-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "at": "2026-11-05T01:20:28.751Z",
+      "sha256": "37c75ee0ef2bfd9396ff58b18e3b056e43bcc5e61d5d93a1bc6631937f3c0ad6",
+      "text": "Sign in to example.test"
+    },
+    {
+      "name": "en-login-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "at": "2026-11-05T01:20:28.834Z",
+      "sha256": "10068286230d120ce83114f2fc44beafc566d840d9607c55026fff0ef00335ea",
+      "text": "Sign in to example.test"
+    },
+    {
+      "name": "en-login-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "at": "2026-11-05T01:20:28.920Z",
+      "sha256": "af85ded7ee1d65b2f128a7b7f5db3a0ad9e09560e6281b48662999fe9096d57c",
+      "text": "Sign in to example.test"
+    },
+    {
+      "name": "en-login-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "at": "2026-11-05T01:20:28.985Z",
+      "sha256": "f1767e36692c620330628b04ced35780ac7229999d783c085c505c33d5aac218",
+      "text": "Sign in to example.test"
+    }
+  ],
+  "eventReads": [
+    {
+      "at": "2026-11-05T01:20:27.140Z",
+      "after": "0",
+      "status": 200,
+      "cursor": "2",
+      "hasMore": false,
+      "events": [
+        {
+          "id": "1",
+          "subagentId": "00000000-0000-4000-8000-0000000000a1",
+          "state": "needs_you"
+        },
+        {
+          "id": "2",
+          "subagentId": "00000000-0000-4000-8000-0000000000a1",
+          "state": "needs_you"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-05T01:20:28.116Z",
+      "after": "0",
+      "status": 200,
+      "cursor": "2",
+      "hasMore": false,
+      "events": [
+        {
+          "id": "1",
+          "subagentId": "00000000-0000-4000-8000-0000000000a1",
+          "state": "needs_you"
+        },
+        {
+          "id": "2",
+          "subagentId": "00000000-0000-4000-8000-0000000000a1",
+          "state": "needs_you"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-05T01:20:29.119Z",
+      "after": "2",
+      "status": 200,
+      "cursor": "3",
+      "hasMore": false,
+      "events": [
+        {
+          "id": "3",
+          "subagentId": "00000000-0000-4000-8000-0000000000a1",
+          "state": "running"
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "Local screenshot evidence; no external login, model execution, or healthy-WebSocket production acceptance."
+  ],
+  "gateway": {
+    "configured": false,
+    "ticketStatus": 200
+  },
+  "initialRead": {
+    "status": 200,
+    "cursor": "2",
+    "eventCount": 2
+  },
+  "browser": {
+    "version": "156.0.8078.4",
+    "mode": "native headed Chromium / Xvfb",
+    "connection": "connectOverCDP noDefaults=true; real visibility, no focus emulation"
+  },
+  "background": {
+    "visibilityState": "hidden",
+    "observedAt": "2026-11-05T01:20:29.084Z",
+    "method": "another real tab brought to front"
+  },
+  "foregroundCatchUp": {
+    "cardRemoved": true,
+    "observedAt": "2026-11-05T01:20:29.122Z"
+  },
+  "finishedAt": "2026-11-05T01:20:29.122Z"
+}

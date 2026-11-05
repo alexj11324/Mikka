@@ -1,0 +1,24 @@
+{
+  "source": "520c397e2f58cdc69dd5c6d75f6e8d83ffe2b103",
+  "tree": "c342a69139192ce077a7738707aec788579c51e1",
+  "reviewer": "egress_1211, independent of C product implementation",
+  "images": [
+    "zh-login-1440-light.png",
+    "zh-login-1440-dark.png",
+    "zh-login-390-light.png",
+    "zh-login-390-dark.png",
+    "en-login-1440-light.png",
+    "en-login-1440-dark.png",
+    "en-login-390-light.png",
+    "en-login-390-dark.png"
+  ],
+  "method": "All eight original PNGs opened with view_image; dimensions and sha256 checked against manifest",
+  "visualBlockers": [],
+  "observed": "Existing login pill; complete EN/ZH labels and site icon, no overlap or clipping at 1440/390, clear light/dark contrast",
+  "limits": [
+    "Component preview only",
+    "No expanded login/OTP validation",
+    "No external credential submitted",
+    "No production acceptance or healthy gateway claim"
+  ]
+}

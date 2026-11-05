@@ -1,0 +1,51 @@
+▲ Next.js 16.4.1
+- Local:         http://localhost:3387
+- Network:       http://localhost:3387
+✓ Ready in 169ms
+✓ Running next.config.mjs took 212ms
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-05T01:20:23.693Z","requestId":"9ea3b730-1f51-412a-be52-4c5c626b8d10","invocationId":"9c60a395-1771-409b-bdd5-624ded8bbfc7","route":"/api/auth/[...all]","method":"POST"}
+2026-11-05T01:20:23.834Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+  status: 'SERVICE_UNAVAILABLE',
+  body: {
+    code: 'AUTH_EMAIL_DELIVERY_UNAVAILABLE',
+    message: 'Email service unavailable'
+  },
+  headers: {},
+  statusCode: 503
+}
+{"level":"info","msg":"api_request","timestamp":"2026-11-05T01:20:23.869Z","requestId":"9ea3b730-1f51-412a-be52-4c5c626b8d10","invocationId":"9c60a395-1771-409b-bdd5-624ded8bbfc7","route":"/api/auth/[...all]","method":"POST","status":200,"durationMs":176,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-05T01:20:23.888Z","requestId":"92f147f0-7f2d-402d-bf89-2608114070c0","invocationId":"6dd69186-63da-45b2-afc3-6a7efd793647","route":"/api/auth/[...all]","method":"GET"}
+{"level":"info","msg":"api_request","timestamp":"2026-11-05T01:20:23.898Z","requestId":"92f147f0-7f2d-402d-bf89-2608114070c0","invocationId":"6dd69186-63da-45b2-afc3-6a7efd793647","route":"/api/auth/[...all]","method":"GET","status":200,"durationMs":10,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-05T01:20:23.922Z","requestId":"ad59d493-6fa1-4a67-9eab-67ff09dc1420","invocationId":"527c52d0-c4cd-49c8-854e-5b0cfa2ed861","route":"/api/workspace","method":"GET"}
+{"level":"info","msg":"api_request","timestamp":"2026-11-05T01:20:23.947Z","requestId":"ad59d493-6fa1-4a67-9eab-67ff09dc1420","invocationId":"527c52d0-c4cd-49c8-854e-5b0cfa2ed861","route":"/api/workspace","method":"GET","status":200,"durationMs":25,"userIdHash":"172e657352358764"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-05T01:20:25.470Z","requestId":"3b7e710d-2035-4a11-8042-c5147bc1f90c","invocationId":"b689f22d-d148-46e7-8ac1-6f9e6e02da0b","route":"/api/auth/[...all]","method":"POST"}
+2026-11-05T01:20:25.559Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+  status: 'SERVICE_UNAVAILABLE',
+  body: {
+    code: 'AUTH_EMAIL_DELIVERY_UNAVAILABLE',
+    message: 'Email service unavailable'
+  },
+  headers: {},
+  statusCode: 503
+}
+{"level":"info","msg":"api_request","timestamp":"2026-11-05T01:20:25.567Z","requestId":"3b7e710d-2035-4a11-8042-c5147bc1f90c","invocationId":"b689f22d-d148-46e7-8ac1-6f9e6e02da0b","route":"/api/auth/[...all]","method":"POST","status":200,"durationMs":98,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-05T01:20:25.579Z","requestId":"c41f0c2b-067d-4e1d-9af3-f8c185ab52b2","invocationId":"9817ea32-d676-4145-b275-b4d1ecc7304f","route":"/api/auth/[...all]","method":"GET"}
+{"level":"info","msg":"api_request","timestamp":"2026-11-05T01:20:25.583Z","requestId":"c41f0c2b-067d-4e1d-9af3-f8c185ab52b2","invocationId":"9817ea32-d676-4145-b275-b4d1ecc7304f","route":"/api/auth/[...all]","method":"GET","status":200,"durationMs":4,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-05T01:20:25.592Z","requestId":"8d4714fa-c81a-4c01-87cc-b35964ccd460","invocationId":"03b36136-690a-473d-944f-81b3d4db1d11","route":"/api/workspace","method":"GET"}
+{"level":"info","msg":"api_request","timestamp":"2026-11-05T01:20:25.598Z","requestId":"8d4714fa-c81a-4c01-87cc-b35964ccd460","invocationId":"03b36136-690a-473d-944f-81b3d4db1d11","route":"/api/workspace","method":"GET","status":200,"durationMs":5,"userIdHash":"ea5d5a1ebdf306d9"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-05T01:20:26.232Z","requestId":"ca7077c4-55a2-48ab-a114-e04daa5bf00f","invocationId":"38c67ca2-3d9a-4ca8-8927-948b3f400974","route":"/api/computer/events","method":"GET"}
+{"level":"info","msg":"api_request","timestamp":"2026-11-05T01:20:26.240Z","requestId":"ca7077c4-55a2-48ab-a114-e04daa5bf00f","invocationId":"38c67ca2-3d9a-4ca8-8927-948b3f400974","route":"/api/computer/events","method":"GET","status":200,"durationMs":9,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-05T01:20:26.251Z","requestId":"f347cf2c-6087-4bea-9e02-fed9323ea236","invocationId":"a901ba95-8037-46df-b48b-3ce9daa8bd8c","route":"/api/live/ticket","method":"GET"}
+{"level":"info","msg":"api_request","timestamp":"2026-11-05T01:20:26.255Z","requestId":"f347cf2c-6087-4bea-9e02-fed9323ea236","invocationId":"a901ba95-8037-46df-b48b-3ce9daa8bd8c","route":"/api/live/ticket","method":"GET","status":200,"durationMs":5,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-05T01:20:27.102Z","requestId":"c4d6f333-3179-4b0e-9cd6-80c44d001847","invocationId":"c2386388-198a-4902-8096-8ecba9dea6f9","route":"/api/live/ticket","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-05T01:20:27.105Z","requestId":"a11c29d2-4b84-471a-975a-8e62ff0cf8c3","invocationId":"3e4f7a39-993a-4941-8684-149627827fe1","route":"/api/computer/events","method":"GET"}
+{"level":"info","msg":"api_request","timestamp":"2026-11-05T01:20:27.112Z","requestId":"c4d6f333-3179-4b0e-9cd6-80c44d001847","invocationId":"c2386388-198a-4902-8096-8ecba9dea6f9","route":"/api/live/ticket","method":"GET","status":200,"durationMs":9,"userIdHash":null}
+{"level":"info","msg":"api_request","timestamp":"2026-11-05T01:20:27.118Z","requestId":"a11c29d2-4b84-471a-975a-8e62ff0cf8c3","invocationId":"3e4f7a39-993a-4941-8684-149627827fe1","route":"/api/computer/events","method":"GET","status":200,"durationMs":14,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-05T01:20:28.103Z","requestId":"9f648d4c-7470-40fb-b9bc-c1c7a811b252","invocationId":"c04db9b9-07a6-4aa6-bf63-f8046b96f495","route":"/api/live/ticket","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-05T01:20:28.105Z","requestId":"e115dade-b36f-4f9d-b727-03bc547eca10","invocationId":"5ef71617-01a0-4290-91a4-37d2f1a31832","route":"/api/computer/events","method":"GET"}
+{"level":"info","msg":"api_request","timestamp":"2026-11-05T01:20:28.111Z","requestId":"9f648d4c-7470-40fb-b9bc-c1c7a811b252","invocationId":"c04db9b9-07a6-4aa6-bf63-f8046b96f495","route":"/api/live/ticket","method":"GET","status":200,"durationMs":8,"userIdHash":null}
+{"level":"info","msg":"api_request","timestamp":"2026-11-05T01:20:28.112Z","requestId":"e115dade-b36f-4f9d-b727-03bc547eca10","invocationId":"5ef71617-01a0-4290-91a4-37d2f1a31832","route":"/api/computer/events","method":"GET","status":200,"durationMs":7,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-05T01:20:29.096Z","requestId":"ecc73a40-8ee5-42b5-b69d-908302262247","invocationId":"f33aaaf4-077e-467e-ae66-267fa106326a","route":"/api/computer/events","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-05T01:20:29.098Z","requestId":"ada5d17a-aea8-4baf-ae75-bfba7982b761","invocationId":"779a2b1c-02d2-4b22-b38f-ae3ed3cdb41c","route":"/api/live/ticket","method":"GET"}
+{"level":"info","msg":"api_request","timestamp":"2026-11-05T01:20:29.103Z","requestId":"ada5d17a-aea8-4baf-ae75-bfba7982b761","invocationId":"779a2b1c-02d2-4b22-b38f-ae3ed3cdb41c","route":"/api/live/ticket","method":"GET","status":200,"durationMs":5,"userIdHash":null}
+{"level":"info","msg":"api_request","timestamp":"2026-11-05T01:20:29.104Z","requestId":"ecc73a40-8ee5-42b5-b69d-908302262247","invocationId":"f33aaaf4-077e-467e-ae66-267fa106326a","route":"/api/computer/events","method":"GET","status":200,"durationMs":8,"userIdHash":null}
