@@ -87,6 +87,9 @@ const HEADER_FADE = 'md:[--scroll-fade-mask:linear-gradient(to_bottom,transparen
 export type CoordinatorPrefill = { text: string; nonce: number; suggestionId?: string }
 
 /** The SWR key of a chat: the Coordinator's, or one bot's. */
+/** A passing usage limit (another turn running, a cost read): the next send works without anything changing. */
+const TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(['usage_in_progress', 'usage_concurrency_limit', 'usage_cost_unavailable'])
+
 export function coordinatorChatKey(botId?: string | null) {
   return botId ? ['coordinator-chat', botId] as const : 'coordinator-chat'
 }
@@ -232,7 +235,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     if (input) { input.focus(); input.setSelectionRange(prefill.text.length, prefill.text.length) }
   }, [prefill])
   // A failed message sent again is retried in place: it goes at once, and the server leaves it out from then on.
-  const items = useMemo(() => (data?.items ?? []).filter(item => !(item.from === 'person' && retrying.has(item.position))), [data, retrying])
+  // A failed welcome stands only until a reply follows (an incremental read appends the reply after it).
+  const items = useMemo(() => (data?.items ?? []).filter((item, index, all) => !(item.from === 'person' && retrying.has(item.position))
+    && !(item.welcome && all.slice(index + 1).some(next => next.from === 'coordinator'))), [data, retrying])
   // One thread has one card in a chat (R-66): under the first reply that dispatched it; later replies name it in their words.
   const firstThreadCard = useMemo(() => firstThreadCards(items), [items])
   // A thread's event line said again later (「… 在等你回答」 twice) shows only the latest one (R-66).
@@ -276,14 +281,21 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const welcomeFailed = Boolean(data?.error && !data.working && (lastSaid?.welcome || (!items.length && !stream.replies.length)))
   // No empty chats: the Coordinator, like every bot, writes its welcome first.
   const welcomed = useRef(false)
-  // A welcome Mikka 默认 refused runs again once the chat's model can run now (the trial points arrived, a card was
-  // verified): the same turn, once per failure (store.retryFailedTurn), so it never loops.
+  // A welcome Mikka 默认 refused runs again once its model becomes runnable while this chat is open (the trial points
+  // arrived, a card was verified): only on a change from not runnable to runnable seen by this mount, never on open
+  // (the menu can read runnable while the server still refuses), never for a passing usage limit, never in a hidden
+  // tab, and once per failure (store.retryFailedTurn), so a visit never fires another refused turn.
   const welcomeModel = useSWR<BotModelMenu>(welcomeFailed && refusal ? botModelMenuKey(botId ?? null) : null, () => getBotModelMenu(botId ?? null))
+  const runnable = welcomeModel.data?.current?.available
+  const wasRunnable = useRef<boolean | undefined>(undefined)
   const rewelcomed = useRef<string | null>(null)
   useEffect(() => {
     if (!data?.enabled || data.working || welcomed.current) return
     if (data.error) {
-      if (!welcomeFailed || !refusal || welcomeModel.data?.current?.available !== true || rewelcomed.current === data.error) return
+      if (document.visibilityState !== 'visible') return
+      const was = wasRunnable.current
+      if (runnable !== undefined) wasRunnable.current = runnable
+      if (!welcomeFailed || !refusal || TRANSIENT_REFUSALS.has(refusal) || was !== false || runnable !== true || rewelcomed.current === data.error) return
       rewelcomed.current = data.error
       void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate())
       return
@@ -303,7 +315,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const lastReplyAt = stream.replies.length ? -1 : items.findLast(item => item.from === 'coordinator' && item.text)?.position
   const rootRef = useRef<HTMLElement>(null)
   // Events are system lines, not messages; the person's own messages never count as unread.
-  const unreadItems = useMemo(() => items.filter(item => item.from !== 'event').map(item => ({ position: item.position, messageId: item.id ?? String(item.position), own: item.from === 'person', reportable: !item.pending })), [items])
+  // A failed welcome is the Bot saying nothing yet: never an unread message.
+  const unreadItems = useMemo(() => items.filter(item => item.from !== 'event' && !item.welcome).map(item => ({ position: item.position, messageId: item.id ?? String(item.position), own: item.from === 'person', reportable: !item.pending })), [items])
   // Reactions people gave on the phone (decision 2026-11-01-0030-mobile-reactions); a pending row has none yet.
   const reactions = useMessageReactions(items.map(item => item.pending || item.from === 'event' ? null : item.id))
   const unread = useUnreadIndicators({ conversationId: botId ? `bot:${botId}` : 'coordinator', items: unreadItems, rootRef })
@@ -441,7 +454,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} />}
                     {/* Top to bottom as it happened: thinking, then the words and each tool after the words said before it.
                         The same rows live and stored, so storing keeps them in place. */}
-                    {item.from === 'coordinator'
+                    {item.welcome ? null : item.from === 'coordinator'
                       ? <ReplyAnswer value={live ? null : answers.get(item.position) ?? null}>{replyRows(item, live).map((segment, index) => segment.kind === 'tools'
                         ? <AgentCitationsContext key={index} value={citations}><ReplyActivity tools={segment.tools} {...(index === 0 && item.activity ? { thinking: live ? liveThinking(live) : undefined, thought: item.activity.thought, reasoningAt: item.activity.reasoningAt } : {})} botId={botId} live={Boolean(live && live.committedThrough === undefined)} /></AgentCitationsContext>
                         : <CoordinatorReply key={index} text={segment.text} carded={cardsOf(item, Boolean(live)).join(',')} citations={live ? live.committedThrough === undefined ? liveCitations.streaming : liveCitations.settled : citations} isStreaming={Boolean(live && live.committedThrough === undefined)} />)}</ReplyAnswer>
@@ -463,7 +476,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {item.id && <MessageReactions reactions={reactions[item.id]} align={item.from === 'person' ? 'end' : 'start'} />}
                     {item.stopped && <MessageFooter><p role="status">{t('stopped')}</p></MessageFooter>}
                     {item.failure && (item.position === failedAt
-                      ? <div data-message-failure="live" className={cn('flex w-full max-w-md flex-col gap-2', item.welcome ? 'self-start' : 'self-end')}>{failureNotice}</div>
+                      ? <div data-message-failure={item.welcome ? 'welcome' : 'live'} className={cn('flex w-full max-w-md flex-col gap-2', item.welcome ? 'self-start' : 'self-end')}>{failureNotice}</div>
                       : <MessageFooter className={cn(item.welcome ? 'self-start' : 'self-end')}><FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { if (item.welcome) void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()); else void deliver(item.text, false, item.position) }} /></MessageFooter>)}
                   </MessageContent></Message>}
             </MessageScrollerItem>
