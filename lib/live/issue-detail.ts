@@ -45,7 +45,8 @@ export async function issueRelationTargets(database: Database, workspaceDatabase
   const { rows: naming } = owners.length ? await database.query<{ id: string }>(
     `SELECT id FROM issues WHERE "userId"=ANY($1::text[]) AND EXISTS (
        SELECT 1 FROM (VALUES (content->'attrs'->'mikka'),(content->'attrs'->'orvilo')) AS m(metadata)
-       WHERE m.metadata->>'parentId'=ANY($2::text[]) OR m.metadata->'blockedByIds' ?| $2::text[] OR m.metadata->'relatedIds' ?| $2::text[])
+       WHERE m.metadata->>'parentId'=ANY($2::text[]) OR m.metadata->>'duplicateOfId'=ANY($2::text[])
+         OR m.metadata->'blockedByIds' ?| $2::text[] OR m.metadata->'relatedIds' ?| $2::text[])
      LIMIT ${MAX_CONNECTED}`, [owners, ids]) : { rows: [] }
   const affected = [...new Set([...ids, ...rows.flatMap(row => relationIds(row.content)), ...naming.map(row => row.id)])].slice(0, MAX_CONNECTED)
   const { documentLiveTargets } = await import('./panels')

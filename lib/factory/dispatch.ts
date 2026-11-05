@@ -60,9 +60,10 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
     // receipt) and, through the queue, the run prompt: mask it once, before either.
     const input = parsed.data.note === undefined ? parsed.data : { ...parsed.data, note: maskFactoryNote(parsed.data.note) };
     const { binding } = input;
+    const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('./transaction');
     const tx = existing ?? await pool.connect();
     try {
-      if (!existing) await tx.query('BEGIN');
+      if (!existing) await beginFactoryTransaction(tx);
       await adapters.lockAdmission?.(tx, userId, input);
       const task = await store.lockTask(tx, userId, binding.taskId);
       if (task.issueId !== binding.issueId) fail('factoryNotFound');
@@ -79,7 +80,7 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
         const replay = adapters.replay?.[task.stage];
         if (task.stage === 'monitor' && !replay) fail('factoryDispatchAdapterRequired');
         await replay?.(tx,task,receipt.result.runId);
-        if (!existing) await tx.query('COMMIT');
+        if (!existing) await commitFactoryTransaction(tx);
         return { ...receipt.result, replayed: true };
       }
       if (task.revision !== binding.revision || task.attemptId !== binding.attemptId || task.candidateId !== binding.candidateId) fail('factoryStale');
@@ -108,13 +109,13 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
       const result = {...state,runId:run.id as string,replayed:false,binding:factoryBinding(state.task)};
       await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)',[task.id,eventId,JSON.stringify(input),JSON.stringify(result)]);
       if (!existing) {
-        await tx.query('COMMIT');
+        await commitFactoryTransaction(tx);
         // Workflow schemas import factoryBinding from this module. Load the
         // Node lifecycle helper only inside the committed dispatch operation.
         await (await import('../device-gateway-notify')).notifyQueuedLocalRun(tx, userId, run.id);
       }
       return result;
-    } catch (error) { if (!existing) await tx.query('ROLLBACK'); throw error; }
-    finally { if (!existing) tx.release(); }
+    } catch (error) { if (!existing) await rollbackFactoryTransaction(tx); throw error; }
+    finally { if (!existing) { forgetFactoryTransaction(tx); tx.release(); } }
   };
 }

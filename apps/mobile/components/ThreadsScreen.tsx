@@ -11,7 +11,9 @@ import { NavBar, underBar } from '@/components/NavBar'
 import { Dot } from '@/components/ui'
 import type { BotPage, Thread, ThreadGroup, Threads } from '@/lib/types'
 import { openChat } from '@/lib/navigate'
-import { useApi, useRefresh } from '@/lib/useApi'
+import { useLiveApi, useRefresh } from '@/lib/useApi'
+import { botPageLive, threadsLive } from '@/lib/live-keys'
+import { useHome } from '@/lib/home'
 import { colors, lift } from '@/lib/theme'
 import { HARNESS } from '@/lib/harness'
 
@@ -50,7 +52,12 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
   // `bot`: one bot's threads, pushed over its chat; otherwise the 线程 tab.
   const pushed = bot !== undefined
   const insets = useSafeAreaInsets()
-  const { data, loading, error, reload } = useApi<Threads | BotPage>(bot ? `/api/mobile/bots/${bot.id}` : '/api/mobile/threads', 10_000)
+  const home = useHome().data
+  const own = home?.live?.workspaceId
+  // The Coordinator's page is addressed as `coordinator`; its key is its bot row's id.
+  const botId = bot?.id === 'coordinator' ? home?.bots.find(item => item.coordinator)?.id : bot?.id
+  const { data, loading, error, reload } = useLiveApi<Threads | BotPage>(bot ? `/api/mobile/bots/${bot.id}` : '/api/mobile/threads',
+    current => bot ? botPageLive(current as BotPage | null, botId, own, home?.workspace.id) : threadsLive(current as Threads | null, own))
   const devices = data && 'devices' in data ? data.devices : []
   const refresh = useRefresh(reload)
   const [machine, setMachine] = useState<string | null>(null)

@@ -140,8 +140,9 @@ const refreshOrderQuota = (query: Query): RefreshOrderQuota => async (scope, con
 }
 
 /** Each entry's credential, read now. Dispatch refreshes missing/stale allowance
- * once per connection, before deciding; Settings can request a projection only. */
-export async function credentialStates(query: Query, scope: OrderScope, entries: readonly OrderEntry[], candidates: readonly (OrderCandidate & { provider: string; credentialOwnerId?: string })[], now?: number, options: { probe?: boolean; refresh?: RefreshOrderQuota; display?: boolean } = {}) {
+ * once per connection; a final cloud claim can require a fresh usage check.
+ * Settings can request a projection only. */
+export async function credentialStates(query: Query, scope: OrderScope, entries: readonly OrderEntry[], candidates: readonly (OrderCandidate & { provider: string; credentialOwnerId?: string })[], now?: number, options: { probe?: boolean | 'always'; refresh?: RefreshOrderQuota; display?: boolean } = {}) {
   let checkedAt = now ?? Date.now()
   const available = new Set(candidates.map(entryKey))
   // Subscriptions whose account catalogue lists anything: only those can say a model has gone away.
@@ -170,7 +171,7 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
     quotaRefreshes.set(query, pending)
     await Promise.all([...connections.values()].filter(row => row.state === 'connected' && !row.paused && entries.some(entry =>
       entry.source.kind === 'subscription' && entry.source.connectionId === row.id && available.has(entryKey(entry))
-      && subscriptionAvailability(row.quota, entry.model, row.provider, checkedAt).status === 'checking')).map(row => {
+      && (options.probe === 'always' || subscriptionAvailability(row.quota, entry.model, row.provider, checkedAt).status === 'checking'))).map(row => {
       const key = `${scope.ownerId}:${scope.workspaceId}:${row.ownerId}:${row.id}:${row.epoch}`
       let refresh = pending.get(key)
       if (!refresh) {

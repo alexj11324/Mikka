@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import test from "node:test";
+import test, { mock } from "node:test";
 import { factory194Fixture } from "../../tests/helpers/factory194";
 import { factory194Target } from "../../tests/helpers/factory194-target";
 import { FactoryError } from "./approval-contract";
@@ -9,6 +9,10 @@ import { createFactoryApprovals } from "./approval";
 import { handleFactoryApproval } from "./approval-http";
 import { createFactoryMerges, FactoryMergeRefused, type GitHubMergePort, type GitHubPullRequestView } from "./merge";
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
+import { threadGroup } from '../thread-groups'
+import { observePoolCommits } from '../db/commit-effects'
+import type { LiveInvalidation } from '../live/events'
+import type { LiveScope } from '../live/scope'
 
 // #528: acceptance is the person's own merge of the candidate PR. Real
 // PostgreSQL (isolated schema); GitHub is a fixture that records every call.
@@ -58,6 +62,13 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
     await pool.query(await readFile(new URL("../../drizzle/20261101121000_factory_merges.sql", import.meta.url), "utf8"));
 
     await pool.query(await readFile(new URL("../../drizzle/20261103060000_factory_deliverables.sql",import.meta.url),"utf8"));
+    await pool.query(`
+      ALTER TABLE issues ADD COLUMN priority text NOT NULL DEFAULT 'normal', ADD COLUMN "updatedAt" timestamptz NOT NULL DEFAULT now();
+      ALTER TABLE factory_tasks ADD COLUMN "createdAt" timestamptz NOT NULL DEFAULT now(), ADD COLUMN route jsonb;
+      ALTER TABLE factory_attempts ADD COLUMN reason text;
+      CREATE TABLE issue_versions (id uuid PRIMARY KEY,"issueId" uuid NOT NULL,"userId" text NOT NULL,
+        revision integer NOT NULL,title text,content jsonb,status text,priority text,actor_type text,actor_id text);
+    `);
 
     let nextPull = 418;
     async function prepared(pr = `https://github.com/alexj11324/Mikka/pull/${nextPull++}`) {
@@ -74,6 +85,196 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       return { ...x, pr, github, merges, accept, taskState: task, rows };
     }
     const refused = (code: string) => (e: unknown) => e instanceof FactoryMergeRefused && e.code === code;
+
+    async function preparedDeliverable(kind: 'report' | 'deliverable' = 'report') {
+      const x = await prepared();
+      // Production's one independent review flow. These are persisted synthetic
+      // reports and receipts, never claims of live Harness/model acceptance.
+      await pool.query(`UPDATE issues SET status='review' WHERE id=$1`, [x.task.issueId]);
+      await pool.query(`UPDATE factory_tasks SET route='{"flowVersion":2}' WHERE id=$1`, [x.task.id]);
+      const removed = await pool.query(`DELETE FROM factory_attempts WHERE "taskId"=$1 AND stage='verify' RETURNING "runId"`, [x.task.id]);
+      await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [removed.rows.map(row => row.runId)]);
+      await pool.query('UPDATE factory_candidates SET kind=$2,sha=$3 WHERE id=$1', [x.task.candidateId, kind, kind === 'deliverable' ? null : x.candidate.sha]);
+      await pool.query(`UPDATE agent_runs SET report=report || jsonb_build_object('sourceCommit',$2::text)
+        WHERE "issueId"=$1`, [x.task.issueId, x.candidate.sha]);
+      if (kind === 'deliverable') await pool.query(`UPDATE factory_attempts SET evidence=(
+        SELECT jsonb_agg(ref || '{"sha":null}'::jsonb) FROM jsonb_array_elements(evidence) ref)
+        WHERE "taskId"=$1 AND stage IN ('execute','review')`, [x.task.id]);
+      const issue = async () => (await pool.query('SELECT status,revision,title,content,priority FROM issues WHERE id=$1', [x.task.issueId])).rows[0];
+      const history = async () => (await pool.query('SELECT revision,status,title,content,priority,actor_type,actor_id FROM issue_versions WHERE "issueId"=$1 ORDER BY revision', [x.task.issueId])).rows;
+      const receipts = async () => (await pool.query('SELECT id FROM factory_deliverable_acceptances WHERE "taskId"=$1', [x.task.id])).rows;
+      const group = async () => threadGroup({ id: 'independent-review', issueId: x.task.issueId, status: 'succeeded', outcome: null, createdAt: '2026-11-05T00:00:00Z' },
+        { status: (await issue()).status, metadata: { pullRequests: [] } });
+      return { ...x, issue, history, receipts, group };
+    }
+
+    for (const kind of ['report', 'deliverable'] as const) await t.test(`${kind} acceptance commits issue completion and human history, resolving the waiting thread`, async () => {
+      const x = await preparedDeliverable(kind);
+      const before = await x.issue();
+      assert.equal(await x.group(), 'waiting');
+      const eventId = randomUUID();
+      const result = await x.accept(eventId, null);
+      assert.equal(result.status, 'accepted');
+      assert.deepEqual(await x.taskState(), { stage: 'approval', status: 'passed' });
+      assert.deepEqual(await x.issue(), { ...before, status: 'done', revision: before.revision + 1 });
+      assert.deepEqual(await x.history(), [{ ...before, status: 'done', revision: before.revision + 1, actor_type: 'user', actor_id: actor.userId }]);
+      assert.equal(await x.group(), 'resolved', 'an unjudged review does not keep a human-accepted issue waiting');
+      assert.equal(x.github.calls.length, 0, 'accepting a deliverable needs no GitHub credential or write');
+      assert.deepEqual(await x.accept(eventId, null), result, 'the same acceptance returns its durable receipt');
+      assert.equal((await x.receipts()).length, 1);
+      assert.equal((await x.history()).length, 1);
+      assert.equal((await x.issue()).revision, before.revision + 1);
+    });
+
+    await t.test('a failure writing issue history rolls back acceptance, Factory state and issue completion together', async () => {
+      const x = await preparedDeliverable();
+      const before = await x.issue();
+      const eventId = randomUUID();
+      await pool.query(`ALTER TABLE issue_versions ADD CONSTRAINT reject_completion_fixture CHECK(status<>'done') NOT VALID`);
+      try {
+        await assert.rejects(() => x.accept(eventId, null), /reject_completion_fixture/);
+      } finally {
+        await pool.query('ALTER TABLE issue_versions DROP CONSTRAINT reject_completion_fixture');
+      }
+      assert.deepEqual(await x.taskState(), { stage: 'approval', status: 'pending' });
+      assert.deepEqual(await x.issue(), before);
+      assert.equal((await x.receipts()).length, 0);
+      assert.equal((await x.history()).length, 0);
+      assert.equal((await x.accept(eventId, null)).status, 'accepted', 'the rolled-back event can succeed once');
+      assert.equal((await x.history()).length, 1);
+    });
+
+    await t.test('a replaced candidate cannot complete the issue or leave an acceptance receipt', async () => {
+      const x = await preparedDeliverable();
+      const candidateId = randomUUID();
+      await pool.query(`INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,kind)
+        SELECT $2,"taskId",sha,repository,environment,scope,kind FROM factory_candidates WHERE id=$1`, [x.task.candidateId, candidateId]);
+      await pool.query('UPDATE factory_tasks SET "candidateId"=$2,revision=revision+1 WHERE id=$1', [x.task.id, candidateId]);
+      await assert.rejects(() => x.accept(randomUUID(), null), error => error instanceof FactoryError && error.code === 'factoryStale');
+      assert.equal((await x.issue()).status, 'review');
+      assert.equal((await x.receipts()).length, 0);
+      assert.equal((await x.history()).length, 0);
+    });
+
+    async function successor(task: Awaited<ReturnType<typeof prepared>>['task']) {
+      await pool.query(`INSERT INTO factory_tasks (id,"userId","issueId","attemptId",revision,stage,status,"createdAt")
+        SELECT $2,"userId","issueId",$3,1,'execute','pending',"createdAt"+interval '1 second' FROM factory_tasks WHERE id=$1`,
+      [task.id, randomUUID(), randomUUID()]);
+    }
+
+    await t.test('accepted deliverables refresh connected panels only after COMMIT, with no replay, rollback or unchanged-status notification', async () => {
+      const pending: (() => Promise<void>)[] = [];
+      const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = [];
+      const notify = await import('../live/notify');
+      const requestScope = await import('../db/request-scope');
+      const workspace = await import('../workspace-db');
+      const mocks = [
+        mock.module(new URL('../live/notify.ts', import.meta.url).href, { namedExports: { ...notify,
+          scheduleLive: (work: () => Promise<void>) => { pending.push(work); },
+          sendLiveInvalidations: async (scope: LiveScope, events: LiveInvalidation[]) => { sent.push({ scope, events }); },
+        } }),
+        mock.module(new URL('../db/request-scope.ts', import.meta.url).href, { namedExports: { ...requestScope, pool } }),
+        mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { ...workspace, workspacePool: pool } }),
+      ];
+      const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET };
+      process.env.DEVICE_GATEWAY_URL = 'https://gateway.example.invalid';
+      process.env.DEVICE_GATEWAY_PUSH_SECRET = 'isolated-factory-relations-fixture';
+      observePoolCommits(pool);
+      const drain = async () => { await Promise.all(pending.splice(0).map(work => work())); };
+      try {
+        await pool.query(`
+          CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,"userId" text,kind text);
+          CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,status text);
+          CREATE TABLE mikka_team_issues ("issueId" uuid,"workspaceId" uuid);
+        `);
+        const home = randomUUID();
+        await pool.query(`INSERT INTO mikka_workspaces VALUES ($1,$2,'personal')`, [home, actor.userId]);
+        await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,$2,'active')`, [home, actor.userId]);
+        const x = await preparedDeliverable();
+        const parent = randomUUID(), blocked = randomUUID();
+        for (const [id, metadata] of [[parent, {}], [blocked, { blockedByIds: [x.task.issueId] }]] as const) {
+          await pool.query(`INSERT INTO issues(id,"userId",title,content,revision) VALUES($1,$2,'Connected fixture',$3,1)`,
+            [id, actor.userId, JSON.stringify({ type: 'doc', attrs: { mikka: metadata }, content: [] })]);
+        }
+        await pool.query(`UPDATE issues SET content=$2 WHERE id=$1`, [x.task.issueId,
+          JSON.stringify({ type: 'doc', attrs: { mikka: { parentId: parent } }, content: [] })]);
+        const eventId = randomUUID();
+        const accepted = await x.accept(eventId, null);
+        assert.equal(accepted.status, 'accepted');
+        assert.equal((await x.issue()).status, 'done', 'the status is committed before deferred readers run');
+        assert.equal(sent.length, 0, 'no transport runs ahead of the deferred after-COMMIT work');
+        await drain();
+        const relations = sent.flatMap(value => value.events.filter(event => event.kind === 'issue_relations').map(event => event.id)).sort();
+        assert.deepEqual(relations, [x.task.issueId, parent, blocked].sort(), 'the accepted child, parent progress and blocked task all refresh');
+        assert.ok(sent.every(value => value.scope.ownerId === actor.userId && value.scope.workspaceId === home));
+        const delivered = sent.length;
+        assert.deepEqual(await x.accept(eventId, null), accepted);
+        assert.equal(pending.length, 0, 'an idempotent acceptance does not emit another invalidation');
+
+        const rolledBack = await preparedDeliverable();
+        await pool.query(`
+          CREATE FUNCTION reject_live_completion_fixture() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN RAISE EXCEPTION 'reject_live_completion_fixture'; END $$;
+          CREATE CONSTRAINT TRIGGER reject_live_completion_fixture AFTER UPDATE ON issues
+            DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.status='done')
+            EXECUTE FUNCTION reject_live_completion_fixture();
+        `);
+        try {
+          await assert.rejects(() => rolledBack.accept(randomUUID(), null), /reject_live_completion_fixture/);
+        } finally {
+          await pool.query('DROP TRIGGER reject_live_completion_fixture ON issues; DROP FUNCTION reject_live_completion_fixture()');
+        }
+        assert.equal((await rolledBack.issue()).status, 'review');
+        assert.equal((await rolledBack.receipts()).length, 0);
+        assert.equal(pending.length, 0, 'a failed COMMIT drops all registered panel notifications');
+
+        const unchanged = await preparedDeliverable();
+        await successor(unchanged.task);
+        assert.equal((await unchanged.accept(randomUUID(), null)).status, 'accepted');
+        assert.equal((await unchanged.issue()).status, 'review');
+        assert.equal(pending.length, 0, 'accepting older work does not refresh unchanged relation panels');
+        assert.equal(sent.length, delivered);
+      } finally {
+        pending.splice(0);
+        for (const module of mocks.reverse()) module.restore();
+        if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = previous.url;
+        if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret;
+      }
+    });
+
+    await t.test('accepting an older deliverable does not complete a later Factory task on the same issue', async () => {
+      const x = await preparedDeliverable();
+      await successor(x.task);
+      assert.equal((await x.accept(randomUUID(), null)).status, 'accepted');
+      assert.equal((await x.issue()).status, 'review');
+      assert.equal((await x.history()).length, 0);
+      assert.equal(await x.group(), 'waiting');
+    });
+
+    await t.test('replaying acceptance does not close a reopened issue with subsequent work', async () => {
+      const x = await preparedDeliverable();
+      const eventId = randomUUID();
+      const accepted = await x.accept(eventId, null);
+      await successor(x.task);
+      await pool.query(`UPDATE issues SET status='review',revision=revision+1 WHERE id=$1`, [x.task.issueId]);
+      const before = await x.issue();
+      assert.deepEqual(await x.accept(eventId, null), accepted);
+      assert.deepEqual(await x.issue(), before);
+      assert.equal((await x.history()).length, 1);
+    });
+
+    await t.test('acceptance preserves active work and an explicit issue status change', async () => {
+      const active = await preparedDeliverable();
+      await pool.query(`INSERT INTO agent_runs(id,"userId","issueId",status) VALUES($1,$2,$3,'running')`, [randomUUID(), actor.userId, active.task.issueId]);
+      assert.equal((await active.accept(randomUUID(), null)).status, 'accepted');
+      assert.equal((await active.issue()).status, 'review');
+      assert.equal((await active.history()).length, 0);
+      const changed = await preparedDeliverable();
+      await pool.query(`UPDATE issues SET status='canceled' WHERE id=$1`, [changed.task.issueId]);
+      assert.equal((await changed.accept(randomUUID(), null)).status, 'accepted');
+      assert.equal((await changed.issue()).status, 'canceled');
+      assert.equal((await changed.history()).length, 0);
+    });
 
     await t.test("accept → merge with the person's own token, bound to the candidate sha; the task completes", async () => {
       const x = await prepared();

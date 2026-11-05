@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl'
 import { Bot, PanelLeft, Plus, Users } from 'lucide-react'
 import { getCoordinatorChat, type CoordinatorChat } from '@/app/actions/coordinator'
 import { useLiveBotChatList, useLiveGroupList } from '@/hooks/use-live-lists'
+import { observeListRead } from '@/lib/live/list-read'
 import type { BotView } from '@/app/actions/bots'
 import type { Thread } from '@/app/actions/task-runs'
 import type { listIssues } from '@/app/actions/issues'
@@ -119,7 +120,7 @@ export function BotList({ phoneOnly = false, ...props }: ListProps) {
 function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: Omit<ListProps, 'phoneOnly'>) {
   const i18nText = useTranslations()
   const { toggleSidebar, setOpenMobile, open, openMobile, isMobile } = useSidebar()
-  const { data: coordinator } = useSWR<CoordinatorChat>('coordinator-chat', () => getCoordinatorChat())
+  const { data: coordinator } = useSWR<CoordinatorChat>('coordinator-chat', () => observeListRead(() => getCoordinatorChat()))
   // Each bot's latest line gives its row the preview and its place in the list.
   const { data: chatList } = useLiveBotChatList(user.id)
   const chats = chatList?.items ?? {}

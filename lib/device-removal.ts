@@ -4,6 +4,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { pool } from '@/lib/db'
 import { deviceIsOnline } from '@/lib/device-presence'
 import { notifyDeviceWork } from '@/lib/device-gateway-notify'
+import { DEVICE_WORK_CHANNEL, notifyChannel } from '@/lib/db/listen'
 import { DEVICE_UNINSTALL_GRACE_MS, enqueueDeviceCommand } from '@/lib/device-management'
 import { ownerListChanged } from '@/lib/live/lists'
 
@@ -79,6 +80,8 @@ export async function removeOwnedDevice(userId: string, id: unknown): Promise<{ 
     ) SELECT id FROM changed`, [target, userId, Boolean(online), new Date(Date.now() + DEVICE_UNINSTALL_GRACE_MS)])
     await client.query(`UPDATE agents SET "deviceId"=NULL,"updatedAt"=now() WHERE "deviceId"=$1 AND "userId"=$2`, [target, userId])
     await client.query(`UPDATE devices SET "removedAt"=now(),enabled=false,"updatedAt"=now() WHERE id=$1`, [target])
+    // A commands long poll for this device re-checks on COMMIT (lib/db/listen.ts).
+    await notifyChannel(client, DEVICE_WORK_CHANNEL, [target])
     await ownerListChanged(client, userId, ['thread_list', 'device_list'])
     await client.query('COMMIT')
     if (online) notifyDeviceWork(target)

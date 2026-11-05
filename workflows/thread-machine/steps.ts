@@ -1,4 +1,16 @@
-export async function maintainThreadMachine(actor: { userId: string; workspaceId: string }, runId: string) {
+/** The provider pauses an untouched sandbox after 15 minutes; each pass re-arms that. */
+const PROVIDER_IDLE_MS = 15 * 60_000
+/** With nothing to wake it, a live machine is maintained this often: well inside
+ * PROVIDER_IDLE_MS, and the bound on noticing a run that ended without a wake. */
+export const MAINTENANCE_FALLBACK_MS = 5 * 60_000
+
+/**
+ * One maintenance pass. False when the lifecycle is over; otherwise the epoch
+ * ms of the next real deadline (an idle queued machine's pause, or the
+ * provider timeout's refresh). The run row changing wakes it sooner
+ * (lib/live/panels.ts runChanged, lib/workflow-wake.ts).
+ */
+export async function maintainThreadMachine(actor: { userId: string; workspaceId: string }, runId: string): Promise<false | number> {
   'use step'
   const { pool } = await import('@/lib/db')
   const { threadMachineAction } = await import('@/lib/cloud-computer/thread-machines')
@@ -19,15 +31,17 @@ export async function maintainThreadMachine(actor: { userId: string; workspaceId
   }
   if (row.state === 'paused') return false
   if (row.state === 'running' && row.sandboxId) {
-    if (row.status === 'queued' && Date.now() - new Date(row.lastActiveAt).getTime() >= 15 * 60_000) {
+    const idleAt = new Date(row.lastActiveAt).getTime() + PROVIDER_IDLE_MS
+    if (row.status === 'queued' && Date.now() >= idleAt) {
       await threadMachineAction(pool, actor, runId, 'pause')
       return false
     }
     // Do not let the provider's timeout suspend an active native process with
     // a live 90-second run lease. Only an idle, unclaimed machine is paused.
-    await (await connectComputer(actor.workspaceId, row.sandboxId)).setTimeout(15 * 60_000)
+    await (await connectComputer(actor.workspaceId, row.sandboxId)).setTimeout(PROVIDER_IDLE_MS)
+    if (row.status === 'queued') return Math.min(idleAt, Date.now() + MAINTENANCE_FALLBACK_MS)
   }
-  return true
+  return Date.now() + MAINTENANCE_FALLBACK_MS
 }
 
 /** The lifecycle's 12-hour cap: an idle machine is paused (free, kept), an active one is left to its lease. */

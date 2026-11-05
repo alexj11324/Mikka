@@ -32,7 +32,9 @@ export function failureLine(failure: ChatFailure): FailureLine {
       text: { wake_failed: '回复等待重试', wake_start_unconfirmed: '回复启动未确认', wake_exhausted: '回复重试已停止' }[failure.code],
       retry: failure.code === 'wake_exhausted', recovery: null,
     }
-    case 'failed': return { text: '回复失败', retry: true, recovery: null }
+    case 'failed': return failure.reason === 'balance'
+      ? { text: 'API 余额不足', retry: false, recovery: 'model' }
+      : { text: '回复失败', retry: true, recovery: null }
   }
 }
 

@@ -6,7 +6,8 @@ import { chatLine } from '@/lib/chat-line'
 import { shortWhen } from '@/lib/clock'
 import { useHome } from '@/lib/home'
 import type { GroupSummary, HomeBot } from '@/lib/types'
-import { useApi } from '@/lib/useApi'
+import { useLiveApi } from '@/lib/useApi'
+import { listRef } from '@/lib/live'
 import { colors } from '@/lib/theme'
 
 export type ChatRow = { kind: 'bot'; bot: HomeBot; at: string } | { kind: 'group'; group: GroupSummary; at: string }
@@ -14,7 +15,10 @@ export type ChatRow = { kind: 'bot'; bot: HomeBot; at: string } | { kind: 'group
 /** The person's bots and group chats, newest first, matching `needle` by name; and a reload for both. */
 export function useChatRows(needle = '') {
   const home = useHome()
-  const groups = useApi<{ conversations: GroupSummary[] }>(home.data ? `/api/conversations?workspaceId=${home.data.workspace.id}` : null, 30_000)
+  const workspaceId = home.data?.workspace.id ?? null
+  // The web's group list key (hooks/use-live-lists.ts): a message, a member or a read in one of these groups.
+  const groups = useLiveApi<{ conversations: GroupSummary[] }>(workspaceId ? `/api/conversations?workspaceId=${workspaceId}` : null,
+    () => ({ refs: [listRef('group_list', workspaceId)], minIntervalMs: 2_000 }))
   const match = (name: string) => !needle || name.toLowerCase().includes(needle)
   const rows: ChatRow[] = [
     // The Coordinator's bot row is the pinned Coordinator entry, not another row.

@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { enqueueGroupTurn, GROUP_TURN_STOPPED, stopGroupTurns } from './coordinator/group-turns'
 import { groupParticipants, type GroupParticipant } from './group-participants'
 import { groupListChanged, groupListReadChanged } from './live/lists'
+import { groupChatChanged } from './live/groups'
 
 const member = z.object({ memberType: z.enum(['user', 'agent', 'bot']), memberId: z.string().min(1).max(256) }).strict()
 const create = z.object({ workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]), leadAgentId: z.uuid().nullable().optional(), leadBotId: z.uuid().nullable().optional() }).strict().refine(input => !input.leadAgentId || !input.leadBotId)
@@ -139,6 +140,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         }
         await q('UPDATE conversations SET "leadAgentId"=$2,"leadBotId"=$3 WHERE id=$1', [req.id, bot ? null : id, bot ? id : null])
         await groupListChanged(client, group.id)
+        await groupChatChanged(client, group.id)
         result = { id: req.id, leadAgentId: bot ? null : id, leadBotId: bot ? id : null }
       } else if (req.resource === 'stop' && req.method === 'POST') {
         // 停止: any member may stop the reply the group is waiting on; what was already posted stays.
@@ -208,6 +210,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         const id = randomUUID(), position = positions[0].position
         const { rows } = await q('INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body,mentions,"replyToId") VALUES ($1,$2,$3,\'user\',$4,$5,$6,$7) RETURNING *', [id, req.id, position, userId, input.body, JSON.stringify(input.mentions), input.replyToId ?? null])
         await groupListChanged(client, group.id)
+        await groupChatChanged(client, group.id)
         if (queueAgents) await enqueueGroupTurn(client, req.id!, id, userId)
         result = rows[0]; status = 201
       } else if (req.resource === 'members' && req.method === 'GET') {
@@ -234,6 +237,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
           await q('UPDATE conversation_members SET "leftAt"=now() WHERE "conversationId"=$1 AND "memberType"=$2 AND "memberId"=$3', [req.id, input.memberType, input.memberId])
         }
         await groupListChanged(client, group.id, req.method === 'DELETE' && input.memberType === 'user' ? input.memberId : null)
+        await groupChatChanged(client, group.id)
         result = { ok: true }
       } else return fail(405)
     }
