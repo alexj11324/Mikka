@@ -1,0 +1,106 @@
+{
+  "observedAt": "2026-11-05T01:19:27Z",
+  "head": "520c397e2f58cdc69dd5c6d75f6e8d83ffe2b103",
+  "source": "GitHub workflow-runs API, selected metadata fields",
+  "runs": [
+    {
+      "id": 41946625369,
+      "name": "Device gateway",
+      "head_sha": "520c397e2f58cdc69dd5c6d75f6e8d83ffe2b103",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-05T01:10:06Z",
+      "updated_at": "2026-11-05T01:11:11Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/41946625369"
+    },
+    {
+      "id": 41946625434,
+      "name": "Cloud computer backend",
+      "head_sha": "520c397e2f58cdc69dd5c6d75f6e8d83ffe2b103",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-05T01:10:06Z",
+      "updated_at": "2026-11-05T01:11:19Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/41946625434"
+    },
+    {
+      "id": 41946625372,
+      "name": "E2B official instance runtime",
+      "head_sha": "520c397e2f58cdc69dd5c6d75f6e8d83ffe2b103",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-05T01:10:06Z",
+      "updated_at": "2026-11-05T01:10:31Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/41946625372"
+    },
+    {
+      "id": 41946625464,
+      "name": "Browser gate",
+      "head_sha": "520c397e2f58cdc69dd5c6d75f6e8d83ffe2b103",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-05T01:10:06Z",
+      "updated_at": "2026-11-05T01:10:18Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/41946625464"
+    },
+    {
+      "id": 41946625331,
+      "name": "Analytics SSR",
+      "head_sha": "520c397e2f58cdc69dd5c6d75f6e8d83ffe2b103",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-05T01:10:06Z",
+      "updated_at": "2026-11-05T01:13:39Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/41946625331"
+    },
+    {
+      "id": 41946625281,
+      "name": "Credential vault backend",
+      "head_sha": "520c397e2f58cdc69dd5c6d75f6e8d83ffe2b103",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-05T01:10:05Z",
+      "updated_at": "2026-11-05T01:11:13Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/41946625281"
+    },
+    {
+      "id": 41946625275,
+      "name": "Unattended sandbox acceptance",
+      "head_sha": "520c397e2f58cdc69dd5c6d75f6e8d83ffe2b103",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-05T01:10:05Z",
+      "updated_at": "2026-11-05T01:12:10Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/41946625275"
+    },
+    {
+      "id": 41946625287,
+      "name": "E2B subscription custody",
+      "head_sha": "520c397e2f58cdc69dd5c6d75f6e8d83ffe2b103",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-05T01:10:05Z",
+      "updated_at": "2026-11-05T01:15:28Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/41946625287"
+    },
+    {
+      "id": 41946625297,
+      "name": "CI",
+      "head_sha": "520c397e2f58cdc69dd5c6d75f6e8d83ffe2b103",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-05T01:10:05Z",
+      "updated_at": "2026-11-05T01:16:19Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/41946625297"
+    }
+  ]
+}

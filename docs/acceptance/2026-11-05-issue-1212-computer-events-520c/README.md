@@ -34,7 +34,7 @@ Each task-owned base database was checked for zero remaining connections, droppe
 
 The source replaces database-polling SSE with bounded authorized incremental reads and committed notifications. It does not change control/Stop authorization. C's event cursor and commit-order lock remain intact, as do broker isolation and fresh-session checks.
 
-The original b127 UI and CI evidence stays historical. Current exact-head CI and a new local production build/capture are being collected separately. This packet establishes source integration and the stated local checks only.
+The original b127 UI and CI evidence stays historical. At 2026-11-05T01:19:27Z, exact-head GitHub checks were complete: 29 total, 24 success and 5 conditional skips, with zero pending or failing checks. All nine associated workflows completed successfully. Selected original GitHub metadata is retained under ci/. A second agent independently reviewed all 29 local and GitHub blobs and the integration; see independent-review.md. A new local production build/capture is still being collected separately. This packet establishes source integration and the stated local checks only.
 
 The draft PR is not ready to merge: the issue body still requires a fixed real task for one hour before and after, matching Vercel route counts and PostHog/Neon traffic, then Web deploy, an exact public version pin and real production acceptance. None of those is inferred from these local fixtures.
 
