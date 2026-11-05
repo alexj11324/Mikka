@@ -1,6 +1,5 @@
-import { View } from 'react-native'
+import { Platform, View } from 'react-native'
 import { useRouter, type Href } from 'expo-router'
-import { X } from 'lucide-react-native'
 import { AccountList } from '@/components/AccountList'
 import { NavBar } from '@/components/NavBar'
 import { colors } from '@/lib/theme'
@@ -14,7 +13,8 @@ export default function Account() {
   const go = (href: Href) => { router.back(); router.push(href) }
   return (
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>
-      <NavBar title="账户" right={{ icon: 'xmark', label: '完成', web: <X size={20} color={colors.ink} />, onPress: () => router.back() }} />
+      {/* As 设置's sheet: 关闭 on iOS; the web build's bar already has its back button. */}
+      <NavBar title="账户" right={Platform.OS === 'ios' ? { icon: 'xmark', label: '关闭', web: null, onPress: () => router.back() } : undefined} />
       <AccountList go={go} />
     </View>
   )
