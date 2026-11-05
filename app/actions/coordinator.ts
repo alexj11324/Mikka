@@ -147,13 +147,15 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
   })
 }
 
-/** A bounded older page overlaps the first rendered item, preserving multi-step reply grouping. */
-export async function coordinatorHistory(botId: string | null, through: number): Promise<ChatView> {
+/** A bounded older page overlaps the first rendered item, preserving multi-step reply grouping. The app's pages are
+ * `CHAT_FIRST_PAGE` long; at most 200. */
+export async function coordinatorHistory(botId: string | null, through: number, limit = 200): Promise<ChatView> {
   z.number().int().min(0).parse(through)
+  z.number().int().min(1).max(200).parse(limit)
   return withDatabaseOperation('/actions/coordinator/history', async () => {
     const user = await getUser()
     const bot = await ownBot(user, botId)
-    return chatView(user.id, 200, bot.id, { through })
+    return chatView(user.id, limit, bot.id, { through })
   })
 }
 
