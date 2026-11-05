@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { wireKeys } from './wire-keys.test-support'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import test, { mock } from 'node:test'
@@ -30,8 +31,7 @@ test('the device list key reaches only the owner home, after real device writers
     if (!target.pathname.startsWith('/v1/live/')) return new Response(JSON.stringify({ online: false }), { status: 200 })
     const scope = channelScopes.get(target.pathname)
     if (!scope) unexpected.push(target.pathname)
-    const events: LiveInvalidation[] = JSON.parse(String(options?.body))
-    for (const event of events) assert.deepEqual(Object.keys(event).sort(), ['id', 'kind'], 'a key carries a kind and an id only')
+    const events: LiveInvalidation[] = wireKeys(JSON.parse(String(options?.body)), 'a key carries a kind and an id only')
     const devices = events.filter(event => event.kind === 'device_list')
     if (devices.length) sent.push({ scope: scope ?? { ownerId: 'unexpected', workspaceId: target.pathname }, events: devices })
     return new Response(null, { status: 204 })

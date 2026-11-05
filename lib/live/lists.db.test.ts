@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { wireKeys } from './wire-keys.test-support'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { readFile, readdir } from 'node:fs/promises'
@@ -60,9 +61,8 @@ test('real PG: lists retain their reader scope and publish only the originating 
       assert.equal(request.headers.authorization, 'Bearer fixture-only-list-live')
       const target = channels.get(request.url!); assert.ok(target, 'only a known fixture scope may receive a key')
       let body = ''; for await (const chunk of request) body += chunk.toString()
-      const events: LiveInvalidation[] = JSON.parse(body)
+      const events: LiveInvalidation[] = wireKeys(JSON.parse(body))
       for (const event of events) {
-        assert.deepEqual(Object.keys(event).sort(), ['id', 'kind'])
         assert.equal(event.id, target.workspaceId, 'list events never expose a run, Bot, issue or group ID')
       }
       const row = await database.query('SELECT status FROM agent_runs WHERE id=$1', [observedRunId])

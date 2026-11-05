@@ -1,3 +1,4 @@
+import { wireKeys } from '../lib/live/wire-keys.test-support'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
@@ -384,7 +385,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
             assert.equal(request.url, `/v1/live/${liveChannelId({ ownerId: f.userId, workspaceId: f.workspaceId })}/push`)
             const chunks: Buffer[] = []
             for await (const chunk of request) chunks.push(Buffer.from(chunk))
-            browserReceived.push(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+            browserReceived.push(wireKeys(JSON.parse(Buffer.concat(chunks).toString('utf8'))))
           }
           response.writeHead(204).end()
         } catch (error) {
