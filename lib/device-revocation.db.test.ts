@@ -191,6 +191,40 @@ test('a long poll loses token authority within its five-second database polling 
   assert.ok(Date.now() - started < longPollIdleCheck.ms + 1500)
 })
 
+test('with push, revocation ends a waiting long poll on its NOTIFY, long before any timer; a lost NOTIFY still fails it at the deadline', async t => {
+  // Push is on when the gateway is configured; this address refuses at once, so the gateway wake itself is a no-op here.
+  const saved = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
+  process.env.DEVICE_GATEWAY_URL = 'http://127.0.0.1:9'
+  process.env.DEVICE_GATEWAY_PUSH_SECRET = 'revocation-test-only'
+  t.after(() => {
+    for (const [name, value] of [['DEVICE_GATEWAY_URL', saved.url], ['DEVICE_GATEWAY_PUSH_SECRET', saved.secret]] as const) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value
+    }
+  })
+  assert.equal(longPollIdleCheck.ms, 5_000)
+  const poll = (f: Fixture, wait: number) => scope.run(() => commands(new Request(`http://127.0.0.1/mikka/v1/devices/${f.device}/commands?wait=${wait}`, {
+    headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${f.token}` },
+  }), { params: Promise.resolve({ deviceId: f.device }) }))
+
+  const pushed = await fixture()
+  await raw.query(`UPDATE agent_runs SET status='succeeded' WHERE id=$1`, [pushed.run])
+  const waiting = poll(pushed, 20)
+  await delay(500)
+  const revokedAt = Date.now()
+  await revokeDeviceCredential(raw, pushed.owner, pushed.tokenId)
+  assert.equal((await waiting).status, 401)
+  assert.ok(Date.now() - revokedAt < 1_000, `revocation reached the poll in ${Date.now() - revokedAt} ms, not on a 5 s check`)
+
+  // The same revocation without its NOTIFY (a lost push): the final check at the deadline still refuses.
+  const lost = await fixture()
+  const started = Date.now()
+  const late = poll(lost, 3)
+  await delay(500)
+  await raw.query('UPDATE device_tokens SET "revokedAt"=clock_timestamp(),"revokedBy"=$2 WHERE id=$1', [lost.tokenId, lost.owner])
+  assert.equal((await late).status, 401)
+  assert.ok(Date.now() - started >= 2_500 && Date.now() - started < 5_000, 'refused by the deadline check')
+})
+
 test('existing device removal still refuses live work, then records revocation without deleting history', async () => {
   const f = await fixture()
   await raw.query('INSERT INTO device_token_devices ("tokenId","deviceId","userId") VALUES($1,$2,$3)', [f.tokenId, f.device, f.owner])

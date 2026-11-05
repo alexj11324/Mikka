@@ -1,6 +1,6 @@
 import { handoffStage, finishQuestionWakeStep, questionWakeStillOwns } from './steps'
-import { getWorkflowMetadata, sleep } from 'workflow'
-import { maintainThreadMachine, pauseAtCap } from '../thread-machine/steps'
+import { getWorkflowMetadata } from 'workflow'
+import { maintainUntilCap } from '../thread-machine/lifecycle'
 import type { QuestionWake } from '@/lib/factory/questions/wake'
 
 export async function factoryCloudStageHandoff(actor: { userId: string; workspaceId: string }, previousRunId: string | null, runId: string, providerContinuation = false, questionWake?: QuestionWake) {
@@ -15,10 +15,6 @@ export async function factoryCloudStageHandoff(actor: { userId: string; workspac
   if (questionWake && workflowRunId) await finishQuestionWakeStep(actor, runId, questionWake, workflowRunId, false)
   // This same durable execution owns maintenance, including after a handoff
   // step response was lost. No second lifecycle is started during step replay.
-  for (let step = 0; step < 1440; step++) {
-    if (questionWake && workflowRunId && !await questionWakeStillOwns(actor, runId, questionWake, workflowRunId)) return
-    if (!await maintainThreadMachine(actor, runId)) return
-    await sleep('30s')
-  }
-  await pauseAtCap(actor, runId)
+  // A newer question wake taking the run over nudges this one (workflows/wake.ts), which then stops.
+  await maintainUntilCap(actor, runId, questionWake && workflowRunId ? () => questionWakeStillOwns(actor, runId, questionWake, workflowRunId) : undefined)
 }

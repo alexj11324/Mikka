@@ -7,7 +7,9 @@ import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
 import type { Task } from '@/lib/types'
-import { useApi, useRefresh } from '@/lib/useApi'
+import { useLiveApi, useRefresh } from '@/lib/useApi'
+import { tasksLive } from '@/lib/live-keys'
+import { useHome } from '@/lib/home'
 import { openOnWeb } from '@/lib/web'
 import { colors } from '@/lib/theme'
 
@@ -32,7 +34,8 @@ function TaskIcon({ status }: { status: string }) {
 /** 任务: a list grouped by status; no board on mobile (mobile.md, out of scope). */
 export default function TasksScreen() {
   const insets = useSafeAreaInsets()
-  const { data, error, loading, reload } = useApi<{ tasks: Task[] }>('/api/mobile/tasks', 30_000)
+  const home = useHome().data
+  const { data, error, loading, reload } = useLiveApi<{ tasks: Task[] }>('/api/mobile/tasks', () => tasksLive(home?.live?.workspaceId, home?.workspace.id))
   const refresh = useRefresh(reload)
   const sections = SECTIONS.map(s => ({ title: s.title, data: (data?.tasks ?? []).filter(t => s.status.includes(t.status)) })).filter(s => s.data.length)
   return (

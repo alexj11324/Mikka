@@ -16,7 +16,12 @@ export interface Home {
   bots: HomeBot[]
   threads: { running: number; waiting: number }
   suggestions: number
+  /** The person's own home channel for live keys (lib/live.ts); absent from a server older than it. */
+  live?: LiveScope
 }
+
+/** Where a read's live keys arrive: the reader's id and the channel's workspace (null: none, read once a minute). */
+export interface LiveScope { ownerId: string; workspaceId: string | null }
 
 export interface IssueSource { kind: 'issue'; id: string; identifier: string | null; number: number | null; title: string; status: string }
 export interface RunSource {
@@ -68,6 +73,8 @@ export interface Chat {
   reactions?: Record<string, Reaction[]>
   /** Why the last reply did not come (lib/chat-failure.ts on the server); null while working or when nothing failed. */
   failure?: ChatFailure | null
+  /** Its live key's channel, and while a reply is coming the moment its lease runs out. */
+  live?: LiveScope & { deadline?: { at: string; afterMs: number } }
 }
 
 /** lib/chat-failure.ts on the server. */
@@ -87,6 +94,8 @@ export interface GroupSummary {
   createdAt: string
   lastMessage: GroupMessage | null
   unreadCount: string
+  /** The workspace it lives in: its members' live keys arrive on that channel. */
+  workspaceId?: string
 }
 
 /** One message in a group chat; `position` is a string (a bigint). */
@@ -135,7 +144,7 @@ export interface BotPage {
 }
 
 /** A bot's cloud computer (GET /api/bots/<id>/computer), as far as the app shows it. */
-export interface ComputerStatus { machine: 'sleeping' | 'waking' | 'running' | 'error'; control: 'agent' | 'user' | 'idle' }
+export interface ComputerStatus { machine: 'sleeping' | 'waking' | 'running' | 'error'; control: 'agent' | 'user' | 'idle'; /** Its live key's channel and next silent change (lib/computer/state-deadline.ts). */ live?: { workspaceId: string; deadline?: { at: string; afterMs: number } } }
 
 export interface Threads { threads: Thread[]; devices: { id: string; name: string; kind: MachineKind; online: boolean }[] }
 
@@ -147,7 +156,7 @@ export type ThreadItem =
 
 /** A thread paused because its subscription ran out (the web's ThreadQuotaPausedCard). */
 export interface ThreadPaused { runId: string; subscription: 'claude' | 'codex'; plan: string | null; resetsAt: string | null; keyReady: boolean }
-export interface ThreadDetail { thread: Thread; active: boolean; /** Generating or running, not waiting for an answer: only then does the composer's button stop. */ working?: boolean; paused?: ThreadPaused | null; summary: string | null; error: string | null; items: ThreadItem[] }
+export interface ThreadDetail { /** Each run's live channel (lib/live/panels.ts threadLiveReferences); absent from a server older than it. */ live?: { runs: { id: string; workspaceId: string | null }[] }; thread: Thread; active: boolean; /** Generating or running, not waiting for an answer: only then does the composer's button stop. */ working?: boolean; paused?: ThreadPaused | null; summary: string | null; error: string | null; items: ThreadItem[] }
 
 export interface Suggestion { id: string; source: Source; action: string; title: string; url: string | null; actor: string | null; occurredAt: string }
 export interface Suggestions { groups: { source: Source; items: Suggestion[] }[] }

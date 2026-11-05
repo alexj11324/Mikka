@@ -11,6 +11,8 @@ import type { RunCommand } from '@mikka/protocol/device'
 import type { DeviceCommandKind } from '@/lib/device-management'
 import { deviceRequestCaller } from '@/lib/device-request-context'
 import { ackMailboxNotices, pendingMailboxNotices } from '@/lib/device-mailbox-notices'
+import { DEVICE_WORK_CHANNEL, subscribeShared } from '@/lib/db/listen'
+import { deviceGatewayEndpoint } from '@/lib/device-gateway-client'
 
 /**
  * The single workspace this MVP serves. The protocol's register answer
@@ -160,6 +162,18 @@ export async function linkDeviceToken(caller: Pick<DeviceCaller, 'userId' | 'tok
  * asserted without waiting the full 5 s.
  */
 export const longPollIdleCheck = { ms: 5_000 }
+
+/**
+ * LISTEN for this device's work and for its credential's revocation, on one
+ * shared session per process (#1212). Only with the gateway configured: then
+ * every write that gives a device work calls notifyDeviceWork, which also
+ * NOTIFYs here. Null without it, or when LISTEN is unavailable; the long poll
+ * then keeps its longPollIdleCheck timer.
+ */
+export async function deviceWorkSubscription(deviceId: string, tokenId: string) {
+  if (!deviceGatewayEndpoint(deviceId, 'push')) return null
+  return subscribeShared(pool, DEVICE_WORK_CHANNEL, [deviceId, `token:${tokenId}`]).catch(() => null)
+}
 
 export async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   try { await delay(ms, undefined, { signal }) }
