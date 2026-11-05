@@ -3313,7 +3313,7 @@
       "expandAll": "全部展开",
       "collapseAll": "全部收起",
       "detail": {
-        "handedTo": "交给 {agent}",
+        "handedTo": "交给",
         "query": "查询",
         "count": "结果",
         "countValue": "{count, plural, other {# 条}}",
@@ -3324,15 +3324,7 @@
         "subject": "主题",
         "repository": "仓库",
         "raw": "原始数据",
-        "states": {
-          "queued": "排队中",
-          "preparing": "准备中",
-          "running": "运行中",
-          "waiting_input": "等待输入",
-          "succeeded": "已完成",
-          "failed": "失败",
-          "stopped": "已停止"
-        }
+        "dispatched": "已派发"
       }
     }
   },

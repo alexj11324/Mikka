@@ -252,36 +252,58 @@ test('readable reasoning opens under 「思考了 N 秒」, live and stored alik
   } finally { try { await view.unmount() } catch { /* already unmounted */ } }
 })
 
-test('an opened dispatch reads 「Handed to」 its agent, the thread chip with its state and the note as a quote, never ids or JSON (R-83)', async () => {
+test('an opened dispatch reads 「Handed to」 its coding agent and its thread chip, then the note as a quote; never ids, JSON or the task (R-83)', async () => {
   const { ReplyActivity } = await import('../components/coordinator/reply-activity')
   const { AgentCitationsContext } = await import('../components/workspace/agent-citations')
+  const { jsonbText } = await import('../lib/coordinator/context')
   const view = await mount()
   const settle = async (done: () => boolean) => { for (let tries = 0; tries < 100 && !done(); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20))) }
-  const note = 'Reproduce the redirect loop on sign-in.\nCheck the callback URL.\nFix it and add a test.\nOpen a PR.'
-  const dispatch = { call: 'd1', name: 'dispatch_run', state: 'done' as const,
-    input: JSON.stringify({ issueId: TASK, botId: '3c3aa707-0000-4c22-b322-0000000000d4', note }),
-    output: JSON.stringify({ runId: THREAD, status: 'queued' }) }
-  const citations = { ...base, sources: { ...known, [THREAD]: { ...thread, status: 'queued' } satisfies CitationSource } }
+  const open = async (selector = '[data-activity-tool] button') => {
+    await act(async () => { (view.container.querySelector(selector) as HTMLButtonElement).click() })
+    await settle(() => Boolean(view.container.querySelector('[data-activity-detail]')))
+  }
+  // A long note, in jsonb's key order and cut at 200 characters as the chat gets it: the note comes first and is cut.
+  const note = 'Reproduce the redirect loop on sign-in with a fresh account, check the callback URL the provider sends back against the one we register, fix the mismatch, add a regression test for it, and open a PR.'
+  const input = jsonbText({ issueId: TASK, botId: '3c3aa707-0000-4c22-b322-0000000000d4', note }).slice(0, 200)
+  const dispatch = { call: 'd1', name: 'dispatch_run', state: 'done' as const, input, quote: note, output: jsonbText({ runId: THREAD, status: 'queued' }) }
+  const citations = { ...base, sources: { ...known, [THREAD]: thread } }
   try {
     await view.render(<AgentCitationsContext value={citations}><ReplyActivity tools={[dispatch]} /></AgentCitationsContext>)
-    await act(async () => { (view.container.querySelector('[data-activity-tool] button') as HTMLButtonElement).click() })
-    await settle(() => Boolean(view.container.querySelector('[data-activity-detail]')))
-    const detail = view.container.querySelector('[data-activity-detail]')
-    const words = detail?.textContent ?? ''
-    assert.match(words, /^Handed to Worker/, 'who it went to comes first, the note under it')
-    const chip = detail?.querySelector('[data-activity-thread] [data-slot="inline-citation-trigger"]')
+    await open()
+    const detail = () => view.container.querySelector('[data-activity-detail]')
+    assert.match(detail()?.textContent ?? '', /^Handed toClaude Code/, 'who it went to first: the coding agent, never the bot')
+    const chip = detail()?.querySelector('[data-activity-thread] [data-slot="inline-citation-trigger"]')
     assert.match(chip?.textContent ?? '', /Fix sign-in redirect/, 'the thread as its chip')
-    // Its state as the thread list groups it (R-52): a queued thread is in 「Running」.
-    assert.match(detail?.querySelector('[data-activity-thread]')?.textContent ?? '', /Running$/, 'with its state')
-    const quote = detail?.querySelector('[data-activity-quote]')
-    assert.equal(quote?.textContent, note, 'the note, whole in the page, three lines until opened')
-    assert.match(quote?.firstElementChild?.className ?? '', /line-clamp-3/)
-    await act(async () => { (quote as HTMLButtonElement).click() })
-    assert.doesNotMatch(view.container.querySelector('[data-activity-quote] > span')?.className ?? '', /line-clamp-3/, 'opened, the whole note')
+    assert.equal(detail()?.querySelectorAll('[data-slot="inline-citation-trigger"]').length, 1, 'one chip: the thread; the task is not drawn (R-15)')
+    assert.equal(detail()?.querySelectorAll('[data-slot="badge"]').length, 0, 'no second state badge beside the chip')
+    const quote = detail()?.querySelector('[data-activity-quote]')
+    assert.equal(quote?.textContent, note, 'the whole note, from the call\'s own quote, though the input preview cut it')
+    assert.match(quote?.querySelector('span')?.className ?? '', /line-clamp-3/)
     const shown = view.container.textContent ?? ''
     assert.doesNotMatch(shown, /"runId"|\{/, 'no raw JSON until 「Raw data」 is opened')
     assert.doesNotMatch(shown, MARKUP, 'no ids')
     assert.ok(view.container.querySelector('[data-activity-raw]'), 'the raw data is there, folded')
+
+    // A thread the chat has not loaded: who it went to and its state in words, as the thread list groups it (R-52).
+    await view.render(<AgentCitationsContext value={{ ...base, sources: known }}><ReplyActivity key="unloaded" tools={[{ ...dispatch, output: jsonbText({ runId: THREAD, status: 'queued', harness: 'codex' }) }]} /></AgentCitationsContext>)
+    await open()
+    assert.equal(detail()?.querySelector('[data-activity-thread]')?.textContent, 'Handed toCodex· Running')
+
+    // A failed call says nothing in words and draws no quote: its row names the reason.
+    const failed = { call: 'm1', name: 'send_email', state: 'done' as const, input: jsonbText({ to: 'a@example.com', subject: 'Hi', body: 'Hello there' }), output: '{"error": "forbidden"}' }
+    await view.render(<AgentCitationsContext value={citations}><ReplyActivity key="failed" tools={[failed]} /></AgentCitationsContext>)
+    await act(async () => { (view.container.querySelector('[data-activity-tool="error"] button') as HTMLButtonElement).click() })
+    await settle(() => Boolean(view.container.querySelector('[data-activity-raw]')))
+    assert.equal(view.container.querySelector('[data-activity-detail]'), null)
+    assert.doesNotMatch(view.container.querySelector('[data-activity-tool="error"]')?.textContent ?? '', /a@example\.com|Hello there|error: forbidden/)
+
+    // Inside a group, an opened row reads the same.
+    await view.render(<AgentCitationsContext value={citations}><ReplyActivity key="group" tools={[{ call: 'g1', name: 'get_issue', state: 'done' as const, input: '{"identifier": "MIK-1"}' }, dispatch]} /></AgentCitationsContext>)
+    await act(async () => { (view.container.querySelector('[data-activity-group] button') as HTMLButtonElement).click() })
+    await settle(() => view.container.querySelectorAll('[data-activity-tool]').length === 2)
+    await open('[data-activity-tool]:nth-child(2) button')
+    assert.match(detail()?.textContent ?? '', /^Handed toClaude Code/)
+    assert.equal(detail()?.querySelector('[data-activity-quote]')?.textContent, note)
   } finally { await view.unmount() }
 })
 

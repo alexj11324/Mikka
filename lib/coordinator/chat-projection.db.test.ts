@@ -16,6 +16,7 @@ const dbTest = databaseUrl ? test : test.skip
 
 const runId = randomUUID()
 const thinking = 'Weighing which thread fits. '.repeat(400)
+const note = 'Fix the login redirect and add a regression test. '.repeat(30).trim()
 const bigOutput = { type: 'json', value: { rows: Array.from({ length: 300 }, (_, i) => ({ i, title: `Issue number ${i} with a long title` })) } }
 /** The shapes stored turns have in production (AI SDK model messages plus Mikka fields). */
 function conversation(): Record<string, unknown>[] {
@@ -24,7 +25,7 @@ function conversation(): Record<string, unknown>[] {
     { role: 'assistant', mikkaStreamId: 'stream-1', content: [
       { type: 'reasoning', text: thinking },
       { type: 'tool-call', toolCallId: 'call-1', toolName: 'list_issues', input: { query: 'login '.repeat(100) } },
-      { type: 'tool-call', toolCallId: 'call-2', toolName: 'dispatch_run', input: { issueId: randomUUID(), prompt: 'Fix login' } },
+      { type: 'tool-call', toolCallId: 'call-2', toolName: 'dispatch_run', input: { issueId: randomUUID(), note } },
     ] },
     { role: 'tool', content: [
       { type: 'tool-result', toolCallId: 'call-1', toolName: 'list_issues', output: bigOutput },
@@ -38,7 +39,7 @@ function conversation(): Record<string, unknown>[] {
 }
 
 dbTest('the chat reads compact parts and shows exactly what the full messages show', async t => {
-  const [{ createRequestDatabaseScope, db }, schema, store, { chatItems }, { compactChatMessage, TOOL_PREVIEW_CHARS }, { asc, eq, and, sql }] = await Promise.all([
+  const [{ createRequestDatabaseScope, db }, schema, store, { chatItems, QUOTE_PREVIEW_CHARS }, { compactChatMessage, TOOL_PREVIEW_CHARS }, { asc, eq, and, sql }] = await Promise.all([
     import('../db'), import('../db/schema'), import('./store'), import('./context'), import('./chat-projection'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
@@ -64,6 +65,7 @@ dbTest('the chat reads compact parts and shows exactly what the full messages sh
     assert.deepEqual(view.items, chatItems(full as never), 'the chat items are the same as from the full messages')
     assert.deepEqual(view.persistedStreamIds, ['stream-1'])
     assert.ok(view.items.some(item => item.threads.includes(runId)), 'the dispatched thread still shows')
+    assert.ok(view.items.some(item => item.activity?.tools.some(tool => tool.quote === `${note.slice(0, QUOTE_PREVIEW_CHARS).trimEnd()}…`)), 'the chat shows the note to its limit, then an ellipsis')
 
     const compact = (await db.select({ message: compactChatMessage }).from(schema.coordinatorMessages).where(mine).orderBy(asc(schema.coordinatorMessages.position))).map(row => row.message)
     const calls = compact[1].content as { inputPreview: string }[]
@@ -72,8 +74,9 @@ dbTest('the chat reads compact parts and shows exactly what the full messages sh
     assert.deepEqual(compact[1], { role: 'assistant', mikkaStreamId: 'stream-1', content: [
       { type: 'reasoning', chars: thinking.length },
       { type: 'tool-call', toolCallId: 'call-1', toolName: 'list_issues', inputPreview: calls[1].inputPreview },
-      { type: 'tool-call', toolCallId: 'call-2', toolName: 'dispatch_run', inputPreview: calls[2].inputPreview },
+      { type: 'tool-call', toolCallId: 'call-2', toolName: 'dispatch_run', inputPreview: calls[2].inputPreview, quotePreview: note.slice(0, QUOTE_PREVIEW_CHARS + 1) },
     ] })
+    assert.ok(calls[2].inputPreview.startsWith('{"note": '), 'the note leads the cut input preview; the quote carries it apart')
     const results = compact[2].content as Record<string, unknown>[]
     assert.equal((results[0].outputPreview as string).length, TOOL_PREVIEW_CHARS)
     assert.deepEqual({ ...results[0], outputPreview: undefined }, { type: 'tool-result', toolCallId: 'call-1', toolName: 'list_issues', status: 'done', outputPreview: undefined })

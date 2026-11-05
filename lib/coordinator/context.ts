@@ -307,12 +307,35 @@ export function instructionsWithPersonal(instructions: string, personal: string)
 /** One entry in the chat the person sees. */
 /** A tool a reply used, as the chat shows it: `running` until its result is stored. */
 /** `at`: how much of the reply's text came before this tool ran, so the chat draws it after those words. */
-export interface ChatTool { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string; at?: number }
+/** `quote`: what the call was asked to do in words (a dispatch's note), whole up to QUOTE_PREVIEW_CHARS, sent apart from `input` so a cut preview never loses it. */
+export interface ChatTool { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string; quote?: string; at?: number }
 /** `reasoningAt`: the stored rows whose reasoning is readable text, fetched only when the person opens it (chat-projection.ts keeps its length). */
 export interface ChatActivity { tools: ChatTool[]; thought: boolean; reasoningAt?: number[] }
 
+/** The input fields that say in words what a call was asked to do, in the order the chat looks for them. */
+export const QUOTE_KEYS = ['note', 'prompt', 'instruction', 'message', 'request', 'text', 'body'] as const
+export const QUOTE_PREVIEW_CHARS = 1000
+
+/** A quote as the chat may show it: trimmed, and cut with an ellipsis past QUOTE_PREVIEW_CHARS. */
+export function quotePreview(text: unknown): string | undefined {
+  if (typeof text !== 'string' || !text.trim()) return undefined
+  const whole = text.trim()
+  return whole.length > QUOTE_PREVIEW_CHARS ? `${whole.slice(0, QUOTE_PREVIEW_CHARS).trimEnd()}…` : whole
+}
+
+/** The first of QUOTE_KEYS a tool input holds as text, as the chat's quote. */
+export function toolQuote(input: unknown): string | undefined {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return undefined
+  for (const key of QUOTE_KEYS) { const quote = quotePreview((input as Record<string, unknown>)[key]); if (quote) return quote }
+  return undefined
+}
+
 function withPreview<K extends 'input' | 'output'>(key: K, text: string | undefined): Partial<Record<K, string>> {
   return text ? { [key]: text } as Record<K, string> : {}
+}
+
+function withQuote(quote: string | undefined): { quote?: string } {
+  return quote ? { quote } : {}
 }
 
 /** A tool input or output as the chat's short preview: the compact projection's, or the start of the full value. */
@@ -466,7 +489,8 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       const cited = takeArtifacts(parts.flatMap(part => part.type === 'text' && part.text.trim() && part.text.trim() !== QUIET_REPLY ? [part.text.trim()] : []).join('\n\n'))
       const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) ? [part.toolName] : [])
       const steps = parts.flatMap((part): ChatTool[] => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName)
-        ? [{ call: part.toolCallId, name: part.toolName, state: 'running', ...withPreview('input', toolPreview((part as { inputPreview?: unknown }).inputPreview, part.input)) }] : [])
+        ? [{ call: part.toolCallId, name: part.toolName, state: 'running', ...withPreview('input', toolPreview((part as { inputPreview?: unknown }).inputPreview, part.input)),
+          ...withQuote(part.input === undefined ? quotePreview((part as { quotePreview?: unknown }).quotePreview) : toolQuote(part.input)) }] : [])
       // Any reasoning means it thought; only readable text (not encrypted or empty) can be opened.
       const thought = parts.some(part => part.type === 'reasoning')
       const readable = parts.some(part => part.type === 'reasoning' && (Number((part as { chars?: unknown }).chars) > 0 || Boolean((part as { text?: unknown }).text?.toString().trim())))

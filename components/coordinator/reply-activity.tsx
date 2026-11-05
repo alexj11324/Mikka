@@ -16,7 +16,8 @@ import { GitHubIcon } from '@/components/icons/brand-icons'
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from '@/components/ui/trace'
 import { toolAction, toolFailure, toolObjectId, toolSummary, toolTarget, type ToolAction } from '@/lib/coordinator/tool-activity'
 import { CitationChip, useAgentCitations } from '@/components/workspace/agent-citations'
-import { ThreadStatus } from '@/components/workspace/thread-status-icon'
+import { threadGroupOfRun } from '@/components/workspace/thread-status-icon'
+import { HarnessLabel } from '@/components/labels/entity-labels'
 import { toolDetail, type ToolDetailLine } from '@/lib/coordinator/tool-detail'
 import { runThreadName } from '@/lib/coordinator/citations'
 import type { ChatTool } from '@/lib/coordinator/context'
@@ -113,7 +114,7 @@ function ToolRow({ tool, live }: { tool: ChatTool; live: boolean }) {
   return <TraceCollapsible data-activity-tool={failed ? 'error' : 'done'}>
     <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
     <TraceCollapsibleContent className="flex flex-col gap-2">
-      <ToolDetail tool={tool} />
+      <ToolDetail tool={tool} failed={failed} />
       <RawData tool={tool} failed={failed} />
     </TraceCollapsibleContent>
   </TraceCollapsible>
@@ -121,43 +122,62 @@ function ToolRow({ tool, live }: { tool: ChatTool; live: boolean }) {
 
 /**
  * An opened call in words (R-83): what it was asked, what it acted on or made, what came back. A dispatch reads
- * 「交给 Claude Code」, its thread's chip and state, and its note as a quote. Ids never show.
+ * 「交给 Claude Code」 and its thread's chip, then its note as a quote. Ids never show. A failed call shows nothing
+ * here: its row names the reason, and what it was asked never happened.
  */
-function ToolDetail({ tool }: { tool: ChatTool }) {
-  const lines = toolDetail(tool)
+function ToolDetail({ tool, failed }: { tool: ChatTool; failed: boolean }) {
+  const lines = toolDetail(tool, failed)
   if (!lines.length) return null
-  return <div data-activity-detail="" className="flex flex-col gap-1.5 text-sm text-foreground">
-    {lines.map((line, index) => <ToolDetailRow key={index} line={line} dispatch={/^(dispatch|dispatchFactory|wake)$/.test(toolAction(tool.name))} />)}
+  return <div data-activity-detail="" className="flex min-w-0 flex-col gap-1.5 text-sm text-foreground">
+    {lines.map((line, index) => <ToolDetailRow key={index} line={line} />)}
   </div>
 }
 
-function ToolDetailRow({ line, dispatch }: { line: ToolDetailLine; dispatch: boolean }) {
+function ToolDetailRow({ line }: { line: ToolDetailLine }) {
   const t = useTranslations('Coordinator.activity.detail')
+  const tIssue = useTranslations('Issue.status')
   const source = useAgentCitations()?.sources[line.kind === 'object' ? line.id : '']
-  const [whole, setWhole] = useState(false)
-  if (line.kind === 'quote') return <Button variant="ghost" data-activity-quote="" aria-expanded={whole} onClick={() => setWhole(!whole)}
-    className="h-auto justify-start rounded-none border-0 border-l-2 border-l-muted-foreground/30 py-0 pr-0 pl-2.5 text-left font-normal whitespace-pre-wrap text-muted-foreground">
-    <span className={cn('min-w-0', !whole && 'line-clamp-3')}>{line.text}</span>
-  </Button>
-  if (line.kind === 'object') {
-    if (!source) return null
-    if (source.kind === 'issue') return <span className="flex min-w-0 flex-wrap items-center gap-1.5"><CitationChip id={line.id} kind="issue" /></span>
-    return <span data-activity-thread="" className="flex min-w-0 flex-wrap items-center gap-1.5">
-      {dispatch && <span className="text-muted-foreground">{t('handedTo', { agent: source.agentName })}</span>}
-      <CitationChip id={line.id} kind="run" />
-      <ThreadStatus status={source.status} outcome={source.outcome} icon={false} />
-    </span>
-  }
+  if (line.kind === 'handoff') return <Handoff line={line} />
+  if (line.kind === 'quote') return <Quote text={line.text} />
+  // A task or thread chip; a thread's chip shows its own state where it needs the reader (R-15).
+  if (line.kind === 'object') return source ? <span className="flex min-w-0 flex-wrap items-center gap-1.5"><CitationChip id={line.id} kind={source.kind} /></span> : null
   if (line.kind === 'field') return <span className="flex min-w-0 gap-2">
     <span className="shrink-0 text-muted-foreground">{t(line.label as never)}</span>
-    <span className="min-w-0 truncate">{line.label === 'count' ? t('countValue', { count: Number(line.value) }) : line.label === 'status' ? statusWord(String(line.value), t) : line.value}</span>
+    <span className="min-w-0 truncate">{line.label === 'count' ? t('countValue', { count: Number(line.value) })
+      : line.label === 'status' && tIssue.has(String(line.value) as never) ? tIssue(String(line.value) as never) : line.value}</span>
   </span>
   return <span className="flex min-w-0 gap-2"><span className="shrink-0 text-muted-foreground">{line.key}</span><span className="min-w-0 truncate">{line.value}</span></span>
 }
 
-/** A run status word from the answer (queued, running…), in the person's language; any other value as it is. */
-function statusWord(value: string, t: ReturnType<typeof useTranslations>) {
-  return t.has(`states.${value}` as never) ? t(`states.${value}` as never) : value
+/**
+ * Who a dispatch went to: 「交给」, the coding agent with its mark (R-74), then the thread's chip. A thread the chat has
+ * not loaded is its state in words, as the thread list groups it (R-52): 「交给 Claude Code · 进行中」.
+ */
+function Handoff({ line }: { line: Extract<ToolDetailLine, { kind: 'handoff' }> }) {
+  const t = useTranslations('Coordinator.activity.detail')
+  const tState = useTranslations('Shell.threads.state')
+  const found = useAgentCitations()?.sources[line.runId ?? '']
+  const thread = found?.kind === 'run' ? found : null
+  const harness = thread?.harness ?? line.harness
+  const status = thread ? null : line.status
+  return <span data-activity-thread="" className="flex min-w-0 flex-wrap items-center gap-1.5">
+    {harness ? <span className="flex items-center gap-1.5 text-muted-foreground">{t('handedTo')}<HarnessLabel harness={harness} /></span>
+      : <span className="text-muted-foreground">{t('dispatched')}</span>}
+    {thread && <CitationChip id={thread.id} kind="run" />}
+    {status && <span className="text-muted-foreground">· {tState(threadGroupOfRun(status))}</span>}
+  </span>
+}
+
+/** A call's words as a quote: three lines, and only when they are cut is it a button that opens the rest. */
+function Quote({ text }: { text: string }) {
+  const [whole, setWhole] = useState(false)
+  const [cut, setCut] = useState(false)
+  const measure = useCallback((node: HTMLSpanElement | null) => { if (node) setCut(node.scrollHeight > node.clientHeight + 1) }, [])
+  const words = <span ref={whole ? undefined : measure} className={cn('min-w-0 [overflow-wrap:anywhere] whitespace-pre-wrap', !whole && 'line-clamp-3')}>{text}</span>
+  const quote = 'border-l-2 border-l-muted-foreground/30 pl-2.5 text-left text-muted-foreground'
+  if (!cut) return <div data-activity-quote="" className={quote}>{words}</div>
+  return <Button variant="ghost" data-activity-quote="" aria-expanded={whole} onClick={() => setWhole(!whole)}
+    className={cn('h-auto justify-start rounded-none border-0 py-0 pr-0 font-normal hover:bg-transparent hover:text-muted-foreground', quote)}>{words}</Button>
 }
 
 /** The call's raw input and output, folded under 「原始数据」, one more click away (R-83). */

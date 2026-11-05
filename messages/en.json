@@ -3313,7 +3313,7 @@
       "expandAll": "Expand all",
       "collapseAll": "Collapse all",
       "detail": {
-        "handedTo": "Handed to {agent}",
+        "handedTo": "Handed to",
         "query": "Query",
         "count": "Results",
         "countValue": "{count, plural, one {# result} other {# results}}",
@@ -3324,15 +3324,7 @@
         "subject": "Subject",
         "repository": "Repository",
         "raw": "Raw data",
-        "states": {
-          "queued": "Queued",
-          "preparing": "Preparing",
-          "running": "Running",
-          "waiting_input": "Waiting for input",
-          "succeeded": "Done",
-          "failed": "Failed",
-          "stopped": "Stopped"
-        }
+        "dispatched": "Dispatched"
       }
     }
   },
