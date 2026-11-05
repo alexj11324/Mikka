@@ -62,7 +62,7 @@ export const pollingAllowlist = {
   'packages/daemon/src/agents/tool-approval.ts': db(daemon, 'ToolApprovalGate fallback timer only: none while the device gateway pushes run control, every 20 s while it is down, 1 s against a server older than run-control push', 1),
   'packages/daemon/src/server-link-http.ts': db(daemon, 'isLive retries an unanswered liveness check (timeout, 5xx) every second for at most 30 s; no periodic check', 1),
   'packages/daemon/src/subscription-hosted-runner.ts': db(daemon, 'a 3-attempt retry of an unanswered subscription context read; the background check runs on push and at token expiry', 1),
-  'packages/daemon/src/computer/web-review.ts': db(daemon, 'pollWebComputerReviews: checks the local broker every second and syncs pending reviews with the server', 1),
+  'packages/daemon/src/computer/web-review.ts': db(daemon, 'pollWebComputerReviews: checks the local broker every second; with review push it syncs only when the pending set changes, on a gateway push, or every 5 s for presence (the server takes decisions on requests seen in the last 10 s); every second only against a server without review push or while the gateway is down', 1),
   'packages/daemon/src/coordinator/runner.ts': db(daemon, 'native coordinator tool waits for its result by asking the server every 500 ms', 1),
   'packages/daemon/src/login.ts': db(daemon, 'device login polls the token endpoint at the server-given interval until approved (RFC 8628)', 1),
   'packages/daemon/src/runs/supervisor.ts': db(daemon, 'CHECKPOINT_EVERY_MS: a periodic write, not a read; saves an idle run\'s checkpoint to the server at most every 2 min', 1),

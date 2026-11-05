@@ -153,7 +153,7 @@ export interface ServerLink {
   deviceGateway?(
     deviceId: string,
     signal?: AbortSignal
-  ): Promise<{ url: string | null; protocol: string | null; runControl?: 'push' }>
+  ): Promise<{ url: string | null; protocol: string | null; runControl?: 'push'; computerReviews?: 'push' }>
   /** Marks messages as handed to their agents. */
   ackCommands(deviceId: string, delivered: string[]): Promise<void>
   /**

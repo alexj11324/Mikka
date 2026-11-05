@@ -98,6 +98,7 @@ import { ComputerBroker } from "./computer/broker.mjs"
 import { detectComputerDriver, executeDriver, type ComputerDriver } from "./computer/driver.mjs"
 import { createHostedComputerExecutor, type CredentialExecutorAuthority } from "./computer/credential-executor"
 import { pollWebComputerReviews } from "./computer/web-review"
+import { DeviceWorkSignal, type PushedWait } from "./device-work-signal"
 import { localComputerMcp } from "./computer/local-grant.mjs"
 
 export * from "./server-link"
@@ -253,6 +254,8 @@ export class Daemon {
   private gatewayLive = false
   /** The server's last gateway ticket said it pushes run control (#1212). */
   private runControlPush = false
+  /** Gateway pushes for computer reviews (and other non-run-control waits). */
+  private readonly workSignal = new DeviceWorkSignal()
   /** The server said it has no gateway. Do not ask again on every long-poll. */
   private gatewayUnavailable = false
   private gatewayFailures = 0
@@ -774,6 +777,7 @@ export class Daemon {
       // their periodic check; an older one keeps the one-second check.
       this.runControlPush = ticket.runControl === 'push'
       this.options.link.setRunControlMode?.(this.runControlPush ? 'fallback' : 'legacy')
+      this.workSignal.setPushedWaits((['computerReviews'] as const satisfies readonly PushedWait[]).filter(wait => ticket[wait] === 'push'))
       if (!ticket.url || !ticket.protocol) { this.gatewayUnavailable = true; return false }
       if (signal.aborted) return false
       const socket = openDeviceGateway(ticket.url, ticket.protocol)
@@ -783,8 +787,9 @@ export class Daemon {
           openedAt = performance.now()
           this.gatewayLive = true
           if (this.runControlPush) this.options.link.setRunControlMode?.('push')
+          this.workSignal.setConnected(true)
         },
-        onWorkAvailable: () => this.options.link.invalidateRunControls?.(),
+        onWorkAvailable: () => { this.options.link.invalidateRunControls?.(); this.workSignal.notify() },
         onWork: async () => {
           await this.pullSignaledWork(deviceId, connection.signal)
           if (connection.signal.aborted || this.stopped) return
@@ -809,6 +814,7 @@ export class Daemon {
       this.gatewayLive = false
       this.options.link.setRunControlMode?.(this.runControlPush ? 'fallback' : 'legacy')
       this.options.link.invalidateRunControls?.()
+      this.workSignal.setConnected(false)
       if (!this.stopped && !signal.aborted && !this.gatewayUnavailable) {
         // Merely opening is not recovery: a flapping server must not reset
         // backoff. Stable sessions start again at the shortest retry delay.
@@ -1270,7 +1276,7 @@ export class Daemon {
       this.reviewAbort?.abort()
       const abort = new AbortController()
       this.reviewAbort = abort
-      this.reviewLoop = pollWebComputerReviews(computerBroker, deviceId, this.options.link, abort.signal)
+      this.reviewLoop = pollWebComputerReviews(computerBroker, deviceId, this.options.link, abort.signal, undefined, this.workSignal)
     }
     this.wakeCommands?.()
   }

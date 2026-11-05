@@ -3,6 +3,9 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
+import { createServer } from 'node:http'
+import { once } from 'node:events'
+import { observePoolCommits } from '../db/commit-effects'
 import { ComputerStore } from './store'
 import { bindComputerRun } from './run-binding'
 import { claimCloudRun, claimLocalRun } from './claim'
@@ -374,7 +377,28 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal((await store.state(actor, another.id)).pendingApproval, undefined)
     assert.equal(await decideComputerReview(pool, otherWorkspace, review.id, review.digest, true), false)
     assert.equal(await decideComputerReview(pool, actor, review.id, '0'.repeat(64), true), false)
-    assert.equal(await decideComputerReview(pool, actor, review.id, review.digest, true), true)
+    // #1212: the decision pushes the device through its gateway, so the daemon applies it now instead of syncing every second.
+    const pushes: string[] = []
+    const gateway = createServer((request, response) => { pushes.push(`${request.method} ${request.url}`); response.writeHead(204).end() })
+    gateway.listen(0, '127.0.0.1')
+    await once(gateway, 'listening')
+    const saved = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
+    process.env.DEVICE_GATEWAY_URL = `http://127.0.0.1:${(gateway.address() as { port: number }).port}`
+    process.env.DEVICE_GATEWAY_PUSH_SECRET = 'computer-review-test-only'
+    // With the gateway configured, live invalidations ride along; they need commit tracking, as the app's pool has.
+    observePoolCommits(pool)
+    const devicePush = `POST /v1/devices/${deviceId}/push`
+    try {
+      assert.equal(await decideComputerReview(pool, actor, review.id, review.digest, true), true)
+      for (let i = 0; i < 100 && !pushes.includes(devicePush); i++) await new Promise(resolve => setTimeout(resolve, 10))
+      assert.equal(pushes.filter(push => push === devicePush).length, 1)
+    } finally {
+      for (const [name, value] of [['DEVICE_GATEWAY_URL', saved.url], ['DEVICE_GATEWAY_PUSH_SECRET', saved.secret]] as const) {
+        if (value === undefined) delete process.env[name]; else process.env[name] = value
+      }
+      gateway.closeAllConnections()
+      await new Promise<void>(resolve => gateway.close(() => resolve()))
+    }
     assert.equal((await store.state(actor, bot.id)).pendingApproval, undefined)
     assert.equal(await decideComputerReview(pool, actor, review.id, review.digest, true), false)
     assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, [review]), [{ id: review.id, digest: review.digest, approve: true }])
