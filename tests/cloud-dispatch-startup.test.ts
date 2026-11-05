@@ -55,7 +55,7 @@ stub('../lib/model-dispatch.ts', {
     return bindingId
   },
 })
-stub('../lib/factory/agent-profile.ts', { ...profileDefinitions, assertProfileSelection: unused,
+stub('../lib/factory/agent-profile.ts', { ...profileDefinitions, assertProfileTarget: unused, assertProfileSelection: unused,
   resolveAgentProfileDispatch: async (db: unknown, scope: unknown, request: { asked?: { harness: string; model?: string } }) => {
     const { resolveModelDispatch } = await import('../lib/model-dispatch')
     return { target: await resolveModelDispatch(db as never, scope as never, request.asked as never), selectionMode: request.asked?.model ? 'picked' : 'preference' }
