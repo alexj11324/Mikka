@@ -1,6 +1,8 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, View, type ScrollViewInstance } from 'react-native'
 import { ChatScrollView } from '@/components/ChatScrollView'
+import { useComposerInset } from '@/lib/composer-inset'
+import { GestureDetector } from 'react-native-gesture-handler'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ellipsis } from 'lucide-react-native'
@@ -57,11 +59,12 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const scroll = useRef<ScrollViewInstance>(null)
-  const { offset, handlers } = useTimeReveal()
+  const { offset, gesture: timeReveal } = useTimeReveal()
   const photos = useChatPhotos()
   const workspaceId = useHome().data?.workspace.id
   // The composer floats over the end of the list; the list leaves room for it.
-  const [composerHeight, setComposerHeight] = useState(90)
+  const composer = useComposerInset()
+  const composerHeight = composer.height
   const path = `/api/mobile/chat${botId ? `?bot=${botId}` : ''}`
   const home = useHome().data?.live?.workspaceId
   // The web's chat key (components/coordinator/coordinator-chat.tsx) on the person's home channel; a turn's lease
@@ -223,9 +226,10 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
           ] }}
       />
       {/* The message list comes first, so the iOS bar finds it and blurs what scrolls under (scroll-edge effect). */}
-      <View style={{ flex: 1, overflow: 'hidden' }} {...handlers}>
+      <GestureDetector gesture={timeReveal}>
+      <View style={{ flex: 1, overflow: 'hidden' }}>
         {/* The system scroll: momentum, and a bounce at both ends even while the chat is shorter than the screen. */}
-        <ChatScrollView ref={scroll} testID="bot-chat-scroll" bounces alwaysBounceVertical {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={[styles.list, { paddingBottom: composerHeight + 16 }]} onScroll={event => { if (chatScroll.onScroll(event)) setPinned(false) }} scrollEventThrottle={16} onContentSizeChange={chatScroll.onContentSizeChange}>
+        <ChatScrollView ref={scroll} testID="bot-chat-scroll" bounces alwaysBounceVertical {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" extraContentPadding={composer.inset} contentContainerStyle={[styles.list, { paddingBottom: composer.paddingBottom }]} onScroll={event => { if (chatScroll.onScroll(event)) setPinned(false) }} scrollEventThrottle={16} onContentSizeChange={chatScroll.onContentSizeChange}>
           {items.map((item, index) => {
             const time = clockTime(item.createdAt)
             const question = item.from === 'event' ? questionCard(item.line, sources) : null
@@ -268,9 +272,10 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
           ) : null}
         </ChatScrollView>
       </View>
+      </GestureDetector>
       <ChatScrollToLatest visible={!chatScroll.atEnd} bottom={composerHeight + 8} onPress={() => { setPinned(false); chatScroll.toLatest() }} />
       <OfflineBanner top={insets.top + 66} />
-      <Composer value={text} sendDisabled={serviceUnavailable} onChangeText={setText} placeholder={name ? `给 ${name} 发消息` : '发消息'} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
+      <Composer value={text} sendDisabled={serviceUnavailable} onChangeText={setText} placeholder={name ? `给 ${name} 发消息` : '发消息'} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={composer.onHeight} autoFocus={compose || Boolean(draft)}
         quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={<>{serviceUnavailable ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.serviceNotice}><Text style={styles.serviceMessage}>对话服务尚未启用，暂时无法回复。</Text><CardButton label="重试" busy={serviceRefresh.refreshing} onPress={() => void serviceRefresh.onRefresh()} /></View> : null}{composerNotice}{reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><CardButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : null}</>} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />
     </View>
   )

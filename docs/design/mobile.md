@@ -191,14 +191,17 @@ What is still our own, and why:
 |---|---|
 | Message bubbles, event lines, the thread card (`components/chat.tsx`) | iOS has no chat transcript control. |
 | Swipe right to quote, swipe left for times (`TimedRow`, `useTimeReveal`) | Messages' gestures are not public API; ours follow them, on `lib/springs.ts`. |
-| Reactions in the long-press menu | A long press on iOS is the system context menu (`components/MessageMenu.ios.tsx`, `@expo/ui` `ContextMenu`), lifting the bubble itself. iOS has no reaction bar on a context menu, so the six reactions are two compact `ControlGroup` rows of three at its top. VoiceOver, the keyboard and the web build keep the actions sheet (`app/message.tsx`). |
+| Reactions in the long-press menu | A long press on iOS is the system context menu through Expo Router's `Link.Menu` (`components/MessageMenu.ios.tsx`), attached to the bubble's own view: no SwiftUI host per row, which broke row sizing (#1404). iOS has no reaction bar on a context menu; the six reactions are its palette row (UIKit's horizontal menu section). VoiceOver, the keyboard and the web build keep the actions sheet (`app/message.tsx`). |
 | The reply action row (copy · 回复 · 更多) | Not a system control; ChatGPT and Claude draw it the same way. |
 | The composer (`Composer` in `components/ui.tsx`) | iOS has no chat composer; its text field is the system's `UITextView`. |
 | Settings rows (`components/settings.tsx` `Row`) | Drawn as an inset grouped list; moving them to `@expo/ui` `Form` is a separate change. |
 | Reactions, mention chips, cards (`cards.tsx`) | No system equivalent. |
 
-Motion: `apps/mobile/lib/springs.ts` holds the one spring family (snap back ζ≈0.73, a new message
-rising 8 pt at ζ≈0.8). Every animation keeps its Reduce Motion branch.
+Motion: `apps/mobile/lib/springs.ts` holds Apple's spring presets, converted exactly from SwiftUI's
+`Spring(duration:bounce:)`: `.snappy` (0.5 s, bounce 0.15) for anything the finger lets go of, with its velocity,
+and `.smooth` (0.5 s, bounce 0) for a new message rising 8 pt. Drags past a mark rubber-band with UIScrollView's
+formula. Gestures run on the UI thread (Gesture Handler and Reanimated, never `PanResponder`). Every animation keeps
+its Reduce Motion branch. Mobile UI work follows the vendored Expo skills (`.claude/skills/expo-overview`).
 
 ## Layout and states
 

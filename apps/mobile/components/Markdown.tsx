@@ -5,6 +5,7 @@ import { StatusIcon } from '@/components/icons'
 import { runIcon } from '@/lib/thread-icon'
 import { Text } from '@/components/Text'
 import { runName, type CitationSource } from '@/lib/types'
+import { tasksShownByThreads } from '@/lib/mentions'
 import { colors, font } from '@/lib/theme'
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { ChatFiles } from './ChatFiles'
@@ -23,12 +24,14 @@ export function Markdown({ text, sources = {}, onOpen, color = colors.text }: {
 }) {
   const parsed = splitChatFiles(text)
   const blocks = parseBlocks(parsed.text)
+  // One chip per piece of work: a task already shown through its thread is not drawn again (lib/mentions.ts).
+  const hidden = tasksShownByThreads(parsed.text, sources)
   return (
     <View style={{ gap: 8 }}>
       <ChatFiles files={parsed.files} />
       {blocks.map((block, index) => {
         switch (block.type) {
-          case 'heading': return <Text selectable key={index} style={[styles.heading, { color }]}>{inline(block.text, sources, onOpen, color)}</Text>
+          case 'heading': return <Text selectable key={index} style={[styles.heading, { color }]}>{inline(block.text, sources, onOpen, color, hidden)}</Text>
           case 'code': return <View key={index} style={styles.codeBlock}><Text selectable style={styles.codeText}>{block.text}</Text></View>
           case 'list':
             return (
@@ -36,12 +39,12 @@ export function Markdown({ text, sources = {}, onOpen, color = colors.text }: {
                 {block.items.map((item, i) => (
                   <View key={i} style={styles.listItem}>
                     <Text style={[styles.body, { color }]}>{block.ordered ? `${i + 1}.` : '•'}</Text>
-                    <Text selectable style={[styles.body, { color, flex: 1 }]}>{inline(item, sources, onOpen, color)}</Text>
+                    <Text selectable style={[styles.body, { color, flex: 1 }]}>{inline(item, sources, onOpen, color, hidden)}</Text>
                   </View>
                 ))}
               </View>
             )
-          case 'paragraph': return <Text selectable key={index} style={[styles.body, { color }]}>{inline(block.text, sources, onOpen, color)}</Text>
+          case 'paragraph': return <Text selectable key={index} style={[styles.body, { color }]}>{inline(block.text, sources, onOpen, color, hidden)}</Text>
         }
       })}
     </View>
@@ -86,7 +89,7 @@ function parseBlocks(text: string): Block[] {
 
 const INLINE = /\[\[(issue|run):([0-9a-f-]{36})\]\]|\*\*([^*]+)\*\*|`([^`]+)`|\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s<>()]+[^\s<>().,;:!?。，；：！？])/gi
 
-function inline(text: string, sources: Record<string, CitationSource>, onOpen: ((source: CitationSource) => void) | undefined, color: string): ReactNode[] {
+function inline(text: string, sources: Record<string, CitationSource>, onOpen: ((source: CitationSource) => void) | undefined, color: string, hidden: Set<string>): ReactNode[] {
   const parts: ReactNode[] = []
   let last = 0
   let key = 0
@@ -94,7 +97,7 @@ function inline(text: string, sources: Record<string, CitationSource>, onOpen: (
     if (match.index > last) parts.push(text.slice(last, match.index))
     if (match[1]) {
       const source = sources[match[2].toLowerCase()]
-      if (source) parts.push(<View key={key++} style={styles.mentionWrap}><MentionChip source={source} onPress={() => onOpen?.(source)} /></View>)
+      if (source && !(source.kind === 'issue' && hidden.has(match[2].toLowerCase()))) parts.push(<View key={key++} style={styles.mentionWrap}><MentionChip source={source} onPress={() => onOpen?.(source)} /></View>)
     } else if (match[3]) parts.push(<Text key={key++} style={{ fontWeight: '600', color }}>{match[3]}</Text>)
     else if (match[4]) parts.push(<Text key={key++} style={styles.code}>{match[4]}</Text>)
     else {

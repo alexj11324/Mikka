@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View, type ScrollViewInstance } from 'react-native'
 import { ChatScrollView } from '@/components/ChatScrollView'
+import { useComposerInset } from '@/lib/composer-inset'
+import { GestureDetector } from 'react-native-gesture-handler'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BotAvatar, Spinner } from '@/components/icons'
@@ -42,10 +44,11 @@ export default function GroupChat() {
   const home = useHome()
   const me = home.data?.user.id
   const scroll = useRef<ScrollViewInstance>(null)
-  const { offset, handlers } = useTimeReveal()
+  const { offset, gesture: timeReveal } = useTimeReveal()
   const apiContext = apiCache.context()
   const chatScroll = useChatScroll(scroll, `${id}:${apiContext}`)
-  const [composerHeight, setComposerHeight] = useState(90)
+  const composer = useComposerInset()
+  const composerHeight = composer.height
   const [text, setText] = useState('')
   const [quote, setQuote] = useState<string | null>(null)
   const [sendFailed, setSendFailed] = useState(false)
@@ -163,9 +166,10 @@ export default function GroupChat() {
   return (
     <View style={styles.screen}>
       <NavBar title={title} material />
-      <View style={{ flex: 1, overflow: 'hidden' }} {...handlers}>
+      <GestureDetector gesture={timeReveal}>
+      <View style={{ flex: 1, overflow: 'hidden' }}>
         <ChatScrollView ref={scroll} testID="group-chat-scroll" bounces alwaysBounceVertical {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd"
-          contentContainerStyle={[styles.list, { paddingBottom: composerHeight + 16 }]} onScroll={chatScroll.onScroll} scrollEventThrottle={16} onContentSizeChange={chatScroll.onContentSizeChange}>
+          extraContentPadding={composer.inset} contentContainerStyle={[styles.list, { paddingBottom: composer.paddingBottom }]} onScroll={chatScroll.onScroll} scrollEventThrottle={16} onContentSizeChange={chatScroll.onContentSizeChange}>
           {!page.data && !page.error ? <View style={styles.loading}><Spinner /></View> : null}
           <ReadNotice error={page.error} hasData={Boolean(page.data)} label="群聊" onRetry={page.reload} />
           <ReadNotice error={reactionState.error} hasData={reactionSnapshot?.identity === identity} label="回应" onRetry={reactionState.reload} />
@@ -206,9 +210,10 @@ export default function GroupChat() {
           {stopFailed ? <StopFailed busy={stopping} onRetry={() => void stop()} /> : null}
         </ChatScrollView>
       </View>
+      </GestureDetector>
       <ChatScrollToLatest visible={!chatScroll.atEnd} bottom={composerHeight + 8} onPress={chatScroll.toLatest} />
       <OfflineBanner top={insets.top + 66} />
-      <Composer value={text} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} attach attachmentScope={{ kind: 'group', id }} overlay onHeight={setComposerHeight}
+      <Composer value={text} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} attach attachmentScope={{ kind: 'group', id }} overlay onHeight={composer.onHeight}
         notice={reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><CardButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : undefined}
         quote={quote} onClearQuote={() => setQuote(null)} onStop={working && !stopping ? () => void stop() : undefined} />
     </View>

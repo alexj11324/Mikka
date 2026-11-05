@@ -1,19 +1,27 @@
 /**
- * One family of springs for the app's own motion (#1386), close to UIKit's: let go and the view carries the
- * finger's speed, overshoots a little and settles quickly. Damping ratio ζ = damping / (2·√(stiffness·mass));
- * below 1 it bounces. Every caller keeps its Reduce Motion branch (no spring: it jumps to the end).
+ * The app's own motion uses Apple's published spring presets, converted exactly (expo-animation: "no approximated
+ * values"). SwiftUI defines `Spring(duration:bounce:)` as mass 1, stiffness (2π / duration)² and
+ * damping 4π · (1 − bounce) / duration, so its damping ratio is 1 − bounce; UIKit's
+ * `UIView.animate(springDuration:bounce:)` takes the same two parameters. The values go to Reanimated as
+ * mass/stiffness/damping, not as its own `duration`, whose settling model is not Apple's.
+ *
+ * Every caller keeps its Reduce Motion branch: there the value jumps to its end.
  */
-/** A dragged message coming back (swipe to quote, the time reveal): ζ ≈ 0.73, about 4% overshoot, ~0.35 s. */
-export const SNAP_BACK = { mass: 1, stiffness: 320, damping: 26 }
-/** A new message arriving: rises 8 pt and fades in, ζ ≈ 0.8, ~0.3 s. */
-export const ENTER = { mass: 1, stiffness: 380, damping: 31 }
+function apple(duration: number, bounce: number) {
+  return { mass: 1, stiffness: (2 * Math.PI / duration) ** 2, damping: (4 * Math.PI * (1 - bounce)) / duration }
+}
+
+/** SwiftUI `.snappy` (`Spring(duration: 0.5, bounce: 0.15)`): something the finger let go of, carrying its velocity. */
+export const SNAPPY = apple(0.5, 0.15)
+/** SwiftUI `.smooth` (`Spring(duration: 0.5, bounce: 0)`): motion no finger drove, so it does not overshoot. */
+export const SMOOTH = apple(0.5, 0)
 
 /**
- * Rubber-band resistance, as UIScrollView past its edge: the further the drag, the less the view follows,
- * approaching `limit` without a hard stop. `x` and `limit` in points.
+ * UIScrollView's rubber band past an edge: `(x · d · c) / (d + c · x)` with c = 0.55, approaching `d` and never
+ * stopping dead. `overshoot` and `dimension` in points.
  */
-export function rubberBand(x: number, limit: number, coefficient = 0.55) {
+export function rubberBand(overshoot: number, dimension: number, constant = 0.55) {
   'worklet'
-  if (x <= 0) return 0
-  return (1 - 1 / ((x * coefficient) / limit + 1)) * limit
+  if (overshoot <= 0) return 0
+  return (overshoot * dimension * constant) / (dimension + constant * overshoot)
 }

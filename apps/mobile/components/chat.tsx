@@ -1,14 +1,14 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import * as Clipboard from 'expo-clipboard'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import Reanimated, { cancelAnimation, FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
+import Reanimated, { cancelAnimation, FadeInDown, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
-import { AccessibilityInfo, Animated, Image, PanResponder, Platform, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
+import { AccessibilityInfo, Image, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
 import { Check, CircleAlert, Copy, Ellipsis, Reply } from 'lucide-react-native'
 import { CardButton } from '@/components/cards'
 import { MessageMenu, NATIVE_MESSAGE_MENU } from '@/components/MessageMenu'
 import type { HeldMessage } from '@/lib/message-actions'
-import { ENTER, rubberBand, SNAP_BACK } from '@/lib/springs'
+import { rubberBand, SMOOTH, SNAPPY } from '@/lib/springs'
 import { StatusIcon } from '@/components/icons'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
@@ -127,11 +127,11 @@ export function ThreadCard({ title, status, info, onPress, action }: { title: st
   )
 }
 
-const ARRIVE = FadeInDown.springify().mass(ENTER.mass).stiffness(ENTER.stiffness).damping(ENTER.damping)
+const ARRIVE = FadeInDown.springify().mass(SMOOTH.mass).stiffness(SMOOTH.stiffness).damping(SMOOTH.damping)
   .withInitialValues({ opacity: 0, transform: [{ translateY: 8 }] })
 
 /**
- * A message that arrived while the chat was open rises into place on a light spring (lib/springs.ts ENTER); what
+ * A message that arrived while the chat was open rises into place on SwiftUI's `.smooth` spring (lib/springs.ts); what
  * was there when it opened, and everything under Reduce Motion, just appears.
  */
 export function Arrival({ animate, children }: { animate: boolean; children: ReactNode }) {
@@ -147,34 +147,26 @@ export function EventLine({ text }: { text: string }) {
 const REVEAL = 56
 
 /**
- * Message times are hidden; dragging the chat from right to left reveals each
- * message's time on the right, as in iMessage (Figma 01b).
+ * Message times are hidden; dragging the chat from right to left reveals each message's time on the right, as in
+ * Messages (Figma 01b). One shared value for every row, driven on the UI thread (expo-animation: Gesture Handler and
+ * Reanimated, never PanResponder): it follows the finger to the times, rubber-bands past them, and the finger's
+ * velocity carries into SwiftUI's `.snappy` spring home.
  */
 export function useTimeReveal() {
-  const offset = useRef(new Animated.Value(0)).current
+  const offset = useSharedValue(0)
   const reduceMotion = useReducedMotionPreference()
-  const preference = useRef(reduceMotion)
-  preference.current = reduceMotion
-  useEffect(() => {
-    if (reduceMotion) { offset.stopAnimation(); offset.setValue(0) }
-    return () => offset.stopAnimation()
-  }, [offset, reduceMotion])
-  const responder = useMemo(() => {
-    const reset = () => {
-      offset.stopAnimation()
-      if (preference.current) offset.setValue(0)
-      else Animated.spring(offset, { toValue: 0, useNativeDriver: Platform.OS !== 'web', ...SNAP_BACK }).start()
-    }
-    return PanResponder.create({
-    onMoveShouldSetPanResponder: (_, g) => g.dx < -8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
-    onPanResponderGrant: () => offset.stopAnimation(),
-    // Past the times the drag meets rubber-band resistance instead of a wall.
-    onPanResponderMove: (_, g) => offset.setValue(g.dx >= -REVEAL ? Math.min(0, g.dx) : -REVEAL - rubberBand(-g.dx - REVEAL, REVEAL / 2)),
-    onPanResponderRelease: reset,
-    onPanResponderTerminate: reset,
+  useEffect(() => { if (reduceMotion) { cancelAnimation(offset); offset.set(0) } }, [offset, reduceMotion])
+  const gesture = useMemo(() => Gesture.Pan()
+    // Leftward only, and it gives way to the list's vertical scroll.
+    .activeOffsetX([-8, 10000])
+    .failOffsetY([-12, 12])
+    .onStart(() => { cancelAnimation(offset) })
+    .onUpdate(event => {
+      const x = -event.translationX
+      offset.set(x <= REVEAL ? -Math.max(0, x) : -REVEAL - rubberBand(x - REVEAL, REVEAL))
     })
-  }, [offset])
-  return { offset, handlers: responder.panHandlers }
+    .onFinalize(event => { offset.set(reduceMotion ? 0 : withSpring(0, { ...SNAPPY, velocity: event.velocityX })) }), [offset, reduceMotion])
+  return { offset, gesture }
 }
 
 /** How far a message is dragged right before letting go quotes it. */
@@ -186,7 +178,7 @@ const QUOTE_AT = 56
  * arrow behind it; letting go past the mark quotes it in the composer, with a
  * tick, as in iMessage and Claude. A spring takes it back on the UI thread.
  */
-export function TimedRow({ time, offset, children, align = 'left', onQuote, onLongPress, menu }: { time?: string; offset: Animated.Value; children: ReactNode; align?: 'left' | 'right'; onQuote?: () => void; onLongPress?: () => void; menu?: HeldMessage }) {
+export function TimedRow({ time, offset, children, align = 'left', onQuote, onLongPress, menu }: { time?: string; offset: SharedValue<number>; children: ReactNode; align?: 'left' | 'right'; onQuote?: () => void; onLongPress?: () => void; menu?: HeldMessage }) {
   const drag = useSharedValue(0)
   const reduceMotion = useReducedMotionPreference()
   const quote = useCallback(() => { tap(); onQuote?.() }, [onQuote])
@@ -197,21 +189,26 @@ export function TimedRow({ time, offset, children, align = 'left', onQuote, onLo
     .failOffsetY([-12, 12])
     .hitSlop({ left: -28 })
     .onStart(() => { cancelAnimation(drag) })
-    // Follows the finger with rubber-band resistance (lib/springs.ts), easing towards twice the mark, never a hard stop.
-    .onUpdate(event => { drag.value = rubberBand(event.translationX, QUOTE_AT * 2) })
+    // Follows the finger one to one up to the mark, as in Messages, then rubber-bands past it (lib/springs.ts).
+    .onUpdate(event => {
+      const x = event.translationX
+      drag.set(x <= QUOTE_AT ? Math.max(0, x) : QUOTE_AT + rubberBand(x - QUOTE_AT, QUOTE_AT))
+    })
     .onEnd((_event, success) => {
-      if (success && drag.value >= QUOTE_AT) scheduleOnRN(quote)
+      if (success && drag.get() >= QUOTE_AT) scheduleOnRN(quote)
     })
     // Finalize also runs for an interrupted/cancelled drag; cancellation never
     // quotes the message and must not leave its bubble stuck off its baseline.
-    .onFinalize(event => { drag.value = reduceMotion ? 0 : withSpring(0, { ...SNAP_BACK, velocity: event.velocityX }) })
+    // SwiftUI `.snappy`, carrying the finger's velocity home.
+    .onFinalize(event => { drag.set(reduceMotion ? 0 : withSpring(0, { ...SNAPPY, velocity: event.velocityX })) })
   const held = useCallback(() => { press(); onLongPress?.() }, [onLongPress])
   // A long press opens the message's actions: on iOS the system context menu (MessageMenu), elsewhere the sheet
   // (app/message.tsx). VoiceOver and the keyboard reach the sheet through the frame below on every platform.
   const native = NATIVE_MESSAGE_MENU && Boolean(menu)
   const long = Gesture.LongPress().enabled(Boolean(onLongPress) && !native).minDuration(380).onStart(() => { scheduleOnRN(held) })
-  const moved = useAnimatedStyle(() => ({ transform: [{ translateX: drag.value }] }))
-  const arrow = useAnimatedStyle(() => ({ opacity: Math.min(1, drag.value / QUOTE_AT), transform: [{ scale: reduceMotion ? 1 : 0.6 + 0.4 * Math.min(1, drag.value / QUOTE_AT) }] }))
+  const moved = useAnimatedStyle(() => ({ transform: [{ translateX: drag.get() }] }))
+  const revealed = useAnimatedStyle(() => ({ transform: [{ translateX: offset.get() }] }))
+  const arrow = useAnimatedStyle(() => ({ opacity: Math.min(1, drag.get() / QUOTE_AT), transform: [{ scale: reduceMotion ? 1 : 0.6 + 0.4 * Math.min(1, drag.get() / QUOTE_AT) }] }))
   return (
     <View>
     <GestureDetector gesture={Gesture.Race(pan, long)}>
@@ -220,10 +217,10 @@ export function TimedRow({ time, offset, children, align = 'left', onQuote, onLo
           <Symbol name="arrowshape.turn.up.left" size={16} color={colors.secondary} web={<Reply size={16} color={colors.secondary} />} />
         </Reanimated.View>
         <Reanimated.View style={moved}>
-          <Animated.View style={{ transform: [{ translateX: offset }], alignItems: align === 'right' ? 'flex-end' : 'stretch' }}>
+          <Reanimated.View style={[revealed, { alignItems: align === 'right' ? 'flex-end' : 'stretch' }]}>
             {native ? <MessageMenu message={menu}><View style={{ alignItems: align === 'right' ? 'flex-end' : 'stretch' }}>{children}</View></MessageMenu> : children}
             {time ? <Text style={styles.time}>{time}</Text> : null}
-          </Animated.View>
+          </Reanimated.View>
         </Reanimated.View>
       </Reanimated.View>
     </GestureDetector>
