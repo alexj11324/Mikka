@@ -176,9 +176,10 @@ const styles = StyleSheet.create({
   selected: { backgroundColor: colors.surface },
   pressed: { opacity: 0.58 },
   mark: { width: 36, height: 36, borderRadius: 10, borderCurve: 'continuous', backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
-  initial: { fontSize: 16, fontWeight: '600', color: colors.secondary },
+  // The workspace's first character, in ink: a grey 个 reads as an arrow.
+  initial: { fontSize: 16, fontWeight: '600', color: colors.ink },
   bigMark: { width: 44, height: 44, borderRadius: 12 },
-  bigInitial: { fontSize: 20, fontWeight: '600', color: colors.secondary },
+  bigInitial: { fontSize: 20, fontWeight: '600', color: colors.ink },
   workspaceName: { flex: 1, minWidth: 0, fontSize: 16, lineHeight: 21, fontWeight: '500' },
   problem: { fontSize: 13, color: colors.danger, paddingHorizontal: 10, paddingTop: 6 },
   rule: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginHorizontal: 10, marginTop: 10, marginBottom: 6 },

@@ -37,23 +37,23 @@ async function handleGET(request: Request) {
   // A workspace token counts the threads of its workspace only.
   const outside = user[tokenWorkspace] ? [...await runsOutsideToken(user, (await db.select({ id: agentRuns.id }).from(agentRuns)
     .where(and(recent, inArray(agentRuns.status, [...RUNNING, 'waiting_input'])))).map(row => row.id))] : []
-  const [botRows, chats, suggestions, [counts], preferences, live, waitingRows] = await Promise.all([
+  const [botRows, chats, suggestions, perBot, preferences, live] = await Promise.all([
     // The Coordinator first, marked `coordinator` (lib/coordinator/coordinator-bot.ts listOwnerBots).
     listOwnerBots(user.id, context.workspace.id),
     botChats(user.id),
     listSuggestions(user.id),
+    // One read for 线程's counts and each bot's waiting mark: the counts per bot, summed here for the drawer.
     db.select({
+      botId: agentRuns.botId,
       running: sql<number>`count(*) filter (where ${inArray(agentRuns.status, [...RUNNING])})`,
       waiting: sql<number>`count(*) filter (where ${eq(agentRuns.status, 'waiting_input')})`,
-    }).from(agentRuns).where(and(recent, outside.length ? notInArray(agentRuns.id, outside) : undefined)),
+    }).from(agentRuns).where(and(recent, outside.length ? notInArray(agentRuns.id, outside) : undefined)).groupBy(agentRuns.botId),
     chatPreferences(user.id),
     ownerListRead(user.id),
-    // Each bot's threads waiting on the person: the home row's waiting mark outranks its unread count.
-    db.select({ botId: agentRuns.botId, waiting: sql<number>`count(*)` }).from(agentRuns)
-      .where(and(recent, eq(agentRuns.status, 'waiting_input'), outside.length ? notInArray(agentRuns.id, outside) : undefined))
-      .groupBy(agentRuns.botId),
   ])
-  const waiting = new Map(waitingRows.map(row => [row.botId, Number(row.waiting)]))
+  // Each bot's threads waiting on the person: the home row's waiting mark outranks its unread count.
+  const waiting = new Map(perBot.map(row => [row.botId, Number(row.waiting)]))
+  const counts = perBot.reduce((sum, row) => ({ running: sum.running + Number(row.running), waiting: sum.waiting + Number(row.waiting) }), { running: 0, waiting: 0 })
   const own = (key: string) => {
     const preference = preferences[key]
     return { hidden: preference?.hidden ?? false, markedUnread: preference?.markedUnread ?? false, pinOrder: preference?.pinOrder ?? null, listOrder: preference?.listOrder ?? null }
@@ -68,7 +68,7 @@ async function handleGET(request: Request) {
     // The person's own state for each group chat they changed on the home list, by conversation id.
     groupPreferences: Object.fromEntries(Object.entries(preferences).filter(([key]) => !botIds.has(key) && /^[0-9a-f-]{36}$/i.test(key))
       .map(([key, preference]) => [key, { pinned: preference.pinned, ...own(key) }])),
-    threads: { running: Number(counts?.running ?? 0), waiting: Number(counts?.waiting ?? 0) },
+    threads: counts,
     suggestions: suggestions.length,
     live: { ownerId: live.ownerId, workspaceId: live.workspaceId },
   })
