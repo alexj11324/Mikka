@@ -305,3 +305,66 @@ test('authenticated HTTP commands use the actual PostgreSQL store with optimisti
   assert.equal((await handler(request(),scope.botId!)).status,409)
   assert.equal((await store.active(scope,defaults)).definition.instructions,'HTTP version')
 })
+
+/** Bytes each statement returns, the same estimate as the db_sample log (lib/db/egress-sample.ts), by the table it reads. */
+function measuredStore(){
+  const read={agent_kit_executions:0,coordinator_messages:0,statements:0}
+  const count=(sql:string,rows:unknown[])=>{
+    const table=/^\s*select\b[\s\S]*?\bfrom (agent_kit_executions|coordinator_messages)\b/i.exec(sql)?.[1] as 'agent_kit_executions'|'coordinator_messages'|undefined
+    if(table){read[table]+=Buffer.byteLength(JSON.stringify(rows));read.statements++}
+  }
+  const measured=new Proxy(pool,{get(target,prop){
+    if(prop==='connect') return async()=>{
+      const client=await target.connect()
+      return new Proxy(client,{get(c,p){
+        if(p!=='query') return Reflect.get(c,p)
+        return async(sql:string,values?:unknown[])=>{const result=await c.query(sql,values);count(sql,result.rows??[]);return result}
+      }})
+    }
+    if(prop==='query') return async(sql:string,values?:unknown[])=>{const result=await target.query(sql,values);count(sql,result.rows??[]);return result}
+    return Reflect.get(target,prop)
+  }}) as Pool
+  return {store:new AgentKitStore(measured),pool:measured,read}
+}
+
+test('one Coordinator turn with five tool calls reads the execution row without its snapshot (bytes per turn)',async t=>{
+  const scope=await owner()
+  // About the production size: the hosted instructions and catalog make a ~30 KB snapshot.
+  const hostInstructions='Synthetic host policy. '.repeat(1300)
+  const execution=await store.beginExecution(scope,`turn-bytes-${randomUUID()}`,hostInstructions,{harness:'ai_sdk',model:null} as never,defaults)
+  const snapshotBytes=Buffer.byteLength(JSON.stringify(execution.snapshot))
+  assert.ok(snapshotBytes>25_000,'the fixture snapshot is production sized')
+  // A synthetic chat history the round reads once for its prompt (workflows/coordinator/steps.ts preparePrompt → loadConversation).
+  for(let position=1;position<=40;position++) await pool.query('insert into coordinator_messages(id,"userId","botId",position,message) values($1,$2,$3,$4,$5)',[randomUUID(),scope.ownerId,scope.botId,position,{role:position%2?'user':'assistant',content:'synthetic history '.repeat(500)}])
+  const historyBytes=(await pool.query('select position,message from coordinator_messages where "userId"=$1 and "botId"=$2',[scope.ownerId,scope.botId])).rows.reduce((sum,row)=>sum+Buffer.byteLength(JSON.stringify(row)),0)
+  const measured=measuredStore()
+  // The round as workflows/coordinator/workflow.ts runs it: the history once, then before/after for each tool call, then finish.
+  await measured.pool.query('select "position","message" from coordinator_messages where ("userId"=$1 and "botId"=$2 and "position">$3) order by "position" asc',[scope.ownerId,scope.botId,0])
+  const tools=execution.snapshot.effectiveTools.slice(0,5)
+  assert.equal(tools.length,5)
+  for(const [index,tool] of tools.entries()){
+    await measured.store.recordTool(scope,execution.id,`call-${index}`,tool,'start')
+    await measured.store.recordTool(scope,execution.id,`call-${index}`,tool,'finish',index===4?'error':'ok')
+  }
+  const finished=await measured.store.finishExecution(scope,execution.id,'completed')
+  assert.deepEqual(finished,{failureCases:execution.snapshot.definition.hooks.includes('failure_cases'),revision:execution.snapshot.revision,revisionId:execution.snapshot.revisionId})
+  t.diagnostic(JSON.stringify({event:'coordinator_turn_bytes',tools:5,snapshotBytes,agentKitExecutionsBytes:measured.read.agent_kit_executions,coordinatorMessagesBytes:measured.read.coordinator_messages,historyBytes,statements:measured.read.statements}))
+  // Before: every hook and the finish read the whole snapshot (12 × ~30 KB per five-tool turn).
+  assert.ok(measured.read.agent_kit_executions<=4_096,`agent_kit_executions bytes per turn: ${measured.read.agent_kit_executions}`)
+  assert.ok(measured.read.coordinator_messages<=historyBytes*1.1,`coordinator_messages bytes per turn: ${measured.read.coordinator_messages}`)
+  assert.equal(await measured.store.executionStatus(scope,execution.id),'completed')
+})
+
+test('the narrow execution read still refuses a tool outside the grant and a closed execution',async()=>{
+  const scope=await owner()
+  const execution=await store.beginExecution(scope,`narrow-${randomUUID()}`,'host',{harness:'codex',model:null},defaults)
+  const tool=execution.snapshot.effectiveTools[0]
+  await assert.rejects(store.recordTool(scope,execution.id,'call-1','not_a_tool','start'),/agentToolNotAllowed/)
+  await store.recordTool(scope,execution.id,'call-1',tool,'start')
+  assert.equal(await store.executionStatus(scope,execution.id),'running')
+  await store.finishExecution(scope,execution.id,'failed','turn_failed')
+  // A replayed start of an already recorded call is idempotent; a new call on the ended execution is refused.
+  await store.recordTool(scope,execution.id,'call-1',tool,'start')
+  await assert.rejects(store.recordTool(scope,execution.id,'call-2',tool,'start'),/agentExecutionClosed/)
+  await assert.rejects(store.executionStatus({...scope,botId:randomUUID()},execution.id),/agentScopeNotFound/)
+})
