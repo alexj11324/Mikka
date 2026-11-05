@@ -2,7 +2,7 @@ import { cronUnauthorized } from '@/lib/cron-auth'
 import { afterJob, cronJob } from '@/lib/background'
 import { pool } from '@/lib/db'
 import { reconcileDue } from '@/lib/reconcile-due'
-import { armDueTimer } from '@/lib/due-timer'
+import { armDueTimer, replaceStaleDueTimers } from '@/lib/due-timer'
 
 export const runtime = 'nodejs'
 // Run recovery's group-turn sweep keeps generating after the answer, as the run-recovery route does.
@@ -20,6 +20,9 @@ const headers = { 'cache-control': 'no-store' }
  */
 async function handleGET(request: Request) {
   const refused = await cronUnauthorized(request); if (refused) return refused
+  // A timer still running an older deployment's code is replaced here even when no write arms it (#1410).
+  // Workflow API calls only; once per kind per process.
+  await replaceStaleDueTimers()
   try {
     const { factoryLifecycleEnabled } = await import('@/lib/factory/runtime')
     const { workspacePool } = await import('@/lib/workspace-db')

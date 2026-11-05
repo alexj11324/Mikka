@@ -105,7 +105,7 @@ export function ColorPickerTrigger({
         onPress?.(event);
         if (!event.defaultPrevented) setOpen(!open);
       }}
-      className={`h-11 flex-row items-center gap-2.5 self-start rounded-xl border border-border bg-background pr-3.5 pl-2.5 active:opacity-80 ${className}`}
+      className={`h-11 flex-row items-center gap-2.5 self-start rounded-xl border border-border bg-surface pr-3.5 pl-2.5 active:opacity-80 ${className}`}
     >
       <View style={styles.chip}>
         <Checkerboard width={CHIP} height={CHIP} />
@@ -269,7 +269,7 @@ export function ColorPickerContent({
         onLayout={({ nativeEvent }) =>
           setPanelHeight(nativeEvent.layout.height)
         }
-        className={`gap-3 rounded-2xl border border-border bg-background p-3 ${className}`}
+        className={`gap-3 rounded-2xl border border-border bg-surface p-3 ${className}`}
         style={[
           styles.panel,
           { left, top, width },

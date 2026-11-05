@@ -61,6 +61,11 @@ The OIDC trust pins the current numeric GitHub repository and owner IDs and immu
 
 ## Issue #328 Preview isolation
 
+Historical record. Pull requests and branches no longer get a Vercel Preview
+([decision 2026-11-05-1632](design/decisions/2026-11-05-1632-no-vercel-preview.md));
+verify before merge in CI or a local/Docker production build with an isolated
+database.
+
 Verified 2026-10-27. The default Preview database lacked the suggestions and
 Coordinator schema. Neon had reached its branch limit, so two dedicated
 databases were initialized on non-production branch `br-billowing-pine-b5fdxmtt`:
@@ -89,10 +94,10 @@ tracked separately in [#330](https://github.com/alexj11324/Mikka/issues/330).
 ## Remaining acceptance
 
 - Diagnose Google account verification/linking state and complete real Google session acceptance through OAuth. Remove the temporary GitHub branch callback after fixed-hub acceptance; the Google temporary callback is already removed.
-- Verify the branch-alias correction and Google/GitHub sign-in on the final deployed Preview. Remote CI and actual deployment checks remain separate evidence.
+- Verify Google/GitHub sign-in in production after merge. Branches have no Vercel Preview; remote CI and the production check remain separate evidence.
 - Check the custom Linear integration callback separately; the Better Auth social proxy does not relay it. The existing Linear application webhook was corrected from the retired API host to `https://linear-sync.aspectlylabs.com/mikka/api/webhooks/linear`; real Linear event processing and token reconnection still need acceptance.
 - Validate the required Neon schema on each new branch. Imported database snapshots do not establish branch runtime acceptance.
 - Other Agent hosts still need their own supported workload authentication; the GitHub OIDC receipt only establishes that hosted runner path.
-- No local development server, build or typecheck was run. The current application changes passed remote CI before PR #46 was merged; the branch-alias follow-up requires its own remote CI and Preview validation.
+- No local development server, build or typecheck was run. The current application changes passed remote CI before PR #46 was merged; the branch-alias follow-up requires its own remote CI and production validation.
 
 Official references: [Vercel integration](https://vercel.com/marketplace/infisical), [Worker native sync](https://infisical.com/docs/integrations/secret-syncs/cloudflare-workers), [secret references](https://infisical.com/docs/documentation/platform/secret-reference), [Better Auth OAuth proxy](https://www.better-auth.com/docs/plugins/oauth-proxy).

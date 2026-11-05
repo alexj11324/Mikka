@@ -297,7 +297,7 @@ export function RangeSlider({
           setWidth(next);
           props.onLayout?.(event);
         }}
-        className={`h-10 w-full justify-center overflow-hidden rounded-lg bg-surface ${disabled ? "opacity-50" : ""} ${className}`}
+        className={`h-10 w-full justify-center overflow-hidden rounded-lg bg-default ${disabled ? "opacity-50" : ""} ${className}`}
         style={style}
       >
         <View style={styles.fillClip} className="rounded-lg">

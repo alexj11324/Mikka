@@ -92,9 +92,9 @@ const BubbleContext = createContext<BubbleContextValue>({ variant: "soft" });
 // Full class strings, so Uniwind can see every token at build time.
 const SURFACE_CLASS: Record<MessageBubbleVariant, string> = {
   solid: "bg-primary",
-  soft: "bg-surface",
+  soft: "bg-default",
   tint: "bg-primary/10",
-  outline: "border border-border-strong bg-background",
+  outline: "border border-border-strong bg-surface",
   ghost: "",
   danger: "bg-destructive/10",
 };
@@ -473,7 +473,7 @@ export function MessageBubbleCollapsible({
   const turn = useSharedValue(open ? 1 : 0);
   const measured = full > 0;
   const surface = useResolveClassNames(
-    SURFACE_CLASS[variant] || "bg-background",
+    SURFACE_CLASS[variant] || "bg-surface",
   );
   const { color: tone } = useResolveClassNames(TEXT_CLASS[variant]);
 

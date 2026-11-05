@@ -232,7 +232,7 @@ export function ImageGeneration({
         >
           <Animated.View
             style={[{ aspectRatio }, liftStyle]}
-            className="w-full overflow-hidden rounded-xl bg-surface"
+            className="w-full overflow-hidden rounded-xl bg-default"
           >
             <Animated.View
               style={[StyleSheet.absoluteFill, mediaStyle]}
@@ -244,7 +244,7 @@ export function ImageGeneration({
             {ditherMounted ? (
               <Animated.View
                 style={[StyleSheet.absoluteFill, overlayStyle]}
-                className="bg-surface"
+                className="bg-default"
               >
                 <DitherField
                   color={String(foreground ?? "#000")}
@@ -257,7 +257,7 @@ export function ImageGeneration({
               <View
                 pointerEvents="none"
                 style={styles.badge}
-                className="rounded-full bg-background/75 px-2 py-0.5"
+                className="rounded-full bg-surface/75 px-2 py-0.5"
               >
                 <Text
                   className="font-mono text-[10px] text-muted"

@@ -12,8 +12,10 @@ directory and access to source files outside it. Both use Team OIDC. The app
 can GenerateDataKey/Encrypt; the broker can Decrypt. There is no static AWS
 key or fallback credential chain. The broker verifies the app's exact signed
 project/team/environment identity before consuming an opaque, database-bound
-30-second single-use lease. Both deployments must use the same isolated
-Preview database and source commit when testing together.
+30-second single-use lease. When testing together, the app and broker must
+run the same source commit against the same isolated database. Branches have
+no Vercel Preview; pre-merge checks run in CI or a local/Docker production
+build ([decision](../design/decisions/2026-11-05-1632-no-vercel-preview.md)).
 
 Infisical supplies the five AWS settings from `staging:/aws` for Preview and
 `prod:/aws` for Production. The vault is enabled by default; the optional
@@ -137,7 +139,8 @@ availability does not supply missing KMS configuration or provider authority.
    to both Vercel projects, as `aws-kms-credential-setup.md` records.
 3. Deploy `services/credential-broker` as the `mikka-credential-broker` project
    so `CREDENTIAL_BROKER_URL` can point at a frozen origin.
-4. Configure `CREDENTIAL_BROKER_URL` for the frozen Preview. Verify: signed out
+4. Configure `CREDENTIAL_BROKER_URL` for the deployment under test (production
+   after merge; there is no branch Preview). Verify: signed out
    gets `401`, signed in gets
    `200 {"logins":[]}`, and the protected `/api/credentials/oidc` probe reports
    own-role and same-context KMS success with cross-role and wrong-owner denial.
