@@ -40,7 +40,7 @@ export default function TasksScreen() {
   const sections = SECTIONS.map(s => ({ title: s.title, data: (data?.tasks ?? []).filter(t => s.status.includes(t.status)) })).filter(s => s.data.length)
   return (
     <View style={styles.screen}>
-      <NavBar title="任务" />
+      <NavBar title="任务" large />
       <SectionList
         sections={sections}
         keyExtractor={t => t.id}

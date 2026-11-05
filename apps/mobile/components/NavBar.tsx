@@ -68,12 +68,12 @@ export function NavBar({ title, titleView, left, right, back, large, search, mat
 }) {
   const router = useRouter()
   const pathname = usePathname()
-  // Expo Web already names these roots in its floating native-tab fallback.
-  const webTabRoot = Platform.OS === 'web' && ['/chats', '/threads', '/search'].includes(pathname)
+  // The home screen has no title and no back button: its bar holds the workspace button and 新建.
+  const webTabRoot = Platform.OS === 'web' && pathname === '/'
   const lefts = list(left), rights = list(right)
   if (!ios) {
     const goBack = back ?? (() => {
-      if (Platform.OS === 'web' && !router.canGoBack()) router.replace('/chats')
+      if (Platform.OS === 'web' && !router.canGoBack()) router.replace('/')
       else router.back()
     })
     // The Web router's history availability is not reactive. Keep an exit on pushed/deep-linked pages.

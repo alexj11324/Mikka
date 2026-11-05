@@ -30,34 +30,38 @@ briefing in the morning and see what is waiting on me.
 
 ## Where it lives
 
-The system tab bar holds **对话**, **线程** and the system search tab
-([decision](decisions/2026-10-31-2345-mobile-bot-home.md),
-[top bar](decisions/2026-11-01-0045-mobile-home-bar.md),
-[no drawer](decisions/2026-11-05-1300-ios-no-drawer.md)); the app
-opens on 对话. A chat, a thread, 设置, 插件, 建议 and 任务 open over the tabs,
-with the system back button and edge swipe.
+The app is one Stack inside a push drawer, as OpenBot's is; there is no tab bar
+([decision](decisions/2026-11-05-2005-ios-push-drawer.md), replacing
+[no drawer](decisions/2026-11-05-1300-ios-no-drawer.md)). It opens on the chat
+list. A chat, a thread, 线程, 任务, 建议, 插件 and 设置 open over it, with the
+system back button and edge swipe.
 
-**对话** is a messaging app's chat list (Alex's Grok screenshot): no title and
-no search field at the top. The person's avatar, on the left of every tab
-root's bar, opens the **account sheet** (`app/account.tsx`), a system page
-sheet with the system grouped list: the person (→ 个人资料), 工作区, 建议 with
-its count, 任务, 插件, 设置, and 「重启以更新」 once an update has downloaded
-([decision](decisions/2026-10-31-2010-ota-updates.md)). There is no drawer. 「+」 (top right) opens 新建 Bot and 新建群聊. The
-pinned bots sit on top, each with a star (the star is the pin, the same for
-every bot; the Coordinator is pinned until the person unpins it,
-[decision](decisions/2026-11-01-1215-star-is-the-pin.md)), then every other
-bot and group chat with its last line and time, newest first (the web bot
-list, R-01; R-06).
-**搜索** is the tab bar's search: its field sits at the bottom and matches
-bots and group chats by name.
+The **home screen** is a messaging app's chat list. It has no title.
+- Its bar holds the workspace button (left), which opens the drawer, and 新建
+  (right): 新建 Bot and 新建群聊.
+- The system search field under the bar matches bots and group chats by name.
+- The pinned bots sit on top as tiles, each with a star. The star is the pin,
+  the same for every bot; the Coordinator is pinned until the person unpins it
+  ([decision](decisions/2026-11-01-1215-star-is-the-pin.md)).
+- Then come the sections 正在工作, Bot and 群聊. Each row has its last line and
+  time, newest first (the web bot list, R-01; R-06).
+- 「重启以更新」 shows above the list once an update has downloaded
+  ([decision](decisions/2026-10-31-2010-ota-updates.md)).
+
+The **drawer** lies under the app at the left edge. A drag to the right on the
+home screen, or the workspace button, slides the app aside to show it.
+- At the top is the open workspace. A tap lists the others to switch to, and
+  排序 arranges them on this device.
+- Then 线程 and 建议, each with its count, and 任务 and 插件.
+- At the foot are the person (→ 个人资料) and 设置.
 The Coordinator gets no other special UI (R-06).
 
 Controls are the system's where iOS has one
 ([decision](decisions/2026-10-31-2200-mobile-native-ios.md)): the top bar is
 the iOS navigation bar with its own bar buttons, menus and back button;
-the tab bar, capsules and the composer are Liquid Glass on iOS 26.
+capsules and the composer are Liquid Glass on iOS 26.
 
-**线程** (the tab; like the Claude app's Code screen): grouped as on the
+**线程** (from the drawer, a large-title page; like the Claude app's Code screen): grouped as on the
 web (R-52), 等待你 · 进行中 · 受阻 · 空闲 · 已解决, a task's attempts folded
 into its newest thread (「第 N 次尝试」); 新线程 and the filter menu sit in the bar.
 
@@ -151,7 +155,7 @@ What reaches the person and when is R-20. On mobile:
 
 ## Settings
 
-Opened from 设置 in the account sheet. A hierarchy (R-70): the
+Opened from 设置 at the foot of the drawer. A hierarchy (R-70): the
 top screen holds categories, each opens its own page. Every row cites its
 precedent. Figma frames 07, 07a–07e.
 
@@ -180,7 +184,7 @@ Administration (members, teams, devices) stays on the web.
 
 Wherever iOS has a native control or behavior, the app uses it; we build our own only where nothing native exists
 ([2026-11-05-1230](decisions/2026-11-05-1230-ios-native-first.md)). Native today: the stack header with the system
-material and its back swipe, the header's 更多 (UIMenu via `Stack.Toolbar.Menu`), a message's long press (the system context menu), the account sheet (page sheet, SwiftUI `Form`), the model picker and 「+」 (SwiftUI
+material and its back swipe, the header's 更多 (UIMenu via `Stack.Toolbar.Menu`), a message's long press (the system context menu), the header search field (`Stack.SearchBar`), the model picker and 「+」 (SwiftUI
 `Menu`), segmented controls (SwiftUI `Picker`), switches (`UISwitch`), the activity indicator, sheets (`formSheet` with
 detents, `modal` page sheets), and the scroll views' bounce and momentum. The vendored beui kit is not used for any of
 these.
@@ -190,6 +194,7 @@ What is still our own, and why:
 | Control | Why it is ours |
 |---|---|
 | Message bubbles, event lines, the thread card (`components/chat.tsx`) | iOS has no chat transcript control. |
+| The push drawer (`features/shell/components/app-drawer.tsx`) | iOS has no side drawer; ours follows OpenBot's, on a 300 ms spring with Reduce Motion. |
 | Swipe right to quote, swipe left for times (`TimedRow`, `useTimeReveal`) | Messages' gestures are not public API; ours follow them, on `lib/springs.ts`. |
 | Reactions in the long-press menu | A long press on iOS is the system context menu (`components/MessageMenu.ios.tsx`, `@expo/ui` `ContextMenu`), lifting the bubble itself. iOS has no reaction bar on a context menu, so the six reactions are two compact `ControlGroup` rows of three at its top. VoiceOver, the keyboard and the web build keep the actions sheet (`app/message.tsx`). |
 | The reply action row (copy · 回复 · 更多) | Not a system control; ChatGPT and Claude draw it the same way. |
@@ -208,8 +213,8 @@ large Dynamic Type. Plus:
 - Coordinator chat: streaming reply, proactive card (unanswered / answered /
   snoozed), thread card (running / waiting / failed / done).
 - Push: lock screen and banner, one per kind (mail, CI, run finished,
-- 对话: the bot list with the pinned bots on top, search, and 重启以更新.
-- Account sheet: with and without 建议, with 重启以更新.
+- Home: the chat list with the pinned bots on top, its sections, search, and 重启以更新.
+- Drawer: closed, mid-drag, open; the workspace list and 排序; with and without counts.
 - 线程: each filter, running / waiting / failed / done rows.
 - 建议: no apps connected (connect CTA), nothing today, briefing generating.
 - Sign in: Google, GitHub (R-40 copy rules).

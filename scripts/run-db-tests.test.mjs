@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { BOOTSTRAP, BROWSER_SUITES, REQUIRED_SUITES, SELF_MANAGED, TEMPLATE_BOUND, checkSummary, cloneDatabaseName, concurrency, inventory, runScript, scriptSteps, shardScripts, suiteEnv, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
 import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
 
@@ -175,6 +176,31 @@ test('the default runner buffers a suite\'s output and reports its exit status',
   assert.deepEqual(result, { status: 3, stdout: 'out', stderr: 'err' })
   const missing = await runScript('/nonexistent/command', [], { cwd: '.', env: process.env })
   assert.equal(missing.status, null)
+})
+
+test('the CLI drains large failed-suite diagnostics before exiting with the failure status', t => {
+  const fixture = runnerFixture(t, ['verbose'])
+  const preload = join(fixture.root, 'mock-postgres.mjs')
+  writeFileSync(preload, `import { mock } from 'node:test';
+    class Client { async connect() {} async query() {} async end() {} }
+    mock.module(${JSON.stringify(import.meta.resolve('pg'))}, { defaultExport: { Client } });`)
+  const stdout = 'SUITE-STDOUT-START\n' + 'x'.repeat(1024 * 1024) + '\nSUITE-STDOUT-END\n# tests 1\n# pass 0\n# fail 1\n'
+  const stderr = 'SUITE-STDERR-START\n' + 'y'.repeat(1024 * 1024) + '\nSUITE-STDERR-END\n'
+  writeFileSync(join(fixture.root, 'pnpm'), `#!/usr/bin/env node
+    process.stdout.write(${JSON.stringify(stdout)});
+    process.stderr.write(${JSON.stringify(stderr)});
+    process.exitCode = 1;`, { mode: 0o755 })
+  const result = spawnSync(process.execPath, ['--experimental-test-module-mocks', '--import', preload,
+    fileURLToPath(new URL('./run-db-tests.mjs', import.meta.url))], {
+    cwd: fixture.root, env: { ...process.env, ...env, PATH: `${fixture.root}:${process.env.PATH}` },
+    encoding: 'utf8', maxBuffer: 4 << 20, timeout: 10_000,
+  })
+  assert.equal(result.error, undefined)
+  assert.equal(result.status, 1)
+  assert.ok(result.stdout.includes(stdout), 'the original failed-suite stdout is complete')
+  assert.ok(result.stderr.includes(stderr), 'the original failed-suite stderr is complete')
+  assert.match(result.stdout, /Required DB timings:/)
+  assert.match(result.stderr, /::error::test:verbose-db exited with 1/)
 })
 
 test('runner validates all expected and discovered suites before sharding and before subprocesses', async t => {

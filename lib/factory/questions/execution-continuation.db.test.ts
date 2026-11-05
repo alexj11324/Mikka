@@ -14,7 +14,7 @@ import { questionFingerprint } from './contract'
 import { questionExecutionContinuation } from './execution-continuation'
 import { checkFactoryRepairBudget } from '../check-recovery-evidence'
 import { appendFactoryCheckContinuationContext, producerCommandObservations } from '../checks'
-import { questionExecutionObservations } from '../question-execution-observations'
+import { questionExecutionObservations, questionExecutionObservationPrompt } from '../question-execution-observations'
 import { freezeWorkerDefinition } from '../../agent-kit/worker'
 
 const url = process.env.E2E_DATABASE_URL
@@ -535,6 +535,49 @@ test('real PG: question receipts preserve one execution without opening a repair
       assert.ok(omitted.data)
       assert.equal(omitted.data.lifecycleComplete, false)
       assert.deepEqual(omitted.data.lifecycleIncompleteReasons, ['execution_observations_omitted'])
+      if (harness === 'claude_code') await transaction(async tx => {
+        // Production CC uses object inputs and string outputs for these two
+        // tools. The fixture preserves those shapes, not the production text.
+        const decisionResultId = randomUUID()
+        const stateChangingTools = [
+          { toolName: 'mcp__mikka__record_decision', toolCallId: 'record-choice', input: {
+            kind: 'choose', title: 'Choose an evidence route', summary: 'Use the recorded evidence.',
+            reason: 'synthetic-decision-reason-must-stay-in-chunk',
+            options: [{ id: 'evidence', title: 'Evidence route', disposition: 'selected' }], selectedOptionId: 'evidence',
+            sources: [{ role: 'evidence', source: { type: 'run_chunk', id: inputId, runId: f.originRunId } }],
+            idempotencyKey: `fixture-choice-${f.questionId}`,
+          }, output: JSON.stringify({ decisionId: decisionResultId, recordedAt: at(41), duplicate: false }) },
+          { toolName: 'Write', toolCallId: 'write-artifact', input: {
+            file_path: '/tmp/fixture/PRIVATE-DETAIL.md', content: 'synthetic-file-content-must-stay-in-chunk',
+          }, output: 'File created successfully at: /tmp/fixture/PRIVATE-DETAIL.md' },
+        ]
+        await tx.query('UPDATE run_chunks SET seq=seq+4 WHERE "runId"=$1 AND seq>=4', [f.originRunId])
+        const pairIds: { input: string; output: string }[] = []
+        for (const [index, tool] of stateChangingTools.entries()) {
+          const ids = { input: randomUUID(), output: randomUUID() }; pairIds.push(ids)
+          await tx.query('INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,$3,$4,$5),($6,$2,$7,$8,$9)',
+            [ids.input, f.originRunId, 4 + index * 2, JSON.stringify({ type: 'tool-input-available', toolName: tool.toolName, toolCallId: tool.toolCallId, input: tool.input }), at(40 + index * 10),
+              ids.output, 5 + index * 2, JSON.stringify({ type: 'tool-output-available', toolCallId: tool.toolCallId, output: tool.output }), at(41 + index * 10)])
+        }
+        const actual = await questionExecutionObservations(tx, task, candidate)
+        assert.ok(actual.data && 'sourceToolActivity' in actual.data)
+        assert.equal(actual.data.sourceToolActivity.enumerationComplete, true, 'known state-changing tools remain explicitly enumerated')
+        assert.equal(actual.data.lifecycleComplete, true)
+        assert.deepEqual(actual.data.sourceToolActivity.unclassifiedTools, [])
+        assert.deepEqual(actual.data.sourceToolActivity.tools.map(tool => tool.toolName), ['Bash', 'mcp__mikka__record_decision', 'Write', 'mcp__mikka__ask_human'])
+        assert.deepEqual(actual.data.sourceToolActivity.tools.slice(1, 3).map(tool => [tool.inputChunkId, tool.outputChunkId]), pairIds.map(ids => [ids.input, ids.output]))
+        const prompt = questionExecutionObservationPrompt(actual.data)
+        assert.match(prompt, /does not establish read-only execution/)
+        assert.match(prompt, /Write can modify files and mcp__mikka__record_decision writes Mikka records/)
+        assert.doesNotMatch(prompt, /synthetic-decision-reason|synthetic-file-content|PRIVATE-DETAIL\.md/)
+        assert.ok(!prompt.includes(decisionResultId), 'a paired tool result is not promoted into verified decision evidence')
+        await tx.query('DELETE FROM run_chunks WHERE id=$1', [pairIds[1].output])
+        const missing = await questionExecutionObservations(tx, task, candidate)
+        assert.ok(missing.data && 'sourceToolActivity' in missing.data)
+        assert.equal(missing.data.sourceToolActivity.enumerationComplete, false)
+        assert.equal(missing.data.lifecycleComplete, false)
+        assert.ok(missing.data.sourceToolActivity.incompleteReasons.includes('tool_pair_incomplete'), 'recognizing Write cannot excuse its missing output')
+      }, true)
       await transaction(async tx => {
         // A daemon without assignment.computer writes transient preparing
         // before the first message; the cloud computer path already has start.
