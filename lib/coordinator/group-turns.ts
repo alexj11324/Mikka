@@ -13,6 +13,9 @@ import { recordGroupFeedback } from './group-decision-feedback'
 import { groupCopy, readGroupLocale } from './group-copy'
 import { openGroupTurnSession } from './group-turn-session'
 import { groupListChanged, runListChanged } from '@/lib/live/lists'
+import { groupChatChanged } from '@/lib/live/groups'
+import { runChanged } from '@/lib/live/panels'
+import { GROUP_TURN_STOP_CHANNEL, listenOn, notifyChannel, type Listener } from '@/lib/db/listen'
 
 export const GROUP_MAX_ROUNDS = GROUP_MAX_RESPONDERS
 export type GroupAgent = RoutingMember
@@ -35,8 +38,10 @@ export type GroupRuntime = {
 }
 /** 停止 in a group: the turn's error once a member stopped it; it keeps the replies already posted and is never replayed. */
 export const GROUP_TURN_STOPPED = 'stopped'
-/** How often a generation checks whether the turn was stopped. */
-const STOP_POLL_MS = 1000
+/** How often a generation checks whether the turn was stopped when no stop push is available. */
+const STOP_CHECK_MS = 1000
+/** With the stop push (LISTEN on the worker's own session), only a slow check for a lost notification. */
+export const STOP_FALLBACK_MS = 15_000
 
 /** Finite diagnostics only: provider errors may contain private prompts, URLs and credentials. */
 export function groupGenerationFailure(error: unknown) {
@@ -60,11 +65,14 @@ export function groupGenerationFailure(error: unknown) {
 export async function stopGroupTurns(client: Pick<PoolClient, 'query'>, conversationId: string, actorUserId?: string): Promise<number> {
   const { rows } = await client.query<{ messageId: string; activeRunId: string | null }>(`UPDATE group_turns SET status='failed',error=$2,"agentId"=NULL,"botId"=NULL,trace=trace || jsonb_build_object('status','stopped','finishedAt',now()),"updatedAt"=now()
     WHERE "conversationId"=$1 AND (status IN ('queued','running') OR error='group_judgment_pending') RETURNING "messageId","activeRunId"`, [conversationId, GROUP_TURN_STOPPED])
+  if (rows.length) await groupChatChanged(client, conversationId)
   if (actorUserId) for (const row of rows) await recordGroupFeedback(client, { conversationId, messageId: row.messageId, userId: actorUserId, source: 'human_cancellation', kind: 'cancelled_turn' })
+  // The worker holding the turn LISTENs on its direct session; this reaches it on COMMIT.
+  await notifyChannel(client, GROUP_TURN_STOP_CHANNEL, rows.map(row => row.messageId))
   const runs = rows.flatMap(row => row.activeRunId ? [row.activeRunId] : [])
   if (runs.length) {
     const stopped = await client.query<{ id: string }>(`UPDATE agent_runs SET status='stopped',"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now() WHERE id=ANY($1::uuid[]) AND kind='group_chat' AND status='running' RETURNING id`, [runs])
-    for (const row of stopped.rows) await runListChanged(client, row.id)
+    for (const row of stopped.rows) { await runListChanged(client, row.id); await runChanged(client, row.id) }
   }
   return rows.length
 }
@@ -101,11 +109,13 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     locked = true
     // An unavailable routing decision has not woken a responder. Retry only
     // that judgment with bounded backoff, never an interrupted generation.
-    await client.query(`UPDATE group_turns SET status='queued',error=NULL,"nextDecisionAt"=NULL WHERE "conversationId"=$1 AND status='failed' AND error='group_judgment_pending' AND "nextDecisionAt"<=now()`,[conversationId])
+    const requeued = await client.query(`UPDATE group_turns SET status='queued',error=NULL,"nextDecisionAt"=NULL WHERE "conversationId"=$1 AND status='failed' AND error='group_judgment_pending' AND "nextDecisionAt"<=now()`,[conversationId])
     // Recover only this group's linked chat runs; never alter daemon/issue runs.
     const interruptedRuns = await client.query<{ id: string }>(`UPDATE agent_runs SET status='failed',"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now() WHERE id IN (SELECT "activeRunId" FROM group_turns WHERE "conversationId"=$1 AND status='running') AND kind='group_chat' AND status='running' RETURNING id`, [conversationId])
-    for (const row of interruptedRuns.rows) await runListChanged(client, row.id)
-    await client.query(`UPDATE group_turns SET "activeRunId"=NULL,status='failed',"agentId"=NULL,"botId"=NULL,error='interrupted_generation_not_replayed',trace=trace || '{"status":"failed"}'::jsonb,"updatedAt"=now() WHERE "conversationId"=$1 AND status='running'`, [conversationId])
+    for (const row of interruptedRuns.rows) { await runListChanged(client, row.id); await runChanged(client, row.id) }
+    const interrupted = await client.query(`UPDATE group_turns SET "activeRunId"=NULL,status='failed',"agentId"=NULL,"botId"=NULL,error='interrupted_generation_not_replayed',trace=trace || '{"status":"failed"}'::jsonb,"updatedAt"=now() WHERE "conversationId"=$1 AND status='running'`, [conversationId])
+    // Who is answering shows on the group's page (its messages read's agentStatus).
+    if (requeued.rowCount || interrupted.rowCount) await groupChatChanged(client, conversationId)
     const { rows } = await client.query(`SELECT t.*, m.body,m.mentions,m.position,c."workspaceId",c."createdBy",c."leadAgentId",c."leadBotId" FROM group_turns t
       JOIN conversation_messages m ON m.id=t."messageId" JOIN conversations c ON c.id=t."conversationId"
       WHERE t."conversationId"=$1 AND t.status='queued' ORDER BY m.position LIMIT 1`, [conversationId])
@@ -127,7 +137,18 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       return hostedBillingScope.run({ workspaceId: root.workspaceId, ownerId: root.userId }, work)
     }
     messageId = root.messageId
-    await client.query(`UPDATE group_turns SET status='running',"updatedAt"=now() WHERE "messageId"=$1`, [messageId])
+    // Listen before the claim: a stop that commits after it is pushed to this
+    // session at once. Without LISTEN the generation falls back to checking every second.
+    const stops: Listener | null = await listenOn(client, GROUP_TURN_STOP_CHANNEL).catch(() => null)
+    // Losing the session (and its lock) wakes the same check as a pushed stop.
+    const stopPushed = stops ? (wake: () => void) => {
+      const offStop = stops.on(root.messageId, wake), offLost = session.onLost(wake)
+      return () => { offStop(); offLost() }
+    } : undefined
+    // Stop may commit after the queue read; it must win over this claim.
+    const claimed = await client.query(`UPDATE group_turns SET status='running',"updatedAt"=now() WHERE "messageId"=$1 AND status='queued'`, [messageId])
+    if (!claimed.rowCount) return true
+    await groupChatChanged(client, conversationId)
     const authorized = async () => {
       if (!await runtime.authorized(root.workspaceId, root.userId) || !await runtime.authorized(root.workspaceId, root.createdBy)) return false
       const member = await client.query(`SELECT 1 FROM conversation_members WHERE "conversationId"=$1 AND "memberType"='user' AND "memberId"=$2 AND "leftAt" IS NULL`, [conversationId, root.userId])
@@ -195,7 +216,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
           session.assertHeld()
           return runtime.delegate!({ userId:root.userId, workspaceId:root.workspaceId, conversationId, messageId:messageId!, reporter, text:input.text, delegation },client)
         } : undefined,
-        generate: (agent, input) => untilStopped(stopped, async signal => {
+        generate: (agent, input) => untilStopped(stopped, { subscribe: stopPushed }, async signal => {
           session.assertHeld()
           input = { ...input, signal, attachmentContext: { userId: root.userId, conversationId } }
           const generate = async (value: typeof input) => {
@@ -228,6 +249,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
               await recordGroupTraceEvent(client, messageId!, { id: `wake:${++wakeCount}`, type: 'wake', memberId: id })
               if (actor.memberType === 'bot') {
                 await client.query(`UPDATE group_turns SET "botId"=$2,"agentId"=NULL,"activeRunId"=NULL,"updatedAt"=now() WHERE "messageId"=$1`, [messageId, id])
+                await groupChatChanged(client, conversationId)
                 await client.query('COMMIT')
                 return
               }
@@ -242,6 +264,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
               await client.query(`UPDATE agent_runs SET status=$2,"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now() WHERE id=(SELECT "activeRunId" FROM group_turns WHERE "messageId"=$1) AND kind='group_chat' AND "userId"=$3 AND status='running'`, [messageId, outcome, root.createdBy])
               await client.query('UPDATE group_turns SET "agentId"=NULL,"activeRunId"=NULL,"botId"=NULL,"updatedAt"=now() WHERE "messageId"=$1', [messageId])
             }
+            await groupChatChanged(client, conversationId)
             await client.query('COMMIT')
           } catch (error) { await client.query('ROLLBACK'); throw error }
         },
@@ -249,6 +272,8 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
           await client.query('BEGIN')
           try {
             await client.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE', [conversationId])
+            // Use the same final Stop fence as a public reply.
+            if ((await client.query(`SELECT status FROM group_turns WHERE "messageId"=$1 FOR UPDATE`, [messageId])).rows[0]?.status !== 'running') { await client.query('ROLLBACK'); return false }
             const current = await eligible()
             const sender = current.find(a => a.id === senderId), recipient = current.find(a => a.id === recipientId)
             if (!sender || !recipient || senderId === recipientId) { await client.query('ROLLBACK'); return false }
@@ -256,6 +281,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
             const link = await appendGroupExchange(client, { sourceId: conversationId, anchorId: messageId!, ownerId: root.createdBy, workspaceId: root.workspaceId,
               senderId, recipientId, senderType: sender.memberType ?? 'agent', recipientType: recipient.memberType ?? 'agent', text: reply.text, title: `${sender.name} ⇄ ${recipient.name}`, linkId: exchangeLinks.get(pair) })
             await recordGroupTraceEvent(client, messageId!, { id: randomUUID(), type: 'private_publish', memberId: senderId })
+            await groupChatChanged(client, conversationId)
             await client.query('COMMIT')
             exchangeLinks.set(pair, link.linkId)
             return true
@@ -275,6 +301,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
             const { rows: positions } = await client.query('UPDATE conversations SET "lastPosition"="lastPosition"+1 WHERE id=$1 RETURNING "lastPosition"::text AS position', [conversationId])
             await client.query(`INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body,mentions,"replyToId") VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [randomUUID(), conversationId, positions[0].position, actor.memberType ?? 'agent', id, reply.text, JSON.stringify(reply.mentions.map(memberId => ({ memberType: current.find(a => a.id === memberId)?.memberType ?? 'agent', memberId }))), messageId])
             await groupListChanged(client, conversationId)
+            await groupChatChanged(client, conversationId)
             await recordGroupTraceEvent(client, messageId!, { id: `publish:${positions[0].position}`, type: 'publish', memberId: id, contentDigest: createHash('sha256').update(reply.text.trim()).digest('hex') })
             await client.query('COMMIT')
             return true
@@ -283,7 +310,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       }, deadline)
     }
     const completed = await client.query(`UPDATE group_turns SET status='complete',"updatedAt"=now() WHERE "messageId"=$1 AND status='running'`, [messageId])
-    if (completed.rowCount) await finishGroupDecisionTrace(client, messageId!, 'complete')
+    if (completed.rowCount) { await groupChatChanged(client, conversationId); await finishGroupDecisionTrace(client, messageId!, 'complete') }
     return true
   } catch (error) {
     if (!messageId) throw error
@@ -295,6 +322,8 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       "decisionAttempts"="decisionAttempts"+CASE WHEN $2='group_judgment_pending' THEN 1 ELSE 0 END,
       "nextDecisionAt"=CASE WHEN $2='group_judgment_pending' AND route IS NULL THEN now()+make_interval(secs=>LEAST(900,60*power(2,LEAST("decisionAttempts",4)))::double precision) ELSE NULL END
       WHERE "messageId"=$1 AND status='running'`, [messageId, reason])
+    // Best effort: the invalidation never replaces the failure being reported.
+    await groupChatChanged(client, conversationId).catch(() => {})
     await finishGroupDecisionTrace(client, messageId, error instanceof GroupJudgmentPendingError ? 'blocked' : 'failed')
     console.error(JSON.stringify({ event: 'group_generation_failed', reason, conversationId, messageId,
       ...(error instanceof GroupJudgmentPendingError && error.decisionFailure ? {decisionFailure:error.decisionFailure,decisionPhase:error.decisions.at(-1)?.phase}:{}),
@@ -307,18 +336,25 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
   }
 }
 
-/** Pure serial round engine, shared by the real adapter and scripted CI. */
-/** Runs `work` with a signal that aborts once `stopped()` says the turn was stopped (polled while it runs). */
-export async function untilStopped<T>(stopped: () => Promise<boolean>, work: (signal: AbortSignal) => Promise<T>, every = STOP_POLL_MS): Promise<T> {
+/** Runs `work` with a signal that aborts once `stopped()` says the turn was
+ * stopped. A stop push (`subscribe`) triggers that check at once; then the
+ * timer is only a slow fallback for a lost notification (STOP_FALLBACK_MS).
+ * Without a push it checks every STOP_CHECK_MS, as before. */
+export async function untilStopped<T>(stopped: () => Promise<boolean>, options: { subscribe?: (wake: () => void) => () => void; every?: number }, work: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController()
-  let polling = false
-  const timer = setInterval(() => {
-    if (polling) return
-    polling = true
-    void stopped().then(yes => { if (yes) controller.abort(new Error(GROUP_TURN_STOPPED)) }, () => undefined).finally(() => { polling = false })
-  }, every)
-  try { return await work(controller.signal) } finally { clearInterval(timer) }
+  let checking = false, again = false
+  const check = () => {
+    if (checking) { again = true; return }
+    checking = true
+    void stopped().then(yes => { if (yes) controller.abort(new Error(GROUP_TURN_STOPPED)) }, () => undefined)
+      .finally(() => { checking = false; if (again && !controller.signal.aborted) { again = false; check() } })
+  }
+  const unsubscribe = options.subscribe?.(check) ?? (() => {})
+  const timer = setInterval(check, options.every ?? (options.subscribe ? STOP_FALLBACK_MS : STOP_CHECK_MS))
+  try { return await work(controller.signal) } finally { clearInterval(timer); unsubscribe() }
 }
+
+/** Pure serial round engine, shared by the real adapter and scripted CI. */
 
 export async function runGroupRounds(route: GroupRoute, message: GroupMessage, io: {
   eligible(): Promise<GroupAgent[]>

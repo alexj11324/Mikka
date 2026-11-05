@@ -1,4 +1,5 @@
 import "server-only";
+import { documentChanged } from '../live/panels';
 import type { PoolClient } from "pg";
 import {
   encodedIssueDocument,
@@ -53,6 +54,7 @@ export async function appendMonitorEvidence(
        ON CONFLICT ("issueId") DO UPDATE SET state=excluded.state,"updatedAt"=now()`,
       [issue.id, issue.userId, encodedIssueDocument(doc)],
     );
+    await documentChanged(tx, issue.id);
   } finally {
     doc.destroy();
   }

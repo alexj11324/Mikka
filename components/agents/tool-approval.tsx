@@ -157,7 +157,7 @@ export function ToolApproval({
           aria-hidden="true"
           className={cn(
             "mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl border border-border/60 bg-background text-muted-foreground",
-            error && "text-destructive",
+            error && "text-destructive-foreground",
           )}
         >
           {busy ? (

@@ -26,7 +26,7 @@ export function ThreadSteps({ harness, steps, stateKey = 'steps' }: { harness: s
     <CollapsibleContent className="w-full">
       <ol className="ml-1.5 flex flex-col gap-1 border-l border-rule py-0.5 pl-3 text-xs">
         {steps.map(step => <li key={step.id} className="flex min-w-0 items-baseline gap-2">
-          <span className={cn('shrink-0 font-mono', step.failed ? 'text-destructive' : 'text-foreground')}>{step.name}</span>
+          <span className={cn('shrink-0 font-mono', step.failed ? 'text-destructive-foreground' : 'text-foreground')}>{step.name}</span>
           {step.detail && <span className="min-w-0 truncate font-mono text-muted-foreground" title={step.detail}>{step.detail}</span>}
         </li>)}
       </ol>

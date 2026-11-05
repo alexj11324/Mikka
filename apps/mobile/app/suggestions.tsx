@@ -1,3 +1,4 @@
+import { ReadNotice } from '@/components/ReadNotice'
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SourceIcon, Spinner } from '@/components/icons'
@@ -34,8 +35,8 @@ export default function SuggestionsScreen() {
         refreshControl={<RefreshControl {...refresh} />}
         ListHeaderComponent={<>
           {loading ? <View style={styles.center}><Spinner /></View> : null}
-          {!loading && error ? <Text style={styles.note}>建议加载失败。</Text> : null}
-          {!loading && data && !items.length ? <Text style={styles.note}>今天还没有新的建议。</Text> : null}
+          <ReadNotice error={error} hasData={Boolean(data)} label="建议" onRetry={reload} />
+          {!loading && !error && data && !items.length ? <Text style={styles.note}>今天还没有新的建议。</Text> : null}
         </>}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24 }]}
         renderItem={({ item, index }) => (

@@ -32,6 +32,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
   t.after(async () => {
     github.restore()
     restoreModels.restore()
+    await pool.query('DELETE FROM factory_agent_profiles WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM factory_tasks WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM model_order_entries WHERE "ownerId" = ANY($1)', [users])
@@ -263,6 +264,69 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     await pool.query(`INSERT INTO workspace_e2b_keys ("workspaceId",ciphertext,iv,"keyVersion",last4,"createdBy","updatedBy") VALUES ($1,'x','x',1,'abcd',$2,$2)`, [c.workspaceId, c.id])
     return { botId, cloudDevice }
   }
+
+  for (const profileMode of ['default', 'inherit', 'fixed'] as const) await t.test(`${profileMode} startup recovery keeps its role and tries the next runnable local model`, async () => {
+    const who = await person(`profile-startup-${profileMode}`)
+    await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1', [who.issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 701 + ['default', 'inherit', 'fixed'].indexOf(profileMode) } } })])
+    const { botId } = await cloudReady(who)
+    await runAt(who, 'cloud')
+    const connection = (await pool.query('SELECT id FROM byos_connections WHERE "ownerId"=$1 ORDER BY "createdAt",id LIMIT 1', [who.id])).rows[0].id
+    await pool.query('UPDATE byos_connections SET "modelCatalog"=$2::jsonb WHERE id=$1', [connection, JSON.stringify({ revision: '2', models: ['gpt-5', 'gpt-5-local'] })])
+    await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5-local')`, [randomUUID(), who.id, who.workspaceId, connection])
+    await pool.query('DELETE FROM model_order_entries WHERE "ownerId"=$1', [who.id])
+    for (const [position, model] of ['gpt-5', 'gpt-5-local'].entries()) await pool.query(`INSERT INTO model_order_entries (id,"ownerId","workspaceId",position,harness,model,"sourceKind","sourceId") VALUES ($1,$2,$3,$4,'codex',$5,'subscription',$6)`, [randomUUID(), who.id, who.workspaceId, position, model, connection])
+    await pool.query('UPDATE model_order_settings SET customized=true WHERE "ownerId"=$1 AND "workspaceId"=$2', [who.id, who.workspaceId])
+    const deviceId = await onlineMac(who.id, true, 'server')
+    await pool.query('UPDATE devices SET harnesses=$2::jsonb WHERE id=$1', [deviceId, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, models: ['gpt-5-local'] }])])
+    const { resolveModelDispatch } = await import('../lib/model-dispatch')
+    const dispatchScope = { ownerId: who.id, workspaceId: who.workspaceId, botId }
+    const original = await resolveModelDispatch(pool, dispatchScope, null, 'cloud', undefined, { bindSubscription: false, skipCatalogueRefresh: true, probeQuota: false })
+    assert.equal(original.kind, 'cloud'); if (original.kind !== 'cloud') assert.fail('fixture cloud target')
+    const exact = await resolveModelDispatch(pool, dispatchScope, null, undefined, undefined, { withoutCloud: true, exactEntry: original.entry, bindSubscription: false, skipCatalogueRefresh: true, probeQuota: false })
+    assert.equal(exact.kind, 'none', 'the old exact-source recovery cannot run cloud-only model A locally')
+    const preferred = await resolveModelDispatch(pool, dispatchScope, null, undefined, undefined, { withoutCloud: true, bindSubscription: false, skipCatalogueRefresh: true, probeQuota: false })
+    assert.equal(preferred.kind === 'device' && preferred.model, 'gpt-5-local', 'the existing preferred order admits local model B')
+    const profiles = await import('../lib/factory/agent-profile')
+    let profileId: string | undefined
+    if (profileMode !== 'default') {
+      const profile = await new profiles.AgentProfileStore(pool).create({ ownerId: who.id, workspaceId: who.workspaceId }, {
+        name: 'Recovery role', harness: 'codex', instructions: 'Keep this frozen responsibility through startup recovery.',
+        model: profileMode === 'fixed' ? { mode: 'fixed', harness: 'codex', model: 'gpt-5', source: { kind: 'subscription', connectionId: connection } } : { mode: 'inherit' },
+      })
+      profileId = profile.id
+    }
+    const sourceEventId = randomUUID()
+    await pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload,"deliveredAt") VALUES ($1::uuid,$2,$3,'user_message',$1::text,$4,now())`, [sourceEventId, who.id, botId, JSON.stringify({ text: 'Run the recovery role.', ...(profileId ? { profileId } : {}) })])
+    const result = await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', profileId, sourceEventId, requestKey: `startup:${randomUUID()}` }, undefined, botId) as unknown as { runId?: string; error?: string; fallback?: string }
+    if (profileMode === 'fixed') {
+      assert.equal(result.error, 'machineUnavailable', JSON.stringify(result))
+      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1 AND "deviceId"=$2`, [who.id, deviceId])).rows[0].n, 0)
+    } else {
+      assert.ok(result.runId, JSON.stringify(result)); assert.equal(result.fallback, 'cloudUnavailable')
+      const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [result.runId])).rows[0]
+      assert.equal(run.deviceId, deviceId); assert.equal(run.agentDefinition.model, 'gpt-5-local')
+      assert.equal(run.agentDefinition.agentProfile.profileId, profileId ?? 'default')
+      assert.equal(run.agentDefinition.agentProfile.targetEntry.model, 'gpt-5-local')
+      assert.deepEqual(run.agentDefinition.agentProfile.targetEntry, run.agentDefinition.modelDispatch.entry)
+      assert.equal(run.agentDefinition.profileOriginRunId, undefined)
+      const source = await pool.query('SELECT "connectionId" FROM byos_bindings WHERE id=$1', [run.agentDefinition.subscription.bindingId])
+      assert.equal(source.rows[0].connectionId, connection)
+      if (profileId) assert.match(run.agentDefinition.instructions, /Keep this frozen responsibility/)
+      await (await import('../lib/factory/profile-admission')).assertRunProfileClaim(pool, run.id)
+    }
+    const cloudRuns = (await pool.query(`SELECT r.status,m.state FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1`, [who.id])).rows
+    assert.deepEqual(cloudRuns, [{ status: 'failed', state: 'ended' }], 'startup recovery records an infrastructure failure before local admission')
+    const tasks = (await pool.query(`SELECT t.id,t."sourceEventId",t.status,a."runId" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" WHERE t."userId"=$1 AND t."issueId"=$2`, [who.id, who.issueId])).rows
+    assert.equal(tasks.length, 1, 'startup recovery keeps the original Factory task')
+    assert.equal(tasks[0].sourceEventId, sourceEventId, 'it never manufactures a replacement user request')
+    assert.equal(tasks[0].status, profileMode === 'fixed' ? 'blocked' : 'running')
+    if (profileMode !== 'fixed') {
+      assert.equal(tasks[0].runId, result.runId)
+      const ancestry = (await pool.query('SELECT "continuesRunId","sessionId" FROM agent_runs WHERE id=$1', [result.runId])).rows[0]
+      const failedCloud = (await pool.query(`SELECT r.id FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1`, [who.id])).rows[0]
+      assert.deepEqual(ancestry, { continuesRunId: failedCloud.id, sessionId: null }, 'only the failed startup ancestry survives, not a native session')
+    }
+  })
 
   await t.test('(c) own E2B refuses (cap, quota, key): the cloud run is ended; with no server or computer the card, else 云端 falls back to the server', async () => {
     const c = await person('cloud')

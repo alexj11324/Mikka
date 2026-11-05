@@ -1,4 +1,4 @@
-export type SyncSnapshot = { ready: boolean; pending: boolean; error: boolean; syncing: boolean }
+export type SyncSnapshot = { ready: boolean; pending: boolean; error: boolean; syncing: boolean; workspaceId?: string | null }
 
 const KEYS = ['ready', 'pending', 'error', 'syncing'] as const
 
@@ -10,6 +10,10 @@ export function nextSyncSnapshot(current: SyncSnapshot, patch: Partial<SyncSnaps
     const value = patch[key]
     if (value === undefined || value === current[key]) continue
     next[key] = value
+    changed = true
+  }
+  if (patch.workspaceId !== undefined && patch.workspaceId !== current.workspaceId) {
+    next.workspaceId = patch.workspaceId
     changed = true
   }
   return changed ? next : null

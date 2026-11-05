@@ -1,3 +1,4 @@
+import { CodedError, type CodedErrorOptions } from "@mikka/protocol/coded-error";
 import { z } from "zod";
 
 export const FACTORY_CONTRACT_VERSION = 1 as const;
@@ -144,11 +145,18 @@ export const changeSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("revoke"), reason }).strict(),
 ]);
 export type FactoryChange = z.infer<typeof changeSchema>;
-export class FactoryError extends Error {
-  constructor(public code: string) {
-    super(code);
+export class FactoryError extends CodedError {
+  constructor(code: string, options?: CodedErrorOptions) {
+    super(code, options);
+    this.name = "FactoryError";
   }
 }
-export function nextStage(stage: FactoryStage): FactoryStage | undefined {
+/** Frozen by the host on creation, never accepted from route/change input.
+ * Missing means the existing execute/review/verify contract, including its receipts. */
+export function factoryFlowVersion(task: { route?: unknown }): 1 | 2 {
+  return task.route && typeof task.route === 'object' && 'flowVersion' in task.route && task.route.flowVersion === 2 ? 2 : 1;
+}
+export function nextStage(stage: FactoryStage, flowVersion: 1 | 2 = 1, reviewed = false): FactoryStage | undefined {
+  if (flowVersion === 2 && (stage === 'review' || (stage === 'execute' && reviewed))) return 'approval';
   return FACTORY_STAGES[FACTORY_STAGES.indexOf(stage) + 1];
 }

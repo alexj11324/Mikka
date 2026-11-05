@@ -1,10 +1,16 @@
 // Harness ids: an agent is identified only by its harness (Claude Code,
 // Codex, Cursor, or the mock). Must match `agent.harness` in packages/db.
 import { z } from "zod"
+import type { UserErrorDetail } from "./user-error-codes"
 
 export const HARNESSES = ["claude_code", "codex", "cursor", "mock"] as const
 export const harnessSchema = z.enum(HARNESSES)
 export type Harness = z.infer<typeof harnessSchema>
+
+/** Safe reasons a local subscription runner failed its startup check; never CLI output. */
+export const SUBSCRIPTION_PREFLIGHT_FAILURES = ["env_not_clean", "cli_missing", "cli_version_mismatch", "adapter_start_failed"] as const satisfies readonly UserErrorDetail<"subscription_local_runtime_unavailable">[]
+export const subscriptionPreflightSchema = z.enum(SUBSCRIPTION_PREFLIGHT_FAILURES)
+export type SubscriptionPreflightFailure = z.infer<typeof subscriptionPreflightSchema>
 
 /**
  * Which harness runs a model (Alex, 2026-10-31): GPT/OpenAI models run on
@@ -46,6 +52,8 @@ export const harnessInfoSchema = z.object({
    * short-lived access lease (never the refresh grant) and wipes it at run end.
    */
   subscriptionBroker: z.literal(true).optional(),
+  /** A failed local startup check takes precedence over a stale broker flag. Omitted after a successful recheck. */
+  subscriptionPreflight: subscriptionPreflightSchema.optional(),
   /** Set only by an E2B worker with the guarded Bot computer broker. */
   computerBroker: z.literal(true).optional(),
   /** Run-scoped CLI approvals and policy-version checks are supported. */

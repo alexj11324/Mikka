@@ -22,6 +22,25 @@ let releases: Versions | undefined
 const daemonVersions = mock.fn(async (): Promise<Versions> => releases ?? { min: '0.0.299' })
 const cachedDaemonVersions = mock.fn((): Versions | undefined => releases)
 const sleep = mock.fn(async (ms: number, signal?: AbortSignal) => actual.sleep(ms, signal))
+type Push = { reset(): void; next(ms: number, signal?: AbortSignal): Promise<void>; readonly lost: boolean; close(): void }
+const deviceWorkSubscription = mock.fn(async (_deviceId: string, _tokenId: string): Promise<Push | null> => null)
+/** A stand-in for the shared LISTEN session: `fire` is a NOTIFY for this device. */
+function fakePush(options: { lost?: boolean } = {}) {
+  let heard = false, wake: (() => void) | undefined
+  const push = {
+    lost: options.lost ?? false,
+    reset: mock.fn(() => { heard = false }),
+    next: mock.fn((ms: number, signal?: AbortSignal) => new Promise<void>(resolve => {
+      if (heard || signal?.aborted) { resolve(); return }
+      const done = () => { clearTimeout(timer); wake = undefined; resolve() }
+      const timer = setTimeout(done, ms)
+      wake = done
+      signal?.addEventListener('abort', done, { once: true })
+    })),
+    close: mock.fn(),
+  }
+  return { push, fire: () => { heard = true; wake?.() } }
+}
 const logs: RequestLogEntry[] = []
 for (const method of ['log', 'warn', 'error'] as const) {
   mock.method(console, method, (line: string) => {
@@ -43,7 +62,7 @@ before(async () => {
     namedExports: { daemonVersions, cachedDaemonVersions, newerDaemonRelease, daemonRequestTooOld },
   })
   mock.module(new URL('../../../../../lib/device-link.ts', import.meta.url).href, {
-    namedExports: { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, longPollIdleCheck: actual.longPollIdleCheck, ownsDevice, sleep, waitSeconds: actual.waitSeconds },
+    namedExports: { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, deviceWorkSubscription, longPollIdleCheck: actual.longPollIdleCheck, ownsDevice, sleep, waitSeconds: actual.waitSeconds },
   })
   GET = (await import('./route')).GET
 })
@@ -64,12 +83,14 @@ beforeEach(() => {
   deviceUpdateNotice.mock.mockImplementation(async () => ({ id: 'update-command', kind: 'update' as const }))
   sleep.mock.resetCalls()
   sleep.mock.mockImplementation(actual.sleep)
+  deviceWorkSubscription.mock.resetCalls()
+  deviceWorkSubscription.mock.mockImplementation(async () => null)
   logs.length = 0
 })
 
 function request(signal?: AbortSignal, wait = 25, skip = '', mailboxNotices = false, updates = '') {
   return new Request(`https://preview.example.test/mikka/v1/devices/device-1/commands?wait=${wait}${skip ? `&skip=${skip}` : ''}${updates}`, { signal,
-    headers: { 'x-mikka-client-version': '0.0.375', ...(mailboxNotices ? { [MAILBOX_NOTICE_HEADER]: '1' } : {}) } })
+    headers: { 'x-mikka-client-version': '0.0.456', ...(mailboxNotices ? { [MAILBOX_NOTICE_HEADER]: '1' } : {}) } })
 }
 const params = { params: Promise.resolve({ deviceId: 'device-1' }) }
 
@@ -240,4 +261,64 @@ test('obsolete daemon commands poll serves upgrade metadata without reading busi
   assert.equal(deviceWork.mock.callCount(), 0)
   assert.equal(pendingDeviceCommands.mock.callCount(), 0, 'an idle upgrade check does not lock the device row')
   assert.equal(deviceUpdateNotice.mock.callCount(), 1)
+})
+
+test('with push, the poll waits on LISTEN and re-checks only when the device is notified: new work arrives at once, with no timer', async () => {
+  const { push, fire } = fakePush()
+  deviceWorkSubscription.mock.mockImplementation(async () => push)
+  let checks = 0
+  const commands = [{ kind: 'stop', runId: 'run-1' }]
+  deviceMayHaveWork.mock.mockImplementation(async () => ({ work: ++checks >= 2, deviceCommand: null }))
+  deviceWork.mock.mockImplementation(async () => ({ commands, queuedRuns: [] }))
+  const started = Date.now()
+  const answer = GET(request(), params)
+  await new Promise(resolve => setTimeout(resolve, 100))
+  fire()
+  assert.deepEqual(await (await answer).json(), { commands })
+  assert.ok(Date.now() - started < 1_000, 'the stop reaches the device on the notification, not on a 5 s check')
+  assert.deepEqual(deviceWorkSubscription.mock.calls[0].arguments, ['device-1', 'token'], 'listens for the device and its credential')
+  assert.equal(deviceMayHaveWork.mock.callCount(), 2, 'one check at the start, one per notification')
+  assert.equal(sleep.mock.callCount(), 0)
+  assert.equal(push.reset.mock.callCount(), 2, 'each check forgets what was heard before it reads')
+  assert.equal(push.close.mock.callCount(), 1)
+})
+
+test('with push, a lost notification still ends the poll at its deadline with one final check, and an idle poll costs two checks, not one per 5 s', async () => {
+  const { push } = fakePush()
+  deviceWorkSubscription.mock.mockImplementation(async () => push)
+  let checks = 0
+  const commands = [{ kind: 'stop', runId: 'run-1' }]
+  // The stop was written, but its NOTIFY never arrived: the final check before the deadline still hands it over.
+  deviceMayHaveWork.mock.mockImplementation(async () => ({ work: ++checks >= 2, deviceCommand: null }))
+  deviceWork.mock.mockImplementation(async () => ({ commands, queuedRuns: [] }))
+  const started = Date.now()
+  assert.deepEqual(await (await GET(request(undefined, 1), params)).json(), { commands })
+  assert.ok(Date.now() - started >= 950 && Date.now() - started < 2_000, 'woken by the deadline')
+  assert.equal(deviceMayHaveWork.mock.callCount(), 2)
+  assert.equal(sleep.mock.callCount(), 0)
+  checks = -100
+  deviceMayHaveWork.mock.resetCalls()
+  assert.deepEqual(await (await GET(request(undefined, 1), params)).json(), { commands: [] })
+  assert.equal(deviceMayHaveWork.mock.callCount(), 2, 'an idle poll: the first check and the final one')
+  assert.equal(logs.at(-1)?.outcome, 'empty')
+})
+
+test('with push, a dropped LISTEN session falls back to the 5 s check; disconnect stops the wait and releases the subscription', async () => {
+  const { push } = fakePush({ lost: true })
+  deviceWorkSubscription.mock.mockImplementation(async () => push)
+  const controller = new AbortController()
+  sleep.mock.mockImplementation(async (ms, signal) => {
+    const waiting = actual.sleep(ms, signal)
+    controller.abort()
+    await waiting
+  })
+  assert.equal((await GET(request(controller.signal), params)).status, 204)
+  assert.equal(sleep.mock.calls[0].arguments[0], 5_000)
+  assert.equal(push.next.mock.callCount(), 0)
+  assert.equal(push.close.mock.callCount(), 1)
+})
+
+test('a zero-wait poll never opens a LISTEN subscription', async () => {
+  await GET(request(undefined, 0), params)
+  assert.equal(deviceWorkSubscription.mock.callCount(), 0)
 })

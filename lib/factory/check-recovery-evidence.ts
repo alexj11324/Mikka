@@ -1,3 +1,4 @@
+import { reportedCandidateShaSql, resolveFactoryCandidateSha } from './deliverable-snapshot';
 import { questionExecutionContinuation } from './questions/execution-continuation';
 import type { PoolClient } from "pg";
 import { isDeepStrictEqual } from "node:util";
@@ -41,9 +42,12 @@ export async function readFactoryCheckFailure(
   const {
     rows: [candidate],
   } = await tx.query(
-    'SELECT * FROM factory_candidates WHERE id=$1 AND "taskId"=$2',
-    [task.candidateId, task.id],
+    `SELECT c.*,${reportedCandidateShaSql()} AS "executionSha" FROM factory_candidates c
+      JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$3 AND producer."issueId"=$4
+      WHERE c.id=$1 AND c."taskId"=$2`,
+    [task.candidateId, task.id, task.userId, task.issueId],
   );
+  const sha = candidate ? await resolveFactoryCandidateSha(tx, task, candidate, candidate.executionSha) : null;
   const check = attempt?.output?.check,
     report = run?.report,
     receipt = finish?.result?.task;
@@ -75,19 +79,16 @@ export async function readFactoryCheckFailure(
     (attempt.output?.requestEpoch != null && attempt.output.requestEpoch !== task.sourceEventId) ||
     check.candidateId !== candidate.id ||
     run.kind !== "acceptance" ||
-    run.baseBranch !== candidate.sha ||
-    check.sha !== candidate.sha ||
+    run.baseBranch !== sha ||
+    check.sha !== sha ||
     check.repository !== candidate.repository ||
-    check.environment !== candidate.environment ||
+    check.environment !== `device:${run.deviceId}` ||
+    (check.candidateEnvironment ?? check.environment) !== candidate.environment ||
     check.deviceRepoId !== run.deviceRepoId ||
-    !check.command ||
-    report?.check?.sha !== candidate.sha ||
+    report?.check?.sha !== sha ||
     report.check.readOnly !== true ||
-    report.verify?.command !== check.command ||
-    !(
-      Number.isFinite(report.verify?.exitCode) ||
-      report.verify?.exitCode === null
-    ) ||
+    (check.reportOnly !== true && (!check.command || report.verify?.command !== check.command ||
+      !(Number.isFinite(report.verify?.exitCode) || report.verify?.exitCode === null))) ||
     !isDeepStrictEqual(
       attempt.output,
       finish.result.attempts.find((a: { id: string }) => a.id === attempt.id)

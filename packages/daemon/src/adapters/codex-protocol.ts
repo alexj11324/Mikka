@@ -30,16 +30,19 @@ export interface ThreadStartParams {
   developerInstructions?: string | null
 }
 
-export interface ThreadResumeParams extends ThreadStartParams {
+// Official 0.163.0 resumes its persisted catalogue; it does not accept
+// dynamicTools. Sending that unknown field silently leaves the old tools.
+export interface ThreadResumeParams extends Omit<ThreadStartParams, 'dynamicTools'> {
   threadId: string
 }
 
 export interface ThreadResponse {
-  thread: { id: string }
+  thread: { id: string; path?: string | null }
   model?: string
 }
 
 export interface TurnStartParams {
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
   threadId: string
   input: UserInput[]
 }
@@ -134,3 +137,4 @@ export interface TokenUsageNotification {
 export interface RateLimitsNotification {
   rateLimits: { primary?: { usedPercent?: number; resetsAt?: number | null } | null; secondary?: { usedPercent?: number; resetsAt?: number | null } | null }
 }
+

@@ -1,3 +1,4 @@
+import { factoryFlowVersion } from './contract'
 import { repositoryExecutionMatches } from './execution-receipt'
 import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
@@ -235,17 +236,35 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
     "SELECT * FROM factory_attempts WHERE \"taskId\"=$1 AND \"candidateId\"=$2 AND stage IN ('execute','review','verify') ORDER BY position",
     [task.id, candidate.id],
   );
-  const latest = ["execute", "review", "verify"].map((stage) =>
-    rows.filter((a) => a.stage === stage).at(-1),
-  );
+  const singleReview = factoryFlowVersion(task) === 2;
+  // An earlier review is historical feedback on its original candidate. It is
+  // shown separately and never becomes evidence that the repaired head passed.
+  const history = singleReview ? (await tx.query(`SELECT a.id,a.status,a."candidateId",c.sha,a."runId",a."sessionId",a.reason,a.output,a.evidence
+    FROM factory_attempts a JOIN factory_candidates c ON c.id=a."candidateId" AND c."taskId"=a."taskId"
+    WHERE a."taskId"=$1 AND a.stage='review' AND a."candidateId"<>$2 AND a."runId" IS NOT NULL
+      AND a.status IN ('passed','failed','blocked','waiting') ORDER BY a.position`, [task.id, candidate.id])).rows : [];
+  const currentReview = rows.filter(a => a.stage === 'review').at(-1);
+  const stages = singleReview ? ['execute', ...(currentReview ? ['review'] : [])] : ['execute', 'review', 'verify'];
+  if (singleReview && !currentReview && !history.length) throw new FactoryError('factoryIndependentEvidenceRequired');
+  const latest = stages.map(stage => rows.filter(a => a.stage === stage).at(-1));
+  const reviewHistory = history.map(a => ({
+    attemptId: a.id, candidateId: a.candidateId, sha: a.sha, status: a.status,
+    runId: a.runId, sessionId: a.sessionId, appliesToCurrentCandidate: false as const,
+    reason: redactArtifact(a.reason), findings: redactArtifact(a.output?.completion?.findings ?? []),
+    evidence: (a.evidence ?? []).flatMap((value: unknown) => {
+      const ref = evidenceSchema.safeParse(value);
+      return ref.success && ref.data.candidateId === a.candidateId && ref.data.sha === a.sha &&
+        ref.data.runId === a.runId && ref.data.sessionId === a.sessionId ? [ref.data] : [];
+    }),
+  }));
   const recovered = latest[0] ? null : await recoveredExecutionEvidence(tx, task, candidate);
   if (recovered) latest[0] = recovered;
   if (
     latest.some(
       (a) => !a || (a.status !== "passed" && a !== recovered) || !a.runId || !a.sessionId,
     ) ||
-    new Set(latest.map((a) => a?.runId)).size !== 3 ||
-    new Set(latest.map((a) => a?.sessionId)).size !== 3
+    new Set(latest.map((a) => a?.runId)).size !== latest.length ||
+    new Set(latest.map((a) => a?.sessionId)).size !== latest.length
   )
     throw new FactoryError("factoryIndependentEvidenceRequired");
   const artifacts = [];
@@ -316,6 +335,7 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
     candidateId: candidate.id,
     candidate: candidateIdentity(candidate),
     artifacts,
+    ...(singleReview ? { reviewHistory } : {}),
   };
   return {
     manifest,

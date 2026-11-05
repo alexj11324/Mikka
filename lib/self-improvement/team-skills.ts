@@ -1,5 +1,7 @@
+import { runChanged } from '../live/panels'
 import 'server-only'
 import { runListChanged } from '../live/lists'
+import { runControlChanged } from '../device-gateway-notify'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
@@ -188,7 +190,8 @@ export class TeamSkillStore {
           "leaseExpiresAt"=LEAST("leaseExpiresAt",clock_timestamp()),"updatedAt"=clock_timestamp()
           WHERE id IN (SELECT "runId" FROM improvement_skill_selections WHERE "versionId"=$1) AND status=ANY($2::text[]) RETURNING id`,
         [versionId, [...UNFINISHED_RUN_STATUSES]])
-        for (const { id } of stopped.rows) await runListChanged(tx, id)
+        for (const { id } of stopped.rows) { await runListChanged(tx, id); await runChanged(tx, id) }
+        runControlChanged(tx, { runIds: stopped.rows.map(row => row.id) })
         await tx.query(`UPDATE run_tokens SET "revokedAt"=COALESCE("revokedAt",clock_timestamp()) WHERE "runId"
           IN (SELECT "runId" FROM improvement_skill_selections WHERE "versionId"=$1)`, [versionId])
       }

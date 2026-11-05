@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Plus } from 'lucide-react-native'
-import { CardButton } from '@/components/cards'
+import { ReadNotice } from '@/components/ReadNotice'
 import { ChatRowView, rowKey, useChatRows } from '@/components/ChatList'
 import { Avatar, useDrawer } from '@/components/Drawer'
 import { BotAvatar, Spinner } from '@/components/icons'
@@ -57,6 +57,7 @@ export default function ChatsScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
         ListHeaderComponent={
           <View>
+            <ReadNotice error={error} hasData={all.length > 0} label="对话列表" onRetry={reload} />
             {updateReady ? (
               <Pressable accessibilityRole="button" onPress={restartToUpdate} style={({ pressed }) => [styles.update, pressed && { opacity: 0.6 }]}>
                 <Symbol name="arrow.down.circle" size={17} color={colors.accent} />
@@ -76,12 +77,7 @@ export default function ChatsScreen() {
             </ScrollView>
           </View>
         }
-        ListEmptyComponent={loading ? <View style={styles.center}><Spinner /></View> : error ? (
-          <View style={styles.failed}>
-            <Text style={styles.error}>连不上 Mikka。</Text>
-            <CardButton label="重试" onPress={() => void reload()} />
-          </View>
-        ) : undefined}
+        ListEmptyComponent={loading && !all.length ? <View style={styles.center}><Spinner /></View> : undefined}
         renderItem={({ item }) => <ChatRowView row={item} onPress={() => router.push(item.kind === 'bot' ? botPath(item.bot) : `/groups/${item.group.id}`)} />}
       />
     </View>

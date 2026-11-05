@@ -1,3 +1,4 @@
+import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import { createFactoryDispatch } from "./dispatch";
 import { factoryDispatchDatabase } from "./transaction";
@@ -38,11 +39,7 @@ import { Pool, type PoolClient } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { evidenceSchema, FactoryError, type FactoryBinding } from "./contract";
 import { handleFactory } from "./http";
-import {
-  createFactoryStore,
-  type FactoryTask,
-  type FactorySnapshot,
-} from "./store";
+import { type FactoryTask, type FactorySnapshot } from "./store";
 import {
   createFactoryMonitor,
   createFactoryMonitorRunConsumer,

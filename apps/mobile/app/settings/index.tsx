@@ -1,3 +1,5 @@
+import { useRef, useState } from 'react'
+import { ReadNotice } from '@/components/ReadNotice'
 import { ActionSheetIOS, Linking, Platform, ScrollView, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -27,11 +29,20 @@ export default function SettingsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { data, error, reload } = useSettings()
+  const leaving = useRef(false)
+  const [signingOut, setSigningOut] = useState(false)
+  const [signOutFailed, setSignOutFailed] = useState(false)
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'))
   const signOut = async () => {
-    if (Platform.OS !== 'web') await (await import('@/lib/push')).unregisterPush().catch(() => undefined)
-    clearApiCache()
-    await authClient.signOut()
+    if (leaving.current) return
+    leaving.current = true; setSigningOut(true); setSignOutFailed(false)
+    try {
+      if (Platform.OS !== 'web') await (await import('@/lib/push')).unregisterPush().catch(() => undefined)
+      const result = await authClient.signOut()
+      if (result.error) throw new Error('signout_failed')
+      clearApiCache()
+    } catch { setSignOutFailed(true) }
+    finally { leaving.current = false; setSigningOut(false) }
   }
   // Signing out asks first, as the system's action sheet (usability review #6).
   const confirmSignOut = () => {
@@ -53,6 +64,7 @@ export default function SettingsScreen() {
         </View>
       ) : !data ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : (
         <ScrollView {...underBar} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
+          <ReadNotice error={error} hasData label="设置" onRetry={reload} />
           <PushRow proactive={data.preferences.proactive} />
           <PreferenceSaveNotice />
           <Group>
@@ -65,13 +77,14 @@ export default function SettingsScreen() {
             <Row icon={icon('square.grid.2x2', Blocks)} label="已连接的 App" onPress={() => { router.dismiss(); router.push('/plugins') }} />
           </Group>
           <Group label="App">
-            <Row icon={icon('globe', Globe)} label="语言" value="简体中文" trailing={<Symbol name="arrow.up.right" size={13} color={colors.tertiary} web={<ArrowUpRight size={16} color={colors.tertiary} strokeWidth={2} />} />}
-              onPress={() => { if (Platform.OS !== 'web') void Linking.openSettings() }} />
+            <Row icon={icon('globe', Globe)} label="语言" value="简体中文" trailing={Platform.OS === 'web' ? null : <Symbol name="arrow.up.right" size={13} color={colors.tertiary} web={<ArrowUpRight size={16} color={colors.tertiary} strokeWidth={2} />} />}
+              onPress={Platform.OS === 'web' ? undefined : () => { void Linking.openSettings() }} />
             <Row icon={icon('info.circle', Info)} label="版本" value={versionLabel()} trailing={null} />
           </Group>
           <Group>
-            <Row icon={icon('rectangle.portrait.and.arrow.right', LogOut, colors.danger)} label="退出登录" destructive onPress={confirmSignOut} />
+            <Row icon={icon('rectangle.portrait.and.arrow.right', LogOut, colors.danger)} label={signingOut ? "正在退出登录" : "退出登录"} disabled={signingOut} destructive onPress={confirmSignOut} />
           </Group>
+          {signOutFailed ? <View accessibilityRole="alert" style={{ gap: 10 }}><Text style={{ color: colors.danger }}>退出登录未完成，请重试。</Text><CardButton label="重试退出登录" busy={signingOut} onPress={() => void signOut()} /></View> : null}
         </ScrollView>
       )}
     </View>

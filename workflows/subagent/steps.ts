@@ -1,19 +1,21 @@
 import type { Actor } from '@/lib/cloud-computer/subagents'
 import { browserLoginContinuation } from '@/lib/cloud-computer/login-result'
-export type WebTick = 'terminal'|'waiting'|'running'|'retry'
+/** `retryAt`: the epoch ms of the row's next attempt after a failure (its own backoff). */
+export type WebTick = 'terminal'|'waiting'|'running'|{retryAt:number}
 
 export async function tick(actor:Actor,botId:string,id:string):Promise<WebTick> {
   'use step'
   const {pool}=await import('@/lib/db')
   const {SubagentStore}=await import('@/lib/cloud-computer/subagents')
-  const store=new SubagentStore(pool)
+  // This workflow re-reads its row after each tick, so its own writes do not wake it.
+  const store=new SubagentStore(pool,{wakeSelf:false})
   let row=await store.get(actor,botId,id)
   if(['done','failed','stopped'].includes(row.status)) {
     await store.cleanup(actor,botId,id)
     await report(actor,botId,id,`Web task ${row.task}: ${row.status}. ${row.step}`,row.status)
     return 'terminal'
   }
-  if(row.nextAttemptAt && new Date(row.nextAttemptAt).getTime()>Date.now()) return 'retry'
+  if(row.nextAttemptAt && new Date(row.nextAttemptAt).getTime()>Date.now()) return {retryAt:new Date(row.nextAttemptAt).getTime()}
   try {
     row=await store.start(actor,botId,id)
     if(row.status==='queued') return 'waiting'
@@ -104,9 +106,9 @@ export async function tick(actor:Actor,botId:string,id:string):Promise<WebTick> 
       await report(actor,botId,id,'The last browser operation has an uncertain outcome. Do not repeat it without reconciliation.','outcome-unknown')
       return 'waiting'
     }
-    const failed=await pool.query(`UPDATE bot_subagents SET "consecutiveFailures"="consecutiveFailures"+1,"lastFailureCode"=$3,"nextAttemptAt"=now()+make_interval(secs=>least(60,power(2,least("consecutiveFailures"+1,5))::int)) WHERE id=$1 AND "ownerId"=$2 AND status IN ('running','queued') RETURNING "consecutiveFailures"`,[id,actor.userId,message==='observation_stale' || message==='browserActionExpired'?'observation_changed':'runtime_unavailable'])
+    const failed=await pool.query(`UPDATE bot_subagents SET "consecutiveFailures"="consecutiveFailures"+1,"lastFailureCode"=$3,"nextAttemptAt"=now()+make_interval(secs=>least(60,power(2,least("consecutiveFailures"+1,5))::int)) WHERE id=$1 AND "ownerId"=$2 AND status IN ('running','queued') RETURNING "consecutiveFailures","nextAttemptAt"`,[id,actor.userId,message==='observation_stale' || message==='browserActionExpired'?'observation_changed':'runtime_unavailable'])
     if(!failed.rows[0]) return 'waiting'
-    if(failed.rows[0].consecutiveFailures<4) return 'retry'
+    if(failed.rows[0].consecutiveFailures<4) return {retryAt:new Date(failed.rows[0].nextAttemptAt).getTime()}
     await store.update(actor,botId,id,'failed','Browser service unavailable after bounded retries; progress retained')
     await report(actor,botId,id,'The browser task could not continue after retrying. Report the retained failure without claiming the task completed.','runtime-failed')
     return 'terminal'

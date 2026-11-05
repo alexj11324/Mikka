@@ -38,3 +38,22 @@ test('wrong-run evidence is rejected and a late old-run response can never be se
     assert.equal((error as Error).message,'thread_execution_evidence_unavailable');return true
   })
 })
+
+test('routing evidence keeps only the frozen decision and never exposes dispatch credentials', () => {
+  const routing = { version: 1, difficulty: 'hard', model: 'gpt-6.1-sol', harness: 'codex', tier: 'strongest', effort: 'high', reason: 'escalated', previousModel: 'gpt-6-luna' }
+  const value = threadExecutionEvidence({ run: { ...host().run, modelRouting: { ...routing, apiKey: 'PRIVATE_KEY', candidate: { credential: 'PRIVATE_CREDENTIAL' } } } }, runId)
+  assert.deepEqual(value.modelRouting, routing)
+  assert.doesNotMatch(JSON.stringify(value.modelRouting), /PRIVATE|apiKey|candidate|credential/)
+  assert.equal(threadExecutionEvidence(host(), runId).modelRouting, undefined, 'old runs do not infer routing from their model')
+})
+
+test('an invalid or future routing snapshot stays absent without breaking the rest of the evidence', () => {
+  const routing = { version: 1, difficulty: 'easy', model: 'gpt-6-luna', harness: 'codex', tier: 'light', reason: 'difficulty_fit' }
+  for (const invalid of [{ ...routing, version: 2 }, { ...routing, difficulty: 'invented' }, { ...routing, effort: 'invented' }, { ...routing, reason: 'PRIVATE_REASON' }, { ...routing, harness: 'invented' }]) {
+    const value = threadExecutionEvidence({ run: { ...host().run, modelRouting: invalid } }, runId)
+    assert.equal(value.modelRouting, null)
+    assert.equal(value.id, runId)
+    assert.equal(value.executionIdentity?.requester, 'requester')
+  }
+  assert.equal(threadExecutionEvidence({ run: { ...host().run, modelRouting: null } }, runId).modelRouting, null)
+})

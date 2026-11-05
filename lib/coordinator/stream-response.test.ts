@@ -122,6 +122,32 @@ test('each tool streams its name, state and short previews; thinking streams as 
   assert.ok(events.findIndex(event => event.type === 'thinking' && event.state === 'delta') < events.findIndex(event => event.type === 'thinking' && event.state === 'end'))
 })
 
+test('a call\'s note streams whole as its quote, apart from the cut input preview; past 1000 characters it ends in an ellipsis', async () => {
+  const note = 'Upgrade axios and run the tests. '.repeat(10).trim()
+  const events = await project([start(), call('c1', 'dispatch_run', { issueId: 'i1', botId: 'b1', note }), call('c2', 'dispatch_run', { note: 'x'.repeat(1200) }), committed()])
+  const tools = events.filter((event): event is Extract<CoordinatorStreamEvent, { type: 'tool' }> => event.type === 'tool')
+  assert.ok(tools[0].input?.startsWith('{"note": ') && tools[0].input.length === 200, 'jsonb puts the note first, and the preview cuts it')
+  assert.equal(tools[0].quote, note, 'the quote carries it whole')
+  assert.equal(tools[1].quote, `${'x'.repeat(1000)}…`)
+})
+
+test('a saved secret straddling the quote\'s cut leaves none of itself: the note is checked whole first', async () => {
+  const old = process.env.BETTER_AUTH_SECRET
+  process.env.BETTER_AUTH_SECRET = 'offline-stream-guard-fixture-secret'
+  try {
+    const secret = 'synthetic-straddling-value'
+    const note = `${'a'.repeat(990)} ${secret} tail`
+    const raw = new ReadableStream<CoordinatorWorkflowStreamPart>({ start(controller) { controller.enqueue(start()); controller.enqueue(call('c1', 'dispatch_run', { note })); controller.close() } })
+    const events = await drain(raw.pipeThrough(coordinatorTextStream('owner', [fingerprint('owner', secret)])))
+    const tool = events.find((event): event is Extract<CoordinatorStreamEvent, { type: 'tool' }> => event.type === 'tool')
+    assert.equal(tool?.quote, undefined, 'the quote is left out')
+    assert.equal(JSON.stringify(events).includes('synthetic-st'), false, 'not even the secret\'s start')
+  } finally {
+    if (old === undefined) delete process.env.BETTER_AUTH_SECRET
+    else process.env.BETTER_AUTH_SECRET = old
+  }
+})
+
 test('a tool call names how much of the reply was said before it, held back or not, so it shows after those words', async () => {
   const events = await project([start(), delta('I will make the task first.'), call('c1', 'create_issue', {}), result('c1', 'create_issue', {}), delta('Done.'), committed()])
   const tools = events.filter((event): event is Extract<CoordinatorStreamEvent, { type: 'tool' }> => event.type === 'tool')
@@ -200,6 +226,7 @@ test('a tool preview that would carry a saved secret or a credential is masked o
     const tools = events.filter((event): event is Extract<CoordinatorStreamEvent, { type: 'tool' }> => event.type === 'tool')
     assert.deepEqual(tools.map(tool => [tool.call, tool.state]), [['c1', 'running'], ['c2', 'running'], ['c2', 'done']], 'the tool itself still shows')
     assert.equal(tools[0].input, undefined, 'a preview holding a saved secret is left out')
+    assert.equal(tools[0].quote, undefined, 'and so is the quote')
     assert.equal(JSON.stringify(events).includes(secret), false)
     assert.equal(JSON.stringify(events).includes('ghp_' + 'A'.repeat(36)), false, 'credential patterns are masked as stored messages are')
   } finally {

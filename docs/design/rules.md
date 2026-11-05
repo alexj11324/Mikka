@@ -26,7 +26,7 @@ source wins in a conflict is in [`README.md`](README.md).
 - **R-05** 「Bot 本身走我们自己的 AI SDK，跑在 Vercel 上。Bot 需要干活时，通过
   daemon 把任务派给 Claude Code 或 Codex。」 (Alex, 2026-11-01;
   [orchestration.md §3](orchestration.md)). Each allowed model names its Agent
-  (「模型与订阅」, [1400](decisions/2026-11-02-1400-model-order-dispatch.md)). The 新建 Bot dialog has a big live preview, a shape grid,
+  (「模型与订阅」, [1400](decisions/2026-11-02-1400-model-order-dispatch.md)); each Agent keeps its own 优先使用的模型, and dispatch tries the 优先使用的 Agent's list first ([0400](decisions/2026-11-05-0400-per-agent-model-lists.md)). The 新建 Bot dialog has a big live preview, a shape grid,
   colours and a name. It has no machine picker, no Claude Code / Codex picker
   and no 说明 field (instructions are edited in chat). A bot's own chat never
   runs inside Claude Code or Codex: that was an old plan (#312), abandoned.
@@ -432,8 +432,20 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   reply streams it shows the call running now. Opened, each call is a row: its
   kind's icon, then verb and object (「查看任务 ALEX-45」); never a bare
   「使用工具」 (`check-copy`). A call that failed, thrown or answered
-  `{"error": …}`, is red and names its reason in words. Raw input and output
-  open only from that call's row. 全部展开 / 全部收起, always shown beside every
+  `{"error": …}`, is red and names its reason in words. An opened call says
+  what it did in words first, ids never shown: a dispatch is 「交给」 and the
+  coding agent with its mark (R-74), never the bot, then its thread's chip, then
+  its note as a quote (three lines; only a cut note opens to the rest); a thread
+  the chat has not loaded is its state in words (「交给 Codex · 进行中」), the
+  state the dispatch answered with, not the thread's state now. In a dispatch
+  the thread's chip is the only chip, so the reader can jump to the thread;
+  the dispatch's task gets none (an exception to R-15, which this keeps: only
+  the thread is a chip), and the chip carries its own state. A call whose
+  object is a task (create, update or look up tasks) draws that task's chip. Other
+  known tools name their object, query, count or status; an unknown tool lists
+  at most six of its own fields, cut short. A failed call says nothing more in
+  words: its row names the reason. Raw input and output sit last, under
+  「原始数据」, folded. 全部展开 / 全部收起, always shown beside every
   group, opens or closes every group in the chat. Under a reply, 复制 and 「N 个来源」 (web pages
   only; tasks and threads are already chips) share one line that shows while the
   reply is hovered, focused or tapped; the latest reply keeps it on a touch screen.
@@ -744,6 +756,12 @@ How a design is reviewed:
     2026-10-31); Mikka writes none of its own, so an item without one, and
     GitHub, Linear and Telegram, show icon and name only. Rows in 设置 › 连接
     have none.
+  - A settings switch or choice may carry one short line saying what it does
+    and what happens when it is on or picked (Alex, 2026-11-05, on 模型与订阅:
+    he could not follow 「这个工作区 / 分享给团队成员」 or 「依次用：云端 →
+    服务器 → 电脑」; [0400](decisions/2026-11-05-0400-per-agent-model-lists.md)).
+    In plain words, as short as it can be, and each line still passes the delete
+    test: if removing it loses nothing a newcomer needs, it goes.
 - **R-41** An empty state is one colloquial line plus one button (often
   "send to a bot"). Never "这里是空的" or "Check back later".
 - **R-42** Every visible string lives in `messages/zh-CN.json` and
@@ -791,12 +809,27 @@ place, not a licence to pick either.
 | `bg/elevated` | `#ffffff` | `--shell-raised`, `--card`, `--popover` | `#ffffff` | |
 | `text/primary` | `#171717` | `--foreground` | `#0a0a0a` | yes |
 | `text/secondary` | `#737373` | `--muted-foreground` | `#606060` | yes (code darker on purpose, less grey) |
-| `text/tertiary` | `#a3a3a3` | `--ink-3` | mix | check |
+| `text/tertiary` | `#a3a3a3` | `--ink-3` | `--muted-foreground` 90% into `--background` (oklch). Text only in the source list's domain (`streaming-text.tsx`), on `bg-inset`, hovered `--hover`: light 4.62 / 4.74, dark 4.82 / 5.09 | deliberate (Figma lighter; code holds 4.5:1, [decision](decisions/2026-11-05-0040-ink-3-holds-contrast.md)) |
 | `border/default` | `#00000014` | `--border` | `#e5e5e5` | close |
 | `border/rule` | `#e5e5e5` / dark `#383838` | `--rule` | `oklch(0.922 0 0)` / dark `oklch(0.269 0 0)` | |
 | `accent/default` | `#2f6bff` | `--sidebar-primary` | shadcn blue | yes |
-| `status/*` | StatusBadge set | `--success`, `--warning`, `--destructive` | Tailwind palette | check |
+| `status/*` | StatusBadge set | `--success`, `--warning`, `--destructive` | Tailwind palette (500; red 600 light) | check |
+| `status/*` text | — | `--success-foreground`, `--warning-foreground`, `--destructive-foreground`, `--info-foreground` | light: emerald / yellow / violet 900, red 800; dark: emerald / yellow / violet 400, red 300 | |
+| `status/warning` mark | — | `--warning-ink` | light yellow 900, dark `--card`: the 紧急 square's ! on solid amber (R-87) | |
 | `brand/claude` (R-74 mark) | none yet | `--color-brand-claude` | `#D97757`, both themes | Figma to add |
+
+A status word or icon, on a status tint (a badge) or on its own, takes the
+`*-foreground` token, never the status colour itself: the colour is the tint and
+the dot, the foreground is what is read (4.5:1 or more in both themes; amber
+500 on white is 1.9:1). Measured 2026-11-04 on the badge tint (status/15 in
+dark, status/10 in light):
+
+| Text on tint | Light | Dark on page | Dark on card |
+| --- | --- | --- | --- |
+| warning | 8.13 (was the 500 base: 1.79) | 8.44 (was 600: 4.52) | 7.36 (was 600: 3.94) |
+| success | 8.81 (was 500: 2.24) | 7.27 (was 600: 3.84) | 6.38 (was 600: 3.36) |
+| destructive | 7.01 | 7.52 with red 300 (was 600: 3.03) | 6.61 (was 600: 2.66; red 400 would be 4.39) |
+| info | 9.70 | 5.37 with violet 400 (was 600: 2.60) | 4.74 (was 600: 2.30) |
 
 The drift rows are open in `decisions.md`. Until they are settled, the code
 value is what ships and Figma is updated to match.

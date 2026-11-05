@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import createNextIntlPlugin from 'next-intl/plugin'
 import { withWorkflow } from 'workflow/next'
 import { basePath } from './lib/base-path-config.mjs'
+import { configuredDeploymentId } from './lib/deployment-id.mjs'
 import { localTestAccountsMode } from './packages/protocol/src/local-test-mode.ts'
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
@@ -17,8 +18,15 @@ function appBuild() {
 // The app lives at app.aspectlylabs.com/mikka. lib/base-path.ts reads this
 // back for the places Next does not prefix on its own.
 
+// Vercel Skew Protection for the prebuilt production upload: only the production
+// workflow sets MIKKA_DEPLOYMENT_ID (lib/deployment-id.mjs). Next 16 sends it as
+// x-deployment-id on Server Action and RSC requests, so an open page keeps
+// reaching its own deployment after the next deploy.
+const deploymentId = configuredDeploymentId()
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  ...(deploymentId ? { deploymentId } : {}),
   // next dev would rewrite AGENTS.md with its own block; the file is the project's
   // (https://nextjs.org/docs/app/api-reference/config/next-config-js/agentRules).
   agentRules: false,
@@ -74,7 +82,8 @@ const nextConfig = {
   transpilePackages: ['@mikka/protocol'],
   // better-auth/react must share Next's SSR React dispatcher with client components.
   // Externalizing the whole package loads native React and crashes enabled analytics.
-  serverExternalPackages: ['ai', 'drizzle-orm', 'officeparser', '@e965/xlsx', 'music-metadata'],
+  // OpenTelemetry stays external so the pg instrumentation can patch the `pg` that lib/db requires (lib/tracing/node.ts).
+  serverExternalPackages: ['ai', 'drizzle-orm', 'officeparser', '@e965/xlsx', 'music-metadata', '@opentelemetry/api', '@opentelemetry/instrumentation', '@opentelemetry/instrumentation-pg', '@opentelemetry/sdk-trace-node', '@opentelemetry/exporter-trace-otlp-proto'],
   async headers() {
     return [{ source: '/(.*)', headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -98,6 +107,9 @@ const nextConfig = {
     // Bulk add in 设置 › 密钥与环境 sends a .env of up to 2 MB (lib/secrets/dotenv.ts) to a server action;
     // the default limit is 1 MB. 3 MB leaves room for the multipart envelope.
     serverActions: { bodySizeLimit: '3mb' },
+    // Pages must carry the build-time id above, the one Vercel pins prebuilt
+    // deployments by, not the runtime dpl_ id (vercel/next.js#94734).
+    ...(deploymentId ? { runtimeServerDeploymentId: false } : {}),
     // A copied acceptance checkout can invalidate Turbopack's persistent
     // parent graph and abort next dev. Keep this disposable stack in memory.
     ...(localTestAccountsMode(process.env) ? { turbopackFileSystemCacheForDev: false } : {}),

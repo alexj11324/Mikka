@@ -96,13 +96,3 @@ export function refusalOffer(code: HostedRefusal, usage: HostedUsage | null) {
 export function balancePoints(balance: HostedBalance): number {
   return Math.floor(Math.max(0, balance.free + balance.purchased) / MICRO_USD_PER_POINT)
 }
-
-/** Polls until `done` holds or `attempts` run out; the last read either way. */
-export async function pollUntil<T>(read: () => Promise<T>, done: (value: T) => boolean, { attempts = 10, interval = 2000, sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms)) } = {}): Promise<T> {
-  let value = await read()
-  for (let i = 1; i < attempts && !done(value); i++) {
-    await sleep(interval)
-    value = await read()
-  }
-  return value
-}

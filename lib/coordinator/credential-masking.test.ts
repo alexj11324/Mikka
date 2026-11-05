@@ -24,7 +24,7 @@ const tx = {
   },
   update(table: unknown) {
     assert.equal(table, coordinatorSessions)
-    return { set(value: Record<string, unknown>) { updates.push(value); return { where: async () => undefined } } }
+    return { set(value: Record<string, unknown>) { updates.push(value); return { where: () => Object.assign(Promise.resolve(undefined), { returning: async () => [{ userId: 'owner' }] }) } } }
   },
 }
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
@@ -36,6 +36,7 @@ stub('../issue-visibility.ts', { issueVisibility: () => {} })
 stub('../task-identifier-server.ts', { taskIdentifiers: () => {} })
 stub('../artifacts/store.ts', { artifactSummaries: () => {} })
 stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async () => {} })
+stub('../live/coordinator-session.ts', { coordinatorSessionChanged: async () => {} })
 
 let store: typeof import('./store')
 before(async () => { store = await import('./store') })

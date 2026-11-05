@@ -1,3 +1,4 @@
+import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { reconcileFactoryCheck } from "./reconcile-check";
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
@@ -8,7 +9,7 @@ import test from "node:test";
 import { Pool } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { FactoryError, type FactoryBinding } from "./contract";
-import { createFactoryStore, type FactoryTask } from "./store";
+import { type FactoryTask } from "./store";
 import { createFactoryDispatch } from "./dispatch";
 import { observeFactoryCheckDispatch } from "./check-dispatch";
 import { createFactoryCheckRecovery } from "./check-recovery";

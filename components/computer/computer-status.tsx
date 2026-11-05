@@ -37,7 +37,7 @@ export function ComputerStatusBadge({ status, end = false }: { status: ComputerS
     (status === 'working' || status === 'waking') && 'bg-sidebar-primary/10 text-sidebar-primary',
     (status === 'approval' || status === 'user') && 'bg-attention/10 text-attention-foreground',
     (status === 'done' || status === 'running') && 'bg-success/10 text-success-foreground',
-    status === 'failed' && 'bg-destructive/10 text-destructive',
+    status === 'failed' && 'bg-destructive/10 text-destructive-foreground',
     status === 'sleeping' && 'bg-muted text-muted-foreground')}>
     {icon}{t(status)}
   </Badge>

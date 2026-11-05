@@ -17,7 +17,7 @@ let sessionUser: string | null = null
 let freshSession = true
 function fixture() {
   const run = { id: runId, issueId, deviceRepoId:undefined as string|undefined, userId: 'owner', botId, status: 'running', stopRequestedAt: null as Date | null, prompt: 'Private thread', report: null, error: null as string | null, questionContinuation: null as (typeof agentRuns.$inferSelect)['questionContinuation'], createdAt: new Date(), finishedAt: null, agentName: 'Owned Bot', harness: 'codex', ownerName: 'Owner' }
-  return { questions: new Map<string, string>(), questionOwners: new Map<string, string>(), questionReads: [] as unknown[][], epochReads: [] as unknown[][], run, continuation: null as typeof run | null, members: new Set(['owner', 'member', botId]), messages: [] as Array<{ id: string; runId: string; userId: string; text: string }>, updates: 0, transactions: 0, ordinaryDispatches: 0, beforeLock: undefined as (() => void) | undefined, fault: undefined as Error | undefined, recovery: null as Record<string,unknown> | null, recoveryReads: 0, recoveryCalls: [] as Array<{actor:unknown;input:unknown}> }
+  return { factoryStages: new Map<string, string>(), controlReads: [] as unknown[][], questions: new Map<string, string>(), questionOwners: new Map<string, string>(), questionReads: [] as unknown[][], epochReads: [] as unknown[][], run, continuation: null as typeof run | null, members: new Set(['owner', 'member', botId]), messages: [] as Array<{ id: string; runId: string; userId: string; text: string }>, updates: 0, transactions: 0, ordinaryDispatches: 0, beforeLock: undefined as (() => void) | undefined, fault: undefined as Error | undefined, recovery: null as Record<string,unknown> | null, recoveryReads: 0, recoveryCalls: [] as Array<{actor:unknown;input:unknown}> }
 }
 let current = fixture()
 class Selection {
@@ -116,12 +116,21 @@ before(async () => {
       current.epochReads.push(params)
       return {rows:[]}
     }
+    if (sql.includes('AS "independentCheck"')) {
+      const liveId = current.continuation?.id ?? current.run.id
+      assert.deepEqual(params, [liveId, 'owner', issueId], 'controls must bind the current run, owner and issue')
+      assert.match(sql, /a\."runId"=r\.id AND a\.stage IN \('review','verify','monitor'\)/)
+      assert.match(sql, /r\.id=\$1 AND r\."userId"=\$2 AND r\."issueId" IS NOT DISTINCT FROM \$3::uuid/)
+      current.controlReads.push(params)
+      return { rows: [{ independentCheck: ['review', 'verify', 'monitor'].includes(current.factoryStages.get(liveId) ?? '') }] }
+    }
     // Run chains (BE-18) fold a resumed-question continuation into its thread; covered against real PG in
     // tests/run-chain.db.test.ts and lib/factory/questions/postgres.test.ts.
     if (/SELECT q.id AS "questionId"/.test(sql)) {
       current.recoveryReads++;
-      assert.deepEqual(params.slice(0,3),['owner',runId,issueId]);
-      assert.equal(params[3],factoryEventId('question-recover',factoryEventId('question-owner-retry',runId)));
+      assert.equal(params[0], 'owner'); assert.equal(params[2], issueId);
+      assert.ok([current.run.id, current.continuation?.id].includes(params[1] as string));
+      assert.equal(params[3],factoryEventId('question-recover',factoryEventId('question-owner-retry',params[1] as string)));
       assert.match(sql,/r\."userId"=\$1/);assert.match(sql,/q\."userId"=\$1/);assert.match(sql,/t\."userId"=\$1/);
       return {rows:current.recovery?[current.recovery]:[]};
     }
@@ -137,6 +146,19 @@ before(async () => {
       && (!taskOwner || current.run.userId === viewerId)).map(id => ({ runId: id, status: current.questions.get(id) })) }
   } } } })
   mock.module('@/lib/workspace-db', { namedExports: { workspaceDb: { select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }) } } })
+  // Scope SQL and post-COMMIT delivery have real-PG coverage in live/panels.db.test.ts.
+  // This action fixture retains the original ownership/chain checks before resolving keys.
+  mock.module('@/lib/live/panels', { namedExports: {
+    runChanged: async () => {},
+    threadLiveReferences: async (_database: unknown, _workspace: unknown, ids: string[], ownerId: string) => {
+      assert.equal(ownerId, 'owner')
+      assert.ok(ids.every(id => [current.run.id, current.continuation?.id].includes(id)))
+      return ids.map(id => ({ id, workspaceId: null }))
+    },
+    documentLiveWorkspace: async (_database: unknown, _workspace: unknown, id: string, ownerId: string) => {
+      assert.equal(id, issueId); assert.equal(ownerId, 'owner'); return null
+    },
+  } })
   mock.module('@/lib/issue-access', { namedExports: {
     requireIssueAccess: async (id: string) => {
       if (!viewer) throw new ActionFailureError('authRequired')
@@ -407,4 +429,78 @@ test('an earlier attempt failure does not remain the current error after a conti
     current.run.status = 'failed'; current.run.error = 'Historical failure'
     assert.equal((await actions.getIssueThread(issueId, runId)).thread.error, null)
   }
+})
+
+
+test('thread controls use host Factory check bindings even when the failed run has no report', async () => {
+  for (const stage of ['review', 'verify', 'monitor']) {
+    current = fixture(); viewer = 'owner'; current.run.status = 'failed'; current.factoryStages.set(runId, stage)
+    const { thread } = await actions.getIssueThread(issueId, runId)
+    assert.equal(thread.retryAvailable, false, `${stage} must not offer ordinary Retry`)
+    assert.equal(thread.replyAvailable, false, `${stage} cannot continue as execution`)
+    assert.deepEqual(current.controlReads, [[runId, 'owner', issueId]])
+    assert.equal(current.recoveryCalls.length + current.ordinaryDispatches, 0, 'a projection must not dispatch')
+  }
+})
+
+test('producer and ordinary failed threads keep their existing Retry and reply controls', async () => {
+  for (const stage of [null, 'execute']) {
+    current = fixture(); viewer = 'owner'; current.run.status = 'failed'
+    if (stage) current.factoryStages.set(runId, stage)
+    const { thread } = await actions.getIssueThread(issueId, runId)
+    assert.equal(thread.retryAvailable, true)
+    assert.equal(thread.replyAvailable, true)
+    assert.equal(current.recoveryReads, 0, 'ordinary controls do not acquire question recovery')
+  }
+})
+
+test('an independent check retains strict question Retry without enabling ordinary Send', async () => {
+  current = fixture(); viewer = 'owner'; current.run.status = 'failed'; current.factoryStages.set(runId, 'review')
+  current.recovery = recoveryRow()
+  let detail = await actions.getIssueThread(issueId, runId)
+  assert.equal(detail.thread.retryAvailable, true)
+  assert.equal(detail.thread.replyAvailable, false)
+  current.recovery = { ...recoveryRow(), questionStatus: 'resuming', taskStatus: 'running' }
+  assert.equal((await actions.getIssueThread(issueId, runId)).thread.retryAvailable, false, 'stale blocked state is not recovery authority')
+  current.recovery = { ...recoveryRow(), continuationRunId: 'another-run' }
+  assert.equal((await actions.getIssueThread(issueId, runId)).thread.retryAvailable, false, 'another continuation cannot enable this control')
+  current.recovery = { ...recoveryRow(), questionStatus: 'resuming', taskStatus: 'running', recoveryRequest: { kind: 'question_recover' } }
+  detail = await actions.getIssueThread(issueId, runId)
+  assert.equal(detail.thread.retryAvailable, true, 'the existing durable receipt remains replayable')
+  assert.equal(detail.thread.replyAvailable, false)
+  assert.equal(current.recoveryCalls.length + current.ordinaryDispatches, 0)
+})
+
+test('current check questions and running checks retain their existing message path', async () => {
+  const routing = process.env.MIKKA_FACTORY_ROUTING_ENABLED, lifecycle = process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED
+  try {
+    process.env.MIKKA_FACTORY_ROUTING_ENABLED = '1'; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = '1'
+    current = fixture(); viewer = 'owner'; current.run.status = 'stopped'; current.factoryStages.set(runId, 'verify'); current.questions.set(runId, 'waiting_user')
+    const waiting = await actions.getIssueThread(issueId, runId)
+    assert.equal(waiting.thread.question, 'waiting')
+    assert.equal(waiting.thread.replyAvailable, true, 'the composer must still answer the current question')
+    assert.equal(waiting.thread.retryAvailable, false)
+    current = fixture(); viewer = 'owner'; current.factoryStages.set(runId, 'monitor')
+    const working = await actions.getIssueThread(issueId, runId)
+    assert.equal(working.thread.replyAvailable, true, 'active checks retain mailbox messages')
+    assert.equal(working.thread.retryAvailable, false)
+    assert.deepEqual(current.controlReads, [], 'an active run needs no continuation probe')
+  } finally {
+    if (routing === undefined) delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; else process.env.MIKKA_FACTORY_ROUTING_ENABLED = routing
+    if (lifecycle === undefined) delete process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED; else process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = lifecycle
+  }
+})
+
+test('thread controls follow the latest attempt binding rather than the opened root stage', async () => {
+  current = fixture(); viewer = 'owner'; strictContinuation()
+  current.factoryStages.set(runId, 'execute'); current.factoryStages.set(failedRunId, 'review')
+  let detail = await actions.getIssueThread(issueId, runId)
+  assert.equal(detail.thread.retryAvailable, false)
+  assert.equal(detail.thread.replyAvailable, false)
+  assert.deepEqual(current.controlReads, [[failedRunId, 'owner', issueId]])
+  current.factoryStages.set(runId, 'review'); current.factoryStages.set(failedRunId, 'execute')
+  current.continuation!.questionContinuation = null
+  detail = await actions.getIssueThread(issueId, runId)
+  assert.equal(detail.thread.retryAvailable, true)
+  assert.equal(detail.thread.replyAvailable, true)
 })

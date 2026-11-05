@@ -29,7 +29,9 @@ mock.module('../../workflows/coordinator/native-steps.ts', { namedExports: {
 mock.module('./native.ts', { namedExports: { nativeCoordinatorStore: {
   assertToolActive: (...args: Parameters<NativeCoordinatorStore['assertToolActive']>) => store!.assertToolActive(...args),
 } } })
-mock.module('workflow', { namedExports: { sleep: async () => undefined, FatalError } })
+// The turn's wake hook never fires here; each wait ends on the immediate sleep, as the 1 s re-read did.
+// oxlint-disable-next-line unicorn/no-thenable -- a Workflow hook is a thenable.
+mock.module('workflow', { namedExports: { sleep: async () => undefined, FatalError, createHook: () => ({ then: () => undefined, dispose: () => undefined }) } })
 let nativeCoordinatorTurn: typeof import('../../workflows/coordinator/native-turn').nativeCoordinatorTurn
 let assertNativeToolScope: typeof import('../../workflows/coordinator/tool-scope').assertNativeToolScope
 
@@ -72,3 +74,24 @@ for (const revoked of ['device','lease','deadline','failed','closed'] as const) 
     assert.deepEqual(effects,['first'])
   })
 }
+
+test('a written tool result wakes the device that asked for it (#1212)', { skip: !url }, async () => {
+  const userId=randomUUID(),deviceId=randomUUID(),holder=randomUUID()
+  const woken: string[]=[]
+  const waking=new NativeCoordinatorStore(pool!, id => woken.push(id))
+  await pool!.query('INSERT INTO devices (id,"ownerId",harnesses) VALUES ($1,$2,$3)',[deviceId,userId,JSON.stringify([{harness:'codex',installed:true,coordinator:true}])])
+  const runtime={harness:'codex' as const,deviceId}
+  await waking.setRuntime(userId,runtime)
+  await pool!.query(`UPDATE coordinator_sessions SET "leaseHolder"=$2,"leaseUntil"=now()+interval '10 minutes' WHERE "userId"=$1`,[userId,holder])
+  const id=await waking.enqueue(userId,holder,0,runtime,{instructions:'Mikka',context:'Authorized context',tools:[{name:'remember',description:'Save memory',inputSchema:{type:'object',properties:{note:{type:'string'}},required:['note']}}]})
+  await waking.claim(userId,deviceId)
+  await waking.submit(userId,deviceId,id,{type:'tool',callId:'only',name:'remember',input:{note:'x'}})
+  assert.deepEqual(await waking.result(userId,deviceId,id,'only'),{status:'pending'})
+  assert.deepEqual(woken,[])
+  await waking.finishTool(userId,holder,id,'only',{remembered:true})
+  assert.deepEqual(woken,[deviceId],'the push goes out with the result, so the device asks once')
+  assert.deepEqual(await waking.result(userId,deviceId,id,'only'),{status:'done',output:{remembered:true}})
+  await pool!.query('UPDATE coordinator_sessions SET "leaseHolder"=null WHERE "userId"=$1',[userId])
+  await assert.rejects(waking.finishTool(userId,holder,id,'only',{remembered:true}),/ExpiredOrLeaseLost/)
+  assert.deepEqual(woken,[deviceId],'a refused write wakes nobody')
+})

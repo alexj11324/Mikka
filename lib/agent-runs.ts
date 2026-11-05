@@ -25,6 +25,7 @@ import { tiptapToText } from '@/lib/tiptap-text'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { runPrompt } from '@/lib/run-prompt'
 import { dispatchInput, dispatchRequestKey, type DispatchInput, type DispatchResult } from '@/lib/run-dispatch'
+import { agentProfileReferenceSchema, BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-reference'
 import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
 import { resolveStopTargets } from '@/lib/run-chain'
 import { afterRunEnded } from '@/lib/run-completion-effects'
@@ -33,7 +34,13 @@ import { runBotName } from '@/lib/run-bot-name'
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
 
+export type RunAgentProfile = Pick<NonNullable<RunModel['agentProfile']>, 'profileId' | 'name' | 'version' | 'digest' | 'source' | 'reason'>
+
 export interface RunView {
+  /** Public provenance only; never the private role instructions, skills or account reference. */
+  agentProfile?: RunAgentProfile | null
+  model?: string | null
+  modelSource?: string | null
   /** Owner-only trusted provenance; omitted from workspace summaries and null on historical runs. */
   executionIdentity?: ExecutionIdentity | null
   id: string
@@ -64,11 +71,29 @@ export interface RunDetail {
 }
 
 export const runViewColumns = {
+  agentProfile: sql<RunAgentProfile | null>`case when ${agentRuns.agentDefinition}->'agentProfile' is null then null else jsonb_build_object(
+    'profileId',${agentRuns.agentDefinition}->'agentProfile'->'profileId', 'name',${agentRuns.agentDefinition}->'agentProfile'->'name',
+    'version',${agentRuns.agentDefinition}->'agentProfile'->'version', 'digest',${agentRuns.agentDefinition}->'agentProfile'->'digest',
+    'source',${agentRuns.agentDefinition}->'agentProfile'->'source', 'reason',${agentRuns.agentDefinition}->'agentProfile'->'reason') end`,
+  model: sql<string | null>`${agentRuns.agentDefinition}->>'model'`,
+  modelSource: sql<string | null>`${agentRuns.agentDefinition}->>'modelSource'`,
   executionIdentity: sql<ExecutionIdentity | null>`${agentRuns.agentDefinition}->'executionIdentity'`,
   id: agentRuns.id, issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: runBotName,
   harness: sql<SupportedHarness>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`, status: agentRuns.status, outcome: agentRuns.outcome, pauseReason: agentRuns.pauseReason, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
   error: agentRuns.error, report: agentRuns.report, createdAt: agentRuns.createdAt,
   startedAt: agentRuns.startedAt, finishedAt: agentRuns.finishedAt,
+}
+
+/**
+ * `runViewColumns` for list reads (citations, the inbox): no provenance, the
+ * report holds only its `summary` and the error only its first non-blank line,
+ * exactly what `runSummaryText` reads from them.
+ */
+const { agentProfile: _profile, model: _model, modelSource: _modelSource, executionIdentity: _identity, ...runBriefColumns } = runViewColumns
+const runBriefViewColumns = {
+  ...runBriefColumns,
+  report: sql<Record<string, unknown> | null>`case when jsonb_typeof(${agentRuns.report}) = 'object' then jsonb_build_object('summary', ${agentRuns.report}->'summary') end`,
+  error: sql<string | null>`substring(${agentRuns.error} from '[^\\n]*\\S[^\\n]*')`,
 }
 
 /**
@@ -82,6 +107,7 @@ type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note
   model: string
   /** The host's original selection policy, never inferred from the required model argument. */
   modelDispatch?: WorkerModelDispatch
+  agentProfile?: RunModel['agentProfile']
   policyCeiling?: RunModel['policyCeiling']
   /** The run this one continues, named when the model is missing. */
   threadRunId?: string
@@ -97,7 +123,7 @@ export async function queueRun(userId: string, input: LocalDispatchInput, botId:
 /** Only the Factory/Skill host calls this with an already-open transaction.
  * Repository ids identify prior scheduling metadata; they confer no authority. */
 /** What the host already decided for a Factory run: its model and credential (lib/computer/run-model.ts), the computer it is pinned to, read-only. */
-export type FactoryRunSelection = { model?: string; subscriptionBindingId?: string; apiKeyId?: string; modelDispatch?: WorkerModelDispatch; policyCeiling?: RunModel['policyCeiling']; pinnedDeviceId?: string; readOnly?: boolean; execution?: AgentExecution }
+export type FactoryRunSelection = { threadRunId?: string; model?: string; subscriptionBindingId?: string; apiKeyId?: string; modelDispatch?: WorkerModelDispatch; agentProfile?: RunModel['agentProfile']; policyCeiling?: RunModel['policyCeiling']; pinnedDeviceId?: string; readOnly?: boolean; execution?: AgentExecution }
 export async function queueFactoryRun(tx: import('pg').PoolClient, userId: string, input: DispatchInput,
   botId: string | null = null, context?: { sourceEventId: string; attemptId: string }, sourceRunId?: string, selection: FactoryRunSelection = {}): Promise<DispatchResult> {
   const parsed = dispatchInput.safeParse(input)
@@ -108,8 +134,9 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
     const [repo] = await executor.select().from(deviceRepos).where(and(eq(deviceRepos.id, parsed.data.deviceRepoId), eq(deviceRepos.userId, userId))).limit(1)
     if (!repo?.remoteUrl) throw new ActionFailureError('agentRepoMissing')
     let requestEventId: string | undefined
+    let profileStage: string = 'execute'
     if (context) {
-      const { rows: [event] } = await tx.query(`SELECT e.payload FROM coordinator_events e
+      const { rows: [event] } = await tx.query(`SELECT e.payload,a.stage FROM coordinator_events e
         JOIN factory_tasks t ON t."sourceEventId"=e.id AND t."userId"=e."userId" AND t."botId" IS NOT DISTINCT FROM e."botId"
         JOIN issues i ON i.id=t."issueId"
         JOIN factory_attempts a ON a."taskId"=t.id AND a.id=t."attemptId"
@@ -117,6 +144,15 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
           AND e.kind='user_message' AND t."issueId"=$3 AND a.id=$5 AND t.status NOT IN ('cancelled','revoked')
           AND (i."userId"=t."userId" OR (i.scope='workspace' AND t."scopeVersion" IS NOT NULL AND t."scopeVersion"=i."scopeVersion"))`, [context.sourceEventId, userId, parsed.data.issueId, botId, context.attemptId])
       if (!event) throw new ActionFailureError('runInvalid')
+      profileStage = event.stage
+      // The public Factory tool shares this queue with host-selected stages.
+      // Only a stored user choice can select Default on the public path;
+      // independent checks and frozen continuations keep the host's selection.
+      if (!selection.model?.trim()) {
+        const profile = agentProfileReferenceSchema.safeParse(event.payload?.profileId)
+        if (profile.success && (profile.data === BUILTIN_AGENT_PROFILE_ID || parsed.data.profileId === BUILTIN_AGENT_PROFILE_ID)) parsed.data.profileId = profile.data
+        else if (parsed.data.profileId === BUILTIN_AGENT_PROFILE_ID) throw new ActionFailureError('runInvalid')
+      }
       // Even malformed destination data must reach the strict host-bound
       // admission check; an unbound ordinary chat request remains valid intake.
       if (Object.hasOwn(event.payload ?? {}, 'taskDestination')) requestEventId = context.sourceEventId
@@ -130,8 +166,8 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
     // else 优先使用的模型 for this computer's Agent. A Factory run is never queued without one.
     const { execution, ...chosen } = selection
     const runModel = await factoryRunModel(userId, botId, parsed.data.agentId, chosen, sourceRunId
-      ? (await executor.select({ agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, sourceRunId), eq(agentRuns.userId, userId))).limit(1))[0]?.agentDefinition : null)
-    const result = await queueAdmittedRun(userId, { ...parsed.data, ...runModel, ...(chosen.pinnedDeviceId ? { pinnedDeviceId: chosen.pinnedDeviceId } : {}), ...(chosen.readOnly ? { readOnly: true } : {}), repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, execution, requestEventId, null, { executor, repo, client: tx, sourceRunId })
+      ? (await executor.select({ agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, sourceRunId), eq(agentRuns.userId, userId))).limit(1))[0]?.agentDefinition : null, parsed.data.profileId, profileStage, parsed.data.issueId, tx)
+    const result = await queueAdmittedRun(userId, { ...parsed.data, ...runModel, threadRunId: selection.threadRunId ?? sourceRunId, ...(chosen.pinnedDeviceId ? { pinnedDeviceId: chosen.pinnedDeviceId } : {}), ...(chosen.readOnly ? { readOnly: true } : {}), repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, execution, requestEventId, null, { executor, repo, client: tx, sourceRunId, factoryContext: context })
     const [run] = await executor.select({ status: agentRuns.status }).from(agentRuns).where(and(eq(agentRuns.id, result.runId), eq(agentRuns.userId, userId))).limit(1)
     if (!run) throw new ActionFailureError('runInvalid')
     // BE-13: the target device cannot take the run right now -> one reason-coded event, same transaction.
@@ -174,7 +210,7 @@ export async function queueProviderFallbackRun(tx: import('pg').PoolClient, user
       originalIdentity.data.outputOwner !== userId || originalIdentity.data.botId !== current.botId) throw new ActionFailureError('executionAccountUnavailable')
     const result = await queueAdmittedRun(userId, {
       ...input, issueId: current.issueId!, repo: repo.remoteUrl,
-      threadRunId: current.id, requestKey: `provider:${current.id}`, pinnedDeviceId: current.agentDefinition.pinnedDeviceId,
+      requestKey: `provider:${current.id}`, pinnedDeviceId: current.agentDefinition.pinnedDeviceId,
       readOnly: current.agentDefinition.readOnly,
     }, current.botId, undefined, current.agentDefinition.repositoryAdmission?.requestEventId, current.source,
     // The wrapper authorizes the failed source above. All target policy,
@@ -196,7 +232,7 @@ export async function queueProviderFallbackRun(tx: import('pg').PoolClient, user
 
 async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 'model'> & { model?: string }, botId: string | null, execution?: AgentExecution,
   requestEventId?: string, source: 'mcp' | null = null,
-  internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string; workspaceHint?: string | null }) {
+  internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string; workspaceHint?: string | null; factoryContext?: { sourceEventId: string; attemptId: string } }) {
   const executor = internal?.executor ?? db
   // Every local run is frozen with its model, a Factory or Skill run included: a caller that left it out fails here, before anything is read or written.
   if (typeof input.model !== 'string' || !input.model.trim() || input.model.trim() === 'auto') {
@@ -215,7 +251,8 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
   if (!device?.enabled || !localExecutionHarnesses(device.harnesses).includes(agent.harness)) throw new ActionFailureError('agentHarnessMissing')
   const repo = internal?.repo ?? await ensureDeviceRepository(userId, agent.deviceId, parsed.data.repo)
   const runId = crypto.randomUUID()
-  const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
+  const instructions = [agent.instructions, input.agentProfile?.instructions].filter(Boolean).join('\n\n')
+  const prompt = runPrompt(issue.title, tiptapToText(issue.content), instructions, parsed.data.note)
   const captureDefinition = true
   const query = internal?.client ?? pool
   const workspaceId = botId ? (await query.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, userId])).rows[0]?.workspaceId
@@ -237,7 +274,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
     mailboxScope = { botId, workspaceId: bot?.workspaceId ?? (await import('@/lib/device-link')).WORKSPACE_ID }
   }
   const agentDefinition = captureDefinition
-    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model, modelDispatch: input.modelDispatch, policyCeiling: input.policyCeiling, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
+    ? freezeWorkerDefinition({ harness: agent.harness, instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model, modelDispatch: input.modelDispatch, agentProfile: input.agentProfile, policyCeiling: input.policyCeiling, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
     : null
   if (agentDefinition && input.modelDispatch && !botId) {
     // Bot-less preferences belong to the actual execution workspace. Persist
@@ -247,24 +284,33 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
       .catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
   }
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, profileSourceRunId: input.threadRunId, factoryContext: internal?.factoryContext, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
 }
 
 /** A Factory run's model: the host's choice; else a rerun's source run's own; else 优先使用的模型 for the Agent's computer. */
 async function factoryRunModel(userId: string, botId: string | null, agentId: string, chosen: Omit<FactoryRunSelection, 'execution' | 'pinnedDeviceId' | 'readOnly'>,
-  source: Parameters<typeof import('@/lib/computer/run-model').threadRunModel>[0]) {
-  const { threadRunModel, chooseLocalRunModel } = await import('@/lib/computer/run-model')
-  if (chosen.model?.trim()) return { model: chosen.model, ...(chosen.subscriptionBindingId ? { subscriptionBindingId: chosen.subscriptionBindingId } : {}), ...(chosen.apiKeyId ? { apiKeyId: chosen.apiKeyId } : {}), ...(chosen.modelDispatch ? { modelDispatch: chosen.modelDispatch } : {}), ...(chosen.policyCeiling ? { policyCeiling: chosen.policyCeiling } : {}) }
+  source: Parameters<typeof import('@/lib/computer/run-model').threadRunModel>[0], profileId?: string, stage: string = 'execute', issueId?: string, transaction?: import('pg').PoolClient) {
+  const { threadRunModel } = await import('@/lib/computer/run-model')
+  if (profileId && chosen.model && chosen.agentProfile?.profileId !== profileId) throw new ActionFailureError('runInvalid')
+  if (chosen.model?.trim()) return { model: chosen.model, ...(chosen.subscriptionBindingId ? { subscriptionBindingId: chosen.subscriptionBindingId } : {}), ...(chosen.apiKeyId ? { apiKeyId: chosen.apiKeyId } : {}), ...(chosen.modelDispatch ? { modelDispatch: chosen.modelDispatch } : {}), ...(chosen.agentProfile ? { agentProfile: chosen.agentProfile } : {}), ...(chosen.policyCeiling ? { policyCeiling: chosen.policyCeiling } : {}) }
   const kept = threadRunModel(source)
-  if (kept) return kept
+  if (kept) {
+    if (profileId && kept.agentProfile?.profileId !== profileId) throw new ActionFailureError('runInvalid')
+    return kept
+  }
   const [agent] = await db.select({ id: agents.id, deviceId: agents.deviceId, harness: agents.harness }).from(agents).where(and(eq(agents.id, agentId), eq(agents.userId, userId))).limit(1)
   if (!agent?.deviceId || (agent.harness !== 'codex' && agent.harness !== 'claude_code')) throw new ActionFailureError('runModelMissing')
   const { executionWorkspace } = await import('@/lib/execution-settings')
   const workspaceId = await executionWorkspace(userId, botId).catch(() => null)
   if (!workspaceId) throw new ActionFailureError('runModelMissing')
-  const picked = await chooseLocalRunModel(pool, { ownerId: userId, workspaceId, botId }, { id: agent.id, deviceId: agent.deviceId, harness: agent.harness })
-  if ('error' in picked) throw new ActionFailureError('runModelMissing')
-  return { ...picked, ...(chosen.policyCeiling ? { policyCeiling: chosen.policyCeiling } : {}) }
+  const { target, agentProfile, selectionMode } = await (await import('@/lib/factory/agent-profile')).resolveAgentProfileDispatch(pool,
+    { ownerId: userId, workspaceId, botId }, { issueId: issueId!, stage, profileId, agentId: agent.id, deviceId: agent.deviceId, location: 'local', asked: { harness: agent.harness } }, { transaction })
+  if (target.kind !== 'device' || target.agentId !== agent.id) throw new ActionFailureError('runModelMissing')
+  return { model: target.model, agentProfile,
+    modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
+    ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
+    ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}),
+    ...(chosen.policyCeiling ? { policyCeiling: chosen.policyCeiling } : {}) }
 }
 
 /** A device run's credential source; the bot's workspace decides whose API keys it may use. */
@@ -276,8 +322,9 @@ async function localRunCredential<S extends { id: string; ownerId: string; conne
 }
 
 /** Every surface uses this gate. Workspace membership never grants run control,
- * personal agent/session access, or raw transcript access. */
-export async function visibleRuns(userId: string, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number } = {}): Promise<RunView[]> {
+ * personal agent/session access, or raw transcript access.
+ * `brief`: the list projection (`runBriefViewColumns`), for callers that show a run's name, state and summary only. */
+export async function visibleRuns(userId: string, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number; brief?: boolean } = {}): Promise<RunView[]> {
   if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
   // Asked about one task or known runs: only their tasks' team links are read.
@@ -286,7 +333,7 @@ export async function visibleRuns(userId: string, input: { issueId?: string; run
     : undefined
   const visibility = await issueVisibility(userId, false, undefined, db, { onlyIssueIds })
   const shared = visibility.allowedIds.length ? and(eq(issues.scope, 'workspace'), inArray(issues.id, visibility.allowedIds)) : sql`false`
-  const rows = await db.select({ ...runViewColumns, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
+  const rows = await db.select({ ...(input.brief ? runBriefViewColumns : runViewColumns), ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))
     .where(and(
       or(and(eq(agentRuns.userId, userId), or(isNull(agentRuns.issueId), visibility.predicate)), and(visibility.predicate, shared)),

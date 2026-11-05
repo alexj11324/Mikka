@@ -80,9 +80,10 @@ export function benchmarkEvidence(row: {
 export function createSkillEvaluations(pool: Pool, dependencies: EvaluationDependencies) {
   async function transaction<T>(work: (tx: PoolClient) => Promise<T>, existing?: PoolClient) {
     if (existing) return work(existing)
+    const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('../factory/transaction')
     const tx = await pool.connect()
-    try { await tx.query('BEGIN'); const result = await work(tx); await tx.query('COMMIT'); return result }
-    catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+    try { await beginFactoryTransaction(tx); const result = await work(tx); await commitFactoryTransaction(tx); return result }
+    catch (error) { await rollbackFactoryTransaction(tx); throw error } finally { forgetFactoryTransaction(tx); tx.release() }
   }
   async function owned(tx: PoolClient, userId: string, runId: string) {
     const { rows: [source] } = await tx.query('SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2', [runId, userId])

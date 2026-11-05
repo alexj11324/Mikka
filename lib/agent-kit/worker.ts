@@ -1,4 +1,5 @@
 import type { ExecutionIdentity } from '../execution-identity'
+import type { AgentProfileSelection } from '../factory/agent-profile'
 import { workerDefinitionDigest } from './worker-digest'
 import { z } from 'zod'
 import type { Harness } from '@mikka/protocol/harness'
@@ -8,12 +9,15 @@ import type { RepositoryAdmission } from '../repository-admission'
 import { mcpAuthoritySchema, type McpAuthority } from '../plugins/contracts'
 import type { OrderEntry, RunLocation } from '../model-order-plan'
 import { runPolicySchema, type RunPolicy } from '@mikka/protocol/agent-policy'
+import { modelTier, supportedModelEfforts, type ModelRoutingSnapshot } from '../model-routing'
 
 /** Host-recorded model choice, distinct from the CLI's explicit model argument. */
 export interface WorkerModelDispatch {
   mode: 'preference' | 'picked'
   location?: RunLocation
   entry?: OrderEntry
+  /** Host-validated difficulty choice, frozen with the actual model. */
+  routing?: ModelRoutingSnapshot
 }
 
 export interface WorkerDefinitionSnapshot {
@@ -33,6 +37,10 @@ export interface WorkerDefinitionSnapshot {
   model?: string
   /** Absent on historical runs: a model argument alone never grants automatic switching. */
   modelDispatch?: WorkerModelDispatch
+  /** Authorized role and definition frozen at admission, independent of its physical runner. */
+  agentProfile?: AgentProfileSelection
+  /** Verified prior started run whose native session keeps this role after a profile edit. */
+  profileOriginRunId?: string
   /** Host-frozen source policy: a model continuation never gains the next worker's broader permissions. */
   policyCeiling?: RunPolicy
   pinnedDeviceId?: string
@@ -51,7 +59,7 @@ export interface WorkerDefinitionSnapshot {
 }
 
 /** Captured atomically with dispatch, not retroactively inferred from a renamed Agent. */
-export function freezeWorkerDefinition(input: { harness: Harness; instructions: string; prompt: string; parent: DefinitionSnapshot | null; executionId: string | null; model?: string; modelDispatch?: WorkerModelDispatch; policyCeiling?: RunPolicy; pinnedDeviceId?: string; allowLocalRecovery?: true; subscription?: { id: string; modelId: string; route: string } | null; apiKey?: { keyId: string; model: string } | null; mailboxEnabled?: boolean; mailboxScope?: WorkerMailboxScope; readOnly?: boolean }): WorkerDefinitionSnapshot {
+export function freezeWorkerDefinition(input: { harness: Harness; instructions: string; prompt: string; parent: DefinitionSnapshot | null; executionId: string | null; model?: string; modelDispatch?: WorkerModelDispatch; agentProfile?: AgentProfileSelection; policyCeiling?: RunPolicy; pinnedDeviceId?: string; allowLocalRecovery?: true; subscription?: { id: string; modelId: string; route: string } | null; apiKey?: { keyId: string; model: string } | null; mailboxEnabled?: boolean; mailboxScope?: WorkerMailboxScope; readOnly?: boolean }): WorkerDefinitionSnapshot {
   if (Boolean(input.parent) !== Boolean(input.executionId)) throw new Error('agentWorkerParentIncomplete')
   if (input.subscription && input.apiKey) throw new Error('agentWorkerCredentialConflict')
   if (input.apiKey && input.harness !== 'codex' && input.harness !== 'claude_code') throw new Error('agentWorkerApiKeyMismatch')
@@ -63,6 +71,7 @@ export function freezeWorkerDefinition(input: { harness: Harness; instructions: 
   // binding. A subscription alone preserves the existing CLI auto selection.
   const model = apiKey?.model ?? input.model
   const modelDispatch = apiKey ? apiKeyModelDispatch(input.modelDispatch, apiKey) : input.modelDispatch ? structuredClone(input.modelDispatch) : undefined
+  const agentProfile = input.agentProfile ? structuredClone(input.agentProfile) : undefined
   const policyCeiling = input.policyCeiling ? runPolicySchema.parse(input.policyCeiling) : undefined
   const customMcp = input.parent?.personalPlugins?.mcpAuthority?.servers.length
     ? mcpAuthoritySchema.parse(structuredClone(input.parent.personalPlugins.mcpAuthority)) : undefined
@@ -72,12 +81,13 @@ export function freezeWorkerDefinition(input: { harness: Harness; instructions: 
   return {
     ...(model ? {model:z.string().trim().min(1).max(128).parse(model)} : {}),
     ...(modelDispatch ? { modelDispatch } : {}),
+    ...(agentProfile ? { agentProfile } : {}),
     ...(policyCeiling ? { policyCeiling } : {}),
     ...(input.pinnedDeviceId ? {pinnedDeviceId:z.uuid().parse(input.pinnedDeviceId)} : {}),
     ...(input.allowLocalRecovery === true ? { allowLocalRecovery: true as const } : {}),
     cliModelSelection: model ? 'explicit' : 'auto',
     schemaVersion: 1, kind: 'worker', harness: input.harness, instructions: input.instructions,
-    definitionDigest: workerDefinitionDigest({ harness: input.harness, instructions: input.instructions, model, modelDispatch, policyCeiling, pinnedDeviceId: input.pinnedDeviceId, allowLocalRecovery: input.allowLocalRecovery, subscription, apiKey, mailbox, customMcp, readOnly: input.readOnly }),
+    definitionDigest: workerDefinitionDigest({ harness: input.harness, instructions: input.instructions, model, modelDispatch, agentProfile, policyCeiling, pinnedDeviceId: input.pinnedDeviceId, allowLocalRecovery: input.allowLocalRecovery, subscription, apiKey, mailbox, customMcp, readOnly: input.readOnly }),
     promptDigest: digest(input.prompt), modelSource: subscription ? 'subscription' : apiKey ? 'api_key' : 'native-default', ...(subscription ? { subscription } : {}), ...(apiKey ? { apiKey } : {}),
     parent: input.parent && input.executionId ? { executionId: input.executionId,revisionId: input.parent.revisionId,revision: input.parent.revision,definitionDigest: input.parent.definitionDigest } : null,
     ...(mailbox ? { mailbox } : {}),
@@ -113,6 +123,11 @@ function apiKeyModelDispatch(dispatch: WorkerModelDispatch | undefined, key: { k
   const entry = frozen.entry
   if (entry && (entry.source.kind !== 'api_key' || entry.source.keyId !== key.keyId || entry.model !== key.model)) {
     frozen.entry = { ...entry, id: `api_key:${entry.harness}:${key.model}:${key.keyId}`, model: key.model, source: { kind: 'api_key', keyId: key.keyId } }
+    if (frozen.routing && frozen.routing.model !== key.model) {
+      const { effort, ...previous } = frozen.routing
+      frozen.routing = { ...previous, model: key.model, harness: entry.harness, tier: modelTier(key.model), reason: 'list_order', previousModel: previous.model,
+        ...(effort && supportedModelEfforts(key.model, entry.harness).includes(effort) ? { effort } : {}) }
+    }
   }
   return frozen
 }

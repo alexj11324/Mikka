@@ -115,6 +115,9 @@ func (p CPACodexOAuth) PollDevice(ctx context.Context, a DeviceAttempt) (*Device
 func (w *Worker) startDevice(ctx context.Context, epoch int64, session string, d DeviceOAuth) (OAuthStart, error) {
 	op, err := w.Repo.BeginAcquire(ctx, w.Scope, epoch)
 	if err != nil {
+		if err == ErrStale {
+			return w.ResumeOAuth(ctx, session)
+		}
 		return OAuthStart{}, err
 	}
 	fail := func(e error) (OAuthStart, error) {
@@ -126,22 +129,21 @@ func (w *Worker) startDevice(ctx context.Context, epoch int64, session string, d
 		return fail(err)
 	}
 	state, name := randomCode(), "mikka-byos-"+newID()
-	raw, _ := json.Marshal(oauthSecret{Scope: w.Scope, SessionHash: hashText(session), OperationID: op.OperationID, Device: &device})
-	op.Deadline = time.Now().Add(15 * time.Minute)
+	// Extend the publication deadline to match CPA's 15-minute device lifetime.
+	err = w.Repo.DB.QueryRowContext(ctx, `update byos_connections set "operationDeadline"=now()+interval '15 minutes' where id=$1 and "operationId"=$2 and epoch=$3 and state='pending' returning "operationDeadline"`, w.Scope.ConnectionID, op.OperationID, op.Epoch).Scan(&op.Deadline)
+	if err != nil {
+		return fail(ErrDatabase)
+	}
+	start := OAuthStart{Flow: "device", State: state, UserCode: device.UserCode, Interval: device.Interval, AuthorizationURL: "https://auth.openai.com/codex/device", Revision: op.Epoch, ExpiresAt: op.Deadline}
+	raw, _ := json.Marshal(oauthSecret{Scope: w.Scope, SessionHash: hashText(session), OperationID: op.OperationID, Device: &device, Start: &start})
 	if createArtifact(ctx, w.Repo, w.Secrets, op, "oauth", name, raw) != nil {
 		return fail(ErrStore)
 	}
-	// Extend the publication deadline to match CPA's 15-minute device lifetime.
-	_, err = w.Repo.DB.ExecContext(ctx, `update byos_connections set "operationDeadline"=now()+interval '15 minutes' where id=$1 and "operationId"=$2 and state='pending'`, w.Scope.ConnectionID, op.OperationID)
+	_, err = w.Repo.DB.ExecContext(ctx, `insert into byos_oauth_attempts ("stateHash","sessionHash","connectionId","ownerId","workspaceId","operationId","secretName","expiresAt",flow,"nextPollAt") select $1,$2,$3,$4,$5,$6,$7,$8,'device',now()+$9*interval '1 second' where exists(select 1 from byos_connections where id=$3 and "ownerId"=$4 and "workspaceId"=$5 and "operationId"=$6 and epoch=$10 and state='pending' and "operationDeadline">now())`, hashText(state), hashText(session), w.Scope.ConnectionID, w.Scope.OwnerID, w.Scope.WorkspaceID, op.OperationID, name, op.Deadline, device.Interval, op.Epoch)
 	if err != nil {
 		return fail(ErrDatabase)
 	}
-	expires := time.Now().Add(15 * time.Minute)
-	_, err = w.Repo.DB.ExecContext(ctx, `insert into byos_oauth_attempts ("stateHash","sessionHash","connectionId","ownerId","workspaceId","operationId","secretName","expiresAt",flow,"nextPollAt") values ($1,$2,$3,$4,$5,$6,$7,$8,'device',now()+$9*interval '1 second')`, hashText(state), hashText(session), w.Scope.ConnectionID, w.Scope.OwnerID, w.Scope.WorkspaceID, op.OperationID, name, expires, device.Interval)
-	if err != nil {
-		return fail(ErrDatabase)
-	}
-	return OAuthStart{Flow: "device", State: state, UserCode: device.UserCode, Interval: device.Interval, AuthorizationURL: "https://auth.openai.com/codex/device", Revision: op.Epoch, ExpiresAt: expires}, nil
+	return w.ResumeOAuth(ctx, session)
 }
 func validState(state string) bool {
 	if len(state) != 43 {
@@ -152,7 +154,7 @@ func validState(state string) bool {
 }
 
 // Claims persist before network use. A crash/uncertain poll leaves polling=true:
-// reconnect is required; another worker must not retry a possibly consumed grant.
+// another worker waits for its result/expiry, never retries a consumed grant.
 func (w *Worker) PollOAuth(ctx context.Context, session, state string) (any, error) {
 	if w.ExecutionOnly || w.Secrets == nil {
 		return nil, ErrUnsupported
@@ -162,8 +164,15 @@ func (w *Worker) PollOAuth(ctx context.Context, session, state string) (any, err
 		return nil, ErrUnsupported
 	}
 	var opID, name string
-	err := w.Repo.DB.QueryRowContext(ctx, `update byos_oauth_attempts a set polling=true where "stateHash"=$1 and "sessionHash"=$2 and "connectionId"=$3 and "ownerId"=$4 and "workspaceId"=$5 and flow='device' and "consumedAt" is null and not polling and "expiresAt">now() and "nextPollAt"<=now() and exists(select 1 from byos_connections c where c.id=a."connectionId" and c."operationId"=a."operationId" and c.state='pending') returning "operationId"::text,"secretName"`, hashText(state), hashText(session), w.Scope.ConnectionID, w.Scope.OwnerID, w.Scope.WorkspaceID).Scan(&opID, &name)
+	err := w.Repo.DB.QueryRowContext(ctx, `update byos_oauth_attempts a set polling=true where "stateHash"=$1 and "sessionHash"=$2 and "connectionId"=$3 and "ownerId"=$4 and "workspaceId"=$5 and flow='device' and "consumedAt" is null and not polling and "expiresAt">now() and "nextPollAt"<=now() and exists(select 1 from byos_connections c where c.id=a."connectionId" and c."operationId"=a."operationId" and c.state='pending' and c."operationDeadline">now()) returning "operationId"::text,"secretName"`, hashText(state), hashText(session), w.Scope.ConnectionID, w.Scope.OwnerID, w.Scope.WorkspaceID).Scan(&opID, &name)
 	if err != nil {
+		// Navigation may resume while the old request still owns its durable
+		// claim. Report pending without another provider request or a false
+		// stale refusal. An uncertain claim remains fenced until expiry.
+		var interval int
+		if w.Repo.DB.QueryRowContext(ctx, `select greatest(5,least(900,ceil(extract(epoch from (a."nextPollAt"-now())))::int)) from byos_oauth_attempts a join byos_connections c on c.id=a."connectionId" and c."operationId"=a."operationId" where a."stateHash"=$1 and a."sessionHash"=$2 and a."connectionId"=$3 and a."ownerId"=$4 and a."workspaceId"=$5 and a.flow='device' and a."expiresAt">now() and c.state='pending' and c."operationDeadline">now() and (a.polling or a."nextPollAt">now())`, hashText(state), hashText(session), w.Scope.ConnectionID, w.Scope.OwnerID, w.Scope.WorkspaceID).Scan(&interval) == nil {
+			return map[string]any{"pending": true, "interval": interval}, nil
+		}
 		return nil, ErrStale
 	}
 	record, err := w.Repo.Lookup(ctx, w.Scope)
@@ -188,9 +197,12 @@ func (w *Worker) PollOAuth(ctx context.Context, session, state string) (any, err
 		return fail(err)
 	}
 	if grant == nil {
-		_, err = w.Repo.DB.ExecContext(ctx, `update byos_oauth_attempts set polling=false,"nextPollAt"=now()+$2*interval '1 second' where "stateHash"=$1 and polling and "consumedAt" is null`, hashText(state), attempt.Device.Interval)
+		result, err := w.Repo.DB.ExecContext(ctx, `update byos_oauth_attempts a set polling=false,"nextPollAt"=now()+$2*interval '1 second' where "stateHash"=$1 and polling and "consumedAt" is null and "expiresAt">now() and exists(select 1 from byos_connections c where c.id=a."connectionId" and c."operationId"=a."operationId" and c.epoch=$3 and c.state='pending' and c."operationDeadline">now())`, hashText(state), attempt.Device.Interval, op.Epoch)
 		if err != nil {
 			return fail(ErrDatabase)
+		}
+		if n, _ := result.RowsAffected(); n != 1 {
+			return nil, ErrStale
 		}
 		return map[string]any{"pending": true, "interval": attempt.Device.Interval}, nil
 	}
@@ -223,7 +235,7 @@ func (w *Worker) CompleteHandoff(ctx context.Context, session, state, callback s
 // Both flows publish through the same actual CPA login manager and durable Store.
 func (w *Worker) publishOAuth(ctx context.Context, op Operation, code, state, verifier string) (Metadata, error) {
 	current, err := w.Repo.Lookup(ctx, w.Scope)
-	if err != nil || current.OperationID != op.OperationID || current.Epoch != op.Epoch || current.State != "pending" {
+	if err != nil || current.OperationID != op.OperationID || current.Epoch != op.Epoch || current.State != "pending" || !current.Deadline.After(time.Now()) {
 		return Metadata{}, ErrStale
 	}
 	manager := newOAuthManager(w, op, code, state, verifier)

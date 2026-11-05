@@ -99,7 +99,7 @@ function useStoredFlag(key: string, fallback: boolean) {
  * Coordinator) over five status columns, with the
  * Coordinator conversation in a sidebar that folds into a pill (MIK-45).
  */
-export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange, stateKey = 'board' }: { stateKey?: string;
+export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBusyChange, stateKey = 'board' }: { stateKey?: string; workspaceId?: string;
   issues: Issue[]
   userId: string
   onOpen: (id: string) => boolean | void
@@ -293,6 +293,6 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange, sta
         <CoordinatorChat compact prefill={prefill} onOpenIssue={id => { setSheet(false); onOpen(id) }} />
       </SheetContent>
     </Sheet>
-    <NewTaskDialog open={newTask} onOpenChange={setNewTask} onSent={openPanel} />
+    <NewTaskDialog workspaceId={workspaceId} open={newTask} onOpenChange={setNewTask} onSent={openPanel} />
   </div>
 }

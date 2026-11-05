@@ -1,5 +1,5 @@
 import { withRequestLog } from '@/lib/request-log'
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { verifyComposioWebhook } from '@/lib/composio-webhook'
 import { composioNotification } from '@/lib/suggestions/notification'
 import { ingestNotifications } from '@/lib/suggestions/store'
@@ -19,7 +19,7 @@ async function handlePOST(request: Request) {
   // Trigger events from Gmail, Slack and Notion become suggestions; anything else is acknowledged.
   const notification = verified.payload.userId ? composioNotification(verified.payload) : null
   if (notification) {
-    after(async () => {
+    afterJob('after:composio-webhook', async () => {
       try { await ingestNotifications([notification]) }
       catch (error) { console.error('Composio suggestion ingest failed', error instanceof Error ? error.message : error) }
     })

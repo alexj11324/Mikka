@@ -12,10 +12,6 @@ export function runIsWorking(status: string) {
   return runIsActive(status) && status !== 'waiting_input'
 }
 
-export function runListRefreshInterval(runs: readonly { status: string }[] | undefined) {
-  return runs?.some(run => runIsActive(run.status)) ? 5000 : 0
-}
-
 export const RUN_STOP_TIMEOUT_MS = 30_000
 
 /** A persisted request retains its deadline across polling and reloads. */

@@ -267,7 +267,7 @@ function MyBulkSheet({ workspaceId, workspaceName, onClose, open = true, onOpenC
               <span className="font-medium">{t('willAdd', { count })}</span>
               <ul className="flex max-h-48 flex-col gap-0.5 overflow-y-auto">
                 {preview.entries.map(entry => <li key={entry.line} className="truncate font-mono text-xs">{entry.name}</li>)}
-                {preview.errors.map(problem => <li key={`e${problem.line}`} className="text-xs text-destructive">{t(`lineError.${problem.reason}`, { line: problem.line, name: 'name' in problem ? problem.name ?? '' : '' })}</li>)}
+                {preview.errors.map(problem => <li key={`e${problem.line}`} className="text-xs text-destructive-foreground">{t(`lineError.${problem.reason}`, { line: problem.line, name: 'name' in problem ? problem.name ?? '' : '' })}</li>)}
               </ul>
             </div>)}
           <Field orientation="horizontal" className="justify-between border-t pt-4">

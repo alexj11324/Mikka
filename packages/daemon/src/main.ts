@@ -70,6 +70,8 @@ import { ensureHarness, type HarnessStore } from "./harness-install"
 import { probeHarnessModels, sweepModelProbeHomes, type ModelReport } from "./model-probe"
 import { sweepRunCredentials } from "./agents/harness-home"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
+import { preflightLocalSubscription } from "./subscription-preflight"
+import { logCodedError } from "@mikka/protocol/coded-error"
 import { isSafeId } from "./ids"
 import { acquireLock } from "./lock"
 import { closeLogger, createLogger, type Logger } from "./log"
@@ -98,6 +100,7 @@ import { ComputerBroker } from "./computer/broker.mjs"
 import { detectComputerDriver, executeDriver, type ComputerDriver } from "./computer/driver.mjs"
 import { createHostedComputerExecutor, type CredentialExecutorAuthority } from "./computer/credential-executor"
 import { pollWebComputerReviews } from "./computer/web-review"
+import { DeviceWorkSignal, type PushedWait } from "./device-work-signal"
 import { localComputerMcp } from "./computer/local-grant.mjs"
 
 export * from "./server-link"
@@ -251,6 +254,10 @@ export class Daemon {
   private commandsAbort = new AbortController()
   /** The push socket is open. An idle device does not heartbeat the database. */
   private gatewayLive = false
+  /** The server's last gateway ticket said it pushes run control (#1212). */
+  private runControlPush = false
+  /** Gateway pushes for computer reviews (and other non-run-control waits). */
+  private readonly workSignal = new DeviceWorkSignal()
   /** The server said it has no gateway. Do not ask again on every long-poll. */
   private gatewayUnavailable = false
   private gatewayFailures = 0
@@ -278,6 +285,13 @@ export class Daemon {
   constructor(private readonly options: DaemonOptions) {
     this.paths = daemonPaths(options.dataDir)
     this.log = options.log ?? createLogger({ dir: this.paths.logs })
+    // A cloud computer runs the daemon built with this deployment, whose server
+    // pushes every run-control write (notifyRunControl). Off the gateway (no
+    // ticket yet, a refused ticket, a dropped socket) its runs use the 20 s
+    // fallback, never the 1 s check kept for older self-hosted servers: stops
+    // still arrive at once through the commands long poll, which the same
+    // write wakes, and each provider request checks its own authority.
+    this.runControlPush = Boolean(options.hostedSubscriptions)
   }
 
   async start() {
@@ -323,6 +337,8 @@ export class Daemon {
     this.repositories = new RepositoryCache(paths.repos, undefined, this.options.retainResources)
     // Hosted subscriptions start their CLIs through the hosted runner.
     this.sandbox = this.options.hostedSubscriptions ? null : await this.createAgentSandbox()
+    // Before its first gateway session, too (runControlPush in the constructor).
+    if (this.runControlPush) this.options.link.setRunControlMode?.('fallback')
     if (this.stopped) throw new Error("daemon stopped during startup")
     if (!this.options.hostedSubscriptions && this.sandbox) this.localComputerDriver = await detectComputerDriver()
     if (this.localComputerDriver && this.options.link.syncComputerReviews && this.options.link.localComputerAuthority) {
@@ -583,16 +599,17 @@ export class Daemon {
     if (this.stopped) throw new Error("daemon stopped during startup")
     // A callback alone is insufficient: the host must own the enforcement
     // boundary and bind its lifetime to the run's authenticated gate.
-    if (!hosted && !this.options.harnesses) this.harnessPrint = harnessFingerprint(this.harnessStore())
-    this.harnesses = [...detected.filter((info) => this.adapters.has(info.harness)).map(info => ({
+    const supported = detected.filter((info) => this.adapters.has(info.harness))
+    this.harnesses = hosted ? supported.map(info => ({
       ...info,
       ...this.modelReports.get(info.harness),
       // The run's live gate stops a revoked run; Codex also verifies its
       // pinned interface at initialize.
       toolApproval: this.supportsToolApproval(info),
-      coordinator: hosted ? false : coordinatorCapable(info),
-      ...(!hosted && this.localSubscriptionCapable(info) ? { subscriptionBroker: true as const } : {}),
-    }))]
+      coordinator: false,
+    })) : await Promise.all(supported.map(info => this.localHarnessReport(info)))
+    if (this.stopped) throw new Error("daemon stopped during startup")
+    if (!hosted && !this.options.harnesses) this.harnessPrint = harnessFingerprint(this.harnessStore())
     // A crash or kill skipped the run-end wipe; resumed runs get fresh credentials.
     sweepRunCredentials(paths.adapterState)
     // Probe homes a crashed daemon left (model-probe.ts).
@@ -768,6 +785,11 @@ export class Daemon {
     if (signal.aborted) connection.abort()
     try {
       const ticket = await mint.call(this.options.link, deviceId, connection.signal)
+      // Only a server that pushes every run-control write lets live runs drop
+      // their periodic check; an older one keeps the one-second check.
+      this.runControlPush = ticket.runControl === 'push' || Boolean(this.options.hostedSubscriptions)
+      this.options.link.setRunControlMode?.(this.runControlPush ? 'fallback' : 'legacy')
+      this.workSignal.setPushedWaits((['computerReviews', 'coordinatorResults'] as const satisfies readonly PushedWait[]).filter(wait => ticket[wait] === 'push'))
       if (!ticket.url || !ticket.protocol) { this.gatewayUnavailable = true; return false }
       if (signal.aborted) return false
       const socket = openDeviceGateway(ticket.url, ticket.protocol)
@@ -776,8 +798,10 @@ export class Daemon {
         onOpen: () => {
           openedAt = performance.now()
           this.gatewayLive = true
+          if (this.runControlPush) this.options.link.setRunControlMode?.('push')
+          this.workSignal.setConnected(true)
         },
-        onWorkAvailable: () => this.options.link.invalidateRunControls?.(),
+        onWorkAvailable: () => { this.options.link.invalidateRunControls?.(); this.workSignal.notify() },
         onWork: async () => {
           await this.pullSignaledWork(deviceId, connection.signal)
           if (connection.signal.aborted || this.stopped) return
@@ -800,7 +824,9 @@ export class Daemon {
       connection.abort()
       signal.removeEventListener("abort", abort)
       this.gatewayLive = false
+      this.options.link.setRunControlMode?.(this.runControlPush ? 'fallback' : 'legacy')
       this.options.link.invalidateRunControls?.()
+      this.workSignal.setConnected(false)
       if (!this.stopped && !signal.aborted && !this.gatewayUnavailable) {
         // Merely opening is not recovery: a flapping server must not reset
         // backoff. Stable sessions start again at the shortest retry delay.
@@ -990,16 +1016,31 @@ export class Daemon {
       this.supportsToolApproval(info) === true && Boolean(this.options.link.nativeLease)
   }
 
-  private async redetectHarnesses() {
+  /** Advertise only a checked local runner, replacing any old readiness or failure. */
+  private async localHarnessReport(info: HarnessInfo): Promise<HarnessInfo> {
+    const report: HarnessInfo = { ...info, ...this.modelReports.get(info.harness),
+      toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info) }
+    delete report.subscriptionBroker
+    delete report.subscriptionPreflight
+    if (!this.localSubscriptionCapable(info) || (info.harness !== "codex" && info.harness !== "claude_code")) return report
+    const result = await preflightLocalSubscription(info.harness, { store: this.harnessStore(), scratchDir: this.paths.dataDir,
+      binary: this.options.harnessBinaries?.[info.harness] })
+    if (result.ready) return { ...report, version: result.version, subscriptionBroker: true }
+    logCodedError(result.error, { harness: info.harness }, this.log)
+    return { ...report, subscriptionPreflight: result.error.detail }
+  }
+
+  private async redetectHarnesses(refreshModels = true) {
+    if (this.options.hostedSubscriptions) {
+      if (refreshModels && this.modelProbeOn()) await this.probeModels()
+      return
+    }
     const detected = detectHarnesses(this.harnessStore())
-    this.harnessPrint = harnessFingerprint(this.harnessStore())
     this.docker = await dockerAvailable()
-    this.harnesses = [...detected.filter(info => this.adapters.has(info.harness)).map(info => {
-      return { ...info, ...this.modelReports.get(info.harness), toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info),
-        ...(this.localSubscriptionCapable(info) ? { subscriptionBroker: true as const } : {}) }
-    })]
+    this.harnesses = await Promise.all(detected.filter(info => this.adapters.has(info.harness)).map(info => this.localHarnessReport(info)))
+    this.harnessPrint = harnessFingerprint(this.harnessStore())
     // 重新检测 asks the CLIs for their models again too.
-    if (this.modelProbeOn()) await this.probeModels().catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
+    if (refreshModels && this.modelProbeOn()) await this.probeModels().catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
   }
 
   /** The models each harness CLI reported, by harness (model-probe.ts). */
@@ -1045,6 +1086,13 @@ export class Daemon {
         changed = true
       }
       if (changed) this.harnesses = this.harnesses.map(info => ({ ...info, ...this.modelReports.get(info.harness) }))
+      // A first probe may have installed the managed CLI. Recheck its runtime
+      // on that completion event; an idle gateway need not send another tick.
+      // Skip model probing here because this very probe is still completing.
+      if (!this.options.hostedSubscriptions && !this.options.harnesses && harnessFingerprint(this.harnessStore()) !== this.harnessPrint) {
+        await this.redetectHarnesses(false)
+        changed = true
+      }
       return changed
     })().finally(() => { this.probingModels = null })
     return this.probingModels
@@ -1262,7 +1310,7 @@ export class Daemon {
       this.reviewAbort?.abort()
       const abort = new AbortController()
       this.reviewAbort = abort
-      this.reviewLoop = pollWebComputerReviews(computerBroker, deviceId, this.options.link, abort.signal)
+      this.reviewLoop = pollWebComputerReviews(computerBroker, deviceId, this.options.link, abort.signal, undefined, this.workSignal)
     }
     this.wakeCommands?.()
   }

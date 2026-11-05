@@ -390,7 +390,7 @@ function Store({ apps, ownRead, category, rootLabel, href, go, tab, setTab, quer
           <AlertDialogTitle>{tApps('disconnectTitle', { name: confirming ? info(confirming.id).name : '' })}</AlertDialogTitle>
           <AlertDialogDescription>{tApps('disconnectConsequence', { name: confirming ? info(confirming.id).name : '' })}</AlertDialogDescription>
         </AlertDialogHeader>
-        {disconnectError && <p role="alert" className="text-xs text-destructive">{disconnectError}</p>}
+        {disconnectError && <p role="alert" className="text-xs text-destructive-foreground">{disconnectError}</p>}
         <AlertDialogFooter>
           <AlertDialogCancel variant="secondary" disabled={Boolean(apps.pending)}>{common('cancel')}</AlertDialogCancel>
           <AlertDialogAction variant="destructive" disabled={Boolean(apps.pending)} onClick={() => {

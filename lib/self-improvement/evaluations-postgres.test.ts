@@ -11,6 +11,7 @@ import { createSkillComparisonCollector } from './comparison-collector'
 import { createRegisteredSkillEvaluator } from './registered-evaluation'
 import { syntheticDecision } from './testing/evaluation-fixture'
 import { createSkillEvaluations, type EvaluationSettings } from './evaluations'
+import { assertFactoryTransaction } from '../factory/transaction'
 import { BASELINE_ARTIFACT, BASELINE_MARKDOWN } from './builtin-skill'
 import { createImprovementStore } from './store'
 import { digest } from './contract'
@@ -45,12 +46,15 @@ test('PG frozen benchmark queues actual owned assignments atomically and keeps s
     await pool.query(`UPDATE agent_runs SET status='preparing',"startedAt"=now(),"leaseExpiresAt"=$2,"sessionId"='synthetic-session' WHERE id=$1`,[sourceRunId,lease])
     await assignments.recordClaim(userId,deviceId,sourceRunId,lease,true)
     await pool.query(`UPDATE agent_runs SET status='succeeded',"finishedAt"=now(),report=$2 WHERE id=$1`,[sourceRunId,JSON.stringify({sourceCommit:'a'.repeat(40),summary:'Synthetic source fixture'})])
+    assert.equal((await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1',[sourceRunId])).rows[0].agentDefinition,null,
+      'the accepted legacy source has no frozen model, so fallback selection needs the real transaction owner')
     const settings:EvaluationSettings={harness:'codex',model:'synthetic-model',policyDigest:'b'.repeat(64),fixtureDigest:'c'.repeat(64),verifyCommand:REPORT_BENCHMARK.verifyCommand}
     let queueCalls=0,failSelection=false
     const loadComparison=createSkillComparisonCollector(pool,authorize,async()=>{throw Error('No stored object in this synthetic fixture')})
     const assess=createRegisteredSkillEvaluator({loadComparison,modelEvaluationEnabled:true,invokeDecision:syntheticDecision('improved')})
     service=createSkillEvaluations(pool,{authorize,assess,settings:async()=>settings,
       queue:async(tx,u,input)=>{
+        assertFactoryTransaction(tx)
         queueCalls++
         assert.equal(u,userId)
         const runId=randomUUID()

@@ -8,10 +8,17 @@ import { ComputerError } from '@/lib/computer/store'
 import { connectComputer } from '@/lib/computer/e2b-provider'
 import { maskFor } from '@/lib/secrets/runtime'
 import { installSubagentRuntime, runtimeRequest, grant, endpointPath, type BrowserBinding } from './runtime'
+import { wakeTokens, wakeWorkflowAfterCommit } from '@/lib/workflow-wake'
 export type Actor = { userId: string; workspaceId: string }
 export type Subagent = BrowserBinding & { task: string; status: SubagentEvent['data']['state']; step: string; needs: SubagentEvent['data']['needs']; targetId: string | null; activeActionId?: string | null; nextAttemptAt?: Date | null; activeSteps?: number; consecutiveFailures?: number }
+/** Queued web tasks wait for a slot; wake them to try again (their workflow re-checks). */
+export async function wakeQueuedSubagents(client: Pick<Pool, 'query'>, ownerId: string, workspaceId: string) {
+  const { rows } = await client.query<{ id: string }>(`SELECT id FROM bot_subagents WHERE "ownerId"=$1 AND "workspaceId"=$2 AND status='queued' ORDER BY "createdAt" LIMIT 6`, [ownerId, workspaceId])
+  for (const { id } of rows) wakeWorkflowAfterCommit(client, wakeTokens.subagent(id))
+}
 export class SubagentStore {
-  constructor(private pool: Pool) {}
+  /** `wakeSelf: false` for the task's own workflow, which re-reads its row after each step anyway. */
+  constructor(private pool: Pool, private readonly options: { wakeSelf?: boolean } = {}) {}
   async get(actor: Actor, botId: string, id: string, client: Pool | PoolClient = this.pool): Promise<Subagent> {
     const row = (await client.query<Subagent>('SELECT * FROM bot_subagents WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4', [id, actor.userId, actor.workspaceId, botId])).rows[0]
     if (!row) throw new ComputerError(404, 'Subagent unavailable')
@@ -30,6 +37,10 @@ export class SubagentStore {
     const event = await maskFor({ workspaceId: row.workspaceId, ownerId: row.ownerId }, subagentEventSchema.parse({ type: 'data-subagent', data: { botId: row.botId, subagentId: row.id, task: row.task, state: row.status, step: row.step, needs: row.needs } }))
     await lockSubagentEvents(client, { ownerId: row.ownerId, workspaceId: row.workspaceId })
     await client.query('INSERT INTO subagent_events ("ownerId","workspaceId","botId","subagentId",event) VALUES ($1,$2,$3,$4,$5)', [row.ownerId, row.workspaceId, row.botId, row.id, JSON.stringify(event)])
+    // Its workflow waits on this change instead of re-reading every 30 s (#1212).
+    if (this.options.wakeSelf !== false) wakeWorkflowAfterCommit(client, wakeTokens.subagent(row.id))
+    // An ended task frees one of the owner's six browser slots for the next queued one.
+    if (['done', 'failed', 'stopped'].includes(row.status)) await wakeQueuedSubagents(client, row.ownerId, row.workspaceId)
     return event
   }
   async start(actor: Actor, botId: string, id: string) {

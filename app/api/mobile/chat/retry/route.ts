@@ -1,4 +1,4 @@
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -36,7 +36,7 @@ async function handlePOST(request: Request) {
   const resolved = await openChatBotId(user, botId)
   const queued = await retryFailedTurn(user.id, resolved)
   if (queued) {
-    after(() => wakeCoordinator(user.id))
+    afterJob('after:coordinator-wake', () => wakeCoordinator(user.id))
     return json({ queued: true })
   }
   const current = await chatView(user.id, 1, resolved)

@@ -1,5 +1,5 @@
 import { withRequestLog } from '@/lib/request-log'
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { db } from '@/lib/db'
 import { linearSyncInbox } from '@/lib/db/schema'
 import { dispatchLinearWebhook } from '@/lib/linear-sync/dispatch'
@@ -35,7 +35,7 @@ async function handlePOST(request: Request) {
   if (saved) {
     dispatchLinearWebhook(saved.deliveryId)
     // The same delivery feeds the suggestions list; only a first delivery, so a retry is not judged twice.
-    after(async () => {
+    afterJob('after:linear-webhook-suggestions', async () => {
       if (!await linearSyncEnabled()) return
       try { await ingestNotifications(await linearWebhookNotifications(parsed.organizationId, parsed.payload)) }
       catch (error) { console.error('Linear suggestion ingest failed', error instanceof Error ? error.message : error) }

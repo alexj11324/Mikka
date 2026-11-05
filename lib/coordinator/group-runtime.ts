@@ -1,6 +1,7 @@
 import 'server-only'
 import { hostedModel } from '@/lib/abuse/model'
 import { hostedBillingScope } from '@/lib/abuse/context'
+import { CodedError } from '@mikka/protocol/coded-error'
 import { COORDINATOR_MODEL } from './model'
 import { generateText, streamText, Output } from 'ai'
 import { and, eq } from 'drizzle-orm'
@@ -35,15 +36,14 @@ export const groupRuntime: GroupRuntime = {
     const availability=new Map<string,{available:boolean;reason?:string}>()
     return groupBotCatalog(client,ownerId,workspaceId,ids,async(bot)=>{
       const { pool,withDatabaseClient }=await import('@/lib/db')
-      const { resolveModelDispatch }=await import('@/lib/model-dispatch')
+      const { agentProfileDispatchAvailability }=await import('@/lib/factory/agent-profile')
       return withDatabaseClient(client,async()=>{
         const executionBotId=bot.ownerId===ownerId ? bot.id : await (await import('./coordinator-bot')).chatBotId(ownerId,null,workspaceId)
         const key=JSON.stringify([executionBotId,bot.repository])
         const cached=availability.get(key)
         if (cached) return cached
         if (bot.repository && !await (await import('@/lib/workspace-admin/bots')).repositoryAvailable(workspaceId,bot.repository)) return {available:false,reason:'repositoryNotFound'}
-        const target=await resolveModelDispatch(pool,{ownerId,workspaceId,botId:executionBotId},null,bot.repository?undefined:'cloud',undefined,{cloudPurpose:bot.repository?'task':'desktop'})
-        const result=target.kind==='none' ? {available:false,reason:target.reason} : {available:true}
+        const result=await agentProfileDispatchAvailability(pool,{ownerId,workspaceId,botId:executionBotId},{location:bot.repository?undefined:'cloud',cloudPurpose:bot.repository?'task':'desktop'})
         availability.set(key,result)
         return result
       })
@@ -60,8 +60,9 @@ export const groupRuntime: GroupRuntime = {
   async delegate(scope,client) { return (await import('./group-factory')).delegateGroupTask(client,scope) },
   async generate(agent, input) {
     const scope = hostedBillingScope.getStore()
-    if (!scope) throw new Error('verification_required')
-    if (agent.memberType === 'bot' && !scope.ownerId) throw new Error('verification_required')
+    // Same code the chat shows today; the detail tells the two missing scopes apart in the stored error and logs.
+    if (!scope) throw new CodedError('verification_required', { detail: 'billing_scope_missing' })
+    if (agent.memberType === 'bot' && !scope.ownerId) throw new CodedError('verification_required', { detail: 'billing_owner_missing' })
     // 停止 in the group aborts it too (lib/coordinator/group-turns.ts).
     const signal = input.signal ? AbortSignal.any([AbortSignal.timeout(20000), input.signal]) : AbortSignal.timeout(20000)
     let streamFailure: unknown

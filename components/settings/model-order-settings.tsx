@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import useSWR from 'swr'
+import useSWR, { unstable_serialize } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ChevronDown, GripVertical, KeyRound, MoreHorizontal } from 'lucide-react'
 import { arrayMove } from '@dnd-kit/sortable'
@@ -13,15 +13,18 @@ import { ModelLabel, harnessName } from '@/components/labels/entity-labels'
 import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { FieldError, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Label } from '@/components/ui/label'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { E2BKeyDialog, useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
 import type { OrderRow, OrderView } from '@/lib/model-order'
 import type { OrderCandidate, OrderHarness } from '@/lib/model-order-plan'
 import { settingsRead } from '@/lib/settings-read'
+import { useLiveKey } from '@/hooks/use-live-key'
 import { settingsHref } from '@/lib/settings-sections'
 import { usePresence } from '@/lib/use-presence'
 import { useActionError } from '@/lib/use-action-error'
@@ -58,6 +61,15 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   const [keyOpen, setKeyOpen] = useState(false)
   const keyDialog = usePresence(keyOpen)
   const data = order.data && !order.data.error ? order.data : null
+  // One Agent's list at a time (decision 2026-11-05-0400): 优先使用的 Agent picks it; each keeps its own order.
+  const shown = data ? data.entries.filter(entry => entry.harness === data.preferredHarness) : []
+  const offered = data ? data.candidates.filter(candidate => candidate.harness === data.preferredHarness) : []
+  // The other Agent's list is the fallback dispatch takes after this one (decision 2026-11-05-0400).
+  const other: OrderHarness = data?.preferredHarness === 'codex' ? 'claude_code' : 'codex'
+  const backup = data ? data.entries.filter(entry => entry.harness === other) : []
+  const offeredOther = data ? data.candidates.filter(candidate => candidate.harness === other) : []
+  // A subscription connected, paused or read again elsewhere: this list re-reads (no polling).
+  useLiveKey('model_settings', workspaceId, [unstable_serialize(modelOrderKey(workspaceId))], workspaceId, { minIntervalMs: 2_000 })
 
   async function checkQuota(connectionId: string) {
     setPending(true); setFailed(null)
@@ -78,25 +90,33 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   async function save(change: Change, optimistic?: OrderView, onFail?: () => void) {
     setPending(true); setFailed(null); setUnsaved(null)
     const fail = (error?: string) => onFail ? onFail() : setFailed({ message: actionError(error), retry: () => void save(change, optimistic) })
+    const restore = async () => {
+      if (optimistic && data) await order.mutate(data, { revalidate: false })
+      // Keep the last saved value visible even if an offline reread also fails.
+      await order.mutate().catch(() => undefined)
+    }
     try {
       if (optimistic) await order.mutate(optimistic, { revalidate: false })
       const result = await changeModelOrder(change, workspaceId)
-      if (result.error) { fail(result.error); await order.mutate(); return false }
+      if (result.error) { fail(result.error); await restore(); return false }
       await order.mutate(result, { revalidate: false })
       return true
     } catch {
       fail()
-      await order.mutate()
+      await restore()
       return false
     } finally { setPending(false) }
   }
   const move = (from: number, to: number) => {
     if (!data) return
     // 重试 on a list that changed meanwhile: nothing left to move clears the mark.
-    if (to < 0 || to >= data.entries.length || from === to) { setUnsaved(null); return }
-    const entries = arrayMove(data.entries, from, to)
-    const id = data.entries[from].id
-    void save({ kind: 'reorder', ids: entries.map(entry => entry.id) }, { ...data, entries }, () => setUnsaved({ id, to }))
+    if (to < 0 || to >= shown.length || from === to) { setUnsaved(null); return }
+    // Only this Agent's rows move, into each other's places; the other Agent's list is untouched.
+    const moved = arrayMove(shown, from, to)
+    const queue = [...moved]
+    const entries = data.entries.map(entry => entry.harness === data.preferredHarness ? queue.shift()! : entry)
+    const id = shown[from].id
+    void save({ kind: 'reorder', ids: moved.map(entry => entry.id) }, { ...data, entries }, () => setUnsaved({ id, to }))
   }
   /** 移出列表 at once; the toast's 撤销 puts the same model back where it was (R2). */
   const remove = async (row: OrderRow) => {
@@ -114,7 +134,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   // The order each location tries (decision 2026-11-02-2330), then where a new run goes now (会先用, the same plan as dispatch).
   const first = data.first ? data.first.kind === 'cloud' ? t('cloud') : data.first.name : null
   const noKey = data.location === 'cloud' && e2b.configured === false
-  const locationLine = `${t(data.location === 'cloud' ? 'orderCloud' : 'orderLocal')} · ${first === null ? t('nowhere') : noKey ? t('noKeyFirst', { place: first }) : t('first', { place: first })}`
+  const locationLine = `${t(data.location === 'cloud' ? 'orderCloud' : 'orderLocal')}${t('clauseSeparator')}${first === null ? t(data.location === 'cloud' ? 'nowhere' : 'nowhereLocal') : noKey ? t('noKeyFirst', { place: first }) : t('first', { place: first })}`
   // R1: what fixes or explains the location sits on its row: 填入 E2B Key for 云端 without one; else 打开设备 when a computer would take the run or nothing would.
   const locationAction = noKey
     ? <Button type="button" variant="secondary" size="sm" onClick={() => setKeyOpen(true)}>{t('setE2BKey')}</Button>
@@ -126,7 +146,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
     if ((reason === 'paused' || reason === 'expired') && row.source.kind === 'subscription') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={`#subscription-${row.source.connectionId}`} />}>{t(reason === 'paused' ? 'enableSubscription' : 'reconnectSubscription')}</Button>
     if (reason === 'keyRefused' && row.source.kind === 'api_key') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={`#api-key-${row.source.keyId}`} />}>{t('openApiKey')}</Button>
     // A removed source may have no row left: its source section retains the recovery control.
-    if (reason === 'missing') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={row.source.kind === 'subscription' ? '#subscriptions-heading' : '#api-keys-heading'} />}>{t(row.source.kind === 'subscription' ? 'openSubscription' : 'openApiKey')}</Button>
+    if (reason === 'missing' || reason === 'removed') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={row.source.kind === 'subscription' ? '#subscriptions-heading' : '#api-keys-heading'} />}>{t(row.source.kind === 'subscription' ? 'openSubscription' : 'openApiKey')}</Button>
     return null
   }
   return <>
@@ -142,7 +162,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
         </span>
       </SettingRow>
       {/* The person's own E2B key, whatever the location: 云端 runs and the bot's own cloud computer both use it (coordinator, 2026-11-02). */}
-      {e2b.configured !== undefined && <SettingRow title={t('e2bKey')}>
+      {e2b.configured !== undefined && <SettingRow title={t('e2bKey')} description={t('e2bKeyHint')}>
         <span className="flex items-center gap-3">
           <span role="status" className="text-sm text-muted-foreground">{e2b.configured ? t('e2bKeySet') : t('e2bKeyMissing')}</span>
           <Button type="button" variant="secondary" size="sm" onClick={() => setKeyOpen(true)}>{e2b.configured ? t('e2bKeyReplace') : t('e2bKeyFill')}</Button>
@@ -152,7 +172,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
     {/* What a task dispatched to an Agent runs on (Alex, 2026-11-02): the preferred Agent and the models in
         order, one card. Bot chats pick their own model; this is a preference order, not a permission. */}
     <SettingsSection id="model-order-heading" title={t('title')} description={t('description')}
-      action={data.entries.length > 0 && <Button type="button" {...settingsSectionAction} disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button>}>
+      action={shown.length > 0 && <Button type="button" {...settingsSectionAction} disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button>}>
       <SettingRow title={t('preferredAgent')} description={t('preferredAgentHint')}>
         <ToggleGroup aria-label={t('preferredAgent')} variant="segment" spacing={0.5} value={[data.preferredHarness]} disabled={pending}
           onValueChange={values => { const next = values[0]; if ((next === 'claude_code' || next === 'codex') && next !== data.preferredHarness) void save({ kind: 'preferred', harness: next }, { ...data, preferredHarness: next }) }}>
@@ -160,29 +180,56 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
           <ToggleGroupItem value="codex">{harnessName('codex')}</ToggleGroupItem>
         </ToggleGroup>
       </SettingRow>
-      {data.entries.length === 0
+      <SettingRow title={t('autoRouting')}>
+        <Switch aria-label={t('autoRouting')} checked={data.autoModelRouting} disabled={pending}
+          onCheckedChange={enabled => { void save({ kind: 'autoRouting', enabled }, { ...data, autoModelRouting: enabled }) }} />
+      </SettingRow>
+      {shown.length === 0
         ? <div className="flex flex-col items-center gap-3 px-5 py-7">
           {/* C8: one line naming what is missing, and the one button that gets it (R-41). */}
-          {data.candidates.length > 0
-            ? <><p className="text-sm text-muted-foreground">{t('empty')}</p>
+          {offered.length > 0
+            ? <><p className="text-sm text-muted-foreground">{data.entries.length ? t('emptyAgent', { agent: harnessName(data.preferredHarness) }) : t('empty')}</p>
               <Button type="button" disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button></>
+            // Nothing for this Agent, models for the other: tasks go there; one button makes it the 优先使用的 Agent.
+            : offeredOther.length > 0 ? <><p className="text-sm text-muted-foreground">{t('emptyUseOther', { agent: harnessName(data.preferredHarness), other: harnessName(other) })}</p>
+              <Button type="button" disabled={pending} onClick={() => void save({ kind: 'preferred', harness: other }, { ...data, preferredHarness: other })}>{t('switchAgent', { agent: harnessName(other) })}</Button></>
             : <><p className="text-sm text-muted-foreground">{data.credentials === 0 ? t('emptyNoCredential') : t('emptyNoModels')}</p>
               <span className="flex flex-wrap justify-center gap-2">
                 <Button nativeButton={false} variant="secondary" render={<a href="#subscriptions-heading" />}>{t(data.credentials === 0 ? 'connectSubscription' : 'openSubscription')}</Button>
                 <Button nativeButton={false} variant="secondary" render={<a href="#api-keys-heading" />}>{t(data.credentials === 0 ? 'addApiKey' : 'openApiKey')}</Button>
               </span></>}
         </div>
-        : <OrderList rows={data.entries} pending={pending} unsaved={unsaved} preferred={data.preferredHarness} repair={repair} onMove={move} onRemove={row => { void remove(row) }}
+        : <OrderList rows={shown} pending={pending} unsaved={unsaved} preferred={data.preferredHarness} repair={repair} onMove={move} onRemove={row => { void remove(row) }}
           onAgent={(row, harness) => void save({ kind: 'harness', id: row.id, harness }, { ...data, entries: data.entries.map(entry => entry.id === row.id ? { ...entry, harness } : entry) })} />}
+      {shown.length > 0 && backup.length > 0 && <BackupList agent={other} rows={backup} />}
     </SettingsSection>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={failed.retry} />}
-    {adding && <AddModelsDialog candidates={data.candidates} onClose={async picked => {
+    {adding && <AddModelsDialog candidates={offered} onClose={async picked => {
       setAdding(false)
       if (picked.length) await save({ kind: 'add', entries: picked.map(({ harness, model, source }) => ({ harness, model, source })) })
     }} />}
     {keyDialog.value && e2b.configured !== undefined && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={e2b.configured}
       onClose={changed => { setKeyOpen(false); if (changed) void Promise.all([e2b.mutate(), order.mutate()]) }} />}
   </>
+}
+
+/** The other Agent's list, read-only and folded: dispatch's fallback once this Agent's models cannot run. */
+function BackupList({ agent, rows }: { agent: OrderHarness; rows: OrderRow[] }) {
+  const t = useTranslations('Settings.modelOrder')
+  return <Collapsible className="border-t border-border">
+    <CollapsibleTrigger render={<Button type="button" variant="ghost" className="group h-auto w-full justify-between rounded-none px-5 py-3 text-sm font-normal text-muted-foreground" />}>
+      {t('backup', { agent: harnessName(agent), count: rows.length })}<ChevronDown aria-hidden="true" className="transition-transform group-data-panel-open:rotate-180" />
+    </CollapsibleTrigger>
+    <CollapsibleContent>
+      <ol aria-label={t('backupList', { agent: harnessName(agent) })} className="flex flex-col divide-y divide-border">
+        {rows.map((row, index) => <li key={row.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
+          <span aria-hidden="true" className="w-4 shrink-0 text-center text-xs text-muted-foreground tabular-nums">{index + 1}</span>
+          <span className="min-w-0 flex-1 truncate">{row.model}</span>
+          <span className="shrink-0 text-xs text-muted-foreground">{row.source.kind === 'api_key' ? `${sourceName(t, row)} · ${t('billedByProvider')}` : sourceName(t, row)}</span>
+        </li>)}
+      </ol>
+    </CollapsibleContent>
+  </Collapsible>
 }
 
 function OrderList({ rows, pending, unsaved, preferred, repair, onMove, onRemove, onAgent }: { rows: OrderRow[]; pending: boolean; unsaved: { id: string; to: number } | null; preferred: OrderHarness; repair: (row: OrderRow) => ReactNode; onMove: (from: number, to: number) => void; onRemove: (row: OrderRow) => void; onAgent: (row: OrderRow, harness: OrderHarness) => void }) {
@@ -214,6 +261,7 @@ function OrderList({ rows, pending, unsaved, preferred, repair, onMove, onRemove
 
 function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgent, onFirst, onUp, onDown, onRemove }: { row: OrderRow; index: number; last: boolean; pending: boolean; preferred: OrderHarness; repair?: ReactNode; retry?: () => void; onAgent: (harness: OrderHarness) => void; onFirst: () => void; onUp: () => void; onDown: () => void; onRemove: () => void }) {
   const t = useTranslations('Settings.modelOrder')
+  const runtimeT = useTranslations('RunErrors.subscription_local_runtime_unavailable')
   const commonT = useTranslations('Common')
   const format = useFormatter()
   const block = row.block
@@ -223,7 +271,7 @@ function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgen
   const status = retry ? t('orderUnsaved') : checking ? t('blocked.checking')
     : !block ? t('ready')
     : block.reason === 'quota' && block.resetsAt ? t('quotaUntil', { time: format.dateTime(new Date(block.resetsAt), { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) })
-      : block.reason === 'noDevice' ? (block.device.why === 'none' ? t('noDevice.none') : t(`noDevice.${block.device.why}`, { device: block.device.device, count: block.device.count, harness: harnessName(row.harness) }))
+      : block.reason === 'noDevice' ? (block.device.why === 'subscriptionRuntimeUnavailable' ? runtimeT(block.device.detail ?? 'default') : block.device.why === 'none' ? t('noDevice.none') : t(`noDevice.${block.device.why}`, { device: block.device.device, count: block.device.count, harness: harnessName(row.harness) }))
         : t(`blocked.${block.reason}`)
   // The handle carries the drag semantics; the row stays a list item (the primitive puts role=button on the item too).
   return <KanbanItem value={row.id} disabled={pending} render={<li />} role="listitem" tabIndex={-1} aria-roledescription={undefined} className="flex flex-wrap items-center gap-x-3 gap-y-2 bg-card py-3 pr-3 pl-2 data-[dragging=true]:relative data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg data-[dragging=true]:ring-1 data-[dragging=true]:ring-border">
@@ -236,7 +284,8 @@ function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgen
         {row.source.kind === 'api_key' ? <span className="inline-flex min-w-0 items-center gap-1.5"><KeyRound aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" /><span className="truncate">{row.model}</span></span>
           : <ModelLabel model={row.model} source={row.harness} />}
       </span>
-      <span className="truncate text-xs text-muted-foreground">{`${sourceName(t, row)} · ${agentsLine(t, row.agents)}`}</span>
+      {/* Every row here runs on this list's Agent; only a model both Agents run says so (its Agent menu is beside it). */}
+      <span className="truncate text-xs text-muted-foreground">{row.agents.length > 1 ? `${sourceName(t, row)} · ${t('bothAgents')}` : sourceName(t, row)}</span>
     </span>
     {/* The row's controls: beside the model where they fit, on their own line on a phone, so the name is never cut to a letter. */}
     <span className="ml-auto flex shrink-0 items-center gap-3">
@@ -257,7 +306,7 @@ function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgen
       </DropdownMenuContent>
     </DropdownMenu>}
     <span className="flex shrink-0 flex-col items-end gap-1.5">
-      <span role="status" className={cn('flex items-center gap-1.5 text-xs', retry ? 'text-destructive' : warn ? 'text-warning-foreground' : 'text-muted-foreground')}>
+      <span role="status" className={cn('flex items-center gap-1.5 text-xs', retry ? 'text-destructive-foreground' : warn ? 'text-warning-foreground' : 'text-muted-foreground')}>
         <span aria-hidden="true" className={cn('size-1.5 rounded-full', retry ? 'bg-destructive' : warn ? 'bg-warning' : checking ? 'bg-muted-foreground' : 'bg-success')} />{status}
       </span>
       {!retry && repair}
@@ -283,10 +332,6 @@ function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgen
 
 type T = ReturnType<typeof useTranslations<'Settings.modelOrder'>>
 /** 「只能用 Claude Code」 or 「两种 Agent 都能跑」: which Agents a credential's model runs on. */
-function agentsLine(t: T, agents: readonly OrderHarness[]) {
-  return agents.length > 1 ? t('bothAgents') : t('onlyAgent', { agent: harnessName(agents[0] ?? 'claude_code') })
-}
-
 /** Which credential a model comes from: the subscription's product, or the key's provider. */
 function sourceName(t: T, item: { source: OrderCandidate['source']; provider: string }) {
   if (item.source.kind === 'subscription') return item.provider === 'codex' ? t('source.codex') : t('source.claude')
@@ -305,7 +350,7 @@ function AddModelsDialog({ candidates, onClose }: { candidates: Candidate[]; onC
       <DialogHeader><DialogTitle>{t('add')}</DialogTitle></DialogHeader>
       <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto">
         {groups.map(group => <FieldSet key={sourceKey(group.head)} className="gap-1">
-          <FieldLegend variant="label" className="text-xs font-normal text-muted-foreground">{`${sourceName(t, group.head)} · ${agentsLine(t, [...new Set(group.items.map(item => item.harness))])}`}</FieldLegend>
+          <FieldLegend variant="label" className="text-xs font-normal text-muted-foreground">{sourceName(t, group.head)}</FieldLegend>
           {group.items.map(item => {
             const key = sourceKey(item)
             return <Label key={key} className={cn('flex items-center gap-2.5 rounded-lg px-2 py-1.5 font-normal', item.added ? 'text-muted-foreground' : 'hover:bg-muted')}>

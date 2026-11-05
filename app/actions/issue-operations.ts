@@ -1,11 +1,12 @@
 'use server'
 
-import { and, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import { getTranslations } from 'next-intl/server'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import { db } from '@/lib/db'
 import { issueListChanged } from '@/lib/live/lists'
+import { issueRelationsChanged, relationIds } from '@/lib/live/issue-detail'
 import { issues, issueMembers, issueVersions } from '@/lib/db/schema'
 import { requireIssueAccess, requireIssueAccessWithoutBody } from '@/lib/issue-access'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
@@ -29,15 +30,38 @@ function scheduleLinearWork() {
   catch (error) { console.error('Linear background sync could not be scheduled', error instanceof Error ? error.name : 'UnknownError') }
 }
 
+/** The task's relations panel and subtasks: the task itself and the tasks it links to or that link to it. */
 export async function listIssueConnections(id: string) {
+  return issueConnections(id, 'linked')
+}
+
+/**
+ * `linked`: only the task, the tasks its metadata names (parent, blocked by,
+ * related, duplicate of) and the tasks whose metadata names it, found in SQL;
+ * every other task of the owner stays in Postgres. `all`: every task of the
+ * owner, for copying a whole subtask tree.
+ */
+async function issueConnections(id: string, reach: 'linked' | 'all') {
   const { issue, user } = await requireIssueAccessWithoutBody(id)
   return db.transaction(async tx => {
-  const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, scopeVersion: issues.scopeVersion }).from(issues).where(eq(issues.id, id)).for('share')
+  const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
   requireLockedIssueScope(locked, user.id, issue.scopeVersion)
+  let candidates: string[] | undefined
+  if (reach === 'linked') {
+    const own = readIssueMetadata(locked.content)
+    const named = [...new Set([own.parentId, own.duplicateOfId, ...own.blockedByIds, ...own.relatedIds].filter((value): value is string => !!value))]
+    // Both metadata keys (readIssueMetadata reads `mikka`, else the pre-rename `orvilo`): a superset, narrowed by the same JS filters.
+    const namesTask = (key: 'mikka' | 'orvilo') => {
+      const metadata = sql`${issues.content}->'attrs'->${sql.raw(`'${key}'`)}`
+      return sql`(${metadata}->>'parentId' = ${id} or ${metadata}->'blockedByIds' ? ${id} or ${metadata}->'relatedIds' ? ${id})`
+    }
+    candidates = (await tx.select({ id: issues.id }).from(issues).where(and(eq(issues.userId, issue.userId),
+      or(eq(issues.id, id), named.length ? inArray(issues.id, named) : undefined, namesTask('mikka'), namesTask('orvilo'))))).map(row => row.id)
+  }
   // Only each row's metadata is used: read the body's attrs, never every task's whole body.
   const rows = await tx.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, scopeVersion: issues.scopeVersion, revision: issues.revision, content: issueAttrsContent, createdAt: issues.createdAt }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, user.id)))
-    .where(and(eq(issues.userId, issue.userId), (await issueVisibility(user.id)).predicate)).orderBy(desc(issues.updatedAt))
+    .where(and(eq(issues.userId, issue.userId), candidates ? inArray(issues.id, candidates) : undefined, (await issueVisibility(user.id, false, undefined, db, candidates ? { onlyIssueIds: candidates } : {})).predicate)).orderBy(desc(issues.updatedAt))
   const live = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
   const identifiers = await taskIdentifiers(live.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
   return live.map(({ content, ...row }) => ({ ...row, identifier: identifiers.get(row.id) ?? null, metadata: readIssueMetadata(content) }))
@@ -113,6 +137,8 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
           await issueListChanged(tx, saved.id)
           if (id === current.id) savedCurrent = saved
         }
+        // Both ends, and any task an edit disconnected (its old parent): their lists change.
+        await issueRelationsChanged(tx, [...patches.keys()].flatMap(id => [id, ...relationIds(rows.find(row => row.id === id)!.content)]))
         return { issue: await issueView(savedCurrent, tx) }
       })
       if ('issue' in result) scheduleLinearWork()
@@ -130,7 +156,7 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
     if (!parsed.success) return { error: 'issueTitleInvalid' }
     const t = await getTranslations('IssueDetail')
     const { issue, user } = await requireIssueAccess(input.id)
-    const accessible = input.includeSubissues ? await listIssueConnections(issue.id) : []
+    const accessible = input.includeSubissues ? await issueConnections(issue.id, 'all') : []
     try {
       const result = await db.transaction(async tx => {
         for (const owner of [...new Set([issue.userId, user.id])].sort()) await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${owner}, 0))`)
@@ -150,6 +176,7 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
         const [created] = await tx.insert(issues).values({ id: crypto.randomUUID(), userId: ownerId, title: parsed.data.title ?? t('defaultDuplicateTitle', { title: source.title.slice(0, 195) }), content: withIssueMetadata(child ? { type: 'doc', content: [{ type: 'paragraph' }] } : source.content, newMetadata), status: 'todo', priority: source.priority, revision: 1 }).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: created.id, userId: ownerId, revision: 1, title: created.title, content: created.content, status: created.status, priority: created.priority, ...activityActor(user.id) })
         await issueListChanged(tx, created.id)
+        await issueRelationsChanged(tx, [created.id, source.id])
         if (child) {
           const members = await tx.select({ memberId: issueMembers.memberId }).from(issueMembers).where(and(eq(issueMembers.issueId, source.id), eq(issueMembers.userId, source.userId)))
           if (members.length) await tx.insert(issueMembers).values(members.map(member => ({ issueId: created.id, userId: ownerId, memberId: member.memberId })))
@@ -231,6 +258,7 @@ export async function setIssueDeleted(input: { id: string; revision?: number; re
         if (input.restore && metadata.deletedAt && Date.now() - new Date(metadata.deletedAt).getTime() > 30 * 86400000) return { error: 'issueRestoreWindow' }
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, deletedAt: input.restore ? null : new Date().toISOString() }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, user.id))).returning()
         await issueListChanged(tx, saved.id, true)
+        await issueRelationsChanged(tx, [saved.id])
         return { issue: await issueView(saved, tx) }
       })
       if (input.restore && 'issue' in result && result.issue?.scope === 'workspace' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) dispatchLinearIssueSync(issue.id)

@@ -2,7 +2,9 @@
 
 import { useRef, useState, type FormEvent } from 'react'
 import { useTranslations } from 'next-intl'
-import useSWR from 'swr'
+import useSWR, { unstable_serialize } from 'swr'
+import { useLiveKey } from '@/hooks/use-live-key'
+import { UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { CheckCircle2, Mail, Search, ShieldCheck, UserPlus, Users } from 'lucide-react'
 import { inviteMember, listMembers, removeMember } from '@/app/actions/collaboration'
 import { useActionError } from '@/lib/use-action-error'
@@ -25,7 +27,11 @@ export function IssueMembers({ id, onChanged }: { id: string; onChanged?: () => 
   const t = useTranslations('Members')
   const tCommon = useTranslations('Common')
   const actionError = useActionError()
-  const { data, error, isValidating, mutate } = useSWR(['members', id], () => listMembers(id), { refreshInterval: 10000 })
+  const membersKey = ['members', id] as const
+  const { data, error, isValidating, mutate } = useSWR(membersKey, () => listMembers(id))
+  // No timer (#1212): adding or removing a member pushes `issue_members` to everyone who can see the task.
+  const liveScope = data?.live.workspaceId ?? null
+  useLiveKey('issue_members', liveScope ? id : UNRESOLVED_LIST_SCOPE, [unstable_serialize(membersKey)], liveScope, { minIntervalMs: 2_000 })
   const [email, setEmail] = useState('')
   const [query, setQuery] = useState('')
   const [pending, setPending] = useState(false)
