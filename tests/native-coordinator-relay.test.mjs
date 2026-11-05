@@ -1,17 +1,20 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { tool } from "ai"
 import { z } from "zod"
 import { nativeCoordinatorTurn } from "../workflows/coordinator/native-turn"
 import * as native from "../workflows/coordinator/native-steps"
 
-vi.mock("workflow", () => ({ sleep: vi.fn(async () => undefined) }))
+// sleep(ms) moves the faked clock; the turn's wake hook (#1212) never fires here.
+// oxlint-disable-next-line unicorn/no-thenable -- a Workflow hook is a thenable.
+vi.mock("workflow", () => ({ sleep: vi.fn(async ms => { vi.setSystemTime(Date.now() + ms) }), createHook: () => ({ then: () => undefined, dispose: () => undefined }) }))
 vi.mock("../workflows/coordinator/native-steps", () => ({ enqueue: vi.fn(),poll: vi.fn(),finishTool: vi.fn(),close: vi.fn() }))
 const runtime = { harness: "codex",deviceId: "11111111-1111-4111-8111-111111111111" }
 // The person's Coordinator is an ordinary bot row; its turns name that bot.
 const coordinatorBot = "11111111-1111-4111-8111-0000000c0de1"
 const reply = 'root = TextContent("收到邮件，要帮你回复吗？")'
 
-beforeEach(() => { vi.resetAllMocks(); vi.mocked(native.enqueue).mockResolvedValue("turn") })
+beforeEach(() => { vi.resetAllMocks(); vi.useFakeTimers({ toFake: ["Date"] }); vi.mocked(native.enqueue).mockResolvedValue("turn") })
+afterEach(() => { vi.useRealTimers() })
 describe("durable Coordinator transport relay", () => {
   it("exposes the existing schema, invokes its person-scoped callback once and records the result", async () => {
     const execute = vi.fn(async ({ text }) => ({ owner: "owner-from-closure",text,approval: "required" }))
@@ -50,7 +53,8 @@ describe("durable Coordinator transport relay", () => {
     vi.mocked(native.poll).mockResolvedValue({status:"queued",reply:null,calls:[]})
     await expect(nativeCoordinatorTurn("owner","holder",0,runtime,() => ({}),coordinatorBot)).rejects.toThrow("TimedOut")
     expect(native.enqueue).toHaveBeenCalledTimes(1)
-    expect(native.poll).toHaveBeenCalledTimes(180)
+    // The 180 s job lifetime bounds it: a read per 15 s re-read (a lost wake) plus the deadline, where the 1 s loop read 180 times.
+    expect(native.poll).toHaveBeenCalledTimes(13)
     expect(native.close).toHaveBeenCalledTimes(1)
   })
 })

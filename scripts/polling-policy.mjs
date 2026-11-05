@@ -43,14 +43,13 @@ export const pollingAllowlist = {
   'app/api/computer/events/route.ts': db(server, 'the "SSE" route re-queries subagent_events in a loop', 1),
   'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll fallback timer only: with the gateway configured it waits on LISTEN for the device (re-check per NOTIFY, one final check at the deadline); every 5 s without push or if LISTEN drops', 1),
   'lib/coordinator/group-turns.ts': db(server, 'untilStopped fallback timer only: 15 s while the worker LISTENs for the stop push, 1 s if LISTEN is unavailable', 1),
-  'workflows/coordinator/native-turn.ts': db(server, 'native coordinator turn re-reads its state every second (up to 180 times)', 1),
   'workflows/run-publication/workflow.ts': db(server, 'untilDone: publish and fail results retried with exponential backoff, 30 s doubling to a 10 min cap, until done (GitHub outage or another worker\'s lease; nothing to push)', 1),
   // Daemon: loops that call our server, which reads the database.
   'packages/daemon/src/agents/tool-approval.ts': db(daemon, 'ToolApprovalGate fallback timer only: none while the device gateway pushes run control, every 20 s while it is down, 1 s against a server older than run-control push', 1),
   'packages/daemon/src/server-link-http.ts': db(daemon, 'isLive retries an unanswered liveness check (timeout, 5xx) every second for at most 30 s; no periodic check', 1),
   'packages/daemon/src/subscription-hosted-runner.ts': db(daemon, 'a 3-attempt retry of an unanswered subscription context read; the background check runs on push and at token expiry', 1),
   'packages/daemon/src/computer/web-review.ts': db(daemon, 'pollWebComputerReviews: checks the local broker every second; with review push it syncs only when the pending set changes, on a gateway push, or every 5 s for presence (the server takes decisions on requests seen in the last 10 s); every second only against a server without review push or while the gateway is down', 1),
-  'packages/daemon/src/coordinator/runner.ts': db(daemon, 'native coordinator tool waits for its result by asking the server every 500 ms', 1),
+  'packages/daemon/src/coordinator/runner.ts': db(daemon, 'awaitToolResult fallback timer only: none while the gateway pushes Coordinator tool results (a 15 s safety re-ask), every 5 s while it is down, 500 ms against a server older than that push', 1),
   'packages/daemon/src/login.ts': db(daemon, 'device login polls the token endpoint at the server-given interval until approved (RFC 8628)', 1),
   'packages/daemon/src/runs/supervisor.ts': db(daemon, 'CHECKPOINT_EVERY_MS: a periodic write, not a read; saves an idle run\'s checkpoint to the server at most every 2 min', 1),
   // Third-party APIs.
