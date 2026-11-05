@@ -10,12 +10,11 @@ import { actingContext } from '@/lib/activity-actor'
 import { db } from '@/lib/db'
 import { issues } from '@/lib/db/schema'
 import { lockTeamRelations } from '@/lib/team-access'
-import { readIssueMetadata } from '@/lib/issue-metadata'
 import { ProjectMapError } from './contracts'
 
 export type ProjectScope = {
   reader: IssueReader; userId: string; workspaceId: string; projectId: string;
-  project: typeof projects.$inferSelect; issueIds: string[];
+  project: Pick<typeof projects.$inferSelect, 'id' | 'userId' | 'name' | 'revision' | 'issueIds' | 'createdAt'>; issueIds: string[];
   runId?: string; botId?: string | null;
 }
 type WorkspaceExecutor = Pick<typeof projectDb, 'select'>
@@ -33,26 +32,30 @@ export async function resolveProjectScope(reader: IssueReader, projectId: string
   const userId = readerId(reader)
   if (tokenScope(reader) && tokenScope(reader) !== workspaceId) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
   const scopedReader: IssueReader = { id: userId, [tokenWorkspace]: workspaceId }
-  const [membership] = await executor.select({ workspace: workspaces }).from(workspaces)
+  const [membership] = await executor.select({ workspace: { kind: workspaces.kind, userId: workspaces.userId } }).from(workspaces)
     .innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, workspaces.id), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
     .where(eq(workspaces.id, workspaceId)).limit(1)
   if (!membership) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
-  const [project] = await executor.select().from(projects).where(eq(projects.id, projectId)).limit(1)
+  const [project] = await executor.select({ id: projects.id, userId: projects.userId, name: projects.name, revision: projects.revision, issueIds: sql<string[] | null>`CASE WHEN jsonb_typeof(${projects.issueIds})='array' AND octet_length(${projects.issueIds}::text)<=4096 THEN CASE WHEN jsonb_array_length(${projects.issueIds})<=100 THEN ${projects.issueIds} ELSE NULL END ELSE NULL END`, createdAt: projects.createdAt }).from(projects).where(eq(projects.id, projectId)).limit(1)
   if (!project) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
-  const links = await executor.select({ workspaceId: teamProjects.workspaceId }).from(teamProjects).where(eq(teamProjects.projectId, projectId))
+  const links = await executor.select({ workspaceId: teamProjects.workspaceId }).from(teamProjects).where(eq(teamProjects.projectId, projectId)).limit(101)
+  if (links.length > 100) throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
   const workspacesForProject = new Set(links.map(link => link.workspaceId))
   // Report malformed ownership only to a member of one of the project's workspaces.
   if (links.length && !workspacesForProject.has(workspaceId)) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
   if (workspacesForProject.size > 1) throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
   if (!links.length && (project.userId !== userId || membership.workspace.kind !== 'personal' || membership.workspace.userId !== userId))
     throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
+  if (!Array.isArray(project.issueIds)) throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
+  const checkedProject = { ...project, issueIds: project.issueIds }
   const candidateIds = [...new Set(project.issueIds)].filter(id => z.uuid().safeParse(id).success)
-  if (authorizedIssueIds) return { reader: scopedReader, userId, workspaceId, projectId, project, issueIds: candidateIds.filter(id => authorizedIssueIds.includes(id)) }
+  if (candidateIds.length > 100) throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
+  if (authorizedIssueIds) return { reader: scopedReader, userId, workspaceId, projectId, project: checkedProject, issueIds: candidateIds.filter(id => authorizedIssueIds.includes(id)) }
   const visibility = await issueVisibility(scopedReader, false, workspaceId, db, { onlyIssueIds: candidateIds })
-  const visible = candidateIds.length ? await db.select({ id: issues.id, content: issues.content }).from(issues)
+  const visible = candidateIds.length ? await db.select({ id: issues.id, deleted: sql<boolean>`(COALESCE(${issues.content}->'attrs'->'mikka',${issues.content}->'attrs'->'orvilo')->>'deletedAt') IS NOT NULL` }).from(issues)
     .where(and(inArray(issues.id, candidateIds), visibility.predicate)) : []
-  const issueIds = visible.filter(row => !readIssueMetadata(row.content).deletedAt).map(row => row.id)
-  return { reader: scopedReader, userId, workspaceId, projectId, project, issueIds }
+  const issueIds = visible.filter(row => !row.deleted).map(row => row.id)
+  return { reader: scopedReader, userId, workspaceId, projectId, project: checkedProject, issueIds }
 }
 
 /** A run without an explicit project may resolve only one structural project association. */
