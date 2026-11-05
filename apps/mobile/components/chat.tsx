@@ -1,14 +1,15 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import * as Clipboard from 'expo-clipboard'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import Reanimated, { cancelAnimation, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated'
+import Reanimated, { cancelAnimation, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming, type SharedValue } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
-import { AccessibilityInfo, Image, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
+import { AccessibilityInfo, Image, Platform, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
 import { Check, CircleAlert, Copy, Ellipsis, Reply } from 'lucide-react-native'
 import { CardButton } from '@/components/cards'
 import { MessageMenu, NATIVE_MESSAGE_MENU } from '@/components/MessageMenu'
 import type { HeldMessage } from '@/lib/message-actions'
 import { ENTER, rubberBand, SNAP_BACK } from '@/lib/springs'
+import { QUOTE_DISTANCE, quotes } from '@/lib/message-gesture'
 import { StatusIcon } from '@/components/icons'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
@@ -186,8 +187,13 @@ export function useTimeReveal() {
   return { offset, gesture, scrollLocked }
 }
 
-/** How far a message is dragged right before letting go quotes it. */
-const QUOTE_AT = 56
+/** How far a message is dragged right before letting go quotes it (`lib/message-gesture.ts`). */
+const WEB = Platform.OS === 'web'
+const QUOTE_AT = QUOTE_DISTANCE
+/** A press opens the message's actions after this long (ms); the bubble starts to give way after `PRESS_IN_DELAY`. */
+const HOLD_MS = 500
+const PRESS_IN_DELAY = 120
+const PRESSED_SCALE = 0.96
 
 /**
  * A message row. Dragging it from left to right (not from the screen's edge,
@@ -199,33 +205,49 @@ export function TimedRow({ time, offset, children, align = 'left', onQuote, onLo
   const drag = useSharedValue(0)
   const reduceMotion = useReducedMotionPreference()
   const quote = useCallback(() => { tap(); onQuote?.() }, [onQuote])
+  // On the web a mouse drag also selects the bubble's text: while the bubble is dragged, its text can't be selected
+  // and the selection the press started is cleared. Selecting text works again once it is let go.
+  const [dragging, setDragging] = useState(false)
+  const dragStarted = useCallback(() => { setDragging(true); globalThis.getSelection?.()?.removeAllRanges() }, [])
+  const dragEnded = useCallback(() => { setDragging(false) }, [])
   const pan = Gesture.Pan()
     .enabled(Boolean(onQuote))
-    // Rightward only, and not from the edge: the first 28 points belong to swipe back.
-    .activeOffsetX([-10000, 12])
+    // Rightward only, and not from the edge: the first 28 points belong to swipe back. It starts after 16 points to
+    // the right and gives way at once to a leftward move (the times) or to 12 points up or down (scrolling).
+    .activeOffsetX(16)
+    .failOffsetX(-8)
     .failOffsetY([-12, 12])
     .hitSlop({ left: -28 })
-    .onStart(() => { cancelAnimation(drag) })
+    .onStart(() => { cancelAnimation(drag); if (WEB) scheduleOnRN(dragStarted) })
     // Follows the finger with rubber-band resistance (lib/springs.ts), easing towards twice the mark, never a hard stop.
     .onUpdate(event => { drag.value = rubberBand(event.translationX, QUOTE_AT * 2) })
-    .onEnd((_event, success) => {
-      if (success && drag.value >= QUOTE_AT) scheduleOnRN(quote)
+    .onEnd((event, success) => {
+      if (success && quotes(drag.value, event.velocityX)) scheduleOnRN(quote)
     })
     // Finalize also runs for an interrupted/cancelled drag; cancellation never
     // quotes the message and must not leave its bubble stuck off its baseline.
-    .onFinalize(event => { drag.value = reduceMotion ? 0 : withSpring(0, { ...SNAP_BACK, velocity: event.velocityX }) })
+    .onFinalize(event => {
+      drag.value = reduceMotion ? 0 : withSpring(0, { ...SNAP_BACK, velocity: event.velocityX })
+      if (WEB) scheduleOnRN(dragEnded)
+    })
   const held = useCallback(() => { press(); onLongPress?.() }, [onLongPress])
   // A long press opens the message's actions: on iOS the system context menu (MessageMenu), elsewhere the sheet
   // (app/message.tsx). VoiceOver and the keyboard reach the sheet through the frame below on every platform.
   const native = NATIVE_MESSAGE_MENU && Boolean(menu)
-  const long = Gesture.LongPress().enabled(Boolean(onLongPress) && !native).minDuration(380).onStart(() => { scheduleOnRN(held) })
-  const moved = useAnimatedStyle(() => ({ transform: [{ translateX: drag.value }] }))
+  // While a finger rests on the bubble it gives way a little (after 120 ms, so a tap or a scroll never shows it), and
+  // the actions open at 500 ms; letting go or scrolling springs it back.
+  const pressed = useSharedValue(1)
+  const long = Gesture.LongPress().enabled(Boolean(onLongPress) && !native).minDuration(HOLD_MS)
+    .onBegin(() => { if (!reduceMotion) pressed.value = withDelay(PRESS_IN_DELAY, withTiming(PRESSED_SCALE, { duration: HOLD_MS - PRESS_IN_DELAY })) })
+    .onStart(() => { scheduleOnRN(held) })
+    .onFinalize(() => { pressed.value = reduceMotion ? 1 : withSpring(1, SNAP_BACK) })
+  const moved = useAnimatedStyle(() => ({ transform: [{ translateX: drag.value }, { scale: pressed.value }] }))
   const revealed = useAnimatedStyle(() => ({ transform: [{ translateX: offset.get() }] }))
   const arrow = useAnimatedStyle(() => ({ opacity: Math.min(1, drag.value / QUOTE_AT), transform: [{ scale: reduceMotion ? 1 : 0.6 + 0.4 * Math.min(1, drag.value / QUOTE_AT) }] }))
   return (
     <View>
     <GestureDetector gesture={Gesture.Race(pan, long)}>
-      <Reanimated.View>
+      <Reanimated.View style={dragging ? styles.unselectable : undefined}>
         <Reanimated.View style={[styles.quoteArrow, arrow]} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
           <Symbol name="arrowshape.turn.up.left" size={15} color={colors.secondary} web={<Reply size={15} color={colors.secondary} />} />
         </Reanimated.View>
@@ -337,6 +359,8 @@ const styles = StyleSheet.create({
   threadInfo: { fontSize: 12, lineHeight: 16, color: colors.secondary },
   event: { alignSelf: 'center', textAlign: 'center', fontSize: 12, lineHeight: 17, color: colors.secondary, marginHorizontal: 24 },
   time: { position: 'absolute', right: -REVEAL + 6, bottom: 4, fontSize: 11, color: colors.secondary },
+  // Web only: the bubble's text is not selected while it is dragged (TimedRow).
+  unselectable: { userSelect: 'none' } as never,
   quoteArrow: { position: 'absolute', left: 4, top: 0, bottom: 0, justifyContent: 'center' },
   // A 32-point button whose 6-point hitSlop keeps the 44-point target (the glyph at text size, as in ChatGPT and Claude).
   copy: { alignSelf: 'flex-start', width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
