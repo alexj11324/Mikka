@@ -167,6 +167,7 @@ test(
         [repoId, deviceId, command],
       );
       let emitPresentation = false;
+      let acceptanceReaderFixture: { taskId: string; artifactId: string; captureId: string } | undefined;
       const store = createFactoryStore(db, authorize, coordinatorBot, {
         onTransition: async (tx,task) => { if (emitPresentation) await syncFactoryPresentation(tx,task); },
         independent: factoryCheckIndependent,
@@ -704,13 +705,7 @@ test(
           assert.deepEqual(flow.acceptance.counts,{passed:1,failed:0,unverified:1});
           assert.equal(flow.acceptance.media[0].captureId,captureId); assert.equal(flow.acceptance.media[0].criterion,'criterion-2');
           assert.equal(flow.acceptance.version,2);
-          const { readArtifact } = await import('../artifacts/store');
-          const [ownedArtifact, foreignArtifact] = await modelDatabase!.run(() => Promise.all([
-            readArtifact('owner',flow.acceptance!.artifactId),readArtifact('other',flow.acceptance!.artifactId),
-          ]));
-          assert.equal(ownedArtifact?.acceptanceTaskId,state.task.id,'the owner can find the report task independently of its initial run');
-          assert.equal(ownedArtifact?.media?.[0].captureId,captureId);
-          assert.equal(foreignArtifact,null,'the task hint is not available to another artifact reader');
+          acceptanceReaderFixture = { taskId: state.task.id, artifactId: flow.acceptance.artifactId, captureId };
           const document = (await db.query('SELECT "inlineContent" FROM artifact_versions WHERE "artifactId"=$1 AND version=2',[flow.acceptance.artifactId])).rows[0].inlineContent;
           assert.ok(document.indexOf('未验证') < document.indexOf('已验证')); assert.match(document,/No executable test command exists/);
           assert.ok(document.includes(captureId)); assert.match(document,/!\[/);
@@ -2975,6 +2970,21 @@ test(
           await workspacePool.end();
           for (const name of names) { const value = saved.get(name); if (value === undefined) delete process.env[name]; else process.env[name] = value; }
         }
+      });
+      await t.test('the owner Artifact reader retains its report task hint and media without exposing them to another reader', async () => {
+        assert.ok(acceptanceReaderFixture, 'the real persisted acceptance report fixture must have been created');
+        // Artifact writes import Coordinator workflow consumers too. Read only
+        // after all queue/native module-mock scenarios so those imports cannot
+        // cache the real consumers before their test fixtures are installed.
+        const { readArtifact } = await import('../artifacts/store');
+        const { taskId, artifactId, captureId } = acceptanceReaderFixture;
+        const [ownedArtifact, foreignArtifact] = await modelDatabase!.run(() => Promise.all([
+          readArtifact('owner',artifactId),readArtifact('other',artifactId),
+        ]));
+        assert.equal(ownedArtifact?.id,artifactId,'the corresponding real Artifact remains present');
+        assert.equal(ownedArtifact?.acceptanceTaskId,taskId,'the owner can find the report task independently of its initial run');
+        assert.equal(ownedArtifact?.media?.[0].captureId,captureId);
+        assert.equal(foreignArtifact,null,'the task hint is not available to another artifact reader');
       });
     } finally {
       if (installedGatewayFixture) delete process.env.AI_GATEWAY_API_KEY;
