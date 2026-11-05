@@ -1,5 +1,5 @@
 import { ChatFileError } from '@/lib/chat-attachments/extract'
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
@@ -75,7 +75,7 @@ async function handlePOST(request: Request) {
       if (error instanceof SubmissionConflictError) return json({ error: 'submissionConflict' }, 409)
       throw error
     }
-    after(() => wakeCoordinator(user.id))
+    afterJob('after:coordinator-wake', () => wakeCoordinator(user.id))
     return json({ queued: true }, 202)
   }
   const result = await sendCoordinatorMessage(parsed.data.text, null, parsed.data.botId ?? null, parsed.data.submissionId, undefined, null, images)

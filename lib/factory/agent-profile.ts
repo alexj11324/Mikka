@@ -207,7 +207,7 @@ export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchSco
       if (request.asked || request.agentId) return await legacy()
       throw new AgentProfileError('agentProfileUnavailable')
     }
-    let chosen: Eligible | undefined, reason = 'Explicit Profile selection.'
+    let chosen: Eligible | undefined, reason: AgentProfileSelection['reason'] = 'explicit'
     let execution: Awaited<ReturnType<typeof invokeDecision>> | null = null
     if (request.profileId) chosen = eligible.find(item => item.row.id === request.profileId)
     else {

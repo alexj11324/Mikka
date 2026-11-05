@@ -1,6 +1,6 @@
 import 'server-only'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 
 export type IssueEffect = { kind: 'sync' | 'scope'; issueId: string } | { kind: 'wake'; userId: string }
 const deferred = new AsyncLocalStorage<IssueEffect[]>()
@@ -24,7 +24,7 @@ export function scheduleIssueEffect(effect: IssueEffect) {
     if (!effects.some(item => JSON.stringify(item) === JSON.stringify(effect))) effects.push(effect)
     return
   }
-  after(async () => {
+  afterJob('after:issue-effects', async () => {
     try { await runIssueEffect(effect) }
     catch { console.error('Issue background work could not start') }
   })

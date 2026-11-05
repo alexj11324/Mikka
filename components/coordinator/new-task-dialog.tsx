@@ -34,7 +34,7 @@ import { useChatFiles } from '@/components/chat/use-chat-files'
 import { ChatFileCards } from '@/components/chat/chat-file-cards'
 import { CHAT_FILE_ACCEPT } from '@mikka/protocol/chat-attachments'
 import { useAgentProfiles } from '@/components/settings/factory-profiles-data'
-import { TaskProfilePicker } from './task-profile-picker'
+import { TaskProfileNotice, TaskProfilePicker } from './task-profile-picker'
 
 const MAX_LENGTH = 8000
 
@@ -192,12 +192,14 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
             </SelectGroup>
           </SelectContent>
         </Select>}
-        <ChevronRight aria-hidden="true" className="size-3.5 text-muted-foreground" />
-        <DialogTitle className="text-sm font-medium">{t('title')}</DialogTitle>
+        <TaskProfilePicker workspaceId={workspaceId} value={profileId ?? null} onChange={id => setProfilePick(id && workspaceId ? { workspaceId, id } : null)} data={profiles.data} disabled={sending} />
+        {/* The chevron and the title wrap together, so the chevron never ends a line on its own. */}
+        <span className="flex items-center gap-2 whitespace-nowrap"><ChevronRight aria-hidden="true" className="size-3.5 text-muted-foreground" />
+        <DialogTitle className="text-sm font-medium">{t('title')}</DialogTitle></span>
         {project && <span className="flex h-7 max-w-40 items-center rounded-full bg-control px-2.5 text-xs text-muted-foreground"><span className="truncate">{project}</span></span>}
       </div>
       <DialogDescription className="sr-only">{t('description')}</DialogDescription>
-      <TaskProfilePicker workspaceId={workspaceId} value={profileId ?? null} onChange={id => setProfilePick(id && workspaceId ? { workspaceId, id } : null)} data={profiles.data} error={profiles.error} onRetry={() => { void profiles.mutate() }} disabled={sending} />
+      <TaskProfileNotice value={profileId ?? null} data={profiles.data} error={profiles.error} onRetry={() => { void profiles.mutate() }} />
       <FieldGroup onDragOver={event => { if (Array.from(event.dataTransfer.types).includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = sending ? 'none' : 'copy' } }} onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); void attach(Array.from(event.dataTransfer.files)) } }} onPaste={event => { if (event.clipboardData.files.length) { event.preventDefault(); void attach(Array.from(event.clipboardData.files)) } }}>
         <Field>
           <ChatFileCards files={attachments.files} pending={attachments.pending} onRemove={attachments.remove} onRetry={attachments.retry} />

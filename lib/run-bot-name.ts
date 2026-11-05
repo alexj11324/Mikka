@@ -31,3 +31,10 @@ export const runBotId = sql<string | null>`coalesce(
  * who did the work, as opposed to the Bot that dispatched it (R-78).
  */
 export const runAgentName = sql<string>`case ${agents.harness} when 'claude_code' then 'Claude Code' when 'codex' then 'Codex' when 'cursor' then 'Cursor' else ${agents.harness} end`
+
+/**
+ * The start of a run's prompt, enough for `threadName` (the first line, cut
+ * at 60 characters): leading blank space dropped, then 400 characters. A list
+ * names a thread from this instead of reading whole prompts.
+ */
+export const threadNamePrompt = sql<string>`left(ltrim(${agentRuns.prompt}, E' \\t\\r\\n'), 400)`

@@ -1,7 +1,7 @@
-import { after } from 'next/server'
-import { waitUntil } from '@vercel/functions'
+import { afterJob } from '@/lib/background'
 import { setTimeout as delay } from 'node:timers/promises'
 import { deviceGatewayEndpoint } from './device-gateway-client'
+import { afterDatabaseCommit } from './db/commit-effects'
 
 /** A wake is idempotent; retry transient failures without dropping committed work. */
 async function sendWake(deviceId: string, endpoint: NonNullable<ReturnType<typeof deviceGatewayEndpoint>>) {
@@ -30,8 +30,7 @@ export function notifyDeviceWork(deviceId: string | null | undefined) {
   if (!deviceId) return
   const endpoint = deviceGatewayEndpoint(deviceId, 'push')
   if (!endpoint) return
-  try { after(() => sendWake(deviceId, endpoint)) }
-  catch { waitUntil(sendWake(deviceId, endpoint)) }
+  afterJob('after:device-wake', () => sendWake(deviceId, endpoint), { orRun: true })
 }
 
 /** The outer Factory/Skill transaction has committed before this lookup. */
@@ -46,4 +45,47 @@ export async function notifyQueuedLocalRun(database: {
         AND d.kind='local' AND d.enabled=true AND d."removedAt" IS NULL`, [runId, userId])
     notifyDeviceWork(run?.deviceId)
   } catch { console.warn('[device-gateway] queued run notification failed', { runId }) }
+}
+
+export type RunControlTarget = { runIds: readonly string[] } | { userId: string } | { workspaceId: string }
+const ACTIVE_RUN_STATUSES = ['preparing', 'running', 'paused', 'waiting_input', 'finishing']
+
+/**
+ * Wakes each device (local or cloud) holding one of these runs, so its daemon
+ * checks run control again at once (#1212). A daemon on the gateway runs no
+ * periodic check, so every write that can stop, pause or revoke a run, or
+ * change its policy, calls this after commit. The wake is a hint: the daemon
+ * reads its authority from the tool-approval route. Waking too many costs one
+ * check per run; waking too few leaves a run live until the next wake.
+ */
+export async function notifyRunControl(database: {
+  query: (text: string, values: unknown[]) => Promise<{ rows: { deviceId: string }[] }>
+}, target: RunControlTarget) {
+  if (!process.env.DEVICE_GATEWAY_URL || !process.env.DEVICE_GATEWAY_PUSH_SECRET) return
+  if ('runIds' in target && target.runIds.length === 0) return
+  const [where, values]: [string, unknown[]] = 'runIds' in target ? ['r.id=ANY($1::uuid[])', [[...target.runIds]]]
+    : 'userId' in target ? ['r."userId"=$1 AND r.status=ANY($2::text[])', [target.userId, ACTIVE_RUN_STATUSES]]
+      : ['r."botId" IN (SELECT id FROM bots WHERE "workspaceId"=$1) AND r.status=ANY($2::text[])', [target.workspaceId, ACTIVE_RUN_STATUSES]]
+  try {
+    const { rows } = await database.query(`SELECT DISTINCT r."deviceId" FROM agent_runs r
+      JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId"
+      WHERE ${where}`, values)
+    for (const { deviceId } of rows) notifyDeviceWork(deviceId)
+  } catch { console.warn('[device-gateway] run control notification failed') }
+}
+
+/** notifyRunControl once this transaction commits; nothing on rollback. The
+ * device lookup reads the committed rows from the default pool. */
+export function runControlChanged(executor: object, target: RunControlTarget, lookup?: Parameters<typeof notifyRunControl>[0]) {
+  if (!process.env.DEVICE_GATEWAY_URL || !process.env.DEVICE_GATEWAY_PUSH_SECRET) return
+  if ('runIds' in target && target.runIds.length === 0) return
+  const key = 'runIds' in target ? `runs:${[...target.runIds].sort().join(',')}` : 'userId' in target ? `owner:${target.userId}` : `workspace:${target.workspaceId}`
+  // A wake is best-effort: it can never fail the stop or policy write itself.
+  try {
+    afterDatabaseCommit(executor, `run-control:${key}`, async () => {
+      if (lookup) return notifyRunControl(lookup, target)
+      const { pool, withoutDatabaseClient } = await import('./db/request-scope')
+      await withoutDatabaseClient(() => notifyRunControl(pool, target))
+    })
+  } catch { console.warn('[device-gateway] run control notification unavailable') }
 }

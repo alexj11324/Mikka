@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { sourcedEventMessage } from './message-safety'
 import { runCompletionObservations } from './run-completion-observation'
 import { visibleRuns } from '@/lib/agent-runs'
+import { threadNamePrompt } from '@/lib/run-bot-name'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { credentialMasker, maskCredentials, maskDeep } from '@/lib/secrets/mask'
 import { issueForUser } from '@/lib/issue-access'
@@ -11,6 +12,8 @@ import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
+import { coordinatorSessionChanged } from '@/lib/live/coordinator-session'
+import { COORDINATOR_LEASE_CHANNEL } from '@/lib/db/listen'
 import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
@@ -117,7 +120,12 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
     if (!taken) return { held: false, ...NO_TAKE }
     // Ordinary renewal is not a broad list update. Only a new/changed turn
     // or actual message delivery changes the summary that the sidebar shows.
-    if (!coordinatorLeaseActive(previousLease, now) || previousLease?.leaseHolder !== holder) await ownerListChanged(tx, userId, ['bot_chat_list'])
+    if (!coordinatorLeaseActive(previousLease, now) || previousLease?.leaseHolder !== holder) {
+      await ownerListChanged(tx, userId, ['bot_chat_list'])
+      // 停止 for a turn that is about to start waits on this (stop-turn.ts); delivered on COMMIT.
+      await tx.execute(sql`SELECT pg_notify(${COORDINATOR_LEASE_CHANNEL}, ${botId})`)
+    }
+    await coordinatorSessionChanged(tx, userId, botId)
     const candidates = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
     // A schedule is a separate read-only turn. Hydrate its authority through
@@ -204,6 +212,7 @@ export async function releaseLease(userId: string, holder: string, botId: string
   const released = await db.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, updatedAt: new Date() })
     .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
   if (released.length) await ownerListChanged(db, userId, ['bot_chat_list'])
+  if (released.length) await coordinatorSessionChanged(db, userId, botId)
   return hasWakingEvents(userId, botId)
 }
 
@@ -218,7 +227,7 @@ export async function untriagedEvents(userId: string, botId: string) {
     .orderBy(desc(eq(coordinatorEvents.kind, 'user_message')), asc(sql`coalesce(${coordinatorEvents.lastTriageAttemptAt}, ${coordinatorEvents.createdAt})`), asc(coordinatorEvents.id)).limit(INBOX_BATCH)
   const runIds = [...new Set(events.flatMap(event => event.runId ? [event.runId] : []))]
   // Reuse the existing visibility gate; teammate projections stay restricted.
-  const observed = new Map((runIds.length ? await visibleRuns(userId, { runIds, limit: runIds.length }) : [])
+  const observed = new Map((runIds.length ? await visibleRuns(userId, { runIds, limit: runIds.length, brief: true }) : [])
     .map(run => [run.id, { id: run.id, status: run.status, finishedAt: run.finishedAt }]))
   return events.map(event => ({ ...event, observedRun: event.runId ? observed.get(event.runId) ?? null : null }))
 }
@@ -291,8 +300,9 @@ export async function appendMessages(userId: string, holder: string, unmasked: M
       await ownerListChanged(tx, userId, ['bot_chat_list'])
     }
     const now = new Date()
-    await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning && maskCredentials(warning), lastErrorAt: warning ? now : null, updatedAt: now })
-      .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder)))
+    const renewed = await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning && maskCredentials(warning), lastErrorAt: warning ? now : null, updatedAt: now })
+      .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
+    if (messages.length || renewed.length) await coordinatorSessionChanged(tx, userId, botId)
     return first + messages.length - 1
   })
 }
@@ -342,6 +352,7 @@ export async function failTurn(userId: string, holder: string, error: string, bo
       .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
     if (!released.length) return
     await ownerListChanged(tx, userId, ['bot_chat_list'])
+    await coordinatorSessionChanged(tx, userId, botId)
     await tx.execute(sql`UPDATE coordinator_messages SET message = message || jsonb_build_object('mikkaFailure', ${reason}::text)
       WHERE "userId"=${userId} AND "botId"=${botId}::uuid AND message->>'role'='user'
         AND position=(SELECT max(position) FROM coordinator_messages WHERE "userId"=${userId} AND "botId"=${botId}::uuid)`)
@@ -452,16 +463,19 @@ export async function citationSources(userId: string, texts: readonly string[], 
     }
   }
   if (runIds.length) {
-    const rows = await visibleRuns(userId, { runIds, limit: runIds.length })
+    // Only what a citation shows: the report's summary, the prompt's opening (its name) and each task without its body.
+    const rows = await visibleRuns(userId, { runIds, limit: runIds.length, brief: true })
     // A teammate's run arrives as the bare projection (no agent id): its prompt, report and steps stay with its owner.
     const ownIds = rows.filter(row => row.agentId).map(row => row.id)
-    const prompts = new Map((ownIds.length ? await db.select({ id: agentRuns.id, prompt: agentRuns.prompt }).from(agentRuns)
+    const prompts = new Map((ownIds.length ? await db.select({ id: agentRuns.id, prompt: threadNamePrompt }).from(agentRuns)
       .where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))) : []).map(row => [row.id, row.prompt]))
     const steps = new Map((ownIds.length ? await db.select({ runId: runChunks.runId, count: sql<number>`count(*)` }).from(runChunks)
       .where(and(inArray(runChunks.runId, ownIds), sql`${runChunks.chunk}->>'type' = 'tool-input-available'`)).groupBy(runChunks.runId) : [])
       .map(row => [row.runId, Number(row.count)]))
+    const tasks = new Map<string, ReturnType<typeof issueForUser>>()
     for (const row of rows) {
-      const task = row.issueId ? await issueForUser(userId, row.issueId) : null
+      if (row.issueId && !tasks.has(row.issueId)) tasks.set(row.issueId, issueForUser(userId, row.issueId, false, db, { withoutBody: true }))
+      const task = row.issueId ? await tasks.get(row.issueId)! : null
       const identifiers = task ? await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }]) : new Map<string, string>()
       const issue = task ? { id: task.id, title: task.title, number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null } : null
       const pullRequests = task ? readIssueMetadata(task.content).pullRequests : []

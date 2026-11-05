@@ -1,4 +1,5 @@
-import { after, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { z } from 'zod'
 import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
@@ -16,7 +17,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const id = z.uuid().parse((await params).id)
     const context = await loadWorkspaceContext(undefined, session.user)
     const result = await startSuggestion(pool, { userId: session.user.id, workspaceId: context.workspace.id }, id)
-    after(() => wakeCoordinator(session.user.id))
+    afterJob('after:coordinator-wake', () => wakeCoordinator(session.user.id))
     return respond(result, 202)
   } catch (error) {
     if (error instanceof ComputerError) return respond({ error: error.message }, error.status)

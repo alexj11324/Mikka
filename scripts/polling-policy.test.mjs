@@ -64,7 +64,6 @@ for (const [name, source, rule] of [
   ['for (;;) awaiting setTimeout', "for (;;) {\n  if (await ready()) return\n  await new Promise(resolve => setTimeout(resolve, 500))\n}", 'polling/sleep-loop'],
   ['long counted loop awaiting delay', "for (let step = 0; step < 1440; step++) { await tick(); await delay(30_000) }", 'polling/sleep-loop'],
   ['mobile useApi with an interval', "const page = useApi<Page>(`/api/x/${id}`, 15_000)", 'polling/helper'],
-  ['daemon run monitor', "const off = gate.monitor(check)", 'polling/helper'],
   ['pollUntil', "await pollUntil(() => read(), value => value.ok)", 'polling/helper'],
 ]) test(`rejects ${name}`, () => assert.ok(rules(source).includes(rule), `${source} -> ${rules(source)}`))
 

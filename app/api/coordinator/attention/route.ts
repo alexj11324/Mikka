@@ -1,4 +1,5 @@
-import { after, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { z } from 'zod'
 import { auth } from '@/lib/api-auth'
 import { attentionBudgets, setAttentionEnabled } from '@/lib/attention/store'
@@ -23,6 +24,6 @@ export async function PUT(request: Request) {
   const parsed = z.object({ enabled: z.boolean() }).safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'invalidInput' }, { status: 400, headers })
   await setAttentionEnabled(session.user.id, parsed.data.enabled)
-  if (parsed.data.enabled) after(() => wakeCoordinator(session.user.id))
+  if (parsed.data.enabled) afterJob('after:coordinator-wake', () => wakeCoordinator(session.user.id))
   return NextResponse.json(await attentionBudgets(session.user.id), { headers })
 }
