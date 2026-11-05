@@ -44,6 +44,7 @@ import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
 import { mailboxToolResult } from '../run-mailbox'
+import { codexMailboxCatalogue, codexMailboxResumeVerified, recordCodexMailboxSession, verifyCodexMailboxResume } from './codex-mailbox'
 import { NATIVE_AUTH_PLACEHOLDER } from '../subscription-native-broker'
 import { classifyProviderFailure, ProviderFailureError, providerFailureMessage, type ProviderFailure } from "@mikka/protocol/provider-failure"
 import type {
@@ -53,7 +54,7 @@ import type {
   RateLimitsNotification,
   ThreadItem,
   ThreadResponse,
-  ThreadStartParams,
+  ThreadResumeParams,
   TokenUsageNotification,
   TurnNotification,
   UserInput,
@@ -323,7 +324,7 @@ export class CodexAdapter implements AgentAdapter {
     const approval = requireRunToolApproval(options.runId, options.toolApproval)
     if (!await approval.checkLive()) { approval.revoke(); throw new Error('Run tool approval unavailable') }
     const log = options.log.child({ harness: "codex" })
-    if (options.mailbox && mode !== 'new') throw new Error('Run mailbox requires a fresh Codex thread; resume capability is unverified')
+    const mailboxCatalogue = options.mailbox ? codexMailboxCatalogue(options.mailbox) : undefined
     const paths = runPaths(this.options.stateDir, options.runId)
     const runDir = await claimRunDir(paths)
     const externalAuth = this.options.subscriptionAuth
@@ -355,7 +356,7 @@ export class CodexAdapter implements AgentAdapter {
           CODEX_HISTORY,
         )
       } catch (error) {
-        if (options.requireSessionResume)
+        if (options.requireSessionResume || options.mailbox)
           throw new Error("Original Codex question history is unavailable", {
             cause: error,
           })
@@ -364,6 +365,11 @@ export class CodexAdapter implements AgentAdapter {
     }
     // Inside the run dir: one run's home is never another run's.
     const codexHome = prepareCodexHome(join(runDir, "codex-home"), log)
+    if (mailboxCatalogue && threadId) verifyCodexMailboxResume(
+      this.options.stateDir,
+      mode === 'continue' ? options.continueSession!.runId : options.runId,
+      codexHome.home, threadId, mailboxCatalogue,
+    )
     const computerMcp = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
     const binary = this.options.binary ?? await this.options.ensureBinary?.() ?? "codex"
     // The official platform package includes code-mode helpers beside Codex.
@@ -791,6 +797,9 @@ export class CodexAdapter implements AgentAdapter {
         "initialize",
       )
       await rpc.sendNotification("initialized")
+      const mailboxResumeVerified = codexMailboxResumeVerified(initialized.userAgent)
+      if (mailboxCatalogue && mode !== 'new' && !mailboxResumeVerified)
+        throw new Error('Run mailbox requires a verified original Codex thread')
       if (externalAuth) {
         startupPhase = 'oauth_login'
         try {
@@ -811,19 +820,18 @@ export class CodexAdapter implements AgentAdapter {
           throw new Error(SUBSCRIPTION_AUTH_ERROR)
         }
       }
-      const thread: ThreadStartParams = {
+      const thread: Omit<ThreadResumeParams, 'threadId'> = {
         cwd: ctx.worktree,
         // Nothing is asked and Codex's own sandbox is off: the equivalent of
         // `--dangerously-bypass-approvals-and-sandbox` (decision 2026-11-01-2335).
         approvalPolicy: "never",
         sandbox: "danger-full-access",
         developerInstructions: ctx.instructions(),
-        ...(options.mailbox ? { dynamicTools: options.mailbox.tools.map(tool => ({ type: 'function' as const, ...tool })) } : {}),
         ...(options.model ? { model: options.model } : {}),
       }
       const newThread = () =>
         ready(
-          rpc.sendRequest<ThreadResponse>("thread/start", thread),
+          rpc.sendRequest<ThreadResponse>("thread/start", { ...thread, ...(mailboxCatalogue ? { dynamicTools: mailboxCatalogue } : {}) }),
           "thread/start",
         )
       let response: ThreadResponse
@@ -839,7 +847,7 @@ export class CodexAdapter implements AgentAdapter {
             "thread/resume",
           )
         } catch (error) {
-          if (managedAuth || mode !== "continue" || ending || options.requireSessionResume) throw error
+          if (managedAuth || mode !== "continue" || ending || options.requireSessionResume || options.mailbox) throw error
           log.info(
             { err: error, thread_id: threadId },
             "could not continue the earlier codex thread; starting a new one",
@@ -850,10 +858,11 @@ export class CodexAdapter implements AgentAdapter {
         }
       }
       sessionId = response.thread.id
+      if ((options.requireSessionResume || (options.mailbox && threadId)) && sessionId !== threadId)
+        throw new Error("Codex resumed a different question thread")
+      if (mailboxCatalogue && mailboxResumeVerified) recordCodexMailboxSession(this.options.stateDir, options.runId, codexHome.home, response.thread, mailboxCatalogue, mode !== 'new')
       runtimeModel = typeof response.model === "string" && response.model ? response.model : null
       if (runtimeModel) options.onRuntimeModel?.(sessionId, runtimeModel)
-      if (options.requireSessionResume && sessionId !== threadId)
-        throw new Error("Codex resumed a different question thread")
       if(managedAuth)await this.options.onHostedSession?.(sessionId)
       startupPhase = 'turn_start'
       await ready(startTurn(firstMessage), "turn/start")
@@ -918,3 +927,4 @@ export class CodexAdapter implements AgentAdapter {
     }
   }
 }
+

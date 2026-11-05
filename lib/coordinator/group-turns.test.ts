@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import test from 'node:test'
-import { Pool } from 'pg'
+import test, { type TestContext } from 'node:test'
+import { Client, Pool } from 'pg'
 import { handleGroup, type GroupRequest } from '../group-conversations-store'
 import { groupGenerationFailure, GroupJudgmentPendingError, groupsWithPendingTurns, hasPendingGroupTurn, processGroupTurn, runGroupRounds, untilStopped, type GroupAgent, type GroupRuntime } from './group-turns'
 import { checkedCorrection, checkedRoute } from './group-correction'
@@ -133,6 +133,39 @@ test('private routing rejects foreign/self/third peers and an unavailable writer
 // Only a disposable loopback *_e2e database, even if REQUIRE_DB is set.
 const dbURL = disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined
 if (process.env.REQUIRE_DB === '1' && !dbURL) throw new Error('REQUIRE_DB=1 requires a loopback *_e2e database')
+
+/** Only controls scheduling: every statement and result still comes from PG.
+ * The separate normal Stop request must commit before the worker proceeds. */
+function groupQueryBarrier(t: TestContext, conversationId: string, phase: 'selected' | 'publishing') {
+  const entered = Promise.withResolvers<void>(), released = Promise.withResolvers<void>()
+  const original = Client.prototype.query
+  let hits = 0
+  const hook = t.mock.method(Client.prototype, 'query', function (this: Client, ...args: unknown[]) {
+    const [sql, values] = args
+    const worker = (this as Client & { connectionParameters: { application_name?: string } }).connectionParameters.application_name === 'mikka-group-turn'
+    const matches = typeof sql === 'string' && Array.isArray(values) && values[0] === conversationId &&
+      (phase === 'selected' ? sql.startsWith('SELECT t.*, m.body') : sql === 'SELECT id FROM conversations WHERE id=$1 FOR UPDATE')
+    if (!worker || !matches || hits) return Reflect.apply(original, this, args)
+    hits++
+    if (phase === 'selected') return Reflect.apply(original, this, args).then(async (result: unknown) => {
+      entered.resolve(); await released.promise; return result
+    })
+    entered.resolve()
+    return released.promise.then(() => Reflect.apply(original, this, args))
+  } as typeof original)
+  return {
+    async wait(work: Promise<unknown>) {
+      let timer: ReturnType<typeof setTimeout> | undefined
+      try {
+        await Promise.race([entered.promise, work.then(() => { throw Error('group_barrier_not_reached') }),
+          new Promise<never>((_, reject) => { timer = setTimeout(() => reject(Error('group_barrier_timeout')), 5000) })])
+      } finally { clearTimeout(timer) }
+      assert.equal(hits, 1)
+    },
+    release: () => released.resolve(),
+    restore: () => hook.mock.restore(),
+  }
+}
 test('PG17: group sessions own different backends and close releases reentrant locks even after a socket loss',{skip:!dbURL},async t=>{
   const database=new Pool({connectionString:dbURL})
   t.after(()=>database.end())
@@ -162,7 +195,7 @@ test('PG17: group sessions own different backends and close releases reentrant l
   const recovered=await openGroupTurnSession(database)
   try {assert.equal((await lock(recovered)).rows[0].acquired,true)} finally {await recovered.close()}
 })
-test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, rounds, correction persistence and privacy', { skip: !dbURL }, async () => {
+test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, rounds, correction persistence and privacy', { skip: !dbURL }, async (t) => {
   const pool = new Pool({ connectionString: dbURL })
   const schema = `turns_${randomUUID().replaceAll('-','')}`
   await pool.query(`CREATE SCHEMA "${schema}"`)
@@ -567,6 +600,75 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     assert.equal(lostGenerationState.error,'interrupted_generation_not_replayed')
     assert.equal(lostGenerationState.trace.events.filter((event:{type:string})=>event.type==='publish').length,0)
     assert.equal((await scoped.query('SELECT count(*)::int n FROM conversation_messages WHERE "replyToId"=$1',[lostGenerationMessage])).rows[0].n,0)
+
+    await t.test('a committed Stop cannot be resurrected after the queued SELECT', async t => {
+      const group = await create(), root = await send(group, 'stop before claim', [a])
+      const otherGroup = await create(), otherRoot = await send(otherGroup, 'unrelated queued turn', [a])
+      const barrier = groupQueryBarrier(t, group, 'selected')
+      let calls = 0
+      const work = processGroupTurn(scoped, group, { ...runtime, async generate() { calls++; return { text: 'must not generate after Stop', mentions: [] } } })
+      try {
+        await barrier.wait(work)
+        assert.equal((await handleGroup(scoped, directory, { ...base, userId: 'stranger', resource: 'stop', id: group }, true)).status, 404)
+        assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1', [root])).rows[0].status, 'queued')
+        const stop = await handleGroup(scoped, directory, { ...base, resource: 'stop', id: group }, true)
+        assert.equal(stop.status, 200); assert.deepEqual(stop.body, { stopped: 1 })
+        const committedAt = new Date().toISOString()
+        const stopped = (await scoped.query('SELECT status,error,trace FROM group_turns WHERE "messageId"=$1', [root])).rows[0]
+        assert.equal(stopped.status, 'failed'); assert.equal(stopped.error, 'stopped')
+        barrier.release()
+        assert.equal(await work, true)
+        const after = (await scoped.query('SELECT status,error,trace FROM group_turns WHERE "messageId"=$1', [root])).rows[0]
+        const replies = (await scoped.query('SELECT body FROM conversation_messages WHERE "replyToId"=$1', [root])).rows
+        console.log(JSON.stringify({ case: 'stop-before-claim', committedAt, stoppedStatus: stopped.status, finalStatus: after.status, error: after.error, generations: calls, replies: replies.length }))
+        assert.equal(calls, 0, 'a root stopped after selection cannot start a responder')
+        assert.deepEqual(after, stopped, 'the original stopped error and trace are retained')
+        assert.deepEqual(replies, [])
+        assert.deepEqual((await scoped.query('SELECT source,kind FROM group_decision_feedback WHERE "messageId"=$1', [root])).rows, [{ source: 'human_cancellation', kind: 'cancelled_turn' }])
+        assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1', [otherRoot])).rows[0].status, 'queued')
+        const next = await send(group, 'new intent after Stop', [a])
+        assert.equal(await processGroupTurn(scoped, group, runtime), true)
+        assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1', [next])).rows[0].status, 'complete')
+      } finally { barrier.release(); await work.catch(() => {}); barrier.restore() }
+    })
+
+    await t.test('a committed Stop fences private publication and preserves earlier exchanges', async t => {
+      const group = await create()
+      await send(group, 'prior private exchange', [a])
+      await processGroupTurn(scoped, group, { ...runtime, async generate(_agent, input) {
+        return input.privatePeer ? { text: '[nothing to add]', mentions: [] } : { text: 'already committed private text', mentions: [], privateTo: b }
+      } })
+      const privateRows = async () => (await scoped.query(`SELECT m.id,m.body,m.position,l.id AS "linkId",l."messageCount"
+        FROM conversation_links l JOIN conversation_messages m ON m."conversationId"=l."linkedConversationId" AND m.position BETWEEN l."firstPosition" AND l."lastPosition"
+        WHERE l."sourceConversationId"=$1 ORDER BY l.id,m.position`, [group])).rows
+      const before = await privateRows()
+      assert.equal(before.length, 1); assert.equal(before[0].body, 'already committed private text')
+      const root = await send(group, 'stop as private reply finishes', [a])
+      const barrier = groupQueryBarrier(t, group, 'publishing')
+      let calls = 0
+      const work = processGroupTurn(scoped, group, { ...runtime, async generate() {
+        calls++; return { text: 'late private text must not persist', mentions: [], privateTo: b }
+      } })
+      try {
+        await barrier.wait(work)
+        assert.equal(calls, 1, 'the reply finished before the private publication transaction locks the conversation')
+        const stop = await handleGroup(scoped, directory, { ...base, resource: 'stop', id: group }, true)
+        assert.equal(stop.status, 200); assert.deepEqual(stop.body, { stopped: 1 })
+        const committedAt = new Date().toISOString()
+        const stopped = (await scoped.query('SELECT status,error,trace FROM group_turns WHERE "messageId"=$1', [root])).rows[0]
+        assert.equal(stopped.status, 'failed'); assert.equal(stopped.error, 'stopped')
+        barrier.release()
+        assert.equal(await work, true)
+        const after = await privateRows()
+        const state = (await scoped.query('SELECT status,error,trace FROM group_turns WHERE "messageId"=$1', [root])).rows[0]
+        console.log(JSON.stringify({ case: 'stop-before-private-publish', committedAt, finalStatus: state.status, error: state.error, generations: calls, privateRowsBefore: before.length, privateRowsAfter: after.length }))
+        assert.deepEqual(after, before, 'Stop keeps existing private history without appending the late reply or a new link')
+        assert.deepEqual(state, stopped, 'a stopped turn must not gain a private_publish event')
+        assert.equal(calls, 1, 'no private follow-up generation starts')
+        assert.deepEqual((await scoped.query('SELECT source,kind FROM group_decision_feedback WHERE "messageId"=$1', [root])).rows, [{ source: 'human_cancellation', kind: 'cancelled_turn' }])
+        assert.equal((await scoped.query('SELECT count(*)::int n FROM conversation_messages WHERE "replyToId"=$1', [root])).rows[0].n, 0)
+      } finally { barrier.release(); await work.catch(() => {}); barrier.restore() }
+    })
     assert.ok(generated.includes('first')); assert.ok(laterRoot)
   } finally { releasePending(); await scoped.end(); await pool.end() }
 })

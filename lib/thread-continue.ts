@@ -11,6 +11,7 @@ import { addRunMessage } from '@/lib/agent-runs'
 import { readRunChain } from '@/lib/run-chain'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
+import { runChanged } from '@/lib/live/panels'
 
 type Source = Parameters<typeof addRunMessage>[2]
 const isActionErrorCode = (code: string): code is ActionErrorCode => (ACTION_ERROR_CODES as readonly string[]).includes(code)
@@ -190,6 +191,7 @@ async function continueThread(userId: string, text: string, source: Source,
   const display = db.insert(runMessages).values({ id: sourceEventId ?? crypto.randomUUID(), runId: result.runId, userId, text, origin: 'owner', mailboxWakeDepth: -1, deliveredAt: new Date() })
   if (sourceEventId) await display.onConflictDoNothing()
   else await display
+  await runChanged(db, result.runId)
   return { runId: result.runId, continued: true }
 }
 

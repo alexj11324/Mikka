@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
+import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Check, X } from 'lucide-react-native'
 import { BOT_COLORS, BOT_PICKER_SHAPES, BotAvatar } from '@/components/icons'
@@ -11,6 +11,13 @@ import { tap } from '@/lib/haptics'
 import { useHome } from '@/lib/home'
 import { chatPath, openChat } from '@/lib/navigate'
 import { colors, font } from '@/lib/theme'
+
+// The same labels as messages/zh-CN.json; API values remain the shared shape/colour ids.
+const shapeLabels: Record<string, string> = { cercle: '圆形', squircle: '圆角方', nuage: '云朵', goutte: '水滴', fleur: '花', chat: '猫' }
+const colorLabels: Record<string, string> = {
+  encre: '墨色', brun: '棕色', rouge: '红色', orange: '橙色', ambre: '琥珀色', vert: '绿色',
+  turquoise: '青色', bleu: '蓝色', violet: '紫色', rose: '粉色', gris: '灰色', creme: '奶油色',
+}
 
 /**
  * 新建 Bot, from 对话's 「+」: a name, a shape and a colour, as on the web
@@ -32,7 +39,6 @@ export default function NewBot() {
       const bot = await api<{ id: string }>('/api/mobile/bots', { method: 'POST', body: { name: name.trim(), color, shape } })
       tap()
       await home.reload()
-      router.back()
       openChat(chatPath(bot.id))
     } catch (error) {
       setProblem(error instanceof ApiError && error.status === 409 ? '已有同名 Bot' : '没能创建')
@@ -43,27 +49,27 @@ export default function NewBot() {
   return (
     <View style={styles.screen}>
       <NavBar title="新建 Bot"
-        left={{ icon: 'xmark', label: '取消', web: <X size={20} color={colors.ink} />, onPress: () => router.back() }}
-        right={{ icon: 'checkmark', label: '创建', web: <Check size={20} color={colors.ink} />, onPress: () => void create() }} />
+        left={{ icon: 'xmark', label: '取消', disabled: busy, web: <X size={20} color={colors.ink} />, onPress: () => router.back() }}
+        right={{ icon: 'checkmark', label: busy ? '创建中' : '创建', disabled: !name.trim() || busy, busy, web: <Check size={20} color={colors.ink} />, onPress: () => void create() }} />
       <ScrollView {...underBar} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         <View style={styles.hero}><BotAvatar color={color} shape={shape} size={96} /></View>
         <Field style={styles.field}>
-          <TextInput value={name} onChangeText={setName} placeholder="名字" placeholderTextColor={colors.secondary} maxLength={60} autoFocus
+          <TextInput editable={!busy} value={name} onChangeText={setName} placeholder="名字" placeholderTextColor={colors.secondary} maxLength={60} autoFocus
             returnKeyType="done" onSubmitEditing={() => void create()} style={styles.input} accessibilityLabel="名字" />
         </Field>
-        {problem ? <Text style={styles.problem}>{problem}</Text> : null}
-        <View style={styles.grid}>
+        {problem ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.problem}>{problem}</Text> : null}
+        <View accessibilityRole="radiogroup" accessibilityLabel="形状" style={[styles.grid, styles.shapeGrid]}>
           {BOT_PICKER_SHAPES.map(item => (
-            <Pressable key={item} accessibilityRole="button" accessibilityState={{ selected: shape === item }} accessibilityLabel={item} onPress={() => { tap(); setShape(item) }}
+            <Pressable key={item} accessibilityRole="radio" accessibilityState={{ checked: shape === item, disabled: busy }} aria-checked={Platform.OS === 'web' ? shape === item : undefined} aria-disabled={Platform.OS === 'web' ? busy : undefined} accessibilityLabel={shapeLabels[item]} disabled={busy} onPress={() => { tap(); setShape(item) }}
               style={[styles.choice, shape === item && styles.chosen]}>
               <BotAvatar color={color} shape={item} size={40} />
             </Pressable>
           ))}
         </View>
-        <View style={styles.grid}>
+        <View accessibilityRole="radiogroup" accessibilityLabel="颜色" style={styles.grid}>
           {Object.entries(BOT_COLORS).map(([id, hex]) => (
-            <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected: color === id }} accessibilityLabel={id} onPress={() => { tap(); setColor(id) }}
-              style={[styles.swatchRing, color === id && { borderColor: hex }]}>
+            <Pressable key={id} accessibilityRole="radio" accessibilityState={{ checked: color === id, disabled: busy }} aria-checked={Platform.OS === 'web' ? color === id : undefined} aria-disabled={Platform.OS === 'web' ? busy : undefined} accessibilityLabel={colorLabels[id]} disabled={busy} onPress={() => { tap(); setColor(id) }}
+              style={[styles.swatchRing, color === id && { borderColor: colors.ink }]}>
               <View style={[styles.swatch, { backgroundColor: hex }]} />
             </Pressable>
           ))}
@@ -77,12 +83,13 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.grouped },
   body: { padding: 16, gap: 20 },
   hero: { alignItems: 'center', marginTop: 8 },
-  field: { height: 50, borderRadius: 14, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: colors.surface },
+  field: { minHeight: 50, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: colors.surface },
   input: { fontSize: 17, fontFamily: font, color: colors.text, outlineStyle: 'none' } as never,
   problem: { color: colors.danger, fontSize: 14, marginTop: -8, marginLeft: 4 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
+  shapeGrid: { width: 3 * 60 + 2 * 12, alignSelf: 'center' },
   choice: { width: 60, height: 60, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   chosen: { borderWidth: 2, borderColor: colors.ink },
-  swatchRing: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+  swatchRing: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   swatch: { width: 30, height: 30, borderRadius: 15 },
 })

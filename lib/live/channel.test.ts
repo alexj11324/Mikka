@@ -271,9 +271,9 @@ test('a change during an in-flight read gets one trailing read after it settles'
 
 test('hidden documents discard delayed reads and reconcile the current document on visibility return', async () => {
   const f = fixture()
-  f.channel.subscribe('approved_writes', task, ['document'], key => { f.reads.push(key) }, { minIntervalMs: 1_500 })
+  f.channel.subscribe('issue_document', task, ['document'], key => { f.reads.push(key) }, { minIntervalMs: 1_500 })
   await f.open(); f.reads.length = 0
-  f.sockets[0].message(JSON.stringify({ kind: 'approved_writes', id: task }))
+  f.sockets[0].message(JSON.stringify({ kind: 'issue_document', id: task }))
   f.visibility(false); await f.advance(60_000)
   assert.deepEqual(f.reads, [])
   f.visibility(true); await f.open()

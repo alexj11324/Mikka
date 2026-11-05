@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
+import { runChanged } from './live/panels'
 import { runListChanged } from './live/lists'
 import { runControlChanged } from './device-gateway-notify'
 
@@ -68,7 +69,7 @@ export async function stopRunsUsingSubscriptions(query: Query, scope: { ownerId?
       AND ($1::text IS NULL OR c."ownerId"=$1) AND ($2::text IS NULL OR b."workspaceId"::text=$2)
       AND ($3::uuid IS NULL OR c.id=$3) AND (NOT $4::boolean OR r."userId"<>c."ownerId") RETURNING r.id`,
     [scope.ownerId ?? null, scope.workspaceId ?? null, scope.connectionId ?? null, scope.othersOnly ?? false])
-  for (const { id } of rows) await runListChanged(query, id)
+  for (const { id } of rows) { await runListChanged(query, id); await runChanged(query, id) }
   runControlChanged(query, { runIds: rows.map(row => row.id) })
   return rowCount ?? 0
 }

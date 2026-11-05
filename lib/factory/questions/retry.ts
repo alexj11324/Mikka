@@ -1,3 +1,4 @@
+import { runChanged } from '../../live/panels';
 import type { Pool } from "pg";
 import { runListChanged } from "../../live/lists";
 
@@ -30,6 +31,6 @@ export async function blockQuestionRetry(
      ) SELECT blocked, (SELECT id FROM ended) AS "changedRunId" FROM unsafe`,
     [userId, issueId, runId],
   );
-  if (result.changedRunId) await runListChanged(db, result.changedRunId);
+  if (result.changedRunId) { await runListChanged(db, result.changedRunId); await runChanged(db, result.changedRunId); }
   return result.blocked;
 }

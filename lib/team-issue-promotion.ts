@@ -12,6 +12,7 @@ import { projects } from '@/lib/db/projects'
 import { lockTeamRelations } from '@/lib/team-access'
 import { userActor } from '@/lib/activity-actor'
 import { issueView } from '@/lib/task-identifier-server'
+import { documentScopesBeforeChange, documentScopeChanged } from '@/lib/live/panels'
 
 const schema = z.object({ requestId: z.uuid(), issueId: z.uuid(), revision: z.number().int().positive(), teamId: z.uuid(), expectedTeamId: z.uuid().nullable() })
 type WorkspaceTx = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
@@ -89,10 +90,12 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
         if (request.status === 'complete') return { issue: await issueView(issue, tx), linearSync: syncResult }
         if (request.status !== 'preparing' || issue.scope !== 'personal' || issue.revision !== revision || !issue.linearSyncBlocked) throw new PromotionError('teamIssueChanged')
         await tx.execute(sql`select set_config('mikka.team_scope_verified', ${issueId}, true), set_config('mikka.team_scope_team', ${teamId}, true), set_config('mikka.team_scope_request', ${requestId}, true)`)
+        const previousScopes = await documentScopesBeforeChange(issue)
         const previousLists = await issueListScopesBeforeChange(issue)
         const [saved] = await tx.update(issues).set({ scope: 'workspace', linearSyncBlocked: true, scopeSetBy: 'user', scopeConfidence: null, revision: issue.revision + 1, updatedAt: new Date() }).where(eq(issues.id, issueId)).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId, userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...userActor(userId) })
         await tx.update(teamIssuePromotions).set({ status: 'complete' }).where(eq(teamIssuePromotions.requestId, requestId))
+        await documentScopeChanged(tx, saved.id, previousScopes)
         await issueListScopeChanged(tx, issueId, previousLists)
         // A task's scope is part of its runs' policy revision.
         runControlChanged(tx, { userId })

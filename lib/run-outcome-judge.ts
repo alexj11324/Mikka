@@ -1,6 +1,7 @@
 import 'server-only'
 import { and, count, eq, sql } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
+import { runChanged } from '@/lib/live/panels'
 import { agentRuns, issues, type RunOutcome } from '@/lib/db/schema'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { runSummaryText } from '@/lib/issue-run-conversation'
@@ -82,7 +83,7 @@ export async function judgeRunOutcome(runId: string, judges: OutcomeJudges = def
   if (!verdict) return null
   const [changed] = await db.update(agentRuns).set({ outcome: verdict.outcome, outcomeDecidedBy: verdict.decidedBy, outcomeReason: verdict.reason.slice(0, 500), outcomeAt: new Date() })
     .where(and(eq(agentRuns.id, runId), sql`${agentRuns.outcome} IS NULL`)).returning({ id: agentRuns.id })
-  if (changed) await runListChanged(db, changed.id)
+  if (changed) { await runListChanged(db, changed.id); await runChanged(db, changed.id) }
   return verdict.outcome
 }
 

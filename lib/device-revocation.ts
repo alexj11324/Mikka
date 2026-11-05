@@ -1,5 +1,6 @@
 import 'server-only'
 import type { Pool } from 'pg'
+import { runChanged } from './live/panels'
 import { runListChanged } from './live/lists'
 import { runControlChanged } from './device-gateway-notify'
 
@@ -18,7 +19,7 @@ export async function revokeDeviceCredential(database: Pick<Pool, 'connect'>, ow
       const stopped = await client.query<{ id: string }>(`UPDATE agent_runs SET "stopRequestedAt"=COALESCE("stopRequestedAt",clock_timestamp()),
         "leaseExpiresAt"=LEAST("leaseExpiresAt",clock_timestamp()),"updatedAt"=clock_timestamp()
         WHERE "deviceTokenId"=$1 AND "userId"=$2 AND status IN ('queued','preparing','running','waiting_input','finishing') RETURNING id`, [tokenId, ownerId])
-      for (const { id } of stopped.rows) await runListChanged(client, id)
+      for (const { id } of stopped.rows) { await runListChanged(client, id); await runChanged(client, id) }
       // The revoked daemon may still hold its gateway socket: wake it to stop now.
       runControlChanged(client, { runIds: stopped.rows.map(row => row.id) })
       await client.query(`UPDATE run_tokens SET "revokedAt"=COALESCE("revokedAt",clock_timestamp())
