@@ -11,6 +11,9 @@
 | [有界审批元数据读取](rpc-db-8e81c003.json) | `8e81c003`；真实数据库和 HTTP 边界；身份 fixture 的模拟范围已单独注明 | 16 通过、0 失败、0 跳过。完整文档 1,200,377 B，所需元数据投影 283 B。 |
 | [原 Next 构建测量](baseline-build-a1b633178.json) | main `a1b633178`；Large 8 CPU / 16 GiB；`/usr/bin/time -v` | 245.21 秒，峰值 RSS 11,168,596 KiB，退出码 0。不是第二阶段最终对照版本。 |
 | [真实 Electron 登录冒烟](smoke-wait-diagnostic.json) / [版本与测试增量](smoke-wait-diagnostic-provenance.json) | `9fa8be5d` 产品和后端，Linux Electron 45.1.0；仅修正测试等待器并增加安全诊断 | 7 项通过，退出码 0，精确资源清理成功。系统浏览器已有的租赁会话完成真实 loopback/PKCE；不声称完成外部 provider challenge。 |
+| [Apple Silicon 打包冒烟](mac-arm-smoke-ae19.json) | 分支 `ae19ca99`，实际 CI merge/build `e4e64690`；独立 PostgreSQL 与真实打包 App | 7 项冒烟通过；随后截图的初始窗口尺寸断言失败，lifecycle 与一小时测量未运行。 |
+| [原生视口回归](native-viewport-linux.json) | 记录中四个源文件的 SHA256；真实 Linux Electron，1024×768 显示器与 800×600 原生窗口 | renderer 与原始 PNG 均为 1440×900、DPR 1；边缘像素和点击通过，不缩放图片。不是 Mac 截图矩阵通过的证据。 |
+| [更新后的 main 构建](main-1f647-build.json) / [原始测量](main-1f647-build-metrics.txt) | main `1f647ca1`；Large 8 CPU / 16 GiB；独立数据库 | 166.55 秒，峰值 RSS 10,894,488 KiB，退出码 0。`6149eb2b` 合入后需重新固定网页基线。 |
 
 字节值是已预热 PostgreSQL 连接的 socket `bytesRead` 差值，范围以各 JSON 为准。上述每次读取的比较不能替代完整一小时空闲测量，也不能推广为所有路由已经验收。
 

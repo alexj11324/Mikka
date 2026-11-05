@@ -57,6 +57,11 @@ const preferences = object({
   pushWhen: z.enum(['always', 'away']), memoryEnabled: bool, sendKey: z.enum(['enter', 'modEnter']),
   personalInstructions: text(8000).transform(value => value.trim()).refine(value => [...value].length <= 2000), dailySuggestions: bool,
 }).partial()
+const listPositions = (limit: number) => z.array(object({ id: uuid, version })).max(limit)
+  .refine(rows => new Set(rows.map(row => row.id)).size === rows.length)
+const coordinatorRead = tuple(bot.optional(), version.optional(), object({ after: count, cursor: count, prefix: version,
+  restoreToolMetadata: z.literal(true).optional(), sourceIds: z.array(uuid).max(400).optional(), artifactIds: z.array(uuid).max(400).optional(),
+}).optional())
 const slug = text(64).min(3).regex(/^[a-z0-9]([a-z0-9-]{1,62}[a-z0-9])$/)
 const avatar = z.instanceof(FormData).superRefine((form, context) => {
   const entries = [...form.entries()]
@@ -68,7 +73,7 @@ const avatar = z.instanceof(FormData).superRefine((form, context) => {
 /** Explicit transport whitelist. Optional parameters and array lengths are
  * checked here before the original action performs its ownership checks. */
 export const desktopActionSchemas = {
-  'desktop.bootstrap': none,
+  'desktop.bootstrap': inWorkspace,
   'desktop.session': none,
   'desktop.accounts': none,
   'desktop.workspaceLink': tuple(slug),
@@ -124,7 +129,8 @@ export const desktopActionSchemas = {
   'collaboration.listMembers': oneId,
   'collaboration.inviteMember': tuple(uuid, z.email().max(254)),
   'collaboration.removeMember': tuple(uuid, id),
-  'coordinator.pollCoordinatorChat': tuple(bot.optional(), version.optional(), object({ after: count, cursor: count, prefix: version, sourceIds: z.array(uuid).max(400).optional(), artifactIds: z.array(uuid).max(400).optional() }).optional()),
+  'coordinator.pollCoordinatorChat': coordinatorRead,
+  'coordinator.syncCoordinatorChat': coordinatorRead,
   'coordinator.coordinatorHistory': tuple(bot, count, z.number().int().min(1).max(200).optional()),
   'coordinator.coordinatorCitationSources': tuple(z.array(uuid).min(1).max(50)),
   'coordinator.coordinatorReasoning': tuple(bot, z.array(positive).min(1).max(50)),
@@ -150,14 +156,17 @@ export const desktopActionSchemas = {
   'issue-prefix.getIssuePrefixState': none,
   'issue-prefix.saveIssuePrefix': tuple(object({ prefix: text(20).min(1) })),
   'issues.listIssues': none,
-  'issues.pollIssues': tuple(version.optional()),
+  'issues.pollIssues': tuple(version.optional(), listPositions(100).optional()),
+  'issues.syncIssueList': tuple(version.optional(), listPositions(100).optional()),
   'issues.listWorkspaceIssues': oneId,
   'issues.getIssue': oneId,
+  'issues.pollIssue': tuple(uuid, version.optional()),
   'issues.saveIssue': tuple(object({ id: uuid.optional(), revision: positive.optional(), title: text(200).trim().min(1), content: document, status: z.enum(ISSUE_STATUS_CODES), priority: z.enum(ISSUE_PRIORITY_CODES) })),
   'issues.promoteIssueToTeam': tuple(object({ requestId: uuid, issueId: uuid, revision: positive, teamId: uuid, expectedTeamId: uuid.nullable() })),
   'issues.moveIssue': tuple(object({ id: uuid, status: z.enum(ISSUE_STATUS_CODES), revision: positive })),
   'issues.changeIssuePriority': tuple(object({ id: uuid, priority: z.enum(ISSUE_PRIORITY_CODES), revision: positive })),
   'issues.listIssueVersions': oneId,
+  'issues.pollIssueVersionSummaries': tuple(uuid, version.optional(), listPositions(50).optional()),
   'issues.setIssueScope': tuple(object({ id: uuid, revision: positive, scope: z.enum(['personal', 'workspace']) })),
   'linear-sync.getLinearIntegrationState': none,
   'linear-sync.getLinearBoardSync': none,
@@ -208,7 +217,8 @@ export const desktopActionSchemas = {
   'settings-activity.replaceSavedLoginPassword': tuple(uuid, text(4096).min(1).regex(/^[^\r\n\0]+$/)),
   'settings-activity.listSavedLoginUsage': oneId,
   'task-runs.pollTaskRuns': none,
-  'task-runs.pollThreads': tuple(version.optional()),
+  'task-runs.pollThreads': tuple(version.optional(), listPositions(200).optional()),
+  'task-runs.syncThreadList': tuple(version.optional(), listPositions(200).optional()),
   'team-relations.getIssueTeam': oneId,
   'team-relations.setIssueTeam': tuple(object({ issueId: uuid, teamId: uuid.nullable(), expectedTeamId: uuid.nullable() })),
   'team-relations.listProjectTeams': none,

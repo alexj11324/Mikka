@@ -7,6 +7,7 @@ import { byoE2BKeyEnabled, getE2BKeyStatus } from '@/lib/secrets/e2b'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { readWorkspaceLink } from '@/lib/workspace-admin/links'
 import { ActionFailureError } from '@/lib/action-error'
+import { authorizedCacheWorkspace } from '@/lib/swr/cache-scope'
 import { safeDesktopSession } from './session'
 import { desktopFeatures } from './features'
 import type { DesktopBootstrap, DesktopConfig } from './wire'
@@ -21,15 +22,17 @@ export async function desktopSession() {
   return session ? safeDesktopSession(session) : null
 }
 
-export async function desktopBootstrap(): Promise<DesktopBootstrap> {
+export async function desktopBootstrap(workspaceId?: string): Promise<DesktopBootstrap> {
   const session = await desktopSession()
   if (!session) throw new ActionFailureError('authRequired')
-  const [config, onboarding] = await Promise.all([desktopConfig(session.user.id), onboardingDone(session.user.id).then(done => !done).catch(() => false)])
+  const [config, onboarding, cacheWorkspace] = await Promise.all([desktopConfig(session.user.id), onboardingDone(session.user.id).then(done => !done).catch(() => false),
+    authorizedCacheWorkspace(session.user.id, workspaceId),
+  ])
   let computer: 'none' | 'ask' = 'none'
   if (onboarding && byoE2BKeyEnabled()) {
     computer = await currentWorkspaceActor().then(async actor => (await getE2BKeyStatus(actor.userId, actor.workspaceId)).configured ? 'none' as const : 'ask' as const).catch(() => 'none' as const)
   }
-  return { ...session, ...config, onboarding, computer }
+  return { ...session, ...config, onboarding, computer, cacheWorkspace }
 }
 
 export async function desktopAccounts() {

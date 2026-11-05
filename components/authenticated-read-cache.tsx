@@ -12,13 +12,13 @@ type InitialRead = { key: unknown; data: unknown }
 
 /** Both the main window and a directly opened Settings page use this boundary.
  * The scope comes from the authenticated server render, never browser storage. */
-export function AuthenticatedReadCache({ ownerId, workspace, initialReads, children }: { ownerId: string; workspace?: AuthorizedCacheWorkspace | null; initialReads?: readonly InitialRead[]; children: ReactNode }) {
+export function AuthenticatedReadCache({ ownerId, workspace, build = APP_BUILD, initialReads, children }: { ownerId: string; workspace?: AuthorizedCacheWorkspace | null; build?: string; initialReads?: readonly InitialRead[]; children: ReactNode }) {
   const requested = useSearchParams().get('workspace')
   // A pushState to a different workspace must not borrow this one's authority.
   // Its normal reads still work; persistence waits for an authorized server render.
-  const scope: ReadCacheScope | null = APP_BUILD && workspace && (!requested || requested === workspace.workspaceId)
-    ? { userId: ownerId, workspaceId: workspace.workspaceId, role: workspace.role, build: APP_BUILD } : null
-  const unauthorized = Boolean(APP_BUILD && (!workspace || requested && requested !== workspace.workspaceId))
+  const scope: ReadCacheScope | null = build && workspace && (!requested || requested === workspace.workspaceId)
+    ? { userId: ownerId, workspaceId: workspace.workspaceId, role: workspace.role, build } : null
+  const unauthorized = Boolean(build && (!workspace || requested && requested !== workspace.workspaceId))
   return <ReadCacheBoundary key={scope ? readCacheNamespace(scope) : `${ownerId}:${requested ?? ''}:memory`} scope={scope} unauthorized={unauthorized} initialReads={initialReads}>{children}</ReadCacheBoundary>
 }
 

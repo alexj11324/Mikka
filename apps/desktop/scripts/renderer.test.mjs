@@ -92,8 +92,8 @@ test('public configuration keeps only existing flags and discards the previous o
   assert.equal(changes, 2)
 })
 
-test('RPC sends only the versioned local envelope, preserves Dates and does not sign out for business denials', () => browser(async () => {
-  const api = await moduleFrom({ source: `export { callAction } from ${JSON.stringify(join(renderer, 'rpc.ts'))}; export { getTransportState } from ${JSON.stringify(join(renderer, 'transport-state.ts'))};` })
+test('RPC sends only the versioned local envelope and preserves shared cache access-denial semantics', () => browser(async () => {
+  const api = await moduleFrom({ source: `export { callAction } from ${JSON.stringify(join(renderer, 'rpc.ts'))}; export { getTransportState } from ${JSON.stringify(join(renderer, 'transport-state.ts'))}; export { readAccessFailure } from '@/lib/swr/persistent-cache';` })
   let request
   globalThis.fetch = async (path, init) => { request = { path, init }; return Response.json({ version: 1, ok: true, result: { saved: true } }) }
   assert.deepEqual(await api.callAction('module.action', [new Date('2026-01-01T00:00:00Z')]), { saved: true })
@@ -104,11 +104,76 @@ test('RPC sends only the versioned local envelope, preserves Dates and does not 
   assert.equal(Object.hasOwn(request.init.headers, 'authorization'), false)
   assert.ok(request.init.body.includes('2026-01-01T00:00:00.000Z'))
   globalThis.fetch = async () => Response.json({ version: 1, ok: false, error: { code: 'workspaceAccessDenied' } }, { status: 403 })
-  await assert.rejects(api.callAction('module.action', []), { code: 'workspaceAccessDenied' })
+  await assert.rejects(api.callAction('module.action', []), error => error.code === 'workspaceAccessDenied' && error.status === 403 && api.readAccessFailure(error) === 'workspace')
   assert.equal(api.getTransportState(), 'ready')
+  globalThis.fetch = async () => Response.json({ version: 1, ok: false, error: { code: 'not_found' } }, { status: 404 })
+  await assert.rejects(api.callAction('module.action', []), error => error.status === 404 && api.readAccessFailure(error) === 'resource')
   globalThis.fetch = async () => new Response('', { status: 401 })
-  await assert.rejects(api.callAction('module.action', []), { code: 'desktop_session_expired' })
+  await assert.rejects(api.callAction('module.action', []), error => error.code === 'desktop_session_expired' && error.status === 401 && api.readAccessFailure(error) === 'session')
   assert.equal(api.getTransportState(), 'unauthenticated')
+}))
+
+test('bootstrap only transports a workspace selector and uses server-proved cache authority', () => browser(async () => {
+  const { readBootstrap } = await moduleFrom({ entry: 'bootstrap.ts' })
+  const id = 'bf0f49e9-60ef-42a2-9e46-519b6010d7ef'
+  const requests = []
+  globalThis.fetch = async (_path, init) => {
+    requests.push(JSON.parse(init.body))
+    return Response.json({ version: 1, ok: true, result: { user: { id: 'owner' }, session: { id: 'session' }, cacheWorkspace: { workspaceId: id, role: 'member' }, onboarding: false } })
+  }
+  assert.deepEqual((await readBootstrap(id)).cacheWorkspace, { workspaceId: id, role: 'member' })
+  assert.deepEqual(requests[0].args, [id])
+  assert.equal((await readBootstrap('invalid-workspace')).cacheWorkspace, null)
+  assert.deepEqual(requests[1].args, [])
+  await readBootstrap()
+  assert.deepEqual(requests[2].args, [])
+}))
+
+test('an old safe-session IPC completion cannot restore the previous account after an owner change', () => browser(async window => {
+  const { authClient, setSession } = await moduleFrom({ entry: 'auth-client.ts' })
+  const old = { user: { id: 'old-owner' }, session: { id: 'old-session' } }
+  const current = { user: { id: 'current-owner' }, session: { id: 'current-session' } }
+  let resolve
+  window.mikka = { bundled: { session: () => new Promise(done => { resolve = done }) } }
+  const request = authClient.getSession()
+  setSession(current)
+  resolve(old)
+  assert.deepEqual(await request, { data: current, error: null })
+  let reject
+  window.mikka.bundled.session = () => new Promise((_resolve, fail) => { reject = fail })
+  const failed = authClient.getSession()
+  setSession(null)
+  reject(new Error('late old account request'))
+  assert.deepEqual(await failed, { data: null, error: null })
+}))
+
+test('native logout waits for queued shared-cache writes and clears them before returning', () => browser(async window => {
+  const api = await moduleFrom({ source: `export { endSession } from ${JSON.stringify(join(renderer, 'auth-client.ts'))}; export { PersistentReadCache } from '@/lib/swr/persistent-cache';` })
+  const events = []
+  let release
+  const writing = new Promise(done => { release = done })
+  const storage = {
+    activate: async () => [], remove: async () => {},
+    write: async () => { events.push('writing'); await writing; events.push('written') },
+    clear: async () => { events.push('cleared') },
+  }
+  const cache = new api.PersistentReadCache({ userId: 'owner', workspaceId: 'workspace', build: 'installed-build', role: 'member' }, storage)
+  const disconnect = cache.connect(() => { events.push('retired') })
+  window.mikka = { bundled: { signOut: async () => { events.push('signed-out') } } }
+  try {
+    cache.set('preferences', { _k: 'preferences', data: { theme: 'dark' } })
+    await Promise.resolve()
+    let settled = false
+    const signingOut = api.endSession().then(result => { settled = true; return result })
+    await new Promise(done => setImmediate(done))
+    assert.equal(cache.isEnabled, false)
+    assert.equal(settled, false)
+    release()
+    assert.equal((await signingOut).error, null)
+    assert.deepEqual(events, ['writing', 'signed-out', 'retired', 'written', 'cleared'])
+    cache.set('preferences', { data: { theme: 'late request' } })
+    assert.equal(cache.size, 0)
+  } finally { release(); disconnect(); await cache.flushed() }
 }))
 
 test('unsupported renderer state cannot be cleared by an older in-flight success', () => browser(async () => {

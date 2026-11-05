@@ -134,3 +134,45 @@ test('Coordinator history keeps the current bounded page size and previous two-a
   for (const args of [[null, 0], [owner, 20, undefined], [null, 50, 1], [owner, 500, 200]]) assert.equal(schema.safeParse(args).success, true)
   for (const args of [[null, 20, 0], [null, 20, 201], [null, 20, 1.5], [null, 20, '20'], [null, -1, 20], [null, 20, 20, peer]]) assert.equal(schema.safeParse(args).success, false)
 })
+
+test('cached list cursors retain each reader limit, old calls and unique bounded row proofs', () => {
+  const held = (length: number) => Array.from({ length }, (_, index) => ({ id: `aaaaaaaa-aaaa-4aaa-8aaa-${index.toString(16).padStart(12, '0')}`, version: 'a'.repeat(32) }))
+  const readers = [
+    ['issues.pollIssues', 100, []], ['issues.syncIssueList', 100, []],
+    ['task-runs.pollThreads', 200, []], ['task-runs.syncThreadList', 200, []],
+    ['issues.pollIssueVersionSummaries', 50, [owner]],
+  ] as const
+  for (const [name, limit, prefix] of readers) {
+    const schema = desktopActionSchemas[name]
+    for (const args of [[...prefix], [...prefix, 'a'.repeat(32)], [...prefix, undefined, []], [...prefix, 'a'.repeat(32), held(limit)]]) {
+      assert.equal(schema.safeParse(args).success, true, name)
+    }
+    for (const positions of [held(limit + 1), [held(1)[0], held(1)[0]], [{ id: owner, version: 'invalid' }], [{ id: 'invalid', version: 'a'.repeat(32) }], [{ ...held(1)[0], userId: peer }]]) {
+      assert.equal(schema.safeParse([...prefix, 'a'.repeat(32), positions]).success, false, name)
+    }
+    assert.equal(schema.safeParse([...prefix, 'a'.repeat(32), [], { role: 'admin' }]).success, false, name)
+  }
+})
+
+test('cached chat metadata repair is literal, bounded and cannot authorize another reader', () => {
+  for (const name of ['coordinator.pollCoordinatorChat', 'coordinator.syncCoordinatorChat'] as const) {
+    const schema = desktopActionSchemas[name]
+    const continuation = { after: 2, cursor: 1, prefix: 'a'.repeat(32), restoreToolMetadata: true, sourceIds: [owner], artifactIds: [peer] }
+    assert.equal(schema.safeParse([]).success, true)
+    assert.equal(schema.safeParse([null, undefined, continuation]).success, true)
+    for (const change of [{ restoreToolMetadata: false }, { restoreToolMetadata: 'true' }, { sourceIds: Array(401).fill(owner) }, { artifactIds: Array(401).fill(peer) }, { ownerId: peer }]) {
+      assert.equal(schema.safeParse([null, undefined, { ...continuation, ...change }]).success, false)
+    }
+  }
+  assert.equal(Object.hasOwn(desktopActionSchemas, 'coordinator.getCoordinatorChat'), false)
+})
+
+test('cached detail and bootstrap accept identity-free selectors while preserving legacy bootstrap', () => {
+  assert.equal(desktopActionSchemas['issues.pollIssue'].safeParse([owner]).success, true)
+  assert.equal(desktopActionSchemas['issues.pollIssue'].safeParse([owner, 'a'.repeat(32)]).success, true)
+  for (const args of [[], ['invalid'], [owner, 'invalid'], [owner, 'a'.repeat(32), { viewerId: peer }]]) {
+    assert.equal(desktopActionSchemas['issues.pollIssue'].safeParse(args).success, false)
+  }
+  for (const args of [[], [undefined], [owner]]) assert.equal(desktopActionSchemas['desktop.bootstrap'].safeParse(args).success, true)
+  for (const args of [[null], ['invalid'], [{ workspaceId: owner, role: 'admin' }], [owner, peer]]) assert.equal(desktopActionSchemas['desktop.bootstrap'].safeParse(args).success, false)
+})

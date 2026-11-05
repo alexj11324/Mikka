@@ -54,6 +54,7 @@ export function normalizedRendererPath(value: string): string | null {
 }
 
 export function allowedApiPath(path: string, method: string): boolean {
+  if (path === '/api/settings/issue-prefix') return method === 'GET'
   // This human approval/read surface has exactly its declared methods. Do not
   // inherit the wider CRUD family or the generic asset HEAD allowance.
   if (FACTORY_FLOW.test(path)) return method === 'GET' || method === 'POST'

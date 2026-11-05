@@ -2,6 +2,7 @@ import { build } from 'esbuild'
 import postcss from 'postcss'
 import tailwind from '@tailwindcss/postcss'
 import ts from 'typescript'
+import { createHash } from 'node:crypto'
 import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -50,6 +51,10 @@ export function applicationBoundary(actions) {
   return {
     name: 'mikka-desktop-application-boundary',
     setup(builder) {
+      // This small local module is written from the finished output's hash.
+      // Keep APP_BUILD empty: the shared web deployment checker must not poll
+      // or reload an installed renderer when its backend deployment changes.
+      builder.onResolve({ filter: /^mikka:renderer-build$/ }, () => ({ path: '/mikka/renderer-build.js', external: true }))
       builder.onResolve({ filter: /^(?:next\/|@\/|@novnc\/)/ }, args => {
         const replacement = aliases.get(args.path)
         // These two adapters delegate unchanged non-viewer behavior to the
@@ -231,14 +236,24 @@ export async function buildRenderer({ outdir = resolve(desktop, 'dist/renderer')
     logLevel: 'info',
   })
   const outputs = Object.entries(result.metafile.outputs)
+  const fingerprint = createHash('sha256')
+  for (const [filename] of [...outputs].sort(([a], [b]) => a.localeCompare(b))) {
+    fingerprint.update(slash(relative(outdir, resolve(repository, filename))))
+    fingerprint.update(await readFile(resolve(repository, filename)))
+  }
+  const rendererBuild = fingerprint.digest('hex')
   const entry = outputs.find(([name, info]) => name.endsWith('.js') && info.entryPoint && resolve(repository, info.entryPoint) === resolve(renderer, 'index.tsx'))
   if (!entry?.[1].cssBundle) throw new Error('Desktop renderer entry or shared stylesheet was not emitted')
   const asset = filename => `/mikka/${slash(relative(outdir, resolve(repository, filename)))}`
   const template = await readFile(resolve(renderer, 'index.html'), 'utf8')
   await writeFile(resolve(outdir, 'index.html'), template.replace('__APP_SCRIPT__', asset(entry[0])).replace('__APP_STYLE__', asset(entry[1].cssBundle)))
   await cp(resolve(repository, 'public'), outdir, { recursive: true })
+  // Outside /assets this fixed-name local module is served no-store, so an
+  // updated package cannot hydrate the previous installed build's namespace.
+  await writeFile(resolve(outdir, 'renderer-build.js'), `export const rendererBuild = ${JSON.stringify(rendererBuild)};\n`)
   const modules = Object.fromEntries([...actions].sort(([a], [b]) => a.localeCompare(b)))
   const inventory = {
+    rendererBuild,
     modules,
     exports: Object.values(modules).reduce((count, names) => count + names.length, 0),
     usedActions: await usedActionImports(Object.keys(result.metafile.inputs)),

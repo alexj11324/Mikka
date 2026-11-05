@@ -54,6 +54,11 @@ test('path policy rejects traversal, encoded delimiters, absolute targets and un
   assert.equal(allowedApiPath('/api/desktop/rpc', 'GET'), false)
   assert.equal(allowedApiPath('/api/settings/preferences', 'GET'), true)
   assert.equal(allowedApiPath('/api/settings/preferences', 'POST'), false)
+  assert.equal(allowedApiPath('/api/settings/issue-prefix', 'GET'), true)
+  for (const method of ['HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+    assert.equal(allowedApiPath('/api/settings/issue-prefix', method), false)
+  }
+  assert.equal(allowedApiPath('/api/settings/issue-prefix/extra', 'GET'), false)
   assert.equal(allowedApiPath('/api/artifacts/shared/public-share-token', 'GET'), true)
   assert.equal(allowedApiPath('/api/artifacts/shared/public-share-token', 'POST'), false)
   assert.equal(allowedApiPath('/api/artifacts/shared/public-share-token/metadata', 'GET'), false)

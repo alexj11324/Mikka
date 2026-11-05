@@ -98,4 +98,8 @@ export type DesktopConfig = {
   features: DesktopFeatures
   daemonPackageName: string
 }
-export type DesktopBootstrap = DesktopSession & DesktopConfig & { onboarding: boolean; computer: 'none' | 'ask' }
+export type DesktopBootstrap = DesktopSession & DesktopConfig & {
+  onboarding: boolean
+  computer: 'none' | 'ask'
+  cacheWorkspace: { workspaceId: string; role: 'admin' | 'member' } | null
+}

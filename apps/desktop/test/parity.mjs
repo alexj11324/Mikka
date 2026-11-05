@@ -15,6 +15,7 @@ import { launchElectron } from './electron-launch.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
+import { assertNativeViewport, assertViewportPng, setNativeViewport } from './native-viewport.mjs'
 
 // A real production backend and one leased dataset serve both modes. These
 // screenshots exercise application routes, components and RPCs; there are no
@@ -29,9 +30,10 @@ const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encodin
 const messages = JSON.parse(await readFile(join(root, 'messages/en.json'), 'utf8'))
 const report = {
   version: 1, mode, appRevision: environment.deploymentSha, harnessRevision: revision,
-  harnessSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).update(await readFile(new URL('./parity-fixtures.mjs', import.meta.url))).update(await readFile(new URL('./parity-images.mjs', import.meta.url))).digest('hex'),
+  harnessSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).update(await readFile(new URL('./parity-fixtures.mjs', import.meta.url))).update(await readFile(new URL('./parity-images.mjs', import.meta.url))).update(await readFile(new URL('./native-viewport.mjs', import.meta.url))).digest('hex'),
   environmentId: environment.id, database: environment.database.name, origin: environment.origin,
   viewport: { width: 1440, height: 900 }, colorThreshold: 0, maximumChangedRatio: 0.001,
+  nativeViewports: [],
   themes: ['light', 'dark'], masksAllowed: ['avatars', 'timestamps'], startedAt: new Date(started).toISOString(), screens: [],
 }
 await mkdir(output, { recursive: true })
@@ -62,11 +64,8 @@ async function launch(mode) {
   })
   applications.add(application)
   const page = await application.firstWindow({ timeout: 90_000 })
-  await application.evaluate(({ BrowserWindow }) => {
-    const window = BrowserWindow.getAllWindows()[0]
-    window.setContentSize(1440, 900)
-    window.webContents.setZoomFactor(1)
-  })
+  const nativeViewport = await setNativeViewport(application, page, report.viewport)
+  report.nativeViewports.push({ mode, ...nativeViewport })
   page.setDefaultTimeout(45_000)
   await page.emulateMedia({ reducedMotion: 'reduce' })
   page.on('pageerror', error => errors.push({ mode, name: error.name }))
@@ -74,8 +73,7 @@ async function launch(mode) {
   const base = mode === 'bundled' ? 'mikka://app/mikka' : `${environment.origin}${environment.basePath}`
   if (mode === 'bundled') await page.waitForFunction(() => Boolean(window.mikka?.bundled))
   else assert.equal(new URL(page.url()).origin, environment.origin, 'Hosted comparison must use the attested backend')
-  const size = await page.evaluate(() => ({ width: innerWidth, height: innerHeight, scale: devicePixelRatio }))
-  assert.deepEqual(size, { width: 1440, height: 900, scale: 1 })
+  await assertNativeViewport(page, report.viewport)
   return { mode, application, page, base }
 }
 
@@ -105,7 +103,10 @@ async function pair(name, appearance, targets, open) {
   for (const target of targets) {
     await open(target)
     assert.ok(!images.has(target.mode), 'Each native mode is captured once per screen')
-    images.set(target.mode, await screenshot(target.page, join(output, `${appearance}-${name}-${target.mode}.png`)))
+    await assertNativeViewport(target.page, report.viewport)
+    const captured = await screenshot(target.page, join(output, `${appearance}-${name}-${target.mode}.png`))
+    assertViewportPng(captured.bytes, report.viewport)
+    images.set(target.mode, captured)
   }
   pendingImages.set(key, images)
   if (!images.has('hosted') || !images.has('bundled')) return
@@ -301,6 +302,7 @@ try {
       await open(target)
       const filename = `${appearance}-${name}-web.png`
       const result = await screenshot(page, join(output, filename), { identities: fixtures.fixture.dynamicIdentityEmails })
+      assertViewportPng(result.bytes, report.viewport)
       report.screens.push({ name, theme: appearance, filename, masks: result.masks, sha256: createHash('sha256').update(result.bytes).digest('hex') })
       await writeFile(join(output, 'parity.json'), `${JSON.stringify(report, null, 2)}\n`)
       console.log(`CAPTURE ${appearance}/${name}`)

@@ -18,6 +18,7 @@ import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { readNativeDaemonMetadata } from './native-metadata.mjs'
+import { assertNativeViewport, assertViewportPng, setNativeViewport } from './native-viewport.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 const environment = await loadEnvironment()
@@ -29,7 +30,7 @@ if (!Number.isInteger(pairs) || pairs < 5 || pairs > 20) throw new Error('LIFECY
 await mkdir(output, { recursive: true })
 const directory = await mkdtemp(join(tmpdir(), 'mikka-lifecycle-'))
 const profiles = { bundled: join(directory, 'bundled'), hosted: join(directory, 'hosted') }
-const viewport = { width: 1440, height: 960 }
+const viewport = { width: 1440, height: 900 }
 const message = 'Review the desktop workspace, including conversations, tasks, artifacts and settings.'
 const menuNames = Object.fromEntries(await Promise.all(['zh-CN', 'en'].map(async locale => [locale, JSON.parse(await readFile(join(root, 'messages', `${locale}.json`), 'utf8')).Nav.workspaceMenu])))
 const evidence = {
@@ -39,7 +40,7 @@ const evidence = {
     bundled: { revision, mode: 'bundled', url: 'mikka://app/mikka', backend: environment.origin },
     hosted: { revision, mode: 'hosted', url: `${environment.origin}/mikka`, backend: environment.origin },
   },
-  startedAt: new Date().toISOString(), viewport, checks: [], samples: [], nativeStates: [],
+  startedAt: new Date().toISOString(), viewport, checks: [], samples: [], nativeStates: [], nativeViewports: [],
   measurement: {
     clock: 'Node performance.now, immediately before Electron launch to visible seeded message and enabled composer accepting a draft',
     process: 'same compiled shell/backend, bundled vs preserved hosted loading path; fresh Electron process for every sample, existing authenticated profile, same account/workspace',
@@ -69,7 +70,7 @@ async function launch(mode, extraArgs = []) {
   page.setDefaultTimeout(60_000)
   const errors = []
   page.on('pageerror', error => errors.push(error.name))
-  await app.evaluate(({ BrowserWindow }, bounds) => { BrowserWindow.getAllWindows().find(window => !window.isDestroyed())?.setContentSize(bounds.width, bounds.height) }, viewport)
+  evidence.nativeViewports.push({ mode, launch: evidence.nativeViewports.length + 1, ...await setNativeViewport(app, page, viewport) })
   return { app, page, errors, started }
 }
 async function close(app) {
@@ -105,8 +106,7 @@ async function usable(page, draft = '') {
   })
   await input.fill(draft)
   assert.equal(await input.inputValue(), draft)
-  const size = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }))
-  assert.deepEqual(size, viewport)
+  await assertNativeViewport(page, viewport)
 }
 
 async function selectFixture(page) {
@@ -294,7 +294,7 @@ try {
   await run.page.evaluate(() => window.dispatchEvent(new Event('offline')))
   assert.equal(await run.page.locator('textarea[data-chat-composer]').first().inputValue(), 'Keep this unsent draft during the outage')
   await run.page.getByText(message, { exact: false }).first().waitFor({ state: 'visible' })
-  await run.page.screenshot({ path: join(output, 'lifecycle-offline-retained.png'), animations: 'disabled' })
+  assertViewportPng(await run.page.screenshot({ path: join(output, 'lifecycle-offline-retained.png'), animations: 'disabled' }), viewport)
   await offline(run.app, false)
   const restored = run.page.waitForResponse(response => response.url().endsWith('/api/desktop/rpc') && response.status() === 200)
   await run.page.evaluate(() => window.dispatchEvent(new Event('online')))
@@ -338,7 +338,8 @@ try {
   assert.equal(new URL(run.page.url()).protocol, 'mikka:')
   assert.ok((await run.page.locator('.desktop-offline').innerText()).trim().length > 10)
   assert.equal(await run.page.evaluate(async () => (await fetch(location.href)).status), 200)
-  await run.page.screenshot({ path: join(output, 'lifecycle-offline-cold-launch.png'), animations: 'disabled' })
+  await assertNativeViewport(run.page, viewport)
+  assertViewportPng(await run.page.screenshot({ path: join(output, 'lifecycle-offline-cold-launch.png'), animations: 'disabled' }), viewport)
   await offline(run.app, false)
   const recovered = run.page.waitForResponse(response => response.url().endsWith('/api/desktop/rpc') && response.status() === 200)
   await run.page.evaluate(() => window.dispatchEvent(new Event('online')))
@@ -348,6 +349,7 @@ try {
   check('fresh-process offline launch serves installed assets and a meaningful local offline screen, then recovers without a reload')
   await run.page.evaluate(() => window.mikka.bundled.signOut())
   await close(run.app); application = null
+  assert.ok(evidence.coldStart.bundledFaster, 'DESKTOP_BUNDLED_COLD_START_NOT_FASTER')
   passed = true
 } finally {
   const cleanupErrors = []

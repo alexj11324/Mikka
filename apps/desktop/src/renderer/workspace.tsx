@@ -3,11 +3,20 @@ import { IssueWorkspace } from '@/components/workspace/issue-workspace'
 import { sectionFromQuery } from '@/components/workspace/workspace-navigation'
 import { LiveProvider } from '@/hooks/use-live-key'
 import { useWorkspace } from '@/hooks/use-workspace'
+import { publicAppOrigin } from '@/lib/platform/public-origin'
 import type { DesktopBootstrap } from './bootstrap'
 import type { DesktopSession } from './host'
 import { useLocation } from './location'
 
 export default function Workspace({ user, bootstrap }: { user: DesktopSession['user']; bootstrap: DesktopBootstrap }) {
+  // The installed UI and validated backend origin version this namespace. The
+  // shared cache retains its exact hydration, field allowlist and invalidation.
+  return <AuthenticatedReadCache ownerId={user.id} workspace={bootstrap.cacheWorkspace} build={`desktop:${rendererBuild}:${publicAppOrigin()}`}>
+    <WorkspaceScope user={user} bootstrap={bootstrap} />
+  </AuthenticatedReadCache>
+}
+
+function WorkspaceScope({ user, bootstrap }: { user: DesktopSession['user']; bootstrap: DesktopBootstrap }) {
   const params = useLocation().searchParams
   // This key is already read by IssueWorkspace. SWR shares the same request and
   // revision; adding native notifications does not add a workspace read.
@@ -18,3 +27,5 @@ export default function Workspace({ user, bootstrap }: { user: DesktopSession['u
     <IssueWorkspace withinLiveProvider user={user} onboarding={bootstrap.onboarding} googleEnabled={bootstrap.googleEnabled} initialSelected={selected && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selected) ? selected : null} initialSection={sectionFromQuery(params.get('section') ?? undefined)} initialSettingsSection={params.get('settings') === 'account' || (params.get('settings') === 'integrations' && params.has('google')) ? 'account' : params.get('settings') === 'integrations' ? 'integrations' : undefined} />
   </LiveProvider>
 }
+import { rendererBuild } from 'mikka:renderer-build'
+import { AuthenticatedReadCache } from '@/components/authenticated-read-cache'

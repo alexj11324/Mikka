@@ -12,6 +12,7 @@ import { launchElectron } from './electron-launch.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { readNativeDaemonMetadata } from './native-metadata.mjs'
+import { setNativeViewport } from './native-viewport.mjs'
 import { captureNativeResources } from './native-resources.mjs'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
@@ -74,6 +75,7 @@ try {
     env: { ...process.env, MIKKA_DESKTOP_RENDERER: 'bundled', MIKKA_USER_DATA_DIR: profile }, timeout: 90_000,
   })
   const page = await application.firstWindow({ timeout: 90_000 })
+  report.nativeViewport = await setNativeViewport(application, page, { width: 1440, height: 900 })
   await page.waitForFunction(() => Boolean(window.mikka?.bundled))
   await page.evaluate(() => {
     window.__mikkaIdleLive = { ready: 0, pong: 0 }
@@ -83,9 +85,7 @@ try {
       else { try { if (JSON.parse(event.data).type === 'live_ready') window.__mikkaIdleLive.ready++ } catch { /* not a live control frame */ } }
     })
   })
-  await application.evaluate(({ shell, BrowserWindow }) => {
-    const window = BrowserWindow.getAllWindows()[0]
-    window.setContentSize(1440, 900)
+  await application.evaluate(({ shell }) => {
     globalThis.__mikkaIdleBrowser = null
     shell.openExternal = async url => { globalThis.__mikkaIdleBrowser = url }
   })

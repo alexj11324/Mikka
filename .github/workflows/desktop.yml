@@ -164,6 +164,7 @@ jobs:
           dbus-run-session -- bash -euc '
             printf "%s" "disposable-desktop-test-keyring" | gnome-keyring-daemon --unlock --components=secrets
             xvfb-run -a node apps/desktop/test/environment.mjs -- bash -euc "
+              node --test apps/desktop/test/native-viewport.test.mjs
               REQUIRE_DB=1 pnpm test:desktop-auth
               node apps/desktop/test/run-acceptance.mjs bundled-smoke
             "
@@ -258,7 +259,7 @@ jobs:
         env:
           # Issue #1415 expressly requests this disposable sandbox endpoint.
           # Other branches default to loopback; no artifact contacts production.
-          MIKKA_DESKTOP_APP_URL: ${{ inputs.test_backend_url || (github.head_ref == 'desktop/bundled-renderer' && 'https://3000-001m6p98ev958vppx9366vfp8ea.sbx.sandboxes-cloud.docker.com/mikka') || 'http://localhost:3000/mikka' }}
+          MIKKA_DESKTOP_APP_URL: ${{ inputs.test_backend_url || (github.head_ref == 'desktop/bundled-renderer' && 'https://3000-001m6p8qt9pcng01mwgkmshdz6m.sbx.sandboxes-cloud.docker.com/mikka') || 'http://localhost:3000/mikka' }}
       - name: Audit native evidence
         if: always()
         id: evidence

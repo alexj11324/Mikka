@@ -59,6 +59,27 @@ test('disk namespaces distinguish owner, viewed workspace, build and authorized 
   }
 })
 
+test('installed UI may supply its build identity while retaining server workspace authority', async () => {
+  const observed: (string | null)[] = []
+  function Read() {
+    const { cache } = swr.useSWRConfig()
+    observed.push(cache instanceof PersistentReadCache ? cache.namespace : null)
+    return <output>shared cache</output>
+  }
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
+  const workspace = { workspaceId: scope.workspaceId, role: 'admin' as const }
+  const nativeBuild = 'desktop:installed-content-hash:https://mikka.example'
+  try {
+    await act(async () => root.render(<AuthenticatedReadCache ownerId={scope.userId} workspace={workspace}><Read /></AuthenticatedReadCache>))
+    assert.equal(observed.at(-1), readCacheNamespace(scope), 'web keeps its deployment build by default')
+    await act(async () => root.render(<AuthenticatedReadCache ownerId={scope.userId} workspace={workspace} build={nativeBuild}><Read /></AuthenticatedReadCache>))
+    assert.equal(observed.at(-1), readCacheNamespace({ ...scope, build: nativeBuild }))
+    requestedWorkspace = 'unproven-workspace'
+    await act(async () => root.render(<AuthenticatedReadCache ownerId={scope.userId} workspace={workspace} build={nativeBuild}><Read /></AuthenticatedReadCache>))
+    assert.equal(observed.at(-1), null, 'changing the URL cannot borrow the old workspace authority')
+  } finally { requestedWorkspace = null; await act(async () => root.unmount()) }
+})
+
 test('fresh server seed and an optimistic write both win over a late disk hydration', async () => {
   for (const seedBeforeStart of [true, false]) {
     const storage = new MemoryStorage(), held = deferred<StoredRead[]>()

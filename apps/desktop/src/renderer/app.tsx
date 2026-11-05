@@ -17,6 +17,7 @@ import { InvitationCard } from '@/components/workspace/invitation-card'
 import { DeviceAuthorization } from '@/components/device-authorization'
 import NotFound from '@/app/[locale]/not-found'
 import { safeAuthReturn } from '@/lib/auth-return'
+import { clearPersistentReadCaches } from '@/lib/swr/persistent-cache'
 import { setSession } from './auth-client'
 import { AuthForm } from './auth-form'
 import { readBootstrap, type DesktopBootstrap } from './bootstrap'
@@ -47,15 +48,30 @@ function SessionApplication() {
   const [bootstrap, setBootstrap] = useState<DesktopBootstrap | null>(null)
   const [failed, setFailed] = useState(false)
   const [pending, setPending] = useState(true)
+  const requestedWorkspace = useLocation().searchParams.get('workspace')
+  const workspace = useRef(requestedWorkspace)
+  workspace.current = requestedWorkspace
+  const lastRequestedWorkspace = useRef(requestedWorkspace)
   const generation = useRef(0)
-  const inFlight = useRef<Promise<void> | null>(null)
+  const inFlight = useRef<{ workspace: string | null; promise: Promise<void> } | null>(null)
   const state = useSyncExternalStore(subscribeTransport, getTransportState, getTransportState)
   const reload = useCallback((changedOwner = false) => {
-    if (inFlight.current && !changedOwner) return inFlight.current
-    if (changedOwner) { setClientConfiguration(null); setSession(null); setBootstrap(null) }
+    const requested = workspace.current
+    if (inFlight.current?.workspace === requested && !changedOwner) return inFlight.current.promise
+    const changedScope = changedOwner || requested !== lastRequestedWorkspace.current
+    lastRequestedWorkspace.current = requested
+    if (changedScope) setBootstrap(null)
+    if (changedOwner) { setClientConfiguration(null); setSession(null) }
     const current = ++generation.current
     setPending(true)
-    inFlight.current = readBootstrap().then(value => {
+    // Record this request before clearing the old provider: its shared
+    // invalidation calls router.refresh(), which should join this same read.
+    const promise = Promise.resolve().then(async () => {
+      if (changedScope) await clearPersistentReadCaches()
+      if (current !== generation.current) return
+      const value = await readBootstrap(requested)
+      if (current !== generation.current) return
+      if (!value.user) await clearPersistentReadCaches()
       if (current !== generation.current) return
       setClientConfiguration(value)
       setSession(value.user && value.session ? { user: value.user, session: value.session } : null)
@@ -67,7 +83,8 @@ function SessionApplication() {
     }).finally(() => {
       if (current === generation.current) { setPending(false); inFlight.current = null }
     })
-    return inFlight.current
+    inFlight.current = { workspace: requested, promise }
+    return promise
   }, [])
   useEffect(() => {
     void reload()
@@ -87,12 +104,20 @@ function SessionApplication() {
     }
   }, [reload])
   useEffect(() => {
+    // Only workspace navigation needs a fresh server authorization. Bot, task,
+    // panel and settings navigation keep the same hydrated shared provider.
+    if (requestedWorkspace !== lastRequestedWorkspace.current) void reload()
+  }, [requestedWorkspace, reload])
+  useEffect(() => {
     // A confirmed expiry discards every owner-scoped cache together. Network
     // failures retain the visible conversation and its unsent local draft.
     if (state === 'unauthenticated' && bootstrap?.user) {
+      generation.current++
+      inFlight.current = null
       setClientConfiguration(null)
       setSession(null)
-      setBootstrap(current => current ? { ...current, user: null, session: null, onboarding: undefined } : null)
+      setBootstrap(current => current ? { ...current, user: null, session: null, cacheWorkspace: null, onboarding: undefined } : null)
+      void clearPersistentReadCaches()
     }
   }, [state, bootstrap?.user])
   if (state === 'update-required') return <UpdateRequired />
