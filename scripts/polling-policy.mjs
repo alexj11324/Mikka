@@ -51,7 +51,7 @@ export const pollingAllowlist = {
   'apps/mobile/app/bots/[id]/info.tsx': db(web, 'bot page and computer status re-read every 15 s', 2),
   // Server: loops that re-query our database.
   'app/api/computer/events/route.ts': db(server, 'the "SSE" route re-queries subagent_events in a loop', 1),
-  'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll re-checks device commands until the deadline', 1),
+  'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll fallback timer only: with the gateway configured it waits on LISTEN for the device (re-check per NOTIFY, one final check at the deadline); every 5 s without push or if LISTEN drops', 1),
   'lib/coordinator/group-turns.ts': db(server, 'untilStopped fallback timer only: 15 s while the worker LISTENs for the stop push, 1 s if LISTEN is unavailable', 1),
   'workflows/coordinator/native-turn.ts': db(server, 'native coordinator turn re-reads its state every second (up to 180 times)', 1),
   'workflows/factory-stage/workflow.ts': db(server, 'stage maintenance step every 30 s for up to 12 h', 1),
