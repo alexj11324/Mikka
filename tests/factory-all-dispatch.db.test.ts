@@ -186,6 +186,7 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   await t.test('initial spec dispatch is atomic, idempotent and cannot replace a locked stage', async () => {
     const { queueFactoryTask } = await import('../lib/factory/task-dispatch')
     const { queueFactoryRun } = await import('../lib/agent-runs')
+    const { resolveAgentProfileDispatch } = await import('../lib/factory/agent-profile')
     const { rows: [agent] } = await pool.query('SELECT id FROM agents WHERE "userId"=$1 AND "deviceId"=$2', [userId, deviceId])
     const { rows: [repo] } = await pool.query('SELECT id FROM device_repos WHERE "userId"=$1 AND "deviceId"=$2', [userId, deviceId])
     await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
@@ -196,9 +197,19 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
         [issue, userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: ++number } } })])
       await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
         VALUES($1,$2,$3,$4,'user_message',$5,$6)`, [source, userId, botId, issue, `spec-source:${source}`, JSON.stringify({ text: 'Write a specification before implementing the tax fix.' })])
+      // Like the normal host entry, finish Profile/model placement before the
+      // queue owns its transaction; this callback receives that real selection.
+      const { target, agentProfile, selectionMode } = await resolveAgentProfileDispatch(pool, { ownerId: userId, workspaceId: ws.id, botId },
+        { issueId: issue, stage: 'spec', agentId: agent.id, deviceId, location: 'local', asked: { harness: 'codex' } })
+      assert.equal(target.kind, 'device')
+      if (target.kind !== 'device') throw new Error('fixtureDeviceUnavailable')
+      const selection = { model: target.model, agentProfile,
+        modelDispatch: { mode: selectionMode ?? 'preference' as const, location: 'local' as const, entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
+        ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
+        ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
       return { issueId: issue, botId, agentId: agent.id as string, deviceRepoId: repo.id as string,
-        sourceEventId: source, key: `spec:${randomUUID()}`, needsSpec: true, note: 'Plan first.',
-        queue: queueFactoryRun }
+        sourceEventId: source, key: `spec:${randomUUID()}`, needsSpec: true, note: 'Plan first.', selection,
+        queue: (...args: Parameters<import('../lib/factory/dispatch').FactoryQueue>) => queueFactoryRun(...args, undefined, selection) }
     }
     const observed = async (issue: string) => (await pool.query(`SELECT
       (SELECT count(*)::int FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2) AS tasks,
@@ -237,7 +248,7 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
 
     const aborted = await request()
     await assert.rejects(queueFactoryTask(pool, userId, { ...aborted, queue: async (...args) => {
-      await queueFactoryRun(...args)
+      await aborted.queue(...args)
       throw new Error('fixtureQueueAborted')
     } }), /fixtureQueueAborted/)
     assert.deepEqual(await observed(aborted.issueId), { tasks: 0, attempts: 0, runs: 0, publications: 0 }, 'a queue failure rolls back the route, run, attempt and publication together')
