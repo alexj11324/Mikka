@@ -89,9 +89,9 @@ export function useLiveBotChatList(ownerId: string) {
     return next
   }), liveListReadOptions)
   const home = result.error instanceof ListReadScopeError ? null : ownerListWorkspace(result.data, ownerId)
-  // The pinned Coordinator row already shares this normal authorized cache.
-  // Only the list's own key holds the list's revision; 'coordinator-chat' always reads.
-  useLiveKey('bot_chat_list', home ?? UNRESOLVED_LIST_SCOPE, [unstable_serialize(key), 'coordinator-chat'], home, { minIntervalMs: LIST_MERGE_MS, deadline: listReadDeadline(result.data, ownerId),
+  // The pinned Coordinator row reads this list too. Its open chat listens to its own
+  // bot_chat key; a list push never re-reads that whole chat.
+  useLiveKey('bot_chat_list', home ?? UNRESOLVED_LIST_SCOPE, [unstable_serialize(key)], home, { minIntervalMs: LIST_MERGE_MS, deadline: listReadDeadline(result.data, ownerId),
     revisions: { [unstable_serialize(key)]: heldRevision(result.data, 'bot_chat_list', home) }, shareAcrossTabs: true })
   return { ...result, data: result.error instanceof ListReadScopeError ? undefined : result.data }
 }

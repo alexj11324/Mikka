@@ -574,6 +574,10 @@ async function chatPrefix(userId: string, botId: string, through: number) {
   return result.hash
 }
 
+/** The web chat's first screen: the latest messages, older ones a page at a time
+ * (`historyBefore`). Each full read transfers every message body on it. */
+export const CHAT_FIRST_PAGE = 50
+
 /** Replay the last rendered item too, so tool results and multi-step replies merge exactly as a full read. */
 export async function chatUpdate(userId: string, botId: string, continuation?: NonNullable<ChatView['continuation']>) {
   if (continuation && continuation.after <= continuation.cursor && await chatPrefix(userId, botId, continuation.after) === continuation.prefix) {
@@ -584,7 +588,7 @@ export async function chatUpdate(userId: string, botId: string, continuation?: N
       if (!tail.historyBefore) return { ...tail, streamRunId: latest.streamRunId, working: latest.working, error: latest.error, after: continuation.after, baseCursor: continuation.cursor }
     }
   }
-  return chatView(userId, 200, botId)
+  return chatView(userId, CHAT_FIRST_PAGE, botId)
 }
 
 /** What a chat poll needs to know without reading the conversation: its version and live state. */

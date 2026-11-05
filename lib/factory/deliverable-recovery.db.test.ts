@@ -63,6 +63,8 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner',$3)`, [repoId, deviceId, repoPath])
       // The database suite exercises check admission, not provider startup.
       await pool.query(`INSERT INTO cloud_machines("workspaceId","ownerId","sandboxId","operationId","runtimeReady",state,"deviceId") VALUES($1,'owner',$2,$3,true,'running',$4)`, [workspaceId, `fixture-bot-${botId}`, randomUUID(), deviceId])
+      await pool.query(`INSERT INTO bot_desktops("botId","workspaceId","ownerId",display) VALUES($1,$2,'owner',1)`, [botId,workspaceId])
+      await pool.query(`INSERT INTO bot_cloud_runtimes("botId","workspaceId","ownerId",harness,"agentId","repoId") VALUES($1,$2,'owner','codex',$3,$4)`, [botId,workspaceId,agentId,repoId])
       await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES($1::uuid,'owner',$2,$3,'user_message',$1::text,'{"text":"Original 56-byte historical request"}')`, [sourceEventId, botId, issueId])
       const store = (singleReview ? createCurrentFactoryStore : createFactoryStore)(pool, authorize, botId, { independent: factoryCheckIndependent, gates: factoryCheckGates })
       const queue: FactoryQueue = async (tx, userId, input, runtimeBot) => {

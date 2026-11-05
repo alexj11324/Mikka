@@ -225,7 +225,7 @@ export function VoiceOrb({
           styles.fallback,
           style,
         ]}
-        className="border border-border bg-surface p-8"
+        className="border border-border bg-default p-8"
         {...props}
       >
         <Text className="text-center text-xs text-muted">

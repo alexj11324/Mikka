@@ -4960,6 +4960,40 @@
       "adapter_start_failed": "The Agent could not start on the cloud computer",
       "cleanup_failed": "The Agent did not start, and cleanup did not finish"
     },
+    "map_invalid_request": {
+      "default": "The map request is invalid.",
+      "invalid_query": "The map filters or page limit are invalid.",
+      "invalid_token": "The map page token is invalid. Reload the map."
+    },
+    "map_not_found": {
+      "default": "This map or source is unavailable to you."
+    },
+    "map_snapshot_changed": {
+      "default": "The map changed. Reload it to continue.",
+      "source_changed": "The map data or filters changed. Reload it to continue."
+    },
+    "map_snapshot_expired": {
+      "default": "This map page expired. Reload the map."
+    },
+    "map_too_large": {
+      "default": "This project exceeds the current map size limit.",
+      "limit": "This project exceeds the current map size limit."
+    },
+    "map_source_too_large": {
+      "default": "This source is too large for a map preview. Open the original source.",
+      "limit": "This source is too large for a map preview. Open the original source."
+    },
+    "map_scope_conflict": {
+      "default": "The project's workspace links conflict. Check its workspace."
+    },
+    "map_unavailable": {
+      "default": "The map could not be loaded. Try again.",
+      "database": "The map data could not be read. Try again.",
+      "signing_key": "Map pagination is unavailable. Try again later."
+    },
+    "map_auth_required": {
+      "default": "Sign in to view this map."
+    },
     "factory_spec_approval_required": {
       "default": "Review and approve the specification before implementation starts."
     }

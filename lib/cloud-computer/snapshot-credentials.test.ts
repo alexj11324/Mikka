@@ -6,47 +6,6 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { credentialProbeCommand, credentialScrubCommand, runCredentialGlobs, SNAPSHOT_CREDENTIAL_GLOBS } from '../../packages/daemon/src/credential-globs'
 
-// Decision 2026-10-31-2225: a cloud snapshot holds software only, never a credential.
-const actor = { userId: 'owner', workspaceId: '10000000-0000-4000-8000-000000000001' } as never
-const revision = 'a'.repeat(40)
-function fixture(found: string[], old?: { snapshotId: string }) {
-  const calls = { snapshots: 0, inserts: 0, probes: [] as string[] }
-  const pool = { query: async (sql: string) => {
-    if (sql.startsWith('SELECT')) return { rows: old ? [{ ...old, sourceRevision: 'b'.repeat(40), lockDigest: 'stale', createdAt: new Date(0) }] : [] }
-    calls.inserts++
-    return { rows: [] }
-  } }
-  const source = {
-    commands: { run: async (command: string) => {
-      if (command.includes('rev-parse')) return { stdout: `${revision}\n` }
-      if (command.includes('sha256sum')) return { stdout: '' }
-      calls.probes.push(command)
-      return { stdout: found.map(path => `${path}\n`).join('') }
-    } },
-    createSnapshot: async () => { calls.snapshots++; return { snapshotId: 'fresh' } },
-  }
-  return { pool: pool as never, source, calls }
-}
-
-test('a clean bot machine is snapshotted, after the credential probe', async () => {
-  const { workspaceSnapshot } = await import('./thread-machines')
-  const { pool, source, calls } = fixture([])
-  assert.equal(await workspaceSnapshot(pool, actor, source as never, '/repo'), 'fresh')
-  assert.deepEqual([calls.probes.length, calls.snapshots, calls.inserts], [1, 1, 1])
-  assert.equal(calls.probes[0], credentialProbeCommand())
-})
-
-test('credentials on the bot machine: no new snapshot; the last clean one is reused, or the thread is refused', async () => {
-  const { workspaceSnapshot } = await import('./thread-machines')
-  const present = ['/home/user/.claude/.credentials.json']
-  const reused = fixture(present, { snapshotId: 'clean-earlier' })
-  assert.equal(await workspaceSnapshot(reused.pool, actor, reused.source as never, '/repo'), 'clean-earlier')
-  assert.deepEqual([reused.calls.snapshots, reused.calls.inserts], [0, 0])
-  const none = fixture(present)
-  await assert.rejects(workspaceSnapshot(none.pool, actor, none.source as never, '/repo'), { status: 409, message: 'Workspace snapshot unavailable' })
-  assert.equal(none.calls.snapshots, 0)
-})
-
 test('the probe finds and the scrub removes exactly the credential paths, in a real shell', () => {
   const root = mkdtempSync(join(tmpdir(), 'snapshot-credentials-'))
   const state = join(root, 'adapters')

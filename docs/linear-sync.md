@@ -112,7 +112,7 @@ Set these server-only environment variables in the Mikka app and the Linear sync
 | `LINEAR_TOKEN_ENCRYPTION_KEY` | 32 random bytes encoded as 64 hex characters; encrypts OAuth tokens stored in Neon; set in both deployments |
 | `LINEAR_WEBHOOK_SECRET` | Linear OAuth application's webhook signing secret; set on the Worker |
 | `CRON_SECRET` | Protects `/mikka/api/cron/linear-sync`; set on the Worker and app if Vercel Cron is also enabled |
-| `LINEAR_REDIRECT_URL` | Optional exact callback URL override; required in Vercel Preview because preview requests must not store their OAuth state in Production |
+| `LINEAR_REDIRECT_URL` | Optional exact callback URL override; required on any non-production deployment so its OAuth state is not stored in Production (Mikka's branches have no Vercel Preview) |
 | `HYPERDRIVE` binding | Cloudflare Hyperdrive connection to the same Neon branch used by the app |
 | `NEXT_PUBLIC_POSTHOG_KEY` | Existing public PostHog project token; set in both deployments; missing means sync stays off |
 

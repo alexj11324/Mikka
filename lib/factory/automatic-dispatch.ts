@@ -218,7 +218,7 @@ export function automaticFactoryDispatch(pool: Pool) {
       return async () => { notifyDeviceWork(deviceId) }
     }
     const selectedHarness = checkStart?.run.agentDefinition.harness ?? (profileChoice?.target.kind === 'cloud' ? profileChoice.target.harness : source.harness)
-    const runtime = await ensureRecordedBotHarnessRuntime(tx, { userId: task.userId, workspaceId: source.workspaceId }, source.runtimeBotId, selectedHarness)
+    const runtime = await ensureRecordedBotHarnessRuntime(tx, { userId: task.userId, workspaceId: source.workspaceId }, source.runtimeBotId, selectedHarness, { freshTask: true })
     if (!runtime || (checkStart && runtime.agentId !== checkStart.run.agentId)) throw new FactoryError('factoryCheckHarnessUnavailable')
     let model: Partial<RunModel> | { error: string } = selection
     if (profileChoice) {
@@ -235,15 +235,14 @@ export function automaticFactoryDispatch(pool: Pool) {
     const repoId = source.remoteUrl ? (await ensureDeviceRepository(task.userId, runtime.deviceId, source.remoteUrl, tx)).id : runtime.repoId
     const { rows: [issue] } = await tx.query('SELECT title,content FROM issues WHERE id=$1', [task.issueId])
     const actor = { userId: task.userId, workspaceId: source.workspaceId as string }
-    const factoryStage = { binding: factoryBinding(task), sourceEventId: task.sourceEventId, sourceRunId: source.id as string }
     const dispatch = createFactoryDispatch(pool, store, (client, _owner, _input, _bot, context) => queueCloudRun(pool, actor, {
       botId: source.runtimeBotId, issueId: task.issueId, agentId: runtime.agentId, deviceRepoId: repoId, title: issue.title, body: tiptapToText(issue.content), ...model, model: cloudModel, ...inheritedPolicy,
       withoutBot: task.botId === null, ...(continueImplementation ? { threadRunId: source.id } : {}), readOnly: check || (continueImplementation && source.agentDefinition?.readOnly), idempotencyKey: `factory:${context.attemptId}`,
       allowLocalRecovery: source.agentDefinition?.allowLocalRecovery, sourceEventId: context.sourceEventId,
-    }, client, factoryStage), { ...defaultFactoryDispatchAdapters, configure: {
+    }, client, context), { ...defaultFactoryDispatchAdapters, configure: {
       ...defaultFactoryDispatchAdapters.configure,
-      review: (client, current, id) => configureFactoryCheck(client, current, id, checkStart?.selection.policyCeiling, factoryStage),
-      verify: (client, current, id) => configureFactoryCheck(client, current, id, checkStart?.selection.policyCeiling, factoryStage),
+      review: (client, current, id) => configureFactoryCheck(client, current, id, checkStart?.selection.policyCeiling),
+      verify: (client, current, id) => configureFactoryCheck(client, current, id, checkStart?.selection.policyCeiling),
     } })
     const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId: runtime.agentId, deviceRepoId: repoId }, tx)
     await registerRoutingAdmission(result.runId)

@@ -144,7 +144,7 @@ export function MessageAvatar({
       importantForAccessibility={placeholder ? "no-hide-descendants" : "auto"}
       accessibilityElementsHidden={placeholder}
       style={[styles.avatar, placeholder && styles.hidden]}
-      className={`items-center justify-center overflow-hidden bg-surface ${className}`}
+      className={`items-center justify-center overflow-hidden bg-default ${className}`}
       {...props}
     >
       {placeholder ? null : typeof children === "string" ? (
@@ -340,7 +340,7 @@ export function MessageMarker({
 }: ViewProps & { className?: string }) {
   return (
     <View
-      className={`max-w-[88%] self-center rounded-full bg-surface px-2.5 py-1 ${className}`}
+      className={`max-w-[88%] self-center rounded-full bg-default px-2.5 py-1 ${className}`}
       {...props}
     >
       {typeof children === "string" ? (

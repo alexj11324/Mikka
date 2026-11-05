@@ -138,8 +138,9 @@ Worker bindings.
 `pnpm build` runs `scripts/migrate.mjs` last, after `next build` succeeds, so a
 Vercel production deploy applies pending migrations itself. Do not apply the
 Production SQL by hand. Off production it skips unless `MIGRATE=1` (or every
-target is a loopback database); initialize a Preview only against its
-dedicated cloud database with `MIGRATE=1`.
+target is a loopback database); initialize any other non-production database
+only against its own dedicated database with `MIGRATE=1`. Branches have no
+Vercel Preview.
 
 GitHub's redelivery API returns 202 when it accepts the request. The receiving
 Mikka webhook also returns 202 before asynchronous suggestion ingestion

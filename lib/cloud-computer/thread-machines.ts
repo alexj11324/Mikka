@@ -20,44 +20,18 @@ import type { Actor } from './subagents'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { secretMaskerFor } from '@/lib/secrets/runtime'
 import { readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder, logRuntimeRefreshFailure, type RuntimeRefreshPhase } from './thread-worker-logs'
-import { credentialProbeCommand, credentialScrubCommand } from '../../packages/daemon/src/credential-globs'
 import { factoryEventId } from '../factory/event-id'
 import { questionFingerprint } from '../factory/questions/contract'
 /** A thread machine runs on its owner's own E2B key (orchestration § 2); this module only acts for that owner. */
 async function options(ownerId: string) {
   return { apiKey: await e2bApiKey(ownerId, 'Cloud runtime unavailable'), proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
 }
-const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
 /** Register only while this provisioning lease still owns a non-ended row. */
 export async function recordThreadSandbox(pool: Pick<Pool, 'query'>, runId: string, sandboxId: string, leaseId: string) {
   return Boolean((await pool.query('UPDATE thread_machines SET "sandboxId"=$2 WHERE "runId"=$1 AND "workerLeaseId"=$3 AND state<>\'ended\' RETURNING "runId"', [runId, sandboxId, leaseId])).rowCount)
 }
 export async function recordCancelledSandbox(pool: Pick<Pool, 'query'>, runId: string, sandboxId: string, operationId: string) {
   return Boolean((await pool.query('UPDATE thread_machines SET "sandboxId"=$2,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND state=\'ended\' AND "operationId"=$3 AND "sandboxId" IS NULL RETURNING "runId"', [runId, sandboxId, operationId])).rowCount)
-}
-/** Capture filesystem only. A cloned memory image would duplicate live daemon
- * credentials/connections. Cache is always bound to one owner and workspace.
- * Never captures a credential (decision 2026-10-31-2225): while one is on the
- * bot machine (a coding-CLI login, a run's GitHub token, a live broker), the
- * last clean snapshot is reused, or the thread waits with a refusal. */
-export async function workspaceSnapshot(pool: Pick<Pool, 'query'>, actor: Actor, source: Pick<Sandbox, 'commands' | 'createSnapshot'>, repoPath: string) {
-  const revision = (await source.commands.run(`git -C ${quote(repoPath)} rev-parse HEAD`, { user: 'user', timeoutMs: 10_000 })).stdout.trim()
-  if (!/^[a-f0-9]{40}$/.test(revision)) throw new ComputerError(409, 'Workspace source unavailable')
-  const lock = (await source.commands.run(`cd ${quote(repoPath)} && for f in pnpm-lock.yaml package-lock.json yarn.lock; do if test -f "$f"; then sha256sum "$f"; fi; done`, { user: 'user', timeoutMs: 10_000 })).stdout
-  const lockDigest = createHash('sha256').update(lock).digest('hex')
-  const old = (await pool.query('SELECT * FROM workspace_snapshots WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])).rows[0]
-  if (old && old.sourceRevision === revision && old.lockDigest === lockDigest && Date.now() - new Date(old.createdAt).getTime() < 24 * 60 * 60_000) return old.snapshotId as string
-  const found = (await source.commands.run(credentialProbeCommand(), { user: 'root', timeoutMs: 10_000 })).stdout.split('\n').filter(Boolean)
-  if (found.length) {
-    // Paths only, never contents; the count is enough to find it in logs.
-    console.warn('Workspace snapshot skipped: credentials present', { count: found.length })
-    if (old) return old.snapshotId as string
-    throw new ComputerError(409, 'Workspace snapshot unavailable')
-  }
-  const snapshot = await source.createSnapshot({ mode: 'filesystem' })
-  await pool.query(`INSERT INTO workspace_snapshots ("workspaceId","ownerId","sourceRevision","lockDigest","snapshotId") VALUES ($1,$2,$3,$4,$5)
-    ON CONFLICT ("workspaceId","ownerId") DO UPDATE SET "sourceRevision"=$3,"lockDigest"=$4,"snapshotId"=$5,"createdAt"=now()`, [actor.workspaceId, actor.userId, revision, lockDigest, snapshot.snapshotId])
-  return snapshot.snapshotId
 }
 /** The provider no longer has this sandbox (deleted, expired or killed outside Mikka). */
 export function sandboxGone(error: unknown) {
@@ -85,10 +59,10 @@ export function threadMachineStartFailure(error: unknown): FailedThreadStart | n
  * (orchestration.md § 4): a new operation ID, the running interval closed.
  * With a lease, only that lease's row is reset.
  */
-async function replaceGoneSandbox(query: Pick<Pool, 'query'>, runId: string, leaseId?: string) {
-  return (await query.query(`UPDATE thread_machines SET "sandboxId"=NULL,"operationId"=$2,state='starting',
+async function replaceGoneSandbox(query: Pick<Pool, 'query'>, runId: string, template: string, leaseId?: string) {
+  return (await query.query(`UPDATE thread_machines SET "sandboxId"=NULL,"operationId"=$2,"snapshotId"=$4,state='starting',
       "computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL
-    WHERE "runId"=$1 AND state<>'ended' AND ($3::uuid IS NULL OR "workerLeaseId"=$3) RETURNING *`, [runId, randomUUID(), leaseId ?? null])).rows[0]
+    WHERE "runId"=$1 AND state<>'ended' AND ($3::uuid IS NULL OR "workerLeaseId"=$3) RETURNING *`, [runId, randomUUID(), leaseId ?? null, template])).rows[0]
 }
 
 // Prepare the owner's key before a stop holds an APP client. The existing key
@@ -102,8 +76,6 @@ const threadMachineStopPreparation: { prepareKill?: (ownerId: string) => Promise
 /** Provider calls of scoped thread operations; tests replace them, production uses E2B. */
 export const threadMachineProvider = {
   ...threadMachineStopPreparation,
-  snapshot: async (client: PoolClient, actor: Actor, botSandboxId: string, repoPath: string) =>
-    workspaceSnapshot(client as unknown as Pool, actor, await connectComputer(actor.workspaceId, botSandboxId), repoPath),
   connect: (sandboxId: string, workspaceId: string, budget?: RuntimeBudget) => connectComputer(workspaceId, sandboxId, undefined, budget),
   create: async (snapshotId: string, operationId: string, metadata: Record<string, string>, ownerId: string) => {
     const base = await options(ownerId)
@@ -393,22 +365,22 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     // Recovery takes policy before question/run locks. Acquire its order while
     // reserving maintenance so a blocked continuation cannot transfer custody.
     if (refreshRuntime) await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
-    const run = (await client.query(`SELECT r.*,COALESCE(r."agentDefinition"->>'harness',agent.harness) AS "runHarness",b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand",COALESCE(source_repo."repoPath",repo."repoPath") AS "snapshotRepoPath",m."sandboxId" AS "botSandboxId"
+    const run = (await client.query(`SELECT r.*,COALESCE(r."agentDefinition"->>'harness',agent.harness) AS "runHarness",b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand"
       FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
       LEFT JOIN agents agent ON agent.id=r."agentId"
       JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId"
       JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId"
-      LEFT JOIN bot_cloud_runtimes runtime ON runtime."botId"=b."botId" AND runtime."ownerId"=b."ownerId" AND runtime."workspaceId"=b."workspaceId" AND runtime."agentId"=r."agentId"
-      LEFT JOIN device_repos source_repo ON source_repo.id=runtime."repoId" AND source_repo."userId"=r."userId"
       WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
-    if (!run || !run.botSandboxId || !(refreshRuntime ? ['succeeded','failed','stopped','cancelled'] : ['queued', 'preparing', 'running', 'waiting_input']).includes(run.status)) throw new ComputerError(404, 'Thread unavailable')
+    if (!run || !(refreshRuntime ? ['succeeded','failed','stopped','cancelled'] : ['queued', 'preparing', 'running', 'waiting_input']).includes(run.status)) throw new ComputerError(404, 'Thread unavailable')
     if (!refreshRuntime) {
       refreshPhase = 'execution_identity'
       await revalidateExecutionIdentity(client, run)
       refreshPhase = 'admission'
     }
+
     exactQuestionMachine = run.questionContinuation?.requireSessionResume === true
     const repositoryTask = Boolean(run.remoteUrl)
+    const freshTemplate = () => repositoryTask ? taskTemplate(run.runHarness) : computerTemplate()
     let machine = (await client.query('SELECT * FROM thread_machines WHERE "runId"=$1 FOR UPDATE', [runId])).rows[0]
     if (!refreshRuntime && !exactQuestionMachine && run.issueId && machine?.sandboxId && machine.deviceId &&
       machine.ownerId === actor.userId && machine.workspaceId === actor.workspaceId && machine.issueId === run.issueId &&
@@ -476,7 +448,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
         throw error
       })
       refreshPhase = 'admission'
-      if (!state) machine = await replaceGoneSandbox(client, runId)
+      if (!state) machine = await replaceGoneSandbox(client, runId, freshTemplate())
       else if (state.state !== 'paused' && !refreshRuntime) {
         const current = await provider.connect(machine.sandboxId, actor.workspaceId)
         if ((await current.files.read('/opt/mikka/worker-source-sha', {user:'root'})).trim() !== process.env.MIKKA_CLOUD_WORKER_SHA) throw new ComputerError(409, 'Worker version mismatch; refresh the idle task runtime')
@@ -492,19 +464,18 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     }
     if (machine?.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now() && machine.state !== 'paused') throw new ComputerError(409, 'Thread provisioning in progress')
     // No Mikka caps: the person's own E2B account sets the limit (orchestration.md § 5).
-    if (!machine || machine.snapshotId === 'pending') {
+    if (!machine || machine.snapshotId === 'pending' || (!machine.sandboxId && !isOfficialE2BTemplate(machine.snapshotId))) {
       // A follow-up keeps this task's own machine. A new repository task starts
       // from the anonymous ready template of its harness (E2B's claude or codex
       // with Mikka's worker, decision 2026-11-01-2335): the daemon clones its admitted
       // remote and creates the task worktree from the configured base branch.
-      // Only non-repository computer work retains the existing desktop snapshot.
-      const template = repositoryTask ? taskTemplate(run.runHarness) : computerTemplate()
+      // Non-repository work starts from the official desktop template too.
+      const template = freshTemplate()
       const adopted = run.issueId ? await adoptTaskMachine(client, actor, runId, run, template) : null
       if (adopted) { machine = adopted; retainedSandboxId = adopted.sandboxId }
       else {
-        const snapshotId = template ?? await provider.snapshot(client, actor, run.botSandboxId, run.snapshotRepoPath)
         machine = (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,'starting') ON CONFLICT ("runId") DO UPDATE SET "snapshotId"=EXCLUDED."snapshotId","issueId"=EXCLUDED."issueId" RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId ?? null, snapshotId, randomUUID()])).rows[0]
+          VALUES ($1,$2,$3,$4,$5,$6,$7,'starting') ON CONFLICT ("runId") DO UPDATE SET "snapshotId"=EXCLUDED."snapshotId","issueId"=EXCLUDED."issueId" RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId ?? null, template, randomUUID()])).rows[0]
       }
     }
     if (retainedSandboxId && !refreshRuntime) {
@@ -520,7 +491,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       refreshDeadline = Date.now() + 240_000
       refreshBudget = budgetUntil(refreshDeadline)
     }
-    // Persist snapshot and operation ID before provider requests.
+    // Persist the official template and operation ID before provider requests.
     await client.query(`UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval '15 minutes',
       state=CASE WHEN $3::boolean AND state='running' THEN 'error' ELSE state END WHERE "runId"=$1`, [runId, leaseId, Boolean(retainedSandboxId)])
     await client.query('COMMIT')
@@ -546,8 +517,8 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (retainedSandboxId && (!connected || connected.sandboxId !== retainedSandboxId)) throw new ComputerError(409, 'Retained task machine unavailable')
     if (refreshRuntime && !connected) throw new ComputerError(409, 'Original task machine unavailable')
     if (machine.sandboxId && !connected) {
-      // The paused sandbox is gone at the provider: the same thread starts a new one from the workspace snapshot.
-      machine = await replaceGoneSandbox(pool, runId, leaseId)
+      // The sandbox is gone at the provider: recreate this thread from its official template.
+      machine = await replaceGoneSandbox(pool, runId, freshTemplate(), leaseId)
       if (!machine) throw new ComputerError(409, 'Thread provisioning cancelled')
     }
     const sandbox = connected ?? await provider.create(machine.snapshotId, machine.operationId, { application: 'mikka-thread', workspaceId: actor.workspaceId, runId }, actor.userId)
@@ -583,12 +554,6 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       // A fresh official instance never inherits the parent Bot's files. Give
       // its registered private workspace a Git base before the daemon starts.
       await initializeBotWorkspace(sandbox, run.runtimeBotId)
-    }
-    if (!machine.sandboxId && !repositoryTask && !isOfficialE2BTemplate(machine.snapshotId)) {
-      // Filesystem snapshots start no old worker process. Remove copied device
-      // identity/capabilities before a new worker can make any network call.
-      // A snapshot never holds a credential; scrub the same list again in case an older snapshot did.
-      await sandbox.commands.run(`rm -rf /home/user/.mikka/worker /home/user/.mikka/bootstrap.json /run/mikka-viewer /run/mikka-subagents; ${credentialScrubCommand()}; install -d -m 700 /run/mikka-viewer`, { user: 'root', timeoutMs: 10_000 })
     }
     refreshPhase = 'runtime_configuration'
     const deviceId = machine.deviceId ?? randomUUID()

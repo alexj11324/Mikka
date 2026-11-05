@@ -59,9 +59,8 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
     const fake = (onCreate: () => Promise<void> = async () => {}) => {
       const calls: string[] = [];
       const provider: typeof threadMachineProvider = {
-        snapshot: async () => { calls.push("snapshot"); return "snapshot-fixture"; },
         connect: async (id) => { calls.push(`connect:${id}`); return { sandboxId: id } as never; },
-        create: async (template, op) => { assert.ok(["desktop", "snapshot-fixture"].includes(template)); calls.push("create"); await onCreate(); return { sandboxId: `sandbox-${op}` } as never; },
+        create: async (template, op) => { assert.equal(template, "desktop"); calls.push("create"); await onCreate(); return { sandboxId: `sandbox-${op}` } as never; },
         kill: async (id) => { calls.push(`kill:${id}`); },
       };
       return { calls, provider };
@@ -315,11 +314,11 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
       const { SandboxNotFoundError } = await import("e2b");
       provider.connect = async (id) => { calls.push(`connect:${id}`); throw new SandboxNotFoundError("gone"); };
       await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), (e: Error) => !(e instanceof SandboxNotFoundError), "it goes on past the lost sandbox");
-      assert.deepEqual(calls.slice(0, 2), ["connect:sandbox-gone", "create"], "no snapshot: the thread keeps its workspace snapshot");
+      assert.deepEqual(calls.slice(0, 2), ["connect:sandbox-gone", "create"], "a lost historical snapshot is replaced by the official template");
       const machine = (await pool.query('SELECT "sandboxId","operationId","snapshotId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
       assert.notEqual(machine.operationId, oldOperation, "a new operation, so E2B creates a new sandbox");
       assert.equal(machine.sandboxId, `sandbox-${machine.operationId}`);
-      assert.equal(machine.snapshotId, "snapshot-fixture");
+      assert.equal(machine.snapshotId, "desktop");
       assert.equal((await state(runId)).run.status, "queued");
     });
 

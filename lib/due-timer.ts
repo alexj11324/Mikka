@@ -51,8 +51,70 @@ async function auditRetentionNextDue() {
   return nextAuditRetentionDue(pool, workspacePool)
 }
 
-/** Tests replace `start` here to observe timer starts without a Workflow world. */
-export const dueTimerTransport: { start?: (kind: DueKind) => Promise<unknown> } = {}
+/** The run holding a timer's token, and the deployment it is pinned to. */
+export type DueTimerHolder = { runId: string; deploymentId: string }
+
+/** Tests replace the Workflow calls here to observe timer starts, lookups and cancels without a Workflow world. */
+export const dueTimerTransport: {
+  start?: (kind: DueKind) => Promise<unknown>
+  holder?: (token: string) => Promise<DueTimerHolder | null>
+  cancel?: (runId: string) => Promise<unknown>
+} = {}
+
+const ENDED = new Set(['completed', 'failed', 'cancelled'])
+
+async function timerHolder(token: string): Promise<DueTimerHolder | null> {
+  if (dueTimerTransport.holder) return dueTimerTransport.holder(token)
+  const { getHookByToken } = await import('workflow/api')
+  let runId: string
+  try { ({ runId } = await getHookByToken(token)) } catch { return null }
+  const { getWorld } = await import('workflow/runtime')
+  const run = await (await getWorld()).runs.get(runId, { resolveData: 'none' })
+  return ENDED.has(run.status) ? null : { runId, deploymentId: run.deploymentId }
+}
+
+async function startDueTimer(kind: DueKind) {
+  if (dueTimerTransport.start) return dueTimerTransport.start(kind)
+  const [{ start }, { dueTimer }] = await Promise.all([import('workflow/api'), import('@/workflows/due-timer/workflow')])
+  return start(dueTimer, [kind])
+}
+
+/** Production run recovery elects and hands over its own owner (lib/due-timer-owner.ts, #1403); it is never cancelled here. */
+const ownsItsDeployment = (kind: DueKind) => kind === 'run-recovery' && process.env.VERCEL_ENV === 'production'
+
+/** Kinds this process has seen held by a run on its own deployment; checked once per process. */
+const current = new Set<DueKind>()
+
+/**
+ * A timer run is pinned to the deployment that started it and keeps that code
+ * for its whole life (#1410). Every kind but production run recovery, which owns its handover (#1403): The first arm of each kind in a process on a newer
+ * deployment cancels a run on another deployment and starts its successor here.
+ * The successor's first pass does whatever came due meanwhile. True when it
+ * replaced one. Workflow API calls only, no database.
+ */
+export async function replaceStaleDueTimer(kind: DueKind): Promise<boolean> {
+  const deploymentId = process.env.VERCEL_DEPLOYMENT_ID
+  if (!deploymentId || current.has(kind) || !workflowWakesEnabled() || ownsItsDeployment(kind)) return false
+  const holder = await timerHolder(wakeTokens.dueTimer(kind))
+  if (!holder) return false
+  current.add(kind)
+  if (holder.deploymentId === deploymentId) return false
+  if (dueTimerTransport.cancel) await dueTimerTransport.cancel(holder.runId)
+  else await (await import('workflow/api')).getRun(holder.runId).cancel({ cancelReason: `due timer replaced by deployment ${deploymentId}` })
+  await startDueTimer(kind)
+  return true
+}
+
+/** replaceStaleDueTimer for every kind; never throws. */
+export async function replaceStaleDueTimers() {
+  await Promise.all((Object.keys(dueJobs) as DueKind[]).map(kind => replaceStaleDueTimer(kind).catch(error => {
+    console.error('Due timer replacement failed', { kind, name: error instanceof Error ? error.name : typeof error })
+    return false
+  })))
+}
+
+/** Tests only: forget which kinds this process already checked. */
+export function forgetCheckedDueTimers() { current.clear() }
 
 /** Wakes the job's running timer, or starts one. Best effort: the slow sweep re-arms a lost start. */
 export async function armDueTimer(kind: DueKind): Promise<void> {
@@ -69,14 +131,17 @@ export async function armDueTimer(kind: DueKind): Promise<void> {
     return
   }
   try {
+    if (await replaceStaleDueTimer(kind)) return
+  } catch (error) {
+    console.error('Due timer replacement failed', { kind, name: error instanceof Error ? error.name : typeof error })
+  }
+  try {
     const resume = wakeTransport.resume ?? (await import('workflow/api')).resumeHook
     await resume(wakeTokens.dueTimer(kind), {})
     return
   } catch { /* no timer holds the token: start one */ }
   try {
-    if (dueTimerTransport.start) { await dueTimerTransport.start(kind); return }
-    const [{ start }, { dueTimer }] = await Promise.all([import('workflow/api'), import('@/workflows/due-timer/workflow')])
-    await start(dueTimer, [kind])
+    await startDueTimer(kind)
   } catch (error) {
     console.error('Due timer start failed', { kind, name: error instanceof Error ? error.name : typeof error })
   }

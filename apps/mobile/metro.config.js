@@ -3,7 +3,7 @@ const { withUniwindConfig } = require('uniwind/metro')
 
 const config = getDefaultConfig(__dirname)
 
-// beUI Native styles with Uniwind; it must be the outermost wrapper.
+// Uniwind styles HeroUI Native, beUI and our own classes from global.css; it must be the outermost wrapper.
 module.exports = withUniwindConfig(config, {
   cssEntryFile: './global.css',
   dtsFile: './uniwind-types.d.ts',
