@@ -8,7 +8,7 @@ export const withActivitySession = (userId, callback, workspaceId) => sessions.r
 const sources = new Map([
   ['server-only', 'export {}'],
   ['next/headers', `import { activityFixtureSession } from ${JSON.stringify(import.meta.url)}; export async function headers(){return new Headers()} export async function cookies(){return {get(key){const id=activityFixtureSession()?.workspaceId;return key==='mikka-workspace' && id ? {value:id} : undefined},set(){}}}`],
-  ['next/server', 'export function after(){}'],
+  ['next/server', 'export function after(){} export const NextResponse={json:(body,init)=>Response.json(body,init)}'],
   ['next-intl/server', 'export async function getLocale(){return "en"} export async function getTranslations(){return (key)=>key}'],
 ])
 const files = new Map([

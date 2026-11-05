@@ -5,7 +5,8 @@ import { visibleRuns } from '@/lib/agent-runs'
 import { threadNamePrompt } from '@/lib/run-bot-name'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { credentialMasker, maskCredentials, maskDeep } from '@/lib/secrets/mask'
-import { issueForUser } from '@/lib/issue-access'
+import { issuesForUser } from '@/lib/issue-access'
+import { accessibleTeamScopes } from '@/lib/team-access'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
@@ -468,39 +469,43 @@ export async function citationSources(userId: string, texts: readonly string[], 
   const issueIds = cited.issueIds
   const runIds = [...new Set([...cited.runIds, ...threads])]
   const sources: Record<string, CitationSource> = {}
-  if (issueIds.length) {
-    const rows = await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent })
-      .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-      .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds })).predicate))
-    const identifiers = await taskIdentifiers(rows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
-    for (const { content, ownerId: _owner, scope: _scope, ...row } of rows) {
-      const metadata = readIssueMetadata(content)
-      if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null, identifier: identifiers.get(row.id) ?? null }
-    }
+  if (!issueIds.length && !runIds.length) return sources
+  // One membership read for every visibility check of this call (never kept past it).
+  const teams = await accessibleTeamScopes(userId)
+  const issueRows = issueIds.length ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent })
+    .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
+    .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds, teams })).predicate)) : []
+  // Only what a citation shows: the report's summary, the prompt's opening (its name) and each task without its body.
+  const runs = runIds.length ? await visibleRuns(userId, { runIds, limit: runIds.length, brief: true, teams }) : []
+  // A teammate's run arrives as the bare projection (no agent id): its prompt, report and steps stay with its owner.
+  const ownIds = runs.filter(row => row.agentId).map(row => row.id)
+  const runIssueIds = [...new Set(runs.flatMap(row => row.issueId ? [row.issueId] : []))]
+  const [prompts, steps, tasks] = await Promise.all([
+    ownIds.length ? db.select({ id: agentRuns.id, prompt: threadNamePrompt }).from(agentRuns)
+      .where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))).then(rows => new Map(rows.map(row => [row.id, row.prompt]))) : new Map<string, string>(),
+    ownIds.length ? db.select({ runId: runChunks.runId, count: sql<number>`count(*)` }).from(runChunks)
+      .where(and(inArray(runChunks.runId, ownIds), sql`${runChunks.chunk}->>'type' = 'tool-input-available'`)).groupBy(runChunks.runId)
+      .then(rows => new Map(rows.map(row => [row.runId, Number(row.count)]))) : new Map<string, number>(),
+    issuesForUser(userId, runIssueIds, false, db, { withoutBody: true, teams }),
+  ])
+  // Every cited and run task's display identifier in one lookup.
+  const identifiers = await taskIdentifiers([
+    ...issueRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })),
+    ...[...tasks.values()].map(task => ({ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number })),
+  ])
+  for (const { content, ownerId: _owner, scope: _scope, ...row } of issueRows) {
+    const metadata = readIssueMetadata(content)
+    if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null, identifier: identifiers.get(row.id) ?? null }
   }
-  if (runIds.length) {
-    // Only what a citation shows: the report's summary, the prompt's opening (its name) and each task without its body.
-    const rows = await visibleRuns(userId, { runIds, limit: runIds.length, brief: true })
-    // A teammate's run arrives as the bare projection (no agent id): its prompt, report and steps stay with its owner.
-    const ownIds = rows.filter(row => row.agentId).map(row => row.id)
-    const prompts = new Map((ownIds.length ? await db.select({ id: agentRuns.id, prompt: threadNamePrompt }).from(agentRuns)
-      .where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))) : []).map(row => [row.id, row.prompt]))
-    const steps = new Map((ownIds.length ? await db.select({ runId: runChunks.runId, count: sql<number>`count(*)` }).from(runChunks)
-      .where(and(inArray(runChunks.runId, ownIds), sql`${runChunks.chunk}->>'type' = 'tool-input-available'`)).groupBy(runChunks.runId) : [])
-      .map(row => [row.runId, Number(row.count)]))
-    const tasks = new Map<string, ReturnType<typeof issueForUser>>()
-    for (const row of rows) {
-      if (row.issueId && !tasks.has(row.issueId)) tasks.set(row.issueId, issueForUser(userId, row.issueId, false, db, { withoutBody: true }))
-      const task = row.issueId ? await tasks.get(row.issueId)! : null
-      const identifiers = task ? await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }]) : new Map<string, string>()
-      const issue = task ? { id: task.id, title: task.title, number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null } : null
-      const pullRequests = task ? readIssueMetadata(task.content).pullRequests : []
-      const group = threadGroup({ id: row.id, status: row.status, issueId: task?.id ?? null, createdAt: row.createdAt.toISOString(), outcome: (row.outcome ?? null) as ThreadOutcome | null }, task ? { status: task.status, metadata: { pullRequests } } : undefined)
-      sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, group, issue,
-        pullRequests,
-        name: threadName(prompts.get(row.id) ?? '', row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
-        createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
-    }
+  for (const row of runs) {
+    const task = row.issueId ? tasks.get(row.issueId) ?? null : null
+    const issue = task ? { id: task.id, title: task.title, number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null } : null
+    const pullRequests = task ? readIssueMetadata(task.content).pullRequests : []
+    const group = threadGroup({ id: row.id, status: row.status, issueId: task?.id ?? null, createdAt: row.createdAt.toISOString(), outcome: (row.outcome ?? null) as ThreadOutcome | null }, task ? { status: task.status, metadata: { pullRequests } } : undefined)
+    sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, group, issue,
+      pullRequests,
+      name: threadName(prompts.get(row.id) ?? '', row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
+      createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
   }
   return sources
 }
