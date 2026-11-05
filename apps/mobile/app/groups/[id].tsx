@@ -66,6 +66,12 @@ export default function GroupChat() {
   const identity = `${id}:${apiContext}`
   // Oldest first, as the chat reads.
   const messages = mergeGroupMessages([], page.data?.messages ?? [])
+  // Only a message sent on this visit is anchored under the bar with room for the reply (v0); opening the chat,
+  // older pages and pushes keep the latest message against the composer.
+  const opened = useRef<{ identity: string; newest: bigint } | null>(null)
+  if (page.data && opened.current?.identity !== identity) opened.current = { identity, newest: messages.reduce((max, message) => BigInt(message.position) > max ? BigInt(message.position) : max, -1n) }
+  const [sentHere, setSentHere] = useState(false)
+  const anchorIndex = sentHere ? latestOwnIndex(messages, message => message.authorType === 'user' && message.authorId === me && BigInt(message.position) > (opened.current?.newest ?? -1n)) : undefined
   const before = page.data?.nextBefore ?? null
   const [historyError, setHistoryError] = useState<unknown>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
@@ -121,6 +127,7 @@ export default function GroupChat() {
   // The composer has put the quote ahead of the words and clears both once this returns true.
   const send = async (body: string) => {
     setSendFailed(false)
+    setSentHere(true)
     list.current?.toLatest(!reduceMotion)
     try {
       await api(`/api/conversations/${id}/messages`, { method: 'POST', body: { body, mentions: mentionsIn(body, bots) } })
@@ -190,7 +197,7 @@ export default function GroupChat() {
       <GestureDetector gesture={timeReveal}>
       <View style={{ flex: 1, overflow: 'hidden' }}>
         <ChatMessageList ref={list} testID="group-chat-scroll" data={messages} scrollEnabled={!scrollLocked} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
-          keyOf={message => message.id} renderItem={renderMessage} anchorIndex={latestOwnIndex(messages, message => message.authorType === 'user' && message.authorId === me)}
+          keyOf={message => message.id} renderItem={renderMessage} anchorIndex={anchorIndex}
           onStartReached={before ? () => void loadEarlier() : undefined}
           header={<>
             {!page.data && !page.error ? <View style={styles.loading}><Spinner /></View> : null}
