@@ -9,6 +9,8 @@ import { tasksShownByThreads } from '@/lib/mentions'
 import { colors, font } from '@/lib/theme'
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { ChatFiles } from './ChatFiles'
+import { ChatImages } from '@/features/chat/components/chat-images'
+import { isImageFile, useImageFiles } from '@/features/chat/model/chat-image-source'
 
 /**
  * The Markdown the Coordinator and agents write, as the app shows it:
@@ -23,12 +25,14 @@ export function Markdown({ text, sources = {}, onOpen, color = colors.text }: {
   color?: string
 }) {
   const parsed = splitChatFiles(text)
+  const pictures = useImageFiles(parsed.files)
   const blocks = parseBlocks(parsed.text)
   // One reference per piece of work: a task already shown through its thread is not named again (lib/mentions.ts).
   const hidden = tasksShownByThreads(parsed.text, sources)
   return (
     <View style={{ gap: 8 }}>
-      <ChatFiles files={parsed.files} />
+      <ChatFiles files={parsed.files.filter(file => !isImageFile(file))} />
+      <ChatImages images={pictures} />
       {blocks.map((block, index) => {
         switch (block.type) {
           case 'heading': return <Text selectable key={index} style={[styles.heading, { color }]}>{inline(block.text, sources, onOpen, color, hidden)}</Text>

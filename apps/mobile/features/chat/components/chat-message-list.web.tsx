@@ -6,7 +6,7 @@ import { VIRTUALIZED_CHAT_LIST, type ChatListHandle, type ChatListProps } from '
 
 export { VIRTUALIZED_CHAT_LIST, type ChatListHandle, type ChatListProps }
 
-/** Expo Web: the same list without the keyboard controller, which has no browser counterpart. */
+/** Expo Web: the same list without the keyboard controller, which has no browser counterpart. A short chat still sits against the composer. */
 function ChatMessageListInner<T>({ data, keyOf, renderItem, header, footer, bottomInset, onStartReached, onAtLatestChange, anchorIndex, testID }: ChatListProps<T>, ref: React.Ref<ChatListHandle>) {
   const list = useRef<LegendListRef>(null)
   // The anchored space counts the rows after the anchor but not the footer (the waiting line, notices): the anchor
@@ -24,6 +24,7 @@ function ChatMessageListInner<T>({ data, keyOf, renderItem, header, footer, bott
     <View testID={testID} style={styles.fill}>
     <LegendList
       ref={list}
+      style={styles.fill}
       data={data}
       keyExtractor={keyOf}
       renderItem={({ item, index }) => <View style={styles.row}>{renderItem(item, index)}</View>}
@@ -31,6 +32,7 @@ function ChatMessageListInner<T>({ data, keyOf, renderItem, header, footer, bott
       estimatedItemSize={CHAT_LIST_ESTIMATED_ROW}
       ItemSeparatorComponent={Separator}
       initialScrollAtEnd
+      alignItemsAtEnd
       maintainScrollAtEnd={{ animated: false, on: { dataChange: true, itemLayout: anchorIndex === undefined, footerLayout: true, layout: true } }}
       anchoredEndSpace={anchorIndex === undefined ? undefined : { anchorIndex, anchorOffset: ANCHOR_GAP + footerHeight }}
       maintainVisibleContentPosition={{ data: true }}

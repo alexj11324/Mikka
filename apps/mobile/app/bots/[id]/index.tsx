@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router'
-import { ChatScreen } from '@/components/ChatScreen'
+import { ChatScreen } from '@/features/chat/screens/chat-screen'
 import { ModelMenu } from '@/components/ModelMenu'
 import { ModelNotice } from '@/components/ModelNotice'
 import { useHome } from '@/lib/home'
