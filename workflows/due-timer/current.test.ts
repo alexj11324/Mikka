@@ -7,7 +7,7 @@ import { afterEach, before, beforeEach, mock, test } from 'node:test'
 const TOKEN = 'due-timer:run-recovery'
 const NAME = 'workflow//./workflows/due-timer/workflow//dueTimer'
 type Context = { runId: string; deploymentId: string }
-type Row = { runId: string; deploymentId: string; workflowName: string; status: string; specVersion: number; startedAt: Date; createdAt: Date }
+type Row = { runId: string; deploymentId: string; workflowName: string; status: string; specVersion: number; startedAt: Date; createdAt: Date; attributes?: Record<string, string> }
 type HookRow = { runId: string; hookId: string; token: string; ownerId: string; projectId: string; environment: string;
   resumeContext: { deploymentId: string; workflowName: string; runSpecVersion: number };
   claimedFrom?: { runId: string; hookId: string; deploymentId: string; workflowName: string; runSpecVersion: number } }
@@ -24,6 +24,7 @@ let latest = 'new', caller = 'new', environment = 'production', resolver = true,
 let serial = 0, jobs = 0, legacyJobs = 0, nextReads = 0, lookupFailure = false, cancelFailure = false, startFailure = false
 let beforeForce: (() => void) | undefined
 let afterForce: (() => void) | undefined
+let afterResume: (() => Promise<void>) | undefined
 let dueTimer: typeof import('./workflow').dueTimer, armDueTimer: typeof import('@/lib/due-timer').armDueTimer
 const previousEnvironment = { VERCEL: process.env.VERCEL, VERCEL_ENV: process.env.VERCEL_ENV }
 
@@ -110,10 +111,11 @@ async function resume(token: string) {
   trace.push({ event: 'resume', runId: value.runId, token })
   if (value.runId === 'legacy') legacyJobs++
   deliver(value, {})
+  await afterResume?.()
   return value
 }
-function launch(runId: string, deploymentId = 'new', kind: Parameters<typeof dueTimer>[0] = 'run-recovery', predecessorRunId?: string) {
-  runs.set(runId, row(runId, deploymentId))
+function launch(runId: string, deploymentId = 'new', kind: Parameters<typeof dueTimer>[0] = 'run-recovery', predecessorRunId?: string, parentRunId?: string) {
+  runs.set(runId, { ...row(runId, deploymentId), ...(parentRunId ? { attributes: { $parentRunId: parentRunId } } : {}) })
   activity.set(runId, 'running')
   const invoke = dueTimer as (kind: Parameters<typeof dueTimer>[0], predecessorRunId?: string) => Promise<void>
   const completion = context.run({ runId, deploymentId }, () => invoke(kind, predecessorRunId)).catch(cause => {
@@ -167,7 +169,8 @@ mock.module('workflow/api', { namedExports: {
     const runId = `candidate-${++serial}`
     trace.push({ event: 'start', runId, deploymentId: options?.deploymentId })
     if (startFailure) throw error('WorkflowWorldError')
-    launch(runId, deploymentId, args[0], args[1])
+    // The installed SDK records the caller independently of workflow arguments.
+    launch(runId, deploymentId, args[0], args[1], context.getStore()?.runId)
     return { runId }
   },
 } })
@@ -190,7 +193,7 @@ beforeEach(() => {
   activity.clear(); observers.clear(); closing = false
   latest = 'new'; caller = 'new'; environment = 'production'; resolver = true; next = null
   serial = 0; jobs = 0; legacyJobs = 0; nextReads = 0; lookupFailure = false; cancelFailure = false; startFailure = false
-  beforeForce = undefined; afterForce = undefined
+  beforeForce = undefined; afterForce = undefined; afterResume = undefined
   process.env.VERCEL = '1'; process.env.VERCEL_ENV = 'production'
 })
 afterEach(async () => {
@@ -268,6 +271,41 @@ test('failed lifetime handoff keeps the global hook and retries only on a real l
   startFailure = false; await resume(TOKEN); await settle()
   assert.notEqual(hooks.get(TOKEN)?.runId, 'one')
   assert.deepEqual(cancelled(), ['one']); assert.equal(jobs, 2)
+})
+
+test('a yielding candidate releases election before its wake starts the lifetime successor', async () => {
+  mock.timers.enable({ apis: ['Date'], now: Date.UTC(2030, 0, 1) })
+  launch('one'); await settle(); mock.timers.tick(7 * 60 * 60_000)
+  // A failed start leaves the incumbent waiting with its global hook held and
+  // its election released. The next real wake must be able to start a child.
+  startFailure = true; await resume(TOKEN); await settle(); startFailure = false
+  const startsBefore = started().length
+  afterResume = async () => {
+    if (context.getStore()?.runId !== 'contender') return
+    // Delivery can wake the incumbent before resumeHook's response returns.
+    // Hold only that response until its child has actually tried the election.
+    await until(() => started().length > startsBefore && trace.some(item =>
+      item.event === 'create' && item.runId === started().at(-1)?.runId && item.token !== TOKEN), 'successor election')
+  }
+  launch('contender'); await settle()
+  assert.notEqual(hooks.get(TOKEN)?.runId, 'one', 'the real wake must not lose the only lifetime successor')
+  assert.equal(hooks.get(TOKEN)?.runId, started().at(-1)?.runId)
+  assert.deepEqual(cancelled(), ['one']); assert.equal(jobs, 2)
+  const released = trace.findIndex(item => item.event === 'dispose' && item.runId === 'contender' && item.token !== TOKEN)
+  const woke = trace.findIndex(item => item.event === 'resume' && item.runId === 'one' && trace.indexOf(item) > released)
+  assert.ok(released >= 0 && woke > released)
+  assert.deepEqual(failures, [])
+})
+
+test('a lifetime predecessor argument without the matching SDK parent cannot force the incumbent', async () => {
+  mock.timers.enable({ apis: ['Date'], now: Date.UTC(2030, 0, 1) })
+  seed('winner', 'new'); mock.timers.tick(7 * 60 * 60_000)
+  launch('missing-parent', 'new', 'run-recovery', 'winner'); await settle()
+  assert.equal(forced().length, 0); assert.deepEqual(cancelled(), [])
+  launch('wrong-parent', 'new', 'run-recovery', 'winner', 'another-workflow'); await settle()
+  assert.equal(forced().length, 0); assert.deepEqual(cancelled(), [])
+  assert.equal(hooks.get(TOKEN)?.runId, 'winner'); assert.equal(jobs, 0)
+  assert.deepEqual(failures, [])
 })
 
 test('late or premature same-deployment successors cannot force a fresh winner', async () => {

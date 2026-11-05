@@ -19,8 +19,10 @@ const lifetimeElapsed = (run: { startedAt?: Date }) => {
   // hours earlier while queued, so it cannot authorize same-deployment force.
   return started !== undefined && Number.isFinite(started) && Date.now() - started >= DUE_TIMER_LIFETIME_MS
 }
-const lifetimeSuccessor = (identity: RecoveryTimerIdentity, run: { runId: string; startedAt?: Date }) =>
-  identity.predecessorRunId === run.runId && run.runId !== identity.runId && lifetimeElapsed(run)
+// The predecessor argument describes intent; the SDK's recorded parent proves
+// that this candidate was actually started by that retiring workflow.
+const lifetimeSuccessor = (identity: RecoveryTimerIdentity, run: { runId: string; startedAt?: Date }, candidate: { attributes?: Record<string, string> }) =>
+  identity.predecessorRunId === run.runId && candidate.attributes?.$parentRunId === run.runId && run.runId !== identity.runId && lifetimeElapsed(run)
 
 /** This migration is deliberately not enabled in preview or for other jobs. */
 export const productionRecoveryTimer = () => process.env.VERCEL_ENV === 'production'
@@ -110,13 +112,13 @@ async function elected(world: World, identity: RecoveryTimerIdentity) {
 
 /** Non-force election precedes this check and the atomic global-token claim. */
 export async function prepareRecoveryTimerClaim(identity: RecoveryTimerIdentity): Promise<RecoveryTimerClaim> {
-  const world = await runtime(), { hook: election } = await elected(world, identity)
+  const world = await runtime(), { hook: election, run: candidate } = await elected(world, identity)
   if (await latest(world) !== identity.deploymentId) return { state: 'handoff' }
   const holder = await lookup(TOKEN)
   if (!holder) return { state: 'take', ownerId: election.ownerId, projectId: election.projectId, previous: null }
   if (holder.ownerId !== election.ownerId || holder.projectId !== election.projectId) throw unavailable()
   const run = await matchingRun(world, holder, identity.workflowName)
-  if (active(run.status) && run.deploymentId === identity.deploymentId && !lifetimeSuccessor(identity, run)) return { state: 'existing' }
+  if (active(run.status) && run.deploymentId === identity.deploymentId && !lifetimeSuccessor(identity, run, candidate)) return { state: 'existing' }
   // SDK 5.2.3 refuses force against active pre-v8 victims. Do not silently
   // replace that refusal with cancellation or an unguarded second timer.
   if (active(run.status) && (run.specVersion ?? 1) < 8) throw unavailable()
@@ -139,7 +141,7 @@ async function owned(identity: RecoveryTimerIdentity, claim?: Extract<RecoveryTi
 /** Uses the World's atomic claimedFrom receipt, never a run id supplied by a user. */
 export async function retirePreviousRecoveryTimer(identity: RecoveryTimerIdentity, claim: RecoveryTimerClaim): Promise<RecoveryTimerState> {
   if (claim.state !== 'take') throw unavailable()
-  const { world, holder } = await owned(identity)
+  const { world, holder, run: candidate } = await owned(identity)
   if (!holder) return 'lost'
   if (holder.ownerId !== claim.ownerId || holder.projectId !== claim.projectId) throw unavailable()
   if (await latest(world) !== identity.deploymentId) return 'handoff'
@@ -150,7 +152,7 @@ export async function retirePreviousRecoveryTimer(identity: RecoveryTimerIdentit
         (receipt.deploymentId && receipt.deploymentId !== previous.deploymentId)) throw unavailable()
     const victim = await world.runs.get(receipt.runId, { resolveData: 'none' })
     if ((!active(victim.status) && !terminal(victim.status)) || victim.workflowName !== identity.workflowName || victim.deploymentId !== previous.deploymentId ||
-        (active(victim.status) && victim.deploymentId === identity.deploymentId && !lifetimeSuccessor(identity, victim))) throw unavailable()
+        (active(victim.status) && victim.deploymentId === identity.deploymentId && !lifetimeSuccessor(identity, victim, candidate))) throw unavailable()
     // The token may have moved again while metadata was read. Never cancel
     // the replacement or run business work from a superseded candidate.
     if ((await lookup(TOKEN))?.runId !== identity.runId) return 'lost'

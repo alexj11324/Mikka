@@ -81,7 +81,12 @@ export async function runCurrentDueTimer(token: string, electionToken: string, d
     if (await election.getConflict()) return
     const claim = await deps.prepare()
     if (claim.state === 'handoff') { await deps.redirect(); return }
-    if (claim.state === 'existing') { await nudgeWorkflow(token); return }
+    if (claim.state === 'existing') {
+      // The wake may start the retiring holder's successor before it returns.
+      // Let that child take the election instead of losing its only wake.
+      election.dispose()
+      await nudgeWorkflow(token); return
+    }
     held = createHook<unknown>({ token, experimental_force: true })
     if (await held.getConflict()) return
     let state = await deps.retire(claim)
