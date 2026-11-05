@@ -16,6 +16,17 @@ export function subscriptionAvailability(quota: unknown, modelId: string, provid
   return { status: state === 'unknown' ? 'checking' : state, resetsAt: times[0] ?? null }
 }
 
+/** A group may submit an intent for a later authoritative quota check. This
+ * proves only a valid past official allowance, never capacity for execution. */
+export function hasStaleOfficialAllowance(quota: unknown, modelId: string, provider: 'claude' | 'codex', now = Date.now()): boolean {
+  const parsed = quotaSnapshotSchema.safeParse(quota)
+  if (!parsed.success || parsed.data.source !== 'official') return false
+  const observed = Date.parse(parsed.data.observedAt)
+  return Number.isFinite(observed) && observed <= now
+    && subscriptionAvailability(parsed.data, modelId, provider, now).status === 'checking'
+    && subscriptionAvailability(parsed.data, modelId, provider, observed).status === 'available'
+}
+
 /** How long Settings shows the last read allowance before it says 待检查 again. */
 export const QUOTA_DISPLAY_MS = 15 * 60_000
 

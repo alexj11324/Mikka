@@ -29,8 +29,8 @@ import type { invokeDecision } from './coordinator/decide'
 /** Why nothing runs: the list's reasons, or the model the thread named (decision 2026-11-02-1400). */
 export type DispatchNothingReason = NothingReason | 'cloudTemporarilyUnavailable' | 'notOffered' | 'namedDevice' | 'pickedNoDevice' | 'pickedUnavailable'
 export type ModelDispatch =
-  | { kind: 'device'; deviceId: string; agentId: string; model: string; entry: OrderEntry; subscriptionBindingId?: string; routing?: ModelRoutingSnapshot }
-  | { kind: 'cloud'; harness: OrderEntry['harness']; model: string; entry: OrderEntry; apiKey: boolean; routing?: ModelRoutingSnapshot }
+  | { kind: 'device'; deviceId: string; agentId: string; model: string; entry: OrderEntry; subscriptionBindingId?: string; routing?: ModelRoutingSnapshot; quotaCheckPending?: true }
+  | { kind: 'cloud'; harness: OrderEntry['harness']; model: string; entry: OrderEntry; apiKey: boolean; routing?: ModelRoutingSnapshot; quotaCheckPending?: true }
   | { kind: 'none'; reason: DispatchNothingReason; card: ReturnType<typeof modelUnavailableCard>; skipped?: SkippedEntry[] }
 
 /**
@@ -58,6 +58,8 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   bindSubscription?: boolean
   probeQuota?: boolean
   skipCatalogueRefresh?: boolean
+  /** Group intent only: never a dispatch option or a grant of fresh quota. */
+  deferStaleQuota?: true
   /** An explicitly named physical Agent is never replaced by another one. */
   agentId?: string
   /** The cloud already failed to start this run: a server or a computer only. */
@@ -98,10 +100,19 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   // The thread's model is the only one tried: no subscription or key offers it on that Agent, so nothing runs and the card says so.
   if (named && !picked) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', named) }
   const entries = picked ? [picked] : order.entries
-  const states = await credentialStates(pool, scope, entries, candidates, undefined, { refresh: dependencies.refreshQuota, probe: dependencies.probeQuota })
+  const deferStaleQuota = dependencies.deferStaleQuota === true && dependencies.probeQuota === false
+    && dependencies.bindSubscription === false && dependencies.skipCatalogueRefresh === true && !dependencies.routing
+  const states = await credentialStates(pool, scope, entries, candidates, undefined, { refresh: dependencies.refreshQuota, probe: dependencies.probeQuota, ...(deferStaleQuota ? { deferStaleQuota: true } : {}) })
   const devices = places !== 'cloudOnly' ? (await poolDevices(pool, scope.ownerId)).filter(device => !deviceId || device.id === deviceId) : []
   const ready = places !== 'local' && await cloudReady(pool, { ownerId: scope.ownerId, workspaceId: scope.workspaceId, botId: scope.botId, harness: entries[0]?.harness ?? 'claude_code' })
-  let plan = planDispatch({ entries: picked ? [] : order.entries, explicit: picked ?? null, location: order.location, devices, credential: entry => states.get(entry.id)?.credential ?? { usable: false, reason: 'missing' }, cloudReady: ready, cloudModel: entry => cloudModelSupport(entry, dependencies.cloudPurpose) })
+  // Deferring a positive old allowance does not establish failure or permit a
+  // later source. Keep the dispatch spending fence through that pending entry.
+  const pendingAt = deferStaleQuota ? entries.findIndex(entry => states.get(entry.id)?.quotaCheckPending) : -1
+  const plannedEntries = pendingAt < 0 ? entries : entries.slice(0, pendingAt + 1)
+  let plan = planDispatch({ entries: picked ? [] : plannedEntries, explicit: picked ?? null, location: order.location, devices, credential: entry => {
+    const state = states.get(entry.id)
+    return deferStaleQuota && state?.quotaCheckPending ? { usable: true } : state?.credential ?? { usable: false, reason: 'missing' }
+  }, cloudReady: ready, cloudModel: entry => cloudModelSupport(entry, dependencies.cloudPurpose) })
   let routing: ModelRoutingSnapshot | undefined
   if (canRoute && dependencies.routing) {
     const harnesses = [...new Set(entries.map(entry => entry.harness))]
@@ -167,12 +178,13 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
     return { kind: 'none', reason, card: modelUnavailableCard(reason, { ...named, ...(plan.reason === 'noDevice' && picked ? { device: whyNoDevice(devices, picked) } : {}) }) }
   }
   if (plan.kind === 'none') return { kind: 'none', reason: plan.reason, card: modelUnavailableCard(plan.reason), skipped: plan.skipped }
-  if (plan.kind === 'cloud') return { kind: 'cloud', harness: plan.entry.harness, model: plan.model, entry: plan.entry, apiKey: plan.entry.source.kind === 'api_key', ...(routing ? { routing } : {}) }
+  const quotaCheckPending = deferStaleQuota && states.get(plan.entry.id)?.quotaCheckPending ? { quotaCheckPending: true as const } : {}
+  if (plan.kind === 'cloud') return { kind: 'cloud', harness: plan.entry.harness, model: plan.model, entry: plan.entry, apiKey: plan.entry.source.kind === 'api_key', ...(routing ? { routing } : {}), ...quotaCheckPending }
   const { rows: [agent] } = await pool.query<{ id: string }>('SELECT id FROM agents WHERE "userId"=$1 AND "deviceId"=$2 AND harness=$3 AND ($4::text IS NULL OR id::text=$4) ORDER BY "createdAt",id LIMIT 1',
     [scope.ownerId, plan.deviceId, plan.entry.harness, dependencies.agentId ?? null])
   if (!agent) return { kind: 'none', reason: 'noDevice', card: modelUnavailableCard('noDevice') }
   const subscriptionBindingId = dependencies.bindSubscription !== false && plan.entry.source.kind === 'subscription' ? await bindAgentToConnection(pool, scope, agent.id, plan.entry.harness, plan.entry.source.connectionId, plan.entry.model) : undefined
-  return { kind: 'device', deviceId: plan.deviceId, agentId: agent.id, model: plan.model, entry: plan.entry, ...(subscriptionBindingId ? { subscriptionBindingId } : {}), ...(routing ? { routing } : {}) }
+  return { kind: 'device', deviceId: plan.deviceId, agentId: agent.id, model: plan.model, entry: plan.entry, ...(subscriptionBindingId ? { subscriptionBindingId } : {}), ...(routing ? { routing } : {}), ...quotaCheckPending }
 }
 
 /**
