@@ -41,7 +41,7 @@ export const pollingAllowlist = {
   'hooks/use-computer.ts': db(web, 'computer grant re-read before it expires (at least every 5 s)', 1),
   'components/swr-defaults.tsx': db(web, 'LIST_POLL_MS, the 60 s list poll interval', 1),
   'lib/coordinator/chat-poll.ts': db(web, 'FULL_READ_EVERY_MS: the chat poll does a full read every 60 s', 1),
-  'components/settings/subscription-settings.tsx': db(web, 'subscription usage re-read every USAGE_EVERY_MS (5 min); the 30 s setInterval is only the clock that ages the "updated" label', 3),
+  'components/settings/subscription-settings.tsx': db(web, 'subscription usage re-read every USAGE_EVERY_MS (5 min); the 30 s setInterval ages the "updated" label; one bounded authorization deadline timeout refreshes its expired state', 3),
   'components/billing/free-allowance-section.tsx': db(web, 'pollUntil after card verification: up to 10 reads, 2 s apart, until the webhook lands', 1),
   'components/billing/hosted-refusal-notice.tsx': db(web, 'pollUntil after a top-up: up to 10 reads, 2 s apart, until the balance lands', 1),
   'lib/billing/hosted-usage.ts': db(web, 'pollUntil, the bounded poll helper behind the billing notices', 1),

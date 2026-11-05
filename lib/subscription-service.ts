@@ -11,6 +11,8 @@ import { nativeBrokerContextSchema, nativeLeaseSchema, type NativeBrokerRequest 
 import { accountLabel, failedUsage, parseSubscriptionUsage, type SubscriptionUsage, type WorkerUsage } from './subscription-usage'
 import { BACKEND_FAILURES, GENERATION_FAILURES, PRIVATE_FAILURES, generationFailureDetails } from './subscription-generation-diagnostics'
 import { stepIdentity } from './model-call-timing'
+import { expireSubscriptionAcquisitions } from './subscription-acquire-expiry'
+import { ownerSettingsChanged } from './live/lists'
 
 // Matches modelRequestMaxBytes in the Go worker. The conversation's 100k
 // compaction estimate excludes the system prompt and tool schemas.
@@ -253,13 +255,15 @@ export class SubscriptionService {
   async cleanupBatch() {
     // Operator-authenticated caller only. Each worker remains fixed to one
     // owner/connection; this never lists or exports credential values.
+    const expired = await expireSubscriptionAcquisitions(this.repository.pool)
+    await Promise.all(expired.ownerIds.map(ownerId => ownerSettingsChanged(this.repository.pool, ownerId)))
     const { rows } = await this.repository.pool.query(`with due as(select a."connectionId",a."deletingAt" as attempted from byos_secret_artifacts a join byos_connections c on c.id=a."connectionId" where a."deletedAt" is null and (a."publishedAt" is not null or a."notBefore"<=now()) and a.name not in (coalesce(c."secretName",''),coalesce(c."accessSecretName",''),coalesce(c."stagedSecretName",''),coalesce(c."stagedAccessName",'')) union all select a."connectionId",a."lastAttemptAt" from byos_enrollment_sources a join byos_enrollment_transfers t on t."enrollmentId"=a."enrollmentId" join byos_connections c on c.id=a."connectionId" where a."deletedAt" is null and (t."canonicalPublishedAt" is not null or t."boundAt" is not null or c.epoch>t.epoch)) select c.id,c."ownerId",c."workspaceId",c.provider from due d join byos_connections c on c.id=d."connectionId" group by c.id,c."ownerId",c."workspaceId",c.provider order by coalesce(max(d.attempted),'epoch'::timestamptz),c.id limit 2`)
     const results = []
     for (const row of rows) {
       try { results.push(await this.worker(this.repository.scope(row)).call<{pending: number; failed: number; providerRevocation: 'not_implemented'}>('cleanup')) }
       catch { results.push({ pending: null, failed: true }) }
     }
-    return { processed: results.length, results }
+    return { expired: expired.expired, processed: results.length, results }
   }
 }
 

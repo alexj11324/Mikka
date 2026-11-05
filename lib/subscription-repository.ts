@@ -7,7 +7,29 @@ import { runMayUseCredentialSql } from './personal-policy'
 
 export interface ConnectionRow { id: string; ownerId: string; workspaceId: string; provider: 'codex' | 'claude'; state: string; epoch: string; quota: unknown; accountLabel?: string | null; paused?: boolean }
 export class SubscriptionRepository {
-  constructor(readonly pool: Pick<Pool, 'query'>) {}
+  constructor(readonly pool: Pick<Pool, 'query'> & Partial<Pick<Pool, 'connect'>>) {}
+  /** Serialize allocation only: provider calls happen after this short transaction.
+   * Reserving a complete bounded operation also lets the expiry sweep recover a
+   * request that disappears before its worker starts. */
+  async acquire(ownerId: string, workspaceId: string, provider: 'codex' | 'claude') {
+    if (!this.pool.connect) throw new SubscriptionRefusal('backend_unavailable')
+    const client = await this.pool.connect()
+    try {
+      await client.query('begin')
+      await client.query("set local lock_timeout='5s'")
+      await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['subscription_acquire', ownerId, workspaceId, provider])])
+      const { rows } = await client.query<{ id: string }>(`select c.id from byos_connections c where c."ownerId"=$1 and c."workspaceId"=$2 and c.provider=$3 and c."removedAt" is null and c.state='pending' and c."operationKind"='acquire' and c."operationDeadline">now()
+        and not exists (select 1 from byos_enrollment_transfers t where t."connectionId"=c.id and t.epoch=c.epoch and t."operationId"=c."operationId")
+        order by c."createdAt" desc limit 1`, [ownerId, workspaceId, provider])
+      const connectionId = rows[0]?.id ?? randomUUID()
+      if (!rows[0]) await client.query(`insert into byos_connections (id,"ownerId","workspaceId",provider,state,"operationId","operationKind","operationDeadline") values ($1,$2,$3,$4,'pending',$5,'acquire',now()+interval '5 minutes')`, [connectionId, ownerId, workspaceId, provider, randomUUID()])
+      await client.query('commit')
+      return { connectionId, created: !rows[0] }
+    } catch (error) {
+      await client.query('rollback').catch(() => undefined)
+      throw error
+    } finally { client.release() }
+  }
   async create(ownerId: string, workspaceId: string, provider: 'codex' | 'claude') {
     const id = randomUUID()
     await this.pool.query('insert into byos_connections (id,"ownerId","workspaceId",provider) values ($1,$2,$3,$4)', [id, ownerId, workspaceId, provider])
