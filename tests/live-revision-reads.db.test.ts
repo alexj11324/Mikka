@@ -24,7 +24,7 @@ let queries = 0
 const query = pg.Client.prototype.query
 pg.Client.prototype.query = function (this: pg.Client, ...args: unknown[]) { queries++; return Reflect.apply(query, this, args) } as typeof pg.Client.prototype.query
 
-type Fake = { onopen: ((event: unknown) => void) | null; onmessage: ((event: { data: string }) => void) | null; onclose: unknown; onerror: unknown; readyState: number; send(): void; close(): void }
+type Fake = { onopen: ((event: unknown) => void) | null; onmessage: ((event: { data: string }) => void) | null; onclose: unknown; onerror: unknown; readyState: 0 | 1 | 2 | 3; send(): void; close(): void }
 
 /** One browser tab or device: a real LiveChannel whose key's read is the real list reader. */
 async function client(ownerId: string, workspaceId: string, version: 1 | 2) {
@@ -43,11 +43,10 @@ async function client(ownerId: string, workspaceId: string, version: 1 | 2) {
     later: (callback, ms) => { timers.set(++next, { at: now + ms, callback }); return next },
     cancel: id => { timers.delete(id as number) },
   })
-  let data: Awaited<ReturnType<typeof pollIssues>> | undefined
   let inflight = 0
   const read = async () => {
     reads++; inflight++
-    try { data = await withActivitySession(ownerId, () => actAs(ownerId, () => pollIssues(known)), workspaceId)
+    try { const data = await withActivitySession(ownerId, () => actAs(ownerId, () => pollIssues(known)), workspaceId)
     known = data.version
     subscription.update({ revisions: { list: heldRevision(data, 'issue_list', workspaceId) } }) } finally { inflight-- }
   }

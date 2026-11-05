@@ -11,7 +11,9 @@ type Begun = { scope: LiveScope | null; revisions: LiveRevisions }
 
 /** Call before reading the data: the revisions it returns are then never newer than that data. */
 export async function readRevisions(refs: readonly LiveRef[]): Promise<LiveRevisions> {
-  return readLiveRevisions(pool, refs)
+  // Best effort: without a revision the next push simply reads.
+  try { return await readLiveRevisions(pool, refs) }
+  catch (error) { console.warn('[live] revision read unavailable', { name: (error as Error | undefined)?.name, code: (error as { code?: string } | undefined)?.code }); return {} }
 }
 
 /** An owner-wide list's home channel and its keys' revisions, read before the list itself. */
