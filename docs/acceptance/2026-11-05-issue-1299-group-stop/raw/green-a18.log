@@ -1,0 +1,42 @@
+✔ group session uses the same database/role/TLS and only bypasses the documented Neon transaction pooler (1.757154ms)
+✔ group failure diagnostics preserve finite underlying causes and never private provider text (0.293026ms)
+✔ serial engine: dedupes each round, caps reciprocal mentions at 3 rounds, later sees previous data (10.383255ms)
+✔ nothing-to-add is not posted; removed members never generate; unknown peer mentions error before post (0.606943ms)
+✔ root explicit mentions all receive direct delivery; autonomous followups still need contribution and revoked targets cannot run (0.440574ms)
+✔ failure clears generating status and does not synthesize a response (0.268331ms)
+✔ private peer rounds stay bounded and never become another public responder context (0.455293ms)
+✔ private routing rejects foreign/self/third peers and an unavailable writer before exposing text (0.639469ms)
+✔ PG17: group sessions own different backends and close releases reentrant locks even after a socket loss (44.195398ms)
+Retaining synthetic group-turn test schema turns_7faf3dc8fd9e4a45b44fe86cccdd748c at 2026-11-05T01:00:33.466Z
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"12c07403-4a2f-42d4-8edc-e6766c9baeca","messageId":"3772709f-e743-4b24-ac6b-a665fc0631e7"}
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"12c07403-4a2f-42d4-8edc-e6766c9baeca","messageId":"32caa62e-07ee-48bb-b926-9c1fffea2893"}
+{"event":"group_generation_failed","reason":"unknown_mention","conversationId":"12c07403-4a2f-42d4-8edc-e6766c9baeca","messageId":"a1cb0ca5-29a2-40d3-a0d9-d475765c2d26"}
+{"event":"group_generation_failed","reason":"generation_failed_not_replayed","conversationId":"12c07403-4a2f-42d4-8edc-e6766c9baeca","messageId":"bdfbd239-e985-4fa1-ad10-e61188a64ef4"}
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"acef2528-4f09-48d4-a905-a48d6dd934ec","messageId":"65b4f155-03a9-4451-be36-46ac751f52e1"}
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"12c07403-4a2f-42d4-8edc-e6766c9baeca","messageId":"a33e1369-7bdf-4375-85ca-f91fa234f9b9"}
+{"event":"group_generation_failed","reason":"unknown_mention","conversationId":"12c07403-4a2f-42d4-8edc-e6766c9baeca","messageId":"bf276e7e-5e8e-49e1-b92a-0c276a1c851a"}
+{"event":"group_generation_failed","reason":"generation_aborted","conversationId":"12c07403-4a2f-42d4-8edc-e6766c9baeca","messageId":"b05bddd3-f22b-4b19-ac8f-cee42d32ab09"}
+{"event":"group_generation_failed","reason":"generation_failed_not_replayed","conversationId":"12c07403-4a2f-42d4-8edc-e6766c9baeca","messageId":"54616676-4554-4588-8715-ad9d99bf28d5"}
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"12c07403-4a2f-42d4-8edc-e6766c9baeca","messageId":"17d88f1a-b1da-430b-91a0-0abd3e375ebe"}
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"12c07403-4a2f-42d4-8edc-e6766c9baeca","messageId":"8e573b79-baf5-420a-af5a-413c4f85f702","decisionFailure":"uncertain","decisionPhase":"responder"}
+{"case":"stop-before-claim","committedAt":"2026-11-05T01:00:36.877Z","stoppedStatus":"failed","finalStatus":"failed","error":"stopped","generations":0,"replies":0}
+▶ PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, rounds, correction persistence and privacy
+  ✔ a committed Stop cannot be resurrected after the queued SELECT (37.443242ms)
+{"case":"stop-before-private-publish","committedAt":"2026-11-05T01:00:36.939Z","finalStatus":"failed","error":"stopped","generations":1,"privateRowsBefore":1,"privateRowsAfter":1}
+  ✔ a committed Stop fences private publication and preserves earlier exchanges (44.015291ms)
+✔ PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, rounds, correction persistence and privacy (3485.998062ms)
+✔ 停止 ends the rounds: no further reply is generated once the turn is stopped (0.270609ms)
+✔ 停止 aborts a reply in flight once the poll sees it, and leaves a finished one alone (5.586574ms)
+✔ expired execution budget cancels before generation/status publication (0.303677ms)
+✔ production adapter does not select private standing instructions or sessions (0.817922ms)
+✔ correction facts come from model judgment and reject uncertain or invalid members (0.203737ms)
+✔ model route preserves its choice and rejects uncertain or non-member output (0.338001ms)
+✔ decision adapter retains each sequential host receipt and refuses missing, inconsistent or invalid answers (1.073889ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3900.906053

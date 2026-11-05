@@ -1,0 +1,23 @@
+{
+  "base": "efef5b5a5a8a55deb3c504b05fb736d4003e942c",
+  "testedBase": "3adee90c742b045e0eebd5854eecc6ade1c84aae",
+  "tree": "ab965bdf7851d50f65103a143b75f99a9557d55f",
+  "proof": [
+    {
+      "path": "lib/coordinator/group-turns.ts",
+      "testedBaseBlob": "b8bcce0edbffa25c0860afdbc28e6dca66874b64",
+      "prBaseBlob": "b8bcce0edbffa25c0860afdbc28e6dca66874b64",
+      "candidateBlob": "ac61b0ada4f538c2cc1dfd6b10d440ff6bef638d"
+    },
+    {
+      "path": "lib/coordinator/group-turns.test.ts",
+      "testedBaseBlob": "998dd00ecfd744f1fe027914f5b086b954898414",
+      "prBaseBlob": "998dd00ecfd744f1fe027914f5b086b954898414",
+      "candidateBlob": "a4657ffae06584bc23938a1f10c94f65c5bdaa9d"
+    }
+  ],
+  "changedFiles": [
+    "lib/coordinator/group-turns.test.ts",
+    "lib/coordinator/group-turns.ts"
+  ]
+}

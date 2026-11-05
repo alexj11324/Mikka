@@ -1,0 +1,11 @@
+{
+  "completedAt": "2026-11-05T01:00:37.035842+00:00",
+  "base": "a18d22a9d4b6b067297a72eb37205493be4f0b2b",
+  "exitCode": 0,
+  "sha256": {
+    "lib/coordinator/group-turns.ts": "0a2190602f448f7a84bce9aee8b607e08857cbec65010faf65cd18bfdd98f788",
+    "lib/coordinator/group-turns.test.ts": "c4147e3d6e8a34d28ef37948e049b12b1c60dd9d7901ce5f02d5daa02b5e5885"
+  },
+  "logSha256": "1c446ca3ca45fed9b68efd9cf50c738377464ad27c59c11b1660a7d18d9e3202",
+  "parts": 2
+}

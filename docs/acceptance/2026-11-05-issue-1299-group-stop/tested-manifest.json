@@ -1,0 +1,45 @@
+{
+  "base": "3adee90c742b045e0eebd5854eecc6ade1c84aae",
+  "tree": "ea9fe31416697ba7d9e6c3bade10c96f1cba7e94",
+  "createdAt": "2026-11-05T01:04:37.053616+00:00",
+  "files": [
+    {
+      "path": "lib/coordinator/group-turns.ts",
+      "bytes": 33045,
+      "sha256": "30a338d32c75f09e3f1b5fdbbb4ff96ade005ed0adc959e80338df79f08cacc5",
+      "blob": "ac61b0ada4f538c2cc1dfd6b10d440ff6bef638d"
+    },
+    {
+      "path": "lib/coordinator/group-turns.test.ts",
+      "bytes": 62906,
+      "sha256": "ddd16f6d12a80616e0dd3c2e37bc21fe336ecc301cbda2bf1d6c7373fbe3c717",
+      "blob": "a4657ffae06584bc23938a1f10c94f65c5bdaa9d"
+    }
+  ],
+  "gates": {
+    "red-final": {
+      "exitCode": 1,
+      "sha256": "fc92ce0d50d50d062e3933eff2abf2489929ed14a83a79efcd1714938ef58a93"
+    },
+    "related-final": {
+      "exitCode": 0,
+      "sha256": "fb4cea17147be684ead0b5a673a7a8368f6568e69c2497a5fffcb97a86ac870f"
+    },
+    "groups": {
+      "exitCode": 0,
+      "sha256": "b4b3c1ac192f1509eec708b982e601b0ed84664e093f3416bb9c8b49b6a0adfc"
+    },
+    "types-final": {
+      "exitCode": 0,
+      "sha256": "fd13ac0df28536c9daa1abc9656808473c6164e55afa5cad995d01f1dd2d6799"
+    },
+    "lint-final": {
+      "exitCode": 0,
+      "sha256": "3f1d72a76cd6db77b449c6f3e323372cbc626880102d59f859bf28994ec56e23"
+    },
+    "diffcheck-final": {
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "explicitDatabase": "group_stop_a18_20261105_e2e",
+  "testCreatedDatabases": {
+    "group_accepted_afe139451c3546d191d556656d74421f_e2e": [
+      "mikka-group-stop-3ad-related-final.log"
+    ],
+    "group_accepted_eb40dbb128f642fa962d0b51f58c204f_e2e": [
+      "mikka-group-stop-3ad-related-final.log"
+    ],
+    "group_accepted_2d3db5dbee56477fba3e6eb0708e1a53_e2e": [
+      "mikka-group-stop-3ad-related.log"
+    ],
+    "group_accepted_d1b4372a38424c09810ff41ea49d9ebc_e2e": [
+      "mikka-group-stop-3ad-related.log"
+    ]
+  }
+}

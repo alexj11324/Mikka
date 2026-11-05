@@ -1,0 +1,100 @@
+✔ group session uses the same database/role/TLS and only bypasses the documented Neon transaction pooler (1.890467ms)
+✔ group failure diagnostics preserve finite underlying causes and never private provider text (0.298596ms)
+✔ serial engine: dedupes each round, caps reciprocal mentions at 3 rounds, later sees previous data (10.965381ms)
+✔ nothing-to-add is not posted; removed members never generate; unknown peer mentions error before post (0.788768ms)
+✔ root explicit mentions all receive direct delivery; autonomous followups still need contribution and revoked targets cannot run (0.498877ms)
+✔ failure clears generating status and does not synthesize a response (0.301529ms)
+✔ private peer rounds stay bounded and never become another public responder context (0.479863ms)
+✔ private routing rejects foreign/self/third peers and an unavailable writer before exposing text (0.621797ms)
+✔ PG17: group sessions own different backends and close releases reentrant locks even after a socket loss (45.532253ms)
+Retaining synthetic group-turn test schema turns_49cdf202aa0c4160b4900849fbf44cdc at 2026-11-05T01:03:54.505Z
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"34738c56-c659-4f75-9b82-6bdf034777f1","messageId":"291aab42-8f20-4d2d-878f-990e6fcf3891"}
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"34738c56-c659-4f75-9b82-6bdf034777f1","messageId":"2d58667e-446d-40a0-95ab-7051fec05de3"}
+{"event":"group_generation_failed","reason":"unknown_mention","conversationId":"34738c56-c659-4f75-9b82-6bdf034777f1","messageId":"b7e8ff90-c777-43da-8f0a-030012f0ec4c"}
+{"event":"group_generation_failed","reason":"generation_failed_not_replayed","conversationId":"34738c56-c659-4f75-9b82-6bdf034777f1","messageId":"8c02ecb8-9f44-48bb-b12d-d46c6874cfdf"}
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"640f06e6-b91b-47cc-91f2-de5c5d42acf5","messageId":"19cb5db0-4d66-4089-98c7-2ded0b11ea8d"}
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"34738c56-c659-4f75-9b82-6bdf034777f1","messageId":"c03e9ad7-5cdc-43d4-b240-91a34633bc4e"}
+{"event":"group_generation_failed","reason":"unknown_mention","conversationId":"34738c56-c659-4f75-9b82-6bdf034777f1","messageId":"72f979e9-1a69-4b53-bde0-63c640a2ce5c"}
+{"event":"group_generation_failed","reason":"generation_aborted","conversationId":"34738c56-c659-4f75-9b82-6bdf034777f1","messageId":"dd4124e2-5dd0-4956-b0fd-d8c6c1f705d3"}
+{"event":"group_generation_failed","reason":"generation_failed_not_replayed","conversationId":"34738c56-c659-4f75-9b82-6bdf034777f1","messageId":"704fc6bc-51cd-4967-a03a-790054aadb8c"}
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"34738c56-c659-4f75-9b82-6bdf034777f1","messageId":"a2a43a82-00f9-4f63-b7d5-1c0fc58aad8a"}
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"34738c56-c659-4f75-9b82-6bdf034777f1","messageId":"1ff931a9-1cb0-4db3-918a-69db0ec9cd8b","decisionFailure":"uncertain","decisionPhase":"responder"}
+{"case":"stop-before-claim","committedAt":"2026-11-05T01:03:57.565Z","stoppedStatus":"failed","finalStatus":"complete","error":"stopped","generations":1,"replies":1}
+▶ PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, rounds, correction persistence and privacy
+  ✖ a committed Stop cannot be resurrected after the queued SELECT (29.686987ms)
+{"case":"stop-before-private-publish","committedAt":"2026-11-05T01:03:57.621Z","finalStatus":"failed","error":"stopped","generations":1,"privateRowsBefore":1,"privateRowsAfter":2}
+  ✖ a committed Stop fences private publication and preserves earlier exchanges (46.126026ms)
+✖ PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, rounds, correction persistence and privacy (3128.763456ms)
+✔ 停止 ends the rounds: no further reply is generated once the turn is stopped (0.352688ms)
+✔ 停止 aborts a reply in flight once the poll sees it, and leaves a finished one alone (5.960819ms)
+✔ expired execution budget cancels before generation/status publication (0.333301ms)
+✔ production adapter does not select private standing instructions or sessions (1.012796ms)
+✔ correction facts come from model judgment and reject uncertain or invalid members (0.270878ms)
+✔ model route preserves its choice and rejects uncertain or non-member output (0.488728ms)
+✔ decision adapter retains each sequential host receipt and refuses missing, inconsistent or invalid answers (1.557894ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 16
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3816.434775
+
+✖ failing tests:
+
+test at lib/coordinator/group-turns.test.ts:3:30159
+✖ a committed Stop cannot be resurrected after the queued SELECT (29.686987ms)
+  AssertionError [ERR_ASSERTION]: a root stopped after selection cannot start a responder
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (/vercel/sandbox/mikka-control-authority/group-stop-3ad/lib/coordinator/group-turns.test.ts:624:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-control-authority/group-stop-3ad/lib/coordinator/group-turns.test.ts:604:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/coordinator/group-turns.test.ts:3:32553
+✖ a committed Stop fences private publication and preserves earlier exchanges (46.126026ms)
+  AssertionError [ERR_ASSERTION]: Stop keeps existing private history without appending the late reply or a new link
+  + actual - expected
+  ... Skipped lines
+  
+    [
+      {
+        body: 'already committed private text',
+        id: '2aab7108-106d-4d29-a7e8-a4e72024fa5b',
+        linkId: '0bd1a141-815c-44c9-8aee-26421ab11e69',
+  ...
+      },
+  +   {
+  +     body: 'late private text must not persist',
+  +     id: '3639c87f-37dd-4e24-a35f-27e09b414bb8',
+  +     linkId: '929bcca4-98c8-4fe3-be37-92ebe4d188d5',
+  +     messageCount: '1',
+  +     position: '2'
+  +   }
+    ]
+  
+      at TestContext.<anonymous> (/vercel/sandbox/mikka-control-authority/group-stop-3ad/lib/coordinator/group-turns.test.ts:665:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-control-authority/group-stop-3ad/lib/coordinator/group-turns.test.ts:635:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ { id: '2aab7108-106d-4d29-a7e8-a4e72024fa5b', body: 'already committed private text', position: '1', linkId: '0bd1a141-815c-44c9-8aee-26421ab11e69', messageCount: '1' }, { id: '3639c87f-37dd-4e24-a35f-27e09b414bb8', body: 'late private text must not persist', position: '2', linkId: '929bcca4-98c8-4fe3-be37-92ebe4d188d5', messageCount: '1' } ],
+    expected: [ { id: '2aab7108-106d-4d29-a7e8-a4e72024fa5b', body: 'already committed private text', position: '1', linkId: '0bd1a141-815c-44c9-8aee-26421ab11e69', messageCount: '1' } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

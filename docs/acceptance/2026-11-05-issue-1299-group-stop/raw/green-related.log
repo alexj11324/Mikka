@@ -1,0 +1,145 @@
+
+> next-app@0.0.1 test:group-turns /vercel/sandbox/mikka-control-authority/group-stop-3ad
+> node --import tsx --test lib/coordinator/group-turns.test.ts lib/coordinator/group-reply-prompt.test.ts lib/coordinator/group-contribution.test.ts lib/coordinator/group-factory.db.test.ts lib/coordinator/group-decision-quality.test.ts lib/coordinator/group-decision-replay.test.ts lib/coordinator/group-decision-sequence.test.ts lib/coordinator/group-decision-quality.db.test.ts scripts/ops/group-production-acceptance.test.mjs scripts/ops/group-factory-acceptance.test.mjs scripts/ops/proactive-test-credentials.test.mjs && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/group-decision-consumer.test.ts
+
+✔ Decision ignore/observe are completed zero-wake actions, distinct from unavailable judgments (4.618302ms)
+✔ one relevant responder generates once; a second needs incremental contribution before generation (1.201438ms)
+✔ explicit mentions remain restricted; a foreign ID fails before decision or execution (0.542404ms)
+✔ delegate selects a host task and exactly one existing reporter; host result needs no generation (1.183715ms)
+✔ catalog reads only public skill descriptors, reflects tool removal and revoked owners on the next read (0.888345ms)
+✔ silent delegation still executes once, without an acknowledgement or chat generation (0.627992ms)
+✔ bots sharing a repository retain their own capability decision and changed public duties (0.410385ms)
+▶ PG: scoped decision traces, exact event counting, human feedback, revoked memberships and privacy
+  ✔ live rollback freezes each routing attempt and retains failed candidate receipts across a baseline retry (11.207456ms)
+✔ PG: scoped decision traces, exact event counting, human feedback, revoked memberships and privacy (166.698057ms)
+✔ deployment rollback changes live policy while host-selected replay versions stay fixed (1.465518ms)
+✔ trace snapshots detect duty/authorization changes without copying role instructions or extra fields (0.742677ms)
+✔ receipt allowlist drops private envelopes and rejects malformed or forged model metadata (0.497363ms)
+✔ offline replay distinguishes false wakes from useful silent delegation and preserves unknown cost (1.125899ms)
+✔ review gate rejects missing cases, wrong members, missed help and increased public noise (1.17849ms)
+✔ runtime observations count actual events, including no public message for delegated work (0.377747ms)
+✔ feedback provenance cannot be client-selected and policy rollback is explicit/versioned (2.078692ms)
+✔ v3 is live while historical v1 and v2 receipts keep their original versions (1.930855ms)
+✔ fixed-case replay uses the model route, never expected labels, and never executes its projection (6.895834ms)
+✔ baseline and candidate share fixed inputs but use distinct prompts; mentions and task targets stay host-bound (2.462484ms)
+✔ missing/malformed receipts cannot be measured as actual inference; runtime faults are not invented provider responses (4.027941ms)
+✔ cost and latency include invalid paid requests; partial/unknown costs never become a complete total (0.575131ms)
+✔ real replay runner fails before calls without normal auth/fixed deployment and stops on unreceipted evidence (22.236697ms)
+✔ fixed replay collection continues after real uncertain and partial invalid results without making quality pass (17.281703ms)
+✔ collector rejects a repeated provider receipt across different logical cases without retrying (1.318568ms)
+✔ a changed deployment after an invalid observation prevents the next fixed replay (1.055988ms)
+✔ full-dataset accuracy retains uncertain and missing cases in its denominator (0.981061ms)
+✔ a fixed baseline abstention remains a failure while a fully correct candidate becomes reviewable (10.764634ms)
+✔ new comparison rejects candidate uncertainty and non-semantic baseline failures (43.683012ms)
+✔ a complete baseline requires an intact typed route and matching projection before comparison (3.294623ms)
+✔ commit build is required; a deployment ID in the public version cannot stand in for it (0.368245ms)
+✔ independent-question protocol: silence completes after one atomic intent with no responder request (5.451758ms)
+✔ sequential responders receive confirmed prior selections; duplicates are unavailable choices and end stops calls (1.712561ms)
+✔ an uncertain later answer preserves the real earlier and failed receipts without fabricating a partial route (1.357997ms)
+✔ multiple explicit authorized mentions retain direct delivery and order after semantic intent (1.015076ms)
+✔ delegation chooses an atomic host task plan before timing; an existing task keeps its designated reporter (1.053815ms)
+✔ baseline preserves forced reply with multiple responders while automatic selection remains bounded (0.910256ms)
+✔ a live policy change applies to the next routing attempt and cannot mix phases inside the current attempt (3.217443ms)
+✔ v2 clarification selects a questioner without treating the missing task details as a missing responder (7.867004ms)
+✔ v2 independent contributions select speaking order, then still require a separate bounded responder decision (0.951658ms)
+✔ v0 baseline and historical v1 request bytes match the six recorded synthetic production request digests (2.384509ms)
+✔ v3 independently requested perspectives survive overlapping skills and stop once the requested views are represented (0.835734ms)
+✔ historical v0/v1/v2 offline request compatibility matches 63 archived synthetic production receipt digests (10.805465ms)
+Retained isolated group Factory bridge schema group_factory_aee1995429544b0ebe5695200b438d38; source/dispatch adapters synthetic, PG persistence real
+✔ PG: group delegation has one Task/Thread, requester scope, replay receipt, latest epoch, status/stop and one reporter (131.826436ms)
+✔ server reports do not claim work passed merely because execute passed (0.398241ms)
+✔ localized task, producer thread and artifact links use the application navigation owners (0.760656ms)
+Retained group_accepted_afe139451c3546d191d556656d74421f_e2e; real Factory store/acceptance/reconciliation, synthetic upstream execution and browser session
+✔ PG: real Factory deliverable acceptance publishes one final report with current-epoch artifact and producer thread (591.067429ms)
+Retained group_accepted_eb40dbb128f642fa962d0b51f58c204f_e2e; real Factory store/acceptance/reconciliation, synthetic upstream execution and browser session
+✔ PG: real Factory repository acceptance publishes one final report with current-epoch artifact and producer thread (635.772745ms)
+✔ PG: production group Factory authorization uses typed Bot membership and rechecks both current workspace owners (33.121028ms)
+(node:55997) Warning: AI SDK Warning System: To turn off warning logging, set the AI_SDK_LOG_WARNINGS global to false.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:55997) Warning: AI SDK Warning (contract-deepseek.chat / deepseek-flash): The feature "responseFormat" is not supported. JSON response format schema is only supported with structuredOutputs
+✔ group structured output satisfies the DeepSeek JSON-mode prompt contract (91.388856ms)
+✔ group session uses the same database/role/TLS and only bypasses the documented Neon transaction pooler (1.713196ms)
+✔ group failure diagnostics preserve finite underlying causes and never private provider text (0.307375ms)
+✔ serial engine: dedupes each round, caps reciprocal mentions at 3 rounds, later sees previous data (15.167118ms)
+✔ nothing-to-add is not posted; removed members never generate; unknown peer mentions error before post (0.667602ms)
+✔ root explicit mentions all receive direct delivery; autonomous followups still need contribution and revoked targets cannot run (0.5651ms)
+✔ failure clears generating status and does not synthesize a response (0.357343ms)
+✔ private peer rounds stay bounded and never become another public responder context (0.511495ms)
+✔ private routing rejects foreign/self/third peers and an unavailable writer before exposing text (0.659362ms)
+✔ PG17: group sessions own different backends and close releases reentrant locks even after a socket loss (30.480926ms)
+Retaining synthetic group-turn test schema turns_62aa2aba768d4ff185a4c2b5d57668a5 at 2026-11-05T01:03:58.852Z
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"1bd6eeb0-7d4b-436d-8463-1c13b536131d","messageId":"64db3598-e2d8-4516-a6e8-1b4ecd5dd3a0"}
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"1bd6eeb0-7d4b-436d-8463-1c13b536131d","messageId":"17bd2d6d-fca3-4811-9559-2d760746046f"}
+{"event":"group_generation_failed","reason":"unknown_mention","conversationId":"1bd6eeb0-7d4b-436d-8463-1c13b536131d","messageId":"1d8abd5b-88db-4c85-af98-40a8747c2f7f"}
+{"event":"group_generation_failed","reason":"generation_failed_not_replayed","conversationId":"1bd6eeb0-7d4b-436d-8463-1c13b536131d","messageId":"91466c4e-fa25-4a30-bb21-6130e2e9abb1"}
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"0f3951e2-220e-4e7d-b521-7d0c5591ed8d","messageId":"82f5f459-769a-4f8d-8f4b-da5242d3a3a0"}
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"1bd6eeb0-7d4b-436d-8463-1c13b536131d","messageId":"097dd0f8-5ddd-472d-96b8-97896be7ac9a"}
+{"event":"group_generation_failed","reason":"unknown_mention","conversationId":"1bd6eeb0-7d4b-436d-8463-1c13b536131d","messageId":"ebf6a4ce-5287-4cc3-92c6-ac164d92199a"}
+{"event":"group_generation_failed","reason":"generation_aborted","conversationId":"1bd6eeb0-7d4b-436d-8463-1c13b536131d","messageId":"23b20a16-3da4-4f0b-a3b4-d95abb848aca"}
+{"event":"group_generation_failed","reason":"generation_failed_not_replayed","conversationId":"1bd6eeb0-7d4b-436d-8463-1c13b536131d","messageId":"42f5fdef-7a50-4f06-93c9-3b736cf1a309"}
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"1bd6eeb0-7d4b-436d-8463-1c13b536131d","messageId":"f45cbec1-856a-453e-91f8-0a15f2d20bb5"}
+{"event":"group_generation_failed","reason":"group_judgment_pending","conversationId":"1bd6eeb0-7d4b-436d-8463-1c13b536131d","messageId":"1ca66428-d539-4824-94ed-8c04c32ff87a","decisionFailure":"uncertain","decisionPhase":"responder"}
+{"case":"stop-before-claim","committedAt":"2026-11-05T01:04:01.881Z","stoppedStatus":"failed","finalStatus":"failed","error":"stopped","generations":0,"replies":0}
+▶ PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, rounds, correction persistence and privacy
+  ✔ a committed Stop cannot be resurrected after the queued SELECT (37.782159ms)
+{"case":"stop-before-private-publish","committedAt":"2026-11-05T01:04:01.944Z","finalStatus":"failed","error":"stopped","generations":1,"privateRowsBefore":1,"privateRowsAfter":1}
+  ✔ a committed Stop fences private publication and preserves earlier exchanges (44.6871ms)
+✔ PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, rounds, correction persistence and privacy (3101.639971ms)
+✔ 停止 ends the rounds: no further reply is generated once the turn is stopped (0.367351ms)
+✔ 停止 aborts a reply in flight once the poll sees it, and leaves a finished one alone (5.856191ms)
+✔ expired execution budget cancels before generation/status publication (0.307086ms)
+✔ production adapter does not select private standing instructions or sessions (0.984622ms)
+✔ correction facts come from model judgment and reject uncertain or invalid members (0.251918ms)
+✔ model route preserves its choice and rejects uncertain or non-member output (0.431568ms)
+✔ decision adapter retains each sequential host receipt and refuses missing, inconsistent or invalid answers (1.449824ms)
+✔ real-API driver contract accepts two exact artifact versions and stops a third epoch on the same Task (11.510163ms)
+✔ a non-Flash fallback fails before any paid group task prompt (0.823918ms)
+✔ actual frozen subscription execution cannot masquerade as Flash API-key acceptance (1.11483ms)
+✔ wrong downloaded bytes cannot be human-accepted, and fixture IDs survive failure (0.804535ms)
+✔ actual frozen execution ownership is checked before acceptance: wrongPrincipal (0.683045ms)
+✔ actual frozen execution ownership is checked before acceptance: wrongRuntimePayer (0.345505ms)
+✔ a second Bot final report fails even if it links the correct Task and artifact (0.62337ms)
+✔ a status query that mutates the Task fails before continuation (1.141643ms)
+✔ the old target bytes cannot satisfy the second epoch or reach its human acceptance (1.922024ms)
+✔ second-epoch checks cannot reuse old request evidence: oldContinuationAttemptEpoch (3.41723ms)
+✔ second-epoch checks cannot reuse old request evidence: oldContinuationCheckEpoch (1.404998ms)
+✔ the second epoch still requires three independent producer/review/verify runs (1.76658ms)
+✔ cancelled Task without an actual run stop acknowledgement times out with resumable evidence (1.933956ms)
+✔ production driver requires an authorized test identity and fixed deployment before any I/O (3.401169ms)
+✔ a moving deployment is rejected before login or fixture writes (19.235443ms)
+✔ a different authenticated identity is rejected and only the transient session is signed out (2.890969ms)
+✔ unavailable Flash stops before a prompt; hosted fallback is not selected and fixture IDs are retained (5.415189ms)
+✔ pending judgment can finish within the original budget but never passes as silence while pending (7.810596ms)
+✔ a permanently pending judgment times out and stops only the newly created owner fixture once (20.718678ms)
+✔ cleanup refuses a changed owner; an unknown stop is observed without another write (43.965002ms)
+✔ unauthorized test identity cannot sign in or inspect credentials (1.318219ms)
+✔ an existing personal key is neither replaced nor deleted (20.992562ms)
+✔ an unsuccessful acceptance still removes only its newly returned key and signs out (3.153453ms)
+✔ cloud acceptance preserves an existing runtime credential (1.581236ms)
+✔ a failed cloud acceptance cleans both newly configured credentials (4.073087ms)
+ℹ tests 93
+ℹ suites 0
+ℹ pass 93
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3977.698714
+Decision unavailable { purpose: 'group-routing' }
+Decision unavailable { purpose: 'group-correction' }
+(node:56149) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:56149) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ group consumer uses a sequential chain of actual host receipts from synthetic REST, not model prose (80.019863ms)
+✔ malformed paid responses remain null by default; only host group diagnostics can retain an unusable receipt (10.497192ms)
+✔ fixed replay uses invokeDecision host receipts and refuses a receipt-less REST response (7.654632ms)
+✔ actual structured generation distinguishes public/private output and validates the peer UUID (537.906773ms)
+✔ Bot group generation reuses frozen binding references and streaming, without a paid-default fallback (163.509768ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1144.24749

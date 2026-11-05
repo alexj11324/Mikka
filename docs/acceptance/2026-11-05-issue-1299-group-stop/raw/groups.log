@@ -1,0 +1,61 @@
+
+> next-app@0.0.1 test:groups /vercel/sandbox/mikka-control-authority/group-stop-3ad
+> node --import tsx --test lib/group-conversations.test.ts lib/message-reactions.test.ts lib/thread-submission-input.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/workspace/message-reactions.test.tsx scripts/thread-composer.test.tsx components/nav/new-group-dialog.test.tsx components/workspace/group-chat-view.test.tsx
+
+✔ directory rejects foreign/suspended users and private or malformed agents (3.669806ms)
+✔ GET conversations: authentication, write Origin/Host before DB (2.38552ms)
+✔ POST conversations: authentication, write Origin/Host before DB (0.526905ms)
+✔ GET messages: authentication, write Origin/Host before DB (0.287183ms)
+✔ POST messages: authentication, write Origin/Host before DB (0.53104ms)
+✔ POST members: authentication, write Origin/Host before DB (0.586305ms)
+✔ DELETE members: authentication, write Origin/Host before DB (0.566004ms)
+Retaining synthetic group test schema group_test_2975ccfe37df48c98d3d8a7fa884d262 at 2026-11-05T01:02:14.322Z
+Retaining synthetic group test schema group_test_0a1f2aad3714439aadefdfd2779c9d75 at 2026-11-05T01:02:14.323Z
+✔ Postgres17 migration, atomic history, pagination, unread counts, membership and privacy (151.532281ms)
+✔ reaction reads ask only for stored messages, once each, a hundred per request (1.651055ms)
+✔ reactions from every page merge; a failed or malformed page reads as none (19.581025ms)
+✔ a refreshed unknown submission retains its original ID and run despite an advanced chain (4.735014ms)
+✔ edited text is a new explicit request; damaged saved state is not reused (0.629184ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 715.973197
+(node:55551) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:55551) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a completed create from an unmounted workspace cannot navigate the current workspace or replay the POST (514.035691ms)
+(node:55552) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:55552) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+(node:55552) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+✔ Factory task and thread references in bot and agent replies are real links; sent user text keeps its existing rendering (956.237275ms)
+✔ group replies use the existing Markdown HTML and URL protections (9.084378ms)
+(node:55553) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:55553) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+✔ reactions read as chips: count past one, the person's own tinted and named (30.162575ms)
+✔ a message nobody reacted to has no reaction row (0.855225ms)
+2026-11-05T01:02:18.019Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+(node:55559) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:55559) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+(node:55559) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+✔ an open thread ends in the composer whether it runs or has ended (520.870729ms)
+✔ the Artifact window and the thread column keep the composer (10.088337ms)
+✔ a thread the viewer cannot read in full has no composer (16.440551ms)
+✔ every conversation container draws the shared composer, directly or through the thread panel (0.906217ms)
+✔ an open thread lets the agent’s words be quoted and every message be copied (8.182816ms)
+✔ the original thread shows the latest failed continuation and its existing Retry control (16.071182ms)
+✔ a historical failure does not offer Retry while the latest continuation works or has succeeded (13.517007ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3687.918095

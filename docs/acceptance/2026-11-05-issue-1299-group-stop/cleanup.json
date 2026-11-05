@@ -1,0 +1,73 @@
+{
+  "completedAt": "2026-11-05T01:09:21.965Z",
+  "identity": {
+    "database": "mikka_e2e",
+    "role": "mikka_test",
+    "address": "127.0.0.1/32",
+    "host": "127.0.0.1",
+    "port": 5432,
+    "version": "17.11 (Ubuntu 17.11-1.pgdg26.04+2)"
+  },
+  "ownershipBasis": "one explicitly created database plus four exact UUID databases recorded by this run group-factory.db.test.ts CREATE DATABASE fixtures",
+  "priorGuardRejection": "inet_server_addr()::text is 127.0.0.1/32; use host(inet_server_addr()) for exact 127.0.0.1 comparison. Initial attempt performed no DROP.",
+  "before": [
+    {
+      "name": "group_accepted_2d3db5dbee56477fba3e6eb0708e1a53_e2e",
+      "owner": "mikka_test"
+    },
+    {
+      "name": "group_accepted_afe139451c3546d191d556656d74421f_e2e",
+      "owner": "mikka_test"
+    },
+    {
+      "name": "group_accepted_d1b4372a38424c09810ff41ea49d9ebc_e2e",
+      "owner": "mikka_test"
+    },
+    {
+      "name": "group_accepted_eb40dbb128f642fa962d0b51f58c204f_e2e",
+      "owner": "mikka_test"
+    },
+    {
+      "name": "group_stop_a18_20261105_e2e",
+      "owner": "mikka_test"
+    }
+  ],
+  "connectionsBefore": [],
+  "actions": [
+    {
+      "database": "group_stop_a18_20261105_e2e",
+      "operation": "DROP DATABASE",
+      "force": false,
+      "completedAt": "2026-11-05T01:09:21.791Z"
+    },
+    {
+      "database": "group_accepted_afe139451c3546d191d556656d74421f_e2e",
+      "operation": "DROP DATABASE",
+      "force": false,
+      "completedAt": "2026-11-05T01:09:21.843Z"
+    },
+    {
+      "database": "group_accepted_eb40dbb128f642fa962d0b51f58c204f_e2e",
+      "operation": "DROP DATABASE",
+      "force": false,
+      "completedAt": "2026-11-05T01:09:21.892Z"
+    },
+    {
+      "database": "group_accepted_2d3db5dbee56477fba3e6eb0708e1a53_e2e",
+      "operation": "DROP DATABASE",
+      "force": false,
+      "completedAt": "2026-11-05T01:09:21.931Z"
+    },
+    {
+      "database": "group_accepted_d1b4372a38424c09810ff41ea49d9ebc_e2e",
+      "operation": "DROP DATABASE",
+      "force": false,
+      "completedAt": "2026-11-05T01:09:21.964Z"
+    }
+  ],
+  "remainingOwned": [],
+  "rolesChanged": [],
+  "sharedDatabaseChanged": false,
+  "sharedPostgresStopped": false,
+  "sandboxStopped": false
+}
