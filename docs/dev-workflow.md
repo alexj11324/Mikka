@@ -48,6 +48,12 @@ Use a production build (`next build` then `next start`) only for production
 screenshots of a UI change. Run `next build`
 directly (`pnpm exec next build`): `pnpm build` also runs lint and migrations.
 
+When using `next build --webpack` for production screenshots, the existing
+Webpack hook also keeps its cache in memory. This avoids the filesystem
+cache's dependency scan and serialization buffers for the large module
+graph. It trades persistent Webpack cache reuse for lower build memory;
+it does not change application caching or the default Turbopack build.
+
 Vercel builds on a Standard machine: 4 cores, 8 GB. `next build` peaks at
 "Collecting page data", while Turbopack's ~5 GB is still held in the
 `next-build` process. So production builds emit no source maps and stop

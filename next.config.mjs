@@ -51,9 +51,10 @@ const nextConfig = {
     },
   },
   webpack(config, { dev }) {
-    // The dev filesystem cache serializes the ~24k-module graph into ~2 GB of
-    // buffers and does not make a restart much faster (docs/dev-workflow.md).
-    if (dev) config.cache = { type: 'memory' }
+    // Serializing the ~24k-module graph into the filesystem cache adds large
+    // buffers. Keep Webpack's existing memory cache for dev and production
+    // screenshots; preserve an explicitly disabled production cache.
+    if (dev || config.cache) config.cache = { type: 'memory' }
     config.resolve.alias['react-syntax-highlighter$'] = new URL('./components/workspace/agent-syntax-highlighter.tsx', import.meta.url).pathname
     return config
   },
