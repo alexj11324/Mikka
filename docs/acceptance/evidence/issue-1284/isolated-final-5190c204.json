@@ -1,0 +1,212 @@
+{
+  "kind": "issue1284-isolated-final-acceptance",
+  "source": {
+    "sha": "5190c20497d1ffe2d7540def2c1fbf0d422448dc",
+    "tree": "c1b99368abf14055fc744ca4dbb1694b9f7a3e33",
+    "cleanBeforeBuild": true,
+    "cleanAfterAcceptance": true
+  },
+  "origin": {
+    "value": "http://localhost:3110",
+    "strictDeploymentAttestation": true,
+    "attestationBoundToExactSourceSha": true
+  },
+  "build": {
+    "command": "pnpm build",
+    "exitCode": 0,
+    "startedAt": "2026-11-05T02:02:24.984Z",
+    "finishedAt": "2026-11-05T02:03:06.350Z",
+    "completedStages": [
+      "build-subscription-worker",
+      "generate:agent-ui",
+      "next build",
+      "pnpm typecheck",
+      "normal database migrations"
+    ]
+  },
+  "authentication": {
+    "normalTestAccountPoolSignupAndSignin": true,
+    "ownerAndPeerSessionIdentityVerified": true
+  },
+  "http": {
+    "startedAt": "2026-11-05T02:03:42.872Z",
+    "finishedAt": "2026-11-05T02:03:45.083Z",
+    "total": 27,
+    "passed": 27,
+    "failed": 0,
+    "checks": [
+      {
+        "name": "strict deployment attestation",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "owner session HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "owner session identity",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "peer session HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "peer session identity",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "owner workspace HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "peer workspace HTTP",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "anonymous Profile list refused",
+        "actual": 401,
+        "expected": 401,
+        "passed": true
+      },
+      {
+        "name": "authenticated Profile list",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "Profile response is private",
+        "actual": "private, no-store",
+        "expected": "private, no-store",
+        "passed": true
+      },
+      {
+        "name": "create Profile via authenticated POST",
+        "actual": 201,
+        "expected": 201,
+        "passed": true
+      },
+      {
+        "name": "initial Profile version",
+        "actual": 1,
+        "expected": 1,
+        "passed": true
+      },
+      {
+        "name": "read own Profile",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "saved instructions unchanged",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "peer cannot read owner workspace Profile",
+        "actual": 404,
+        "expected": 404,
+        "passed": true
+      },
+      {
+        "name": "update owned Profile via PATCH",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "updated Profile version",
+        "actual": 2,
+        "expected": 2,
+        "passed": true
+      },
+      {
+        "name": "revision changes digest",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "stale Profile update rejected",
+        "actual": 409,
+        "expected": 409,
+        "passed": true
+      },
+      {
+        "name": "read Profile history",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "immutable revisions retained",
+        "actual": 2,
+        "expected": 2,
+        "passed": true
+      },
+      {
+        "name": "archive owned Profile via DELETE",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "archive recorded",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "list after archive",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "archived Profile absent from active list",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      },
+      {
+        "name": "peer own workspace remains available",
+        "actual": 200,
+        "expected": 200,
+        "passed": true
+      },
+      {
+        "name": "peer list isolated",
+        "actual": true,
+        "expected": true,
+        "passed": true
+      }
+    ]
+  },
+  "cleanup": {
+    "normalLeaseRelease": true,
+    "activeLeases": 0,
+    "validSessions": 0,
+    "previewListening": false,
+    "ownedLiveProcesses": 0,
+    "controllerStoppedAt": "2026-11-05T02:04:51.948Z",
+    "verifiedAt": "2026-11-05T02:04:53.236Z"
+  },
+  "publicSummary": "已发布提交 5190c20497d1ffe2d7540def2c1fbf0d422448dc 在 Docker 隔离环境完成完整 pnpm build，退出码 0；通过绑定该 SHA 的严格部署身份校验与正常 TestAccountPool 注册登录；27 项 HTTP 断言全部通过。验证覆盖账号会话、Profile CRUD、版本冲突、历史保留和工作区权限隔离。验收后 active leases=0、有效 sessions=0、预览已停止、所属存活进程=0。该收据记录隔离构建和 HTTP 验收，不代表真实供应商的生产 CC/Codex 执行验收。"
+}

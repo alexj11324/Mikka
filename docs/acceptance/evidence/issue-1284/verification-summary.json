@@ -1,0 +1,37 @@
+{
+  "gates": {
+    "sourceLocal": "cbe50f020a3d87dfbd5c11b2e9a4c0c1a8703a1a",
+    "published": "5190c20497d1ffe2d7540def2c1fbf0d422448dc",
+    "tree": "c1b99368abf14055fc744ca4dbb1694b9f7a3e33",
+    "coordinator": {
+      "pass": 345,
+      "fail": 0,
+      "skip": 0,
+      "log": "/tmp/issue1284-cbe50f-coordinator-events.log"
+    },
+    "questionWorker": {
+      "pass": 68,
+      "fail": 0,
+      "skip": 0,
+      "log": "/tmp/issue1284-main1301-regression-runtime.log"
+    },
+    "profileQuestion": {
+      "pass": 17,
+      "fail": 0,
+      "skip": 0,
+      "log": "/tmp/issue1284-main1301-regression-profile.log"
+    },
+    "isolatedDatabaseCleaned": true
+  },
+  "newMainPollingPolicy": {
+    "guardSource": "7e20598ca47b079564a44c5df619ddce7af2d364",
+    "auditedHead": "5190c20497d1ffe2d7540def2c1fbf0d422448dc",
+    "diagnostics": 0,
+    "staleAllowlist": 0,
+    "globalPeriodicRefresh": false,
+    "profilePeriodicRefresh": false,
+    "reads": "initial load, focus event or explicit mutation refresh; no direct profile push claim"
+  },
+  "api": "User explicitly excluded unfunded DeepSeek API. No balance probe or paid API test. test:local-loop not run.",
+  "production": "Pending actual post-deploy Agent Profile acceptance at time of this checkpoint."
+}
