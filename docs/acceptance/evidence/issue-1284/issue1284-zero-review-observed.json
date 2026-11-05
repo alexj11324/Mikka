@@ -1,0 +1,41 @@
+{
+  "kind": "production-review-report-observed-through-owner-ui",
+  "observedAt": "2026-11-05T05:59:55.874Z",
+  "producerRunId": "7d3b4ea8-c9f5-4d87-8d91-28c7b6608355",
+  "runId": "6d2409ea-8911-4db5-801c-75b65da05585",
+  "taskId": "feaefa0a-d826-49a2-b6bd-b02f55b267ce",
+  "candidateId": "6bae401a-b4d2-486b-b6d5-e96bc12a0678",
+  "repositoryCandidateSha": null,
+  "producerSessionSha256": "73c3bfe72221a083312ce3f1f9e2e93d61201bb1acb2c58eb55e724c4ef6d03e",
+  "report": {
+    "check": {
+      "sha": "5266aa0da32a8a6bdd6901ae21c610a93d26255e",
+      "readOnly": true
+    },
+    "verify": {
+      "status": "not_run"
+    },
+    "summary": "Independent read-only review of candidate 6bae401a-b4d2-486b-b6d5-e96bc12a0678 at 5266aa0da32a8a6bdd6901ae21c610a93d26255e. mikka.inspect_artifact on mikka-1284-default-ready.txt returned 36 bytes, SHA-256 2477b0bbddcb38a090a51700a4d4106a31cfb0efada1932edc7afc42af56c00b, HEAD 5266aa0da32a8a6bdd6901ae21c610a93d26255e, committed SHA-256 identical, contentMatchesGit true, and matchesExpectedUtf8 true against \"mikka-1284-default-ready\\n6 * 7 = 42\\n\". Byte arithmetic checks out: 24+1 + 10+1 = 36. The arithmetic 6 * 7 = 42 is correct. No code was changed and no shell was used. Producer command records (run 7d3b4ea8-c9f5-4d87-8d91-28c7b6608355, session [native session redacted], status succeeded) show the same bytes and SHA-256 in run-chunk:75843711-826b-4790-8e5b-a63278c91461; I cite them as producer observations, not as commands run here. The producer's verify status was not_run; no verifyCommand was granted to this check.",
+    "criteria": [
+      {
+        "text": "File mikka-1284-default-ready.txt exists in the fixed worktree with exact UTF-8 content \"mikka-1284-default-ready\\n6 * 7 = 42\\n\", 36 bytes, LF only, one trailing LF, no blank lines",
+        "passed": true,
+        "evidence": "mikka.inspect_artifact path=mikka-1284-default-ready.txt: bytes=36, contentUtf8 = \"mikka-1284-default-ready\\n6 * 7 = 42\\n\", matchesExpectedUtf8=true for the exact expected text including the final newline. Producer observation run-chunk:75843711-826b-4790-8e5b-a63278c91461 also reports lf=2 cr=0 and cat -A output with no blank lines."
+      },
+      {
+        "text": "SHA-256 of mikka-1284-default-ready.txt equals 2477b0bbddcb38a090a51700a4d4106a31cfb0efada1932edc7afc42af56c00b",
+        "passed": true,
+        "evidence": "mikka.inspect_artifact sha256 = 2477b0bbddcb38a090a51700a4d4106a31cfb0efada1932edc7afc42af56c00b, matching the expected value. Producer observation run-chunk:75843711-826b-4790-8e5b-a63278c91461 reports the same digest."
+      },
+      {
+        "text": "The file is committed at the fixed candidate HEAD and matches the working tree",
+        "passed": true,
+        "evidence": "mikka.inspect_artifact head = 5266aa0da32a8a6bdd6901ae21c610a93d26255e; committedSha256 = 2477b0bbddcb38a090a51700a4d4106a31cfb0efada1932edc7afc42af56c00b; contentMatchesGit = true."
+      }
+    ],
+    "nextStep": "Owner acceptance in the UI. No code merge or build is required. No Accept or Verify was performed by this check.",
+    "filesChanged": [],
+    "sourceCommit": "5266aa0da32a8a6bdd6901ae21c610a93d26255e",
+    "openQuestions": []
+  }
+}

@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "kind": "owner-visible-frozen-profile-metadata-supplement",
+  "issue": 1284,
+  "recordedAt": "2026-11-05T06:33:33.524Z",
+  "provenance": "Structured fields transcribed from normal signed-in Owner browser directly rendering existing read-only JSON endpoints. Only allowlisted metadata retained; not a raw full response.",
+  "runs": [
+    {
+      "caseName": "zero_execute",
+      "observedAt": "2026-11-05T06:31:59.489Z",
+      "url": "https://app.aspectlylabs.com/mikka/api/runs/7d3b4ea8-c9f5-4d87-8d91-28c7b6608355/evidence",
+      "run": {
+        "id": "7d3b4ea8-c9f5-4d87-8d91-28c7b6608355",
+        "issueId": "dd7bc618-b7ae-4835-981e-acd3f233c3da",
+        "status": "succeeded",
+        "harness": "claude_code",
+        "model": "claude-haiku-5-5",
+        "credentialType": "subscription",
+        "subscriptionRoute": "claude_code_cli",
+        "modelRouting": null,
+        "agentProfile": {
+          "profileId": "default",
+          "name": "Default Agent",
+          "version": 1,
+          "digest": "11d1251a5ce926292b6ad64f27039633ab031f620cdead0ba6d71cb18a762c96",
+          "source": "default",
+          "reason": "default"
+        }
+      }
+    },
+    {
+      "caseName": "zero_review",
+      "observedAt": "2026-11-05T06:31:59.814Z",
+      "url": "https://app.aspectlylabs.com/mikka/api/runs/6d2409ea-8911-4db5-801c-75b65da05585/evidence",
+      "run": {
+        "id": "6d2409ea-8911-4db5-801c-75b65da05585",
+        "issueId": "dd7bc618-b7ae-4835-981e-acd3f233c3da",
+        "status": "succeeded",
+        "harness": "claude_code",
+        "model": "claude-haiku-5-5",
+        "credentialType": "subscription",
+        "subscriptionRoute": "claude_code_cli",
+        "modelRouting": null,
+        "agentProfile": {
+          "profileId": "default",
+          "name": "Default Agent",
+          "version": 1,
+          "digest": "11d1251a5ce926292b6ad64f27039633ab031f620cdead0ba6d71cb18a762c96",
+          "source": "default",
+          "reason": "default"
+        }
+      }
+    },
+    {
+      "caseName": "frontend_execute",
+      "observedAt": "2026-11-05T06:30:39.218Z",
+      "url": "https://app.aspectlylabs.com/mikka/api/runs/aef86f65-3c9b-4434-8f50-eaaed004678b/evidence",
+      "run": {
+        "id": "aef86f65-3c9b-4434-8f50-eaaed004678b",
+        "issueId": "06c14053-5490-4bd6-90e9-391fc5dca740",
+        "status": "failed",
+        "harness": "claude_code",
+        "model": "claude-haiku-5-5",
+        "credentialType": "subscription",
+        "subscriptionRoute": "claude_code_cli",
+        "modelRouting": null,
+        "agentProfile": {
+          "profileId": "55e1952f-0129-43c6-9690-2f1b9d99e6b2",
+          "name": "1284 前端实现",
+          "version": 1,
+          "digest": "3a33e10dff60bf8ae3c5702ab9ce6b30184f9b3c4e65cff1055caea87621c182",
+          "source": "decision",
+          "reason": "capability_fit"
+        }
+      }
+    },
+    {
+      "caseName": "backend_execute",
+      "observedAt": "2026-11-05T06:31:07.318Z",
+      "url": "https://app.aspectlylabs.com/mikka/api/runs/52c25088-3cbf-4e3f-882f-d7b3296637a4/evidence",
+      "run": {
+        "id": "52c25088-3cbf-4e3f-882f-d7b3296637a4",
+        "issueId": "6cda8149-144c-49cc-bdcb-a85ff14cb144",
+        "status": "succeeded",
+        "harness": "claude_code",
+        "model": "claude-haiku-5-5",
+        "credentialType": "subscription",
+        "subscriptionRoute": "claude_code_cli",
+        "modelRouting": null,
+        "agentProfile": {
+          "profileId": "923c75f2-cecb-4bb2-b812-646d057e8a22",
+          "name": "1284 后端实现",
+          "version": 1,
+          "digest": "91fb6c351e970b2920a3d07de9d60c3df58fd755b9ae3a3534ac947f9292b731",
+          "source": "decision",
+          "reason": "capability_fit"
+        }
+      }
+    }
+  ],
+  "profileManagement": {
+    "observedAt": "2026-11-05T06:31:19.323Z",
+    "profiles": [
+      {
+        "profileId": "55e1952f-0129-43c6-9690-2f1b9d99e6b2",
+        "name": "1284 前端实现",
+        "version": 1,
+        "digest": "3a33e10dff60bf8ae3c5702ab9ce6b30184f9b3c4e65cff1055caea87621c182",
+        "createdAt": "2026-11-05T06:02:49.689Z",
+        "updatedAt": "2026-11-05T06:02:49.689Z",
+        "enabled": true,
+        "archivedAt": null,
+        "harness": "claude_code",
+        "model": {
+          "mode": "inherit"
+        },
+        "availability": {
+          "available": false,
+          "reason": "checking"
+        }
+      },
+      {
+        "profileId": "923c75f2-cecb-4bb2-b812-646d057e8a22",
+        "name": "1284 后端实现",
+        "version": 1,
+        "digest": "91fb6c351e970b2920a3d07de9d60c3df58fd755b9ae3a3534ac947f9292b731",
+        "createdAt": "2026-11-05T06:03:25.697Z",
+        "updatedAt": "2026-11-05T06:03:25.697Z",
+        "enabled": true,
+        "archivedAt": null,
+        "harness": "claude_code",
+        "model": {
+          "mode": "fixed",
+          "harness": "claude_code",
+          "model": "claude-haiku-5-5",
+          "sourceKind": "subscription"
+        },
+        "availability": {
+          "available": false,
+          "reason": "checking"
+        }
+      },
+      {
+        "profileId": "1880144e-4005-4d72-b3e3-6f362fbe8bd8",
+        "name": "1284 独立审阅",
+        "version": 1,
+        "digest": "a8f543efb2a4e53afc388434788952f8473108dd3f6f762b52f3053ba31dc134",
+        "createdAt": "2026-11-05T06:04:12.590Z",
+        "updatedAt": "2026-11-05T06:04:12.590Z",
+        "enabled": true,
+        "archivedAt": null,
+        "harness": "codex",
+        "model": {
+          "mode": "fixed",
+          "harness": "codex",
+          "model": "gpt-6-luna",
+          "sourceKind": "subscription"
+        },
+        "availability": {
+          "available": false,
+          "reason": "checking"
+        }
+      }
+    ],
+    "defaultAvailability": {
+      "available": false,
+      "reason": "checking"
+    }
+  },
+  "scope": {
+    "normalAuthenticatedReadOnly": true,
+    "productionSqlUsed": false,
+    "rawNativeSessionsIncluded": false,
+    "credentialMaterialIncluded": false,
+    "privateInstructionsIncluded": false
+  },
+  "limitations": [
+    "Current non-probing availability checking does not establish historical eligibility or quota exhaustion.",
+    "No definitionDigest, targetEntry, native SID or raw Decision response is exposed by the observed evidence projection.",
+    "This later observation supplements earlier records without claiming their UI had exposed these fields.",
+    "The configured Codex review Profile has not yet produced an observed Review Run for ALEX67."
+  ]
+}
+

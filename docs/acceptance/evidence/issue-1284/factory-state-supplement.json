@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "kind": "owner-visible-factory-state-supplement",
+  "issue": 1284,
+  "recordedAt": "2026-11-05T06:40:09.395Z",
+  "provenance": "Allowlisted fields transcribed from existing authenticated Owner GET /mikka/api/factory/tasks/{taskId} rendered in normal browser; no Coordinator model summary or production SQL.",
+  "tasks": [
+    {
+      "observedAt": "2026-11-05T06:37:36.681Z",
+      "id": "b5785091-2c95-4f55-821d-fce51e027b0e",
+      "issueId": "6cda8149-144c-49cc-bdcb-a85ff14cb144",
+      "stage": "execute",
+      "status": "blocked",
+      "revision": 3,
+      "flowVersion": 2,
+      "attemptId": "5b49149a-2918-44f2-a390-6970499f1838",
+      "candidateId": null,
+      "reason": "Automatic recovery attempts are exhausted. Restore the executor or credential and explicitly resume this task.",
+      "createdAt": "2026-11-05T06:11:45.864Z",
+      "updatedAt": "2026-11-05T06:35:21.118Z",
+      "attempts": [
+        {
+          "id": "5b49149a-2918-44f2-a390-6970499f1838",
+          "stage": "execute",
+          "status": "blocked",
+          "runId": "52c25088-3cbf-4e3f-882f-d7b3296637a4",
+          "position": 1,
+          "outputKeys": [
+            "handoff",
+            "watchdog",
+            "requestEpoch"
+          ]
+        }
+      ],
+      "candidates": [],
+      "checks": [],
+      "decisionWarnings": [],
+      "completionRecovery": {
+        "binding": {
+          "taskId": "b5785091-2c95-4f55-821d-fce51e027b0e",
+          "revision": 3
+        }
+      },
+      "interpretation": "The Run separately reports succeeded, while the authoritative Factory Task has not preserved a candidate and is blocked in execute. The Issue UI In Review label is not substituted for this Factory state."
+    },
+    {
+      "observedAt": "2026-11-05T06:38:05.735Z",
+      "id": "9c1da61e-14e2-4a96-a228-7085bebcfd5a",
+      "issueId": "06c14053-5490-4bd6-90e9-391fc5dca740",
+      "stage": "execute",
+      "status": "blocked",
+      "revision": 3,
+      "flowVersion": 2,
+      "attemptId": "498f235f-f023-44ea-bb33-c75c3ed53219",
+      "candidateId": null,
+      "reason": "Question recovery blocked: factoryQuestionRunMismatch",
+      "createdAt": "2026-11-05T06:07:00.793Z",
+      "updatedAt": "2026-11-05T06:07:39.141Z",
+      "attempts": [
+        {
+          "id": "498f235f-f023-44ea-bb33-c75c3ed53219",
+          "stage": "execute",
+          "status": "blocked",
+          "runId": "aef86f65-3c9b-4434-8f50-eaaed004678b",
+          "position": 1,
+          "outputKeys": [
+            "runId",
+            "handoff",
+            "requestEpoch"
+          ]
+        }
+      ],
+      "candidateCount": 0,
+      "checkCount": 0,
+      "decisionWarnings": [],
+      "completionRecovery": "not_exposed",
+      "interpretation": "One attempt is present. The Factory reason and the Run's generic Profile error are separate observations; neither is silently rewritten as the root cause."
+    }
+  ],
+  "actions": {
+    "tasksRetried": false,
+    "statusManuallyChanged": false,
+    "profilesChanged": false,
+    "productionSqlUsed": false,
+    "rawNativeSessionsIncluded": false,
+    "credentialMaterialIncluded": false
+  },
+  "nextStep": "Docker diagnosis and root-cause fixes; then recover these same tasks through normal Owner controls, with strict Profile selection and native subscription checks retained."
+}
+

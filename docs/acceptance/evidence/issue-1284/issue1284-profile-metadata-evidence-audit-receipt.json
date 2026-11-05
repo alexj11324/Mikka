@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "kind": "repository-auditEvidence-gate",
+  "startedAt": "2026-11-05T06:35:52.171Z",
+  "nodeVersion": "v24.22.2",
+  "sourceBefore": {
+    "head": "81f8493c1a76f371f90008ddacc039abf185eaba",
+    "tree": "3fa53d0776c91cdd9d1a807724947f7e1997d87a",
+    "workingTreeStatus": "M app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts\n M lib/factory/profile-admission.ts\n M lib/factory/profile-dispatch.db.test.ts"
+  },
+  "inputs": [
+    {
+      "filename": "profile-metadata-supplement.json",
+      "path": "/tmp/issue1284-prod-evidence/profile-metadata-supplement.json",
+      "bytes": 6565,
+      "sha256": "03b69e3615d110e08d32e18716389f547472bbf4f275ca2bdd548e508c65b9eb"
+    }
+  ],
+  "auditModules": [
+    {
+      "path": "scripts/test-accounts/session.mjs",
+      "sha256": "0af2d324bdfbfda64c8e4ba791f5668afa943d978b08472eeee78ad30ea5d699"
+    },
+    {
+      "path": "scripts/test-accounts/evidence-content.mjs",
+      "sha256": "0c67b5108591c3c33081f400604787c045c80fbf803690a1a7702158e24211c2"
+    },
+    {
+      "path": "scripts/test-accounts/evidence.mjs",
+      "sha256": "51905c6fc5c19ff6debc155e9e47e2e8230d87ac755cc515fb67d62dedf77e5f"
+    },
+    {
+      "path": "scripts/test-accounts/environment.mjs",
+      "sha256": "967eec59d8c641440eaf03d04a89f6d493930cf824ee1eeaa2c59e3f2dbb426c"
+    }
+  ],
+  "scope": {
+    "databaseQueries": false,
+    "accountLeasesAcquired": false,
+    "appStarted": false,
+    "sourceModified": false,
+    "coordinatorConversationIncluded": false
+  },
+  "scannerContext": {
+    "descriptorPath": "/tmp/issue1284-test-environment-batch-f4e0a991.json",
+    "descriptorSha256": "a41c1cff16209fe400c24370e24191737b3ae7e1913220d5c6c57db089922d61",
+    "instanceId": "6cc93cf5-c972-46b5-8b87-d509b352dab8",
+    "descriptorDeploymentSha": "f4e0a99143ab924390e8fbd915455c4abc7e21cf",
+    "stateDirectory": "/workspace/Mikka/.cache/e2e/test-accounts/6cc93cf5-c972-46b5-8b87-d509b352dab8",
+    "note": "Existing genuine f4e0 TestAccountPool credentials/cookies ledger; not a newly attested deployment or a synthetic scanner state."
+  },
+  "auditModuleWorkingTreeDiff": "",
+  "result": {
+    "files": 1,
+    "archives": 0,
+    "archiveEntries": 0,
+    "decodedBytes": 0,
+    "result": "passed",
+    "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+  },
+  "exitCode": 0,
+  "finishedAt": "2026-11-05T06:35:52.261Z",
+  "sourceAfter": {
+    "head": "81f8493c1a76f371f90008ddacc039abf185eaba",
+    "tree": "3fa53d0776c91cdd9d1a807724947f7e1997d87a",
+    "workingTreeStatus": "M app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts\n M lib/factory/profile-admission.ts\n M lib/factory/profile-dispatch.db.test.ts"
+  },
+  "command": "python /workspace/scratch/50f8cfcdd7f3/ops/run.py <<'SH'\ncd /workspace/Mikka\nnode --input-type=module <<'JS'\nimport { readFile, writeFile } from 'node:fs/promises'\nimport { createHash } from 'node:crypto'\nimport { execFileSync } from 'node:child_process'\nimport { auditEvidence } from './scripts/test-accounts/session.mjs'\nimport { formatEvidenceFailure } from './scripts/test-accounts/evidence.mjs'\nimport { loadEnvironment } from './scripts/test-accounts/environment.mjs'\nconst names = ['profile-metadata-supplement.json']\nconst directory = '/tmp/issue1284-prod-evidence'\nconst descriptorPath = '/tmp/issue1284-test-environment-batch-f4e0a991.json'\nconst outputPath = '/tmp/issue1284-profile-metadata-evidence-audit.json'\nconst sha256 = data => createHash('sha256').update(data).digest('hex')\nconst git = (...args) => execFileSync('git',args,{encoding:'utf8'}).trim()\nconst snapshot = () => ({head:git('rev-parse','HEAD'),tree:git('rev-parse','HEAD^{tree}'),workingTreeStatus:git('status','--short')})\nconst record = {kind:'repository-auditEvidence-gate',startedAt:new Date().toISOString(),nodeVersion:process.version,sourceBefore:snapshot(),inputs:[],auditModules:[],scope:{databaseQueries:false,accountLeasesAcquired:false,appStarted:false,sourceModified:false,coordinatorConversationIncluded:false}}\ntry {\n  const descriptorBytes=await readFile(descriptorPath)\n  const descriptor=JSON.parse(descriptorBytes)\n  const url=new URL((await readFile('/tmp/issue1284-preview-db-url','utf8')).trim())\n  url.pathname='/'+descriptor.database.name\n  const dbUrl=url.toString()\n  Object.assign(process.env,{E2E_DATABASE_URL:dbUrl,MIKKA_DATABASE_URL:dbUrl,DATABASE_URL:dbUrl,BETTER_AUTH_URL:descriptor.origin,E2E_BASE_URL:descriptor.origin,MIKKA_TEST_DEPLOYMENT_SHA:descriptor.deploymentSha,MIKKA_TEST_ENVIRONMENT_FILE:descriptorPath})\n  const environment=await loadEnvironment()\n  record.scannerContext={descriptorPath,descriptorSha256:sha256(descriptorBytes),instanceId:environment.instanceId,descriptorDeploymentSha:environment.deploymentSha,stateDirectory:`/workspace/Mikka/.cache/e2e/test-accounts/${environment.instanceId}`,note:'Existing genuine f4e0 TestAccountPool credentials/cookies ledger; not a newly attested deployment or a synthetic scanner state.'}\n  for(const name of names){const data=await readFile(`${directory}/${name}`);record.inputs.push({filename:name,path:`${directory}/${name}`,bytes:data.length,sha256:sha256(data)})}\n  for(const path of ['scripts/test-accounts/session.mjs','scripts/test-accounts/evidence-content.mjs','scripts/test-accounts/evidence.mjs','scripts/test-accounts/environment.mjs']){record.auditModules.push({path,sha256:sha256(await readFile(path))})}\n  record.auditModuleWorkingTreeDiff=git('diff','--name-only','--','scripts/test-accounts')\n  record.result=await auditEvidence(names.map(name=>`${directory}/${name}`),{environment})\n  record.exitCode=0\n}catch(error){record.result=JSON.parse(formatEvidenceFailure(error));record.exitCode=1;process.exitCode=1}\nrecord.finishedAt=new Date().toISOString()\nrecord.sourceAfter=snapshot()\nawait writeFile(outputPath,JSON.stringify(record,null,2)+'\\n',{mode:0o600})\nconsole.log(JSON.stringify(record))\nJS\nSH",
+  "postAuditLocalInputHashMatches": true,
+  "previousReceiptHashes": {
+    "issue1284-prod-evidence-audit-receipt.json": "062b46d7fffeedbb7b4a35d189f1b6f1f62866bcf17cb7306c6d815b218c2b20",
+    "issue1284-backend-review-evidence-audit-receipt.json": "7503bcd13c68d89c06736f4e8eeeffd3f081622f1296fa77d9808ecbcaaaadbb"
+  },
+  "publicationBoundary": {
+    "onlySupplementJsonScanned": true,
+    "previousSixInputsNotReauditedOrModified": true,
+    "inputProvenance": "Normal Owner-visible structured fields transcribed by root, not a full raw production response; the audit does not upgrade that provenance.",
+    "coordinatorRawConversationExcluded": true,
+    "githubWritten": false,
+    "otherTestsRun": false,
+    "productSourceEdited": false,
+    "environmentRolesModified": false,
+    "sandboxOrPgLifecycleChanged": false
+  }
+}

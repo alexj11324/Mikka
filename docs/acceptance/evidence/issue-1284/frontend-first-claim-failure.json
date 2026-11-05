@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "kind": "production-custom-profile-first-claim-block",
+  "recordedAt": "2026-11-05T06:15:27.838Z",
+  "issue": 1284,
+  "acceptanceCase": "frontend_auto",
+  "issueId": "06c14053-5490-4bd6-90e9-391fc5dca740",
+  "taskId": "9c1da61e-14e2-4a96-a228-7085bebcfd5a",
+  "runId": "aef86f65-3c9b-4434-8f50-eaaed004678b",
+  "attemptId": "498f235f-f023-44ea-bb33-c75c3ed53219",
+  "requestEpoch": "7f2ece83-e847-4b8c-82d4-9c8b2105d5a3",
+  "dispatchParams": {
+    "botId": "b56e7f61-59dd-4d7e-a114-b9dddf821a84",
+    "issueId": "06c14053-5490-4bd6-90e9-391fc5dca740"
+  },
+  "observedUiStatus": "Blocked",
+  "observedError": "The selected Agent Profile changed or is no longer available. Select an available Profile for a new run.",
+  "frozenRoutingDisplayed": {
+    "profile": {
+      "name": "1284 前端实现",
+      "version": 1,
+      "selectedBy": "Task capability matching",
+      "reason": "Capabilities best fit the work",
+      "source": "decision",
+      "reasonCode": "capability_fit"
+    },
+    "harness": "claude_code",
+    "model": "claude-haiku-5-5",
+    "credentialType": "Official subscription",
+    "subscriptionRoute": "claude_code_cli"
+  },
+  "profilePolicy": "inherit preferred models constrained to claude_code",
+  "configuredSkill": {
+    "id": "implementation-evidence",
+    "version": 1,
+    "digest": "78b6332cd55806bc9e965037dd9a2d3be5a33b314b7beb9da37b280e1e246996"
+  },
+  "privateInstructionMarker": "1284/frontend-private-v1",
+  "nativeExecution": {
+    "agentStartObserved": false,
+    "workerToolStepsObserved": 0,
+    "providerCallSuccessEstablished": false
+  },
+  "profileEditsByThisAcceptanceAfterCreate": 0,
+  "profileChangesByOtherActors": "not_independently_audited",
+  "candidate": null,
+  "review": "not_started",
+  "ownerAcceptance": "not_accepted",
+  "rootCause": "under Docker investigation; the generic UI error alone does not identify profile version, policy digest, target or credential eligibility gate",
+  "sourceInterpretation": "Production UI labels map directly to frozen source=decision and reason=capability_fit. This confirms selection succeeded; it does not establish successful final claim or native execution.",
+  "productionVersions": {
+    "requestSubmittedAt": "2026-11-05T06:05:48.758Z",
+    "previousPublicBuildObserved": "94f1b829300156af343751647d2417dde7373c6e",
+    "publicBuildAfterRefresh": "7bf009959071afe4d9e6963a9c9bd81085d33a4b",
+    "publicBuildAfterRefreshObservedAt": "2026-11-05T06:08:27.184Z",
+    "exactClaimBuild": "not_exposed"
+  },
+  "evidence": {
+    "identityScreenshot": "issue1284-frontend-v1-blocked-identity.jpg",
+    "uiUrl": "https://app.aspectlylabs.com/mikka/en?thread=aef86f65-3c9b-4434-8f50-eaaed004678b"
+  },
+  "scope": {
+    "deepseekApi": "excluded by user; not tested",
+    "productionSqlUsed": false,
+    "rawNativeSessionsIncluded": false,
+    "credentialsIncluded": false
+  },
+  "nextStep": "Reproduce and fix in the existing Docker Agentic Platform Large sandbox, run required isolated/CI gates, release, then retry through normal Owner UI.",
+  "sourceMappingEvidence": {
+    "commit": "7bf009959071afe4d9e6963a9c9bd81085d33a4b",
+    "component": "components/workspace/thread-execution-identity.tsx",
+    "rootRead": true,
+    "reviewedBy": [
+      "requirements_review",
+      "backend_impl"
+    ],
+    "uiLabels": {
+      "sourceDecision": "Task capability matching",
+      "reasonCapabilityFit": "Capabilities best fit the work"
+    }
+  }
+}

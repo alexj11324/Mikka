@@ -1,0 +1,351 @@
+{
+  "schemaVersion": 1,
+  "kind": "production-zero-configuration-owner-acceptance",
+  "recordedAt": "2026-11-05 06:05:33 UTC",
+  "issueNumber": 1284,
+  "scope": "ALEX-59 zero-configuration task only",
+  "acceptanceStatus": "owner_accepted",
+  "overallIssueAcceptanceComplete": false,
+  "identities": {
+    "issue": {
+      "identifier": "ALEX-59",
+      "id": "dd7bc618-b7ae-4835-981e-acd3f233c3da"
+    },
+    "taskId": "feaefa0a-d826-49a2-b6bd-b02f55b267ce",
+    "executeRunId": "7d3b4ea8-c9f5-4d87-8d91-28c7b6608355",
+    "reviewRunId": "6d2409ea-8911-4db5-801c-75b65da05585",
+    "candidateId": "6bae401a-b4d2-486b-b6d5-e96bc12a0678"
+  },
+  "versionTimeline": {
+    "launch": {
+      "servingCommit": "f47326089aaddda1a7d668441e322265ebac8ea9",
+      "servingTree": "1fc7e470a4ce8fa6f8cbbb43951140306a7b2544",
+      "exactLaunchTimestamp": "not_exposed",
+      "evidence": "Root's normal production task observation, default identity screenshot, and independently recorded f473 release receipt."
+    },
+    "ownerAcceptance": {
+      "servingCommit": "94f1b829300156af343751647d2417dde7373c6e",
+      "observedAtMinute": "2026-11-05T06:00Z",
+      "exactEventTimestamp": "2026-11-05T06:00:01Z",
+      "evidence": "Root's contemporaneous production UI/version observation supplied for this record; Accepted state independently visible in the retained screenshot.",
+      "ancestry": {
+        "directParentContainsCommit": "f47326089aaddda1a7d668441e322265ebac8ea9",
+        "source": "Root-provided release/ancestry observation for the subsequent #1351 batch",
+        "independentlyQueriedDuringPackaging": false
+      },
+      "exactEventTimestampProvenance": "normalCoordinator read-only tools summarized in observed UI"
+    },
+    "allActionsAttributedToF473": false,
+    "note": "The zero-config task started on f473. The site advanced to 94f1 before Owner acceptance; this record does not label every action as occurring on f473."
+  },
+  "execute": {
+    "runId": "7d3b4ea8-c9f5-4d87-8d91-28c7b6608355",
+    "frozenIdentityUi": {
+      "agent": "Claude Code",
+      "model": "claude-haiku-5-5",
+      "credentialType": "Official subscription",
+      "subscriptionRoute": "claude_code_cli",
+      "agentProfile": {
+        "name": "Default agent profile",
+        "version": "v1",
+        "selectedBy": "Default profile",
+        "selectionReason": "Inherited preferred models",
+        "profileId": "not_exposed",
+        "digest": "not_exposed"
+      },
+      "connectionId": "not_exposed",
+      "modelRequestId": "not_exposed",
+      "executionPrincipal": "not_exposed",
+      "billingAmount": "not_exposed"
+    },
+    "statusReportedByReview": "succeeded",
+    "finalRunStatusAfterOwnerAcceptance": "succeeded",
+    "producerNativeSessionSha256": "73c3bfe72221a083312ce3f1f9e2e93d61201bb1acb2c58eb55e724c4ef6d03e",
+    "producerNativeSessionRawRetained": false,
+    "producerShellExitCode": "not_exposed",
+    "evidence": "issue1284-zero-default-identity-f4732608.jpg and issue1284-zero-review-observed.json",
+    "finalRunStatusProvenance": "normalCoordinator read-only tools summarized in observed UI",
+    "startedAt": "2026-11-05T05:47:37.669Z",
+    "finishedAt": "2026-11-05T05:49:02.036Z",
+    "runTimingProvenance": "normalCoordinator read-only tools summarized in observed UI",
+    "stopReasonAfterOwnerAcceptance": "submitted"
+  },
+  "candidate": {
+    "id": "6bae401a-b4d2-486b-b6d5-e96bc12a0678",
+    "repositoryCandidateSha": null,
+    "artifactSnapshotHead": "5266aa0da32a8a6bdd6901ae21c610a93d26255e",
+    "publication": "not_exposed",
+    "note": "repositoryCandidateSha remains null. The artifact snapshot HEAD is independently reported by inspect_artifact; it is not substituted for the repository candidate SHA."
+  },
+  "artifact": {
+    "path": "mikka-1284-default-ready.txt",
+    "expectedUtf8": "mikka-1284-default-ready\n6 * 7 = 42\n",
+    "observedBytes": 36,
+    "sha256": "2477b0bbddcb38a090a51700a4d4106a31cfb0efada1932edc7afc42af56c00b",
+    "committedSha256": "2477b0bbddcb38a090a51700a4d4106a31cfb0efada1932edc7afc42af56c00b",
+    "contentMatchesGit": true,
+    "matchesExpectedUtf8": true,
+    "producerReportedLineEndings": {
+      "lf": 2,
+      "cr": 0,
+      "blankLines": 0
+    },
+    "producerObservationRef": "run-chunk:75843711-826b-4790-8e5b-a63278c91461",
+    "evidenceLevel": "Observed independent review report of mikka.inspect_artifact, which also cites producer command observations. The packaging agent did not fetch the production file or rerun commands."
+  },
+  "review": {
+    "runId": "6d2409ea-8911-4db5-801c-75b65da05585",
+    "observedAt": "2026-11-05T05:59:55.874Z",
+    "observedReportKind": "production-review-report-observed-through-owner-ui",
+    "readOnly": true,
+    "hostReviewStatusReportedInOwnerUi": "passed",
+    "runStatusReportedInOwnerUi": "succeeded",
+    "independentResultLabel": "Review — Merge suggested",
+    "independentReviewLabel": "Independent review",
+    "inspectionTool": "mikka.inspect_artifact",
+    "shellUsed": false,
+    "filesChanged": [],
+    "criteria": [
+      {
+        "text": "File mikka-1284-default-ready.txt exists in the fixed worktree with exact UTF-8 content \"mikka-1284-default-ready\\n6 * 7 = 42\\n\", 36 bytes, LF only, one trailing LF, no blank lines",
+        "passed": true,
+        "evidence": "mikka.inspect_artifact path=mikka-1284-default-ready.txt: bytes=36, contentUtf8 = \"mikka-1284-default-ready\\n6 * 7 = 42\\n\", matchesExpectedUtf8=true for the exact expected text including the final newline. Producer observation run-chunk:75843711-826b-4790-8e5b-a63278c91461 also reports lf=2 cr=0 and cat -A output with no blank lines."
+      },
+      {
+        "text": "SHA-256 of mikka-1284-default-ready.txt equals 2477b0bbddcb38a090a51700a4d4106a31cfb0efada1932edc7afc42af56c00b",
+        "passed": true,
+        "evidence": "mikka.inspect_artifact sha256 = 2477b0bbddcb38a090a51700a4d4106a31cfb0efada1932edc7afc42af56c00b, matching the expected value. Producer observation run-chunk:75843711-826b-4790-8e5b-a63278c91461 reports the same digest."
+      },
+      {
+        "text": "The file is committed at the fixed candidate HEAD and matches the working tree",
+        "passed": true,
+        "evidence": "mikka.inspect_artifact head = 5266aa0da32a8a6bdd6901ae21c610a93d26255e; committedSha256 = 2477b0bbddcb38a090a51700a4d4106a31cfb0efada1932edc7afc42af56c00b; contentMatchesGit = true."
+      }
+    ],
+    "openQuestions": [],
+    "postRunVerifyStatus": "not_run",
+    "verifyCommandGranted": false,
+    "harness": "claude_code",
+    "model": "not_exposed",
+    "credentialSource": "not_exposed",
+    "nativeSessionSha256": "not_exposed",
+    "commandExitCode": "not_exposed",
+    "note": "The independent read-only review and its three passed artifact criteria are recorded. The later normal Coordinator UI summary reports both execute and review harnesses as claude_code; review model remains not_exposed. No separate Verify stage or test command is inferred.",
+    "harnessProvenance": "normalCoordinator read-only tools summarized in observed UI",
+    "startedAt": "2026-11-05T05:49:23.496Z",
+    "finishedAt": "2026-11-05T05:50:49.032Z",
+    "runTimingProvenance": "normalCoordinator read-only tools summarized in observed UI",
+    "stopReasonReportedInOwnerUi": "submitted"
+  },
+  "ownerAcceptance": {
+    "visibleState": "Accepted",
+    "screenshot": "issue1284-zero-owner-accepted.jpg",
+    "observedAtMinute": "2026-11-05T06:00Z",
+    "activity": {
+      "actorDisplayName": "acme",
+      "text": "Changed status to Done",
+      "source": "Root-provided normal production UI observation",
+      "exactEventTimestamp": "not_exposed"
+    },
+    "acceptedByAccountId": "not_exposed",
+    "operationMethod": "Normal Owner UI",
+    "performedByPackagingAgent": false,
+    "screenshotContext": "The current task header/footer show Accepted. The Coordinator message in the same screenshot was written before acceptance and still describes approval pending / Waiting for you; it is retained as historical conversation, not the final current state.",
+    "acceptanceId": "d2d8c131-35f8-4dcb-a834-895e831b04b9",
+    "acceptedAt": "2026-11-05T06:00:01Z",
+    "acceptanceMetadataProvenance": "normalCoordinator read-only tools summarized in observed UI"
+  },
+  "flowObservation": {
+    "threadCount": 2,
+    "reviewStageCount": 1,
+    "verifyStageCount": 0,
+    "sequence": [
+      "execute",
+      "review",
+      "owner_acceptance"
+    ],
+    "countEvidence": "Root's direct normal Owner UI observation, corroborated by the later normalCoordinator read-only UI summary (full raw tool trace unavailable; the normal UI excerpt is truncated).",
+    "reviewPostRunVerifyStatus": "not_run",
+    "flowVersion": 2,
+    "flowVersionProvenance": "normalCoordinator read-only tools summarized in observed UI",
+    "note": "The stage/status/revision and attempt counts are retained in coordinatorReadOnlyUiSummary; direct Accepted/Done UI observations remain separate."
+  },
+  "releaseReference": {
+    "file": "release-f4732608.json",
+    "sha256": "88358a6251633d4e9f01a6a043f217b48c1b6d1e973005b423a88dd622669a44",
+    "sourceCommit": "f47326089aaddda1a7d668441e322265ebac8ea9",
+    "sourceTree": "1fc7e470a4ce8fa6f8cbbb43951140306a7b2544",
+    "mainCi": {
+      "runId": 41975093772,
+      "conclusion": "success"
+    },
+    "web": {
+      "runId": 41975093782,
+      "conclusion": "success"
+    },
+    "vercelDeploymentId": "dpl_7GyiV8xMiQh1dVCP1WEenLSKGxaC",
+    "publicBuild": "f47326089aaddda1a7d668441e322265ebac8ea9",
+    "note": "This proves the starting f473 release. It is not reused as a release receipt for 94f1."
+  },
+  "evidenceFiles": [
+    {
+      "path": "issue1284-zero-review-observed.json",
+      "bytes": 3214,
+      "sha256": "3ab0968091ad337021c40a3a76499fab23641afca289ebc72d76271876ff6492",
+      "filename": "issue1284-zero-review-observed.json"
+    },
+    {
+      "path": "issue1284-zero-owner-accepted.jpg",
+      "bytes": 95889,
+      "sha256": "5f5fded345994caef56fa3e314e80168d870d4aa32227dc58ce12b41cb3633a7",
+      "width": 1021,
+      "height": 885,
+      "filename": "issue1284-zero-owner-accepted.jpg"
+    },
+    {
+      "path": "issue1284-zero-default-identity-f4732608.jpg",
+      "bytes": 21021,
+      "sha256": "ab36c9d05f795bbe25556f8da94e10a7bc4aa3610c605ef96e952dc2d473cd77",
+      "width": 576,
+      "height": 388,
+      "filename": "issue1284-zero-default-identity-f4732608.jpg"
+    },
+    {
+      "path": "release-f4732608.json",
+      "bytes": 10122,
+      "sha256": "88358a6251633d4e9f01a6a043f217b48c1b6d1e973005b423a88dd622669a44",
+      "filename": "release-f4732608.json"
+    }
+  ],
+  "pendingAcceptance": {
+    "frontendCustomProfile": "not_yet_accepted",
+    "codexCustomProfile": "not_yet_accepted",
+    "automaticCustomProfileSelection": "not_yet_accepted",
+    "sameTaskClaudeCodeToCodexReview": "not_established_by_this_zero_config_record",
+    "overallFeature": "in_progress"
+  },
+  "privacyAndMethod": {
+    "nativeSessionIds": "Only the producer SHA256 supplied in the sanitized observation is retained; no raw Native SID is copied.",
+    "tokensIncluded": false,
+    "credentialMaterialIncluded": false,
+    "productionSqlUsed": false,
+    "browserUsedByPackagingAgent": false,
+    "dockerStartedByPackagingAgent": false,
+    "githubWrittenByPackagingAgent": false,
+    "productFilesChanged": false,
+    "evidencePackagingOnly": true,
+    "rawCoordinatorConversationPublished": false
+  },
+  "metadataEnrichedAt": "2026-11-05 06:07:18 UTC",
+  "coordinatorReadOnlyUiSummary": {
+    "provenance": "normalCoordinator read-only tools summarized in observed UI",
+    "tools": [
+      "get_issue",
+      "get_factory_task",
+      "get_run"
+    ],
+    "observedAt": "not_exposed",
+    "task": {
+      "id": "feaefa0a-d826-49a2-b6bd-b02f55b267ce",
+      "route": {
+        "flowVersion": 2
+      },
+      "stage": "approval",
+      "status": "passed",
+      "revision": 9,
+      "stageAttempts": {
+        "execute": {
+          "count": 1,
+          "status": "passed"
+        },
+        "review": {
+          "count": 1,
+          "status": "passed"
+        },
+        "approval": {
+          "count": 1,
+          "status": "passed"
+        }
+      }
+    },
+    "issue": {
+      "id": "dd7bc618-b7ae-4835-981e-acd3f233c3da",
+      "status": "done"
+    },
+    "acceptance": {
+      "id": "d2d8c131-35f8-4dcb-a834-895e831b04b9",
+      "acceptedAt": "2026-11-05T06:00:01Z"
+    },
+    "runs": [
+      {
+        "role": "execute",
+        "id": "7d3b4ea8-c9f5-4d87-8d91-28c7b6608355",
+        "startedAt": "2026-11-05T05:47:37.669Z",
+        "finishedAt": "2026-11-05T05:49:02.036Z",
+        "harness": "claude_code",
+        "errorSummary": "empty",
+        "status": "succeeded",
+        "stopReason": "submitted"
+      },
+      {
+        "role": "review",
+        "id": "6d2409ea-8911-4db5-801c-75b65da05585",
+        "startedAt": "2026-11-05T05:49:23.496Z",
+        "finishedAt": "2026-11-05T05:50:49.032Z",
+        "harness": "claude_code",
+        "errorSummary": "empty",
+        "status": "succeeded",
+        "stopReason": "submitted"
+      }
+    ],
+    "attemptSessions": {
+      "executePresent": true,
+      "reviewPresent": true,
+      "distinct": true,
+      "rawValuesRetained": false
+    },
+    "notExposedByTheseTools": [
+      "full agentProfile fields",
+      "definitionDigest",
+      "model",
+      "billing"
+    ],
+    "note": "These values come from the normal Coordinator's read-only tool results as summarized in the observed UI; the saved DOM text explicitly names status and stopReason. The get_factory_task Raw data panel was opened but showed only an approximately 200-byte truncated excerpt, so no full raw tool trace is available and the provenance remains UI summary. The packaging agent has not queried a production database.",
+    "fullRawToolTraceAvailable": false,
+    "partialRawToolTraceUiExpansion": {
+      "tool": "get_factory_task",
+      "expanded": true,
+      "visibleBytesApprox": 200,
+      "truncated": true,
+      "provenance": "Root's normal UI observation; this does not upgrade the metadata provenance."
+    },
+    "localOnlyDiagnosticSource": {
+      "filename": "issue1284-zero-coordinator-observed.txt",
+      "bytes": 3882,
+      "sha256": "c38d3ceb9daba56ef16d14a84ad4f51bf90f2484fd265e7ffd2b87101483236d",
+      "storage": "scratch-only",
+      "publishToRepository": false,
+      "includedInEvidenceFiles": false,
+      "note": "The full Coordinator conversation is a local-only diagnostic source. Only its hash, provenance and structured factual observations are retained in the published acceptance record."
+    }
+  },
+  "directOwnerUiObservations": {
+    "accepted": {
+      "label": "Accepted",
+      "headerAndFooterVisible": true,
+      "screenshot": "issue1284-zero-owner-accepted.jpg",
+      "observedAtMinute": "2026-11-05T06:00Z",
+      "provenance": "Retained normal production Owner screenshot, independently visually inspected by the packaging agent."
+    },
+    "doneActivity": {
+      "actorDisplayName": "acme",
+      "text": "Changed status to Done",
+      "provenance": "Root's direct normal production UI observation, separate from the later Coordinator summary."
+    },
+    "executeIdentity": {
+      "runId": "7d3b4ea8-c9f5-4d87-8d91-28c7b6608355",
+      "screenshot": "issue1284-zero-default-identity-f4732608.jpg",
+      "provenance": "Retained normal production identity screenshot, independently visually inspected; authoritative evidence here for the actual execute model and credential route."
+    }
+  }
+}

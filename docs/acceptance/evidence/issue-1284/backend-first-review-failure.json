@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "kind": "production-custom-profile-review-admission-block",
+  "issue": 1284,
+  "recordedAt": "2026-11-05T06:28:53.710Z",
+  "title": "1284 后端自动选择生产验收 20261105",
+  "issueNumber": 67,
+  "issueId": "6cda8149-144c-49cc-bdcb-a85ff14cb144",
+  "executeRunId": "52c25088-3cbf-4e3f-882f-d7b3296637a4",
+  "dispatchParams": {
+    "botId": "b56e7f61-59dd-4d7e-a114-b9dddf821a84",
+    "issueId": "6cda8149-144c-49cc-bdcb-a85ff14cb144"
+  },
+  "observedStatus": "execute submitted; independent review blocked before dispatch",
+  "observedAt": "2026-11-05T06:13:30.306Z",
+  "nativeStartedVerified": true,
+  "taskId": "b5785091-2c95-4f55-821d-fce51e027b0e",
+  "executeAttemptId": "5b49149a-2918-44f2-a390-6970499f1838",
+  "requestEpoch": "694c20d5-87bc-4ffa-bff5-231c48f9dbdf",
+  "agentStartSeconds": 19.7,
+  "harness": "claude_code",
+  "model": "claude-haiku-5-5",
+  "credentialType": "Official subscription",
+  "subscriptionRoute": "claude_code_cli",
+  "profile": {
+    "name": "1284 后端实现",
+    "version": 1,
+    "selectedBy": "Task capability matching",
+    "reason": "Capabilities best fit the work",
+    "source": "decision",
+    "reasonCode": "capability_fit"
+  },
+  "skillDigest": "78b6332cd55806bc9e965037dd9a2d3be5a33b314b7beb9da37b280e1e246996",
+  "privateInstructionMarkerObserved": "1284/backend-private-v1",
+  "testOutcomeReportedByProducer": {
+    "baselinePassed": 4,
+    "total": 8,
+    "baselineExit": 1,
+    "finalPassed": 8,
+    "finalExit": 0,
+    "independentlyReviewed": false
+  },
+  "producerArtifactHashes": {
+    "summarize-jobs.mjs": "24854ab8136c9a466f3fab2c446ee9f4b901afa8b0260ffb028a55744ae38546",
+    "test-summarize-jobs.mjs": "d1e7192a6ce5143736956a6ac3d5abf6813563e5848feeb068c6f67a155b0103"
+  },
+  "reviewBlocker": {
+    "code": "agentProfileDecisionUnavailable",
+    "observedAt": "2026-11-05T06:15:08.560Z",
+    "source": "project-scoped Vercel log for exact execute Run complete request",
+    "requestId": "pzjpp-1793859302481-c1a233422922",
+    "deploymentId": "dpl_3nCUgLbKkAA8g3HZTkpj1qxHqMQq"
+  },
+  "coordinatorWakeBlocker": {
+    "workflowRunId": "wrun_41M6N5HM6F0GZEZ5HZMTDGTZKK",
+    "step": "prepareTurn",
+    "errorCode": "agentProfileDecisionUnavailable",
+    "attempts": 4,
+    "maxRetries": 3,
+    "failedAt": "2026-11-05T06:15:37.793Z"
+  },
+  "profilePolicy": "fixed claude_code / claude-haiku-5-5 / existing official Claude subscription",
+  "profileId": "not_exposed",
+  "profileDigest": "not_exposed",
+  "candidate": "not_exposed",
+  "reviewRunId": "not_observed",
+  "ownerAcceptance": "not_accepted",
+  "rootCause": "Decision result rejected or none; exact subreason not preserved by current error. Docker investigation in progress.",
+  "scope": {
+    "productionSqlUsed": false,
+    "deepseekApi": "excluded by user; not tested",
+    "rawNativeSessionsIncluded": false,
+    "credentialMaterialIncluded": false
+  },
+  "ui": {
+    "observedThreadCount": 1,
+    "taskStatus": "In Review",
+    "threadStatus": "Waiting for you",
+    "activityStatusChangedAtMinute": "2026-11-05T06:15Z",
+    "url": "https://app.aspectlylabs.com/mikka/en?section=coordinator&issue=6cda8149-144c-49cc-bdcb-a85ff14cb144&thread=52c25088-3cbf-4e3f-882f-d7b3296637a4"
+  },
+  "evidence": {
+    "identityScreenshot": "issue1284-backend-v1-native-identity-0628.jpg",
+    "screenshotSha256": "a731495af9a409950f2b80f9fe5f4df0ca6f5aae8c4efd92bcc102def90a4d84",
+    "producerReportedTestsAreIndependentReview": false,
+    "logScope": "Exact executeRunId then its completion requestId then the workflowRunId returned by that request; no unrelated task lookup."
+  }
+}
+

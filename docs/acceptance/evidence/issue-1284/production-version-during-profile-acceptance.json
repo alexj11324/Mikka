@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "kind": "public-version-during-profile-production-acceptance",
+  "observedAt": "2026-11-05T06:08:27.184002+00:00",
+  "versionRequest": {
+    "url": "https://app.aspectlylabs.com/mikka/api/version",
+    "method": "GET",
+    "requestCount": 1,
+    "authentication": "none",
+    "cookies": false,
+    "status": 200,
+    "response": {
+      "build": "7bf009959071afe4d9e6963a9c9bd81085d33a4b",
+      "minMobileBuild": 0,
+      "mobileUpdateUrl": "itms-beta://beta.itunes.apple.com/v1/app/6829300983",
+      "minDesktopVersion": null
+    }
+  },
+  "currentCommit": {
+    "sha": "7bf009959071afe4d9e6963a9c9bd81085d33a4b",
+    "parentShas": [
+      "94f1b829300156af343751647d2417dde7373c6e"
+    ],
+    "title": "fix(factory): 默认 Profile 按优先顺序跳过失败来源 (#1348)",
+    "url": "https://github.com/alexj11324/Mikka/commit/7bf009959071afe4d9e6963a9c9bd81085d33a4b"
+  },
+  "ancestry": {
+    "includesBatch1345": true,
+    "chain": [
+      {
+        "sha": "7bf009959071afe4d9e6963a9c9bd81085d33a4b",
+        "parent": "94f1b829300156af343751647d2417dde7373c6e"
+      },
+      {
+        "sha": "94f1b829300156af343751647d2417dde7373c6e",
+        "parent": "f47326089aaddda1a7d668441e322265ebac8ea9"
+      }
+    ],
+    "releaseCommit": "f47326089aaddda1a7d668441e322265ebac8ea9",
+    "releaseTitle": "Merge batch #1345: complete Issue 1284 dispatch fixes",
+    "releaseUrl": "https://github.com/alexj11324/Mikka/commit/f47326089aaddda1a7d668441e322265ebac8ea9"
+  },
+  "webDeploy": {
+    "runId": 41977657539,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/41977657539",
+    "headSha": "7bf009959071afe4d9e6963a9c9bd81085d33a4b",
+    "status": "completed",
+    "conclusion": "success",
+    "event": "push",
+    "workflowPath": ".github/workflows/web-deploy.yml",
+    "updatedAt": "2026-11-05T06:06:54Z"
+  },
+  "attribution": "The observed build includes other owners' subsequent changes (#1351 and #1348). This is a read-only observation during Owner acceptance, not a redeployment of those PRs by this agent.",
+  "operations": {
+    "dockerResumed": false,
+    "repositoryModified": false,
+    "productionModified": false,
+    "browserUsed": false,
+    "vercelSharelinkUsed": false
+  }
+}

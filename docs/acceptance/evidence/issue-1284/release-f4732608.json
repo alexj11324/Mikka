@@ -1,0 +1,250 @@
+{
+  "schemaVersion": 1,
+  "kind": "read-only-production-release-evidence",
+  "recordedAt": "2026-11-05 05:43:42 UTC",
+  "repository": "alexj11324/Mikka",
+  "pullRequest": "https://github.com/alexj11324/Mikka/pull/1345",
+  "source": {
+    "commit": "f47326089aaddda1a7d668441e322265ebac8ea9",
+    "tree": "1fc7e470a4ce8fa6f8cbbb43951140306a7b2544",
+    "parents": [
+      "122fd9054b5400569fd2518f55c52cec8f04d28a",
+      "f4e0a99143ab924390e8fbd915455c4abc7e21cf"
+    ],
+    "commitUrl": "https://github.com/alexj11324/Mikka/commit/f47326089aaddda1a7d668441e322265ebac8ea9",
+    "treeMatchesValidatedPrHead": "f4e0a99143ab924390e8fbd915455c4abc7e21cf"
+  },
+  "mainCi": {
+    "runId": 41975093772,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/41975093772",
+    "headSha": "f47326089aaddda1a7d668441e322265ebac8ea9",
+    "status": "completed",
+    "conclusion": "success",
+    "updatedAt": "2026-11-05T05:41:59Z",
+    "totalJobs": 12,
+    "successfulJobs": 12,
+    "jobs": [
+      {
+        "id": 127071965570,
+        "name": "Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41975093772/job/127071965570"
+      },
+      {
+        "id": 127072021118,
+        "name": "Core unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41975093772/job/127072021118"
+      },
+      {
+        "id": 127072021129,
+        "name": "Integration unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41975093772/job/127072021129"
+      },
+      {
+        "id": 127072021136,
+        "name": "Daemon checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41975093772/job/127072021136"
+      },
+      {
+        "id": 127072021138,
+        "name": "Database checks (3/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41975093772/job/127072021138"
+      },
+      {
+        "id": 127072021145,
+        "name": "Database checks (4/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41975093772/job/127072021145"
+      },
+      {
+        "id": 127072021215,
+        "name": "Cloud credential access (OIDC)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41975093772/job/127072021215"
+      },
+      {
+        "id": 127072021282,
+        "name": "Source checks",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41975093772/job/127072021282"
+      },
+      {
+        "id": 127072021290,
+        "name": "Database checks (2/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41975093772/job/127072021290"
+      },
+      {
+        "id": 127072021393,
+        "name": "Database checks (1/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41975093772/job/127072021393"
+      },
+      {
+        "id": 127073333253,
+        "name": "Production build and browser interactions",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41975093772/job/127073333253"
+      },
+      {
+        "id": 127073696010,
+        "name": "UI policy (strict)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41975093772/job/127073696010"
+      }
+    ]
+  },
+  "webRelease": {
+    "runId": 41975093782,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/41975093782",
+    "headSha": "f47326089aaddda1a7d668441e322265ebac8ea9",
+    "status": "completed",
+    "conclusion": "success",
+    "updatedAt": "2026-11-05T05:42:11Z",
+    "jobId": 127071965957,
+    "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/41975093782/job/127071965957",
+    "steps": [
+      {
+        "name": "Refuse an obsolete source before release work",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Publish the verified official runtime pair inside the deployment queue",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "name": "Build (runs migrations last, as the Vercel build did)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Upload the prebuilt output to production",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify the public production version before releasing the deployment queue",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "publicVerificationEventLogTimestamp": "2026-11-05T05:42:08.7783629Z",
+    "verificationLogNote": "GitHub secret masking obscures characters in the log's build value. Exact public build proof below comes from one unauthenticated public fetch, not reconstruction of the masked log."
+  },
+  "vercel": {
+    "deploymentId": "dpl_7GyiV8xMiQh1dVCP1WEenLSKGxaC",
+    "url": "https://mikka-93uf56hc4-mikka-dev.vercel.app",
+    "state": "READY",
+    "sourceCommit": "f47326089aaddda1a7d668441e322265ebac8ea9",
+    "target": "production",
+    "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "proofMethod": "Read-only list_deployments filtered to exact commit and production, using existing account612 connector."
+  },
+  "publicVersion": {
+    "url": "https://app.aspectlylabs.com/mikka/api/version",
+    "statusCode": 200,
+    "contentType": "application/json",
+    "body": {
+      "build": "f47326089aaddda1a7d668441e322265ebac8ea9",
+      "minMobileBuild": 0,
+      "mobileUpdateUrl": "itms-beta://beta.itunes.apple.com/v1/app/6829300983",
+      "minDesktopVersion": null
+    },
+    "exactBuildMatchesSource": true,
+    "proofMethod": "One fresh unauthenticated public HTTP read via Firecrawl with maxAge=0 and storeInCache=false, after the Web Verify step succeeded.",
+    "numberOfPublicReads": 1,
+    "shareLinkCreated": false
+  },
+  "officialRuntime": {
+    "newValidationForThisRelease": false,
+    "newRuntimePublishForThisRelease": false,
+    "workflowTriggeredForThisSha": false,
+    "reuseReason": "The push from 122fd905 to f473 changes no paths in the exact f473 e2b-official-runtime.yml push filter. The Web runtime-refresh publishing step is therefore skipped; the existing officially published runtime pair is reused.",
+    "workflowUrl": "https://github.com/alexj11324/Mikka/blob/f47326089aaddda1a7d668441e322265ebac8ea9/.github/workflows/e2b-official-runtime.yml",
+    "comparisonUrl": "https://github.com/alexj11324/Mikka/compare/122fd9054b5400569fd2518f55c52cec8f04d28a...f47326089aaddda1a7d668441e322265ebac8ea9",
+    "changedFiles": [
+      "docs/dev-workflow.md",
+      "lib/agent-runs.ts",
+      "lib/factory/agent-profile.db.test.ts",
+      "lib/factory/agent-profile.ts",
+      "lib/factory/automatic-dispatch.ts",
+      "lib/factory/continuity.db.test.ts",
+      "lib/factory/dispatch.ts",
+      "lib/factory/reconcile.ts",
+      "lib/factory/store.ts",
+      "lib/factory/transaction.ts",
+      "lib/factory/watchdog.ts",
+      "lib/self-improvement/evaluations-postgres.test.ts",
+      "lib/self-improvement/evaluations.ts",
+      "lib/self-improvement/factory-bridge.ts",
+      "lib/self-improvement/wiring-postgres.test.ts",
+      "lib/subscription-runtime.ts",
+      "tests/factory-admission.db.test.ts",
+      "tests/issue-tool-calls.db.test.ts"
+    ],
+    "reusedSourceCommit": "89cfb577cecada3087f02222f7a656cae5706977",
+    "reusedWorkerSha": "38556a4744d48cd816580cbe4471744c14ddb083",
+    "lastActualPublish": {
+      "sourceCommit": "89cfb577cecada3087f02222f7a656cae5706977",
+      "runId": 41970583843,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41970583843",
+      "jobId": 127059129341,
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/41970583843/job/127059129341",
+      "readbackEvent": {
+        "event": "official_runtime_env_verified",
+        "changed": true,
+        "requiresWebBuild": true,
+        "sourceCommit": "89cfb577cecada3087f02222f7a656cae5706977",
+        "workerSha": "38556a4744d48cd816580cbe4471744c14ddb083"
+      },
+      "readbackLogTimestamp": "2026-11-05T04:58:40.3092223Z"
+    },
+    "lastProductionHashComparison": {
+      "sourceCommit": "122fd9054b5400569fd2518f55c52cec8f04d28a",
+      "runId": 41972149297,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41972149297",
+      "jobId": 127062773291,
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/41972149297/job/127062773291",
+      "timestamp": "2026-11-05T05:10:00.2092798Z",
+      "wantedWorkerSha": "38556a4744d48cd816580cbe4471744c14ddb083",
+      "productionWorkerSha": "38556a4744d48cd816580cbe4471744c14ddb083",
+      "equal": true,
+      "workflowConclusion": "success",
+      "validateAwaitWebPublish": "skipped"
+    },
+    "scopeNote": "The runtime's actual validated/published application source remains 89cfb577. This receipt does not claim runtime validation on f473. The f473 web application is independently READY and serving the exact public build."
+  },
+  "boundaries": {
+    "readOnlyMonitoring": true,
+    "dockerStarted": false,
+    "browserUsed": false,
+    "productionSqlUsed": false,
+    "shareLinkCreated": false,
+    "workflowDispatched": false,
+    "workflowRerun": false,
+    "deploymentTriggered": false,
+    "tokensIncluded": false,
+    "privateEnvironmentIncluded": false,
+    "ownerAcceptancePerformed": false,
+    "ownerAcceptanceStatus": "Root resumes the real Owner UI/task validation separately."
+  }
+}
