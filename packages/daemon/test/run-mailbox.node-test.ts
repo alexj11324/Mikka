@@ -331,7 +331,7 @@ test('stop aborts a genuinely pending host request and prevents another request 
   await mailbox.close()
 })
 
-test('Codex mailbox-enabled history resume fails closed without a fallback thread, on any Codex version', async () => {
+test('Codex mailbox history without a host receipt fails closed regardless of the reported version', async () => {
   const f = fixture(), mailbox = (await f.create())!
   const dir = join(retained, 'unsupported'); mkdirSync(dir, { recursive: true, mode: 0o700 })
   const original = readFileSync('test/fakes/fake-codex.mjs', 'utf8')
@@ -344,8 +344,9 @@ test('Codex mailbox-enabled history resume fails closed without a fallback threa
       const adapter = new CodexAdapter({ sandbox: new NoSandbox(), stateDir: join(dir, version), binary, userHome: home })
       const runId = randomUUID()
       const options = { runId, toolApproval: syntheticApproval(runId), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox, prompt: 'No provider invocation' }
-      await assert.rejects(adapter.resume('another-history', options), /fresh Codex thread/)
+      await assert.rejects(adapter.resume('another-history', options), /Run mailbox/)
     }
     assert.equal(f.state.writes, 0)
   } finally { await mailbox.close() }
 })
+

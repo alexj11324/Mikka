@@ -104,6 +104,43 @@ test('a one-run thread is its own chain: the question is read on it once it ende
   assert.deepEqual(threadQuestionView({ ...ended, question: 'waiting' }), { question: 'waiting', waiting: true, status: 'stopped', outcome: null, runId: 'solo', stopping: false })
 })
 
+test('a committed question whose original machine could not wake shows failure on that same queued child', () => {
+  const questionWake = { generation: '41500000-0000-4000-8000-000000000010', error: 'Original task machine unavailable' }
+  const thread = { id: 'origin', status: 'stopped', question: 'resuming' as const,
+    continuation: { id: 'child', status: 'queued', outcome: null, stopping: false }, questionWake }
+  const before = structuredClone(thread)
+  assert.deepEqual(threadQuestionView(thread), {
+    question: 'resuming', waiting: false, status: 'failed', outcome: null, runId: 'child', stopping: false,
+  })
+  assert.deepEqual(thread, before, 'the presentation does not mark the queued run failed or replay its answer')
+  assert.equal(threadQuestionView({ ...thread, questionWake: null }).status, 'running', 'a new wake generation returns to the existing resuming state')
+})
+
+test('a stale wake failure cannot replace a claimed continuation or an ordinary queued run', () => {
+  const questionWake = { generation: '41500000-0000-4000-8000-000000000010', error: 'Original task machine unavailable' }
+  const thread = { id: 'origin', status: 'stopped', question: 'resuming' as const,
+    continuation: { id: 'child', status: 'running', outcome: null, stopping: false }, questionWake }
+  assert.deepEqual(threadQuestionView(thread), {
+    question: null, waiting: false, status: 'running', outcome: null, runId: 'child', stopping: false,
+  })
+  assert.equal(threadQuestionView({ ...thread, question: null, continuation: { ...thread.continuation, status: 'queued' } }).status, 'queued')
+})
+
+test('opening the queued child directly keeps its blocked question wake recoverable', () => {
+  const questionWake = { generation: '41500000-0000-4000-8000-000000000010', error: 'Original task machine unavailable' }
+  const [child] = projectIssueThreads([{ ...make('child', 'viewer'), status: 'queued' }], 'issue', 'viewer', new Set(['viewer']))
+  const thread = withRunChain(child, { rootRunId: 'origin', latestRunId: 'child', attempts: [
+    { runId: 'origin', attempt: 1, status: 'stopped', stopRequestedAt: null, createdAt: new Date(0), finishedAt: new Date(1) },
+    { runId: 'child', attempt: 2, status: 'queued', stopRequestedAt: null, createdAt: new Date(2), finishedAt: null },
+  ] })
+  assert.equal(thread.continuation, null)
+  assert.equal(threadQuestionRunId(thread), 'origin')
+  assert.deepEqual(threadQuestionView({ ...thread, question: 'resuming', questionWake }), {
+    question: 'resuming', waiting: false, status: 'failed', outcome: null, runId: 'child', stopping: false,
+  })
+  assert.equal(threadQuestionView({ ...thread, question: 'resuming', questionWake: null }).status, 'queued', 'an unfailed direct child retains its existing view')
+})
+
 test('a continuation without its origin in view never shows raw markdown as its name', () => {
   // Its origin is outside the chain's scope (another owner or issue), so it is its own root.
   const [orphan] = projectIssueThreads([{ ...make('next', 'viewer'), prompt: '# Thread question abc' }], 'issue', 'viewer', new Set(['viewer']))

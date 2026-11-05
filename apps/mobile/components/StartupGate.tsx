@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Linking, Pressable, StyleSheet, View } from 'react-native'
 import * as Application from 'expo-application'
 import * as Updates from 'expo-updates'
@@ -25,6 +25,9 @@ async function versionInfo(): Promise<{ minMobileBuild?: unknown; mobileUpdateUr
  */
 export function StartupGate({ children }: { children: ReactNode }) {
   const [launch, setLaunch] = useState<Launch>({ kind: 'checking' })
+  const opening = useRef(false)
+  const [openingUpdate, setOpeningUpdate] = useState(false)
+  const [openFailed, setOpenFailed] = useState(false)
   useEffect(() => {
     let live = true
     const set = (next: Launch) => { if (live) setLaunch(next) }
@@ -51,12 +54,19 @@ export function StartupGate({ children }: { children: ReactNode }) {
   if (launch.kind === 'ready') return children
   if (launch.kind === 'tooOld') {
     const url = launch.url
+    const openUpdate = async () => {
+      if (opening.current) return
+      opening.current = true; setOpeningUpdate(true); setOpenFailed(false)
+      try { await Linking.openURL(url) } catch { setOpenFailed(true) }
+      finally { opening.current = false; setOpeningUpdate(false) }
+    }
     return (
       <View style={styles.screen}>
         <Text style={styles.title}>请更新到最新版</Text>
-        <Pressable accessibilityRole="button" onPress={() => void Linking.openURL(url).catch(() => undefined)} style={({ pressed }) => [styles.button, pressed && { opacity: 0.7 }]}>
-          <Text style={styles.buttonText}>更新</Text>
+        <Pressable accessibilityRole="button" accessibilityState={{ busy: openingUpdate, disabled: openingUpdate }} disabled={openingUpdate} onPress={() => void openUpdate()} style={({ pressed }) => [styles.button, pressed && { opacity: 0.7 }]}>
+          <Text style={styles.buttonText}>{openingUpdate ? '正在打开' : '更新'}</Text>
         </Pressable>
+        {openFailed ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.status}>更新页面未打开，请重试。</Text> : null}
       </View>
     )
   }
@@ -72,6 +82,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: colors.page, paddingHorizontal: 32 },
   status: { fontSize: 15, color: colors.secondary },
   title: { fontSize: 22, lineHeight: 28, fontWeight: '700', color: colors.ink, textAlign: 'center' },
-  button: { marginTop: 10, height: 50, minWidth: 200, paddingHorizontal: 28, borderRadius: 25, backgroundColor: colors.accentFill, alignItems: 'center', justifyContent: 'center' },
+  button: { marginTop: 10, minHeight: 50, paddingVertical: 12, minWidth: 200, paddingHorizontal: 28, borderRadius: 25, backgroundColor: colors.accentFill, alignItems: 'center', justifyContent: 'center' },
   buttonText: { fontSize: 17, fontWeight: '600', color: colors.onAccent },
 })

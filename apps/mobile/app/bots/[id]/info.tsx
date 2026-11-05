@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { ReadNotice } from '@/components/ReadNotice'
+import { useRef, useState } from 'react'
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
@@ -53,8 +54,12 @@ export default function BotInfo() {
   const library = page.data?.library ?? []
   const home = useHome()
   // 置顶 and 通知 change at once, then save; a save that fails puts the switch back and says so.
+  const saving = useRef(false)
+  const [busy, setBusy] = useState(false)
   const [unsaved, setUnsaved] = useState<'置顶' | '通知' | null>(null)
   const setPreference = async (change: { pinned?: boolean; muted?: boolean }) => {
+    if (saving.current) return
+    saving.current = true; setBusy(true)
     const before = page.data && { pinned: page.data.pinned, muted: page.data.muted }
     setUnsaved(null)
     const saved = await saveOptimistic(
@@ -63,7 +68,13 @@ export default function BotInfo() {
       () => page.setData(current => current && before ? { ...current, ...before } : current),
     )
     if (!saved) setUnsaved(change.pinned !== undefined ? '置顶' : '通知')
-    else if (change.pinned !== undefined) await home.reload()
+    else {
+      // A poll started during the PATCH may still contain the old preference.
+      // Confirm the saved fields and invalidate that older read.
+      page.setData(current => current && { ...current, ...change })
+      if (change.pinned !== undefined) await home.reload()
+    }
+    saving.current = false; setBusy(false)
   }
   // A long press deletes one of the person's own files, after the system's confirmation (R-51, decision 2026-11-01-2255).
   const deleteFile = (item: BotPage['library'][number]) => Alert.alert(`删除「${item.title}」？`, undefined, [
@@ -87,14 +98,17 @@ export default function BotInfo() {
           <BotAvatar color={bot?.color} shape={bot?.shape} size={96} />
           {name ? <Text style={styles.name}>{name}</Text> : <Spinner />}
         </View>
+        <ReadNotice error={page.error} hasData={Boolean(page.data)} label="Bot 资料" onRetry={page.reload} />
+        <ReadNotice error={computer.error} hasData={Boolean(computer.data)} label="电脑状态" onRetry={computer.reload} />
         {page.loading && !page.data ? <View style={styles.center}><Spinner /></View> : null}
         {page.data ? (
           <Group>
-            <ToggleRow label="置顶" value={page.data.pinned} onChange={pinned => void setPreference({ pinned })} />
-            <ToggleRow label="通知" value={!page.data.muted} onChange={on => void setPreference({ muted: !on })} />
+            <ToggleRow label="置顶" value={page.data.pinned} disabled={busy} onChange={pinned => void setPreference({ pinned })} />
+            <ToggleRow label="通知" value={!page.data.muted} disabled={busy} onChange={on => void setPreference({ muted: !on })} />
           </Group>
         ) : null}
-        {unsaved ? <Text style={styles.unsaved}>{unsaved}没保存，请稍后重试</Text> : null}
+        {busy ? <Text accessibilityLiveRegion="polite" style={{ color: colors.secondary, marginBottom: 16 }}>正在保存</Text> : null}
+        {unsaved ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.unsaved}>{unsaved}没保存，请稍后重试</Text> : null}
         {threads.length ? (
           <Group label="线程">
             {threads.slice(0, SHOWN).map(thread => <ThreadRow key={thread.id} thread={thread} onPress={() => router.push(`/thread/${thread.id}`)} />)}

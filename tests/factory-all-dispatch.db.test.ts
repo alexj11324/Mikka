@@ -106,7 +106,7 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
     await runtime.reconcile.run(userId, id)
   }
   await finish(dispatched.runId!, false)
-  const current = async () => (await pool.query(`SELECT t.id,t.stage,t.status,a."runId",r.kind,r."baseBranch",r."agentDefinition" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" LEFT JOIN agent_runs r ON r.id=a."runId" WHERE t."userId"=$1`, [userId])).rows[0]
+  const current = async () => (await pool.query(`SELECT t.id,t.route,t.stage,t.status,a."runId",r.kind,r."baseBranch",r."agentDefinition" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" LEFT JOIN agent_runs r ON r.id=a."runId" WHERE t."userId"=$1`, [userId])).rows[0]
   const review = await current()
   assert.equal(review.stage, 'review')
   assert.equal(review.status, 'running')
@@ -114,17 +114,16 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   assert.equal(review.agentDefinition.readOnly, true)
   assert.notEqual(review.runId, dispatched.runId)
   await finish(review.runId, true)
-  const verify = await current()
-  assert.equal(verify.stage, 'verify')
-  assert.equal(verify.status, 'running')
-  assert.notEqual(verify.runId, review.runId)
-  await finish(verify.runId, true)
   const acceptance = await current()
+  assert.equal(acceptance.route.flowVersion, 2, 'new dispatches retain the host-frozen single-review flow')
   assert.equal(acceptance.stage, 'approval')
   assert.equal(acceptance.status, 'pending', 'only the person may accept')
   const attempts = (await pool.query('SELECT stage,"runId" FROM factory_attempts WHERE "taskId"=$1 ORDER BY position', [acceptance.id])).rows
-  assert.deepEqual(attempts.map(attempt => attempt.stage), ['execute', 'review', 'verify', 'approval'])
-  assert.equal(new Set(attempts.slice(0, 3).map(attempt => attempt.runId)).size, 3)
+  assert.deepEqual(attempts.map(attempt => attempt.stage), ['execute', 'review', 'approval'])
+  assert.equal(attempts.filter(attempt => attempt.stage === 'review').length, 1)
+  assert.equal(attempts.filter(attempt => attempt.stage === 'verify').length, 0)
+  assert.equal(new Set(attempts.slice(0, 2).map(attempt => attempt.runId)).size, 2)
+  assert.equal(attempts.at(-1)?.runId, null, 'human acceptance does not dispatch another worker')
 
   // An online but unproductive A is stopped, then the actual watchdog consumer
   // chooses B through normal model selection, repository and credential admission.
@@ -160,7 +159,7 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   const recoveryTime = new Date(Date.now() + 2 * 60_000)
   const recovered = await sweepFactoryWatchdog(pool, recovery, recoveryTime)
   assert.equal(recovered.failed, 0)
-  const resumed = (await pool.query(`SELECT t.id,t."sourceEventId",t.status,r.id AS "runId",r."deviceId",r."agentId",r."retryOf",r.prompt,a.output
+  const resumed = (await pool.query(`SELECT t.id,t."sourceEventId",t.status,r.id AS "runId",r."deviceId",r."agentId",r."retryOf",r."agentDefinition",r."sessionId",r.prompt,a.output
     FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" JOIN agent_runs r ON r.id=a."runId" WHERE t.id=$1`, [acceptance.id])).rows[0]
   assert.equal(resumed.id, acceptance.id)
   assert.equal(resumed.sourceEventId, epoch)
@@ -168,6 +167,15 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   assert.equal(resumed.deviceId, deviceB)
   assert.equal(resumed.agentId, agentB)
   assert.equal(resumed.retryOf, continued.runId, 'the existing checkpoint restore path follows the original executor')
+  assert.equal(resumed.sessionId, null, 'a different device starts an independent native session')
+  assert.equal(resumed.agentDefinition.agentProfile.source, 'default')
+  assert.deepEqual(resumed.agentDefinition.agentProfile.targetEntry, resumed.agentDefinition.modelDispatch.entry,
+    'the recovery receipt records the actual newly admitted target')
+  assert.equal(resumed.agentDefinition.model, 'gpt-5')
+  assert.deepEqual(resumed.agentDefinition.agentProfile.targetEntry.source, { kind: 'subscription', connectionId: connection })
+  const recoveredBinding = (await pool.query(`SELECT "ownerId","workspaceId","consumerId","connectionId","modelId"
+    FROM byos_bindings WHERE id=$1`, [resumed.agentDefinition.subscription.bindingId])).rows[0]
+  assert.deepEqual(recoveredBinding, { ownerId: userId, workspaceId: ws.id, consumerId: agentB, connectionId: connection, modelId: 'gpt-5' })
   assert.equal(resumed.output.handoff.requestEpoch, epoch)
   assert.match(resumed.prompt, /null-input regression/)
   assert.match(resumed.prompt, /externalEffects/)

@@ -65,7 +65,7 @@ const getStatus = (status: ToolUIPart["state"], t: ReturnType<typeof useTranslat
     "approval-requested": <CircleIcon className="size-3.5 text-warning-foreground" />,
     "approval-responded": <WrenchIcon className="size-3.5" />,
     "output-available": <WrenchIcon className="size-3.5" />,
-    "output-error": <XCircleIcon className="size-3.5 text-destructive" />,
+    "output-error": <XCircleIcon className="size-3.5 text-destructive-foreground" />,
     "output-denied": <XCircleIcon className="size-3.5 text-warning-foreground" />,
   };
 
@@ -94,7 +94,7 @@ export const ToolHeader = ({
     <span className="truncate">
       {title ?? type.split("-").slice(1).join("-")}
     </span>
-    <span className={status.shown ? (state === "output-error" ? "text-destructive" : "text-warning-foreground") : "sr-only"}>
+    <span className={status.shown ? (state === "output-error" ? "text-destructive-foreground" : "text-warning-foreground") : "sr-only"}>
       {status.label}
     </span>
     <ChevronDownIcon aria-hidden="true" className="size-3.5 shrink-0 transition-transform in-data-[panel-open]:rotate-180" />
@@ -170,7 +170,7 @@ export const ToolOutput = ({
       <div
         className={cn(
           "overflow-x-auto font-mono text-xs [&_table]:w-full",
-          errorText ? "whitespace-pre-wrap break-words text-destructive" : "text-foreground"
+          errorText ? "whitespace-pre-wrap break-words text-destructive-foreground" : "text-foreground"
         )}
       >
         {errorText && <div>{errorText}</div>}

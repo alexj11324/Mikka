@@ -17,10 +17,10 @@ export async function queueTaskRun(userId: string, input: Parameters<typeof queu
   return queueFactoryTask(pool, userId, {
     issueId: input.issueId, botId, agentId: input.agentId, deviceRepoId: repo.id, note: input.note,
     key: input.requestKey, sourceEventId, previousRunId: input.threadRunId,
-    selection: [input.model, input.apiKeyId, input.subscriptionBindingId, input.pinnedDeviceId, Boolean(input.readOnly), execution?.id, source, ...(input.modelDispatch ? [{ modelDispatch: input.modelDispatch }] : []), ...(input.policyCeiling ? [{ policyCeiling: input.policyCeiling }] : [])],
+    selection: [input.model, input.apiKeyId, input.subscriptionBindingId, input.pinnedDeviceId, Boolean(input.readOnly), execution?.id, source, ...(input.modelDispatch ? [{ modelDispatch: input.modelDispatch }] : []), ...(input.agentProfile ? [{ agentProfile: input.agentProfile }] : []), ...(input.policyCeiling ? [{ policyCeiling: input.policyCeiling }] : [])],
     queue: async (tx, owner, request, scopeBot, context) => {
-      const result = await queueFactoryRun(tx, owner, request, scopeBot, context, undefined, { model: input.model, apiKeyId: input.apiKeyId,
-        subscriptionBindingId: input.subscriptionBindingId, modelDispatch: input.modelDispatch, policyCeiling: input.policyCeiling, pinnedDeviceId: input.pinnedDeviceId, readOnly: input.readOnly, execution })
+      const result = await queueFactoryRun(tx, owner, request, scopeBot, context, undefined, { threadRunId: input.threadRunId, model: input.model, apiKeyId: input.apiKeyId,
+        subscriptionBindingId: input.subscriptionBindingId, modelDispatch: input.modelDispatch, agentProfile: input.agentProfile, policyCeiling: input.policyCeiling, pinnedDeviceId: input.pinnedDeviceId, readOnly: input.readOnly, execution })
       if (source) await tx.query('UPDATE agent_runs SET source=$2 WHERE id=$1', [result.runId, source])
       return result
     },

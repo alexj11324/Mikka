@@ -308,7 +308,7 @@ export function ConnectedAppsStatus({ apps }: { apps: ConnectedApps }) {
   return <>
     {apps.loading && <span role="status" className="sr-only">{t('loading')}</span>}
     {error && <FieldError>{error}</FieldError>}
-    {notice && <p role={notice.tone} className={cn('text-sm', notice.tone === 'alert' ? 'text-destructive' : 'text-muted-foreground')}>{notice.text}</p>}
+    {notice && <p role={notice.tone} className={cn('text-sm', notice.tone === 'alert' ? 'text-destructive-foreground' : 'text-muted-foreground')}>{notice.text}</p>}
   </>
 }
 
@@ -556,7 +556,7 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
               <FieldLabel htmlFor="account-alias" className="sr-only">{t('accountName')}</FieldLabel>
               {/* Grey fill, no stroke (R-31); a local override until the shared Input changes. */}
               <Input id="account-alias" autoFocus maxLength={60} value={alias} aria-invalid={Boolean(dialogError)} aria-describedby={dialogError ? 'account-alias-error' : undefined} placeholder={renaming ? accountName(renaming) : undefined} onChange={event => { setAlias(event.target.value); setDialogError('') }} className="border-transparent bg-muted" />
-              {dialogError && <p id="account-alias-error" role="alert" className="text-xs text-destructive">{dialogError}</p>}
+              {dialogError && <p id="account-alias-error" role="alert" className="text-xs text-destructive-foreground">{dialogError}</p>}
             </Field>
           </FieldGroup>
           <DialogFooter>

@@ -1,8 +1,8 @@
 # Mobile app
 
-- **Status:** draft (2026-10-27)
-- **Linear / GitHub:** none yet
-- **Figma:** page `268:4750` 「手机端 · iOS 初稿（Claude · 2026-10-27）」 in `zPe5LKycb2XuT1ivCLRw07`, frames 01–07 (in review)
+- **Status:** implemented baseline; UI/UX acceptance tracked in [#1296](https://github.com/alexj11324/Mikka/issues/1296) (2026-11-05)
+- **GitHub:** #1296
+- **Figma:** `zPe5LKycb2XuT1ivCLRw07`; page `268:4750` is archived per #1296 and is not a design authority. Page `358:9186` is a reference to verify. Current main and accepted decisions govern; do not redesign from archived or unaccepted frames.
 - **Owner thread:** `claude/mikka-mobile-tech-choice-jrtbd3`
 - **Code:** `apps/mobile` (Expo SDK 58) on the server's `app/api/mobile/*`
   routes; checked end to end with Expo web against a local server.
@@ -273,14 +273,11 @@ mobile tabs.
   web. Chat items carry `images` (a count) and the app loads each photo from
   `GET /api/mobile/chat/image?message=<id>&index=<n>`, which serves only the
   person's own messages.
-- **现状（非决定）:** not on the server yet, so the app leaves them out: 待审阅 and 已归档
-  threads, pinned bots, 电脑不在用时 (needs the web to report presence),
-  dictation (so the composer has no mic yet), dark mode.
+- **现状（非决定）:** thread filters 待审阅 and 已归档, and dictation remain outside the implemented first-version flow. Pins are implemented. Appearance follows the system ([decision](decisions/2026-11-02-1410-mobile-follows-system-appearance.md)); changing the native appearance configuration requires a compatible EAS build.
 - **App icon:** the Mikka mark, the same file as the desktop app's
   (`apps/mobile/assets/icon.icon`, Icon Composer; `icon.png` is the opaque
   1024 fallback). A new icon needs a new build.
-- **Updates:** EAS Update for JavaScript changes; store releases for native
-  changes.
+- **Updates:** `.github/workflows/mobile-update.yml` publishes JavaScript to the production OTA channel on main. Native configuration changes use `.github/workflows/mobile-native.yml`: exact-commit main CI, a completed EAS iOS build, then submission of that exact build id to App Store Connect/TestFlight. The workflow's automatic path filters cover `app.json`, `app.config.ts` and `eas.json`; native dependency or asset changes outside those filters need manual dispatch on main. A different runtime needs a compatible binary. TestFlight processing, installation and device acceptance remain separate from publication; see `apps/mobile/README.md`.
 
 ## Out of scope (first version)
 
@@ -294,7 +291,7 @@ mobile tabs.
 
 ## Done when
 
-- `docs/review-checklist.md` passes on the Figma frames, and Alex accepts
-  them (listed in `decisions.md`).
-- A TestFlight build signs in, shows the Coordinator chat, receives a real
-  proactive push from a real event, and the card's buttons dispatch a thread.
+- `docs/review-checklist.md` passes against the implemented screens and accepted decisions; #1296 authorizes autonomous audit, fixes, merge and deployment.
+- Docker Expo Web evidence covers narrow screens, empty/loading/error states, keyboard access, dark/high-contrast appearance and relevant functional flows. Native-only behavior is identified separately.
+- A compatible TestFlight build signs in, opens the chat list and chat, receives a real proactive push from a real event, and the card's buttons dispatch a thread. VoiceOver, Dynamic Type, UIKit navigation, haptics and Reduce Motion need real iOS evidence.
+- The release record distinguishes web/API deployment, EAS OTA and native build/installation. Production failures return to Docker for reproduction, repair and regression before redeploying.

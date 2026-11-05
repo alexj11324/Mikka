@@ -60,7 +60,7 @@ function getStatusClass(status: ApprovalCardStatus) {
   if (status === "approved" || status === "answered") {
     return "text-success-foreground";
   }
-  if (status === "rejected") return "text-destructive";
+  if (status === "rejected") return "text-destructive-foreground";
   if (status === "changes-requested") {
     return "text-warning-foreground";
   }
@@ -562,7 +562,7 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
                     size="sm"
                     disabled={busy}
                     onClick={onReject}
-                    className="rounded-full text-muted-foreground hover:text-destructive"
+                    className="rounded-full text-muted-foreground hover:text-destructive-foreground"
                   >
                     {agentCopy.reject}</Button>
                 ) : null}

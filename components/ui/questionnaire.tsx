@@ -183,7 +183,7 @@ function QuestionnaireError({
   return (
     <QuestionnairePrimitive.Error
       data-slot="questionnaire-error"
-      className={cn("mt-2 text-sm text-destructive", className)}
+      className={cn("mt-2 text-sm text-destructive-foreground", className)}
       {...props}
     />
   )

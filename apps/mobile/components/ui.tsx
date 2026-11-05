@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { Children, type ReactNode, useEffect, useRef, useState } from 'react'
 import { Image, Platform, Pressable, StyleSheet, TextInput, useColorScheme, View, type StyleProp, type TextInputInstance, type ViewStyle } from 'react-native'
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ArrowUp, ChevronLeft, FileText, RotateCw, Square, X } from 'lucide-react-native'
 import { AttachMenu, type AttachSource } from '@/components/AttachMenu'
 import { Text } from '@/components/Text'
+import { Spinner } from '@/components/icons'
 import { MAX_IMAGES, pickImages, pickText, pickChatFile, uploadPickedFile, pastedChatImage, type Attachment } from '@/lib/attachments'
 import { withChatFiles, CHAT_FILE_MAX_COUNT, type ChatFileScope } from '@mikka/protocol/chat-attachments'
 import { api } from '@/lib/api'
@@ -19,19 +20,21 @@ const glass = Platform.OS === 'ios' && isLiquidGlassAvailable()
  * iOS 26 it is the system's interactive Liquid Glass; earlier iOS and the web
  * draw a white circle with a soft lift.
  */
-export function RoundButton({ onPress, children, label, dot }: { onPress?: () => void; children: ReactNode; label: string; dot?: boolean }) {
+export function RoundButton({ onPress, children, label, dot, disabled = false, busy = false }: { onPress?: () => void; children: ReactNode; label: string; dot?: boolean; disabled?: boolean; busy?: boolean }) {
+  const blocked = disabled || busy
+  const content = busy ? <Spinner size={20} color={colors.ink} /> : children
   if (glass) {
     return (
-      <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={6}>
-        <GlassView isInteractive style={styles.glassRound}>{children}</GlassView>
+      <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: blocked, busy }} aria-disabled={Platform.OS === 'web' ? blocked : undefined} aria-busy={Platform.OS === 'web' ? busy : undefined} disabled={blocked} onPress={onPress} style={blocked ? { opacity: 0.4 } : undefined}>
+        <GlassView isInteractive={!blocked} style={styles.glassRound}>{content}</GlassView>
         {dot ? <View style={styles.dot} /> : null}
       </Pressable>
     )
   }
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={6}
-      style={({ pressed }) => [styles.round, pressed && { backgroundColor: colors.pressed }]}>
-      {children}
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: blocked, busy }} aria-disabled={Platform.OS === 'web' ? blocked : undefined} aria-busy={Platform.OS === 'web' ? busy : undefined} disabled={blocked} onPress={onPress}
+      style={({ pressed }) => [styles.round, blocked && { opacity: 0.4 }, pressed && { backgroundColor: colors.pressed }]}>
+      {content}
       {dot ? <View style={styles.dot} /> : null}
     </Pressable>
   )
@@ -48,14 +51,16 @@ export function CloseButton({ onPress }: { onPress: () => void }) {
 /** Top bar: left button, centred title (or a pill), right button. Floats over the content, no bar background. */
 export function Header({ left, title, right, subtitle, style }: { left?: ReactNode; title?: ReactNode; right?: ReactNode; subtitle?: string; style?: StyleProp<ViewStyle> }) {
   const insets = useSafeAreaInsets()
+  const count = Math.max(1, Children.count(left), Children.count(right))
+  const sideWidth = count * 44 + (count - 1) * 8
   return (
     <View style={[styles.header, { paddingTop: insets.top + 8 }, style]}>
-      <View style={styles.side}>{left}</View>
+      <View style={[styles.side, { width: sideWidth }]}>{left}</View>
       <View style={styles.titleBox}>
         {typeof title === 'string' ? <Text style={styles.title} numberOfLines={1}>{title}</Text> : title}
         {subtitle ? <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text> : null}
       </View>
-      <View style={[styles.side, { alignItems: 'flex-end' }]}>{right}</View>
+      <View style={[styles.side, { width: sideWidth, justifyContent: 'flex-end' }]}>{right}</View>
     </View>
   )
 }
@@ -69,11 +74,13 @@ export function Header({ left, title, right, subtitle, style }: { left?: ReactNo
  * them), so a failed send loses nothing. Controlled when `value` and
  * `onChangeText` are passed.
  */
-export function Composer({ placeholder, onSend, initial = '', disabled = false, value, onChangeText, attach = false, overlay = false, onHeight, autoFocus = false, quote, onClearQuote, accessory, notice, onStop, attachmentScope }: {
+export function Composer({ placeholder, onSend, initial = '', disabled = false, sendDisabled = false, value, onChangeText, attach = false, overlay = false, onHeight, autoFocus = false, quote, onClearQuote, accessory, notice, onStop, attachmentScope }: {
   placeholder: string
   onSend?: (text: string, attachments: Attachment[]) => boolean | void | Promise<boolean | void>
   initial?: string
   disabled?: boolean
+  /** Only sending is unavailable; editing, attachments, model controls and stop stay available. */
+  sendDisabled?: boolean
   value?: string
   onChangeText?: (text: string) => void
   attach?: boolean
@@ -112,9 +119,10 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   const filesBlocked = files.some(file => file.kind === 'file' && file.state !== 'ready')
   const images = files.filter(file => file.kind === 'image').length
   const empty = !text.trim() && !files.length
+  const sendBlocked = blocked || filesBlocked || empty || sendDisabled
   const quoted = (words: string) => quote ? `${quote.split('\n').map(line => `> ${line}`).join('\n')}\n\n${words}` : words
   const send = async () => {
-    if (empty || blocked || filesBlocked) return
+    if (sendBlocked) return
     setSending(true)
     tap()
     try {
@@ -167,13 +175,13 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
               <View key={file.key} style={file.kind === 'image' ? styles.thumb : styles.fileChip}>
                 {file.kind === 'image'
                   ? <Image source={{ uri: file.uri }} style={styles.thumbImage} accessibilityLabel="照片" />
-                  : <><FileText size={16} color={colors.ink} strokeWidth={1.8} /><View style={{ flex: 1, minWidth: 0 }}><Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>{file.kind === 'file' ? <Text numberOfLines={1} style={styles.problem}>{file.state === 'uploading' ? '上传中' : file.state === 'error' ? file.error : `${Math.ceil(file.size / 1024)} KB`}</Text> : null}</View>{file.kind === 'file' && file.state === 'error' ? <Pressable accessibilityRole="button" accessibilityLabel={`重试上传 ${file.name}`} hitSlop={14} disabled={blocked} onPress={() => void upload(file)}><RotateCw size={16} color={colors.secondary} /></Pressable> : null}</>}
-                <Pressable accessibilityRole="button" accessibilityLabel="移除" hitSlop={12} disabled={blocked} onPress={() => { if (blocked) return; setFiles(list => list.filter(item => item.key !== file.key)); if (file.kind === 'file' && file.uploaded) void api(`/api/chat/attachments/${file.uploaded.id}`, { method: 'DELETE' }).catch(() => {}) }} style={styles.remove}>
-                  <X size={12} color={colors.onInk} strokeWidth={3} />
+                  : <><FileText size={16} color={colors.ink} strokeWidth={1.8} /><View style={{ flex: 1, minWidth: 0 }}><Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>{file.kind === 'file' ? <Text numberOfLines={1} style={styles.problem}>{file.state === 'uploading' ? '上传中' : file.state === 'error' ? file.error : `${Math.ceil(file.size / 1024)} KB`}</Text> : null}</View>{file.kind === 'file' && file.state === 'error' ? <Pressable accessibilityRole="button" accessibilityLabel={`重试上传 ${file.name}`} accessibilityState={{ disabled: blocked }} aria-disabled={Platform.OS === 'web' ? blocked : undefined} style={styles.attachmentAction} disabled={blocked} onPress={() => void upload(file)}><RotateCw size={16} color={colors.secondary} /></Pressable> : null}</>}
+                <Pressable accessibilityRole="button" accessibilityLabel={file.kind === 'image' ? '移除照片' : `移除 ${file.name}`} accessibilityState={{ disabled: blocked }} aria-disabled={Platform.OS === 'web' ? blocked : undefined} disabled={blocked} onPress={() => { if (blocked) return; setFiles(list => list.filter(item => item.key !== file.key)); if (file.kind === 'file' && file.uploaded) void api(`/api/chat/attachments/${file.uploaded.id}`, { method: 'DELETE' }).catch(() => {}) }} style={styles.remove}>
+                  <View style={styles.removeMark}><X size={12} color={colors.onInk} strokeWidth={3} /></View>
                 </Pressable>
               </View>
             ))}
-            {problem ? <Text style={styles.problem}>{problem}</Text> : null}
+            {problem ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.problem}>{problem}</Text> : null}
           </View>
         ) : null}
         {notice}
@@ -182,12 +190,12 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
           {quote ? (
             <View style={styles.quote}>
               <Text style={styles.quoteText} numberOfLines={1}>{quote.replace(/\s+/g, ' ')}</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="取消引用" hitSlop={10} onPress={onClearQuote}>
+              <Pressable accessibilityRole="button" accessibilityLabel="取消引用" style={styles.attachmentAction} onPress={onClearQuote}>
                 <X size={16} color={colors.secondary} strokeWidth={2.2} />
               </Pressable>
             </View>
           ) : null}
-          <TextInput ref={input} value={text} onChangeText={setText} placeholder={placeholder} editable={!blocked} multiline autoFocus={autoFocus}
+          <TextInput ref={input} accessibilityLabel={placeholder} value={text} onChangeText={setText} placeholder={placeholder} editable={!blocked} multiline autoFocus={autoFocus}
             placeholderTextColor={colors.secondary} style={[styles.input, sending && { color: colors.secondary }]} />
           <View style={styles.fieldRow}>
             {attach ? <AttachMenu images={attachmentScope ? files.length < CHAT_FILE_MAX_COUNT : images < MAX_IMAGES} onPick={pick} onPasteImage={attachmentScope ? async image => { if (!blocked && files.length < CHAT_FILE_MAX_COUNT) { try { void upload(await pastedChatImage(image)) } catch { setProblem('无法粘贴图片') } } } : undefined} /> : null}
@@ -198,8 +206,8 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
                 <Square size={14} color={colors.onAccent} fill={colors.onAccent} strokeWidth={2.4} />
               </Pressable>
             ) : (
-              <Pressable accessibilityRole="button" accessibilityLabel="发送" accessibilityState={{ disabled: blocked || filesBlocked || empty }} onPress={() => void send()} disabled={blocked || filesBlocked || empty}
-                style={[styles.send, (blocked || filesBlocked || empty) && { backgroundColor: colors.tertiary }]}>
+              <Pressable accessibilityRole="button" accessibilityLabel="发送" accessibilityState={{ disabled: sendBlocked, busy: sending }} aria-disabled={Platform.OS === 'web' ? sendBlocked : undefined} aria-busy={Platform.OS === 'web' ? sending : undefined} onPress={() => void send()} disabled={sendBlocked}
+                style={[styles.send, sendBlocked && { backgroundColor: colors.tertiary }]}>
                 <ArrowUp size={20} color={colors.onAccent} strokeWidth={2.4} />
               </Pressable>
             )}
@@ -254,29 +262,31 @@ const styles = StyleSheet.create({
   round: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', ...lift },
   dot: { position: 'absolute', top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.unread, borderWidth: 1.5, borderColor: colors.surface },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8, zIndex: 10 },
-  side: { width: 64 },
-  titleBox: { flex: 1, alignItems: 'center' },
+  side: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  titleBox: { flex: 1, minWidth: 0, alignItems: 'center' },
   title: { fontSize: 17, fontWeight: '600' },
   subtitle: { fontSize: 11, color: colors.secondary, marginTop: 1 },
   glassRound: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   composerWrap: { paddingHorizontal: 16, paddingTop: 10, gap: 8 },
   overlay: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   // What scrolls under the composer fades out, as under the iOS bar at the top.
-  capsule: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 40, paddingHorizontal: 16, borderRadius: 20, maxWidth: 220 },
+  capsule: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 22, maxWidth: 220 },
   field: { borderRadius: 26, backgroundColor: colors.surface, paddingHorizontal: 8, paddingTop: 8, paddingBottom: 8, gap: 4 },
   fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  quote: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 4, paddingLeft: 14, paddingRight: 10, height: 36, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator },
+  quote: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 4, paddingLeft: 14, paddingRight: 0, minHeight: 44, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator },
   quoteText: { flex: 1, minWidth: 0, fontSize: 14, color: colors.secondary },
   // Six lines of 22, then it scrolls.
   input: { minHeight: 40, maxHeight: 6 * 22 + 16, paddingHorizontal: 10, fontFamily: font, fontSize: 16, lineHeight: 22, color: colors.text, paddingTop: 9, paddingBottom: 9, outlineStyle: 'none' } as never,
   tray: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   thumb: { width: 64, height: 64, borderRadius: 14 },
   thumbImage: { width: 64, height: 64, borderRadius: 14, backgroundColor: colors.bubble },
-  fileChip: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, maxWidth: 200, paddingLeft: 12, paddingRight: 22, borderRadius: 14, backgroundColor: colors.bubble },
+  fileChip: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, maxWidth: 280, paddingLeft: 12, paddingRight: 44, paddingVertical: 8, borderRadius: 14, backgroundColor: colors.bubble },
   fileName: { fontSize: 14, flexShrink: 1 },
-  remove: { position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+  remove: { position: 'absolute', top: 0, right: 0, width: 44, height: 44, alignItems: 'flex-end', justifyContent: 'flex-start', padding: 4 },
+  removeMark: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+  attachmentAction: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   problem: { fontSize: 13, color: colors.danger },
-  send: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.accentFill, alignItems: 'center', justifyContent: 'center' },
+  send: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accentFill, alignItems: 'center', justifyContent: 'center' },
   groupLabel: { fontSize: 13, color: colors.secondary, marginLeft: 16, marginBottom: 7 },
   group: { backgroundColor: colors.surface, borderRadius: 14, overflow: 'hidden' },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginLeft: 16 },

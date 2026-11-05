@@ -1,0 +1,209 @@
+// No new periodic data polling (docs/design/decisions/2026-11-05-0200-no-new-polling.md).
+// Data changes reach the screen by live push (hooks/use-live-key.tsx, lib/live/*),
+// tracked in #1212. Every poller that exists today is listed in pollingAllowlist,
+// with its reason and its hit count, so the list only shrinks: a new poller fails,
+// a replaced one must leave the list.
+import { execFileSync } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
+
+export const pollingMessage = '不要新增轮询；数据变化用 live push（`hooks/use-live-key.tsx` / `lib/live/*`），见 #1212；确实只是界面计时器或外部 API 才加入 allowlist 并写明原因。'
+
+export const pollingRoots = ['app/', 'components/', 'hooks/', 'lib/', 'packages/daemon/src/', 'apps/mobile/', 'workflows/']
+
+const web = 'hooks/use-live-key.tsx'
+const daemon = 'lib/device-gateway-notify.ts'
+const server = 'lib/live/notify.ts'
+const db = (replaceWith, reason, hits) => ({ tracking: '#1212', replaceWith, reason, hits })
+const ui = (reason, hits) => ({ kind: 'ui-timer', reason, hits })
+const external = (reason, hits) => ({ kind: 'external', reason, hits })
+const local = (reason, hits) => ({ kind: 'local', reason, hits })
+
+/**
+ * Files allowed to poll, and why. `hits` is the number of findings the file has
+ * today; more fails (new polling), fewer fails too (lower it, or drop the entry).
+ * - kind 'ui-timer': reads no data (animations, clocks, loaders).
+ * - kind 'external': polls a third-party API, not our database.
+ * - kind 'local': waits on state on the same machine (a file lock, a local browser), no network.
+ * - kind 'keepalive': keeps the live push connection itself open.
+ * - tracking '#1212': a database poll still waiting to be replaced by push, through `replaceWith`.
+ */
+export const pollingAllowlist = {
+  // Web: SWR polling that reads our database.
+  'components/artifacts/artifact-viewer.tsx': db(web, 'artifact detail re-read every 15 s', 1),
+  'components/coordinator/coordinator-chat.tsx': db(web, 'chat re-read on chatPollInterval while a turn runs', 1),
+  'components/desktop/desktop-integration.tsx': db(web, 'desktop link status re-read every POLL_MS', 1),
+  'components/devices/devices-settings.tsx': db(web, 'device list re-read every 5 s', 1),
+  'components/workspace/group-chat-view.tsx': db(web, 'group chat re-read every ANSWER_POLL_MS while an agent answers', 2),
+  'components/workspace/issue-members.tsx': db(web, 'issue members re-read every 10 s', 1),
+  'components/workspace/issue-pull-request-link.tsx': db(web, 'linked pull request status re-read every 60 s through our API', 1),
+  'components/workspace/issue-relations.tsx': db(web, 'issue connections re-read every 10 s', 1),
+  'components/workspace/issue-thread-panel.tsx': db(web, 'thread detail re-read every 2 s while the run is active, slower while waiting', 1),
+  'components/workspace/issue-threads.tsx': db(web, 'issue thread list re-read on runListRefreshInterval', 1),
+  'components/workspace/task-detail.tsx': db(web, 'document sync exchange every 1.5 s', 1),
+  'hooks/use-computer.ts': db(web, 'computer grant re-read before it expires (at least every 5 s)', 1),
+  'components/swr-defaults.tsx': db(web, 'LIST_POLL_MS, the 60 s list poll interval', 1),
+  'lib/coordinator/chat-poll.ts': db(web, 'FULL_READ_EVERY_MS: the chat poll does a full read every 60 s', 1),
+  'components/settings/subscription-settings.tsx': db(web, 'subscription usage re-read every USAGE_EVERY_MS (5 min); the 30 s setInterval is only the clock that ages the "updated" label', 3),
+  'components/billing/free-allowance-section.tsx': db(web, 'pollUntil after card verification: up to 10 reads, 2 s apart, until the webhook lands', 1),
+  'components/billing/hosted-refusal-notice.tsx': db(web, 'pollUntil after a top-up: up to 10 reads, 2 s apart, until the balance lands', 1),
+  'lib/billing/hosted-usage.ts': db(web, 'pollUntil, the bounded poll helper behind the billing notices', 1),
+  // Mobile: useApi polling that reads our database.
+  'apps/mobile/lib/useApi.ts': db(web, 'the useApi polling timer (every screen that passes an interval)', 2),
+  'apps/mobile/components/ChatScreen.tsx': db(web, 'chat re-read every 3.75 s while working, 45 s otherwise, pending actions every 10 s; the 1 s setInterval is the elapsed clock', 3),
+  'apps/mobile/components/ChatList.tsx': db(web, 'group conversations re-read every 30 s', 1),
+  'apps/mobile/components/ThreadsScreen.tsx': db(web, 'thread list re-read every 10 s', 1),
+  'apps/mobile/app/groups/[id].tsx': db(web, 'group messages every 2.5 s while answering (8 s otherwise), members every 60 s, reactions every 15 s', 3),
+  'apps/mobile/app/tasks.tsx': db(web, 'task list re-read every 30 s', 1),
+  'apps/mobile/app/thread/[id].tsx': db(web, 'thread re-read every 4 s while running, 30 s once ended', 1),
+  'apps/mobile/lib/home.tsx': db(web, 'drawer home data re-read every minute', 1),
+  'apps/mobile/app/bots/[id]/info.tsx': db(web, 'bot page and computer status re-read every 15 s', 2),
+  // Server: loops that re-query our database.
+  'app/api/computer/events/route.ts': db(server, 'the "SSE" route re-queries subagent_events in a loop', 1),
+  'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll re-checks device commands until the deadline', 1),
+  'lib/coordinator/group-turns.ts': db(server, 'STOP_POLL_MS: untilStopped re-reads the stop flag every second', 2),
+  'lib/coordinator/stop-turn.ts': db(server, 'stop waits briefly for a starting turn by re-reading the session lease', 1),
+  'workflows/coordinator/native-turn.ts': db(server, 'native coordinator turn re-reads its state every second (up to 180 times)', 1),
+  'workflows/factory-stage/workflow.ts': db(server, 'stage maintenance step every 30 s for up to 12 h', 1),
+  'workflows/run-publication/workflow.ts': db(server, 'publish and fail results retried every 30 s until done', 2),
+  'workflows/subagent/workflow.ts': db(server, 'subagent tick every 1–30 s until terminal', 1),
+  'workflows/thread-machine/workflow.ts': db(server, 'thread machine maintenance every 30 s for up to 12 h', 1),
+  // Daemon: loops that call our server, which reads the database.
+  'packages/daemon/src/agents/tool-approval.ts': db(daemon, 'ToolApprovalGate.monitor: the 1 s run liveness check', 1),
+  'packages/daemon/src/server-link-http.ts': db(daemon, 'prepareRunToolApproval: gate.monitor plus the 1 s isLive loop while a run is paused', 2),
+  'packages/daemon/src/subscription-launcher.ts': db(daemon, 'gate.monitor checking liveness and subscription access', 1),
+  'packages/daemon/src/subscription-hosted-runner.ts': db(daemon, 'gate.monitor with the hosted subscription background check; also a 3-attempt context retry loop', 2),
+  'packages/daemon/src/computer/web-review.ts': db(daemon, 'pollWebComputerReviews: checks the local broker every second and syncs pending reviews with the server', 1),
+  'packages/daemon/src/coordinator/runner.ts': db(daemon, 'native coordinator tool waits for its result by asking the server every 500 ms', 1),
+  'packages/daemon/src/login.ts': db(daemon, 'device login polls the token endpoint at the server-given interval until approved (RFC 8628)', 1),
+  'packages/daemon/src/runs/supervisor.ts': db(daemon, 'CHECKPOINT_EVERY_MS: a periodic write, not a read; saves an idle run\'s checkpoint to the server at most every 2 min', 1),
+  // Third-party APIs.
+  'packages/daemon/src/quota/poller.ts': external('provider quota (Claude/Codex), every 3 min; not our database', 2),
+  // Same machine only.
+  'packages/daemon/src/lock.ts': local('waits for the daemon file lock', 1),
+  'packages/daemon/src/repositories.ts': local('waits for the repository cache file lock', 1),
+  'packages/daemon/src/adapters/mock.ts': local('mock adapter paces scripted output', 1),
+  'lib/db/transport-sample.ts': local('flushes the in-process database transfer counter to the log once a minute; runs no query', 1),
+  'lib/schedules/claim-child.mts': local('keeps a database-test child process alive until it is killed; reads nothing', 1),
+  // The push channel's own keepalive.
+  'packages/daemon/src/device-gateway.ts': { kind: 'keepalive', reason: 'pings the device gateway WebSocket so live push stays connected; reads no data', hits: 1 },
+  // UI timers: read no data.
+  'components/motion/loader.tsx': ui('loader animation frames', 3),
+  'components/ui/thinking-loader-clean.tsx': ui('thinking loader animation', 1),
+  'components/workspace/agent-demo.tsx': ui('types out the demo code', 1),
+  'components/onboarding/onboarding.tsx': ui('onboarding waits up to 5 s for data another hook is already loading; no read of its own', 2),
+  'apps/mobile/components/beui/components/loader/loader.tsx': ui('loader animation frames', 3),
+  'apps/mobile/components/beui/components/loading-states/agent-progress.tsx': ui('progress animation', 1),
+  'apps/mobile/components/beui/components/loading-states/reasoning-text.tsx': ui('reasoning text animation', 2),
+  'apps/mobile/components/beui/components/tool-result/tool-result.tsx': ui('elapsed-time clock', 1),
+  'components/version-guard.tsx': ui('checks the public build metadata once a minute (decision 2026-11-03-1437); no database read', 1),
+}
+
+const delayCall = /\bawait\s+(?:(?:sleep|delay|wait|pause|setTimeout|scheduler\.wait)\s*\(|new\s+Promise\b[\s\S]{0,300}?\bsetTimeout\b)/
+// The interval may be the literal 0 or false; anything else (a number, a constant, a function) polls.
+const off = String.raw`\s*(?:0|false)\s*(?:[,}\n)]|$)`
+
+const definition = /^\s*(?:export\s+)?(?:async\s+)?function\s*$/
+const rules = [
+  { rule: 'polling/refresh-interval', pattern: new RegExp(String.raw`\b(?:refreshInterval|refetchInterval)\s*:(?!${off})`, 'g') },
+  { rule: 'polling/refresh-interval', pattern: new RegExp(String.raw`\b(?:refreshInterval|refetchInterval)\s*=\s*\{(?!\s*(?:0|false)\s*\})`, 'g') },
+  { rule: 'polling/refresh-interval', pattern: /[{,]\s*(?:refreshInterval|refetchInterval)\s*(?=[,}])/g },
+  { rule: 'polling/set-interval', pattern: /\bsetInterval\s*\(/g },
+  { rule: 'polling/poll-constant', pattern: /\b[A-Z][A-Z0-9_]*(?:_POLL_MS|POLL_INTERVAL[A-Z0-9_]*|_EVERY_MS)\s*=(?!=)/g },
+  // Polling helpers of our own: the daemon's run liveness monitor and mobile useApi with an interval.
+  { rule: 'polling/helper', pattern: /\bgate\.monitor\(/g },
+  { rule: 'polling/helper', skip: definition, pattern: /\buseApi\b(?:<[^\n(]*?>)?\((?:[^()]|\([^()]*\))*?,\s*(?!0\s*\)|undefined\s*\)|null\s*\))[^\s)]/g },
+  { rule: 'polling/helper', skip: definition, pattern: /\bpollUntil\(/g },
+]
+
+/** Where a loop body ends: a braced block, or the rest of its single-statement line. */
+function loopBody(source, from) {
+  const lead = source.slice(from).match(/^\s*/)[0].length
+  const start = from + lead
+  const lineEnd = source.indexOf('\n', start)
+  if (source[start] !== '{') return source.slice(start, lineEnd < 0 ? source.length : lineEnd)
+  for (let depth = 0, i = start; i < source.length; i++) {
+    if (source[i] === '{') depth++
+    else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1)
+  }
+  return source.slice(start)
+}
+
+/**
+ * A `while` or `for` loop that awaits a delay: sleep, delay, wait, pause, setTimeout.
+ * Skipped: `for…of`/`for…in`, and short retries bounded by a literal of 10 or less
+ * (`attempt < 3`), which back off rather than poll.
+ */
+function sleepLoops(source) {
+  const found = []
+  for (const match of source.matchAll(/\b(?:while|for)\s*\(/g)) {
+    let i = match.index + match[0].length
+    for (let depth = 1; depth > 0 && i < source.length; i++) {
+      if (source[i] === '(') depth++
+      else if (source[i] === ')') depth--
+    }
+    const header = source.slice(match.index, i)
+    if (/^for\s*\(\s*(?:const|let|var)\s+[^;]*?\b(?:of|in)\b/.test(header)) continue
+    if (/<=?\s*(?:10|[0-9])\s*[;)&|]/.test(header)) continue
+    if (delayCall.test(loopBody(source, i))) found.push(match.index)
+  }
+  return found
+}
+
+function at(file, source, index, rule) {
+  const before = source.slice(0, index)
+  return { file, line: before.split('\n').length, column: index - before.lastIndexOf('\n'), rule, message: pollingMessage }
+}
+
+/** Every polling site in one file, allowlisted or not. */
+export function findPolling(file, source) {
+  const found = []
+  for (const { rule, pattern, skip } of rules) {
+    for (const match of source.matchAll(pattern)) {
+      if (skip && skip.test(source.slice(source.lastIndexOf('\n', match.index) + 1, match.index))) continue
+      found.push(at(file, source, match.index, rule))
+    }
+  }
+  for (const index of sleepLoops(source)) found.push(at(file, source, index, 'polling/sleep-loop'))
+  return found.sort((a, b) => a.line - b.line || a.column - b.column)
+}
+
+/** Findings that fail: polling in a file not on the allowlist, or more than its entry allows. */
+export function auditPolling(file, source, allowlist = pollingAllowlist) {
+  const found = findPolling(file, source)
+  const entry = allowlist[file]
+  if (!entry) return found
+  if (found.length > entry.hits) return found.map(d => ({ ...d, message: `${pollingMessage}（allowlist 只允许这个文件 ${entry.hits} 处，现在 ${found.length} 处）` }))
+  return []
+}
+
+export function pollingPolicyFiles() {
+  return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+    .split('\0')
+    .filter(file => pollingRoots.some(root => file.startsWith(root))
+      && /\.(?:[cm]?[jt]sx?)$/.test(file)
+      && !/(?:^|\/)(?:node_modules|\.next|dist|out|build|__tests__|tests?|e2e)\//.test(file)
+      && !/\.(?:test|spec|fixture|stories)\.[cm]?[jt]sx?$/.test(file)
+      && !file.endsWith('.d.ts')
+      && existsSync(file))
+}
+
+/** Tests are not shipped code: test files by name, and files that import a test runner. */
+export const isTestSource = source => /\bfrom\s+['"](?:node:test|vitest|bun:test|@playwright\/test)['"]/.test(source)
+
+export function auditRepository() {
+  return pollingPolicyFiles().flatMap(file => {
+    const source = readFileSync(file, 'utf8')
+    return isTestSource(source) ? [] : auditPolling(file, source)
+  })
+}
+
+/** Allowlist entries that no longer match the code: a replaced poller, or a count to lower. */
+export function staleAllowlistEntries(allowlist = pollingAllowlist) {
+  return Object.entries(allowlist).flatMap(([file, entry]) => {
+    if (!existsSync(file)) return [`${file}: file no longer exists; delete its pollingAllowlist entry`]
+    const hits = findPolling(file, readFileSync(file, 'utf8')).length
+    if (hits === 0) return [`${file}: no polling left; delete its pollingAllowlist entry`]
+    if (hits < entry.hits) return [`${file}: ${hits} polling sites, allowlist says ${entry.hits}; lower it`]
+    return []
+  })
+}

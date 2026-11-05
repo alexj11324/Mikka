@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { CalendarClock, Mail } from 'lucide-react-native'
 import { CardButton, ChatCard, Field, cardText } from '@/components/cards'
@@ -31,41 +31,56 @@ type Outcome = { item: PendingAction; line: string; failed?: boolean }
  */
 export function PendingActions({ items, focus, reload, onFocusLayout }: { items: PendingAction[]; focus?: string; reload: () => Promise<void>; onFocusLayout?: (y: number) => void }) {
   const [busy, setBusy] = useState<string | null>(null)
+  const inFlight = useRef(false)
+  const settled = useRef(new Set<string>())
   const [outcomes, setOutcomes] = useState<Outcome[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const decide = async (item: PendingAction, approve: boolean) => {
+    if (inFlight.current || settled.current.has(item.id)) return
+    inFlight.current = true
     setBusy(item.id)
     setErrors(current => ({ ...current, [item.id]: '' }))
+    const remember = (line: string, failed = false) => {
+      settled.current.add(item.id)
+      setOutcomes(current => [...current.filter(outcome => outcome.item.id !== item.id), { item, line, failed }])
+    }
+    // The read owns its error notice; a failed refresh cannot undo an acknowledged decision.
+    const refresh = () => reload().catch(() => {})
     try {
       const result = await api<{ status: 'done' | 'failed' | 'declined'; reason: string | null }>(`/api/mobile/pending-actions/${item.id}`, { method: 'POST', body: { approve } })
       if (result.status !== 'failed') tap()
-      if (result.status === 'done') setOutcomes(current => [...current, { item, line: item.action === 'send_email' ? '邮件已发送' : '日历已更新' }])
-      else if (result.status === 'failed') setOutcomes(current => [...current, { item, line: `没做成：${result.reason ?? ''}`, failed: true }])
-      await reload()
+      if (result.status === 'done') remember(item.action === 'send_email' ? '邮件已发送' : '日历已更新')
+      else if (result.status === 'failed') remember(`没做成：${result.reason ?? ''}`, true)
+      else remember('已拒绝')
+      await refresh()
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
-        setOutcomes(current => [...current, { item, line: '已处理或已过期' }])
-        await reload()
+        remember('已处理或已过期')
+        await refresh()
       } else setErrors(current => ({ ...current, [item.id]: '没发出去，再试一次。' }))
     } finally {
+      inFlight.current = false
       setBusy(null)
     }
   }
 
+  const completed = new Set(outcomes.map(outcome => outcome.item.id))
   const shown = new Set(items.map(item => item.id))
   const missed = focus && !shown.has(focus) && !outcomes.some(outcome => outcome.item.id === focus)
 
   return (
     <View style={{ gap: 12 }} accessibilityLabel="等你确认">
-      {outcomes.filter(outcome => !shown.has(outcome.item.id)).map(({ item, line, failed }) => (
-        <ChatCard key={`done-${item.id}`}>
-          <Heading item={item} />
-          <Text style={failed ? cardText.error : cardText.meta}>{line}</Text>
-        </ChatCard>
+      {outcomes.map(({ item, line, failed }) => (
+        <View key={`done-${item.id}`} onLayout={item.id === focus ? event => onFocusLayout?.(event.nativeEvent.layout.y) : undefined}>
+          <ChatCard highlighted={item.id === focus}>
+            <Heading item={item} />
+            <Text accessibilityLiveRegion="polite" style={failed ? cardText.error : cardText.meta}>{line}</Text>
+          </ChatCard>
+        </View>
       ))}
       {missed ? <Text style={styles.missed} onLayout={event => onFocusLayout?.(event.nativeEvent.layout.y)}>这件事已处理或已过期。</Text> : null}
-      {items.map(item => {
+      {items.filter(item => !completed.has(item.id)).map(item => {
         const input = item.input
         const email = item.action === 'send_email'
         const body = text(email ? input.body : input.description)

@@ -297,7 +297,7 @@ export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { 
             {mine && !catching && <SignInPanel attempt={mine} callback={callback} pending={pending} onCallback={setCallback} onFinish={() => { void finishCallback() }} onCancel={cancel} />}
           </div>
           {failure && <div role="alert" className="flex items-center gap-2 px-5 py-3 text-sm text-warning-foreground">
-            <TriangleAlert aria-hidden="true" className="size-4 shrink-0 text-warning" />
+            <TriangleAlert aria-hidden="true" className="size-4 shrink-0 text-warning-foreground" />
             <span className="min-w-0 flex-1">{failure.message}</span>
             {failure.again && available && <Button type="button" variant="secondary" size="sm" disabled={pending || !!attempt} onClick={() => startAgain(failure)}>{t('retry')}</Button>}
           </div>}
@@ -388,7 +388,7 @@ function QuotaMeters({ windows, now }: { windows: SubscriptionUsageView['windows
           <span className="text-foreground">{label}</span>
           <span className="flex items-baseline gap-2 whitespace-nowrap tabular-nums">
             {reset && <span className="text-muted-foreground">{reset}</span>}
-            <span className={cn('font-medium', low ? 'text-destructive' : 'text-foreground')}>{left}</span>
+            <span className={cn('font-medium', low ? 'text-destructive-foreground' : 'text-foreground')}>{left}</span>
           </span>
         </div>
         <Progress value={window.remaining} aria-label={[label, left, reset].filter(Boolean).join(' · ')} className={cn('[&_[data-slot=progress-track]]:h-1.5', low && '[&_[data-slot=progress-indicator]]:bg-destructive')} />

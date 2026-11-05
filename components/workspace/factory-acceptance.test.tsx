@@ -44,7 +44,7 @@ test('a failed list shows the default alert with retry', () => {
   swr = { error: new Error('down'), isLoading: false, mutate: () => { retried++ } }
   const html = list()
   assert.match(html, /data-slot="alert"/)
-  assert.doesNotMatch(html, /text-destructive/)
+  assert.doesNotMatch(html, /text-destructive(?:-foreground)?\b/, 'the default alert: no destructive text, in the colour or its foreground')
   assert.match(html, />无法加载验收</)
   assert.match(html, />重试</)
   assert.equal(retried, 0)

@@ -83,7 +83,7 @@ const STATUS_TONE: Record<FileUploadStatus, string> = {
   queued: "text-muted-foreground",
   uploading: "text-foreground",
   success: "text-emerald-600 dark:text-emerald-400",
-  error: "text-destructive",
+  error: "text-destructive-foreground",
 };
 
 function useControllableUpload({

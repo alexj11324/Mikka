@@ -1,3 +1,5 @@
+import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { createFactoryStore as createCurrentFactoryStore } from './store';
 // Real isolated PostgreSQL contracts. The VM observation and Harness reports
 // below are explicit synthetic fixtures, never live-provider acceptance.
 import assert from 'node:assert/strict'
@@ -9,7 +11,7 @@ import { Pool, type PoolClient } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { applyApprovalMode, defaultRunPolicy } from '@mikka/protocol/agent-policy'
-import { createFactoryStore } from './store'
+
 import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding, type FactoryQueue } from './dispatch'
 import { createFactoryHumanStore } from './human-store'
 import { handleFactory } from './http'
@@ -50,7 +52,7 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
     process.env.MIKKA_FACTORY_ROUTING_ENABLED = process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = '1'
     const authorize = async (userId: string, issueId: string, tx: PoolClient) => (await tx.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issueId, userId])).rowCount === 1
 
-    const fixture = async () => {
+    const fixture = async (singleReview = false) => {
       const issueId = randomUUID(), sourceEventId = randomUUID(), workspaceId = randomUUID(), botId = randomUUID()
       const deviceId = randomUUID(), repoId = randomUUID(), agentId = randomUUID(), sandboxId = `retained-${randomUUID()}`
       const repoPath = `/home/user/.mikka/bot-workspaces/${botId}`, worktreePath = `/home/user/.mikka/worker/worktrees/${randomUUID()}`
@@ -62,7 +64,7 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       // The database suite exercises check admission, not provider startup.
       await pool.query(`INSERT INTO cloud_machines("workspaceId","ownerId","sandboxId","operationId","runtimeReady",state,"deviceId") VALUES($1,'owner',$2,$3,true,'running',$4)`, [workspaceId, `fixture-bot-${botId}`, randomUUID(), deviceId])
       await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES($1::uuid,'owner',$2,$3,'user_message',$1::text,'{"text":"Original 56-byte historical request"}')`, [sourceEventId, botId, issueId])
-      const store = createFactoryStore(pool, authorize, botId, { independent: factoryCheckIndependent, gates: factoryCheckGates })
+      const store = (singleReview ? createCurrentFactoryStore : createFactoryStore)(pool, authorize, botId, { independent: factoryCheckIndependent, gates: factoryCheckGates })
       const queue: FactoryQueue = async (tx, userId, input, runtimeBot) => {
         const runId = randomUUID()
         await tx.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,prompt) VALUES($1,$2,$3,$4,$5,$6,$7,'queued','Historical original target was 56 bytes.')`, [runId, userId, input.issueId, input.agentId, deviceId, input.deviceRepoId, runtimeBot])
@@ -157,6 +159,34 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
         question, task: state.task, deviceId, agentId, repoId, botId, workspaceId, sandboxId, request, completionEventId, historical, observer, human,
         counts: () => ({ observedCount, releaseCount, dispatchCount, startCount }) }
     }
+
+    await t.test('single-review retained delivery recovery hands off the observed snapshot without another review or rewriting old evidence', async () => {
+      const f = await fixture(true), before = await f.historical()
+      assert.equal(f.task.route.flowVersion, 2)
+      const response = await handleFactory(f.human(), f.request)
+      assert.equal(response.status, 200)
+      const result = response.body as Awaited<ReturnType<typeof f.store.read>>
+      assert.equal(result.task.stage, 'approval')
+      assert.equal(result.task.status, 'pending')
+      assert.equal(result.attempts.filter(a => a.stage === 'review').length, 1)
+      assert.equal(result.attempts.filter(a => a.stage === 'verify').length, 0)
+      assert.notEqual(result.task.candidateId, f.oldCandidateId)
+      assert.deepEqual(f.counts(), { observedCount: 1, releaseCount: 1, dispatchCount: 0, startCount: 0 })
+      const candidate = result.candidates.find(c => c.id === result.task.candidateId)!
+      assert.equal(await resolveFactoryCandidateSha(pool, result.task, candidate, null), head)
+      const client = await pool.connect()
+      try {
+        const accepted = await approvalEvidence(client, result.task)
+        assert.deepEqual(accepted.manifest.artifacts.map(a => a.stage), ['execute'])
+        assert.equal(accepted.manifest.artifacts[0].deliverableSnapshotSha, head)
+        assert.equal(accepted.manifest.reviewHistory?.length, 1)
+        assert.equal(accepted.manifest.reviewHistory![0].candidateId, f.oldCandidateId)
+        assert.equal(accepted.manifest.reviewHistory![0].status, 'waiting')
+        assert.equal(accepted.manifest.reviewHistory![0].appliesToCurrentCandidate, false)
+        assert.ok(accepted.evidence.every(a => a.candidateId === candidate.id))
+      } finally { client.release() }
+      assert.deepEqual(await f.historical(), before)
+    })
 
     await t.test('Owner Retry uses the original producer, makes one immutable receipt and independent candidate, and reaches real approval gates', async () => {
       const f = await fixture(), before = await f.historical()

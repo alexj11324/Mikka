@@ -1216,3 +1216,5 @@ export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
 })
 
 export { projectDecisions, projectDecisionSources } from './project-map-schema.ts'
+
+export { factoryAgentProfiles, factoryAgentProfileVersions } from './agent-profile-schema.ts'
