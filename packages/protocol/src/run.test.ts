@@ -119,3 +119,26 @@ describe("run completion contract", () => {
     expect(runReport.safeParse({ ...value, criteria: [{ ...value.criteria[0], exitCode: 0.5 }] }).success).toBe(false)
   })
 })
+
+
+describe("Factory validation results", () => {
+  it("retains an unverified criterion and its specific reason without reporting a pass", () => {
+    const criterion = { text: "End-to-end behavior", passed: false, status: "unverified", reason: "No package.json, Makefile or CI workflow defines an executable check." }
+    const value = { ...emptyRunReport(), criteria: [criterion], reviewVerdict: "needs_judgment" }
+    expect(runReport.parse(value)).toEqual(value)
+  })
+  it("rejects an unverified item without a reason or one pretending to have passed", () => {
+    for (const criterion of [
+      { text: "End-to-end behavior", passed: false, status: "unverified" },
+      { text: "End-to-end behavior", passed: false, status: "unverified", reason: " " },
+      { text: "End-to-end behavior", passed: true, status: "unverified", reason: "Not run" },
+      { text: "End-to-end behavior", passed: false, status: "passed", evidence: "No run" },
+    ]) expect(runReport.safeParse({ ...emptyRunReport(), criteria: [criterion] }).success).toBe(false)
+  })
+  it("keeps legacy criterion booleans and accepts only the three review verdicts", () => {
+    const value = { ...emptyRunReport(), criteria: [{ text: "Existing result", passed: true, evidence: "Inspected the change." }] }
+    expect(runReport.parse(value)).toEqual(value)
+    for (const reviewVerdict of ["passed", "changes_requested", "needs_judgment"]) expect(runReport.parse({ ...value, reviewVerdict })).toEqual({ ...value, reviewVerdict })
+    expect(runReport.safeParse({ ...value, reviewVerdict: "maybe" }).success).toBe(false)
+  })
+})

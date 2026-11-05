@@ -248,6 +248,7 @@ describe("mikka MCP server", () => {
         arguments: {
           summary: "Checked AC-1",
           previewDatabaseBranch: "preview/ac-1",
+          reviewVerdict: "needs_judgment",
           criteria: [
             {
               criterionId,
@@ -256,6 +257,7 @@ describe("mikka MCP server", () => {
               command: "curl -fsS localhost:4000",
               exitCode: 0,
             },
+            { text: "End-to-end checks", passed: false, status: "unverified", reason: "No executable command exists.", resolution: "Recorded the missing observation." },
           ],
         },
       })
@@ -263,6 +265,7 @@ describe("mikka MCP server", () => {
         stopReason: "submitted",
         report: {
           previewDatabaseBranch: "preview/ac-1",
+          reviewVerdict: "needs_judgment",
           criteria: [
             {
               criterionId,
@@ -271,6 +274,7 @@ describe("mikka MCP server", () => {
               command: "curl -fsS localhost:4000",
               exitCode: 0,
             },
+            { text: "End-to-end checks", passed: false, status: "unverified", reason: "No executable command exists.", resolution: "Recorded the missing observation." },
           ],
         },
       })

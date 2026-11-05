@@ -1,3 +1,10 @@
+import { syncFactoryPresentation } from './stage-progress';
+import { readFactoryFlow } from './public-flow';
+import { createFactorySpecApproval } from './spec-approval';
+import { createFactoryHumanStore } from './human-store';
+import { handleFactoryFlow } from './flow-http';
+import { readIssueThreads, loadIssueDocument, encodedIssueDocument } from '../linear-sync/document';
+import { runArtifactSubmissions } from '../artifacts/run-submissions';
 // Real #192 migrations/store/dispatch/questions/claim and #193 consumers.
 // Run production code over isolated PG; queue, actor and terminal reports are fixtures.
 // #331 host invocation uses a real loopback HTTP provider fixture and synthetic PNG.
@@ -29,6 +36,7 @@ import { approvalEvidence } from "./evidence";
 import { createFactoryStore, type FactoryTask } from "./store";
 import {
   createFactoryDispatch,
+  defaultFactoryDispatchAdapters,
   factoryBinding,
   type FactoryQueue,
 } from "./dispatch";
@@ -155,7 +163,9 @@ test(
         `INSERT INTO device_repos(id,"deviceId","userId","repoPath","verifyCommand") VALUES ($1,$2,'owner','/fixture/repo',$3)`,
         [repoId, deviceId, command],
       );
+      let emitPresentation = false;
       const store = createFactoryStore(db, authorize, coordinatorBot, {
+        onTransition: async (tx,task) => { if (emitPresentation) await syncFactoryPresentation(tx,task); },
         independent: factoryCheckIndependent,
         gates: factoryCheckGates,
       });
@@ -347,12 +357,12 @@ test(
         review: reconcileFactoryCheck,
         verify: reconcileFactoryCheck,
       }, coordinatorBot);
-      async function pendingReview(kind: 'repository' | 'report' | 'deliverable' = 'repository', legacy = true) {
+      async function pendingReview(kind: 'repository' | 'report' | 'deliverable' = 'repository', legacy = true, producer?: (runId: string, issueId: string) => Promise<void>) {
         const issueId = randomUUID(),
           sourceEventId = randomUUID();
         await db.query(
-          `INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Check fixture','{}','todo','normal')`,
-          [issueId],
+          `INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Check fixture',$2,'todo','normal')`,
+          [issueId,emitPresentation ? JSON.stringify({type:'doc',content:[]}) : '{}'],
         );
         await db.query(
           `INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES ($1,'owner',$3,'user_message',$2,'{"text":"Check original request"}')`,
@@ -391,6 +401,7 @@ test(
             }),
           ],
         );
+        await producer?.(execute.runId,issueId);
         state = await store.apply("owner", execute.binding, randomUUID(), {
           action: "candidate",
           runId: execute.runId,
@@ -581,6 +592,251 @@ test(
         const evidence = await currentEvidence(pending.task.id);
         assert.deepEqual([...new Set(evidence.manifest.artifacts.map(a => a.stage))], ['execute', 'review']);
         assert.deepEqual(evidence.manifest.reviewHistory, []);
+      });
+      await t.test('single review hands unverified observations to the person with their reason instead of asking for a command', async () => {
+        const pending = await pendingReview('repository', false);
+        await db.query('UPDATE device_repos SET "verifyCommand"=NULL WHERE id=$1', [repoId]);
+        try {
+          const review = await start(pending.task);
+          const { rows: [queued] } = await db.query('SELECT prompt FROM agent_runs WHERE id=$1', [review.runId]);
+          assert.doesNotMatch(queued.prompt, /report_blocked or request_help with the missing evidence|asking the person to reply with the exact command/);
+          await terminal(review.runId, `unverified-review-${pending.task.id}`, false, report => {
+            report.verify = { status: 'not_run' };
+            report.criteria = [{ text: 'End-to-end behavior', passed: false, status: 'unverified', reason: 'No package.json, Makefile or CI workflow defines a command.' }];
+          });
+          await reconcile('owner');
+          const ready = await state(pending.task.id);
+          assert.equal(ready.task.stage, 'approval');
+          assert.equal(ready.task.status, 'pending');
+          assert.equal(ready.attempts.filter(a => a.stage === 'review').length, 1);
+          assert.equal(ready.attempts.filter(a => a.stage === 'verify').length, 0);
+          assert.equal((await db.query('SELECT id FROM factory_questions WHERE "taskId"=$1', [pending.task.id])).rowCount, 0);
+          const detail = await store.read('owner', pending.task.id);
+          const criterion = detail.checks!.find(c => c.runId === review.runId)!.criteria[0] as { status?: string; reason?: string; passed: boolean };
+          assert.equal(criterion.status, 'unverified');
+          assert.equal(criterion.passed, false);
+          assert.match(criterion.reason!, /No package.json/);
+          await currentEvidence(pending.task.id);
+        } finally { await db.query('UPDATE device_repos SET "verifyCommand"=$2 WHERE id=$1', [repoId, command]); }
+      });
+      await t.test('public flow, same Artifact versions and one Bot comment per visited stage use real persisted provenance', async () => {
+        emitPresentation = true;
+        try {
+          const captureId = randomUUID();
+          let producerRun = '';
+          const initial = await pendingReview('repository',false,async (runId,issueId) => {
+            producerRun = runId;
+            const report = { summary: 'Implemented a readable report', filesChanged: ['README.md'], sourceCommit: sha, publish: { commit: sha, pushed: true }, verify: { status: 'not_run' },
+              criteria: [ { text: 'End-to-end execution', passed: false, status: 'unverified', reason: 'No executable test command exists in this repository.' },
+                { text: 'Report is readable', passed: true, status: 'passed', evidence: `Observed actual fixture capture run-capture:${captureId}` } ] };
+            await db.query('UPDATE agent_runs SET report=$2 WHERE id=$1',[runId,JSON.stringify(report)]);
+            await db.query(`INSERT INTO run_captures(id,"userId","runId","issueId","botId",kind,"contentType",source,status,title,size,sha256,"inlineContent","storageKey")
+              VALUES ($1,'owner',$2,$3,$4,'image','image/png','local','ready','Synthetic fixture image',1,$5,$6,'synthetic/fixture.png')`,[captureId,runId,issueId,coordinatorBot,'1'.repeat(64),Buffer.from([0])]);
+          });
+          const review = await start(initial.task);
+          const reviewPrompt=(await db.query('SELECT prompt FROM agent_runs WHERE id=$1',[review.runId])).rows[0].prompt;
+          assert.match(reviewPrompt,/Acceptance Artifact receipt/);
+          assert.ok(reviewPrompt.includes((await readFactoryFlow(db,initial.task)).acceptance!.artifactId));
+          await db.query("UPDATE agent_runs SET status='waiting_input' WHERE id=$1",[review.runId]);
+          assert.equal((await readFactoryFlow(db,(await store.read('owner',initial.task.id)).task)).needsYou,undefined);
+          await terminal(review.runId,`presentation-${randomUUID()}`,false,report => {
+            report.verify = {status:'not_run'}; report.reviewVerdict='needs_judgment';
+            report.criteria = [{text:'End-to-end execution',passed:false,status:'unverified',reason:'No executable test command exists in this repository.'},
+              {text:'Report is readable',passed:true,evidence:'Inspected the fixed report bytes.'}];
+          });
+          await reconcile.run('owner',review.runId);
+          const state = await store.read('owner',initial.task.id);
+          const flowReadBytes: number[]=[];
+          const measuredFlow = {query:async (sql:string,values:unknown[])=>{
+            const result=await db.query(sql,values);
+            flowReadBytes.push(Buffer.byteLength(JSON.stringify(result.rows)));
+            return result;
+          }} as Pick<import('pg').PoolClient,'query'>;
+          const flow = await readFactoryFlow(measuredFlow,state.task);
+          assert.equal(flow.stage,'handoff'); assert.equal(flow.needsYou?.kind,'pr_review');
+          assert.deepEqual(flow.stages,['implement','review','handoff']);
+          assert.equal(flow.review?.verdict,'needs_judgment'); assert.equal(flow.review?.currentCandidateReviewed,true);
+          assert.ok(flow.acceptance); assert.equal(flow.acceptance.runId,producerRun);
+          assert.deepEqual(flow.acceptance.counts,{passed:1,failed:0,unverified:1});
+          assert.equal(flow.acceptance.media[0].captureId,captureId); assert.equal(flow.acceptance.media[0].criterion,'criterion-2');
+          assert.equal(flow.acceptance.version,2);
+          const document = (await db.query('SELECT "inlineContent" FROM artifact_versions WHERE "artifactId"=$1 AND version=2',[flow.acceptance.artifactId])).rows[0].inlineContent;
+          assert.ok(document.indexOf('未验证') < document.indexOf('已验证')); assert.match(document,/No executable test command exists/);
+          assert.ok(document.includes(captureId)); assert.match(document,/!\[/);
+          assert.equal((await runArtifactSubmissions(db,'owner',[producerRun]))[0].latestVersion,2);
+          const tx = await db.connect();
+          try { await tx.query('BEGIN'); await syncFactoryPresentation(tx,state.task); await syncFactoryPresentation(tx,state.task); await tx.query('COMMIT'); }
+          finally { tx.release(); }
+          assert.equal((await db.query('SELECT count(*)::int AS n FROM artifact_versions WHERE "artifactId"=$1',[flow.acceptance.artifactId])).rows[0].n,2);
+          const saved = (await db.query('SELECT state FROM issue_documents WHERE "issueId"=$1',[state.task.issueId])).rows[0];
+          const ydoc = loadIssueDocument(saved.state,{type:'doc',content:[]});
+          try { const threads=readIssueThreads(ydoc); assert.equal(threads.length,1); assert.equal(threads[0].id,state.task.id);
+            assert.equal(threads[0].messages.length,3); assert.ok(threads[0].messages.every(message => message.author==='Coordinator' && !message.authorUserId));
+            assert.ok(threads[0].messages.some(message => message.body.includes(`?artifact=${flow.acceptance!.artifactId}`))); }
+          finally { ydoc.destroy(); }
+          const humanStore = createFactoryHumanStore(db,botId => createFactoryStore(db,authorize,botId));
+          const read = (userId: string) => handleFactoryFlow(db,humanStore,createFactorySpecApproval(db,humanStore),{ actor:{userId,sessionId:'fixture-browser'},authorization:null,
+            method:'GET',taskId:state.task.id,origin:null,url:'https://app.invalid/api/factory/tasks/'+state.task.id+'/flow' });
+          assert.equal((await read('owner')).status,200); assert.equal((await read('other')).status,404);
+          const beforeBytes = Buffer.byteLength(JSON.stringify(state)), afterBytes = Buffer.byteLength(JSON.stringify(flow));
+          t.diagnostic(`Factory flow fixture: full snapshot ${beforeBytes} bytes; public flow ${afterBytes} bytes; projected DB rows ${flowReadBytes.join(" + ")} bytes; acceptance Markdown ${Buffer.byteLength(document)} bytes.`);
+          assert.ok(afterBytes < beforeBytes);
+          await db.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey","pullRequest")
+            VALUES($1,'owner',$2,'https://github.com/example/fixture.git','github.com/example/fixture',$3)`,[producerRun,state.task.issueId,JSON.stringify({url:'https://github.com/example/fixture/pull/1',state:'closed'})]);
+          assert.equal((await readFactoryFlow(db,state.task)).stage,'handoff','closed without merge is never completed');
+          await db.query(`INSERT INTO factory_merges(id,"taskId","candidateId","userId","eventId","pullRequestUrl",sha,status,source,"finishedAt")
+            VALUES($1,$2,$3,'owner',$4,'https://github.com/example/fixture/pull/1',$5,'merged','github',now())`,[randomUUID(),state.task.id,state.task.candidateId,randomUUID(),sha]);
+          const merged = await readFactoryFlow(db,state.task);
+          assert.equal(merged.stage,'completed'); assert.equal(merged.needsYou,undefined);
+        } finally { emitPresentation=false; }
+      });
+
+      await t.test('acceptance history survives live run cleanup and keeps task and Artifact deletion semantics', async () => {
+        emitPresentation=true;
+        try {
+          const pending=await pendingReview('repository',false,async runId=>{
+            await db.query('UPDATE agent_runs SET report=$2 WHERE id=$1',[runId,JSON.stringify({summary:'Retained acceptance receipt',filesChanged:[],sourceCommit:sha,publish:{commit:sha,pushed:true},verify:{status:'passed'},
+              criteria:[{text:'Retained observation',passed:true,status:'passed',evidence:'Observed before live run cleanup.'}]})]);
+          });
+          const before=await readFactoryFlow(db,pending.task);
+          assert.ok(before.acceptance);
+          const {artifactId,runId,candidateId}=before.acceptance;
+          const versions=(await db.query('SELECT id,version,sha256,"inlineContent","executionIdentity" FROM artifact_versions WHERE "artifactId"=$1 ORDER BY version',[artifactId])).rows;
+          assert.ok(versions.length>0);
+          await db.query('DELETE FROM agent_runs WHERE id=$1',[runId]);
+          assert.equal((await db.query('SELECT id FROM agent_runs WHERE id=$1',[runId])).rowCount,0);
+          assert.deepEqual((await db.query('SELECT "runId","candidateId" FROM factory_acceptance_artifacts WHERE "taskId"=$1',[pending.task.id])).rows,[{runId,candidateId}]);
+          assert.equal((await db.query('SELECT "runId" FROM artifacts WHERE id=$1',[artifactId])).rows[0].runId,null);
+          assert.deepEqual((await readFactoryFlow(db,pending.task)).acceptance,before.acceptance,'a retained receipt identifies the historical source without requiring a live run');
+          assert.deepEqual((await db.query('SELECT id,version,sha256,"inlineContent","executionIdentity" FROM artifact_versions WHERE "artifactId"=$1 ORDER BY version',[artifactId])).rows,versions);
+          await db.query('DELETE FROM factory_tasks WHERE id=$1',[pending.task.id]);
+          assert.equal((await db.query('SELECT 1 FROM factory_acceptance_artifacts WHERE "taskId"=$1',[pending.task.id])).rowCount,0);
+          assert.equal((await db.query('SELECT 1 FROM factory_stage_updates WHERE "taskId"=$1',[pending.task.id])).rowCount,0);
+          assert.deepEqual((await db.query('SELECT id,version,sha256,"inlineContent","executionIdentity" FROM artifact_versions WHERE "artifactId"=$1 ORDER BY version',[artifactId])).rows,versions,'task deletion retains the independently owned Artifact history');
+          await db.query('DELETE FROM artifacts WHERE id=$1',[artifactId]);
+          assert.equal((await db.query('SELECT 1 FROM artifact_versions WHERE "artifactId"=$1',[artifactId])).rowCount,0);
+        } finally {emitPresentation=false;}
+      });
+
+      await t.test('current review-only missing observations update handoff counts; repairs never expose an earlier candidate as current acceptance', async () => {
+        emitPresentation=true;
+        try {
+          const criterionId=randomUUID();
+          const pending=await pendingReview('repository',false,async runId=>{
+            await db.query('UPDATE agent_runs SET report=$2 WHERE id=$1',[runId,JSON.stringify({summary:'Implementation observed one success',filesChanged:[],sourceCommit:sha,publish:{commit:sha,pushed:true},verify:{status:'passed'},
+              criteria:[{criterionId,text:'Behavior',passed:true,status:'passed',evidence:'Implementation fixture passed.'}]})]);
+          });
+          const check=await start(pending.task);
+          await terminal(check.runId,`review-only-${pending.task.id}`,false,report=>{
+            report.verify={status:'not_run'};report.reviewVerdict='needs_judgment';
+            report.criteria=[{criterionId,text:'Behavior',passed:false,status:'unverified',reason:'Independent observation unavailable.',evidence:''},
+              {text:'Review-only capability',passed:false,status:'unverified',reason:'Review environment unavailable.'}];
+          });
+          await reconcile.run('owner',check.runId);
+          const handed=await store.read('owner',pending.task.id),flow=await readFactoryFlow(db,handed.task);
+          const artifactId=flow.acceptance!.artifactId;
+          const content=(await db.query('SELECT "inlineContent" FROM artifact_versions WHERE "artifactId"=$1 AND version=$2',[artifactId,flow.acceptance!.version])).rows[0].inlineContent;
+          const ydoc=loadIssueDocument((await db.query('SELECT state FROM issue_documents WHERE "issueId"=$1',[handed.task.issueId])).rows[0].state,{type:'doc',content:[]});
+          let correctSummary=false;
+          try {correctSummary=readIssueThreads(ydoc)[0].messages.some(message=>message.body.includes('0 项已验证，2 项未验证'));}finally{ydoc.destroy();}
+          const repair=await store.apply('owner',factoryBinding(handed.task),randomUUID(),{action:'repair',reason:'Owner requested further observations'});
+          assert.equal(repair.task.candidateId,null);
+          assert.equal((await readFactoryFlow(db,repair.task)).acceptance,null,'repair pending cannot expose old acceptance');
+          assert.deepEqual(flow.acceptance!.counts,{passed:0,failed:0,unverified:2});
+          assert.ok(content.includes('Independent observation unavailable')&&content.indexOf('Independent observation unavailable')<content.indexOf('## 审阅'));
+          assert.ok(content.includes('Review environment unavailable')&&content.indexOf('Review environment unavailable')<content.indexOf('## 审阅'));
+          assert.equal(correctSummary,true);
+
+          const execution=await start(repair.task),session=`repair-observed-${repair.task.id}`;
+          await terminal(execution.runId,session,false,report=>{
+            report.verify={status:'passed'};report.publish={commit:sha,pushed:true};report.sourceCommit=sha;
+            report.criteria=[{criterionId,text:'Behavior',passed:true,status:'passed',evidence:'New implementation fixture observed the requested behavior.',resolution:'Added the observation.'}];
+          });
+          let completed=await store.apply('owner',execution.binding,randomUUID(),{action:'candidate',runId:execution.runId,
+            candidate:{sha,repository:'/fixture/repo',environment:`device:${deviceId}`,scope:`issue:${repair.task.issueId}`}});
+          assert.notEqual(completed.task.candidateId,handed.task.candidateId);
+          assert.equal((await readFactoryFlow(db,completed.task)).acceptance,null,'a newly selected but unfinished candidate cannot inherit old acceptance');
+          completed=await store.apply('owner',factoryBinding(completed.task),randomUUID(),{action:'finish',status:'passed',reason:'Repair observed',
+            evidence:[{artifact:`run-report:${execution.runId}`,kind:'report',runId:execution.runId,sessionId:session,candidateId:completed.task.candidateId,sha,environment:`device:${deviceId}`,recordedAt:new Date().toISOString()}],output:{}});
+          completed=await store.apply('owner',factoryBinding(completed.task),randomUUID(),{action:'advance',stage:'approval',reason:'Single review already completed'});
+          const current=await readFactoryFlow(db,completed.task);
+          assert.equal(current.acceptance!.artifactId,artifactId);assert.equal(current.acceptance!.candidateId,completed.task.candidateId);
+          assert.deepEqual(current.acceptance!.counts,{passed:1,failed:0,unverified:0});
+          assert.equal(completed.attempts.filter(attempt=>attempt.stage==='review').length,1);
+          const updated=(await db.query('SELECT "inlineContent" FROM artifact_versions WHERE "artifactId"=$1 AND version=$2',[artifactId,current.acceptance!.version])).rows[0].inlineContent;
+          assert.match(updated,/审阅针对先前候选/);assert.match(updated,/Independent observation unavailable/,'empty historical evidence must not hide its unverified reason');
+        } finally {emitPresentation=false;}
+      });
+
+      for (const exists of [false,true]) await t.test(`two tasks on one issue keep both comments without upgrading issue SHARE locks (document exists: ${exists})`, async () => {
+        const issueId=randomUUID();
+        await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,'owner','Concurrent stages','{"type":"doc","content":[]}','todo','normal')`,[issueId]);
+        const tasks:FactoryTask[]=[];
+        for (let i=0;i<2;i++) {
+          const sourceEventId=randomUUID();
+          await db.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1::uuid,'owner',$2,'user_message',$1::uuid::text,'{"text":"Concurrent stage fixture"}')`,[sourceEventId,coordinatorBot]);
+          tasks.push((await store.route('owner',{issueId,sourceEventId,eventId:randomUUID(),rationale:'Fixture task',missingInformation:[],missingPermissions:[],needsSpec:false})).task);
+        }
+        if(exists){const initial=loadIssueDocument(null,{type:'doc',content:[]});try{
+          await db.query(`INSERT INTO issue_documents("issueId","userId",state) VALUES($1,'owner',$2)`,[issueId,encodedIssueDocument(initial)]);
+        }finally{initial.destroy();}}
+        const transactions=await Promise.all(tasks.map(()=>db.connect()));
+        const {beginFactoryTransaction,commitFactoryTransaction,rollbackFactoryTransaction,forgetFactoryTransaction}=await import('./transaction');
+        try {
+          await Promise.all(transactions.map(tx=>beginFactoryTransaction(tx)));
+          const locked=await Promise.all(transactions.map((tx,index)=>store.lockTask(tx,'owner',tasks[index].id)));
+          // Both transactions now hold their distinct task locks and the same
+          // issue's SHARE lock. Neither may upgrade it while writing comments.
+          emitPresentation=true;
+          const results=await Promise.allSettled(transactions.map(async(tx,index)=>{
+            try {await store.apply('owner',factoryBinding(locked[index]),randomUUID(),{action:'cancel',reason:'Fixture cancellation'},tx);await commitFactoryTransaction(tx);}
+            catch(error){await rollbackFactoryTransaction(tx);throw error;}
+          }));
+          assert.deepEqual(results.map(result=>result.status),['fulfilled','fulfilled'],results.filter(result=>result.status==='rejected').map(result=>String(result.reason)).join('; '));
+          const doc=loadIssueDocument((await db.query('SELECT state FROM issue_documents WHERE "issueId"=$1',[issueId])).rows[0].state,{type:'doc',content:[]});
+          try {assert.deepEqual(readIssueThreads(doc).map(thread=>thread.id).sort(),tasks.map(task=>task.id).sort());
+            assert.ok(readIssueThreads(doc).every(thread=>thread.messages.length===1&&thread.messages[0].body.includes('已取消')));
+          }finally{doc.destroy();}
+        } finally {emitPresentation=false;for(const tx of transactions){forgetFactoryTransaction(tx);tx.release();}}
+      });
+
+      await t.test('completed specifications wait for a real browser approval receipt; stale and replayed requests cannot bypass it', async () => {
+        const issueId=randomUUID(),sourceEventId=randomUUID();
+        await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,'owner','Spec fixture','{"type":"doc","content":[]}','todo','normal')`,[issueId]);
+        await db.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1::uuid,'owner',$2,'user_message',$1::uuid::text,'{"text":"Plan first"}')`,[sourceEventId,coordinatorBot]);
+        const routed = await store.route('owner',{issueId,sourceEventId,eventId:randomUUID(),rationale:'Plan first',missingInformation:[],missingPermissions:[],needsSpec:true});
+        const specDispatch = createFactoryDispatch(db,store,queue,defaultFactoryDispatchAdapters);
+        const planned = await specDispatch('owner',{binding:factoryBinding(routed.task),agentId,deviceRepoId:repoId});
+        await db.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"=$2,"startedAt"=now()-interval '1 second',"finishedAt"=now(),report=$3 WHERE id=$1`,
+          [planned.runId,'plan-fixture',JSON.stringify({summary:'Specification ready',filesChanged:[],verify:{status:'not_run'},openQuestions:[],nextStep:null})]);
+        await reconcile.run('owner',planned.runId);
+        const ready = await store.read('owner',routed.task.id);
+        assert.equal(ready.task.stage,'spec'); assert.equal(ready.task.status,'passed');
+        assert.equal((await readFactoryFlow(db,ready.task)).needsYou?.kind,'spec_review');
+        await assert.rejects(store.apply('owner',factoryBinding(ready.task),randomUUID(),{action:'advance',stage:'execute',reason:'Agent cannot approve'}),{code:'factory_spec_approval_required'});
+        let dispatched=0;
+        const approve = createFactorySpecApproval(db,store,async()=>{dispatched++;return undefined;});
+        const input={binding:{taskId:ready.task.id,revision:ready.task.revision},eventId:randomUUID()};
+        await assert.rejects(approve({userId:'owner',sessionId:'fixture-browser'},{...input,binding:{...input.binding,revision:1}}),{code:'factoryStale'});
+        const results=await Promise.all([approve({userId:'owner',sessionId:'fixture-browser'},input),approve({userId:'owner',sessionId:'fixture-browser'},input)]);
+        assert.equal(dispatched,1); assert.equal(results.filter(result=>result.replayed).length,1);
+        assert.equal((await store.read('owner',ready.task.id)).task.stage,'execute');
+        assert.equal((await db.query('SELECT count(*)::int AS n FROM factory_spec_approvals WHERE "taskId"=$1',[ready.task.id])).rows[0].n,1);
+      });
+
+      await t.test('single review can hand an ambiguous finding to the person without starting a repair or a second review', async () => {
+        const pending = await pendingReview('repository', false);
+        const review = await start(pending.task);
+        await terminal(review.runId, `judgment-review-${pending.task.id}`, false, report => {
+          report.verify = { status: 'not_run' };
+          report.reviewVerdict = 'needs_judgment';
+          report.criteria = [{ text: 'Ambiguous product preference', passed: false, status: 'unverified', reason: 'Both documented behaviors are possible; the owner must choose.' }];
+        });
+        await reconcile('owner');
+        const ready = await state(pending.task.id);
+        assert.equal(ready.task.stage, 'approval');
+        assert.equal(ready.attempts.filter(a => a.stage === 'review').length, 1);
+        assert.equal((ready.attempts.find(a => a.id === review.task.attemptId)?.output.completion as { reviewVerdict?: string } | undefined)?.reviewVerdict, 'needs_judgment');
       });
       await t.test('single-review repair hands off its new candidate and keeps earlier findings tied to the old SHA', async () => {
         const pending = await pendingReview('repository', false);
@@ -1708,12 +1964,14 @@ test(
       );
 
       // Use the real automatic consumer, store transition, dispatcher and
-      // definition freeze. Only the provider-facing local queue is a fixture.
+      // definition freeze. Provider-facing role selection and the local queue are fixtures.
       const originalRepairRequest = 'Only acceptance.txt: exact UTF-8 "mikka-production-20261101-847\\n\\n", 31 bytes. Keep all standing constraints.';
       const failedRepairClaim = 'Expected "mikka-production-acceptance-20261101-847\\n\\n", 42 bytes; actual file is 31 bytes.';
       let queuedRepairPrompt = originalRepairRequest;
+      let lastQueueSelection: Record<string, unknown> | undefined;
       const queueModule = t.mock.module(new URL("../agent-runs.ts", import.meta.url).href, { namedExports: {
         queueFactoryRun: async (...args: Parameters<FactoryQueue>) => {
+          lastQueueSelection = (args as unknown[])[6] as Record<string, unknown> | undefined;
           const queued = await queue(...args);
           await args[0].query('UPDATE agent_runs SET prompt=$2 WHERE id=$1', [queued.runId, queuedRepairPrompt]);
           return queued;
@@ -1721,6 +1979,40 @@ test(
       } });
       try {
         const { automaticFactoryDispatch } = await import("./automatic-dispatch");
+        await t.test('approved spec starts a fresh executor role without planner read-only or continuation grants', async () => {
+          const issueId=randomUUID(),sourceEventId=randomUUID(),specRepoId=randomUUID();
+          await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,'owner','Approved specification','{"type":"doc","content":[]}','todo','normal')`,[issueId]);
+          await db.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1::uuid,'owner',$2,'user_message',$1::uuid::text,'{"text":"Plan before implementation"}')`,[sourceEventId,coordinatorBot]);
+          await db.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES($1,$2,'owner','v2/github.com/example/spec','https://github.com/example/spec.git')`,[specRepoId,deviceId]);
+          const routed=await store.route('owner',{issueId,sourceEventId,eventId:randomUUID(),rationale:'Plan first',missingInformation:[],missingPermissions:[],needsSpec:true});
+          const spec=await createFactoryDispatch(db,store,queue,defaultFactoryDispatchAdapters)('owner',{binding:factoryBinding(routed.task),agentId,deviceRepoId:specRepoId});
+          await db.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='planner-fixture',"startedAt"=now()-interval '1 second',"finishedAt"=now(),report=$2,
+            "agentDefinition"="agentDefinition" || '{"readOnly":true,"model":"planner-only"}'::jsonb WHERE id=$1`,[spec.runId,JSON.stringify({summary:'Approved plan',filesChanged:[],verify:{status:'not_run'},openQuestions:[],nextStep:null})]);
+          await reconcile.run('owner',spec.runId);
+          const planned=await store.read('owner',routed.task.id);
+          let selections=0;
+          const profileModule=t.mock.module(new URL('./agent-profile.ts',import.meta.url).href,{namedExports:{
+            resolveAgentProfileDispatch:async (_pool:unknown,_scope:unknown,request:{stage:string})=>{
+              selections++;assert.equal(request.stage,'execute');
+              return {target:{kind:'device',agentId,deviceId,model:'fixture-executor',entry:{id:'fixture-role',harness:'codex',model:'fixture-executor',source:{kind:'api_key',keyId:randomUUID()}}}};
+            },
+          }});
+          const fixtureWorkspace=(await import('drizzle-orm/node-postgres')).drizzle(db,{schema:await import('../db/workspace-schema')});
+          const workspaceTransaction=t.mock.method((await import('../workspace-db')).workspaceDb,'transaction',fixtureWorkspace.transaction.bind(fixtureWorkspace));
+          try {
+            await modelDatabase!.run(()=>createFactorySpecApproval(db,store,automaticFactoryDispatch(db))({userId:'owner',sessionId:'fixture-browser'},{binding:{taskId:planned.task.id,revision:planned.task.revision},eventId:randomUUID()}));
+          } finally {workspaceTransaction.mock.restore();profileModule.restore();}
+          assert.equal(selections,1);
+          assert.equal(lastQueueSelection?.model,'fixture-executor');
+          assert.equal(lastQueueSelection?.readOnly,false);
+          assert.equal(lastQueueSelection?.threadRunId,undefined);
+          const current=await store.read('owner',planned.task.id);
+          assert.equal(current.task.stage,'execute');assert.equal(current.task.status,'running');
+          const runId=current.attempts.find(attempt=>attempt.id===current.task.attemptId)!.runId;
+          const run=(await db.query('SELECT "continuesRunId",prompt FROM agent_runs WHERE id=$1',[runId])).rows[0];
+          assert.equal(run.continuesRunId,null);
+          assert.match(run.prompt,/Factory implementation owns validation/);
+        });
         await t.test('saved Owner answer survives automatic repair and the new candidate checks through canonical same-epoch ancestry', async () => {
           const pending = await pendingReview();
           const candidate = pending.candidates.find(c => c.id === pending.task.candidateId)!;

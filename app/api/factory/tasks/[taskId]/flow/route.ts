@@ -1,0 +1,22 @@
+import { NextResponse } from 'next/server';
+import { auth } from '@/lib/api-auth';
+import { pool } from '@/lib/db';
+import { withRequestLog, noteLogUser } from '@/lib/request-log';
+import { factoryBrowserHuman } from '@/lib/factory/browser-human';
+import { factoryHumanStore, factorySpecApproval } from '@/lib/factory/server';
+import { handleFactoryFlow } from '@/lib/factory/flow-http';
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+const respond = withRequestLog('/api/factory/tasks/[taskId]/flow', async (request: Request, context: { params: Promise<{ taskId: string }> }) => {
+  const actor = await factoryBrowserHuman(request,headers => auth.api.getSession({ headers, query: { disableCookieCache: true } }));
+  noteLogUser(actor?.userId);
+  const { taskId } = await context.params;
+  const result = await handleFactoryFlow(pool,factoryHumanStore,factorySpecApproval,{
+    actor, authorization: request.headers.get('authorization'), method: request.method, taskId,
+    origin: request.headers.get('origin'), url: request.url,
+    ...(request.method === 'POST' ? { body: await request.json().catch(() => null) } : {}),
+  });
+  return NextResponse.json(result.body,{ status: result.status, headers: { 'Cache-Control': 'private, no-store' } });
+});
+export const GET = respond;
+export const POST = respond;
