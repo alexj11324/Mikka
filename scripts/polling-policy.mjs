@@ -29,9 +29,7 @@ const local = (reason, hits) => ({ kind: 'local', reason, hits })
  */
 export const pollingAllowlist = {
   // Web: SWR polling that reads our database.
-  'components/artifacts/artifact-viewer.tsx': db(web, 'artifact detail re-read every 15 s', 1),
   'components/desktop/desktop-integration.tsx': db(web, 'desktop link status re-read every POLL_MS', 1),
-  'components/devices/devices-settings.tsx': db(web, 'device list re-read every 5 s', 1),
   'components/workspace/group-chat-view.tsx': db(web, 'group chat re-read every ANSWER_POLL_MS while an agent answers', 2),
   'components/workspace/issue-pull-request-link.tsx': db(web, 'linked pull request status re-read every 60 s through our API', 1),
   'hooks/use-computer.ts': db(web, 'computer grant re-read before it expires (at least every 5 s)', 1),

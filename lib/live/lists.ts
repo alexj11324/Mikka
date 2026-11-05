@@ -7,7 +7,7 @@ import type { LiveInvalidation } from './events'
 import { ownerLiveScope } from './owner-scope'
 
 type Database = Pick<PoolClient, 'query'>
-export type OwnerListKind = 'thread_list' | 'task_run_list' | 'bot_chat_list'
+export type OwnerListKind = 'thread_list' | 'task_run_list' | 'bot_chat_list' | 'device_list'
 export type WorkspaceListKind = 'issue_list' | 'bot_list' | 'group_list' | 'workspace_settings'
 type ListKind = OwnerListKind | WorkspaceListKind | 'model_settings'
 type Target = { scope: LiveScope; events: LiveInvalidation[] }

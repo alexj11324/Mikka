@@ -2,15 +2,12 @@
   "$comment": "Server calls each page makes in one idle, visible minute with a healthy live channel (tests/idle-request-budget.test.tsx). A call not listed is allowed 0. Budgets only go down: the test fails when a page goes over, and when it measures at or below half a budget, so lower the number (remove the entry at 0).",
   "pages": {
     "board": {},
-    "task-detail": {
-    },
+    "task-detail": {},
     "bot-chat": {},
     "devices": {
-      "agents.listDevices": { "max": 11, "tracking": "#1212", "why": "device list, refreshInterval 5 s" }
+      "agents.pollDevices": { "max": 1, "tracking": "#1212", "why": "a device online through the gateway has no write when it goes offline, so the list keeps the shared 60 s live fallback while one is; every other device change is pushed (device_list)" }
     },
-    "artifact-viewer": {
-      "artifacts.getArtifact": { "max": 4, "tracking": "#1212", "why": "artifact detail, refreshInterval 15 s" }
-    },
+    "artifact-viewer": {},
     "nav-bot-list": {}
   }
 }

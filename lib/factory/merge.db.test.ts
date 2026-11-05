@@ -202,7 +202,7 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
         const accepted = await x.accept(eventId, null);
         assert.equal(accepted.status, 'accepted');
         assert.equal((await x.issue()).status, 'done', 'the status is committed before deferred readers run');
-        assert.deepEqual(sent, [], 'no transport runs ahead of the deferred after-COMMIT work');
+        assert.equal(sent.length, 0, 'no transport runs ahead of the deferred after-COMMIT work');
         await drain();
         const relations = sent.flatMap(value => value.events.filter(event => event.kind === 'issue_relations').map(event => event.id)).sort();
         assert.deepEqual(relations, [x.task.issueId, parent, blocked].sort(), 'the accepted child, parent progress and blocked task all refresh');
