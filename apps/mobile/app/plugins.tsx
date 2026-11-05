@@ -5,6 +5,7 @@ import * as WebBrowser from 'expo-web-browser'
 import { Puzzle, Search } from 'lucide-react-native'
 import { SourceIcon, Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
+import { ListSectionHeader } from '@/shared/components/list-section'
 import { Segmented } from '@/components/Segmented'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
@@ -102,7 +103,7 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
       contentContainerStyle={styles.list}
       ListEmptyComponent={catalog.loading ? <View style={styles.center}><Spinner /></View>
         : <Text style={styles.note}>{catalog.error ? '应用加载失败' : needle ? `没有找到「${query.trim()}」` : catalog.data?.configured === false ? '应用商店未配置' : '没有应用'}</Text>}
-      renderItem={({ item: row }) => 'title' in row ? <Text style={styles.section}>{row.title}</Text> : (
+      renderItem={({ item: row }) => 'title' in row ? <ListSectionHeader title={row.title} /> : (
         <Pressable accessibilityRole="button" onPress={() => void open(row.item.id)} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
           <AppIcon entry={row.item} />
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -190,7 +191,6 @@ const styles = StyleSheet.create({
   search: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, borderRadius: 22, paddingHorizontal: 14, backgroundColor: colors.bubble },
   searchInput: { flex: 1, minWidth: 0, width: 0, minHeight: 44, fontSize: 16, fontFamily: font, color: colors.text, outlineStyle: 'none' } as never,
   list: { paddingBottom: 32 },
-  section: { fontSize: 13, color: colors.secondary, marginLeft: 20, marginTop: 18, marginBottom: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, paddingHorizontal: 20, paddingVertical: 8 },
   icon: { width: 36, height: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   iconBlank: { backgroundColor: colors.bubble },

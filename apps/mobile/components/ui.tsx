@@ -1,3 +1,4 @@
+import { ListGroup } from 'heroui-native'
 import { Children, type ReactNode } from 'react'
 import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 import { GlassView } from 'expo-glass-effect'
@@ -75,19 +76,23 @@ export function Field({ style, children }: { style: StyleProp<ViewStyle>; childr
 }
 
 /** Grouped list section, iOS inset style, no outline. */
+/**
+ * A grouped section, as in iOS Settings and OpenBot: an optional small grey title, then the rows on one rounded
+ * surface (HeroUI's ListGroup), each after the first under a hairline inset from the leading edge.
+ */
 export function Group({ label, children }: { label?: string; children: ReactNode }) {
   const items = (Array.isArray(children) ? children : [children]).flat().filter(Boolean)
   return (
-    <View style={{ marginBottom: 20 }}>
+    <View style={styles.groupBlock}>
       {label ? <Text style={styles.groupLabel}>{label}</Text> : null}
-      <View style={styles.group}>
+      <ListGroup style={styles.group}>
         {items.map((child, index) => (
           <View key={index}>
             {index > 0 ? <View style={styles.separator} /> : null}
             {child}
           </View>
         ))}
-      </View>
+      </ListGroup>
     </View>
   )
 }
@@ -106,7 +111,8 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 11, color: colors.secondary, marginTop: 1 },
   glassRound: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   capsule: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 22, maxWidth: 220 },
-  groupLabel: { fontSize: 13, color: colors.secondary, marginLeft: 16, marginBottom: 7 },
-  group: { backgroundColor: colors.surface, borderRadius: 14, overflow: 'hidden' },
+  groupBlock: { marginBottom: 24, gap: 8 },
+  groupLabel: { fontSize: 13, lineHeight: 18, color: colors.secondary, paddingHorizontal: 16 },
+  group: { backgroundColor: colors.surface, borderRadius: 16, borderCurve: 'continuous', overflow: 'hidden', padding: 0, boxShadow: 'none' },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginLeft: 16 },
 })

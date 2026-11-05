@@ -12,7 +12,7 @@ records), and those files win where this one disagrees. The architecture follows
 | Stacks, titles, back, bar buttons, header search | Expo Router native `Stack`, `Stack.Toolbar`, `Stack.SearchBar` | No hand-drawn header. A screen fills the system bar; it never draws one. |
 | Route-level sheets (message actions, attach, forms) | A `formSheet` route with detents and the grabber | Not a JS bottom sheet. |
 | App frame | `AppDrawer` (`features/shell/components/app-drawer.tsx`): one `Stack` on a surface over a push drawer | No tab bar (decision `2026-11-05-2005-ios-push-drawer`). The chat list is home (`app/index.tsx`). |
-| Menus, pickers, switches, segmented controls, grouped settings forms | `@expo/ui` inside `Host` | `Stack.Toolbar.Menu` for a bar's menu. |
+| Menus, pickers, switches, segmented controls, grouped settings forms | `@expo/ui` inside `Host` | `Stack.Toolbar.Menu` for a bar's menu. A settings switch row is SwiftUI's `Toggle` (`components/SettingsSwitch.ios.tsx`); sections are HeroUI `ListGroup` (`Group`). |
 | Product content: buttons, cards, chips, fields, alerts, text | HeroUI Native and its `Typography` | Themed by `styles/tokens.css`. |
 | AI-specific pieces HeroUI has no part for (tool approval, streamed text) | `components/beui/` | Same palette. A general control is HeroUI's, never a new beUI use. |
 | Chat message text | React Native `Text` with the chat text styles | The one exception to `Typography`: chat text has its own sizes so it lines up with the composer. |

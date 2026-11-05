@@ -62,6 +62,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, paddingHorizontal: 14, paddingVertical: 10 },
   first: { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 14 },
   last: { borderBottomLeftRadius: 16, borderBottomRightRadius: 16, paddingBottom: 14 },
-  title: { fontSize: 16 },
-  meta: { fontSize: 12, color: colors.secondary, marginTop: 2 },
+  title: { fontSize: 16, lineHeight: 21 },
+  meta: { fontSize: 13, lineHeight: 18, color: colors.secondary, marginTop: 2 },
 })

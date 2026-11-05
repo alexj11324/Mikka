@@ -1,7 +1,8 @@
+import { ToggleRowView } from '@/components/SettingsSwitch'
 import { ReadNotice } from '@/components/ReadNotice'
 import { useSettings } from '@/lib/settings'
 import { useEffect, useState, type ReactNode } from 'react'
-import { Image, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
+import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check, ChevronRight } from 'lucide-react-native'
@@ -38,7 +39,7 @@ export function SettingsPage({ title, children, footer }: { title: string; child
   const { data, error, loading, reload } = useSettings()
   return (
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>
-      <NavBar back={() => router.canGoBack() ? router.back() : router.replace('/settings')} title={title} />
+      <NavBar back={() => router.canGoBack() ? router.back() : router.replace('/settings')} title={title} large />
       <ScrollView {...underBar} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: footer ? 16 : insets.bottom + 24 }}>
         <ReadNotice error={error} hasData={Boolean(data)} label="设置" onRetry={reload} />
         {!data && loading ? <View style={{ padding: 24, alignItems: 'center' }}><Spinner /></View> : null}
@@ -72,13 +73,9 @@ export function Row({ icon, label, detail, value, onPress, onLongPress, trailing
   )
 }
 
+/** A switch row: the system's toggle row on iOS (SettingsSwitch.ios.tsx). */
 export function ToggleRow({ label, value, onChange, disabled = false }: { label: string; value: boolean; onChange: (next: boolean) => void; disabled?: boolean }) {
-  return (
-    <View style={styles.row}>
-      <Text style={[styles.label, { flex: 1 }]}>{label}</Text>
-      <Switch accessibilityLabel={label} accessibilityState={{ checked: value, disabled }} value={value} disabled={disabled} onValueChange={onChange} trackColor={{ true: colors.success, false: colors.chip }} thumbColor="#fff" {...{ activeThumbColor: '#fff' }} />
-    </View>
-  )
+  return <ToggleRowView label={label} value={value} disabled={disabled} onChange={onChange} />
 }
 
 /** A row to pick one of several; `busy` spins in place of the tick while the pick is saved. */
@@ -92,10 +89,10 @@ export function ChoiceRow({ label, selected, busy = false, disabled = false, onP
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: 16, paddingVertical: 10, gap: 12, backgroundColor: colors.surface },
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: 48, paddingHorizontal: 16, paddingVertical: 12, gap: 12, backgroundColor: colors.surface },
   icon: { minWidth: 24, alignItems: 'center' },
-  label: { fontSize: 16 },
-  detail: { fontSize: 12, color: colors.secondary, marginTop: 2 },
+  label: { fontSize: 16, lineHeight: 21 },
+  detail: { fontSize: 13, lineHeight: 18, color: colors.secondary, marginTop: 2 },
   value: { fontSize: 15, color: colors.secondary, maxWidth: 200 },
   avatar: { backgroundColor: '#55705F', alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#fff', fontWeight: '600' },

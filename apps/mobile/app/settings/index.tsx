@@ -51,7 +51,7 @@ export default function SettingsScreen() {
   }
   return (
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>
-      {Platform.OS === 'ios' ? <NavBar title="设置" right={{ icon: 'xmark', label: '关闭', onPress: close, web: null }} /> : (
+      {Platform.OS === 'ios' ? <NavBar title="设置" large right={{ icon: 'xmark', label: '关闭', onPress: close, web: null }} /> : (
         <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
           <Text style={styles.title}>设置</Text>
           <CloseButton onPress={close} />
