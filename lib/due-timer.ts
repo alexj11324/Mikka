@@ -17,8 +17,8 @@ export const dueJobs: Record<DueKind, DueJob> = {
     next: async () => (await import('./schedules/runtime')).scheduleNextDue(),
   },
   'run-recovery': {
-    // In a Workflow step the group-turn sweep runs inline: there is no request to run it after.
-    run: async () => { const { recoverRuns } = await import('./run-recovery'); await recoverRuns(work => work()); return (await import('./run-recovery-due')).runRecoveryNextDue() },
+    // Only the sweeps due now run (#1371); a pass with nothing due costs one statement.
+    run: async () => (await import('./run-recovery-due')).runRecoveryPass(),
     next: async () => (await import('./run-recovery-due')).runRecoveryNextDue(),
   },
   'account-deletions': {

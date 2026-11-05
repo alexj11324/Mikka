@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
-import { nextRunRecoveryDue } from './run-recovery-due'
+import { nextRunRecoveryDue, runRecoveryDueSweeps } from './run-recovery-due'
 
 // #1212 D: run recovery no longer gets a minute sweep. The run-recovery due
 // timer (workflows/due-timer, loop.test.ts) sleeps until nextRunRecoveryDue and
@@ -52,7 +52,7 @@ test('run-recovery due times match what each sweep selects', { skip: !valid }, a
     await clear()
   })
 
-  await t.test('an ended, unjudged run is due now; an unanswered try an hour later', async () => {
+  await t.test('an ended, unjudged run is due now; an unanswered try after as long as it waited, at least an hour', async () => {
     await run({ status: 'failed', finishedAt: new Date() })
     near(await due(), await dbNow())
     await clear()
@@ -61,6 +61,11 @@ test('run-recovery due times match what each sweep selects', { skip: !valid }, a
     assert.equal(await due(), tried.getTime() + 60 * 60_000 + 1)
     await run({ status: 'failed', finishedAt: new Date(Date.now() - 8 * 24 * 60 * 60_000) })
     assert.equal(await due(), tried.getTime() + 60 * 60_000 + 1, 'runs past the 7-day window are left alone')
+    await clear()
+    // #1371: a run the judge never answers backs off instead of being asked every hour for a week.
+    const finished = new Date(Date.now() - 3 * 24 * 60 * 60_000), lastTry = new Date(Date.now() - 2 * 60 * 60_000)
+    await run({ status: 'succeeded', finishedAt: finished, outcomeAt: lastTry })
+    assert.equal(await due(), lastTry.getTime() + (lastTry.getTime() - finished.getTime()) + 1)
     await clear()
   })
 
@@ -90,12 +95,12 @@ test('run-recovery due times match what each sweep selects', { skip: !valid }, a
     await clear()
   })
 
-  await t.test('a running machine is checked with E2B once idle for an hour, then each minute', async () => {
+  await t.test('a running machine is checked with E2B once idle for an hour, then every 10 minutes', async () => {
     const active = new Date(Date.now() - 10 * 60_000)
     await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId",state,"sandboxId","lastActiveAt") VALUES ($1,'owner',$2,'running','sbx',$3)`, [randomUUID(), randomUUID(), active])
     assert.equal(await due(), active.getTime() + 60 * 60_000 + 1)
     await pool.query(`UPDATE cloud_machines SET "lastActiveAt"=now()-interval '2 hours'`)
-    near(await due(), await dbNow() + 60_000)
+    near(await due(), await dbNow() + 10 * 60_000)
     await pool.query(`UPDATE cloud_machines SET state='sleeping'`)
     assert.equal(await due(), null, 'a sleeping machine needs no check')
     await clear()
@@ -121,6 +126,19 @@ test('run-recovery due times match what each sweep selects', { skip: !valid }, a
     await pool.query(`INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)`,
       [task, randomUUID(), { kind: 'task_watchdog', attemptId: attempt }, { nextAt: nextAt.toISOString() }])
     assert.equal(await due(), nextAt.getTime())
+    await clear()
+  })
+
+  await t.test('a pass runs only the sweeps due now (#1371)', async () => {
+    assert.deepEqual(await runRecoveryDueSweeps(pool, { factoryLifecycle: true }), { next: null, due: new Set() })
+    const lease = new Date(Date.now() + 90_000)
+    await run({ status: 'running', leaseExpiresAt: lease })
+    assert.deepEqual(await runRecoveryDueSweeps(pool, { factoryLifecycle: true }), { next: lease.getTime() + 1, due: new Set() }, 'future work runs nothing yet')
+    await run({ status: 'failed', finishedAt: new Date() })
+    await pool.query(`INSERT INTO sandbox_kill_retries ("sandboxId","ownerId","lastAttemptAt") VALUES ('sbx','owner',now()-interval '2 minutes')`)
+    const { next, due: sweeps } = await runRecoveryDueSweeps(pool, { factoryLifecycle: true })
+    assert.deepEqual([...sweeps].sort(), ['outcomes', 'sandboxKills'])
+    assert.ok(next !== null && next <= await dbNow())
     await clear()
   })
 })
