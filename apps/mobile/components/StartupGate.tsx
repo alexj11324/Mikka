@@ -5,6 +5,7 @@ import * as Updates from 'expo-updates'
 import { Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { API_URL } from '@/lib/config'
+import { mobileTraceHeaders } from '@/lib/tracing'
 import { buildTooOld, CHECK_MS, DOWNLOAD_MS, within } from '@/lib/startup'
 import { colors } from '@/lib/theme'
 
@@ -12,7 +13,7 @@ type Launch = { kind: 'checking' | 'updating' | 'ready' } | { kind: 'tooOld'; ur
 
 /** `GET /api/version`: the oldest native build Mikka accepts, and where a newer one is. */
 async function versionInfo(): Promise<{ minMobileBuild?: unknown; mobileUpdateUrl?: unknown } | null> {
-  const response = await fetch(`${API_URL}/api/version`, { headers: { accept: 'application/json' } })
+  const response = await fetch(`${API_URL}/api/version`, { headers: { accept: 'application/json', ...mobileTraceHeaders() } })
   return response.ok ? response.json() : null
 }
 

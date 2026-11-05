@@ -1,4 +1,6 @@
-import { trace, type Attributes, type Context, type Span as ApiSpan } from '@opentelemetry/api'
+import { channel } from 'node:diagnostics_channel'
+import { safeErrorAttributes } from '@mikka/protocol/tracing'
+import { SpanStatusCode, trace, type Attributes, type Context, type Span as ApiSpan } from '@opentelemetry/api'
 import type { ReadableSpan, Span, SpanProcessor } from '@opentelemetry/sdk-trace-base'
 import type { PgRequestHookInformation, PgResponseHookInformation } from '@opentelemetry/instrumentation-pg'
 import { basePath } from '@/lib/base-path-config.mjs'
@@ -44,6 +46,24 @@ const text = (value: unknown) => (typeof value === 'string' && value ? value : u
  * step's, else from the incoming path on the root span.
  */
 export class RouteAttributesProcessor implements SpanProcessor {
+  private readonly requestClientChannel = channel('mikka.request.client')
+  private readonly stampRequestClient = (attributes: unknown) => {
+    try { trace.getActiveSpan()?.setAttributes(attributes as Attributes) } catch { /* tracing never breaks a request */ }
+  }
+
+  private readonly requestErrorChannel = channel('mikka.request.error')
+  private readonly stampRequestError = (error: unknown) => {
+    try {
+      const span = trace.getActiveSpan()
+      span?.setAttributes(safeErrorAttributes(error))
+      span?.setStatus({ code: SpanStatusCode.ERROR })
+    } catch { /* tracing never changes a thrown error */ }
+  }
+
+  constructor() {
+    this.requestClientChannel.subscribe(this.stampRequestClient)
+    this.requestErrorChannel.subscribe(this.stampRequestError)
+  }
   onStart(span: Span, parentContext: Context): void {
     try {
       const parent = (trace.getSpan(parentContext) as unknown as { attributes?: Attributes } | undefined)?.attributes
@@ -55,11 +75,20 @@ export class RouteAttributesProcessor implements SpanProcessor {
       const kind = text(own['mikka.client_kind']) ?? text(parent?.['mikka.client_kind']) ?? (step ? 'workflow' : undefined) ?? (path && clientKindFor(path)) ?? (route ? clientKindFor(route) : 'web')
       if (route) span.setAttribute('mikka.route', route)
       span.setAttribute('mikka.client_kind', kind)
+      // A background job owns its kind and does not inherit the scheduling phone's version.
+      if (kind === 'mobile') {
+        const version = text(own['mikka.app.version']) ?? text(parent?.['mikka.app.version'])
+        if (version) span.setAttribute('mikka.app.version', version)
+      }
     } catch { /* attributes never break a request */ }
   }
   onEnd(_span: ReadableSpan): void {}
   forceFlush(): Promise<void> { return Promise.resolve() }
-  shutdown(): Promise<void> { return Promise.resolve() }
+  shutdown(): Promise<void> {
+    this.requestClientChannel.unsubscribe(this.stampRequestClient)
+    this.requestErrorChannel.unsubscribe(this.stampRequestError)
+    return Promise.resolve()
+  }
 }
 
 /** Sizes larger results from their first rows, so a big read costs no more than a small one. */
