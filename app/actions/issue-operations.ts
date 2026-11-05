@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import { db } from '@/lib/db'
 import { issueListChanged } from '@/lib/live/lists'
+import { issueRelationsChanged, relationIds } from '@/lib/live/issue-detail'
 import { issues, issueMembers, issueVersions } from '@/lib/db/schema'
 import { requireIssueAccess, requireIssueAccessWithoutBody } from '@/lib/issue-access'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
@@ -136,6 +137,8 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
           await issueListChanged(tx, saved.id)
           if (id === current.id) savedCurrent = saved
         }
+        // Both ends, and any task an edit disconnected (its old parent): their lists change.
+        await issueRelationsChanged(tx, [...patches.keys()].flatMap(id => [id, ...relationIds(rows.find(row => row.id === id)!.content)]))
         return { issue: await issueView(savedCurrent, tx) }
       })
       if ('issue' in result) scheduleLinearWork()
@@ -173,6 +176,7 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
         const [created] = await tx.insert(issues).values({ id: crypto.randomUUID(), userId: ownerId, title: parsed.data.title ?? t('defaultDuplicateTitle', { title: source.title.slice(0, 195) }), content: withIssueMetadata(child ? { type: 'doc', content: [{ type: 'paragraph' }] } : source.content, newMetadata), status: 'todo', priority: source.priority, revision: 1 }).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: created.id, userId: ownerId, revision: 1, title: created.title, content: created.content, status: created.status, priority: created.priority, ...activityActor(user.id) })
         await issueListChanged(tx, created.id)
+        await issueRelationsChanged(tx, [created.id, source.id])
         if (child) {
           const members = await tx.select({ memberId: issueMembers.memberId }).from(issueMembers).where(and(eq(issueMembers.issueId, source.id), eq(issueMembers.userId, source.userId)))
           if (members.length) await tx.insert(issueMembers).values(members.map(member => ({ issueId: created.id, userId: ownerId, memberId: member.memberId })))
@@ -254,6 +258,7 @@ export async function setIssueDeleted(input: { id: string; revision?: number; re
         if (input.restore && metadata.deletedAt && Date.now() - new Date(metadata.deletedAt).getTime() > 30 * 86400000) return { error: 'issueRestoreWindow' }
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, deletedAt: input.restore ? null : new Date().toISOString() }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, user.id))).returning()
         await issueListChanged(tx, saved.id, true)
+        await issueRelationsChanged(tx, [saved.id])
         return { issue: await issueView(saved, tx) }
       })
       if (input.restore && 'issue' in result && result.issue?.scope === 'workspace' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) dispatchLinearIssueSync(issue.id)
