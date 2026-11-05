@@ -48,11 +48,15 @@ test('real PG: computer changes publish committed owner state without heartbeat 
   observePoolCommits(database)
   const received: { channel: string; events: { kind: string; id: string }[] }[] = []
   const errors: unknown[] = []
+  // The same gateway also receives device wakes (#1212): a decided review wakes its daemon.
+  const deviceWakes: string[] = []
   const server = createServer(async (request, response) => {
     try {
       let text = ''
       for await (const chunk of request) text += chunk.toString()
       assert.equal(request.headers.authorization, 'Bearer fixture-only-live-secret')
+      const wake = /^\/v1\/devices\/([^/]+)\/push$/.exec(request.url ?? '')
+      if (wake) { assert.equal(text, ''); deviceWakes.push(wake[1]); response.writeHead(204).end(); return }
       const events = JSON.parse(text)
       for (const event of events) {
         assert.deepEqual(Object.keys(event).sort(), ['id', 'kind'])
@@ -187,11 +191,15 @@ test('real PG: computer changes publish committed owner state without heartbeat 
       await clear()
       const request = snapshot()
       await syncComputerReviews(database, deviceId, actor.userId, [request]); await clear()
+      deviceWakes.length = 0
       assert.equal(await decideComputerReview(database, peer, request.id, request.digest, false), false)
       assert.equal(await decideComputerReview(database, other, request.id, request.digest, false), false)
       await drain(); assert.equal(received.length, 0)
+      assert.deepEqual(deviceWakes, [], 'a refused decision wakes no device')
       assert.equal(await decideComputerReview(database, actor, request.id, request.digest, false), true)
       await drain(); assert.equal(received.length, 1)
+      for (let i = 0; i < 100 && !deviceWakes.length; i++) await new Promise(resolve => setTimeout(resolve, 10))
+      assert.deepEqual(deviceWakes, [deviceId], 'the decision wakes the daemon showing the review')
       assert.equal((await store.state(actor, botId)).pendingApproval, undefined)
       await clear()
       assert.equal(await decideComputerReview(database, actor, request.id, request.digest, true), false)
