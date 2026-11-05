@@ -425,6 +425,44 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
       [['acct-opus-u2', 'acct-sonnet-u2'], [], []], 'haiku was not reported by Mac\'s daemon')
   })
 
+  await t.test('the one-off migration keeps everyone\'s first choice: 优先使用的 Agent becomes the first row\'s Agent', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const sql = await readFile(new URL('../drizzle/20261105041500_preferred_agent_from_first_row.sql', import.meta.url), 'utf8')
+    const saved = await person('migration-first-row'), untouched = await person('migration-untouched')
+    const codex = await subscribe(saved, 'codex', ['first-codex']), claude = await subscribe(saved, 'claude', ['second-claude'])
+    await order.changeOrder(pool, saved, { kind: 'add', entries: [{ harness: 'codex', model: 'first-codex', source: { kind: 'subscription', connectionId: codex } }, { harness: 'claude_code', model: 'second-claude', source: { kind: 'subscription', connectionId: claude } }] })
+    const stored = (await order.readOrder(pool, saved)).entries
+    await order.changeOrder(pool, saved, { kind: 'reorder', ids: [stored.find(row => row.model === 'first-codex')!.id, ...stored.filter(row => row.model !== 'first-codex').map(row => row.id)] })
+    await pool.query('UPDATE model_order_settings SET "preferredHarness"=\'claude_code\' WHERE "ownerId"=$1', [saved.ownerId])
+    await subscribe(untouched, 'codex', ['only-codex'])
+    await order.changeOrder(pool, untouched, { kind: 'location', location: 'local' })
+    await pool.query(sql); await pool.query(sql)
+    assert.equal((await order.readOrder(pool, saved)).preferredHarness, 'codex', 'its first row runs on Codex')
+    assert.equal((await order.readOrder(pool, untouched)).preferredHarness, 'claude_code', 'an untouched list keeps its setting')
+  })
+
+  await t.test('a model the account no longer reports stays listed, marked modelGone; never deleted', async () => {
+    const scope = await person('order-model-gone')
+    const connection = await subscribe(scope, 'claude', ['claude-opus-gone', 'claude-sonnet-kept'])
+    await order.changeOrder(pool, scope, { kind: 'add', entries: ['claude-opus-gone', 'claude-sonnet-kept'].map(model => ({ harness: 'claude_code' as const, model, source: { kind: 'subscription' as const, connectionId: connection } })) })
+    // 刷新模型 stored a catalogue without the Opus model.
+    await pool.query(`UPDATE byos_connections SET "modelCatalog"=$2::jsonb WHERE id=$1`, [connection, JSON.stringify({ revision: '1', models: ['claude-sonnet-kept'] })])
+    const view = await order.orderView(pool, scope)
+    const gone = view.entries.find(entry => entry.model === 'claude-opus-gone')
+    assert.equal(gone?.block?.reason, 'modelGone')
+    assert.notEqual(view.entries.find(entry => entry.model === 'claude-sonnet-kept')?.block?.reason, 'modelGone')
+    // An API key too: its provider's /models no longer lists one (重新获取模型); a key listing nothing says nothing more.
+    const key = await keys.addApiKey(pool, scope.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'ds-gone' }, { id: 'ds-kept' }] })) as unknown as typeof fetch })
+    await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: 'claude_code', model: 'ds-gone', source: { kind: 'api_key', keyId: key.id } }] })
+    await pool.query('UPDATE model_api_keys SET models=$2::jsonb WHERE id=$1', [key.id, JSON.stringify(['ds-kept'])])
+    assert.equal((await order.orderView(pool, scope)).entries.find(entry => entry.model === 'ds-gone')?.block?.reason, 'modelGone')
+    await pool.query('UPDATE model_api_keys SET models=\'[]\'::jsonb WHERE id=$1', [key.id])
+    assert.equal((await order.orderView(pool, scope)).entries.find(entry => entry.model === 'ds-gone')?.block?.reason, 'missing')
+    // 移除 the subscription: 已移除, not 未连接或不可用.
+    await pool.query(`UPDATE byos_connections SET state='disconnected',"secretName"=NULL,"secretDigest"=NULL,"removedAt"=now() WHERE id=$1`, [connection])
+    assert.equal((await order.orderView(pool, scope)).entries.find(entry => entry.model === 'claude-sonnet-kept')?.block?.reason, 'removed')
+  })
+
   await t.test('优先使用的 Agent and a row\'s Agent: a DeepSeek model both Agents run goes on the preferred one; a row switches; 0 credentials for the empty state', async () => {
     const empty = await person('order-agent-empty')
     assert.equal((await order.orderView(pool, empty)).credentials, 0, 'nothing connected: the empty state asks to connect one (C8)')
@@ -439,23 +477,29 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     await order.changeOrder(pool, scope, { kind: 'preferred', harness: 'codex' })
     view = await order.orderView(pool, scope)
     assert.deepEqual([view.preferredHarness, view.customized, view.entries.map(entry => [entry.model, entry.harness])], ['codex', false, [['acct-opus-p', 'claude_code'], ['ds-a', 'codex']]])
-    // A stored list: rows of two-Agent models on the old preferred Agent move with it; one-Agent rows stay.
+    // A stored list: each Agent keeps its own rows; switching 优先使用的 Agent moves none (decision 2026-11-05-0400).
     await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: 'codex', model: 'ds-b', source: key }] })
     await order.changeOrder(pool, scope, { kind: 'preferred', harness: 'claude_code' })
     view = await order.orderView(pool, scope)
-    assert.deepEqual(view.entries.map(entry => [entry.model, entry.harness, entry.agents.length]), [['acct-opus-p', 'claude_code', 1], ['ds-a', 'claude_code', 2], ['ds-b', 'claude_code', 2]])
-    // One row's Agent: switched, then refused where the model is not offered or would be listed twice.
-    const dsA = view.entries[1]
-    await order.changeOrder(pool, scope, { kind: 'harness', id: dsA.id, harness: 'codex' })
+    assert.deepEqual(view.entries.map(entry => [entry.model, entry.harness, entry.agents.length]), [['acct-opus-p', 'claude_code', 1], ['ds-a', 'codex', 2], ['ds-b', 'codex', 2]])
+    // One row's Agent: it moves to the other list, keeping its place in the stored order.
+    await order.changeOrder(pool, scope, { kind: 'harness', id: view.entries[1].id, harness: 'claude_code' })
     view = await order.orderView(pool, scope)
-    assert.deepEqual(view.entries.map(entry => [entry.model, entry.harness]), [['acct-opus-p', 'claude_code'], ['ds-a', 'codex'], ['ds-b', 'claude_code']], 'same place in the list')
+    assert.deepEqual(view.entries.map(entry => [entry.model, entry.harness]), [['acct-opus-p', 'claude_code'], ['ds-a', 'claude_code'], ['ds-b', 'codex']], 'same place in the list')
     await assert.rejects(order.changeOrder(pool, scope, { kind: 'harness', id: view.entries[0].id, harness: 'codex' }), { code: 'executionModelUnknown' }, 'a Claude subscription model has no Codex')
-    await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: 'claude_code', model: 'ds-a', source: key }] })
+    await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: 'codex', model: 'ds-a', source: key }] })
     view = await order.orderView(pool, scope)
-    await assert.rejects(order.changeOrder(pool, scope, { kind: 'harness', id: view.entries[1].id, harness: 'claude_code' }), { code: 'executionRuleOrderInvalid' }, 'already listed on that Agent')
-    // Dispatch takes the row's own Agent.
+    await assert.rejects(order.changeOrder(pool, scope, { kind: 'harness', id: view.entries[1].id, harness: 'codex' }), { code: 'executionRuleOrderInvalid' }, 'already listed on that Agent')
+    // One Agent's reorder: its rows take each other's places; the other Agent's rows do not move.
+    const [opus, claudeDs, codexB, codexA] = view.entries
+    await order.changeOrder(pool, scope, { kind: 'reorder', ids: [claudeDs.id, opus.id] })
+    view = await order.orderView(pool, scope)
+    assert.deepEqual(view.entries.map(entry => entry.id), [claudeDs.id, opus.id, codexB.id, codexA.id])
+    await assert.rejects(order.changeOrder(pool, scope, { kind: 'reorder', ids: [claudeDs.id, codexB.id] }), { code: 'executionRuleOrderInvalid' }, 'one Agent at a time, all of its rows')
+    await assert.rejects(order.changeOrder(pool, scope, { kind: 'reorder', ids: [claudeDs.id] }), { code: 'executionRuleOrderInvalid' })
+    // Dispatch tries the 优先使用的 Agent's list first; a computer that runs only Codex falls back to the Codex list in its order.
     await device(scope.ownerId, [{ harness: 'codex', installed: true }], true, { name: 'codex-only' })
-    await order.changeOrder(pool, scope, { kind: 'reorder', ids: [view.entries[1].id, view.entries[0].id, view.entries[2].id, view.entries[3].id] })
+    await order.changeOrder(pool, scope, { kind: 'reorder', ids: [codexA.id, codexB.id] })
     const run = await resolveModelDispatch(pool, { ...scope, botId: null })
     assert.deepEqual(run.kind === 'device' && [run.entry.model, run.entry.harness, run.entry.source], ['ds-a', 'codex', key])
   })

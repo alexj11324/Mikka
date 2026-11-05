@@ -14,10 +14,13 @@ let refreshUnconfirmed = false
 const events: string[] = []
 const translate = Object.assign((key: string) => key, { has: () => false })
 mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'time' }) } })
-mock.module('swr', { defaultExport: () => ({ data, mutate: async (value?: OrderView) => { events.push(value ? 'order-cache' : 'order'); return data } }) })
+mock.module('swr', { defaultExport: () => ({ data, mutate: async (value?: OrderView) => { events.push(value ? 'order-cache' : 'order'); return data } }), namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) } })
+const liveKeys: unknown[] = []
+const changes: unknown[] = []
+mock.module(new URL('../../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKey: (...args: unknown[]) => { liveKeys.push(args) } } })
 mock.module('next/link', { defaultExport: ({ children, href }: { children: ReactNode; href: string }) => <a href={href}>{children}</a> })
 mock.module(new URL('../../app/actions/model-order.ts', import.meta.url).href, { namedExports: {
-  changeModelOrder: async () => data,
+  changeModelOrder: async (change: unknown) => { changes.push(change); return data },
   checkModelOrderQuota: async (id: string, workspace: string) => {
     assert.equal(workspace, workspaceId)
     assert.ok(data.entries.some(row => row.source.kind === 'subscription' && row.source.connectionId === id))
@@ -55,7 +58,7 @@ before(async () => {
   ;({ ModelOrderSettings } = await import('./model-order-settings'))
 })
 beforeEach(() => {
-  configured = true; refreshFails = false; refreshUnconfirmed = false; events.length = 0
+  configured = true; refreshFails = false; refreshUnconfirmed = false; events.length = 0; changes.length = 0
   data = { location: 'cloud', customized: true, preferredHarness: 'claude_code', credentials: 1, entries: [], candidates: [], devices: 0, cloudReady: true, cloudModels: {}, first: { kind: 'cloud' }, readyDeviceIds: [], deviceModels: {} }
   container = browser.document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container)
@@ -110,18 +113,18 @@ test('a shared subscription allowance check uses the authorized row action witho
 
 test('each 运行位置 says the order it tries, then where a new run goes first', async () => {
   await render()
-  assert.ok(container.textContent?.includes('orderCloud · first'))
+  assert.ok(container.textContent?.includes('orderCloudclauseSeparatorfirst'))
   await act(async () => root.unmount())
   root = createRoot(container)
   data = { ...data, location: 'local', cloudReady: false, first: { kind: 'device', id: randomUUID(), name: 'Box', server: true } }
   await render()
-  assert.ok(container.textContent?.includes('orderLocal · first'))
+  assert.ok(container.textContent?.includes('orderLocalclauseSeparatorfirst'))
   assert.ok(button('openDevices') === undefined && container.querySelector('a')?.textContent === 'openDevices', '打开设备 sits on the 运行位置 row when a computer takes the run')
   await act(async () => root.unmount())
   root = createRoot(container)
   data = { ...data, first: null }
   await render()
-  assert.ok(container.textContent?.includes('orderLocal · nowhere'))
+  assert.ok(container.textContent?.includes('orderLocalclauseSeparatornowhereLocal'))
 })
 
 test('云端 without an E2B key: rows stay ready, the 运行位置 line says where runs go instead, and its button opens the key dialog', async () => {
@@ -130,7 +133,7 @@ test('云端 without an E2B key: rows stay ready, the 运行位置 line says whe
   await render()
   assert.equal(container.querySelector('li [role="status"]')?.textContent, 'ready')
   assert.ok(![...container.querySelectorAll('li button')].some(item => item.textContent === 'setE2BKey'), 'the key is the 运行位置 row\'s, not each model\'s')
-  assert.ok(container.textContent?.includes('orderCloud · noKeyFirst'))
+  assert.ok(container.textContent?.includes('orderCloudclauseSeparatornoKeyFirst'))
   await act(async () => button('setE2BKey')!.click())
   assert.equal(container.querySelector('[role="dialog"]')?.textContent, 'E2B key')
 })
@@ -153,4 +156,52 @@ test('an unavailable provider read keeps checking even when the HTTP request suc
   await act(async () => button('checkQuota')!.click())
   assert.ok(container.querySelector('[role="alert"]')?.textContent?.includes('quotaCheckUnconfirmed'))
   assert.equal(container.querySelector('li [role="status"]')?.textContent, 'blocked.checking')
+})
+
+test('the list is the 优先使用的 Agent\'s own: the other Agent\'s rows stay out, a move sends only its rows, and the list re-reads on a live push', async () => {
+  const claude = [{ ...row(null), model: 'claude-opus' }, { ...row(null), model: 'claude-sonnet' }]
+  const codex = { ...row(null), model: 'gpt-codex', harness: 'codex' as const, provider: 'codex', agents: ['codex' as const] }
+  data = { ...data, entries: [claude[0], codex, claude[1]] }
+  await render()
+  const text = container.textContent ?? ''
+  assert.match(text, /claude-opus/); assert.match(text, /claude-sonnet/)
+  assert.doesNotMatch(text, /gpt-codex/, 'Codex rows belong to the Codex list')
+  assert.ok(liveKeys.some(args => (args as unknown[])[0] === 'model_settings'), 'it listens for 模型与订阅 changes only')
+  assert.ok(!liveKeys.some(args => (args as unknown[])[0] === 'workspace_settings'), 'not the app-wide settings kind')
+  const menus = [...container.querySelectorAll('button')].filter(item => item.getAttribute('aria-label') === 'rowMenu')
+  assert.equal(menus.length, 2, 'one menu per Claude Code row')
+  await act(async () => { menus[0].click() })
+  const down = [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === 'moveDown')
+  assert.ok(down, 'the first row can move down')
+  await act(async () => { (down as HTMLElement).click() })
+  const reorder = changes.find(change => (change as { kind?: string }).kind === 'reorder') as { ids: string[] } | undefined
+  assert.ok(reorder, 'a move sends a reorder')
+  assert.deepEqual(reorder.ids, [claude[1].id, claude[0].id], 'only this Agent\'s rows, in their new order')
+  data = { ...data, preferredHarness: 'codex' }
+  await render()
+  assert.match(container.textContent ?? '', /gpt-codex/)
+  assert.doesNotMatch(container.textContent ?? '', /claude-opus/)
+})
+
+test('nothing for the 优先使用的 Agent but models for the other: the line says tasks go there, and one button switches', async () => {
+  const keyId = randomUUID()
+  data = { ...data, candidates: [{ harness: 'codex', model: 'gpt-codex', name: 'gpt-codex', provider: 'openai', source: { kind: 'api_key', keyId } }] as OrderView['candidates'] }
+  await render()
+  assert.ok(container.textContent?.includes('emptyUseOther'), 'not 「订阅和 API Key 还没有报告模型」')
+  assert.ok(!container.textContent?.includes('emptyNoModels'))
+  await act(async () => button('switchAgent')!.click())
+  assert.deepEqual(changes.at(-1), { kind: 'preferred', harness: 'codex' })
+})
+
+test('the other Agent\'s list folds under this one as the fallback, an API key marked as billed by its provider', async () => {
+  const claude = { ...row(null), model: 'claude-opus' }
+  const codex = { ...row(null, { kind: 'api_key', keyId: randomUUID() }), model: 'gpt-codex', harness: 'codex' as const, provider: 'openai', agents: ['codex' as const] }
+  data = { ...data, entries: [claude, codex] }
+  await render()
+  const fold = button('backup')
+  assert.ok(fold, 'one line for the fallback list')
+  assert.doesNotMatch(container.textContent ?? '', /gpt-codex/, 'folded until tapped')
+  await act(async () => fold!.click())
+  assert.match(container.textContent ?? '', /gpt-codex/)
+  assert.match(container.textContent ?? '', /billedByProvider/)
 })

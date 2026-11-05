@@ -415,6 +415,8 @@ export interface ChatItem {
   stopped?: true
   /** Why the turn answering this message of the person's failed; it stays after later turns and reloads. */
   failure?: ChatFailure
+  /** The Bot's welcome failed (`failure` says why); shown on the Bot's side until a reply follows. */
+  welcome?: true
 }
 
 /** The run id a successful local or Bot-computer dispatch carries. */
@@ -463,8 +465,18 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       // 重新发送 retried this failed message in place (store.sendRetryOf): the new attempt stands for it.
       if ((message as { mikkaRetried?: unknown }).mikkaRetried === true) continue
       const raw = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
-      // The request for its welcome is for the Coordinator only.
-      if (raw.startsWith(COORDINATOR_WELCOME_MARK)) continue
+      // The request for its welcome is for the Coordinator only. When the turn answering it failed (store.failTurn),
+      // the Bot's side says why, with 重试, until a reply follows (the welcome request had no other trace in the chat).
+      if (raw.startsWith(COORDINATOR_WELCOME_MARK)) {
+        const reason = (message as { mikkaFailure?: unknown }).mikkaFailure
+        const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason }) : null
+        if (failure) {
+          flush()
+          items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: '', tools: [], threads: [], createdAt: createdAt.toISOString(), artifacts: [], welcome: true, failure })
+          briefingBoundary = true
+        }
+        continue
+      }
       // Evidence the person has not seen (lib/attention): only what the Coordinator decides to tell them shows, as its own message.
       if (raw.startsWith(HANDOFF_PREFIX)) {
         briefingBoundary = true
@@ -551,5 +563,6 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
     }
   }
   flush()
-  return items
+  // A welcome that failed and was answered later (重试 worked): the reply stands for it.
+  return items.filter((item, index) => !item.welcome || !items.slice(index + 1).some(next => next.from === 'coordinator'))
 }

@@ -7,9 +7,9 @@ import type { LiveInvalidation } from './events'
 import { ownerLiveScope } from './owner-scope'
 
 type Database = Pick<PoolClient, 'query'>
-export type OwnerListKind = 'thread_list' | 'task_run_list' | 'bot_chat_list'
+export type OwnerListKind = 'thread_list' | 'task_run_list' | 'bot_chat_list' | 'device_list'
 export type WorkspaceListKind = 'issue_list' | 'bot_list' | 'group_list' | 'workspace_settings'
-type ListKind = OwnerListKind | WorkspaceListKind
+type ListKind = OwnerListKind | WorkspaceListKind | 'model_settings'
 type Target = { scope: LiveScope; events: LiveInvalidation[] }
 
 const target = (scope: LiveScope, kinds: readonly ListKind[]): Target => ({
@@ -124,7 +124,11 @@ async function changed(executor: object, key: string, resolve: Resolve) {
   }))
 }
 
-export const runListChanged = (executor: object, runId: string, previewOnly = false) => changed(executor, `run:${runId}:${previewOnly ? 'reply' : 'state'}`, (db, workspace) => runListTargets(db, workspace, runId, previewOnly))
+export async function runListChanged(executor: object, runId: string, previewOnly = false) {
+  await changed(executor, `run:${runId}:${previewOnly ? 'reply' : 'state'}`, (db, workspace) => runListTargets(db, workspace, runId, previewOnly))
+  // The run's cards in its own bot's chat show its state; a reply preview is not a state change.
+  if (!previewOnly) await (await import('./chats')).runBotChatChanged(executor, runId)
+}
 export const issueListChanged = (executor: object, issueId: string, titleChanged = false) => changed(executor, `issue:${issueId}:${titleChanged ? 'title' : 'content'}`, (db, workspace) => issueListTargets(db, workspace, issueId, titleChanged))
 export const botListChanged = (executor: object, botId: string) => changed(executor, `bot:${botId}`, (db, workspace) => botListTargets(db, workspace, botId))
 export const groupListChanged = (executor: object, conversationId: string, removedUserId: string | null = null) => changed(executor, `group:${conversationId}:${removedUserId ?? ''}`, (db, workspace) => groupListTargets(db, workspace, conversationId, removedUserId))
@@ -154,6 +158,26 @@ export const ownerProfileListsChanged = (executor: object, ownerId: string) => c
     JOIN mikka_workspace_members audience ON audience."workspaceId"=w.id AND audience.status='active'`, [ownerId])
   return mergeTargets(scopes.map(scope => target(scope, ['workspace_settings', 'issue_list'])))
 })
+
+/**
+ * 模型与订阅 changed for an account: a subscription connected, paused or removed, its allowance or model list read
+ * again, its order changed. Only the two settings sections listen (`model_settings`), never the app-wide preloader.
+ * The account itself re-reads in every workspace it is an active member of (its subscriptions are its own there);
+ * teammates only where it shares them with other members (othersMayUse). No connection, model or quota crosses.
+ */
+export async function ownerSettingsTargets(database: Database, workspaceDatabase: Database, ownerId: string): Promise<Target[]> {
+  const { rows: memberships } = await workspaceDatabase.query<{ workspaceId: string }>(`SELECT "workspaceId" FROM mikka_workspace_members WHERE "userId"=$1 AND status='active'`, [ownerId])
+  const { othersMayUse } = await import('../personal-policy')
+  const shared: string[] = []
+  for (const { workspaceId } of memberships) if (await othersMayUse(database, ownerId, workspaceId)) shared.push(workspaceId)
+  const { rows: teammates } = shared.length
+    ? await workspaceDatabase.query<LiveScope>(`SELECT "userId" AS "ownerId","workspaceId" FROM mikka_workspace_members WHERE "workspaceId"=ANY($1::uuid[]) AND status='active' AND "userId"<>$2`, [shared, ownerId])
+    : { rows: [] as LiveScope[] }
+  return mergeTargets([...memberships.map(({ workspaceId }) => ({ ownerId, workspaceId })), ...teammates].map(scope => target(scope, ['model_settings'])))
+}
+/** Best effort: an action that already succeeded never fails on its invalidation (the page's own response updates it). */
+export const ownerSettingsChanged = (executor: object, ownerId: string) => changed(executor, `owner-settings:${ownerId}`, (database, workspace) => ownerSettingsTargets(database, workspace, ownerId))
+  .catch(() => console.warn('[live] settings invalidation unavailable'))
 
 /** The account's workspace directory and personal issue identifiers are read
  * across selected workspaces. Their transport still uses the actual owned

@@ -29,7 +29,7 @@ export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTr
   const open = controlledOpen ?? localOpen
 
   function changeOpen(next: boolean) {
-    if (!next) void mutate('devices')
+    if (!next) { void mutate('devices'); void mutate('devices-settings') }
     setLocalOpen(next)
     onOpenChange?.(next)
   }

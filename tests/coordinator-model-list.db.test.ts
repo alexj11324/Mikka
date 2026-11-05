@@ -52,6 +52,12 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
   const entries = [...['fx-codex-a', 'fx-codex-b', 'fx-codex-c'].map(model => ({ harness: 'codex' as const, model, source: { kind: 'subscription' as const, connectionId: codex } })),
     ...['fx-claude-a', 'fx-claude-b'].map(model => ({ harness: 'claude_code' as const, model, source: { kind: 'subscription' as const, connectionId: claude } }))]
   for (const entry of entries) await order.changeOrder(pool, scope, { kind: 'add', entries: [entry] })
+  // The first add stored the untouched list, a default for each Agent (decision 2026-11-05-0400) with fx-claude-a first:
+  // the person drags it into their order.
+  const stored = (await order.readOrder(pool, scope)).entries
+  await order.changeOrder(pool, scope, { kind: 'reorder', ids: entries.map(entry => stored.find(row => row.model === entry.model)!.id) })
+  // Codex first in the prompt as in the stored list: the prompt lists them in dispatch order (decision 2026-11-05-0400).
+  await order.changeOrder(pool, scope, { kind: 'preferred', harness: 'codex' })
   await order.changeOrder(pool, scope, { kind: 'location', location: 'local' })
   // A computer whose Codex reported fx-codex-a and fx-codex-b.
   const deviceId = randomUUID()

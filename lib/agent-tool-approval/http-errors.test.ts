@@ -17,7 +17,7 @@ mock.module(new URL('./store.ts', import.meta.url).href, { namedExports: {
 } })
 const route = import('../../app/v1/runs/[runId]/tool-approval/route')
 const check = async () => (await route).POST(new Request('https://mikka.test/v1/runs/'+runId+'/tool-approval', {
-  method: 'POST', headers: { 'x-mikka-client-version': '0.0.375', 'content-type': 'application/json' },
+  method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', 'content-type': 'application/json' },
   body: JSON.stringify({ operation: 'check', deviceId, policyRevision: 'a'.repeat(64) }),
 }), { params: Promise.resolve({ runId }) })
 

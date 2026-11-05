@@ -14,6 +14,11 @@ let buildCheck = async () => currentBuild
 let submissions = 0, removedNotes = 0
 const submitted: { text: string; context: { retryOf?: number } | undefined }[] = []
 let chatItems: import('@/lib/coordinator/context').ChatItem[] = []
+// A chat whose welcome failed: its read, the model menu's 可用, the refusal code and whether the tab is visible.
+let chatData: Record<string, unknown> | null = null
+let menu: unknown = undefined
+let refusalCode: string | null = null
+let visibility: 'visible' | 'hidden' = 'visible'
 let versionReads = 0
 let pathname = '/mikka/en', search = ''
 let serverVersion: { build: string } = { build: 'fixture-current' }
@@ -33,9 +38,10 @@ mock.module(new URL('../../app/actions/coordinator.ts', import.meta.url).href, {
   retryCoordinatorTurn: async () => { calls++; if (reply instanceof Error) throw reply; if (typeof reply === 'function') return reply(); return reply },
   getCoordinatorChat: async () => ({}), pollCoordinatorChat: async () => ({}), coordinatorHistory: async () => ({}), stopCoordinatorTurn: async () => ({}), welcomeCoordinator: async () => ({}), coordinatorCitationSources: async () => ({}),
 } })
+mock.module(new URL('../../app/actions/execution-settings.ts', import.meta.url).href, { namedExports: { getBotModelMenu: async () => ({}) } })
 mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 mock.module(new URL('../../lib/use-action-error.ts', import.meta.url).href, { namedExports: { useActionError: () => (key: string) => `Errors.${key}` } })
-mock.module(new URL('../../lib/billing/verification-client.ts', import.meta.url).href, { namedExports: { hostedRefusal: () => null } })
+mock.module(new URL('../../lib/billing/verification-client.ts', import.meta.url).href, { namedExports: { hostedRefusal: () => refusalCode } })
 mock.module(new URL('../../lib/app-build.ts', import.meta.url).href, { namedExports: {
   checkPageBuildBeforeAction: () => buildCheck(),
   markPageNeedsRefresh: () => {}, pageNeedsRefresh: () => false, APP_BUILD: 'fixture-current', STALE_BUILD_EVENT: 'mikka:stale-build',
@@ -46,7 +52,7 @@ mock.module(new URL('../../lib/app-build.ts', import.meta.url).href, { namedExpo
 mock.module('next/navigation', { namedExports: { usePathname: () => pathname, useSearchParams: () => new URLSearchParams(search) } })
 mock.module(new URL('../../i18n/navigation.ts', import.meta.url).href, { namedExports: { Link: plain, useRouter: () => ({ push: nothing }), usePathname: () => pathname } })
 mock.module('sonner', { namedExports: { toast: Object.assign((...args: unknown[]) => { notices.push(args) }, { error: nothing }) } })
-mock.module('swr', { defaultExport: () => ({ data: { items: chatItems, enabled: false, working: false, error: null, artifacts: {} }, mutate: async () => {} }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }) } })
+mock.module('swr', { defaultExport: (key: unknown) => Array.isArray(key) && key[0] === 'bot-model-menu' ? { data: menu, mutate: async () => {} } : ({ data: chatData ?? { items: chatItems, enabled: false, working: false, error: null, artifacts: {} }, mutate: async () => {} }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }), unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 mock.module(new URL('./use-coordinator-submit.ts', import.meta.url).href, { namedExports: { useCoordinatorSubmit: () => ({ submit: async (text: string, context?: { retryOf?: number }) => { submissions++; submitted.push({ text, context }); return { kind: 'accepted' } }, failureMessage: () => 'fixture failed' }) } })
 mock.module(new URL('./use-coordinator-stream.ts', import.meta.url).href, { namedExports: { useCoordinatorStream: () => ({ replies: [], error: false, reconnect: nothing }) } })
 mock.module(new URL('./chat-composer.tsx', import.meta.url).href, { namedExports: { ChatComposer: (props: { value: string; onChange: (value: string) => void; onSubmit: () => void; ref: Ref<HTMLTextAreaElement>; quote?: ReactNode }) => {
@@ -67,11 +73,12 @@ mock.module(new URL('../../lib/hooks/use-unread-indicators.ts', import.meta.url)
 mock.module(new URL('../browser/browser-notes.tsx', import.meta.url).href, { namedExports: { BrowserNoteChip: ({ note }: { note: { note: string } }) => <span>{note.note}</span>, BrowserNoteLine: nothing, useBrowserNotesComposer: () => ({ notes, remove: nothing, removeMany: () => { removedNotes++ } }) } })
 for (const [file, names] of [
   ['./coordinator-reply.tsx', ['CoordinatorReply']], ['./chat-event-line.tsx', ['ChatEventLine']], ['./thread-card.tsx', ['ThreadCard']], 
-  ['./pending-actions.tsx', ['PendingActions']], ['./subagent-login-needs.tsx', ['SubagentLoginNeeds']], ['./bot-model-picker.tsx', ['BotModelPicker', 'openModelPicker']],
+  ['./pending-actions.tsx', ['PendingActions']], ['./subagent-login-needs.tsx', ['SubagentLoginNeeds']],
   ['./hosted-unavailable-notice.tsx', ['HostedUnavailableNotice']], ['./quota-notice.tsx', ['QuotaNotice', 'QuotaSwitchLine']],
   ['../billing/hosted-refusal-notice.tsx', ['HostedRefusalNotice']], ['../nav/bot-avatar.tsx', ['BotAvatar', 'COORDINATOR_AVATAR']],
   ['../suggestions/mobile-card.tsx', ['SentSuggestion']], ['../artifacts/artifact-card.tsx', ['ArtifactCard', 'ArtifactChip']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, nothing])) })
+mock.module(new URL('./bot-model-picker.tsx', import.meta.url).href, { namedExports: { BotModelPicker: nothing, openModelPicker: nothing, botModelMenuKey: (botId: string | null) => ['bot-model-menu', botId ?? 'coordinator'] } })
 let quoteReply: (text: string) => void = nothing
 let quoteRemovals = 0
 mock.module(new URL('../chat/selection-quote.tsx', import.meta.url).href, { namedExports: { QUOTE_SOURCE_ATTR: 'data-quote-source', SelectionQuote: ({ onQuote }: { onQuote: (text: string) => void }) => { quoteReply = onQuote; return null } } })
@@ -97,8 +104,9 @@ before(async () => {
   ;({ RetryReplyButton } = await import('./retry-reply-button'))
   ;({ CoordinatorChat } = await import('./coordinator-chat'))
   ;({ VersionGuard } = await import('../version-guard'))
+  Object.defineProperty(browser.document, 'visibilityState', { configurable: true, get: () => visibility })
 })
-beforeEach(() => { calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; submitted.length = 0; chatItems = []; removedNotes = 0; versionReads = 0; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
+beforeEach(() => { chatData = null; menu = undefined; refusalCode = null; visibility = 'visible'; calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; submitted.length = 0; chatItems = []; removedNotes = 0; versionReads = 0; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 after(() => browser.happyDOM.close())
 const render = async (onQueued = async () => {}) => { await act(async () => root.render(<RetryReplyButton botId={null} onQueued={onQueued} />)) }
@@ -285,4 +293,52 @@ test('an idle page detects the new build on its minute probe and keeps the draft
   await act(async () => root.render(null))
   await act(async () => t.mock.timers.tick(60_000))
   assert.equal(versionReads, 2, 'unmount clears the probe')
+})
+
+// A [Welcome] turn that failed (store.failTurn): the chat as chatView reads it.
+const welcomeFailed = (error = 'Error: verification_required') => {
+  chatItems = [{ id: 'fixture-welcome', position: 1, from: 'coordinator', text: '', tools: [], threads: [], artifacts: [], createdAt: '2026-11-05T03:00:00Z', welcome: true, failure: { kind: 'hosted', code: 'verification_required' } }]
+  chatData = { items: chatItems, enabled: true, working: false, error, artifacts: {} }
+  refusalCode = error.includes('verification_required') ? 'verification_required' : error
+}
+const chat = () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />)
+
+test('a failed welcome shows on the Bot\'s side in the chat, not only above the composer', async () => {
+  welcomeFailed()
+  await act(async () => chat())
+  assert.ok(container.querySelector('[data-message-failure="welcome"]'), 'the welcome failure sits in the chat')
+  assert.equal(calls, 0)
+})
+
+test('the refused welcome is not retried when the model already reads runnable on open', async () => {
+  welcomeFailed(); menu = { current: { id: 'mikka', available: true } }
+  await act(async () => chat())
+  await act(async () => chat())
+  assert.equal(calls, 0, 'opening the chat never fires another refused turn')
+})
+
+test('the refused welcome runs again exactly once when its model turns runnable while the chat is open', async () => {
+  welcomeFailed(); menu = { current: { id: 'mikka', available: false } }
+  await act(async () => chat())
+  assert.equal(calls, 0)
+  menu = { current: { id: 'mikka', available: true } }
+  await act(async () => chat())
+  await act(async () => chat())
+  assert.equal(calls, 1)
+})
+
+for (const code of ['usage_in_progress', 'usage_concurrency_limit', 'usage_cost_unavailable']) test(`a passing usage limit (${code}) is never retried on its own`, async () => {
+  welcomeFailed(code); menu = { current: { id: 'mikka', available: false } }
+  await act(async () => chat())
+  menu = { current: { id: 'mikka', available: true } }
+  await act(async () => chat())
+  assert.equal(calls, 0)
+})
+
+test('a hidden tab never retries the welcome', async () => {
+  welcomeFailed(); visibility = 'hidden'; menu = { current: { id: 'mikka', available: false } }
+  await act(async () => chat())
+  menu = { current: { id: 'mikka', available: true } }
+  await act(async () => chat())
+  assert.equal(calls, 0)
 })

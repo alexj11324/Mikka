@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { chatPollInterval } from './chat-poll-interval'
 
-test('the chat polls slowly when quiet, quickly while a turn starts, and leans on the stream while it streams', () => {
-  assert.equal(chatPollInterval(undefined), 30_000)
-  assert.equal(chatPollInterval({ working: false }), 30_000)
-  assert.equal(chatPollInterval({ working: true }), 3_000)
-  assert.equal(chatPollInterval({ working: true, streamRunId: 'wrun_1' }), 15_000)
+test('the chat reads on its live key, never on a timer', async () => {
+  const { readFileSync } = await import('node:fs')
+  const source = readFileSync('components/coordinator/coordinator-chat.tsx', 'utf8')
+  assert.match(source, /useLiveKey\('bot_chat',/)
+  assert.doesNotMatch(source, /refreshInterval/)
 })
 
 test('migrated lists use shared invalidation while the fallback interval remains one minute', async () => {

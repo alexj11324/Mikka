@@ -1,6 +1,7 @@
 import 'server-only'
 import type { Pool, PoolClient } from 'pg'
 import { ownerListChanged } from '@/lib/live/lists'
+import { botChatChanged } from '@/lib/live/chats'
 
 /**
  * The person's Coordinator is an ordinary bot (glossary), one per person per
@@ -168,7 +169,7 @@ async function moveChat(client: PoolClient, ownerId: string, botId: string) {
   const runs = await client.query(`UPDATE agent_runs r SET "botId"=$2 WHERE r."userId"=$1 AND r."botId" IS NULL
       AND r.kind <> 'group_chat'
       AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)`, [ownerId, botId])
-  if (messages.rowCount || old) await ownerListChanged(client, ownerId, ['bot_chat_list'])
+  if (messages.rowCount || old) await botChatChanged(client, ownerId, botId)
   if (runs.rowCount) await ownerListChanged(client, ownerId, ['thread_list', 'task_run_list'])
 }
 

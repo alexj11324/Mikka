@@ -13,7 +13,7 @@ import { prepareThreadReply, type ThreadReplySubmission } from '@/lib/thread-sub
 import { mergeThreadChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
 import { ThreadExecutionIdentity } from './thread-execution-identity'
-import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
+import { threadQuestionView } from '@/lib/issue-threads'
 import { threadComposerHarness } from '@/lib/run-model-fallback-view'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { QuoteChip, QuoteLine } from '@/components/artifacts/artifact-quote'
@@ -28,8 +28,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Skeleton } from '@/components/ui/skeleton'
 import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
-import { harnessLabel } from './issue-threads'
+import { harnessLabel, type IssueThreadsRead } from './issue-threads'
 import { ThreadStatus } from './thread-status-icon'
+import { RunErrorDetails, useRunErrorText } from './run-error-text'
 import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
 import { cn } from '@/lib/utils'
 import { listRunArtifacts } from '@/app/actions/artifacts'
@@ -78,6 +79,7 @@ export function IssueThreadPanel(props: IssueThreadPanelProps) {
 
 function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask, name: listedName }: IssueThreadPanelProps) {
   const t = useTranslations('IssueThreads')
+  const runErrorText = useRunErrorText()
   const format = useFormatter()
   const { mutate: mutateCache, cache } = useSWRConfig()
   const key = ['issue-thread', issueId, runId]
@@ -139,8 +141,12 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const failedStagesId = failure ? [...items].reverse().find(item => item.kind === 'stages' && item.stages.some(stage => !stage.ok))?.id : undefined
   // A message to an ended thread runs it again in the same thread (R-81): 重试 is that message, one tap (N2).
   const canRetry = !!failure && !!data?.thread.detail && data.thread.ownedByCurrentUser && !runIsActive(view?.status ?? '')
+  const failureText = runErrorText(failure)
   const failureLine = failure && !providerExplained && <div className="flex items-start gap-2" data-slot="thread-failure">
-    <p className="line-clamp-2 min-w-0 flex-1 text-xs break-words text-destructive-foreground" title={failure}>{failure}</p>
+    <div className="flex min-w-0 flex-1 flex-col">
+      <p className="line-clamp-2 text-xs break-words text-destructive-foreground" title={failureText.message ?? undefined}>{failureText.message}</p>
+      {failureText.code && <RunErrorDetails code={failureText.code} />}
+    </div>
     {canRetry && <Button variant="outline" size="xs" className="shrink-0 pointer-coarse:h-11" disabled={sending} onClick={() => { void send(t('retry'), true) }}>{t('retry')}</Button>}
   </div>
   useEffect(() => {
@@ -179,7 +185,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     const attempt = Date.now()
     stopAttemptRef.current = attempt
     setStopAttempt(attempt); setStopFailed(false)
-    void mutateCache<IssueThread[]>(['issue-threads', issueId], threads => threads?.map(thread => thread.id === runId ? { ...thread, stopping: true, continuation: thread.continuation && { ...thread.continuation, stopping: true } } : thread), { revalidate: false })
+    void mutateCache<IssueThreadsRead>(['issue-threads', issueId], read => read && { ...read, threads: read.threads.map(thread => thread.id === runId ? { ...thread, stopping: true, continuation: thread.continuation && { ...thread.continuation, stopping: true } } : thread) }, { revalidate: false })
     try { await stopRun(liveRunId); void mutate(); void mutateCache(['issue-threads', issueId]) }
     catch {
       // A late response from an earlier request must not cancel a retry.

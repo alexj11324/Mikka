@@ -167,7 +167,7 @@ const live = { ownerId: OWNER, workspaceId: OWNER_HOME }
 const doc = (text: string) => ({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] })
 const issue = (id: string, title: string, status = 'todo') => ({ ...issueWithMetadata({ id, userId: OWNER, title, content: doc(title), status, priority: 'normal', scope: 'workspace' as const, scopeVersion: 1, linearSyncBlocked: false, scopeSetBy: 'user' as const, scopeConfidence: null, revision: 3, createdAt: new Date(AT), updatedAt: new Date(AT) }), identifier: 'MIK-7', linearTargetVerified: false })
 const CHAT_VERSION = '0123456789abcdef0123456789abcdef'
-const chat = { botId: BOT, enabled: true, version: CHAT_VERSION, working: false, error: null, cursor: 2, sources: {}, artifacts: {}, persistedStreamIds: [], items: [
+const chat = { botId: BOT, enabled: true, version: CHAT_VERSION, working: false, error: null, cursor: 2, sources: {}, artifacts: {}, persistedStreamIds: [], live, items: [
   { id: 'm1', position: 1, from: 'person', text: 'Can you fix the sign-in redirect?', tools: [], threads: [], artifacts: [], createdAt: AT },
   { id: 'm2', position: 2, from: 'coordinator', text: 'Done: the redirect is fixed.', tools: [], threads: [], artifacts: [], createdAt: AT },
 ] }
@@ -183,12 +183,14 @@ Object.assign(fixtures, {
   'issue-operations.listIssueConnections': () => [],
   // The authorized live scope each read returns (app/actions/collaboration.ts, agents.ts).
   'collaboration.exchangeDocument': () => ({ version: 'v1', workspaceId: WORKSPACE }),
-  'collaboration.listMembers': () => ({ members: [{ ...person, id: MEMBER, name: 'Grace', email: 'grace@example.invalid', createdAt: new Date(AT) }], owner: person, currentUserId: OWNER, isOwner: true }),
+  'collaboration.listMembers': () => ({ members: [{ ...person, id: MEMBER, name: 'Grace', email: 'grace@example.invalid', createdAt: new Date(AT) }], owner: person, currentUserId: OWNER, isOwner: true, live: { workspaceId: WORKSPACE } }),
   'agents.listDevices': () => [{ id: DEVICE, name: 'Ada’s MacBook', deviceType: 'laptop', hostname: 'ada-mbp', platform: 'darwin', arch: 'arm64', harnesses: [], online: true, enabled: true, lastSeenAt: new Date(AT), repos: [] }],
+  // The device is online through the gateway (its last HTTP heartbeat is an hour old): presence has no write.
+  'agents.pollDevices': () => ({ devices: [{ id: DEVICE, name: 'Ada’s MacBook', deviceType: 'laptop', hostname: 'ada-mbp', platform: 'darwin', arch: 'arm64', harnesses: [], online: true, enabled: true, lastSeenAt: new Date(AT), repos: [] }], live, presenceFallback: true }),
   'artifacts.getArtifact': () => ({ id: ARTIFACT, kind: 'markdown', title: 'Release notes', latestVersion: 2, runId: RUN, issueId: ISSUE, botId: BOT, shared: false,
-    versions: [1, 2].map(version => ({ version, authorName: 'Scout', authorColor: 'bleu', authorShape: 'cercle', createdAt: AT })) }),
+    versions: [1, 2].map(version => ({ version, authorName: 'Scout', authorColor: 'bleu', authorShape: 'cercle', createdAt: AT })), live }),
   'artifacts.listRunArtifacts': () => [],
-  'agents.listIssueThreads': () => [thread],
+  'agents.pollIssueThreads': () => ({ threads: [thread], live: { workspaceId: WORKSPACE } }),
   'agents.getIssueThread': () => ({ live: { runs: [{ id: RUN, workspaceId: WORKSPACE }], issueWorkspaceId: WORKSPACE, questionDeadline: null }, thread: { ...thread, prompt: 'Fix the sign-in redirect', stopRequestedAt: null, feedbackEligible: false, error: null, quota: null }, chunks: [{ chunk: { type: 'text-delta', id: 't1', delta: 'Looking at the redirect handler.' }, at: new Date(AT) }], messages: [], chunkCursor: null, chunksAppend: false }),
   'agents.getThreadChanges': () => ({ state: 'none' }),
   'agents.listAgents': () => [{ id: AGENT, name: 'Claude Code', description: '', instructions: '', harness: 'claude_code', deviceId: DEVICE, deviceName: 'Ada’s MacBook' }],
@@ -196,7 +198,7 @@ Object.assign(fixtures, {
   'task-runs.pollTaskRuns': () => ({ items: [{ issueId: ISSUE, runId: RUN, issueTitle: 'Fix sign-in redirect', agentId: AGENT, agentName: 'Claude Code', status: 'running', outcome: null, error: null, finishedAt: null, bot: null, harnesses: ['claude_code'] }], live }),
   'execution-settings.getBotModelMenu': () => ({ groups: [{ kind: 'subscription', provider: 'claude', plan: 'Max', credentialLabel: 'ada@example.invalid', options: [{ id: 'binding-1', modelId: 'claude-sonnet-4-6', provider: 'claude' }] }],
     current: { id: 'binding-1', modelId: 'claude-sonnet-4-6', provider: 'claude', kind: 'subscription', chosen: false, available: true } }),
-  'coordinator.pollCoordinatorChat': (_bot: unknown, known: unknown) => known === CHAT_VERSION ? { unchanged: true, version: CHAT_VERSION, cursor: 2, working: false, error: null, botId: BOT, enabled: true } : chat,
+  'coordinator.pollCoordinatorChat': (_bot: unknown, known: unknown) => known === CHAT_VERSION ? { unchanged: true, version: CHAT_VERSION, cursor: 2, working: false, error: null, botId: BOT, enabled: true, live } : chat,
   'coordinator.getCoordinatorChat': () => chat,
   'coordinator.pollBotChatSummaries': () => ({ items: { [BOT]: { at: AT, text: 'Done: the redirect is fixed.' } }, live }),
   'artifacts.getArtifactText': () => '# Release notes\n\nSign-in redirect fixed.',

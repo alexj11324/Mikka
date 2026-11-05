@@ -17,6 +17,7 @@ import {
 } from '@/lib/db/schema'
 import { issueDeviceToken } from '@/lib/device-link'
 import { deviceOnlineStates } from '@/lib/device-presence'
+import { DEVICE_ONLINE_WINDOW_MS, isDeviceOnline } from '@mikka/protocol/device'
 import { removeOwnedDevice, renameOwnedDevice } from '@/lib/device-removal'
 import { enqueueDeviceCommand, type DeviceCommandKind } from '@/lib/device-management'
 import { listSshHosts } from '@/lib/ssh'
@@ -77,7 +78,23 @@ export interface AgentView {
 
 /** Every local device this person owns, with its repository history. */
 export async function listDevices(): Promise<DeviceView[]> {
+  return (await readDevices(await getUserId())).devices
+}
+
+/**
+ * The device list for 设备 settings, with when to read it again. Registration, a rename,
+ * enable/disable, removal, a repository and a device coming back online push `device_list`.
+ * Going offline writes nothing: a heartbeat device's lapse is a deadline, and a device
+ * online through the gateway keeps the 60 s fallback while it is (presenceFallback).
+ */
+export async function pollDevices() {
   const userId = await getUserId()
+  const { devices: items, expiries, gatewayOnline, observedAt } = await readDevices(userId)
+  const { ownerListRead } = await import('@/lib/live/list-read-server')
+  return { devices: items, live: await ownerListRead(userId, expiries, observedAt), presenceFallback: gatewayOnline }
+}
+
+async function readDevices(userId: string) {
   const rows = await db.select({
     id: devices.id, name: devices.name, deviceType: devices.deviceType, hostname: devices.hostname, platform: devices.platform, arch: devices.arch,
     harnesses: devices.harnesses, lastSeenAt: devices.lastSeenAt, enabled: devices.enabled,
@@ -87,8 +104,12 @@ export async function listDevices(): Promise<DeviceView[]> {
       id: deviceRepos.id, deviceId: deviceRepos.deviceId, repoPath: deviceRepos.repoPath, baseBranch: deviceRepos.baseBranch, verifyCommand: deviceRepos.verifyCommand,
     }).from(deviceRepos).where(inArray(deviceRepos.deviceId, rows.map(row => row.id)))
     : []
-  const presence = await deviceOnlineStates(rows)
-  return rows.map(device => ({
+  const observedAt = Date.now()
+  const presence = await deviceOnlineStates(rows, observedAt)
+  const heartbeat = (device: (typeof rows)[number]) => isDeviceOnline(device.lastSeenAt, observedAt)
+  const expiries = rows.flatMap(device => device.lastSeenAt && heartbeat(device) ? [device.lastSeenAt.getTime() + DEVICE_ONLINE_WINDOW_MS] : [])
+  const gatewayOnline = rows.some(device => presence.get(device.id) && !heartbeat(device))
+  const views: DeviceView[] = rows.map(device => ({
     id: device.id, name: device.name, deviceType: device.deviceType, hostname: device.hostname, platform: device.platform, arch: device.arch,
     harnesses: device.harnesses, lastSeenAt: device.lastSeenAt, enabled: device.enabled,
     online: presence.get(device.id) ?? false,
@@ -96,6 +117,7 @@ export async function listDevices(): Promise<DeviceView[]> {
       id: repo.id, repoPath: repo.repoPath, baseBranch: repo.baseBranch, verifyCommand: repo.verifyCommand,
     })),
   }))
+  return { devices: views, expiries, gatewayOnline, observedAt }
 }
 
 /** Mints a device token. The plaintext is returned once and never stored. */
@@ -127,7 +149,7 @@ export async function setDeviceEnabled(input: { deviceId: string; enabled: boole
     const changed = await db.update(devices)
       .set({ enabled: parsed.data.enabled, updatedAt: new Date() })
       .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt))).returning({ id: devices.id })
-    if (changed.length) await ownerListChanged(db, userId, ['thread_list'])
+    if (changed.length) await ownerListChanged(db, userId, ['thread_list', 'device_list'])
     return { success: true }
   })
 }
@@ -190,17 +212,30 @@ const threadColumns = {
 
 /** The issue's threads, as much of each as this viewer may see (R-62). */
 export async function listIssueThreads(issueId: string): Promise<IssueThread[]> {
+  return (await readIssueThreads(issueId)).threads
+}
+
+/** The same list, plus the channel its `issue_threads` key arrives on: the issue's
+ * workspace, or the owner's home for a personal issue; null reads once a minute. */
+export async function pollIssueThreads(issueId: string): Promise<{ threads: IssueThread[]; live: { workspaceId: string | null } }> {
+  const { threads, issue, user } = await readIssueThreads(issueId)
+  const [{ documentLiveWorkspace }, { workspacePool }] = await Promise.all([import('@/lib/live/panels'), import('@/lib/workspace-db')])
+  return { threads, live: { workspaceId: await documentLiveWorkspace(pool, workspacePool, issue.id, user.id) } }
+}
+
+async function readIssueThreads(issueId: string) {
   const { issue, user, memberIds } = await issueThreadAccess(issueId)
-  if (!memberIds.has(user.id)) return []
+  const result = (threads: IssueThread[]) => ({ threads, issue, user })
+  if (!memberIds.has(user.id)) return result([])
   // BE-18: fold continuation chains by root first, then take the newest ISSUE_THREAD_LIMIT
   // roots, so continuations never use up a slot (lib/run-chain.ts). Read-only, no locks.
   const chains = await listIssueRunChains(pool, issue.id, [...memberIds], ISSUE_THREAD_LIMIT)
-  if (!chains.length) return []
+  if (!chains.length) return result([])
   const rows = await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
     .where(and(eq(agentRuns.issueId, issue.id), inArray(agentRuns.userId, [...memberIds]), inArray(agentRuns.id, chains.map(chain => chain.rootRunId))))
     .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(ISSUE_THREAD_LIMIT)
   const byRoot = new Map(chains.map(chain => [chain.rootRunId, chain]))
-  return (await threadQuestions(projectIssueThreads(rows, issue.id, user.id, memberIds).map(thread => withRunChain(thread, byRoot.get(thread.id))), user.id)).threads
+  return result((await threadQuestions(projectIssueThreads(rows, issue.id, user.id, memberIds).map(thread => withRunChain(thread, byRoot.get(thread.id))), user.id)).threads)
 }
 
 /**
