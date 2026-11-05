@@ -5,9 +5,7 @@
       "coordinator.pollCoordinatorChat": { "max": 2, "tracking": "#1212", "why": "the Coordinator sidebar polls its chat every 30 s while quiet" }
     },
     "task-detail": {
-      "agents.listIssueThreads": { "max": 12, "tracking": "#1212", "why": "issue thread list, refreshInterval 5 s while a thread is active (runListRefreshInterval); it includes teammates' threads, whose run changes have no live key yet" },
-      "collaboration.listMembers": { "max": 6, "tracking": "#1212", "why": "issue members, refreshInterval 10 s" },
-      "issue-operations.listIssueConnections": { "max": 6, "tracking": "#1212", "why": "issue relations, refreshInterval 10 s" }
+      "agents.listIssueThreads": { "max": 12, "tracking": "#1212", "why": "issue thread list, refreshInterval 5 s while a thread is active (runListRefreshInterval); it includes teammates' threads, whose run changes have no live key yet" }
     },
     "bot-chat": {
       "coordinator.pollCoordinatorChat": { "max": 2, "tracking": "#1212", "why": "chat poll every 30 s while quiet (lib/coordinator/chat-poll-interval.ts)" }

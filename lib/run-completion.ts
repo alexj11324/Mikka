@@ -9,6 +9,7 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
 import { issueListChanged, runListChanged } from './live/lists'
+import { issueRelationsChanged } from './live/issue-detail'
 
 const LIVE_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing'] as const
 type Issue = typeof issues.$inferSelect
@@ -52,7 +53,7 @@ async function completeRunTransaction(userId: string, hint: { id: string; issueI
     const review = issue && reachesReview(stopReason, report)
       ? (await tx.update(issues).set({ status: 'review', updatedAt: new Date() }).where(eq(issues.id, issue.id)).returning({ id: issues.id, scopeVersion: issues.scopeVersion }))[0]
       : null
-    if (review) await issueListChanged(tx, review.id)
+    if (review) { await issueListChanged(tx, review.id); await issueRelationsChanged(tx, [review.id]) }
     return { userId: run.run.userId, review }
   })
 }

@@ -183,7 +183,7 @@ Object.assign(fixtures, {
   'issue-operations.listIssueConnections': () => [],
   // The authorized live scope each read returns (app/actions/collaboration.ts, agents.ts).
   'collaboration.exchangeDocument': () => ({ version: 'v1', workspaceId: WORKSPACE }),
-  'collaboration.listMembers': () => ({ members: [{ ...person, id: MEMBER, name: 'Grace', email: 'grace@example.invalid', createdAt: new Date(AT) }], owner: person, currentUserId: OWNER, isOwner: true }),
+  'collaboration.listMembers': () => ({ members: [{ ...person, id: MEMBER, name: 'Grace', email: 'grace@example.invalid', createdAt: new Date(AT) }], owner: person, currentUserId: OWNER, isOwner: true, live: { workspaceId: WORKSPACE } }),
   'agents.listDevices': () => [{ id: DEVICE, name: 'Ada’s MacBook', deviceType: 'laptop', hostname: 'ada-mbp', platform: 'darwin', arch: 'arm64', harnesses: [], online: true, enabled: true, lastSeenAt: new Date(AT), repos: [] }],
   'artifacts.getArtifact': () => ({ id: ARTIFACT, kind: 'markdown', title: 'Release notes', latestVersion: 2, runId: RUN, issueId: ISSUE, botId: BOT, shared: false,
     versions: [1, 2].map(version => ({ version, authorName: 'Scout', authorColor: 'bleu', authorShape: 'cercle', createdAt: AT })) }),
