@@ -41,6 +41,8 @@ export function applicationBoundary(actions) {
     ['@/lib/auth-client', 'auth-client.ts'],
     ['@/components/auth-form', 'auth-form.tsx'],
     ['@/lib/platform/open-settings', 'open-settings.ts'],
+    ['@/lib/platform/client-config', 'client-config.ts'],
+    ['@/hooks/use-feature-availability', 'feature-availability.ts'],
     ['@/lib/live/browser-runtime', 'live-runtime.ts'],
     ['@/lib/computer/request', 'computer-request.ts'],
     ['@novnc/novnc/lib/rfb.js', 'novnc.ts'],

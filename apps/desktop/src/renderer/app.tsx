@@ -26,6 +26,7 @@ import { localeOf, navigate, REFRESH_EVENT, useLocation, withoutLocale } from '.
 import { openCurrentPageInBrowser } from './open-settings'
 import { getTransportState, setTransportState, subscribeTransport } from './transport-state'
 import { Offline } from './offline'
+import { setClientConfiguration } from './client-configuration'
 
 const Workspace = lazy(() => import('./workspace'))
 const SharedArtifactRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.SharedArtifactRoute })))
@@ -51,11 +52,12 @@ function SessionApplication() {
   const state = useSyncExternalStore(subscribeTransport, getTransportState, getTransportState)
   const reload = useCallback((changedOwner = false) => {
     if (inFlight.current && !changedOwner) return inFlight.current
-    if (changedOwner) { setSession(null); setBootstrap(null) }
+    if (changedOwner) { setClientConfiguration(null); setSession(null); setBootstrap(null) }
     const current = ++generation.current
     setPending(true)
     inFlight.current = readBootstrap().then(value => {
       if (current !== generation.current) return
+      setClientConfiguration(value)
       setSession(value.user && value.session ? { user: value.user, session: value.session } : null)
       setBootstrap(value)
       setFailed(false)
@@ -88,6 +90,7 @@ function SessionApplication() {
     // A confirmed expiry discards every owner-scoped cache together. Network
     // failures retain the visible conversation and its unsent local draft.
     if (state === 'unauthenticated' && bootstrap?.user) {
+      setClientConfiguration(null)
       setSession(null)
       setBootstrap(current => current ? { ...current, user: null, session: null, onboarding: undefined } : null)
     }

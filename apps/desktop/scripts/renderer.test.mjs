@@ -71,6 +71,27 @@ test('generated action stubs preserve declaration arity, including SWR zero-argu
   assert.deepEqual(requests.map(request => [request.action, request.args]), [['projects.listProjects', []], ['artifacts.getArtifact', ['artifact-id']]])
 }))
 
+test('public configuration keeps only existing flags and discards the previous owner snapshot on reset', async () => {
+  const store = await moduleFrom({ entry: 'client-configuration.ts' })
+  let changes = 0
+  const unsubscribe = store.subscribeClientConfiguration(() => { changes++ })
+  const snapshot = { features: { flags: { 'mikka-cloud-computer': true, 'mikka-computer-tab-off': true, 'private-unlisted-flag': true }, cloudComputer: true }, daemonPackageName: '@aspectlylabs/mikka-dev' }
+  store.setClientConfiguration(snapshot)
+  assert.equal(store.getClientConfiguration().features.flags['mikka-cloud-computer'], true)
+  assert.equal(store.getClientConfiguration().features.flags['mikka-computer-tab-off'], true)
+  assert.equal(Object.hasOwn(store.getClientConfiguration().features.flags, 'private-unlisted-flag'), false)
+  assert.equal(store.getClientConfiguration().daemonPackageName, '@aspectlylabs/mikka-dev')
+  store.setClientConfiguration(snapshot)
+  assert.equal(changes, 1)
+  store.setClientConfiguration(null)
+  assert.equal(store.getClientConfiguration().features.cloudComputer, false)
+  assert.ok(Object.values(store.getClientConfiguration().features.flags).every(value => value === false))
+  assert.equal(changes, 2)
+  unsubscribe()
+  store.setClientConfiguration(snapshot)
+  assert.equal(changes, 2)
+})
+
 test('RPC sends only the versioned local envelope, preserves Dates and does not sign out for business denials', () => browser(async () => {
   const api = await moduleFrom({ source: `export { callAction } from ${JSON.stringify(join(renderer, 'rpc.ts'))}; export { getTransportState } from ${JSON.stringify(join(renderer, 'transport-state.ts'))};` })
   let request

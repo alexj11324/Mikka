@@ -118,6 +118,14 @@ jobs:
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium
       - run: sudo apt-get install -y xvfb dbus-x11 gnome-keyring libsecret-1-0
+      - name: Install the pinned Electron runtime and its Linux sandbox helper
+        working-directory: apps/desktop
+        run: |
+          node node_modules/electron/install.js
+          electron_sandbox="$(node -p "require('node:path').join(require('node:path').dirname(require('electron')), 'chrome-sandbox')")"
+          sudo chown root:root "$electron_sandbox"
+          sudo chmod 4755 "$electron_sandbox"
+          stat -c '%U:%G %a %n' "$electron_sandbox"
       - name: Generate ephemeral test-only auth secret
         run: |
           node --input-type=commonjs - <<'NODE'

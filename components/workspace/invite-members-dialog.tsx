@@ -13,6 +13,7 @@ import {
   validateInvitationEmails,
 } from "@/lib/invitation-csv";
 import { useActionError } from "@/lib/use-action-error";
+import { publicAppOrigin } from "@/lib/platform/public-origin";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -197,7 +198,7 @@ export function InviteMembersDialog({
       setLinks(
         result.data.map((link) => ({
           email: link.email,
-          url: new URL(withBasePath(link.path), window.location.origin).href,
+          url: new URL(withBasePath(link.path), publicAppOrigin()).href,
         })),
       );
       try {

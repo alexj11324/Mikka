@@ -12,6 +12,8 @@ import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 import { createParityFixtures } from './parity-fixtures.mjs'
 import { compareImages, screenshot } from './parity-images.mjs'
 import { launchElectron } from './electron-launch.mjs'
+import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
+import { captureNativeResources } from './native-resources.mjs'
 
 // A real production backend and one leased dataset serve both modes. These
 // screenshots exercise application routes, components and RPCs; there are no
@@ -34,6 +36,7 @@ const report = {
 await mkdir(output, { recursive: true })
 let scope
 let fixtures
+let nativeResources
 let systemBrowser
 let webBrowser
 const applications = []
@@ -54,12 +57,12 @@ async function launch(mode) {
     timeout: 90_000,
   })
   applications.push(application)
+  const page = await application.firstWindow({ timeout: 90_000 })
   await application.evaluate(({ BrowserWindow }) => {
     const window = BrowserWindow.getAllWindows()[0]
     window.setContentSize(1440, 900)
     window.webContents.setZoomFactor(1)
   })
-  const page = await application.firstWindow({ timeout: 90_000 })
   page.setDefaultTimeout(45_000)
   await page.emulateMedia({ reducedMotion: 'reduce' })
   page.on('pageerror', error => errors.push({ mode, name: error.name }))
@@ -142,7 +145,19 @@ async function authenticate(bundled, hosted) {
   const state = JSON.parse(await readFile(scope.owner.storageStatePath, 'utf8'))
   // Hosted fallback remains a normal web session. Bundled receives no cookies;
   // its session goes through the actual browser/loopback/PKCE implementation.
-  await hosted.application.context().addCookies(state.cookies)
+  await hosted.application.evaluate(async ({ BrowserWindow }, { cookies, origin }) => {
+    // Electron uses its explicitly named window session, which need not be
+    // Playwright's default browser context. Seed only the hosted window.
+    const partition = BrowserWindow.getAllWindows()[0].webContents.session
+    for (const cookie of cookies) await partition.cookies.set({
+      url: `${origin}${cookie.path}`, name: cookie.name, value: cookie.value,
+      domain: cookie.domain, path: cookie.path, secure: cookie.secure, httpOnly: cookie.httpOnly,
+      sameSite: cookie.sameSite === 'None' ? 'no_restriction' : cookie.sameSite?.toLowerCase(),
+      ...(cookie.expires > 0 ? { expirationDate: cookie.expires } : {}),
+    })
+    await partition.cookies.set({ url: origin, name: 'NEXT_LOCALE', value: 'en', path: '/' })
+    await partition.cookies.flushStore()
+  }, { cookies: state.cookies, origin: environment.origin })
   systemBrowser = await chromium.launch({ headless: true })
   const context = await systemBrowser.newContext({ storageState: scope.owner.storageStatePath })
   const page = await context.newPage()
@@ -242,6 +257,7 @@ function publicScreens(fixture) {
 try {
   scope = await acquireTestAccounts({ runId: `parity-${started}`, workerId: 'desktop-parity', requestId: `parity-${started}`, ttlMs: 300_000 })
   fixtures = await createParityFixtures(scope)
+  if (mode === 'desktop') nativeResources = await captureNativeResources(scope)
   if (mode === 'web-capture') {
     webBrowser = await chromium.launch({ headless: true })
     const context = await webBrowser.newContext({ viewport: report.viewport, deviceScaleFactor: 1, reducedMotion: 'reduce', timezoneId: 'UTC' })
@@ -301,14 +317,26 @@ try {
   passed = true
   }
 } finally {
-  await systemBrowser?.close().catch(() => {})
-  await webBrowser?.close().catch(() => {})
-  for (const application of applications.reverse()) await application.close().catch(() => {})
-  try { if (fixtures) { await fixtures.cleanup(); cleaned = true } } catch (error) { cleanupError = error }
+  const failedCleanup = error => { cleanupError ??= error }
+  let closed = true
+  const failedClose = error => { closed = false; failedCleanup(error) }
+  await systemBrowser?.close().catch(failedClose)
+  await webBrowser?.close().catch(failedClose)
+  for (const application of applications.reverse()) await closeElectron(application).catch(failedClose)
+  let drained = profiles.length === 0
+  if (closed && profiles.length) {
+    try { drained = (await stopLocalDaemons(profiles)).profilesStopped } catch (error) { failedCleanup(error) }
+  }
+  if (closed && drained) {
+    try {
+      if (nativeResources) report.nativeCleanup = await nativeResources.cleanup({ drained: true })
+      if (fixtures) { await fixtures.cleanup(); cleaned = true }
+    } catch (error) { failedCleanup(error) }
+  }
   // The pool re-fingerprints both users. A visual mismatch can release a clean
   // pair only after exact cleanup; unknown or leftover writes quarantine it.
-  try { if (scope) await scope.release({ outcome: cleaned ? 'clean' : 'dirty' }) } catch (error) { cleanupError ??= error }
-  for (const profile of profiles) await rm(profile, { recursive: true, force: true })
+  try { if (scope) await scope.release({ outcome: cleaned && !cleanupError ? 'clean' : 'dirty' }) } catch (error) { failedCleanup(error) }
+  if (!cleanupError) for (const profile of profiles) await rm(profile, { recursive: true, force: true })
   report.result = passed && !cleanupError ? 'passed' : 'failed'
   report.cleanup = cleanupError ? 'failed' : cleaned ? 'passed' : 'not-created'
   report.finishedAt = new Date().toISOString()

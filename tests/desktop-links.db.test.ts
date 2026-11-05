@@ -18,14 +18,25 @@ test('desktop links preserve real workspace membership and public share permissi
   const slug = `current-${randomUUID().slice(0, 8)}`, oldSlug = `old-${randomUUID().slice(0, 8)}`, foreignSlug = `foreign-${randomUUID().slice(0, 8)}`
   const artifactIds: string[] = [], mocks: { restore(): void }[] = []
   const queries: string[] = []
+  let applicationPool: Pool | undefined
+  const measuredClient = new Proxy(client, { get(target, property) {
+    const value = Reflect.get(target, property, target)
+    if (property === 'query') return (...args: unknown[]) => {
+      const query = typeof args[0] === 'string' ? args[0] : (args[0] as { text?: string })?.text
+      if (query) queries.push(query)
+      return Reflect.apply(value, target, args)
+    }
+    return typeof value === 'function' ? value.bind(target) : value
+  } })
   try {
-    const [schema, workspaceSchema] = await Promise.all([import('../lib/db/schema'), import('../lib/db/workspace-schema')])
-    const logger = { logQuery: (query: string) => { queries.push(query) } }
-    mocks.push(mock.module(new URL('../lib/db/index.ts', import.meta.url).href, { namedExports: { pool: database, db: drizzle(client, { schema, logger }) } }))
-    mocks.push(mock.module(new URL('../lib/workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: database, workspaceDb: drizzle(client, { schema: workspaceSchema, logger }) } }))
+    const [workspaceSchema, applicationDatabase] = await Promise.all([import('../lib/db/workspace-schema'), import('../lib/db')])
+    applicationPool = applicationDatabase.pool
+    const { withDatabaseClient } = applicationDatabase
+    mocks.push(mock.module(new URL('../lib/workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: database, workspaceDb: drizzle(measuredClient, { schema: workspaceSchema }) } }))
     const { readWorkspaceLink, readWorkspaceSlug } = await import('../lib/workspace-admin/links')
     const { resolveSlugRedirect } = await import('../lib/workspace-admin/general')
     const { sharedArtifact } = await import('../lib/artifacts/store')
+    const readShared = (token: string) => withDatabaseClient(measuredClient, () => sharedArtifact(token))
     const { GET } = await import('../app/api/artifacts/shared/[token]/route')
     for (const id of [owner, peer]) await database.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [id, `${id}@example.invalid`])
     for (const [id, userId, name] of [[workspaceId, owner, slug], [foreignWorkspaceId, peer, foreignSlug]]) {
@@ -43,7 +54,7 @@ test('desktop links preserve real workspace membership and public share permissi
       return { id, token, content }
     }
     const markdown = await artifact('markdown'), html = await artifact('html')
-    const get = (token: string) => GET(new Request(`http://127.0.0.1/mikka/api/artifacts/shared/${encodeURIComponent(token)}`), { params: Promise.resolve({ token }) })
+    const get = (token: string) => withDatabaseClient(measuredClient, () => GET(new Request(`http://127.0.0.1/mikka/api/artifacts/shared/${encodeURIComponent(token)}`), { params: Promise.resolve({ token }) }))
 
     await t.test('current and historical workspace links keep the original member reads and byte budget', async () => {
       const before = stream.bytesRead
@@ -75,10 +86,10 @@ test('desktop links preserve real workspace membership and public share permissi
       assert.equal(queries.length, 0)
     })
     await t.test('a signed-out reader receives only the original shared props without additional database reads', async () => {
-      await sharedArtifact(markdown.token)
+      await readShared(markdown.token)
       queries.length = 0
       const before = stream.bytesRead
-      const original = (await sharedArtifact(markdown.token))!
+      const original = (await readShared(markdown.token))!
       const browserBytes = stream.bytesRead - before, originalQueries = [...queries]
       queries.length = 0
       const nativeStart = stream.bytesRead
@@ -121,6 +132,6 @@ test('desktop links preserve real workspace membership and public share permissi
     await database.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [[workspaceId, foreignWorkspaceId]])
     await database.query('DELETE FROM "user" WHERE id=ANY($1)', [[owner, peer]])
     client.release()
-    await database.end()
+    await Promise.all([database.end(), applicationPool?.end()])
   }
 })

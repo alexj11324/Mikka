@@ -14,6 +14,8 @@ import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accoun
 import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 import { createParityFixtures } from './parity-fixtures.mjs'
 import { launchElectron } from './electron-launch.mjs'
+import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
+import { captureNativeResources } from './native-resources.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 const environment = await loadEnvironment()
@@ -40,8 +42,9 @@ const evidence = {
   },
 }
 const check = name => { evidence.checks.push({ name, result: 'passed' }); console.log(`PASS ${name}`) }
-let scope, browser, fixtures, application, ownerEmail
+let scope, browser, fixtures, nativeResources, application, ownerEmail
 let passed = false
+let cleanupFailure
 const active = new Set()
 
 async function launch(mode, extraArgs = []) {
@@ -60,7 +63,7 @@ async function launch(mode, extraArgs = []) {
   await app.evaluate(({ BrowserWindow }, bounds) => { BrowserWindow.getAllWindows().find(window => !window.isDestroyed())?.setContentSize(bounds.width, bounds.height) }, viewport)
   return { app, page, errors, started }
 }
-async function close(app) { if (!app) return; try { await app.close() } finally { active.delete(app) } }
+async function close(app) { if (!app) return; try { await closeElectron(app) } finally { active.delete(app) } }
 
 async function usable(page, draft = '') {
   await page.getByText(message, { exact: false }).first().waitFor({ state: 'visible' })
@@ -200,6 +203,7 @@ try {
   // The lease helper renews this five-minute lease while the process is alive.
   scope = await acquireTestAccounts({ runId: `desktop-lifecycle-${Date.now()}`, workerId: 'lifecycle', requestId: `lifecycle-${process.pid}-${Date.now()}`, ttlMs: 300_000 })
   fixtures = await createParityFixtures(scope)
+  nativeResources = await captureNativeResources(scope)
   browser = await chromium.launch({ headless: true })
   let run = await launch('bundled')
   application = run.app
@@ -313,14 +317,23 @@ try {
   await close(run.app); application = null
   passed = true
 } finally {
-  if (application) await close(application).catch(() => {})
-  for (const app of active) await close(app).catch(() => {})
+  const cleanupErrors = []
+  if (application) await close(application).catch(error => cleanupErrors.push(error))
+  for (const app of active) await close(app).catch(error => cleanupErrors.push(error))
   await browser?.close().catch(() => {})
-  if (fixtures) await fixtures.cleanup().catch(() => { passed = false })
-  if (scope) await scope.release({ outcome: passed ? 'clean' : 'dirty' })
+  let drained = false
+  try { drained = (await stopLocalDaemons(Object.values(profiles))).profilesStopped } catch (error) { cleanupErrors.push(error) }
+  if (nativeResources && drained && !cleanupErrors.length) {
+    try { evidence.nativeCleanup = await nativeResources.cleanup({ drained: true }) } catch (error) { cleanupErrors.push(error) }
+  }
+  if (fixtures) await fixtures.cleanup().catch(error => cleanupErrors.push(error))
+  if (cleanupErrors.length) passed = false
+  if (scope) await scope.release({ outcome: passed ? 'clean' : 'dirty' }).catch(error => { passed = false; cleanupErrors.push(error) })
   evidence.finishedAt = new Date().toISOString()
   evidence.result = passed ? 'passed' : 'failed'
   await writeFile(join(output, 'lifecycle.json'), `${JSON.stringify(evidence, null, 2)}\n`)
   await auditEvidence([output], { environment })
-  await rm(directory, { recursive: true, force: true })
+  if (drained) await rm(directory, { recursive: true, force: true })
+  if (cleanupErrors.length) cleanupFailure = new AggregateError(cleanupErrors, 'LIFECYCLE_NATIVE_CLEANUP_FAILED')
 }
+if (cleanupFailure) throw cleanupFailure

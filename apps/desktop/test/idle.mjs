@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { request } from 'node:http'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,6 +9,8 @@ import { performance } from 'node:perf_hooks'
 import { setTimeout as delay } from 'node:timers/promises'
 import { chromium } from '@playwright/test'
 import { launchElectron } from './electron-launch.mjs'
+import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
+import { captureNativeResources } from './native-resources.mjs'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 
@@ -32,7 +34,9 @@ const report = {
 let application
 let browser
 let scope
+let nativeResources
 let passed = false
+const profile = join(tmpdir(), `mikka-idle-${process.pid}-${Date.now()}`)
 
 function metrics(socketPath, reset = false) {
   return new Promise((resolve, reject) => {
@@ -51,6 +55,7 @@ function metrics(socketPath, reset = false) {
 
 try {
   scope = await acquireTestAccounts({ runId: `desktop-idle-${Date.now()}`, workerId: 'hour', requestId: `hour-${Date.now()}`, ttlMs: 300_000 })
+  nativeResources = await captureNativeResources(scope)
   browser = await chromium.launch({ headless: true })
   const context = await browser.newContext({ storageState: scope.owner.storageStatePath, viewport: { width: 1440, height: 900 } })
   const web = await context.newPage()
@@ -62,7 +67,7 @@ try {
   }))
   application = await launchElectron({
     args: [join(root, 'apps/desktop')], cwd: root,
-    env: { ...process.env, MIKKA_DESKTOP_RENDERER: 'bundled', MIKKA_USER_DATA_DIR: join(tmpdir(), `mikka-idle-${process.pid}-${Date.now()}`) }, timeout: 90_000,
+    env: { ...process.env, MIKKA_DESKTOP_RENDERER: 'bundled', MIKKA_USER_DATA_DIR: profile }, timeout: 90_000,
   })
   const page = await application.firstWindow({ timeout: 90_000 })
   await page.waitForFunction(() => Boolean(window.mikka?.bundled))
@@ -149,10 +154,22 @@ try {
   assert.ok(report.live.web.pong >= Math.floor(durationMs / 30_000) - 3)
   passed = true
 } finally {
-  await application?.close().catch(() => {})
-  await browser?.close().catch(() => {})
-  if (scope) await scope.release({ outcome: passed ? 'clean' : 'dirty' })
+  const cleanupErrors = []
+  const failedCleanup = error => { passed = false; cleanupErrors.push(error) }
+  await browser?.close().catch(failedCleanup)
+  let closed = true
+  await closeElectron(application).catch(error => { closed = false; failedCleanup(error) })
+  let drained = false
+  if (closed) {
+    try { drained = (await stopLocalDaemons([profile])).profilesStopped } catch (error) { failedCleanup(error) }
+  }
+  if (drained && nativeResources) {
+    try { report.nativeCleanup = await nativeResources.cleanup({ drained: true }) } catch (error) { failedCleanup(error) }
+  }
+  if (scope) await scope.release({ outcome: passed ? 'clean' : 'dirty' }).catch(failedCleanup)
   report.result = passed ? 'passed' : 'failed'
   await writeFile(join(output, 'idle.json'), `${JSON.stringify(report, null, 2)}\n`)
   await auditEvidence([output], { environment })
+  if (!cleanupErrors.length) await rm(profile, { recursive: true, force: true })
+  if (cleanupErrors.length) throw new AggregateError(cleanupErrors, 'DESKTOP_IDLE_CLEANUP_FAILED')
 }

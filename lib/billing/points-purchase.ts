@@ -38,7 +38,7 @@ export interface PurchaseFromChat { chat: { botId: string | null } }
  * the key, or from 计费, a hosted Checkout page that comes back to where it
  * started (`url`).
  */
-export async function pointsPurchase(actorId: string, workspaceId: string, amount: number, locale: string, from: Partial<PurchaseFromChat>, fetchImpl: typeof fetch = fetch, env: Env = process.env): Promise<{ url: string } | { clientSecret: string }> {
+export async function pointsPurchase(actorId: string, workspaceId: string, amount: number, locale: string, from: Partial<PurchaseFromChat> & { hosted?: boolean }, fetchImpl: typeof fetch = fetch, env: Env = process.env): Promise<{ url: string } | { clientSecret: string }> {
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))
   z.number().refine(value => (POINTS_PURCHASE_AMOUNTS as readonly number[]).includes(value)).parse(amount)
   const config = stripeConfig(env)
@@ -50,7 +50,9 @@ export async function pointsPurchase(actorId: string, workspaceId: string, amoun
   const back = new URL(withBasePath(`${locale === 'en' ? '/en' : ''}${chat ? workspaceLink(chat.botId ? { bot: chat.botId } : {}) : '/settings'}`), trustedOrigin)
   if (!chat) back.searchParams.set('section', 'billing')
   back.searchParams.set('workspace', workspaceId)
-  const embedded = Boolean(chat && env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+  // The bundled renderer cannot load Stripe's remote script. Its authenticated
+  // RPC scope selects the existing hosted flow, retaining the same chat return.
+  const embedded = Boolean(chat && env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY && !from.hosted)
   const metadata = { workspaceId, points: String(amount * 1_000_000 / MICRO_USD_PER_POINT), purpose: 'points_purchase' }
   try {
     const prior = (await pool.query<{ id: string }>(`

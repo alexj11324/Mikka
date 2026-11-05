@@ -8,10 +8,12 @@ import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { readWorkspaceLink } from '@/lib/workspace-admin/links'
 import { ActionFailureError } from '@/lib/action-error'
 import { safeDesktopSession } from './session'
+import { desktopFeatures } from './features'
 import type { DesktopBootstrap, DesktopConfig } from './wire'
 
-export async function desktopConfig(): Promise<DesktopConfig> {
-  return { googleEnabled, githubEnabled, emailEnabled: await emailSignInEnabled() }
+export async function desktopConfig(userId?: string): Promise<DesktopConfig> {
+  const [emailEnabled, features] = await Promise.all([emailSignInEnabled(), desktopFeatures(userId)])
+  return { googleEnabled, githubEnabled, emailEnabled, features, daemonPackageName: process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME ?? '@aspectlylabs/mikka' }
 }
 
 export async function desktopSession() {
@@ -22,7 +24,7 @@ export async function desktopSession() {
 export async function desktopBootstrap(): Promise<DesktopBootstrap> {
   const session = await desktopSession()
   if (!session) throw new ActionFailureError('authRequired')
-  const [config, onboarding] = await Promise.all([desktopConfig(), onboardingDone(session.user.id).then(done => !done).catch(() => false)])
+  const [config, onboarding] = await Promise.all([desktopConfig(session.user.id), onboardingDone(session.user.id).then(done => !done).catch(() => false)])
   let computer: 'none' | 'ask' = 'none'
   if (onboarding && byoE2BKeyEnabled()) {
     computer = await currentWorkspaceActor().then(async actor => (await getE2BKeyStatus(actor.userId, actor.workspaceId)).configured ? 'none' as const : 'ask' as const).catch(() => 'none' as const)

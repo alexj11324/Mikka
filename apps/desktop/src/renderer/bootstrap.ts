@@ -2,8 +2,9 @@ import type { OnboardingComputer } from '@/components/onboarding/onboarding'
 import { withBasePath } from '@/lib/base-path'
 import type { DesktopSession } from './host'
 import { callAction, DesktopTransportError } from './rpc'
+import type { DesktopPublicConfiguration } from './client-configuration'
 
-export type AuthConfiguration = { googleEnabled: boolean; githubEnabled: boolean; emailEnabled: boolean }
+export type AuthConfiguration = { googleEnabled: boolean; githubEnabled: boolean; emailEnabled: boolean } & Partial<DesktopPublicConfiguration>
 export type DesktopBootstrap = AuthConfiguration & {
   user: DesktopSession['user'] | null
   session: DesktopSession['session'] | null
@@ -15,7 +16,7 @@ export type DesktopBootstrap = AuthConfiguration & {
 export async function readBootstrap(): Promise<DesktopBootstrap> {
   try {
     const value = await callAction<AuthConfiguration & DesktopSession & { onboarding: boolean; computer: OnboardingComputer }>('desktop.bootstrap', [])
-    return { user: value.user, session: value.session, googleEnabled: value.googleEnabled, githubEnabled: value.githubEnabled, emailEnabled: value.emailEnabled, ...(value.onboarding ? { onboarding: { computer: value.computer } } : {}) }
+    return { user: value.user, session: value.session, googleEnabled: value.googleEnabled, githubEnabled: value.githubEnabled, emailEnabled: value.emailEnabled, features: value.features, daemonPackageName: value.daemonPackageName, ...(value.onboarding ? { onboarding: { computer: value.computer } } : {}) }
   }
   catch (error) {
     if (!(error instanceof DesktopTransportError) || error.code !== 'desktop_session_expired') throw error

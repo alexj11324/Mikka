@@ -11,8 +11,9 @@ import { Popover, PopoverContent, PopoverDescription, PopoverTitle, PopoverTrigg
 import { Spinner } from '@/components/ui/spinner'
 import { withBasePath } from '@/lib/base-path'
 import { useActionError } from '@/lib/use-action-error'
+import { publicAppOrigin } from '@/lib/platform/public-origin'
 
-const linkFor = (token: string) => `${window.location.origin}${withBasePath(`/a/${token}`)}`
+const linkFor = (token: string) => `${publicAppOrigin()}${withBasePath(`/a/${token}`)}`
 
 async function copy(text: string) {
   try { await navigator.clipboard.writeText(text); return true } catch { return false }

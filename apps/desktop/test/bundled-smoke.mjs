@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { chromium } from '@playwright/test'
 import { launchElectron } from './electron-launch.mjs'
+import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
+import { captureNativeResources } from './native-resources.mjs'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 
@@ -27,9 +29,12 @@ const profile = join(tmpdir(), `mikka-bundled-${process.pid}-${started}`)
 let application
 let browser
 let scope
+let nativeResources
 let passed = false
 
 try {
+  scope = await acquireTestAccounts({ runId: `desktop-${started}`, workerId: 'bundled-smoke', requestId: `desktop-${started}`, ttlMs: 300_000 })
+  nativeResources = await captureNativeResources(scope)
   application = await launchElectron({
     ...(process.env.MIKKA_DESKTOP_EXECUTABLE ? { executablePath: process.env.MIKKA_DESKTOP_EXECUTABLE } : {}),
     args: process.env.MIKKA_DESKTOP_EXECUTABLE ? [] : [join(root, 'apps/desktop')],
@@ -64,7 +69,6 @@ try {
 
   await page.waitForFunction(() => document.body.innerText.trim().length > 30)
   await page.screenshot({ path: join(output, 'bundled-sign-in.png'), animations: 'disabled' })
-  scope = await acquireTestAccounts({ runId: `desktop-${started}`, workerId: 'bundled-smoke', requestId: `desktop-${started}`, ttlMs: 300_000 })
   browser = await chromium.launch({ headless: true })
   const context = await browser.newContext({ storageState: scope.owner.storageStatePath })
   const systemBrowser = await context.newPage()
@@ -130,11 +134,23 @@ try {
   check('sign-out clears the main-owned session')
   passed = true
 } finally {
-  await browser?.close().catch(() => {})
-  await application?.close().catch(() => {})
-  if (scope) await scope.release({ outcome: passed ? 'clean' : 'dirty' })
+  const cleanupErrors = []
+  const failedCleanup = error => { passed = false; cleanupErrors.push(error) }
+  await browser?.close().catch(failedCleanup)
+  let closed = true
+  await closeElectron(application).catch(error => { closed = false; failedCleanup(error) })
+  let drained = false
+  if (closed) {
+    try { drained = (await stopLocalDaemons([profile])).profilesStopped } catch (error) { failedCleanup(error) }
+  }
+  if (drained && nativeResources) {
+    try { evidence.nativeCleanup = await nativeResources.cleanup({ drained: true }) } catch (error) { failedCleanup(error) }
+  }
+  if (scope) await scope.release({ outcome: passed ? 'clean' : 'dirty' }).catch(failedCleanup)
   evidence.finishedAt = new Date().toISOString()
   evidence.result = passed ? 'passed' : 'failed'
   await writeFile(join(output, 'smoke.json'), `${JSON.stringify(evidence, null, 2)}\n`)
   await auditEvidence([output], { environment })
+  if (!cleanupErrors.length) await rm(profile, { recursive: true, force: true })
+  if (cleanupErrors.length) throw new AggregateError(cleanupErrors, 'DESKTOP_SMOKE_CLEANUP_FAILED')
 }

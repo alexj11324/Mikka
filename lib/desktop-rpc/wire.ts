@@ -90,5 +90,12 @@ export type DesktopUser = {
   emailVerified: boolean
 }
 export type DesktopSession = { user: DesktopUser; session: { id: string } }
-export type DesktopConfig = { googleEnabled: boolean; githubEnabled: boolean; emailEnabled: boolean }
+export type DesktopFeatures = { flags: Record<string, boolean>; cloudComputer: boolean }
+export type DesktopConfig = {
+  googleEnabled: boolean
+  githubEnabled: boolean
+  emailEnabled: boolean
+  features: DesktopFeatures
+  daemonPackageName: string
+}
 export type DesktopBootstrap = DesktopSession & DesktopConfig & { onboarding: boolean; computer: 'none' | 'ask' }
