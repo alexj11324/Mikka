@@ -2438,8 +2438,8 @@
         "claude": "Claude",
         "codex": "ChatGPT"
       },
-      "othersHint": "{workspace} 的成员也能用你的 {names} 订阅跑任务，用量算在你的额度上",
-      "othersHintAny": "{workspace} 的成员也能用你的订阅跑任务，用量算在你的额度上",
+      "othersHint": "{workspace}的成员也能用你的 {names} 订阅跑任务，用量算在你的额度上",
+      "othersHintAny": "{workspace}的成员也能用你的订阅跑任务，用量算在你的额度上",
       "othersOnAny": "已分享你的订阅 · 成员跑任务时凭据会临时放到他们的电脑上",
       "thisWorkspace": "这个工作区"
     },
@@ -2615,7 +2615,7 @@
       "orderLocal": "任务先在你的服务器跑，没有服务器就用你的电脑",
       "first": "现在会先用 {place}",
       "noKeyFirst": "云端还没填 E2B Key，现在会先用 {place}",
-      "nowhere": "现在三个都没有可用的",
+      "nowhere": "云端、服务器和电脑现在都跑不了",
       "add": "添加模型",
       "addCount": "添加 {count} 个",
       "empty": "还没有优先使用的模型",
@@ -2635,7 +2635,8 @@
         "quota": "额度用完",
         "expired": "需要重新连接",
         "paused": "订阅已停用",
-        "missing": "订阅或 API Key 已移除",
+        "missing": "未连接或不可用",
+        "removed": "已移除",
         "modelGone": "账号已不提供这个模型",
         "keyRefused": "Key 无效或已被撤销",
         "balance": "余额不足",
@@ -2679,7 +2680,6 @@
       "preferredAgent": "优先使用的 Agent",
       "preferredAgentHint": "任务先交给它，按它的模型顺序选；它跑不了就换另一个",
       "preferredMark": "优先",
-      "onlyAgent": "只能用 {agent}",
       "bothAgents": "两种 Agent 都能跑",
       "agentMenu": "{model} 的 Agent：{agent}",
       "emptyNoCredential": "还没有订阅或 API Key",
@@ -2695,9 +2695,14 @@
       "openApiKey": "查看 API Key",
       "openSubscription": "查看订阅",
       "description": "任务从上往下选第一个现在能用的模型",
-      "nowhereLocal": "现在两个都没有可用的",
-      "e2bKeyHint": "在云端跑任务要用它开机器",
-      "clauseSeparator": "；"
+      "nowhereLocal": "服务器和电脑现在都跑不了",
+      "e2bKeyHint": "云端跑任务用",
+      "clauseSeparator": "；",
+      "emptyUseOther": "{agent} 没有能用的模型，任务会交给 {other}",
+      "switchAgent": "改用 {agent}",
+      "backup": "{agent} 列表作为后备 · {count, plural, other {# 个模型}}",
+      "backupList": "{agent} 后备列表",
+      "billedByProvider": "按服务商计费"
     },
     "loadingPage": "正在加载设置",
     "modelScope": {
@@ -2768,7 +2773,12 @@
       "revision": "版本",
       "selectedBy": "选择方式",
       "selectionReason": "选择原因",
-      "selectionReasons": { "capability_fit": "能力最匹配这项工作", "stage_fit": "职责最匹配这个阶段", "only_suitable": "唯一能力合适的 Agent 配置", "other": "按任务能力选择" },
+      "selectionReasons": {
+        "capability_fit": "能力最匹配这项工作",
+        "stage_fit": "职责最匹配这个阶段",
+        "only_suitable": "唯一能力合适的 Agent 配置",
+        "other": "按任务能力选择"
+      },
       "explicitReason": "使用你为这次任务指定的 Agent 配置",
       "defaultReason": "继承优先使用的模型",
       "sources": {

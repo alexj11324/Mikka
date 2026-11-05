@@ -33,6 +33,19 @@ export function shownSubscriptionAvailability(quota: unknown, modelId: string, p
   return shown
 }
 
+/**
+ * What Settings would show for a stored reading, as a comparable key: 待检查 (missing or too old), the read status, and
+ * each window that is used up with when it resets. A new reading that leaves the key the same changes nothing on
+ * screen, so it is not pushed (a meter reads about every 45 s while a subscription is in use).
+ */
+export function quotaDisplayKey(quota: unknown, now = Date.now()): string {
+  const parsed = quotaSnapshotSchema.safeParse(quota)
+  const observed = parsed.success ? Date.parse(parsed.data.observedAt) : NaN
+  if (!parsed.success || !Number.isFinite(observed) || observed > now || now - observed > QUOTA_DISPLAY_MS) return 'checking'
+  const used = parsed.data.windows.filter(window => window.used >= 1).map(window => `${window.kind}:${window.resetsAt ?? ''}`).sort()
+  return JSON.stringify([parsed.data.status, used])
+}
+
 /** A subscription is out of quota while an account-wide window is fully used and has not reset. */
 export function quotaExhausted(quota: unknown, now = Date.now()) {
   const parsed = z.object({ windows: z.array(quotaWindowSchema) }).safeParse(quota);

@@ -166,15 +166,42 @@ test('the list is the 优先使用的 Agent\'s own: the other Agent\'s rows stay
   const text = container.textContent ?? ''
   assert.match(text, /claude-opus/); assert.match(text, /claude-sonnet/)
   assert.doesNotMatch(text, /gpt-codex/, 'Codex rows belong to the Codex list')
-  assert.ok(liveKeys.some(args => (args as unknown[])[0] === 'workspace_settings'), 'it listens for 模型与订阅 changes')
-  const down = [...container.querySelectorAll('[role="menuitem"], button')].find(item => item.textContent?.trim() === 'moveDown')
-  if (down) {
-    await act(async () => { (down as HTMLElement).click() })
-    const reorder = changes.find(change => (change as { kind?: string }).kind === 'reorder') as { ids: string[] } | undefined
-    if (reorder) assert.deepEqual(reorder.ids, [claude[1].id, claude[0].id], 'only this Agent\'s rows, in their new order')
-  }
+  assert.ok(liveKeys.some(args => (args as unknown[])[0] === 'model_settings'), 'it listens for 模型与订阅 changes only')
+  assert.ok(!liveKeys.some(args => (args as unknown[])[0] === 'workspace_settings'), 'not the app-wide settings kind')
+  const menus = [...container.querySelectorAll('button')].filter(item => item.getAttribute('aria-label') === 'rowMenu')
+  assert.equal(menus.length, 2, 'one menu per Claude Code row')
+  await act(async () => { menus[0].click() })
+  const down = [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === 'moveDown')
+  assert.ok(down, 'the first row can move down')
+  await act(async () => { (down as HTMLElement).click() })
+  const reorder = changes.find(change => (change as { kind?: string }).kind === 'reorder') as { ids: string[] } | undefined
+  assert.ok(reorder, 'a move sends a reorder')
+  assert.deepEqual(reorder.ids, [claude[1].id, claude[0].id], 'only this Agent\'s rows, in their new order')
   data = { ...data, preferredHarness: 'codex' }
   await render()
   assert.match(container.textContent ?? '', /gpt-codex/)
   assert.doesNotMatch(container.textContent ?? '', /claude-opus/)
+})
+
+test('nothing for the 优先使用的 Agent but models for the other: the line says tasks go there, and one button switches', async () => {
+  const keyId = randomUUID()
+  data = { ...data, candidates: [{ harness: 'codex', model: 'gpt-codex', name: 'gpt-codex', provider: 'openai', source: { kind: 'api_key', keyId } }] as OrderView['candidates'] }
+  await render()
+  assert.ok(container.textContent?.includes('emptyUseOther'), 'not 「订阅和 API Key 还没有报告模型」')
+  assert.ok(!container.textContent?.includes('emptyNoModels'))
+  await act(async () => button('switchAgent')!.click())
+  assert.deepEqual(changes.at(-1), { kind: 'preferred', harness: 'codex' })
+})
+
+test('the other Agent\'s list folds under this one as the fallback, an API key marked as billed by its provider', async () => {
+  const claude = { ...row(null), model: 'claude-opus' }
+  const codex = { ...row(null, { kind: 'api_key', keyId: randomUUID() }), model: 'gpt-codex', harness: 'codex' as const, provider: 'openai', agents: ['codex' as const] }
+  data = { ...data, entries: [claude, codex] }
+  await render()
+  const fold = button('backup')
+  assert.ok(fold, 'one line for the fallback list')
+  assert.doesNotMatch(container.textContent ?? '', /gpt-codex/, 'folded until tapped')
+  await act(async () => fold!.click())
+  assert.match(container.textContent ?? '', /gpt-codex/)
+  assert.match(container.textContent ?? '', /billedByProvider/)
 })

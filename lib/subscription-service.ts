@@ -225,7 +225,9 @@ export class SubscriptionService {
       if (usage.account && usage.account !== row.accountLabel) await this.repository.saveAccountLabel(row, usage.account).catch(() => undefined)
       return { ...usage, account: usage.account ?? accountLabel(row.accountLabel) }
     } catch {
-      // The list shows a connection the runtime itself moved to reconnect_required.
+      // The list shows a connection the runtime itself moved to reconnect_required; open 模型与订阅 pages re-read it.
+      const now = await this.repository.connection(ownerId, id).catch(() => null)
+      if (now && now.state !== row.state) await (await import('./live/lists')).ownerSettingsChanged(this.repository.pool, ownerId)
       return failedUsage(row.id, 'unavailable', row.accountLabel)
     }
   }

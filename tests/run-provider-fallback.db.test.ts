@@ -233,6 +233,24 @@ test('provider failure continues the same task through its authorized preferred 
     assert.equal(assignment.subscriptionBinding, undefined)
   })
 
+  await t.test('the 优先使用的 Agent\'s list runs first, so a failure there still falls back to the other Agent\'s list', async () => {
+    // Decision 2026-11-05-0400: stored [codexA, codexB, claudeX], 优先使用的 Agent Claude Code. claudeX runs first;
+    // when it fails, codexA comes next. Taking the stored order would count codexA/B as already tried.
+    const p = await person('provider-agent-order')
+    const codexKey = await addKey(p.id, 'openai', ['fixture-codex-a', 'fixture-codex-b'])
+    const claudeKey = await addKey(p.id, 'anthropic', ['fixture-claude-x'])
+    await preferences(p, [entry('codex', 'fixture-codex-a', codexKey.id), entry('codex', 'fixture-codex-b', codexKey.id), entry('claude_code', 'fixture-claude-x', claudeKey.id)])
+    await order.changeOrder(pool, scope(p), { kind: 'preferred', harness: 'claude_code' })
+    const runId = await running(p)
+    assert.equal((await row(runId)).agentDefinition.modelDispatch.entry.model, 'fixture-claude-x')
+    await end(p, runId, balance)
+    const [continuation, ...extra] = await children(runId)
+    assert.ok(continuation, 'the Codex list is the fallback after the preferred list is exhausted')
+    assert.equal(extra.length, 0)
+    assert.equal(continuation.agentDefinition.harness, 'codex')
+    assert.equal(continuation.agentDefinition.modelDispatch.entry.model, 'fixture-codex-a')
+  })
+
   for (const status of [429, 502]) await t.test(`terminal HTTP ${status} advances after native short retries, and the same harness resumes its session`, async () => {
     const { p, second } = await twoModels(`provider-transient-${status}`, true)
     const runId = await running(p)

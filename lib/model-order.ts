@@ -10,7 +10,7 @@ import { apiKeyHarnesses } from './model-api-key-providers'
 import { shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
 import { providerHealthStates, providerSourceKey } from './model-provider-health'
 import {
-  agentsByOffer, defaultOrderByAgent, deviceModel, entryKey, offerKey, planDispatch, whyNoDevice,
+  agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, offerKey, planDispatch, whyNoDevice,
   type CredentialState, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
 } from './model-order-plan'
 
@@ -34,7 +34,7 @@ export interface OrderRow extends OrderEntry {
   agents: OrderHarness[]
   /** Why it cannot run now, or null when it can. noDevice when no place of 运行位置 runs it, with what the closest computer lacks. */
   block: null
-    | { reason: 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'modelGone' | 'keyRefused' | 'balance' | 'providerUnavailable'; resetsAt?: string | null }
+    | { reason: 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'removed' | 'modelGone' | 'keyRefused' | 'balance' | 'providerUnavailable'; resetsAt?: string | null }
     | { reason: 'noDevice'; device: NoDeviceWhy }
 }
 
@@ -127,13 +127,7 @@ export async function readOrder(query: Query, scope: OrderScope, candidates?: (O
   return { ...settings, entries: rows.map(toEntry) }
 }
 
-/**
- * The order dispatch tries with no Agent named (decision 2026-11-05-0400): the 优先使用的 Agent's own list first,
- * then the other Agent's list, each in its own order. The page shows only the first; the second is a fallback.
- */
-export function dispatchOrder<T extends Pick<OrderEntry, 'harness'>>(entries: readonly T[], preferred: OrderHarness): T[] {
-  return [...entries.filter(entry => entry.harness === preferred), ...entries.filter(entry => entry.harness !== preferred)]
-}
+export { dispatchOrder } from './model-order-plan'
 
 export type RefreshOrderQuota = (scope: OrderScope, connectionId: string, signal: AbortSignal, credentialOwnerId?: string) => Promise<void>
 const quotaRefreshes = new WeakMap<Query, Map<string, Promise<void>>>()
@@ -147,7 +141,7 @@ const refreshOrderQuota = (query: Query): RefreshOrderQuota => async (scope, con
 
 /** Each entry's credential, read now. Dispatch refreshes missing/stale allowance
  * once per connection, before deciding; Settings can request a projection only. */
-export async function credentialStates(query: Query, scope: OrderScope, entries: readonly OrderEntry[], candidates: readonly (OrderCandidate & { provider: string; credentialOwnerId?: string })[], now?: number, options: { probe?: boolean; refresh?: RefreshOrderQuota } = {}) {
+export async function credentialStates(query: Query, scope: OrderScope, entries: readonly OrderEntry[], candidates: readonly (OrderCandidate & { provider: string; credentialOwnerId?: string })[], now?: number, options: { probe?: boolean; refresh?: RefreshOrderQuota; display?: boolean } = {}) {
   let checkedAt = now ?? Date.now()
   const available = new Set(candidates.map(entryKey))
   // Subscriptions whose account catalogue lists anything: only those can say a model has gone away.
@@ -159,13 +153,16 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
   // browser's stored order/source. The database verifies each (id, owner) pair.
   const owners = new Map(connectionIds.map(id => [id, scope.ownerId]))
   for (const candidate of candidates) if (candidate.source.kind === 'subscription' && connectionIds.includes(candidate.source.connectionId)) owners.set(candidate.source.connectionId, candidate.credentialOwnerId ?? scope.ownerId)
-  const keyOwners = new Map(authorizedCandidates.flatMap(candidate => candidate.source.kind === 'api_key'
+  // Any authorized candidate of a listed key, not only the listed model's: a key whose /models dropped that model is
+  // still read, so the row can say 账号已不提供 rather than 未连接或不可用.
+  const entryKeys = new Set(entries.flatMap(entry => entry.source.kind === 'api_key' ? [entry.source.keyId] : []))
+  const keyOwners = new Map(candidates.flatMap(candidate => candidate.source.kind === 'api_key' && entryKeys.has(candidate.source.keyId)
     ? [[candidate.source.keyId, candidate.credentialOwnerId ?? scope.ownerId] as const] : []))
   const readConnections = async () => {
     const authorized = [] as [string, string][]
     for (const [id, owner] of owners) if (owner === scope.ownerId || await (await import('./personal-policy')).othersMayUse(query, owner, scope.workspaceId)) authorized.push([id, owner])
-    return new Map((authorized.length ? (await query.query<{ id: string; ownerId: string; state: string; paused: boolean; quota: unknown; provider: 'claude' | 'codex'; epoch: string }>(
-      'SELECT c.id::text AS id,c."ownerId",c.state,c.paused,c.quota,c.provider,c.epoch::text AS epoch FROM byos_connections c JOIN unnest($1::text[],$2::text[]) AS authorized(id,owner) ON c.id::text=authorized.id AND c."ownerId"=authorized.owner', [authorized.map(([id]) => id), authorized.map(([, owner]) => owner)])).rows : []).map(row => [row.id, row]))
+    return new Map((authorized.length ? (await query.query<{ id: string; ownerId: string; state: string; paused: boolean; quota: unknown; provider: 'claude' | 'codex'; epoch: string; removed: boolean }>(
+      'SELECT c.id::text AS id,c."ownerId",c.state,c.paused,c.quota,c.provider,c.epoch::text AS epoch,c."removedAt" IS NOT NULL AS removed FROM byos_connections c JOIN unnest($1::text[],$2::text[]) AS authorized(id,owner) ON c.id::text=authorized.id AND c."ownerId"=authorized.owner', [authorized.map(([id]) => id), authorized.map(([, owner]) => owner)])).rows : []).map(row => [row.id, row]))
   }
   let connections = await readConnections()
   if (options.probe !== false) {
@@ -198,14 +195,17 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
     if (entry.source.kind === 'subscription') {
       const row = connections.get(entry.source.connectionId)
       const provider = row?.provider ?? (entry.harness === 'codex' ? 'codex' : 'claude')
-      // Settings shows the last read allowance; dispatch (probe) needs a fresh one.
-      const availability = (options.probe === false ? shownSubscriptionAvailability : subscriptionAvailability)(row?.quota, entry.model, provider, checkedAt)
+      // Only the settings page shows a reading up to 15 minutes old; dispatch, Profiles and fallback keep the 60 s rule.
+      const availability = (options.display ? shownSubscriptionAvailability : subscriptionAvailability)(row?.quota, entry.model, provider, checkedAt)
+      // 已移除: a connection 移除 removed. 未连接或不可用: not connected (yet), gone, not shared with this person (any more),
+      // or its account lists nothing; it says nothing more about a credential that is not theirs to read.
+      // 账号已不提供: the account lists models, not this one any more.
       const credential: CredentialState = !row ? { usable: false, reason: 'missing' }
+        : row.removed ? { usable: false, reason: 'removed' }
         : row.state === 'reconnect_required' ? { usable: false, reason: 'expired' }
           : row.paused ? { usable: false, reason: 'paused' }
             : row.state !== 'connected' ? { usable: false, reason: 'missing' }
-              // Connected, but its account no longer reports this model (刷新模型): unavailable, kept in the list.
-              : !available.has(entryKey(entry)) ? { usable: false, reason: entry.source.kind === 'subscription' && listing.has(entry.source.connectionId) ? 'modelGone' : 'missing' }
+              : !available.has(entryKey(entry)) ? { usable: false, reason: listing.has(entry.source.connectionId) ? 'modelGone' : 'missing' }
               : health.get(providerSourceKey(entry.source)) ?? health.get(entryKey(entry)) ?? (
                 availability.status === 'exhausted' ? { usable: false, reason: 'quota', resetsAt: availability.resetsAt }
                 : availability.status === 'checking' ? { usable: false, reason: 'checking' }
@@ -213,8 +213,11 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
       states.set(entry.id, { credential, provider })
     } else {
       const row = keys.get(entry.source.keyId)
-      const credential: CredentialState = !row || !available.has(entryKey(entry)) ? { usable: false, reason: 'missing' }
+      const keyId = entry.source.keyId
+      const credential: CredentialState = !row ? { usable: false, reason: 'missing' }
         : row.modelsError === 'invalid' ? { usable: false, reason: 'keyRefused' }
+        // The provider's /models still answers, without this one (重新获取模型): kept in the list, marked.
+        : !available.has(entryKey(entry)) ? { usable: false, reason: candidates.some(candidate => candidate.source.kind === 'api_key' && candidate.source.keyId === keyId) ? 'modelGone' : 'missing' }
           : health.get(providerSourceKey(entry.source)) ?? health.get(entryKey(entry)) ?? { usable: true }
       states.set(entry.id, { credential, provider: row?.provider ?? 'custom' })
     }
@@ -254,7 +257,7 @@ export async function poolDevices(query: Query, ownerId: string): Promise<PoolDe
 export async function orderView(query: Query, scope: OrderScope): Promise<OrderView> {
   const candidates = await orderCandidates(query, scope)
   const order = await readOrder(query, scope, candidates)
-  const states = await credentialStates(query, scope, order.entries, candidates, Date.now(), { probe: false })
+  const states = await credentialStates(query, scope, order.entries, candidates, Date.now(), { probe: false, display: true })
   const devices = await poolDevices(query, scope.ownerId)
   const added = new Set(order.entries.map(entryKey))
   const agents = agentsByOffer(candidates)

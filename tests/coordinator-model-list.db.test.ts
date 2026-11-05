@@ -56,6 +56,8 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
   // the person drags it into their order.
   const stored = (await order.readOrder(pool, scope)).entries
   await order.changeOrder(pool, scope, { kind: 'reorder', ids: entries.map(entry => stored.find(row => row.model === entry.model)!.id) })
+  // Codex first in the prompt as in the stored list: the prompt lists them in dispatch order (decision 2026-11-05-0400).
+  await order.changeOrder(pool, scope, { kind: 'preferred', harness: 'codex' })
   await order.changeOrder(pool, scope, { kind: 'location', location: 'local' })
   // A computer whose Codex reported fx-codex-a and fx-codex-b.
   const deviceId = randomUUID()

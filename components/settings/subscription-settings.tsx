@@ -82,7 +82,7 @@ export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { 
   const { mutate: mutateCached } = useSWRConfig()
   const refresh = useCallback(async () => { await mutate(); void mutateCached(modelOrderKey(workspaceId)) }, [mutate, mutateCached, workspaceId])
   // Connected, paused or removed elsewhere (another tab, the desktop app's sign-in): this list re-reads (no polling).
-  useLiveKey('workspace_settings', workspaceId, [unstable_serialize(subscriptionsKey(workspaceId))], workspaceId, { minIntervalMs: 2_000 })
+  useLiveKey('model_settings', workspaceId, [unstable_serialize(subscriptionsKey(workspaceId))], workspaceId, { minIntervalMs: 2_000 })
   /** 刷新模型: the account is asked for its models again; 优先使用的模型 shows the answer, a model gone marked unavailable. */
   const [refreshingModels, setRefreshingModels] = useState<string | null>(null)
   const refreshModels = useCallback(async (connection: { id: string; label: string }) => {

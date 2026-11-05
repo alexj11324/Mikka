@@ -33,7 +33,7 @@ export function ThreadModelFallbackNotice({ item, retry, retrying }: { item: Thr
   const reason = (code: string) => ({
     balance: copy.needsModelBalance, providerUnavailable: copy.needsModelProviderUnavailable,
     keyRefused: copy.needsModelKeyRefused, expired: blocked('expired'), quota: blocked('quota'),
-    paused: blocked('paused'), missing: blocked('missing'), checking: blocked('checking'),
+    paused: blocked('paused'), missing: blocked('missing'), removed: blocked('removed'), modelGone: blocked('modelGone'), checking: blocked('checking'),
     noDevice: copy.needsModelNoPlace, cloudNotConfigured: copy.needsModelCloud,
     cloudModelsUnknown: copy.needsModelCloudModelsUnknown, cloudModelNotReported: copy.needsModelCloudModelNotReported,
     alreadyTried: copy.needsModelAlreadyTried,
