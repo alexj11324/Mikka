@@ -1,0 +1,98 @@
+{
+  "reviewer": "/root/egress_1211",
+  "reviewedAt": "2026-11-05T01:35:53.406362+00:00",
+  "base": "efef5b5a5a8a55deb3c504b05fb736d4003e942c",
+  "candidateTree": "d6051ef87b6b18c1cc894942468e6bd23046e8eb",
+  "fileHashes": [
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "size": 6287,
+      "sha": "e97226987c6b9d88ad70340d2f5490b74dab6279",
+      "sha256": "bc3cf327c10f0642c33f4c57623ca1b7235ee731151254b181edd8e65e1a96f0",
+      "changedFrom4f91": false
+    },
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "size": 8017,
+      "sha": "d623fe2d05727935bce2eac6468b260c0ff881ac",
+      "sha256": "81b31ff63166d4e3f9088b517cdce78909b5155836e32e686ef860f029603f11",
+      "changedFrom4f91": true
+    },
+    {
+      "path": "scripts/release/web-deploy.mjs",
+      "size": 15759,
+      "sha": "62a70d9315cb85097f524cb1ca5a9fd438002ea9",
+      "sha256": "5d7c589fe173ebe4a9e179233ae15bf35739f979e489f515c55cc27c73a3a8d3",
+      "changedFrom4f91": true
+    },
+    {
+      "path": "scripts/release/web-deploy.test.mjs",
+      "size": 23682,
+      "sha": "b9cb09aba0f8b5d36c2d091306e4912b1c12db97",
+      "sha256": "0dccb1b0002d926bc69dffca06bb3a2571979616d99e18c6ca7aab56661d4c2b",
+      "changedFrom4f91": true
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "size": 7012,
+      "sha": "d04390cffb9c1e14ef452dc9c516dd39d6061f7c",
+      "sha256": "b4f88cb08997fdadf07e83c9f184b9e05da62f94bde7c1a727a6d813160952ca",
+      "changedFrom4f91": false
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "size": 13149,
+      "sha": "aa17e3a56b3875a83e64428c27159428e25546da",
+      "sha256": "923511259a06475f58e21e78a0ee70f4bab3251c5ff9841804bf31b4ee4e0de6",
+      "changedFrom4f91": false
+    },
+    {
+      "path": "docs/operations/web-deploy.md",
+      "size": 6944,
+      "sha": "80ada4817517fdd279bde34cf3ba4c39f5d47d85",
+      "sha256": "5d5b9d01d4c79987d56293e57d1385dba19d81085b03fa3a18014c4f21e9a5d4",
+      "changedFrom4f91": true
+    }
+  ],
+  "evidence": [
+    {
+      "path": "mikka-runtime-web-release-review/cloud-proof-v3/logs/mikka-runtime-release-red.log",
+      "bytes": 3624,
+      "sha256": "6c063ae3e22f16f3a2fee1df5459dae2409afd3a214864cae4e493083cb2e1ea"
+    },
+    {
+      "path": "mikka-runtime-web-release-review/cloud-proof-v3/logs/mikka-runtime-release-timeline-red.log",
+      "bytes": 975,
+      "sha256": "f622b7c903d8ed3ff74adf83d22ec7e8d5667d51adeed0df7f1b9511787862fb"
+    },
+    {
+      "path": "mikka-runtime-web-release-review/cloud-proof-v3/logs/mikka-runtime-release-green-v3.log",
+      "bytes": 4502,
+      "sha256": "8905228e4ec79c0748a81e67216792d86afd57ef5fb4e76bf5a1bb2d46c25e1d"
+    },
+    {
+      "path": "mikka-runtime-web-release-review/cloud-proof-v3/logs/mikka-runtime-release-related-v3.log",
+      "bytes": 12952,
+      "sha256": "ae41c80ebbe00fdea51629df0f06bd2163e0c327a39b1ef3e399d885684ce271"
+    },
+    {
+      "path": "mikka-runtime-web-release-review/cloud-proof-v3/logs/mikka-runtime-release-lint-v3.log",
+      "bytes": 89,
+      "sha256": "ea66e69b17490280ec3e9e23ae5e1ed85e37918b8d137f170c1f78e8328bf19f"
+    }
+  ],
+  "conclusion": "No remaining source blocker in this seven-file final candidate; runtime/OIDC/deployment not executed by reviewer.",
+  "resolvedFinding": "E2B caller default pending replacement could discard newest main runtime request; final queue:max/cancel:false fixes this documented scheduler counterexample.",
+  "actualReviewerTestExecutions": 0,
+  "productionActions": 0,
+  "limits": [
+    "File blobs independently recomputed; full candidate tree is author git write-tree evidence.",
+    "81 related tests include narrow suite, not additive.",
+    "Strict current-main/docs-only recovery gap remains explicitly bounded.",
+    "No live OIDC, paid runtime validation, deployment, hour or egress success asserted."
+  ],
+  "reviewMarkdown": {
+    "bytes": 11089,
+    "sha256": "282a18ff57b2060a8ae2cb38839d0da977c20397a7537e6db525eacfbb8a8abf"
+  }
+}

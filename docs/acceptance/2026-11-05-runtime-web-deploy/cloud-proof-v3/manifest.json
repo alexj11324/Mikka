@@ -1,0 +1,50 @@
+{
+  "base": "efef5b5a5a8a55deb3c504b05fb736d4003e942c",
+  "tree": "d6051ef87b6b18c1cc894942468e6bd23046e8eb",
+  "recordedAt": "2026-11-05T01:33:17.306168+00:00",
+  "node": "v24.22.1",
+  "files": [
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "sha": "e97226987c6b9d88ad70340d2f5490b74dab6279",
+      "sha256": "bc3cf327c10f0642c33f4c57623ca1b7235ee731151254b181edd8e65e1a96f0",
+      "size": 6287
+    },
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "sha": "d623fe2d05727935bce2eac6468b260c0ff881ac",
+      "sha256": "81b31ff63166d4e3f9088b517cdce78909b5155836e32e686ef860f029603f11",
+      "size": 8017
+    },
+    {
+      "path": "scripts/release/web-deploy.mjs",
+      "sha": "62a70d9315cb85097f524cb1ca5a9fd438002ea9",
+      "sha256": "5d7c589fe173ebe4a9e179233ae15bf35739f979e489f515c55cc27c73a3a8d3",
+      "size": 15759
+    },
+    {
+      "path": "scripts/release/web-deploy.test.mjs",
+      "sha": "b9cb09aba0f8b5d36c2d091306e4912b1c12db97",
+      "sha256": "0dccb1b0002d926bc69dffca06bb3a2571979616d99e18c6ca7aab56661d4c2b",
+      "size": 23682
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "sha": "d04390cffb9c1e14ef452dc9c516dd39d6061f7c",
+      "sha256": "b4f88cb08997fdadf07e83c9f184b9e05da62f94bde7c1a727a6d813160952ca",
+      "size": 7012
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "sha": "aa17e3a56b3875a83e64428c27159428e25546da",
+      "sha256": "923511259a06475f58e21e78a0ee70f4bab3251c5ff9841804bf31b4ee4e0de6",
+      "size": 13149
+    },
+    {
+      "path": "docs/operations/web-deploy.md",
+      "sha": "80ada4817517fdd279bde34cf3ba4c39f5d47d85",
+      "sha256": "5d5b9d01d4c79987d56293e57d1385dba19d81085b03fa3a18014c4f21e9a5d4",
+      "size": 6944
+    }
+  ]
+}

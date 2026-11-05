@@ -1,0 +1,48 @@
+✔ official instance release derives its worker digest from the exact acceptance revision (2.249923ms)
+✔ private template configuration and a different source stop before worker preparation (2.217854ms)
+✔ an old or malformed worker receipt cannot identify the official instance release (0.678411ms)
+✔ real Git rejects changed or untracked runtime source before hashing but ignores generated caches (37.975578ms)
+✔ official templates, worker, source and measured capabilities go to production in one verified upsert (34.167414ms)
+✔ runtime configuration never asks Vercel to rebuild source; the caller must use Web deploy (2.58067ms)
+✔ an explicit refresh still requires a Web build after an earlier env write succeeded (2.42742ms)
+✔ a readback mismatch fails before the caller can build (3.529091ms)
+✔ an uncertain mutation is never retried; an explicit rerun reads it and still requires a build (3.226322ms)
+✔ an HTTP mutation error has one attempt and never exposes the response body (1.591426ms)
+✔ main advancing during configuration reads prevents the single env mutation (1.160381ms)
+✔ obsolete refreshes fail even when their old runtime env already matches (0.325571ms)
+✔ a different serving alias or public version prevents every configuration write (0.961529ms)
+✔ does not search past a newer application for an older matching READY deployment (0.538454ms)
+✔ refuses missing or short source identities and custom official templates before requests (0.400664ms)
+✔ pair validation still rejects short worker SHA, odd or missing template IDs and unmeasured harnesses (0.407952ms)
+✔ reads only the exact production worker hash and returns empty when unset (0.608208ms)
+✔ GitHub-only build timeline waits for source upload before the single runtime env publication (4.973497ms)
+✔ fills sensitive build values from the job and pins the main Git identity (1.676304ms)
+✔ refuses a build with a missing value and names only the variable (0.819048ms)
+✔ reads the commit production serves through the alias (3.59268ms)
+✔ public verification waits through an HTTP error and the previous build before recording the exact build (43.028397ms)
+✔ a different public build cannot pass just because its deployment is READY (1.182857ms)
+✔ invalid responses and network failures stay bounded and never copy response bodies into errors (1.378311ms)
+✔ a moving branch name or invalid budget fails before sending a public request (0.249368ms)
+✔ an exact response arriving after the monotonic verification deadline cannot pass (0.401003ms)
+✔ waits for a GitHub build while Vercel still only serves the older READY source (2.883343ms)
+✔ main advancing while waiting rejects the obsolete source before another workflow or public read (3.127753ms)
+✔ the latest exact Web attempt must succeed; an older success cannot hide its failure or cancellation (1.434172ms)
+✔ a docs-only skipped build or incomplete upload never passes even if public already has that SHA (0.997091ms)
+✔ another repository, branch or workflow cannot stand in for the matching main Web run (1.764687ms)
+✔ a successful Web run with an old public build has a finite monotonic wait (1.054861ms)
+✔ a matching public response after the deadline cannot admit the runtime mutation (0.449134ms)
+✔ the final read-only fence also rejects a main change during public verification (0.635773ms)
+✔ invalid source, missing identity or invalid wait fails without any network request (0.219874ms)
+✔ GitHub errors do not expose response bodies or transport messages (0.720474ms)
+✔ explicit runtime refresh always builds while ordinary docs-only classification is preserved (0.437822ms)
+✔ both release paths use one non-cancelling pending queue, and the Web wait remains outside it (0.493345ms)
+✔ runtime env, build and upload are ordered under the same job with fixed identity and source fences (0.407491ms)
+✔ the actual dispatch comparison only bypasses unchanged-hash optimization when explicitly requested (13.702975ms)
+ℹ tests 40
+ℹ suites 0
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 199.553706

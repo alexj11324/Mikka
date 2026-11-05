@@ -1,0 +1,76 @@
+✔ every template and the worker hash go to production in one upsert, then production is redeployed (4.802457ms)
+✔ waits for a production build already running before redeploying (1.086755ms)
+✔ stops before redeploying when the env did not take (2.215737ms)
+✔ a failed redeploy fails the run (0.683255ms)
+✔ an unchanged production env skips the write and the redeploy (0.380578ms)
+✔ refuses a short SHA, an odd or a missing template id before any write (0.246979ms)
+✔ reads production's current worker hash, empty when unset (0.306732ms)
+✔ refuses publishing a template without measured models before any write (0.20049ms)
+✔ official runtime publishes source, worker and measured capabilities together, redeploying the exact Git commit (0.778997ms)
+✔ unchanged official runtime does not redeploy over a newer READY application (0.716062ms)
+✔ official runtime cannot redeploy a READY application from a different commit (0.596083ms)
+✔ a newer READY main application cannot be replaced by an older matching source (0.574381ms)
+✔ official runtime refuses custom templates and invalid commits before writing production (0.451665ms)
+✖ runtime configuration never asks Vercel to rebuild source; the caller must use Web deploy (2.382764ms)
+✖ an explicit refresh still requires a Web build after an earlier env write succeeded (0.65571ms)
+✖ main advancing during configuration reads prevents the single env mutation (0.752775ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 13
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 89.733955
+
+✖ failing tests:
+
+test at scripts/e2b/publish-template-env.test.mjs:158:1
+✖ runtime configuration never asks Vercel to rebuild source; the caller must use Web deploy (2.382764ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/mikka-runtime-web-release/scripts/e2b/publish-template-env.test.mjs:161:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/e2b/publish-template-env.test.mjs:165:1
+✖ an explicit refresh still requires a Web build after an earlier env write succeeded (0.65571ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - true
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/mikka-runtime-web-release/scripts/e2b/publish-template-env.test.mjs:168:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/e2b/publish-template-env.test.mjs:172:1
+✖ main advancing during configuration reads prevents the single env mutation (0.752775ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///vercel/sandbox/mikka-runtime-web-release/scripts/e2b/publish-template-env.test.mjs:174:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /mainChanged/,
+    operator: 'rejects',
+    diff: 'simple'
+  }

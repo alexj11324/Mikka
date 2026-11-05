@@ -1,0 +1,47 @@
+✔ official instance release derives its worker digest from the exact acceptance revision (1.797345ms)
+✔ private template configuration and a different source stop before worker preparation (1.440551ms)
+✔ an old or malformed worker receipt cannot identify the official instance release (0.61226ms)
+✔ real Git rejects changed or untracked runtime source before hashing but ignores generated caches (30.030116ms)
+✔ official templates, worker, source and measured capabilities go to production in one verified upsert (35.343676ms)
+✔ runtime configuration never asks Vercel to rebuild source; the caller must use Web deploy (2.817825ms)
+✔ an explicit refresh still requires a Web build after an earlier env write succeeded (2.464856ms)
+✔ a readback mismatch fails before the caller can build (3.810209ms)
+✔ an uncertain mutation is never retried; an explicit rerun reads it and still requires a build (3.0058ms)
+✔ an HTTP mutation error has one attempt and never exposes the response body (1.403474ms)
+✔ main advancing during configuration reads prevents the single env mutation (1.088424ms)
+✔ obsolete refreshes fail even when their old runtime env already matches (0.342119ms)
+✔ a different serving alias or public version prevents every configuration write (0.871612ms)
+✔ does not search past a newer application for an older matching READY deployment (0.506386ms)
+✔ refuses missing or short source identities and custom official templates before requests (0.421794ms)
+✔ pair validation still rejects short worker SHA, odd or missing template IDs and unmeasured harnesses (0.395961ms)
+✔ reads only the exact production worker hash and returns empty when unset (0.56829ms)
+✔ GitHub-only build timeline waits for source upload before the single runtime env publication (4.306505ms)
+✔ fills sensitive build values from the job and pins the main Git identity (1.45307ms)
+✔ refuses a build with a missing value and names only the variable (0.696771ms)
+✔ reads the commit production serves through the alias (3.038612ms)
+✔ public verification waits through an HTTP error and the previous build before recording the exact build (49.411376ms)
+✔ a different public build cannot pass just because its deployment is READY (1.678631ms)
+✔ invalid responses and network failures stay bounded and never copy response bodies into errors (1.980582ms)
+✔ a moving branch name or invalid budget fails before sending a public request (0.371723ms)
+✔ an exact response arriving after the monotonic verification deadline cannot pass (0.562162ms)
+✔ waits for a GitHub build while Vercel still only serves the older READY source (4.151214ms)
+✔ main advancing while waiting rejects the obsolete source before another workflow or public read (2.462588ms)
+✔ the latest exact Web attempt must succeed; an older success cannot hide its failure or cancellation (1.829374ms)
+✔ a docs-only skipped build or incomplete upload never passes even if public already has that SHA (1.614543ms)
+✔ another repository, branch or workflow cannot stand in for the matching main Web run (2.747327ms)
+✔ a successful Web run with an old public build has a finite monotonic wait (1.572543ms)
+✔ a matching public response after the deadline cannot admit the runtime mutation (0.709554ms)
+✔ the final read-only fence also rejects a main change during public verification (0.880691ms)
+✔ invalid source, missing identity or invalid wait fails without any network request (0.334154ms)
+✔ GitHub errors do not expose response bodies or transport messages (0.92462ms)
+✔ explicit runtime refresh always builds while ordinary docs-only classification is preserved (0.628499ms)
+✔ both release paths use one non-cancelling pending queue, and the Web wait remains outside it (0.602997ms)
+✔ runtime env, build and upload are ordered under the same job with fixed identity and source fences (0.573799ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 175.449524

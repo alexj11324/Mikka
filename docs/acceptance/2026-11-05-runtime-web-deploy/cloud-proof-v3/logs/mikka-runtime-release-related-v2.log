@@ -1,0 +1,126 @@
+Retained docs gate evidence: /tmp/docs-gate-retained-P81bl7
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+Retained docs gate loader evidence: /tmp/docs-gate-loader-retained-1wP7ak
+Retained trusted classifier fixture: /tmp/tmp.ebfKQ8Bvh5/ci-docs-only.mjs
+Retained trusted classifier fixture: /tmp/tmp.agaefs89Un/ci-docs-only.mjs
+Retained workflow module-loader evidence: /tmp/docs-gate-module-retained-yGLd64/tmp.9pB1Tw395U/ci-docs-only.mjs
+Retained workflow module-loader evidence: /tmp/docs-gate-module-retained-Ka5Bsu/tmp.gWADF51edh/ci-docs-only.mjs
+Retained workflow launcher fixture: /tmp/docs-gate-launch-retained-sjC8Yj
+Retained workflow classifier evidence: /tmp/docs-workflow-retained-ZooQpZ
+Retained workflow classifier evidence: /tmp/docs-workflow-retained-vDRil3
+Retained workflow bootstrap evidence: /tmp/docs-gate-bootstrap-retained-9eXZCk
+Switched to a new branch 'candidate'
+From /tmp/docs-gate-bootstrap-retained-9eXZCk
+ * branch            main       -> FETCH_HEAD
+ * [new branch]      main       -> origin/main
+From /tmp/docs-gate-bootstrap-retained-9eXZCk
+ * branch            main       -> FETCH_HEAD
+From /tmp/docs-gate-bootstrap-retained-9eXZCk
+ * branch            main       -> FETCH_HEAD
+From /tmp/docs-gate-bootstrap-retained-9eXZCk
+ * branch            main       -> FETCH_HEAD
+✔ approved documentation paths are documentation-only (1.653351ms)
+✔ code, workflows, configuration, messages and public assets are not documentation-only (0.315427ms)
+✔ one code file makes a mixed change run the full suites (0.675745ms)
+✔ an empty change set is never treated as documentation-only (0.2851ms)
+✔ a docs path with a non-regular mode is not documentation-only (0.133005ms)
+✔ non-executable regular files including added and deleted files are safe (0.430112ms)
+✔ symlinks, gitlinks and unmerged entries fail closed (0.15791ms)
+✔ real git diffs retain all fixtures while testing rename, deletion and event boundaries (579.803833ms)
+✔ the workflow-extracted trusted classifier executes as an ES module (69.768956ms)
+✔ trusted workflow classifier executes as an ES module from its retained temporary file (66.351569ms)
+✔ all required gates reject failed classification and skipped full jobs (27.49419ms)
+✔ each actual workflow temp-file command produces a classifier Node can load outside the package (64.297668ms)
+✔ the exact trusted-classifier workflow step executes ESM from a retained temporary file (82.896208ms)
+✔ actual workflow classifier launches trusted ESM from its retained temporary file (123.662601ms)
+✔ the trusted classifier runs as a copied .mjs entry point (42.214297ms)
+✔ a trusted stdin wrapper can import the paired classifier without running its entry point (31.635047ms)
+✔ the actual workflow bootstrap executes its trusted temporary ESM module (199.572275ms)
+✔ blocking CI checks synthetic PR merge candidates once and preserves every main run (0.311669ms)
+✔ CI partitions DB suites across isolated jobs and requires source and daemon lanes (0.463392ms)
+✔ integration branches take the full tier under both the integration/ and the older integrate/ prefix (0.142763ms)
+✔ UTC windows are equal, aligned, nonoverlapping, complete, and outside warmup (3.223631ms)
+✔ initial CPU threshold requires both strict ratio and absolute delta; sample boundary is inclusive (0.525448ms)
+✔ traffic, routes, status, samples and error growth cannot masquerade as improvement (0.360304ms)
+✔ query has proven project scope and only deployment/environment filters and route/status groups (0.600063ms)
+✔ only expected aggregate fields leave the boundary; malformed and truncated samples fail closed (0.677914ms)
+✔ API failures never echo upstream payloads, token or exceptions (9.154957ms)
+✔ read-only full path pins deployment, rejects event/race mismatch, emits aggregate report (11.791003ms)
+✔ outcome coverage distinguishes legitimate empty work from errors, missing completion and legacy logs (2.59316ms)
+✔ started, failed, 429 and overdue unfinished requests share the denominator; raw payloads never enter metrics (0.656129ms)
+✔ real internal HTTP sink receives one firing and recovery; failed sink remains visible and retryable (37.511939ms)
+✔ real HTTP status and failure logs feed the request SLI without copying request data (10.813231ms)
+✔ normal login carries session only to same-origin read probes; reports contain no credentials (30.866548ms)
+✔ a disabled required capability or failed Coordinator read fails the smoke (5.59135ms)
+✔ missing cookies and mismatched account fail before application probes (1.622448ms)
+✔ configuration cannot send credentials to insecure targets or silently ignore misspelled required features (0.560234ms)
+✔ transport errors never expose cookies, URLs or provider error messages (0.291005ms)
+{"internalFailureEvents":3,"primaryFailurePreserved":true,"notificationFailureVisible":true,"databasesCreated":0}
+✔ a blocked restore emits a safe real internal alert; receiver failure is visible without replacing the recovery failure (51.843848ms)
+{"version":1,"id":"restore-blocked:recoveryDistinctDatabasesRequired","state":"firing","observedAt":"2026-11-05T01:24:12.318Z","code":"recoveryDistinctDatabasesRequired","value":1,"owner":"repository-maintainers","runbook":"docs/operations/safe-recovery.md","action":"Keep the recovery target isolated. Check the independent manifest, schema, object payloads, vault and current deletion journal before a new attempt.","notificationStatus":"not_configured"}
+{"version":1,"id":"restore-blocked:recoveryDistinctDatabasesRequired","state":"firing","observedAt":"2026-11-05T01:24:12.331Z","code":"recoveryDistinctDatabasesRequired","value":1,"owner":"repository-maintainers","runbook":"docs/operations/safe-recovery.md","action":"Keep the recovery target isolated. Check the independent manifest, schema, object payloads, vault and current deletion journal before a new attempt.","notificationStatus":"not_configured"}
+{"version":1,"id":"restore-blocked:recoveryManifestInvalid","state":"firing","observedAt":"2026-11-05T01:24:12.334Z","code":"recoveryManifestInvalid","value":1,"owner":"repository-maintainers","runbook":"docs/operations/safe-recovery.md","action":"Keep the recovery target isolated. Check the independent manifest, schema, object payloads, vault and current deletion journal before a new attempt.","notificationStatus":"not_configured"}
+{"version":1,"id":"restore-blocked:recoveryManifestInvalid","state":"firing","observedAt":"2026-11-05T01:24:12.335Z","code":"recoveryManifestInvalid","value":1,"owner":"repository-maintainers","runbook":"docs/operations/safe-recovery.md","action":"Keep the recovery target isolated. Check the independent manifest, schema, object payloads, vault and current deletion journal before a new attempt.","notificationStatus":"not_configured"}
+{"version":1,"id":"restore-blocked:recoveryManifestInvalid","state":"firing","observedAt":"2026-11-05T01:24:12.335Z","code":"recoveryManifestInvalid","value":1,"owner":"repository-maintainers","runbook":"docs/operations/safe-recovery.md","action":"Keep the recovery target isolated. Check the independent manifest, schema, object payloads, vault and current deletion journal before a new attempt.","notificationStatus":"not_configured"}
+{"version":1,"id":"restore-blocked:recoveryManifestMismatch","state":"firing","observedAt":"2026-11-05T01:24:12.335Z","code":"recoveryManifestMismatch","value":1,"owner":"repository-maintainers","runbook":"docs/operations/safe-recovery.md","action":"Keep the recovery target isolated. Check the independent manifest, schema, object payloads, vault and current deletion journal before a new attempt.","notificationStatus":"not_configured"}
+✔ source topology is hash-bound while co-located and legacy backups still require distinct restore targets (105.547225ms)
+✔ REST query uses exact millisecond ISO bounds, immutable production scope and minimal fields (2.511994ms)
+✔ bounded paginated collection retains only fixed route aggregates; duplicate lines do not double-count requests (27.894338ms)
+✔ excluded intervals, truncation, malformed lines and missing outcomes remain insufficient with no empty inference (1.495021ms)
+✔ fresh pending starts and rejected requests are unknown without being mislabeled empty or stale (1.533251ms)
+✔ an unmarked successful completion exposes missing instrumentation even if its start was not collected (2.980857ms)
+✔ no samples and failures expose null ratios and fixed reasons, never upstream secrets (1.37946ms)
+✔ deployment changes, cursor loops and collection budgets fail coverage instead of reporting complete (3.772686ms)
+✔ release identity and exact-SHA checks reject fork/PR/old checks and a newer failed run (43.771404ms)
+✔ artifact, SBOM, source, source-lock and trusted manifest digest stay bound across publication/rollback (34.06619ms)
+✔ published direct runtime versions come from installed package manifests instead of floating ranges (5.460756ms)
+✔ known high vulnerabilities, malformed audit results and expired exceptions prevent release (1.143451ms)
+✔ a transitive finding needs its own via:<package> exception (0.311947ms)
+✔ desktop staging publishes only intended installers and the selected production SBOM graph (13.24179ms)
+✔ the release SBOM skips optional platform packages pnpm did not install, and still fails on any other missing package (1.29675ms)
+✔ third-party actions in workflows and local composite actions use immutable SHA refs (7.356772ms)
+✔ fills sensitive build values from the job and pins the main Git identity (1.46216ms)
+✔ refuses a build with a missing value and names only the variable (0.708531ms)
+✔ reads the commit production serves through the alias (3.150504ms)
+✔ public verification waits through an HTTP error and the previous build before recording the exact build (42.133793ms)
+✔ a different public build cannot pass just because its deployment is READY (1.189063ms)
+✔ invalid responses and network failures stay bounded and never copy response bodies into errors (1.306852ms)
+✔ a moving branch name or invalid budget fails before sending a public request (0.231184ms)
+✔ an exact response arriving after the monotonic verification deadline cannot pass (0.395179ms)
+✔ waits for a GitHub build while Vercel still only serves the older READY source (4.414018ms)
+✔ main advancing while waiting rejects the obsolete source before another workflow or public read (0.718246ms)
+✔ the latest exact Web attempt must succeed; an older success cannot hide its failure or cancellation (1.254854ms)
+✔ a docs-only skipped build or incomplete upload never passes even if public already has that SHA (0.960533ms)
+✔ another repository, branch or workflow cannot stand in for the matching main Web run (1.750742ms)
+✔ a successful Web run with an old public build has a finite monotonic wait (0.955492ms)
+✔ a matching public response after the deadline cannot admit the runtime mutation (0.476998ms)
+✔ the final read-only fence also rejects a main change during public verification (0.625472ms)
+✔ invalid source, missing identity or invalid wait fails without any network request (0.219235ms)
+✔ GitHub errors do not expose response bodies or transport messages (0.58804ms)
+✔ explicit runtime refresh always builds while ordinary docs-only classification is preserved (0.432297ms)
+✔ both release paths use one non-cancelling pending queue, and the Web wait remains outside it (0.88528ms)
+✔ runtime env, build and upload are ordered under the same job with fixed identity and source fences (0.408324ms)
+✔ the actual dispatch comparison only bypasses unchanged-hash optimization when explicitly requested (11.330102ms)
+✔ a docs-only change since the last deployment skips the production build (1.884907ms)
+✔ any code change builds (0.340997ms)
+✔ anything unclear builds (0.297012ms)
+ℹ tests 78
+ℹ suites 0
+ℹ pass 78
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1361.273461

@@ -1,0 +1,1237 @@
+diff --git a/.github/workflows/e2b-official-runtime.yml b/.github/workflows/e2b-official-runtime.yml
+index 6d963d12e..d623fe2d0 100644
+--- a/.github/workflows/e2b-official-runtime.yml
++++ b/.github/workflows/e2b-official-runtime.yml
+@@ -13,8 +13,12 @@ on:
+       - 'packages/config/**'
+       - 'patches/**'
+       - 'scripts/e2b/**'
++      - 'scripts/e2b/publish-template-env.mjs'
+       - 'lib/computer/official-runtime.ts'
+       - '.github/workflows/e2b-official-runtime.yml'
++      - '.github/workflows/web-deploy.yml'
++      - 'scripts/release/web-deploy.mjs'
++      - 'scripts/release/web-deploy.test.mjs'
+       # This issue's acceptance requires a same-application-SHA runtime proof.
+       - '.github/workflows/model-provider-fallback-acceptance.yml'
+       - 'scripts/acceptance/model-provider-fallback.mjs'
+@@ -25,11 +29,19 @@ on:
+   pull_request:
+     paths: *runtime_paths
+   workflow_dispatch:
++    inputs:
++      runtime-refresh:
++        description: Validate and publish even when the configured worker hash matches
++        type: boolean
++        default: false
+ permissions:
+   contents: read
+ concurrency:
+   group: ${{ github.event_name == 'pull_request' && format('e2b-official-runtime-{0}', github.ref) || 'e2b-official-runtime-release' }}
+-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
++  # An old rerun must not replace the latest main's pending runtime validation.
++  # PRs have their own group and only run the offline test job; retain those too.
++  cancel-in-progress: false
++  queue: max
+ jobs:
+   test:
+     runs-on: ubuntu-latest
+@@ -40,11 +52,11 @@ jobs:
+       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+         with:
+           node-version: 24
+-      - run: node --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs
++      - run: node --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs
+       - run: python3 -m py_compile scripts/e2b/validate-official-instances.py
+       - run: bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh
+-  # Same comparison as the historical template workflow. A commit that leaves the
+-  # daemon install and the runtime recipe alone does not validate or redeploy.
++  # Unchanged runtime content skips validation unless its release-control path
++  # changed in this push, or an operator explicitly requested a full refresh.
+   check:
+     needs: test
+     if: github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+@@ -58,10 +70,20 @@ jobs:
+     steps:
+       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+         with:
++          fetch-depth: 0
+           persist-credentials: false
+       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+         with:
+           node-version: 24
++      - name: Refuse an obsolete source before runtime validation
++        run: node scripts/release/web-deploy.mjs main
++        env:
++          GITHUB_TOKEN: ${{ github.token }}
++      - name: Check publication-control changes across this push
++        id: control
++        run: node scripts/release/web-deploy.mjs runtime-refresh
++        env:
++          RUNTIME_REFRESH: ${{ inputs.runtime-refresh }}
+       - name: Read the Vercel team token through Infisical workload identity
+         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+         with:
+@@ -79,7 +101,9 @@ jobs:
+           wanted="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
+           live="$(node scripts/e2b/publish-template-env.mjs --current)"
+           echo "worker hash $wanted; production $live"
+-          if [ "$wanted" = "$live" ]; then echo "changed=false" >> "$GITHUB_OUTPUT"; else echo "changed=true" >> "$GITHUB_OUTPUT"; fi
++          if [ "$RUNTIME_REFRESH" = true ] || [ "$wanted" != "$live" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; else echo "changed=false" >> "$GITHUB_OUTPUT"; fi
++        env:
++          RUNTIME_REFRESH: ${{ steps.control.outputs.refresh }}
+   validate:
+     needs: [test, check]
+     if: needs.check.outputs.changed == 'true'
+@@ -127,13 +151,15 @@ jobs:
+           }
+           appendFileSync(process.env.GITHUB_OUTPUT, `source-sha=${report.workerSha}\ntemplate-models=${JSON.stringify(models)}\n`)
+           JS
+-  publish:
++  # Do not take web-deploy-production here: the matching Web job needs that
++  # queue to finish its GitHub build and upload while this read-only job waits.
++  await-web:
+     needs: validate
+     runs-on: ubuntu-latest
+     timeout-minutes: 45
+     permissions:
+       contents: read
+-      id-token: write
++      actions: read
+     steps:
+       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+         with:
+@@ -141,23 +167,17 @@ jobs:
+       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+         with:
+           node-version: 24
+-      - name: Read the existing Vercel release token
+-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+-        with:
+-          method: oidc
+-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+-          oidc-audience: mikka-infisical
+-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+-          env-slug: prod
+-          secret-path: /platform
+-          secret-name: VERCEL_TEAM_TOKEN
+-          include-imports: false
+-      - name: Publish the verified official runtime pair
+-        run: node scripts/e2b/publish-template-env.mjs
++      - name: Await this source's actual Web build and public version
++        run: node scripts/release/web-deploy.mjs await-web
+         env:
+-          DESKTOP_TEMPLATE_ID: desktop
+-          CLAUDE_TEMPLATE_ID: claude
+-          CODEX_TEMPLATE_ID: codex
+-          SOURCE_SHA: ${{ needs.validate.outputs.source-sha }}
+-          MIKKA_CLOUD_WORKER_SOURCE_COMMIT: ${{ github.sha }}
+-          TEMPLATE_MODELS: ${{ needs.validate.outputs.template-models }}
++          GITHUB_TOKEN: ${{ github.token }}
++  publish:
++    needs: [validate, await-web]
++    permissions:
++      contents: read
++      id-token: write
++    uses: ./.github/workflows/web-deploy.yml
++    with:
++      runtime-refresh: true
++      runtime-worker-sha: ${{ needs.validate.outputs.source-sha }}
++      runtime-template-models: ${{ needs.validate.outputs.template-models }}
+diff --git a/.github/workflows/web-deploy.yml b/.github/workflows/web-deploy.yml
+index 44073bfbe..e97226987 100644
+--- a/.github/workflows/web-deploy.yml
++++ b/.github/workflows/web-deploy.yml
+@@ -7,17 +7,30 @@ on:
+   push:
+     branches: [main]
+   workflow_dispatch:
++  workflow_call:
++    inputs:
++      runtime-refresh:
++        type: boolean
++        default: false
++      runtime-worker-sha:
++        type: string
++        default: ''
++      runtime-template-models:
++        type: string
++        default: '{}'
+ permissions:
+   contents: read
+-concurrency:
+-  # One production upload at a time; a newer push waits and replaces any older queued run.
+-  group: web-deploy-production
+-  cancel-in-progress: false
+ jobs:
+   deploy:
+     if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
+     runs-on: ubuntu-latest
+     timeout-minutes: 45
++    concurrency:
++      # Keep newer main jobs queued even if an older runtime validation finishes
++      # later. Queue order is not commit order; the main guards reject stale jobs.
++      group: web-deploy-production
++      cancel-in-progress: false
++      queue: max
+     permissions:
+       contents: read
+       id-token: write
+@@ -39,6 +52,10 @@ jobs:
+       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+         with:
+           node-version: 24
++      - name: Refuse an obsolete source before release work
++        run: node scripts/release/web-deploy.mjs main
++        env:
++          GITHUB_TOKEN: ${{ github.token }}
+       - name: Read the Vercel deploy token
+         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+         with:
+@@ -55,6 +72,30 @@ jobs:
+         run: node scripts/release/web-deploy.mjs skip
+         env:
+           VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
++          RUNTIME_REFRESH: ${{ inputs.runtime-refresh }}
++      - name: Read the existing Vercel runtime release token
++        if: inputs.runtime-refresh == true
++        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
++        with:
++          method: oidc
++          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
++          oidc-audience: mikka-infisical
++          project-id: 89850d6a-f020-4936-863e-df77380dfe40
++          env-slug: prod
++          secret-path: /platform
++          secret-name: VERCEL_TEAM_TOKEN
++          include-imports: false
++      - name: Publish the verified official runtime pair inside the deployment queue
++        if: inputs.runtime-refresh == true
++        run: node scripts/e2b/publish-template-env.mjs
++        env:
++          GITHUB_TOKEN: ${{ github.token }}
++          DESKTOP_TEMPLATE_ID: desktop
++          CLAUDE_TEMPLATE_ID: claude
++          CODEX_TEMPLATE_ID: codex
++          SOURCE_SHA: ${{ inputs.runtime-worker-sha }}
++          MIKKA_CLOUD_WORKER_SOURCE_COMMIT: ${{ github.sha }}
++          TEMPLATE_MODELS: ${{ inputs.runtime-template-models }}
+       # `vercel pull` returns Vercel's sensitive values empty. prod:/vercel is the
+       # Infisical source Vercel production is synced from; the next step fills only
+       # keys production defines and Vercel withheld. Runtime still reads Vercel's copy.
+@@ -88,6 +129,7 @@ jobs:
+       - name: Upload the prebuilt output to production
+         if: steps.skip.outputs.skip != 'true'
+         run: |
++          node scripts/release/web-deploy.mjs main
+           message="$(git log -1 --format=%s "$GITHUB_SHA")"
+           url="$(npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --archive=tgz --token "$VERCEL_TOKEN" \
+             --meta githubDeployment=1 --meta githubOrg=alexj11324 --meta githubRepo=Mikka \
+@@ -97,6 +139,7 @@ jobs:
+           echo "### Production deployment" >> "$GITHUB_STEP_SUMMARY"
+           echo "$url (commit $GITHUB_SHA)" >> "$GITHUB_STEP_SUMMARY"
+         env:
++          GITHUB_TOKEN: ${{ github.token }}
+           VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
+       - name: Verify the public production version before releasing the deployment queue
+         if: steps.skip.outputs.skip != 'true'
+diff --git a/docs/operations/web-deploy.md b/docs/operations/web-deploy.md
+index 8292731d1..80ada4817 100644
+--- a/docs/operations/web-deploy.md
++++ b/docs/operations/web-deploy.md
+@@ -7,11 +7,17 @@ times a day. Vercel still hosts the deployment and serves `app.aspectlylabs.com`
+ 
+ ## Flow
+ 
+-`.github/workflows/web-deploy.yml` runs on every push to `main` and on manual
+-dispatch. Runs are serialized: a newer push waits for the running upload and
+-replaces any older queued run.
++`.github/workflows/web-deploy.yml` runs on every push to `main`, on manual
++dispatch, and as the reusable build for a verified official runtime refresh.
++Its deploy job holds `web-deploy-production` through environment publication,
++build, upload and public-version verification. `queue: max` retains pending
++jobs instead of allowing a late old runtime refresh to replace a queued new
++main deploy. The queue orders jobs by when they start waiting, not by commit
++order; source guards reject jobs whose full SHA is no longer current `main`.
++See [GitHub's concurrency contract](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
+ 
+-1. **Token.** Reads `VERCEL_DEPLOY_TOKEN` from Infisical `prod:/platform`
++1. **Source and token.** Checks the current `main` SHA before release work,
++   then reads `VERCEL_DEPLOY_TOKEN` from Infisical `prod:/platform`
+    through the existing GitHub OIDC identity. This is a dedicated Mikka-team
+    token, so it can be rotated without touching `VERCEL_TOKEN` or
+    `VERCEL_TEAM_TOKEN`. It expires on 2027-02-02.
+@@ -32,9 +38,12 @@ replaces any older queued run.
+ 4. **Build.** Runs `vercel build --prod`, which is the same `pnpm build` as
+    before, ending with typecheck and then migrations against the production
+    database.
+-5. **Deploy.** Runs `vercel deploy --prebuilt --prod`. The Git metadata (org,
++5. **Deploy.** Rechecks current `main` immediately before
++   `vercel deploy --prebuilt --prod`. The Git metadata (org,
+    repo, ref, SHA) lets the device gateway release
+    (`docs/operations/device-gateway-release.md`) identify the serving commit.
++6. **Verify.** Before releasing the queue, requires the unauthenticated public
++   `/mikka/api/version` response's `build` to equal the complete commit SHA.
+ 
+ The deployment's runtime environment comes from the Vercel project as before.
+ The workflow uploads build output only.
+@@ -42,6 +51,58 @@ The workflow uploads build output only.
+ `vercel.json` keeps `git.deploymentEnabled.main` off, so Vercel does not also
+ build each push.
+ 
++## Official runtime configuration
++
++The official runtime workflow keeps its existing disposable-instance validation,
++worker hash, measured model catalogue and unchanged-file proofs. After validation,
++a read-only job waits up to 40 minutes for the same source's latest Web run to
++succeed, including its actual build/upload/version steps, and for the public
++version to match. A docs-only skipped build cannot satisfy this gate. If `main`
++advances, the old release stops. This wait is outside the shared deployment queue
++so it cannot block the Web job it is waiting for.
++
++Changes to the two release workflows, `scripts/release/web-deploy.mjs` or
++`scripts/e2b/publish-template-env.mjs` also require the full runtime validation
++and reusable publication, even when the worker hash is unchanged. The check
++compares the actual complete push (`github.event.before` to `github.sha`) with
++full history; missing or invalid endpoints fail instead of counting as unchanged.
++These four paths are all in the runtime workflow's push filter. Documentation
++and test-only changes do not force paid instance validation.
++
++The E2B caller itself also uses a distinct `queue: max` group, so an old rerun
++cannot discard a newer main's pending validation before it reaches Web deploy.
++The check rejects obsolete main jobs before reading release credentials or
++starting instance validation. PRs keep their separate group and only run offline
++tests; retaining their pending runs replaces the previous cancellation behavior
++at the cost of possibly running an obsolete, short offline test job.
++
++The runtime workflow then calls `web-deploy.yml` at its own commit with
++`runtime-refresh: true`. Inside the shared deploy job, the original Infisical
++identity reads the existing `VERCEL_TEAM_TOKEN`. The publisher verifies current
++`main`, the production alias and public version, reads the six runtime values,
++checks `main` again, and submits at most one environment upsert followed by exact
++readback. The ordinary GitHub build and prebuilt upload follow in that same job.
++The publisher does not create a Vercel deployment or request a source rebuild.
++
++If env publication succeeds but the later build fails, use Actions' **Re-run
++failed jobs** on that runtime run while its source is still current `main`. It
++reuses the successful validation outputs. The explicit runtime refresh builds
++even when the env values already match; it also bypasses the docs-only skip.
++An uncertain environment POST is never automatically retried. A failed-job rerun
++reads back before deciding whether one new upsert is needed. Re-running the
++entire runtime workflow with the default inputs is different: its initial
++worker-hash comparison can skip validation/publication when the env hash already
++matches. For a full refresh or a release-pipeline acceptance, manually dispatch
++**E2B official instance runtime** on current `main` with `runtime-refresh: true`
++after its Web run and public version match. That explicit option only bypasses
++the unchanged-hash optimization; it runs the official-instance validation again
++and preserves all source, measured-model, queue and readback checks. It defaults
++to false, so ordinary unchanged pushes keep their existing skip behavior.
++
++The source fences and queue protect application upload order; they do not make
++the Git ref and Vercel environment one atomic transaction. A newer push during
++the build prevents the obsolete upload. Its normal main release proceeds next.
++
+ ## Logs are public
+ 
+ Actions logs on this repository are public. Infisical values are masked by the
+@@ -50,9 +111,7 @@ environment or `.vercel/.env.production.local`.
+ 
+ ## Rollback
+ 
+-There are two ways back:
+-
+-- **Promote an earlier deployment.** In Vercel, promote an earlier production
+-  deployment (instant rollback). No build is needed.
+-- **Return to Vercel building main.** Set `git.deploymentEnabled.main` back to
+-  `true` in `vercel.json` and disable this workflow in the same PR.
++Fix forward in a new PR, or revert through a PR. The resulting `main` commit
++uses the same GitHub build, prebuilt upload and public-version verification.
++Do not restore Vercel source builds, delete deployments or revoke shared tokens
++as a recovery step.
+diff --git a/scripts/e2b/publish-template-env.mjs b/scripts/e2b/publish-template-env.mjs
+index 869e95ada..d04390cff 100644
+--- a/scripts/e2b/publish-template-env.mjs
++++ b/scripts/e2b/publish-template-env.mjs
+@@ -1,12 +1,16 @@
+-// Points production at freshly built, public E2B templates, then redeploys production.
++// Publishes the verified official runtime configuration inside Web deploy's
++// production queue. The caller then builds on GitHub and uploads --prebuilt;
++// this module never requests a Vercel source build.
+ // Inputs: DESKTOP_TEMPLATE_ID, CLAUDE_TEMPLATE_ID, CODEX_TEMPLATE_ID and SOURCE_SHA (the worker hash,
+-// workerSha from build-template.py --public --json), VERCEL_TEAM_TOKEN. With --current it only prints
++// workerSha from build-template.py --public --json), the full source commit,
++// GITHUB_TOKEN and VERCEL_TEAM_TOKEN. With --current it only prints
+ // production's MIKKA_CLOUD_WORKER_SHA (empty when unset). All variables go in one request, so production
+ // never holds a template from one build and a SHA from another (decision 2026-11-01-2335).
++import { assertCurrentMain, assertProductionSource } from '../release/web-deploy.mjs'
++
+ const API = 'https://api.vercel.com'
+ export const PROJECT = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
+ export const TEAM = 'team_C7lwxVVvnUicFli6112mvxpv'
+-const IN_FLIGHT = new Set(['QUEUED', 'INITIALIZING', 'BUILDING'])
+ 
+ const fail = (code) => { throw new Error(code) }
+ 
+@@ -14,11 +18,14 @@ export async function api(path, { token, method = 'GET', body, fetchImpl = fetch
+   const url = new URL(path, API)
+   if (url.origin !== API) fail('api_origin_invalid')
+   url.searchParams.set('teamId', TEAM)
+-  const response = await fetchImpl(url, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+-    ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(30_000), redirect: 'error' })
++  let response
++  try {
++    response = await fetchImpl(url, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
++      ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(30_000), redirect: 'error' })
++  } catch { fail(`vercel_api_unavailable ${method} ${url.pathname}`) }
+   // The status only: response bodies are not echoed into CI logs.
+   if (!response.ok) fail(`vercel_api_http_${response.status} ${method} ${url.pathname}`)
+-  return response.json()
++  try { return await response.json() } catch { fail(`vercel_api_invalid_response ${method} ${url.pathname}`) }
+ }
+ 
+ /** Which variable names each template: the bot's computer, and a task machine per harness. */
+@@ -53,16 +60,14 @@ export async function currentWorkerSha({ token, fetchImpl = fetch }) {
+   return /^[0-9a-f]{40}$/.test(value ?? '') ? value : ''
+ }
+ 
+-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+-
+-export async function publish({ token, templates, sourceSha, sourceCommit, models, fetchImpl = fetch, wait = sleep, log = console.log, maxPolls = 120 }) {
++export async function publish({ token, githubToken, templates, sourceSha, sourceCommit, models, fetchImpl = fetch, log = console.log }) {
+   if (!token) fail('vercel_token_unavailable')
+-  if (sourceCommit !== undefined) {
+-    if (!/^[0-9a-f]{40}$/.test(sourceCommit)) fail('official_source_commit_invalid')
+-    for (const kind of Object.keys(TEMPLATE_ENV)) if (templates?.[kind] !== kind) fail(`official_template_invalid ${kind}`)
+-  }
++  if (!/^[0-9a-f]{40}$/.test(sourceCommit ?? '')) fail('official_source_commit_invalid')
++  for (const kind of Object.keys(TEMPLATE_ENV)) if (templates?.[kind] !== kind) fail(`official_template_invalid ${kind}`)
+   const env = pairEnv({ templates, sourceSha, models })
+-  if (sourceCommit) env.push({ key: 'MIKKA_CLOUD_WORKER_SOURCE_COMMIT', value: sourceCommit, type: 'plain', target: ['production'] })
++  env.push({ key: 'MIKKA_CLOUD_WORKER_SOURCE_COMMIT', value: sourceCommit, type: 'plain', target: ['production'] })
++  await assertCurrentMain({ expectedBuild: sourceCommit, token: githubToken, fetchImpl })
++  await assertProductionSource({ expectedBuild: sourceCommit, token, fetchImpl })
+   const call = (path, options = {}) => api(path, { token, fetchImpl, ...options })
+   const listedNow = await call(`/v10/projects/${PROJECT}/env`)
+   const unchanged = []
+@@ -71,31 +76,13 @@ export async function publish({ token, templates, sourceSha, sourceCommit, model
+     const value = row ? (await call(`/v1/projects/${PROJECT}/env/${encodeURIComponent(row.id)}`)).value : undefined
+     unchanged.push(value === want.value)
+   }
+-  // Same templates, worker hash and catalogue: the git deploy is the only production build.
+-  if (unchanged.every(Boolean)) {
+-    log('production env unchanged; skip redeploy')
+-    return { skipped: true }
+-  }
+-
+-  // A production build already running (e.g. the git deploy of this same push) started with the old
+-  // pair. Let it finish and identify the exact source before changing configuration.
+-  // A missing/failed matching application must not leave production env pointing at another worker.
+-  let latest
+-  for (let poll = 0; ; poll++) {
+-    const { deployments = [] } = await call(`/v6/deployments?projectId=${PROJECT}&target=production&limit=20`)
+-    if (!deployments.some((item) => IN_FLIGHT.has(item.state ?? item.readyState))) {
+-      latest = deployments.find((item) => (item.state ?? item.readyState) === 'READY')
+-      break
+-    }
+-    if (poll >= maxPolls) fail('production_build_still_running')
+-    await wait(10_000)
+-  }
+-  if (!latest) fail('no_ready_production_deployment')
+-  // Never search past a newer READY application to redeploy an older matching
+-  // commit: another main release may have completed while instances validated.
+-  if (sourceCommit && latest.meta?.githubCommitSha !== sourceCommit) fail('production_source_changed')
+-
+-  await call(`/v10/projects/${PROJECT}/env?upsert=true`, { method: 'POST', body: env })
++  // Environment reads can span a new main push. Recheck at the write boundary,
++  // including no-op refreshes, which must not rebuild an obsolete application.
++  await assertCurrentMain({ expectedBuild: sourceCommit, token: githubToken, fetchImpl })
++  const changed = !unchanged.every(Boolean)
++  // An uncertain POST is not retried. The next explicit failed-job rerun reads
++  // back first; whether or not this write took, Web deploy still rebuilds.
++  if (changed) await call(`/v10/projects/${PROJECT}/env?upsert=true`, { method: 'POST', body: env })
+   const listed = await call(`/v10/projects/${PROJECT}/env`)
+   for (const want of env) {
+     const row = (listed.envs ?? []).find((item) => item.key === want.key && item.target?.includes('production') && !item.gitBranch)
+@@ -103,29 +90,15 @@ export async function publish({ token, templates, sourceSha, sourceCommit, model
+     const read = await call(`/v1/projects/${PROJECT}/env/${encodeURIComponent(row.id)}`)
+     if (read.value !== want.value) fail(`env_not_updated ${want.key}`)
+   }
+-  log(`production env: ${env.map((item) => `${item.key}=${item.value}`).join(' ')}`)
+-
+-  const created = await call('/v13/deployments?forceNew=1', { method: 'POST',
+-    body: { name: latest.name, deploymentId: latest.uid ?? latest.id, target: 'production' } })
+-  log(`redeploy: ${created.id} from ${latest.uid ?? latest.id}`)
+-  for (let poll = 0; ; poll++) {
+-    const deployment = await call(`/v13/deployments/${encodeURIComponent(created.id)}`)
+-    const state = deployment.readyState
+-    if (state === 'READY') {
+-      if (sourceCommit && deployment.meta?.githubCommitSha !== sourceCommit) fail('redeploy_source_commit_mismatch')
+-      return { deploymentId: created.id }
+-    }
+-    if (state === 'ERROR' || state === 'CANCELED') fail(`redeploy_${state.toLowerCase()}`)
+-    if (poll >= maxPolls) fail('redeploy_timeout')
+-    await wait(10_000)
+-  }
++  log(`production runtime env ${changed ? 'updated' : 'unchanged'} and verified; GitHub Web build required`)
++  return { changed, requiresWebBuild: true, sourceCommit, workerSha: sourceSha }
+ }
+ 
+ if (import.meta.url === `file://${process.argv[1]}` && process.argv.includes('--current')) {
+   console.log(await currentWorkerSha({ token: process.env.VERCEL_TEAM_TOKEN }))
+ } else if (import.meta.url === `file://${process.argv[1]}`) {
+   const templates = { desktop: process.env.DESKTOP_TEMPLATE_ID, claude: process.env.CLAUDE_TEMPLATE_ID, codex: process.env.CODEX_TEMPLATE_ID }
+-  const result = await publish({ token: process.env.VERCEL_TEAM_TOKEN, templates, sourceSha: process.env.SOURCE_SHA,
++  const result = await publish({ token: process.env.VERCEL_TEAM_TOKEN, githubToken: process.env.GITHUB_TOKEN, templates, sourceSha: process.env.SOURCE_SHA,
+     sourceCommit: process.env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT, models: JSON.parse(process.env.TEMPLATE_MODELS ?? '{}') })
+-  console.log(`production deployment ready: ${result.deploymentId}`)
++  console.log(JSON.stringify({ event: 'official_runtime_env_verified', ...result }))
+ }
+diff --git a/scripts/e2b/publish-template-env.test.mjs b/scripts/e2b/publish-template-env.test.mjs
+index 96768472c..aa17e3a56 100644
+--- a/scripts/e2b/publish-template-env.test.mjs
++++ b/scripts/e2b/publish-template-env.test.mjs
+@@ -1,135 +1,203 @@
+ import assert from 'node:assert/strict'
+ import test from 'node:test'
+-import { currentWorkerSha, pairEnv, publish } from './publish-template-env.mjs'
+-
+-const SHA = 'a'.repeat(40)
++import { readFileSync } from 'node:fs'
++import { currentWorkerSha, pairEnv, publish, PROJECT, TEAM } from './publish-template-env.mjs'
++import * as webRelease from '../release/web-deploy.mjs'
+ 
++const SHA = 'a'.repeat(40), COMMIT = 'b'.repeat(40), OTHER = 'c'.repeat(40)
+ const report = harness => ({ harness, installed: true, version: null, models: ['fixture-model'] })
+ const MODELS = { desktop: [report('claude_code'), report('codex')], claude: [report('claude_code')], codex: [report('codex')] }
+-const TEMPLATES = { desktop: 'tpl1', claude: 'tpl2', codex: 'tpl3' }
+-const CATALOGUE = JSON.stringify({ version: 1, workerSha: SHA, templates: Object.fromEntries(Object.keys(TEMPLATES).map(kind => [kind, { templateId: TEMPLATES[kind], models: MODELS[kind] }])) })
+-const STORED = { MIKKA_CLOUD_TEMPLATE_MODELS: CATALOGUE, E2B_BYO_COMPUTER_TEMPLATE: 'tpl1', E2B_CLAUDE_TEMPLATE: 'tpl2', E2B_CODEX_TEMPLATE: 'tpl3', MIKKA_CLOUD_WORKER_SHA: SHA }
+-
+-function fakeVercel({ inFlight = 0, stored = STORED, before, redeploy = 'READY', commit, newerCommit } = {}) {
+-  const calls = []
+-  let listings = 0
+-  let wrote = false
+-  const fetchImpl = async (url, init) => {
+-    const path = url.pathname, method = init.method
+-    calls.push({ method, path, search: url.search, body: init.body && JSON.parse(init.body) })
+-    const json = (body) => ({ ok: true, status: 200, json: async () => body })
+-    const source = wrote || !before ? stored : before
+-    if (method === 'POST' && path.endsWith('/env')) { wrote = true; return json({ created: [] }) }
+-    if (path.endsWith('/env')) return json({ envs: Object.keys({ ...stored, ...source }).map((key) => ({ id: `id-${key}`, key, target: ['production'] })) })
+-    if (path.includes('/env/id-')) return json({ value: source[path.split('/env/id-')[1]] })
+-    if (path === '/v6/deployments') return json({ deployments: [
+-      ...(listings++ < inFlight ? [{ uid: 'dpl_new', name: 'mikka', state: 'BUILDING' }] : []),
+-      ...(newerCommit ? [{ uid: 'dpl_newer', name: 'mikka', state: 'READY', meta: { githubCommitSha: newerCommit } }] : []),
+-      { uid: 'dpl_live', name: 'mikka', state: 'READY', meta: { githubCommitSha: commit } }] })
+-    if (method === 'POST' && path === '/v13/deployments') return json({ id: 'dpl_redeploy' })
+-    if (path === '/v13/deployments/dpl_redeploy') return json({ readyState: redeploy, meta: { githubCommitSha: commit } })
+-    return { ok: false, status: 404, json: async () => ({}) }
++const TEMPLATES = { desktop: 'desktop', claude: 'claude', codex: 'codex' }
++const STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: SHA, models: MODELS }).map(row => [row.key, row.value]))
++STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = COMMIT
++
++function fixture(options = {}) {
++  const calls = [], logs = [], stored = options.stored ?? STORED
++  let wrote = false, mainReads = 0, uncertain = options.uncertainPost === true
++  const fetchImpl = async (input, init = {}) => {
++    const url = new URL(input), method = init.method ?? 'GET'
++    calls.push({ origin: url.origin, method, path: url.pathname, search: url.search, body: init.body && JSON.parse(init.body) })
++    if (url.origin === 'https://api.github.com') {
++      assert.equal(method, 'GET')
++      assert.equal(init.headers.authorization, 'Bearer github-read-fixture')
++      mainReads++
++      return Response.json({ object: { type: 'commit', sha: mainReads > 1 ? options.afterReadsMain ?? options.currentMain ?? COMMIT : options.currentMain ?? COMMIT } })
++    }
++    if (url.origin === 'https://app.aspectlylabs.com') {
++      assert.equal(init.headers.authorization, undefined)
++      return Response.json({ build: options.publicBuild ?? COMMIT })
++    }
++    assert.equal(url.origin, 'https://api.vercel.com')
++    assert.equal(url.searchParams.get('teamId'), TEAM)
++    assert.equal(init.headers.authorization, 'Bearer vercel-fixture')
++    if (url.pathname.startsWith('/v4/aliases/')) {
++      assert.equal(url.searchParams.get('projectId'), PROJECT)
++      return Response.json({ deploymentId: 'dpl_live' })
++    }
++    if (url.pathname === '/v13/deployments/dpl_live') return Response.json({ meta: { githubCommitSha: options.aliasBuild ?? COMMIT } })
++    if (method === 'POST' && url.pathname.endsWith('/env')) {
++      wrote = true
++      if (uncertain) { uncertain = false; throw Error('fixture response lost after mutation') }
++      if (options.postStatus) return new Response('private-response-marker', { status: options.postStatus })
++      return Response.json({ created: [] })
++    }
++    const source = wrote || options.unchanged ? stored : options.before ?? { ...stored, MIKKA_CLOUD_WORKER_SHA: OTHER }
++    if (url.pathname.endsWith('/env')) return Response.json({ envs: Object.keys(stored).flatMap(key => [
++      { id: `preview-${key}`, key, target: ['preview'] },
++      { id: `branch-${key}`, key, target: ['production'], gitBranch: 'other' },
++      { id: `id-${key}`, key, target: ['production'] },
++    ]) })
++    if (url.pathname.includes('/env/id-')) return Response.json({ value: source[url.pathname.split('/env/id-')[1]] })
++    assert.fail(`unexpected release request ${method} ${url.pathname}`)
+   }
+-  return { fetchImpl, calls }
++  const run = extra => publish({ token: 'vercel-fixture', githubToken: 'github-read-fixture', templates: TEMPLATES,
++    sourceSha: SHA, sourceCommit: COMMIT, models: MODELS, fetchImpl, log: message => logs.push(message), ...extra })
++  return { calls, logs, fetchImpl, run }
+ }
+ 
+-const run = (fake, extra = {}) => publish({ token: 't', templates: TEMPLATES, sourceSha: SHA, models: MODELS, fetchImpl: fake.fetchImpl, wait: async () => {}, log: () => {}, ...extra })
+-
+-test('every template and the worker hash go to production in one upsert, then production is redeployed', async () => {
+-  const fake = fakeVercel({ before: { ...STORED, MIKKA_CLOUD_WORKER_SHA: 'b'.repeat(40) } })
+-  assert.deepEqual(await run(fake), { deploymentId: 'dpl_redeploy' })
+-  const writes = fake.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/env'))
++test('official templates, worker, source and measured capabilities go to production in one verified upsert', async () => {
++  const fake = fixture()
++  assert.deepEqual(await fake.run(), { changed: true, requiresWebBuild: true, sourceCommit: COMMIT, workerSha: SHA })
++  const writes = fake.calls.filter(call => call.method === 'POST')
+   assert.equal(writes.length, 1)
++  assert.equal(writes[0].path, `/v10/projects/${PROJECT}/env`)
+   assert.match(writes[0].search, /upsert=true/)
+-  assert.deepEqual(writes[0].body.map((e) => [e.key, e.value, e.target]), [
+-    ['E2B_BYO_COMPUTER_TEMPLATE', 'tpl1', ['production']], ['E2B_CLAUDE_TEMPLATE', 'tpl2', ['production']],
+-    ['E2B_CODEX_TEMPLATE', 'tpl3', ['production']], ['MIKKA_CLOUD_WORKER_SHA', SHA, ['production']], ['MIKKA_CLOUD_TEMPLATE_MODELS', CATALOGUE, ['production']]])
+-  const redeploy = fake.calls.find((c) => c.method === 'POST' && c.path === '/v13/deployments')
+-  assert.deepEqual(redeploy.body, { name: 'mikka', deploymentId: 'dpl_live', target: 'production' })
++  assert.deepEqual(writes[0].body.map(row => [row.key, row.value, row.target]), Object.entries(STORED).map(([key, value]) => [key, value, ['production']]))
++  assert.equal(fake.calls.filter(call => call.path.includes('/env/id-')).length, 12, 'read each exact production value before and after the write')
++  assert.doesNotMatch(fake.logs.join('\n'), /fixture-model|vercel-fixture|github-read-fixture/)
+ })
+ 
+-test('waits for a production build already running before redeploying', async () => {
+-  const fake = fakeVercel({ inFlight: 2, before: { ...STORED, MIKKA_CLOUD_WORKER_SHA: 'b'.repeat(40) } })
+-  await run(fake)
+-  assert.equal(fake.calls.filter((c) => c.path === '/v6/deployments').length, 3)
++test('runtime configuration never asks Vercel to rebuild source; the caller must use Web deploy', async () => {
++  const fake = fixture()
++  await fake.run()
++  assert.equal(fake.calls.filter(call => call.method === 'POST' && call.path === '/v13/deployments').length, 0)
++  assert.equal(fake.calls.filter(call => call.method === 'POST' && call.path.endsWith('/env')).length, 1)
+ })
+ 
+-test('stops before redeploying when the env did not take', async () => {
+-  const fake = fakeVercel({ stored: { ...STORED, E2B_CODEX_TEMPLATE: 'old' } })
+-  await assert.rejects(run(fake), /env_not_updated E2B_CODEX_TEMPLATE/)
+-  assert.ok(!fake.calls.some((c) => c.path === '/v13/deployments'))
++test('an explicit refresh still requires a Web build after an earlier env write succeeded', async () => {
++  const fake = fixture({ unchanged: true })
++  assert.deepEqual(await fake.run(), { changed: false, requiresWebBuild: true, sourceCommit: COMMIT, workerSha: SHA })
++  assert.equal(fake.calls.filter(call => call.method === 'POST').length, 0)
+ })
+ 
+-test('a failed redeploy fails the run', async () => {
+-  await assert.rejects(run(fakeVercel({ redeploy: 'ERROR', before: { ...STORED, MIKKA_CLOUD_WORKER_SHA: 'b'.repeat(40) } })), /redeploy_error/)
++test('a readback mismatch fails before the caller can build', async () => {
++  const fake = fixture({ stored: { ...STORED, E2B_CODEX_TEMPLATE: 'old' } })
++  await assert.rejects(fake.run(), /env_not_updated E2B_CODEX_TEMPLATE/)
++  assert.equal(fake.calls.filter(call => call.method === 'POST').length, 1)
+ })
+ 
+-test('an unchanged production env skips the write and the redeploy', async () => {
+-  const fake = fakeVercel()
+-  assert.deepEqual(await run(fake), { skipped: true })
+-  assert.equal(fake.calls.filter((call) => call.method === 'POST').length, 0)
++test('an uncertain mutation is never retried; an explicit rerun reads it and still requires a build', async () => {
++  const fake = fixture({ uncertainPost: true })
++  await assert.rejects(fake.run(), error => {
++    assert.match(error.message, /vercel_api_unavailable POST/)
++    assert.doesNotMatch(error.message, /fixture response lost after mutation/)
++    return true
++  })
++  assert.equal(fake.calls.filter(call => call.method === 'POST').length, 1)
++  assert.equal((await fake.run()).requiresWebBuild, true)
++  assert.equal(fake.calls.filter(call => call.method === 'POST').length, 1)
+ })
+ 
+-test('refuses a short SHA, an odd or a missing template id before any write', () => {
+-  assert.throws(() => pairEnv({ templates: TEMPLATES, sourceSha: 'abc1234' }), /source_sha_invalid/)
+-  assert.throws(() => pairEnv({ templates: { ...TEMPLATES, claude: 'a/b' }, sourceSha: SHA }), /template_id_invalid claude/)
+-  assert.throws(() => pairEnv({ templates: { desktop: 'tpl1', claude: 'tpl2' }, sourceSha: SHA }), /template_id_invalid codex/)
++test('an HTTP mutation error has one attempt and never exposes the response body', async () => {
++  const fake = fixture({ postStatus: 503 })
++  await assert.rejects(fake.run(), error => {
++    assert.match(error.message, /vercel_api_http_503 POST/)
++    assert.doesNotMatch(error.message, /private-response-marker/)
++    return true
++  })
++  assert.equal(fake.calls.filter(call => call.method === 'POST').length, 1)
+ })
+ 
+-test('reads production\'s current worker hash, empty when unset', async () => {
+-  assert.equal(await currentWorkerSha({ token: 't', fetchImpl: fakeVercel().fetchImpl }), SHA)
+-  assert.equal(await currentWorkerSha({ token: 't', fetchImpl: fakeVercel({ stored: {} }).fetchImpl }), '')
++test('main advancing during configuration reads prevents the single env mutation', async () => {
++  const fake = fixture({ afterReadsMain: OTHER })
++  await assert.rejects(fake.run(), /mainChanged/)
++  assert.equal(fake.calls.filter(call => call.method === 'POST').length, 0)
+ })
+ 
+-test('refuses publishing a template without measured models before any write', () => {
+-  assert.throws(() => pairEnv({ templates: TEMPLATES, sourceSha: SHA }), /template_models_invalid/)
+-  assert.throws(() => pairEnv({ templates: TEMPLATES, sourceSha: SHA, models: { ...MODELS, desktop: [report('codex')] } }), /template_models_missing desktop claude_code/)
++test('obsolete refreshes fail even when their old runtime env already matches', async () => {
++  const fake = fixture({ unchanged: true, currentMain: OTHER })
++  await assert.rejects(fake.run(), /mainChanged/)
++  assert.equal(fake.calls.filter(call => call.origin === 'https://api.vercel.com').length, 0)
+ })
+ 
+-test('official runtime publishes source, worker and measured capabilities together, redeploying the exact Git commit', async () => {
+-  const sourceCommit = 'b'.repeat(40), templates = { desktop: 'desktop', claude: 'claude', codex: 'codex' }
+-  const officialEnv = pairEnv({ templates, sourceSha: SHA, models: MODELS })
+-  const stored = Object.fromEntries(officialEnv.map(row => [row.key, row.value]))
+-  stored.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = sourceCommit
+-  const fake = fakeVercel({ stored, before: { ...stored, MIKKA_CLOUD_WORKER_SHA: 'c'.repeat(40) }, commit: sourceCommit })
+-  await run(fake, { templates, sourceCommit })
+-  const writes = fake.calls.filter(row => row.method === 'POST' && row.path.endsWith('/env'))
+-  assert.equal(writes.length, 1)
+-  assert.ok(writes[0].body.some(row => row.key === 'MIKKA_CLOUD_WORKER_SOURCE_COMMIT' && row.value === sourceCommit))
++test('a different serving alias or public version prevents every configuration write', async () => {
++  for (const options of [{ aliasBuild: OTHER }, { publicBuild: OTHER }]) {
++    const fake = fixture(options)
++    await assert.rejects(fake.run(), /production_source_changed/)
++    assert.equal(fake.calls.filter(call => call.method === 'POST').length, 0)
++  }
+ })
+ 
+-test('unchanged official runtime does not redeploy over a newer READY application', async () => {
+-  const sourceCommit = 'b'.repeat(40), templates = { desktop: 'desktop', claude: 'claude', codex: 'codex' }
+-  const stored = Object.fromEntries(pairEnv({ templates, sourceSha: SHA, models: MODELS }).map(row => [row.key, row.value]))
+-  stored.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = sourceCommit
+-  const fake = fakeVercel({ stored, commit: sourceCommit, newerCommit: 'c'.repeat(40) })
+-  assert.deepEqual(await run(fake, { templates, sourceCommit }), { skipped: true })
+-  assert.equal(fake.calls.filter(row => row.method === 'POST').length, 0)
++test('does not search past a newer application for an older matching READY deployment', async () => {
++  const fake = fixture({ aliasBuild: OTHER })
++  await assert.rejects(fake.run(), /production_source_changed/)
++  assert.equal(fake.calls.filter(call => call.path === '/v6/deployments').length, 0)
++  assert.equal(fake.calls.filter(call => call.method === 'POST').length, 0)
+ })
+ 
+-test('official runtime cannot redeploy a READY application from a different commit', async () => {
+-  const sourceCommit = 'b'.repeat(40), templates = { desktop: 'desktop', claude: 'claude', codex: 'codex' }
+-  const stored = Object.fromEntries(pairEnv({ templates, sourceSha: SHA, models: MODELS }).map(row => [row.key, row.value]))
+-  stored.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = sourceCommit
+-  const fake = fakeVercel({ stored, before: { ...stored, MIKKA_CLOUD_WORKER_SHA: 'd'.repeat(40) }, commit: 'c'.repeat(40) })
+-  await assert.rejects(run(fake, { templates, sourceCommit }), /production_source_changed/)
+-  assert.ok(!fake.calls.some(row => row.method === 'POST' && row.path.endsWith('/env')))
+-  assert.ok(!fake.calls.some(row => row.method === 'POST' && row.path === '/v13/deployments'))
++test('refuses missing or short source identities and custom official templates before requests', async () => {
++  for (const extra of [{ sourceCommit: undefined }, { sourceCommit: 'short' }, { templates: { ...TEMPLATES, codex: 'private-old' } }]) {
++    const fake = fixture()
++    await assert.rejects(fake.run(extra), /official_(source_commit|template)_invalid/)
++    assert.equal(fake.calls.length, 0)
++  }
+ })
+ 
+-test('a newer READY main application cannot be replaced by an older matching source', async () => {
+-  const sourceCommit = 'b'.repeat(40), templates = { desktop: 'desktop', claude: 'claude', codex: 'codex' }
+-  const stored = Object.fromEntries(pairEnv({ templates, sourceSha: SHA, models: MODELS }).map(row => [row.key, row.value]))
+-  stored.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = sourceCommit
+-  const fake = fakeVercel({ stored, before: { ...stored, MIKKA_CLOUD_WORKER_SHA: 'd'.repeat(40) }, commit: sourceCommit, newerCommit: 'c'.repeat(40) })
+-  await assert.rejects(run(fake, { templates, sourceCommit }), /production_source_changed/)
+-  assert.equal(fake.calls.filter(row => row.method === 'POST').length, 0, 'keep the newer application and all configuration intact')
++test('pair validation still rejects short worker SHA, odd or missing template IDs and unmeasured harnesses', () => {
++  assert.throws(() => pairEnv({ templates: TEMPLATES, sourceSha: 'abc1234' }), /source_sha_invalid/)
++  assert.throws(() => pairEnv({ templates: { ...TEMPLATES, claude: 'a/b' }, sourceSha: SHA }), /template_id_invalid claude/)
++  assert.throws(() => pairEnv({ templates: { desktop: 'tpl1', claude: 'tpl2' }, sourceSha: SHA }), /template_id_invalid codex/)
++  assert.throws(() => pairEnv({ templates: TEMPLATES, sourceSha: SHA }), /template_models_invalid/)
++  assert.throws(() => pairEnv({ templates: TEMPLATES, sourceSha: SHA, models: { ...MODELS, desktop: [report('codex')] } }), /template_models_missing desktop claude_code/)
+ })
+ 
+-test('official runtime refuses custom templates and invalid commits before writing production', async () => {
+-  for (const extra of [{ sourceCommit: 'short' }, { sourceCommit: 'b'.repeat(40) }]) {
+-    const fake = fakeVercel()
+-    await assert.rejects(run(fake, extra), /official_(source_commit|template)_invalid/)
+-    assert.equal(fake.calls.length, 0)
++test('reads only the exact production worker hash and returns empty when unset', async () => {
++  assert.equal(await currentWorkerSha({ token: 'vercel-fixture', fetchImpl: fixture({ unchanged: true }).fetchImpl }), SHA)
++  assert.equal(await currentWorkerSha({ token: 'vercel-fixture', fetchImpl: fixture({ stored: {} }).fetchImpl }), '')
++})
++
++test('GitHub-only build timeline waits for source upload before the single runtime env publication', async () => {
++  let elapsed = 0, wrote = false
++  const calls = []
++  const fetchImpl = async (input, init = {}) => {
++    const url = new URL(input), method = init.method ?? 'GET'
++    calls.push({ origin: url.origin, path: url.pathname, method, at: elapsed })
++    if (url.origin === 'https://api.github.com') {
++      if (url.pathname.endsWith('/git/ref/heads/main')) return Response.json({ object: { type: 'commit', sha: COMMIT } })
++      if (url.pathname.endsWith('/actions/workflows/web-deploy.yml/runs')) return Response.json({ workflow_runs: [{
++        id: 70, run_attempt: 1, head_sha: COMMIT, head_branch: 'main', path: '.github/workflows/web-deploy.yml',
++        repository: { full_name: 'alexj11324/Mikka' }, head_repository: { full_name: 'alexj11324/Mikka' }, event: 'push',
++        status: elapsed < 200 ? 'in_progress' : 'completed', conclusion: elapsed < 200 ? null : 'success',
++      }] })
++      assert.equal(url.pathname, '/repos/alexj11324/Mikka/actions/runs/70/attempts/1/jobs')
++      return Response.json({ total_count: 1, jobs: [{ name: 'deploy', head_sha: COMMIT, status: 'completed', conclusion: 'success',
++        steps: ['Build (runs migrations last, as the Vercel build did)', 'Upload the prebuilt output to production',
++          'Verify the public production version before releasing the deployment queue'].map(name => ({ name, status: 'completed', conclusion: 'success' })),
++      }] })
++    }
++    if (url.origin === 'https://app.aspectlylabs.com') return Response.json({ build: elapsed < 300 ? OTHER : COMMIT })
++    assert.equal(url.origin, 'https://api.vercel.com')
++    if (method === 'POST' && url.pathname.endsWith('/env')) { wrote = true; return Response.json({ created: [] }) }
++    const values = wrote ? STORED : { ...STORED, MIKKA_CLOUD_WORKER_SHA: OTHER }
++    if (url.pathname.endsWith('/env')) return Response.json({ envs: Object.keys(values).map(key => ({ id: `id-${key}`, key, target: ['production'] })) })
++    if (url.pathname.includes('/env/id-')) return Response.json({ value: values[url.pathname.split('/env/id-')[1]] })
++    // Reproduce the observed gap: while GitHub is building there is NO Vercel
++    // in-flight deployment, only the previous READY application. The legacy
++    // orchestration fails production_source_changed here without waiting.
++    if (url.pathname === '/v6/deployments') return Response.json({ deployments: [{ uid: 'dpl_live', name: 'mikka', state: 'READY',
++      meta: { githubCommitSha: elapsed < 300 ? OTHER : COMMIT } }] })
++    if (url.pathname.startsWith('/v4/aliases/')) return Response.json({ deploymentId: 'dpl_live' })
++    if (url.pathname === '/v13/deployments/dpl_live') return Response.json({ meta: { githubCommitSha: elapsed < 300 ? OTHER : COMMIT } })
++    assert.fail(`unexpected publication ${method} ${url.pathname}`)
+   }
++  // Run the same fixture with either checkout's actual orchestration. The
++  // workflow contract test separately requires the new lock-free await step.
++  const workflow = readFileSync(new URL('../../.github/workflows/e2b-official-runtime.yml', import.meta.url), 'utf8')
++  if (workflow.includes('\n  await-web:')) await webRelease.waitForWebDeployment({ expectedBuild: COMMIT, token: 'github-read-fixture',
++    fetchImpl, now: () => elapsed, wait: async ms => { elapsed += ms }, intervalMs: 100, maxWaitMs: 500 })
++  const result = await publish({ token: 'vercel-fixture', githubToken: 'github-read-fixture', templates: TEMPLATES, sourceSha: SHA,
++    sourceCommit: COMMIT, models: MODELS, fetchImpl, log: () => {}, wait: async ms => { elapsed += ms } })
++  assert.equal(result.requiresWebBuild, true)
++  assert.equal(elapsed, 300)
++  assert.deepEqual(calls.filter(call => call.method === 'POST'), [{ origin: 'https://api.vercel.com', path: `/v10/projects/${PROJECT}/env`, method: 'POST', at: 300 }])
+ })
+diff --git a/scripts/release/web-deploy.mjs b/scripts/release/web-deploy.mjs
+index e0e3fc38a..62a70d931 100644
+--- a/scripts/release/web-deploy.mjs
++++ b/scripts/release/web-deploy.mjs
+@@ -9,6 +9,7 @@
+ import { readFileSync, writeFileSync } from 'node:fs'
+ import { pathToFileURL } from 'node:url'
+ import { setTimeout as sleep } from 'node:timers/promises'
++import { execFileSync } from 'node:child_process'
+ import { shouldSkip } from '../vercel-ignore-build.mjs'
+ 
+ /** Must be non-empty in the final build environment: inlined client keys, the migration targets, the worker build. */
+@@ -18,6 +19,12 @@ export const REQUIRED = ['MIKKA_DATABASE_URL', 'DATABASE_URL', 'NEXT_PUBLIC_POST
+ const LINE = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/
+ const SHA = /^[a-f0-9]{40}$/
+ export const PRODUCTION_VERSION_URL = 'https://app.aspectlylabs.com/mikka/api/version'
++const REPOSITORY = 'alexj11324/Mikka'
++const WEB_WORKFLOW = '.github/workflows/web-deploy.yml'
++const BUILD_STEPS = ['Build (runs migrations last, as the Vercel build did)',
++  'Upload the prebuilt output to production', 'Verify the public production version before releasing the deployment queue']
++export const RUNTIME_RELEASE_PATHS = ['.github/workflows/e2b-official-runtime.yml', '.github/workflows/web-deploy.yml',
++  'scripts/e2b/publish-template-env.mjs', 'scripts/release/web-deploy.mjs']
+ 
+ function parse(text) {
+   const entries = new Map()
+@@ -62,6 +69,113 @@ export async function productionSha({ token, fetchImpl = fetch }) {
+   return SHA.test(sha ?? '') ? sha : ''
+ }
+ 
++async function githubRead(path, { token, fetchImpl, timeoutMs = 20_000 }) {
++  if (!token) throw Error('webDeploy:githubTokenRequired')
++  let response
++  try {
++    response = await fetchImpl(`https://api.github.com/repos/${REPOSITORY}${path}`, {
++      headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
++      signal: AbortSignal.timeout(Math.max(1, Math.ceil(timeoutMs))), redirect: 'error', cache: 'no-store',
++    })
++  } catch { throw Error('webDeploy:githubUnavailable') }
++  if (!response.ok) throw Error(`webDeploy:github:${response.status}`)
++  try { return await response.json() } catch { throw Error('webDeploy:githubInvalidResponse') }
++}
++
++/** A queued older release must never mutate configuration or upload after main advanced. */
++export async function assertCurrentMain({ expectedBuild, token, fetchImpl = fetch, timeoutMs }) {
++  if (!SHA.test(expectedBuild ?? '')) throw Error('webDeploy:commitShaRequired')
++  const ref = await githubRead('/git/ref/heads/main', { token, fetchImpl, timeoutMs })
++  if (ref.object?.type !== 'commit' || !SHA.test(ref.object?.sha ?? '')) throw Error('webDeploy:invalidMainRef')
++  if (ref.object.sha !== expectedBuild) throw Error(`webDeploy:mainChanged:expected=${expectedBuild}:actual=${ref.object.sha}`)
++}
++
++async function publicBuild(fetchImpl, timeoutMs) {
++  try {
++    const response = await fetchImpl(PRODUCTION_VERSION_URL, { cache: 'no-store', headers: { 'cache-control': 'no-cache' },
++      signal: AbortSignal.timeout(Math.max(1, Math.ceil(timeoutMs))), redirect: 'error' })
++    if (!response.ok) { await response.body?.cancel(); return null }
++    const value = await response.json()
++    return SHA.test(value?.build ?? '') ? value.build : null
++  } catch { return null }
++}
++
++/** Called again inside the shared publication queue before touching runtime env. */
++export async function assertProductionSource({ expectedBuild, token, fetchImpl = fetch }) {
++  if (!SHA.test(expectedBuild ?? '')) throw Error('webDeploy:commitShaRequired')
++  if (await productionSha({ token, fetchImpl }) !== expectedBuild || await publicBuild(fetchImpl, 10_000) !== expectedBuild) {
++    throw Error('production_source_changed')
++  }
++}
++
++/** This read-only wait runs OUTSIDE web-deploy-production: GitHub can still be
++ * building while Vercel only knows the previous READY deployment. A successful
++ * docs-only workflow is not a successful application build. */
++export async function waitForWebDeployment({ expectedBuild, token, fetchImpl = fetch, maxWaitMs = 40 * 60_000,
++  intervalMs = 10_000, now = () => performance.now(), wait = sleep }) {
++  if (!SHA.test(expectedBuild ?? '')) throw Error('webDeploy:commitShaRequired')
++  if (!Number.isFinite(maxWaitMs) || maxWaitMs <= 0 || !Number.isFinite(intervalMs) || intervalMs <= 0) throw Error('webDeploy:invalidVerificationWait')
++  const started = now(), remaining = () => maxWaitMs - (now() - started)
++  while (remaining() > 0) {
++    await assertCurrentMain({ expectedBuild, token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
++    if (remaining() <= 0) break
++    const data = await githubRead(`/actions/workflows/web-deploy.yml/runs?head_sha=${expectedBuild}&branch=main&per_page=100`,
++      { token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
++    const runs = (data.workflow_runs ?? []).filter(run => run.head_sha === expectedBuild && run.head_branch === 'main'
++      && run.path === WEB_WORKFLOW && run.repository?.full_name === REPOSITORY && run.head_repository?.full_name === REPOSITORY
++      && ['push', 'workflow_dispatch'].includes(run.event)).sort((a, b) => b.id - a.id)
++    const run = runs[0]
++    if (run?.status === 'completed') {
++      if (run.conclusion !== 'success') throw Error(`webDeploy:matchingWebRunFailed:${run.id}`)
++      if (!Number.isSafeInteger(run.id) || run.id <= 0 || !Number.isSafeInteger(run.run_attempt) || run.run_attempt <= 0) {
++        throw Error('webDeploy:invalidWebRun')
++      }
++      if (remaining() <= 0) break
++      const jobs = await githubRead(`/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`,
++        { token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
++      const builds = (jobs.jobs ?? []).filter(job => job.name === 'deploy' && job.head_sha === expectedBuild)
++      const job = builds[0]
++      if (jobs.total_count !== jobs.jobs?.length || builds.length !== 1 || job.status !== 'completed' || job.conclusion !== 'success'
++        || !BUILD_STEPS.every(name => job.steps?.filter(step => step.name === name && step.status === 'completed' && step.conclusion === 'success').length === 1)) {
++        throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
++      }
++      if (remaining() <= 0) break
++      if (await publicBuild(fetchImpl, Math.min(10_000, remaining())) === expectedBuild && remaining() > 0) {
++        await assertCurrentMain({ expectedBuild, token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
++        if (remaining() > 0) return { sourceCommit: expectedBuild, webRunId: run.id, webAttempt: run.run_attempt,
++          publicBuild: expectedBuild, verifiedAt: new Date().toISOString() }
++      }
++    }
++    if (remaining() > 0) await wait(Math.min(intervalMs, remaining()))
++  }
++  throw Error('webDeploy:matchingWebDeploymentTimedOut')
++}
++
++export async function deploymentPlan({ expectedBuild, runtimeRefresh = false, token, fetchImpl = fetch, classify = shouldSkip }) {
++  if (!SHA.test(expectedBuild ?? '')) throw Error('webDeploy:commitShaRequired')
++  // A prior attempt may have written env and then failed its build. The explicit
++  // refresh reuses the validated runtime pair and must still build that source.
++  if (runtimeRefresh) return { skip: false, reason: 'verified runtime refresh' }
++  const previous = await productionSha({ token, fetchImpl })
++  return classify({ VERCEL_ENV: 'production', VERCEL_GIT_PREVIOUS_SHA: previous, VERCEL_GIT_COMMIT_SHA: expectedBuild })
++}
++
++/** Publication-control edits need their own real release validation even though
++ * they intentionally do not alter the daemon's content hash. Compare the entire
++ * push, never just HEAD's parent. Missing history is an error, not "unchanged". */
++export function runtimeRefreshRequired({ expectedBuild, eventName, event, explicit = false }, diff = (before, after) =>
++  execFileSync('git', ['diff', '--name-only', '--no-renames', before, after, '--', ...RUNTIME_RELEASE_PATHS], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim().split('\n').filter(Boolean)) {
++  if (!SHA.test(expectedBuild ?? '')) throw Error('webDeploy:commitShaRequired')
++  if (eventName !== 'push') return eventName === 'workflow_dispatch' && explicit === true
++  if (!SHA.test(event?.before ?? '') || /^0+$/.test(event.before) || event.after !== expectedBuild || event.ref !== 'refs/heads/main') {
++    throw Error('webDeploy:invalidPushSource')
++  }
++  let files
++  try { files = diff(event.before, expectedBuild) } catch { throw Error('webDeploy:releaseControlDiffUnavailable') }
++  if (!Array.isArray(files) || !files.every(path => typeof path === 'string')) throw Error('webDeploy:releaseControlDiffUnavailable')
++  return files.some(path => RUNTIME_RELEASE_PATHS.includes(path))
++}
++
+ /** Verify the public application while this job still owns the deployment
+  * queue. Deployment metadata alone does not prove what the public route serves. */
+ export async function verifyProductionBuild({ expectedBuild, fetchImpl = fetch, maxWaitMs = 120_000,
+@@ -106,14 +220,29 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
+     console.log('Build environment ready')
+   } else if (command === 'skip') {
+     // Same documentation-only rule Vercel's Ignored Build Step used, against what production serves now.
+-    const previous = await productionSha({ token: process.env.VERCEL_TOKEN })
+-    const { skip, reason } = shouldSkip({ VERCEL_ENV: 'production', VERCEL_GIT_PREVIOUS_SHA: previous, VERCEL_GIT_COMMIT_SHA: process.env.GITHUB_SHA })
++    const { skip, reason } = await deploymentPlan({ expectedBuild: process.env.GITHUB_SHA, token: process.env.VERCEL_TOKEN,
++      runtimeRefresh: process.env.RUNTIME_REFRESH === 'true' })
+     console.log(`${skip ? 'Skipping' : 'Building'}: ${reason}`)
+     if (process.env.GITHUB_OUTPUT) writeFileSync(process.env.GITHUB_OUTPUT, `skip=${skip}\n`, { flag: 'a' })
++  } else if (command === 'main') {
++    await assertCurrentMain({ expectedBuild: process.env.GITHUB_SHA, token: process.env.GITHUB_TOKEN })
++    console.log('Current main matches this release')
++  } else if (command === 'runtime-refresh') {
++    let event
++    if (process.env.GITHUB_EVENT_NAME === 'push') {
++      try { event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')) } catch { throw Error('webDeploy:invalidPushEvent') }
++    }
++    const refresh = runtimeRefreshRequired({ expectedBuild: process.env.GITHUB_SHA, eventName: process.env.GITHUB_EVENT_NAME,
++      event, explicit: process.env.RUNTIME_REFRESH === 'true' })
++    console.log(`Runtime release control refresh: ${refresh}`)
++    if (process.env.GITHUB_OUTPUT) writeFileSync(process.env.GITHUB_OUTPUT, `refresh=${refresh}\n`, { flag: 'a' })
++  } else if (command === 'await-web') {
++    const result = await waitForWebDeployment({ expectedBuild: process.env.GITHUB_SHA, token: process.env.GITHUB_TOKEN })
++    console.log(JSON.stringify({ event: 'matching_web_deployment_verified', ...result }))
+   } else if (command === 'verify') {
+     const result = await verifyProductionBuild({ expectedBuild: process.env.GITHUB_SHA })
+     console.log(JSON.stringify({ event: 'production_version_verified', ...result }))
+     if (process.env.GITHUB_STEP_SUMMARY) writeFileSync(process.env.GITHUB_STEP_SUMMARY,
+       `\n### Public production version verified\n${result.url}\n\nBuild: \`${result.build}\`\n\nUTC: ${result.verifiedAt}\n`, { flag: 'a' })
+-  } else throw Error('usage: web-deploy.mjs env <file> | skip | verify')
++  } else throw Error('usage: web-deploy.mjs env <file> | skip | main | runtime-refresh | await-web | verify')
+ }
+diff --git a/scripts/release/web-deploy.test.mjs b/scripts/release/web-deploy.test.mjs
+index 929946eb7..b9cb09aba 100644
+--- a/scripts/release/web-deploy.test.mjs
++++ b/scripts/release/web-deploy.test.mjs
+@@ -2,7 +2,13 @@ import assert from 'node:assert/strict'
+ import test from 'node:test'
+ import { createServer } from 'node:http'
+ import { once } from 'node:events'
+-import { buildEnvironment, productionSha, verifyProductionBuild, PRODUCTION_VERSION_URL, REQUIRED } from './web-deploy.mjs'
++import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
++import { execFileSync } from 'node:child_process'
++import { join } from 'node:path'
++import { tmpdir } from 'node:os'
++import { fileURLToPath } from 'node:url'
++import { buildEnvironment, productionSha, verifyProductionBuild, PRODUCTION_VERSION_URL, REQUIRED,
++  assertCurrentMain, waitForWebDeployment, deploymentPlan, runtimeRefreshRequired, RUNTIME_RELEASE_PATHS } from './web-deploy.mjs'
+ 
+ const SHA = 'a'.repeat(40)
+ const pulled = [
+@@ -116,3 +122,250 @@ test('an exact response arriving after the monotonic verification deadline canno
+     now: () => elapsed, wait: async () => { throw Error('the deadline has already elapsed') },
+     fetchImpl: async () => { elapsed = 61; return Response.json({ build: SHA }) } }), /productionVersionUnverified/)
+ })
++
++const OTHER = 'b'.repeat(40)
++const webRun = overrides => ({ id: 70, run_attempt: 2, head_sha: SHA, head_branch: 'main', path: '.github/workflows/web-deploy.yml',
++  repository: { full_name: 'alexj11324/Mikka' }, head_repository: { full_name: 'alexj11324/Mikka' },
++  event: 'push', status: 'completed', conclusion: 'success', ...overrides })
++const buildJob = overrides => ({ name: 'deploy', head_sha: SHA, status: 'completed', conclusion: 'success',
++  steps: ['Build (runs migrations last, as the Vercel build did)', 'Upload the prebuilt output to production',
++    'Verify the public production version before releasing the deployment queue'].map(name => ({ name, status: 'completed', conclusion: 'success' })), ...overrides })
++
++function webFixture({ main = () => SHA, runs = () => [webRun()], job = buildJob(), version = () => SHA, budget = 500 } = {}) {
++  let elapsed = 0
++  const calls = []
++  const fetchImpl = async (input, init = {}) => {
++    const url = new URL(input)
++    calls.push({ path: url.pathname, origin: url.origin, method: init.method ?? 'GET', at: elapsed })
++    assert.equal(init.redirect, 'error')
++    if (url.origin === 'https://api.github.com') {
++      assert.equal(init.headers.authorization, 'Bearer read-only-fixture')
++      if (url.pathname.endsWith('/git/ref/heads/main')) return Response.json({ object: { type: 'commit', sha: main(elapsed) } })
++      if (url.pathname.endsWith('/actions/workflows/web-deploy.yml/runs')) {
++        assert.equal(url.searchParams.get('head_sha'), SHA)
++        assert.equal(url.searchParams.get('branch'), 'main')
++        return Response.json({ workflow_runs: runs(elapsed) })
++      }
++      assert.equal(url.pathname, '/repos/alexj11324/Mikka/actions/runs/70/attempts/2/jobs')
++      return Response.json({ total_count: 1, jobs: [job] })
++    }
++    assert.equal(input, PRODUCTION_VERSION_URL)
++    assert.equal(init.headers.authorization, undefined)
++    assert.equal(init.cache, 'no-store')
++    return Response.json({ build: version(elapsed, value => { elapsed = value }) })
++  }
++  return { calls, run: extra => waitForWebDeployment({ expectedBuild: SHA, token: 'read-only-fixture', fetchImpl,
++    now: () => elapsed, wait: async ms => { elapsed += ms }, intervalMs: 100, maxWaitMs: budget, ...extra }), elapsed: () => elapsed }
++}
++
++test('waits for a GitHub build while Vercel still only serves the older READY source', async () => {
++  const fixture = webFixture({ runs: elapsed => [webRun(elapsed < 200 ? { status: 'in_progress', conclusion: null } : {})],
++    version: elapsed => elapsed < 300 ? OTHER : SHA })
++  const result = await fixture.run()
++  assert.equal(result.sourceCommit, SHA)
++  assert.equal(result.webRunId, 70)
++  assert.equal(result.webAttempt, 2)
++  assert.equal(result.publicBuild, SHA)
++  assert.equal(fixture.elapsed(), 300)
++  assert.deepEqual(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').map(call => call.at), [200, 300])
++  assert.ok(fixture.calls.every(call => call.method === 'GET'))
++  assert.ok(fixture.calls.every(call => call.origin !== 'https://api.vercel.com'), 'the lock-free wait does not inspect Vercel build states or mutate configuration')
++})
++
++test('main advancing while waiting rejects the obsolete source before another workflow or public read', async () => {
++  const fixture = webFixture({ main: elapsed => elapsed >= 100 ? OTHER : SHA, runs: () => [webRun({ status: 'in_progress', conclusion: null })] })
++  await assert.rejects(fixture.run(), /mainChanged/)
++  assert.equal(fixture.calls.filter(call => call.path.endsWith('/runs')).length, 1)
++  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
++})
++
++test('the latest exact Web attempt must succeed; an older success cannot hide its failure or cancellation', async () => {
++  for (const conclusion of ['failure', 'cancelled', 'timed_out', 'skipped']) {
++    const fixture = webFixture({ runs: () => [webRun({ id: 69, run_attempt: 1 }), webRun({ conclusion })] })
++    await assert.rejects(fixture.run(), /matchingWebRunFailed:70/)
++    assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
++  }
++})
++
++test('a docs-only skipped build or incomplete upload never passes even if public already has that SHA', async () => {
++  for (const index of [0, 1, 2]) {
++    const job = buildJob()
++    job.steps[index].conclusion = 'skipped'
++    const fixture = webFixture({ job })
++    await assert.rejects(fixture.run(), /matchingWebBuildSkippedOrIncomplete/)
++    assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
++  }
++})
++
++test('another repository, branch or workflow cannot stand in for the matching main Web run', async () => {
++  for (const wrong of [{ repository: { full_name: 'other/Mikka' } }, { head_repository: { full_name: 'fork/Mikka' } },
++    { path: '.github/workflows/e2b-official-runtime.yml' }, { head_sha: OTHER }, { head_branch: 'other' }]) {
++    const fixture = webFixture({ runs: () => [webRun(wrong)], budget: 200 })
++    await assert.rejects(fixture.run(), /matchingWebDeploymentTimedOut/)
++    assert.equal(fixture.elapsed(), 200)
++    assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
++  }
++})
++
++test('a successful Web run with an old public build has a finite monotonic wait', async () => {
++  const fixture = webFixture({ version: () => OTHER, budget: 250 })
++  await assert.rejects(fixture.run(), /matchingWebDeploymentTimedOut/)
++  assert.equal(fixture.elapsed(), 250)
++  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 3)
++})
++
++test('a matching public response after the deadline cannot admit the runtime mutation', async () => {
++  const fixture = webFixture({ version: (_elapsed, advance) => { advance(501); return SHA } })
++  await assert.rejects(fixture.run(), /matchingWebDeploymentTimedOut/)
++})
++
++test('the final read-only fence also rejects a main change during public verification', async () => {
++  const fixture = webFixture({ main: elapsed => elapsed ? OTHER : SHA, version: (_elapsed, advance) => { advance(1); return SHA } })
++  await assert.rejects(fixture.run(), /mainChanged/)
++})
++
++test('invalid source, missing identity or invalid wait fails without any network request', async () => {
++  const fetchImpl = async () => assert.fail('no request for an invalid release')
++  await assert.rejects(assertCurrentMain({ expectedBuild: 'main', token: 't', fetchImpl }), /commitShaRequired/)
++  await assert.rejects(assertCurrentMain({ expectedBuild: SHA, fetchImpl }), /githubTokenRequired/)
++  await assert.rejects(waitForWebDeployment({ expectedBuild: SHA, token: 't', maxWaitMs: 0, fetchImpl }), /invalidVerificationWait/)
++})
++
++test('GitHub errors do not expose response bodies or transport messages', async () => {
++  for (const fetchImpl of [async () => new Response('private-response-marker', { status: 403 }),
++    async () => new Response('private-response-marker'), async () => { throw Error('private-response-marker') }]) {
++    await assert.rejects(assertCurrentMain({ expectedBuild: SHA, token: 't', fetchImpl }), error => {
++      assert.match(error.message, /webDeploy:github/)
++      assert.doesNotMatch(error.message, /private-response-marker/)
++      return true
++    })
++  }
++})
++
++test('explicit runtime refresh always builds while ordinary docs-only classification is preserved', async () => {
++  const noRead = async () => assert.fail('runtime refresh must bypass docs/same-SHA skip')
++  assert.deepEqual(await deploymentPlan({ expectedBuild: SHA, runtimeRefresh: true, fetchImpl: noRead, classify: noRead }),
++    { skip: false, reason: 'verified runtime refresh' })
++  let classified = 0
++  const result = await deploymentPlan({ expectedBuild: SHA, token: 't',
++    fetchImpl: async url => Response.json(String(url).includes('/aliases/') ? { deploymentId: 'dpl_old' } : { meta: { githubCommitSha: OTHER } }),
++    classify: env => { classified++; assert.equal(env.VERCEL_GIT_COMMIT_SHA, SHA); assert.equal(env.VERCEL_GIT_PREVIOUS_SHA, OTHER); return { skip: true, reason: 'docs only' } } })
++  assert.deepEqual(result, { skip: true, reason: 'docs only' })
++  assert.equal(classified, 1)
++})
++
++test('both release paths use one non-cancelling pending queue, and the Web wait remains outside it', () => {
++  const web = readFileSync(new URL('../../.github/workflows/web-deploy.yml', import.meta.url), 'utf8')
++  const e2b = readFileSync(new URL('../../.github/workflows/e2b-official-runtime.yml', import.meta.url), 'utf8')
++  assert.doesNotMatch(web, /^concurrency:/m, 'caller and reusable job must not acquire the same group twice')
++  assert.match(web, /\n    concurrency:\n(?:[^\n]*\n)*?      group: web-deploy-production\n      cancel-in-progress: false\n      queue: max\n/)
++  assert.equal((web.match(/group: web-deploy-production/g) ?? []).length, 1)
++  const callerQueue = e2b.slice(e2b.indexOf('\nconcurrency:'), e2b.indexOf('\njobs:'))
++  assert.match(callerQueue, /cancel-in-progress: false\n  queue: max/)
++  assert.match(callerQueue, /e2b-official-runtime-release/)
++  assert.doesNotMatch(callerQueue, /web-deploy-production/)
++  const waitJob = e2b.slice(e2b.indexOf('\n  await-web:'), e2b.indexOf('\n  publish:'))
++  assert.match(waitJob, /actions: read/)
++  assert.match(waitJob, /node scripts\/release\/web-deploy\.mjs await-web/)
++  assert.doesNotMatch(waitJob, /concurrency:|id-token:|Infisical|publish-template-env\.mjs/)
++  assert.match(e2b, /publish:\n    needs: \[validate, await-web\]/)
++  assert.match(e2b, /uses: \.\/\.github\/workflows\/web-deploy\.yml/)
++  assert.match(e2b, /runtime-refresh: true/)
++  assert.match(e2b, /workflow_dispatch:\n    inputs:\n      runtime-refresh:\n        description: [^\n]+\n        type: boolean\n        default: false/)
++  assert.match(e2b, /if \[ "\$RUNTIME_REFRESH" = true \] \|\| \[ "\$wanted" != "\$live" \]; then echo "changed=true"/)
++  assert.match(e2b, /validate:\n    needs: \[test, check\]\n    if: needs\.check\.outputs\.changed == 'true'/)
++  assert.match(e2b, /runtime-worker-sha: \$\{\{ needs\.validate\.outputs\.source-sha \}\}/)
++  assert.match(e2b, /runtime-template-models: \$\{\{ needs\.validate\.outputs\.template-models \}\}/)
++  const checkJob = e2b.slice(e2b.indexOf('\n  check:'), e2b.indexOf('\n  validate:'))
++  assert.match(checkJob, /fetch-depth: 0/)
++  const checkGuard = checkJob.indexOf('node scripts/release/web-deploy.mjs main')
++  assert.ok(checkGuard >= 0 && checkGuard < checkJob.indexOf('uses: Infisical/'))
++  assert.match(checkJob, /RUNTIME_REFRESH: \$\{\{ steps\.control\.outputs\.refresh \}\}/)
++  for (const path of RUNTIME_RELEASE_PATHS) assert.ok(e2b.includes(`      - '${path}'`), `main push filter must include ${path}`)
++  assert.match(web, /workflow_call:/)
++  assert.match(web, /RUNTIME_REFRESH: \$\{\{ inputs\.runtime-refresh \}\}/)
++  // queue:max is GitHub's documented queue contract, not a locally simulated
++  // scheduler. Stale jobs still need the main fences regardless of queue order.
++})
++
++test('runtime env, build and upload are ordered under the same job with fixed identity and source fences', () => {
++  const web = readFileSync(new URL('../../.github/workflows/web-deploy.yml', import.meta.url), 'utf8')
++  const publisher = readFileSync(new URL('../e2b/publish-template-env.mjs', import.meta.url), 'utf8')
++  const firstGuard = web.indexOf('node scripts/release/web-deploy.mjs main')
++  const envWrite = web.indexOf('run: node scripts/e2b/publish-template-env.mjs')
++  const build = web.indexOf('run: npx --yes "$VERCEL_CLI" build --prod')
++  const finalGuard = web.lastIndexOf('node scripts/release/web-deploy.mjs main')
++  const upload = web.indexOf('deploy --prebuilt --prod')
++  assert.ok(firstGuard > 0 && firstGuard < web.indexOf('uses: Infisical/'))
++  assert.ok(firstGuard < envWrite && envWrite < build && build < finalGuard && finalGuard < upload)
++  assert.doesNotMatch(publisher, /forceNew|method: 'POST'[^\n]*deployments/)
++  assert.deepEqual([...new Set([...web.matchAll(/identity-id: (.+)/g)].map(match => match[1]))], ['2cf9fa19-b9db-4c08-8ca0-b31859f2cbac'])
++  assert.deepEqual([...new Set([...web.matchAll(/oidc-audience: (.+)/g)].map(match => match[1]))], ['mikka-infisical'])
++  assert.deepEqual([...new Set([...web.matchAll(/project-id: (.+)/g)].map(match => match[1]))], ['89850d6a-f020-4936-863e-df77380dfe40'])
++})
++
++test('the actual dispatch comparison only bypasses unchanged-hash optimization when explicitly requested', () => {
++  const e2b = readFileSync(new URL('../../.github/workflows/e2b-official-runtime.yml', import.meta.url), 'utf8')
++  const condition = e2b.split('\n').find(line => line.trim().startsWith('if [ "$RUNTIME_REFRESH"'))?.trim()
++  assert.ok(condition)
++  const dir = mkdtempSync(join(tmpdir(), 'runtime-dispatch-'))
++  try {
++    for (const [refresh, live, changed] of [['', SHA, false], ['false', SHA, false], ['true', SHA, true], ['false', OTHER, true]]) {
++      const output = join(dir, `${refresh || 'push'}-${live}`)
++      execFileSync('bash', ['-euc', condition], { env: { PATH: process.env.PATH, RUNTIME_REFRESH: refresh, wanted: SHA, live, GITHUB_OUTPUT: output } })
++      assert.equal(readFileSync(output, 'utf8'), `changed=${changed}\n`)
++    }
++  } finally { rmSync(dir, { recursive: true, force: true }) }
++})
++
++test('release-control refresh validates both immutable push endpoints and never assumes missing history is unchanged', () => {
++  const valid = { expectedBuild: SHA, eventName: 'push', event: { before: OTHER, after: SHA, ref: 'refs/heads/main' } }
++  for (const event of [{ ...valid.event, before: undefined }, { ...valid.event, before: 'main' }, { ...valid.event, before: '0'.repeat(40) },
++    { ...valid.event, after: OTHER }, { ...valid.event, ref: 'refs/heads/other' }]) {
++    assert.throws(() => runtimeRefreshRequired({ ...valid, event }, () => assert.fail('invalid source must not reach Git')), /invalidPushSource/)
++  }
++  assert.throws(() => runtimeRefreshRequired(valid, () => { throw Error('missing history') }), /releaseControlDiffUnavailable/)
++  assert.throws(() => runtimeRefreshRequired(valid, () => null), /releaseControlDiffUnavailable/)
++  for (const path of RUNTIME_RELEASE_PATHS) assert.equal(runtimeRefreshRequired(valid, () => [path]), true)
++  assert.equal(runtimeRefreshRequired(valid, () => ['docs/change.md', 'scripts/release/web-deploy.test.mjs']), false)
++})
++
++test('manual runtime refresh defaults off and does not make pull requests eligible', () => {
++  const noGit = () => assert.fail('non-push events do not compare Git endpoints')
++  assert.equal(runtimeRefreshRequired({ expectedBuild: SHA, eventName: 'workflow_dispatch' }, noGit), false)
++  assert.equal(runtimeRefreshRequired({ expectedBuild: SHA, eventName: 'workflow_dispatch', explicit: true }, noGit), true)
++  assert.equal(runtimeRefreshRequired({ expectedBuild: SHA, eventName: 'pull_request', explicit: true }, noGit), false)
++})
++
++test('real Git and the production CLI compare the entire push, preserve docs-only skip and reject unavailable before', () => {
++  const dir = mkdtempSync(join(tmpdir(), 'runtime-control-git-'))
++  const git = args => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
++  const commit = () => { git(['add', '.']); git(['-c', 'user.name=Release fixture', '-c', 'user.email=release@example.invalid', 'commit', '-qm', 'fixture']); return git(['rev-parse', 'HEAD']) }
++  const run = (before, after) => {
++    const eventPath = join(dir, '.git/event.json'), output = join(dir, '.git/output.txt')
++    writeFileSync(eventPath, JSON.stringify({ before, after, ref: 'refs/heads/main' }))
++    rmSync(output, { force: true })
++    execFileSync(process.execPath, [fileURLToPath(new URL('./web-deploy.mjs', import.meta.url)), 'runtime-refresh'], {
++      cwd: dir, env: { PATH: process.env.PATH, GITHUB_EVENT_NAME: 'push', GITHUB_SHA: after, GITHUB_EVENT_PATH: eventPath, GITHUB_OUTPUT: output }, stdio: ['ignore', 'pipe', 'pipe'],
++    })
++    return readFileSync(output, 'utf8')
++  }
++  try {
++    git(['init', '-q', '-b', 'main'])
++    mkdirSync(join(dir, '.github/workflows'), { recursive: true }); mkdirSync(join(dir, 'docs'))
++    writeFileSync(join(dir, '.github/workflows/web-deploy.yml'), 'name: before\n')
++    writeFileSync(join(dir, 'docs/change.md'), 'before\n')
++    const before = commit()
++    writeFileSync(join(dir, '.github/workflows/web-deploy.yml'), 'name: changed\n'); commit()
++    writeFileSync(join(dir, 'docs/change.md'), 'last commit only changes docs\n')
++    const after = commit()
++    assert.equal(run(before, after), 'refresh=true\n', 'a control change earlier in a multi-commit push is included')
++    writeFileSync(join(dir, 'docs/change.md'), 'only docs this push\n')
++    const docsAfter = commit()
++    assert.equal(run(after, docsAfter), 'refresh=false\n')
++    assert.throws(() => run('f'.repeat(40), docsAfter), error => {
++      assert.match(String(error.stderr), /webDeploy:releaseControlDiffUnavailable/)
++      return true
++    })
++  } finally { rmSync(dir, { recursive: true, force: true }) }
++})

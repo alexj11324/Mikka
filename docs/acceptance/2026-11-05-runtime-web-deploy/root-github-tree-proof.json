@@ -1,0 +1,44 @@
+{
+  "base": "66e43629a684bfed778cadd1df3c073d93cddb5a",
+  "candidate": "58f14e63fc36cf12a936b9825604f71162586a84",
+  "baseBlobs": 4580,
+  "candidateBlobs": 4580,
+  "diff": [
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "before": "6d963d12ec540da761186ca074e9b7f676375ebe",
+      "after": "d623fe2d05727935bce2eac6468b260c0ff881ac"
+    },
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "before": "44073bfbea473848ed39b41ee74590ad6226feaf",
+      "after": "e97226987c6b9d88ad70340d2f5490b74dab6279"
+    },
+    {
+      "path": "docs/operations/web-deploy.md",
+      "before": "8292731d1cd8d703776046bee702b23fa525c74f",
+      "after": "80ada4817517fdd279bde34cf3ba4c39f5d47d85"
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "before": "869e95ada4be1fac8d1a4d6b50567adb6c0db371",
+      "after": "d04390cffb9c1e14ef452dc9c516dd39d6061f7c"
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "before": "96768472cc660698738586d1443e730bfc5fddb7",
+      "after": "aa17e3a56b3875a83e64428c27159428e25546da"
+    },
+    {
+      "path": "scripts/release/web-deploy.mjs",
+      "before": "e0e3fc38a878856018b19a4ba4ed4d0e76f9d149",
+      "after": "62a70d9315cb85097f524cb1ca5a9fd438002ea9"
+    },
+    {
+      "path": "scripts/release/web-deploy.test.mjs",
+      "before": "929946eb715c278d169e60728954ff94d1486a6f",
+      "after": "b9cb09aba0f8b5d36c2d091306e4912b1c12db97"
+    }
+  ],
+  "observedAt": "2026-11-05T01:39:24.672Z"
+}

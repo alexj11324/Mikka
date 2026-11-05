@@ -1,0 +1,41 @@
+{
+  "pr": 1302,
+  "url": "https://github.com/alexj11324/Mikka/pull/1302",
+  "branch": "fix/official-runtime-web-deploy-20261105",
+  "head": "c9da99ff14d7fd3446e0417d3a54fc0408442dff",
+  "base": "5d2011f0f27a4ae300909dd1632ffede8a763471",
+  "tree": "58f14e63fc36cf12a936b9825604f71162586a84",
+  "localProofTree": "d6051ef87b6b18c1cc894942468e6bd23046e8eb",
+  "localProofBase": "efef5b5a5a8a55deb3c504b05fb736d4003e942c",
+  "ciRun": "https://github.com/alexj11324/Mikka/actions/runs/41949914315",
+  "e2bPrRun": "https://github.com/alexj11324/Mikka/actions/runs/41949914330",
+  "cloudArchive": {
+    "base": "efef5b5a5a8a55deb3c504b05fb736d4003e942c",
+    "tree": "d6051ef87b6b18c1cc894942468e6bd23046e8eb",
+    "files": 7,
+    "archive": "/vercel/acceptance/runtime-web-release-review-v3.tar.gz",
+    "bytes": 55750,
+    "sha256": "6b46ad3258894cb721a30dff35c05459fd0738de622a4fbb79b9ebc90bcd11a5"
+  },
+  "integration": {
+    "base": "5d2011f0f27a4ae300909dd1632ffede8a763471",
+    "tree": "58f14e63fc36cf12a936b9825604f71162586a84",
+    "changed": [
+      ".github/workflows/e2b-official-runtime.yml",
+      ".github/workflows/web-deploy.yml",
+      "docs/operations/web-deploy.md",
+      "scripts/e2b/publish-template-env.mjs",
+      "scripts/e2b/publish-template-env.test.mjs",
+      "scripts/release/web-deploy.mjs",
+      "scripts/release/web-deploy.test.mjs"
+    ],
+    "preservedMainFiles": [
+      "lib/cloud-computer/thread-machine-task.db.test.ts",
+      "lib/cloud-computer/thread-machines.ts",
+      "lib/cloud-computer/thread-worker-logs.test.ts",
+      "lib/cloud-computer/thread-worker-logs.ts"
+    ]
+  },
+  "paidModelCalls": 0,
+  "productionMutation": false
+}

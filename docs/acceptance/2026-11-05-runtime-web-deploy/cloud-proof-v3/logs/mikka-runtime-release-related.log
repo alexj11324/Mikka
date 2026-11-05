@@ -1,0 +1,162 @@
+Retained docs gate evidence: /tmp/docs-gate-retained-dlbJbJ
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+Retained docs gate loader evidence: /tmp/docs-gate-loader-retained-QaJ7ts
+Retained trusted classifier fixture: /tmp/tmp.GMI1lheQa4/ci-docs-only.mjs
+Retained trusted classifier fixture: /tmp/tmp.DmTKXkrEQI/ci-docs-only.mjs
+Retained workflow module-loader evidence: /tmp/docs-gate-module-retained-kbXRSM/tmp.fkcV2Ybspl/ci-docs-only.mjs
+Retained workflow module-loader evidence: /tmp/docs-gate-module-retained-2ZIjYP/tmp.S12I2nPeIc/ci-docs-only.mjs
+Retained workflow launcher fixture: /tmp/docs-gate-launch-retained-GigXJX
+Retained workflow classifier evidence: /tmp/docs-workflow-retained-1Xc0aL
+Retained workflow classifier evidence: /tmp/docs-workflow-retained-i08duM
+Retained workflow bootstrap evidence: /tmp/docs-gate-bootstrap-retained-rXQw0B
+Switched to a new branch 'candidate'
+From /tmp/docs-gate-bootstrap-retained-rXQw0B
+ * branch            main       -> FETCH_HEAD
+ * [new branch]      main       -> origin/main
+From /tmp/docs-gate-bootstrap-retained-rXQw0B
+ * branch            main       -> FETCH_HEAD
+From /tmp/docs-gate-bootstrap-retained-rXQw0B
+ * branch            main       -> FETCH_HEAD
+From /tmp/docs-gate-bootstrap-retained-rXQw0B
+ * branch            main       -> FETCH_HEAD
+✔ approved documentation paths are documentation-only (5.845288ms)
+✔ code, workflows, configuration, messages and public assets are not documentation-only (0.23605ms)
+✔ one code file makes a mixed change run the full suites (0.166108ms)
+✔ an empty change set is never treated as documentation-only (0.127799ms)
+✔ a docs path with a non-regular mode is not documentation-only (0.127335ms)
+✔ non-executable regular files including added and deleted files are safe (0.367269ms)
+✔ symlinks, gitlinks and unmerged entries fail closed (0.162069ms)
+✔ real git diffs retain all fixtures while testing rename, deletion and event boundaries (572.206329ms)
+✔ the workflow-extracted trusted classifier executes as an ES module (75.299027ms)
+✔ trusted workflow classifier executes as an ES module from its retained temporary file (66.301358ms)
+✔ all required gates reject failed classification and skipped full jobs (28.698421ms)
+✔ each actual workflow temp-file command produces a classifier Node can load outside the package (67.586321ms)
+✔ the exact trusted-classifier workflow step executes ESM from a retained temporary file (71.088989ms)
+✔ actual workflow classifier launches trusted ESM from its retained temporary file (122.148336ms)
+✔ the trusted classifier runs as a copied .mjs entry point (36.294907ms)
+✔ a trusted stdin wrapper can import the paired classifier without running its entry point (29.959535ms)
+✔ the actual workflow bootstrap executes its trusted temporary ESM module (199.284867ms)
+✔ blocking CI checks synthetic PR merge candidates once and preserves every main run (0.337511ms)
+✔ CI partitions DB suites across isolated jobs and requires source and daemon lanes (0.460684ms)
+✔ integration branches take the full tier under both the integration/ and the older integrate/ prefix (0.167521ms)
+✔ UTC windows are equal, aligned, nonoverlapping, complete, and outside warmup (3.326521ms)
+✔ initial CPU threshold requires both strict ratio and absolute delta; sample boundary is inclusive (0.582259ms)
+✔ traffic, routes, status, samples and error growth cannot masquerade as improvement (0.508294ms)
+✔ query has proven project scope and only deployment/environment filters and route/status groups (0.573822ms)
+✔ only expected aggregate fields leave the boundary; malformed and truncated samples fail closed (0.695789ms)
+✔ API failures never echo upstream payloads, token or exceptions (0.715017ms)
+✔ read-only full path pins deployment, rejects event/race mismatch, emits aggregate report (8.52273ms)
+node:internal/modules/package_json_reader:331
+  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+        ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'pg' imported from /vercel/sandbox/mikka-runtime-web-release/scripts/ops/monitor.mjs
+    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:331:9)
+    at packageResolve (node:internal/modules/esm/resolve:784:25)
+    at moduleResolve (node:internal/modules/esm/resolve:873:18)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:705:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:725:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:763:56)
+    at #resolve (node:internal/modules/esm/loader:687:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:607:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:276:33) {
+  code: 'ERR_MODULE_NOT_FOUND'
+}
+
+Node.js v24.22.1
+✖ scripts/ops/monitor.test.mjs (86.699616ms)
+✔ normal login carries session only to same-origin read probes; reports contain no credentials (31.322987ms)
+✔ a disabled required capability or failed Coordinator read fails the smoke (5.784819ms)
+✔ missing cookies and mismatched account fail before application probes (1.011704ms)
+✔ configuration cannot send credentials to insecure targets or silently ignore misspelled required features (0.413863ms)
+✔ transport errors never expose cookies, URLs or provider error messages (0.289559ms)
+node:internal/modules/package_json_reader:331
+  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+        ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'pg' imported from /vercel/sandbox/mikka-runtime-web-release/scripts/ops/isolated-recovery.mjs
+    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:331:9)
+    at packageResolve (node:internal/modules/esm/resolve:784:25)
+    at moduleResolve (node:internal/modules/esm/resolve:873:18)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:705:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:725:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:763:56)
+    at #resolve (node:internal/modules/esm/loader:687:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:607:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:276:33) {
+  code: 'ERR_MODULE_NOT_FOUND'
+}
+
+Node.js v24.22.1
+✖ scripts/ops/recovery-failures.test.mjs (85.867924ms)
+✔ REST query uses exact millisecond ISO bounds, immutable production scope and minimal fields (2.035889ms)
+✔ bounded paginated collection retains only fixed route aggregates; duplicate lines do not double-count requests (38.847185ms)
+✔ excluded intervals, truncation, malformed lines and missing outcomes remain insufficient with no empty inference (1.527571ms)
+✔ fresh pending starts and rejected requests are unknown without being mislabeled empty or stale (2.178339ms)
+✔ an unmarked successful completion exposes missing instrumentation even if its start was not collected (2.821536ms)
+✔ no samples and failures expose null ratios and fixed reasons, never upstream secrets (1.339939ms)
+✔ deployment changes, cursor loops and collection budgets fail coverage instead of reporting complete (3.202417ms)
+✔ release identity and exact-SHA checks reject fork/PR/old checks and a newer failed run (25.196278ms)
+✔ artifact, SBOM, source, source-lock and trusted manifest digest stay bound across publication/rollback (18.220033ms)
+✔ published direct runtime versions come from installed package manifests instead of floating ranges (2.922799ms)
+✔ known high vulnerabilities, malformed audit results and expired exceptions prevent release (1.207603ms)
+✔ a transitive finding needs its own via:<package> exception (0.33911ms)
+✔ desktop staging publishes only intended installers and the selected production SBOM graph (13.650862ms)
+✔ the release SBOM skips optional platform packages pnpm did not install, and still fails on any other missing package (0.82724ms)
+✔ third-party actions in workflows and local composite actions use immutable SHA refs (7.145551ms)
+✔ fills sensitive build values from the job and pins the main Git identity (1.478125ms)
+✔ refuses a build with a missing value and names only the variable (0.695383ms)
+✔ reads the commit production serves through the alias (2.970577ms)
+✔ public verification waits through an HTTP error and the previous build before recording the exact build (42.622369ms)
+✔ a different public build cannot pass just because its deployment is READY (1.263387ms)
+✔ invalid responses and network failures stay bounded and never copy response bodies into errors (1.352263ms)
+✔ a moving branch name or invalid budget fails before sending a public request (0.248611ms)
+✔ an exact response arriving after the monotonic verification deadline cannot pass (0.420856ms)
+✔ waits for a GitHub build while Vercel still only serves the older READY source (2.869593ms)
+✔ main advancing while waiting rejects the obsolete source before another workflow or public read (1.833277ms)
+✔ the latest exact Web attempt must succeed; an older success cannot hide its failure or cancellation (1.216159ms)
+✔ a docs-only skipped build or incomplete upload never passes even if public already has that SHA (1.030353ms)
+✔ another repository, branch or workflow cannot stand in for the matching main Web run (1.795706ms)
+✔ a successful Web run with an old public build has a finite monotonic wait (0.984953ms)
+✔ a matching public response after the deadline cannot admit the runtime mutation (0.428674ms)
+✔ the final read-only fence also rejects a main change during public verification (0.585495ms)
+✔ invalid source, missing identity or invalid wait fails without any network request (0.22643ms)
+✔ GitHub errors do not expose response bodies or transport messages (0.671661ms)
+✔ explicit runtime refresh always builds while ordinary docs-only classification is preserved (0.429714ms)
+✔ both release paths use one non-cancelling pending queue, and the Web wait remains outside it (0.420617ms)
+✔ runtime env, build and upload are ordered under the same job with fixed identity and source fences (0.39911ms)
+✔ a docs-only change since the last deployment skips the production build (2.08807ms)
+✔ any code change builds (0.393342ms)
+✔ anything unclear builds (0.229705ms)
+ℹ tests 73
+ℹ suites 0
+ℹ pass 71
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1348.953461
+
+✖ failing tests:
+
+test at scripts/ops/monitor.test.mjs:1:1
+✖ scripts/ops/monitor.test.mjs (86.699616ms)
+  'test failed'
+
+test at scripts/ops/recovery-failures.test.mjs:1:1
+✖ scripts/ops/recovery-failures.test.mjs (85.867924ms)
+  'test failed'
