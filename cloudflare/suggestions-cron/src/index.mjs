@@ -53,6 +53,8 @@ export async function runSchedule(cron, env, fetcher = fetch, scheduledTime = Da
   if (cron === '* * * * *') {
     if (minute === 0) endpoints.push('/api/cron/account-deletions', '/api/cron/audit-retention')
     if (minute % 15 === 0) endpoints.push('/api/cron/ops-monitor')
+    // Abandoned subscription sign-ins and their secret artifacts: maintenance with no single event (#1371).
+    if (minute === 0) endpoints.push('/api/cron/subscriptions')
     if (minute % 15 === 0) endpoints.push(SCHEDULES['*/15 * * * *'])
     if (minute === 0) endpoints.push(SCHEDULES['0 * * * *'])
     if (minute === 30) endpoints.push(SCHEDULES['30 * * * *'])

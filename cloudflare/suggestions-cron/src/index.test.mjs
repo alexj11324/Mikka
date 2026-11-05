@@ -131,7 +131,7 @@ test('one minute trigger retains every UTC cadence without duplicate endpoints',
     [15, ['/api/cron/ops-monitor', '/api/cron/briefings']],
     [30, ['/api/cron/ops-monitor', '/api/cron/briefings', '/api/cron/user-facts']],
     [45, ['/api/cron/ops-monitor', '/api/cron/briefings']],
-    [0, ['/api/cron/account-deletions', '/api/cron/audit-retention', '/api/cron/ops-monitor', '/api/cron/briefings', '/api/cron/suggestions-reconcile']],
+    [0, ['/api/cron/account-deletions', '/api/cron/audit-retention', '/api/cron/ops-monitor', '/api/cron/subscriptions', '/api/cron/briefings', '/api/cron/suggestions-reconcile']],
   ]) {
     const { calls, fetcher } = recorder()
     await runSchedule('* * * * *', env, fetcher, Date.UTC(2026, 0, 1, 0, minute))
@@ -150,7 +150,7 @@ test('scheduled dispatch uses the event timestamp even when wall time has advanc
   worker.scheduled({ cron: '* * * * *', scheduledTime: Date.UTC(2026, 0, 1, 0, 0) }, env, { waitUntil: promise => pending.push(promise) })
   await Promise.all(pending)
   assert.deepEqual(calls.map(call => new URL(call.url).pathname.replace('/mikka', '')),
-    [...MINUTE_ENDPOINTS, '/api/cron/account-deletions', '/api/cron/audit-retention', '/api/cron/ops-monitor', '/api/cron/briefings', '/api/cron/suggestions-reconcile'])
+    [...MINUTE_ENDPOINTS, '/api/cron/account-deletions', '/api/cron/audit-retention', '/api/cron/ops-monitor', '/api/cron/subscriptions', '/api/cron/briefings', '/api/cron/suggestions-reconcile'])
 })
 
 test('a complete UTC hour runs each reconciliation sweep and maintenance at its requested cadence', async t => {
@@ -173,6 +173,7 @@ test('a complete UTC hour runs each reconciliation sweep and maintenance at its 
     '/api/cron/run-recovery': 4,
     '/api/cron/account-deletions': 1,
     '/api/cron/audit-retention': 1,
+    '/api/cron/subscriptions': 1,
     '/api/cron/ops-monitor': 4,
     '/api/cron/briefings': 4,
     '/api/cron/suggestions-reconcile': 1,
@@ -182,7 +183,7 @@ test('a complete UTC hour runs each reconciliation sweep and maintenance at its 
 
 test('maintenance failures still wait for every selected endpoint without leaking response content', async t => {
   t.mock.method(console, 'log', () => {})
-  for (const [minute, failedPath] of [[0, '/api/cron/account-deletions'], [0, '/api/cron/audit-retention'], [15, '/api/cron/ops-monitor']]) {
+  for (const [minute, failedPath] of [[0, '/api/cron/account-deletions'], [0, '/api/cron/audit-retention'], [15, '/api/cron/ops-monitor'], [0, '/api/cron/subscriptions']]) {
     const paths = []
     let finishSchedules
     const held = new Promise(resolve => { finishSchedules = resolve })
@@ -198,7 +199,8 @@ test('maintenance failures still wait for every selected endpoint without leakin
     await new Promise(resolve => setImmediate(resolve))
     const maintenance = minute === 0 ? ['/api/cron/account-deletions', '/api/cron/audit-retention'] : []
     const reconcile = minute === 0 ? ['/api/cron/suggestions-reconcile'] : []
-    assert.deepEqual(paths, [...sweepsAt(minute), ...maintenance, '/api/cron/ops-monitor', '/api/cron/briefings', ...reconcile])
+    const hourly = minute === 0 ? ['/api/cron/subscriptions'] : []
+    assert.deepEqual(paths, [...sweepsAt(minute), ...maintenance, '/api/cron/ops-monitor', ...hourly, '/api/cron/briefings', ...reconcile])
     assert.equal(settled, false)
     finishSchedules()
     await failure
