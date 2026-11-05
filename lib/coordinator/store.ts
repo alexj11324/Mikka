@@ -14,6 +14,7 @@ import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
 import { coordinatorSessionChanged } from '@/lib/live/coordinator-session'
 import { wakeTokens, wakeWorkflowAfterCommit } from '@/lib/workflow-wake'
+import { wakeCoordinatorSoon } from './wake-after-commit'
 import { COORDINATOR_LEASE_CHANNEL } from '@/lib/db/listen'
 import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
@@ -74,6 +75,12 @@ function waking(userId: string, botId: string) {
 /** Whether any undelivered event should start a turn in this chat. */
 export async function hasWakingEvents(userId: string, botId: string): Promise<boolean> {
   const [row] = await db.select({ id: coordinatorEvents.id }).from(coordinatorEvents).where(waking(userId, botId)).limit(1)
+  return Boolean(row)
+}
+
+/** Any undelivered, non-background row of this chat, triaged or not. */
+export async function hasPendingEvents(userId: string, botId: string): Promise<boolean> {
+  const [row] = await db.select({ id: coordinatorEvents.id }).from(coordinatorEvents).where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), or(isNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background')))).limit(1)
   return Boolean(row)
 }
 
@@ -216,7 +223,12 @@ export async function releaseLease(userId: string, holder: string, botId: string
   if (released.length) await coordinatorSessionChanged(db, userId, botId)
   // A wake deadline waiting behind this lease rechecks now, not at the lease's old expiry (#1212).
   if (released.length) wakeWorkflowAfterCommit(db, wakeTokens.coordinatorWake(userId, botId))
-  return hasWakingEvents(userId, botId)
+  const waking = await hasWakingEvents(userId, botId)
+  // Rows written during the turn that triage has not seen (tier NULL, not a
+  // user message) are not this loop's to take; their writer's wake deferred
+  // behind this lease, so wake again now that it is free (#1212).
+  if (released.length && !waking && await hasPendingEvents(userId, botId)) wakeCoordinatorSoon(userId)
+  return waking
 }
 
 /** Direct user delivery first. Runtime ordering uses the last attempt, falling

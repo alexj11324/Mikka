@@ -6,6 +6,7 @@ import { nextTime, timezone } from './time'
 import { botChatChanged } from '../live/chats'
 import { observePoolCommits } from '../db/commit-effects'
 import { coordinatorSessionChanged } from '../live/coordinator-session'
+import { wakeCoordinatorAfterCommit } from '../coordinator/wake-after-commit'
 
 export type WorkspaceGuard = <T>(ownerId: string, workspaceId: string | null, work: () => Promise<T>) => Promise<T>
 export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => Promise<void>
@@ -108,6 +109,7 @@ export class ScheduleStore {
     // A result is already in the chat. Whether it also needs the person (a failure, a skipped or cancelled run, a result they would want flagged)
     // is triage's call on the Decisions API, not a fixed background tier: the event is left untriaged and undelivered.
     await tx.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1,$2,$3,'run_report',$4,$5) ON CONFLICT("dedupeKey") DO NOTHING`,[o.id,row.owner_id,row.bot_id,`schedule_result:${o.id}`,{source:'schedule_result',scheduleId:row.id,occurrenceId:o.id,operationId:o.operation_id,status,error}])
+    wakeCoordinatorAfterCommit(tx,row.owner_id)
     await tx.query('UPDATE schedule_occurrences SET reported_at=$2,report_attempts=report_attempts+1 WHERE id=$1',[o.id,this.clock()])
   }
   async execute(claim:Occurrence){

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { wakeCoordinatorAfterCommit } from "../coordinator/wake-after-commit";
 import { factoryCheckIndependent } from "./check-independence";
 import { recordMonitorIncidentState } from "./monitor-incidents";
 import { factoryScopeAllows, type FactoryIssueScope } from "./scope";
@@ -549,6 +550,7 @@ export function createFactoryMonitor(
           task.botId,
         ],
       );
+      wakeCoordinatorAfterCommit(tx, userId);
       await appendEvidence(tx, notice);
       for (const issueId of recoveredIssueIds)
         if (issueId !== notice.issueId) await appendEvidence(tx, { ...notice, issueId });

@@ -23,12 +23,16 @@ dbTest('event-driven Coordinator wakes need no minute sweep', async t => {
     import('../db'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
     import('./wake-recovery'), import('../workflow-wake'),
   ])
+  const { coordinatorWakeTransport } = await import('./wake-after-commit')
+  const ownerWakes: string[] = []
+  coordinatorWakeTransport.wake = async userId => { ownerWakes.push(userId) }
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-wake-events-${randomUUID()}`
   const woken: string[] = []
   wake.wakeTransport.resume = async token => { woken.push(token) }
   t.after(async () => {
     delete wake.wakeTransport.resume
+    delete coordinatorWakeTransport.wake
     t.diagnostic(JSON.stringify({ event: 'coordinator_db_fixture_retained', fixtureOwnerIds: [owner], database: 'mikka_e2e' }))
     await scope.close()
   })
@@ -36,6 +40,39 @@ dbTest('event-driven Coordinator wakes need no minute sweep', async t => {
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Wake fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
     const botId = (await seedCoordinator(owner)).botId
     const token = wake.wakeTokens.coordinatorWake(owner, botId)
+
+    await t.test('a producer\'s pending row starts the owner\'s wake after COMMIT, once per commit, never on rollback', async () => {
+      ownerWakes.length = 0
+      await db.transaction(async tx => {
+        await recordCoordinatorEvent(tx, userMessageEvent(owner, 'Producer one', { botId }))
+        await recordCoordinatorEvent(tx, { userId: owner, botId, kind: 'run_report', dedupeKey: `test-report-${randomUUID()}`, issueId: null, runId: null, payload: { text: 'A report' } })
+        await settle()
+        assert.deepEqual(ownerWakes, [], 'nothing before COMMIT')
+      })
+      await settle()
+      assert.deepEqual(ownerWakes, [owner])
+      ownerWakes.length = 0
+      await assert.rejects(db.transaction(async tx => {
+        await recordCoordinatorEvent(tx, userMessageEvent(owner, 'Rolled back', { botId }))
+        throw new Error('synthetic rollback')
+      }), /synthetic rollback/)
+      await settle()
+      assert.deepEqual(ownerWakes, [])
+      await db.execute(sql`update coordinator_events set "deliveredAt"=now() where "userId"=${owner}`)
+    })
+
+    await t.test('a row triage has not seen, written during a turn, is woken when the turn lets go', async () => {
+      await recordCoordinatorEvent(db, userMessageEvent(owner, 'Turn request', { botId }))
+      assert.equal((await store.takeInbox(owner, 'wrun_untriaged-fixture', botId)).held, true)
+      // A tool's escalation during the turn: tier NULL, so not this loop's to take; its own wake deferred.
+      await recordCoordinatorEvent(db, { userId: owner, botId, kind: 'run_question', dedupeKey: `test-question-${randomUUID()}`, issueId: null, runId: null, payload: { text: 'A question' } })
+      await settle()
+      ownerWakes.length = 0
+      assert.equal(await store.releaseLease(owner, 'wrun_untriaged-fixture', botId), false, 'not a waking row for the loop')
+      await settle()
+      assert.deepEqual(ownerWakes, [owner])
+      await db.execute(sql`update coordinator_events set "deliveredAt"=now() where "userId"=${owner}`)
+    })
 
     await t.test('releasing a turn lease wakes the deadline waiting behind it, after COMMIT and only when it was held', async () => {
       await recordCoordinatorEvent(db, userMessageEvent(owner, 'First request', { botId }))
