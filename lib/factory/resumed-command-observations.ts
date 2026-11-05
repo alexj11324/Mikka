@@ -13,7 +13,7 @@ const time = (value: unknown) => value instanceof Date ? value.getTime() : typeo
 
 /** Completed command evidence has a stronger boundary than execution-budget
  * attribution: actual native claims, resumed SID, timing and candidate SHA. */
-export async function resumedCommandObservations(tx: Query, task: Task, candidate: Candidate) {
+export async function completedQuestionExecution(tx: Query, task: Task, candidate: Candidate) {
   const producer = candidate.producerExecution
   const { rows: [bound] } = await tx.query(`SELECT c.id,c.kind,${reportedCandidateShaSql('c', 'p')} AS "reportedSha",
       t."sourceEventId",t."botId",pa.id AS "producerAttemptId"
@@ -23,9 +23,9 @@ export async function resumedCommandObservations(tx: Query, task: Task, candidat
     WHERE t.id=$1 AND t."userId"=$2 AND t."issueId"=$3 AND c.id=$4 AND p.id=$5 AND p."sessionId"=$6
       AND t.stage IN ('review','verify') AND c.kind='deliverable'`,
   [task.id, task.userId, task.issueId, candidate.id, producer.runId, producer.sessionId])
-  if (!bound || await resolveFactoryCandidateSha(tx, task, bound, bound.reportedSha) !== candidate.executionSha) return empty()
+  if (!bound || await resolveFactoryCandidateSha(tx, task, bound, bound.reportedSha) !== candidate.executionSha) return null
   const edge = await questionExecutionContinuation(tx, { ...task, sourceEventId: bound.sourceEventId, botId: bound.botId }, bound.producerAttemptId)
-  if (!edge || edge.continuationRunId !== producer.runId || edge.originSessionId !== producer.sessionId) return empty()
+  if (!edge || edge.continuationRunId !== producer.runId || edge.originSessionId !== producer.sessionId) return null
   const { rows: [row] } = await tx.query(`SELECT s.status AS "sourceStatus",s."stopReason" AS "sourceStopReason",
       s."startedAt" AS "sourceStartedAt",s."finishedAt" AS "sourceFinishedAt",
       p."startedAt" AS "producerStartedAt",p."finishedAt" AS "producerFinishedAt",
@@ -48,13 +48,20 @@ export async function resumedCommandObservations(tx: Query, task: Task, candidat
       AND COALESCE(s."agentDefinition"->'policy'->>'readOnly','false')<>'true'
       AND COALESCE(s."agentDefinition"->>'readOnly','false')<>'true'`,
   [producer.runId, edge.sourceRunId, task.userId, task.issueId, producer.sessionId, task.id, edge.questionId, edge.recoveryEventId])
-  if (!row || row.sourceStatus !== (edge.kind === 'question_resume' ? 'stopped' : 'failed')) return empty()
-  if (row.subscription && (row.producerBindingId !== row.subscription.bindingId || row.sourceBindingId !== row.subscription.bindingId)) return empty()
+  if (!row || row.sourceStatus !== (edge.kind === 'question_resume' ? 'stopped' : 'failed')) return null
+  if (row.subscription && (row.producerBindingId !== row.subscription.bindingId || row.sourceBindingId !== row.subscription.bindingId)) return null
   const started = time(row.sourceStartedAt), finished = time(row.sourceFinishedAt), answered = time(row.answeredAt)
   const recovered = time(row.recoveryCreatedAt), producerStarted = time(row.producerStartedAt), producerFinished = time(row.producerFinishedAt)
   if (![started, finished, answered, recovered, producerStarted, producerFinished].every(Number.isFinite) ||
     started > finished || finished > recovered || recovered > producerStarted || producerStarted > producerFinished ||
-    (edge.kind === 'question_resume' ? finished > answered || answered > recovered : answered > started)) return empty()
+    (edge.kind === 'question_resume' ? finished > answered || answered > recovered : answered > started)) return null
+  return { edge, bound, row }
+}
+
+export async function resumedCommandObservations(tx: Query, task: Task, candidate: Candidate) {
+  const completed = await completedQuestionExecution(tx, task, candidate)
+  if (!completed) return empty()
+  const { edge, bound, row } = completed, producer = candidate.producerExecution
   const { rows: chunks } = await tx.query(`SELECT i.id AS "inputChunkId",o.id AS "outputChunkId",i.seq,
       i.chunk->>'toolName' AS "toolName",i."createdAt" AS "inputObservedAt",o."createdAt" AS "observedAt",
       left((i.chunk->'input')::text,4000) AS "inputJson",length((i.chunk->'input')::text)>4000 AS "inputTruncated",
