@@ -1,0 +1,28 @@
+{
+  "savedAt": "2026-11-05T22:15:47.828+00:00",
+  "responseTextUtf8Bytes": 18312,
+  "responseTextSha256": "4f035baac98dcebb04d599625bd45cf2f38648df9e73a42673ef6fcba5c6b7d2",
+  "byteMeaning": "Exact UTF-8 bytes of the Neon connector text response. Not HTTP transport bytes, PostgreSQL wire bytes or Neon billing traffic.",
+  "files": [
+    {
+      "path": "query.template.sql",
+      "sha256": "963f0029bf876a863572a18ebe0fcb5325ed7b07b58777fab0706e72b40ec8a4",
+      "utf8Bytes": 9614
+    },
+    {
+      "path": "response-content.json",
+      "sha256": "4f035baac98dcebb04d599625bd45cf2f38648df9e73a42673ef6fcba5c6b7d2",
+      "utf8Bytes": 18312
+    },
+    {
+      "path": "summary.json",
+      "sha256": "af1749cb1adc567d33f2123efb7b8cc716dc00ea270e9f6dc2aef6108e7a739c",
+      "utf8Bytes": 10294
+    },
+    {
+      "path": "tool-result.json",
+      "sha256": "05248808f15a91f07435c817d43a29e683ad93344b851c90a197fcbefc22dea5",
+      "utf8Bytes": 20089
+    }
+  ]
+}

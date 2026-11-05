@@ -1,0 +1,272 @@
+{
+  "observedAt": "2026-11-05T22:13:00.176Z",
+  "database": "orvilo_mvp",
+  "transactionReadOnly": true,
+  "projectId": "5034db32-324a-4fc9-b723-4e9da0286334",
+  "issueId": "c866b8df-6ae9-44c6-a38b-0f527504f3f4",
+  "scopeChecks": {
+    "project_found": true,
+    "project_owner_matches_authorized": true,
+    "issue_owner_matches_project": true,
+    "exact_scope_confirmed": true
+  },
+  "limits": {
+    "decisions": 20,
+    "sources": 20
+  },
+  "actualCounts": {
+    "decisions": 4,
+    "sources": 7
+  },
+  "limitsReached": false,
+  "decisions": [
+    {
+      "decisionId": "bcbb3d2c-a785-42ba-9383-055a4a362109",
+      "kind": "confirm",
+      "recordedAt": "2026-11-05T20:43:49.95+00:00",
+      "runId": null,
+      "selectedOptionId": null,
+      "recordedIdentity": {
+        "kind": "bot",
+        "model": "gpt-5.6-luna",
+        "harness": "ai_sdk",
+        "ownerMatches": true,
+        "runIdMatches": null,
+        "decidedByKind": "bot",
+        "identityAssurance": "host_context",
+        "liveRunNamespaceMatches": null,
+        "humanDeciderMatchesOwner": null
+      },
+      "runtime": {
+        "model": null,
+        "status": null,
+        "harness": null,
+        "startedAt": null,
+        "finishedAt": null,
+        "runPresent": false,
+        "modelSource": null,
+        "bindingModel": null,
+        "bindingRoute": null,
+        "apiKeyPresent": false,
+        "hasNativeSession": false,
+        "connectionPresent": false,
+        "recordedDuringRun": null,
+        "subscriptionRoute": null,
+        "attemptBoundToTask": false,
+        "connectionProvider": null,
+        "nativeClaimPresent": false,
+        "bindingOwnerMatchesRun": null,
+        "continuationQuestionId": null,
+        "continuationOriginRunId": null,
+        "bindingModelMatchesFrozen": null,
+        "claimMatchesFrozenBinding": null,
+        "bindingConsumerMatchesAgent": null,
+        "recordedIdentityMatchesFrozen": null,
+        "bindingWorkspaceMatchesDecision": null
+      },
+      "contextOption": {
+        "optionId": null,
+        "decisionId": null
+      },
+      "predecessors": []
+    },
+    {
+      "decisionId": "e5d412aa-0a4a-4e68-89e3-00d197fb22b4",
+      "kind": "choose",
+      "recordedAt": "2026-11-05T21:24:04.102+00:00",
+      "runId": "c7708ec5-71bf-4fc2-a5e2-aa65290d40e2",
+      "selectedOptionId": "source_first",
+      "recordedIdentity": {
+        "kind": "agent",
+        "model": "gpt-6-luna",
+        "harness": "codex",
+        "ownerMatches": true,
+        "runIdMatches": true,
+        "decidedByKind": "agent",
+        "identityAssurance": "run_token",
+        "liveRunNamespaceMatches": true,
+        "humanDeciderMatchesOwner": null
+      },
+      "runtime": {
+        "model": "gpt-6-luna",
+        "status": "stopped",
+        "harness": "codex",
+        "startedAt": "2026-11-05T21:22:47.304721+00:00",
+        "finishedAt": "2026-11-05T21:25:14.402604+00:00",
+        "runPresent": true,
+        "modelSource": "subscription",
+        "bindingModel": "gpt-6-luna",
+        "bindingRoute": "codex_cli",
+        "apiKeyPresent": false,
+        "hasNativeSession": true,
+        "connectionPresent": true,
+        "recordedDuringRun": true,
+        "subscriptionRoute": "codex_cli",
+        "attemptBoundToTask": true,
+        "connectionProvider": "codex",
+        "nativeClaimPresent": true,
+        "bindingOwnerMatchesRun": true,
+        "continuationQuestionId": "f7d4f073-eeff-4df9-8ef6-236dec665892",
+        "continuationOriginRunId": "6e52661a-0fa3-43a0-8358-a491566d513e",
+        "bindingModelMatchesFrozen": true,
+        "claimMatchesFrozenBinding": true,
+        "bindingConsumerMatchesAgent": true,
+        "recordedIdentityMatchesFrozen": true,
+        "bindingWorkspaceMatchesDecision": true
+      },
+      "contextOption": {
+        "optionId": null,
+        "decisionId": null
+      },
+      "predecessors": []
+    },
+    {
+      "decisionId": "6f809ef7-eced-4064-91b2-2c9edc5442da",
+      "kind": "redirect",
+      "recordedAt": "2026-11-05T21:29:35.876+00:00",
+      "runId": "72da4bde-06e9-4fce-8fa6-c9e7c61e98b4",
+      "selectedOptionId": "ui_first",
+      "recordedIdentity": {
+        "kind": "agent",
+        "model": "gpt-6-luna",
+        "harness": "codex",
+        "ownerMatches": true,
+        "runIdMatches": true,
+        "decidedByKind": "human",
+        "identityAssurance": "run_token",
+        "liveRunNamespaceMatches": true,
+        "humanDeciderMatchesOwner": true
+      },
+      "runtime": {
+        "model": "gpt-6-luna",
+        "status": "failed",
+        "harness": "codex",
+        "startedAt": "2026-11-05T21:28:25.581373+00:00",
+        "finishedAt": "2026-11-05T21:32:18.807211+00:00",
+        "runPresent": true,
+        "modelSource": "subscription",
+        "bindingModel": "gpt-6-luna",
+        "bindingRoute": "codex_cli",
+        "apiKeyPresent": false,
+        "hasNativeSession": true,
+        "connectionPresent": true,
+        "recordedDuringRun": true,
+        "subscriptionRoute": "codex_cli",
+        "attemptBoundToTask": true,
+        "connectionProvider": "codex",
+        "nativeClaimPresent": true,
+        "bindingOwnerMatchesRun": true,
+        "continuationQuestionId": "0319d55d-3ea5-4ec7-863d-0de33e7ec087",
+        "continuationOriginRunId": "c7708ec5-71bf-4fc2-a5e2-aa65290d40e2",
+        "bindingModelMatchesFrozen": true,
+        "claimMatchesFrozenBinding": true,
+        "bindingConsumerMatchesAgent": true,
+        "recordedIdentityMatchesFrozen": true,
+        "bindingWorkspaceMatchesDecision": true
+      },
+      "contextOption": {
+        "optionId": "source_first",
+        "decisionId": "e5d412aa-0a4a-4e68-89e3-00d197fb22b4"
+      },
+      "predecessors": [
+        "e5d412aa-0a4a-4e68-89e3-00d197fb22b4"
+      ]
+    },
+    {
+      "decisionId": "0b02d4e0-9359-48da-9a23-aaf055f7a10e",
+      "kind": "abandon",
+      "recordedAt": "2026-11-05T21:30:35.349+00:00",
+      "runId": "72da4bde-06e9-4fce-8fa6-c9e7c61e98b4",
+      "selectedOptionId": null,
+      "recordedIdentity": {
+        "kind": "agent",
+        "model": "gpt-6-luna",
+        "harness": "codex",
+        "ownerMatches": true,
+        "runIdMatches": true,
+        "decidedByKind": "human",
+        "identityAssurance": "run_token",
+        "liveRunNamespaceMatches": true,
+        "humanDeciderMatchesOwner": true
+      },
+      "runtime": {
+        "model": "gpt-6-luna",
+        "status": "failed",
+        "harness": "codex",
+        "startedAt": "2026-11-05T21:28:25.581373+00:00",
+        "finishedAt": "2026-11-05T21:32:18.807211+00:00",
+        "runPresent": true,
+        "modelSource": "subscription",
+        "bindingModel": "gpt-6-luna",
+        "bindingRoute": "codex_cli",
+        "apiKeyPresent": false,
+        "hasNativeSession": true,
+        "connectionPresent": true,
+        "recordedDuringRun": true,
+        "subscriptionRoute": "codex_cli",
+        "attemptBoundToTask": true,
+        "connectionProvider": "codex",
+        "nativeClaimPresent": true,
+        "bindingOwnerMatchesRun": true,
+        "continuationQuestionId": "0319d55d-3ea5-4ec7-863d-0de33e7ec087",
+        "continuationOriginRunId": "c7708ec5-71bf-4fc2-a5e2-aa65290d40e2",
+        "bindingModelMatchesFrozen": true,
+        "claimMatchesFrozenBinding": true,
+        "bindingConsumerMatchesAgent": true,
+        "recordedIdentityMatchesFrozen": true,
+        "bindingWorkspaceMatchesDecision": true
+      },
+      "contextOption": {
+        "optionId": "source_first",
+        "decisionId": "e5d412aa-0a4a-4e68-89e3-00d197fb22b4"
+      },
+      "predecessors": [
+        "e5d412aa-0a4a-4e68-89e3-00d197fb22b4",
+        "6f809ef7-eced-4064-91b2-2c9edc5442da"
+      ]
+    }
+  ],
+  "humanAnswer": {
+    "kind": "decision",
+    "status": "blocked",
+    "answerId": "ce39e69a-b911-5bbf-8e68-f12867670a46",
+    "answeredAt": "2026-11-05T21:28:13.819508+00:00",
+    "questionId": "0319d55d-3ea5-4ec7-863d-0de33e7ec087",
+    "originRunId": "c7708ec5-71bf-4fc2-a5e2-aa65290d40e2",
+    "answerSource": "human",
+    "questionCreatedAt": "2026-11-05T21:25:14.273395+00:00",
+    "answerPrecedesDecision": true,
+    "answerReferenceMatches": true,
+    "humanAnswerOwnerMatches": true,
+    "currentContinuationRunId": "bd1d92c5-c122-4b91-8e4f-62978f0e4752",
+    "humanDeciderMatchesAnswer": true,
+    "sourceVerifiedAfterAnswer": true,
+    "sourceLocatorAnswerMatches": true,
+    "recordingRunContinuationMatches": true,
+    "recordingRunHasHostResumeReceipt": true,
+    "sameNativeSessionAsQuestionOrigin": true,
+    "frozenHarnessModelAndSubscriptionUnchanged": true
+  },
+  "answerSourceRefs": [
+    "7da25303-773d-446b-91e9-d387bcb4bd7b",
+    "13d7032a-467c-4a6d-ade5-b839f4fc3580"
+  ],
+  "stoppedAt": {
+    "sourceRef": "246d8a72-011e-49e3-9aac-d437fc2a57ef",
+    "questionId": "0319d55d-3ea5-4ec7-863d-0de33e7ec087",
+    "originRunId": "c7708ec5-71bf-4fc2-a5e2-aa65290d40e2",
+    "relation": "host_verified",
+    "decisionId": "0b02d4e0-9359-48da-9a23-aaf055f7a10e"
+  },
+  "readOnlyTransactionsExecuted": 1,
+  "boundedDataSelectStatements": 1,
+  "otherSqlStatements": "SET TRANSACTION ... READ ONLY; SET LOCAL statement_timeout=5s; SET LOCAL lock_timeout=1s",
+  "productionWrites": 0,
+  "normalHttpRequests": 0,
+  "providerRequests": 0,
+  "assessment": "Codex record_decision production acceptance evidence is satisfied. Together with the already recorded Claude Code and Bot evidence, #1245 may close on its own criteria after evidence backfill. Later provider failure, document delivery, Factory final acceptance and #1247 graph/performance work are separate; none invalidates the earlier successful immutable decision writes.",
+  "provenanceBoundary": "Actual host-native claim + pinned subscription + live run-token decision writes and human-source/host-resume binding are recorded. Native session values, credentials, prompt/report/log/answer/message text were not returned. A later current question continuation differs because of recovery; the original recording run retains a matching host receipt and actual same-session proof.",
+  "responseTextUtf8Bytes": 18312,
+  "responseTextSha256": "4f035baac98dcebb04d599625bd45cf2f38648df9e73a42673ef6fcba5c6b7d2",
+  "byteMeaning": "Exact UTF-8 bytes of the Neon connector text response. Not HTTP transport bytes, PostgreSQL wire bytes or Neon billing traffic."
+}
