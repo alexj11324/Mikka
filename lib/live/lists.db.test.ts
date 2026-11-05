@@ -41,6 +41,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
   for (const ownerId of ['owner', 'peer', 'foreign', 'inactive', 'no-home']) for (const workspaceId of [home, team, foreignHome, inactiveHome]) {
     const value = { ownerId, workspaceId }; channels.set(`/v1/live/${liveChannelId(value)}/push`, value)
   }
+  let observedRunId = runId
   const received: { scope: LiveScope; events: LiveInvalidation[]; committedStatus: string | null }[] = []
   const errors: unknown[] = []
   const server = createServer(async (request, response) => {
@@ -53,7 +54,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
         assert.deepEqual(Object.keys(event).sort(), ['id', 'kind'])
         assert.equal(event.id, target.workspaceId, 'list events never expose a run, Bot, issue or group ID')
       }
-      const row = await database.query('SELECT status FROM agent_runs WHERE id=$1', [runId])
+      const row = await database.query('SELECT status FROM agent_runs WHERE id=$1', [observedRunId])
       received.push({ scope: target, events, committedStatus: row.rows[0]?.status ?? null })
       response.writeHead(204).end()
     } catch (error) { errors.push(error); response.writeHead(500).end() }
@@ -239,6 +240,73 @@ test('real PG: lists retain their reader scope and publish only the originating 
       }])
       await clear(); await scope.run(() => stopOwnedRun(db, 'owner', runId)); await drain()
       assert.equal(received.length, 0, 'an already-recorded stop is not a new list mutation')
+    })
+
+    await t.test('an actual unclaimed startup failure publishes its terminal lists once even when the completion event is already present', async () => {
+      const { failUnclaimedCloudStart } = await import('../run-leases')
+      const { coordinatorEnabled } = await import('../coordinator/wake')
+      assert.equal(coordinatorEnabled(), false, 'this isolated writer regression must not start model work')
+      const botId = randomUUID()
+      await database.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,'Startup list fixture')`, [botId, home])
+      const makeRun = async (deduped: boolean) => {
+        const id = randomUUID(), definition = { schemaVersion: 1, harness: 'codex', model: 'gpt-6-luna' }
+        await database.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","botId",status,prompt,"agentDefinition")
+          VALUES($1,'owner',$2,$3,$4,'queued','Startup list fixture',$5)`, [id, personalIssueId, ownerAgent, botId, definition])
+        await database.query(`INSERT INTO computer_run_bindings("runId","ownerId","workspaceId","botId") VALUES($1,'owner',$2,$3)`, [id, home, botId])
+        if (deduped) await database.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey","issueId","runId",payload)
+          VALUES($1,'owner',$2,'run_finished',$3,$4,$5,'{"status":"failed","stopReason":"device_lost"}')`, [randomUUID(), botId, `run_finished:${id}`, personalIssueId, id])
+        return { id, definition }
+      }
+      const fail = (id: string, userId = 'owner', workspaceId = home) => scope.run(() => failUnclaimedCloudStart({ userId, workspaceId }, id, new Error('Isolated startup fixture')))
+      try {
+        for (const deduped of [false, true]) {
+          const run = await makeRun(deduped)
+          await clear(); observedRunId = run.id
+          assert.equal(await fail(run.id), true)
+          await wrongScope.run(drain)
+          const listReads = received.filter(value => value.events.some(event => event.kind === 'thread_list' || event.kind === 'task_run_list'))
+          assert.deepEqual(listReads, [{ scope: { ownerId: 'owner', workspaceId: home },
+            events: [{ kind: 'thread_list', id: home }, { kind: 'task_run_list', id: home }], committedStatus: 'failed' }],
+          `the actual committed row needs exactly one list update, completion event deduped=${deduped}`)
+          assert.ok(received.every(value => value.scope.ownerId === 'owner' && value.scope.workspaceId === home))
+          const row = (await database.query('SELECT status,"stopReason","stopRequestedAt","agentDefinition" FROM agent_runs WHERE id=$1', [run.id])).rows[0]
+          assert.deepEqual(row, { status: 'failed', stopReason: 'device_lost', stopRequestedAt: null, agentDefinition: run.definition })
+          assert.equal((await database.query(`SELECT count(*)::int AS n FROM coordinator_events WHERE "dedupeKey"=$1`, [`run_finished:${run.id}`])).rows[0].n, 1)
+          await clear(); assert.equal(await fail(run.id), false); await drain()
+          assert.equal(received.length, 0, 'terminal replay is not a new write')
+        }
+        const rollback = await makeRun(true)
+        await clear(); observedRunId = rollback.id
+        await database.query(`CREATE FUNCTION reject_startup_list_commit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+          IF NEW.id='${rollback.id}'::uuid AND NEW.status='failed' THEN RAISE EXCEPTION 'startup list commit rejected'; END IF; RETURN NEW; END $$`)
+        await database.query(`CREATE CONSTRAINT TRIGGER reject_startup_list_commit AFTER UPDATE ON agent_runs
+          DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION reject_startup_list_commit()`)
+        try {
+          await assert.rejects(fail(rollback.id), error => {
+            const cause = (error as { cause?: unknown }).cause ?? error
+            return (cause as { code?: string }).code === 'P0001' && String(cause).includes('startup list commit rejected')
+          })
+          await drain(); assert.equal(received.length, 0, 'a real PostgreSQL COMMIT failure discards the registered invalidation')
+          assert.equal((await database.query('SELECT status FROM agent_runs WHERE id=$1', [rollback.id])).rows[0].status, 'queued')
+          assert.equal((await database.query(`SELECT count(*)::int AS n FROM coordinator_events WHERE "dedupeKey"=$1`, [`run_finished:${rollback.id}`])).rows[0].n, 1, 'the previously committed event is unchanged')
+        } finally {
+          await database.query('DROP TRIGGER reject_startup_list_commit ON agent_runs')
+          await database.query('DROP FUNCTION reject_startup_list_commit()')
+        }
+        for (const guard of ['owner', 'workspace', 'claim', 'lease', 'stop', 'session_resume'] as const) {
+          const run = await makeRun(false)
+          if (guard === 'claim') await database.query(`UPDATE agent_runs SET status='running',"startedAt"=now(),"sessionId"='fixture-native-session' WHERE id=$1`, [run.id])
+          if (guard === 'lease') await database.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()+interval '1 minute' WHERE id=$1`, [run.id])
+          if (guard === 'stop') await database.query(`UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1`, [run.id])
+          if (guard === 'session_resume') await database.query(`UPDATE agent_runs SET "questionContinuation"='{"requireSessionResume":true}' WHERE id=$1`, [run.id])
+          const before = (await database.query('SELECT * FROM agent_runs WHERE id=$1', [run.id])).rows[0]
+          await clear(); observedRunId = run.id
+          assert.equal(await fail(run.id, guard === 'owner' ? 'peer' : 'owner', guard === 'workspace' ? team : home), false, guard)
+          await drain(); assert.equal(received.length, 0, guard)
+          assert.deepEqual((await database.query('SELECT * FROM agent_runs WHERE id=$1', [run.id])).rows[0], before, guard)
+          assert.equal((await database.query(`SELECT count(*)::int AS n FROM coordinator_events WHERE "runId"=$1`, [run.id])).rows[0].n, 0, guard)
+        }
+      } finally { observedRunId = runId }
     })
 
     await t.test('actual private group message, read receipt and member removal update only their authorized list audiences', async () => {

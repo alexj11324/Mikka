@@ -427,6 +427,8 @@ export async function failUnclaimedCloudStart(actor: { userId: string; workspace
       .where(eq(agentRuns.id, runId)).returning()
     const event = runFinishedEvent({ ...ended, stopReason: 'device_lost', report: null })
     await recordCoordinatorEvent(tx, { ...event, payload: { ...event.payload, noMachine } })
+    // The terminal row changed even when its durable completion event already exists.
+    await runListChanged(tx, ended.id)
     return ended
   })
   if (!failed) return false
