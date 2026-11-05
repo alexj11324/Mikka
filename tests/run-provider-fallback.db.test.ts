@@ -104,7 +104,7 @@ test('provider failure continues the same task through its authorized preferred 
   type Person = Awaited<ReturnType<typeof person>>
   const scope = (p: Person) => ({ ownerId: p.id, workspaceId: p.workspaceId, botId: p.botId })
   /** Use the same add/remove/reorder operations as Settings; no SQL snapshot edits. */
-  const preferences = async (p: Person, entries: Entry[]) => {
+  const preferences = async (p: Person, entries: (Entry | { harness: Harness; model: string; source: { kind: 'subscription'; connectionId: string } })[]) => {
     await order.changeOrder(pool, scope(p), { kind: 'location', location: 'local' })
     await order.changeOrder(pool, scope(p), { kind: 'add', entries })
     const wanted = new Set(entries.map(entryKey))
@@ -132,7 +132,7 @@ test('provider failure continues the same task through its authorized preferred 
       "startedAt"=now(),"leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [runId, `session-${runId}`, `/tmp/provider-${runId}`])
     return runId
   }
-  const routedSelection = async (p: Person, model: string, issueId: string, profileId?: string) => {
+  const routedSelection = async (p: Person, model: string, issueId: string, profileId?: string, harness: Harness = 'claude_code') => {
     const decision: typeof import('../lib/coordinator/decide').invokeDecision = async (_purpose, input) => {
       const body = JSON.parse(typeof input === 'string' ? input : input.text) as { candidates: { id: string; model: string }[] }
       const candidate = body.candidates.find(item => item.model === model)
@@ -145,7 +145,7 @@ test('provider failure continues the same task through its authorized preferred 
     }
     const { resolveAgentProfileDispatch } = await import('../lib/factory/agent-profile')
     const picked = await resolveAgentProfileDispatch(pool, scope(p), { issueId, stage: 'execute', location: 'local',
-      deviceId: p.deviceId, defaultHarness: 'claude_code', ...(profileId ? { profileId } : { defaultOnly: true }) }, { modelDecision: decision })
+      deviceId: p.deviceId, defaultHarness: harness, ...(profileId ? { profileId } : { defaultOnly: true }) }, { modelDecision: decision })
     const target = picked.target
     assert.equal(target.kind, 'device')
     if (target.kind !== 'device') assert.fail('The fixture must select its real local executor')
@@ -189,6 +189,60 @@ test('provider failure continues the same task through its authorized preferred 
     const entries = [entry('claude_code', 'fixture-claude-a', first.id), entry(sameHarness ? 'claude_code' : 'codex', 'fixture-model-b', second.id)]
     await preferences(p, entries)
     return { p, first, second, entries }
+  }
+
+  const automaticFailure = async (label: string, options: { subscription?: boolean; onlyLight?: boolean } = {}) => {
+    const [{ AgentProfileStore }, { createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun },
+      { automaticFactoryDispatch }, { createFactoryReconciler }, { factoryCheckGates }, { factoryCheckIndependent },
+      { ensureDeviceRepository }] = await Promise.all([
+      import('../lib/factory/agent-profile'), import('../lib/factory/store'), import('../lib/factory/dispatch'), import('../lib/agent-runs'),
+      import('../lib/factory/automatic-dispatch'), import('../lib/factory/reconcile'), import('../lib/factory/checks'),
+      import('../lib/factory/check-independence'), import('../lib/device-repositories'),
+    ])
+    const p = await person(label), issueId = await task(p.id), epoch = randomUUID()
+    const harness = options.subscription ? 'codex' : 'claude_code'
+    const light = options.subscription ? 'gpt-6-luna' : 'claude-haiku-5-5'
+    const standard = options.subscription ? 'gpt-6-sol' : 'claude-sonnet-5-5'
+    const credential = await addKey(p.id, options.subscription ? 'openai' : 'anthropic',
+      options.subscription || options.onlyLight ? [light] : [standard, light])
+    if (options.subscription) {
+      const { connectionId } = await seedAllowedModel(pool, p.id, { workspaceId: p.workspaceId })
+      await pool.query('UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1',
+        [connectionId, JSON.stringify({ revision: '1', models: [standard] })])
+      await pool.query('UPDATE byos_bindings SET "modelId"=$2 WHERE "connectionId"=$1', [connectionId, standard])
+      await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [p.deviceId, JSON.stringify([
+        { harness: 'codex', installed: true, subscriptionBroker: true, toolApproval: true,
+          modelSlots: [{ slot: standard, model: standard, name: standard }] },
+      ])])
+      await preferences(p, [{ harness, model: standard, source: { kind: 'subscription', connectionId } }, entry(harness, light, credential.id)])
+    } else await preferences(p, (options.onlyLight ? [light] : [standard, light]).map(model => entry(harness, model, credential.id)))
+    const profiles = new AgentProfileStore(pool)
+    const profile = await profiles.create(scope(p), { name: `Frozen ${label} role`, roles: ['implementation'],
+      harness, model: { mode: 'inherit' }, effort: 'low', instructions: 'Keep this frozen responsibility through the existing repair path.' })
+    const selected = await routedSelection(p, light, issueId, profile.id, harness)
+    await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
+      VALUES ($1,$2,$3,$4,'user_message',$5,'{"text":"Retry the existing implementation within its original authority"}')`,
+    [epoch, p.id, p.botId, issueId, `cascade:${epoch}`])
+    const repo = await ensureDeviceRepository(p.id, p.deviceId, p.remote)
+    const factory = createFactoryStore(pool, async (owner, id, tx) =>
+      (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [id, owner])).rowCount === 1, p.botId,
+    { independent: factoryCheckIndependent, gates: factoryCheckGates })
+    const routed = await factory.route(p.id, { issueId, sourceEventId: epoch, eventId: randomUUID(), rationale: 'Automatic repair transaction boundary fixture' })
+    const dispatch = createFactoryDispatch(pool, factory, (tx, owner, input, bot, context) =>
+      queueFactoryRun(tx, owner, input, bot, context, undefined, { ...selected, readOnly: true }))
+    const first = await dispatch(p.id, { binding: factoryBinding(routed.task), agentId: p.agents[harness], deviceRepoId: repo.id })
+    await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='agent_error',"startedAt"=now()-interval '1 second',
+      "finishedAt"=now(),"sessionId"=$2,report=$3 WHERE id=$1`,
+    [first.runId, `automatic-source-${first.runId}`, JSON.stringify(emptyRunReport('Synthetic terminal implementation failure'))])
+    const original = await row(first.runId), automatic = automaticFactoryDispatch(pool)
+    const bindings = async () => (await pool.query(`SELECT id,"consumerId","connectionId","connectionRevision","modelId","createdAt"
+      FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id`, [p.id])).rows
+    const currentRun = async (query: Pick<import('pg').PoolClient, 'query'> = pool) => {
+      const { rows: [run] } = await query.query(`SELECT r.* FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId"
+        JOIN agent_runs r ON r.id=a."runId" WHERE t.id=$1`, [routed.task.id])
+      return run
+    }
+    return { p, profile, profiles, factory, first, original, automatic, createFactoryReconciler, bindings, currentRun, light, standard }
   }
 
   for (const enabled of [true, false]) await t.test(`routed light failure ${enabled ? 'raises one tier before the failed list position' : 'respects a disabled routing switch'}`, async () => {
@@ -314,6 +368,83 @@ test('provider failure continues the same task through its authorized preferred 
     assert.equal(assignment.resumeSessionId, undefined)
     assert.equal(assignment.effort, 'low')
     assert.equal((await pool.query(`SELECT 1 FROM factory_attempts WHERE "taskId"=$1 AND stage='execute'`, [routed.task.id])).rowCount, 2)
+  })
+
+  await t.test('automatic escalation rolls its subscription binding back with the real Factory transaction', async () => {
+    const setup = await automaticFailure('automatic-binding-rollback', { subscription: true })
+    const before = await setup.bindings(), failure = new Error('fixture_after_automatic_queue')
+    let queuedRunId: string | undefined
+    const reconciler = setup.createFactoryReconciler(pool, setup.factory, undefined, {}, setup.p.botId, async (tx, store, prior, run) => {
+      await setup.automatic(tx, store, prior, run)
+      const queued = await setup.currentRun(tx)
+      queuedRunId = queued.id
+      assert.notEqual(queued.id, setup.first.runId)
+      assert.equal(queued.agentDefinition.model, setup.standard)
+      assert.ok(queued.agentDefinition.subscription?.bindingId)
+      assert.equal((await tx.query('SELECT 1 FROM byos_bindings WHERE id=$1', [queued.agentDefinition.subscription.bindingId])).rowCount, 1)
+      throw failure
+    })
+    await assert.rejects(reconciler.run(setup.p.id, setup.first.runId), error => error === failure)
+    assert.ok(queuedRunId, 'the failure must occur after the real upgraded run and binding were queued')
+    assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE id=$1', [queuedRunId])).rowCount, 0)
+    assert.deepEqual(await setup.bindings(), before, 'no new binding or latest-binding timestamp may escape the outer rollback')
+    assert.equal((await setup.currentRun()).id, setup.first.runId, 'Factory binding and run rollback together')
+  })
+
+  await t.test('disabled automatic routing does not publish an unused subscription binding', async () => {
+    const setup = await automaticFailure('automatic-binding-off', { subscription: true })
+    await order.changeOrder(pool, scope(setup.p), { kind: 'autoRouting', enabled: false })
+    const before = await setup.bindings()
+    const reconciler = setup.createFactoryReconciler(pool, setup.factory, undefined, {}, setup.p.botId, setup.automatic)
+    await reconciler.run(setup.p.id, setup.first.runId)
+    const repaired = await setup.currentRun()
+    assert.notEqual(repaired.id, setup.first.runId)
+    assert.equal(repaired.agentDefinition.model, setup.light)
+    assert.deepEqual(repaired.agentDefinition.modelDispatch, setup.original.agentDefinition.modelDispatch)
+    assert.equal(repaired.agentDefinition.profileOriginRunId, setup.first.runId)
+    assert.deepEqual(await setup.bindings(), before, 'the ignored normal-order target must never write a binding')
+  })
+
+  await t.test('fresh automatic escalation rechecks workspace membership at the real outer commit', async () => {
+    const setup = await automaticFailure('automatic-membership-commit')
+    let queuedRunId: string | undefined
+    const reconciler = setup.createFactoryReconciler(pool, setup.factory, undefined, {}, setup.p.botId, async (tx, store, prior, run) => {
+      const start = await setup.automatic(tx, store, prior, run)
+      const queued = await setup.currentRun(tx)
+      queuedRunId = queued.id
+      assert.equal(queued.agentDefinition.model, setup.standard)
+      assert.equal(queued.agentDefinition.profileOriginRunId, undefined, 'an upgraded model is fresh admission')
+      await workspacePool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2',
+        [setup.p.workspaceId, setup.p.id])
+      return start
+    })
+    try {
+      await assert.rejects(reconciler.run(setup.p.id, setup.first.runId), { message: 'agentProfileScopeNotFound' })
+    } finally {
+      await workspacePool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2',
+        [setup.p.workspaceId, setup.p.id])
+    }
+    assert.ok(queuedRunId, 'membership is revoked after queue admission, before its owner commits')
+    assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE id=$1', [queuedRunId])).rowCount, 0)
+    assert.equal((await setup.currentRun()).id, setup.first.runId, 'the fresh attempt cannot outlive its revoked authority')
+  })
+
+  await t.test('same-target automatic repair preserves a started native session after its Profile is archived', async () => {
+    const setup = await automaticFailure('automatic-native-frozen-role', { onlyLight: true })
+    await setup.profiles.archive(scope(setup.p), setup.profile.id, setup.profile.version)
+    const reconciler = setup.createFactoryReconciler(pool, setup.factory, undefined, {}, setup.p.botId, setup.automatic)
+    await reconciler.run(setup.p.id, setup.first.runId)
+    const repaired = await setup.currentRun()
+    assert.notEqual(repaired.id, setup.first.runId)
+    assert.equal(repaired.agentDefinition.model, setup.light)
+    assert.equal(repaired.agentDefinition.modelDispatch.routing.reason, 'list_order')
+    assert.deepEqual(repaired.agentDefinition.agentProfile, setup.original.agentDefinition.agentProfile)
+    assert.equal(repaired.agentDefinition.profileOriginRunId, setup.first.runId, 'only the DB-validated exact native origin exempts the old role')
+    assert.equal(repaired.continuesRunId, setup.first.runId)
+    const { profileNativeSessionMatches } = await import('../lib/factory/profile-native-session')
+    assert.equal(profileNativeSessionMatches(setup.original.agentDefinition, repaired.agentDefinition), true)
+    const assignment = await claim(setup.p, repaired.id)
+    assert.equal(assignment.effort, 'low', 'first claim still admits the frozen native role')
   })
 
   await t.test('an untouched default order persists its source and subscription continuation with the same entry identities', async () => {

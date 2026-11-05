@@ -5,7 +5,9 @@ import { z } from 'zod'
 import { retainEnrollmentSourcesForAcceptance } from './subscription-enrollment-policy'
 import { SubscriptionRefusal, type SubscriptionRoute } from '@mikka/protocol/subscription'
 import { workspaceDb } from './workspace-db'
-import { requireWorkspace } from './workspace-access'
+import { and, eq } from 'drizzle-orm'
+import { workspaces, workspaceMembers } from './db/workspace-schema'
+import { WorkspaceError } from './workspace-error'
 import { pool } from './db'
 import { captureDatabaseQuery } from './db/commit-effects'
 import { byosEnabled, byosEnrollmentEnabled } from './cloud-computer-flag'
@@ -18,7 +20,16 @@ import { authorizedAccessName, subscriptionAccessSnapshot } from './subscription
 import { join } from 'node:path'
 
 export async function authorizeSubscriptionWorkspace(userId: string, workspaceId: string) {
-  await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, userId))
+  z.uuid().parse(workspaceId)
+  await workspaceDb.transaction(async tx => {
+    // Pure authorization needs a read lock. An exclusive workspace lock can
+    // wait on one member's lease while blocking another member's validation.
+    const [row] = await tx.select({ id: workspaces.id }).from(workspaces)
+      .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
+      .where(and(eq(workspaces.id, workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
+      .for('share').limit(1)
+    if (!row) throw new WorkspaceError('workspaceAccessDenied')
+  })
 }
 /** A subscription runs its owner's own bots in every workspace the owner belongs to (decision 2026-11-01-2240);
  * another member's bot only while the owner shares it there with 分享给团队成员 and the admin allows it. */

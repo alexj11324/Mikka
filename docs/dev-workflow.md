@@ -2,7 +2,8 @@
 
 Standing rules for how work moves from a branch to `main`. Decision:
 [`2026-11-01-1440-dev-workflow-local-first`](design/decisions/2026-11-01-1440-dev-workflow-local-first.md);
-ownership and merging as Alex set them on 2026-11-03 (§ 5).
+ownership as Alex set it on 2026-11-03, with batch merging updated on
+2026-11-05 (§ 5).
 Where another document disagrees, this page wins; fix the other document.
 
 ## 1. Local first
@@ -108,8 +109,9 @@ loopback `*_e2e` database) is described in
 
 ## 5. Ownership and merging
 
-Alex set these rules on 2026-11-03
+Alex set the ownership rules on 2026-11-03
 ([`2026-11-03-2359`](design/decisions/2026-11-03-2359-issue-owner-merges-and-accepts-in-production.md)).
+Batch merging follows Alex's 2026-11-05 update in `AGENTS.md`.
 They replace the coordinator-merges rule, the push-fixes-to-main rule and the
 old module owners (backend was Codex's).
 
@@ -118,11 +120,16 @@ old module owners (backend was Codex's).
    owns it end to end: code, PR, merge, deploy check and production
    acceptance.
 2. **No direct pushes.** Nobody pushes to `main`. Every change goes through a
-   PR from a branch that branches from `main` and changes one thing. There
-   are no integration batches.
+   PR from a branch based on `main`. Each original PR changes one thing;
+   ready PRs are integrated as a batch under rule 3.
 3. **The owner merges.** When CI is green on the latest head and the PR is
-   mergeable, the owner squash-merges it itself. A UI change merges only
-   after the owner has reviewed its screenshots and attached them to the PR.
+   mergeable, the owner completes the merge. When two or more PRs are ready,
+   combine their branches into one `batch/<date>-<n>` branch, resolve conflicts
+   once and run CI on the final batch head. Merge the batch PR with a merge
+   commit so the original PRs are recorded as merged. Each original issue
+   keeps its owner and production acceptance criteria. A single ready PR may
+   be squash-merged. A UI change merges only after the owner has reviewed its
+   screenshots and attached them to the PR.
    A change to auth, signup, privilege or credentials says so in the PR.
 4. **Stacked PRs** merge in order. After a base merges, retarget the next PR
    to `main`.
@@ -131,7 +138,8 @@ old module owners (backend was Codex's).
    Merge `main` in when there is a conflict, or when a change that just landed
    touches the same code and the PR must be checked against it.
 5. **After the merge** the owner watches the Vercel production deployment
-   until it is READY and the production domain serves that commit. Pending
+   until it is READY and the production domain serves that commit. After a
+   batch lands, leave `main` unchanged until both conditions hold. Pending
    migrations run through the existing flow (`pnpm build` runs
    `scripts/migrate.mjs`). Then the owner accepts the change in production
    against the issue's acceptance criteria, with a real account and task

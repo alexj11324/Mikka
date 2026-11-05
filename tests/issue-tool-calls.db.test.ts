@@ -19,6 +19,13 @@ if (enabled) {
   overrideDeploymentSwitch('issueTools', true)
 }
 
+// Preserve the original failure, but let every concurrent operation finish
+// before fixture deletion takes locks on the same owner/issues.
+async function settledValues<T extends readonly unknown[]>(operations: T) {
+  await Promise.allSettled(operations)
+  return Promise.all(operations)
+}
+
 test('actual issue actions commit one issue per tool call, roll back partial writes, and preserve history on replay', { skip: !enabled }, async () => {
   const { pool } = await import('../lib/db')
   const { createIssue, updateIssue } = await import('../lib/mcp/actions')
@@ -61,7 +68,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     // actions. No test-only issue writer stands in for the Coordinator.
     const tools = createCoordinatorRegistry(owner, coordinator, undefined, { coordinator: true })
     const create = () => tools.create_issue!.execute!(input, { toolCallId: callId, messages: [], context: {} })
-    const results = await Promise.all([create(), create()])
+    const results = await settledValues([create(), create()])
     assert.ok('id' in results[0], JSON.stringify(results[0]))
     assert.deepEqual(results[0], results[1])
     assert.equal(await count('issues'), 1)
@@ -146,7 +153,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     type Snapshot=import('../lib/factory/store').FactorySnapshot
     const invoke=factoryTools.intake_factory_request!.execute! as unknown as (input:unknown,options:{toolCallId:string;messages:never[];context:object})=>Promise<Snapshot|{error:string}>
     const issueCount=await count('issues')
-    const routed=await Promise.all(Array.from({length:10},(_,n)=>invoke({...request,sourceEventId:n%2?sourceId.toUpperCase():sourceId},{toolCallId:`attempt-${n}`,messages:[],context:{}})))
+    const routed=await settledValues(Array.from({length:10},(_,n)=>invoke({...request,sourceEventId:n%2?sourceId.toUpperCase():sourceId},{toolCallId:`attempt-${n}`,messages:[],context:{}})))
     for(const result of routed){assert.ok('task' in result,JSON.stringify(result));assert.equal(result.task.stage,'execute');assert.equal(result.task.status,'pending')}
     assert.equal(new Set(routed.map(result=>'task' in result?result.task.id:null)).size,1)
     assert.equal(await count('issues'),issueCount+1)
@@ -172,7 +179,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     const {factoryBinding}=await import('../lib/factory/dispatch')
     const dispatch=lifecycleTools.dispatch_factory_task!.execute! as unknown as (input:unknown,options:{toolCallId:string;messages:never[];context:object})=>Promise<import('../lib/factory/dispatch').FactoryDispatchResult|{error:string}>
     const dispatchInput={binding:factoryBinding(first.task),agentId:worker,deviceRepoId:repo}
-    const executions=await Promise.all(Array.from({length:10},(_,n)=>dispatch(dispatchInput,{toolCallId:`dispatch-${n}`,messages:[],context:{}})))
+    const executions=await settledValues(Array.from({length:10},(_,n)=>dispatch(dispatchInput,{toolCallId:`dispatch-${n}`,messages:[],context:{}})))
     for(const execution of executions)assert.ok('runId' in execution,JSON.stringify(execution))
     assert.equal(new Set(executions.map(r=>'runId' in r?r.runId:null)).size,1)
     const frozen=(await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1',[first.task.issueId])).rows

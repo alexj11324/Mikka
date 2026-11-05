@@ -213,17 +213,18 @@ export function createFactoryStore(
     // #191 can enqueue and bind on its already-open transaction. Its caller
     // owns BEGIN/COMMIT/ROLLBACK; an error must roll back the entire dispatch.
     if (existing) return fn(existing);
+    const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('./transaction');
     const tx = await pool.connect();
     try {
-      await tx.query("BEGIN");
+      await beginFactoryTransaction(tx);
       const result = await fn(tx);
-      await tx.query("COMMIT");
+      await commitFactoryTransaction(tx);
       return result;
     } catch (error) {
-      await tx.query("ROLLBACK");
+      await rollbackFactoryTransaction(tx);
       throw error;
     } finally {
-      tx.release();
+      forgetFactoryTransaction(tx); tx.release();
     }
   }
   async function sourceAllowed(

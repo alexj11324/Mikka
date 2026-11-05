@@ -1,5 +1,5 @@
 import 'server-only'
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { digest } from '@/lib/agent-kit/definition'
 import { bindAgentToConnection, resolveModelDispatch, type ModelDispatch } from '@/lib/model-dispatch'
@@ -44,6 +44,8 @@ export interface AgentProfileDispatchResult {
 }
 type DispatchScope = AgentProfileScope & { botId: string | null }
 type DispatchDependencies = {
+  /** Host-owned Factory client; its real COMMIT acquires the final lease. */
+  transaction?: PoolClient
   membership?: (scope: AgentProfileScope) => Promise<ProfileMembership>
   resolve?: typeof resolveModelDispatch
   decision?: typeof invokeDecision
@@ -189,72 +191,89 @@ export async function assertProfileTarget(query: ProfileQuery, scope: AgentProfi
 
 export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchScope, request: AgentProfileDispatchRequest, deps: DispatchDependencies = {}): Promise<AgentProfileDispatchResult> {
   validateProfileScope(scope)
-  const member = await (deps.membership ?? acquireProfileMembership)(scope)
-  try {
-    const rows = await readProfileRows(pool, scope)
-    const legacy = async () => {
-      const constraints = await requestConstraints(pool, scope, request)
-      const target = await (deps.resolve ?? resolveModelDispatch)(pool, scope, request.asked, request.location, constraints.deviceId, { withoutCloud: request.withoutCloud, cloudPurpose: request.cloudPurpose, harness: constraints.harness ?? request.defaultHarness, agentId: request.agentId,
-        routing: { issueId: request.issueId, stage: request.stage, note: request.note, ...request.routing }, decision: deps.modelDecision })
-      const agentProfile = target.kind === 'none' ? undefined : builtinAgentProfileSelection(scope, target.entry)
-      if (agentProfile) await assertProfileSelection(pool, scope, agentProfile)
-      await member.check(); return { target, ...(agentProfile ? { agentProfile } : {}), selectionMode: request.asked?.model ? 'picked' as const : 'preference' as const }
-    }
-    if (request.defaultOnly && request.profileId) throw new AgentProfileError('agentProfilePinConflict')
-    if (request.defaultOnly || (!request.profileId && !rows.some(row => row.definition.enabled))) return await legacy()
-    const selectedRow = request.profileId ? rows.find(row => row.id === request.profileId) : undefined
-    if (request.profileId && !selectedRow) throw new AgentProfileError('agentProfileNotFound', 404)
-    if (selectedRow && !selectedRow.definition.enabled) throw new AgentProfileError('agentProfileDisabled')
-    const { eligible, availability } = await eligibleProfiles(pool, scope, selectedRow ? [selectedRow] : rows, request, deps)
-    if (!eligible.length) {
-      if (selectedRow) throw new AgentProfileError(availability[selectedRow.id]?.reason === 'pinConflict' ? 'agentProfilePinConflict' : 'agentProfileUnavailable')
-      // An explicit physical Agent/model wins even when the owner's profiles describe other work.
-      if (request.asked || request.agentId) return await legacy()
-      throw new AgentProfileError('agentProfileUnavailable')
-    }
-    let chosen: Eligible | undefined, reason: AgentProfileSelection['reason'] = 'explicit'
-    let execution: Awaited<ReturnType<typeof invokeDecision>> | null = null
-    if (request.profileId) chosen = eligible.find(item => item.row.id === request.profileId)
-    else {
-      z.uuid().parse(request.issueId)
-      const { issueForUser } = await import('@/lib/issue-access')
-      const issue = await issueForUser(scope.ownerId, request.issueId)
-      if (!issue) throw new AgentProfileError('agentProfileScopeNotFound', 404)
-      const catalog = eligible.map(item => item.public)
-      const input = maskFactoryNote(JSON.stringify({ task: { title: issue.title, content: JSON.stringify(issue.content).slice(0, 12_000), stage: request.stage ?? 'execute', note: request.note?.slice(0, 4000) }, candidates: catalog }))
-      execution = await hostedBillingScope.run({ workspaceId: scope.workspaceId, ownerId: scope.ownerId }, () => (deps.decision ?? invokeDecision)('factory-agent-profile', input, profileDecisionQuestions(catalog)))
-      const selected = selectedProfileAnswer(catalog, execution?.answers ?? null)
-      if (!selected) throw new AgentProfileError('agentProfileDecisionUnavailable')
-      chosen = eligible.find(item => item.row.id === selected.id); reason = selected.reason
-    }
-    if (!chosen) throw new AgentProfileError('agentProfileSelectionInvalid')
-    const definition = parseAgentProfile(chosen.row.definition), skills = resolveAgentProfileSkills(definition.skills)
-    // Role selection happens first. Its fixed model and a person's explicit
-    // model are never replaced; only an inherited model list is routed.
-    if (definition.model.mode !== 'fixed' && !request.asked?.model) {
-      const constraints = await requestConstraints(pool, scope, request)
-      const routed = await (deps.resolve ?? resolveModelDispatch)(pool, scope, request.asked, request.location, constraints.deviceId, {
-        harness: definition.harness === 'auto' ? constraints.harness : definition.harness,
-        agentId: request.agentId, withoutCloud: request.withoutCloud, cloudPurpose: request.cloudPurpose, bindSubscription: false,
-        routing: { issueId: request.issueId, stage: request.stage, note: request.note, effort: definition.effort, ...request.routing }, decision: deps.modelDecision,
-      })
-      if (routed.kind === 'none') throw new AgentProfileError('agentProfileModelUnavailable')
-      chosen = { ...chosen, target: routed }
-    }
-    const selection: AgentProfileSelection = {
-      profileId: chosen.row.id, version: chosen.row.version, digest: chosen.row.digest, name: definition.name,
-      source: request.profileId ? 'explicit' : 'decision', reason, scope: { ownerId: scope.ownerId, workspaceId: scope.workspaceId }, definition, skills,
-      instructions: agentProfileInstructions(definition, skills), ...(definition.effort ? { effort: definition.effort } : {}), targetEntry: chosen.target.entry,
-      ...(execution ? { decision: execution.execution } : {}),
-    }
-    const client = await pool.connect()
-    let target = chosen.target
+  if (deps.transaction) (await import('./transaction')).assertFactoryTransaction(deps.transaction)
+  const membership = deps.membership ?? acquireProfileMembership
+  const initialMember = await membership(scope)
+  let rows: ProfileRow[]
+  try { rows = await readProfileRows(pool, scope); await initialMember.check() }
+  finally { await initialMember.close() }
+  // Catalogue/credential refresh and Decision can outlive the 20-second
+  // membership lease. Plan without holding that lease or writing a binding,
+  // then acquire current authority again for the short admission transaction.
+  const finalize = async (target: ModelDispatch, agentProfile: AgentProfileSelection | undefined, selectionMode: 'picked' | 'preference'): Promise<AgentProfileDispatchResult> => {
+    const client = deps.transaction ?? await pool.connect()
+    let member: ProfileMembership | undefined
     try {
-      await client.query('BEGIN'); await assertProfileSelection(client, scope, selection); await member.check()
+      if (!deps.transaction) await client.query('BEGIN')
+      if (agentProfile) await assertProfileTarget(client, scope, agentProfile)
       if (target.kind === 'device' && target.entry.source.kind === 'subscription') target = { ...target, subscriptionBindingId: await bindAgentToConnection(client, scope, target.agentId, target.entry.harness, target.entry.source.connectionId, target.entry.model) }
-      await client.query('COMMIT')
-    } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error }
-    finally { client.release() }
-    return { target, agentProfile: selection, selectionMode: definition.model.mode === 'fixed' || request.asked?.model ? 'picked' : 'preference' }
-  } finally { await member.close() }
+      // Finish shared-source authorization before taking the Profile lock.
+      // Binding effects remain uncommitted until the current Profile and
+      // fresh membership checks both pass.
+      if (agentProfile) await assertProfileSelection(client, scope, agentProfile)
+      if (deps.transaction) (await import('./transaction')).registerFactoryProfile(client, scope, agentProfile)
+      else {
+        member = await membership(scope)
+        await member.check()
+        await client.query('COMMIT')
+      }
+      return { target, ...(agentProfile ? { agentProfile } : {}), selectionMode }
+    } catch (error) { if (!deps.transaction) await client.query('ROLLBACK').catch(() => {}); throw error }
+    finally { if (!deps.transaction) { await member?.close(); client.release() } }
+  }
+  const legacy = async () => {
+    const constraints = await requestConstraints(pool, scope, request)
+    const target = await (deps.resolve ?? resolveModelDispatch)(pool, scope, request.asked, request.location, constraints.deviceId, { withoutCloud: request.withoutCloud, cloudPurpose: request.cloudPurpose, harness: constraints.harness ?? request.defaultHarness, agentId: request.agentId, bindSubscription: false,
+      routing: { issueId: request.issueId, stage: request.stage, note: request.note, ...request.routing }, decision: deps.modelDecision })
+    const agentProfile = target.kind === 'none' ? undefined : builtinAgentProfileSelection(scope, target.entry)
+    return finalize(target, agentProfile, request.asked?.model ? 'picked' : 'preference')
+  }
+  if (request.defaultOnly && request.profileId) throw new AgentProfileError('agentProfilePinConflict')
+  if (request.defaultOnly || (!request.profileId && !rows.some(row => row.definition.enabled))) return await legacy()
+  const selectedRow = request.profileId ? rows.find(row => row.id === request.profileId) : undefined
+  if (request.profileId && !selectedRow) throw new AgentProfileError('agentProfileNotFound', 404)
+  if (selectedRow && !selectedRow.definition.enabled) throw new AgentProfileError('agentProfileDisabled')
+  const { eligible, availability } = await eligibleProfiles(pool, scope, selectedRow ? [selectedRow] : rows, request, deps)
+  if (!eligible.length) {
+    if (selectedRow) throw new AgentProfileError(availability[selectedRow.id]?.reason === 'pinConflict' ? 'agentProfilePinConflict' : 'agentProfileUnavailable')
+    // An explicit physical Agent/model wins even when the owner's profiles describe other work.
+    if (request.asked || request.agentId) return await legacy()
+    throw new AgentProfileError('agentProfileUnavailable')
+  }
+  let chosen: Eligible | undefined, reason: AgentProfileSelection['reason'] = 'explicit'
+  let execution: Awaited<ReturnType<typeof invokeDecision>> | null = null
+  if (request.profileId) chosen = eligible.find(item => item.row.id === request.profileId)
+  else {
+    z.uuid().parse(request.issueId)
+    const { issueForUser } = await import('@/lib/issue-access')
+    const issue = await issueForUser(scope.ownerId, request.issueId)
+    if (!issue) throw new AgentProfileError('agentProfileScopeNotFound', 404)
+    const catalog = eligible.map(item => item.public)
+    const input = maskFactoryNote(JSON.stringify({ task: { title: issue.title, content: JSON.stringify(issue.content).slice(0, 12_000), stage: request.stage ?? 'execute', note: request.note?.slice(0, 4000) }, candidates: catalog }))
+    execution = await hostedBillingScope.run({ workspaceId: scope.workspaceId, ownerId: scope.ownerId }, () => (deps.decision ?? invokeDecision)('factory-agent-profile', input, profileDecisionQuestions(catalog)))
+    const selected = selectedProfileAnswer(catalog, execution?.answers ?? null)
+    if (!selected) throw new AgentProfileError('agentProfileDecisionUnavailable')
+    chosen = eligible.find(item => item.row.id === selected.id); reason = selected.reason
+  }
+  if (!chosen) throw new AgentProfileError('agentProfileSelectionInvalid')
+  const definition = parseAgentProfile(chosen.row.definition), skills = resolveAgentProfileSkills(definition.skills)
+  // Role selection happens first. Its fixed model and a person's explicit
+  // model are never replaced; only an inherited model list is routed.
+  if (definition.model.mode !== 'fixed' && !request.asked?.model) {
+    const constraints = await requestConstraints(pool, scope, request)
+    const routed = await (deps.resolve ?? resolveModelDispatch)(pool, scope, request.asked, request.location, constraints.deviceId, {
+      harness: definition.harness === 'auto' ? constraints.harness : definition.harness,
+      agentId: request.agentId, withoutCloud: request.withoutCloud, cloudPurpose: request.cloudPurpose, bindSubscription: false,
+      routing: { issueId: request.issueId, stage: request.stage, note: request.note, effort: definition.effort, ...request.routing }, decision: deps.modelDecision,
+    })
+    if (routed.kind === 'none') throw new AgentProfileError('agentProfileModelUnavailable')
+    chosen = { ...chosen, target: routed }
+  }
+  const selection: AgentProfileSelection = {
+    profileId: chosen.row.id, version: chosen.row.version, digest: chosen.row.digest, name: definition.name,
+    source: request.profileId ? 'explicit' : 'decision', reason, scope: { ownerId: scope.ownerId, workspaceId: scope.workspaceId }, definition, skills,
+    instructions: agentProfileInstructions(definition, skills), ...(definition.effort ? { effort: definition.effort } : {}), targetEntry: chosen.target.entry,
+    ...(execution ? { decision: execution.execution } : {}),
+  }
+  return finalize(chosen.target, selection, definition.model.mode === 'fixed' || request.asked?.model ? 'picked' : 'preference')
 }

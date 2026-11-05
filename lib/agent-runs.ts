@@ -157,7 +157,7 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
     // else 优先使用的模型 for this computer's Agent. A Factory run is never queued without one.
     const { execution, ...chosen } = selection
     const runModel = await factoryRunModel(userId, botId, parsed.data.agentId, chosen, sourceRunId
-      ? (await executor.select({ agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, sourceRunId), eq(agentRuns.userId, userId))).limit(1))[0]?.agentDefinition : null, parsed.data.profileId, profileStage, parsed.data.issueId)
+      ? (await executor.select({ agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, sourceRunId), eq(agentRuns.userId, userId))).limit(1))[0]?.agentDefinition : null, parsed.data.profileId, profileStage, parsed.data.issueId, tx)
     const result = await queueAdmittedRun(userId, { ...parsed.data, ...runModel, threadRunId: selection.threadRunId ?? sourceRunId, ...(chosen.pinnedDeviceId ? { pinnedDeviceId: chosen.pinnedDeviceId } : {}), ...(chosen.readOnly ? { readOnly: true } : {}), repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, execution, requestEventId, null, { executor, repo, client: tx, sourceRunId, factoryContext: context })
     const [run] = await executor.select({ status: agentRuns.status }).from(agentRuns).where(and(eq(agentRuns.id, result.runId), eq(agentRuns.userId, userId))).limit(1)
     if (!run) throw new ActionFailureError('runInvalid')
@@ -280,7 +280,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
 
 /** A Factory run's model: the host's choice; else a rerun's source run's own; else 优先使用的模型 for the Agent's computer. */
 async function factoryRunModel(userId: string, botId: string | null, agentId: string, chosen: Omit<FactoryRunSelection, 'execution' | 'pinnedDeviceId' | 'readOnly'>,
-  source: Parameters<typeof import('@/lib/computer/run-model').threadRunModel>[0], profileId?: string, stage: string = 'execute', issueId?: string) {
+  source: Parameters<typeof import('@/lib/computer/run-model').threadRunModel>[0], profileId?: string, stage: string = 'execute', issueId?: string, transaction?: import('pg').PoolClient) {
   const { threadRunModel } = await import('@/lib/computer/run-model')
   if (profileId && chosen.model && chosen.agentProfile?.profileId !== profileId) throw new ActionFailureError('runInvalid')
   if (chosen.model?.trim()) return { model: chosen.model, ...(chosen.subscriptionBindingId ? { subscriptionBindingId: chosen.subscriptionBindingId } : {}), ...(chosen.apiKeyId ? { apiKeyId: chosen.apiKeyId } : {}), ...(chosen.modelDispatch ? { modelDispatch: chosen.modelDispatch } : {}), ...(chosen.agentProfile ? { agentProfile: chosen.agentProfile } : {}), ...(chosen.policyCeiling ? { policyCeiling: chosen.policyCeiling } : {}) }
@@ -295,7 +295,7 @@ async function factoryRunModel(userId: string, botId: string | null, agentId: st
   const workspaceId = await executionWorkspace(userId, botId).catch(() => null)
   if (!workspaceId) throw new ActionFailureError('runModelMissing')
   const { target, agentProfile, selectionMode } = await (await import('@/lib/factory/agent-profile')).resolveAgentProfileDispatch(pool,
-    { ownerId: userId, workspaceId, botId }, { issueId: issueId!, stage, profileId, agentId: agent.id, deviceId: agent.deviceId, location: 'local', asked: { harness: agent.harness } })
+    { ownerId: userId, workspaceId, botId }, { issueId: issueId!, stage, profileId, agentId: agent.id, deviceId: agent.deviceId, location: 'local', asked: { harness: agent.harness } }, { transaction })
   if (target.kind !== 'device' || target.agentId !== agent.id) throw new ActionFailureError('runModelMissing')
   return { model: target.model, agentProfile,
     modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
