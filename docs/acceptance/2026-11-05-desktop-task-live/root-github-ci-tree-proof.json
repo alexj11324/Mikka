@@ -1,0 +1,290 @@
+{
+  "at": "2026-11-05T02:00:19.921Z",
+  "pr": 1303,
+  "head": "526abe89100fd3079671136510629719fc4fb397",
+  "base": "40d03479ea8260b8934f609b84c7c9cb60a94b3c",
+  "draft": true,
+  "state": "open",
+  "tree": "d9faf9e04129555fc5251ef493e7f82702c0588d",
+  "baseBlobs": 4580,
+  "candidateBlobs": 4581,
+  "diff": [
+    {
+      "path": "components/desktop/desktop-integration.tsx",
+      "before": "7844345217cfe58ee1b88c949cc4eddc8e0063df",
+      "after": "05cceda9c82df78dbd1178d396b88eeb0d0ffcf3"
+    },
+    {
+      "path": "package.json",
+      "before": "9af0c38a89e8935ee5e20786aede037b9e5c68da",
+      "after": "8e9cd60ff01b18272a24b586276dba054a4bd8ab"
+    },
+    {
+      "path": "scripts/desktop-task-list.live.test.tsx",
+      "after": "4f447c08c9f42fb945c42ded9e2b696aa5b3795d"
+    }
+  ],
+  "checks": {
+    "total": 26,
+    "entries": [
+      {
+        "id": 126997636083,
+        "name": "UI policy (strict)",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248860/job/126997636083"
+      },
+      {
+        "id": 126996771769,
+        "name": "Production build and browser interactions",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248860/job/126996771769"
+      },
+      {
+        "id": 126996585221,
+        "name": "analytics-ssr",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248925/job/126996585221"
+      },
+      {
+        "id": 126995563812,
+        "name": "Cloud credential access (OIDC)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248860/job/126995563812"
+      },
+      {
+        "id": 126995562531,
+        "name": "Database checks (2/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248860/job/126995562531"
+      },
+      {
+        "id": 126995562486,
+        "name": "Database checks (1/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248860/job/126995562486"
+      },
+      {
+        "id": 126995562481,
+        "name": "Core unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248860/job/126995562481"
+      },
+      {
+        "id": 126995562471,
+        "name": "Database checks (4/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248860/job/126995562471"
+      },
+      {
+        "id": 126995562409,
+        "name": "Integration unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248860/job/126995562409"
+      },
+      {
+        "id": 126995562390,
+        "name": "Database checks (3/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248860/job/126995562390"
+      },
+      {
+        "id": 126995562389,
+        "name": "Source checks",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248860/job/126995562389"
+      },
+      {
+        "id": 126995562387,
+        "name": "Daemon checks",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248860/job/126995562387"
+      },
+      {
+        "id": 126995531591,
+        "name": "publish",
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248999/job/126995531591"
+      },
+      {
+        "id": 126995531265,
+        "name": "await-web",
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248999/job/126995531265"
+      },
+      {
+        "id": 126995530835,
+        "name": "validate",
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248999/job/126995530835"
+      },
+      {
+        "id": 126995530339,
+        "name": "check",
+        "status": "completed",
+        "conclusion": "skipped",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248999/job/126995530339"
+      },
+      {
+        "id": 126995510387,
+        "name": "Analytics SSR (full)",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248925/job/126995510387"
+      },
+      {
+        "id": 126995460980,
+        "name": "GitGuardian Security Checks",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://dashboard.gitguardian.com"
+      },
+      {
+        "id": 126995447482,
+        "name": "icon",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951249138/job/126995447482"
+      },
+      {
+        "id": 126995447210,
+        "name": "checks",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951249138/job/126995447210"
+      },
+      {
+        "id": 126995447188,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248999/job/126995447188"
+      },
+      {
+        "id": 126995447015,
+        "name": "smoke",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951249138/job/126995447015"
+      },
+      {
+        "id": 126995446754,
+        "name": "Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248925/job/126995446754"
+      },
+      {
+        "id": 126995446613,
+        "name": "Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248860/job/126995446613"
+      },
+      {
+        "id": 126995446474,
+        "name": "custody",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248851/job/126995446474"
+      },
+      {
+        "id": 126995445749,
+        "name": "Browser tests (before merge)",
+        "status": "completed",
+        "conclusion": "success",
+        "head": "526abe89100fd3079671136510629719fc4fb397",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248760/job/126995445749"
+      }
+    ]
+  },
+  "workflows": [
+    {
+      "id": 41951248760,
+      "name": "Browser gate",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "526abe89100fd3079671136510629719fc4fb397",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248760"
+    },
+    {
+      "id": 41951248999,
+      "name": "E2B official instance runtime",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "526abe89100fd3079671136510629719fc4fb397",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248999"
+    },
+    {
+      "id": 41951248860,
+      "name": "CI",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "526abe89100fd3079671136510629719fc4fb397",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248860"
+    },
+    {
+      "id": 41951249138,
+      "name": "Desktop shell",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "526abe89100fd3079671136510629719fc4fb397",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41951249138"
+    },
+    {
+      "id": 41951248925,
+      "name": "Analytics SSR",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "526abe89100fd3079671136510629719fc4fb397",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248925"
+    },
+    {
+      "id": 41951248851,
+      "name": "E2B subscription custody",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "526abe89100fd3079671136510629719fc4fb397",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/41951248851"
+    }
+  ]
+}
