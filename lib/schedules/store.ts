@@ -16,6 +16,16 @@ export type Occurrence = { id: string; schedule_id: string; operation_id: string
 export const SCHEDULE_LEASE_MS = 5 * 60_000
 const MAX_ATTEMPTS = 3
 
+/** The earliest persisted due time of any schedule work (epoch ms, rounded up from PostgreSQL microseconds), or null. */
+export async function nextScheduleDue(executor:Pick<Pool,'query'>):Promise<number|null>{
+  const {rows}=await executor.query<{at:string|null}>(`SELECT ceil(extract(epoch FROM min(at))*1000)::bigint::text AS at FROM (
+    SELECT min(next_at) AS at FROM user_schedules WHERE status='active'
+    UNION ALL SELECT min(next_retry_at) FROM schedule_occurrences WHERE status='pending'
+    UNION ALL SELECT min(lease_until) FROM schedule_occurrences WHERE status='running'
+    UNION ALL SELECT min(report_next_at) FROM schedule_occurrences WHERE status='failed' AND reported_at IS NULL) due`)
+  return rows[0]?.at==null?null:Number(rows[0].at)
+}
+
 export function scheduledInbox(row: Occurrence | undefined, now: Date): { eventId: string; scope: ScheduledRead | null } | null {
   if(!row?.event_id)return null
   if(row.status!=='running'||!row.lease_token||row.lease_until<=now)return{eventId:row.event_id,scope:null}

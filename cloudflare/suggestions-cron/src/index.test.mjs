@@ -168,7 +168,7 @@ test('a complete UTC hour runs each reconciliation sweep and maintenance at its 
   }
   assert.deepEqual(counts, {
     '/api/cron/coordinator-wakes': 12,
-    '/api/cron/schedules': 60,
+    '/api/cron/schedules': 6,
     '/api/cron/run-recovery': 60,
     '/api/cron/account-deletions': 1,
     '/api/cron/audit-retention': 1,
@@ -189,7 +189,7 @@ test('maintenance failures still wait for every selected endpoint without leakin
     const tick = runSchedule('* * * * *', env, async url => {
       const path = new URL(url).pathname.replace('/mikka', '')
       paths.push(path)
-      if (path === '/api/cron/schedules') await held
+      if (path === sweepsAt(minute)[0]) await held
       if (path === failedPath) return new Response(env.CRON_SECRET, { status: 503 })
       return Response.json({})
     }, Date.UTC(2026, 0, 1, 8, minute)).finally(() => { settled = true })

@@ -7,4 +7,6 @@ export const wakeTokens = {
   subagent: (subagentId: string) => 'subagent:' + subagentId,
   /** A Bot chat's pending Coordinator wake deadline (workflows/coordinator-wake-recovery), woken when a lease it waits behind is released. */
   coordinatorWake: (userId: string, botId: string) => 'coordinator-wake:' + JSON.stringify([userId, botId]),
+  /** The one durable due timer of a reconciled job (workflows/due-timer), woken by writes that make its work due sooner. */
+  dueTimer: (kind: string) => 'due-timer:' + kind,
 }

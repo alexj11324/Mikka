@@ -1098,7 +1098,7 @@ export async function completeScheduleRead(userId:string,botId:string,scope:impo
 }
 export async function failScheduleRead(scope:import('@/lib/schedules/contract').ScheduledRead,denied=false){
   'use step'
-  const {schedules}=await import('@/lib/schedules/runtime')
+  const {failScheduledRead}=await import('@/lib/schedules/runtime')
   const {ScheduleError}=await import('@/lib/schedules/contract')
-  await schedules().fail({id:scope.occurrenceId,lease_token:scope.leaseToken},denied?new ScheduleError('scheduleReadAuthorityLost',403):new Error('scheduledReadFailed'))
+  await failScheduledRead({id:scope.occurrenceId,lease_token:scope.leaseToken},denied?new ScheduleError('scheduleReadAuthorityLost',403):new Error('scheduledReadFailed'))
 }

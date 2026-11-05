@@ -1,0 +1,56 @@
+import { afterDatabaseCommit } from './db/commit-effects'
+import { wakeTokens, wakeTransport, workflowWakesEnabled } from './workflow-wake'
+
+/**
+ * Jobs whose work carries a persisted due time (#1212 D). Instead of a minute
+ * sweep, one durable timer per job (workflows/due-timer) does the work when it
+ * is due; a write that makes work due sooner wakes it after COMMIT, or starts
+ * it when none runs. The job's cron route stays as a slow reconciliation sweep
+ * that only recovers a start lost between COMMIT and here.
+ */
+export type DueKind = 'schedules'
+export type DueJob = { run(): Promise<number | null>; next(): Promise<number | null> }
+
+export const dueJobs: Record<DueKind, DueJob> = {
+  schedules: {
+    run: async () => { const { sweepSchedules, scheduleNextDue } = await import('./schedules/runtime'); await sweepSchedules(); return scheduleNextDue() },
+    next: async () => (await import('./schedules/runtime')).scheduleNextDue(),
+  },
+}
+
+/** Tests replace `start` here to observe timer starts without a Workflow world. */
+export const dueTimerTransport: { start?: (kind: DueKind) => Promise<unknown> } = {}
+
+/** Wakes the job's running timer, or starts one. Best effort: the slow sweep re-arms a lost start. */
+export async function armDueTimer(kind: DueKind): Promise<void> {
+  if (!workflowWakesEnabled()) return
+  try {
+    const resume = wakeTransport.resume ?? (await import('workflow/api')).resumeHook
+    await resume(wakeTokens.dueTimer(kind), {})
+    return
+  } catch { /* no timer holds the token: start one */ }
+  try {
+    if (dueTimerTransport.start) { await dueTimerTransport.start(kind); return }
+    const [{ start }, { dueTimer }] = await Promise.all([import('workflow/api'), import('@/workflows/due-timer/workflow')])
+    await start(dueTimer, [kind])
+  } catch (error) {
+    console.error('Due timer start failed', { kind, name: error instanceof Error ? error.name : typeof error })
+  }
+}
+
+/** armDueTimer after the current request, for a write that has already committed. */
+export function armDueTimerSoon(kind: DueKind) {
+  if (!workflowWakesEnabled()) return
+  void import('./background').then(({ afterJob }) => afterJob('after:due-timer', () => armDueTimer(kind), { orRun: true })).catch(() => {})
+}
+
+/** armDueTimer once this transaction commits; nothing on rollback. Never fails the write. */
+export function armDueTimerAfterCommit(executor: object, kind: DueKind) {
+  if (!workflowWakesEnabled()) return
+  try {
+    afterDatabaseCommit(executor, `due-timer:${kind}`, async () => {
+      const { afterJob } = await import('./background')
+      afterJob('after:due-timer', () => armDueTimer(kind), { orRun: true })
+    })
+  } catch { /* an executor without commit tracking: the slow sweep re-arms */ }
+}
