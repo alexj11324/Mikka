@@ -2,6 +2,7 @@ import { runMcpCommand, type McpCommand, type McpDependencies } from '@/lib/plug
 import { credentialMasker, maskDeep } from '@/lib/secrets/mask'
 import { GitHubAccessError } from './user-access-error'
 import { createHash } from 'node:crypto'
+import { catalogueToolDisplayName } from '@/lib/coordinator/tool-metadata'
 
 /**
  * The Coordinator's own GitHub tools (decision 2026-11-02-1730): GitHub's
@@ -17,7 +18,7 @@ export const GITHUB_MCP_MIN_VALIDITY_MS = 5 * 60_000
 const PAGE_BYTES = 32 * 1024
 const CURSOR_PREFIX = 'mikka-github-tools:'
 type Page = { remote: string | null; offset: number }
-type ListedTool = Record<string, unknown> & { name: string; description?: string }
+type ListedTool = Record<string, unknown> & { name: string; description?: string; displayName?: string }
 export type GitHubMcpCommand = Extract<McpCommand, { name: string }> | { cursor?: string; tool?: string }
 class GitHubCursorError extends Error {}
 
@@ -60,10 +61,10 @@ function cataloguePage(userId: string, result: Record<string, unknown>, page: Pa
     // A schema is either complete or refused; truncated properties are unsafe to call.
     return Buffer.byteLength(JSON.stringify(response)) <= PAGE_BYTES ? response : { error: 'githubToolSchemaTooLarge' }
   }
-  const selected: { name: string; description?: string }[] = []
+  const selected: { name: string; description?: string; displayName: string }[] = []
   for (let index = page.offset; index < tools.length; index++) {
     const tool = tools[index]
-    const summary = { name: tool.name, ...(tool.description === undefined ? {} : { description: tool.description.slice(0, 240) }) }
+    const summary = { name: tool.name, displayName: tool.displayName ?? catalogueToolDisplayName(tool), ...(tool.description === undefined ? {} : { description: tool.description.slice(0, 240) }) }
     if (Buffer.byteLength(JSON.stringify({ tools: [...selected, summary], nextCursor: next(index + 1) })) > PAGE_BYTES) break
     selected.push(summary)
   }

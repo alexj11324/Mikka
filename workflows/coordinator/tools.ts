@@ -25,6 +25,7 @@ import { supportsWritePlanning } from '@/lib/operations/write-planning-model'
 import { scheduledReadTools } from '@/lib/coordinator/scheduled-read-tools'
 import { scheduleTools } from '@/lib/schedules/tools'
 import { recordDecisionSchema } from '@/lib/project-map/contracts'
+import { withToolDisplayNames } from '@/lib/coordinator/tool-metadata'
 
 /** `coordinator`: this chat's bot is the person's Coordinator, which may act on any of their bots and hold the factory tools. */
 /** Deployment switches the tools depend on (lib/deployment-switches.ts), read in a step: a workflow body never reads one itself. */
@@ -257,7 +258,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
     }),
     load_skill:tool({ description:'Load an assigned, version-pinned skill from this execution.',inputSchema:z.object({skillId:z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/)}),execute:input=>kit.loadAgentSkill(userId,botId,execution?.id,input.skillId,scope) }),
   }
-  return options.readOnly ? scheduledReadTools(registry, options.readToolIds) : registry
+  return withToolDisplayNames(options.readOnly ? scheduledReadTools(registry, options.readToolIds) : registry)
 }
 export function coordinatorTools(userId: string, botId: string, scope?: NativeToolScope, options: CoordinatorToolOptions = {}): ToolSet {
   const registry = createCoordinatorRegistry(userId,botId,scope,options)
