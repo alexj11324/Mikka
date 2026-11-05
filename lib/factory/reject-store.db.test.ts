@@ -62,10 +62,12 @@ test("reject through the real Factory store", { skip: !url, timeout: 180000 }, a
       process.env.E2B_API_KEY = synthetic;
       try {
         const { binding, candidateId } = await atApproval();
+        assert.equal((await service.ledger(actor, binding.taskId)).capabilities.reject, true);
         const req = { binding, eventId: randomUUID(), candidateId, note: `key ${synthetic} and E2B_API_KEY=other_value_123 ghp_abcdefghijklmnop1234` };
         const out = await service.reject(actor, req);
         const { rows: [task] } = await pool.query(`SELECT stage,status,"attemptId","candidateId",row_to_json(t)::text AS raw FROM factory_tasks t WHERE id=$1`, [binding.taskId]);
         assert.deepEqual({ stage: task.stage, status: task.status, candidateId: task.candidateId }, { stage: "execute", status: "pending", candidateId: null });
+        assert.equal((await service.ledger(actor, binding.taskId)).capabilities.reject, false);
         assert.equal(out.binding.attemptId, task.attemptId);
         const { rows: [attempt] } = await pool.query(`SELECT stage,status,reason FROM factory_attempts WHERE id=$1`, [task.attemptId]);
         assert.deepEqual({ stage: attempt.stage, status: attempt.status }, { stage: "execute", status: "pending" });
@@ -91,6 +93,7 @@ test("reject through the real Factory store", { skip: !url, timeout: 180000 }, a
       await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('intruder','X','x@example.invalid',true,now(),now()) ON CONFLICT DO NOTHING`);
       await rejects(() => service.reject({ userId: "intruder" }, { binding, eventId: randomUUID(), candidateId }), "factoryNotFound");
       await pool.query(`UPDATE factory_tasks SET status='passed' WHERE id=$1`, [binding.taskId]);
+      assert.equal((await service.ledger(actor, binding.taskId)).capabilities.reject, false);
       await rejects(() => service.reject(actor, { binding, eventId: randomUUID(), candidateId }), "factoryTransition");
     });
 

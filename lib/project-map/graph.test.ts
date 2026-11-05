@@ -61,6 +61,57 @@ test('abandoning selected A then redirecting C leaves the common root and histor
   assert.equal(graph.branches.find(b => b.id === 'option:' + id(5) + ':c')!.status, 'active')
   assert.equal(graph.nodes.find(n => n.id === 'decision:' + id(3))!.decision!.options[0].disposition, 'selected')
 })
+test('a late abandon with an earlier stop stays reachable in all and abandoned pages', () => {
+  const facts = fixture()
+  facts.runs = facts.runs.filter(run => [id(20), id(22)].includes(run.id))
+  facts.runs[0].status = 'stopped'; facts.runs[0].outcome = 'asked_human'
+  facts.runs[1].createdAt = at(40)
+  const abandoned = { ...option('a'), disposition: 'abandoned' as const }
+  facts.decisions = [
+    decision(3, { options: [option('a', 'selected'), { ...option('b'), disposition: 'rejected' }], sources: [source(100, 20, 'a')] }),
+    decision(30, { kind: 'redirect', options: [option('c', 'selected'), { ...option('a'), disposition: 'rejected' }], selectedOptionId: 'c',
+      contextOptionRef: { decisionId: id(3), optionId: 'a' }, predecessorDecisionIds: [id(3)], sources: [source(101, 22, 'c')] }),
+    decision(45, { kind: 'abandon', options: [abandoned], selectedOptionId: null,
+      contextOptionRef: { decisionId: id(3), optionId: 'a' }, predecessorDecisionIds: [id(3), id(30)] }),
+    decision(50, { kind: 'abandon', options: [abandoned], selectedOptionId: null, supersedesId: id(45),
+      contextOptionRef: { decisionId: id(3), optionId: 'a' }, predecessorDecisionIds: [id(3), id(30)],
+      sources: [{ ...source(102, 20, 'a', 'stopped_at'), locator: { type: 'question', id: id(103), runId: id(20), issueId: id(2) } }] }),
+  ]
+  const branchId = 'option:' + id(50) + ':a', endId = 'end:' + branchId
+  for (const laneLimit of [2, 3] as const) {
+    const graph = projectGraph(facts, laneLimit)
+    for (const filter of ['all', 'abandoned'] as const) {
+      const query = mapQuerySchema.parse({ workspaceId: id(10), laneLimit, filter, limit: 100 })
+      const whole = graphPage(graph, query)
+      assert.equal(whole.folds.length, 0)
+      assert.equal(whole.page.hasMore, false)
+      assert.equal(whole.nodes.length, whole.page.matchedCount, 'every match must be reachable without folds or another page')
+      assert.ok(whole.nodes.some(node => node.id === endId))
+      assert.ok(whole.nodes.every(node => node.lane !== null && node.lane >= 0 && node.lane < laneLimit))
+      for (const limit of [1, 3]) {
+        const visited: string[] = []
+        let after = -1
+        for (let count = 0; count < graph.nodes.length; count++) {
+          const page = graphPage(graph, { ...query, limit }, after)
+          visited.push(...page.nodes.map(node => node.id))
+          assert.equal(page.folds.length, 0)
+          if (!page.page.hasMore) break
+          assert.ok(page.lastOrder > after)
+          after = page.lastOrder
+        }
+        assert.deepEqual(visited, whole.nodes.map(node => node.id))
+        assert.equal(new Set(visited).size, whole.page.matchedCount)
+      }
+    }
+    const end = graph.nodes.find(node => node.id === endId)!, fork = graph.nodes.find(node => node.id === 'decision:' + id(50))!
+    assert.ok(end.order > fork.order, 'a terminal marker cannot precede the decision that creates its branch')
+    assert.equal(graph.branches.find(branch => branch.id === branchId)!.stoppedAtNodeId, 'run:' + id(20))
+    assert.equal(graph.branches.find(branch => branch.id === 'option:' + id(3) + ':a')!.stoppedAtNodeId, 'run:' + id(20))
+    const path = graphPath(graph, endId)
+    assert.ok(path.nodes.some(node => node.id === fork.id))
+    assert.ok(path.nodes.some(node => node.id === 'run:' + id(20)))
+  }
+})
 test('every page edge endpoint is in the page or its authorized boundary, without duplicates', () => {
   const graph = projectGraph(fixture()), query = mapQuerySchema.parse({ workspaceId: id(10), limit: 1 })
   let after = -1

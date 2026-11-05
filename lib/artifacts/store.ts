@@ -128,7 +128,7 @@ export async function readArtifact(userId: string, artifactId: string): Promise<
   // The bot whose run made it, so its window sits beside that bot's chat (as on the Artifact page); only the person's own run counts.
   const [run] = found.runId ? await db.select({ botId: agentRuns.botId }).from(agentRuns)
     .where(and(eq(agentRuns.id, found.runId), eq(agentRuns.userId, userId))).limit(1) : []
-  return { ...found, botId: run?.botId ?? null, shared: Boolean(live), media: await acceptanceMedia(artifactId) }
+  return { ...found, botId: run?.botId ?? null, shared: Boolean(live), ...await acceptanceReport(artifactId) }
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -139,14 +139,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
  * row belongs to the artifact the caller already read as its owner; captures
  * are still served only through the owner-checked capture route.
  */
-async function acceptanceMedia(artifactId: string): Promise<ArtifactMedia[]> {
-  const { rows: [row] } = await pool.query<{ media: unknown }>('SELECT media FROM factory_acceptance_artifacts WHERE "artifactId"=$1 LIMIT 1', [artifactId])
-  if (!Array.isArray(row?.media)) return []
-  return row.media.flatMap((item): ArtifactMedia[] => {
+async function acceptanceReport(artifactId: string): Promise<Pick<ArtifactDetail, 'media' | 'acceptanceTaskId'>> {
+  const { rows: [row] } = await pool.query<{ taskId: string; media: unknown }>('SELECT "taskId",media FROM factory_acceptance_artifacts WHERE "artifactId"=$1 LIMIT 1', [artifactId])
+  const media = (Array.isArray(row?.media) ? row.media : []).flatMap((item): ArtifactMedia[] => {
     const entry = item as { captureId?: unknown; kind?: unknown; title?: unknown }
     return typeof entry.captureId === 'string' && UUID.test(entry.captureId) && (entry.kind === 'video' || entry.kind === 'image')
       ? [{ captureId: entry.captureId, kind: entry.kind, title: typeof entry.title === 'string' ? entry.title.slice(0, 200) : '' }] : []
   }).slice(0, 40)
+  return { media, acceptanceTaskId: row?.taskId ?? null }
 }
 
 const LIST_LIMIT = 200
