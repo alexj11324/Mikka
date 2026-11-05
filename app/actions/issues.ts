@@ -32,6 +32,7 @@ import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { actingContext, activityActor } from '@/lib/activity-actor'
 import { requireLockedIssueScope } from '@/lib/issue-scope-authorization'
 import { queryVersion } from '@/lib/db/query-version'
+import { singleFlight } from '@/lib/single-flight'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
 import { issueListChanged } from '@/lib/live/lists'
@@ -84,16 +85,21 @@ export async function listWorkspaceIssues(workspaceId: string) {
 }
 
 async function readIssues(workspaceId?: string, known?: string) {
-  return withDatabaseOperation('/actions/issues/poll', () => readIssueSnapshot(workspaceId, known))
+  return withDatabaseOperation('/actions/issues/poll', async () => {
+    // Each request is authorized on its own: session, selected workspace and role, and team scopes.
+    const userId = await getUserId()
+    const context = await loadWorkspaceContext(workspaceId)
+    const allTeams = await accessibleTeamScopes(userId)
+    // Identical concurrent polls of this person (tabs, devices after one push) share one read.
+    return singleFlight(['/actions/issues/poll', userId, context.workspace.id, context.role, allTeams.map(team => `${team.id}:${team.workspaceId}`).sort().join(','), known ?? null],
+      () => readIssueSnapshot(userId, context, allTeams, known))
+  })
 }
 
-async function readIssueSnapshot(workspaceId?: string, known?: string) {
-  const userId = await getUserId()
-  const context = await loadWorkspaceContext(workspaceId)
+async function readIssueSnapshot(userId: string, context: Awaited<ReturnType<typeof loadWorkspaceContext>>, allTeams: Awaited<ReturnType<typeof accessibleTeamScopes>>, known?: string) {
   const live = { ...await ownerListRead(userId), selectedWorkspaceId: context.workspace.id }
   // Membership is fresh for each poll. Reuse only this operation's narrow
   // identity rows for visibility, workspace filtering and remaining links.
-  const allTeams = await accessibleTeamScopes(userId)
   const teams = allTeams.filter(team => team.workspaceId === context.workspace.id)
   // Fingerprint before reading links that will be reused below. A relation
   // moved during this read must invalidate the next poll, never be acknowledged

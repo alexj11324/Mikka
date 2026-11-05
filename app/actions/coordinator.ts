@@ -1,5 +1,6 @@
 'use server'
 
+import { singleFlight } from '@/lib/single-flight'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { ownerListRead } from '@/lib/live/list-read-server'
 import type { ListLiveRead } from '@/lib/live/list-read'
@@ -93,8 +94,15 @@ export async function pollCoordinatorChat(botId: string | null = null, known?: s
 }
 
 async function readCoordinatorChat(botId: string | null, known?: string, continuation?: z.infer<typeof continuationSchema>): Promise<CoordinatorChat | UnchangedChat> {
+  // Each request is authorized on its own: the session and its ownership of this bot.
   const user = await getUser()
   const bot = await ownBot(user, botId)
+  // The chat is the owner's own: identical concurrent reads (tabs, devices after one push) share one read.
+  return singleFlight(['/actions/coordinator/poll', user.id, bot.id, known ?? null, continuation ? JSON.stringify(continuation) : null],
+    () => readOwnedChat(user, bot, known, continuation))
+}
+
+async function readOwnedChat(user: Awaited<ReturnType<typeof getUser>>, bot: Awaited<ReturnType<typeof ownBot>>, known?: string, continuation?: z.infer<typeof continuationSchema>): Promise<CoordinatorChat | UnchangedChat> {
   const enabled = coordinatorEnabled()
   const parsed = versionSchema.safeParse(known)
   const { expiries, observedAt, ...current } = await chatVersionState(user.id, 200, bot.id)

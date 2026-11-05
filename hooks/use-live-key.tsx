@@ -5,9 +5,27 @@ import { useSWRConfig } from 'swr'
 import { withBasePath } from '@/lib/base-path'
 import { type LiveRuntime, type LiveTicket, type LiveSubscriptionOptions, type LiveSubscription } from '@/lib/live/channel'
 import { LiveChannels } from '@/lib/live/channels'
+import { TabShare } from '@/lib/live/tab-share'
 import type { LiveKind } from '@/lib/live/events'
 
-const LiveContext = createContext<{ channels: LiveChannels; workspaceId?: string } | null>(null)
+const LiveContext = createContext<{ channels: LiveChannels; workspaceId?: string; share: (scope: string | null) => TabShare } | null>(null)
+
+/** Live reads opt in to taking another tab's result (lib/live/tab-share.ts). */
+export type LiveKeyOptions = LiveSubscriptionOptions & { shareAcrossTabs?: boolean }
+
+/** One tab-share channel per signed-in person and workspace scope; all closed on sign-out or a user switch. */
+function tabShares(ownerId: string) {
+  const shares = new Map<string, TabShare>()
+  return {
+    share(scope: string | null) {
+      const name = `mikka-live-read:${ownerId}:${scope ?? 'none'}`
+      let share = shares.get(name)
+      if (!share) shares.set(name, share = new TabShare(name))
+      return share
+    },
+    close() { for (const share of shares.values()) share.close(); shares.clear() },
+  }
+}
 
 /** Shared visibility subscription for live transport and local display clocks.
  * Subscribers decide their own catch-up; this helper never reads application data. */
@@ -44,24 +62,27 @@ function browserRuntime(workspaceId: string | null): LiveRuntime {
 
 export function LiveProvider({ ownerId, workspaceId, children }: { ownerId: string; workspaceId?: string; children: ReactNode }) {
   const channels = useMemo(() => new LiveChannels(browserRuntime), [ownerId])
-  const value = useMemo(() => ({ channels, workspaceId }), [channels, workspaceId])
+  const shares = useMemo(() => tabShares(ownerId), [ownerId])
+  const value = useMemo(() => ({ channels, workspaceId, share: shares.share }), [channels, workspaceId, shares])
   useEffect(() => () => channels.dispose(), [channels])
+  useEffect(() => () => shares.close(), [shares])
   return <LiveContext value={value}>{children}</LiveContext>
 }
 
 export function useLiveScope() { return useContext(LiveContext) }
 
 /** Register the SWR keys invalidated by a committed entity change. */
-export function useLiveKey(kind: LiveKind, id: string | null | undefined, keys: readonly string[], workspaceId?: string | null, options?: LiveSubscriptionOptions) {
+export function useLiveKey(kind: LiveKind, id: string | null | undefined, keys: readonly string[], workspaceId?: string | null, options?: LiveKeyOptions) {
   useLiveKeys(id ? [{ kind, id }] : [], keys, workspaceId, options)
 }
 
 /** A thread's attempts share one read and one owner/workspace connection. */
-export function useLiveKeys(entities: readonly { kind: LiveKind; id: string; workspaceId?: string | null }[], keys: readonly string[], workspaceId?: string | null, options?: LiveSubscriptionOptions) {
+export function useLiveKeys(entities: readonly { kind: LiveKind; id: string; workspaceId?: string | null }[], keys: readonly string[], workspaceId?: string | null, options?: LiveKeyOptions) {
   const context = useContext(LiveContext)
   const channels = context?.channels
   const scope = workspaceId === undefined ? context?.workspaceId ?? null : workspaceId
   const { mutate } = useSWRConfig()
+  const share = options?.shareAcrossTabs ? context?.share : undefined
   const serialized = JSON.stringify(keys)
   const references = JSON.stringify(entities)
   const minIntervalMs = options?.minIntervalMs ?? 0
@@ -74,8 +95,12 @@ export function useLiveKeys(entities: readonly { kind: LiveKind; id: string; wor
   const active = useRef<LiveSubscription[]>([])
   useEffect(() => {
     if (!channels) return
-    const subscriptions = (JSON.parse(references) as { kind: LiveKind; id: string; workspaceId?: string | null }[]).map(({ kind, id, workspaceId: entityScope }) =>
-      channels.subscribe(entityScope === undefined ? scope : entityScope, kind, id, JSON.parse(serialized) as string[], key => mutate(key), timing.current))
+    const subscriptions = (JSON.parse(references) as { kind: LiveKind; id: string; workspaceId?: string | null }[]).map(({ kind, id, workspaceId: entityScope }) => {
+      const channelScope = entityScope === undefined ? scope : entityScope
+      // Another tab of this person reading the same key in the same scope serves this one too.
+      const refresh = share ? (key: string) => share(channelScope).run(key, () => mutate(key), data => mutate(key, data, { revalidate: false })) : (key: string) => mutate(key)
+      return channels.subscribe(channelScope, kind, id, JSON.parse(serialized) as string[], refresh, timing.current)
+    })
     active.current = subscriptions
     return () => {
       for (const stop of subscriptions) stop()
@@ -83,7 +108,7 @@ export function useLiveKeys(entities: readonly { kind: LiveKind; id: string; wor
     }
     // Timing options update the existing handles below. Only an actual scope,
     // entity, cache key or refresh owner change needs a new initial read.
-  }, [channels, scope, references, serialized, mutate])
+  }, [channels, scope, references, serialized, mutate, share])
   useEffect(() => {
     for (const subscription of active.current) subscription.update(timing.current)
   }, [minIntervalMs, deadlineKey, deadlineObservation])

@@ -182,7 +182,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const liveOwner = data?.live?.ownerId
   const liveHome = liveOwner ? ownerListWorkspace(data, liveOwner) : null
   useLiveKey('bot_chat', liveHome && data?.botId ? data.botId : UNRESOLVED_LIST_SCOPE, [unstable_serialize(chatKey)], liveHome,
-    { minIntervalMs: CHAT_MERGE_MS, deadline: liveOwner ? listReadDeadline(data, liveOwner) : undefined })
+    { minIntervalMs: CHAT_MERGE_MS, deadline: liveOwner ? listReadDeadline(data, liveOwner) : undefined, shareAcrossTabs: true })
   // Cards and cited names have no chat write (lib/coordinator/chat-poll.ts). An artifact's own key marks them
   // stale and reads the chat once, in full; the read that catches up after the page was hidden is full too.
   const metadataKey = useMemo(() => ['coordinator-chat-metadata', botId ?? 'coordinator'] as const, [botId])
