@@ -2,11 +2,12 @@
 
 import { useId, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Archive, Copy, KeyRound, MoreHorizontal, Pencil, Plus, SlidersHorizontal, UserRound } from 'lucide-react'
+import { Archive, CircleAlert, CircleCheck, CircleSlash, Copy, KeyRound, MoreHorizontal, Pencil, Plus, SlidersHorizontal, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import type { AgentProfile, AgentProfileDefinition } from '@/lib/factory/agent-profile-definition'
 import { HarnessLabel, ModelLabel, harnessName } from '@/components/labels/entity-labels'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/reui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogFooter, DialogTitle } from '@/components/ui/dialog'
@@ -16,13 +17,13 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { cn } from '@/lib/utils'
 import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection, settingsSectionAction } from './primitives'
 import { profileAvailabilityKey, profileDefinition, profileModelKey, profileRequest, ProfileRequestError, useAgentProfiles, type AgentProfilesView } from './factory-profiles-data'
 
 type ProfileEditor = { profile?: AgentProfile; duplicate?: boolean }
 const EFFORTS = ['auto', 'low', 'medium', 'high', 'xhigh', 'max'] as const
-const skillCopyKey = (id: string) => id === 'implementation-evidence' || id === 'independent-review' || id === 'systematic-debugging' ? id : null
+const SKILL_COPY = ['implementation-evidence', 'independent-review', 'systematic-debugging'] as const
+const skillCopyKey = (id: string) => (SKILL_COPY as readonly string[]).includes(id) ? id as typeof SKILL_COPY[number] : null
 const initialDefinition: AgentProfileDefinition = { name: '', description: '', roles: [], enabled: true, harness: 'auto', model: { mode: 'inherit' }, instructions: '', skills: [] }
 
 function modelSourceName(model: AgentProfilesView['catalog']['models'][number], t: ReturnType<typeof useTranslations<'Settings.agentProfiles'>>) {
@@ -57,6 +58,8 @@ export function FactoryProfilesSettings({ workspaceId }: { workspaceId: string }
   const [archiving, setArchiving] = useState<AgentProfile | null>(null)
   const [pending, setPending] = useState<string | null>(null)
   const [failure, setFailure] = useState<ReturnType<typeof profileFailure> | null>(null)
+  // Only a toggle's result is announced; the rows' states are read in place, not as live regions.
+  const [announce, setAnnounce] = useState('')
   const data = list.data
 
   async function update(profile: AgentProfile, archive = false) {
@@ -65,6 +68,7 @@ export function FactoryProfilesSettings({ workspaceId }: { workspaceId: string }
       await profileRequest(workspaceId, archive ? 'DELETE' : 'PATCH', profile.id,
         archive ? { version: profile.version } : { version: profile.version, profile: { ...profileDefinition(profile), enabled: !profile.enabled } })
       setArchiving(null)
+      if (!archive) setAnnounce(t(profile.enabled ? 'disabledNamed' : 'enabledNamed', { name: profile.name }))
       void list.mutate()
     } catch (error) {
       setFailure(profileFailure(error))
@@ -80,7 +84,7 @@ export function FactoryProfilesSettings({ workspaceId }: { workspaceId: string }
         : <>
           <SettingRow title={t('defaultName')} icon={<SlidersHorizontal aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />}
             description={<span className="flex flex-col gap-1"><span>{t('inherit')}</span>
-              {data.defaultAvailability && <span>{data.defaultAvailability.available ? t('available') : t(`reasons.${profileAvailabilityKey(data.defaultAvailability.reason)}`)}</span>}</span>}>
+              {data.defaultAvailability && <ProfileState available={data.defaultAvailability.available} enabled label={data.defaultAvailability.available ? t('available') : t(`reasons.${profileAvailabilityKey(data.defaultAvailability.reason)}`)} />}</span>}>
             <span className="text-muted-foreground">{t('builtIn')}</span>
           </SettingRow>
           {data.profiles.length === 0 && <p className="px-5 py-4 text-sm text-muted-foreground">{t('empty')}</p>}
@@ -97,7 +101,7 @@ export function FactoryProfilesSettings({ workspaceId }: { workspaceId: string }
                   {profile.model.mode === 'inherit' ? <span>{t('inherit')}</span> : <><ModelLabel model={profile.model.model} />{source && <ProfileSource model={source} />}</>}
                   <span>{t('version', { version: profile.version })}</span>
                 </span>
-                <span role="status" className={cn(profile.enabled && !state?.available && 'text-destructive')}>{state?.available ? t('available') : t(`reasons.${profileAvailabilityKey(state?.reason)}`)}</span>
+                <ProfileState available={!!state?.available} enabled={profile.enabled} label={state?.available ? t('available') : t(`reasons.${profileAvailabilityKey(state?.reason)}`)} />
               </span>}>
               <span className="flex items-center gap-3">
                 <Switch checked={profile.enabled} disabled={!!pending || !!list.error} aria-label={t('enableNamed', { name: profile.name })} onCheckedChange={() => { void update(profile) }} />
@@ -114,6 +118,7 @@ export function FactoryProfilesSettings({ workspaceId }: { workspaceId: string }
           })}
         </>}
     </SettingsSection>
+    <span role="status" className="sr-only">{announce}</span>
     {(failure || (data && list.error)) && <SettingsSaveError message={t(failure ?? 'loadFailed')} retryLabel={t('reload')} onRetry={() => { setFailure(null); void list.mutate() }} />}
     {editor && data && <ProfileEditorDialog key={(editor.duplicate ? 'copy:' : 'edit:') + (editor.profile?.id ?? 'new')} workspaceId={workspaceId} editor={editor} catalog={data.catalog}
       onClose={() => { setEditor(null); void list.mutate() }} onSaved={() => { setEditor(null); void list.mutate() }} onReload={() => { setEditor(null); void list.mutate() }} />}
@@ -230,7 +235,7 @@ function ProfileEditorDialog({ workspaceId, editor, catalog, onClose, onSaved, o
               </Field> })}
               {draft.skills.filter(skill => !catalog.skills.some(item => item.id === skill)).map(skill => <Field key={skill} orientation="horizontal">
                 <Checkbox id={id + '-missing-' + skill} checked disabled={pending || frozen} onCheckedChange={() => change({ skills: draft.skills.filter(value => value !== skill) })} />
-                <FieldLabel htmlFor={id + '-missing-' + skill} className="text-destructive">{skill} · {t('skillUnavailable')}</FieldLabel>
+                <FieldLabel htmlFor={id + '-missing-' + skill} className="text-destructive-foreground">{(key => key ? t('unavailableNamed', { name: t(`skillNames.${key}`) }) : t('removedSkill'))(skillCopyKey(skill))}</FieldLabel>
               </Field>)}
             </FieldGroup>
           </FieldSet>
@@ -244,4 +249,12 @@ function ProfileEditorDialog({ workspaceId, editor, catalog, onClose, onSaved, o
       </form>
     </DialogContent>
   </Dialog>
+}
+
+/** A Profile's state as the shared status badge (R-34, R-87): icon, colour and word. */
+function ProfileState({ available, enabled, label }: { available: boolean; enabled: boolean; label: string }) {
+  const Icon = available ? CircleCheck : enabled ? CircleAlert : CircleSlash
+  return <Badge size="lg" variant={available ? 'success-light' : enabled ? 'destructive-light' : 'secondary'} className="max-w-full self-start">
+    <Icon aria-hidden="true" /><span className="truncate">{label}</span>
+  </Badge>
 }
