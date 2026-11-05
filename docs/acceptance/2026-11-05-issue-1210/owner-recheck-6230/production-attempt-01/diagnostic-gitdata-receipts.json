@@ -1,0 +1,40 @@
+{
+  "tree": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "sha": "6a28852f5862e2b22495c55843f41dd7028a4465"
+    },
+    "isError": false
+  },
+  "commit": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1"
+    },
+    "isError": false
+  },
+  "source": {
+    "base": "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+    "tree": "6a28852f5862e2b22495c55843f41dd7028a4465",
+    "files": [
+      {
+        "path": "lib/factory/http.ts",
+        "sha": "ddac750aa31e5280ad7addc7891cfa4caa5f3bfd"
+      },
+      {
+        "path": "lib/factory/http-list.test.ts",
+        "sha": "04419c27ff577dca3e3f285ac1a86695ed975be0"
+      }
+    ]
+  }
+}

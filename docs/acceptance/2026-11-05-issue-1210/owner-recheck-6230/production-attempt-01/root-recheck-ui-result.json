@@ -1,0 +1,10 @@
+{
+  "observed_after": "2026-11-05T23:14:03.905Z",
+  "observed_text": "Retry did not complete",
+  "observed_behavior": "After initial Loading Retry review, the button became enabled and the error was rendered. No second click.",
+  "source_inference": "Source sets checkRetryFailed only for RequestError with status <500; exact HTTP status/code not observed.",
+  "post_commit_observation": "production-click01-observation-response.json",
+  "actual_server_request_id": "bfnqt-1793920444534-c1b90c0e2149",
+  "production_deployment": "dpl_vLkaVGiFgPqxZC4fXWZDYksmGFYX",
+  "issue_comment_id": 6672139719
+}

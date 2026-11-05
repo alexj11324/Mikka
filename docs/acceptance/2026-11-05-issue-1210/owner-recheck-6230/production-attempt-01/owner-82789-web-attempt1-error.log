@@ -1,0 +1,61 @@
+2026-11-05T23:02:37.1176490Z go: downloading github.com/tidwall/pretty v***.2.0
+2026-11-05T23:02:37.2513711Z go: downloading github.com/gin-contrib/sse v0.***.0
+2026-11-05T23:02:37.3148260Z go: downloading github.com/mattn/go-isatty v0.0.20
+2026-11-05T23:02:37.3798299Z go: downloading github.com/go-playground/validator/v***0 v***0.20.0
+2026-11-05T23:02:37.3814268Z go: downloading github.com/pelletier/go-toml/v2 v2.4.3-0.20260624044523-35f78d5908f***
+2026-11-05T23:02:37.4322255Z go: downloading github.com/ugorji/go/codec v***.2.***2
+2026-11-05T23:02:37.5841746Z go: downloading github.com/jackc/pgpassfile v***.0.0
+2026-11-05T23:02:37.7065094Z go: downloading github.com/jackc/pgservicefile v0.0.0-20240606***20523-5a60cdf6a76***
+2026-11-05T23:02:37.7175209Z go: downloading golang.org/x/text v0.42.0
+2026-11-05T23:02:37.7655780Z go: downloading github.com/jackc/puddle/v2 v2.2.2
+2026-11-05T23:02:37.8551066Z go: downloading github.com/cespare/xxhash/v2 v2.3.0
+2026-11-05T23:02:37.8635606Z go: downloading go.uber.org/atomic v***.***.0
+2026-11-05T23:02:37.8789953Z go: downloading github.com/gabriel-vasile/mimetype v***.4.3
+2026-11-05T23:02:37.9458189Z go: downloading github.com/go-playground/universal-translator v0.***8.***
+2026-11-05T23:02:37.9728415Z go: downloading github.com/leodido/go-urn v***.4.0
+2026-11-05T23:02:38.3411159Z go: downloading github.com/go-playground/locales v0.***4.***
+2026-11-05T23:02:41.8764382Z /tmp/mikka-byos-build-aVcXFn/gopath/pkg/mod/github.com/gabriel-vasile/mimetype@v***.4.3/internal/charset/charset.go:9:2: golang.org/x/net@v0.60.0: read "https://proxy.golang.org/golang.org/x/net/@v/v0.60.0.zip": stream error: stream ID 39; INTERNAL_ERROR; received from peer
+2026-11-05T23:02:41.8766488Z /tmp/mikka-byos-build-aVcXFn/gopath/pkg/mod/github.com/gin-gonic/gin@v***.***0.***/gin.go:2***:2: golang.org/x/net@v0.60.0: read "https://proxy.golang.org/golang.org/x/net/@v/v0.60.0.zip": stream error: stream ID 39; INTERNAL_ERROR; received from peer
+2026-11-05T23:02:41.8768732Z /tmp/mikka-byos-build-aVcXFn/gopath/pkg/mod/github.com/gin-gonic/gin@v***.***0.***/gin.go:22:2: golang.org/x/net@v0.60.0: read "https://proxy.golang.org/golang.org/x/net/@v/v0.60.0.zip": stream error: stream ID 39; INTERNAL_ERROR; received from peer
+2026-11-05T23:02:41.8770403Z .upstream/sdk/proxyutil/proxy.go:***7:2: golang.org/x/net@v0.60.0: read "https://proxy.golang.org/golang.org/x/net/@v/v0.60.0.zip": stream error: stream ID 39; INTERNAL_ERROR; received from peer
+2026-11-05T23:02:41.8772386Z .upstream/internal/auth/claude/oauth_response.go:***4:2: github.com/andybalholm/brotli@v***.0.6: read "https://proxy.golang.org/github.com/andybalholm/brotli/@v/v***.0.6.zip": stream error: stream ID 3***; INTERNAL_ERROR; received from peer
+2026-11-05T23:02:41.8795554Z Retained subscription worker build directory: /tmp/mikka-byos-build-aVcXFn
+2026-11-05T23:02:41.8801888Z node:internal/errors:986
+2026-11-05T23:02:41.8802838Z   const err = new Error(message);
+2026-11-05T23:02:41.8803640Z               ^
+2026-11-05T23:02:41.8804162Z 
+2026-11-05T23:02:41.8805846Z Error: Command failed: /tmp/mikka-byos-build-aVcXFn/go/bin/go build -mod=readonly -trimpath -o bin/mikka-subscription-worker ./cmd/mikka-subscription-worker
+2026-11-05T23:02:41.8807567Z     at genericNodeError (node:internal/errors:986:***5)
+2026-11-05T23:02:41.8809071Z     at wrappedFn (node:internal/errors:540:***4)
+2026-11-05T23:02:41.8810010Z     at checkExecSyncError (node:child_process:943:***)
+2026-11-05T23:02:41.8810832Z     at execFileSync (node:child_process:979:***5)
+2026-11-05T23:02:41.8811532Z     at file:///home/runner/work/Mikka/Mikka/scripts/build-subscription-worker.mjs:28:7
+2026-11-05T23:02:41.8812387Z     at process.processTicksAndRejections (node:internal/process/task_queues:***04:5) {
+2026-11-05T23:02:41.8813014Z   status: ***,
+2026-11-05T23:02:41.8813400Z   signal: null,
+2026-11-05T23:02:41.8813810Z   output: [ null, null, null ],
+2026-11-05T23:02:41.8814242Z   pid: 2745,
+2026-11-05T23:02:41.8814597Z   stdout: null,
+2026-11-05T23:02:41.8814955Z   stderr: null
+2026-11-05T23:02:41.8815321Z }
+2026-11-05T23:02:41.8815521Z 
+2026-11-05T23:02:41.8815683Z Node.js v24.22.2
+2026-11-05T23:02:41.9123614Z  ELIFECYCLE  Command failed with exit code ***.
+2026-11-05T23:02:41.9530876Z Error: [BUILD_UTILS_SPAWN_***] Command "pnpm run build" exited with ***
+2026-11-05T23:02:42.1034382Z ##[error]Process completed with exit code ***.
+2026-11-05T23:02:42.1280194Z Post job cleanup.
+2026-11-05T23:02:42.2999352Z Pruning is unnecessary.
+2026-11-05T23:02:42.3192888Z Post job cleanup.
+2026-11-05T23:02:42.4306437Z [command]/usr/bin/git version
+2026-11-05T23:02:42.4399359Z git version 2.56.0
+2026-11-05T23:02:42.4473950Z Temporarily overriding HOME='/home/runner/work/_temp/8ab7f094-c697-4ebd-9***74-42***3b099***e29' before making global git config changes
+2026-11-05T23:02:42.4475789Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-05T23:02:42.4477317Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-05T23:02:42.4534172Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-05T23:02:42.4606287Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-05T23:02:42.4981343Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-05T23:02:42.5025439Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-05T23:02:42.5271373Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-05T23:02:42.5310892Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-05T23:02:42.5765305Z Cleaning up orphan processes
+2026-11-05T23:02:42.6154249Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@***d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d***e84afbd3f7d6820020, pnpm/action-setup@b906affcce***4559ad***aafd4ab0e942779e9f58b***. For more information see: https://github.blog/changelog/2025-09-***9-deprecation-of-node-20-on-github-actions-runners/

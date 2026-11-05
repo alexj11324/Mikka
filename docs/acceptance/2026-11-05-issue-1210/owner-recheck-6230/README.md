@@ -1,10 +1,76 @@
 # #1210 / #1449 — Owner 重新审阅当前交付物
 
-> 审阅记录：共30张真实构建截图，按实际源码版本分列：6230的18图、历史925的6图、当前3f0的6图。当前3f0的134/134源与Happy DOM检查、类型检查、默认构建、UI6截图与审计已有成功原件；root与独立reviewer分别亲阅本轮6图。当前远端产品head为79c；其最终CI、部署与生产六项验收另行核对，不能沿用历史42995的通过结论。
+> 截至本次生产尝试记录：#1449 已以82789正常合并并部署；23:14的唯一一次 Owner Retry review 未完成，23:22无新回执/attempt，原六项与最终接受仍未完成。官方快照和原源码纯回放复现额度准入阻断，原失败POST具体错误正文未捕获。下方原30张隔离UI截图保留实际6230 / 925 / 3f0版本；诊断#1462及其后续合并单列，未冒充生产验收通过。
 
 这次修改让仍在 flow v1 验证阶段、或当前交付物尚未接受的 Owner，从已有 Factory 验收入口发起同一候选的重新审阅，再进行独立验证。此前结果保留。既有的接受、退回修改与检查恢复操作继续使用原有组件和权限。
 
-## 当前组合 3f0 / 79c：UI6 与六张增量截图
+## production-attempt-01：部署后的唯一一次正常重审，未完成验收
+
+**本轮结果：#1449 已正常合并并部署；ALEX43 的单次正常 Owner「Retry review」没有完成，没有提交新的 recheck 回执或新的检查 attempt。** 以下生产记录与下方 30 张隔离 UI 截图分开解释。原六项合同、新的独立 review / verify、最终 Owner 接受仍未完成。[首次阻塞记录](https://github.com/alexj11324/Mikka/issues/1210#issuecomment-6672139719)和[后续调查记录](https://github.com/alexj11324/Mikka/issues/1210#issuecomment-6672295398)保留在 #1210。
+
+### 实际发布与单次点击
+
+| 时间（UTC）/ 对象 | 实际观察与证据 |
+| --- | --- |
+| #1449 的源码 CI 与合并 | PR head `79c3731ca819b3304efea0e8f98c936f4b28cd2b`；CI 实际检出 synthetic merge `0c59cd7d13cc1329ee69db78465328b0e4335eac` / tree `21e20c013e5b7859d8c4daf258fa11024aec5b34`。23:00 最终前置检查为 18 项：17 success、条件性 OIDC skipped。23:01:27 普通合并为 `82789ddf380841a4f3ea637d940005bbbd2cecdd`，parents `9cf06716dd576c2a5dba04c952e5f0fcaa998594` + `79c…`；合并树与该 synthetic tree 完整相同。[版本及合并/重跑回执的必要字段投影](production-attempt-01/deployment-actions-projection.json) |
+| Web `42126327554`，attempt 1 | job `127591350656` 的 Go 模块下载在 23:02:41 遇到 `proxy.golang.org` 的 HTTP/2 peer `INTERNAL_ERROR`，应用 Next build 尚未开始，upload / public verify skipped。保留[失败记录](production-attempt-01/owner-82789-web-attempt1-failure.json)及[实际错误摘录](production-attempt-01/owner-82789-web-attempt1-error.log)。 |
+| 同一个 Web run，attempt 2 | root 只执行一次正常 **rerun failed jobs**；job `127593222401` success，**23:11:47.7141975 READY**。[部署记录](production-attempt-01/owner-82789-deployed.json)及[构建/READY 原始摘录](production-attempt-01/owner-82789-web-attempt2-build-ready.log)。日志中的 `***` 是原 Actions 日志已有的掩码，不能用它重建完整 SHA。 |
+| 23:12:38.458335 | root 对普通公开版本端点实际 GET 返回 HTTP 200，完整 build=`82789ddf380841a4f3ea637d940005bbbd2cecdd`；[完整公共版本响应](production-attempt-01/public-root-82789-ready.json)。这是本次 Owner 点击前的已部署版本。 |
+| **23:14:03.905** | 正常登录的 Owner UI 只点一次 **Retry review**；先显示 Loading / disabled，随后显示 **Retry did not complete** 并恢复按钮。没有第二次点击，没有回答旧 verify 问题，没有接受交付物。[动作记录](production-attempt-01/root-recheck-ui-action.json)、[实际结果记录](production-attempt-01/root-recheck-ui-result.json)。 |
+| 生产失败截图 | 浏览器当时实际显示并 emit 了失败画面，但保存的浏览器文件未同步到共享文件系统；有界五秒检查后对应文件仍不存在。[同步限制原件](production-attempt-01/screenshot-click01-sync-limitation.json)。**本页没有附上生产失败截图，也没有用隔离夹具截图替代它。** |
+
+### 点击前后：只有只读采样，没有新的检查结果
+
+点击前数据库时间为 **23:04:14.917–23:04:14.924**，点击后为 **23:22:03.184–23:22:03.192**。两次采样均使用只读事务与 5 秒 statement timeout。[前置响应](production-attempt-01/production-before-minimal-response.json)、[后置响应](production-attempt-01/production-click01-observation-response.json)、[前置采集时间](production-attempt-01/production-before-minimal-timing.json)、[后置采集时间](production-attempt-01/production-click01-observation-timing.json)保留实际返回；SQL 副本只遮去不影响阅读的 Owner 账户 ID，具体变换与原件 SHA256 见 [evidence-manifest.json](production-attempt-01/evidence-manifest.json)。
+
+| 绑定或状态 | 点击后的实测结果 |
+| --- | --- |
+| 原任务 | `e42571e5-58f7-40e3-9418-c02ee8843fe6`；仍 `verify / waiting`、revision 13。issue `0b9e6f79-790b-4931-aa54-2f45f5d142de`。 |
+| 同一交付候选 | candidate `2f338962-c690-4ba7-bc63-6c73a9de3acb`、原 attempt 和绑定均不变；权威 deliverable HEAD 仍 `d05417e7848871e511141e10a282ffb7998b0a79`。`candidateSha=null` 原样保留，未补造 SHA。 |
+| 真实新动作 | `owner_candidate_recheck` 回执 0；position > 4 的新 attempt 0；active run / 有效 lease 0；最终接受记录 0。没有新的 review/verify run、SID、VM、工具 IO 或报告可用于六项验收。 |
+| 原过期问题 | `31b87a5f-7be6-49e9-9031-126dd2144007` 仍 `waiting_user`、revision 2，expiry=`2026-11-05T20:15:32.526Z`；八个消费字段仍 NULL。 |
+| 原父机 | `ipa60du803guuiqnyzqan` 仍 sleeping，lastActiveAt=`2026-11-05T14:48:42.215Z`。 |
+| 前后逐项比较 | **48 个共同字段、0 差异**；完整字段表见[比较原件](production-attempt-01/production-click01-comparison.json)。旧报告指纹没有在这次后置投影中重查，不能声称后置读取再次证明了全部旧报告。 |
+
+这些读回证明采样时没有可见的新提交结果；不证明 HTTP 请求没有执行，也不排除事务回滚。浏览器显示通用失败，原失败 POST 的精确 status / code / body 和实际封装 cause 没有被捕获。下面的额度结论来自另外取得的官方快照和源码回放，不能从通用 UI 文案直接推断。
+
+### 官方额度快照与源码回放：可复现的准入阻断
+
+四批最小只读投影按部署 `82789…` 的源码路径核对后执行；[总体观察](production-attempt-01/recheck-gates-observations.json)、[详细调查记录](production-attempt-01/recheck-gates-findings.md)与[固定源码分析](production-attempt-01/recheck-refusal-source-analysis.md)分别记录事实、判定链和边界。所选原始响应、执行 statements 与采集时间在本节目录中，完整选择和原路径见清单。没有为本证据执行新的查询、凭据 refresh 或模型调用。
+
+| 批次 / 数据库时间（UTC） | 范围 | 实测结果 |
+| --- | --- | --- |
+| 01 / 23:27:51.977 | 冻结 native 绑定、订阅与模型选择 | 旧 review / verify 的 consumer、route、workspace、connection、epoch、model 均一致；原来源仍属 Owner；连接 connected、未 paused / removed、自有非共享；目录包含冻结 Haiku；profile / API-key 键 absent。[响应](production-attempt-01/recheck-gates-01-response.json) |
+| 02 / 23:29:24.240 | automatic dispatch 与 runtime identity | producer、旧 review/verify 与当前 Bot runtime agent 一致；设备、工作区、ownership、desktop 和 runtime repo/candidate repository 一致；父机 sleeping、ready、device enabled。[响应](production-attempt-01/recheck-gates-02-response.json) |
+| 03 / 23:31:10.038 | 官方订阅 quota 与精确模型目录 | exactOrderCandidateExists=true；quota 公共结构有效。官方快照的 **observedAt=23:14:06.758**，在单次点击后 2.853 秒；适用的全局 weekly **used=1**，reset=`2026-11-06T00:00:00.000Z`。five_hour used=0.04；另一个 model=fable 的 weekly used=0 不适用于冻结的 `claude-haiku-5-5`。[响应](production-attempt-01/recheck-gates-03-response.json) |
+| 04 / 23:35:34.214 | 指定 source/model 的优先 health 拒绝 | selected permanent / transient 行均 **0**。这是当前投影，不能冒充点击当时的完整历史回放。[响应](production-attempt-01/recheck-gates-04-response.json) |
+
+[root 的纯本地回放](production-attempt-01/root-quota-replay.json)使用上述 03 响应以及部署版原函数：两个阶段在本次 POST 数据库日志时刻均得 `exhausted`；到 23:31 的读取时刻已变旧，得 `checking`；**只把时钟推进到 reset、没有新的官方 provider 快照，仍是 `checking`，并非 available**。原始 `subscription-quota.ts` / `packages/protocol/src/subscription.ts` 在诊断补丁中未改动。
+
+按部署源码，在没有更优先健康拒绝时，这个 exhausted 状态进入 `reason:'quota'` 的 credential / frozen-target 准入拒绝链。因此，这是与点击期间官方刷新一致、可按实际源码复现的明确阻断条件。**本次没有抓到失败 POST 的实际 quota 错误码或服务器封装 detail，不能将推导写成实测响应。** Membership 和其他后续事务门槛在发现该阻断后没有继续投影，也不声称已经通过。旧订阅、模型、候选与原问题均未被替换或放宽。
+
+### 诊断补丁 #1462：实际红绿检查，单独记录合并版本
+
+原失败请求没有留下足够的受控拒绝 cause 日志。诊断 [PR #1462](https://github.com/alexj11324/Mikka/pull/1462)在既有 POST `FactoryError` catch 中调用现有 `logCodedError`，附上已校验的 task UUID；HTTP status/body、权限、事务、订阅/模型选择和 UI 均不变。只新增有界 code/detail/cause name，不加入 reason、provider message、URL、凭据或 stack。它提高后续诊断能力，**不证明 ALEX43 重审已成功**。
+
+| 项目 | 精确记录 |
+| --- | --- |
+| 源码身份 | source head `b1bee585e7f1c78b09fb8f80b8752227591b13f1` / tree `6a28852f5862e2b22495c55843f41dd7028a4465`，base `82789…`；本地实际 HEAD 仍为 base，staged tree 与远端 source tree 相等，不能把本地测试写成在远端 commit 对象上运行。[GitData 回执](production-attempt-01/diagnostic-gitdata-receipts.json)、[本地/远端源码绑定](production-attempt-01/diagnostic-source-binding.json) |
+| 实际 red | 7 tests：6 pass / 1 fail；缺少有界诊断记录，实际 0、预期 1。[red 原始输出](production-attempt-01/diagnostics-red.log) |
+| 实际 green | `http-list.test.ts` + `note-mask.test.ts`：**10 / 10**，fail / cancelled / skipped / todo 均 0。[green 原始输出](production-attempt-01/diagnostics-green.log) |
+| 实际工具执行 | error-cause policy、polling policy、直接 `oxlint`、直接 `next typegen`、`tsrs --noEmit` 各 exit 0；[执行命令、退出与耗时](production-attempt-01/diagnostics-validation.json)。原始 actual 日志一并保留；空输出与成功退出分别记录，早期 pnpm wrapper 日志未作为 lint / typegen 成功证据。 |
+| 独立审阅 | [固定 b1 / 6a288 的只读报告](production-attempt-01/diagnostic-independent-review.md)无阻断；审阅者未执行测试，不冒领 red/green。新增日志只覆盖进入 catch 的 POST FactoryError，前置显式拒绝与未封装异常不在这条新增日志分支内。 |
+| source head 上的 CI | b1 的前置检查 18 项：17 success + 条件性 OIDC skipped；实际 synthetic `e8ad91f4…` 的 base 是82789、tree 是6a288。[时点/应用身份与最终合并投影](production-attempt-01/diagnostic-merge-projection.json) |
+| 后续普通合并 | root 已正常合并为 **`0677fbff4c949c53b839706011af5ec77cdd1d24`** / tree **`4d234a44ec32bb1b28e8552b6dd0e44c2c7733b1`**，parents `b9e1b5b892132c758db601c681de1e559bb17956` + `b1…`。新 main #1460 的 16 个路径与本补丁两路径不交叉；实际 merge tree 与新 main 加两个已验证 blob 的独立计算相符。**旧 synthetic CI 没有测试这个新 merge tree。** 本节采样时 0677 的部署仍待 READY，未写成已部署，也没有在它上面再点重审。 |
+
+### 证据发布边界
+
+本节只选择本次发布、单击、只读状态、quota 和诊断红绿所需的记录；[清单](production-attempt-01/evidence-manifest.json)逐一给出来源、原 SHA256、发布 SHA256、字节数与变换。原日志摘录中的掩码保留；before/after SQL 仅将 Owner 账户 ID 替换为明确占位符；从大型 GitHub 回执抽出的必要字段标为 projection，完整原件哈希仍可追溯。[本次模式扫描](production-attempt-01/sanitization-audit.json)没有发现已列凭据模式；这不等同于证明不存在所有未知秘密类型。没有选择 token、cookie、原始 credentials、完整 provider 响应、完整 Vercel request trace 或生产会话文件。
+
+原有 **30 张 PNG 的路径与内容哈希全部保持不变**，仍分别绑定 6230 / 925 / 3f0。它们已通过独立 evidence ref 的 `7cbe6552e57834f954a6cf7bae3692a6a7a86e47` 发布；本次只计划在该证据历史上追加记录，不改产品源码或 main，不触发构建、运行或最终接受。旧 UI6 草稿中的“79c CI 待收集”仅表示当时的收集进度，实际后续 CI / merge / READY 已在本节补齐。
+
+
+## UI6 组合 3f0 / 79c：六张增量截图
 
 主线 `3511b3927bc31bf66c52c97545d8ad0d4617c062` 的 #1457 在同一个验收面板加入报告版本绑定的决策区包装。普通 Factory 面板保留 Owner 重新审阅；approval 的底部现在同时显示“退回修改”和“验收”。因此在合并后的精确源码上重新检查该处，而不把历史 925 的界面或 CI 改标为新版本。17 个 Owner 路径中，除面板合并之外的 16 个 blob 与 925 逐字节相等；[源码绑定](increment-3f0/source-binding.json) 记录全部对象与父提交。
 
@@ -22,7 +88,7 @@
 | 自审与独立复核 | [root 的6/6自审](increment-3f0/root-review.json)及[独立6/6逐图报告](increment-3f0/independent-review.md)均通过本次入口/动作呈现复核，无严重度3/4阻断 |
 | 原始日志 | [33文件归档](increment-3f0/raw-evidence.tar.gz)，SHA256 `daa256a08a136f70a8fa5b5f4bd357cbde29cc24e6abc8eb0fff7f1120df9749`；[归档模式扫描](increment-3f0/archive-audit.json)无匹配 |
 | 清理 | 正常释放租约、删除 UI6 专属数据库，PostgreSQL 明确 `server stopped`。root 的[DELETE响应](increment-3f0/cleanup-delete-response.json)为 `{}`，随后[平台GET读回](increment-3f0/cleanup-readback.json)为 HTTP404 / Sandbox not found，确认该临时资源已删除 |
-| 当前 head 的最终 CI | **本页尚未收集 `79c…` 的最终 CI 证明**；由 PR / issue 后续按精确 head 和应用身份记录。下文 `42995…` 的成功只属于历史版本 |
+| UI6 草稿时点的 CI 收集边界 | 当时尚未收集79c的最终CI；后续79c的实际CI、82789的正常合并与READY已追加在本页 production-attempt-01。下文42995的成功仍只属于历史版本 |
 
 | 状态 | 3f0 的任务入口 | 3f0 的验收面板 |
 | --- | --- | --- |
@@ -63,7 +129,7 @@ CI 实际检出的是 synthetic merge `f4fd9c09bd3de8c049831d13942ea7b1aa157538`
 
 三种状态均正常出现验收入口与重新审阅按钮；approval 同时完整保留独立主验收按钮。approval、expired 两张 pane PNG 与旧 UI4 对应图片逐字节相等。waiting pane 本帧为通用“线程”标题；与 expired 相同，这是已记录的异步标题帧限制。图中未见横溢、遮挡或新增布局阻断，不能将静态截图写成加载失败、键盘操作、重审 POST 或生产模型验收通过。
 
-旧18图继续精确归属于6230/f88，证明其浅深桌面与窄屏状态；没有把旧图改标成新组合。以下历史分版本证据保持原样，未重复运行未受影响的133个PG与29个shared-handoff检查。当时已准备独立证据提交，尚未发布引用；产品源码head为42995。本页此次统一收录历史和当前证据，引用由root后续发布；当前产品head已更新为79c。独立证据提交避免纯证据追加重复全量CI。
+旧18图继续精确归属于6230/f88，证明其浅深桌面与窄屏状态；没有把旧图改标成新组合。以下历史分版本证据保持原样，未重复运行未受影响的133个PG与29个shared-handoff检查。当时已准备独立证据提交，尚未发布引用；产品源码head为42995。之后历史和UI6证据统一收录为独立证据提交7cbe，并由root发布evidence引用；该证据提交所绑定的产品source head为79c。随后实际82789部署与生产尝试另见本页新增章节。独立证据提交避免纯证据追加重复全量CI。
 
 ## 首轮18图（6230）的版本与证据来源
 
@@ -179,7 +245,7 @@ CI 实际检出的是 synthetic merge `f4fd9c09bd3de8c049831d13942ea7b1aa157538`
 | 同一 `6230… / f88…` | 默认 production build | exit 0，121.592 秒；详见本页资源记录 |
 | 同一 `6230… / f88…` | 首次截图阶段 | `ui-capture` exit 1：`ACCOUNT_INITIALIZATION_FAILED`，发生在账户分配、业务夹具和图片生成之前；原失败日志保留 |
 | 同一 `6230… / f88…`、同一 BUILD_ID | UI4 成功截图 | `ui4-capture` exit 0，18 PNG；`ui-evidence-audit`、`ui-package` 均 exit 0，源码前后检查一致，清理 exit 0 |
-| 当前产品 PR head `79c…` | Git-linked CI 与 mergeability | 本页尚未收集最终 CI 证明；按 PR / issue 后续精确 head 记录核对，不将历史版本 CI 计为当前通过 |
+| UI6 当时的产品 PR head `79c…` | Git-linked CI 与 mergeability | 本稿UI6阶段尚未收集；后续精确head的CI、合并与部署事实已追加在production-attempt-01，不将历史42995版本CI计为79c通过 |
 
 旧轮三组 PostgreSQL 合计 133 个测试，不能写成在新 `6230…` 上重跑过。#1444 实质交叉是 shared dispatch 的 approved-plan handoff，所以本轮增量运行 `cloud-runtime-auto.db.test.ts`；它并不是专门新增的“Owner 重新审阅且有 spec 历史”用例。原始 Owner 17 个补丁 blob 与 UI blob 都未改变，可按版本关联复用已有证据；最终组合仍以最终 PR CI 为门禁。
 
@@ -242,6 +308,6 @@ reviewer 未编写产品 UI，按 `ux-heuristics` 和 `cognitive-walkthrough` �
 
 ## 与生产验收的关系
 
-本页只证明指定版本在隔离环境中的 UI 入口与布局，以及另行列明的源码/数据库检查。合成夹具内的“通过”结果不证明 ALEX-43 的生产六项验收，也不证明真实独立 review/verify 已运行、已回答历史问题或已完成新检查。生产真实任务、订阅运行、来源与候选绑定、六项证据和最终 Owner 回执由 #1210 的后续生产验收记录单独证明。
+本页隔离UI部分证明指定版本的入口与布局，以及另行列明的源码/数据库检查；新增production-attempt-01记录真实发布、单次正常Owner点击及其阻断。合成夹具内的“通过”结果不证明ALEX43的生产六项验收，也不证明真实独立review/verify已运行、已回答历史问题或已完成新检查。本轮实际读回没有新的检查回执，六项与最终Owner接受仍未完成。
 
-截至本稿，三轮30张截图分别保留实际源码身份；最新3f0的源/Happy DOM检查、类型检查、构建、UI6审计、自审和独立逐图复核已有成功原件。当前产品head79c的最终CI由PR/issue后续记录，历史42995的CI结果不作替代。部署和生产六项验收仍须真实记录确认，不能从本页推断完成。
+三轮30张截图继续保留实际源码身份；3f0的源/Happy DOM检查、类型检查、构建、UI6审计、自审和独立逐图复核已有成功原件。79c随后通过CI、82789部署成功的原件已在新增章节补齐；23:14的真实重审未完成，额度准入阻断的来源与推导边界均保留。诊断补丁的测试与合并不能替代原六项及最终Owner接受。

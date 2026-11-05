@@ -1,0 +1,255 @@
+{
+  "observedAt": "2026-11-05T23:12:14.790742Z",
+  "scope": "Own #1449 merge production deployment, verified independently after its own READY. No production data mutation or browser actions by this reviewer.",
+  "mergeCommit": {
+    "sha": "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+    "tree": "21e20c013e5b7859d8c4daf258fa11024aec5b34",
+    "parents": [
+      "9cf06716dd576c2a5dba04c952e5f0fcaa998594",
+      "79c3731ca819b3304efea0e8f98c936f4b28cd2b"
+    ]
+  },
+  "completeTreeEqualsCITest": true,
+  "ciTestedSyntheticCommit": "0c59cd7d13cc1329ee69db78465328b0e4335eac",
+  "currentMain": "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+  "web": {
+    "workflowRun": 42126327554,
+    "attempt": 2,
+    "job": 127593222401,
+    "head": "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+    "status": "completed",
+    "conclusion": "success",
+    "runStartedAt": "2026-11-05T23:05:31Z",
+    "runUpdatedAt": "2026-11-05T23:11:53Z",
+    "readyAt": "2026-11-05T23:11:47.7141975Z",
+    "publicVerifiedAt": "2026-11-05T23:11:50.2612010Z",
+    "deploymentUrl": "https://mikka-88m9wg5it-mikka-dev.vercel.app",
+    "fullLog": "owner-82789-web-attempt2-full.log",
+    "excerpt": "owner-82789-web-attempt2-build-ready.log",
+    "publicEvidence": "public-version-owner-82789-ready.json",
+    "stages": {
+      "goDownload": "2026-11-05T23:06:43Z",
+      "nextStarted": "2026-11-05T23:07:16.9410445Z",
+      "nextCompiled": "2026-11-05T23:09:19.6792249Z",
+      "buildCompleted": "2026-11-05T23:10:12.6350255Z"
+    },
+    "originalFailureEvidence": "owner-82789-web-attempt1-failure.json",
+    "normalRetriesByRoot": 1,
+    "independentPublicGET": {
+      "observedAt": "2026-11-05T23:12:14.790742+00:00",
+      "url": "https://app.aspectlylabs.com/mikka/api/version",
+      "status": 200,
+      "body": {
+        "build": "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+        "minMobileBuild": 0,
+        "mobileUpdateUrl": "itms-beta://beta.itunes.apple.com/v1/app/6829300983",
+        "minDesktopVersion": null
+      }
+    },
+    "fullLogSha256": "f0acc73e40f58e24a358ca52b9b4dea1e2c76ca05fb089d3cf309274c875125d",
+    "fullLogBytes": 273154
+  },
+  "mainCI": [
+    {
+      "id": 42126327488,
+      "head_sha": "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+      "status": "completed",
+      "conclusion": "success",
+      "updated_at": "2026-11-05T23:07:30Z"
+    }
+  ],
+  "runtime": {
+    "run": 42126327661,
+    "status": "completed",
+    "conclusion": "success",
+    "head": "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+    "jobs": [
+      {
+        "id": 127591351526,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 42126327661,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Run node --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Run python3 -m py_compile scripts/e2b/validate-official-instances.py",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5
+          },
+          {
+            "name": "Run bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6
+          },
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 11
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 12
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 13
+          }
+        ]
+      },
+      {
+        "id": 127591425586,
+        "name": "check",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 42126327661,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Refuse an obsolete source before runtime validation",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Check publication-control changes across this push",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5
+          },
+          {
+            "name": "Read the Vercel team token through Infisical workload identity",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6
+          },
+          {
+            "name": "Compare the worker hash with production",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7
+          },
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 13
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 14
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 15
+          }
+        ]
+      },
+      {
+        "id": 127591536133,
+        "name": "validate",
+        "status": "completed",
+        "conclusion": "skipped",
+        "run_id": 42126327661,
+        "logs_url": null,
+        "steps": null
+      },
+      {
+        "id": 127591536874,
+        "name": "await-web",
+        "status": "completed",
+        "conclusion": "skipped",
+        "run_id": 42126327661,
+        "logs_url": null,
+        "steps": null
+      },
+      {
+        "id": 127591537005,
+        "name": "publish",
+        "status": "completed",
+        "conclusion": "skipped",
+        "run_id": 42126327661,
+        "logs_url": null,
+        "steps": null
+      }
+    ],
+    "noSecondDeployment": true,
+    "reason": "test/check passed and validate/await-web/publish were conditionally skipped"
+  },
+  "logExcerpt": [
+    "2026-11-05T23:06:38.6946273Z Detected Next.js version: ***6.4.***",
+    "2026-11-05T23:06:39.0078855Z > node scripts/build-subscription-worker.mjs && pnpm generate:agent-ui && next build && pnpm typecheck && node scripts/migrate.mjs",
+    "2026-11-05T23:06:43.2523551Z go: downloading github.com/andybalholm/brotli v***.0.6",
+    "2026-11-05T23:06:43.2595264Z go: downloading golang.org/x/net v0.60.0",
+    "2026-11-05T23:07:16.9410445Z \u25b2 Next.js ***6.4.*** (Turbopack)",
+    "2026-11-05T23:07:25.6287271Z \u2713 Compiled workflows in 8.***s (***6*** steps, 8 workflows)",
+    "2026-11-05T23:09:19.6792249Z \u2713 Compiled successfully in ***4s",
+    "2026-11-05T23:09:19.7971805Z   Collecting page data using *** worker ...",
+    "2026-11-05T23:09:30.3893362Z   Generating static pages using *** worker (0/67) ...",
+    "2026-11-05T23:09:30.5532410Z   Generating static pages using *** worker (***6/67) ",
+    "2026-11-05T23:09:30.6062365Z   Generating static pages using *** worker (33/67) ",
+    "2026-11-05T23:09:30.6182211Z   Generating static pages using *** worker (50/67) ",
+    "2026-11-05T23:09:30.6382696Z \u2713 Generating static pages using *** worker (67/67) in 247ms",
+    "2026-11-05T23:09:47.9646997Z Traced Next.js server files in: 2***.6***ms",
+    "2026-11-05T23:10:12.6350255Z Build Completed in .vercel/output [4m]",
+    "2026-11-05T23:10:47.9922728Z   Production      https://mikka-88m9wg5it-mikka-dev.vercel.app",
+    "2026-11-05T23:11:47.5249974Z \u001b[2K\u001b[***A\u001b[2K\u001b[G  Production      https://mikka-88m9wg5it-mikka-dev.vercel.app",
+    "2026-11-05T23:11:47.7141975Z \u2713 Ready in ***m",
+    "2026-11-05T23:11:47.8552113Z Deployed https://mikka-88m9wg5it-mikka-dev.vercel.app",
+    "2026-11-05T23:11:50.2612010Z {\"event\":\"***uction_version_verified\",\"url\":\"***/mikka/api/version\",\"build\":\"82789ddf38084***a4f3ea637d940005bbbd2cecdd\",\"status\":200,\"verifiedAt\":\"2026-***-05T23:***:50.260Z\",\"attempts\":2}"
+  ],
+  "result": "Own merge 82789 reached READY and the production domain independently served its exact complete SHA. Production ALEX43 acceptance can now proceed; this evidence is not that functional acceptance itself."
+}

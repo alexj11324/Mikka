@@ -1,0 +1,11 @@
+{
+  "startedAt": "2026-11-05T23:04:12.076Z",
+  "finishedAt": "2026-11-05T23:04:15.052Z",
+  "readOnly": true,
+  "statementTimeout": "5s",
+  "phase": "pre-click-minimal-before",
+  "productionReadyAsserted": false,
+  "browserActions": 0,
+  "modelInvocations": 0,
+  "productionWrites": 0
+}

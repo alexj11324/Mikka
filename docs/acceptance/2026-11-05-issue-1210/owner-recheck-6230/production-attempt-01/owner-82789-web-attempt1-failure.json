@@ -1,0 +1,17 @@
+{
+  "observedAt": "2026-11-05T23:05:19.551Z",
+  "commit": "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+  "workflowRun": 42126327554,
+  "attempt": 1,
+  "job": 127591350656,
+  "result": "failure",
+  "failedStep": "Build (runs migrations last, as the Vercel build did)",
+  "firstErrorAt": "2026-11-05T23:02:41.8764382Z",
+  "actualError": "Go module downloads from proxy.golang.org failed with HTTP/2 stream INTERNAL_ERROR received from peer for golang.org/x/net@v0.60.0 and github.com/andybalholm/brotli. build-subscription-worker.mjs failed before the application build.",
+  "upload": "skipped",
+  "publicVerify": "skipped",
+  "mainAtObservation": "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+  "fullLog": "owner-82789-web-attempt1-full.log",
+  "excerpt": "owner-82789-web-attempt1-error.log",
+  "authorizedActionByThisReviewer": "Read-only diagnosis and evidence preservation. Root notified to rerun the same failed Web job once; no workflow mutation by this reviewer."
+}

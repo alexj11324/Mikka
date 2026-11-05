@@ -1,0 +1,388 @@
+{
+  "phase": "after-single-retry-review-click",
+  "clickAtAsReportedByRoot": "2026-11-05T23:14:03.905Z",
+  "databaseObservedFrom": "2026-11-05T23:22:03.184Z",
+  "databaseObservedThrough": "2026-11-05T23:22:03.192Z",
+  "baselineResponse": "production-before-minimal-response.json",
+  "comparedFieldCount": 48,
+  "differenceCount": 0,
+  "differences": [],
+  "fieldComparisons": [
+    {
+      "path": "task.taskId",
+      "before": "e42571e5-58f7-40e3-9418-c02ee8843fe6",
+      "after": "e42571e5-58f7-40e3-9418-c02ee8843fe6",
+      "equal": true
+    },
+    {
+      "path": "task.issueId",
+      "before": "0b9e6f79-790b-4931-aa54-2f45f5d142de",
+      "after": "0b9e6f79-790b-4931-aa54-2f45f5d142de",
+      "equal": true
+    },
+    {
+      "path": "task.sourceEventId",
+      "before": "4ad02e70-8015-5eac-87f4-a96fbd775d14",
+      "after": "4ad02e70-8015-5eac-87f4-a96fbd775d14",
+      "equal": true
+    },
+    {
+      "path": "task.botId",
+      "before": "279c373e-2a6b-415d-a430-ac64f4c33b16",
+      "after": "279c373e-2a6b-415d-a430-ac64f4c33b16",
+      "equal": true
+    },
+    {
+      "path": "task.stage",
+      "before": "verify",
+      "after": "verify",
+      "equal": true
+    },
+    {
+      "path": "task.status",
+      "before": "waiting",
+      "after": "waiting",
+      "equal": true
+    },
+    {
+      "path": "task.revision",
+      "before": 13,
+      "after": 13,
+      "equal": true
+    },
+    {
+      "path": "task.attemptId",
+      "before": "aa77cb0b-bb48-4c7a-ab73-ad68e7df7dba",
+      "after": "aa77cb0b-bb48-4c7a-ab73-ad68e7df7dba",
+      "equal": true
+    },
+    {
+      "path": "task.candidateId",
+      "before": "2f338962-c690-4ba7-bc63-6c73a9de3acb",
+      "after": "2f338962-c690-4ba7-bc63-6c73a9de3acb",
+      "equal": true
+    },
+    {
+      "path": "task.flowVersion",
+      "before": null,
+      "after": null,
+      "equal": true
+    },
+    {
+      "path": "task.kind",
+      "before": "deliverable",
+      "after": "deliverable",
+      "equal": true
+    },
+    {
+      "path": "task.candidateSha",
+      "before": null,
+      "after": null,
+      "equal": true
+    },
+    {
+      "path": "task.producerRunId",
+      "before": "d5cc2bb2-eb0c-44cf-945d-31a0b9fe0a11",
+      "after": "d5cc2bb2-eb0c-44cf-945d-31a0b9fe0a11",
+      "equal": true
+    },
+    {
+      "path": "task.deliverableHead",
+      "before": "d05417e7848871e511141e10a282ffb7998b0a79",
+      "after": "d05417e7848871e511141e10a282ffb7998b0a79",
+      "equal": true
+    },
+    {
+      "path": "question.id",
+      "before": "31b87a5f-7be6-49e9-9031-126dd2144007",
+      "after": "31b87a5f-7be6-49e9-9031-126dd2144007",
+      "equal": true
+    },
+    {
+      "path": "question.stage",
+      "before": "verify",
+      "after": "verify",
+      "equal": true
+    },
+    {
+      "path": "question.status",
+      "before": "waiting_user",
+      "after": "waiting_user",
+      "equal": true
+    },
+    {
+      "path": "question.revision",
+      "before": 2,
+      "after": 2,
+      "equal": true
+    },
+    {
+      "path": "question.expiresAt",
+      "before": "2026-11-05T20:15:32.526Z",
+      "after": "2026-11-05T20:15:32.526Z",
+      "equal": true
+    },
+    {
+      "path": "question.originRunId",
+      "before": "f5269f72-0103-4d34-864a-0018c60195fc",
+      "after": "f5269f72-0103-4d34-864a-0018c60195fc",
+      "equal": true
+    },
+    {
+      "path": "question.originSessionId",
+      "before": "ff0a4699-7d4a-4b98-97a8-84d51acaba29",
+      "after": "ff0a4699-7d4a-4b98-97a8-84d51acaba29",
+      "equal": true
+    },
+    {
+      "path": "question.attemptId",
+      "before": "aa77cb0b-bb48-4c7a-ab73-ad68e7df7dba",
+      "after": "aa77cb0b-bb48-4c7a-ab73-ad68e7df7dba",
+      "equal": true
+    },
+    {
+      "path": "question.candidateId",
+      "before": "2f338962-c690-4ba7-bc63-6c73a9de3acb",
+      "after": "2f338962-c690-4ba7-bc63-6c73a9de3acb",
+      "equal": true
+    },
+    {
+      "path": "question.waitingBinding.taskId",
+      "before": "e42571e5-58f7-40e3-9418-c02ee8843fe6",
+      "after": "e42571e5-58f7-40e3-9418-c02ee8843fe6",
+      "equal": true
+    },
+    {
+      "path": "question.waitingBinding.issueId",
+      "before": "0b9e6f79-790b-4931-aa54-2f45f5d142de",
+      "after": "0b9e6f79-790b-4931-aa54-2f45f5d142de",
+      "equal": true
+    },
+    {
+      "path": "question.waitingBinding.revision",
+      "before": 13,
+      "after": 13,
+      "equal": true
+    },
+    {
+      "path": "question.waitingBinding.attemptId",
+      "before": "aa77cb0b-bb48-4c7a-ab73-ad68e7df7dba",
+      "after": "aa77cb0b-bb48-4c7a-ab73-ad68e7df7dba",
+      "equal": true
+    },
+    {
+      "path": "question.waitingBinding.candidateId",
+      "before": "2f338962-c690-4ba7-bc63-6c73a9de3acb",
+      "after": "2f338962-c690-4ba7-bc63-6c73a9de3acb",
+      "equal": true
+    },
+    {
+      "path": "question.answerId",
+      "before": null,
+      "after": null,
+      "equal": true
+    },
+    {
+      "path": "question.answerSource",
+      "before": null,
+      "after": null,
+      "equal": true
+    },
+    {
+      "path": "question.answerSourceEventId",
+      "before": null,
+      "after": null,
+      "equal": true
+    },
+    {
+      "path": "question.answerFingerprint",
+      "before": null,
+      "after": null,
+      "equal": true
+    },
+    {
+      "path": "question.answeredAt",
+      "before": null,
+      "after": null,
+      "equal": true
+    },
+    {
+      "path": "question.answerNull",
+      "before": true,
+      "after": true,
+      "equal": true
+    },
+    {
+      "path": "question.resultNull",
+      "before": true,
+      "after": true,
+      "equal": true
+    },
+    {
+      "path": "question.continuationRunId",
+      "before": null,
+      "after": null,
+      "equal": true
+    },
+    {
+      "path": "parent.workspaceId",
+      "before": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+      "after": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+      "equal": true
+    },
+    {
+      "path": "parent.parentState",
+      "before": "sleeping",
+      "after": "sleeping",
+      "equal": true
+    },
+    {
+      "path": "parent.parentSandboxId",
+      "before": "ipa60du803guuiqnyzqan",
+      "after": "ipa60du803guuiqnyzqan",
+      "equal": true
+    },
+    {
+      "path": "parent.runtimeReady",
+      "before": true,
+      "after": true,
+      "equal": true
+    },
+    {
+      "path": "parent.deviceId",
+      "before": "93340db5-3234-467c-af26-a50d9f6425df",
+      "after": "93340db5-3234-467c-af26-a50d9f6425df",
+      "equal": true
+    },
+    {
+      "path": "parent.lastActiveAt",
+      "before": "2026-11-05T14:48:42.215Z",
+      "after": "2026-11-05T14:48:42.215Z",
+      "equal": true
+    },
+    {
+      "path": "parent.deviceEnabled",
+      "before": true,
+      "after": true,
+      "equal": true
+    },
+    {
+      "path": "counts.ownerRecheckCount",
+      "before": 0,
+      "after": 0,
+      "equal": true
+    },
+    {
+      "path": "counts.acceptanceCount",
+      "before": 0,
+      "after": 0,
+      "equal": true
+    },
+    {
+      "path": "counts.postBaselineAttemptCount",
+      "before": 0,
+      "after": 0,
+      "equal": true
+    },
+    {
+      "path": "counts.activeRuns",
+      "before": 0,
+      "after": 0,
+      "equal": true
+    },
+    {
+      "path": "counts.activeLeases",
+      "before": 0,
+      "after": 0,
+      "equal": true
+    }
+  ],
+  "noCommittedRecheckReceiptOrNewAttemptObserved": true,
+  "eightConsumedFieldsNull": true,
+  "newReviewRunId": null,
+  "newVerifyRunId": null,
+  "newSidOrVmObserved": false,
+  "originalFrozenSourceMetadata": {
+    "observedAt": "2026-11-05T21:35:29.839Z",
+    "sourceFile": "../1210-a43-audit/before.json",
+    "stages": [
+      {
+        "stage": "review",
+        "attemptId": "41e41625-f1e2-4b2d-9d62-9fecbc4d62ae",
+        "runId": "6fc099f4-8f04-47b1-8be8-f95edd54fde0",
+        "baseBranch": "d05417e7848871e511141e10a282ffb7998b0a79",
+        "harness": "claude_code",
+        "model": "claude-haiku-5-5",
+        "subscription": {
+          "route": "claude_code_cli",
+          "modelId": "claude-haiku-5-5",
+          "bindingId": "0e5edf2d-2653-475e-8693-b53ceafa7c11"
+        },
+        "nativeClaimBindingId": "0e5edf2d-2653-475e-8693-b53ceafa7c11",
+        "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce",
+        "connectionRevision": "2",
+        "route": "claude_code_cli",
+        "modelId": "claude-haiku-5-5",
+        "apiClaim": false,
+        "providerObservedModel": null,
+        "modelDispatch": {
+          "mode": "preference",
+          "entry": {
+            "id": "346a59f4-c7d6-4312-a7f1-0c1389886ede",
+            "model": "claude-haiku-5-5",
+            "source": {
+              "kind": "subscription",
+              "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+            },
+            "harness": "claude_code"
+          },
+          "location": "cloud"
+        },
+        "agentProfile": null,
+        "readOnly": "true"
+      },
+      {
+        "stage": "verify",
+        "attemptId": "aa77cb0b-bb48-4c7a-ab73-ad68e7df7dba",
+        "runId": "f5269f72-0103-4d34-864a-0018c60195fc",
+        "baseBranch": "d05417e7848871e511141e10a282ffb7998b0a79",
+        "harness": "claude_code",
+        "model": "claude-haiku-5-5",
+        "subscription": {
+          "route": "claude_code_cli",
+          "modelId": "claude-haiku-5-5",
+          "bindingId": "0e5edf2d-2653-475e-8693-b53ceafa7c11"
+        },
+        "nativeClaimBindingId": "0e5edf2d-2653-475e-8693-b53ceafa7c11",
+        "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce",
+        "connectionRevision": "2",
+        "route": "claude_code_cli",
+        "modelId": "claude-haiku-5-5",
+        "apiClaim": false,
+        "providerObservedModel": null,
+        "modelDispatch": {
+          "mode": "preference",
+          "entry": {
+            "id": "346a59f4-c7d6-4312-a7f1-0c1389886ede",
+            "model": "claude-haiku-5-5",
+            "source": {
+              "kind": "subscription",
+              "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+            },
+            "harness": "claude_code"
+          },
+          "location": "cloud"
+        },
+        "agentProfile": null,
+        "readOnly": "true"
+      }
+    ]
+  },
+  "outcome": "BLOCKED: normal UI Retry review returned a generic failure and no committed owner recheck receipt or new attempt is visible. No new six-criterion acceptance run exists.",
+  "limitations": [
+    "This database observation does not reveal the failed HTTP response body/server exception or a rolled-back transaction.",
+    "Do not infer quota, subscription failure, or a model run error from the generic UI message.",
+    "Historical frozen source metadata is not a new live readiness or quota check.",
+    "Old report fingerprints were not queried again here; their 23:04 raw comparison remains the last report snapshot."
+  ]
+}

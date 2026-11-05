@@ -1,0 +1,48 @@
+[
+  {
+    "check": "error-policy",
+    "command": [
+      "node",
+      "scripts/error-cause-policy.mjs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.146
+  },
+  {
+    "check": "polling-policy",
+    "command": [
+      "node",
+      "scripts/polling-policy.mjs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.057
+  },
+  {
+    "check": "lint",
+    "command": [
+      "./node_modules/.bin/oxlint",
+      "lib/factory/http.ts",
+      "lib/factory/http-list.test.ts"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.082
+  },
+  {
+    "check": "typegen",
+    "command": [
+      "./node_modules/.bin/next",
+      "typegen"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 8.451
+  },
+  {
+    "check": "typecheck",
+    "command": [
+      "./node_modules/.bin/tsrs",
+      "--noEmit"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.076
+  }
+]

@@ -1,0 +1,19 @@
+factory list unavailable { error: 'Error', code: '42P01' }
+✔ list contract is exactly 401/422/404/503 (2.29764ms)
+✔ a database error is 503 without detail, never a 500 (1.042604ms)
+✔ list reason uses the factory text masker (0.366399ms)
+✔ check text masks an installation token and a JWT whole (shared credential patterns) (0.234585ms)
+✔ list reason masks key=value secrets and env secret values (0.644258ms)
+✔ controlled recheck refusal preserves its safe cause in server logs without exposing request text (4.606877ms)
+✔ diagnostic sink failure never changes a controlled Factory response (0.586973ms)
+✔ note masker hides secret values in their encoded forms and token patterns (2.923891ms)
+✔ note masker hides uppercase hex and lowercase %xx spellings (0.7952ms)
+✔ control endpoint masks the human reason before the store sees it (15.568478ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1132.776997

@@ -1,0 +1,30 @@
+{
+  "observedAt": "2026-11-05T23:45:32.843380+00:00",
+  "kind": "local source/index comparison with saved GitData receipt",
+  "localHead": "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+  "localIndexTree": "6a28852f5862e2b22495c55843f41dd7028a4465",
+  "remoteSourceHead": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+  "remoteSourceTree": "6a28852f5862e2b22495c55843f41dd7028a4465",
+  "base": "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+  "files": [
+    {
+      "path": "lib/factory/http.ts",
+      "sha": "ddac750aa31e5280ad7addc7891cfa4caa5f3bfd",
+      "localIndexBlob": "ddac750aa31e5280ad7addc7891cfa4caa5f3bfd",
+      "localWorktreeBlob": "ddac750aa31e5280ad7addc7891cfa4caa5f3bfd"
+    },
+    {
+      "path": "lib/factory/http-list.test.ts",
+      "sha": "04419c27ff577dca3e3f285ac1a86695ed975be0",
+      "localIndexBlob": "04419c27ff577dca3e3f285ac1a86695ed975be0",
+      "localWorktreeBlob": "04419c27ff577dca3e3f285ac1a86695ed975be0"
+    }
+  ],
+  "limits": "The actual local checkout HEAD is the base with staged diagnostic changes. These checks do not claim execution on the remote commit object.",
+  "source": {
+    "source": "ops/1210-a43-final/diagnostic-gitdata-receipts.json",
+    "sourceBytes": 850,
+    "sourceSha256": "bd595c51cb609973f64a2d6a13292b26f4b938270b314eed4dbc5d787be93c3d",
+    "transformation": "byte-for-byte selected original"
+  }
+}

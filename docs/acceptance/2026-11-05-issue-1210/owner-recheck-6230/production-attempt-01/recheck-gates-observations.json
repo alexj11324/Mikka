@@ -1,0 +1,82 @@
+{
+  "state": "blocked_official_subscription_quota_condition_reproduced",
+  "sourceCommit": "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+  "sourceReviewer": "/root/release_gate_1449",
+  "phases": [
+    {
+      "phase": "01",
+      "responseFile": "recheck-gates-01-response.json",
+      "responseSha256": "eb7277fe67073b4c50be8ef04b1ecacc141b1bdabfa06eb19c9d79800840c51f",
+      "rowCount": 2,
+      "observedAt": [
+        "2026-11-05T23:27:51.977Z"
+      ]
+    },
+    {
+      "phase": "02",
+      "responseFile": "recheck-gates-02-response.json",
+      "responseSha256": "2883fa699d0cf0738bee4bf24ac881143a58c63c890ff03677f44b71a5815c4d",
+      "rowCount": 2,
+      "observedAt": [
+        "2026-11-05T23:29:24.240Z"
+      ]
+    },
+    {
+      "phase": "03",
+      "responseFile": "recheck-gates-03-response.json",
+      "responseSha256": "bc653e5c887bb888dd0b593a6845bd3999dca1fc59b9807f0aa1804e0b6e6477",
+      "rowCount": 2,
+      "observedAt": [
+        "2026-11-05T23:31:10.038Z"
+      ]
+    },
+    {
+      "phase": "04",
+      "responseFile": "recheck-gates-04-response.json",
+      "responseSha256": "6d85a02ded33131e708c5fbcdc46912b1f5404a507dd39aa6daf000a89566f6c",
+      "rowCount": 0,
+      "observedAt": [
+        "2026-11-05T23:35:34.214Z"
+      ]
+    }
+  ],
+  "quotaProviderObservedAt": "2026-11-05T23:14:06.758Z",
+  "secondsAfterReportedClick": 2.853,
+  "quotaSnapshot": {
+    "plan": "Subscription",
+    "source": "official",
+    "status": "ok",
+    "vendor": "claude_code",
+    "windows": [
+      {
+        "kind": "five_hour",
+        "used": 0.04,
+        "resetsAt": "2026-11-06T02:30:00.000Z"
+      },
+      {
+        "kind": "weekly",
+        "used": 1,
+        "resetsAt": "2026-11-06T00:00:00.000Z"
+      },
+      {
+        "kind": "weekly",
+        "used": 0,
+        "model": "fable",
+        "resetsAt": "2026-11-06T00:00:00.000Z"
+      }
+    ],
+    "observedAt": "2026-11-05T23:14:06.758Z"
+  },
+  "productionWrites": 0,
+  "credentialRefreshes": 0,
+  "modelInvocations": 0,
+  "browserActions": 0,
+  "limits": [
+    "Actual failed HTTP response detail is unavailable; quota is a source-reproducible admission blocker from the post-click official snapshot, not a captured server exception.",
+    "Current health projection is not a complete historical replay.",
+    "Membership and later transaction gates were intentionally not queried after the quota blocker was established.",
+    "No fresh review/verify exists; original six-criterion acceptance and final Owner acceptance remain incomplete."
+  ],
+  "currentPriorityHealthRows": 0,
+  "pureReplayFile": "root-quota-replay.json"
+}

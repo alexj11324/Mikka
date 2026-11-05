@@ -1,0 +1,301 @@
+{
+  "kind": "derived necessary-field projection",
+  "sources": [
+    {
+      "source": "ops/1210-release-gate/pr-1462-ready-gate.json",
+      "sourceBytes": 25226,
+      "sourceSha256": "69a48e22910b3c2486db26f627400214e34945949bd5f9e54310568ce21cc8ca",
+      "transformation": "byte-for-byte selected original"
+    },
+    {
+      "source": "ops/1210-a43-final/pr1462-root-merge.json",
+      "sourceBytes": 129595,
+      "sourceSha256": "ff33a40f14f24f61a0dba8e40eaec7b160c0dfbeabccd78908e4469955046ea9",
+      "transformation": "byte-for-byte selected original"
+    }
+  ],
+  "premergeRecordedAt": "2026-11-05T23:39:17.258725Z",
+  "pr": {
+    "number": 1462,
+    "url": "https://github.com/alexj11324/Mikka/pull/1462",
+    "head": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+    "base": "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+    "draft": false,
+    "mergeable": true,
+    "mergeable_state": "clean",
+    "merge_commit_sha": "e8ad91f4d2661c64887b0e8791f1b7cac8b03cb5"
+  },
+  "checks": [
+    {
+      "id": 127606389873,
+      "name": "UI policy (strict)",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:37:00Z",
+      "completed_at": "2026-11-05T23:37:04Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883010/job/127606389873"
+    },
+    {
+      "id": 127605525562,
+      "name": "analytics-ssr",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:35:03Z",
+      "completed_at": "2026-11-05T23:35:07Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883034/job/127605525562"
+    },
+    {
+      "id": 127605453923,
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:34:54Z",
+      "completed_at": "2026-11-05T23:34:57Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883010/job/127605453923"
+    },
+    {
+      "id": 127605051240,
+      "name": "Browser tests (before merge)",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:34:00Z",
+      "completed_at": "2026-11-05T23:34:03Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42130340447/job/127605051240"
+    },
+    {
+      "id": 127603612607,
+      "name": "Cloud credential access (OIDC)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:30:48Z",
+      "completed_at": "2026-11-05T23:30:48Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883010/job/127603612607"
+    },
+    {
+      "id": 127603610485,
+      "name": "Analytics SSR (full)",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:30:50Z",
+      "completed_at": "2026-11-05T23:35:01Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883034/job/127603610485"
+    },
+    {
+      "id": 127603609795,
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:30:50Z",
+      "completed_at": "2026-11-05T23:33:38Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883010/job/127603609795"
+    },
+    {
+      "id": 127603609737,
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:30:50Z",
+      "completed_at": "2026-11-05T23:34:32Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883010/job/127603609737"
+    },
+    {
+      "id": 127603609662,
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:30:50Z",
+      "completed_at": "2026-11-05T23:34:52Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883010/job/127603609662"
+    },
+    {
+      "id": 127603609619,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:30:50Z",
+      "completed_at": "2026-11-05T23:33:58Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883010/job/127603609619"
+    },
+    {
+      "id": 127603609602,
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:30:50Z",
+      "completed_at": "2026-11-05T23:34:21Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883010/job/127603609602"
+    },
+    {
+      "id": 127603609549,
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:30:50Z",
+      "completed_at": "2026-11-05T23:32:11Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883010/job/127603609549"
+    },
+    {
+      "id": 127603609542,
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:30:50Z",
+      "completed_at": "2026-11-05T23:36:30Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883010/job/127603609542"
+    },
+    {
+      "id": 127603609539,
+      "name": "Integration unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:30:50Z",
+      "completed_at": "2026-11-05T23:36:58Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883010/job/127603609539"
+    },
+    {
+      "id": 127603505717,
+      "name": "Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:30:37Z",
+      "completed_at": "2026-11-05T23:30:48Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883034/job/127603505717"
+    },
+    {
+      "id": 127603505478,
+      "name": "Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:30:37Z",
+      "completed_at": "2026-11-05T23:30:48Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883010/job/127603505478"
+    },
+    {
+      "id": 127603505293,
+      "name": "Browser tests (before merge)",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 15368,
+      "started_at": "2026-11-05T23:30:37Z",
+      "completed_at": "2026-11-05T23:30:40Z",
+      "details_url": "https://github.com/alexj11324/Mikka/actions/runs/42129883033/job/127603505293"
+    },
+    {
+      "id": 127603498409,
+      "name": "GitGuardian Security Checks",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+      "app_id": 46505,
+      "started_at": "2026-11-05T23:30:34Z",
+      "completed_at": "2026-11-05T23:30:35Z",
+      "details_url": "https://dashboard.gitguardian.com"
+    }
+  ],
+  "checksCount": {
+    "total": 18,
+    "success": 17,
+    "skipped": 1
+  },
+  "testedSyntheticMerge": {
+    "sha": "e8ad91f4d2661c64887b0e8791f1b7cac8b03cb5",
+    "tree": "6a28852f5862e2b22495c55843f41dd7028a4465",
+    "parents": [
+      "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+      "b1bee585e7f1c78b09fb8f80b8752227591b13f1"
+    ],
+    "committedAt": "2026-11-05T23:30:32Z"
+  },
+  "actualCheckout": [
+    "2026-11-05T23:30:52.1839786Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +e8ad91f4d2661c64887b0e8791f1b7cac8b03cb5:refs/remotes/pull/1462/merge",
+    "2026-11-05T23:30:54.5683326Z  * [new ref]         e8ad91f4d2661c64887b0e8791f1b7cac8b03cb5 -> pull/1462/merge",
+    "2026-11-05T23:30:55.0255064Z [command]/usr/bin/git log -1 --format=%H",
+    "2026-11-05T23:30:55.0290886Z e8ad91f4d2661c64887b0e8791f1b7cac8b03cb5"
+  ],
+  "laterMain": {
+    "sha": "b9e1b5b892132c758db601c681de1e559bb17956",
+    "tree": "abe950dba89845dfd4ef5603db88ad4684a20040",
+    "parents": [
+      "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+      "b7c8d1847201e3a40da9995e26d86b7e840d3f1c"
+    ],
+    "committedAt": "2026-11-05T23:31:06Z"
+  },
+  "laterMainDiffPaths": [
+    "docs/acceptance/project-map-cold-read-cost-20261105.md",
+    "docs/design/project-map-api.md",
+    "lib/factory/profile-dispatch.db.test.ts",
+    "lib/project-map/read-performance.test.ts",
+    "lib/project-map/read-sql.ts",
+    "lib/project-map/read-store.ts",
+    "lib/project-map/read-transport.test.ts",
+    "lib/project-map/read-transport.ts",
+    "lib/project-map/read.db.test.ts",
+    "lib/project-map/scope-transport.test.ts",
+    "lib/project-map/scope.ts",
+    "lib/project-map/source-access.ts",
+    "lib/secrets/project-map-mask.db.test.ts",
+    "lib/secrets/project-map-mask.test.ts",
+    "lib/secrets/project-map-mask.ts",
+    "package.json"
+  ],
+  "expectedMerge": {
+    "base": "b9e1b5b892132c758db601c681de1e559bb17956",
+    "head": "b1bee585e7f1c78b09fb8f80b8752227591b13f1",
+    "predictedTree": "4d234a44ec32bb1b28e8552b6dd0e44c2c7733b1",
+    "changedPaths": [
+      "lib/factory/http.ts",
+      "lib/factory/http-list.test.ts"
+    ],
+    "note": "Main #1460 changes are disjoint. Overlay exactly two validated source blobs; prior CI synthetic tree stays recorded as6a288 and is not claimed to include newer main."
+  },
+  "mergeReceipt": {
+    "sha": "0677fbff4c949c53b839706011af5ec77cdd1d24",
+    "merged": true,
+    "message": "Pull Request successfully merged"
+  },
+  "actualMerge": {
+    "sha": "0677fbff4c949c53b839706011af5ec77cdd1d24",
+    "tree": "4d234a44ec32bb1b28e8552b6dd0e44c2c7733b1",
+    "parents": [
+      "b9e1b5b892132c758db601c681de1e559bb17956",
+      "b1bee585e7f1c78b09fb8f80b8752227591b13f1"
+    ],
+    "committedAt": "2026-11-05T23:40:29Z"
+  },
+  "qualification": "CI source head b1/synthetic e8ad/tree6a288 predates disjoint #1460 main. Exact final tree independently computed from new main plus validated two blobs and verified against actual merge; final main CI/build follows.",
+  "deploymentStatusAtThisSnapshot": "pending READY; no new production click or acceptance asserted"
+}

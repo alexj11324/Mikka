@@ -1,0 +1,35 @@
+factory list unavailable { error: 'Error', code: '42P01' }
+✔ list contract is exactly 401/422/404/503 (2.061422ms)
+✔ a database error is 503 without detail, never a 500 (1.002605ms)
+✔ list reason uses the factory text masker (0.383975ms)
+✔ check text masks an installation token and a JWT whole (shared credential patterns) (0.209679ms)
+✔ list reason masks key=value secrets and env secret values (0.756793ms)
+✖ controlled recheck refusal preserves its safe cause in server logs without exposing request text (4.15988ms)
+✔ diagnostic sink failure never changes a controlled Factory response (0.396083ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 6
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1022.692444
+
+✖ failing tests:
+
+test at lib/factory/http-list.test.ts:1:3047
+✖ controlled recheck refusal preserves its safe cause in server logs without exposing request text (4.15988ms)
+  AssertionError [ERR_ASSERTION]: a controlled refusal must leave one bounded diagnostic record
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/6b649311982a/Mikka-recheck-diagnostics/lib/factory/http-list.test.ts:61:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

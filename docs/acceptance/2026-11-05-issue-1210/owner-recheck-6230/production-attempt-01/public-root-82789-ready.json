@@ -1,0 +1,11 @@
+{
+  "observedAt": "2026-11-05T23:12:38.458335+00:00",
+  "url": "https://app.aspectlylabs.com/mikka/api/version",
+  "status": 200,
+  "body": {
+    "build": "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+    "minMobileBuild": 0,
+    "mobileUpdateUrl": "itms-beta://beta.itunes.apple.com/v1/app/6829300983",
+    "minDesktopVersion": null
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "sourceCommit": "82789ddf380841a4f3ea637d940005bbbd2cecdd",
+  "sourceNote": "subscription-quota.ts and protocol/subscription.ts unchanged in diagnostic source tree",
+  "input": "recheck-gates-03-response.json",
+  "scope": "pure local replay; no network, DB write, credential refresh or model invocation",
+  "result": [
+    {
+      "stage": "review",
+      "runId": "6fc099f4-8f04-47b1-8be8-f95edd54fde0",
+      "model": "claude-haiku-5-5",
+      "snapshotObservedAt": "2026-11-05T23:14:06.758Z",
+      "atActualPostDbLog": {
+        "status": "exhausted",
+        "resetsAt": "2026-11-06T00:00:00.000Z"
+      },
+      "atRecordedRead": {
+        "status": "checking",
+        "resetsAt": null
+      },
+      "atResetWithoutFreshProviderRead": {
+        "status": "checking",
+        "resetsAt": null
+      }
+    },
+    {
+      "stage": "verify",
+      "runId": "f5269f72-0103-4d34-864a-0018c60195fc",
+      "model": "claude-haiku-5-5",
+      "snapshotObservedAt": "2026-11-05T23:14:06.758Z",
+      "atActualPostDbLog": {
+        "status": "exhausted",
+        "resetsAt": "2026-11-06T00:00:00.000Z"
+      },
+      "atRecordedRead": {
+        "status": "checking",
+        "resetsAt": null
+      },
+      "atResetWithoutFreshProviderRead": {
+        "status": "checking",
+        "resetsAt": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+2026-11-05T22:45:35.9954095Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +0c59cd7d13cc1329ee69db78465328b0e4335eac:refs/remotes/pull/1449/merge
+2026-11-05T22:45:37.6772417Z  * [new ref]         0c59cd7d13cc1329ee69db78465328b0e4335eac -> pull/1449/merge
+2026-11-05T22:45:37.6880806Z ##[group]Checking out the ref
+2026-11-05T22:45:37.6883555Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/1449/merge
+2026-11-05T22:45:38.1155978Z HEAD is now at 0c59cd7 Merge 79c3731ca819b3304efea0e8f98c936f4b28cd2b into 9cf06716dd576c2a5dba04c952e5f0fcaa998594
+2026-11-05T22:45:38.1212508Z [command]/usr/bin/git log -1 --format=%H
+2026-11-05T22:45:38.1243205Z 0c59cd7d13cc1329ee69db78465328b0e4335eac

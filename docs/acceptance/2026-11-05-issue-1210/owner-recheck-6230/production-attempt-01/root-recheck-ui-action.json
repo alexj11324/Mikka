@@ -1,0 +1,14 @@
+{
+  "action": "owner_candidate_recheck",
+  "clickAt": "2026-11-05T23:14:03.905Z",
+  "method": "Normal signed-in Owner UI",
+  "tabId": "64",
+  "issueId": "0b9e6f79-790b-4931-aa54-2f45f5d142de",
+  "taskId": "e42571e5-58f7-40e3-9418-c02ee8843fe6",
+  "button": "Retry review",
+  "clickCount": 1,
+  "afterClickObserved": "Loading Retry review; disabled",
+  "publicVersionProof": "../1210-release-gate/public-root-82789-ready.json",
+  "oldVerifyQuestionAnswered": false,
+  "acceptancePerformed": false
+}
