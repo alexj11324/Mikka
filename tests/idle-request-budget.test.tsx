@@ -207,6 +207,8 @@ routes['/api/auth/get-session'] = () => ({ user: { ...person, emailVerified: tru
 routes['/api/workspace/switcher'] = () => ({ workspace: { id: WORKSPACE, name: 'Mikka' }, live, accounts: [{ id: OWNER, email: person.email, choices: [{ id: OWNER_HOME, name: 'Personal', kind: 'personal' }, { id: WORKSPACE, name: 'Mikka', kind: 'team' }] }] })
 routes['/api/pending-actions'] = () => new Response('[]', { headers: { 'content-type': 'application/json', 'x-mikka-viewer': OWNER, 'x-mikka-observed-at': AT } })
 routes['/api/approved-writes'] = () => ({ enabled: false })
+// Sub-agent login prompts: one read on mount, then only on a subagent_events push.
+routes['/api/computer/events'] = url => ({ events: [], cursor: url.searchParams.get('after') ?? '0', hasMore: false })
 routes['/api/conversations'] = url => ({ conversations: [], viewerId: OWNER, workspaceId: url.searchParams.get('workspaceId') })
 routes['/api/factory/tasks'] = () => ({ tasks: [], liveWorkspaceId: WORKSPACE })
 routes['/api/conversations/:id/read'] = () => ({ lastReadMessageId: 'm2', lastReadPosition: 2, unreadCount: 0 })

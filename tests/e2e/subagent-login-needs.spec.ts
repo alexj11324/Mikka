@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 const BOT = '00000000-0000-4000-8000-0000000000b0'
+const WORKSPACE = '00000000-0000-4000-8000-0000000000c0'
 const SUB = '00000000-0000-4000-8000-0000000000a1'
 const OTHER = '00000000-0000-4000-8000-0000000000a2'
 const PREFIX = `/mikka/api/bots/${BOT}/subagents/${SUB}/credentials`
@@ -9,16 +10,28 @@ const SECRET = 'hunter2-secret'
 type Update = { subagentId?: string; botId?: string; state?: string; needs?: unknown }
 const update = (over: Update) => ({ botId: BOT, subagentId: SUB, task: '查 Cloudflare 账单', state: 'needs_you', step: '需要登录', needs: { kind: 'login', site: 'dash.cloudflare.com' }, ...over })
 
-/** Serves a fixed SSE batch; EventSource reconnects and replays it, which the latest-per-sub-agent reducer absorbs. */
-async function stream(page: Page, updates: Update[]) {
-  await page.route('**/mikka/api/computer/events*', route => route.fulfill({
-    headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-store' },
-    body: `retry: 60000\n\n${updates.map((data, index) => `id: ${index + 1}\nevent: data-subagent\ndata: ${JSON.stringify(update(data))}\n\n`).join('')}`,
-  }))
+/** Serves bounded cursor pages through the same scope used by the live provider. */
+async function computerEvents(page: Page, updates: Update[]) {
+  const events = updates.map((data, index) => ({ id: String(index + 1), data: update(data) }))
+  // This isolated rendering fixture has no gateway. An unavailable ticket uses
+  // the normal slow fallback; the test never opens a real remote WebSocket.
+  await page.route('**/mikka/api/live/ticket*', route => route.fulfill({ status: 503, json: { error: 'fixtureGatewayUnavailable' } }))
+  await page.route('**/mikka/api/computer/events*', route => {
+    const url = new URL(route.request().url())
+    expect(url.searchParams.get('workspace')).toBe(WORKSPACE)
+    const after = url.searchParams.get('after') ?? '0'
+    expect(after).toMatch(/^(0|[1-9][0-9]*)$/)
+    const remaining = events.filter(event => BigInt(event.id) > BigInt(after))
+    const batch = remaining.slice(0, 100)
+    return route.fulfill({
+      headers: { 'cache-control': 'no-store' },
+      json: { events: batch, cursor: batch.at(-1)?.id ?? after, hasMore: remaining.length > batch.length },
+    })
+  })
 }
 
 test('a sub-agent login need renders the card against its own credential API', async ({ page }) => {
-  await stream(page, [
+  await computerEvents(page, [
     {},
     {},
     { subagentId: '00000000-0000-4000-8000-0000000000a5', state: 'running' },
@@ -51,7 +64,7 @@ test('a sub-agent login need renders the card against its own credential API', a
 })
 
 test('the card goes away once the sub-agent moves on', async ({ page }) => {
-  await stream(page, [{}, { state: 'running', needs: null }])
+  await computerEvents(page, [{}, { state: 'running', needs: null }])
   await page.goto('/mikka/zh-CN/preview/subagent-login')
   await expect(page.getByRole('main')).toBeVisible()
   await page.waitForTimeout(500)
@@ -59,7 +72,7 @@ test('the card goes away once the sub-agent moves on', async ({ page }) => {
 })
 
 test('a BE-17 rejection from the sub-agent route shows its reason', async ({ page }) => {
-  await stream(page, [{}])
+  await computerEvents(page, [{}])
   await page.route(`**${PREFIX}/challenge`, route => route.fulfill({ json: { nonce: 'n'.repeat(43), origin: 'https://dash.cloudflare.com', expiresIn: 300 } }))
   await page.route(`**${PREFIX}`, route => route.fulfill({ json: { attemptId: '11111111-1111-4111-8111-111111111111', status: 'rejected', reason: 'invalidCredentials', origin: 'https://dash.cloudflare.com' } }))
   await page.goto('/mikka/zh-CN/preview/subagent-login')
