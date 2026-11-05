@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { Text } from '@/components/Text'
-import { GlassButton } from '@/components/ui'
+import { GlassButton } from '@/components/GlassButton'
 import { colors } from '@/lib/theme'
 
 /** A failed read keeps useful data visible and offers an explicit retry. */

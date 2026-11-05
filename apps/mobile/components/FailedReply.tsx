@@ -1,7 +1,7 @@
 import { type ReactNode, useRef, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
 import { Text } from '@/components/Text'
-import { GlassButton } from '@/components/ui'
+import { GlassButton } from '@/components/GlassButton'
 import { api, ApiError } from '@/lib/api'
 import { failureLine, failureSettingsPath } from '@/lib/chat-failure'
 import { replyRetryLine, retryReply, type ReplyRetryOutcome } from '@/lib/reply-retry'

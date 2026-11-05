@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native'
 import { Text } from '@/components/Text'
-import { GlassButton } from '@/components/ui'
+import { GlassButton } from '@/components/GlassButton'
 import { colors } from '@/lib/theme'
 
 /** 「没停下 · 重试」 under a reply or thread that a stop did not end (lib/useStop.ts). */
