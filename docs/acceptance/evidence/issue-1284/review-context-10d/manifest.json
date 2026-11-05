@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "kind": "prepared-public-evidence-manifest",
+  "preparedAt": "2026-11-05T09:47:48.691309+00:00",
+  "publicationPerformed": false,
+  "productSource": {
+    "commit": "10d3754a640e3b5b3ba43ed421983d047ba18e6b",
+    "tree": "ea4987de4d7f06f1ba5b961e934161adb061f001",
+    "parent": "9727fcfcfc16724e1cfcd915dc28d59b52d69481",
+    "pullRequest": 1361
+  },
+  "testCheckpoint": {
+    "commit": "9ab7ecc2b62acecfdc0c1405d0881be6af3ee03a",
+    "tree": "ea4987de4d7f06f1ba5b961e934161adb061f001"
+  },
+  "productionObservationCommit": "9727fcfcfc16724e1cfcd915dc28d59b52d69481",
+  "fileCount": 3,
+  "totalBytes": 15046,
+  "files": [
+    {
+      "path": "review-context-receipt.json",
+      "bytes": 8126,
+      "sha256": "e38fc63a6970a9fcd78a2cc66cad09791075f4e88050a6fde12bd1c173b8173e",
+      "gitBlob": "b3eb267ea048fc85c7abdd0749d409e25e39934f"
+    },
+    {
+      "path": "review-context-pr-description.md",
+      "bytes": 2595,
+      "sha256": "879eabd7d52bffcec53aee7b4a9afa5f1e61fbc9c500ea7fd71e577855aef995",
+      "gitBlob": "8bbf3549de8aa40b73c36dcec2e56c3de7104dca"
+    },
+    {
+      "path": "production-9727-observation.json",
+      "bytes": 4325,
+      "sha256": "23a0448c4e2db097e2af6edf8788062c8b352a557f73a0dea227a2b8538cea78",
+      "gitBlob": "3cdafa50b5192a0261d04876d566ed60aacd263b"
+    }
+  ],
+  "reviewScope": "Manual content and common credential-pattern review; separate official static audits use historical isolated runner secret ledgers. No new product execution, database, login, model, or production verification is performed by these audits."
+}

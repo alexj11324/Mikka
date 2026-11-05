@@ -1,0 +1,27 @@
+{
+  "kind": "official-test-account-evidence-static-audit",
+  "context": "5251",
+  "runnerSourceCommit": "5251a6bfeda13c2e6c300dfba5fa0841ee0e9f8a",
+  "runnerSourceTree": "d1397ffac0a07e2a8a62290a161839d44a2b0a97",
+  "candidateProductCommit": "10d3754a640e3b5b3ba43ed421983d047ba18e6b",
+  "candidateProductTree": "ea4987de4d7f06f1ba5b961e934161adb061f001",
+  "productionObservationCommit": "9727fcfcfc16724e1cfcd915dc28d59b52d69481",
+  "manifestSha256": "b0e70506e6585c9b9f27a17800b2569e91747a1ca771d39621352b347dd39b13",
+  "candidateDirectory": "/tmp/issue1284-review-context-10d-public-b0e70506",
+  "candidateFiles": 3,
+  "candidateBytes": 15046,
+  "candidateBytesVerifiedBeforeAndAfter": true,
+  "privateContextExported": false,
+  "liveDatabaseOrServerRequired": false,
+  "newProductValidation": false,
+  "startedAt": "2026-11-05T09:50:51.916Z",
+  "completedAt": "2026-11-05T09:50:51.924Z",
+  "officialAudit": {
+    "files": 3,
+    "archives": 0,
+    "archiveEntries": 0,
+    "decodedBytes": 0,
+    "result": "passed",
+    "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+  }
+}

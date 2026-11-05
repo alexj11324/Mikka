@@ -1,0 +1,207 @@
+{
+  "schemaVersion": 1,
+  "status": "verified-checkpoint",
+  "baseCommit": "9727fcfcfc16724e1cfcd915dc28d59b52d69481",
+  "worktree": "/workspace/Mikka-1284-review-context",
+  "verifiedAt": "2026-11-05T09:32:37.258622+00:00",
+  "productionObservation": {
+    "code": "agentProfileDecisionUnavailable",
+    "detail": "uncertain_profile",
+    "candidateCount": 3,
+    "availableCandidateCount": 3,
+    "selectedProfileId": "not_exposed",
+    "confidence": "not_exposed",
+    "causality": "The missing current-stage input is reproduced. It does not establish why the historical model returned low confidence."
+  },
+  "scope": {
+    "productFiles": [
+      "lib/factory/automatic-dispatch.ts",
+      "lib/factory/agent-profile.ts",
+      "lib/factory/agent-profile-decision.ts"
+    ],
+    "testFiles": [
+      "lib/factory/agent-profile.test.ts",
+      "lib/factory/profile-dispatch.db.test.ts"
+    ],
+    "thresholdChanged": false,
+    "newDecisionFallback": false,
+    "newProviderCall": false,
+    "newPersistenceOrRoute": false
+  },
+  "commands": {
+    "redUnit": "CI=true REQUIRE_DB=1 node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/agent-profile.test.ts",
+    "redAndGreenPostgres": "CI=true REQUIRE_DB=1 node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/profile-dispatch.db.test.ts",
+    "greenUnit": "CI=true REQUIRE_DB=1 node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/agent-profile.test.ts lib/factory/profile-request.test.ts",
+    "finalTypeOnlyUnit": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/agent-profile.test.ts lib/factory/profile-request.test.ts",
+    "types": "pnpm typecheck",
+    "lint": "pnpm exec oxlint lib/factory/automatic-dispatch.ts lib/factory/agent-profile.ts lib/factory/agent-profile-decision.ts lib/factory/agent-profile.test.ts lib/factory/profile-dispatch.db.test.ts",
+    "diff": "git diff --check"
+  },
+  "validation": {
+    "postgres": {
+      "tests": 47,
+      "pass": 47,
+      "fail": 0,
+      "skip": 0,
+      "exitCode": 0,
+      "kind": "real isolated PostgreSQL 17 with synthetic Decision/provider boundaries"
+    },
+    "unit": {
+      "tests": 17,
+      "pass": 17,
+      "fail": 0,
+      "skip": 0,
+      "exitCode": 0
+    },
+    "typesExitCode": 0,
+    "lintExitCode": 0,
+    "diffExitCode": 0,
+    "redEvidencePreserved": true,
+    "sourceOrdering": "The real PG green completed before adding an explicit optional TypeScript type to the diagnostics object. This last change has no runtime effect; the final unit run and full typecheck passed after it. No PG result is relabeled as a later rerun.",
+    "realModelCalls": 0,
+    "productionWrites": 0,
+    "liveHTTP": false
+  },
+  "logs": {
+    "unitBefore": {
+      "path": "/tmp/issue1284-review-context-unit-before.log",
+      "sha256": "6a85fbf3273ea6ed5efd205d78412da3d83a3caf5b05a20e892d811056e2379b",
+      "bytes": 2393,
+      "logCreatedAt": "2026-11-05 09:24:09.496027133 +0000",
+      "logModifiedAt": "2026-11-05 09:24:10.388027093 +0000",
+      "counts": {
+        "tests": 13,
+        "pass": 12,
+        "fail": 1,
+        "skipped": 0
+      }
+    },
+    "pgBefore": {
+      "path": "/tmp/issue1284-review-context-pg-before.log",
+      "sha256": "c443c1b7ac34852ad1e3c8a3ec642184bcaf43a41fca2e3964d18a7c0e852d3c",
+      "bytes": 9165,
+      "logCreatedAt": "2026-11-05 09:24:10.400027093 +0000",
+      "logModifiedAt": "2026-11-05 09:24:26.972026357 +0000",
+      "counts": {
+        "tests": 47,
+        "pass": 42,
+        "fail": 5,
+        "skipped": 0
+      }
+    },
+    "unitAfter": {
+      "path": "/tmp/issue1284-review-context-unit-after.log",
+      "sha256": "a2074bc4836ba2fe27387209e75fe305cfe4a6c03840f39a9f6f07cbddcbd7cb",
+      "bytes": 1796,
+      "logCreatedAt": "2026-11-05 09:26:31.548020827 +0000",
+      "logModifiedAt": "2026-11-05 09:26:32.612020779 +0000",
+      "counts": {
+        "tests": 17,
+        "pass": 17,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    "pgAfter": {
+      "path": "/tmp/issue1284-review-context-pg-after.log",
+      "sha256": "abbc0880d1a22ca5b2dd95787b605c1f0de7b47e97f1c565c48bc1a442c87d95",
+      "bytes": 4723,
+      "logCreatedAt": "2026-11-05 09:26:32.616020779 +0000",
+      "logModifiedAt": "2026-11-05 09:26:49.536020028 +0000",
+      "counts": {
+        "tests": 47,
+        "pass": 47,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    "typesBefore": {
+      "path": "/tmp/issue1284-review-context-types-before.log",
+      "sha256": "19118747547e09cb67230523f522f564bc03df47cc59018feac7db4670cb84da",
+      "bytes": 1138,
+      "logCreatedAt": "2026-11-05 09:29:08.900013841 +0000",
+      "logModifiedAt": "2026-11-05 09:29:08.900013841 +0000"
+    },
+    "types": {
+      "path": "/tmp/issue1284-review-context-types.log",
+      "sha256": "5d7848bebb3ebb7a17bb09052e193def74855c47e1ce3faab64525ae06ca4155",
+      "bytes": 82,
+      "logCreatedAt": "2026-11-05 09:28:00.256016889 +0000",
+      "logModifiedAt": "2026-11-05 09:29:09.292013824 +0000"
+    },
+    "unitFinal": {
+      "path": "/tmp/issue1284-review-context-unit-final.log",
+      "sha256": "61e908e3b7915a380b20ec0ddc0480b1fe5a9db2aae6959cbfb1501d5fdb0593",
+      "bytes": 1795,
+      "logCreatedAt": "2026-11-05 09:29:12.196013695 +0000",
+      "logModifiedAt": "2026-11-05 09:29:13.288013646 +0000",
+      "counts": {
+        "tests": 17,
+        "pass": 17,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    "lint": {
+      "path": "/tmp/issue1284-review-context-lint-final.log",
+      "sha256": "309f5672b9c582e577929ca2f5f761bde174303b1ea9eaa2169e7e3e878c5a11",
+      "bytes": 89,
+      "logCreatedAt": "2026-11-05 09:29:13.296013646 +0000",
+      "logModifiedAt": "2026-11-05 09:29:13.636013631 +0000"
+    },
+    "diff": {
+      "path": "/tmp/issue1284-review-context-diffcheck-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "logCreatedAt": "2026-11-05 09:29:13.648013630 +0000",
+      "logModifiedAt": "2026-11-05 09:29:13.648013630 +0000"
+    }
+  },
+  "files": [
+    {
+      "path": "lib/factory/automatic-dispatch.ts",
+      "gitBlob": "76d954baa030a139b1d1e5ba621841fb023c5023",
+      "sha256": "e7eaf099f0b6ea04f71365f1ab071512bb0f771bd1dbcf5f0185f5b8d65852f8"
+    },
+    {
+      "path": "lib/factory/agent-profile.ts",
+      "gitBlob": "c8193a43ee95322883ec48b4d181c079fa258996",
+      "sha256": "2398c4077110f125d085cae8f0c40f4dd6f143a7476d557e4f1e8ab5e4e84113"
+    },
+    {
+      "path": "lib/factory/agent-profile-decision.ts",
+      "gitBlob": "1486de99096e8e1568430e6fb0a63b53d9a01fca",
+      "sha256": "8a72bf9628735f308657fd3077edd3b82e4df179d56ba1c9f33bd4f9b23a1cb4"
+    },
+    {
+      "path": "lib/factory/agent-profile.test.ts",
+      "gitBlob": "b9a60d0e7b5373349e105762a039b3dc5fd5cdfb",
+      "sha256": "b052f2712b0a47f64ecf82bcff98251d4e610d3cd39ccc1e493bbd08bdf7c9c0"
+    },
+    {
+      "path": "lib/factory/profile-dispatch.db.test.ts",
+      "gitBlob": "7624eb7f0d4c1855ccded19073708785b09354a7",
+      "sha256": "3850a0b0e4dee6652f4b2eb3cbb05d3c750160216946554e8034777e4db3460c"
+    }
+  ],
+  "cleanup": {
+    "completedAt": "2026-11-05T09:30:31.304023+00:00",
+    "ownedDatabaseCount": 1,
+    "clientSessionsBefore": 0,
+    "remainingDatabases": 0,
+    "remainingRoles": 0,
+    "credentialsFileRemoved": true,
+    "forceOrTerminateUsed": false,
+    "scope": "Only the unique role and databases created for the review-context regression. PostgreSQL and other worktrees remain available."
+  },
+  "cleanupLogSha256": "e0a93ab60e08d715cafb3709f3e47cf35a9c32956095d9bd2a7e5e6170ec0e8c",
+  "checkpointCommit": "9ab7ecc2b62acecfdc0c1405d0881be6af3ee03a",
+  "checkpointTree": "ea4987de4d7f06f1ba5b961e934161adb061f001",
+  "checkpointParent": "9727fcfcfc16724e1cfcd915dc28d59b52d69481",
+  "cleanAfterCommit": true,
+  "independentReview": {
+    "agent": "requirements_review",
+    "result": "passed",
+    "scope": "Read-only review of all five changed files; no additional tests or production verification."
+  }
+}

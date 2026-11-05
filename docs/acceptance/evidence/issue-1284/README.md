@@ -217,3 +217,8 @@ ALEX-67 / Task `b5785091-2c95-4f55-821d-fce51e027b0e` 实际 Claude Code native 
 
 本次增量保留以上旧证据与原失败，不覆盖或改写此前的生产观察。#1284仍保持打开。
 
+
+
+## Review selection recovery follow-up (10d / PR #1361)
+
+[Scoped repair and immutable 9727 production observations](review-context-10d/README.md). The source CI passed with one expected OIDC skip; the recorded production Review and queued frontend run remain blocked. The two historical static credential audits cover exactly the three manifest files and are not new provider or production acceptance.
