@@ -1,6 +1,9 @@
 import { memo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
-import { ArrowUpDown, Check, ChevronDown, ChevronUp, Inbox, ListChecks, MessageCircle, Puzzle, Settings } from 'lucide-react-native'
+import { ArrowUpDown, Check, ChevronDown, ChevronUp, GripVertical, Inbox, ListChecks, MessageCircle, Puzzle, Settings } from 'lucide-react-native'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import Reanimated, { useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated'
+import { scheduleOnRN } from 'react-native-worklets'
 import type { Href } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MyAvatar } from '@/components/AccountButton'
@@ -11,8 +14,10 @@ import { api, saveWorkspace } from '@/lib/api'
 import { useHome } from '@/lib/home'
 import type { Settings as SettingsData, Workspace } from '@/lib/types'
 import { switchWorkspace } from '@/lib/workspace-switch'
+import { tap } from '@/lib/haptics'
+import { SNAP_BACK } from '@/lib/springs'
 import { colors } from '@/lib/theme'
-import { moveWorkspace, orderWorkspaces } from '../model/workspace-order'
+import { dragSlot, moveTo, orderWorkspaces } from '../model/workspace-order'
 import { useWorkspaceOrder } from '../model/use-workspace-order'
 import { useAppDrawer } from './app-drawer'
 
@@ -50,7 +55,8 @@ export const DrawerContent = memo(function DrawerContent({ live }: { live: boole
     if (failed) setProblem(failed)
     else { setListed(false); close() }
   }
-  const move = (id: string, step: -1 | 1) => setOrder(moveWorkspace(workspaces.map(w => w.id), id, step))
+  // The row being dragged while 编辑顺序 is on, and how far it has travelled.
+  const drag = { from: useSharedValue(-1), travel: useSharedValue(0) }
 
   const places: Place[] = [
     { href: '/threads', label: '线程', symbol: 'text.bubble', web: MessageCircle, count: data?.threads.waiting },
@@ -71,39 +77,18 @@ export const DrawerContent = memo(function DrawerContent({ live }: { live: boole
             web={listed ? <ChevronUp size={20} color={colors.secondary} strokeWidth={2.4} /> : <ChevronDown size={20} color={colors.secondary} strokeWidth={2.4} />} />
         </Pressable>
         {listed && workspaces.length > 1 ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={sorting ? '完成排序' : '排序'} hitSlop={6} onPress={() => setSorting(!sorting)} style={({ pressed }) => [styles.icon, pressed && styles.pressed]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={sorting ? '完成' : '编辑顺序'} hitSlop={6} onPress={() => setSorting(!sorting)} style={({ pressed }) => [styles.icon, pressed && styles.pressed]}>
             <Symbol name={sorting ? 'checkmark' : 'arrow.up.arrow.down'} size={17} color={colors.secondary}
               web={sorting ? <Check size={18} color={colors.secondary} strokeWidth={2} /> : <ArrowUpDown size={18} color={colors.secondary} strokeWidth={2} />} />
           </Pressable>
         ) : null}
       </View>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.list}>
-        {listed ? workspaces.map((workspace, index) => {
-          const selected = workspace.id === current
-          return (
-            <View key={workspace.id} style={[styles.workspace, selected && styles.selected]}>
-              {/* While arranging, the row is not a switch: only its arrows act. */}
-              <Pressable accessibilityRole="button" accessibilityState={{ selected, busy: switching === workspace.id, disabled: sorting }} accessibilityLabel={workspace.name}
-                disabled={Boolean(switching) || sorting} onPress={() => void pick(workspace)}
-                style={({ pressed }) => [styles.pick, pressed && styles.pressed]}>
-                <View style={styles.mark}><Text style={styles.initial}>{initial(workspace.name)}</Text></View>
-                <Text style={styles.workspaceName} numberOfLines={1}>{workspace.name}</Text>
-                {sorting ? null : switching === workspace.id ? <Spinner size={16} />
-                  : selected ? <Symbol name="checkmark" size={15} color={colors.accent} web={<Check size={18} color={colors.accent} strokeWidth={2.2} />} /> : null}
-              </Pressable>
-              {sorting ? (
-                <View style={styles.moves}>
-                  <Pressable accessibilityRole="button" accessibilityLabel={`上移 ${workspace.name}`} disabled={index === 0} hitSlop={6} onPress={() => move(workspace.id, -1)} style={[styles.icon, index === 0 && styles.off]}>
-                    <Symbol name="chevron.up" size={15} color={colors.secondary} web={<ChevronUp size={18} color={colors.secondary} strokeWidth={2} />} />
-                  </Pressable>
-                  <Pressable accessibilityRole="button" accessibilityLabel={`下移 ${workspace.name}`} disabled={index === workspaces.length - 1} hitSlop={6} onPress={() => move(workspace.id, 1)} style={[styles.icon, index === workspaces.length - 1 && styles.off]}>
-                    <Symbol name="chevron.down" size={15} color={colors.secondary} web={<ChevronDown size={18} color={colors.secondary} strokeWidth={2} />} />
-                  </Pressable>
-                </View>
-              ) : null}
-            </View>
-          )
-        }) : null}
+        {listed ? workspaces.map((workspace, index) => (
+          <WorkspaceRow key={workspace.id} workspace={workspace} index={index} count={workspaces.length} selected={workspace.id === current}
+            busy={switching === workspace.id} disabled={Boolean(switching)} sorting={sorting} drag={drag}
+            onPick={() => void pick(workspace)} onMove={(from, to) => setOrder(moveTo(workspaces.map(w => w.id), from, to))} />
+        )) : null}
         {problem ? <Text accessibilityRole="alert" style={styles.problem}>{problem}</Text> : null}
         {listed ? <View style={styles.rule} /> : null}
         {places.map(place => (
@@ -131,6 +116,52 @@ export const DrawerContent = memo(function DrawerContent({ live }: { live: boole
   )
 })
 
+const ROW = 52
+
+/**
+ * A workspace in the drawer's list: a tap switches to it. While 编辑顺序 is on, its handle drags it up or down; the
+ * other rows make room, and letting go puts it there.
+ */
+function WorkspaceRow({ workspace, index, count, selected, busy, disabled, sorting, drag, onPick, onMove }: {
+  workspace: Workspace; index: number; count: number; selected: boolean; busy: boolean; disabled: boolean; sorting: boolean
+  drag: { from: SharedValue<number>; travel: SharedValue<number> }; onPick: () => void; onMove: (from: number, to: number) => void
+}) {
+  const pan = Gesture.Pan().enabled(sorting).activeOffsetY([-4, 4])
+    .onStart(() => { drag.from.set(index); drag.travel.set(0); scheduleOnRN(tap) })
+    .onUpdate(event => { drag.travel.set(event.translationY) })
+    .onEnd(() => {
+      const to = dragSlot(index, drag.travel.get(), ROW, count)
+      if (to !== index) scheduleOnRN(onMove, index, to)
+    })
+    .onFinalize(() => { drag.from.set(-1); drag.travel.set(withSpring(0, SNAP_BACK)) })
+  const moved = useAnimatedStyle(() => {
+    const from = drag.from.get()
+    if (from < 0) return { zIndex: 0, transform: [{ translateY: 0 }] }
+    if (from === index) return { zIndex: 1, transform: [{ translateY: drag.travel.get() }] }
+    const to = dragSlot(from, drag.travel.get(), ROW, count)
+    const shift = from < index && to >= index ? -ROW : from > index && to <= index ? ROW : 0
+    return { zIndex: 0, transform: [{ translateY: withSpring(shift, SNAP_BACK) }] }
+  })
+  return (
+    <Reanimated.View style={[styles.workspace, selected && styles.selected, moved]}>
+      <Pressable accessibilityRole="button" accessibilityState={{ selected, busy, disabled: sorting }} accessibilityLabel={workspace.name}
+        disabled={disabled || sorting} onPress={onPick} style={({ pressed }) => [styles.pick, pressed && styles.pressed]}>
+        <View style={styles.mark}><Text style={styles.initial}>{initial(workspace.name)}</Text></View>
+        <Text style={styles.workspaceName} numberOfLines={1}>{workspace.name}</Text>
+        {sorting ? null : busy ? <Spinner size={16} />
+          : selected ? <Symbol name="checkmark" size={15} color={colors.accent} web={<Check size={18} color={colors.accent} strokeWidth={2.2} />} /> : null}
+      </Pressable>
+      {sorting ? (
+        <GestureDetector gesture={pan}>
+          <View accessibilityLabel={`拖动 ${workspace.name}`} style={styles.icon}>
+            <Symbol name="line.3.horizontal" size={15} color={colors.secondary} web={<GripVertical size={18} color={colors.secondary} strokeWidth={2} />} />
+          </View>
+        </GestureDetector>
+      ) : null}
+    </Reanimated.View>
+  )
+}
+
 const initial = (name: string) => [...name.trim()][0]?.toUpperCase() ?? '·'
 
 const styles = StyleSheet.create({
@@ -140,17 +171,16 @@ const styles = StyleSheet.create({
   title: { flexShrink: 1, fontSize: 26, lineHeight: 32, fontWeight: '700', letterSpacing: -0.5 },
   scroll: { flex: 1 },
   list: { paddingBottom: 12 },
-  workspace: { height: 52, flexDirection: 'row', alignItems: 'center', paddingRight: 6, borderRadius: 16, borderCurve: 'continuous' },
+  workspace: { height: ROW, flexDirection: 'row', alignItems: 'center', paddingRight: 6, borderRadius: 16, borderCurve: 'continuous' },
   pick: { flex: 1, minWidth: 0, alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 10 },
   selected: { backgroundColor: colors.surface },
   pressed: { opacity: 0.58 },
   mark: { width: 36, height: 36, borderRadius: 10, borderCurve: 'continuous', backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
-  initial: { fontSize: 16, fontWeight: '600', color: colors.secondary },
+  // The workspace's first character, in ink: a grey 个 reads as an arrow.
+  initial: { fontSize: 16, fontWeight: '600', color: colors.ink },
   bigMark: { width: 44, height: 44, borderRadius: 12 },
-  bigInitial: { fontSize: 20, fontWeight: '600', color: colors.secondary },
+  bigInitial: { fontSize: 20, fontWeight: '600', color: colors.ink },
   workspaceName: { flex: 1, minWidth: 0, fontSize: 16, lineHeight: 21, fontWeight: '500' },
-  moves: { flexDirection: 'row', gap: 2 },
-  off: { opacity: 0.3 },
   problem: { fontSize: 13, color: colors.danger, paddingHorizontal: 10, paddingTop: 6 },
   rule: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginHorizontal: 10, marginTop: 10, marginBottom: 6 },
   place: { height: 46, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, borderRadius: 16, borderCurve: 'continuous' },

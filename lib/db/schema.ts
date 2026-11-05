@@ -851,10 +851,15 @@ export const conversationMessages = pgTable('conversation_messages', {
   authorId: text('authorId').notNull(), body: text('body').notNull(), mentions: jsonb('mentions').notNull().default([]),
   replyToId: uuid('replyToId'), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique('conversation_messages_position_key').on(t.conversationId, t.position), index('conversation_messages_timeline_idx').on(t.conversationId, t.position.desc())])
-/** A person's 置顶 and 通知 for one chat, keyed by the bot's id (the Coordinator's bot row too; drizzle/20261101020600). */
+/**
+ * A person's own state for one chat, keyed by the bot's id or a group chat's conversation id: 置顶 and 通知
+ * (drizzle/20261101020600), and the home list's hidden, marked-unread and drag order (drizzle/20261105203000).
+ */
 export const chatPreferences = pgTable('chat_preferences', {
   userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }), chatKey: text('chatKey').notNull(),
   pinned: boolean('pinned').notNull().default(false), muted: boolean('muted').notNull().default(false),
+  hidden: boolean('hidden').notNull().default(false), markedUnread: boolean('markedUnread').notNull().default(false),
+  pinOrder: integer('pinOrder'), listOrder: integer('listOrder'),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.userId, t.chatKey] })])
 /** A person's reaction to a bot-chat or group-chat message: one emoji each (drizzle/20261101020500). No FK: the message is in either table. */

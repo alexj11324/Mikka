@@ -7,7 +7,10 @@ export type ThreadStatus = 'running' | 'waiting' | 'paused' | 'failed' | 'done' 
 export interface Person { id: string; name: string; email: string; image: string | null }
 export interface Workspace { id: string; name: string }
 
-export interface HomeBot { id: string; name: string; color: string; shape: string; /** Plain text; an empty string is a card with no words. */ line: string | null; at: string | null; working: boolean; pinned?: boolean; /** The person's Coordinator: the app draws it pinned on top, not as a row. */ coordinator?: boolean }
+/** The person's own state for a chat on the home list (lib/chat-preferences.ts on the server). Absent from a server older than it. */
+export interface ChatOwnState { hidden?: boolean; markedUnread?: boolean; pinOrder?: number | null; listOrder?: number | null }
+
+export interface HomeBot extends ChatOwnState { id: string; name: string; color: string; shape: string; /** Plain text; an empty string is a card with no words. */ line: string | null; at: string | null; working: boolean; pinned?: boolean; /** The person's Coordinator: the app draws it pinned on top, not as a row. */ coordinator?: boolean; /** Its threads waiting on the person. */ waiting?: number }
 
 export interface Home {
   user: Person
@@ -16,6 +19,8 @@ export interface Home {
   bots: HomeBot[]
   threads: { running: number; waiting: number }
   suggestions: number
+  /** The person's own state for the group chats they changed on the home list, by conversation id. */
+  groupPreferences?: Record<string, ChatOwnState & { pinned: boolean }>
   /** The person's own home channel for live keys (lib/live.ts); absent from a server older than it. */
   live?: LiveScope
 }

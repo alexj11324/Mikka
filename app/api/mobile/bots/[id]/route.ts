@@ -27,9 +27,13 @@ async function handleGET(request: Request, context: { params: Promise<{ id: stri
   return json(await mobileBot(user.id, workspace.id, bot.id))
 }
 
-const change = z.object({ pinned: z.boolean().optional(), muted: z.boolean().optional() }).strict().refine(value => value.pinned !== undefined || value.muted !== undefined)
+const change = z.object({ pinned: z.boolean().optional(), muted: z.boolean().optional(), hidden: z.boolean().optional(), markedUnread: z.boolean().optional() })
+  .strict().refine(value => Object.values(value).some(field => field !== undefined))
 
-/** `PATCH /api/mobile/bots/<id>` with `{ pinned?, muted? }`: the person's 置顶 and 通知 for this chat (`coordinator` too). */
+/**
+ * `PATCH /api/mobile/bots/<id>` with `{ pinned?, muted?, hidden?, markedUnread? }`: the person's own state for this chat
+ * (`coordinator` too): 置顶, 通知, hidden from the home list, marked unread. 409 `pinLimit` when the pins are full.
+ */
 async function handlePATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   if (!writeAllowed(request)) return forbiddenOrigin()
   const user = await mobileUser(request)
@@ -39,7 +43,9 @@ async function handlePATCH(request: Request, context: { params: Promise<{ id: st
   const body = change.safeParse(await request.json().catch(() => null))
   if (!body.success) return json({ error: 'invalidChange' }, 400)
   if (id !== 'coordinator' && (!z.uuid().safeParse(id).success || await botOutsideToken(user, id))) return json({ error: 'Not found' }, 404)
-  if (!await setChatPreference(user.id, await openChatBotId(user, id === 'coordinator' ? null : id), body.data)) return json({ error: 'Not found' }, 404)
+  const result = await setChatPreference(user.id, await openChatBotId(user, id === 'coordinator' ? null : id), body.data)
+  if (result === 'notFound') return json({ error: 'Not found' }, 404)
+  if (result === 'pinLimit') return json({ error: 'pinLimit' }, 409)
   return json({ ok: true })
 }
 
