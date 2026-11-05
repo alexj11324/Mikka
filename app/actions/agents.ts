@@ -1,4 +1,6 @@
 'use server'
+
+import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { ownerListChanged } from '@/lib/live/lists'
 
@@ -347,6 +349,10 @@ function originalSessionRetryAvailable(question: { recoveryRequest?: unknown; qu
 
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
 export async function getIssueThread(issueId: string | null, runId: string, after?: ThreadChunkCursor | null): Promise<IssueThreadDetail> {
+  return withDatabaseOperation('/actions/threads/detail', () => readIssueThread(issueId, runId, after))
+}
+
+async function readIssueThread(issueId: string | null, runId: string, after?: ThreadChunkCursor | null): Promise<IssueThreadDetail> {
   const cursor = after ? threadChunkCursor.parse(after) : null
   const { row, user } = await readableThread(issueId, runId)
   // The run that resumes this one after an answered question, or runs it again after it ended (R-81), is the same thread: its chain (BE-18).

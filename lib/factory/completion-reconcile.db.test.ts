@@ -138,6 +138,19 @@ test("run completion enters review without the Coordinator; replays do not advan
         body: { binding: { taskId: task.id, revision: task.revision }, eventId: randomUUID(), action: 'retry', reason: 'Resume completed execution' } };
       return { task, runId: created.runId, request, watchdog };
     };
+    await t.test('list recovery eligibility transfers only the run id; the locked action retains the complete producer', async () => {
+      const ready = await exhaustedCompletion();
+      await pool.query('UPDATE agent_runs SET prompt=$2 WHERE id=$1', [ready.runId, 'Synthetic producer context '.repeat(4096)]);
+      const { completedRunForRecovery } = await import('./completion-recovery');
+      const full = await completedRunForRecovery(pool, ready.task, true);
+      const compact = await completedRunForRecovery(pool, ready.task);
+      assert.deepEqual(compact, { id: ready.runId });
+      assert.ok(full.report && full.sessionId && full.remoteUrl, 'the mutating recovery still receives all required inputs');
+      const beforeBytes = Buffer.byteLength(JSON.stringify([full]));
+      const afterBytes = Buffer.byteLength(JSON.stringify([compact]));
+      assert.ok(beforeBytes > 100_000 && afterBytes < 100);
+      t.diagnostic(JSON.stringify({ factoryRecoveryBeforeBytes: beforeBytes, factoryRecoveryAfterBytes: afterBytes, returnedRows: 1 }));
+    });
     const history = async (taskId: string, runId: string, attemptId: string) => ({
       run: (await pool.query('SELECT to_jsonb(r) AS value FROM agent_runs r WHERE id=$1', [runId])).rows[0].value,
       attempt: (await pool.query('SELECT to_jsonb(a) AS value FROM factory_attempts a WHERE id=$1', [attemptId])).rows[0].value,

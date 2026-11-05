@@ -1,6 +1,8 @@
 'use server'
 
 import { pool } from '@/lib/db'
+import { withDatabaseOperation } from '@/lib/db/egress-sample'
+import { currentRoute } from '@/lib/tracing/labels'
 import { ExecutionSettings } from '@/lib/execution-settings'
 import { requireUser } from '@/lib/issue-access'
 import { changeOrder, checkOrderQuota, orderView, type OrderChange, type OrderView } from '@/lib/model-order'
@@ -18,6 +20,10 @@ async function scope(workspaceId?: string) {
 }
 
 export async function getModelOrder(workspaceId?: string): Promise<SettingsActionResult<OrderView>> {
+  return withDatabaseOperation(currentRoute() ?? '/actions/settings/model-order', () => readModelOrder(workspaceId))
+}
+
+async function readModelOrder(workspaceId?: string): Promise<SettingsActionResult<OrderView>> {
   return settingsWorkspaceAction(async () => {
     const target = await scope(workspaceId)
     // A subscription never asked for its models has no candidates yet: ask it before reading the list.
