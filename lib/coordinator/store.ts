@@ -514,7 +514,9 @@ export async function chatView(userId: string, limit = 200, botId: string, windo
   const pending = waiting.filter(event => event.kind === 'user_message' && event.payload.postedToChat !== true && !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK)).map((event, index) => ({
     position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: withImages(eventPrompt(event), event.payload.images) } as ModelMessage, pending: true as const,
   }))
-  const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
+  const read = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
+  // An older page (history): a welcome failure there was answered by what came after it, so it is not shown.
+  const items = window.through !== undefined ? read.filter(item => !item.welcome) : read
   const after = Math.max(0, (items.findLast(item => !item.pending)?.position ?? 1) - 1)
   return {
     items,
@@ -628,6 +630,8 @@ export async function botChatSnapshot(userId: string) {
   const lines = latest.flatMap(row => {
     if (!row.botId) return []
     const [item] = chatItems([{ position: 0, message: row.message as unknown as ModelMessage, createdAt: row.createdAt }])
+    // A failed welcome is no message from the Bot: no preview line and no time to count as unread.
+    if (item?.welcome) return []
     // An event's stored text is the model's (English, ids): the preview leaves it out (C1).
     return [{ botId: row.botId, text: item?.from === 'event' ? null : item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
   })

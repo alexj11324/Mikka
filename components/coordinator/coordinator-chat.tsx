@@ -7,7 +7,9 @@ import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { useTranslations } from 'next-intl'
-import { pollCoordinatorChat, coordinatorHistory, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { pollCoordinatorChat, coordinatorHistory, retryCoordinatorTurn, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { getBotModelMenu } from '@/app/actions/execution-settings'
+import type { BotModelMenu } from '@/lib/bot-model-menu-view'
 import { knownVersion, mergeChat } from '@/lib/coordinator/chat-poll'
 import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
@@ -29,7 +31,7 @@ import { AgentThemeProvider } from '@/components/workspace/agent-theme'
 import { openThread } from '@/components/workspace/workspace-navigation'
 import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
-import { BotModelPicker } from './bot-model-picker'
+import { BotModelPicker, botModelMenuKey } from './bot-model-picker'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
 import { chatPollInterval } from '@/lib/coordinator/chat-poll-interval'
@@ -85,6 +87,9 @@ const HEADER_FADE = 'md:[--scroll-fade-mask:linear-gradient(to_bottom,transparen
 export type CoordinatorPrefill = { text: string; nonce: number; suggestionId?: string }
 
 /** The SWR key of a chat: the Coordinator's, or one bot's. */
+/** A passing usage limit (another turn running, a cost read): the next send works without anything changing. */
+const TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(['usage_in_progress', 'usage_concurrency_limit', 'usage_cost_unavailable'])
+
 export function coordinatorChatKey(botId?: string | null) {
   return botId ? ['coordinator-chat', botId] as const : 'coordinator-chat'
 }
@@ -230,7 +235,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     if (input) { input.focus(); input.setSelectionRange(prefill.text.length, prefill.text.length) }
   }, [prefill])
   // A failed message sent again is retried in place: it goes at once, and the server leaves it out from then on.
-  const items = useMemo(() => (data?.items ?? []).filter(item => !(item.from === 'person' && retrying.has(item.position))), [data, retrying])
+  // A failed welcome stands only until a reply follows (an incremental read appends the reply after it).
+  const items = useMemo(() => (data?.items ?? []).filter((item, index, all) => !(item.from === 'person' && retrying.has(item.position))
+    && !(item.welcome && all.slice(index + 1).some(next => next.from === 'coordinator'))), [data, retrying])
   // One thread has one card in a chat (R-66): under the first reply that dispatched it; later replies name it in their words.
   const firstThreadCard = useMemo(() => firstThreadCards(items), [items])
   // A thread's event line said again later (「… 在等你回答」 twice) shows only the latest one (R-66).
@@ -269,11 +276,31 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // The failure of the newest turn sits under the message it was answering (it carries the mark, store.failTurn),
   // with its way on; an older failure keeps only its reason there. Without the mark it stays above the composer.
   const lastSaid = items.findLast(item => item.from !== 'event')
-  const failedAt = data?.error && !data.working && lastSaid?.from === 'person' && lastSaid.failure ? lastSaid.position : null
+  const failedAt = data?.error && !data.working && (lastSaid?.from === 'person' || lastSaid?.welcome) && lastSaid.failure ? lastSaid.position : null
+  // The welcome never came: its failure is the chat's one line, on the Bot's side, never only a banner (11 people on 11-02).
+  const welcomeFailed = Boolean(data?.error && !data.working && (lastSaid?.welcome || (!items.length && !stream.replies.length)))
   // No empty chats: the Coordinator, like every bot, writes its welcome first.
   const welcomed = useRef(false)
+  // A welcome Mikka 默认 refused runs again once its model becomes runnable while this chat is open (the trial points
+  // arrived, a card was verified): only on a change from not runnable to runnable seen by this mount, never on open
+  // (the menu can read runnable while the server still refuses), never for a passing usage limit, never in a hidden
+  // tab, and once per failure (store.retryFailedTurn), so a visit never fires another refused turn.
+  const welcomeModel = useSWR<BotModelMenu>(welcomeFailed && refusal ? botModelMenuKey(botId ?? null) : null, () => getBotModelMenu(botId ?? null))
+  const runnable = welcomeModel.data?.current?.available
+  const wasRunnable = useRef<boolean | undefined>(undefined)
+  const rewelcomed = useRef<string | null>(null)
   useEffect(() => {
-    if (!data?.enabled || items.length || data.working || data.error || welcomed.current) return
+    if (!data?.enabled || data.working || welcomed.current) return
+    if (data.error) {
+      if (document.visibilityState !== 'visible') return
+      const was = wasRunnable.current
+      if (runnable !== undefined) wasRunnable.current = runnable
+      if (!welcomeFailed || !refusal || TRANSIENT_REFUSALS.has(refusal) || was !== false || runnable !== true || rewelcomed.current === data.error) return
+      rewelcomed.current = data.error
+      void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate())
+      return
+    }
+    if (items.length) return
     welcomed.current = true
     void (botId ? welcomeCoordinator(botId) : welcomeCoordinator()).then(() => mutate())
   })
@@ -288,7 +315,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const lastReplyAt = stream.replies.length ? -1 : items.findLast(item => item.from === 'coordinator' && item.text)?.position
   const rootRef = useRef<HTMLElement>(null)
   // Events are system lines, not messages; the person's own messages never count as unread.
-  const unreadItems = useMemo(() => items.filter(item => item.from !== 'event').map(item => ({ position: item.position, messageId: item.id ?? String(item.position), own: item.from === 'person', reportable: !item.pending })), [items])
+  // A failed welcome is the Bot saying nothing yet: never an unread message.
+  const unreadItems = useMemo(() => items.filter(item => item.from !== 'event' && !item.welcome).map(item => ({ position: item.position, messageId: item.id ?? String(item.position), own: item.from === 'person', reportable: !item.pending })), [items])
   // Reactions people gave on the phone (decision 2026-11-01-0030-mobile-reactions); a pending row has none yet.
   const reactions = useMessageReactions(items.map(item => item.pending || item.from === 'event' ? null : item.id))
   const unread = useUnreadIndicators({ conversationId: botId ? `bot:${botId}` : 'coordinator', items: unreadItems, rootRef })
@@ -406,6 +434,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
               <Skeleton className="h-24 w-2/3 rounded-2xl" />
             </div>}
             {/* The header pill and the 概览 panel already name the bot: an empty chat says one line, no third avatar (R-41). */}
+            {welcomeFailed && !items.length && <div data-message-failure="welcome" className="flex w-full max-w-md flex-col gap-2 self-start">{failureNotice}</div>}
             {data && !items.length && !stream.replies.length && !data.error && (data.enabled
               ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">{avatar('pill', 'thinking')}{tNav('writingWelcome')}</p>
               : <p className="m-auto text-sm text-muted-foreground">{t('empty', { name })}</p>)}
@@ -425,7 +454,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} />}
                     {/* Top to bottom as it happened: thinking, then the words and each tool after the words said before it.
                         The same rows live and stored, so storing keeps them in place. */}
-                    {item.from === 'coordinator'
+                    {item.welcome ? null : item.from === 'coordinator'
                       ? <ReplyAnswer value={live ? null : answers.get(item.position) ?? null}>{replyRows(item, live).map((segment, index) => segment.kind === 'tools'
                         ? <AgentCitationsContext key={index} value={citations}><ReplyActivity tools={segment.tools} {...(index === 0 && item.activity ? { thinking: live ? liveThinking(live) : undefined, thought: item.activity.thought, reasoningAt: item.activity.reasoningAt } : {})} botId={botId} live={Boolean(live && live.committedThrough === undefined)} /></AgentCitationsContext>
                         : <CoordinatorReply key={index} text={segment.text} carded={cardsOf(item, Boolean(live)).join(',')} citations={live ? live.committedThrough === undefined ? liveCitations.streaming : liveCitations.settled : citations} isStreaming={Boolean(live && live.committedThrough === undefined)} />)}</ReplyAnswer>
@@ -447,8 +476,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {item.id && <MessageReactions reactions={reactions[item.id]} align={item.from === 'person' ? 'end' : 'start'} />}
                     {item.stopped && <MessageFooter><p role="status">{t('stopped')}</p></MessageFooter>}
                     {item.failure && (item.position === failedAt
-                      ? <div data-message-failure="live" className="flex w-full max-w-md flex-col gap-2 self-end">{failureNotice}</div>
-                      : <MessageFooter className="self-end"><FailureReason failure={item.failure} botId={botId} sending={sending} onResend={() => { void deliver(item.text, false, item.position) }} /></MessageFooter>)}
+                      ? <div data-message-failure={item.welcome ? 'welcome' : 'live'} className={cn('flex w-full max-w-md flex-col gap-2', item.welcome ? 'self-start' : 'self-end')}>{failureNotice}</div>
+                      : <MessageFooter className={cn(item.welcome ? 'self-start' : 'self-end')}><FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { if (item.welcome) void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()); else void deliver(item.text, false, item.position) }} /></MessageFooter>)}
                   </MessageContent></Message>}
             </MessageScrollerItem>
             </Fragment>)}
@@ -480,7 +509,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     </MessageScrollerProvider>
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
       {(loadError || stream.error) && <FieldError className="text-xs">{t('loadError')}</FieldError>}
-      {failedAt === null && failureNotice}
+      {failedAt === null && !welcomeFailed && failureNotice}
       {/* Out of quota: after a turn stopped on it, or before the next message is sent. */}
       {/* On Mikka 默认 with no points here: said before sending (decision 2026-11-02-1450). */}
       {!data?.error && <HostedUnavailableNotice botId={botId} />}

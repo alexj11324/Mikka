@@ -43,11 +43,14 @@ async function handleGET(request: Request) {
     if (typeof user[tokenWorkspace] === 'string') {
       if (!await tokenBotAllowed(user, bot.data)) return json({ error: 'botNotFound' }, 404)
       const enabled = coordinatorEnabled()
-      const chat = await chatView(user.id, 200, await openChatBotId(user, bot.data))
+      const view = await chatView(user.id, 200, await openChatBotId(user, bot.data))
+      // The app shows a failed welcome through `failure`; the empty Bot item is no message (nor unread, nor reactable).
+      const chat = { ...view, items: view.items.filter(item => !item.welcome) }
       const working = enabled && chat.working
       return json({ ...chat, enabled, working, failure: enabled ? chatFailure({ working, error: chat.error, items: chat.items }) : null, reactions: await reactionsOf(user.id, chat.items) })
     }
-    const chat = await getCoordinatorChat(bot.data)
+    const read = await getCoordinatorChat(bot.data)
+    const chat = { ...read, items: read.items.filter(item => !item.welcome) }
     return json({ ...chat, failure: chat.enabled ? chatFailure(chat) : null, reactions: await reactionsOf(user.id, chat.items) })
   } catch (error) {
     if (error instanceof ActionFailureError) return json({ error: error.code }, 404)
