@@ -1,0 +1,26 @@
+{
+  "issueId": "dd7bc618-b7ae-4835-981e-acd3f233c3da",
+  "input": {
+    "botId": "b56e7f61-59dd-4d7e-a114-b9dddf821a84",
+    "issueId": "dd7bc618-b7ae-4835-981e-acd3f233c3da"
+  },
+  "error": "FatalError: Step \"step//./workflows/coordinator/steps//dispatchComputerThread\" failed after 3 retries: Workspace membership lease unavailable or cancelled",
+  "observedVia": "normal Owner UI expanded tool result",
+  "runExistence": "Independently observed raw list_runs output [] in normal Owner UI",
+  "source": "514030294dcdc68b2d9ca4a977ce04b298b37e6f",
+  "rawListRuns": [],
+  "rawListRunsObserved": true,
+  "issueStatus": "todo",
+  "factoryTasks": "empty according to Coordinator get_issue summary; raw body UI truncates output",
+  "productionWorkflowRun": "wrun_41M6MRBJQD0GPSFACKRYGN0VMH",
+  "productionErrorAt": "2026-11-05T02:27:06.221Z",
+  "isolatedReproduction": {
+    "delayedPlanningMs": 21000,
+    "failedAtApproxMs": 22070,
+    "error": "Workspace membership lease unavailable or cancelled",
+    "guardUnchanged": true,
+    "log": "/tmp/issue1284-lease-514-before.log"
+  },
+  "status": "production acceptance blocked; fix in progress",
+  "deepseekApi": "not tested; user explicitly confirmed unfunded and excluded path"
+}

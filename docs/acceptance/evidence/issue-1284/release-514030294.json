@@ -1,0 +1,20 @@
+{
+  "sha": "514030294dcdc68b2d9ca4a977ce04b298b37e6f",
+  "workerSha": "763970493d277fea13cef08e7f795f30de380d56",
+  "finalDeploymentUrl": "https://mikka-k2s4loqhq-mikka-dev.vercel.app",
+  "publicVersionMatches": true,
+  "initialWebRun": 41953294911,
+  "runtimeRun": 41953295050,
+  "publishJob": 127004322764,
+  "completedAt": "2026-11-05T02:20:36Z",
+  "officialTemplates": [
+    "desktop",
+    "claude",
+    "codex"
+  ],
+  "models": [
+    "claude-haiku-5-5",
+    "gpt-6-luna"
+  ],
+  "harnessesInstalled": true
+}

@@ -29,3 +29,15 @@ The DeepSeek API path was explicitly excluded by the user because the account is
 [逐条 HTTP 验收脱敏收据](isolated-final-5190c204.json) · [最终回归与新增轮询规则核对](verification-summary.json)。收据经过现有 evidence audit；没有账号标识、密码、Cookie、令牌、私密 headers 或 descriptor 密钥。套件有覆盖重叠，不将不同套件数量累加成唯一测试数。
 
 [PR #1297](https://github.com/alexj11324/Mikka/pull/1297) 的 exact-head [CI](https://github.com/alexj11324/Mikka/actions/runs/41952290490) 全部结束：27 success、5 按 PR 条件 skipped、0 failure。已 squash merge 为 `514030294dcdc68b2d9ca4a977ce04b298b37e6f`，保留合并时的最新主分支。此节记录隔离验收；最终生产 Profile 协作证据将在部署和真实执行完成后补充。
+
+
+## First production attempt after #1297
+
+The initial Web deployment and official runtime refresh both completed for `514030294dcdc68b2d9ca4a977ce04b298b37e6f` (worker `763970493d277fea13cef08e7f795f30de380d56`). This confirms deployment, not successful feature acceptance.
+
+The zero-custom-Profile task ALEX-59 failed at dispatch with `Workspace membership lease unavailable or cancelled`. The expanded Owner UI tool result and production log agree; a separate normal UI `list_runs` call returned `[]`. The same failure was reproduced in Docker Large with real PostgreSQL by delaying model planning for 21 seconds, beyond the existing 20-second membership lease. A fix-forward patch is being validated without extending or bypassing the guard. No custom production Profiles have been created, and #1284 remains open.
+
+- [Initial release receipt](./release-514030294.json)
+- [First production failure and isolated reproduction](./production-first-failure-514030294.json)
+
+DeepSeek API remains excluded by the user's instruction; no funded/API success is claimed.
