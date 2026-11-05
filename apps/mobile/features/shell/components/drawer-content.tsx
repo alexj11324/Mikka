@@ -10,6 +10,7 @@ import { MyAvatar } from '@/components/AccountButton'
 import { Spinner } from '@/components/icons'
 import { Symbol, type SymbolName } from '@/components/Symbol'
 import { Text } from '@/components/Text'
+import { Group } from '@/components/ui'
 import { api, saveWorkspace } from '@/lib/api'
 import { useHome } from '@/lib/home'
 import type { Settings as SettingsData, Workspace } from '@/lib/types'
@@ -66,7 +67,7 @@ export const DrawerContent = memo(function DrawerContent({ live }: { live: boole
   ]
 
   return (
-    <View style={[styles.drawer, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 12) }]}>
+    <View style={[styles.drawer, { paddingTop: insets.top + 12, paddingBottom: Math.max(insets.bottom, 16) }]}>
       {/* The open workspace; a tap lists the others in place, to switch to or arrange. */}
       <View style={styles.head}>
         <Pressable accessibilityRole="button" accessibilityLabel={name} accessibilityHint={listed ? '收起工作区' : '切换工作区'} accessibilityState={{ expanded: listed }}
@@ -91,14 +92,16 @@ export const DrawerContent = memo(function DrawerContent({ live }: { live: boole
         )) : null}
         {problem ? <Text accessibilityRole="alert" style={styles.problem}>{problem}</Text> : null}
         {listed ? <View style={styles.rule} /> : null}
-        {places.map(place => (
-          <Pressable key={place.label} accessibilityRole="button" accessibilityLabel={live && place.count ? `${place.label}，${place.count}` : place.label} onPress={() => go(place.href)}
-            style={({ pressed }) => [styles.place, pressed && styles.pressed]}>
-            <Symbol name={place.symbol} size={18} color={colors.secondary} web={<place.web size={20} color={colors.secondary} strokeWidth={1.8} />} />
-            <Text style={styles.placeLabel} numberOfLines={1}>{place.label}</Text>
-            {live && place.count ? <Text style={styles.count}>{place.count}</Text> : null}
-          </Pressable>
-        ))}
+        <Group backgroundColor={colors.drawerRow}>
+          {places.map(place => (
+            <Pressable key={place.label} accessibilityRole="button" accessibilityLabel={live && place.count ? `${place.label}，${place.count}` : place.label} onPress={() => go(place.href)}
+              style={({ pressed }) => [styles.place, pressed && styles.pressed]}>
+              <Symbol name={place.symbol} size={18} color={colors.secondary} web={<place.web size={20} color={colors.secondary} strokeWidth={1.8} />} />
+              <Text style={styles.placeLabel} numberOfLines={1}>{place.label}</Text>
+              {live && place.count ? <Text style={styles.count}>{place.count}</Text> : null}
+            </Pressable>
+          ))}
+        </Group>
       </ScrollView>
       <View style={styles.foot}>
         <Pressable accessibilityRole="button" accessibilityLabel="个人资料" onPress={() => go('/settings/profile')} style={({ pressed }) => [styles.person, pressed && styles.pressed]}>
@@ -165,32 +168,32 @@ function WorkspaceRow({ workspace, index, count, selected, busy, disabled, sorti
 const initial = (name: string) => [...name.trim()][0]?.toUpperCase() ?? '·'
 
 const styles = StyleSheet.create({
-  drawer: { flex: 1, paddingLeft: 18, paddingRight: 12 },
-  head: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 6, marginBottom: 6 },
-  current: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, paddingHorizontal: 4, borderRadius: 16 },
-  title: { flexShrink: 1, fontSize: 26, lineHeight: 32, fontWeight: '700', letterSpacing: -0.5 },
+  drawer: { flex: 1, paddingHorizontal: 16 },
+  head: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  current: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4, borderRadius: 12, borderCurve: 'continuous' },
+  title: { flexShrink: 1, fontSize: 22, lineHeight: 28, fontWeight: '700', letterSpacing: -0.4, color: colors.text },
   scroll: { flex: 1 },
-  list: { paddingBottom: 12 },
-  workspace: { height: ROW, flexDirection: 'row', alignItems: 'center', paddingRight: 6, borderRadius: 16, borderCurve: 'continuous' },
-  pick: { flex: 1, minWidth: 0, alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 10 },
-  selected: { backgroundColor: colors.surface },
-  pressed: { opacity: 0.58 },
-  mark: { width: 36, height: 36, borderRadius: 10, borderCurve: 'continuous', backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
+  list: { paddingBottom: 8 },
+  workspace: { height: ROW, flexDirection: 'row', alignItems: 'center', paddingRight: 4, borderRadius: 12, borderCurve: 'continuous' },
+  pick: { flex: 1, minWidth: 0, alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12 },
+  selected: { backgroundColor: colors.chip },
+  pressed: { backgroundColor: colors.pressed },
+  mark: { width: 32, height: 32, borderRadius: 8, borderCurve: 'continuous', backgroundColor: colors.drawerRow, alignItems: 'center', justifyContent: 'center' },
   // The workspace's first character, in ink: a grey 个 reads as an arrow.
   initial: { fontSize: 16, fontWeight: '600', color: colors.ink },
-  bigMark: { width: 44, height: 44, borderRadius: 12 },
-  bigInitial: { fontSize: 20, fontWeight: '600', color: colors.ink },
-  workspaceName: { flex: 1, minWidth: 0, fontSize: 16, lineHeight: 21, fontWeight: '500' },
-  problem: { fontSize: 13, color: colors.danger, paddingHorizontal: 10, paddingTop: 6 },
-  rule: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginHorizontal: 10, marginTop: 10, marginBottom: 6 },
-  place: { height: 46, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, borderRadius: 16, borderCurve: 'continuous' },
-  placeLabel: { flex: 1, minWidth: 0, fontSize: 16, lineHeight: 21 },
-  count: { fontSize: 14, color: colors.secondary, fontVariant: ['tabular-nums'] },
-  foot: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 8 },
-  person: { flex: 1, minWidth: 0, minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, borderRadius: 16 },
+  bigMark: { width: 36, height: 36, borderRadius: 10 },
+  bigInitial: { fontSize: 17, fontWeight: '600', color: colors.ink },
+  workspaceName: { flex: 1, minWidth: 0, fontSize: 16, lineHeight: 21, fontWeight: '500', color: colors.text },
+  problem: { fontSize: 13, color: colors.danger, paddingHorizontal: 12, paddingTop: 6 },
+  rule: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginTop: 4, marginBottom: 12 },
+  place: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16 },
+  placeLabel: { flex: 1, minWidth: 0, fontSize: 16, lineHeight: 21, color: colors.text },
+  count: { fontSize: 16, lineHeight: 21, color: colors.secondary, fontVariant: ['tabular-nums'] },
+  foot: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 4 },
+  person: { flex: 1, minWidth: 0, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12, borderCurve: 'continuous' },
   personText: { flex: 1, minWidth: 0 },
-  name: { fontSize: 14, lineHeight: 19, fontWeight: '600' },
-  email: { fontSize: 12.5, lineHeight: 16, color: colors.secondary },
-  icon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  settings: { backgroundColor: colors.surface },
+  name: { fontSize: 16, lineHeight: 21, fontWeight: '600', color: colors.text },
+  email: { fontSize: 13, lineHeight: 18, color: colors.secondary },
+  icon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  settings: { backgroundColor: colors.drawerRow },
 })
