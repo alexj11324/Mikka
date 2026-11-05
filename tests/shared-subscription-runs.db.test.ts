@@ -123,7 +123,7 @@ test('shared subscriptions reach local and cloud claims with current membership 
     const frozen = await repository.nativeBinding(userId, agentId, harness, definition.subscription.bindingId, workspaceId)
     assert.equal(frozen?.ownerId, ownerId, 'the lender remains the credential owner')
     const worker = cloud ? await threadMachines.start({ userId, workspaceId }, queued.runId) : { deviceId, token }
-    const claim = (runId = queued.runId) => claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${worker.deviceId}/runs/${runId}/claim`, { method: 'POST', headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${worker.token}`, [REPO_ORIGIN_HEADER]: '1' } }), { params: Promise.resolve({ deviceId: worker.deviceId, runId }) })
+    const claim = (runId = queued.runId) => claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${worker.deviceId}/runs/${runId}/claim`, { method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${worker.token}`, [REPO_ORIGIN_HEADER]: '1' } }), { params: Promise.resolve({ deviceId: worker.deviceId, runId }) })
     return { ownerId, userId, workspaceId, botId, agentId, harness, connectionId, model, scope, worker, runId: queued.runId, repoId, issueId, remote, claim }
   }
   const staleProfileQuota = async (p: Awaited<ReturnType<typeof seed>>) => {

@@ -4,7 +4,7 @@
 
 跟踪：[Mikka #1296](https://github.com/alexj11324/Mikka/issues/1296)。本文补充[主 UI／可用性／motion 审计报告](issue-1296-ui-audit.md)，记录主 PR 上线后的真实生产验收、发现的问题、最小修复与 Docker 回归。本文不修改既有验收规则，也不把模型菜单可选、合成测试、Web 截图或 binary 构建视为其它层次的验收结果。
 
-**当前结论：主 PR #1308 已完成 CI、Web 生产部署、生产 OTA 和 iOS binary 构建。生产验收与后续复现发现五项需要处理的问题；对应源码已发布至修复分支，Docker 的受影响测试、类型检查和 lint 全部通过。跟进修复已建立 [PR #1328](https://github.com/alexj11324/Mikka/pull/1328)，尚未合并或完成生产复验；iOS 的 App Store Connect 提交和原生设备验收也尚未完成。** 后续发布与生产复验的实际结果继续写入 Issue #1296 正文，不在本文预填成功状态。
+**提交时的证据快照：主 PR #1308 已完成 CI、Web 生产部署、生产 OTA 和 iOS binary 构建。生产验收发现的五项问题由 [PR #1328](https://github.com/alexj11324/Mikka/pull/1328) 修复；与新主线整合时又复现、修复三项交集问题，一并由 [批次 PR #1336](https://github.com/alexj11324/Mikka/pull/1336) 发布。Docker 回归及本地生产界面证据见第 7、8 节。** 第 1—7 节保留各轮当时的事实；最终 head CI、merge、Web／OTA、生产复验与 iOS 提交状态以 Issue #1296 正文中的实际回执为准。本文不预填后续成功状态。
 
 ## 1. 版本与主 PR 发布证据
 
@@ -195,7 +195,7 @@ REQUIRE_DB=1 node \
 若上线后发现新的产品问题，继续返回 Docker 复现、修复、回归，再经 PR／CI／merge 重新部署验收。本文记录的是已取得的证据与当前边界，不将 #1296 的所有 live 和原生完成标准宣告为已满足。
 
 
-## 7. 最新主线整合与最终 Docker 回归（04:11 UTC）
+## 7. 第一轮主线整合与 Docker 回归（04:11 UTC 历史快照）
 
 主线又合入 #1326，提交为 `caebc8e6b4f6afb5f3fe3a22b833b32da9c1a7c4`。
 两项修复直接合并会在 cloud route 和 claim 函数内连续查询同一订阅。
@@ -205,7 +205,7 @@ Profile、60 秒时效和 native continuation 规则均未放宽；未引入其�
 
 两个独立复核确认此整合。Docker 新建 worktree 从固定基线应用完整补丁后，
 `git write-tree` 精确得到 `1f22c38fc6530e99597ae9ab41e25fd1a449a02d`。
-以下结果对应此 tree 的代码；此节之后仅添加本验证记录，没有更改被测产品或测试代码。
+以下结果对应此 tree 的代码；从当轮验证结束到 #1328 提交只添加了验证记录。第 8 节是其后的新批次整合，不沿用这句话声明后续产品代码未变。
 
 | 最终集成检查 | 实际结果 |
 | --- | --- |
@@ -228,3 +228,83 @@ revision 限定保存，但 worker I/O 已明确替换；最终 claim case 继�
 四组自有 UI／租约进程与私密临时账户文件已清理；不将被隔离的测试身份再投入复用。
 最终回归使用同一 Docker 沙盒中的既有独立测试 schemas，完成后立即发出停止请求。
 新的 PR CI、merge、Web／OTA 和生产模型复验仍需各自独立回执，见 Issue #1296 正文。
+
+
+## 8. 批次整合、交集修复与本地生产 UI（04:59 UTC）
+
+### 8.1 已发布基线与本批身份
+
+前批 #1335 已以正常 merge commit `89cfb577cecada3087f02222f7a656cae5706977`
+合入 main，其 tree 为 `065c96952524e630eda49671887165191ed4bf1f`，
+与前批最终 head `e6d6d06abcdc31cefc607f94be3c64c5ebb44488` 相同。
+[Web run 41970583732](https://github.com/alexj11324/Mikka/actions/runs/41970583732)
+于 04:57:41 成功，04:58 正常 GET 生产 version 为 HTTP 200 且 build 精确匹配该 merge commit。
+本批在前批完成部署后才进入自己的最终合并与发布；不移动他人的批次分支。
+
+本批先前已绿 head 为 `10a715931b72faa276ba9bd740265f52f5ad2519`，
+tree `8e675cf39909ccbfa5850e11447640247cb34e53`；
+[CI 41969341946](https://github.com/alexj11324/Mikka/actions/runs/41969341946)
+的四项 required checks 均通过。与前批最终版本合并后的产品 tree 为
+`22aafc19edabf19432002d03f4451ca57ae09994`，本次再追加本文和两张 UI 截图。
+相对已绿 tree 的 25 个文件是最低 daemon 版本从 `0.0.375` 到 `0.0.456`、
+21 个测试文件的对应版本字面量，以及三个 released fixture 的迁移／更新。
+最低版本变化属于真实准入行为变化；本批最终提交仍需要自己关联的完整 CI。
+
+前批含独立的 Settings 展示 TTL 调整；最终 claim 的 60 秒准入规则、
+`probe: 'always'`、授权与来源冻结仍保留。第 7 节“未合展示 TTL”只描述当时旧基线。
+独立复核逐 blob 比较三处交集修复涉及的 11 个文件，确认新 daemon 基线没有覆盖它们。
+
+### 8.2 三项新复现问题及最小修复
+
+| 问题 | 具体失败路径与修复 | 发生概率 × 影响 |
+| --- | --- | --- |
+| 共享聊天读取丢失 live 元数据 | `getCoordinatorChat` 写入共享 SWR key 的返回值缺少 live scope／请求起点，覆盖版本感知 fetcher 的数据；复用已有 session、inbox 生成完整 view state，并在实际列表读取处记录 observation。缺少 home 时保持空 scope，先授权再解析 owner | 7 × 6 = 42 |
+| 反向 duplicate 关系没有更新通知 | 只扫描正向关系会漏掉以当前 Issue 为 `duplicateOfId` 的目标；补齐反向查询，保留 owner 限制、50 条边界，并分别解析各文档的可见 audience | 7 × 4 = 28 |
+| Owner Accept 完成子任务后父任务／被阻塞项不刷新 | Issue 更新成功后缺少关系通知；仅在实际更新行存在时，于同一事务登记关系变更。保持 COMMIT 后发送、回滚不发送、重复请求及后继任务 no-op | 8 × 5 = 40 |
+
+三项问题均有具体回归证据，没有以主观清理或低概率假设扩大产品改动。
+新测试首次 CI 中，空数组 `assert.deepEqual(sent, [])` 将后续 `sent` 推断为 `never[]`；
+改为等价的 `assert.equal(sent.length, 0)`，保留“COMMIT 前没有通知”的原断言，
+未删除测试、放宽类型检查或使用 `any` 绕过。
+
+### 8.3 Docker 实际结果与版本边界
+
+全部在获授权的 Docker Cloud Sandbox Large（8 vCPU／16 GiB）执行，
+使用 PostgreSQL 17 隔离数据库。以下是实际测试结果，不是从测试文件数量推算。
+
+| 被测版本／范围 | 结果 |
+| --- | --- |
+| tree `37d450642e236c1db4846cae5536c9a149044a02`，仅还原三处产品实现的目标红灯 | 61 项中 55 pass、6 fail、0 skip；其中四个目标断言失败、两个父 suite 级联失败。不是完整旧版本回归，也不把 fixture 初始化错误计入产品复现 |
+| 同一 tree 恢复三处修复后的目标绿灯 | 61／61 pass，0 fail／skip；含共享 action、Factory 接受和真实 PG 关系通知 |
+| 同轮 Profile 与 shared subscription／真实 HTTP claim | 57／57 pass（23 + 34），0 fail／skip |
+| 同轮 chat-version observation | 2／2 pass |
+| 同轮 balance／welcome／idle UI | 36／36 pass |
+| 同轮 root typecheck、lint | 退出码均为 0；迁移策略 55／55 |
+| 精确 head `10a7159` 的 device／artifact live DB | 7／7 pass，0 fail／skip |
+| 精确 head `10a7159` 的 idle budget | 7／7 pass |
+| 精确 head `10a7159` 的 typecheck、lint、隔离 QA 初始化、Next production build | 退出码均为 0 |
+
+真实 PG 用例验证了延迟 COMMIT 失败、回滚不泄漏通知、重复接受与 successor no-op。
+两轮测试的具体版本分别列出；最终 daemon 基线后的新 CI 结果记录在 PR 和 Issue，
+不能将旧 head 的绿灯自动转记给新 head。
+
+### 8.4 #1325 错误详情的实际生产构建截图
+
+截图与交互来自 Docker 中固定 `10a7159` 的 `next build`／`next start`，
+专用库 `mikka_1296_batch_e2e`、环境
+`local-304a6cff-952b-45dc-b1f2-350fdb46784d`。
+普通测试账户通过现有 lease 与正常产品一次性浏览器交接登录，没有改认证 guard。
+fixture 只创建本轮 owner 的 terminal failed run，错误为
+`subscription_local_runtime_unavailable (lease_refused)`；没有入队、重试或模型调用。
+
+- 中文 375 × 812：固定错误提示自然换行，右侧“重试”未遮挡文字；点击“详情”后原始详情完整显示，按钮 expanded 为 true，按 Enter 后收起为 false。
+- 英文深色 430 × 932：固定英文提示完整显示，Enter 展开 Details 后键盘焦点清晰，技术详情可换行阅读，底部输入区未被遮挡。
+- 两张图均由 owning agent 实际查看；两图另经独立视觉复核，无裁切、横向溢出或内容重叠。合成失败记录仅支持 UI 外观与操作结论，不证明真实模型恢复、Expo 或原生 iOS 验收。
+
+![中文 375：展开错误详情](issue-1296-evidence/run-error-details-zh-375.jpg)
+
+![英文深色 430：键盘展开 Details](issue-1296-evidence/run-error-details-en-dark-430.jpg)
+
+本轮 lease 与临时数据按独立身份清理；最终 stop 回执、最终 CI／merge／Web／OTA、
+Claude 原候选 review 与 Owner Accept 的生产复验，以及 API 余额提示核验，
+分别续写 Issue #1296 正文。App Store Connect／TestFlight 和原生设备证据继续单独报告。
