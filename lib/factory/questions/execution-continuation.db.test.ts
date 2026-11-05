@@ -14,6 +14,7 @@ import { questionFingerprint } from './contract'
 import { questionExecutionContinuation } from './execution-continuation'
 import { checkFactoryRepairBudget } from '../check-recovery-evidence'
 import { appendFactoryCheckContinuationContext, producerCommandObservations } from '../checks'
+import { questionExecutionObservations } from '../question-execution-observations'
 import { freezeWorkerDefinition } from '../../agent-kit/worker'
 
 const url = process.env.E2E_DATABASE_URL
@@ -44,7 +45,7 @@ test('real PG: question receipts preserve one execution without opening a repair
       catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
     }
 
-    async function fixture(options: { native?: boolean; withoutBot?: boolean; separateChat?: boolean; local?: boolean; harness?: 'codex' | 'claude_code' } = {}) {
+    async function fixture(options: { native?: boolean; withoutBot?: boolean; separateChat?: boolean; local?: boolean; harness?: 'codex' | 'claude_code'; legacy?: boolean } = {}) {
       const harness = options.harness ?? 'codex', model = options.native ? (harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5') : 'deepseek-flash'
       const route = harness === 'codex' ? 'codex_cli' : 'claude_code_cli'
       const workspaceId = randomUUID(), runtimeBotId = randomUUID(), issueId = randomUUID(), sourceEventId = randomUUID()
@@ -66,6 +67,10 @@ test('real PG: question receipts preserve one execution without opening a repair
         ...(options.native ? { subscription: { bindingId, route, modelId: model } } : { apiKey: { credentialId: 'synthetic-reference' }, subscription: null }) }
       const store = createFactoryStore(pool, authorize, botId, {})
       let task = (await store.route('owner', { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Synthetic execution history' })).task
+      if (options.legacy) {
+        await pool.query(`UPDATE factory_tasks SET route=route-'flowVersion' WHERE id=$1`, [task.id])
+        task = (await store.read('owner', task.id)).task
+      }
       const run = async (tx: Pick<PoolClient, 'query'>, parent: string | null = null) => {
         const id = randomUUID()
         await tx.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",kind,status,prompt,"baseBranch","agentDefinition","continuesRunId") VALUES($1,'owner',$2,$3,$4,$5,$6,'implement','queued','Synthetic task','main',$7,$8)`, [id, issueId, agentId, deviceId, repoId, runBotId, JSON.stringify(definition), parent])
@@ -448,8 +453,8 @@ test('real PG: question receipts preserve one execution without opening a repair
       assert.deepEqual(await f.store.read('owner', exhausted.id), before)
     })
 
-    for (const harness of ['codex', 'claude_code'] as const) await t.test(`${harness}: completed command provenance requires actual native resume, fixed SHA and a complete source record set`, async () => {
-      const f = await fixture({ native: true, harness }), child = await f.createContinuation()
+    for (const harness of ['codex', 'claude_code'] as const) await t.test(`${harness}: legacy v1 completed command provenance requires actual native resume, fixed SHA and a complete source record set`, async () => {
+      const f = await fixture({ native: true, harness, legacy: true }), child = await f.createContinuation()
       const head = 'b'.repeat(40), base = 'a'.repeat(40), worktree = `/tmp/fixture-${child.runId}`
       const epoch = Date.now() - 600_000, at = (seconds: number) => new Date(epoch + seconds * 1000).toISOString()
       await pool.query(`UPDATE agent_runs SET "startedAt"=$2,"finishedAt"=$3,"worktreePath"=$4 WHERE id=$1`, [f.originRunId, at(0), at(120), worktree])
@@ -459,11 +464,37 @@ test('real PG: question receipts preserve one execution without opening a repair
         [child.runId, f.sessionId, worktree, at(300), at(540), JSON.stringify({ sourceCommit: base, deliverableCommit: head, summary: 'Synthetic complete report', verify: { status: 'not_run' } })])
       for (const id of [f.originRunId, child.runId]) await pool.query('INSERT INTO byos_native_runs("runId","bindingId") VALUES($1,$2)', [id, f.bindingId])
       const inputId = randomUUID(), outputId = randomUUID()
-      await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,1,$3,$4),($5,$2,2,$6,$7)`,
+      await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,2,$3,$4),($5,$2,3,$6,$7)`,
         [inputId, f.originRunId, JSON.stringify({ type: 'tool-input-available', toolName: harness === 'codex' ? 'shell' : 'Bash', toolCallId: 'source-command', input: { command: 'wc -c REPORT.md && sha256sum REPORT.md' } }), at(10), outputId,
           JSON.stringify({ type: 'tool-output-available', toolCallId: 'source-command', output: { exitCode: 0, output: '85 REPORT.md; secret=fixture-value' } }), at(20)])
-      await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,1,$3,$4)`, [randomUUID(), child.runId,
-        JSON.stringify({ type: 'tool-input-available', toolName: 'mcp__mikka__submit', toolCallId: 'submit-only', input: {} }), at(500)])
+      const exactQuestion = 'Submit the exact checked artifact for independent review?'
+      const sourceEventId = factoryEventId('execution-question', f.questionId), waitEventId = factoryEventId('question-wait', f.questionId)
+      const handoff = { questionId: f.questionId, kind: 'decision', question: exactQuestion, context: '', options: [] }
+      await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId","runId",kind,"dedupeKey",payload,"createdAt") VALUES($1::uuid,'owner',$2,$3,$4,'run_question',$1::text,$5,$6)`,
+        [sourceEventId, f.task.botId, f.task.issueId, f.originRunId, JSON.stringify({ ...handoff, taskId: f.task.id, originRunId: f.originRunId, originSessionId: f.sessionId }), at(120)])
+      await pool.query(`UPDATE factory_questions SET kind='decision',question=$2,request=$3,"sourceEventId"=$4,"createdAt"=$5 WHERE id=$1`,
+        [f.questionId, exactQuestion, JSON.stringify({ handoff, originRunId: f.originRunId, originSessionId: f.sessionId }), sourceEventId, at(120)])
+      await pool.query(`INSERT INTO factory_events("taskId","eventId",request,result,"createdAt")
+        SELECT "taskId",$2,request,result,$4 FROM factory_events WHERE "taskId"=$1 AND request->'change'->>'status'='waiting' AND result->'task'->>'attemptId'=$3`,
+        [f.task.id, waitEventId, f.originAttemptId, at(120)])
+      const askInputId = randomUUID(), askOutputId = randomUUID(), submitOutputId = randomUUID(), producerTerminalId = randomUUID()
+      const addChunk = async (runId: string, seq: number, chunk: Record<string, unknown>, seconds: number, id = randomUUID()) => {
+        await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,$3,$4,$5)`, [id, runId, seq, JSON.stringify(chunk), at(seconds)])
+        return id
+      }
+      await addChunk(f.originRunId, 1, { type: 'start' }, 1)
+      await addChunk(f.originRunId, 4, { type: 'tool-input-available', toolCallId: 'real-question', toolName: 'mcp__mikka__ask_human', input: { kind: 'decision', question: exactQuestion } }, 80, askInputId)
+      await addChunk(f.originRunId, 5, { type: 'tool-output-available', toolCallId: 'real-question',
+        output: harness === 'codex' ? [{ type: 'text', text: 'Recorded. End your turn now.' }] : 'Recorded. End your turn now.' }, 90, askOutputId)
+      await addChunk(f.originRunId, 6, { type: 'finish' }, 115)
+      await addChunk(f.originRunId, 7, { type: 'data-run-state', transient: true, data: { state: 'stopped', stopReason: 'asked_human' } }, 119)
+      await addChunk(child.runId, 1, { type: 'start' }, 301)
+      await addChunk(child.runId, 2, { type: 'tool-input-available', toolName: 'ToolSearch', toolCallId: 'find-submit', input: { query: 'select:mcp__mikka__submit' } }, 480)
+      await addChunk(child.runId, 3, { type: 'tool-output-available', toolCallId: 'find-submit', output: 'Submission tool schema' }, 481)
+      await addChunk(child.runId, 4, { type: 'tool-input-available', toolName: 'mcp__mikka__submit', toolCallId: 'submit-only', input: { summary: 'This untrusted summary is not lifecycle evidence.' } }, 500)
+      await addChunk(child.runId, 5, { type: 'tool-output-available', toolCallId: 'submit-only', output: 'Recorded.' }, 510, submitOutputId)
+      await addChunk(child.runId, 6, { type: 'finish' }, 530)
+      await addChunk(child.runId, 7, { type: 'data-run-state', transient: true, data: { state: 'succeeded', stopReason: 'submitted' } }, 539, producerTerminalId)
       let task = (await f.store.apply('owner', factoryBinding(child.task), randomUUID(), { action: 'candidate', runId: child.runId,
         candidate: { kind: 'deliverable', sha: null, repository: '/tmp/fixture', environment: `device:${f.deviceId}`, scope: 'Synthetic artifact' } })).task
       const candidate = { id: task.candidateId!, executionSha: head, producerExecution: { runId: child.runId, sessionId: f.sessionId } }
@@ -487,6 +518,113 @@ test('real PG: question receipts preserve one execution without opening a repair
       assert.equal(observations.inheritedRecords[0].candidateSha, head)
       assert.doesNotMatch(JSON.stringify(observations), /fixture-value/)
       assert.deepEqual(await snapshot(), before, 'reading evidence never rewrites an attempt, report, receipt or verdict')
+      const execution = await questionExecutionObservations(pool, task, candidate)
+      assert.ok(execution.data && 'question' in execution.data)
+      assert.equal(execution.data.lifecycleComplete, true)
+      assert.equal(execution.data.question.text, exactQuestion)
+      assert.equal(execution.data.question.nativeQuestion?.inputChunkId, askInputId)
+      assert.equal(execution.data.question.nativeQuestion?.outputChunkId, askOutputId)
+      assert.equal(execution.data.question.waitEventId, waitEventId)
+      assert.deepEqual([execution.data.answer.id, execution.data.answer.source, execution.data.answer.text], [f.answerId, 'human', f.answer.input.text])
+      assert.deepEqual([execution.data.resume.kind, execution.data.resume.eventId], ['question_resume', child.eventId])
+      assert.equal(execution.data.producerToolActivity.enumerationComplete, true)
+      assert.deepEqual(execution.data.producerToolActivity.tools.map(tool => tool.toolName), ['ToolSearch', 'mcp__mikka__submit'])
+      assert.doesNotMatch(JSON.stringify(execution), /untrusted summary|fixture-value/)
+      assert.deepEqual(await snapshot(), before)
+      const omitted = await questionExecutionObservations(pool, task, candidate, undefined, 0)
+      assert.ok(omitted.data)
+      assert.equal(omitted.data.lifecycleComplete, false)
+      assert.deepEqual(omitted.data.lifecycleIncompleteReasons, ['execution_observations_omitted'])
+      await transaction(async tx => {
+        // A daemon without assignment.computer writes transient preparing
+        // before the first message; the cloud computer path already has start.
+        for (const [runId, start] of [[f.originRunId, 0], [child.runId, 300]] as const) {
+          const { rows } = await tx.query('DELETE FROM run_chunks WHERE "runId"=$1 RETURNING *', [runId])
+          for (const chunk of rows) await tx.query('INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,$3,$4,$5)',
+            [chunk.id, chunk.runId, chunk.seq + 1, JSON.stringify(chunk.chunk), chunk.createdAt])
+          await tx.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,1,'{"type":"data-run-state","transient":true,"data":{"state":"preparing"}}',$3)`,
+            [randomUUID(), runId, at(start)])
+        }
+        const actual = await questionExecutionObservations(tx, task, candidate)
+        assert.ok(actual.data && 'producerToolActivity' in actual.data)
+        assert.equal(actual.data.lifecycleComplete, true)
+        assert.equal(actual.data.producerToolActivity.enumerationComplete, true)
+        assert.equal(actual.data.producerToolActivity.start.seq, 2)
+        await tx.query(`UPDATE run_chunks SET chunk=chunk-'transient' WHERE "runId"=$1 AND seq=1`, [child.runId])
+        const invalid = await questionExecutionObservations(tx, task, candidate)
+        assert.ok(invalid.data && 'producerToolActivity' in invalid.data)
+        assert.equal(invalid.data.producerToolActivity.enumerationComplete, false)
+        assert.ok(invalid.data.producerToolActivity.incompleteReasons.includes('message_boundary_incomplete'))
+        await tx.query(`UPDATE run_chunks SET chunk='{"type":"tool-input-available","toolName":"Bash","toolCallId":"outside-message"}' WHERE "runId"=$1 AND seq=1`, [child.runId])
+        const outside = await questionExecutionObservations(tx, task, candidate)
+        assert.ok(outside.data && 'producerToolActivity' in outside.data)
+        assert.equal(outside.data.producerToolActivity.enumerationComplete, false)
+        assert.ok(outside.data.producerToolActivity.incompleteReasons.includes('message_boundary_incomplete'))
+      }, true)
+      await transaction(async tx => {
+        await tx.query('UPDATE run_chunks SET seq=10 WHERE "runId"=$1 AND seq=7', [f.originRunId])
+        for (const [seq, chunk] of [[7, { type: 'start' }], [8, { type: 'text-delta', delta: 'Waiting for the owner' }], [9, { type: 'finish' }]] as const)
+          await tx.query('INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,$3,$4,$5)', [randomUUID(), f.originRunId, seq, JSON.stringify(chunk), at(109 + seq)])
+        const actual = await questionExecutionObservations(tx, task, candidate)
+        assert.ok(actual.data && 'sourceToolActivity' in actual.data)
+        assert.equal(actual.data.lifecycleComplete, true, 'multiple closed messages remain a complete native stream')
+        await tx.query('DELETE FROM run_chunks WHERE "runId"=$1 AND seq=9', [f.originRunId])
+        const invalid = await questionExecutionObservations(tx, task, candidate)
+        assert.ok(invalid.data && 'sourceToolActivity' in invalid.data)
+        assert.equal(invalid.data.sourceToolActivity.enumerationComplete, false, 'an unclosed later message cannot become complete')
+      }, true)
+      for (const [label, sql, args, reason] of [
+        ['missing question tool output', 'DELETE FROM run_chunks WHERE id=$1', [askOutputId], 'native_question_unavailable_in_direct_source'],
+        ['different exact question', `UPDATE run_chunks SET chunk=jsonb_set(chunk,'{input,question}','"Different question"') WHERE id=$1`, [askInputId], 'native_question_mismatch_or_incomplete'],
+        ['missing immutable waiting receipt', 'DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, waitEventId], 'question_wait_provenance_unavailable'],
+        ['waiting receipt after answer', 'UPDATE factory_events SET "createdAt"=$3 WHERE "taskId"=$1 AND "eventId"=$2', [task.id, waitEventId, at(190)], 'question_timeline_incomplete'],
+        ['oversized native question output', `UPDATE run_chunks SET chunk=jsonb_set(chunk,'{output}',to_jsonb($2::text)) WHERE id=$1`, [askOutputId, 'x'.repeat(2100)], 'native_question_mismatch_or_incomplete'],
+      ] as [string, string, unknown[], string][]) await transaction(async tx => {
+        await tx.query(sql, args)
+        const actual = await questionExecutionObservations(tx, task, candidate)
+        assert.ok(actual.data && 'question' in actual.data, label)
+        assert.equal(actual.data.lifecycleComplete, false, label)
+        assert.ok(actual.data.lifecycleIncompleteReasons.includes(reason), label)
+      }, true)
+      for (const [label, sql, args, reason] of [
+        ['missing result', 'DELETE FROM run_chunks WHERE id=$1', [submitOutputId], 'tool_pair_incomplete'],
+        ['unknown stream format', `UPDATE run_chunks SET chunk='{"type":"unknown-native-activity"}' WHERE id=$1`, [submitOutputId], 'unclassified_chunk_type'],
+        ['Read is never hidden by the command whitelist', `UPDATE run_chunks SET chunk=jsonb_set(chunk,'{toolName}','"Read"') WHERE "runId"=$1 AND seq=2`, [child.runId], 'unclassified_tool'],
+        ['stream without terminal state', 'DELETE FROM run_chunks WHERE id=$1', [producerTerminalId], 'stream_not_closed'],
+      ] as [string, string, unknown[], string][]) await transaction(async tx => {
+        await tx.query(sql, args)
+        const actual = await questionExecutionObservations(tx, task, candidate)
+        assert.ok(actual.data && 'producerToolActivity' in actual.data, label)
+        assert.equal(actual.data.producerToolActivity.enumerationComplete, false, label)
+        assert.ok(actual.data.producerToolActivity.incompleteReasons.includes(reason), label)
+        if (label.startsWith('Read')) assert.ok(actual.data.producerToolActivity.tools.some(tool => tool.toolName === 'Read'))
+      }, true)
+      await transaction(async tx => {
+        const text = 'Approve secret=synthetic-question-secret only?'
+        await tx.query(`UPDATE factory_questions SET question=$2,request=jsonb_set(request,'{handoff,question}',to_jsonb($2::text)) WHERE id=$1`, [f.questionId, text])
+        await tx.query(`UPDATE coordinator_events SET payload=jsonb_set(payload,'{question}',to_jsonb($2::text)) WHERE id=$1`, [sourceEventId, text])
+        await tx.query(`UPDATE run_chunks SET chunk=jsonb_set(chunk,'{input,question}',to_jsonb($2::text)) WHERE id=$1`, [askInputId, text])
+        await tx.query(`UPDATE run_chunks SET chunk=jsonb_set(chunk,'{type}','"secret=synthetic-chunk-secret"') WHERE id=$1`, [producerTerminalId])
+        const actual = await questionExecutionObservations(tx, task, candidate)
+        assert.ok(actual.data && 'question' in actual.data)
+        assert.equal(actual.data.lifecycleComplete, false, 'a redacted exact question cannot prove exact wording')
+        assert.ok(actual.data.lifecycleIncompleteReasons.includes('question_or_answer_text_incomplete'))
+        assert.equal(actual.data.producerToolActivity.enumerationComplete, false)
+        assert.doesNotMatch(JSON.stringify(actual), /synthetic-question-secret|synthetic-chunk-secret/)
+      }, true)
+      await transaction(async tx => {
+        await tx.query('UPDATE run_chunks SET seq=seq+66 WHERE "runId"=$1 AND seq>=6', [child.runId])
+        await tx.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt")
+          SELECT gen_random_uuid(),$1,g+6,CASE WHEN g%2=0
+            THEN jsonb_build_object('type','tool-input-available','toolName','ToolSearch','toolCallId','bounded-'||(g/2)::text)
+            ELSE jsonb_build_object('type','tool-output-available','toolCallId','bounded-'||(g/2)::text) END,$2::timestamptz
+          FROM generate_series(0,65) g`, [child.runId, at(520)])
+        const actual = await questionExecutionObservations(tx, task, candidate)
+        assert.ok(actual.data && 'producerToolActivity' in actual.data)
+        assert.equal(actual.data.producerToolActivity.enumerationComplete, false)
+        assert.ok(actual.data.producerToolActivity.incompleteReasons.includes('tool_index_omitted'))
+        assert.ok(actual.data.producerToolActivity.tools.length <= 32)
+      }, true)
       const corrupted: [string, string, unknown[], boolean][] = [
         ['missing native claim', 'DELETE FROM byos_native_runs WHERE "runId"=$1', [child.runId], false],
         ['different actual SID', 'UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1', [f.originRunId, 'different-native-session'], false],
@@ -501,6 +639,7 @@ test('real PG: question receipts preserve one execution without opening a repair
         const result = JSON.parse(await producerCommandObservations(tx, task, candidate))
         assert.deepEqual(result.inheritedRecords, [], label)
         assert.equal(result.inheritedRecordsOmitted, omitted, label)
+        if (!omitted) assert.equal((await questionExecutionObservations(tx, task, candidate)).data, null, label)
       }, true)
 
       // The continuation message uses this same receipt-bound reader and the
@@ -524,6 +663,25 @@ test('real PG: question receipts preserve one execution without opening a repair
           [runId, owner, f.workspaceId, f.runtimeBotId, input.issueId, checkDevice, checkRepo, `independent-${runId}`, harness === 'codex' ? 'codex' : 'claude', randomUUID()])
         return { runId }
       })
+      await transaction(async tx => {
+        const { rows: tail } = await tx.query('DELETE FROM run_chunks WHERE "runId"=$1 AND seq>=5 RETURNING *', [child.runId])
+        const input = { binding: factoryBinding(task), agentId: checkAgent, deviceRepoId: checkRepo }
+        const incomplete = await dispatch('owner', input, tx)
+        const first = await appendFactoryCheckContinuationContext(tx, incomplete.task, incomplete.runId, 'Continue the same check.')
+        assert.match(first, /stream_not_closed/, 'an incomplete stream does not prevent an ordinary artifact check')
+        const frozen = (await tx.query('SELECT output FROM factory_attempts WHERE id=$1', [incomplete.task.attemptId])).rows[0].output.check.questionExecutionObservation
+        assert.deepEqual(frozen.watermark, { source: 7, producer: 4 })
+        for (const chunk of tail) await tx.query('INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,$3,$4,$5)',
+          [chunk.id, chunk.runId, chunk.seq, JSON.stringify(chunk.chunk), chunk.createdAt])
+        assert.equal(await appendFactoryCheckContinuationContext(tx, incomplete.task, incomplete.runId, 'Continue the same check.'), first,
+          'late output and terminal chunks cannot rewrite this attempt’s incomplete prefix')
+        assert.equal((await dispatch('owner', input, tx)).replayed, true, 'dispatch replay retains its saved evidence descriptor')
+        assert.deepEqual((await tx.query('SELECT output FROM factory_attempts WHERE id=$1', [incomplete.task.attemptId])).rows[0].output.check.questionExecutionObservation, frozen)
+        const refreshed = await questionExecutionObservations(tx, incomplete.task, candidate)
+        assert.ok(refreshed.data && 'producerToolActivity' in refreshed.data)
+        assert.equal(refreshed.data.producerToolActivity.enumerationComplete, true, 'a new configuration can observe the now-closed stream')
+        assert.notEqual(refreshed.digest, frozen.digest)
+      }, true)
       const checking = await dispatch('owner', { binding: factoryBinding(task), agentId: checkAgent, deviceRepoId: checkRepo })
       const originalFollowUp = 'Continue only this original independent check.'
       const beforeFollowUp = await snapshot()
@@ -532,12 +690,17 @@ test('real PG: question receipts preserve one execution without opening a repair
       const delivered = JSON.parse(followUp.split('\n').at(-1)!)
       assert.deepEqual(delivered, observations, 'the delivered evidence retains the original stopped source and immutable resume receipt')
       assert.match(followUp, /run-chunk:<outputChunkId>/)
+      assert.ok(followUp.includes(JSON.stringify(execution.data)), 'actual native follow-up carries frozen question/wait/answer/receipt and full activity index')
+      assert.match(followUp, /empty command whitelist is not an empty activity stream/)
       assert.doesNotMatch(followUp, /fixture-value|Original issue and standing instructions/)
       assert.deepEqual(await snapshot(), beforeFollowUp, 'building the native message cannot rewrite frozen evidence or verdicts')
       for (const [label, sql, args] of [
         ['missing immutable receipt', 'DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, child.eventId]],
         ['different original SID', 'UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1', [f.originRunId, 'different-native-session']],
         ['changed fixed candidate', `UPDATE agent_runs SET report=jsonb_set(report,'{deliverableCommit}',to_jsonb($2::text)) WHERE id=$1`, [child.runId, 'c'.repeat(40)]],
+        ['changed admitted question', `UPDATE run_chunks SET chunk=jsonb_set(chunk,'{input,question}','"Changed after dispatch"') WHERE id=$1`, [askInputId]],
+        ['changed frozen digest', `UPDATE factory_attempts SET output=jsonb_set(output,'{check,questionExecutionObservation,digest}',to_jsonb($2::text)) WHERE id=$1`, [checking.task.attemptId, '0'.repeat(64)]],
+        ['records after a closed snapshot', `INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,8,'{"type":"text-delta","delta":"Late activity"}',$3)`, [randomUUID(), child.runId, at(539)]],
       ] as [string, string, unknown[]][]) await transaction(async tx => {
         await tx.query(sql, args)
         await assert.rejects(appendFactoryCheckContinuationContext(tx, checking.task, checking.runId, originalFollowUp),
