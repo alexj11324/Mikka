@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { issueForUser } from "@/lib/issue-access";
+import { singleFlight } from "@/lib/single-flight";
 import { auth } from "@/lib/api-auth";
 import { handleFactoryList } from "@/lib/factory/http";
 import { factoryHumanStore } from "@/lib/factory/server";
@@ -14,10 +17,12 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
   const issueId = new URL(request.url).searchParams.get("issueId");
-  const result = await handleFactoryList(factoryHumanStore, {
-    userId: session?.user?.id ?? null,
-    issueId,
-  });
+  const userId = session?.user?.id ?? null;
+  // The list holds only this user's own tasks of this issue. Each request checks
+  // its own access to the issue, then identical concurrent requests share one read.
+  const readable = userId && issueId && z.uuid().safeParse(issueId).success && Boolean(await issueForUser(userId, issueId, false));
+  const list = () => handleFactoryList(factoryHumanStore, { userId, issueId });
+  const result = readable ? await singleFlight(["/api/factory/tasks", userId, issueId], list) : await list();
   let liveWorkspaceId: string | null = null;
   if (result.status === 200 && session?.user && issueId) {
     try { liveWorkspaceId = (await factoryIssueLiveScope(pool, workspacePool, issueId, session.user.id))?.workspaceId ?? null; }

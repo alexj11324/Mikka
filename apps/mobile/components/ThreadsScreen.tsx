@@ -7,6 +7,7 @@ import { Check, List, Plus, SlidersHorizontal } from 'lucide-react-native'
 import { MachineIcon, Spinner, StatusIcon } from '@/components/icons'
 import { GROUP_ICON } from '@/lib/thread-icon'
 import { Text } from '@/components/Text'
+import { accountItem } from '@/components/AccountButton'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Dot } from '@/components/ui'
 import type { BotPage, Thread, ThreadGroup, Threads } from '@/lib/types'
@@ -84,6 +85,7 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
     <View style={styles.screen}>
       <NavBar
         back={pushed ? () => router.back() : undefined}
+        left={pushed ? undefined : accountItem(router)}
         title={bot ? `${bot.name} 的线程` : '线程'}
         large={!pushed}
         right={[{ icon: 'square.and.pencil', label: '新线程', web: <Plus size={20} color={colors.ink} strokeWidth={2} />, onPress: () => openChat({ pathname: '/bots/[id]', params: { id: 'coordinator', compose: '1' } }) }, { icon: 'line.3.horizontal.decrease', label: '筛选', web: <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />, onOpen: () => setMenu(true),

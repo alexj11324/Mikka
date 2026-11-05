@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import { Plus } from 'lucide-react-native'
 import { ReadNotice } from '@/components/ReadNotice'
 import { ChatRowView, rowKey, useChatRows } from '@/components/ChatList'
-import { Avatar, useDrawer } from '@/components/Drawer'
+import { accountItem } from '@/components/AccountButton'
 import { BotAvatar, Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Symbol } from '@/components/Symbol'
@@ -17,14 +17,13 @@ import { colors } from '@/lib/theme'
 /**
  * 对话, the app's home, as a messaging app's chat list (decision
  * 2026-10-31-2330, Alex's Grok screenshot): no title and no search at the top
- * (search is the tab bar's); the person's avatar (top left) opens the drawer
+ * (search is the tab bar's); the person's avatar (top left) opens the account sheet
  * and 「+」 (top right) opens 新建 Bot and 新建群聊. The pinned bots sit on top
  * with a star (the Coordinator first, pinned until the person unpins it), then
  * every other bot and group chat with its last line, newest first.
  */
 export default function ChatsScreen() {
   const router = useRouter()
-  const drawer = useDrawer()
   const { rows: all, loading, error, reload } = useChatRows()
   // Pinned bots sit in the row on top, each with the star; the rest are the list (置顶 on a bot's page).
   const split = splitPinned(all)
@@ -42,7 +41,7 @@ export default function ChatsScreen() {
     <View style={styles.screen}>
       <NavBar
         title=""
-        left={{ label: '菜单', view: <Avatar size={34} />, onPress: drawer.open }}
+        left={accountItem(router)}
         right={{ icon: 'plus', label: '新建', web: <Plus size={22} color={colors.ink} strokeWidth={2} />, onOpen: () => router.push('/new-bot'),
           items: [
             { label: '新建 Bot', icon: 'person.crop.circle.badge.plus', onPress: () => router.push('/new-bot') },

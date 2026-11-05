@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { FlatList, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { ChatRowView, rowKey, useChatRows } from '@/components/ChatList'
+import { accountItem } from '@/components/AccountButton'
 import { NavBar, underBar } from '@/components/NavBar'
 import { ReadNotice } from '@/components/ReadNotice'
 import { Spinner } from '@/components/icons'
@@ -21,7 +22,7 @@ export default function SearchScreen() {
   const { rows, loading, error, reload } = useChatRows(needle)
   return (
     <View style={styles.screen}>
-      <NavBar title="搜索" search={{ placeholder: '搜索 Bot 和群聊', onChange: setQuery }} />
+      <NavBar title="搜索" left={accountItem(router)} search={{ placeholder: '搜索 Bot 和群聊', onChange: setQuery }} />
       <FlatList
         data={rows}
         keyExtractor={rowKey}
