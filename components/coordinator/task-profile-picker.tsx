@@ -62,9 +62,10 @@ export function TaskProfileNotice({ value, data, error, onRetry }: { value: stri
   const common = useTranslations('Common')
   const selected = data?.profiles.find(profile => profile.id === value)
   const availability = value === BUILTIN_AGENT_PROFILE_ID ? data?.defaultAvailability : selected && data?.availability[selected.id]
+  const reason = selected?.archivedAt ? 'archived' : selected?.enabled === false ? 'disabled' : availability?.reason
   const unavailable = value && !taskProfileSelectable(value, data)
   if (error) return <InlineLoadError message={t('loadFailed')} retryLabel={common('retry')} onRetry={onRetry} />
-  if (unavailable) return <p role="alert" className="text-sm text-destructive-foreground">{t(`reasons.${profileAvailabilityKey(availability?.reason)}`)}</p>
-  if (value && !availability?.available && availability?.reason === 'checking') return <p role="status" className="text-sm text-muted-foreground">{t('reasons.checking')}</p>
+  if (unavailable) return <p role="alert" className="text-sm text-destructive-foreground">{t(`reasons.${profileAvailabilityKey(reason)}`)}</p>
+  if (value && !availability?.available && reason === 'checking') return <p role="status" className="text-sm text-muted-foreground">{t('reasons.checking')}</p>
   return null
 }
