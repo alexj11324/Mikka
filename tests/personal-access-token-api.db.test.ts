@@ -39,7 +39,7 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
   } } } } })
   const next = await import('next/server')
   mock.module('next/server', { namedExports: { ...next, after: () => {} } })
-  mock.module('@/app/actions/coordinator', { namedExports: { getCoordinatorChat: async () => { throw new Error('PAT must not use cookie action') }, sendCoordinatorMessage: async () => { throw new Error('PAT must not use cookie action') } } })
+  mock.module('@/app/actions/coordinator', { namedExports: Object.fromEntries(['getCoordinatorChat', 'pollCoordinatorChat', 'coordinatorHistory', 'sendCoordinatorMessage'].map(name => [name, async () => { throw new Error('PAT must not use cookie action') }])) })
   const store = await import('../lib/tokens/store')
   const { getApiSession } = await import('../lib/api-auth')
   const workspaceRoute = await import('../app/api/workspace/route')
@@ -154,6 +154,12 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
     assert.equal((await callMobile('/api/mobile/tasks')).status, 200)
     assert.equal((await callMobile(`/api/mobile/chat?bot=${ownBot}`)).status, 200)
     assert.equal((await callMobile(`/api/mobile/chat?bot=${otherBot}`)).status, 404)
+    // The app's paged reads (#1408): an older page, what is new since the last read, and a malformed window.
+    const first = await (await callMobile(`/api/mobile/chat?bot=${ownBot}`)).json() as { continuation: { after: number; cursor: number; prefix: string } }
+    assert.equal((await callMobile(`/api/mobile/chat?bot=${ownBot}&through=1`)).status, 200)
+    assert.equal((await callMobile(`/api/mobile/chat?bot=${ownBot}&after=${first.continuation.after}&cursor=${first.continuation.cursor}&prefix=${first.continuation.prefix}`)).status, 200)
+    assert.equal((await callMobile(`/api/mobile/chat?bot=${ownBot}&after=1&cursor=1&prefix=nothex`)).status, 400)
+    assert.equal((await callMobile(`/api/mobile/chat?bot=${otherBot}&through=1`)).status, 404)
     assert.equal((await callMobile('/api/mobile/chat', { text: 'PAT mobile message', botId: ownBot })).status, 202)
     assert.equal((await callMobile('/api/mobile/chat', { text: 'must not send', botId: otherBot })).status, 404)
     const messages = (await pool.query(`SELECT "userId","botId",payload FROM coordinator_events WHERE "userId"=$1 AND payload->>'text'='PAT mobile message'`, [owner])).rows

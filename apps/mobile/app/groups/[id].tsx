@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { StyleSheet, View, type ScrollViewInstance } from 'react-native'
-import { ChatScrollView } from '@/components/ChatScrollView'
+import { StyleSheet, View } from 'react-native'
+import { ChatMessageList, type ChatListHandle } from '@/features/chat/components/chat-message-list'
+import { groupPagePath, mergeGroupHistory, mergeGroupRead, type GroupRead } from '@/features/chat/model/chat-pages'
 import { GestureDetector } from 'react-native-gesture-handler'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BotAvatar, Spinner } from '@/components/icons'
 import { BotBubble, CopyButton, MyBubble, Reactions, TimedRow, useTimeReveal } from '@/components/chat'
 import { Markdown } from '@/components/Markdown'
-import { NavBar, underBar } from '@/components/NavBar'
+import { NavBar } from '@/components/NavBar'
 import { Text } from '@/components/Text'
 import { Composer } from '@/components/ui'
 import { GlassButton } from '@/components/GlassButton'
@@ -17,7 +18,6 @@ import { StopFailed } from '@/components/StopFailed'
 import { ChatScrollToLatest } from '@/components/ChatScrollToLatest'
 import { apiCache } from '@/lib/api-cache'
 import { groupReactionPaths, mergeGroupMessages } from '@/lib/group-history'
-import { useChatScroll } from '@/lib/useChatScroll'
 import { api } from '@/lib/api'
 import { clockTime } from '@/lib/clock'
 import { mentionsIn } from '@/lib/group'
@@ -42,10 +42,10 @@ export default function GroupChat() {
   const insets = useSafeAreaInsets()
   const home = useHome()
   const me = home.data?.user.id
-  const scroll = useRef<ScrollViewInstance>(null)
+  const list = useRef<ChatListHandle>(null)
+  const [atLatest, setAtLatest] = useState(true)
   const { offset, gesture: timeReveal, scrollLocked } = useTimeReveal()
   const apiContext = apiCache.context()
-  const chatScroll = useChatScroll(scroll, `${id}:${apiContext}`)
   const [composerHeight, setComposerHeight] = useState(90)
   const [text, setText] = useState('')
   const [quote, setQuote] = useState<string | null>(null)
@@ -55,34 +55,27 @@ export default function GroupChat() {
   const title = summary?.title ?? ''
   // One key for this group's page (lib/live/groups.ts): a message, who is answering, a member, a reaction.
   const live = groupChatLive(id, summary?.workspaceId)
-  const page = useLiveApi<GroupPage>(`/api/conversations/${id}/messages?limit=100`, () => live)
+  // The newest page, 50 messages; a push reads only what came after the newest one shown (#1408).
+  const pagePath = `/api/conversations/${id}/messages?limit=50`
+  const readPage = useCallback(async (at: string) => mergeGroupRead(apiCache.get<GroupRead>(at), await api<GroupRead>(groupPagePath(id, apiCache.get<GroupRead>(at)))), [id])
+  const page = useLiveApi<GroupRead>(pagePath, () => live, readPage)
   const members = useLiveApi<{ members: GroupMember[] }>(`/api/conversations/${id}/members`, () => live)
-  const [history, setHistory] = useState<{ identity: string; messages: GroupMessage[]; before: string | null } | null>(null)
   const identity = `${id}:${apiContext}`
-  const currentHistory = history?.identity === identity ? history : null
-  const messages = mergeGroupMessages(currentHistory?.messages ?? [], page.data?.messages ?? [])
-  const before = currentHistory ? currentHistory.before : page.data?.nextBefore
+  // Oldest first, as the chat reads.
+  const messages = mergeGroupMessages([], page.data?.messages ?? [])
+  const before = page.data?.nextBefore ?? null
   const [historyError, setHistoryError] = useState<unknown>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
   const historyRequest = useRef<object | null>(null)
   useEffect(() => { historyRequest.current = null; setLoadingHistory(false); setHistoryError(null) }, [identity])
-  useEffect(() => {
-    if (!page.data) return
-    setHistory(current => current?.identity === identity
-      ? { ...current, messages: mergeGroupMessages(current.messages, page.data!.messages) }
-      : { identity, messages: mergeGroupMessages([], page.data!.messages), before: page.data!.nextBefore })
-  }, [identity, page.data])
+  // Scrolling to the top loads the page before, a page at a time.
   const loadEarlier = async () => {
     if (!before || historyRequest.current) return
     const request = {}; historyRequest.current = request
     setLoadingHistory(true); setHistoryError(null)
     try {
-      const earlier = await api<GroupPage>(`/api/conversations/${id}/messages?limit=100&before=${encodeURIComponent(before)}`)
-      apiCache.commit(apiContext, () => {
-        if (historyRequest.current !== request) return
-        chatScroll.preservePrepend()
-        setHistory(current => ({ identity, before: earlier.nextBefore, messages: mergeGroupMessages(current?.identity === identity ? current.messages : messages, earlier.messages) }))
-      })
+      const earlier = await api<GroupPage>(groupPagePath(id, null, before))
+      apiCache.commit(apiContext, () => { if (historyRequest.current === request) page.setData(current => current && mergeGroupHistory(current, earlier)) })
     } catch (error) {
       apiCache.commit(apiContext, () => { if (historyRequest.current === request) setHistoryError(error) })
     } finally {
@@ -117,7 +110,7 @@ export default function GroupChat() {
 
   // What the person has seen: the newest message, once it is on screen.
   const newest = page.data?.messages[0]?.id
-  useEffect(() => { if (newest && chatScroll.atEnd) void api(`/api/conversations/${id}/read`, { method: 'POST', body: { messageId: newest } }).catch(() => undefined) }, [id, newest, chatScroll.atEnd])
+  useEffect(() => { if (newest && atLatest) void api(`/api/conversations/${id}/read`, { method: 'POST', body: { messageId: newest } }).catch(() => undefined) }, [id, newest, atLatest])
 
   const member = (type: string, memberId: string) => members.data?.members.find(item => item.memberType === type && item.id === memberId)
   const bots = (members.data?.members ?? []).filter(item => item.memberType !== 'user')
@@ -125,7 +118,7 @@ export default function GroupChat() {
   // The composer has put the quote ahead of the words and clears both once this returns true.
   const send = async (body: string) => {
     setSendFailed(false)
-    chatScroll.toLatest()
+    list.current?.toLatest()
     try {
       await api(`/api/conversations/${id}/messages`, { method: 'POST', body: { body, mentions: mentionsIn(body, bots) } })
       await page.reload()
@@ -161,55 +154,60 @@ export default function GroupChat() {
   }
   const chips = (messageId: string, align?: 'right') => <Reactions reactions={reactions[messageId]} align={align} onToggle={emoji => void react(messageId, toggled(reactions[messageId], emoji))} />
 
+  const renderMessage = (message: GroupMessage, index: number) => {
+    const time = clockTime(message.createdAt)
+    if (message.authorType === 'user' && message.authorId === me) {
+      return (
+        <TimedRow time={time} offset={offset} align="right" onQuote={() => setQuote(quotable(message.body))} onLongPress={() => actions(message.body, message.id)} menu={held(message.body, message.id)}>
+          <MyBubble text={message.body} />{chips(message.id, 'right')}
+        </TimedRow>
+      )
+    }
+    const author = member(message.authorType, message.authorId)
+    const previous = messages[index - 1]
+    const first = !previous || previous.authorType !== message.authorType || previous.authorId !== message.authorId
+    return (
+      <TimedRow time={time} offset={offset} onQuote={() => setQuote(quotable(message.body))} onLongPress={() => actions(message.body, message.id)} menu={held(message.body, message.id)}>
+        {first ? (
+          <View style={styles.author}>
+            {message.authorType === 'user' ? null : <BotAvatar color={author?.color} shape={author?.shape} size={20} />}
+            <Text style={styles.authorName}>{author?.name ?? (message.authorType === 'user' ? '成员' : 'Bot')}</Text>
+          </View>
+        ) : null}
+        <BotBubble><Markdown text={message.body} /></BotBubble>
+        {chips(message.id)}
+        {message.authorType === 'user' ? null : <CopyButton text={plainText(message.body)} />}
+      </TimedRow>
+    )
+  }
+
   return (
     <View style={styles.screen}>
       <NavBar title={title} material />
       <GestureDetector gesture={timeReveal}>
       <View style={{ flex: 1, overflow: 'hidden' }}>
-        <ChatScrollView scrollEnabled={!scrollLocked} ref={scroll} testID="group-chat-scroll" bounces alwaysBounceVertical {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd"
-          contentContainerStyle={[styles.list, { paddingBottom: composerHeight + 16 }]} onScroll={chatScroll.onScroll} scrollEventThrottle={16} onContentSizeChange={chatScroll.onContentSizeChange}>
-          {!page.data && !page.error ? <View style={styles.loading}><Spinner /></View> : null}
-          <ReadNotice error={page.error} hasData={Boolean(page.data)} label="群聊" onRetry={page.reload} />
-          <ReadNotice error={reactionState.error} hasData={reactionSnapshot?.identity === identity} label="回应" onRetry={reactionState.reload} />
-          <ReadNotice error={members.error} hasData={Boolean(members.data)} label="群成员" onRetry={members.reload} />
-          {before ? <View style={styles.history}><GlassButton label="加载更早消息" busy={loadingHistory} onPress={() => void loadEarlier()} /></View> : null}
-          <ReadNotice error={historyError} label="更早消息" onRetry={loadEarlier} />
-          {messages.map((message, index) => {
-            const time = clockTime(message.createdAt)
-            if (message.authorType === 'user' && message.authorId === me) {
-              return (
-                <TimedRow key={message.id} time={time} offset={offset} align="right" onQuote={() => setQuote(quotable(message.body))} onLongPress={() => actions(message.body, message.id)} menu={held(message.body, message.id)}>
-                  <MyBubble text={message.body} />{chips(message.id, 'right')}
-                </TimedRow>
-              )
-            }
-            const author = member(message.authorType, message.authorId)
-            const previous = messages[index - 1]
-            const first = !previous || previous.authorType !== message.authorType || previous.authorId !== message.authorId
-            return (
-              <TimedRow key={message.id} time={time} offset={offset} onQuote={() => setQuote(quotable(message.body))} onLongPress={() => actions(message.body, message.id)} menu={held(message.body, message.id)}>
-                {first ? (
-                  <View style={styles.author}>
-                    {message.authorType === 'user' ? null : <BotAvatar color={author?.color} shape={author?.shape} size={20} />}
-                    <Text style={styles.authorName}>{author?.name ?? (message.authorType === 'user' ? '成员' : 'Bot')}</Text>
-                  </View>
-                ) : null}
-                <BotBubble><Markdown text={message.body} /></BotBubble>
-                {chips(message.id)}
-                {message.authorType === 'user' ? null : <CopyButton text={plainText(message.body)} />}
-              </TimedRow>
-            )
-          })}
-          {working ? <View style={styles.working}><Spinner size={16} /></View> : null}
-          {page.data && !messages.length ? <Text style={styles.empty}>@ 一个 Bot，或直接说</Text> : null}
-          {page.data?.routingError && !working ? <Text style={styles.error}>没有 Bot 接这条，@ 它的名字</Text> : null}
-          {page.data?.stopped && !working ? <Text style={styles.stopped}>已停止</Text> : null}
-          {sendFailed ? <Text accessibilityRole="alert" style={styles.error}>没发出去，消息仍在输入框中。</Text> : null}
-          {stopFailed ? <StopFailed busy={stopping} onRetry={() => void stop()} /> : null}
-        </ChatScrollView>
+        <ChatMessageList ref={list} testID="group-chat-scroll" data={messages} scrollEnabled={!scrollLocked} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
+          keyOf={message => message.id} renderItem={renderMessage}
+          onStartReached={before ? () => void loadEarlier() : undefined}
+          header={<>
+            {!page.data && !page.error ? <View style={styles.loading}><Spinner /></View> : null}
+            <ReadNotice error={page.error} hasData={Boolean(page.data)} label="群聊" onRetry={page.reload} />
+            <ReadNotice error={reactionState.error} hasData={reactionSnapshot?.identity === identity} label="回应" onRetry={reactionState.reload} />
+            <ReadNotice error={members.error} hasData={Boolean(members.data)} label="群成员" onRetry={members.reload} />
+            {loadingHistory ? <View style={styles.history}><Spinner size={16} /></View> : null}
+            <ReadNotice error={historyError} label="更早消息" onRetry={loadEarlier} />
+          </>}
+          footer={<>
+        {working ? <View style={styles.working}><Spinner size={16} /></View> : null}
+        {page.data && !messages.length ? <Text style={styles.empty}>@ 一个 Bot，或直接说</Text> : null}
+        {page.data?.routingError && !working ? <Text style={styles.error}>没有 Bot 接这条，@ 它的名字</Text> : null}
+        {page.data?.stopped && !working ? <Text style={styles.stopped}>已停止</Text> : null}
+        {sendFailed ? <Text accessibilityRole="alert" style={styles.error}>没发出去，消息仍在输入框中。</Text> : null}
+        {stopFailed ? <StopFailed busy={stopping} onRetry={() => void stop()} /> : null}
+          </>} />
       </View>
       </GestureDetector>
-      <ChatScrollToLatest visible={!chatScroll.atEnd} bottom={composerHeight + 12} onPress={chatScroll.toLatest} />
+      <ChatScrollToLatest visible={!atLatest} bottom={composerHeight + 12} onPress={() => list.current?.toLatest()} />
       <OfflineBanner top={insets.top + 66} />
       <Composer value={text} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} attach attachmentScope={{ kind: 'group', id }} overlay onHeight={setComposerHeight}
         notice={reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : undefined}
@@ -220,7 +218,6 @@ export default function GroupChat() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
-  list: { paddingHorizontal: 16, gap: 12 },
   reactionNotice: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 8 },
   history: { alignItems: 'center', paddingVertical: 8 },
   loading: { paddingTop: 120, alignItems: 'center' },
