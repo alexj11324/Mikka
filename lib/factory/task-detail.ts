@@ -1,6 +1,6 @@
 import type { PoolClient } from "pg";
 import { factoryDecisionWarnings, type ProjectDecisionWarning } from "../project-decision-warnings";
-import { VERIFY_STATUSES, type VerifyStatus } from "@mikka/protocol/run";
+import { VERIFY_STATUSES, criterionVerificationStatus, runCriterion, type CriterionStatus, type VerifyStatus } from "@mikka/protocol/run";
 import { redactFactoryCheckText } from "./checks";
 import { FACTORY_STATUSES, type FactoryStatus } from "./contract";
 import { citedQuestionCommandSources, type QuestionCommandOrigin } from "./question-command-sources";
@@ -10,6 +10,8 @@ export interface FactoryCheckCriterion {
   criterionId: string | null;
   text: string | null;
   passed: boolean;
+  status: CriterionStatus;
+  reason: string | null;
   evidence: string | null;
   command: string | null;
   exitCode: number | null;
@@ -71,6 +73,8 @@ export function factoryCriteria(report: unknown): FactoryCheckCriterion[] {
           criterionId: typeof (c as { criterionId?: unknown }).criterionId === "string" ? (c as { criterionId: string }).criterionId : null,
           text: text((c as { text?: unknown }).text),
           passed: (c as { passed: boolean }).passed,
+          status: runCriterion.safeParse(c).success ? criterionVerificationStatus(runCriterion.parse(c)) : "unverified",
+          reason: text((c as { reason?: unknown }).reason),
           evidence: text((c as { evidence?: unknown }).evidence),
           command: text((c as { command?: unknown }).command) ?? fallback?.command ?? null,
           exitCode: text((c as { command?: unknown }).command) ? (Number.isSafeInteger((c as { exitCode?: unknown }).exitCode) ? (c as { exitCode: number }).exitCode : null) : fallback?.exitCode ?? null,

@@ -1,6 +1,7 @@
 import { Children, type ReactNode, useEffect, useRef, useState } from 'react'
 import { Image, Platform, Pressable, StyleSheet, TextInput, useColorScheme, View, type StyleProp, type TextInputInstance, type ViewStyle } from 'react-native'
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect'
+import { GlassView } from 'expo-glass-effect'
+import { useLiquidGlass } from '@/lib/glass'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ArrowUp, ChevronLeft, FileText, RotateCw, Square, X } from 'lucide-react-native'
@@ -13,7 +14,6 @@ import { api } from '@/lib/api'
 import { tap } from '@/lib/haptics'
 import { colors, font, lift, plainColor } from '@/lib/theme'
 
-const glass = Platform.OS === 'ios' && isLiquidGlassAvailable()
 
 /**
  * A round floating button (the web bar's buttons). On
@@ -23,6 +23,7 @@ const glass = Platform.OS === 'ios' && isLiquidGlassAvailable()
 export function RoundButton({ onPress, children, label, dot, disabled = false, busy = false }: { onPress?: () => void; children: ReactNode; label: string; dot?: boolean; disabled?: boolean; busy?: boolean }) {
   const blocked = disabled || busy
   const content = busy ? <Spinner size={20} color={colors.ink} /> : children
+  const glass = useLiquidGlass()
   if (glass) {
     return (
       <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: blocked, busy }} aria-disabled={Platform.OS === 'web' ? blocked : undefined} aria-busy={Platform.OS === 'web' ? busy : undefined} disabled={blocked} onPress={onPress} style={blocked ? { opacity: 0.4 } : undefined}>
@@ -220,6 +221,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
 
 /** A capsule for the bar's title (the bot's name): Liquid Glass on iOS 26, white with a lift elsewhere. */
 export function Capsule({ children }: { children: ReactNode }) {
+  const glass = useLiquidGlass()
   return glass
     ? <GlassView style={styles.capsule}>{children}</GlassView>
     : <View style={[styles.capsule, { backgroundColor: colors.surface }, lift]}>{children}</View>
@@ -227,6 +229,7 @@ export function Capsule({ children }: { children: ReactNode }) {
 
 /** A field's surface (the composer): Liquid Glass on iOS 26, white with a lift elsewhere. */
 export function Field({ style, children }: { style: StyleProp<ViewStyle>; children: ReactNode }) {
+  const glass = useLiquidGlass()
   return glass ? <GlassView style={[style, { backgroundColor: undefined }]}>{children}</GlassView> : <View style={[style, lift]}>{children}</View>
 }
 

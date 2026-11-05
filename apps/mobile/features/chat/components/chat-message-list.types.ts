@@ -18,6 +18,11 @@ export type ChatListProps<T> = {
   footer?: ReactNode
   /** Room left under the last row for the floating composer. */
   bottomInset: number
+  /**
+   * The person's latest message (v0's send motion, #1408): the list leaves blank space under it so it can sit just
+   * under the bar, and the reply fills that space without the list scrolling. Unset: no space is added.
+   */
+  anchorIndex?: number
   /** The reader reached the top: load the page before. */
   onStartReached?: () => void
   /** Whether the latest message is in view, for the jump-to-latest button. */

@@ -20,6 +20,7 @@ export const USER_ERROR_CODES = {
   desktop_rpc_request_rejected: [],
   desktop_rpc_response_invalid: [],
   desktop_rpc_value_invalid: [],
+  factory_spec_approval_required: [],
   map_invalid_request: ["invalid_query", "invalid_token"],
   map_not_found: [],
   map_snapshot_changed: ["source_changed"],

@@ -11,3 +11,12 @@ export const AT_LATEST_SLACK = 80
 export function isAtLatest(offset: number, contentHeight: number, viewportHeight: number) {
   return contentHeight - viewportHeight - offset <= AT_LATEST_SLACK
 }
+
+/** How far below the top of the visible list the person's anchored message sits. */
+export const ANCHOR_GAP = 12
+
+/** The index of the person's latest message, the one a reply answers; undefined when they have not written. */
+export function latestOwnIndex<T>(items: T[], own: (item: T) => boolean) {
+  for (let index = items.length - 1; index >= 0; index--) if (own(items[index]!)) return index
+  return undefined
+}

@@ -7,7 +7,7 @@ import { deviceOnlineStates } from './device-presence'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import { ActionFailureError } from './action-error'
 import { apiKeyHarnesses } from './model-api-key-providers'
-import { shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
+import { hasStaleOfficialAllowance, shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
 import { providerHealthStates, providerSourceKey } from './model-provider-health'
 import {
   agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, offerKey, onPreferredAgent, planDispatch, whyNoDevice,
@@ -151,7 +151,7 @@ const refreshOrderQuota = (query: Query): RefreshOrderQuota => async (scope, con
 /** Each entry's credential, read now. Dispatch refreshes missing/stale allowance
  * once per connection; a final cloud claim can require a fresh usage check.
  * Settings can request a projection only. */
-export async function credentialStates(query: Query, scope: OrderScope, entries: readonly OrderEntry[], candidates: readonly (OrderCandidate & { provider: string; credentialOwnerId?: string })[], now?: number, options: { probe?: boolean | 'always'; refresh?: RefreshOrderQuota; display?: boolean } = {}) {
+export async function credentialStates(query: Query, scope: OrderScope, entries: readonly OrderEntry[], candidates: readonly (OrderCandidate & { provider: string; credentialOwnerId?: string })[], now?: number, options: { probe?: boolean | 'always'; refresh?: RefreshOrderQuota; display?: boolean; deferStaleQuota?: true } = {}) {
   let checkedAt = now ?? Date.now()
   const available = new Set(candidates.map(entryKey))
   // Subscriptions whose account catalogue lists anything: only those can say a model has gone away.
@@ -200,7 +200,7 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
         AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies p WHERE p."workspaceId"::text=$4 AND NOT p.subscriptions))`,
     [[...keyOwners.keys()], [...keyOwners.values()], scope.ownerId, scope.workspaceId])).rows : []).map(row => [row.id, row]))
   const health = await providerHealthStates(query, scope, authorizedCandidates, checkedAt)
-  const states = new Map<string, { credential: CredentialState; provider: string }>()
+  const states = new Map<string, { credential: CredentialState; provider: string; quotaCheckPending?: true }>()
   for (const entry of entries) {
     if (entry.source.kind === 'subscription') {
       const row = connections.get(entry.source.connectionId)
@@ -220,7 +220,11 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
                 availability.status === 'exhausted' ? { usable: false, reason: 'quota', resetsAt: availability.resetsAt }
                 : availability.status === 'checking' ? { usable: false, reason: 'checking' }
                 : { usable: true })
-      states.set(entry.id, { credential, provider })
+      // Keep the credential refused. Only the group intent's read-only planner
+      // can defer this specific stale allowance; admission still refreshes it.
+      const quotaCheckPending = options.probe === false && options.deferStaleQuota && !credential.usable && credential.reason === 'checking'
+        && hasStaleOfficialAllowance(row?.quota, entry.model, provider, checkedAt)
+      states.set(entry.id, { credential, provider, ...(quotaCheckPending ? { quotaCheckPending: true as const } : {}) })
     } else {
       const row = keys.get(entry.source.keyId)
       const keyId = entry.source.keyId

@@ -288,7 +288,8 @@ const TOOLS = [
         spec: SPEC_SCHEMA,
         split: SPLIT_SCHEMA,
         previewDatabaseBranch: { type: "string", description: "Name of the preview database branch you actually created or used; omit when none." },
-        verificationCommand: { type: "object", description: "For a Factory verification with no frozen command: the command inferred from repository scripts, Makefile or CI and its concrete source. Run it and report its actual observations too. If no command can be inferred, request help instead of inventing one.", properties: { command: { type: "string" }, basis: { type: "string" } }, required: ["command", "basis"] },
+        verificationCommand: { type: "object", description: "For a Factory verification with no frozen command: the command inferred from repository scripts, Makefile or CI and its concrete source. Run it and report its actual observations too. If no command can be inferred, mark that criterion unverified with its reason; do not invent a command or ask the person for one.", properties: { command: { type: "string" }, basis: { type: "string" } }, required: ["command", "basis"] },
+        reviewVerdict: { type: "string", enum: ["passed", "changes_requested", "needs_judgment"], description: "The task’s single review: clear defects require changes; ambiguous findings go to the person. An unverified observation is not an observed defect." },
         criteria: {
           type: "array",
           description:
@@ -301,7 +302,10 @@ const TOOLS = [
                 description: "The criterion's id, as given in your brief.",
               },
               text: { type: "string", description: "The criterion checked, required when the brief provides no criterion UUID." },
-              passed: { type: "boolean" },
+              passed: { type: "boolean", description: "True only for an observed pass; false for failed and unverified." },
+              status: { type: "string", enum: ["passed", "failed", "unverified"] },
+              reason: { type: "string", description: "Required for unverified: why the observation could not be made." },
+              resolution: { type: "string", description: "For a repair, how the review finding on this criterion was addressed; keep the original criterion id or text." },
               command: { type: "string", description: "Exact command used to check this criterion, when one was run." },
               exitCode: { type: ["integer", "null"], description: "Observed exit code of that command." },
               evidence: {
@@ -493,6 +497,7 @@ function record(kind, args, toolName) {
     // Kept as sent; the daemon validates and trims each entry.
     ...(typeof args.previewDatabaseBranch === "string" ? { previewDatabaseBranch: args.previewDatabaseBranch } : {}),
     ...(Array.isArray(args.criteria) ? { criteria: args.criteria } : {}),
+    ...(typeof args.reviewVerdict === "string" ? { reviewVerdict: args.reviewVerdict } : {}),
     ...(args.verificationCommand ? { verificationCommand: args.verificationCommand } : {}),
     ...(args.repositorySelection ? { repositorySelection: args.repositorySelection } : {}),
     at: new Date().toISOString(),

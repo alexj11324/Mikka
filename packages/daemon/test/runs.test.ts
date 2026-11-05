@@ -272,16 +272,16 @@ describe("mock runs", () => {
     const fixturesDir = tempDir()
     const criterionId = "10000000-0000-4000-8000-000000000001"
     writeFileSync(join(fixturesDir, "details.jsonl"), JSON.stringify({ t: 0, submit: {
-      summary: "Checked criterion", previewDatabaseBranch: "  preview/541  ",
+      summary: "Checked criterion", previewDatabaseBranch: "  preview/541  ", reviewVerdict: "needs_judgment",
       verify: { status: "failed", command: "forged" },
-      criteria: [{ criterionId, passed: true, command: "  pnpm check:criterion  ", exitCode: 0, evidence: "passed" }, { text: 'A criterion with no UUID', passed: true, evidence: 'Inspected README.md:1' }],
+      criteria: [{ criterionId, passed: true, command: "  pnpm check:criterion  ", exitCode: 0, evidence: "passed" }, { text: 'A criterion with no UUID', passed: false, status: 'unverified', reason: 'No executable command exists.', resolution: 'Documented the missing observation.' }],
     } }) + "\n")
     const daemon = await boot(server, dataDir, Number.POSITIVE_INFINITY, undefined, fixturesDir)
     const runId = queue(server, "details")
     await runToEnd(daemon, server, runId)
     expect(server.runs.get(runId)?.completion?.report).toMatchObject({
-      previewDatabaseBranch: "preview/541",
-      criteria: [{ criterionId, command: "pnpm check:criterion", exitCode: 0 }, { text: 'A criterion with no UUID', passed: true, evidence: 'Inspected README.md:1' }],
+      previewDatabaseBranch: "preview/541", reviewVerdict: "needs_judgment",
+      criteria: [{ criterionId, command: "pnpm check:criterion", exitCode: 0 }, { text: 'A criterion with no UUID', passed: false, status: 'unverified', reason: 'No executable command exists.', resolution: 'Documented the missing observation.' }],
       verify: { status: "passed", command: VERIFY, exitCode: 0 },
     })
   })

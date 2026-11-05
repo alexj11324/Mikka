@@ -11,7 +11,7 @@ import { artifactSubmittedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { ARTIFACT_CONTENT_TYPES, ARTIFACT_EXTENSIONS, ARTIFACT_MAX_BYTES, cleanTitle, utf8Bytes } from '@/lib/artifacts/limits'
 import { stripDiffMarkers } from '@/lib/artifacts/diff'
-import type { ArtifactDetail, ArtifactListItem, ArtifactSummary } from '@/lib/artifacts/types'
+import type { ArtifactDetail, ArtifactListItem, ArtifactMedia, ArtifactSummary } from '@/lib/artifacts/types'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { artifactStorage, getArtifactObject, putArtifactObject } from '@/lib/artifacts/storage'
@@ -128,7 +128,25 @@ export async function readArtifact(userId: string, artifactId: string): Promise<
   // The bot whose run made it, so its window sits beside that bot's chat (as on the Artifact page); only the person's own run counts.
   const [run] = found.runId ? await db.select({ botId: agentRuns.botId }).from(agentRuns)
     .where(and(eq(agentRuns.id, found.runId), eq(agentRuns.userId, userId))).limit(1) : []
-  return { ...found, botId: run?.botId ?? null, shared: Boolean(live) }
+  return { ...found, botId: run?.botId ?? null, shared: Boolean(live), media: await acceptanceMedia(artifactId) }
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * A Factory acceptance report's recordings (#1276): the capture ids its
+ * Markdown links to as videos, so the reader plays them in place. The index
+ * row belongs to the artifact the caller already read as its owner; captures
+ * are still served only through the owner-checked capture route.
+ */
+async function acceptanceMedia(artifactId: string): Promise<ArtifactMedia[]> {
+  const { rows: [row] } = await pool.query<{ media: unknown }>('SELECT media FROM factory_acceptance_artifacts WHERE "artifactId"=$1 LIMIT 1', [artifactId])
+  if (!Array.isArray(row?.media)) return []
+  return row.media.flatMap((item): ArtifactMedia[] => {
+    const entry = item as { captureId?: unknown; kind?: unknown; title?: unknown }
+    return typeof entry.captureId === 'string' && UUID.test(entry.captureId) && (entry.kind === 'video' || entry.kind === 'image')
+      ? [{ captureId: entry.captureId, kind: entry.kind, title: typeof entry.title === 'string' ? entry.title.slice(0, 200) : '' }] : []
+  }).slice(0, 40)
 }
 
 const LIST_LIMIT = 200

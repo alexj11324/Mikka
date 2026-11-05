@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { ChatMessageList, type ChatListHandle } from '@/features/chat/components/chat-message-list'
 import { chatHistoryPath, chatUpdatePath, mergeChatHistory, mergeChatRead, olderThrough, type ChatHistoryPage, type ChatRead } from '@/features/chat/model/chat-pages'
+import { latestOwnIndex } from '@/features/chat/model/chat-layout'
 import { GestureDetector } from 'react-native-gesture-handler'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -120,6 +121,10 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
   const chatKey = `${self}:${apiContext}`
   if (data && opened.current?.chat !== chatKey) opened.current = { chat: chatKey, last: items.reduce((last, item) => Math.max(last, item.position), -1) }
   const arrived = (position: number) => Boolean(opened.current && position > opened.current.last)
+  // Only a message sent on this visit is anchored under the bar with room for the reply (v0); opening the chat,
+  // older pages and pushes keep the latest message against the composer.
+  const [sentHere, setSentHere] = useState(false)
+  const anchorIndex = sentHere ? latestOwnIndex(items, item => item.from === 'person' && arrived(item.position)) : undefined
   // The one action row goes under the bot's latest reply, once it has finished (#1386).
   const latestReply = items.reduce((last, item, index) => item.from === 'coordinator' && item.text ? index : item.from === 'person' ? -1 : last, -1)
   // A card is answered once the person has written after it (here or anywhere else).
@@ -155,7 +160,9 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
 
   const send = async (words: string, attachments: Attachment[] = []) => {
     if (serviceUnavailable) return false
-    list.current?.toLatest()
+    // The sent message rises to the top of the chat, blank space under it for the reply (v0).
+    setSentHere(true)
+    list.current?.toLatest(!reduceMotion)
     const { text: message, images } = outgoing(words, attachments)
     const context = apiCache.context()
     const targetBotId = data?.botId ?? botId
@@ -263,7 +270,7 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
       <View style={{ flex: 1, overflow: 'hidden' }}>
         {/* The system scroll: momentum, and a bounce at both ends even while the chat is shorter than the screen. */}
         <ChatMessageList ref={list} testID="bot-chat-scroll" data={items} scrollEnabled={!scrollLocked} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
-          keyOf={item => item.pending ? `pending-${item.position}` : String(item.position)} renderItem={renderItem}
+          keyOf={item => item.pending ? `pending-${item.position}` : String(item.position)} renderItem={renderItem} anchorIndex={anchorIndex}
           onStartReached={data?.historyBefore ? () => void loadOlder() : undefined}
           header={loadingOlder ? <View style={styles.older}><Spinner size={16} /></View> : null}
           footer={<>
