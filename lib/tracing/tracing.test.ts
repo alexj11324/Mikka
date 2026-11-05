@@ -120,6 +120,7 @@ describe('server tracing', () => {
     // Next's after(): the callback runs once the response is done, in a
     // snapshot of the scheduling request's async context (bindSnapshot).
     const scheduled: (() => unknown)[] = []
+    const foreign: (() => unknown)[] = []
     const nextAfter = (task: () => unknown) => { const snapshot = AsyncLocalStorage.snapshot(); scheduled.push(() => snapshot(task)) }
     await tracer.startActiveSpan('POST', { kind: SpanKind.SERVER, attributes: { 'http.method': 'POST', 'http.target': '/mikka/api/coordinator/messages' } }, async root => {
       await routeScope.run('/api/coordinator/messages', async () => {
@@ -130,10 +131,14 @@ describe('server tracing', () => {
         }, { schedule: nextAfter })
         // The same work scheduled with a bare after(): the pitfall afterJob avoids.
         nextAfter(() => pool.query('select 3 as "bare_after"'))
+        // retainContext binds the request's context; the label is still entered inside it.
+        afterJob('after:live-notify', () => pool.query('select 6 as "retained"'), { retainContext: true, schedule: task => { foreign.push(task) } })
       })
       root.end()
     })
     for (const task of scheduled) await task()
+    // A scheduler that calls back from an unrelated context.
+    await routeScope.run('/api/unrelated', async () => { for (const task of foreign) await task() })
 
     // A Workflow step body runs inside the SDK's step context, on the step delivery request.
     const stepContext = ((globalThis as Record<symbol, unknown>)[Symbol.for('WORKFLOW_STEP_CONTEXT_STORAGE')] ??= new AsyncLocalStorage()) as AsyncLocalStorage<unknown>
@@ -214,6 +219,10 @@ describe('server tracing', () => {
     const bare = query('select ? as "bare_after"')
     assert.equal(bare.attributes['mikka.route'], '/api/coordinator/messages')
     assert.equal(traceOf(bare), traceOf(request))
+    // A context-retaining job called back from elsewhere still runs under its own label.
+    const retained = query('select ? as "retained"')
+    assert.equal(retained.attributes['mikka.route'], 'after:live-notify')
+    assert.equal(retained.attributes['mikka.client_kind'], 'background')
   })
 
   test('a Workflow step is labelled with its workflow and step', () => {

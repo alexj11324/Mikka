@@ -1,7 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, randomUUID } from 'node:crypto'
-// The route template of the request being handled, read by the database sample and the tracer.
-import { routeScope } from '@/lib/tracing/labels'
 
 // Start and completion JSON lines per API request, written to stdout so Vercel Runtime Logs
 // (free on every plan) can search it. Only safe fields: never headers,
@@ -10,6 +8,10 @@ import { routeScope } from '@/lib/tracing/labels'
 export type RequestLogOutcome = 'empty' | 'work' | 'ignored'
 type Store = { userId?: string; outcome?: RequestLogOutcome }
 const requestScope = new AsyncLocalStorage<Store>()
+// The route template of the request being handled, read by the database sample
+// and the tracer (lib/tracing/labels.ts) through this global key. Kept local:
+// scripts/ops load this file with plain Node, without the @/ alias.
+const routeScope: AsyncLocalStorage<string> = ((globalThis as Record<symbol, unknown>)[Symbol.for('mikka.requestRoute')] ??= new AsyncLocalStorage<string>()) as AsyncLocalStorage<string>
 
 /** Records the signed-in user for the current request's log line. */
 export function noteLogUser(userId: string | null | undefined) {

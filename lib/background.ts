@@ -1,5 +1,6 @@
 // oxlint-disable-next-line no-restricted-imports -- the one place that schedules after() work
 import { after } from 'next/server'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { waitUntil } from '@vercel/functions'
 import { runJob, type JobKind } from '@/lib/tracing/jobs'
 
@@ -12,6 +13,13 @@ export type JobLabel = `after:${string}` | `cron:${string}`
 export type AfterJobOptions = {
   /** Outside a request (a script, a test) run the work now, kept alive with waitUntil, instead of throwing as after() does. */
   orRun?: boolean
+  /**
+   * Keep the scheduling call's async context (its request database scope) even
+   * when the scheduler invokes the work from another context, as
+   * AsyncLocalStorage.bind does. The job's label is entered inside the bound
+   * function, so it still wins over the scheduling request's.
+   */
+  retainContext?: boolean
   /** Test seam for next/server's after(). */
   schedule?: (task: () => unknown) => void
 }
@@ -27,16 +35,18 @@ const kindOf = (label: JobLabel): JobKind => (label.startsWith('cron:') ? 'cron'
  * context (Next's bindSnapshot), so without this the work's queries would
  * carry the request's route, under a request span that has already ended.
  * runJob is entered inside that callback, after the snapshot is restored, so
- * its label is the one in force when the work runs. Do not bind `task` (or
- * this callback) with AsyncLocalStorage.bind/snapshot: entering a bound task
- * restores the request's context, losing the label and Next's own after-phase
- * store.
+ * its label is the one in force when the work runs. Do not bind `task` itself
+ * with AsyncLocalStorage.bind/snapshot (entering it would restore the
+ * request's context over the label); use `retainContext` instead.
  */
-export function afterJob(label: JobLabel, task: () => unknown, { orRun = false, schedule = after }: AfterJobOptions = {}): void {
-  const run = () => runJob(label, kindOf(label), task, { detach: true })
+export function afterJob(label: JobLabel, task: () => unknown, { orRun = false, retainContext = false, schedule = after }: AfterJobOptions = {}): void {
+  const job = () => runJob(label, kindOf(label), task, { detach: true })
+  const run = retainContext ? AsyncLocalStorage.bind(job) : job
   try { schedule(run) } catch (error) {
     if (!orRun) throw error
-    waitUntil(Promise.resolve().then(run).catch(() => {}))
+    let pending: unknown
+    try { pending = run() } catch { return }
+    waitUntil(Promise.resolve(pending).catch(() => {}))
   }
 }
 

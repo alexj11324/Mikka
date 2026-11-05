@@ -62,7 +62,9 @@ groups like a route.
   ended. `afterJob` enters the job inside that callback, after the snapshot
   is restored, so the job's label is the one in force. Do not bind the task
   with `AsyncLocalStorage.bind`/`snapshot`: entering it would restore the
-  request's context. The only bare `after()` calls left hand over promises
+  request's context over the label. Work that must keep its scheduling
+  context when called back from elsewhere (live notifications) passes
+  `retainContext`, which binds outside the job. The only bare `after()` calls left hand over promises
   already running in their webhook (Slack, Telegram) or flush analytics.
 - Wrap a cron handler with `cronJob('<name>', handler)`.
 - Workflow steps need nothing: the label comes from the step context the

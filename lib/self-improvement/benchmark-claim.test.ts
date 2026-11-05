@@ -39,7 +39,8 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
       assert.equal(executor,db);assert.equal(runId,run.id);assert.equal(run.status,'failed');calls.push('listChanged')
     }},
     '@/lib/cloud-computer-flag':{cloudComputerTasksEnabled:()=>true},
-    'next/server':{after:()=>{calls.push('wakeScheduled')},NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
+    '@/lib/background':{afterJob:()=>{calls.push('wakeScheduled')}},
+    'next/server':{NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
     'drizzle-orm':{and:(...args:unknown[])=>args,eq:(...args:unknown[])=>args,isNull:(value:unknown)=>value},
     '@mikka/protocol/device':deviceProtocol,
     '@mikka/protocol/daemon':daemonProtocol,
