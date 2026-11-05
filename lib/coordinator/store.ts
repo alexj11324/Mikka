@@ -11,6 +11,7 @@ import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
+import { COORDINATOR_LEASE_CHANNEL } from '@/lib/db/listen'
 import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
@@ -117,7 +118,11 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
     if (!taken) return { held: false, ...NO_TAKE }
     // Ordinary renewal is not a broad list update. Only a new/changed turn
     // or actual message delivery changes the summary that the sidebar shows.
-    if (!coordinatorLeaseActive(previousLease, now) || previousLease?.leaseHolder !== holder) await ownerListChanged(tx, userId, ['bot_chat_list'])
+    if (!coordinatorLeaseActive(previousLease, now) || previousLease?.leaseHolder !== holder) {
+      await ownerListChanged(tx, userId, ['bot_chat_list'])
+      // 停止 for a turn that is about to start waits on this (stop-turn.ts); delivered on COMMIT.
+      await tx.execute(sql`SELECT pg_notify(${COORDINATOR_LEASE_CHANNEL}, ${botId})`)
+    }
     const candidates = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
     // A schedule is a separate read-only turn. Hydrate its authority through
