@@ -347,7 +347,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
       decision: async () => {
         await new Promise(resolve => setTimeout(resolve, 21_000))
         await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
-        return { answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([['profile', { name: 'profile', type: 'choice', choice: ui.id, confidence: .95 }], ['reason', { name: 'reason', type: 'choice', choice: 'capability_fit' }]]), execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'fixture-delayed-decision', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
+        return { answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([['profile', { name: 'profile', type: 'choice', choice: `${ui.id}:capability_fit`, confidence: .95 }]]), execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'fixture-delayed-decision', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
       },
     })
     assert.equal(selected.agentProfile?.profileId, ui.id)
@@ -695,7 +695,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
           assert.ok(serialized.includes(title)); assert.ok(serialized.includes(stage))
           for (const forbidden of ['PRIVATE_PROFILE_INSTRUCTIONS', 'connectionId', 'providerSubject', 'synthetic-profile-', 'Start from the observed failure']) assert.ok(!serialized.includes(forbidden), forbidden)
           assert.ok(JSON.stringify(questions).includes(selected.id))
-          return { answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([['profile', { name: 'profile', type: 'choice', choice: selected.id, confidence: .95 }], ['reason', { name: 'reason', type: 'choice', choice: 'capability_fit' }]]), execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'fixture-decision', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
+          return { answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([['profile', { name: 'profile', type: 'choice', choice: `${selected.id}:capability_fit`, confidence: .95 }]]), execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'fixture-decision', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
         },
       })
       assert.equal(result.agentProfile!.profileId, selected.id); assert.equal(result.agentProfile!.source, 'decision')
@@ -710,7 +710,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     await assert.rejects(profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' }, {
       decision: async () => {
         await store.update(scope, current.id, current.version, { ...definition('Race', 'codex', codex, 'gpt-6-luna'), instructions: 'Edited during Decision' })
-        return { answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([['profile', { name: 'profile', type: 'choice', choice: current.id, confidence: .95 }], ['reason', { name: 'reason', type: 'choice', choice: 'stage_fit' }]]), execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'fixture-racing-decision', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'b'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
+        return { answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([['profile', { name: 'profile', type: 'choice', choice: `${current.id}:stage_fit`, confidence: .95 }]]), execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'fixture-racing-decision', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'b'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
       },
     }), { code: 'agentProfileVersionConflict' })
     assert.deepEqual((await pool.query('SELECT id,"createdAt" FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [scope.ownerId])).rows, before)
