@@ -43,6 +43,7 @@ import { createFactoryReconciler } from "./reconcile";
 import { factoryCheckIndependent } from "./check-independence";
 import { observeFactoryCheckDispatch } from "./check-dispatch";
 import {
+  appendFactoryCheckContinuationContext,
   configureFactoryCheck,
   producerCommandObservations,
   factoryCheckAssignment,
@@ -1008,13 +1009,28 @@ test(
           },
         );
       for (const phase of ['review', 'verify'] as const) for (const machineState of ['running', 'paused'] as const)
-        await t.test(phase + ' question continuation keeps its owned ' + machineState + ' VM, issue, candidate and original session without a parent runtime', async () => {
-          const pending = await pendingReview();
+        for (const kind of ['repository', 'deliverable'] as const)
+        await t.test(kind + ' ' + phase + ' question continuation keeps its owned ' + machineState + ' VM, issue, candidate and original session without a parent runtime', async () => {
+          const pending = await pendingReview(kind);
           let origin = await start(pending.task);
           if (phase === 'verify') {
             await terminal(origin.runId, 'review-' + pending.task.id);
             await reconcile('owner');
             origin = await start((await state(pending.task.id)).task);
+          }
+          let outputChunkId: string | undefined;
+          if (kind === 'deliverable') {
+            // The native checker already has the old empty collection. A fresh
+            // host read can now see saved evidence, as after a reader upgrade.
+            const producer = (await db.query(`SELECT r.* FROM factory_candidates c JOIN agent_runs r ON r.id=c."runId" WHERE c.id=$1`, [pending.task.candidateId])).rows[0];
+            outputChunkId = randomUUID();
+            // Stay inside the run window: JS Date drops PostgreSQL microseconds.
+            await db.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,1,$3,$4),($5,$2,2,$6,$7)`,
+              [randomUUID(), producer.id, JSON.stringify({ type: 'tool-input-available', toolName: 'shell', toolCallId: 'persisted-producer-command', input: { command: 'wc -c REPORT.md' } }), new Date(producer.startedAt.getTime() + 100),
+                outputChunkId, JSON.stringify({ type: 'tool-output-available', toolCallId: 'persisted-producer-command', output: { exitCode: 0, output: '52 REPORT.md' } }), new Date(producer.finishedAt.getTime() - 100)]);
+            const oldPrompt = (await db.query('SELECT prompt FROM agent_runs WHERE id=$1', [origin.runId])).rows[0].prompt;
+            assert.match(oldPrompt, /"records":\[\],"inheritedRecords":\[\]/);
+            assert.ok(!oldPrompt.includes(outputChunkId));
           }
           const childDevice = randomUUID(), childRepo = randomUUID(), connectionId = randomUUID(), credentialId = randomUUID();
           const nativeSession = 'original-question-' + origin.runId, sandboxId = 'retained-question-' + origin.runId;
@@ -1067,6 +1083,11 @@ test(
           assert.equal(run.questionContinuation.requiredSandboxId, sandboxId);
           assert.equal(run.agentDefinition.definitionDigest, definition.definitionDigest);
           assert.deepEqual(run.agentDefinition.subscription, definition.subscription);
+          if (outputChunkId) {
+            assert.ok(run.questionContinuation.followUp.includes(outputChunkId));
+            assert.match(run.questionContinuation.followUp, /52 REPORT.md/);
+            assert.doesNotMatch(run.questionContinuation.followUp, /Original issue and standing instructions|Producing run report \(observations/);
+          } else assert.doesNotMatch(run.questionContinuation.followUp, /Current host-recorded command evidence/);
           assert.equal((await state(pending.task.id)).task.candidateId, pending.task.candidateId);
           assert.deepEqual((await db.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=$1', [origin.runId])).rows, beforeRun);
           assert.deepEqual((await db.query('SELECT to_jsonb(c) AS candidate FROM factory_candidates c WHERE id=$1', [pending.task.candidateId])).rows, beforeCandidate);
@@ -1114,14 +1135,77 @@ test(
             assert.equal(extras.requireSessionResume, true);
             assert.equal(extras.resumeSessionId, nativeSession);
             assert.equal(extras.baseBranch, sha);
-            assert.deepEqual(extras.factoryCheck, { stage: phase, inferCommand: false, reportOnly: false });
-            assert.equal(extras.verifyCommand, command);
+            assert.deepEqual(extras.factoryCheck, { stage: phase, inferCommand: false, reportOnly: kind === 'deliverable' });
+            assert.equal(extras.verifyCommand, kind === 'deliverable' ? undefined : command);
+            assert.equal((extras.policy as RunPolicy).readOnly, true);
+            assert.equal(extras.followUp, run.questionContinuation.followUp, 'the actual native message receives the fresh host evidence');
+            if (outputChunkId) {
+              for (const drift of [
+                { userId: 'other' }, { issueId: randomUUID() }, { candidateId: randomUUID() },
+                { attemptId: randomUUID() }, { sourceEventId: randomUUID() },
+              ]) await assert.rejects(appendFactoryCheckContinuationContext(tx, { ...resumed.task, ...drift }, run.id, 'Original answer'),
+                { code: 'factoryCheckBindingMismatch' });
+              for (const sources of [null, {}, [{ outputChunkId: randomUUID() }]]) {
+                await tx.query('SAVEPOINT evidence_binding');
+                await tx.query(`UPDATE factory_attempts SET output=jsonb_set(output,'{check,questionCommandSources}',$2::jsonb) WHERE id=$1`,
+                  [resumed.task.attemptId, JSON.stringify(sources)]);
+                await assert.rejects(appendFactoryCheckContinuationContext(tx, resumed.task, run.id, 'Original answer'),
+                  { code: 'factoryCheckBindingMismatch' }, 'malformed or mismatched citation sources must not be delivered');
+                await tx.query('ROLLBACK TO SAVEPOINT evidence_binding');
+              }
+            }
           } finally { await tx.query('ROLLBACK'); tx.release(); }
           const replayed = await cloudQuestions.answer({ source: 'human', userId: 'owner', sessionId: browserSessionId }, answer);
           assert.equal(replayed.continuationRunId, run.id);
           assert.equal(replayed.replayed, true);
+          assert.equal((await db.query('SELECT "questionContinuation" FROM agent_runs WHERE id=$1', [run.id])).rows[0].questionContinuation.followUp,
+            run.questionContinuation.followUp, 'answer replay does not regenerate or append another collection');
+          if (kind === 'deliverable' && machineState === 'paused') {
+            await db.query(`UPDATE agent_runs SET status='failed',"stopReason"='error',"sessionId"=$2,"finishedAt"=now() WHERE id=$1`, [run.id, nativeSession]);
+            await cloudQuestions.settle('owner', run.id);
+            const blocked = await cloudQuestions.read('owner', q.id);
+            const recovery = { requestId: randomUUID(), ...blocked.recoverReference! };
+            const failedBefore = (await db.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=$1', [run.id])).rows;
+            const answerBefore = (await db.query('SELECT answer,"answerFingerprint",result FROM factory_questions WHERE id=$1', [q.id])).rows;
+            const recovered = await cloudQuestions.recover({ source: 'human', userId: 'owner', sessionId: browserSessionId }, recovery);
+            const recoveryRun = (await db.query('SELECT * FROM agent_runs WHERE id=$1', [recovered.continuationRunId])).rows[0];
+            assert.ok(recoveryRun.questionContinuation.followUp.includes(outputChunkId!));
+            assert.doesNotMatch(recoveryRun.questionContinuation.followUp, /Answer to execution question|Original issue and standing instructions/);
+            assert.equal(recoveryRun.questionContinuation.originSessionId, nativeSession);
+            assert.equal(recoveryRun.questionContinuation.requiredSandboxId, sandboxId);
+            assert.equal(recoveryRun.deviceId, childDevice);
+            assert.equal(recoveryRun.deviceRepoId, childRepo);
+            assert.equal(recoveryRun.agentDefinition.definitionDigest, definition.definitionDigest);
+            assert.deepEqual(recoveryRun.agentDefinition.subscription, definition.subscription);
+            assert.equal(recovered.task.candidateId, pending.task.candidateId);
+            assert.deepEqual((await db.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=$1', [run.id])).rows, failedBefore);
+            assert.deepEqual((await db.query('SELECT answer,"answerFingerprint",result FROM factory_questions WHERE id=$1', [q.id])).rows, answerBefore);
+            const tx = await db.connect();
+            try {
+              await tx.query('BEGIN');
+              await tx.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [childDevice]);
+              await tx.query("UPDATE thread_machines SET state='running' WHERE \"runId\"=$1", [recoveryRun.id]);
+              const extras = await createFactoryClaim(store, cloudQuestions, assignment)(tx, 'owner', childDevice, recoveryRun.id, new Date(Date.now() + 60000).toISOString());
+              assert.equal(extras.followUp, recoveryRun.questionContinuation.followUp);
+              assert.equal(extras.continuesRunId, run.id);
+              assert.equal(extras.resumeSessionId, nativeSession);
+              assert.equal(extras.requireSessionResume, true);
+              assert.equal(extras.baseBranch, sha);
+              assert.equal((extras.policy as RunPolicy).readOnly, true);
+              assert.equal(extras.verifyCommand, undefined);
+            } finally { await tx.query('ROLLBACK'); tx.release(); }
+            const replay = await cloudQuestions.recover({ source: 'human', userId: 'owner', sessionId: browserSessionId }, recovery);
+            assert.equal(replay.continuationRunId, recoveryRun.id);
+            assert.equal(replay.replayed, true);
+            assert.equal((await db.query('SELECT "questionContinuation" FROM agent_runs WHERE id=$1', [recoveryRun.id])).rows[0].questionContinuation.followUp,
+              recoveryRun.questionContinuation.followUp);
+            // Evidence delivery is not acceptance. This test stops at the
+            // strict native claim and does not alter the existing recovery gate.
+            assert.equal((await state(pending.task.id)).task.status, 'running');
+            return;
+          }
           await terminal(run.id, nativeSession);
-          if (phase === 'verify') await toolChunks(run.id);
+          if (phase === 'verify' && kind === 'repository') await toolChunks(run.id);
           await reconcile('owner');
           assert.equal((await state(pending.task.id)).task.stage, phase === 'review' ? 'verify' : 'approval');
         });

@@ -73,6 +73,28 @@ test('catalog reads only public skill descriptors, reflects tool removal and rev
   active=false;assert.deepEqual(await read(),[])
 })
 
+test('a stale-quota group intent advertises Factory admission, while disabled tools still deny it',async()=>{
+  let tools=['dispatch_run']
+  const client={query:async()=>({rows:[{id:a,name:'Coder',ownerId:'requester',tools,skills:[]}]})} as any
+  const read=()=>groupBotCatalog(client,'requester','workspace',[a],async()=>({available:true,reason:'quota_check_required'}),async()=>true)
+  const catalog=await read()
+  assert.equal(catalog[0].executionAvailable,true)
+  assert.equal(catalog[0].executionReason,'quota_check_required')
+  const delegate=routeAnswers('delegate',[a],{task_operation:'create'})
+  const judge=createGroupJudgment(async(purpose,input,questions,...rest)=>{
+    const context=JSON.parse(typeof input==='string'?input:input.text)
+    assert.equal(context.members[0].executionReason,'quota_check_required')
+    assert.match(context.instructions,/quota check required before execution/)
+    return delegate(purpose,input,questions,...rest)
+  })
+  const route=await judge.route({text:'Create a small deliverable',mentions:[a]},catalog,null,[])
+  assert.equal(route.action,'delegate')
+  tools=[]
+  const denied=(await read())[0]
+  assert.equal(denied.executionAvailable,false)
+  assert.equal(denied.executionReason,'task_tool_disabled')
+})
+
 test('silent delegation still executes once, without an acknowledgement or chat generation',async()=>{
   const route=await createGroupJudgment(routeAnswers('delegate',[a],{task_operation:'create',report_timing:'on_completion'})).route({text:'创建报告，完成后再通知',mentions:[]},members,null,[])
   let delegated=0
