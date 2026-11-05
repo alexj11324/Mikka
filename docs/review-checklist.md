@@ -142,6 +142,9 @@ with what Slack, Notion, Cursor and ChatGPT do.
       admin permissions govern only sharing with others
       ([decision 2026-11-01-2240](design/decisions/2026-11-01-2240-own-credentials-always-usable.md)).
 - [ ] The value on screen is the value that is stored.
+- [ ] No new polling: data changes arrive by live push; the polling allowlist
+      grows only for UI timers and external APIs
+      ([decision 2026-11-05-0200](design/decisions/2026-11-05-0200-no-new-polling.md)).
 - [ ] The default works: no unusable option selected by default, and nothing
       shown online that is not.
 - [ ] The same feature behaves the same on the phone and on the web.
