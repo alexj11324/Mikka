@@ -76,17 +76,27 @@ source wins in a conflict is in [`README.md`](README.md).
   instruction under it is a blue bubble (R-55). This holds in every one-to-one
   chat, the board's Coordinator sidebar and the AI sidebar included.
 - **R-15** A task or thread mentioned in chat is an inline chip, not a large
-  card (a task chip carries the board's status icon). Internal object chips
-  are boxed: a faint accent fill (`--object-chip`), small radius, the status or
-  type icon, then the title in the accent with no underline; the chip never
-  breaks across lines and a long title truncates. The task number is in the
-  hover card, not the chip. A thread chip leads with the thread's status icon
-  (the same marks and colours as the thread card and Threads list) and opens
-  the thread's own conversation, as a thread card does (R-66); only a task chip
-  opens the task. Web sources and links keep the unboxed source chip (R-14). A thread the reply
-  dispatches is different: it is a thread card under that reply (R-66). An
-  Artifact waiting for acceptance is a bordered card under the reply (icon,
-  name, state such as 待你确认); clicking it opens the Artifact window (R-56).
+  card. Internal object chips are boxed: a faint accent fill (`--object-chip`),
+  rounded, then the title in the accent with no underline, at the text's own
+  size and line height, so a chip reads as a word of the sentence; a long title
+  wraps like the words around it, each line keeping the fill. The icon says what
+  it is: a task's status circle, a thread's bubble (R-52;
+  [decision](decisions/2026-11-04-2220-task-circle-thread-bubble.md)). A thread
+  chip shows its state only when it needs the person, 等待你 or 受阻: the dot on
+  the bubble and the word beside the title, on a tint (R-87); other states are in
+  its hover card. The task
+  number is in the hover card, not the chip. A thread chip opens the thread's own
+  conversation, as a thread card does (R-66); only a task chip opens the task. A
+  task and its thread are one piece of work (R-81): when a reply cites both, only
+  the thread is a chip and the task is its number in the sentence (「这个任务」 when
+  it has none, so the sentence still reads). A thread whose card sits under the same reply is named in the words
+  without a chip: the card is its one object there. Every mention of
+  an object in the words is its chip; it is the cards and lists under a reply that
+  never repeat it (R-66, R-83). Web sources and links keep the unboxed source chip
+  (R-14). A thread the reply dispatches is different: it is a thread card under
+  that reply (R-66). An Artifact waiting for acceptance is a bordered card under
+  the reply (icon, name, state such as 待你确认); clicking it opens the Artifact
+  window (R-56).
 - **R-16** The computer card in chat shows a title, a status, one sentence
   about the task and a big screen. It has no approval step: the bot operates
   until the person takes control (decisions 2026-10-30). It never shows an
@@ -239,7 +249,7 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   Figma: page 「AI 侧栏 · 全局」.
 - **R-66** When the Coordinator dispatches a thread, the chat shows one
   thread card under its reply: status icon (never the bot's avatar), thread
-  name, then on the right one PR badge for the PRs it produced: the summary
+  name, then on the right the state's badge (its word on its tint, R-87) and one PR badge for the PRs it produced: the summary
   state's git mark in its GitHub colour (any open: green; else any draft:
   grey; else any merged: purple; else closed: red) and the count. Hovering
   the badge, or tapping it on a phone, lists each PR (title; state mark,
@@ -247,8 +257,10 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   opens the PR. Every thread card carries it, in the chat and in the thread
   lists ([decision](decisions/2026-11-02-0230-pr-badge-on-thread-cards.md)).
   No step or progress line under the name (Alex, 2026-10-27). The card updates in place, so a thread has one
-  card in a chat; a later change of state is a sentence from the Coordinator,
-  not a second card. The card has no log, input box or buttons besides the
+  card in a chat: under the first reply that dispatched it, never again under
+  a later reply that names it; a later change of state is a sentence from the
+  Coordinator, not a second card, and a thread's repeated event line shows only
+  the latest one. The card has no log, input box or buttons besides the
   PR badge. Clicking it
   opens the thread conversation as R-82 says for every thread: on desktop in
   the right column beside the chat, which stays; on a phone it pushes in full
@@ -318,9 +330,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   - 已解决 only when the outcome is done, or its task is done, cancelled or a
     duplicate, or its PR is merged. A run nobody could judge sits under 受阻
     (failed) or 等待你, never 已解决.
-  - Every row leads with its group's status icon and colour, the phone's set
-    (`ThreadStatusIcon`): 进行中 spins, 受阻 a red alert, 等待你 a raised
-    hand, 空闲 a slashed circle, 已解决 a green check.
+  - Every row leads with the thread's bubble and its group's dot
+    (`ThreadStatusIcon`): 进行中 a pulsing grey dot, 等待你 amber, 受阻 red,
+    已解决 green, 空闲 a hollow ring. A circle is always a task, so a thread
+    borrows no circle icon (`icons/thread-not-circle`;
+    [decision](decisions/2026-11-04-2220-task-circle-thread-bubble.md)).
   - A thread's state badge (an open thread, a task's 线程, a thread chip's
     card) shows the same icon and the group's word, never the run's raw
     status: a finished run nobody judged reads 等待你, not 已完成. Only a stop
@@ -408,6 +422,21 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   badge under it says the state. Source: Alex,
   2026-11-01 ([decision](decisions/2026-11-01-1320-navigation-model.md)), 2026-11-02
   ([decision](decisions/2026-11-02-0310-all-threads-from-the-window-bar.md)).
+- **R-83** A reply's tool calls say what they did, not that a tool was used
+  ([decision](decisions/2026-11-04-2221-chat-tool-groups-and-citations.md),
+  spec `chat-tool-calls.md`). Two or more calls with nothing said between them
+  are one line that sums up what succeeded, side effects first, and counts the
+  failures apart in red (「派发了 1 个线程，查看了 3 次任务 · 1 个失败」); a failed
+  call is never said as done, and a group where nothing succeeded names the calls
+  that failed. Closed by default; while the
+  reply streams it shows the call running now. Opened, each call is a row: its
+  kind's icon, then verb and object (「查看任务 ALEX-45」); never a bare
+  「使用工具」 (`check-copy`). A call that failed, thrown or answered
+  `{"error": …}`, is red and names its reason in words. Raw input and output
+  open only from that call's row. 全部展开 / 全部收起, always shown beside every
+  group, opens or closes every group in the chat. Under a reply, 复制 and 「N 个来源」 (web pages
+  only; tasks and threads are already chips) share one line that shows while the
+  reply is hovered, focused or tapped; the latest reply keeps it on a touch screen.
 
 ## Settings
 
@@ -638,8 +667,10 @@ the chat tool group (`chat-tool-calls.md`). Each check is pass or fail; a
 design that fails any of them is sent back before it reaches Alex.
 
 - **R-84** A thread's conversation always uses the existing thread view
-  (`IssueThreadPanel`: header, 消息 / 改动 / 终端 / 文件 / 预览, Trace rows, the
-  插话 composer), wherever it appears: the Artifact window, the session view,
+  (`IssueThreadPanel`, drawn as its code renders it: the person's prompt
+  first, collapsible `ThreadSteps`, the agent's grey bubbles and its composer;
+  in `bare` mode, as inside the Artifact window, no header and no tabs),
+  wherever it appears: the Artifact window, the session view,
   an inbox detail. A one-to-one bot chat uses the existing coordinator chat.
   No design draws a third chat style or adds a new chat component.
 - **R-85** Deliverables (PR, diff, recording, screenshot, test output) live
@@ -663,6 +694,18 @@ design that fails any of them is sent back before it reaches Alex.
   first sight without scrolling: one prominent block or button per screen
   (for example the task page's 验收 block under the description), not a small
   header button or a link inside a comment.
+- **R-90** Reuse before you draw or build. Before a screen or a part of one is
+  designed (Figma) or coded, look up the component for that job, in this
+  order: `components.md`; the product's own components already on the live
+  screen for the same job (thread view, coordinator chat, Artifact window,
+  board card, chips); then the libraries `components/reui/`,
+  `components/ui/` (shadcn, including ones nothing imports yet, such as
+  `Questionnaire`), `components/motion/` and the OpenUI catalog
+  (`lib/agent-ui-catalog.ts`). If one fits, the design draws it as its code
+  renders it and the code uses it; restyling or redrawing a near copy fails
+  this check. A new component is allowed only when none fits, and the same
+  PR adds it to `components.md` with the reason. The design hand-in lists,
+  for every part, the component it uses or why a new one was needed.
 
 How a design is reviewed:
 
@@ -672,7 +715,7 @@ How a design is reviewed:
    `ux-heuristics` and runs `cognitive-walkthrough` on the key tasks.
 2. The reviewer looks at full-size screenshots and compares them side by side
    with the live product's current screens, not thumbnails.
-3. The reviewer goes through R-84 to R-89 one by one and reports each as pass
+3. The reviewer goes through R-84 to R-90 one by one and reports each as pass
    or fail with the screen it checked.
 
 ## Copy

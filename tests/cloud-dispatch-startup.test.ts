@@ -96,6 +96,12 @@ stub('../lib/cloud-computer/thread-machines.ts', {
     assert.deepEqual(actor, { userId: owner, workspaceId: 'workspace' }); assert.equal(id, runId); assert.equal(action, 'end'); calls.push('end')
   },
 })
+stub('../lib/run-leases.ts', { failUnclaimedCloudStart: async (actor: unknown, id: string, error: unknown) => {
+  assert.deepEqual(actor, { userId: owner, workspaceId }); assert.equal(id, runId)
+  assert.ok(error instanceof Error)
+  calls.push('fail-unclaimed-start')
+  return true
+} })
 mock.module('workflow/api', { namedExports: { start: async () => { calls.push('lifecycle'); if (failure === 'lifecycle') throw new Error('Synthetic workflow launch failure'); return { runId: 'workflow' } } } })
 stub('../workflows/thread-machine/workflow.ts', { threadMachineLifecycle: async () => {} })
 let dispatch: typeof import('../workflows/coordinator/steps')['dispatchComputerTask']
@@ -122,10 +128,12 @@ test('model arguments cannot grant local recovery; only the separate host placem
   assert.equal(queued.get('coordinator:automatic-placement')?.allowLocalRecovery, true)
 })
 
-for (const stage of ['machine', 'lifecycle'] as const) test(`a ${stage} failure ends the queued cloud run before returning an unavailable result`, async () => {
+for (const stage of ['machine', 'lifecycle'] as const) test(`a ${stage} failure uses the unclaimed infrastructure-failure path without requesting a user stop`, async () => {
   failure = stage
   assert.deepEqual(await dispatch(owner, { botId, issueId, harness: 'codex', model: 'synthetic-model' }, 'synthetic-call'), { error: 'cloudComputerUnavailable' })
-  assert.deepEqual(calls, ['queue', 'machine', ...(stage === 'lifecycle' ? ['lifecycle'] : []), 'end'])
+  assert.deepEqual(calls, ['queue', 'machine', ...(stage === 'lifecycle' ? ['lifecycle'] : []), 'fail-unclaimed-start'])
+  assert.equal(modelResolutions, 0, 'a machine failure does not select another model')
+  assert.equal(queued.get('coordinator:synthetic-call')?.model, model)
 })
 
 for (const harness of ['codex', 'claude_code'] as const) for (const source of ['subscription', 'api_key'] as const) test(`a sleeping Bot dispatches ${harness} with its selected ${source}, without a separate wake tool`, async () => {

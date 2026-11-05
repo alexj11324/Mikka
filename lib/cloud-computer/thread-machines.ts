@@ -67,6 +67,15 @@ export class RetainedTaskMachineUnavailable extends ComputerError {
   constructor() { super(503, 'Retained task machine unavailable') }
 }
 
+type FailedThreadStart = Readonly<{ userId: string; workspaceId: string; runId: string; leaseId: string }>
+// Only this module can attest the lease that actually failed. Keep the proof
+// off the original error: callers retain ComputerError semantics, and neither
+// public error fields nor serialized/replayed errors can authorize cleanup.
+const failedThreadStarts = new WeakMap<object, FailedThreadStart>()
+export function threadMachineStartFailure(error: unknown): FailedThreadStart | null {
+  return error && typeof error === 'object' ? failedThreadStarts.get(error) ?? null : null
+}
+
 /**
  * Forgets a thread's lost sandbox so a new one is created for the same thread
  * (orchestration.md § 4): a new operation ID, the running interval closed.
@@ -242,6 +251,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
   let exactQuestionMachine = false
   let retainedSandboxId: string | undefined
   let upgradeRetainedRuntime = false
+  let reservedStartLease = false
   let runtimeRollback: (() => Promise<void>) | undefined
   let verifyRefreshedRuntime: (() => Promise<unknown>) | undefined
   try {
@@ -382,6 +392,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     await client.query(`UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval '15 minutes',
       state=CASE WHEN $3::boolean AND state='running' THEN 'error' ELSE state END WHERE "runId"=$1`, [runId, leaseId, Boolean(retainedSandboxId)])
     await client.query('COMMIT')
+    reservedStartLease = true
     if (exactQuestionMachine) {
       // Provider I/O happens after the lease transaction. A running original VM
       // already has its worker; only a paused VM needs bootstrap after connect.
@@ -609,6 +620,9 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
         AND (r."leaseExpiresAt" IS NULL OR r."leaseExpiresAt"<=now())) THEN 'error' ELSE m.state END,
         "workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "sandboxId"=$4 AND "workerLeaseId"=$5 AND state<>'ended'`, [runId,actor.userId,actor.workspaceId,retainedSandboxId,leaseId]).catch(()=>undefined)
       throw new RetainedTaskMachineUnavailable()
+    }
+    else if (reservedStartLease && error && typeof error === 'object') {
+      failedThreadStarts.set(error, Object.freeze({ userId: actor.userId, workspaceId: actor.workspaceId, runId, leaseId }))
     }
     throw error
   } finally { client.release() }
