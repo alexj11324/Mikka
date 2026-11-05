@@ -14,7 +14,7 @@ if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('Reconcile tests r
 
 const TABLES = ['coordinator_events', 'coordinator_sessions', 'user_schedules', 'schedule_occurrences', 'agent_runs', 'devices', 'cloud_machines',
   'thread_machines', 'issues', 'sandbox_kill_retries', 'group_turns', 'group_task_bindings', 'factory_tasks', 'factory_attempts', 'factory_events',
-  'factory_deliverable_acceptances', 'factory_candidates', 'factory_merges']
+  'factory_deliverable_acceptances', 'factory_candidates', 'factory_merges', 'account_deletion_jobs', 'chat_attachments', 'chat_attachment_retirements']
 
 test('the safety-net check names exactly the jobs with work already due', { skip: !valid }, async t => {
   const schema = `reconcile_due_${randomUUID().replaceAll('-', '')}`
@@ -24,7 +24,7 @@ test('the safety-net check names exactly the jobs with work already due', { skip
   const pool = new Pool({ connectionString: target, options: `-c search_path=${schema}`, max: 2 })
   t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end() })
   const due = () => reconcileDue(pool, { factoryLifecycle: true })
-  const none = { wakes: false, schedules: false, recovery: false }
+  const none = { wakes: false, schedules: false, recovery: false, deletions: false }
   const clear = async () => { for (const table of TABLES) await pool.query(`DELETE FROM ${table}`) }
   const event = (values: string) => pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload,"nextWakeAt","wakeLeaseUntil",tier,"deliveredAt") VALUES ($1,'owner',$2,'user_message',$3,'{}',${values})`, [randomUUID(), randomUUID(), randomUUID()])
 
@@ -64,6 +64,13 @@ test('the safety-net check names exactly the jobs with work already due', { skip
     assert.deepEqual(await due(), none)
     await run(`now()-interval '1 second'`)
     assert.deepEqual(await due(), { ...none, recovery: true })
+    await clear()
+  })
+  await t.test('an account deletion is due once requested; a retired object at its notBefore', async () => {
+    await pool.query(`INSERT INTO chat_attachment_retirements ("storageKey","userId","notBefore") VALUES ('key','owner',now()+interval '5 minutes')`)
+    assert.deepEqual(await due(), none)
+    await pool.query(`INSERT INTO account_deletion_jobs (id,"subjectUserId","subjectEmailHash",stage) VALUES ($1,'subject',$2,'requested')`, [randomUUID(), 'a'.repeat(64)])
+    assert.deepEqual(await due(), { ...none, deletions: true })
     await clear()
   })
 })

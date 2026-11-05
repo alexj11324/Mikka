@@ -131,7 +131,7 @@ test('one minute trigger retains every UTC cadence without duplicate endpoints',
     [15, ['/api/cron/ops-monitor', '/api/cron/briefings']],
     [30, ['/api/cron/ops-monitor', '/api/cron/briefings', '/api/cron/user-facts']],
     [45, ['/api/cron/ops-monitor', '/api/cron/briefings']],
-    [0, ['/api/cron/account-deletions', '/api/cron/audit-retention', '/api/cron/ops-monitor', '/api/cron/subscriptions', '/api/cron/briefings', '/api/cron/suggestions-reconcile']],
+    [0, ['/api/cron/audit-retention', '/api/cron/ops-monitor', '/api/cron/subscriptions', '/api/cron/briefings', '/api/cron/suggestions-reconcile']],
   ]) {
     const { calls, fetcher } = recorder()
     await runSchedule('* * * * *', env, fetcher, Date.UTC(2026, 0, 1, 0, minute))
@@ -150,7 +150,7 @@ test('scheduled dispatch uses the event timestamp even when wall time has advanc
   worker.scheduled({ cron: '* * * * *', scheduledTime: Date.UTC(2026, 0, 1, 0, 0) }, env, { waitUntil: promise => pending.push(promise) })
   await Promise.all(pending)
   assert.deepEqual(calls.map(call => new URL(call.url).pathname.replace('/mikka', '')),
-    [...MINUTE_ENDPOINTS, '/api/cron/account-deletions', '/api/cron/audit-retention', '/api/cron/ops-monitor', '/api/cron/subscriptions', '/api/cron/briefings', '/api/cron/suggestions-reconcile'])
+    [...MINUTE_ENDPOINTS, '/api/cron/audit-retention', '/api/cron/ops-monitor', '/api/cron/subscriptions', '/api/cron/briefings', '/api/cron/suggestions-reconcile'])
 })
 
 test('a complete UTC hour runs each reconciliation sweep and maintenance at its requested cadence', async t => {
@@ -169,7 +169,6 @@ test('a complete UTC hour runs each reconciliation sweep and maintenance at its 
   }
   assert.deepEqual(counts, {
     '/api/cron/reconcile': 4,
-    '/api/cron/account-deletions': 1,
     '/api/cron/audit-retention': 1,
     '/api/cron/subscriptions': 1,
     '/api/cron/ops-monitor': 4,
@@ -181,7 +180,7 @@ test('a complete UTC hour runs each reconciliation sweep and maintenance at its 
 
 test('maintenance failures still wait for every selected endpoint without leaking response content', async t => {
   t.mock.method(console, 'log', () => {})
-  for (const [minute, failedPath] of [[0, '/api/cron/account-deletions'], [0, '/api/cron/audit-retention'], [15, '/api/cron/ops-monitor'], [0, '/api/cron/subscriptions']]) {
+  for (const [minute, failedPath] of [[0, '/api/cron/audit-retention'], [15, '/api/cron/ops-monitor'], [0, '/api/cron/subscriptions']]) {
     const paths = []
     let finishSchedules
     const held = new Promise(resolve => { finishSchedules = resolve })
@@ -195,7 +194,7 @@ test('maintenance failures still wait for every selected endpoint without leakin
     }, Date.UTC(2026, 0, 1, 8, minute)).finally(() => { settled = true })
     const failure = assert.rejects(tick, { message: `${failedPath} answered 503` })
     await new Promise(resolve => setImmediate(resolve))
-    const maintenance = minute === 0 ? ['/api/cron/account-deletions', '/api/cron/audit-retention'] : []
+    const maintenance = minute === 0 ? ['/api/cron/audit-retention'] : []
     const reconcile = minute === 0 ? ['/api/cron/suggestions-reconcile'] : []
     const hourly = minute === 0 ? ['/api/cron/subscriptions'] : []
     assert.deepEqual(paths, [...sweepsAt(minute), ...maintenance, '/api/cron/ops-monitor', ...hourly, '/api/cron/briefings', ...reconcile])
@@ -219,4 +218,11 @@ test('reconciliation sweeps run only at their interval, each within 1-15 minutes
     assert.equal(await runSchedule('* * * * *', env, fetcher, Date.UTC(2026, 0, 1, 0, quiet)), null)
     assert.equal(calls.length, 0)
   }
+})
+
+test('account deletion is no longer swept on a schedule: its due timer and the safety net run it', async t => {
+  t.mock.method(console, 'log', () => {})
+  const { calls, fetcher } = recorder()
+  for (let minute = 0; minute < 60; minute++) await runSchedule('* * * * *', env, fetcher, Date.UTC(2026, 0, 1, 8, minute))
+  assert.equal(calls.filter(call => call.url.endsWith('/api/cron/account-deletions')).length, 0)
 })

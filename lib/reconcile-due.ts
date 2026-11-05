@@ -2,8 +2,9 @@ import type { Pool } from 'pg'
 import { MAX_WAKE_ATTEMPTS } from './coordinator/wake-recovery'
 import { SCHEDULE_DUE_SQL } from './schedules/store'
 import { RUN_RECOVERY_DUE_SQL, runRecoveryDueParams } from './run-recovery-due'
+import { ACCOUNT_DELETIONS_DUE_SQL } from './account-deletions-due'
 
-export type ReconcileDue = { wakes: boolean; schedules: boolean; recovery: boolean }
+export type ReconcileDue = { wakes: boolean; schedules: boolean; recovery: boolean; deletions: boolean }
 
 /**
  * The one safety-net check (#1371), every 15 minutes: which event-driven jobs
@@ -15,6 +16,7 @@ export type ReconcileDue = { wakes: boolean; schedules: boolean; recovery: boole
  * - schedules: any schedule work at or past its due time.
  * - recovery: any run-recovery work due within the minute (items that wait on
  *   outside state are re-checked each minute while they exist).
+ * - deletions: an account deletion, chat file or retired object due for cleanup.
  */
 export async function reconcileDue(pool: Pick<Pool, 'query'>, options: { factoryLifecycle: boolean }): Promise<ReconcileDue> {
   const { rows } = await pool.query<ReconcileDue>(`SELECT
@@ -22,7 +24,8 @@ export async function reconcileDue(pool: Pick<Pool, 'query'>, options: { factory
         AND (tier IS NULL OR tier <> 'background') AND "nextWakeAt" <= now() AND ("wakeLeaseUntil" IS NULL OR "wakeLeaseUntil" <= now()))
       OR EXISTS (SELECT 1 FROM coordinator_sessions WHERE "leaseHolder" LIKE 'wrun\\_%' AND "leaseUntil" > now()) AS wakes,
     coalesce((SELECT min(at) FROM (${SCHEDULE_DUE_SQL}) s) <= now(), false) AS schedules,
-    coalesce((SELECT min(at) FROM (${RUN_RECOVERY_DUE_SQL}) r) <= now() + interval '1 minute', false) AS recovery`,
+    coalesce((SELECT min(at) FROM (${RUN_RECOVERY_DUE_SQL}) r) <= now() + interval '1 minute', false) AS recovery,
+    coalesce((SELECT min(at) FROM (${ACCOUNT_DELETIONS_DUE_SQL}) d) <= now(), false) AS deletions`,
   runRecoveryDueParams(options.factoryLifecycle))
-  return rows[0] ?? { wakes: false, schedules: false, recovery: false }
+  return rows[0] ?? { wakes: false, schedules: false, recovery: false, deletions: false }
 }
