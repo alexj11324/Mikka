@@ -712,7 +712,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       assert.equal(planned.run.agentDefinition.executionIdentity.billingAccount.model.kind, 'subscription')
       assert.equal(planned.run.agentDefinition.executionIdentity.billingAccount.model.ownerId, who.id)
       assert.ok(profileSelections.slice(decisionsBefore).some(choice => choice.stage === 'spec' && choice.profileId === planner.id), 'normal profile selection receives the actual spec stage')
-      if (entry !== 'coordinator') continue
+      if (entry !== 'coordinator') return
 
       const { sendThreadMessage } = await import('../lib/thread-continue')
       const clarification = 'OWNER_PLAN_CONTEXT_1276: keep the original acceptance criteria and the exact final newline in the plan.'
