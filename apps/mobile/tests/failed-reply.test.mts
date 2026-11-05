@@ -47,6 +47,17 @@ test('a rejected model uses the supplied native model menu directly', async () =
   assert.deepEqual(opened, [])
 })
 
+test('API balance opens the existing model choice without offering retry or sending a request', async () => {
+  await act(async () => root.render(createElement(FailedReply, { failure: { kind: 'failed', reason: 'balance' }, botId: 'fixture-bot', onQueued: () => {}, modelChoice: createElement('button', { onClick: () => { picks++ } }, 'fixture-native-menu') })))
+  assert.match(container.textContent ?? '', /API 余额不足/)
+  assert.doesNotMatch(container.textContent ?? '', /重试|充值|request_id|doStreamStep/)
+  assert.equal(container.querySelectorAll('button').length, 1)
+  await click()
+  assert.equal(picks, 1)
+  assert.equal(calls, 0)
+  assert.deepEqual(opened, [])
+})
+
 test('retry keeps explicit processing feedback and rejects a burst of duplicate taps', async () => {
   let finish!: (value: unknown) => void
   reply = () => new Promise(resolve => { finish = resolve })

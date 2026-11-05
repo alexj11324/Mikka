@@ -56,7 +56,7 @@ export function IssuePrefixSettings() {
             onChange={event => setValue(event.target.value.replace(/[^a-z]/gi, '').toUpperCase())}
             onKeyDown={event => { if (event.key === 'Escape' && state) setValue(null) }} />
         </Field>
-        {message && <p role={message.kind === 'error' ? 'alert' : 'status'} className={cn('px-5 pb-4 text-sm', message.kind === 'error' ? 'text-destructive' : 'text-success-foreground')}>{message.text}</p>}
+        {message && <p role={message.kind === 'error' ? 'alert' : 'status'} className={cn('px-5 pb-4 text-sm', message.kind === 'error' ? 'text-destructive-foreground' : 'text-success-foreground')}>{message.text}</p>}
       </FieldGroup>
     </form>
   </SettingsSection>

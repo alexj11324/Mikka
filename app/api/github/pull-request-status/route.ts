@@ -11,6 +11,14 @@ const canonicalUrl = (url: string) => url.replace(/\/$/, '').toLowerCase()
 const headers = { 'Cache-Control': 'private, no-store' }
 const fail = (error: string, status: number) => NextResponse.json({ error }, { status, headers })
 
+/** The viewer's channel for this task, or null (the badge then reads on its slow fallback only). */
+async function liveWorkspace(issueId: string, viewerId: string) {
+  try {
+    const [{ documentLiveWorkspace }, { pool }, { workspacePool }] = await Promise.all([import('@/lib/live/panels'), import('@/lib/db'), import('@/lib/workspace-db')])
+    return await documentLiveWorkspace(pool, workspacePool, issueId, viewerId)
+  } catch { return null }
+}
+
 async function handlePOST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
   noteLogUser(session?.user?.id)
@@ -25,8 +33,10 @@ async function handlePOST(request: Request) {
   try {
     const pr = await readAuthorizedPullRequest(request.headers, linked.url)
     if (pr.userId !== session.user.id) return fail('authRequired', 401)
-    // GitHub data is returned only to this viewer, never persisted in shared metadata.
-    return NextResponse.json({ viewerId: session.user.id, url: pr.url, state: pr.state, updatedAt: pr.updatedAt }, { headers })
+    // GitHub data is returned only to this viewer, never persisted in shared metadata. The task's live
+    // channel (#1212) says when a webhook changed a delivered PR, so the badge asks again.
+    const live = await liveWorkspace(input.data.issueId, session.user.id)
+    return NextResponse.json({ viewerId: session.user.id, url: pr.url, state: pr.state, updatedAt: pr.updatedAt, live: { workspaceId: live } }, { headers })
   } catch (error) {
     return error instanceof GitHubAccessError ? fail(error.code, error.status) : fail('githubUnavailable', 502)
   }

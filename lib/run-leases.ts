@@ -1,3 +1,4 @@
+import { runChanged } from './live/panels'
 import 'server-only'
 import { runListChanged } from './live/lists'
 import { rebindExecutionDevice, revalidateExecutionIdentity, ExecutionIdentityError } from './execution-identity'
@@ -6,7 +7,7 @@ import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { retryWorkerDefinition } from '@/lib/agent-kit/worker'
-import { after } from 'next/server'
+import { afterJob } from '@/lib/background'
 import { and, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { DEVICE_ONLINE_WINDOW_MS, RUN_LEASE_MS, type RunCheckpoint } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
@@ -23,6 +24,10 @@ import { notifyDeviceWork } from '@/lib/device-gateway-notify'
 import { deviceOnlineStates } from '@/lib/device-presence'
 import { ownE2BKeySql } from './secrets/e2b-owner-sql'
 import { readmitLostLocalRun, type AdmittedTakeover, type CloudRecoverySource } from './run-repository-retry'
+import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
+import { subscriptionPreflightSchema } from '@mikka/protocol/harness'
+import type { RunReport } from '@mikka/protocol/run'
+import messages from '@/messages/zh-CN.json'
 
 const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -69,7 +74,7 @@ export async function renewRunLeases(deviceId: string, runIds: readonly string[]
       if (!(error instanceof ExecutionIdentityError)) throw error
       // The daemon receives revoked on this heartbeat and removes injected credentials.
       const stopped = await db.update(agentRuns).set({ stopRequestedAt: now, leaseExpiresAt: now, updatedAt: now }).where(and(eq(agentRuns.id, run.id), eq(agentRuns.deviceId, deviceId), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]))).returning({ id: agentRuns.id })
-      if (stopped.length && !run.stopRequestedAt) await runListChanged(db, run.id)
+      if (stopped.length && !run.stopRequestedAt) { await runListChanged(db, run.id); await runChanged(db, run.id) }
     }
   }
   const renewed = authorized.length ? await db.update(agentRuns)
@@ -120,7 +125,7 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
     if (target) {
       const moved = await db.update(agentRuns).set({ deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, agentDefinition: await rebindExecutionDevice(pool, run, target.deviceId), updatedAt: now })
         .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt))).returning({ id: agentRuns.id })
-      if (moved.length) await runListChanged(db, run.id)
+      if (moved.length) { await runListChanged(db, run.id); await runChanged(db, run.id) }
       notifyDeviceWork(target.deviceId)
       continue
     }
@@ -162,7 +167,7 @@ async function takeoverTarget(run: { id: string; userId: string; agentId: string
     ? await db.select({ id: agents.id, deviceId: agents.deviceId }).from(agents).where(and(eq(agents.userId, run.userId), eq(agents.harness, agent.harness), inArray(agents.deviceId, candidates.map(candidate => candidate.deviceId)))).orderBy(agents.id)
     : []
   if (run.agentDefinition?.repositoryAdmission) candidates = candidates.filter(candidate => registered.some(agent => agent.deviceId === candidate.deviceId))
-  const target = pickTakeover(run.agentDefinition?.subscription ? candidates.filter(candidate => candidate.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) : candidates, { remoteUrl: repo.remoteUrl, harness, lostDeviceId: run.deviceId })
+  const target = pickTakeover(run.agentDefinition?.subscription ? candidates.filter(candidate => candidate.harnesses.some(info => info.harness === harness && info.subscriptionBroker && !info.subscriptionPreflight)) : candidates, { remoteUrl: repo.remoteUrl, harness, lostDeviceId: run.deviceId })
   if (!target) return null
   const targetRepo = await ensureDeviceRepository(run.userId, target.deviceId, repo.remoteUrl)
   return { ...target, deviceRepoId: targetRepo.id, agentId: registered.find(agent => agent.deviceId === target.deviceId)?.id ?? run.agentId }
@@ -258,6 +263,7 @@ async function reclaimLostRun(run: Run, now: Date) {
       .returning({ id: agentRuns.id })
     if (!ended) return false
     await runListChanged(tx, run.id)
+    await runChanged(tx, run.id)
     if (cloud) return true
     await tx.insert(agentRuns).values({
       id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
@@ -266,6 +272,7 @@ async function reclaimLostRun(run: Run, now: Date) {
       prompt: recovery.prompt, attempt: outcome.attempt, retryOf: run.id,
     })
     await runListChanged(tx, retryId)
+    await runChanged(tx, retryId)
     if (bound) {
       // Same thread, new sandbox: the retry gets its own thread machine, built from the workspace snapshot.
       await tx.execute(sql`insert into computer_run_bindings ("runId","botId","workspaceId","ownerId") select ${retryId},"botId","workspaceId","ownerId" from computer_run_bindings where "runId"=${run.id} and "ownerId"=${run.userId}`)
@@ -429,6 +436,7 @@ export async function failUnclaimedCloudStart(actor: { userId: string; workspace
     await recordCoordinatorEvent(tx, { ...event, payload: { ...event.payload, noMachine } })
     // The terminal row changed even when its durable completion event already exists.
     await runListChanged(tx, ended.id)
+    await runChanged(tx, ended.id)
     return ended
   })
   if (!failed) return false
@@ -484,6 +492,43 @@ export async function failRunForDaemonUpgrade(runId: string, deviceId: string, u
   return true
 }
 
+/** A queued subscription must not wait forever after its device loses the
+ * broker. Read the current report under lock: a stale claim snapshot cannot
+ * fail a device that already recovered. A claim, stop or newer assignment wins. */
+export async function failQueuedSubscriptionRuntime(runId: string, deviceId: string, userId: string,
+  expected: { harness: 'codex' | 'claude_code'; bindingId: string }, now = new Date()): Promise<boolean> {
+  const ended = await db.transaction(async tx => {
+    const [device] = await tx.select().from(devices).where(and(eq(devices.id, deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'), eq(devices.enabled, true), isNull(devices.removedAt))).for('update')
+    if (!device) return null
+    const info = device.harnesses.find(item => item.harness === expected.harness)
+    if (info?.installed && info.toolApproval && info.subscriptionBroker && !info.subscriptionPreflight) return null
+    const detail = subscriptionPreflightSchema.safeParse(info?.subscriptionPreflight).data ?? (!info?.installed ? 'cli_missing' : 'adapter_start_failed')
+    const error = new CodedError('subscription_local_runtime_unavailable', { detail })
+    const summary = messages.RunErrors.subscription_local_runtime_unavailable[detail ?? 'default']
+    const report: RunReport = { summary, filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null }
+    const [run] = await tx.update(agentRuns).set({ status: 'failed', pauseReason: null, resumeStatus: null, stopReason: 'error', error: error.message,
+      report, finishedAt: now, updatedAt: now })
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.userId, userId), eq(agentRuns.status, 'queued'),
+        isNull(agentRuns.startedAt), isNull(agentRuns.sessionId), isNull(agentRuns.stopRequestedAt), or(isNull(agentRuns.leaseExpiresAt), lt(agentRuns.leaseExpiresAt, now)),
+        sql`EXISTS (SELECT 1 FROM agents a WHERE a.id=${agentRuns.agentId} AND a."userId"=${userId}
+          AND coalesce(${agentRuns.agentDefinition}->>'harness',a.harness)=${expected.harness})`,
+        // Current snapshots pin their subscription; legacy snapshots are null
+        // and the authenticated claim supplied their resolved binding above.
+        sql`(${agentRuns.agentDefinition} IS NULL OR (${agentRuns.agentDefinition}->'apiKey' IS NULL
+          AND ${agentRuns.agentDefinition}->'subscription'->>'bindingId'=${expected.bindingId}))`))
+      .returning()
+    if (!run) return null
+    await recordCoordinatorEvent(tx, runFinishedEvent({ ...run, stopReason: 'error', report }))
+    await runListChanged(tx, run.id)
+    await runChanged(tx, run.id)
+    return { run, error }
+  })
+  if (!ended) return false
+  logCodedError(ended.error, { runId, harness: expected.harness })
+  await announceEnd({ ...ended.run, status: 'failed' })
+  return true
+}
+
 /** The run error a too-old daemon leaves (lib/coordinator/context.ts tells the person to update). */
 export const DAEMON_UPGRADE_REQUIRED = 'Mikka on this device needs an update.'
 
@@ -492,5 +537,5 @@ async function announceEnd(run: Run & { status: 'failed' | 'stopped' }) {
   await revokeRunTokens(run.id)
   stopRecordingsAfter([run.id])
   await afterRunEnded(run.userId, run.id)
-  after(() => wakeCoordinator(run.userId))
+  afterJob('after:coordinator-wake', () => wakeCoordinator(run.userId))
 }

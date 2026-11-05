@@ -1,3 +1,5 @@
+import messages from '@/messages/en.json'
+
 /**
  * What the Bot knows each turn about where the person's work can run, so it
  * never asks for something they already set up: the workspace, their
@@ -27,9 +29,10 @@ export type ExecutionContextSource = { [Key in keyof ExecutionFacts]: (userId: s
 const AGENT: Record<string, string> = { claude_code: 'Claude Code', codex: 'Codex' }
 const agentName = (harness: string) => AGENT[harness] ?? harness
 /** Why a server or computer cannot run a model, from what its daemon reported. */
-const WHY: Record<'notInstalled' | 'modelNotReported' | 'needsUpdate' | 'ready', string> = {
+const WHY: Record<'notInstalled' | 'modelNotReported' | 'needsUpdate' | 'subscriptionRuntimeUnavailable' | 'ready', string> = {
   ready: '',
   notInstalled: 'Agent not installed', modelNotReported: 'its daemon did not report this model', needsUpdate: 'its Mikka is too old to report its models',
+  subscriptionRuntimeUnavailable: messages.RunErrors.subscription_local_runtime_unavailable.default,
 }
 
 const scopeFor = async (userId: string, botId: string) => ({ ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, botId) })
@@ -46,7 +49,7 @@ const source: ExecutionContextSource = {
     return (await poolDevices(pool, userId)).map(device => ({ name: device.name, online: device.online, enabled: device.enabled, agents: device.harnesses.filter(item => item.installed).map(item => agentName(item.harness)) }))
   },
   order: async (userId, botId) => {
-    const [{ pool }, { orderView, poolDevices }] = await Promise.all([import('@/lib/db'), import('@/lib/model-order')])
+    const [{ pool }, { dispatchOrder, orderView, poolDevices }] = await Promise.all([import('@/lib/db'), import('@/lib/model-order')])
     const [view, devices] = await Promise.all([orderView(pool, await scopeFor(userId, botId)), poolDevices(pool, userId)])
     const credentials = new Map(view.candidates.map(candidate => [`${candidate.source.kind}:${candidate.provider}`, { kind: candidate.source.kind, provider: candidate.provider }]))
     // Where each model can run: the person's own E2B cloud when it takes runs, and each server or computer whose daemon
@@ -55,10 +58,14 @@ const source: ExecutionContextSource = {
     const label = (device: (typeof devices)[number]) => `${device.name} (${device.server ? 'server' : 'computer'})`
     const support = (entry: (typeof view.entries)[number]) => devices.map(device => ({ device, stage: deviceSupport(device, entry) }))
     const places = (entry: (typeof view.entries)[number]) => [...(view.cloudReady && view.cloudModels[entry.id] === 'ready' ? ['cloud'] : []), ...support(entry).filter(item => item.stage === 'ready').map(item => label(item.device)).sort()]
-    const unsupported = (entry: (typeof view.entries)[number]) => support(entry).filter(item => item.stage !== 'ready').map(item => `${label(item.device)}: ${WHY[item.stage]}`).sort()
+    const unsupported = (entry: (typeof view.entries)[number]) => support(entry).filter(item => item.stage !== 'ready').map(item => {
+      const detail = item.stage === 'subscriptionRuntimeUnavailable' ? item.device.harnesses.find(info => info.harness === entry.harness)?.subscriptionPreflight : undefined
+      return `${label(item.device)}: ${detail ? messages.RunErrors.subscription_local_runtime_unavailable[detail] : WHY[item.stage]}`
+    }).sort()
     return {
       location: view.location,
-      entries: view.entries.map(entry => ({ harness: entry.harness, agent: agentName(entry.harness), model: entry.model, source: entry.source.kind, provider: entry.provider, places: places(entry), unsupported: unsupported(entry), block: entry.block?.reason ?? null })),
+      // In the order a new thread tries them: the 优先使用的 Agent's list, then the other's (decision 2026-11-05-0400).
+      entries: dispatchOrder(view.entries, view.preferredHarness).map(entry => ({ harness: entry.harness, agent: agentName(entry.harness), model: entry.model, source: entry.source.kind, provider: entry.provider, places: places(entry), unsupported: unsupported(entry), block: entry.block?.reason ?? null })),
       credentials: [...credentials.values()],
     }
   },

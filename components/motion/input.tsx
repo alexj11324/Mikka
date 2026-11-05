@@ -228,7 +228,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
               }
               transition={{ duration: 0.2 }}
               className={cn(
-                "px-1 text-xs text-destructive",
+                "px-1 text-xs text-destructive-foreground",
                 classNames?.errorMessage,
               )}
             >

@@ -99,6 +99,17 @@ export function threadQuestionView(thread: { id: string; status: string; outcome
   return { question, waiting: question === 'waiting', status: question === 'resuming' ? 'running' : live.status, outcome: live.outcome ?? null, runId: live.id, stopping: runIsActive(live.status) && live.stopping }
 }
 
+/** Human acceptance resolves only its current candidate's still-waiting producer.
+ * This is a display value; run outcomes, historical checks and send authority stay intact. */
+export function acceptedProducerOutcome(thread: Pick<IssueThread, 'id' | 'status' | 'outcome' | 'stopping' | 'question' | 'questionWake' | 'continuation' | 'latestRunId'>,
+  issueId: string | null, tasks: readonly { issueId: string; stage: string; status: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean }[]) {
+  const view = threadQuestionView(thread)
+  if (!issueId || view.status !== 'succeeded' || view.question || thread.questionWake || thread.stopping || thread.continuation?.stopping ||
+    view.runId !== thread.latestRunId || (view.outcome !== null && view.outcome !== 'needs_input')) return view.outcome
+  return tasks.some(task => task.issueId === issueId && task.stage === 'approval' && task.status === 'passed' &&
+    !task.isSkillCandidate && !!task.candidateId && task.candidateRunId === thread.latestRunId) ? 'done' : view.outcome
+}
+
 /** When the row last changed, never after `now`: clock skew with the server must not read as 「1秒钟后」. */
 export function threadTime(thread: { createdAt: Date; finishedAt: Date | null }, now: Date) {
   return new Date(Math.min(now.getTime(), new Date(thread.finishedAt ?? thread.createdAt).getTime()))

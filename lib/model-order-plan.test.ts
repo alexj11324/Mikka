@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { agentsByOffer, defaultOrder, deviceModel, onPreferredAgent, pickDevice, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
+import { agentsByOffer, defaultOrder, deviceModel, dispatchOrder, onPreferredAgent, pickDevice, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
 
 // Model names here are fixtures standing for what a CLI or provider reported.
 const sub = (id: string, harness: OrderEntry['harness'], model: string, connectionId = `conn-${harness}`): OrderEntry => ({ id, harness, model, source: { kind: 'subscription', connectionId } })
@@ -88,6 +88,18 @@ test('no computer can run it: the reason comes from the computer closest to runn
   assert.deepEqual(whyNoDevice([device('box', { online: false }), codexOnly('mac')], opus), { why: 'notInstalled', device: 'mac', count: 1 })
   assert.deepEqual(whyNoDevice([codexOnly('mac'), old('MacBook Pro')], opus), { why: 'needsUpdate', device: 'MacBook Pro', count: 1 })
   assert.deepEqual(whyNoDevice([old('a'), old('b'), device('c', { enabled: false })], opus), { why: 'needsUpdate', device: 'a', count: 2 })
+})
+
+test('failed subscription preflight is actionable and overrides a stale broker flag without blocking API-key runs', () => {
+  for (const detail of ['env_not_clean', 'cli_missing', 'cli_version_mismatch', 'adapter_start_failed'] as const) {
+    const failed = device('checked computer', { harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true, subscriptionPreflight: detail, models: [first.model] }] })
+    assert.equal(deviceModel(failed, first), null)
+    assert.deepEqual(whyNoDevice([failed], first), { why: 'subscriptionRuntimeUnavailable', detail, device: 'checked computer', count: 1 })
+    const plan = planDispatch({ entries: [first], location: 'local', devices: [failed], credential: usable, cloudReady: false })
+    assert.equal(plan.kind, 'none')
+    assert.equal(deviceModel(failed, keyed), keyed.model)
+    assert.equal(deviceModel({ ...failed, harnesses: failed.harnesses.map(info => ({ ...info, subscriptionPreflight: undefined })) }, first), first.model)
+  }
 })
 
 test('本地 order: a server before a computer, then the fewest unfinished runs, then the one that joined first; the same input gives the same device', () => {
@@ -207,4 +219,14 @@ test('a configured cloud without measured template models cannot take a subscrip
   const plan = planDispatch({ entries: [first], location: 'cloudOnly', devices: [], credential: usable, cloudReady: true })
   assert.equal(plan.kind, 'none')
   assert.equal(plan.kind === 'none' && plan.reason, 'cloudModelsUnknown')
+})
+
+test('dispatch order: the 优先使用的 Agent\'s list first, then the other\'s, each keeping its own order (decision 2026-11-05-0400)', () => {
+  const rows = [{ id: 'codex-a', harness: 'codex' as const }, { id: 'claude-x', harness: 'claude_code' as const }, { id: 'codex-b', harness: 'codex' as const }, { id: 'claude-y', harness: 'claude_code' as const }]
+  assert.deepEqual(dispatchOrder(rows, 'claude_code').map(row => row.id), ['claude-x', 'claude-y', 'codex-a', 'codex-b'])
+  assert.deepEqual(dispatchOrder(rows, 'codex').map(row => row.id), ['codex-a', 'codex-b', 'claude-x', 'claude-y'])
+  // One Agent only, or nothing: unchanged; the input is never reordered in place.
+  assert.deepEqual(dispatchOrder(rows.filter(row => row.harness === 'codex'), 'claude_code').map(row => row.id), ['codex-a', 'codex-b'])
+  assert.deepEqual(dispatchOrder([], 'codex'), [])
+  assert.deepEqual(rows.map(row => row.id), ['codex-a', 'claude-x', 'codex-b', 'claude-y'])
 })

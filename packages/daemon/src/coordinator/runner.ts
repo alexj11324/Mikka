@@ -1,6 +1,5 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
-import { setTimeout as delay } from "node:timers/promises"
 import { z } from "zod"
 import type { HarnessInfo, NativeCoordinatorJob } from "@mikka/protocol"
 import type { ServerLink } from "../server-link"
@@ -14,6 +13,32 @@ import type { AgentSandbox } from "../agents/sandbox"
 import { runClaudeCoordinator } from "./claude"
 import { CODEX_COORDINATOR_APPROVAL_POLICY, runCodexCoordinator } from "./codex"
 import type { CoordinatorTool } from "./contract"
+import type { DeviceWorkSignal } from "../device-work-signal"
+
+/** Against a server that does not push tool results: ask every 500 ms, as before. */
+export const TOOL_RESULT_LEGACY_MS = 500
+/** The server pushes results, but the gateway is down: ask this often. */
+export const TOOL_RESULT_FALLBACK_MS = 5_000
+/** With push, re-ask only this often, in case a push was lost. */
+export const TOOL_RESULT_PUSH_SAFETY_MS = 15_000
+
+/** Waits for a host tool's result: on the gateway push the server sends when it
+ * writes the result (#1212), with a timer only for an older server, a closed
+ * socket, or a lost push. */
+export async function awaitToolResult(read: () => Promise<{ status: "done"; output?: unknown } | { status: "pending" }>, signal: AbortSignal, pushes?: DeviceWorkSignal) {
+  while (!signal.aborted) {
+    const answer = await read()
+    if (answer.status === "done") return answer.output
+    const mode = pushes?.mode("coordinatorResults") ?? "legacy"
+    if (pushes && mode !== "legacy") await pushes.next(mode === "push" ? TOOL_RESULT_PUSH_SAFETY_MS : TOOL_RESULT_FALLBACK_MS, signal)
+    else await new Promise<void>(resolve => {
+      const done = () => { clearTimeout(timer); signal.removeEventListener("abort", done); resolve() }
+      const timer = setTimeout(done, TOOL_RESULT_LEGACY_MS)
+      signal.addEventListener("abort", done, { once: true })
+    })
+  }
+  signal.throwIfAborted()
+}
 
 export function coordinatorCapable(info: HarnessInfo): boolean {
   if (!info.installed) return false
@@ -32,6 +57,8 @@ interface RunnerOptions {
   log: Logger
   codexBinary?: string
   claudeBinary?: string
+  /** Gateway pushes; without them a tool result is asked for every 500 ms. */
+  pushes?: DeviceWorkSignal
 }
 
 /** A claimed personal-assistant turn has no repository, worktree or handoff. */
@@ -53,12 +80,7 @@ export async function runNativeCoordinatorJob(job: NativeCoordinatorJob, options
       return { name: spec.name, description: spec.description, inputSchema: schema.shape,
         execute: async (input, context) => {
           await submit(deviceId,job.id,{ type: "tool",callId: context.callId,name: spec.name,input },context.signal)
-          while (!context.signal.aborted) {
-            const answer = await result(deviceId,job.id,context.callId,context.signal)
-            if (answer.status === "done") return answer.output
-            await delay(500,undefined,{ signal: context.signal })
-          }
-          context.signal.throwIfAborted()
+          return awaitToolResult(() => result(deviceId,job.id,context.callId,context.signal), context.signal, options.pushes)
         },
       }
     })

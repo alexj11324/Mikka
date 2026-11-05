@@ -3,14 +3,14 @@ import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { readFile, readdir } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { after, mock, test } from 'node:test'
+import { after, before, mock, test } from 'node:test'
 import { Pool } from 'pg'
 import { sql } from 'drizzle-orm'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { captureDatabaseQuery, observePoolCommits } from '../db/commit-effects'
-import { groupListTargets, issueListTargets, issueListScopesBeforeChange, issueListScopeChanged, ownerListTargets, runListChanged, runListTargets, workspaceListTargets } from './lists'
+import { groupListTargets, issueListTargets, issueListScopesBeforeChange, issueListScopeChanged, ownerListTargets, ownerSettingsTargets, runListChanged, runListTargets, workspaceListTargets } from './lists'
 import { liveChannelId, type LiveScope } from './scope'
 import type { LiveInvalidation } from './events'
 
@@ -19,6 +19,17 @@ if (process.env.REQUIRE_DB === '1') assert.ok(url, 'actual isolated PostgreSQL r
 if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 const scheduled: (() => Promise<void>)[] = []
 mock.module('next/server', { namedExports: { after: (work: () => Promise<void>) => { scheduled.push(work) } } })
+// The same writers also wake task/thread detail panels with their run, thread
+// or document IDs, bot chats with their bot IDs and group pages with their group
+// IDs; panels.db.test.ts, chats.db.test.ts and groups.db.test.ts cover those keys.
+// Here count list keys only.
+before(async () => {
+  for (const file of ['./panels.ts', './chats.ts', './groups.ts']) {
+    const actual = await import(file)
+    mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(Object.entries(actual).map(([name, value]) =>
+      [name, name.endsWith('ScopesBeforeChange') ? async () => [] : name.endsWith('Changed') ? async () => {} : value])) })
+  }
+})
 after(() => mock.restoreAll())
 
 test('real PG: lists retain their reader scope and publish only the originating committed writes', { skip: !url, timeout: 180_000 }, async t => {
@@ -117,6 +128,21 @@ test('real PG: lists retain their reader scope and publish only the originating 
       assert.deepEqual(new Set(clearing.map(value => value.scope.ownerId)), new Set(['owner', 'peer']))
       assert.ok(clearing.every(value => value.events.every(event => event.kind === 'group_list' && event.id === team)))
       assert.deepEqual((await groupListTargets(database, database, groupId, 'foreign')).map(value => value.scope.ownerId), ['owner'], 'a caller cannot invent prior group membership')
+    })
+
+    await t.test('模型与订阅 pushes model_settings to the account in its workspaces, and to teammates only where it shares', async () => {
+      const audience = async () => (await ownerSettingsTargets(database, database, 'owner')).map(value => `${value.scope.ownerId}@${value.scope.workspaceId === home ? 'home' : 'team'}:${value.events.map(event => event.kind).join(',')}`).sort()
+      // Not shared: only the account itself, in each workspace it is an active member of; never the app-wide workspace_settings.
+      assert.deepEqual(await audience(), ['owner@home:model_settings', 'owner@team:model_settings'])
+      // 分享我的订阅给团队成员 on in the team: its active members too (not the suspended one, not the home's peer).
+      await database.query(`INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ('owner',$1,true)`, [team])
+      assert.deepEqual(await audience(), ['foreign@team:model_settings', 'no-home@team:model_settings', 'owner@home:model_settings', 'owner@team:model_settings', 'peer@team:model_settings'])
+      // An admin who does not allow sharing subscriptions: back to the account alone.
+      await database.query(`INSERT INTO workspace_personal_policies ("workspaceId",subscriptions) VALUES ($1,false)`, [team])
+      assert.deepEqual(await audience(), ['owner@home:model_settings', 'owner@team:model_settings'])
+      await database.query('DELETE FROM workspace_personal_policies WHERE "workspaceId"=$1', [team])
+      await database.query('DELETE FROM workspace_subscription_shares WHERE "ownerId"=\'owner\'')
+      assert.deepEqual(await ownerSettingsTargets(database, database, 'no-such-account'), [])
     })
 
     await t.test('issue lists retain personal/unlinked visibility; body saves do not invalidate unrelated chat/run summaries', async () => {

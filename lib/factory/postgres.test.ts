@@ -1,3 +1,4 @@
+import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { factoryTestLifecycle } from "../../tests/helpers/factory-test-authority";
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
@@ -13,7 +14,7 @@ import {
   type FactoryChange,
 } from "./contract";
 import { handleFactory } from "./http";
-import { createFactoryStore, type FactoryTask } from "./store";
+import { type FactoryTask } from "./store";
 import { createFactoryDispatch } from "./dispatch";
 import { factoryDispatchDatabase } from "./transaction";
 import { createExecutionClaim } from "./execution-claim";

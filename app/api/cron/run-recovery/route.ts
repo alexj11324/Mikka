@@ -1,11 +1,11 @@
 import { cronUnauthorized } from '@/lib/cron-auth'
+import { afterJob, cronJob } from '@/lib/background'
 import { sweepExpiredRunLeases } from '@/lib/run-leases'
 import { reconcileCloudMachines } from '@/lib/computer/reconcile'
 import { pool } from '@/lib/db'
 import { judgePendingOutcomes } from '@/lib/run-outcome-judge'
 import { endClosedTaskMachines } from '@/lib/cloud-computer/thread-machines'
 import { retrySandboxKills } from '@/lib/cloud-computer/workspace-teardown'
-import { after } from 'next/server'
 import { resumePendingGroupTurns } from '@/lib/group-conversations-route'
 
 export const runtime = 'nodejs'
@@ -14,7 +14,7 @@ export const maxDuration = 300
 const headers = { 'cache-control': 'no-store' }
 
 /** The existing cron Worker calls this independently of owner/device requests. */
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const refused = await cronUnauthorized(request); if (refused) return refused
   try {
     const runs = await sweepExpiredRunLeases()
@@ -30,8 +30,10 @@ export async function GET(request: Request) {
     const tasks = await (await import('@/lib/factory/watchdog')).sweepFactoryWatchdog(pool).catch(() => null)
     // Group turns left queued when their request ended: they no longer wait for someone to read the group.
     const started = Date.now()
-    after(() => resumePendingGroupTurns(started + 220000).catch(() => console.error('Group turn sweep failed')))
+    afterJob('cron:run-recovery/group-turns', () => resumePendingGroupTurns(started + 220000).catch(() => console.error('Group turn sweep failed')))
     return Response.json({ ...runs, machines, outcomes, taskMachines, sandboxKills, tasks }, { headers })
   }
   catch { return Response.json({ error: 'runRecoverySweepFailed' }, { status: 502, headers }) }
 }
+
+export const GET = cronJob('run-recovery', handleGET)

@@ -3,6 +3,7 @@ import type { PoolClient } from "pg";
 import type { RunReport } from "@mikka/protocol/run";
 import {
   FactoryError,
+  factoryFlowVersion,
   type FactoryBinding,
   type FactoryEvidence,
 } from "./contract";
@@ -234,11 +235,13 @@ export async function reconcileFactoryCheck(
       factoryEventId("check-advance", run.id),
       {
         action: "advance",
-        stage: task.stage === "review" ? "verify" : "approval",
+        stage: task.stage === "review" && factoryFlowVersion(task) === 1 ? "verify" : "approval",
         reason:
-          task.stage === "review"
-            ? "Candidate awaits a separate verification session"
-            : "Independent review and verification passed; existing authorization gate pending",
+          factoryFlowVersion(task) === 2
+            ? "Review complete; the candidate and implementation validation are ready for the person"
+            : task.stage === "review"
+              ? "Candidate awaits a separate verification session"
+              : "Independent review and verification passed; existing authorization gate pending",
       },
       tx,
     );

@@ -13,15 +13,24 @@ function query(columns){
 }
 function update(value){
   const table=value[Object.getOwnPropertySymbols(value).find(s=>s.description==='drizzle:Name')]
-  return {set(values){return {async where(condition){
-    const p=globalThis.claimResponseProbe;(p.updates??=[]).push({table,values:{...values}})
-    await p.beforeUpdate?.(table,values)
-    // Evaluate the route's real WHERE (column = value conjuncts) against the in-memory run.
-    const rendered=new PgDialect().sqlToQuery(condition)
-    const terms=[...rendered.sql.matchAll(/"agent_runs"\\."(\\w+)" = \\$(\\d+)/g)]
-    if(rendered.sql.replace(/"agent_runs"\\."\\w+" = \\$\\d+|[() ]|and/g,'')!=='')throw new Error('unsupported claim WHERE: '+rendered.sql)
-    const same=(a,b)=>a instanceof Date||b instanceof Date?a!=null&&b!=null&&new Date(a).getTime()===new Date(b).getTime():a===b
-    if(table==='agent_runs'&&terms.every(([,column,index])=>same(p.run[column],rendered.params[Number(index)-1])))Object.assign(p.run,values)
+  return {set(values){return {where(condition){
+    const execute=async()=>{
+      const p=globalThis.claimResponseProbe;(p.updates??=[]).push({table,values:{...values}})
+      await p.beforeUpdate?.(table,values)
+      // Evaluate the route's actual equality and NULL predicates; unsupported
+      // expressions must not turn a rejected CAS into a fixture success.
+      const rendered=new PgDialect().sqlToQuery(condition)
+      const terms=[...rendered.sql.matchAll(/"agent_runs"\\."(\\w+)" = \\$(\\d+)/g)]
+      const nulls=[...rendered.sql.matchAll(/"agent_runs"\\."(\\w+)" is null/g)]
+      if(rendered.sql.replace(/"agent_runs"\\."\\w+" = \\$\\d+|"agent_runs"\\."\\w+" is null|[() ]|and/g,'')!=='')throw new Error('unsupported claim WHERE: '+rendered.sql)
+      const same=(a,b)=>a instanceof Date||b instanceof Date?a!=null&&b!=null&&new Date(a).getTime()===new Date(b).getTime():a===b
+      const changed=table==='agent_runs'&&terms.every(([,column,index])=>same(p.run[column],rendered.params[Number(index)-1]))&&nulls.every(([,column])=>p.run[column]==null)
+      if(changed)Object.assign(p.run,values)
+      return changed?[{id:p.run.id}]:[]
+    }
+    let result
+    const once=()=>result??=execute()
+    return {then(resolve,reject){return once().then(()=>undefined).then(resolve,reject)},returning(){return once()}}
   }}}}
 }
 export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
@@ -54,6 +63,7 @@ const sources = new Map([
       const p=globalThis.claimResponseProbe;const tx=claimTransaction()
       if(typeof beforeClaim!=="function"||typeof afterClaim!=="function")throw new Error("claim callbacks missing")
       if(await beforeClaim(tx)===false)return "unavailable"
+      if(p.claimError){p.preparation.push("claim-rejected");throw p.claimError}
       p.preparation.push("claim");p.run.status="preparing";p.run.leaseExpiresAt=lease
       await afterClaim(tx);return "claimed"
     }
@@ -61,13 +71,15 @@ const sources = new Map([
       const p=globalThis.claimResponseProbe;const tx=claimTransaction()
       if(!p.cloud)throw new Error("unexpected cloud claim")
       if(await beforeClaim(tx)===false)return null
+      if(p.claimError){p.preparation.push("claim-rejected");throw p.claimError}
       p.preparation.push("claim");p.run.status="preparing";p.run.leaseExpiresAt=lease
       await afterClaim(tx);return {botId:"bot",ownerId:"member",display:":1",policyVersion:1,permission:"ask"}
     }
   `],
   ['/lib/computer/native-run-binding.ts', 'export async function nativeRunBinding(){return globalThis.claimResponseProbe.cloud.subscription}'],
   ['/lib/secrets/runtime.ts', 'export function remoteRepositoryRef(url){return url};export async function taskSecretInjection(...args){const p=globalThis.claimResponseProbe;p.preparation.push("secrets");(p.secretReads??=[]).push(args);return p.secretInjection??{env:{},secretNames:[]}}'],
-  ['/lib/run-leases.ts', 'export async function latestCheckpoint(){const p=globalThis.claimResponseProbe;p.preparation.push("checkpoint");return structuredClone(p.checkpoint)};export async function failRunForDaemonUpgrade(){throw new Error("unexpected daemon upgrade refusal")}'],
+  ['/lib/run-completion-effects.ts', 'export async function afterRunEnded(ownerId,runId){const p=globalThis.claimResponseProbe;(p.endedRuns??=[]).push({ownerId,runId})}'],
+  ['/lib/run-leases.ts', 'export async function latestCheckpoint(){const p=globalThis.claimResponseProbe;p.preparation.push("checkpoint");return structuredClone(p.checkpoint)};export async function failRunForDaemonUpgrade(){throw new Error("unexpected daemon upgrade refusal")};export async function failQueuedSubscriptionRuntime(...args){const p=globalThis.claimResponseProbe;p.preparation.push("subscription-preflight");p.runtimeRefusal=args;p.run.status="failed";return true}'],
   ['/lib/app-tools-server.ts', 'export async function runAppToolkits(){return []}'],
   ['/lib/github/repository-installation.ts', 'export async function linkedGitHubAccountId(userId){const p=globalThis.claimResponseProbe;(p.githubLookups??=[]).push(userId);return p.githubAccountId===undefined?"123":p.githubAccountId}'],
   ['/lib/subscription-runtime.ts', 'export function subscriptionRuntime(){throw new Error("unexpected subscription access")}'],

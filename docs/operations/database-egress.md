@@ -4,6 +4,8 @@ The monitor joins three distinct signals: Neon public network transfer,
 completed API request counts, and 1% samples of database result JSON sizes.
 Sampled JSON size is a diagnostic estimate, not Postgres wire size or a bill.
 The collector makes no SQL queries and does not wake a suspended compute.
+Per-request query attribution (which route, action or client) is in the
+sampled PostHog traces: [tracing.md](tracing.md).
 
 The existing Production smoke deployment-comparison job collects every fifteen
 minutes and after production deployments. It uses the existing Infisical OIDC

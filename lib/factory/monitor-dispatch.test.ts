@@ -1,3 +1,4 @@
+import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -9,7 +10,7 @@ import test from "node:test";
 import { Pool, type PoolClient } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { FactoryError } from "./contract";
-import { createFactoryStore, type FactoryTask } from "./store";
+import { type FactoryTask } from "./store";
 import { createFactoryDispatch } from "./dispatch";
 import { factoryDispatchDatabase } from "./transaction";
 import { insertRunOnce } from "../run-dispatch";

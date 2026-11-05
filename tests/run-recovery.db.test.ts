@@ -17,7 +17,7 @@ if (process.env.REQUIRE_DB === '1' && !connection) throw new Error('Recovery DB 
 
 test('independent run recovery: concurrency, STOP, renewed leases and attempt fencing', { skip: !connection, timeout: 120_000 }, async t => {
   const pool = new Pool({ connectionString: connection, max: 14 })
-  const { reclaimLostRuns, sweepExpiredRunLeases, latestCheckpoint } = await import('../lib/run-leases')
+  const { reclaimLostRuns, sweepExpiredRunLeases, latestCheckpoint, failQueuedSubscriptionRuntime } = await import('../lib/run-leases')
   const { checkpointRecoveryError } = await import('../lib/run-retry')
   const { issueRunToken, verifyRunToken } = await import('../lib/mcp/worker')
   t.after(async () => {
@@ -65,6 +65,82 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     try { await work(client) }
     finally { await client.query('ROLLBACK'); client.release() }
   }
+
+  await t.test('a queued subscription that loses its runtime ends once with a readable report and a durable event', async () => {
+    const expected = { harness: 'codex' as const, bindingId: randomUUID() }
+    const run = await fixture(1, { harness: 'codex', subscription: { ...expected, modelId: 'fixture-model', route: 'codex_cli' } })
+    const token = await issueRunToken({ id: run.id, userId: run.userId })
+    await pool.query(`UPDATE agent_runs SET status='queued',"startedAt"=NULL,"leaseExpiresAt"=NULL WHERE id=$1`, [run.id])
+    // A contradictory old broker flag must not override a failed self-test.
+    await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [run.deviceId, JSON.stringify([{ harness: 'codex', installed: true, toolApproval: true, subscriptionBroker: true, subscriptionPreflight: 'env_not_clean' }])])
+    const attempts = await Promise.all(Array.from({ length: 6 }, () => failQueuedSubscriptionRuntime(run.id, run.deviceId, run.userId, expected, now)))
+    assert.equal(attempts.filter(Boolean).length, 1)
+    const { rows: [ended] } = await pool.query('SELECT status,"stopReason",error,report,"startedAt","leaseExpiresAt" FROM agent_runs WHERE id=$1', [run.id])
+    assert.equal(ended.status, 'failed')
+    assert.equal(ended.stopReason, 'error')
+    assert.equal(ended.error, 'subscription_local_runtime_unavailable (env_not_clean)')
+    assert.equal(ended.startedAt, null)
+    assert.equal(ended.leaseExpiresAt, null)
+    assert.match(ended.report.summary, /更新 Mikka/)
+    assert.doesNotMatch(ended.report.summary, /subscription_local_runtime_unavailable|env_not_clean/)
+    const { rows: events } = await pool.query(`SELECT payload FROM coordinator_events WHERE "runId"=$1 AND kind='run_finished'`, [run.id])
+    assert.equal(events.length, 1)
+    assert.equal(events[0].payload.summary, ended.report.summary)
+    assert.equal(events[0].payload.verification, 'not_run')
+    assert.equal(Boolean(await verifyRunToken(new Request('http://localhost/mikka/api/mcp'), token.token)), false)
+    assert.ok((await pool.query('SELECT "revokedAt" FROM run_tokens WHERE "runId"=$1', [run.id])).rows.every(row => row.revokedAt))
+  })
+
+  await t.test('runtime refusal cannot end another owner/device, claimed work, STOP, a live lease or a different assignment', async () => {
+    for (const condition of ['owner', 'device', 'started', 'session', 'lease', 'stop', 'claimed', 'binding', 'api-key'] as const) {
+      const expected = { harness: 'codex' as const, bindingId: randomUUID() }
+      const run = await fixture(1, { harness: 'codex', subscription: { bindingId: expected.bindingId, modelId: 'fixture-model', route: 'codex_cli' } })
+      await pool.query(`UPDATE agent_runs SET status='queued',"leaseExpiresAt"=NULL WHERE id=$1`, [run.id])
+      if (condition === 'started') await pool.query('UPDATE agent_runs SET "startedAt"=now() WHERE id=$1', [run.id])
+      if (condition === 'session') await pool.query('UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1', [run.id, 'existing-native-session'])
+      if (condition === 'lease') await pool.query('UPDATE agent_runs SET "leaseExpiresAt"=$2 WHERE id=$1', [run.id, new Date(now.getTime() + 60_000)])
+      if (condition === 'stop') await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [run.id])
+      if (condition === 'claimed') await pool.query(`UPDATE agent_runs SET status='preparing' WHERE id=$1`, [run.id])
+      if (condition === 'api-key') await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [run.id, JSON.stringify({ harness: 'codex', apiKey: { keyId: randomUUID() } })])
+      const changed = await failQueuedSubscriptionRuntime(run.id, condition === 'device' ? run.otherDeviceId : run.deviceId,
+        condition === 'owner' ? 'another-owner' : run.userId, condition === 'binding' ? { ...expected, bindingId: randomUUID() } : expected, now)
+      assert.equal(changed, false, condition)
+      assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [run.id])).rows[0].status, condition === 'claimed' ? 'preparing' : 'queued', condition)
+      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM coordinator_events WHERE "runId"=$1 AND kind='run_finished'`, [run.id])).rows[0].n, 0, condition)
+    }
+  })
+
+  await t.test('a fresh device self-test or a concurrent claim wins over an older refusal snapshot', async () => {
+    for (const recovery of ['device', 'claim', 'stop'] as const) {
+      const expected = { harness: 'codex' as const, bindingId: randomUUID() }
+      const run = await fixture(1, { harness: 'codex', subscription: { bindingId: expected.bindingId, modelId: 'fixture-model', route: 'codex_cli' } })
+      await pool.query(`UPDATE agent_runs SET status='queued',"leaseExpiresAt"=NULL WHERE id=$1`, [run.id])
+      await locked(async blocker => {
+        if (recovery === 'device') await blocker.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [run.deviceId, JSON.stringify([{ harness: 'codex', installed: true, toolApproval: true, subscriptionBroker: true }])])
+        else if (recovery === 'claim') await blocker.query(`UPDATE agent_runs SET status='preparing',"startedAt"=now(),"leaseExpiresAt"=now()+interval '1 minute' WHERE id=$1`, [run.id])
+        else await blocker.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [run.id])
+        const refused = failQueuedSubscriptionRuntime(run.id, run.deviceId, run.userId, expected, now)
+        try { await waitForLock(recovery === 'device' ? 'devices' : 'agent_runs') }
+        finally { await blocker.query('COMMIT') }
+        assert.equal(await refused, false, recovery)
+      })
+      assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [run.id])).rows[0].status, recovery === 'claim' ? 'preparing' : 'queued')
+      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM coordinator_events WHERE "runId"=$1 AND kind='run_finished'`, [run.id])).rows[0].n, 0)
+    }
+  })
+
+  await t.test('subscription takeover ignores a failed target harness without excluding a different healthy provider', async () => {
+    for (const failedHarness of ['codex', 'claude_code']) {
+      const run = await fixture(1, { harness: 'codex', subscription: { bindingId: randomUUID(), modelId: 'fixture-model', route: 'codex_cli' } })
+      await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [run.otherDeviceId, JSON.stringify([
+        { harness: 'codex', installed: true, subscriptionBroker: true, ...(failedHarness === 'codex' ? { subscriptionPreflight: 'env_not_clean' } : {}) },
+        { harness: 'claude_code', installed: true, subscriptionBroker: true, ...(failedHarness === 'claude_code' ? { subscriptionPreflight: 'env_not_clean' } : {}) },
+      ])])
+      await reclaimLostRuns(run.userId, now)
+      const { rows } = await pool.query('SELECT "deviceId" FROM agent_runs WHERE "retryOf"=$1', [run.id])
+      assert.deepEqual(rows, failedHarness === 'codex' ? [] : [{ deviceId: run.otherDeviceId }], failedHarness)
+    }
+  })
 
   await t.test('ten independent cron scans create one retry and fence the old attempt', async () => {
     const run = await fixture()

@@ -83,6 +83,29 @@ test('device runs on a shared subscription', { skip: !dbUrl }, async t => {
     assert.equal((await lease(owner, own)).ownerId, owner, 'the owner\'s own run is unaffected')
   })
 
+  await t.test('the run harness must pass its current self-test even when an old broker flag remains', async () => {
+    const binding = randomUUID()
+    await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,$4,$5,$6,'claude_code_cli','synthetic-model')`,
+      [binding, owner, team.id, ownAgent, connection, epoch])
+    const own = await runOn(owner, ownAgent, binding)
+    const healthy = { harness: 'claude_code', installed: true, subscriptionBroker: true }
+    for (const detail of ['env_not_clean', 'cli_missing', 'cli_version_mismatch', 'adapter_start_failed']) {
+      await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [own.device, JSON.stringify([
+        { ...healthy, subscriptionPreflight: detail },
+        { harness: 'codex', installed: true, subscriptionBroker: true },
+      ])])
+      await assert.rejects(lease(owner, own), /account_unavailable/, detail)
+    }
+    await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [own.device, JSON.stringify([
+      healthy, { harness: 'codex', installed: true, subscriptionBroker: true, subscriptionPreflight: 'env_not_clean' },
+    ])])
+    assert.equal((await lease(owner, own)).bindingId, binding, 'another provider\'s failed self-test does not block a healthy target')
+    await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [own.device, JSON.stringify([
+      healthy, { ...healthy, subscriptionPreflight: 'env_not_clean' },
+    ])])
+    await assert.rejects(lease(owner, own), /account_unavailable/, 'a duplicate healthy report cannot override the target failure')
+  })
+
   await t.test('the admin switch, leaving the team, another workspace or a stop request refuse a member\'s lease', async () => {
     await setSubscriptionShare(pool, owner, team.id, true, true)
     const fresh = async () => {

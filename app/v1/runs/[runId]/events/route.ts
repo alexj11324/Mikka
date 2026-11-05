@@ -1,3 +1,4 @@
+import { runChanged } from '@/lib/live/panels'
 import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { and, eq, sql } from 'drizzle-orm'
@@ -48,7 +49,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
   const started = await db.update(agentRuns)
     .set({ status: 'running', updatedAt: new Date() })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'preparing'))).returning({ id: agentRuns.id })
-  if (started.length) await runListChanged(db, runId)
+  if (started.length) { await runListChanged(db, runId); await runChanged(db, runId) }
   const [tail] = await db
     .select({ seq: sql<number | null>`max(${runChunks.seq})` })
     .from(runChunks)

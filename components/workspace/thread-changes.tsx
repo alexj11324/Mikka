@@ -98,7 +98,7 @@ export function ChangesTabLabel({ changes }: { changes: ThreadChanges | null }) 
 function Counts({ additions, deletions }: { additions: number; deletions: number }) {
   return <span className="flex shrink-0 items-center gap-1.5 text-xs tabular-nums">
     {additions > 0 && <span className="text-success-foreground">+{additions}</span>}
-    {deletions > 0 && <span className="text-destructive">−{deletions}</span>}
+    {deletions > 0 && <span className="text-destructive-foreground">−{deletions}</span>}
   </span>
 }
 

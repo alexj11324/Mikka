@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { factoryChanged, factoryCommitted } from '../live/factory';
+import { issueListChanged } from '../live/lists';
+import { documentChanged } from '../live/panels';
+import { issueRelationsChanged } from '../live/issue-detail';
+import { userActor } from '../activity-actor';
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { bindingSchema, FactoryError, type FactoryActor, type FactoryBinding } from "./approval-contract";
@@ -203,6 +207,38 @@ export function createFactoryMerges(
     return { sha: row.sha, url: row.url!, repo: match[1], number: Number(match[2]) };
   }
 
+  /** Human acceptance completes the reviewed issue in the same commit as its receipt.
+   * A stale acceptance cannot close later work, or undo a person's status change. */
+  async function completeDeliverableIssue(tx: PoolClient, task: FactoryTask, actor: FactoryActor) {
+    const activity = userActor(actor.userId);
+    // Routing holds this issue FOR SHARE. Read successors only after it yields,
+    // in a fresh statement, so an already-committing task cannot be overlooked.
+    await tx.query('SELECT id FROM issues WHERE id=$1 FOR UPDATE', [task.issueId]);
+    const { rows } = await tx.query<{ id: string }>(`WITH accepted AS (
+      SELECT id,"issueId","createdAt" FROM factory_tasks
+      WHERE id=$1 AND "userId"=$2 AND "issueId"=$3 AND "candidateId"=$4
+        AND stage='approval' AND status='passed'
+    ), saved AS (
+      UPDATE issues i SET status='done',revision=i.revision+1,"updatedAt"=now()
+      FROM accepted a WHERE i.id=a."issueId" AND i.status='review'
+        AND NOT EXISTS (SELECT 1 FROM factory_tasks newer WHERE newer."issueId"=a."issueId"
+          AND (newer."createdAt",newer.id)>(a."createdAt",a.id))
+        AND NOT EXISTS (SELECT 1 FROM agent_runs r WHERE r."issueId"=a."issueId"
+          AND r.status IN ('queued','preparing','running','finishing','paused','waiting_input'))
+      RETURNING i.id,i."userId",i.revision,i.title,i.content,i.status,i.priority
+    ), history AS (
+      INSERT INTO issue_versions (id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id)
+      SELECT gen_random_uuid(),id,"userId",revision,title,content,status,priority,$5,$6 FROM saved
+      RETURNING "issueId"
+    ) SELECT "issueId" AS id FROM history`,
+    [task.id, task.userId, task.issueId, task.candidateId, activity.actorType, activity.actorId]);
+    if (rows.length) {
+      await issueListChanged(tx, task.issueId);
+      await documentChanged(tx, task.issueId);
+      await issueRelationsChanged(tx, [task.issueId]);
+    }
+  }
+
   /** Approval passes, then publish passes: the task is complete. Both gates check the merged row. */
   async function finalize(tx: PoolClient, task: FactoryTask, mergeId: string) {
     if (task.stage !== "approval" || !["pending", "waiting"].includes(task.status)) return task;
@@ -261,6 +297,9 @@ export function createFactoryMerges(
       if (!actor?.userId || !actor.sessionId) fail("factoryHumanRequired");
       let credential = typeof token === 'string' ? token : null;
       const claim = await transaction(async (tx) => {
+        // Match route()'s owner/issue lock so acceptance and a new task cannot
+        // race between the successor check and the issue status write.
+        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify([actor.userId, req.binding.issueId])]);
         const task = await store.lockTask(tx, actor.userId, req.binding.taskId);
         if (!task || !(await authorize(actor.userId, task.issueId, tx))) fail("factoryNotFound");
         const { rows: live } = await tx.query(
@@ -278,6 +317,7 @@ export function createFactoryMerges(
           const id = randomUUID();
           await tx.query('INSERT INTO factory_deliverable_acceptances (id,"taskId","candidateId","userId","sessionId","eventId") VALUES ($1,$2,$3,$4,$5,$6)', [id, task.id, task.candidateId, actor.userId, actor.sessionId, req.eventId]);
           const accepted = await store.apply(actor.userId, bindingOf(task), req.eventId, { action: 'finish', status: 'passed', reason: 'The person accepted the report and its independently checked evidence.', evidence: evidence.evidence, output: { deliverableAcceptanceId: id } }, tx);
+          await completeDeliverableIssue(tx, accepted.task, actor);
           return { accepted: id, task: accepted.task };
         }
         const {

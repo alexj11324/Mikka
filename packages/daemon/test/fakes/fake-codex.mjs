@@ -6,7 +6,7 @@
 // Threads are kept as files under `$CODEX_HOME/sessions`; `thread/resume`
 // of a thread not there fails, as with the real store.
 import { randomUUID } from "node:crypto"
-import { existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
 
@@ -33,6 +33,11 @@ const send = (message) =>
   process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`)
 const notify = (method, params) => send({ method, params })
 const sessions = join(process.env.CODEX_HOME, "sessions")
+const fixtureTrace = (event) => appendFileSync(join(process.env.CODEX_HOME, 'fixture-protocol.jsonl'), JSON.stringify(event) + '\n')
+const fixtureControl = () => {
+  const file = join(process.env.CODEX_HOME, 'fixture-control.json')
+  return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}
+}
 let threadId = process.env.FAKE_THREAD_ID ?? `thread-${randomUUID()}`
 let turn = 0
 let open = null
@@ -64,6 +69,8 @@ function complete(status = "completed") {
 }
 
 async function runTurn(text) {
+  if (text.startsWith('Mikka was restarted') && fixtureControl().mailboxOnRestart)
+    text = 'MAILBOX_RESUME_TEST ' + JSON.stringify([{ name: 'mailbox_inbox', arguments: {} }])
   turn++
   open = `turn-${turn}`
   notify("turn/started", {
@@ -175,9 +182,10 @@ async function runTurn(text) {
     complete()
     return
   }
-  if (text.startsWith('MAILBOX_TEST ')) {
+  if (text.startsWith('MAILBOX_TEST ') || text.startsWith('MAILBOX_RESUME_TEST ')) {
+    const resumeFixture = text.startsWith('MAILBOX_RESUME_TEST ')
     const results = []
-    for (const call of JSON.parse(text.slice('MAILBOX_TEST '.length))) {
+    for (const call of JSON.parse(text.slice(resumeFixture ? 'MAILBOX_RESUME_TEST '.length : 'MAILBOX_TEST '.length))) {
       if (call.foreignNotice) {
         notify('turn/started', { threadId: 'foreign-thread', turn: { id: 'poison-turn', status: 'inProgress', error: null } })
         notify('turn/completed', { threadId: 'foreign-thread', turn: { id: 'poison-turn', status: 'completed', error: null } })
@@ -195,7 +203,7 @@ async function runTurn(text) {
     item('started', { type: 'agentMessage', id: `m-${turn}`, text: '' })
     notify('item/agentMessage/delta', { threadId, turnId: open, itemId: `m-${turn}`, delta: output })
     item('completed', { type: 'agentMessage', id: `m-${turn}`, text: output })
-    await callMcpTool(mcp, 'report_blocked', { reason: 'Synthetic mailbox wiring complete; no provider was invoked' })
+    if (!resumeFixture) await callMcpTool(mcp, 'report_blocked', { reason: 'Synthetic mailbox wiring complete; no provider was invoked' })
     complete()
     return
   }
@@ -244,16 +252,18 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
     case "initialize":
       return send({
         id,
-        result: { userAgent: "codex_cli_rs/0.163.0", codexHome: process.env.CODEX_HOME },
+        result: { userAgent: fixtureControl().userAgent ?? "codex_cli_rs/0.163.0", codexHome: process.env.CODEX_HOME },
       })
     case "thread/start":
-    case "thread/resume":
-      dynamicTools = params.dynamicTools ?? []
+    case "thread/resume": {
+      fixtureTrace({ method, dynamicToolsPresent: Object.hasOwn(params, 'dynamicTools') })
       // Runs ask nothing and use no Codex sandbox (decision 2026-11-01-2335).
       if (!params.cwd || params.sandbox !== "danger-full-access" || params.approvalPolicy !== "never")
         return send({ id, error: { code: -1, message: "bad thread params" } })
       if (params.model) model = params.model
       if (method === "thread/resume") {
+        const controls = fixtureControl()
+        if (controls.refuseResume) return send({ id, error: { code: -1, message: 'Synthetic resume refusal' } })
         if (!existsSync(join(sessions, `${params.threadId}.jsonl`)))
           return send({
             id,
@@ -263,13 +273,26 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
             },
           })
         threadId = params.threadId
+        // Official 0.163.0 restores the catalogue from the rollout. Its resume
+        // schema has no dynamicTools: an extra request field cannot replace it.
+        const header = JSON.parse(readFileSync(join(sessions, `${threadId}.jsonl`), 'utf8').split('\n')[0])
+        dynamicTools = header.payload?.dynamic_tools ?? []
+        if (controls.staleDuringResume) {
+          open = 'previous-turn'
+          fixtureTrace({ staleDuringResume: await hostCall('mailbox_inbox', {}) })
+          open = null
+        }
+        if (controls.differentThread) return send({ id, result: { thread: { id: 'different-thread', path: join(sessions, `${threadId}.jsonl`) } } })
       } else {
+        dynamicTools = params.dynamicTools ?? []
         mkdirSync(sessions, { recursive: true })
-        writeFileSync(join(sessions, `${threadId}.jsonl`), "{}\n")
+        writeFileSync(join(sessions, `${threadId}.jsonl`), JSON.stringify({ type: 'session_meta', payload: { id: threadId, dynamic_tools: dynamicTools } }) + '\n')
       }
-      return send({ id, result: { thread: { id: threadId },
+      return send({ id, result: { thread: { id: threadId, ...(fixtureControl().omitRolloutPath ? {} : { path: join(sessions, `${threadId}.jsonl`) }) },
         ...(model === "protocol-omits-model" ? {} : { model: model ? `observed:${model}` : "observed-default" }) } })
+    }
     case "turn/start":
+      fixtureTrace({ method })
       if (params.input[0].text.startsWith('PROVIDER_DIAGNOSTIC ')) {
         const scenario = JSON.parse(params.input[0].text.slice('PROVIDER_DIAGNOSTIC '.length))
         if (scenario.rpcError) {
@@ -305,3 +328,4 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
       return send({ id, error: { code: -32601, message: method } })
   }
 })
+

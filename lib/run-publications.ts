@@ -1,3 +1,4 @@
+import { runChanged } from './live/panels'
 import 'server-only'
 import { isCurrentFactoryDeliverable } from './factory/execution-kind'
 import { issueListChanged, runListChanged } from './live/lists'
@@ -208,6 +209,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
         ...(quota ? { quotaResetsAt: resetsAt ? new Date(resetsAt) : null } : {}),
         ...(paused ? { leaseExpiresAt: null, finishedAt: null } : { finishedAt: sql`clock_timestamp()` }), updatedAt: new Date() }).where(eq(agentRuns.id, runId)).returning()
       await runListChanged(tx, runId)
+      await runChanged(tx, runId)
       await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, runId), isNull(runTokens.revokedAt)))
       await settleRunCompletionEffects(client, run, completion.stopReason, factoryBound, completion.report)
       if (quota) {

@@ -79,13 +79,14 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
   const workspaceIds = [...new Set([workspaceId, task?.workspaceId].filter((id): id is string => !!id))].sort()
   const primaryWorkspaceId = workspaceId ?? task?.workspaceId ?? null
   const key = scope.botId ?? 'coordinator'
-  await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`agent-cli-policy:${userId}:${key}`])
-  await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`worker-cli-policy:${scope.agentId}`])
-  for (const id of workspaceIds) await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`workspace-cli-policy:${id}`])
+  // One statement, the same locks in the same order: agent, worker, then each
+  // workspace in UUID order (a function scan returns unnest's rows in order).
+  await tx.query('SELECT pg_advisory_xact_lock(hashtextextended(k,0)) FROM unnest($1::text[]) AS k',
+    [[`agent-cli-policy:${userId}:${key}`, `worker-cli-policy:${scope.agentId}`, ...workspaceIds.map(id => `workspace-cli-policy:${id}`)]])
   // Materialize empty defaults under the same locks, so legacy runs have a
   // stable generation. No existing computer or external-write choice changes.
-  await tx.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id) VALUES ($1,$2,$3,$4) ON CONFLICT (owner_id,bot_key) DO NOTHING`, [userId,key,scope.botId,scope.workspaceId])
-  for (const id of workspaceIds) await tx.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission) VALUES ($1,'allow') ON CONFLICT ("workspaceId") DO NOTHING`, [id])
+  await tx.query(`WITH head AS (INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id) VALUES ($1,$2,$3,$4) ON CONFLICT (owner_id,bot_key) DO NOTHING)
+    INSERT INTO workspace_computer_policies ("workspaceId",permission) SELECT w,'allow' FROM unnest($5::uuid[]) AS w ON CONFLICT ("workspaceId") DO NOTHING`, [userId,key,scope.botId,scope.workspaceId,workspaceIds])
   const agentRow = await tx.query<{ policy: unknown; version: string; generation: string; workspace: string | null }>(`SELECT cli_run_policy AS policy,cli_run_policy_version AS version,cli_run_policy_generation AS generation,workspace_id AS workspace FROM agent_kit_heads WHERE owner_id=$1 AND bot_key=$2 FOR SHARE`, [userId,key])
   if (!agentRow.rows[0] || agentRow.rows[0].workspace !== scope.workspaceId) throw new Error('agentPolicyUnavailable')
   const agent = cliPolicyValuesSchema.parse(agentRow.rows[0]?.policy ?? {})
@@ -245,5 +246,11 @@ export function cliPolicyGuard(runId: string, userId: string, membership: CliMem
 
 /** Read an authenticated run's policy under the same locks used by decisions. */
 export async function readCliRunPolicy(pool: Pick<Pool, 'connect'>, runId: string, userId: string, guard: CliMembershipGuard = realCliMembershipGuard) {
-  return writeTransaction(pool, tx => lockCliRunPolicy(tx, runId, userId), { guard: cliPolicyGuard(runId,userId,guard) })
+  // The work resolved the policy in this transaction and still holds its locks
+  // (advisory, FOR SHARE) through COMMIT, so the membership lease is taken for
+  // that same result instead of resolving it a second time (12 statements).
+  let current: Awaited<ReturnType<typeof lockCliRunPolicy>> | undefined
+  return writeTransaction(pool, async tx => (current = await lockCliRunPolicy(tx, runId, userId)), {
+    guard: (_tx, signal) => policyMemberships(current!, userId, signal, guard),
+  })
 }

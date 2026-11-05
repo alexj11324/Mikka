@@ -85,8 +85,8 @@ Rules that hold everywhere:
   API key. Model-specific windows affect only the requested model.
 - Conversation compaction uses the same frozen model and credential as the
   turn.
-- This order serves bot chats. A thread takes the person's 优先使用的模型 in
-  their order instead (§4,
+- This order serves bot chats. A thread uses the person's 优先使用的模型,
+  with task-difficulty routing when enabled (§4,
   [1400](decisions/2026-11-02-1400-model-order-dispatch.md)). The bot itself
   runs on Mikka's own AI SDK on Vercel; a thread goes through the daemon to
   the entry's Agent (§3).
@@ -172,7 +172,13 @@ not report the model ([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
 1. A machine the run asks for is used as asked: a thread continuing in its
    environment, a device-only source event, or a device the person picked.
 2. Otherwise the thread's own model, when the person picked one, then
-   优先使用的模型 in the person's order: the first entry that can run now.
+   优先使用的模型. With 按任务难度自动选模型 on (the default), the host
+   filters usable credentials, quota and machines before the Decision API
+   chooses an enumerated model and supported reasoning effort. An explicit
+   model or an Agent 配置 with a fixed model wins; a selected configuration
+   that inherits the list uses routing only after the configuration is chosen.
+   A low-confidence, invalid or unavailable decision preserves the existing
+   list and placement order. Turning the setting off also preserves that order.
    运行位置 decides where, trying places in order and moving on only when
    no allowed model runs in the one before
    ([2330](decisions/2026-11-02-2330-cloud-first-dispatch.md)): 云端 (the
@@ -188,6 +194,18 @@ not report the model ([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
    device can run any and 云端 has no E2B key, every model unavailable now) and
    rows that fix it: 打开模型与订阅, 连接电脑, 填入 E2B Key. Answering a row makes
    the bot dispatch again.
+
+**Task difficulty (#1329).** Model tiers are metadata for authorized candidates,
+never a catalogue: unknown models count as `standard`. The untouched default
+list retains its existing leading entries and, while routing is on, includes
+the other reported models from those same credentials on the preferred Agent.
+It does not silently add a different paid key. A customized list is never
+expanded. The run freezes difficulty, selected model, supported effort and a
+localized reason code; execution details read that snapshot. Existing failure
+and review-repair paths can move an automatically routed run to the next
+available tier, without a second retry loop or overriding a fixed choice.
+Terminal outcomes enter the existing `factory_events` ledger, scoped to that
+owner and task. See [the feature spec](model-difficulty-routing.md).
 
 **Runtime provider failure (#1225).** A thread dispatched from 优先使用的模型
 can discover an empty balance, refused credentials or a provider outage only

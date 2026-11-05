@@ -1,5 +1,6 @@
 import 'server-only'
 import { pool } from '@/lib/db'
+import { botChatChanged } from '@/lib/live/chats'
 
 export type ChatPreference = { pinned: boolean; muted: boolean }
 
@@ -27,6 +28,8 @@ export async function setChatPreference(userId: string, botId: string, change: P
   await pool.query(`INSERT INTO chat_preferences ("userId","chatKey",pinned,muted) VALUES ($1,$2,COALESCE($3::boolean,$5::boolean),COALESCE($4::boolean,false))
     ON CONFLICT ("userId","chatKey") DO UPDATE SET pinned=COALESCE($3::boolean,chat_preferences.pinned), muted=COALESCE($4::boolean,chat_preferences.muted), "updatedAt"=now()`,
     [userId, botId, change.pinned ?? null, change.muted ?? null, await pinnedByDefault(userId, botId)])
+  // The person's other screens (the drawer's order, the bot's page) re-read after this committed write.
+  await botChatChanged(pool, userId, botId)
   return true
 }
 

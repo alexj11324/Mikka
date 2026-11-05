@@ -1,3 +1,4 @@
+import { runChanged } from '../live/panels'
 import 'server-only'
 import { botListChanged, runListChanged } from '../live/lists'
 import { randomUUID } from 'node:crypto'
@@ -8,6 +9,7 @@ import { ensureCloudMachine } from './provision'
 import { computerPermission, type ComputerPermission } from './permission'
 import { computerChanged, computerWorkspaceChanged, machineChanged } from '@/lib/live/computer-state'
 import { computerLiveState } from './state-deadline'
+import { wakeTokens, wakeWorkflowSoon, workflowWakesEnabled } from '@/lib/workflow-wake'
 
 export class ComputerError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -65,7 +67,7 @@ export class ComputerStore {
           status=CASE WHEN r.status='queued' THEN 'stopped' ELSE r.status END
           FROM computer_run_bindings b WHERE b."runId"=r.id AND b."workspaceId"=$1
             AND r.status=ANY($2::text[]) RETURNING r.id`, [workspaceId, ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']])
-        for (const { id } of stopped.rows) await runListChanged(client, id)
+        for (const { id } of stopped.rows) { await runListChanged(client, id); await runChanged(client, id) }
       }
       const sync = async () => {
         for (const machine of machines) {
@@ -88,6 +90,13 @@ export class ComputerStore {
       await sync()
       if (previous !== permission) await computerWorkspaceChanged(client, this.pool, workspaceId)
       await client.query('COMMIT')
+      // Web tasks waiting on a person or a slot re-check the policy at once and fail (#1212).
+      if (permission === 'deny' && workflowWakesEnabled()) {
+        try {
+          const tasks = await this.pool.query<{ id: string }>(`SELECT id FROM bot_subagents WHERE "workspaceId"=$1 AND status IN ('queued','running','needs_you')`, [workspaceId])
+          for (const { id } of tasks.rows) wakeWorkflowSoon(wakeTokens.subagent(id))
+        } catch { /* their 2-minute re-check still sees the denial */ }
+      }
       return { permission }
     } catch (error) {
       await client.query('ROLLBACK')
@@ -185,7 +194,7 @@ export class ComputerStore {
         const resumed = await client.query<{ id: string }>(`UPDATE agent_runs r SET status=COALESCE(r."resumeStatus",'running'),"resumeStatus"=NULL,"pauseReason"=NULL,"updatedAt"=now()
           FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3
           AND r."userId"=$3 AND r.status='paused' AND r."pauseReason"='human_control' RETURNING r.id`, [botId, actor.workspaceId, actor.userId])
-        for (const { id } of resumed.rows) await runListChanged(client, id)
+        for (const { id } of resumed.rows) { await runListChanged(client, id); await runChanged(client, id) }
       }
       persistProgress = true
       await this.runtime.syncDesktopLease(sandbox, lease)

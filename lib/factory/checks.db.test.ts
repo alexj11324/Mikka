@@ -25,6 +25,7 @@ import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { freezeWorkerDefinition } from "../agent-kit/worker";
 import { claimLocalRun } from "../computer/claim";
 import { FactoryError } from "./contract";
+import { approvalEvidence } from "./evidence";
 import { createFactoryStore, type FactoryTask } from "./store";
 import {
   createFactoryDispatch,
@@ -178,10 +179,16 @@ test(
       const dispatch = createFactoryDispatch(db, store, queue, {
         configure: {
           execute: factoryRepairBrief,
-          review: (tx, task, id) =>
-            configureFactoryCheck(tx, task, id, selectedPolicy),
-          verify: (tx, task, id) =>
-            configureFactoryCheck(tx, task, id, selectedPolicy),
+          // The fixture device is "online" only within the 90 s presence window (lib/device-presence.ts),
+          // and this file runs for minutes: keep its heartbeat current so a slow runner cannot age it out.
+          review: async (tx, task, id) => {
+            await tx.query(`UPDATE devices SET "lastSeenAt"=now() WHERE id=$1`, [deviceId]);
+            return configureFactoryCheck(tx, task, id, selectedPolicy);
+          },
+          verify: async (tx, task, id) => {
+            await tx.query(`UPDATE devices SET "lastSeenAt"=now() WHERE id=$1`, [deviceId]);
+            return configureFactoryCheck(tx, task, id, selectedPolicy);
+          },
         },
         freeze: async (tx, _task, id) => {
           const {
@@ -340,7 +347,7 @@ test(
         review: reconcileFactoryCheck,
         verify: reconcileFactoryCheck,
       }, coordinatorBot);
-      async function pendingReview(kind: 'repository' | 'report' | 'deliverable' = 'repository') {
+      async function pendingReview(kind: 'repository' | 'report' | 'deliverable' = 'repository', legacy = true) {
         const issueId = randomUUID(),
           sourceEventId = randomUUID();
         await db.query(
@@ -360,6 +367,12 @@ test(
           missingPermissions: [],
           needsSpec: false,
         });
+        if (legacy) {
+          // Materialize the historical contract before any work: these existing
+          // fixtures keep exercising retained Verify receipts after the upgrade.
+          await db.query(`UPDATE factory_tasks SET route=route-'flowVersion' WHERE id=$1`, [state.task.id]);
+          await db.query(`UPDATE factory_events SET result=jsonb_set(result,'{task,route}',(result#>'{task,route}')-'flowVersion') WHERE "taskId"=$1`, [state.task.id]);
+        }
         const execute = await dispatch("owner", {
           binding: factoryBinding(state.task),
           agentId,
@@ -538,6 +551,67 @@ test(
           if (gateway.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = gateway.url;
           if (gateway.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = gateway.secret;
         }
+      });
+      async function currentEvidence(taskId: string) {
+        const tx = await db.connect();
+        try {
+          await tx.query('BEGIN');
+          const task = await store.lockTask(tx, 'owner', taskId);
+          const result = await approvalEvidence(tx, task);
+          await tx.query('ROLLBACK');
+          return result;
+        } finally { tx.release(); }
+      }
+      await t.test('new host-frozen flow hands a single review to the person without a Verify run', async () => {
+        const pending = await pendingReview('repository', false);
+        assert.equal(pending.task.route.flowVersion, 2);
+        const review = await start(pending.task);
+        const extras = await factoryCheckAssignment(db, 'owner', review.runId);
+        assert.equal(extras.factoryCheck.reportOnly, true);
+        assert.equal(extras.verifyCommand, undefined);
+        await terminal(review.runId, `single-review-${pending.task.id}`, false, report => { report.verify = { status: 'not_run' }; });
+        await reconcile('owner');
+        const ready = await state(pending.task.id);
+        assert.equal(ready.task.stage, 'approval');
+        assert.equal(ready.task.status, 'pending');
+        assert.equal(ready.attempts.filter(a => a.stage === 'review').length, 1);
+        assert.equal(ready.attempts.filter(a => a.stage === 'verify').length, 0);
+        const evidence = await currentEvidence(pending.task.id);
+        assert.deepEqual([...new Set(evidence.manifest.artifacts.map(a => a.stage))], ['execute', 'review']);
+        assert.deepEqual(evidence.manifest.reviewHistory, []);
+      });
+      await t.test('single-review repair hands off its new candidate and keeps earlier findings tied to the old SHA', async () => {
+        const pending = await pendingReview('repository', false);
+        const review = await start(pending.task);
+        await terminal(review.runId, `single-review-failed-${pending.task.id}`, true);
+        await reconcile('owner');
+        const failed = await state(pending.task.id);
+        assert.equal(failed.task.status, 'failed');
+        await assert.rejects(store.apply('owner', factoryBinding(failed.task), randomUUID(), { action: 'retry', reason: 'Do not run a second review' }),
+          error => error instanceof FactoryError && error.code === 'factoryTransition');
+        const repair = await recover('owner', { binding: factoryBinding(failed.task), choice: 'repair_code' });
+        const run = await start(repair.task);
+        const repairedSha = 'b'.repeat(40);
+        await db.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"=$2,
+          "startedAt"=now()-interval '1 second',"finishedAt"=now(),report=$3 WHERE id=$1`,
+          [run.runId, `repair-${pending.task.id}`, JSON.stringify({ sourceCommit: repairedSha, publish: { commit: repairedSha, pushed: true },
+            summary: 'The finding was repaired and validated during implementation', verify: { status: 'passed' }, filesChanged: [] })]);
+        await reconcile('owner');
+        const ready = await state(pending.task.id);
+        assert.equal(ready.task.stage, 'approval');
+        assert.equal(ready.task.status, 'pending');
+        assert.equal(ready.attempts.filter(a => a.stage === 'review').length, 1);
+        assert.equal(ready.attempts.filter(a => a.stage === 'verify').length, 0);
+        const evidence = await currentEvidence(pending.task.id);
+        assert.equal(evidence.manifest.candidate.sha, repairedSha);
+        assert.deepEqual([...new Set(evidence.manifest.artifacts.map(a => a.stage))], ['execute']);
+        assert.ok(evidence.manifest.artifacts.every(a => a.sha === repairedSha && a.candidateId === ready.task.candidateId));
+        assert.equal(evidence.manifest.reviewHistory?.length, 1);
+        assert.equal(evidence.manifest.reviewHistory![0].sha, sha);
+        assert.equal(evidence.manifest.reviewHistory![0].candidateId, failed.task.candidateId);
+        assert.equal(evidence.manifest.reviewHistory![0].appliesToCurrentCandidate, false);
+        assert.equal(evidence.manifest.reviewHistory![0].status, 'failed');
+        assert.ok(evidence.evidence.every(a => a.candidateId === ready.task.candidateId));
       });
       for (const stage of ["review", "verify"] as const) {
         for (const prerequisite of ["harness"] as const) {

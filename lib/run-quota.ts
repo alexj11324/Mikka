@@ -1,3 +1,4 @@
+import { runChanged } from './live/panels'
 import 'server-only'
 import { freezeExecutionIdentity, revalidateExecutionIdentity } from './execution-identity'
 import type { PoolClient } from 'pg'
@@ -115,6 +116,7 @@ async function queueDeviceContinuation(tx: Tx, run: Run, key: RunApiKey | null):
     status: 'queued', kind: run.kind, baseBranch: run.baseBranch, prompt, attempt: run.attempt, retryOf: run.id,
   })
   await runListChanged(tx, id)
+  await runChanged(tx, id)
   return id
 }
 
@@ -146,6 +148,7 @@ export async function queueCloudQuotaContinuation(run: Run, cloud: CloudBinding,
       await db.update(agentRuns).set({ retryOf: run.id, attempt: run.attempt, kind: run.kind, baseBranch: run.baseBranch,
         agentDefinition: await continuationDefinition(run, queued.prompt, key, queued), updatedAt: new Date() }).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId)))
       await runListChanged(client, runId)
+      await runChanged(client, runId)
       return runId
     })
     await client.query('COMMIT')
@@ -158,7 +161,7 @@ export async function queueCloudQuotaContinuation(run: Run, cloud: CloudBinding,
 async function endPausedRun(tx: Tx, runId: string, userId: string): Promise<boolean> {
   const [ended] = await tx.update(agentRuns).set({ status: 'failed', pauseReason: null, finishedAt: new Date(), updatedAt: new Date() })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId), eq(agentRuns.status, 'paused'), eq(agentRuns.pauseReason, 'quota_exhausted'))).returning({ id: agentRuns.id })
-  if (ended) await runListChanged(tx, runId)
+  if (ended) { await runListChanged(tx, runId); await runChanged(tx, runId) }
   return Boolean(ended)
 }
 

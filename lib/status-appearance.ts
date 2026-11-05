@@ -4,7 +4,7 @@ export const statusTones = {
   warning: 'border-transparent bg-warning/10 text-warning-foreground',
   info: 'border-transparent bg-info/10 text-info-foreground',
   success: 'border-transparent bg-success/10 text-success-foreground',
-  destructive: 'border-transparent bg-destructive/10 text-destructive',
+  destructive: 'border-transparent bg-destructive/10 text-destructive-foreground',
   focus: 'border-transparent bg-info/10 text-info-foreground',
 } as const
 
@@ -36,6 +36,6 @@ export const statusIconTints: Record<StatusTone, string> = {
   warning: 'text-warning-foreground',
   info: 'text-info-foreground',
   success: 'text-success-foreground',
-  destructive: 'text-destructive',
+  destructive: 'text-destructive-foreground',
   focus: 'text-info-foreground',
 }

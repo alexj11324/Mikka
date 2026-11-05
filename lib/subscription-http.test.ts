@@ -12,7 +12,8 @@ function connect(failure: Error, oauth = true) {
   const service = {
     capabilities: { oauth: { codex: oauth, claude: oauth } },
     repository: {
-      create: async () => connectionId,
+      pool: { query: async () => ({ rows: [] }) },
+      acquire: async () => ({ connectionId, created: true }),
       connection: async () => ({ id: connectionId, workspaceId, provider: 'codex', epoch: '1' }),
       scope: () => ({}),
       remove: async (_owner: string, id: string) => { removed.push(id) },
@@ -78,7 +79,7 @@ test('the account list projects chat selections only from the authorized workspa
   const service = {
     capabilities: { oauth: { claude: true } },
     repository: {
-      pool: { query: async () => ({ rows: [{ id: connectionId, provider: 'claude', state: 'connected', epoch: '1', accountLabel: 'Account' }] }) },
+      pool: { query: async (sql: string) => ({ rows: sql.startsWith('select id,') ? [{ id: connectionId, provider: 'claude', state: 'connected', epoch: '1', accountLabel: 'Account' }] : [] }) },
       connectionBots: async (...args: unknown[]) => { calls.push(args); return [
         { connectionId, id: botId, workspaceId, name: 'Coordinator', color: 'encre', shape: 'cercle' },
         { connectionId, id: randomUUID(), workspaceId: randomUUID(), name: 'Other workspace', color: 'encre', shape: 'cercle' },
@@ -114,4 +115,142 @@ test('pause reaches the repository with the owner and needs no provider call', a
   assert.deepEqual(calls, [['user-1', connectionId, true]])
   assert.deepEqual(worker, [])
   assert.notEqual((await send({ action: 'pause', connectionId, paused: 'yes' })).status, 200)
+})
+
+const authorization = { flow: 'device', state: 's'.repeat(43), authorizationUrl: 'https://auth.openai.com/codex/device', userCode: 'ABCD-EFGH', interval: 5, expiresAt: '2099-01-01T00:00:00Z', revision: 2 }
+function lifecycle() {
+  const calls: { method: string; params: Record<string, unknown>; signal?: AbortSignal }[] = [], lines: string[] = []
+  const row = { id: connectionId, ownerId: 'alice', workspaceId, provider: 'codex' as const, state: 'pending', epoch: '2', quota: null }
+  let acquireCount = 0, removed = false
+  let invoke = async (method: string, _params: Record<string, unknown>, _signal?: AbortSignal): Promise<unknown> => {
+    if (method === 'disconnect') { row.state = 'disconnected'; row.epoch = '3'; return { state: row.state, revision: 3 } }
+    return authorization
+  }
+  const service = {
+    capabilities: { oauth: { codex: true, claude: true } },
+    repository: {
+      pool: { query: async (sql: string) => ({ rows: sql.startsWith('select id,') ? [row] : [] }) },
+      acquire: async () => { acquireCount++; return { connectionId, created: false } },
+      connection: async (owner: string, id: string) => { assert.equal(owner, 'alice'); assert.equal(id, connectionId); return row },
+      scope: () => ({ ownerId: row.ownerId, workspaceId, connectionId, provider: row.provider }),
+      connectionBots: async () => [],
+      remove: async () => { removed = true },
+    },
+    worker: () => ({ call: async (method: string, params: Record<string, unknown>, signal?: AbortSignal) => { calls.push({ method, params, signal }); return invoke(method, params, signal) } }),
+    status: async (_owner: string, _id: string, signal?: AbortSignal) => { assert.equal(signal?.aborted, false); return { id: connectionId, state: row.state, revision: Number(row.epoch) } },
+  } as unknown as SubscriptionService
+  const deps: SubscriptionHTTPDependencies = {
+    session: async () => ({ userId: 'alice', sessionId: 'owner-session' }), workspace: async () => undefined, service: () => service, log: line => { lines.push(line) },
+  }
+  return { calls, lines, row, deps, service, acquisitions: () => acquireCount, removed: () => removed, invoke: (call: typeof invoke) => { invoke = call },
+    send: (body: unknown, signal?: AbortSignal) => subscriptionHTTP(deps)(new Request('https://mikka.test/api/subscriptions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal })),
+  }
+}
+
+test('pending account without credentials is listed with its owner-session recovery presentation', async () => {
+  const fixture = lifecycle()
+  const result = await subscriptionList(new Request(`https://mikka.test/api/subscriptions?workspace=${workspaceId}`), fixture.deps)
+  assert.equal(result.status, 200)
+  const row = (await result.json()).connections[0]
+  assert.equal(row.state, 'pending')
+  assert.deepEqual(row.activeAttempt, { connectionId, ...authorization })
+  assert.deepEqual(fixture.calls.map(call => [call.method, call.params]), [['oauthResume', { sessionId: 'owner-session' }]])
+  assert.equal(fixture.acquisitions(), 0)
+  assert.doesNotMatch(JSON.stringify(row), /owner-session|secretName|verifier|device_auth_id/)
+})
+
+test('expired account remains visible with its reconnect reason and no new provider call', async () => {
+  const fixture = lifecycle()
+  Object.assign(fixture.row, { state: 'reconnect_required', lastErrorCode: 'acquire_expired' })
+  const response = await subscriptionList(new Request(`https://mikka.test/api/subscriptions?workspace=${workspaceId}`), fixture.deps)
+  const row = (await response.json()).connections[0]
+  assert.equal(row.lastErrorCode, 'acquire_expired')
+  assert.equal(row.activeAttempt, null)
+  assert.equal(fixture.calls.length, 0)
+})
+
+test('a concurrent start cannot attach a newer attempt to an older list revision', async () => {
+  const fixture = lifecycle()
+  fixture.row.epoch = '1'
+  const response = await subscriptionList(new Request(`https://mikka.test/api/subscriptions?workspace=${workspaceId}`), fixture.deps)
+  assert.equal(response.status, 200)
+  const row = (await response.json()).connections[0]
+  assert.equal(row.revision, 1)
+  assert.equal(row.activeAttempt, null)
+})
+
+test('resume and repeated Connect use the existing pending connection', async () => {
+  const fixture = lifecycle()
+  const resumed = await fixture.send({ action: 'resume', connectionId })
+  assert.deepEqual(await resumed.json(), { connectionId, ...authorization })
+  const connected = await fixture.send({ action: 'connect', workspaceId, provider: 'codex' })
+  assert.deepEqual(await connected.json(), { connectionId, ...authorization })
+  assert.deepEqual(fixture.calls.map(call => call.method), ['oauthResume', 'oauthStart'])
+  assert.equal(fixture.acquisitions(), 1)
+  assert.equal(fixture.removed(), false)
+})
+
+test('leaving during start, device poll, callback or Cancel does not abort a claimed server operation', async () => {
+  for (const body of [
+    { action: 'connect', workspaceId, provider: 'codex' },
+    { action: 'poll', connectionId, state: authorization.state },
+    { action: 'callback', connectionId, state: authorization.state, callbackUrl: 'http://localhost:54545/callback?code=private-code&state=' + authorization.state },
+    { action: 'disconnect', connectionId, revision: 2 },
+  ]) {
+    const fixture = lifecycle(), browser = new AbortController()
+    fixture.invoke(async (_method, _params, signal) => {
+      assert.ok(signal)
+      assert.notEqual(signal, browser.signal)
+      browser.abort()
+      await Promise.resolve()
+      assert.equal(signal.aborted, false, 'browser cancellation reached the claimed grant')
+      return authorization
+    })
+    const response = await fixture.send(body, browser.signal)
+    assert.equal(response.status, 200)
+    assert.equal(fixture.removed(), false)
+    assert.equal(fixture.lines.length, 0)
+  }
+})
+
+test('stale poll and callback refusals are logged once without state, session or provider callback data', async () => {
+  for (const action of ['poll', 'callback']) {
+    const fixture = lifecycle()
+    fixture.invoke(async () => { throw new WorkerRefusal('stale_operation') })
+    const response = await fixture.send({ action, connectionId, state: authorization.state, ...(action === 'callback' ? { callbackUrl: 'http://localhost:54545/callback?code=private-code&state=' + authorization.state } : {}) })
+    assert.equal(response.status, 409)
+    assert.deepEqual(await response.json(), { error: 'stale_operation' })
+    assert.equal(fixture.lines.length, 1)
+    assert.deepEqual(JSON.parse(fixture.lines[0]), { level: 'warn', msg: 'subscription_refused', action, provider: 'codex', code: 'stale_operation', error: 'WorkerRefusal' })
+    assert.doesNotMatch(fixture.lines[0], /owner-session|private-code|localhost|ssssssss|ABCD/)
+  }
+})
+
+test('explicit Cancel disconnects the pending revision without starting another attempt', async () => {
+  const fixture = lifecycle()
+  const response = await fixture.send({ action: 'disconnect', connectionId, revision: 2 })
+  assert.equal(response.status, 200)
+  assert.deepEqual(fixture.calls.map(call => [call.method, call.params]), [['disconnect', { revision: 2 }]])
+  assert.equal(fixture.row.state, 'disconnected')
+  assert.equal(fixture.acquisitions(), 0)
+})
+
+test('explicit reconnect fences a legacy or previous-session pending attempt before starting a new one', async () => {
+  const fixture = lifecycle()
+  const response = await fixture.send({ action: 'reconnect', connectionId, revision: 2 })
+  assert.equal(response.status, 200)
+  assert.deepEqual(fixture.calls.map(call => [call.method, call.params]), [['disconnect', { revision: 2 }], ['oauthStart', { revision: 3, sessionId: 'owner-session' }]])
+  assert.deepEqual(await response.json(), { connectionId, ...authorization })
+})
+
+test('an overlapping or uncertain start remains available instead of being disconnected by error cleanup', async () => {
+  const fixture = lifecycle()
+  fixture.service.repository.acquire = async () => ({ connectionId, created: true })
+  fixture.invoke(async () => { throw new WorkerRefusal('credential_busy') })
+  const response = await fixture.send({ action: 'connect', workspaceId, provider: 'codex' })
+  assert.equal(response.status, 409)
+  assert.deepEqual(await response.json(), { error: 'credential_busy' })
+  assert.equal(fixture.row.state, 'pending')
+  assert.deepEqual(fixture.calls.map(call => call.method), ['oauthStart'])
+  assert.equal(fixture.removed(), false)
 })

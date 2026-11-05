@@ -173,7 +173,7 @@ export type HeartbeatRun = z.infer<typeof heartbeatRunSchema>
  * Oldest local daemon the server serves. Older released clients cannot access
  * device business routes or register again, even with a fresh login.
  */
-export const MIN_DAEMON_VERSION = '0.0.375'
+export const MIN_DAEMON_VERSION = '0.0.456'
 /** packages/daemon/package.json's version: a daemon run from source (dev, E2E). Releases are 0.0.<run number>. */
 export const SOURCE_DAEMON_VERSION = '0.0.1'
 const stableVersion = z.string().regex(/^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/)
@@ -227,6 +227,19 @@ export type HeartbeatResult = z.input<typeof heartbeatResultSchema>
 export const deviceGatewaySchema = z.object({
   url: z.string().url().nullable(),
   protocol: z.string().regex(/^mikka-ticket-[0-9]+-[a-f0-9]{64}$/).nullable(),
+  /** This server wakes the device after every write that can end, pause or
+   * revoke one of its runs (stop, lease, credential, policy, membership), so a
+   * connected daemon needs no periodic run-control check (#1212). Absent from
+   * older servers: the daemon then keeps its one-second check. */
+  runControl: z.literal('push').optional(),
+  /** This server wakes the device when a person decides a computer review in
+   * the web, so a connected daemon syncs pending reviews only on a change or a
+   * push, plus a presence refresh (#1212). Absent from older servers: the
+   * daemon then keeps syncing every second while a review is pending. */
+  computerReviews: z.literal('push').optional(),
+  /** This server wakes the device when it writes a native Coordinator tool
+   * result, so the waiting tool asks once per push, not every 500 ms. */
+  coordinatorResults: z.literal('push').optional(),
 })
 export type DeviceGatewayTicket = z.infer<typeof deviceGatewaySchema>
 
@@ -352,6 +365,8 @@ export const runAssignmentSchema = z.object({
    * (zod strips unknown keys), so this needs no version gate.
    */
   model: modelNameSchema.optional(),
+  /** Frozen Profile effort, passed to the native harness unchanged. */
+  effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
   /** Owner-bound selection only; no subscription credential enters the assignment. */
   subscriptionBinding: z.object({
     bindingId: z.uuid(), ownerId: z.string().min(1).max(128), workspaceId: z.uuid(),

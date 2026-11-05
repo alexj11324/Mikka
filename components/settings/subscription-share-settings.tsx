@@ -23,7 +23,7 @@ type Change = { shared: boolean; allowOthers?: boolean }
  * workspace always uses its owner's subscriptions, so it shows nothing here
  * (decision 2026-10-31-2225).
  */
-export function SubscriptionShareSettings({ workspaceId }: { workspaceId: string }) {
+export function SubscriptionShareSettings({ workspaceId, workspaceName }: { workspaceId: string; workspaceName?: string }) {
   const t = useTranslations('Settings.subscriptionShare')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
@@ -54,9 +54,13 @@ export function SubscriptionShareSettings({ workspaceId }: { workspaceId: string
   const ownName = data.own.length
     ? data.own.map(provider => t('subscriptionName', { provider: t(`provider.${provider}`) })).join(t('listSeparator'))
     : t('ownFallback')
+  // What is shared and what happens, on the row whether on or off (Alex, 2026-11-05): the connected subscriptions by name.
+  const names = data.own.map(provider => t(`provider.${provider}`)).join(t('listSeparator'))
+  const workspace = workspaceName ?? t('thisWorkspace')
+  const hint = othersOn ? (names ? t('othersOn', { names }) : t('othersOnAny')) : names ? t('othersHint', { workspace, names }) : t('othersHintAny', { workspace })
   return <>
     <SettingsSection id="subscription-share-heading" title={t('heading')}>
-      <SettingRow title={t('others')} description={data.allowed && othersOn ? t('othersOn') : undefined}>
+      <SettingRow title={t('others')} description={data.allowed ? hint : undefined}>
         {data.allowed
           ? <Switch aria-label={t('others')} checked={othersOn} disabled={pending}
             onCheckedChange={checked => { if (checked) setConfirming(true); else void change({ shared: true, allowOthers: false }) }} />

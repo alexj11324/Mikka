@@ -15,24 +15,26 @@ export function createImprovementFactoryBridge(pool: Pool, factory: ReturnType<t
     async rehearse(userId:string,input:ImprovementRehearsal) {
       const parsed=commandSchema.safeParse(input)
       if (!parsed.success || parsed.data.action!=='rehearse') throw new ImprovementError('invalid')
+      const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('../factory/transaction')
       const tx=await pool.connect(), req=parsed.data
       try {
-        await tx.query('BEGIN')
+        await beginFactoryTransaction(tx)
         const task=await factory.lockForDispatch(userId,req.binding,req.binding.attemptId,tx)
         if (task.stage!=='execute') throw new ImprovementError('runUnavailable')
         const result=await dispatch(userId,{binding:req.binding,agentId:req.agentId,deviceRepoId:req.deviceRepoId},tx)
         const selection=await assignments.selectBaseline(userId,result.runId,tx)
-        await tx.query('COMMIT')
+        await commitFactoryTransaction(tx)
         if (!result.replayed) await notifyQueuedLocalRun(tx, userId, result.runId)
         return {...result,selection,productionEligible:false}
-      } catch(error) {await tx.query('ROLLBACK');throw error} finally {tx.release()}
+      } catch(error) {await rollbackFactoryTransaction(tx);throw error} finally {forgetFactoryTransaction(tx);tx.release()}
     },
     async handoff(userId: string, input: ImprovementHandoff) {
       const parsed = commandSchema.safeParse(input)
       if (!parsed.success || parsed.data.action !== 'handoff') throw new ImprovementError('invalid')
+      const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('../factory/transaction')
       const req = parsed.data, tx = await pool.connect()
       try {
-        await tx.query('BEGIN')
+        await beginFactoryTransaction(tx)
         await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`improvement-handoff:${userId}:${req.proposalId}`])
         const { rows: [proposal] } = await tx.query('SELECT * FROM improvement_proposals WHERE id=$1 AND "userId"=$2', [req.proposalId,userId])
         if (!proposal || proposal.issueId !== req.binding.issueId) throw new ImprovementError('notFound')
@@ -66,17 +68,17 @@ export function createImprovementFactoryBridge(pool: Pool, factory: ReturnType<t
         if (proposal.status !== 'awaiting_model_candidate' || digest(proposal.candidate) !== digest(expected.candidate) ||
           digest(proposal.result) !== digest(expected.result)) throw new ImprovementError('sourceMismatch')
         if (previous) {
-          await tx.query('COMMIT')
+          await commitFactoryTransaction(tx)
           return { ...previous, binding: bindingSchema.parse(req.binding), replayed: true, productionEligible: false }
         }
         const note = generationNote(proposal.id, expected.candidate)
         const result = await dispatch(userId,{ binding:req.binding,agentId:req.agentId,deviceRepoId:req.deviceRepoId,note },tx)
         await tx.query(`INSERT INTO improvement_factory_links("proposalId","userId","issueId","taskId","attemptId","runId",request)
           VALUES($1,$2,$3,$4,$5,$6,$7)`, [req.proposalId,userId,proposal.issueId,req.binding.taskId,req.binding.attemptId,result.runId,JSON.stringify(req)])
-        await tx.query('COMMIT')
+        await commitFactoryTransaction(tx)
         if (!result.replayed) await notifyQueuedLocalRun(tx, userId, result.runId)
         return { ...result, proposalId:req.proposalId, productionEligible:false }
-      } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+      } catch (error) { await rollbackFactoryTransaction(tx); throw error } finally { forgetFactoryTransaction(tx); tx.release() }
     },
     async status(userId: string, proposalId: string) {
       const { rows:[link] } = await pool.query('SELECT * FROM improvement_factory_links WHERE "proposalId"=$1 AND "userId"=$2',[proposalId,userId])

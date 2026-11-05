@@ -72,6 +72,8 @@ if (flag("--resume")) text(`resumed ${sessionId}`)
 let release = null
 let handedIn = null
 let afterHandIn = null
+let awaitingSigterm = false
+let sigtermDeadline
 const lines = createInterface({ input: process.stdin })
 lines.on("line", async (line) => {
   const frame = JSON.parse(line)
@@ -168,10 +170,14 @@ lines.on("line", async (line) => {
   }
   if (message.includes("HANG")) {
     const exitMarker = message.match(/SIGTERM_EXIT_143:(\S+)/)?.[1]
-    if (exitMarker) process.on('SIGTERM', () => {
-      writeFileSync(exitMarker, '143\n')
-      process.exit(143)
-    })
+    if (exitMarker) {
+      awaitingSigterm = true
+      process.on('SIGTERM', () => {
+        clearTimeout(sigtermDeadline)
+        writeFileSync(exitMarker, '143\n')
+        process.exit(143)
+      })
+    }
     if (exitMarker) writeFileSync(`${exitMarker}.ready`, 'ready\n')
     text("working forever")
     return
@@ -231,4 +237,12 @@ lines.on("line", async (line) => {
   text(`echo: ${message}`)
   result()
 })
-lines.on("close", () => process.exit(0))
+lines.on("close", () => {
+  // SDK cancellation can close stdin before SIGTERM is handled. Only this
+  // explicit signal fixture waits for it; a missing signal still fails boundedly.
+  if (awaitingSigterm) {
+    sigtermDeadline = setTimeout(() => process.exit(1), 20_000)
+    return
+  }
+  process.exit(0)
+})

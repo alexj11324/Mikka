@@ -139,6 +139,7 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
         const state = encodedIssueDocument(doc)
         await tx.insert(issueDocuments).values({ issueId: latest.id, userId: latest.userId, state, updatedAt: new Date() })
           .onConflictDoUpdate({ target: issueDocuments.issueId, set: { state, updatedAt: new Date() } })
+        await documentChanged(tx, latest.id)
       } finally { doc.destroy() }
     }
 
@@ -214,6 +215,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
     try {
       const state = encodedIssueDocument(doc)
       await tx.insert(issueDocuments).values({ issueId: id, userId: team.ownerId, state, updatedAt: now })
+      await documentChanged(tx, id)
     } finally { doc.destroy() }
     await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: team.ownerId, revision: 1, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...systemActor('linear') })
     await tx.insert(linearIssueLinks).values({
@@ -314,3 +316,5 @@ async function syncPublication(snapshot: Publication) {
   await linearCommentSync(issue, syncedLink, snapshot.documentState, token, connection.organizationId, snapshot)
   return { scopeVersion: issue.scopeVersion, observedUpdatedAt: issue.updatedAt }
 }
+
+import { documentChanged } from '../live/panels'

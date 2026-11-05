@@ -26,8 +26,8 @@ export function subscriptionRecovery(notice: SubscriptionRefusalNotice): 'retry'
   return 'model'
 }
 
-// The code alone, or ending a wrapped message; never a word inside an unrelated error.
-const pattern = new RegExp(`^(?:[^]*: )?(${Object.keys(REFUSALS).join('|')})$`)
+// The code alone (with its detail, `code (detail)`), or ending a wrapped message; never a word inside an unrelated error.
+const pattern = new RegExp(`^(?:[^]*: )?(${Object.keys(REFUSALS).join('|')})(?: \\([a-z][a-z0-9_]*\\))?$`)
 
 /**
  * The notice for a turn the chosen subscription refused, or null. The code is

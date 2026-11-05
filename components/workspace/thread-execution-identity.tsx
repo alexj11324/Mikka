@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { InlineLoadError } from '@/components/load-error'
 import { HarnessLabel, ModelLabel } from '@/components/labels/entity-labels'
 import { currentThreadExecutionEvidence, readThreadExecutionEvidence, type ThreadExecutionEvidence } from '@/lib/thread-execution-identity-view'
+import { DECISION_REASONS, type DecisionReason } from '@/lib/factory/agent-profile-decision'
 
 export function ThreadExecutionIdentity({ runId }: { runId: string }) {
   // A different actual run closes the previous dialog and starts with no data.
@@ -51,6 +52,9 @@ function AccountReference({ id }: { id: string }) {
 export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadExecutionEvidence }) {
   const t = useTranslations('IssueThreads.executionIdentity')
   const identity = evidence.executionIdentity
+  const profileT = useTranslations('Settings.agentProfiles')
+  const profile = evidence.agentProfile
+  const routing = evidence.modelRouting
   async function copyRunId() {
     try { await navigator.clipboard.writeText(evidence.id); toast.success(t('copied')) }
     catch { toast.error(t('copyFailed')) }
@@ -63,6 +67,26 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
       <ValueRow label={t('credential')}>{t(`credentialKinds.${evidence.credentialType}`)}</ValueRow>
       {evidence.credentialType === 'subscription' && <ValueRow label={t('subscriptionRoute')}><span className="break-all">{evidence.subscriptionRoute ?? t('unknown')}</span></ValueRow>}
     </dl>
+    {routing && <section className="flex flex-col gap-3" data-model-routing={routing.reason}>
+      <h3 className="font-medium">{t('modelRouting')}</h3>
+      <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+        <span>{t(`routingDifficulty.${routing.difficulty}`)}</span><span aria-hidden="true">→</span>
+        <span className="min-w-0 wrap-break-word" title={routing.model}><ModelLabel model={routing.model} /></span>
+        {routing.effort && <><span aria-hidden="true">·</span><span>{t(`routingEffort.${routing.effort}`)}</span></>}
+      </p>
+      <dl className="flex flex-col gap-3">
+        <ValueRow label={t('routingReason')}>{t(`routingReasons.${routing.reason}`)}</ValueRow>
+        {routing.previousModel && <ValueRow label={t('previousModel')}><span title={routing.previousModel}><ModelLabel model={routing.previousModel} /></span></ValueRow>}
+      </dl>
+    </section>}
+    {profile && <section className="flex flex-col gap-3"><h3 className="font-medium">{profileT('frozenProfile')}</h3><dl className="flex flex-col gap-3">
+      <ValueRow label={profileT('name')}>{profile.source === 'default' && profile.profileId === 'default' ? profileT('defaultName') : profile.name}</ValueRow>
+      <ValueRow label={profileT('revision')}>{profileT('version', { version: profile.version })}</ValueRow>
+      <ValueRow label={profileT('selectedBy')}>{profileT(`selectionSources.${profile.source}`)}</ValueRow>
+      {/* A run frozen before reasons were codes holds an English sentence: 选择方式 already says how it was chosen, so no reason row. */}
+      {(profile.source !== 'decision' || (DECISION_REASONS as readonly string[]).includes(profile.reason)) && <ValueRow label={profileT('selectionReason')}>{profile.source === 'explicit' ? profileT('explicitReason')
+        : profile.source === 'default' ? profileT('defaultReason') : profileT(`selectionReasons.${profile.reason as DecisionReason}`)}</ValueRow>}
+    </dl></section>}
     {!identity ? <p className="text-muted-foreground">{t('snapshotMissing')}</p> : <>
       <section className="flex flex-col gap-3"><h3 className="font-medium">{t('participants')}</h3><dl className="flex flex-col gap-3">
         <ValueRow label={t('workspace')}>{identity.workspaceId ? <span className="break-all">{identity.workspaceId}</span> : t('notRecorded')}</ValueRow>

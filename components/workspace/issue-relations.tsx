@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import useSWR, { useSWRConfig } from 'swr'
+import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { ChevronDown, ChevronRight, Circle, Flag, GitBranch, Link2, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -9,7 +9,8 @@ import { listIssueConnections, updateIssueRelation } from '@/app/actions/issue-o
 import { moveIssue, type IssueView } from '@/app/actions/issues'
 import { useActionError } from '@/lib/use-action-error'
 import { useRelationSearch } from '@/lib/hooks/use-relation-search'
-import { isIssueListKey } from '@/lib/live/list-read'
+import { isIssueListKey, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
+import { useLiveKey } from '@/hooks/use-live-key'
 import { Button } from '@/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -36,7 +37,7 @@ export function IssueRelationPicker({ kind, task, open, onOpenChange, pending, o
   return <Dialog open={open} onOpenChange={value => { if (!pending) onOpenChange(value) }}><DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">{/* Our own container caps the height to the viewport so the header and close button stay visible on short screens; the list scrolls inside. */}<div className="flex max-h-[calc(100svh-2rem)] min-h-0 flex-col"><DialogHeader className="shrink-0 p-4 pr-10"><DialogTitle>{relationTitle(kind)}</DialogTitle></DialogHeader>{validationError && <FieldError className="shrink-0 px-4 pb-3">{validationError}</FieldError>}{loadFailed && <FieldError className="shrink-0 px-4 pb-3">{t('loadFailed')}</FieldError>}<Command shouldFilter={false} className="min-h-0 flex-1 [&_[cmdk-item]]:min-h-11 lg:[&_[cmdk-item]]:min-h-0"><CommandInput value={query} onValueChange={setQuery} placeholder={t('searchPlaceholder')} aria-label={t('searchAria')} disabled={pending} />{/* min-h keeps loading / empty / list states the same height so the dialog does not jump. */}<CommandList className="min-h-36">{empty ? <CommandEmpty>{!items ? <span className="text-muted-foreground">{empty}</span> : empty}</CommandEmpty> : null}{rows.length > 0 && <CommandGroup heading={t('group')}>{rows.map(row => { const Icon = ISSUE_STATUSES.find(status => status.value === row.status)?.icon ?? Circle; return <CommandItem key={row.id} value={`${row.id} ${issueIdentifier(row)} ${row.title}`} disabled={pending} onSelect={() => onSelect(row.id)}><Icon /><span className="shrink-0 text-xs text-muted-foreground">{issueIdentifier(row)}</span><span className="truncate">{row.title}</span></CommandItem> })}</CommandGroup>}{failed && <CommandGroup><CommandItem value="reload" onSelect={reload}>{t('reload')}</CommandItem></CommandGroup>}</CommandList></Command></div></DialogContent></Dialog>
 }
 
-export function IssueRelations({ viewerId, task, mode, onOpen, onCreate, onPick, getCurrent, onSaved, disabled }: { viewerId: string; task: Issue; mode: 'subissues' | 'sidebar'; onOpen: (id: string) => void; onCreate: () => void; onPick: (kind: RelationKind) => void; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; disabled: boolean }) {
+export function IssueRelations({ liveWorkspaceId = null, viewerId, task, mode, onOpen, onCreate, onPick, getCurrent, onSaved, disabled }: { liveWorkspaceId?: string | null; viewerId: string; task: Issue; mode: 'subissues' | 'sidebar'; onOpen: (id: string) => void; onCreate: () => void; onPick: (kind: RelationKind) => void; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; disabled: boolean }) {
   const t = useTranslations('Metadata.relations')
   const tIssue = useTranslations('Issue')
   const actionError = useActionError()
@@ -44,7 +45,11 @@ export function IssueRelations({ viewerId, task, mode, onOpen, onCreate, onPick,
   const groupLabel = (value: RelationKind) => t.has(`groupLabel.${value}` as never) ? t(`groupLabel.${value}` as never) : value
   const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
   const { mutate: refresh } = useSWRConfig()
-  const { data: rows, error, mutate } = useSWR(['issue-connections', task.id], () => listIssueConnections(task.id), { refreshInterval: 10000 })
+  const connectionsKey = ['issue-connections', task.id] as const
+  const { data: rows, error, mutate } = useSWR(connectionsKey, () => listIssueConnections(task.id))
+  // No timer (#1212): a change to this task or one connected to it pushes `issue_relations` on the
+  // task's own channel, the one its document syncs on. Without one it is read once a minute.
+  useLiveKey('issue_relations', liveWorkspaceId ? task.id : UNRESOLVED_LIST_SCOPE, [unstable_serialize(connectionsKey)], liveWorkspaceId, { minIntervalMs: 2_000 })
   const [expanded, setExpanded] = useState(true)
   const [pending, setPending] = useState(false)
   const busy = useRef(false)
