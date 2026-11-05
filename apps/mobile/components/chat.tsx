@@ -1,10 +1,10 @@
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Clipboard from 'expo-clipboard'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import Reanimated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
+import Reanimated, { cancelAnimation, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
-import { Animated, Image, PanResponder, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
-import { Check, CircleAlert, Copy, Reply } from 'lucide-react-native'
+import { AccessibilityInfo, Animated, Image, PanResponder, Platform, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
+import { Check, CircleAlert, Copy, Ellipsis, Reply } from 'lucide-react-native'
 import { StatusIcon } from '@/components/icons'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
@@ -14,6 +14,7 @@ import { authHeaders } from '@/lib/api'
 import { API_URL } from '@/lib/config'
 import type { Reaction, ThreadStatus } from '@/lib/types'
 import { colors } from '@/lib/theme'
+import { useReducedMotionPreference } from '@/lib/reduced-motion'
 
 /** The bot's words sit in the grey bubble (R-14). */
 export function BotBubble({ children }: { children: ReactNode }) {
@@ -120,12 +121,27 @@ const REVEAL = 56
  */
 export function useTimeReveal() {
   const offset = useRef(new Animated.Value(0)).current
-  const responder = useRef(PanResponder.create({
+  const reduceMotion = useReducedMotionPreference()
+  const preference = useRef(reduceMotion)
+  preference.current = reduceMotion
+  useEffect(() => {
+    if (reduceMotion) { offset.stopAnimation(); offset.setValue(0) }
+    return () => offset.stopAnimation()
+  }, [offset, reduceMotion])
+  const responder = useMemo(() => {
+    const reset = () => {
+      offset.stopAnimation()
+      if (preference.current) offset.setValue(0)
+      else Animated.spring(offset, { toValue: 0, useNativeDriver: Platform.OS !== 'web', damping: 22, stiffness: 260, overshootClamping: true }).start()
+    }
+    return PanResponder.create({
     onMoveShouldSetPanResponder: (_, g) => g.dx < -8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+    onPanResponderGrant: () => offset.stopAnimation(),
     onPanResponderMove: (_, g) => offset.setValue(Math.max(-REVEAL, Math.min(0, g.dx))),
-    onPanResponderRelease: () => Animated.spring(offset, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start(),
-    onPanResponderTerminate: () => Animated.spring(offset, { toValue: 0, useNativeDriver: true }).start(),
-  })).current
+    onPanResponderRelease: reset,
+    onPanResponderTerminate: reset,
+    })
+  }, [offset])
   return { offset, handlers: responder.panHandlers }
 }
 
@@ -140,6 +156,7 @@ const QUOTE_AT = 56
  */
 export function TimedRow({ time, offset, children, align = 'left', onQuote, onLongPress }: { time?: string; offset: Animated.Value; children: ReactNode; align?: 'left' | 'right'; onQuote?: () => void; onLongPress?: () => void }) {
   const drag = useSharedValue(0)
+  const reduceMotion = useReducedMotionPreference()
   const quote = useCallback(() => { tap(); onQuote?.() }, [onQuote])
   const pan = Gesture.Pan()
     .enabled(Boolean(onQuote))
@@ -147,20 +164,24 @@ export function TimedRow({ time, offset, children, align = 'left', onQuote, onLo
     .activeOffsetX([-10000, 12])
     .failOffsetY([-12, 12])
     .hitSlop({ left: -28 })
+    .onStart(() => { cancelAnimation(drag) })
     .onUpdate(event => { drag.value = Math.max(0, Math.min(QUOTE_AT * 1.4, event.translationX * 0.8)) })
-    .onEnd(() => {
-      if (drag.value >= QUOTE_AT) scheduleOnRN(quote)
-      drag.value = withSpring(0, { damping: 22, stiffness: 260 })
+    .onEnd((_event, success) => {
+      if (success && drag.value >= QUOTE_AT) scheduleOnRN(quote)
     })
+    // Finalize also runs for an interrupted/cancelled drag; cancellation never
+    // quotes the message and must not leave its bubble stuck off its baseline.
+    .onFinalize(() => { drag.value = reduceMotion ? 0 : withSpring(0, { damping: 22, stiffness: 260, overshootClamping: true }) })
   const held = useCallback(() => { press(); onLongPress?.() }, [onLongPress])
   // A long press opens the message's actions (app/message.tsx).
   const long = Gesture.LongPress().enabled(Boolean(onLongPress)).minDuration(380).onStart(() => { scheduleOnRN(held) })
   const moved = useAnimatedStyle(() => ({ transform: [{ translateX: drag.value }] }))
-  const arrow = useAnimatedStyle(() => ({ opacity: Math.min(1, drag.value / QUOTE_AT), transform: [{ scale: 0.6 + 0.4 * Math.min(1, drag.value / QUOTE_AT) }] }))
+  const arrow = useAnimatedStyle(() => ({ opacity: Math.min(1, drag.value / QUOTE_AT), transform: [{ scale: reduceMotion ? 1 : 0.6 + 0.4 * Math.min(1, drag.value / QUOTE_AT) }] }))
   return (
+    <View>
     <GestureDetector gesture={Gesture.Race(pan, long)}>
       <Reanimated.View>
-        <Reanimated.View style={[styles.quoteArrow, arrow]} pointerEvents="none">
+        <Reanimated.View style={[styles.quoteArrow, arrow]} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
           <Symbol name="arrowshape.turn.up.left" size={16} color={colors.secondary} web={<Reply size={16} color={colors.secondary} />} />
         </Reanimated.View>
         <Reanimated.View style={moved}>
@@ -171,6 +192,25 @@ export function TimedRow({ time, offset, children, align = 'left', onQuote, onLo
         </Reanimated.View>
       </Reanimated.View>
     </GestureDetector>
+    {onLongPress || onQuote ? (
+      <Pressable accessibilityRole="button" accessibilityLabel={`${time ? `${time}，` : ''}${onLongPress ? '消息操作' : '引用消息'}`}
+        accessibilityActions={[
+          { name: 'activate', label: onLongPress ? '消息操作' : '引用消息' },
+          ...(onQuote ? [{ name: 'quote', label: '引用消息' }] : []),
+          ...(time ? [{ name: 'time', label: `时间：${time}` }] : []),
+        ]}
+        onAccessibilityAction={event => {
+          if (event.nativeEvent.actionName === 'quote') quote()
+          else if (event.nativeEvent.actionName === 'time' && time) AccessibilityInfo.announceForAccessibility(time)
+          else if (event.nativeEvent.actionName === 'activate') { if (onLongPress) held(); else quote() }
+        }}
+        onPress={onLongPress ? held : quote}
+        style={({ pressed }) => [styles.messageAction, { alignSelf: align === 'right' ? 'flex-end' : 'flex-start' }, pressed && { backgroundColor: colors.pressed }]}>
+        <Symbol name={onLongPress ? 'ellipsis' : 'arrowshape.turn.up.left'} size={18} color={colors.secondary}
+          web={onLongPress ? <Ellipsis size={18} color={colors.secondary} /> : <Reply size={18} color={colors.secondary} />} />
+      </Pressable>
+    ) : null}
+    </View>
   )
 }
 
@@ -187,7 +227,7 @@ export function CopyButton({ text }: { text: string }) {
     setTimeout(() => setCopied(false), 1500)
   }
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={copied ? '已复制' : '复制'} hitSlop={10} onPress={() => void copy()} style={styles.copy}>
+    <Pressable accessibilityRole="button" accessibilityLabel={copied ? '已复制' : '复制'} onPress={() => void copy()} style={({ pressed }) => [styles.copy, pressed && { backgroundColor: colors.pressed }]}>
       <Symbol name={copied ? 'checkmark' : 'doc.on.doc'} size={15} color={colors.secondary} web={copied ? <Check size={15} color={colors.secondary} /> : <Copy size={15} color={colors.secondary} />} />
     </Pressable>
   )
@@ -200,8 +240,11 @@ export function Reactions({ reactions, align = 'left', onToggle }: { reactions?:
     <View style={[styles.reactions, align === 'right' && { alignSelf: 'flex-end' }]}>
       {reactions.map(reaction => (
         <Pressable key={reaction.emoji} accessibilityRole="button" accessibilityState={{ selected: reaction.mine }} accessibilityLabel={`${reaction.emoji} ${reaction.count}`}
-          onPress={() => { tap(); onToggle(reaction.emoji) }} style={[styles.reaction, reaction.mine && styles.reactionMine]}>
+          accessibilityHint={reaction.mine ? '移除回应' : '添加回应'}
+          onPress={() => { tap(); onToggle(reaction.emoji) }} style={({ pressed }) => [styles.reactionTarget, pressed && { opacity: 0.6 }]}>
+          <View style={[styles.reaction, reaction.mine && styles.reactionMine]}>
           <Text style={styles.reactionText}>{reaction.emoji}{reaction.count > 1 ? ` ${reaction.count}` : ''}</Text>
+          </View>
         </Pressable>
       ))}
     </View>
@@ -209,7 +252,8 @@ export function Reactions({ reactions, align = 'left', onToggle }: { reactions?:
 }
 
 const styles = StyleSheet.create({
-  reactions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  reactions: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, marginTop: 4 },
+  reactionTarget: { minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 2, paddingVertical: 8 },
   reaction: { height: 28, paddingHorizontal: 9, borderRadius: 14, justifyContent: 'center', backgroundColor: colors.bubble },
   reactionMine: { backgroundColor: colors.objectChip },
   reactionText: { fontSize: 14 },
@@ -229,7 +273,8 @@ const styles = StyleSheet.create({
   event: { alignSelf: 'center', textAlign: 'center', fontSize: 12, lineHeight: 17, color: colors.secondary, marginHorizontal: 24 },
   time: { position: 'absolute', right: -REVEAL + 6, bottom: 4, fontSize: 11, color: colors.secondary },
   quoteArrow: { position: 'absolute', left: 4, top: 0, bottom: 0, justifyContent: 'center' },
-  copy: { alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 6, marginTop: 2 },
+  copy: { alignSelf: 'flex-start', minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, marginTop: 2 },
+  messageAction: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
 })
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { ChatFiles } from './ChatFiles'

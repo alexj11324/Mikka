@@ -1,4 +1,5 @@
-import { type ComponentType, useMemo, useState } from 'react'
+import { ReadNotice } from '@/components/ReadNotice'
+import { type ComponentType, useEffect, useMemo, useState } from 'react'
 import { FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -8,7 +9,6 @@ import { GROUP_ICON } from '@/lib/thread-icon'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Dot } from '@/components/ui'
-import { CardButton } from '@/components/cards'
 import type { BotPage, Thread, ThreadGroup, Threads } from '@/lib/types'
 import { openChat } from '@/lib/navigate'
 import { useApi, useRefresh } from '@/lib/useApi'
@@ -57,6 +57,13 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
   const [filter, setFilter] = useState<Filter>('all')
   const [menu, setMenu] = useState(false)
 
+  // A workspace change or removed device must not leave an invisible filter.
+  useEffect(() => {
+    if (!data || !machine) return
+    const available = 'devices' in data ? data.devices : []
+    if (!available.some(device => device.id === machine)) setMachine(null)
+  }, [data, machine])
+
   const list = useMemo(() => (data?.threads ?? [])
     .filter(t => matches(t, filter) && (!machine || t.device?.id === machine))
     .sort((a, b) => rank(a) - rank(b)), [data, filter, machine])
@@ -83,12 +90,13 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         ListHeaderComponent={
           <View>
+            <ReadNotice error={error} hasData={Boolean(data)} label="线程" onRetry={reload} />
             {devices.length ? <Text style={styles.section}>设备</Text> : null}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
               {devices.map(m => {
                 const active = machine === m.id
                 return (
-                  <Pressable key={m.id} accessibilityRole="button" onPress={() => setMachine(active ? null : m.id)} style={[styles.chip, active && styles.chipActive]}>
+                  <Pressable key={m.id} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => setMachine(active ? null : m.id)} style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && { opacity: 0.7 }]}>
                     <MachineIcon machine={m.kind} size={16} color={active ? colors.onInk : colors.ink} />
                     <Text style={[styles.chipText, active && { color: colors.onInk }]}>{m.name}</Text>
                     {m.online ? <View style={styles.online} /> : null}
@@ -99,12 +107,7 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
             {filter === 'all' ? null : <Text style={styles.section}>{filters.find(f => f.id === filter)?.label}</Text>}
           </View>
         }
-        ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : error ? (
-          <View style={styles.failed}>
-            <Text style={styles.error}>线程加载失败。</Text>
-            <CardButton label="重试" onPress={() => void reload()} />
-          </View>
-        ) : <Text style={styles.empty}>没有线程</Text>}
+        ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : error ? undefined : <Text style={styles.empty}>没有线程</Text>}
         renderItem={({ item }) => 'title' in item ? <Text style={styles.section}>{item.title}</Text> : <ThreadRow thread={item} onPress={() => router.push(`/thread/${item.id}`)} />}
       />
       <Modal visible={menu} transparent animationType="fade" onRequestClose={() => setMenu(false)}>
@@ -145,7 +148,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
   section: { fontSize: 13, color: colors.secondary, marginLeft: 20, marginTop: 12, marginBottom: 8 },
   chips: { paddingHorizontal: 16, gap: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 7, height: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: colors.bubble },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 44, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: colors.bubble },
   chipActive: { backgroundColor: colors.ink },
   chipText: { fontSize: 15 },
   online: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.success },
@@ -158,5 +161,5 @@ const styles = StyleSheet.create({
   failed: { alignItems: 'center', gap: 10, marginTop: 40 },
   error: { fontSize: 13, color: colors.danger },
   menu: { position: 'absolute', right: 16, width: 220, backgroundColor: colors.surface, borderRadius: 18, paddingVertical: 6, ...lift, shadowOpacity: 0.16, shadowRadius: 24 },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, height: 44 },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, minHeight: 44, paddingVertical: 10 },
 })

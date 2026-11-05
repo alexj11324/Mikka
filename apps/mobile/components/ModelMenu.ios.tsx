@@ -1,5 +1,5 @@
 import { Button, Host, Menu, Section, Text, Toggle } from '@expo/ui/swift-ui'
-import { buttonStyle, controlSize, tint } from '@expo/ui/swift-ui/modifiers'
+import { buttonStyle, controlSize, disabled, tint } from '@expo/ui/swift-ui/modifiers'
 import { groupTag, groupTitle, modelMenuLabel, modelMenuReadLabel, optionName, type ModelMenuState } from '@/lib/model-menu'
 import { colors } from '@/lib/theme'
 
@@ -10,7 +10,7 @@ import { colors } from '@/lib/theme'
  * a pick that does not save keeps the saved model here (ModelNotice says why).
  */
 export function ModelMenu({ model, running = false }: { model: ModelMenuState; running?: boolean }) {
-  const { menu, choose, refresh, refreshing, refreshFailed, loading, retryRead } = model
+  const { menu, choose, refresh, refreshing, refreshFailed, loading, retryRead, busy } = model
   if (!menu) return <Host matchContents>{loading
     ? <Text>{modelMenuReadLabel(true)}</Text>
     : <Button label={modelMenuReadLabel(false)} systemImage="arrow.clockwise" onPress={() => { void retryRead().catch(() => undefined) }} modifiers={[buttonStyle('borderless'), controlSize('small'), tint(colors.secondary)]} />}</Host>
@@ -19,7 +19,7 @@ export function ModelMenu({ model, running = false }: { model: ModelMenuState; r
   const unavailable = !current.available && current.availability !== 'checking'
   return (
     <Host matchContents>
-      <Menu label={label} systemImage="chevron.down" modifiers={[buttonStyle('borderless'), controlSize('small'), tint(unavailable ? colors.secondary : colors.ink)]}>
+      <Menu label={label} systemImage="chevron.down" modifiers={[buttonStyle('borderless'), controlSize('small'), disabled(busy), tint(unavailable ? colors.secondary : colors.ink)]}>
         {groups.map((group, index) => (
           <Section key={`${group.kind}-${index}`} title={groupTitle(group)}>
             {group.options.map(option => {

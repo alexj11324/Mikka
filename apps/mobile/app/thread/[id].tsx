@@ -12,7 +12,7 @@ import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Composer } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
-import { CardButton } from '@/components/cards'
+import { ReadNotice } from '@/components/ReadNotice'
 import { StopFailed } from '@/components/StopFailed'
 import { ThreadQuotaPaused } from '@/components/ThreadQuotaPaused'
 import { useStop } from '@/lib/useStop'
@@ -70,7 +70,7 @@ export default function ThreadScreen() {
             <View style={{ flexShrink: 1 }}>
               <Text style={styles.title} numberOfLines={1}>{thread.name}</Text>
               <View style={styles.subtitleRow}>
-                <Text style={styles.subtitle} numberOfLines={1}>{STATUS_WORD[thread.status]} · {HARNESS[thread.harness] ?? thread.harness}</Text>
+                <Text style={styles.subtitle} numberOfLines={1}>{error ? '上次状态：' : ''}{STATUS_WORD[thread.status]} · {HARNESS[thread.harness] ?? thread.harness}</Text>
                 {thread.device ? <MachineIcon machine={thread.device.kind} size={11} /> : null}
               </View>
             </View>
@@ -81,12 +81,7 @@ export default function ThreadScreen() {
       />
       <KeyboardChatScrollView {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : null}
-        {error && !data ? (
-          <View style={styles.failed}>
-            <Text style={styles.error}>线程加载失败。</Text>
-            <CardButton label="重试" onPress={() => void reload()} />
-          </View>
-        ) : null}
+        <ReadNotice error={error} hasData={Boolean(data)} label="线程" onRetry={reload} />
         {data?.items.map((item, index) => {
           switch (item.kind) {
             case 'steps': {
@@ -125,5 +120,4 @@ const styles = StyleSheet.create({
   step: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 26 },
   stepText: { fontSize: 14, color: colors.secondary },
   error: { fontSize: 14, color: colors.danger, marginVertical: 4 },
-  failed: { alignItems: 'center', gap: 10, marginTop: 24 },
 })
