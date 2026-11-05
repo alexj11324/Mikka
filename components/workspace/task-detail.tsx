@@ -1,7 +1,8 @@
 'use client'
 
 import { Component, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import useSWR from 'swr'
+import useSWR, { unstable_serialize } from 'swr'
+import { useLiveKey } from '@/hooks/use-live-key'
 import { useTranslations } from 'next-intl'
 import type { JSONContent } from '@tiptap/react'
 import { ArrowLeft } from 'lucide-react'
@@ -88,7 +89,7 @@ class EditorErrorBoundary extends Component<{ children: ReactNode; title: string
   }
 }
 
-const READ_ONLY_SNAPSHOT = { ready: false, pending: false, error: false, syncing: false }
+const READ_ONLY_SNAPSHOT = { ready: false, pending: false, error: false, syncing: false, workspaceId: null }
 const readOnlySnapshot = () => READ_ONLY_SNAPSHOT
 const noSubscribe = () => () => {}
 
@@ -105,7 +106,9 @@ function TaskForm({ initial, thread: openThread, origin, user, onSaved, onDirty,
   // Read-only never constructs a DocumentSync: no Y.Doc, no provider, no exchange.
   const [sync] = useState(() => seed ? new DocumentSync(initial.id, seed) : null)
   const syncState = useSyncExternalStore(sync?.subscribe ?? noSubscribe, sync?.getSnapshot ?? readOnlySnapshot, sync?.getSnapshot ?? readOnlySnapshot)
-  const { mutate: retrySync } = useSWR(sync ? ['document-sync', saved.id, sync.doc.clientID] : null, () => sync?.exchange(saved.id), { refreshInterval: 1500, shouldRetryOnError: true, errorRetryInterval: 3000 })
+  const syncKey = sync ? ['document-sync', saved.id, sync.doc.clientID] : null
+  const { mutate: retrySync } = useSWR(syncKey, () => sync?.exchange(saved.id), { refreshInterval: 0, revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false })
+  useLiveKey('issue_document', sync ? saved.id : null, syncKey ? [unstable_serialize(syncKey)] : [], syncState.workspaceId ?? null, { minIntervalMs: 1500 })
   useEffect(() => {
     // Delay disposal so React Strict Mode's immediate effect replay retains this document.
     if (!sync) return

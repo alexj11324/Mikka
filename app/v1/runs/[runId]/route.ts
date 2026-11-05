@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { agentRuns, devices } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
 import { maskFor } from '@/lib/secrets/runtime'
+import { runChanged } from '@/lib/live/panels'
 import { runListChanged } from '@/lib/live/lists'
 
 export const dynamic = 'force-dynamic'
@@ -42,7 +43,7 @@ async function handlePATCH(request: Request, { params }: { params: Promise<{ run
         .set({ error: patch.error, updatedAt: new Date() })
         .where(and(eq(agentRuns.id, runId), isNull(agentRuns.error), inArray(agentRuns.status, [...LIVE_STATES, 'paused', 'failed'])))
         .returning({ id: agentRuns.id })
-      if (changed.length) await runListChanged(db, runId)
+      if (changed.length) { await runListChanged(db, runId); await runChanged(db, runId) }
     }
     return new NextResponse(null, { status: 204 })
   }
@@ -60,7 +61,7 @@ async function handlePATCH(request: Request, { params }: { params: Promise<{ run
     .returning({ id: agentRuns.id })
   // Supervisor state transitions use this route. Its periodic device lease
   // heartbeat and streaming chunks have separate writers and send no list key.
-  if (changed.length) await runListChanged(db, runId)
+  if (changed.length) { await runListChanged(db, runId); await runChanged(db, runId) }
   return new NextResponse(null, { status: 204 })
 }
 

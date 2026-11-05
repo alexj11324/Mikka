@@ -46,6 +46,7 @@ import { ThreadFeedback } from './self-improvement'
 import { InlineLoadError } from '@/components/load-error'
 import { FieldError } from '@/components/ui/field'
 import { closeOnEscape, useFocusReturn } from '@/hooks/use-focus-return'
+import { useLiveKey, useLiveKeys } from '@/hooks/use-live-key'
 
 // R-32 chat: 13/21 as in Comma, also for the agent's Markdown inside a bubble.
 const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.25 whitespace-pre-wrap break-words [&_[data-agent-markdown]]:leading-5.25'
@@ -79,19 +80,18 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const t = useTranslations('IssueThreads')
   const format = useFormatter()
   const { mutate: mutateCache, cache } = useSWRConfig()
-  const waitingPolls = useRef(0)
   const key = ['issue-thread', issueId, runId]
-  // A live run polls every 2 s: pass where the held chunks end, so only later chunks are read and sent.
+  // Keep incremental chunks while shared invalidations schedule the reads.
   const { data, error, mutate } = useSWR(key, async () => {
     const held = cache.get(unstable_serialize(key))?.data as IssueThreadDetail | undefined
     const previous = held?.chunkCursor ? held : undefined
     return mergeThreadChunks(previous, await getIssueThread(issueId, runId, previous?.chunkCursor))
-  }, {
-    // Ended runs can still await an answer or a host-prepared model change.
-    // Back off, capped, until the continuation or refusal has committed.
-    refreshInterval: detail => !detail ? 0 : runIsActive(threadQuestionView(detail.thread).status) ? 2000 : threadQuestionView(detail.thread).question || detail.thread.modelFallbackPending ? Math.min(2000 * 2 ** waitingPolls.current, 30_000) : 0,
-    onSuccess: detail => { waitingPolls.current = threadQuestionView(detail.thread).question || detail.thread.modelFallbackPending ? waitingPolls.current + 1 : 0 },
-  })
+  }, { refreshInterval: 0, revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false })
+  const liveRuns = data?.live?.runs ?? [{ id: runId, workspaceId: null }]
+  const liveKeys = [unstable_serialize(key)]
+  useLiveKeys(liveRuns.map(reference => ({ ...reference, kind: 'thread' as const })), liveKeys, null, { minIntervalMs: 2000 })
+  useLiveKeys(liveRuns.map(reference => ({ ...reference, kind: 'run' as const })), liveKeys, null)
+  useLiveKey('factory_issue', issueId, liveKeys, data?.live?.issueWorkspaceId ?? null, { deadline: data?.live?.questionDeadline })
   // Frame 06: a thread whose candidate waits for acceptance has 对话 | 验收 in its header.
   const acceptance = useThreadAcceptance(issueId, runId)
   const [tab, setTab] = useViewState<ThreadTab>(`thread:${runId}:tab:${initialTab}`, initialTab)

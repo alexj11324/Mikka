@@ -22,7 +22,10 @@ test('provider failure continues the same task through its authorized preferred 
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
   delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
   const next = await import('next/server')
-  mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
+  let captureAfter: (() => Promise<void>)[] | undefined
+  mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse,
+    after: (work: () => Promise<void>) => { captureAfter?.push(work) },
+  } })
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 4 })
   const { pool: appPool } = await import('../lib/db')
@@ -442,4 +445,91 @@ test('provider failure continues the same task through its authorized preferred 
     assert.equal((await children(otherRun)).length, 0)
     assert.equal((await row(otherRun)).report.modelFallback.state, 'blocked')
   })
+  await t.test('committed provider recovery wakes its existing thread; rollback and replay stay silent', async liveTest => {
+    const { observePoolCommits } = await import('../lib/db/commit-effects')
+    const { liveChannelId } = await import('../lib/live/scope')
+    const { pendingProviderFallback } = await import('../lib/run-provider-fallback')
+    observePoolCommits(pool)
+    const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
+    process.env.DEVICE_GATEWAY_URL = 'https://provider-live.example.invalid'
+    process.env.DEVICE_GATEWAY_PUSH_SECRET = 'synthetic-live-fixture'
+    const scheduled: (() => Promise<void>)[] = [], sent: { path: string; events: { kind: string; id: string }[] }[] = []
+    captureAfter = scheduled
+    liveTest.mock.method(globalThis, 'fetch', async (input: string | URL | Request, options?: RequestInit) => {
+      const target = new URL(String(input))
+      assert.equal(target.hostname, 'provider-live.example.invalid', 'only the isolated live gateway is allowed')
+      assert.match(target.pathname, /^\/v1\/live\/[^/]+\/push$/)
+      // The same commit also refreshes owner lists (lib/live/lists.db.test.ts
+      // covers those keys); this case checks the existing thread's panel key.
+      const events = (JSON.parse(String(options?.body)) as { kind: string; id: string }[]).filter(event => !event.kind.endsWith('_list'))
+      if (events.length) sent.push({ path: target.pathname, events })
+      return new Response(null, { status: 204 })
+    })
+    const drain = async () => { await Promise.all(scheduled.splice(0).map(work => work())) }
+    // A normal admission remains intact. This lifecycle-only fixture is the
+    // durable crash boundary: completion committed pending, then the host died
+    // before recoverProviderFailure. No provider call or worker success is faked.
+    const interrupted = async (label: string, kind: 'preference' | 'picked' = 'preference') => {
+      const setup = await twoModels(label)
+      const home = await seedWorkspace(pool, setup.p.id, [{ userId: setup.p.id, role: 'admin' }])
+      await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [home.id])
+      const runId = await running(setup.p, 'claude_code', kind === 'picked' ? { asked: 'fixture-claude-a' } : {})
+      const source = await row(runId)
+      await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='provider_failure',"finishedAt"=now(),report=$2 WHERE id=$1`,
+        [runId, JSON.stringify({ ...emptyRunReport(), providerFailure: balance, modelFallback: pendingProviderFallback(source, balance) })])
+      scheduled.length = 0; sent.length = 0
+      const { runLiveTargets } = await import('../lib/live/panels')
+      assert.deepEqual(await runLiveTargets(appPool, workspacePool, runId, 'run'), [{
+        scope: { ownerId: setup.p.id, workspaceId: home.id }, events: [{ kind: 'run', id: runId }],
+      }], 'the personal issue has the same authorized home channel as a normally registered owner')
+      return { ...setup, runId, homeId: home.id }
+    }
+    const assertSent = async (p: Person, homeId: string, runId: string, state: string) => {
+      assert.equal((await row(runId)).report.modelFallback.state, state, 'independent connection sees the committed receipt')
+      assert.ok(scheduled.length > 0, 'post-COMMIT work is scheduled for the existing thread')
+      assert.equal(sent.length, 0, 'delivery waits for the actual Next after callback')
+      await drain()
+      assert.deepEqual(sent.splice(0), [{
+        path: `/v1/live/${liveChannelId({ ownerId: p.id, workspaceId: homeId })}/push`,
+        events: [{ kind: 'run', id: runId }],
+      }])
+      await recoverProviderFailure(pool, p.id, runId)
+      assert.equal(scheduled.length, 0, 'a replay cannot notify an unchanged receipt')
+    }
+    try {
+      const setup = await interrupted('provider-live-switch')
+      const functionName = `live_rollback_${randomUUID().replaceAll('-', '')}`
+      // Force a real PG error after the receipt write and notification
+      // registration, before COMMIT. Its queued effect must roll back too.
+      await pool.query(`CREATE FUNCTION "${functionName}"() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN IF NEW."runId"='${setup.runId}'::uuid THEN RAISE EXCEPTION 'fixture_provider_event_rollback'; END IF; RETURN NEW; END $$`)
+      await pool.query(`CREATE TRIGGER "${functionName}" BEFORE INSERT ON coordinator_events FOR EACH ROW EXECUTE FUNCTION "${functionName}"()`)
+      try {
+        await assert.rejects(recoverProviderFailure(pool, setup.p.id, setup.runId), error => error instanceof Error && error.cause instanceof Error
+          && error.cause.message === 'fixture_provider_event_rollback' && (error.cause as Error & { code?: string }).code === 'P0001')
+        assert.equal((await row(setup.runId)).report.modelFallback.state, 'pending')
+        assert.equal((await children(setup.runId)).length, 0)
+        assert.equal(scheduled.length, 0, 'the failed recovery transaction emits no live event')
+      } finally {
+        await pool.query(`DROP TRIGGER "${functionName}" ON coordinator_events`)
+        await pool.query(`DROP FUNCTION "${functionName}"()`)
+      }
+      const continued = await recoverProviderFailure(pool, setup.p.id, setup.runId)
+      assert.ok(continued)
+      await assertSent(setup.p, setup.homeId, setup.runId, 'switched')
+      for (const state of ['picked', 'blocked', 'stopped'] as const) {
+        const current = await interrupted(`provider-live-${state}`, state === 'picked' ? 'picked' : 'preference')
+        if (state === 'blocked') await preferences(current.p, [current.entries[0]])
+        if (state === 'stopped') await pool.query(`UPDATE issues SET status='done' WHERE id=$1`, [(await row(current.runId)).issueId])
+        assert.equal(await recoverProviderFailure(pool, current.p.id, current.runId), null)
+        assert.equal((await children(current.runId)).length, 0)
+        await assertSent(current.p, current.homeId, current.runId, state)
+      }
+    } finally {
+      captureAfter = undefined
+      if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = previous.url
+      if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
+    }
+  })
+
 })

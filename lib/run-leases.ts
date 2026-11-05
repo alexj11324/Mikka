@@ -1,3 +1,4 @@
+import { runChanged } from './live/panels'
 import 'server-only'
 import { runListChanged } from './live/lists'
 import { rebindExecutionDevice, revalidateExecutionIdentity, ExecutionIdentityError } from './execution-identity'
@@ -69,7 +70,7 @@ export async function renewRunLeases(deviceId: string, runIds: readonly string[]
       if (!(error instanceof ExecutionIdentityError)) throw error
       // The daemon receives revoked on this heartbeat and removes injected credentials.
       const stopped = await db.update(agentRuns).set({ stopRequestedAt: now, leaseExpiresAt: now, updatedAt: now }).where(and(eq(agentRuns.id, run.id), eq(agentRuns.deviceId, deviceId), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]))).returning({ id: agentRuns.id })
-      if (stopped.length && !run.stopRequestedAt) await runListChanged(db, run.id)
+      if (stopped.length && !run.stopRequestedAt) { await runListChanged(db, run.id); await runChanged(db, run.id) }
     }
   }
   const renewed = authorized.length ? await db.update(agentRuns)
@@ -258,6 +259,7 @@ async function reclaimLostRun(run: Run, now: Date) {
       .returning({ id: agentRuns.id })
     if (!ended) return false
     await runListChanged(tx, run.id)
+    await runChanged(tx, run.id)
     if (cloud) return true
     await tx.insert(agentRuns).values({
       id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,

@@ -21,6 +21,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
     if(await prepareLocalClaimBinding(client,runId,subscriptionBindingId)==='cloud-required'){await client.query('COMMIT');return 'cloud-required'}
     await client.query('UPDATE agent_runs SET status=$2,"startedAt"=now(),"leaseExpiresAt"=$3,"updatedAt"=now() WHERE id=$1', [runId, 'preparing', leaseExpiresAt])
     await runListChanged(client, runId)
+    await runChanged(client, runId)
     if (afterClaim) await afterClaim(client)
     await client.query('COMMIT')
     return 'claimed'
@@ -69,6 +70,7 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
     } else if (!(await client.query('SELECT 1 FROM model_api_key_runs WHERE "runId"=$1', [runId])).rowCount) { await client.query('COMMIT'); return null }
     await client.query('UPDATE agent_runs SET status=$2,"startedAt"=now(),"leaseExpiresAt"=$3,"updatedAt"=now() WHERE id=$1', [runId, 'preparing', leaseExpiresAt])
     await runListChanged(client, runId)
+    await runChanged(client, runId)
     if (afterClaim) await afterClaim(client)
     await client.query('COMMIT')
     return { botId: binding.botId, ownerId: actor.userId, display: `:${binding.display}`, policyVersion: policy?.version ?? 0, permission }
@@ -82,3 +84,5 @@ export async function prepareLocalClaimBinding(client:PoolClient,runId:string,su
   if(subscriptionBindingId)await client.query('INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)',[runId,subscriptionBindingId])
   return 'ready'
 }
+
+import { runChanged } from '../live/panels'

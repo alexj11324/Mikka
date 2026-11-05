@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { coordinatorEvents } from '@/lib/db/schema'
 import type { CoordinatorEventInput } from '@/lib/coordinator-events'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
+import { runChanged } from '@/lib/live/panels'
 import { ownerListChanged, runListChanged } from './live/lists'
 
 type Executor = Pick<typeof db, 'insert' | 'execute'>
@@ -18,9 +19,9 @@ export async function recordCoordinatorEvent(executor: Executor, event: Coordina
   await assertCredentialSafeChat(event.userId, event.payload, executor)
   const inserted = await executor.insert(coordinatorEvents).values({ id: crypto.randomUUID(), ...event }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
   if (!inserted.length) return
+  if (event.runId) await runChanged(executor, event.runId)
   await ownerListChanged(executor, event.userId, ['bot_chat_list'])
   if (event.runId && ['run_finished', 'run_retried', 'run_credential_switched', 'run_quota_paused', 'run_question', 'run_blocked'].includes(event.kind)) {
     await runListChanged(executor, event.runId)
   }
 }
-
