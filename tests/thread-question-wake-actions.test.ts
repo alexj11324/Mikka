@@ -47,7 +47,12 @@ before(async () => {
   stub('../lib/agent-runs.ts', { requestRunStop: () => assert.fail('no run stop') })
   stub('../lib/thread-continue.ts', { sendThreadMessage: async (...args: unknown[]) => { ordinary.push(args); return { runId: CHILD, continued: false } } })
   stub('../lib/thread-chunks.ts', { readThreadChunks: async () => ({ chunks: [], cursor: null, append: false }), threadChunkCursor: z.unknown() })
-  stub('../lib/issue-thread-questions.ts', { threadQuestionStates: async () => questionState ? new Map([[ORIGIN, questionState]]) : new Map() })
+  const questionStates = () => questionState ? new Map([[ORIGIN, questionState]]) : new Map()
+  stub('../lib/issue-thread-questions.ts', {
+    threadQuestionStates: async () => questionStates(),
+    // #1236: the thread actions read the state together with its next answer deadline.
+    readThreadQuestionState: async () => ({ states: questionStates(), deadline: null }),
+  })
   stub('../lib/run-chain.ts', { listIssueRunChains: async () => [fixtureChain()], readRunChain: async () => fixtureChain() })
   stub('../lib/run-quota-view.ts', { threadQuotaView: async () => null, threadModelFallbackState: async () => null })
   stub('../lib/factory/questions/wake.ts', {
