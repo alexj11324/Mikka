@@ -14,6 +14,7 @@ import { useLiveKey } from '@/hooks/use-live-key'
 import type { AcceptanceDetail } from '@/lib/factory/acceptance-view'
 import { approveSpecConfirmed, approveSpecError, approveSpecErrorCode, approveSpecErrorKey, flowKey, flowTone, pullRequestLink, readFlow, type ApproveSpecFailure, type FactoryFlow, type FlowStage, type NeedsYouKind } from '@/lib/factory/flow-client'
 import { RunErrorDetails } from './run-error-text'
+import { pullNumberOf } from '@/lib/factory/artifact-review'
 import { RequestError, request } from '@/lib/factory/browser-request'
 import type { FactoryTask } from './factory-acceptance-pane'
 import { navigate, openArtifact } from './workspace-navigation'
@@ -56,7 +57,7 @@ export function FactoryFlowBadge({ flow }: { flow: FactoryFlow }) {
 }
 
 /** The acceptance report's counts (Figma 947:1786): 4 项已验证 · 1 项未验证. */
-function CountBadges({ counts }: { counts: NonNullable<FactoryFlow['acceptance']>['counts'] }) {
+export function CountBadges({ counts }: { counts: NonNullable<FactoryFlow['acceptance']>['counts'] }) {
   const t = useTranslations('FactoryFlow.card.counts')
   return <>
     {(counts.passed ?? 0) > 0 && <Badge variant="outline" tone="success"><Check aria-hidden="true" />{t('passed', { count: counts.passed ?? 0 })}</Badge>}
@@ -105,6 +106,7 @@ export function FactoryFlowCard({ task, detail, onOpenThread }: { task: FactoryT
 
   const specRunId = detail?.attempts?.find(attempt => attempt.id === detail.task?.attemptId)?.runId ?? null
   const pr = pullRequestLink(flow)
+  const prNumber = pullNumberOf(pr)
   const kind = flow.needsYou?.kind
   const shownError = approval.error && (approval.error.kind === 'stale' || approval.error.revision === flow.revision) ? approval.error : null
 
@@ -157,7 +159,8 @@ export function FactoryFlowCard({ task, detail, onOpenThread }: { task: FactoryT
         </>}
         {kind === 'question' && flow.botId && <Button size="sm" onClick={() => navigate({ section: 'coordinator', bot: flow.botId, issue: null })}><MessageCircleQuestion data-icon="inline-start" aria-hidden="true" />{t('card.answer')}</Button>}
         {flow.acceptance
-          ? <Button size="sm" onClick={() => openArtifact(flow.acceptance!.artifactId)}><FileCheck data-icon="inline-start" aria-hidden="true" />{t('card.openAcceptance')}</Button>
+          // E2 (decision 2026-11-06-1615): a PR's report opens as the PR it reviews, 「查看 PR #1288」.
+          ? <Button size="sm" onClick={() => openArtifact(flow.acceptance!.artifactId)}>{prNumber ? t('card.viewPullRequest', { number: prNumber }) : <><FileCheck data-icon="inline-start" aria-hidden="true" />{t('card.openAcceptance')}</>}</Button>
           : pr && kind === 'pr_review' && <Button size="sm" variant="secondary" nativeButton={false} render={<a href={pr} target="_blank" rel="noopener noreferrer" />}><ExternalLink data-icon="inline-start" aria-hidden="true" />{t('card.openPullRequest')}</Button>}
       </ItemActions>
     </Item>

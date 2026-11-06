@@ -47,6 +47,11 @@ mock.module('next-intl', { namedExports: { useTranslations: translationsFor, use
   dateTime: (value: Date, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', ...options }).format(value),
 }) } })
 mock.module(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
+// The report's diff rows use @pierre/diffs, which registers a web component on import; they draw only in a browser.
+mock.module(new URL('../components/workspace/thread-changes.tsx', import.meta.url).href, { namedExports: {
+  ThreadChangesPane: () => null, ThreadChangesView: () => null, ChangesTabLabel: () => null, Counts: () => null, FileSection: () => null,
+  useDiffWrap: () => ['nowrap', () => {}],
+} })
 const Pass = ({ children }: { children?: ReactNode }) => <div>{children}</div>
 mock.module(new URL('../components/ui/dialog.tsx', import.meta.url).href, { namedExports: { Dialog: Pass, DialogContent: Pass, DialogHeader: Pass, DialogTitle: Pass, DialogFooter: Pass } })
 mock.module(new URL('../components/workspace/factory-reject-note.tsx', import.meta.url).href, { namedExports: { RejectNote: () => null } })
