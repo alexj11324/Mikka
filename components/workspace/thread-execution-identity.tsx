@@ -3,14 +3,16 @@
 import { useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { Copy, ShieldCheck, UserRound } from 'lucide-react'
+import { Cloud, Copy, KeyRound, Laptop, Plug, Server, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Skeleton } from '@/components/ui/skeleton'
 import { InlineLoadError } from '@/components/load-error'
-import { HarnessLabel, ModelLabel } from '@/components/labels/entity-labels'
+import { HarnessLabel, ModelLabel, ProviderMark } from '@/components/labels/entity-labels'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { EMPTY_LABELS, rolesByPerson } from '@/lib/execution-identity-label-view'
 import { currentThreadExecutionEvidence, readThreadExecutionEvidence, type ThreadExecutionEvidence } from '@/lib/thread-execution-identity-view'
 import { DECISION_REASONS, type DecisionReason } from '@/lib/factory/agent-profile-decision'
 
@@ -40,76 +42,113 @@ function ExecutionIdentityDialog({ runId }: { runId: string }) {
 }
 
 function ValueRow({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="grid min-w-0 gap-1 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-3">
-    <dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 wrap-break-word">{children}</dd>
+  return <div className="grid min-w-0 gap-1 sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-3">
+    <dt className="text-muted-foreground">{label}</dt><dd className="flex min-w-0 flex-col gap-1.5 wrap-break-word">{children}</dd>
   </div>
 }
-function AccountReference({ id }: { id: string }) {
-  return <span className="inline-flex min-w-0 items-start gap-1.5"><UserRound aria-hidden="true" className="mt-0.5 size-4 shrink-0" /><span className="break-all">{id}</span></span>
+function Line({ children }: { children: ReactNode }) {
+  return <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">{children}</span>
 }
+function Quiet({ children }: { children: ReactNode }) {
+  return <span className="text-muted-foreground">{children}</span>
+}
+function Person({ name, image }: { name: string; image: string | null }) {
+  return <Avatar className="size-5"><AvatarImage src={image ?? undefined} alt="" /><AvatarFallback className="text-xs">{name.slice(0, 1).toUpperCase()}</AvatarFallback></Avatar>
+}
+const KIND_ICON = { cloud: Cloud, laptop: Laptop, server: Server } as const
+const API_KEY_PROVIDERS: Record<string, string> = { anthropic: 'Anthropic', openai: 'OpenAI', deepseek: 'DeepSeek', kimi: 'Kimi' }
 
-/** Frozen host metadata only. No current-setting fallback or credential value. */
+/**
+ * Frozen host metadata in words a person reads: people by name, machines and
+ * accounts by what they are, the cost as one sentence (Alex, 2026-11-06). Raw
+ * references only go into 「复制诊断信息」. No current-setting fallback or credential value.
+ */
 export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadExecutionEvidence }) {
   const t = useTranslations('IssueThreads.executionIdentity')
   const identity = evidence.executionIdentity
+  const labels = evidence.labels ?? EMPTY_LABELS
   const profileT = useTranslations('Settings.agentProfiles')
   const profile = evidence.agentProfile
   const routing = evidence.modelRouting
-  async function copyRunId() {
-    try { await navigator.clipboard.writeText(evidence.id); toast.success(t('copied')) }
-    catch { toast.error(t('copyFailed')) }
+  const personName = (id: string) => labels.people[id]?.you ? t('you') : labels.people[id]?.name || t('unknownPerson')
+  // 「你的」/「Bob 的」; English capitalizes it at the start of a phrase only.
+  const owner = (id: string, inline = false) => labels.people[id]?.you ? t(inline ? 'yourOwnerInline' : 'yourOwner') : t('personOwner', { name: labels.people[id]?.name || t('unknownPerson') })
+  const deviceName = (id: string) => labels.devices[id]?.kind === 'cloud' ? t('cloudComputer') : labels.devices[id]?.name ?? t('unknownDevice')
+  const keyProvider = (provider: string, name: string | null) => name || API_KEY_PROVIDERS[provider] || provider
+  async function copyDiagnostics() {
+    const text = JSON.stringify({ run: evidence.id, harness: evidence.harness, model: evidence.model, credentialType: evidence.credentialType,
+      subscriptionRoute: evidence.subscriptionRoute, executionIdentity: evidence.executionIdentity, modelRouting: evidence.modelRouting ?? null,
+      agentProfile: profile ? { profileId: profile.profileId, version: profile.version, source: profile.source } : null }, null, 2)
+    try { await navigator.clipboard.writeText(text); toast.success(t('diagnosticsCopied')) }
+    catch { toast.error(t('diagnosticsCopyFailed')) }
   }
-  return <div className="flex flex-col gap-5 text-sm" data-execution-evidence-run={evidence.id}>
+  const device = identity?.resourceBindings.find(item => item.kind === 'device')
+  const cloud = identity && (identity.billingAccount.runtime.kind === 'e2b' || identity.resourceBindings.some(item => item.kind === 'e2b'))
+  const where = cloud ? { Icon: Cloud, name: t('cloudComputer') } : device ? { Icon: KIND_ICON[labels.devices[device.id]?.kind ?? 'laptop'], name: deviceName(device.id) } : null
+  function resource(binding: NonNullable<typeof identity>['resourceBindings'][number]) {
+    const shared = binding.access === 'workspace_share' ? <Quiet>· {t('shared')}</Quiet> : null
+    if (binding.kind === 'device') {
+      const Icon = KIND_ICON[labels.devices[binding.id]?.kind ?? 'laptop']
+      return <Line><Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />{deviceName(binding.id)}{shared}</Line>
+    }
+    if (binding.kind === 'subscription') {
+      const sub = labels.subscriptions[binding.id]
+      return <Line><ProviderMark provider={sub?.provider === 'codex' ? 'openai' : 'claude'} />{t('subscription', { owner: owner(binding.ownerId), provider: sub?.provider === 'codex' ? 'ChatGPT' : 'Claude' })}{sub?.account && <Quiet>· {sub.account}</Quiet>}{shared}</Line>
+    }
+    if (binding.kind === 'api_key') {
+      const key = labels.apiKeys[binding.id]
+      return <Line><KeyRound aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />{t('apiKey', { owner: owner(binding.ownerId), provider: key ? keyProvider(key.provider, key.name) : t('unknown') })}{key?.last4 && <Quiet>····{key.last4}</Quiet>}{shared}</Line>
+    }
+    if (binding.kind === 'e2b') return <Line><Cloud aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />{t('e2bKey', { owner: owner(binding.ownerId) })}{labels.e2b && labels.people[binding.ownerId]?.you && <Quiet>····{labels.e2b.last4}</Quiet>}{shared}</Line>
+    return <Line><Plug aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />{labels.mcp[binding.id]?.name ?? t('unknown')}{shared}</Line>
+  }
+  function cost() {
+    if (!identity) return null
+    const { model, runtime } = identity.billingAccount
+    const modelPart = model.kind === 'subscription'
+      ? t('costModelSubscription', { owner: owner(model.ownerId), provider: labels.subscriptions[model.resourceId]?.provider === 'codex' ? 'ChatGPT' : 'Claude' })
+      : model.kind === 'api_key' ? t('costModelApiKey', { owner: owner(model.ownerId), provider: labels.apiKeys[model.resourceId] ? keyProvider(labels.apiKeys[model.resourceId].provider, labels.apiKeys[model.resourceId].name) : t('unknown') })
+      : t('costModelLogin')
+    const runtimePart = runtime.kind === 'e2b' ? t('costRuntimeE2b', { owner: owner(runtime.ownerId, true) })
+      : t('costRuntimeDevice', { owner: owner(runtime.ownerId, true), device: deviceName(runtime.resourceId) })
+    const mikka = model.amount === 'metered' || runtime.amount === 'metered' ? t('costMikkaMetered') : t('costMikkaFree')
+    return t('costSentence', { model: modelPart, runtime: runtimePart, mikka })
+  }
+  return <div className="flex flex-col gap-6 text-sm" data-execution-evidence-run={evidence.id}>
     <dl className="flex flex-col gap-3">
-      <ValueRow label={t('runId')}><span className="flex min-w-0 items-start gap-1"><span className="min-w-0 break-all tabular-nums">{evidence.id}</span><Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" className="shrink-0" aria-label={t('copyRunId')} onClick={() => { void copyRunId() }} />}><Copy data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('copyRunId')}</TooltipContent></Tooltip></span></ValueRow>
       <ValueRow label={t('harness')}>{evidence.harness ? <HarnessLabel harness={evidence.harness} /> : t('unknown')}</ValueRow>
-      <ValueRow label={t('model')}>{evidence.model ? <span title={evidence.model}><ModelLabel model={evidence.model} /></span> : t('unknown')}</ValueRow>
-      <ValueRow label={t('credential')}>{t(`credentialKinds.${evidence.credentialType}`)}</ValueRow>
-      {evidence.credentialType === 'subscription' && <ValueRow label={t('subscriptionRoute')}><span className="break-all">{evidence.subscriptionRoute ?? t('unknown')}</span></ValueRow>}
+      <ValueRow label={t('model')}>{evidence.model ? <Line><span title={evidence.model}><ModelLabel model={evidence.model} /></span>{routing && <Quiet>· {t(`routingReasons.${routing.reason}`)}</Quiet>}</Line> : t('unknown')}</ValueRow>
+      {where && <ValueRow label={t('runsOn')}><Line><where.Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />{where.name}</Line></ValueRow>}
+      {identity && <ValueRow label={t('workspace')}>{labels.workspace?.name ?? t('notRecorded')}</ValueRow>}
     </dl>
-    {routing && <section className="flex flex-col gap-3" data-model-routing={routing.reason}>
-      <h3 className="font-medium">{t('modelRouting')}</h3>
-      <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+    {routing && <section className="flex flex-col gap-1" data-model-routing={routing.reason}>
+      <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-muted-foreground">
+        <span>{t('modelRouting')}</span>
         {routing.version === 2 && routing.required !== 'unknown' && <><span>{t(`routingTier.${routing.required}`)}</span><span aria-hidden="true">→</span></>}
         {routing.version === 1 && routing.difficulty !== 'unknown' && <><span>{t(`routingDifficulty.${routing.difficulty}`)}</span><span aria-hidden="true">→</span></>}
-        <span className="min-w-0 wrap-break-word" title={routing.model}><ModelLabel model={routing.model} /></span>
+        <span className="min-w-0 wrap-break-word text-foreground" title={routing.model}><ModelLabel model={routing.model} /></span>
         {routing.effort && <><span aria-hidden="true">·</span><span>{t(`routingEffort.${routing.effort}`)}</span></>}
       </p>
-      <dl className="flex flex-col gap-3">
-        <ValueRow label={t('routingReason')}>{t(`routingReasons.${routing.reason}`)}</ValueRow>
-        {routing.previousModel && <ValueRow label={t('previousModel')}><span title={routing.previousModel}><ModelLabel model={routing.previousModel} /></span></ValueRow>}
-      </dl>
+      {routing.previousModel && <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-muted-foreground">{t('previousModel')}<span className="text-foreground" title={routing.previousModel}><ModelLabel model={routing.previousModel} /></span></p>}
     </section>}
-    {profile && <section className="flex flex-col gap-3"><h3 className="font-medium">{profileT('frozenProfile')}</h3><dl className="flex flex-col gap-3">
-      <ValueRow label={profileT('name')}>{profile.source === 'default' && profile.profileId === 'default' ? profileT('defaultName') : profile.name}</ValueRow>
-      <ValueRow label={profileT('revision')}>{profileT('version', { version: profile.version })}</ValueRow>
-      <ValueRow label={profileT('selectedBy')}>{profileT(`selectionSources.${profile.source}`)}</ValueRow>
-      {/* A run frozen before reasons were codes holds an English sentence: 选择方式 already says how it was chosen, so no reason row. */}
-      {(profile.source !== 'decision' || (DECISION_REASONS as readonly string[]).includes(profile.reason)) && <ValueRow label={profileT('selectionReason')}>{profile.source === 'explicit' ? profileT('explicitReason')
-        : profile.source === 'default' ? profileT('defaultReason') : profileT(`selectionReasons.${profile.reason as DecisionReason}`)}</ValueRow>}
-    </dl></section>}
+    {profile && <dl className="flex flex-col gap-3"><ValueRow label={profileT('frozenProfile')}><Line>
+      {profile.source === 'default' && profile.profileId === 'default' ? profileT('defaultName') : profile.name}
+      <Quiet>· {profileT('version', { version: profile.version })} · {profileT(`selectionSources.${profile.source}`)}</Quiet>
+      {/* A run frozen before reasons were codes holds an English sentence: the source already says how it was chosen. */}
+      {profile.source === 'decision' && (DECISION_REASONS as readonly string[]).includes(profile.reason) && <Quiet>· {profileT(`selectionReasons.${profile.reason as DecisionReason}`)}</Quiet>}
+    </Line></ValueRow></dl>}
     {!identity ? <p className="text-muted-foreground">{t('snapshotMissing')}</p> : <>
-      <section className="flex flex-col gap-3"><h3 className="font-medium">{t('participants')}</h3><dl className="flex flex-col gap-3">
-        <ValueRow label={t('workspace')}>{identity.workspaceId ? <span className="break-all">{identity.workspaceId}</span> : t('notRecorded')}</ValueRow>
-        <ValueRow label={t('requester')}><AccountReference id={identity.requester} /></ValueRow>
-        <ValueRow label={t('botOwner')}>{identity.botOwner ? <AccountReference id={identity.botOwner} /> : t('notRecorded')}</ValueRow>
-        <ValueRow label={t('executionPrincipal')}><AccountReference id={identity.executionPrincipal} /></ValueRow>
-        <ValueRow label={t('outputOwner')}><AccountReference id={identity.outputOwner} /></ValueRow>
-      </dl></section>
-      <section className="flex flex-col gap-3"><h3 className="font-medium">{t('resources')}</h3>
-        {identity.resourceBindings.length === 0 ? <p className="text-muted-foreground">{t('notRecorded')}</p> : <ul className="flex flex-col gap-3">{identity.resourceBindings.map((resource, index) => <li key={`${resource.kind}:${resource.id}:${index}`} className="flex flex-col gap-1">
-          <span className="font-medium">{t(`resourceKinds.${resource.kind}`)} · {t(`access.${resource.access}`)}</span>
-          <dl className="flex flex-col gap-1"><ValueRow label={t('resourceOwner')}><AccountReference id={resource.ownerId} /></ValueRow><ValueRow label={t('resourceReference')}><span className="break-all">{resource.id}</span></ValueRow>
-            {resource.revision && <ValueRow label={t('resourceRevision')}><span className="break-all">{resource.revision}</span></ValueRow>}
-          </dl>
-        </li>)}</ul>}
-      </section>
-      <section className="flex flex-col gap-3"><h3 className="font-medium">{t('billing')}</h3>{(['model', 'runtime'] as const).map(kind => {
-        const account = identity.billingAccount[kind]
-        return <dl key={kind} className="flex flex-col gap-1"><ValueRow label={t(`${kind}Billing`)}><span>{t(`accountKinds.${account.kind}`)}</span></ValueRow>
-          <ValueRow label={t('payer')}><AccountReference id={account.ownerId} /></ValueRow><ValueRow label={t('resourceReference')}><span className="break-all">{account.resourceId}</span></ValueRow><ValueRow label={t('amount')}><span>{t(`amounts.${account.amount}`)}</span></ValueRow>
-        </dl>
-      })}</section>
+      <dl className="flex flex-col gap-3">
+        {rolesByPerson(identity).map(row => <ValueRow key={row.personId} label={row.roles.length === 1 ? t(`roles.${row.roles[0]}`) : t('rolesTogether', { first: t(`roles.${row.roles[0]}`), last: t(`roles.${row.roles.at(-1)!}`) })}>
+          <Line><Person name={labels.people[row.personId]?.name || personName(row.personId)} image={labels.people[row.personId]?.image ?? null} />{personName(row.personId)}
+            {row.roles.length > 2 && <Quiet>· {row.roles.map(role => t(`roles.${role}`)).join(t('roleSeparator'))}</Quiet>}</Line>
+        </ValueRow>)}
+      </dl>
+        <dl className="flex flex-col gap-3">
+        {identity.resourceBindings.length > 0 && <ValueRow label={t('resources')}>{identity.resourceBindings.map((binding, index) => <span key={`${binding.kind}:${binding.id}:${index}`}>{resource(binding)}</span>)}</ValueRow>}
+        <ValueRow label={t('billing')}><span>{cost()}</span></ValueRow>
+      </dl>
     </>}
+    <div><Button variant="ghost" size="sm" onClick={() => { void copyDiagnostics() }}><Copy data-icon="inline-start" />{t('copyDiagnostics')}</Button></div>
   </div>
 }
