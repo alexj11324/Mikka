@@ -138,7 +138,7 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
     {!identity ? <p className="text-muted-foreground">{t('snapshotMissing')}</p> : <>
       <dl className="flex flex-col gap-3">
         {rolesByPerson(identity).map(row => <ValueRow key={row.personId} label={row.roles.length === 1 ? t(`roles.${row.roles[0]}`) : t('rolesTogether', { first: t(`roles.${row.roles[0]}`), last: t(`roles.${row.roles.at(-1)!}`) })}>
-          <Line><Person name={personName(row.personId)} image={labels.people[row.personId]?.image ?? null} />{personName(row.personId)}
+          <Line><Person name={labels.people[row.personId]?.name || personName(row.personId)} image={labels.people[row.personId]?.image ?? null} />{personName(row.personId)}
             {row.roles.length > 2 && <Quiet>· {row.roles.map(role => t(`roles.${role}`)).join(t('roleSeparator'))}</Quiet>}</Line>
         </ValueRow>)}
       </dl>
