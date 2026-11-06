@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url'
 import { validateFixtureReceipt, OUTPUT_DIR } from './coordinator-fixtures.mjs'
 import { observeVersion } from './phase1.mjs'
 
-const phases = ['cache', 'cache-live', 'tool', 'group-public']
+const phases = ['cache', 'cache-live', 'tool', 'group-public', 'group-private']
 const fail = code => { throw new Error(code) }
 export function validateContinuation(value, receipt) {
   const keys = ['schemaVersion', 'enabled', 'phase', 'expectedSha', 'fixtureRunKey', 'workspaceId',
@@ -16,7 +16,8 @@ export function validateContinuation(value, receipt) {
     !(value.expectedSha === null && !value.enabled || /^[0-9a-f]{40}$/.test(value.expectedSha ?? '')) ||
     !/^receipts\/[a-z0-9-]+\.json$/.test(value.fixtureReceipt ?? '') || !/^[0-9a-f]{64}$/.test(value.fixtureReceiptSha256 ?? '') ||
     ![2, 3].includes(value.cacheTurns) || ![2, 3].includes(value.liveTabs) || typeof value.delayOneReturnedResult !== 'boolean' ||
-    !['responding_bot', 'after_send'].includes(value.groupBoundary)) fail('continuation_invalid')
+    !['responding_bot', 'after_send', 'private_generation_receipt'].includes(value.groupBoundary) ||
+    (value.phase === 'group-private') !== (value.groupBoundary === 'private_generation_receipt')) fail('continuation_invalid')
   validateFixtureReceipt(receipt, { ready: true })
   if (receipt.workspace.id !== value.workspaceId || receipt.runKey !== value.fixtureRunKey) fail('continuation_scope_invalid')
   return value
@@ -36,7 +37,7 @@ async function actualDriver(phase) {
   if (phase === 'cache') return (await import('./coordinator-cache-turns.mjs')).runCacheTurns
   if (phase === 'cache-live') return (await import('./live-cache-turns.mjs')).runLiveCacheTurns
   if (phase === 'tool') return (await import('./coordinator-tool-stop.mjs')).runToolStop
-  if (phase === 'group-public') return (await import('./group-stop.mjs')).runGroupStop
+  if (phase === 'group-public' || phase === 'group-private') return (await import('./group-stop.mjs')).runGroupStop
   fail('continuation_invalid')
 }
 
@@ -52,14 +53,15 @@ export async function runContinuation(key, { config, receipt, env = process.env,
     startedAt: new Date().toISOString(), observation: null }
   const configuredEnv = { ...env, MIKKA_ACCEPTANCE_SHA: config.expectedSha, MIKKA_FIXTURE_KIND: key,
     MIKKA_CACHE_TURNS: String(config.cacheTurns), MIKKA_LIVE_TABS: String(config.liveTabs),
-    MIKKA_LIVE_DELAY_ONE_RESULT: config.delayOneReturnedResult ? '1' : '0', MIKKA_GROUP_STOP_BOUNDARY: config.groupBoundary }
+    MIKKA_LIVE_DELAY_ONE_RESULT: config.delayOneReturnedResult ? '1' : '0', MIKKA_GROUP_STOP_BOUNDARY: config.groupBoundary,
+    MIKKA_GROUP_STOP_SCENARIO: config.phase === 'group-private' ? 'private' : 'public' }
   try {
     report.before = await observeVersion(config.expectedSha, fetchImpl)
     if (!report.before.matches) fail('continuation_version_mismatch')
     const execute = driver ?? await actualDriver(config.phase)
     report.attempted = true
     report.observation = await execute({ env: configuredEnv, fixtureReceipt: receipt, checkpoint })
-    const wanted = config.phase === 'group-public' ? 'stop_evidence_captured' : 'observed'
+    const wanted = config.phase === 'group-public' || config.phase === 'group-private' ? 'stop_evidence_captured' : 'observed'
     if (report.observation?.status !== wanted) fail('continuation_observation_failed')
     report.status = 'observed'
   } catch (error) {
