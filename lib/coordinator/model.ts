@@ -2,11 +2,12 @@ import { roundStep } from '@/lib/agent-rounds'
 
 /**
  * The default model (Mikka 默认): the Coordinator's, and the one behind action
- * titles, profile facts and group replies. It is called directly on ZeroCat's
+ * titles, profile facts and group replies. It is called first on ZeroCat's
  * OpenAI-compatible API (`deepseek-v4.1-flash`, lib/abuse/zerocat.ts), with
- * ZEROCAT_BASE_URL and ZEROCAT_API_KEY from Infisical `prod:/vercel`; without
- * them a call refuses as temporarily unavailable and never falls back to AI
- * Gateway. Other hosted model ids keep their Gateway route.
+ * ZEROCAT_BASE_URL and ZEROCAT_API_KEY from Infisical `prod:/vercel`. When
+ * ZeroCat is unconfigured or fails before the first token, the same call goes
+ * to this id on Vercel AI Gateway (lib/abuse/model.ts). Other hosted model ids
+ * use Gateway only.
  */
 // User-selected project default. Existing immutable run snapshots still resolve
 // their own saved selection; changing this constant cannot rewrite their model.

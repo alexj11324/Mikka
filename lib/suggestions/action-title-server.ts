@@ -1,5 +1,6 @@
 import 'server-only'
 import { generateText } from 'ai'
+import { gatewayAuth } from '@/lib/ai-gateway-auth'
 import { zeroCatConfig } from '@/lib/abuse/zerocat'
 import { and, eq, sql } from 'drizzle-orm'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
@@ -24,16 +25,16 @@ export async function rememberLocale(userId: string, locale: ActionLocale): Prom
 
 /**
  * Writes action lines (R-45) for one person's newly shown items, in batches of
- * ACTION_BATCH, one model call each, on the default model's ZeroCat transport
- * (lib/abuse/zerocat.ts); the hosted usage budget caps the spend. Without the
- * ZeroCat variables, or when a call fails, the items keep their raw title.
+ * ACTION_BATCH, one model call each, on the default model (ZeroCat, with its
+ * Gateway fallback; lib/abuse/model.ts); the hosted usage budget caps the
+ * spend. With neither credential, or when a call fails, the items keep their raw title.
  * Never throws.
  */
 export async function writeActionTitles(userId: string, items: readonly ActionTitleInput[]): Promise<void> {
   'use step'
   const { hostedModel, admitHostedModel } = await import('@/lib/abuse/model')
   const { executionWorkspace } = await import('@/lib/execution-settings')
-  if (!items.length || !zeroCatConfig()) return
+  if (!items.length || (!zeroCatConfig() && !await gatewayAuth())) return
   try {
     const locale = await personLocale(userId)
     const workspaceId=await executionWorkspace(userId,null)

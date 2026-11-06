@@ -134,7 +134,7 @@ What is fake and what is real:
 | GitHub identity | Synthetic: every local account is linked to GitHub account `4242`, which the fake lets write |
 | Model, a workspace's own key (Settings › 模型与订阅) | Real. Saving it needs `WORKSPACE_SECRETS_KEY`; without one, dev:local creates a random local key in `.cache/dev-local/workspace-secrets-key` (git-ignored, mode 0600) and reuses it, so saved keys still open after a restart |
 | The DeepSeek key, added automatically | `DEEPSEEK_API_KEY` comes from the environment or the named Infisical `dev:/vercel` secret. Use the configured `INFISICAL_PROJECT_ID` (or `MIKKA_DEV_INFISICAL_PROJECT`) with an existing `INFISICAL_TOKEN` or Universal Auth identity. The managed HTTP proxy is preserved. Setup runs immediately, then reconciles every 5 seconds; existing keys are reused, new Bots and workspaces receive the Flash choice, and individual failures back off from 30 seconds to 5 minutes. The key stays in process memory and sealed application storage. Missing Flash models never fall back to another real model. Without the key, the scripted substitute below remains available for development; real-model acceptance requires the key. |
-| Mikka 默认 (ZeroCat, `https://zero.cat/v1`, `lib/abuse/zerocat.ts`) | Not used locally: the Coordinator and Bots use DS 4.1 Flash through the DeepSeek key (below). With no `ZEROCAT_API_KEY` set, dev:local sets the placeholder `mikka-local-zerocat` and sends ZeroCat's `/v1/chat/completions` to a scripted model: it echoes (`Local model: <text>`), a message `/tool <name> <json>` calls that registered tool for real, and a tool result comes back as JSON |
+| Mikka 默认 (ZeroCat, `https://zero.cat/v1`, `lib/abuse/zerocat.ts`; AI Gateway as fallback) | Not used locally: the Coordinator and Bots use DS 4.1 Flash through the DeepSeek key (below). With no `ZEROCAT_API_KEY` set, dev:local sets the placeholder `mikka-local-zerocat` and sends ZeroCat's `/v1/chat/completions` to a scripted model: it echoes (`Local model: <text>`), a message `/tool <name> <json>` calls that registered tool for real, and a tool result comes back as JSON |
 | Decisions (AI Gateway Decision API: triage, run outcome, push) | Local runs set no `AI_GATEWAY_API_KEY`, so the first choice of each question, `0.5` for a predicate |
 | Card verification and credit for Mikka 默认 (Stripe) | Every local workspace gets a verification and a $1000 local allowance, checked every 5 seconds |
 | Verification and password-reset mail ([Resend](https://resend.com/docs/api-reference/emails/send-email)) | Real with a real `RESEND_API_KEY`; otherwise a local outbox at `http://127.0.0.1:3191/mail` (JSON at `/mail.json`), one terminal line per mail |
@@ -156,7 +156,7 @@ never Mikka 默认 and never the AI Gateway:
   the Coordinator and the Bots (`scripts/dev-local/seed-model-keys.ts`). Outside
   dev:local, add it as a DeepSeek key in Settings › 模型与订阅 and pick DS 4.1
   Flash by hand.
-- Mikka 默认 (hosted, billed per call, served directly by ZeroCat) is not
+- Mikka 默认 (hosted, billed per call, served by ZeroCat, AI Gateway as fallback) is not
   used for local work, so a local run needs neither `ZEROCAT_API_KEY` nor a
   card verification.
 
@@ -167,10 +167,10 @@ dev`). Read the key from Infisical `prod:/vercel` with an existing identity
 never into `.env*`, a file, a commit, a log or a report. A real key turns the
 local substitute off and spends real credit.
 
-The base URL must be exactly `https://zero.cat/v1`; any other value refuses
-rather than sending the key elsewhere. Without either variable, Mikka 默认
-answers "temporarily unavailable" (`usage_cost_unavailable`,
-detail `zerocat_unconfigured`); it never falls back to the AI Gateway.
+The base URL must be exactly `https://zero.cat/v1`; any other value is not
+called. Without either variable, or when ZeroCat fails before its first token,
+Mikka 默认 uses `deepseek/deepseek-v4.1-flash` on the AI Gateway instead (which
+dev:local also substitutes).
 
 First run: sign up at `http://localhost:3000/mikka`, then approve the device
 with the code the script prints. Ask the Coordinator to change

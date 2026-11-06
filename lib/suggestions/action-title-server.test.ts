@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { after,before,beforeEach,mock,test } from 'node:test'
 import type { ActionTitleInput } from './action-title'
-const saved={key:process.env.ZEROCAT_API_KEY,url:process.env.ZEROCAT_BASE_URL}
+const saved={key:process.env.ZEROCAT_API_KEY,url:process.env.ZEROCAT_BASE_URL,gateway:process.env.AI_GATEWAY_API_KEY}
 let allowed=true
 const admitted:unknown[]=[],writes:unknown[]=[]
 const generateText=mock.fn(async()=>({text:JSON.stringify({titles:[{id:'item',title:'Review the change'}]})}))
@@ -17,8 +17,8 @@ mock.module(new URL('../abuse/model.ts',import.meta.url).href,{namedExports:{
 }})
 let writeActionTitles:typeof import('./action-title-server').writeActionTitles
 before(async()=>{writeActionTitles=(await import('./action-title-server')).writeActionTitles})
-beforeEach(()=>{process.env.ZEROCAT_API_KEY='synthetic-action-key';process.env.ZEROCAT_BASE_URL='https://zero.cat/v1';allowed=true;admitted.length=0;writes.length=0;generateText.mock.resetCalls()})
-after(()=>{for(const [name,value] of [['ZEROCAT_API_KEY',saved.key],['ZEROCAT_BASE_URL',saved.url]] as const){if(value===undefined)delete process.env[name];else process.env[name]=value}})
+beforeEach(()=>{delete process.env.AI_GATEWAY_API_KEY;process.env.ZEROCAT_API_KEY='synthetic-action-key';process.env.ZEROCAT_BASE_URL='https://zero.cat/v1';allowed=true;admitted.length=0;writes.length=0;generateText.mock.resetCalls()})
+after(()=>{for(const [name,value] of [['ZEROCAT_API_KEY',saved.key],['ZEROCAT_BASE_URL',saved.url],['AI_GATEWAY_API_KEY',saved.gateway]] as const){if(value===undefined)delete process.env[name];else process.env[name]=value}})
 const items:ActionTitleInput[]=[{id:'item',source:'github',action:'review',title:'Change',actor:null,excerpt:'Review the change'}]
 test('an allowed action-title route uses the default model on its server-owned ZeroCat transport',async()=>{
   await writeActionTitles('owner',items)
@@ -31,8 +31,13 @@ test('a denied action-title route cannot generate or update titles',async t=>{
   await writeActionTitles('owner',items)
   assert.equal(generateText.mock.callCount(),0);assert.equal(writes.length,0)
 })
-test('without the ZeroCat variables no action title is written',async()=>{
+test('with neither ZeroCat nor a gateway credential no action title is written',async()=>{
   delete process.env.ZEROCAT_API_KEY
   await writeActionTitles('owner',items)
   assert.equal(generateText.mock.callCount(),0);assert.equal(admitted.length,0);assert.equal(writes.length,0)
+})
+test('without ZeroCat the default model still writes titles through its gateway fallback',async()=>{
+  delete process.env.ZEROCAT_API_KEY;process.env.AI_GATEWAY_API_KEY='synthetic-gateway-key'
+  await writeActionTitles('owner',items)
+  assert.equal(generateText.mock.callCount(),1);assert.deepEqual(writes,[{actionTitle:'Review the change'}])
 })

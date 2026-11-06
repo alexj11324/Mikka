@@ -1,5 +1,6 @@
 import 'server-only'
 import { generateText } from 'ai'
+import { gatewayAuth } from '@/lib/ai-gateway-auth'
 import { zeroCatConfig } from '@/lib/abuse/zerocat'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
@@ -20,16 +21,16 @@ const FACT_TIMEOUT_MS = 15_000
  * person's PostHog flag, their 记忆 switch, and their daily call cap. Each
  * call and its tokens are recorded in proactive_usage and sent to PostHog as
  * an $ai_generation event (model and tokens only). Like the action lines
- * it runs on the default model's ZeroCat transport (lib/abuse/zerocat.ts),
- * and the hosted usage budget caps the spend; without the ZeroCat variables,
- * or when the call fails, nothing is learnt. The
+ * it runs on the default model (ZeroCat, with its Gateway fallback), and the
+ * hosted usage budget caps the spend; with neither credential, or when the
+ * call fails, nothing is learnt. The
  * notification text is read here only, never stored. Never throws.
  */
 export async function extractFacts(notification: ExternalNotification, suggestionId: string): Promise<number> {
   'use step'
   const { hostedModel, admitHostedModel } = await import('@/lib/abuse/model')
   const { executionWorkspace } = await import('@/lib/execution-settings')
-  if (!profileEnabled() || !zeroCatConfig()) return 0
+  if (!profileEnabled() || (!zeroCatConfig() && !await gatewayAuth())) return 0
   try {
     if (!await profileEntitled(notification.userId) || !await memoryEnabled(notification.userId)) return 0
     const workspaceId=await executionWorkspace(notification.userId,null)

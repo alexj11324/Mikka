@@ -271,8 +271,8 @@ A separate credential broker in
 [`services/credential-broker`](services/credential-broker) is the only part
 that decrypts saved logins, using AWS KMS.
 
-The hosted default model (Mikka 默认) is called directly on ZeroCat's
-OpenAI-compatible API and is metered per call; card
+The hosted default model (Mikka 默认) is called on ZeroCat's OpenAI-compatible
+API, with Vercel AI Gateway as its fallback, and is metered per call; card
 verification and top-ups go through Stripe Checkout and its webhooks.
 
 A Cloudflare Worker fires every minute and calls the app's cron routes: due
