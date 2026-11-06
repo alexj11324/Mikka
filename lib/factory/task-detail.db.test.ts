@@ -47,7 +47,7 @@ test('task detail GET exposes criteria and delivery without unused fields or wri
       { passed: 'yes' },
     ], verify: { status: 'passed', command: 'pnpm test', exitCode: 0, timedOut: false, signal: null } };
     await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId","issueId",status,kind,prompt,report) VALUES ($1,'owner',$3,$4,$5,'succeeded','implement','p',NULL),($2,'owner',$3,$4,$5,'succeeded','review','p',$6)`, [implRun, reviewRun, agentId, deviceId, issueId, JSON.stringify(report)]);
-    await pool.query(`INSERT INTO run_publications ("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest") VALUES ($1,'owner',$2,'https://github.com/o/r','o/r','published','{"url":"https://github.com/o/r/pull/7","state":"open"}')`, [implRun, issueId]);
+    await pool.query(`INSERT INTO run_publications ("runId","userId","issueId","remoteUrl","remoteKey",status,branch,"baseBranch","pullRequest") VALUES ($1,'owner',$2,'https://github.com/o/r','o/r','published','mik-7-fix','main','{"url":"https://github.com/o/r/pull/7","state":"open"}')`, [implRun, issueId]);
     const c = await pool.connect();
     await c.query('BEGIN');
     await c.query(`INSERT INTO factory_tasks (id,"userId","issueId","sourceEventId",route,stage,status,"attemptId",reason) VALUES ($1,'owner',$2,$3,'{}','verify','running',$4,'fixture')`, [taskId, issueId, sourceEventId, verifyAttempt]);
@@ -78,7 +78,7 @@ test('task detail GET exposes criteria and delivery without unused fields or wri
     assert.doesNotMatch(review.criteria[1].text!, /xyz/);
     assert.equal(review.criteria[1].criterionId, null);
     assert.deepEqual(review.verify, { status: 'passed', command: 'pnpm test', exitCode: 0 });
-    assert.deepEqual(detail.delivery, { candidateSha: sha, previewDatabaseBranch: 'preview/ac-7', machineName: 'Build server', repository: 'o/r', environment: 'device:x', pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' }, previewUrl: null, deploymentEnvironment: null }, 'no receipt: deploymentEnvironment null');
+    assert.deepEqual(detail.delivery, { candidateSha: sha, previewDatabaseBranch: 'preview/ac-7', machineName: 'Build server', repository: 'o/r', environment: 'device:x', pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' }, previewUrl: null, deploymentEnvironment: null, branch: { head: 'mik-7-fix', base: 'main' }, mergeAs: null }, 'no receipt: deploymentEnvironment null');
 
     await t.test('public task readers keep the v1 contract on a one-connection pool', async () => {
       const single = new Pool({ connectionString: target.toString(), max: 1 });

@@ -54,7 +54,8 @@ import { UnreadPill } from '@/components/chat/unread-pill'
 import { MESSAGE_POSITION_ATTR, useUnreadIndicators } from '@/lib/hooks/use-unread-indicators'
 import { useArrivals } from '@/lib/hooks/use-arrivals'
 import { openArtifact as openArtifactWindow } from '@/components/workspace/workspace-navigation'
-import { ArtifactCard, ArtifactChip } from '@/components/artifacts/artifact-card'
+import { ArtifactChip } from '@/components/artifacts/artifact-card'
+import { ArtifactReviewCard } from '@/components/workspace/artifact-review'
 import { ArtifactQuoteChip, ArtifactQuoteLine, QuoteChip, QuoteLine } from '@/components/artifacts/artifact-quote'
 import { MessageActions } from '@/components/ai-elements/message'
 import { CopyAction, REPLY_ACTIONS } from '@/components/chat/copy-action'
@@ -498,7 +499,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {item.artifacts.length > 0 && <div className={cn('flex flex-col gap-2', embedded ? 'items-start gap-1.5' : 'w-full')}>
                       {item.artifacts.flatMap(id => { const artifact = data?.artifacts[id]; return artifact ? [embedded
                         ? <ArtifactChip key={id} artifact={artifact} active={id === embedded.activeArtifactId} onOpen={openArtifact} />
-                        : <ArtifactCard key={id} artifact={artifact} onOpen={openArtifact} />] : [] })}
+                        : <ArtifactReviewCard key={id} artifact={artifact} onOpen={openArtifact} />] : [] })}
                     </div>}
                     {cardsOf(item, Boolean(live)).map(id => {
                       const run = sources?.[id]

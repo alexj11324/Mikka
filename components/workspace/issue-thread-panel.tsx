@@ -5,7 +5,7 @@ import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useRef, useState } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { ArrowLeft, Square, SquareKanban, X } from 'lucide-react'
+import { ArrowLeft, MessageSquareDiff, Square, SquareKanban, X } from 'lucide-react'
 import { getIssueThread, getThreadChanges, sendIssueThreadReply, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
@@ -33,16 +33,12 @@ import { ThreadStatus } from './thread-status-icon'
 import { RunErrorDetails, useRunErrorText } from './run-error-text'
 import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
 import { cn } from '@/lib/utils'
-import { listRunArtifacts } from '@/app/actions/artifacts'
-import { ArtifactIcon } from '@/components/icons/artifact-icon'
-import { ArtifactKindIcon } from '@/components/artifacts/artifact-card'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { ThreadArtifactButton, ThreadArtifactCards } from './artifact-review'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AcceptanceStateBadge, useAcceptanceTasks } from './factory-acceptance'
 import { FactoryAcceptancePane } from './factory-acceptance-pane'
 import { ChangesTabLabel, ThreadChangesPane } from './thread-changes'
 
-import { openArtifact } from './workspace-navigation'
 import { ThreadFeedback } from './self-improvement'
 import { InlineLoadError } from '@/components/load-error'
 import { FieldError } from '@/components/ui/field'
@@ -71,14 +67,16 @@ function PersonBubble({ text, mine }: { text: string; mine: boolean }) {
  * the bot that dispatched it.
  */
 type ThreadTab = 'chat' | 'changes' | 'acceptance'
-type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; /** ← and Esc: back to the list it was opened from. */ onBack?: () => void; /** ✕, only where it closes more than ← does (全部线程 under it). */ onClose?: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void; /** The name its thread-list row shows (glossary: its task, else what it was asked); defaults to what it was asked. */ name?: string }
+type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; /** ← and Esc: back to the list it was opened from. */ onBack?: () => void; /** ✕, only where it closes more than ← does (全部线程 under it). */ onClose?: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void; /** The name its thread-list row shows (glossary: its task, else what it was asked); defaults to what it was asked. */ name?: string; /** Inside the Artifact window (P2): 要求修改 waits in the composer as a chip; sending it starts the fix run on the same PR. */ changeRequest?: ThreadChangeRequest }
+
+export type ThreadChangeRequest = { label: string; onSend: (note: string) => Promise<boolean>; onCancel: () => void }
 
 export function IssueThreadPanel(props: IssueThreadPanelProps) {
   // Drafts, in-flight callbacks and retry deadlines belong to exactly one run.
   return <ThreadPanel key={props.runId} {...props} />
 }
 
-function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask, name: listedName }: IssueThreadPanelProps) {
+function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask, name: listedName, changeRequest }: IssueThreadPanelProps) {
   const t = useTranslations('IssueThreads')
   const runErrorText = useRunErrorText()
   const format = useFormatter()
@@ -166,7 +164,20 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     // Acknowledgement updates the task's thread list as soon as this panel sees it.
     void mutateCache(['issue-threads', issueId])
   }, [issueId, view?.status, view?.stopping, question, mutateCache])
+  // 要求修改 from the Artifact window puts the person straight into the composer.
+  const requesting = Boolean(changeRequest)
+  useEffect(() => { if (requesting) inputRef.current?.focus() }, [requesting])
+  async function sendChangeRequest(request: ThreadChangeRequest) {
+    const text = draft.trim()
+    if (!text || sending) return
+    setSending(true); setSendFailed(false)
+    try {
+      if (await request.onSend(text)) { setDraft(current => current.trim() === text ? '' : current); void mutate(); void mutateCache(['issue-threads', issueId]) }
+      else setSendFailed(t('sendFailed'))
+    } finally { setSending(false) }
+  }
   async function send(retry?: string, retryOriginalSession?: true) {
+    if (changeRequest && retry === undefined) return sendChangeRequest(changeRequest)
     const text = retry ?? draft.trim()
     const questionWake = retryOriginalSession ? data?.thread.questionWake : null
     if (!text || sending || stopRequested || (question === 'resuming' && !questionWake)) return
@@ -211,8 +222,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {onBack && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0" aria-label={t('back')} aria-keyshortcuts="Escape" onClick={onBack} />}><ArrowLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('back')}</TooltipContent></Tooltip>}
       <h2 ref={headingRef} tabIndex={-1} className={cn('min-w-0 truncate text-sm font-semibold outline-none', !acceptance && 'flex-1')}>{title}</h2>
       {acceptance && <><AcceptanceStateBadge task={acceptance} /><span className="flex-1" /></>}
-      <ThreadArtifacts runId={runId} status={data?.thread.status ?? ''} />
       {data?.thread.ownedByCurrentUser && <ThreadExecutionIdentity runId={liveRunId} />}
+      {/* Always there, left of stop: off until the thread hands an Artifact over (decision 2026-11-06-1615). */}
+      <ThreadArtifactButton runId={runId} status={data?.thread.status ?? ''} taskId={acceptance?.id} />
       {/* Stop lives here for every live run, also one waiting for an answer, whose composer button sends. */}
       {canStop && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('stop')} data-slot="thread-stop" onClick={() => { void stop() }} />}><Square data-icon="inline-start" className="fill-current" /></TooltipTrigger><TooltipContent side="bottom">{t('stop')}</TooltipContent></Tooltip>}
       {onOpenTask && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('openTask')} onClick={onOpenTask} />}><SquareKanban data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('openTask')}</TooltipContent></Tooltip>}
@@ -273,6 +285,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
           {data.thread.quota?.switched.map(item => <ThreadQuotaSwitchLine key={item.runId} switched={item} />)}
           {modelFallback.map(item => <ThreadModelFallbackNotice key={item.runId} item={item}
             retry={item.state !== 'switched' && canRetry ? () => { void send(t('retry'), true) } : undefined} retrying={sending} />)}
+          {/* L3: the finishing message carries the thread's Artifact card. */}
+          {!active && (view?.status ?? data.thread.status) === 'succeeded' && <ThreadArtifactCards runId={runId} />}
           {data.thread.feedbackEligible && <ThreadFeedback runId={runId} />}
         </>}
     </div>
@@ -284,37 +298,13 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     {detail && <div data-slot="thread-composer" className="flex shrink-0 flex-col gap-1 p-3">
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }} attachmentScope={{ kind: 'thread', id: liveRunId }}
-        quote={replyQuote ? <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} /> : undefined}
-        sending={sending || stopPending} editableWhileSending submitDisabled={replyBlocked || stopRequested || question === 'resuming'} running={working || (question === 'resuming' && !data?.thread.questionWake)} thread onStop={working && canStop ? () => { void stop() } : undefined} />
+        quote={changeRequest ? <QuoteChip slot="change-request-chip" text={changeRequest.label} icon={<MessageSquareDiff aria-hidden="true" className="size-3.5 shrink-0" />} onRemove={changeRequest.onCancel} />
+          : replyQuote ? <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} /> : undefined}
+        sending={sending || stopPending} editableWhileSending submitDisabled={changeRequest ? false : replyBlocked || stopRequested || question === 'resuming'} running={working || (question === 'resuming' && !data?.thread.questionWake)} thread onStop={working && canStop ? () => { void stop() } : undefined} />
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </div>}
     </>}
     {detail && <SelectionQuote root={rootRef} onQuote={text => { setReplyQuote(text); inputRef.current?.focus() }} />}
   </section>
-}
-
-/**
- * 「Artifact · N」 in an open thread's header (Figma F3 `395:15024`): what this
- * thread handed over. One opens straight in the Artifact window, with this
- * thread's conversation on its right (F4); several open a list first.
- */
-function ThreadArtifacts({ runId, status }: { runId: string; status: string }) {
-  const t = useTranslations('ArtifactsPage')
-  const { data, mutate } = useSWR(['run-artifacts', runId], () => listRunArtifacts(runId))
-  // A thread usually hands its artifact over as it finishes.
-  useEffect(() => { void mutate() }, [status, mutate])
-  const mine = data ?? []
-  if (!mine.length) return null
-  const label = t('threadEntry', { count: mine.length })
-  return <>
-    {mine.length === 1
-      ? <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground" onClick={() => openArtifact(mine[0].id)}><ArtifactIcon data-icon="inline-start" />{label}</Button>
-      : <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground" />}><ArtifactIcon data-icon="inline-start" />{label}</DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
-          <DropdownMenuGroup>{mine.map(item => <DropdownMenuItem key={item.id} onClick={() => openArtifact(item.id)}><ArtifactKindIcon kind={item.kind} /><span className="truncate">{item.title}</span></DropdownMenuItem>)}</DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>}
-  </>
 }
