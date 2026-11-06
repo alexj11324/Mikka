@@ -5,10 +5,10 @@ on:
 permissions:
   contents: read
 jobs:
-  session:
+  preflight:
     if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     permissions:
       contents: read
       id-token: write
@@ -26,49 +26,99 @@ jobs:
           secret-path: /
           recursive: false
           include-imports: false
-      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          recursive: false
-          include-imports: false
-      - name: Configure the smoke account and seal its temporary session to the acceptance runner
+      - name: Restore the temporary smoke key and inspect ACME through normal sessions
         run: |
           node --input-type=module <<'JS'
-          import { randomBytes, createCipheriv, publicEncrypt, constants } from 'node:crypto';
-          import { writeFileSync } from 'node:fs';
-          const origin='https://app.aspectlylabs.com'; let cookie=''; let sealed=false;
-          async function call(path,body,rpc=false) {
-            const r=await fetch(origin+'/mikka'+path,{method:body===undefined?'GET':'POST',redirect:'error',signal:AbortSignal.timeout(60000),headers:{origin,...(cookie?{cookie}:{}),...(body!==undefined?{'content-type':'application/json'}:{}),...(rpc?{'x-mikka-rpc':'1'}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});
-            if(path==='/api/auth/sign-in/email'&&r.ok)cookie=r.headers.getSetCookie().map(x=>x.split(';',1)[0]).join('; ');
-            return {status:r.status,data:await r.json().catch(()=>null)};
+          // Temporary #1505 operational preflight. Normal sessions stay only in memory.
+          const origin = 'https://app.aspectlylabs.com'
+          const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+          const post = body => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+          const assert = (value, code) => { if (!value) throw new Error(code) }
+          const decode = value => Array.isArray(value) ? value.map(decode) : value && typeof value === 'object'
+            ? value.$mikka === 'undefined' ? undefined : value.$mikka === 'date' ? value.value
+              : Object.fromEntries(Object.entries(value).map(([key, item]) => [key, decode(item)])) : value
+          const emit = data => console.log(JSON.stringify(data))
+          async function withSession(kind, email, password, work) {
+            assert(email && password, 'credentials_missing')
+            const cookies = new Map()
+            async function request(path, init = {}) {
+              const response = await fetch(origin + '/mikka' + path, { ...init, redirect: 'error', signal: AbortSignal.timeout(30000),
+                headers: { origin, 'cache-control': 'no-store', ...(cookies.size ? { cookie: [...cookies].map(([key, value]) => `${key}=${value}`).join('; ') } : {}), ...init.headers } })
+              for (const line of response.headers.getSetCookie()) {
+                const pair = line.split(';', 1)[0], at = pair.indexOf('=')
+                if (at < 1) continue
+                const key = pair.slice(0, at), value = pair.slice(at + 1)
+                if (!value || /;\s*max-age=0(?:;|$)/i.test(line)) cookies.delete(key); else cookies.set(key, value)
+              }
+              assert(response.ok, 'api_refused')
+              return response
+            }
+            async function json(path, init) { const value = await (await request(path, init)).json(); assert(!value.error, 'api_refused'); return value }
+            async function rpc(action, args) {
+              const response = await json('/api/rpc', { ...post({ version: 1, action, args }), headers: { 'content-type': 'application/json', 'x-mikka-rpc': '1' } })
+              assert(response.ok, 'rpc_refused')
+              const value = decode(response.result); assert(!value?.error && value?.ok !== false, 'action_refused')
+              return value?.ok === true && 'data' in value ? value.data : value
+            }
+            let loggedIn = false
+            try {
+              await request('/api/auth/sign-in/email', post({ email, password, rememberMe: false })); loggedIn = true
+              assert(cookies.size, 'session_cookie_missing')
+              const session = await json('/api/auth/get-session')
+              assert(session.user?.email?.toLowerCase() === email.toLowerCase(), 'identity_mismatch')
+              emit({ phase: 'login', account: kind, ok: true })
+              await work({ json, rpc, user: session.user })
+            } finally {
+              if (loggedIn) {
+                try { await request('/api/auth/sign-out', post({})); emit({ phase: 'sign_out', account: kind, ok: true }) }
+                catch { emit({ phase: 'sign_out', account: kind, ok: false }); process.exitCode = 1 }
+              }
+              cookies.clear()
+            }
           }
-          try{
-            const login=await call('/api/auth/sign-in/email',{email:process.env.SMOKE_OWNER_EMAIL,password:process.env.SMOKE_OWNER_PASSWORD,rememberMe:false});
-            if(login.status!==200||!cookie)throw Error('smoke_sign_in_refused');
-            const identity=await call('/api/auth/get-session');
-            if(identity.data?.user?.email!==process.env.SMOKE_OWNER_EMAIL)throw Error('smoke_identity_mismatch');
-            if(!process.env.E2B_API_KEY)throw Error('e2b_key_unavailable');
-            const configured=await call('/api/rpc',{version:1,action:'workspace-secrets.saveE2BKey',args:[{apiKey:process.env.E2B_API_KEY},'0f877068-66a0-4893-8801-9a14eb3116b3']},true);
-            console.log(JSON.stringify({phase:'configure_e2b',status:configured.status,ok:configured.data?.ok,result:configured.data?.result}));
-            if(configured.status!==200||!configured.data?.ok||configured.data.result?.ok===false)throw Error('e2b_configure_failed');
-            const aes=randomBytes(32),iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',aes,iv);
-            const ciphertext=Buffer.concat([cipher.update(JSON.stringify({cookie})),cipher.final()]);
-            const recipient="-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzx0NgTPcxpjLfRWGeH/G\nVgrh5dPi5yNRkT1U4fQIG8DGc50NT24kB1u04aZlE+kKGh+va47YBTjW3gUETgco\nyFTTNIBdsCremenbyxTdQx9far2O8DRfewpkGupBLUCvw14HsrcDULugnMfx16Un\nvjMsN5+CF6sga7HYY9YCe3+FEEEYE6jGv8bOnOuposnAy77Ii9x/bnDLbJyYhd5Q\n8jm6wlvsm23zQQrTpg0QsFwpaKZT07sHJOH+jdge3vkMGCc13kAfH21DA1l4KXWp\nGdJxzO82D73ObC7vXPVJ1j9G69sX8oUtv0IKT7iLY86K78ZwroLWQhHS5er4RZOg\naQIDAQAB\n-----END PUBLIC KEY-----\n";
-            const encrypted=publicEncrypt({key:recipient,oaepHash:'sha256',padding:constants.RSA_PKCS1_OAEP_PADDING},aes);
-            writeFileSync(process.env.RUNNER_TEMP+'/smoke-session.sealed.json',JSON.stringify({key:encrypted.toString('base64'),iv:iv.toString('base64'),data:ciphertext.toString('base64'),tag:cipher.getAuthTag().toString('base64')}),{mode:0o600});
-            console.log('Temporary session encrypted for the acceptance runner');
-            sealed=true;
-          }catch(error){console.log(JSON.stringify({phase:'failed',code:['smoke_sign_in_refused','smoke_identity_mismatch','e2b_key_unavailable','e2b_configure_failed'].includes(error.message)?error.message:'transport_failed'}));process.exitCode=1}
-          finally{if(cookie&&!sealed)await call('/api/auth/sign-out',{}).catch(()=>{});cookie=''}
+          try {
+            await withSession('smoke_restore', process.env.SMOKE_OWNER_EMAIL, process.env.SMOKE_OWNER_PASSWORD, async ({ rpc }) => {
+              const workspaceId = '0f877068-66a0-4893-8801-9a14eb3116b3'
+              const before = await rpc('workspace-secrets.getE2BKeyCapability', [workspaceId])
+              const removed = await rpc('workspace-secrets.deleteE2BKey', [workspaceId])
+              const after = await rpc('workspace-secrets.getE2BKeyCapability', [workspaceId])
+              assert(after.configured === false, 'smoke_restore_failed')
+              emit({ phase: 'smoke_e2b_restored', workspaceId, beforeConfigured: before.configured, removed: removed.removed, configured: after.configured })
+            })
+          } catch (error) { emit({ phase: 'smoke_restore_failed', code: ['credentials_missing', 'identity_mismatch', 'smoke_restore_failed'].includes(error.message) ? error.message : 'preflight_failed' }); process.exitCode = 1 }
+          try {
+            assert(process.env.ACME_DEMO_EMAIL?.toLowerCase() === 'alex@acme.aspectlylabs.com', 'acme_identity_required')
+            await withSession('acme', process.env.ACME_DEMO_EMAIL, process.env.ACME_DEMO_PASSWORD, async ({ json, rpc, user }) => {
+              const version = await json('/api/version'); emit({ phase: 'version', build: version.build })
+              const switcher = await json('/api/workspace/switcher')
+              const choices = switcher.accounts?.find(account => account.id === user.id)?.choices
+              assert(Array.isArray(choices) && choices.length > 0 && choices.length <= 30, 'workspaces_missing')
+              emit({ phase: 'workspaces', currentWorkspaceId: switcher.workspace?.id, choices: choices.map(item => ({ id: item.id, name: item.name })) })
+              const ready = []
+              for (const workspace of choices) {
+                assert(uuid.test(workspace.id), 'workspace_invalid')
+                const [subscriptions, order, e2b] = await Promise.all([
+                  json('/api/subscriptions?workspace=' + workspace.id), rpc('model-order.getModelOrder', [workspace.id]),
+                  rpc('workspace-secrets.getE2BKeyCapability', [workspace.id]),
+                ])
+                const candidates = (order.candidates ?? []).filter(item => item.source?.kind === 'subscription')
+                const smallModels = candidates.filter(item => (item.harness === 'claude_code' && item.model === 'claude-haiku-5-5') || (item.harness === 'codex' && item.model === 'gpt-6-luna'))
+                const both = new Set(smallModels.map(item => item.harness)).size === 2
+                emit({ phase: 'workspace_capabilities', workspaceId: workspace.id, subscriptions: subscriptions.connections?.map(item => ({ id: item.id, provider: item.provider, state: item.state, paused: item.paused })),
+                  models: smallModels.map(item => ({ harness: item.harness, model: item.model })), e2bConfigured: e2b.configured, e2bCanEdit: e2b.canEdit, bothSubscriptions: both })
+                if (both && e2b.configured) ready.push(workspace.id)
+              }
+              assert(ready.length, 'ready_workspace_missing')
+              const workspaceId = ready.includes(switcher.workspace?.id) ? switcher.workspace.id : ready[0]
+              await rpc('workspace.switchWorkspace', [workspaceId])
+              const bots = await rpc('bots.listBots', [])
+              emit({ phase: 'bots', workspaceId, bots: bots.map(item => ({ id: item.id, name: item.name, coordinator: Boolean(item.coordinator) })) })
+              const name = '测试1505 云启动验收'
+              const existing = bots.find(item => item.name === name)
+              const bot = existing ?? await rpc('bots.createBot', [{ name, color: 'gris', shape: 'cercle', model: null, repository: null }])
+              assert(uuid.test(bot.id), 'test_bot_missing')
+              emit({ phase: 'acceptance_fixture', workspaceId, botId: bot.id, created: !existing, productionTasksDispatched: 0 })
+            })
+          } catch (error) { emit({ phase: 'acme_preflight_failed', code: ['credentials_missing', 'acme_identity_required', 'identity_mismatch', 'ready_workspace_missing', 'workspaces_missing', 'test_bot_missing'].includes(error.message) ? error.message : 'preflight_failed' }); process.exitCode = 1 }
+          
           JS
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: smoke-session-sealed
-          path: ${{ runner.temp }}/smoke-session.sealed.json
-          retention-days: 1
-          if-no-files-found: error
