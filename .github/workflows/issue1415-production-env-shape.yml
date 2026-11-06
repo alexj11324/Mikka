@@ -25,11 +25,11 @@ jobs:
     timeout-minutes: 8
     env:
       APPLICATION_SHA: ce512e77f01589f56729c31d00750c0203e46ed9
-      ENV_SHAPE_DEPENDENCIES: ${{ runner.temp }}/issue1415-env-shape-deps
+      ENV_SHAPE_DEPENDENCIES: /tmp/issue1415-env-shape-deps-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
