@@ -39,9 +39,10 @@ export function verifySharedHaiku(menu) {
   const manuallyListed = Array.isArray(menu?.groups) && menu.groups.some(group =>
     Array.isArray(group.options) && group.options.some(option => option.id === current?.id))
   if (!current || current.modelId !== EXPECTED_MODEL || current.provider !== 'claude'
-    || current.kind !== 'subscription' || current.available !== true || current.chosen !== false
+    || current.kind !== 'subscription' || !(current.available === true || current.available === false && current.availability === 'checking') || current.chosen !== false
     || typeof current.id !== 'string' || !current.id || manuallyListed) fail('model_not_shared_haiku')
-  return { model: EXPECTED_MODEL, provider: 'claude', kind: 'subscription', available: true,
+  return { model: EXPECTED_MODEL, provider: 'claude', kind: 'subscription', available: current.available,
+    availability: current.available ? 'available' : 'checking', admissionPending: !current.available,
     chosen: false, listedAsOwnOption: false, sharedInference: 'resolved_subscription_absent_from_manual_options',
     runtimeModelConfirmed: false }
 }
