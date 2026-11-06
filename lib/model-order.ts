@@ -77,6 +77,11 @@ export async function orderCandidates(query: Query, scope: OrderScope): Promise<
   const { usableApiKeys } = await import('./model-api-keys')
   const settings = new ExecutionSettings(query as Pool)
   const rows = await settings.modelCandidates(scope, query)
+  // Design prototype only (MIKKA_DESIGN_FIXTURES=1 on a local build): stored catalogues stand in for bindings.
+  if (process.env.MIKKA_DESIGN_FIXTURES === '1' && rows.length === 0) {
+    const { rows: stored } = await query.query<{ id: string; provider: string; models: unknown }>(`SELECT id::text AS id, provider, "modelCatalog"->'models' AS models FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND "removedAt" IS NULL`, [scope.ownerId])
+    for (const row of stored) for (const model of Array.isArray(row.models) ? row.models.map(String) : []) rows.push({ ...(rows[0] ?? {}), provider: row.provider, modelId: model, connectionId: row.id, ownerId: scope.ownerId } as (typeof rows)[number])
+  }
   const { pooledOwners } = await import('./personal-policy')
   const { authorizeSubscriptionWorkspace } = await import('./subscription-runtime')
   // Sharing grants use in this workspace, never ownership of the account. Both parties must still

@@ -50,7 +50,8 @@ async function designFixtureMenu(menu: BotModelMenu, ownerId: string): Promise<B
 /** 刷新模型列表: re-reads what this person can use here, after asking each subscription for its models. */
 export async function refreshBotModelMenuAction(chatBot: string | null) {
   const { botId, scope } = await chatScope(chatBot);
-  return refreshBotModelMenu(pool, new ExecutionSettings(pool), scope, botId);
+  const menu = await refreshBotModelMenu(pool, new ExecutionSettings(pool), scope, botId);
+  return process.env.MIKKA_DESIGN_FIXTURES === "1" ? designFixtureMenu(menu, scope.ownerId) : menu;
 }
 /**
  * Saves the composer's pick for the bot's next runs; a run already going keeps its model.
