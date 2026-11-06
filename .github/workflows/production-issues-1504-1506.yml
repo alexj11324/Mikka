@@ -1,4 +1,4 @@
-name: Issue 1504 production model routing acceptance
+name: Issues 1504-1506 owned workspace setup
 
 # Branch-only acceptance using ordinary smoke login; only owned synthetic fixtures.
 on:
@@ -17,10 +17,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  routing:
+  setup:
     if: github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -32,7 +32,7 @@ jobs:
       - name: Check the acceptance clients
         run: |
           node --check scripts/acceptance/issue-1504-1506/production-session.mjs
-          node --check scripts/acceptance/issue-1504-1506/routing-production.mjs
+          node --check scripts/acceptance/issue-1504-1506/workspace-provision.mjs
       - name: Read the existing smoke email only
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -57,15 +57,13 @@ jobs:
           secret-name: SMOKE_OWNER_PASSWORD
           recursive: false
           include-imports: false
-      - name: Dispatch three difficulty levels and clean up owned fixtures
-        env:
-          MIKKA_ACCEPTANCE_SHA: e8dd7a1265027a0477819dde1a80178e7bcdb1ae
-        run: node scripts/acceptance/issue-1504-1506/routing-production.mjs dispatch
-      - name: Retain the sanitized routing result
+      - name: Provision this task owned smoke workspace
+        run: node scripts/acceptance/issue-1504-1506/workspace-provision.mjs provision
+      - name: Retain the sanitized setup result
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: production-issues-1504-1506-${{ github.run_id }}
-          path: issue-1504-1506-report/routing-production*.json
+          path: issue-1504-1506-report/workspace-provision.json
           if-no-files-found: ignore
           retention-days: 7
