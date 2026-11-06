@@ -389,7 +389,9 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   const revisions = await readRevisions([{ kind: 'thread', id: runId }, { kind: 'run', id: runId }])
   const { row, user } = cursor ? await readableThread(issueId, runId, threadCursorColumns) : await readableThread(issueId, runId, threadColumns)
   // The run that resumes this one after an answered question, or runs it again after it ended (R-81), is the same thread: its chain (BE-18).
-  const [projected] = projectIssueThreads([row], row.issueId, user.id, new Set([user.id]))
+  // Named by its task, not by system text prepended to the prompt (lib/thread-prompt.ts); a cursor read's prompt is already its name lines.
+  const named = cursor ? row : { ...row, prompt: threadPromptView(row.prompt, row.promptTaskStart, row.promptTaskLength).task }
+  const [projected] = projectIssueThreads([named], row.issueId, user.id, new Set([user.id]))
   const chain = projected ? await readRunChain(pool, row.userId, row.id) : null
   // The conversation is the thread's, across its runs from this one on, oldest first.
   const from = chain ? Math.max(0, chain.attempts.findIndex(attempt => attempt.runId === row.id)) : 0
