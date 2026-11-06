@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "issue": 1506,
+  "phase": "alex-1506-workspace",
+  "status": "ready",
+  "runKey": "acme-1506-20261106",
+  "ownerRef": "b86765f1f6d3",
+  "applicationSha": "2960d783f0196fed5375593d910a43430a101747",
+  "workspace": {
+    "id": "0a700222-137b-4bca-b86d-a74b8fdffc21",
+    "ref": "d9367a49ac45",
+    "kind": "team",
+    "name": "测试 Issue 1506 ACME acme-1506-20261106",
+    "slug": "acceptance-1506-acme-acme-1506-20261106"
+  },
+  "creationAttempted": true,
+  "creationOutcome": "acknowledged",
+  "modelMessages": 0,
+  "taskCreationRequests": 0,
+  "balanceWrites": 0,
+  "shares": {
+    "subscription": true,
+    "allowOthers": false,
+    "credit": true,
+    "subscriptionWrites": 1,
+    "creditWrites": 1
+  },
+  "requests": [
+    {
+      "path": "/mikka/api/auth/sign-in/email",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 410
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 74
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 32
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 94
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 167
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 448
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 85
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 160
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 233
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 540
+    },
+    {
+      "path": "/mikka/api/bots",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 81
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 116
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 195
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 91
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 297
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 228
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 116
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 238
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 48
+    },
+    {
+      "path": "/mikka/api/auth/sign-out",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 194
+    }
+  ],
+  "signedOut": true,
+  "durationMs": 3289
+}

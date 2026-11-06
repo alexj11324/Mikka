@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "issue": 1506,
+  "phase": "alex-coordinator-fixtures",
+  "runKey": "acme-1506-20261106",
+  "ownerRef": "b86765f1f6d3",
+  "workspace": {
+    "id": "0a700222-137b-4bca-b86d-a74b8fdffc21",
+    "ref": "d9367a49ac45",
+    "kind": "team",
+    "name": "测试 Issue 1506 ACME acme-1506-20261106",
+    "slug": "acceptance-1506-acme-acme-1506-20261106"
+  },
+  "applicationSha": "2960d783f0196fed5375593d910a43430a101747",
+  "fixtures": [
+    {
+      "key": "haiku",
+      "model": "claude-haiku-5-5",
+      "provider": "claude",
+      "botId": "9df34d90-6db6-407e-a2d2-bfd4ac616c58",
+      "optionId": "ce672255-07fe-4cf1-86ff-c8dbc7dafd3e",
+      "createAttempted": true,
+      "selectionAttempted": true,
+      "status": "failed",
+      "creationOutcome": "acknowledged",
+      "selectionOutcome": "acknowledged",
+      "error": "fixture_model_mismatch"
+    },
+    {
+      "key": "luna",
+      "model": "gpt-6-luna",
+      "provider": "codex",
+      "botId": "8ff8b30e-2eb9-48bd-987f-4cbf048944d7",
+      "optionId": "eea56ee7-ae47-4713-8115-3a7bb39117fc",
+      "createAttempted": true,
+      "selectionAttempted": true,
+      "status": "failed",
+      "creationOutcome": "acknowledged",
+      "selectionOutcome": "acknowledged",
+      "error": "fixture_model_mismatch"
+    }
+  ],
+  "mode": "setup",
+  "status": "failed",
+  "modelMessages": 0,
+  "taskCreationRequests": 0,
+  "subscriptionOrCreditWrites": 0,
+  "startedAt": "2026-11-06T20:02:46.566Z",
+  "requests": [
+    {
+      "path": "/mikka/api/auth/sign-in/email",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 357
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 63
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 28
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 83
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 62
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 96
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 165
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 220
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 521
+    },
+    {
+      "path": "/mikka/api/bots",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 6144
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 20
+    },
+    {
+      "path": "/mikka/api/bots",
+      "method": "POST",
+      "status": 201,
+      "headersMs": 64
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 226
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 968
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 603
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 22
+    },
+    {
+      "path": "/mikka/api/bots",
+      "method": "POST",
+      "status": 201,
+      "headersMs": 53
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 218
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 373
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 432
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 30
+    },
+    {
+      "path": "/mikka/api/auth/sign-out",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 219
+    }
+  ],
+  "observedApplicationSha": "2960d783f0196fed5375593d910a43430a101747",
+  "authorizedSourceCandidates": true,
+  "retainedForAcceptance": true,
+  "signedOut": true,
+  "finishedAt": "2026-11-06T20:02:57.339Z"
+}

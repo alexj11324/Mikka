@@ -79,6 +79,26 @@ export function verifyOwnModel(menu, row) {
     fallback: false, optionId: row.optionId, runtimeModelConfirmed: false, runtimeOwnerAccessConfirmed: false }
 }
 
+// setBotModel clones an account-level binding into this Bot's workspace.
+// The normal menu then prefers that workspace's canonical option. Accept only
+// the exact deterministic clone created by bindingForBot, never an arbitrary ID.
+export function ownBotBindingId(workspaceId, botId, optionId) {
+  if (![workspaceId, botId, optionId].every(value => UUID.test(value ?? ''))) fail('fixture_receipt_invalid')
+  const value = hash(JSON.stringify([ALEX_OWNER_ID, workspaceId, botId, optionId]))
+  return `${value.slice(0, 8)}-${value.slice(8, 12)}-4${value.slice(13, 16)}-8${value.slice(17, 20)}-${value.slice(20, 32)}`
+}
+
+export function reconcileChosenOption(menu, row, workspaceId) {
+  if (menu?.current?.id === row.optionId) return
+  const expected = ownBotBindingId(workspaceId, row.botId, row.optionId)
+  if (menu?.current?.id !== expected) fail('fixture_model_mismatch')
+  // All original source/model/chosen/no-fallback checks still apply before saving.
+  verifyOwnModel(menu, { ...row, optionId: expected })
+  row.selectedSourceOptionId ??= row.optionId
+  row.optionId = expected
+  row.optionCanonicalization = 'exact_owned_bot_binding_clone'
+}
+
 export async function openAcceptanceFixture(session, env = process.env, receiptOverride = null) {
   const receipt = receiptOverride ? validateFixtureReceipt(receiptOverride, { ready: true })
     : loadFixtureReceipt(env.MIKKA_FIXTURE_RECEIPT, { ready: true })
@@ -185,10 +205,11 @@ export async function runFixtureSetup({ env = process.env, mode = 'setup', recei
             try { menu = await rpc(session, 'execution-settings.chooseBotModel', [bot.id, row.optionId]); row.selectionOutcome = 'acknowledged' }
             catch { menu = await rpc(session, 'execution-settings.getBotModelMenu', [bot.id]); row.selectionOutcome = 'read_after_unknown_no_retry' }
           }
+          reconcileChosenOption(menu, row, report.workspace.id)
           row.menu = verifyOwnModel(menu, row)
           // One normal read verifies the saved choice, independently of the write acknowledgement.
           row.menu = verifyOwnModel(await rpc(session, 'execution-settings.getBotModelMenu', [bot.id]), row)
-          row.status = 'ready'; save()
+          row.status = 'ready'; delete row.error; save()
         } catch (error) {
           row.status = 'failed'; row.error = fixtureError(error)
           if (mode === 'cleanup') row.cleanup = { ...row.cleanup, status: 'needs_followup' }

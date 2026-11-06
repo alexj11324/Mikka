@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "phase": "resume-and-1490-baseline",
+  "expectedSha": "2960d783f0196fed5375593d910a43430a101747",
+  "fixtureRunKey": "acme-1506-20261106",
+  "workspaceId": "0a700222-137b-4bca-b86d-a74b8fdffc21",
+  "workspaceReceipt": "receipts/workspace-42284845261.json",
+  "workspaceReceiptSha256": "ca8e01afd498e0feb98bbf45fbd0251aa0daf23873e5998fa60c9e2192175884",
+  "fixtureReceipt": "receipts/fixtures-failed-42284845261.json",
+  "fixtureReceiptSha256": "62f1a1972b700506902f767a19c9ba41aa4588c7ad8cfadb89a8290d3ca038b1"
+}
