@@ -1,0 +1,61 @@
+name: Issue 1505 isolated template components
+on:
+  push:
+    branches: [ops/1505-template-benchmark]
+permissions:
+  contents: read
+concurrency:
+  group: issue-1505-template-components
+  cancel-in-progress: false
+jobs:
+  compare:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: benchmark
+          POSTGRES_PASSWORD: benchmark
+          POSTGRES_DB: mikka_1505_components
+        ports: [5432:5432]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install isolated benchmark SDKs
+        run: |
+          python3 -m venv "$RUNNER_TEMP/e2b-benchmark"
+          "$RUNNER_TEMP/e2b-benchmark/bin/pip" install 'e2b==2.62.0' 'psycopg[binary]==3.2.13'
+      - name: Read E2B through the existing workload identity
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          include-imports: false
+      - name: Compare private candidates and exact isolated pool claims
+        env:
+          BENCHMARK_DATABASE_URL: postgresql://benchmark:benchmark@127.0.0.1:5432/mikka_1505_components
+        run: '"$RUNNER_TEMP/e2b-benchmark/bin/python" scripts/e2b/benchmark-template-pool.py'
+      - name: Preserve safe measurements
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: issue-1505-component-benchmark
+          path: scripts/e2b/component-benchmark.json
+          if-no-files-found: warn
+          retention-days: 7
