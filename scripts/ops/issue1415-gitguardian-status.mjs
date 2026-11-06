@@ -7,13 +7,15 @@ const REPOSITORY = 'alexj11324/Mikka'
 const REPOSITORY_ID = 1427517699
 const OWNER_ID = 183887963
 const BRANCH = 'refs/heads/ops/issue1415-gitguardian-status'
-const REVISION = '7973afa9ad8cd3aaaaca0e5a12c05e3de8fd791d'
-const EVIDENCE = 'docs/acceptance/issue-1415/hydration-and-harness-regressions.json'
-const INCIDENTS = Object.freeze([39721795, 39721796])
-const SOURCES = Object.freeze([
-  { path: 'components/authenticated-read-cache.tsx', line: 7, sha256: '8a37c05d9473e5fc47f7f0b1188122e1aa014902841fc4e0575e2b55a94d3d48' },
-  { path: 'apps/desktop/test/native-auth-diagnostics.mjs', line: 14, sha256: '0a422c9d337ba3507f6e6eb2825163ca6a6e860fcb96e9d45165da45ff7b85ea' },
-])
+const REVISION = '6800f6676db2ff0e99165667a7e25713c8003043'
+const INCIDENTS = Object.freeze([39749296])
+const SOURCE = Object.freeze({
+  path: 'scripts/release/build-vercel.test.mjs',
+  line: 32,
+  sha256: 'b1905ebdb970bbc98a340daa25a9513a05a24395497ad1703a7921a777749c1e',
+  lineSha256: '55f84297ad4f000574153dc0e65e8435e605905563b192aa21a5c0df5ebcbd59',
+  occurrenceId: 310827339,
+})
 const API = 'https://api.gitguardian.com/v1'
 const STATES = new Set(['TRIGGERED', 'ASSIGNED', 'IGNORED', 'RESOLVED'])
 const MAX_BYTES = 2 * 1024 * 1024
@@ -51,23 +53,23 @@ export async function verifySourceEvidence(fetcher = fetch) {
     requireCondition(response.status === 200 && response.url === url, 'GG_SOURCE_HTTP')
     return readBounded(response)
   }
-  const evidenceBytes = await read(EVIDENCE)
-  let evidence
-  try { evidence = JSON.parse(evidenceBytes.toString('utf8')) }
-  catch { throw new DispositionError('GG_SOURCE_JSON') }
-  const lines = evidenceBytes.toString('utf8').split(/\r?\n/)
-  const verified = []
-  for (const source of SOURCES) {
-    requireCondition(evidence.files?.[source.path] === source.sha256 &&
-      lines[source.line - 1]?.includes(JSON.stringify(source.path) + ': ' + JSON.stringify(source.sha256)),
-      'GG_EVIDENCE_BINDING')
-    const bytes = await read(source.path)
-    requireCondition(digest(bytes) === source.sha256, 'GG_SOURCE_DIGEST')
-    verified.push({ path: source.path, evidenceLine: source.line,
-      sha256: source.sha256, matchesEvidenceDigest: true })
-  }
-  return { revision: REVISION, evidenceFile: EVIDENCE,
-    evidenceSha256: digest(evidenceBytes), files: verified }
+  const bytes = await read(SOURCE.path)
+  requireCondition(digest(bytes) === SOURCE.sha256, 'GG_SOURCE_DIGEST')
+  const line = bytes.toString('utf8').split(/\r?\n/)[SOURCE.line - 1]
+  requireCondition(typeof line === 'string' && digest(line) === SOURCE.lineSha256, 'GG_EVIDENCE_BINDING')
+  // This exact immutable test fixture is never a credential supplied by an environment.
+  const match = /^  const plain = '([^']+)'$/.exec(line)
+  requireCondition(match !== null, 'GG_SYNTHETIC_FIXTURE')
+  let fixture
+  try { fixture = new URL(match[1]) }
+  catch { throw new DispositionError('GG_SYNTHETIC_FIXTURE') }
+  requireCondition(fixture.protocol === 'postgresql:' && fixture.username === 'fixture' &&
+    fixture.password === 'plain' && fixture.hostname === 'ep-fixture-pooler.us-east-2.aws.neon.tech' &&
+    fixture.port === '' && fixture.pathname === '/app' && fixture.search === '?sslmode=require' &&
+    fixture.hash === '', 'GG_SYNTHETIC_FIXTURE')
+  return { revision: REVISION, evidenceFile: SOURCE.path, evidenceSha256: SOURCE.sha256,
+    evidenceLine: SOURCE.line, evidenceLineSha256: SOURCE.lineSha256,
+    syntheticFixtureVerified: true, fixtureKind: 'synthetic-database-url-regression-fixture' }
 }
 
 export function assessIncident(detail, occurrences, id, workspaceId) {
@@ -80,7 +82,7 @@ export function assessIncident(detail, occurrences, id, workspaceId) {
   requireCondition(dashboard.origin === 'https://dashboard.gitguardian.com' &&
     dashboard.pathname === '/workspace/' + workspaceId + '/incidents/' + id &&
     !dashboard.search && !dashboard.hash && !dashboard.username && !dashboard.password, 'GG_INCIDENT_WORKSPACE')
-  requireCondition(Array.isArray(occurrences) && occurrences.length > 0 && occurrences.length <= 100 &&
+  requireCondition(Array.isArray(occurrences) && occurrences.length === 1 &&
     Number.isSafeInteger(detail.occurrences_count) &&
     detail.occurrences_count === occurrences.length, 'GG_OCCURRENCES_COMPLETE')
   const evidenceLines = new Set()
@@ -88,7 +90,7 @@ export function assessIncident(detail, occurrences, id, workspaceId) {
     let sourceUrl
     try { sourceUrl = new URL(occurrence.source?.url) }
     catch { throw new DispositionError('GG_OCCURRENCE_SOURCE') }
-    requireCondition(occurrence.incident_id === id && occurrence.source?.type === 'github' &&
+    requireCondition(occurrence.id === SOURCE.occurrenceId && occurrence.incident_id === id && occurrence.source?.type === 'github' &&
       typeof occurrence.source.full_name === 'string' &&
       occurrence.source.full_name.toLowerCase() === REPOSITORY.toLowerCase() &&
       sourceUrl.origin === 'https://github.com' &&
@@ -96,21 +98,21 @@ export function assessIncident(detail, occurrences, id, workspaceId) {
       !sourceUrl.search && !sourceUrl.hash && !sourceUrl.username && !sourceUrl.password &&
       (occurrence.source.external_id === undefined || String(occurrence.source.external_id) === String(REPOSITORY_ID)),
       'GG_OCCURRENCE_SOURCE')
-    requireCondition(occurrence.sha === REVISION && occurrence.filepath === EVIDENCE &&
+    requireCondition(occurrence.sha === REVISION && occurrence.filepath === SOURCE.path &&
       occurrence.change_type === 'addition', 'GG_OCCURRENCE_COMMIT_PATH')
     requireCondition(Array.isArray(occurrence.matches) && occurrence.matches.length > 0, 'GG_OCCURRENCE_MATCHES')
     const lines = new Set()
     for (const match of occurrence.matches) {
       requireCondition(Number.isSafeInteger(match.post_line_start) &&
         match.post_line_start === match.post_line_end &&
-        SOURCES.some(source => source.line === match.post_line_start), 'GG_OCCURRENCE_LINE')
+        match.post_line_start === SOURCE.line, 'GG_OCCURRENCE_LINE')
       lines.add(match.post_line_start)
     }
     requireCondition(lines.size === 1, 'GG_OCCURRENCE_LINE')
     evidenceLines.add([...lines][0])
   }
   requireCondition(evidenceLines.size === 1, 'GG_OCCURRENCE_LINE')
-  return { id, beforeStatus: detail.status, evidenceLine: [...evidenceLines][0],
+  return { id, occurrenceId: SOURCE.occurrenceId, beforeStatus: detail.status, evidenceLine: [...evidenceLines][0],
     occurrenceCount: occurrences.length, repositoryMatches: true, pathMatches: true,
     revisionMatches: true, workspaceMatches: true }
 }
@@ -166,13 +168,14 @@ export async function disposeFalsePositives({ token, report, fetcher = fetch }) 
   requireCondition(report.token.active && canEdit && Number.isSafeInteger(self.workspace_id) &&
     self.workspace_id > 0, 'GG_TOKEN_PERMISSION')
   const assessments = []
-  // Complete both evidence bindings before the first write.
+  // Complete the one exact occurrence binding before the only permitted write.
   for (const id of INCIDENTS) {
     const detail = await request('incident-before', '/incidents/secrets/' + id, id)
     const occurrences = await request('occurrence-metadata', '/occurrences/secrets?incident_id=' + id + '&per_page=100', id)
     assessments.push(assessIncident(detail, occurrences, id, self.workspace_id))
   }
-  requireCondition(new Set(assessments.map(item => item.evidenceLine)).size === SOURCES.length, 'GG_INCIDENT_PAIR')
+  requireCondition(assessments.length === 1 && assessments[0].occurrenceId === SOURCE.occurrenceId,
+    'GG_INCIDENT_BINDING')
   report.incidents = assessments
   report.allBindingsVerifiedBeforeWrite = true
   for (const item of assessments) {
@@ -190,7 +193,7 @@ export async function disposeFalsePositives({ token, report, fetcher = fetch }) 
 }
 
 async function main() {
-  const report = { version: 1, operation: 'issue1415-exact-source-checksum-false-positives',
+  const report = { version: 1, operation: 'issue1415-exact-synthetic-fixture-false-positive',
     repository: REPOSITORY, branch: BRANCH, startedAt: new Date().toISOString(),
     result: 'failed', stage: 'workflow-scope', requests: [], incidents: [],
     writeAttempts: 0, writeResponsesAccepted: 0, allBindingsVerifiedBeforeWrite: false,

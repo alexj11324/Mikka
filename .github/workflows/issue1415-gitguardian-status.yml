@@ -41,7 +41,7 @@ jobs:
           recursive: false
           include-imports: false
           export-type: env
-      - name: Verify immutable evidence and dispose only the two exact false positives
+      - name: Verify immutable synthetic fixture and dispose only the one exact false positive
         run: node scripts/ops/issue1415-gitguardian-status.mjs
       - name: Retain only the closed aggregate report
         if: always()
