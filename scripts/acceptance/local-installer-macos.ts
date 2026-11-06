@@ -17,6 +17,7 @@ const home = await mkdtemp(join(tmpdir(), 'mikka-node22-installer-'))
 const originalHome = process.env.HOME, originalPath = process.env.PATH
 const selectedBin = dirname(process.execPath)
 const deviceId = randomUUID(), workspaceId = randomUUID()
+const registrationToken = `orv_${'r'.repeat(43)}`
 const credential = `orv_${'t'.repeat(43)}`
 let registrations = 0, heartbeats = 0, enrollments = 0
 const server = createServer(async (request, response) => {
@@ -25,7 +26,10 @@ const server = createServer(async (request, response) => {
   const body = raw ? JSON.parse(raw) : {}
   const route = request.url ?? ''
   response.setHeader('content-type', 'application/json')
-  if (route.endsWith('/enroll')) { enrollments++; response.end(JSON.stringify({ credential })); return }
+  if (route.endsWith('/enroll')) {
+    assert.equal(request.headers.authorization, `Bearer ${registrationToken}`)
+    enrollments++; response.end(JSON.stringify({ credential })); return
+  }
   if (request.headers.authorization !== `Bearer ${credential}`) { response.writeHead(401).end('{}'); return }
   if (route.endsWith('/register')) {
     assert.equal(body.deviceType, 'laptop'); registrations++
@@ -70,7 +74,7 @@ try {
     if (script.includes('npm install')) { npmStarted = true; script = script.replace('@aspectlylabs/mikka', quote(tarball)) }
     return runProcess(command, [...args.slice(0, -1), script], input, timeout, signal)
   }
-  const installer = new SshInstaller(`http://127.0.0.1:${address.port}/mikka`, async () => 'fixture-registration-token', state => {
+  const installer = new SshInstaller(`http://127.0.0.1:${address.port}/mikka`, async () => registrationToken, state => {
     states.push(state)
     if (state.status === 'online' || state.status === 'failed') finish()
   }, execute, home, undefined, undefined, 'prod', { command: '/bin/sh', args: script => ['-c', script] }, async id => id === deviceId)
