@@ -128,11 +128,25 @@ hand ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 7).
 
 ## License
 
-Mikka is licensed under [AGPL-3.0-only](LICENSE). Contributions are submitted
-under the same license; contributors retain copyright in their work. No separate
-contributor agreement or copyright assignment is required. Please only submit
-work you are authorized to license under AGPL-3.0-only, and identify any
-third-party material and its license in your pull request. Send licensing
+Mikka is copyright © 2026 Aspectly Labs and licensed under
+[AGPL-3.0-only](LICENSE). Aspectly Labs also offers Mikka under separate
+commercial license terms ([`NOTICE`](NOTICE)).
+
+By intentionally submitting a contribution for inclusion in Mikka (a pull
+request, a patch, or any code, documentation or asset), you agree that:
+
+1. You keep the copyright in your contribution and license it under
+   AGPL-3.0-only, like the rest of Mikka.
+2. You also grant Aspectly Labs a perpetual, worldwide, non-exclusive,
+   royalty-free and irrevocable license to use, copy, modify, distribute and
+   sublicense your contribution, and to license it under other terms,
+   including commercial licenses and later versions of Mikka's license.
+3. You have the right to grant these licenses: the work is yours, or you are
+   authorized to submit it, for example by your employer. You identify any
+   third-party material and its license in your pull request.
+
+There is no separate form to sign. When an agent prepares a contribution, the
+person or organization that submits it makes these agreements. Send licensing
 questions to [legal@aspectlylabs.com](mailto:legal@aspectlylabs.com).
 
 ## Security
