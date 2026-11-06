@@ -3,7 +3,7 @@ import { before, mock, test } from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ThreadExecutionEvidence } from '../../lib/thread-execution-identity-view'
 
-mock.module('next-intl',{namedExports:{useTranslations:()=> (key:string)=>key}})
+mock.module('next-intl',{namedExports:{useTranslations:()=> (key:string,params?:Record<string,unknown>)=>params?`${key}(${Object.values(params).join('|')})`:key}})
 let Content: typeof import('./thread-execution-identity')['ThreadExecutionIdentityContent']
 before(async()=>{({ThreadExecutionIdentityContent:Content}=await import('./thread-execution-identity'))})
 const evidence:ThreadExecutionEvidence={id:'00000000-0000-4000-8000-000000000001',harness:'claude_code',model:'claude-test',credentialType:'subscription',subscriptionRoute:'claude_code_cli',
@@ -11,16 +11,32 @@ const evidence:ThreadExecutionEvidence={id:'00000000-0000-4000-8000-000000000001
     resourceBindings:[{kind:'subscription',id:'binding',ownerId:'model-payer',access:'workspace_share',revision:'3'}],
     billingAccount:{model:{kind:'subscription',ownerId:'model-payer',resourceId:'binding',amount:'provider_unknown'},runtime:{kind:'local_device',ownerId:'device-owner',resourceId:'device',amount:'not_applicable'}},personalResourcePolicy:'requester_only'}}
 
-test('the frozen subscription route, distinct actors and unknown external billing are visible without a fabricated zero',()=>{
-  const html=renderToStaticMarkup(<Content evidence={evidence} />)
-  for(const value of [evidence.id,evidence.executionIdentity!.workspaceId!,'claude_code_cli','credentialKinds.subscription','requester','bot-owner','principal','output-owner','model-payer','device-owner','binding','device','access.workspace_share','amounts.provider_unknown','amounts.not_applicable'])assert.ok(html.includes(value),value)
-  assert.match(html,/copyRunId/);assert.doesNotMatch(html,/\$0|0\.00|agentDefinition|apiKey/)
+const labels={workspace:{name:'Alex 的工作区'},people:{requester:{name:'Alex',image:null,you:true},'bot-owner':{name:'Bob Chen',image:null,you:false},principal:{name:'Alex',image:null,you:true},'output-owner':{name:'Alex',image:null,you:true},'model-payer':{name:'Alex',image:null,you:true},'device-owner':{name:'Bob Chen',image:null,you:false}},
+  devices:{device:{name:'Bob 的 Mac mini',kind:'laptop' as const}},subscriptions:{binding:{provider:'claude' as const,account:'alex@example.com',mine:true}},apiKeys:{},mcp:{},e2b:null}
+
+test('people, machines and accounts read by name; raw references stay out of the dialog and go into the diagnostics copy',()=>{
+  const html=renderToStaticMarkup(<Content evidence={{...evidence,labels}} />)
+  for(const value of ['Alex 的工作区','Bob Chen','Bob 的 Mac mini','alex@example.com','shared','costSentence','copyDiagnostics','roles.botOwner'])assert.ok(html.includes(value),value)
+  // The run id stays a DOM attribute for the stale-response guard; it is never text.
+  const visible=html.replace(/data-execution-evidence-run="[^"]*"/,'')
+  for(const value of [evidence.id,evidence.executionIdentity!.workspaceId!,'model-payer','device-owner','output-owner','binding','claude_code_cli'])assert.ok(!visible.includes(value),value)
+  assert.doesNotMatch(html,/\$0|0\.00|agentDefinition|apiKey"/)
+})
+
+test('one person in several roles is one row naming the roles',()=>{
+  const identity={...evidence.executionIdentity!,requester:'alex',executionPrincipal:'alex',outputOwner:'alex',botOwner:'bob'}
+  const people={alex:{name:'Alex',image:null,you:true},bob:{name:'Bob Chen',image:null,you:false}}
+  const html=renderToStaticMarkup(<Content evidence={{...evidence,executionIdentity:identity,labels:{...labels,people}}} />)
+  // requester, principal and output owner are Alex; bot owner is Bob: two rows, Alex's names the three roles.
+  assert.equal(html.match(/rolesTogether/g)?.length,1)
+  assert.match(html,/roles\.requester/)
+  assert.match(html,/roleSeparator/)
 })
 
 test('a legacy run displays its missing snapshot and never invents actors or billing from current settings',()=>{
   const html=renderToStaticMarkup(<Content evidence={{...evidence,credentialType:'unknown',subscriptionRoute:null,executionIdentity:null}} />)
-  assert.match(html,/snapshotMissing/);assert.match(html,/credentialKinds.unknown/)
-  assert.doesNotMatch(html,/model-payer|output-owner|amounts\.|claude_code_cli|access\.workspace_share/)
+  assert.match(html,/snapshotMissing/)
+  assert.doesNotMatch(html,/costSentence|roles\.|resources/)
 })
 
 test('the frozen Agent 配置 words its selection reason in the reader\'s language; a pre-code English sentence shows no reason row, and no digest shows',()=>{
