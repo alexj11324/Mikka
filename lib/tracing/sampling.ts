@@ -28,11 +28,13 @@ export class RunSampler implements Sampler {
   toString() { return `MikkaRunSampler(${this.rate})` }
 }
 
-type Pending = { open: Set<string>; spans: ReadableSpan[]; keep: boolean }
+type Pending = { open: Set<string>; spans: ReadableSpan[]; headSampled: boolean; retention?: 'error_or_slow' | 'critical_child' }
 
 /**
  * Bounded in-process tail retention, with no timer, network or DB work on the
- * request. Ordinary successes are discarded after their local tree ends;
+ * request. Ordinary spans, including head-sampled spans, wait until their
+ * local tree ends so errors/slow trees get an effective sample rate of one.
+ * Ordinary unsampled successes are discarded;
  * errors/slow requests promote their complete local tree into the batcher.
  * Critical traces bypass buffering. Limits protect a collector outage or a
  * never-ending request; the normal SDK queue still bounds retained spans.
@@ -42,34 +44,36 @@ export class RetainingSpanProcessor implements SpanProcessor {
   constructor(private readonly batcher: SpanProcessor, private readonly maxTraces = 256, private readonly maxSpansPerTrace = 512) {}
   onStart(span: Span, parent: Context): void {
     const { traceId, spanId, traceFlags } = span.spanContext()
-    if (traceFlags & TraceFlags.SAMPLED) {
+    if (span.attributes['mikka.trace.critical'] === true) {
       const pending = this.pending.get(traceId)
-      if (pending) pending.keep = true
+      if (pending) pending.retention ??= 'critical_child'
       this.batcher.onStart(span, parent)
       return
     }
     let pending = this.pending.get(traceId)
     if (!pending) {
       if (this.pending.size >= this.maxTraces) this.pending.delete(this.pending.keys().next().value!)
-      this.pending.set(traceId, pending = { open: new Set(), spans: [], keep: false })
+      this.pending.set(traceId, pending = { open: new Set(), spans: [], headSampled: Boolean(traceFlags & TraceFlags.SAMPLED) })
     }
     pending.open.add(spanId)
   }
   onEnd(span: ReadableSpan): void {
     const info = span.spanContext()
-    if (info.traceFlags & TraceFlags.SAMPLED) { this.batcher.onEnd(span); return }
+    if (span.attributes['mikka.trace.critical'] === true) { this.batcher.onEnd(span); return }
     const pending = this.pending.get(info.traceId)
     if (!pending) return
     pending.open.delete(info.spanId)
     if (pending.spans.length < this.maxSpansPerTrace) pending.spans.push(span)
     const ms = span.duration[0] * 1_000 + span.duration[1] / 1_000_000
-    if (span.status.code === SpanStatusCode.ERROR || ms >= SLOW_REQUEST_MS) pending.keep = true
+    const httpStatus = Number(span.attributes['http.response.status_code'] ?? span.attributes['http.status_code'] ?? 0)
+    if (span.status.code === SpanStatusCode.ERROR || httpStatus >= 400 || ms >= SLOW_REQUEST_MS) pending.retention = 'error_or_slow'
     if (!pending.open.size) {
       this.pending.delete(info.traceId)
-      if (pending.keep) for (const item of pending.spans) this.batcher.onEnd(Object.create(item, {
+      if (pending.retention) for (const item of pending.spans) this.batcher.onEnd(Object.create(item, {
         spanContext: { value: () => ({ ...item.spanContext(), traceFlags: item.spanContext().traceFlags | TraceFlags.SAMPLED }) },
-        attributes: { value: { ...item.attributes, 'mikka.trace.retention': 'error_or_slow', 'mikka.trace.sample_rate': 1 } },
+        attributes: { value: { ...item.attributes, 'mikka.trace.retention': pending.retention, 'mikka.trace.sample_rate': 1 } },
       }) as ReadableSpan)
+      else if (pending.headSampled) for (const item of pending.spans) this.batcher.onEnd(item)
     }
   }
   forceFlush(): Promise<void> { return this.batcher.forceFlush() }

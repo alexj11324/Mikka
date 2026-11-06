@@ -6,7 +6,7 @@ import { resourceFromAttributes } from '@opentelemetry/resources'
 import { BatchLogRecordProcessor, LoggerProvider, type LogRecordExporter, type ReadableLogRecord } from '@opentelemetry/sdk-logs'
 import type { ReadableSpan, SpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { SERVICE_NAME, type TraceEnvironment } from './config'
-import { sanitizeAttributes } from './sanitize'
+import { sanitizeAttributes, sanitizeSpanName } from './sanitize'
 
 /** Only fixed stage names and allowlisted span metadata enter PostHog Logs. */
 export class SafeLogExporter implements LogRecordExporter {
@@ -56,7 +56,7 @@ export class StageLogProcessor implements SpanProcessor {
         severityNumber: failed ? SeverityNumber.ERROR : SeverityNumber.INFO,
         severityText: failed ? 'ERROR' : 'INFO',
         body: failed ? 'mikka.stage.failed' : 'mikka.stage.completed',
-        attributes: { ...sanitizeAttributes(span.attributes), 'mikka.stage': span.name, 'mikka.duration_ms': seconds * 1_000 + nanos / 1e6, 'mikka.status': failed ? 'error' : 'ok' },
+        attributes: { ...sanitizeAttributes(span.attributes), 'mikka.stage': sanitizeSpanName(span.name), 'mikka.duration_ms': seconds * 1_000 + nanos / 1e6, 'mikka.status': failed ? 'error' : 'ok' },
       })
     } catch { /* telemetry never changes the completed operation */ }
   }

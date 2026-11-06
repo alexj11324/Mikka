@@ -1,19 +1,24 @@
 import { AsyncLocalStorage } from "node:async_hooks"
 import { createHash } from "node:crypto"
-import { ROOT_CONTEXT, SpanStatusCode, trace, type Attributes, type AttributeValue, type Context, type Span } from "@opentelemetry/api"
+import { ROOT_CONTEXT, SpanStatusCode, createContextKey, isSpanContextValid, trace, type Attributes, type AttributeValue, type Context, type Span } from "@opentelemetry/api"
 import { ExportResultCode, W3CTraceContextPropagator, type ExportResult } from "@opentelemetry/core"
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto"
 import { resourceFromAttributes } from "@opentelemetry/resources"
-import { BasicTracerProvider, BatchSpanProcessor, ParentBasedSampler, TraceIdRatioBasedSampler, type ReadableSpan, type SpanExporter } from "@opentelemetry/sdk-trace-base"
+import { BasicTracerProvider, BatchSpanProcessor, ParentBasedSampler, SamplingDecision, TraceIdRatioBasedSampler, type ReadableSpan, type SpanExporter } from "@opentelemetry/sdk-trace-base"
+import type { LoggerProvider, LogRecordExporter } from "@opentelemetry/sdk-logs"
 import type { DeviceRegistered } from "@mikka/protocol/device"
 import { HARNESSES, type Harness } from "@mikka/protocol/harness"
 import { safeErrorAttributes, scrubLocalString } from "@mikka/protocol/tracing"
+import { TRACE_FIELDS, runTraceHeaders, sanitizeTraceContext, telemetryId, traceAttributes, type RunTraceContext } from "@mikka/protocol/trace-context"
+import { createLogProvider, StageLogProcessor } from "./tracing-logs"
+import { AI_NUMBERS, createAiSink, generationAttributes, generationEvent, modelLabel, type AiSink, type GenerationMetrics } from "./tracing-ai"
 
 // Traces of the daemon's own operations (docs/operations/tracing.md, "Daemon"):
 // runs, their start-up stages, the gateway connection, tool approval and each
-// call to the server. Never the agent CLI's own activity, prompts, files,
-// paths, environment or credentials. Off until the server's registration
-// response hands over its public PostHog settings; `MIKKA_DAEMON_TRACING=0`
+// call to the server, plus numeric provider usage from supported SDK frames.
+// Never prompts, responses, tool payloads, files, paths, env or credentials.
+// Off until registration (or a trusted cloud bootstrap handoff) supplies
+// public PostHog settings; `MIKKA_DAEMON_TRACING=0`
 // keeps it off. Nothing is registered globally, so code that loads its own
 // OpenTelemetry (an agent SDK) is unaffected.
 
@@ -60,7 +65,7 @@ type StartupScope = {
   runIdHash: string; harness: Harness; startedAt: number; started: number
   phases: DaemonStartupPhase[]; phaseCount: number; truncated: boolean; closed: boolean
 }
-type SpanOptions = { root?: boolean; onStartupTiming?: (timing: DaemonStartupTiming) => void }
+type SpanOptions = { root?: boolean; traceContext?: RunTraceContext; startedAt?: number; onStartupTiming?: (timing: DaemonStartupTiming) => void }
 const milliseconds = (value: number) => Math.max(0, Math.round(value * 1_000) / 1_000)
 
 /** The only attributes a daemon span may carry. Everything else is dropped before export. */
@@ -68,7 +73,12 @@ const ALLOWED = new Set([
   "mikka.route", "mikka.client_kind", "mikka.run.id_hash", "mikka.harness", "mikka.outcome",
   "mikka.error.code", "mikka.error.detail", "mikka.gateway.mode",
   "error.type", "http.request.method", "http.response.status_code", "url.path",
+  "mikka.error.causes", "mikka.stage", "mikka.duration_ms", "mikka.status",
+  ...Object.values(TRACE_FIELDS),
+  ...Object.values(AI_NUMBERS).map(([attribute]) => attribute),
+  "mikka.ai.provider", "mikka.ai.model", "mikka.ai.operation",
 ])
+const ID_ATTRIBUTES = new Set<string>(Object.values(TRACE_FIELDS))
 
 /** The sample rate the daemon uses: the server's, lowered (or turned off with 0) by `MIKKA_DAEMON_TRACE_SAMPLE_RATE`. */
 export function daemonSampleRate(settings: TraceSettings, env: Env = process.env): number {
@@ -79,7 +89,7 @@ export function daemonSampleRate(settings: TraceSettings, env: Env = process.env
   return Math.min(1, Math.max(0, rate))
 }
 
-/** Same run, same hash, on every span; the run id itself never leaves the computer. */
+/** Legacy correlation key retained for startup timing consumers. */
 export function runIdHash(runId: string): string {
   return createHash("sha256").update(runId).digest("hex").slice(0, 16)
 }
@@ -90,12 +100,14 @@ export function routeTemplate(path: string): string {
   return clean.split("/").map(part => part === "" || part === "v1" || /^[a-z][a-z-]{0,39}$/.test(part) ? part : "[id]").join("/")
 }
 
-function cleanAttributes(attributes: Attributes): Attributes {
+export function cleanAttributes(attributes: Attributes): Attributes {
   const clean: Attributes = {}
   for (const [key, value] of Object.entries(attributes)) {
     if (!ALLOWED.has(key)) continue
-    if (typeof value === "string") clean[key] = scrubLocalString(value)
-    else if (typeof value === "number" || typeof value === "boolean") clean[key] = value
+    if (ID_ATTRIBUTES.has(key)) { if (telemetryId(value)) clean[key] = value }
+    else if (key === "mikka.ai.model") { const model = modelLabel(value); if (model) clean[key] = model }
+    else if (typeof value === "string") clean[key] = scrubLocalString(value)
+    else if (typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) clean[key] = value
   }
   return clean
 }
@@ -138,16 +150,20 @@ export class SafeExporter implements SpanExporter {
 
 const propagator = new W3CTraceContextPropagator()
 const setter = { set(carrier: Record<string, string>, key: string, value: string) { carrier[key] = value } }
+const getter = { get: (carrier: Record<string, string>, key: string) => carrier[key], keys: (carrier: Record<string, string>) => Object.keys(carrier) }
+const RUN_CONTEXT = createContextKey("mikka.daemon.run")
 
 export class DaemonTracer {
   private provider: BasicTracerProvider | null = null
+  private logProvider: LoggerProvider | null = null
+  private ai: AiSink | null = null
   private readonly scope = new AsyncLocalStorage<Context>()
   private readonly startupScope = new AsyncLocalStorage<StartupScope>()
 
   get enabled(): boolean { return this.provider !== null }
 
   /** Starts exporting with the server's settings. Called again (a new registration) it keeps the first provider. */
-  configure(settings: TraceSettings | undefined, { version, env = process.env, exporter }: { version?: string; env?: Env; exporter?: SpanExporter } = {}): boolean {
+  configure(settings: TraceSettings | undefined, { version, env = process.env, exporter, logExporter, aiSink }: { version?: string; env?: Env; exporter?: SpanExporter; logExporter?: LogRecordExporter; aiSink?: AiSink | null } = {}): boolean {
     if (this.provider || !settings) return this.enabled
     try {
       const rate = daemonSampleRate(settings, env)
@@ -155,19 +171,34 @@ export class DaemonTracer {
       const inner = exporter ?? new OTLPTraceExporter({ url: settings.endpoint, headers: { Authorization: `Bearer ${settings.projectToken}` }, timeoutMillis: 5_000 })
       const ratio = new TraceIdRatioBasedSampler(rate)
       const environment = settings.environment ?? "production"
-      this.provider = new BasicTracerProvider({
-        resource: resourceFromAttributes({
-          "service.name": SERVICE_NAME,
-          ...(version ? { "service.version": version } : {}),
-          "deployment.environment": environment,
-          "deployment.environment.name": environment,
-        }),
-        // The server samples a remote parent by the same trace-id ratio, so at
-        // equal rates both sides keep or drop the same trace.
-        sampler: new ParentBasedSampler({ root: ratio }),
-        spanProcessors: [new BatchSpanProcessor(new SafeExporter(inner), { maxQueueSize: 512, maxExportBatchSize: 256, scheduledDelayMillis: 10_000, exportTimeoutMillis: 10_000 })],
+      const resource = resourceFromAttributes({
+        "service.name": SERVICE_NAME,
+        ...(version ? { "service.version": version } : {}),
+        "deployment.environment": environment,
+        "deployment.environment.name": environment,
       })
-    } catch { this.provider = null }
+      this.logProvider = createLogProvider({ endpoint: settings.endpoint, projectToken: settings.projectToken, resource, sanitize: cleanAttributes, exporter: logExporter })
+      this.ai = aiSink === undefined ? createAiSink(settings.endpoint, settings.projectToken) : aiSink
+      this.provider = new BasicTracerProvider({
+        resource,
+        // Current server carriers already retain critical runs. Legacy or
+        // locally initiated runs must be complete too; ordinary background
+        // traffic keeps the configured ratio. A zero rate still disables setup.
+        sampler: new ParentBasedSampler({ root: {
+          shouldSample: (parent, id, name) => /^daemon\.(?:run(?:\.|$)|adapter\.|registration$|bootstrap(?:\.|$))/.test(name)
+            ? { decision: SamplingDecision.RECORD_AND_SAMPLED } : ratio.shouldSample(parent, id),
+          toString: () => 'MikkaDaemonCriticalRootSampler',
+        } }),
+        spanProcessors: [new BatchSpanProcessor(new SafeExporter(inner), { maxQueueSize: 512, maxExportBatchSize: 256, scheduledDelayMillis: 10_000, exportTimeoutMillis: 10_000 }),
+          new StageLogProcessor(this.logProvider.getLogger("mikka.daemon"), cleanAttributes)],
+      })
+    } catch {
+      this.provider = null
+      void this.logProvider?.shutdown().catch(() => {})
+      this.logProvider = null
+      void this.ai?.shutdown().catch(() => {})
+      this.ai = null
+    }
     return this.enabled
   }
 
@@ -225,15 +256,26 @@ export class DaemonTracer {
     return pending.then(value => { end(failed); return value }, (error: unknown) => { end(true); throw error })
   }
 
-  private traceSpan<T>(name: string, attributes: Record<string, Value>, work: (span: SpanHandle) => Promise<T>, { root = false }: SpanOptions): Promise<T> {
+  private traceSpan<T>(name: string, attributes: Record<string, Value>, work: (span: SpanHandle) => Promise<T>, { root = false, traceContext, startedAt }: SpanOptions): Promise<T> {
     const provider = this.provider
-    if (!provider) return work(NOOP)
     let span: Span | undefined
-    let scope: Context = ROOT_CONTEXT
+    let scope = root ? ROOT_CONTEXT : this.scope.getStore() ?? ROOT_CONTEXT
     try {
-      const parent = root ? ROOT_CONTEXT : this.scope.getStore() ?? ROOT_CONTEXT
-      span = provider.getTracer("mikka.daemon").startSpan(name, { attributes: { "mikka.client_kind": "daemon", ...definedAttributes(attributes) } }, parent)
-      scope = trace.setSpan(parent, span)
+      const incoming = sanitizeTraceContext(traceContext)
+      if (incoming) scope = propagator.extract(ROOT_CONTEXT, { traceparent: incoming.traceparent }, getter).setValue(RUN_CONTEXT, incoming)
+      if (provider) {
+        span = provider.getTracer("mikka.daemon").startSpan(name, { ...(startedAt === undefined ? {} : { startTime: new Date(startedAt) }), attributes: cleanAttributes({ "mikka.client_kind": "daemon",
+          ...traceAttributes(scope.getValue(RUN_CONTEXT) as RunTraceContext | undefined), ...definedAttributes(attributes) }) }, scope)
+        scope = trace.setSpan(scope, span)
+        const metadata = { ...(scope.getValue(RUN_CONTEXT) as RunTraceContext | undefined) }
+        for (const [field, key] of Object.entries(TRACE_FIELDS)) {
+          const value = attributes[key]
+          if (telemetryId(value)) Object.assign(metadata, { [field]: value })
+        }
+        const parent = span.spanContext()
+        scope = scope.setValue(RUN_CONTEXT, sanitizeTraceContext({ ...metadata,
+          traceparent: `00-${parent.traceId}-${parent.spanId}-${parent.traceFlags.toString(16).padStart(2, "0")}` }))
+      }
     } catch { span = undefined }
     const handle = span ? handleFor(span) : NOOP
     const end = (error?: unknown, failed = false) => {
@@ -250,12 +292,50 @@ export class DaemonTracer {
     return pending.then(value => { end(); return value }, (error: unknown) => { end(error, true); throw error })
   }
 
-  /** `traceparent` for an outgoing request from the current span; empty without one. */
+  /** The current span plus validated run/session references, for delayed callbacks. */
+  capture(): RunTraceContext | undefined {
+    try {
+      const active = this.scope.getStore(), span = active && trace.getSpanContext(active)
+      if (!span || !isSpanContextValid(span)) return undefined
+      return sanitizeTraceContext({ ...(active?.getValue(RUN_CONTEXT) as RunTraceContext | undefined),
+        traceparent: `00-${span.traceId}-${span.spanId}-${span.traceFlags.toString(16).padStart(2, "0")}` })
+    } catch { return undefined }
+  }
+
+  /** Re-enter a captured run in an outbox or SDK callback without creating a span. */
+  withContext<T>(carrier: RunTraceContext | undefined, work: () => T): T {
+    const clean = sanitizeTraceContext(carrier)
+    if (!clean) return work()
+    const parent = propagator.extract(ROOT_CONTEXT, { traceparent: clean.traceparent }, getter).setValue(RUN_CONTEXT, clean)
+    return this.scope.run(parent, work)
+  }
+
+  /** One completed provider generation, never a cumulative turn or session usage total. */
+  generation(metrics: GenerationMetrics, carrier = this.capture()): void {
+    if (!this.provider || !carrier) return
+    const parentId = carrier.traceparent.slice(36, 52)
+    const duration = metrics.latencyMs
+    const startedAt = typeof duration === 'number' && Number.isFinite(duration) && duration >= 0 ? Date.now() - duration : undefined
+    void this.span('daemon.ai.generation', generationAttributes(metrics), async span => {
+      const active = this.capture()
+      if (metrics.outcome === 'error') span.fail({ name: 'ProviderError' })
+      // AI analytics follows the trace sampling decision, including a remote parent.
+      if (active && (parseInt(active.traceparent.slice(-2), 16) & 1)) {
+        const event = generationEvent(metrics, active, parentId, startedAt === undefined ? undefined : new Date(startedAt))
+        if (event) { try { this.ai?.capture(event) } catch { /* Telemetry never blocks an agent. */ } }
+      }
+    }, { traceContext: carrier, startedAt }).catch(() => {})
+  }
+
+  /** W3C parent and safe run references, confined to outgoing Mikka requests. */
   headers(): Record<string, string> {
     const carrier: Record<string, string> = {}
     try {
       const active = this.scope.getStore()
-      if (this.provider && active) propagator.inject(active, carrier, setter)
+      if (this.provider && active) {
+        Object.assign(carrier, runTraceHeaders(this.capture()))
+        propagator.inject(active, carrier, setter)
+      }
     } catch { /* a request goes out without trace context */ }
     return carrier
   }
@@ -263,17 +343,24 @@ export class DaemonTracer {
   /** Exports what has ended, for at most `timeoutMs`; never delays shutdown longer. */
   async shutdown(timeoutMs = 2_000): Promise<void> {
     const provider = this.provider
+    const logs = this.logProvider
+    const ai = this.ai
     this.provider = null
-    if (!provider) return
+    this.logProvider = null
+    this.ai = null
+    if (!provider && !logs && !ai) return
     let timer: NodeJS.Timeout | undefined
     await Promise.race([
-      provider.shutdown().catch(() => {}),
+      Promise.allSettled([provider?.shutdown(), logs?.shutdown(), ai?.shutdown()]),
       new Promise<void>(resolve => { timer = setTimeout(resolve, timeoutMs); timer.unref() }),
     ]).finally(() => clearTimeout(timer))
   }
 
-  /** For tests: exports every ended span now. */
-  async flush(): Promise<void> { await this.provider?.forceFlush().catch(() => {}) }
+  /** Run completion starts a background drain; tests can await the same queues. */
+  async flush(): Promise<void> {
+    try { await Promise.allSettled([this.provider?.forceFlush(), this.logProvider?.forceFlush(), this.ai?.flush()]) }
+    catch { /* A collector cannot break the run's completion. */ }
+  }
 }
 
 export interface SpanHandle {

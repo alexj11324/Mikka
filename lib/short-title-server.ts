@@ -10,6 +10,7 @@ import { issueListChanged } from '@/lib/live/lists'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { isCjk, parseShortTitle, shortTitlePrompt } from './short-title'
 import { causeFields } from '@mikka/protocol/coded-error'
+import { withAiMetadata } from './tracing/ai'
 
 /** The small text model that names tasks; the Coordinator's flash model, as for 建议's action lines. */
 const SHORT_TITLE_MODEL = COORDINATOR_MODEL
@@ -34,7 +35,7 @@ export async function writeShortTitle(issueId: string, ownerId: string): Promise
     const model = await hostedModel(workspaceId, SHORT_TITLE_MODEL, undefined, ownerId)
     const body = tiptapToText(task.content)
     const { instructions, prompt } = shortTitlePrompt({ title: task.title, body })
-    const { text } = await generateText({ model, instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(SHORT_TITLE_TIMEOUT_MS) })
+    const { text } = await withAiMetadata({ operation: 'short_title' }, () => generateText({ model, instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(SHORT_TITLE_TIMEOUT_MS) }))
     const shortTitle = parseShortTitle(text, isCjk(`${task.title} ${body}`))
     if (!shortTitle) return
     await db.transaction(async tx => {

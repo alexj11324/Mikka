@@ -1,7 +1,6 @@
 import { withBasePath } from '@/lib/base-path'
 import type { LiveRuntime, LiveTicket } from './channel'
-import posthog from 'posthog-js'
-import { liveTelemetry } from './telemetry'
+import { observeLiveTelemetry } from './telemetry'
 
 // The desktop build replaces this transport only. Shared live invalidation,
 // revisions and the consuming components remain identical to the web.
@@ -35,10 +34,7 @@ export function browserRuntime(workspaceId: string | null): LiveRuntime {
     monotonicNow: () => performance.now(),
     later: (callback, milliseconds) => setTimeout(callback, milliseconds),
     cancel: timer => clearTimeout(timer as ReturnType<typeof setTimeout>),
-    observe(observation) {
-      const { event, properties } = liveTelemetry(observation)
-      posthog.capture(event, properties)
-    },
+    observe: observeLiveTelemetry,
   }
 }
 

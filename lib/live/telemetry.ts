@@ -1,6 +1,21 @@
 import { LIVE_ID, LIVE_KINDS } from './events'
 import type { LiveObservation } from './channel'
 
+let sink: ((event: string, properties: Record<string, string | number>) => void) | undefined
+
+/** Browser instrumentation installs the sink after SDK initialization. The
+ * shared live transport stays importable by SSR and native clients without a
+ * browser SDK or a second analytics client. */
+export function setLiveTelemetrySink(capture: typeof sink): void { sink = capture }
+
+export function observeLiveTelemetry(observation: LiveObservation): void {
+  if (!sink) return
+  try {
+    const { event, properties } = liveTelemetry(observation)
+    sink(event, properties)
+  } catch { /* observing a cache read must never cause another read or failure */ }
+}
+
 const keyFamilies = new Set(['coordinator-chat', 'coordinator-chat-metadata', 'bot-chats', 'threads', 'issue-thread', 'task-runs', 'issues', 'issue', 'versions', 'issue-activity-versions', 'issue-connections', 'deleted-issue', 'document-sync', 'bots', 'bot-list-groups', 'computer', 'groups', 'devices', 'approved-writes', 'approved-write', 'pending-actions', 'factory', 'factory-task', 'factory-issue', 'project-map'])
 
 /** The family and stable digest identify a read without sending SWR's owner,

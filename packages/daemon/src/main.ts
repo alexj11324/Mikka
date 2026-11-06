@@ -76,6 +76,7 @@ import { isSafeId } from "./ids"
 import { acquireLock } from "./lock"
 import { closeLogger, createLogger, type Logger } from "./log"
 import { Outbox } from "./outbox"
+import type { RunTraceContext } from '@mikka/protocol/trace-context'
 import { QuotaPoller, type QuotaSource } from "./quota/poller"
 import { DAEMON_VERSION, daemonPaths, type DaemonPaths } from "./paths"
 import { daemonTracer, runIdHash } from "./tracing"
@@ -219,6 +220,7 @@ export class Daemon {
   private releaseLock: (() => Promise<void>) | null = null
   private rpc: RpcServer | null = null
   private outbox!: Outbox
+  private registrationTraceContext?: RunTraceContext
   private journal!: RunJournal
   private captureUploader!: CaptureUploader
   private worktrees!: WorktreeManager
@@ -332,7 +334,8 @@ export class Daemon {
       this.log,
       undefined,
       (runId, _item, error) => this.supervisor.markUndeliverable(runId, error),
-      this.options.retainResources
+      this.options.retainResources,
+      runId => this.journal.get(runId)?.assignment.traceContext,
     )
     this.worktrees = new WorktreeManager(paths.worktrees, this.options.retainResources)
     this.repositories = new RepositoryCache(paths.repos, undefined, this.options.retainResources)
@@ -1288,7 +1291,7 @@ export class Daemon {
 
   private async register(credential: string) {
     const { workspaceId, deviceId: knownDeviceId } = this.device
-    const { deviceId, tracing } = await this.options.link.registerDevice(
+    const { deviceId, tracing } = await daemonTracer.span("daemon.registration", {}, async () => this.options.link.registerDevice(
       credential,
       {
         name: hostname(),
@@ -1306,7 +1309,7 @@ export class Daemon {
           : {}),
       },
       knownDeviceId
-    )
+    ), { traceContext: this.registrationTraceContext })
     // A late registration must not restore the session replaced over RPC.
     if (this.device.credential !== credential || this.device.workspaceId !== workspaceId) throw new Error('Device session changed during registration')
     if (deviceId !== this.device.deviceId) {
@@ -1711,7 +1714,7 @@ export class Daemon {
       "device.setCredential": (raw) => {
         this.reviewAbort?.abort()
         this.reviewAbort = null
-        const { credential, workspaceId } =
+        const { credential, workspaceId, traceContext } =
           daemonRpc["device.setCredential"].params.parse(raw)
         // The device id is kept, in every workspace (ADR ORV-284):
         // registering with it in another workspace joins this same device
@@ -1722,7 +1725,8 @@ export class Daemon {
         })
         this.revokeLocalComputerGrants()
         this.registered = false
-        void this.syncWithServer()
+        this.registrationTraceContext = traceContext
+        void daemonTracer.withContext(traceContext, () => this.syncWithServer())
         return { ok: true as const }
       },
       "device.clearCredential": () => {

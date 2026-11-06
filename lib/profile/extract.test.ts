@@ -48,11 +48,11 @@ after(() => {
 
 const mail: ExternalNotification = { userId: 'u1', source: 'gmail', externalId: 'm1', matterKey: 'gmail:t1', action: 'read', title: 'Cloudflare security advisory', url: null, actor: 'Cloudflare <noreply@cloudflare.com>', occurredAt: new Date('2026-10-27T10:00:00Z'), required: false, direct: false, fromSelf: false, automated: true, excerpt: 'Update cloudflared to 2026.10.2' }
 
-test('with every switch on, one call writes facts and reports usage without content', async () => {
+test('with every switch on, one call writes facts and leaves generation capture to the model boundary', async () => {
   assert.equal(await extractFacts(mail, 's1'), 1)
   assert.equal(generateText.mock.callCount(), 1)
   assert.deepEqual(store.recordExtractionTokens.mock.calls.at(-1)?.arguments, ['u1', '2026-10-28', 100, 20])
-  assert.equal((captured[0] as { event: string }).event, '$ai_generation')
+  assert.equal(captured.length, 0, 'the extraction no longer emits a duplicate generation event')
   assert.ok(!JSON.stringify(captured).includes('cloudflared'), 'no prompt or answer goes to PostHog')
   // The default model, on its ZeroCat transport (hostedModel picks it).
   assert.deepEqual(hostedCalls,['deepseek/deepseek-v4.1-flash'])

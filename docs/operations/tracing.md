@@ -1,7 +1,9 @@
-# Server tracing (PostHog)
+# Runtime observability (PostHog)
 
-The web backend sends OpenTelemetry traces to PostHog distributed tracing
-(beta), so sampled API requests and actions show the database statements they ran.
+The API and daemon send OpenTelemetry traces and structured logs to PostHog.
+A runtime keeps one W3C trace across requests, Workflow steps, dispatch, cloud
+startup, agent work and completion; model generations and masked browser
+replays attach to the same operational context.
 Group by route and caller to find who drives database transfer, instead of
 diffing `pg_stat_statements`. This adds to the
 [database transfer monitoring](database-egress.md); the ops snapshot and the
@@ -10,13 +12,15 @@ diffing `pg_stat_statements`. This adds to the
 ## What is traced
 
 Mikka's independent Node API (`apps/api`) and the daemon's own operations (service
-`mikka-daemon`, see [Daemon](#daemon)). Nothing from the desktop app or users'
-own Claude Code or Codex sessions. The mobile app sends trace context, not
+`mikka-daemon`, see [Daemon](#daemon)). Mikka records its own runtime stages and
+numeric model receipts from the adapters, not the text or internal activity of
+a user's Claude Code or Codex session. The mobile app sends trace context, not
 spans (see [Mobile app](#mobile-app)).
 
 - API server spans: `apps/api/runtime/request-trace.ts` starts
   `<METHOD> <route template>` from the generated route inventory and extracts
-  only the standard `traceparent`/`tracestate` carrier. H3 ends the span when the
+  the standard `traceparent`/`tracestate` carrier and bounded correlation IDs.
+  Arbitrary baggage and content-bearing request headers are not propagated. H3 ends the span when the
   actual response is disposed, including streamed responses, before deferred
   jobs run. The Vite frontend does not produce Next server-render spans.
 - One `pg.query:<COMMAND> <db>` span per statement, from
@@ -49,8 +53,9 @@ one `model.route` span, and the same values as a `default_model_route` log line:
 | `mikka.model.zerocat_status` | ZeroCat's HTTP status, when the failure had one |
 | `mikka.model.gateway_credential` | On `gateway`: `system` (Vercel bills) or `byok` (our own provider key), from Gateway's routing receipt |
 
-Count fallbacks with `SELECT properties.mikka.model.fallback_reason, count()` over
-`model.route` spans where `mikka.model.route = 'gateway'`.
+Count fallbacks by `attributes['mikka.model.fallback_reason']` on
+`posthog.trace_spans` where `name = 'model.route'` and
+`attributes['mikka.model.route'] = 'gateway'`.
 
 Database spans also have:
 
@@ -111,24 +116,28 @@ user's computer, as service `mikka-daemon`:
 | `daemon.gateway.connect` | Opening the device gateway socket, until it opens or fails |
 | `GET /v1/devices/[id]/…` | Every call to the server, named by route template (ids become `[id]`, no query), with `http.response.status_code` |
 
-Each span has `mikka.client_kind=daemon`, `mikka.run.id_hash` (sha256 prefix
-of the run id, never the id), `mikka.harness`, `mikka.outcome`, and on failure
+Each span has `mikka.client_kind=daemon`, `mikka.harness`, `mikka.outcome`,
+and, when available, the opaque run/thread/task/Workflow IDs listed below.
+Older data has `mikka.run.id_hash` (a sha256 prefix); it remains a legacy
+correlation field rather than the new run lookup key. Failures carry
 `error.type`, `mikka.error.code` and `mikka.error.detail`. Filter the error
 code with `mikka.error.code = subscription_local_runtime_unavailable` to see
 why runs fail on users' computers.
 
-- **Joining the server's trace.** Each `/v1/*` call sends `traceparent`, so
-  the server's request and database spans are children of the daemon span.
-  Both sides head-sample by the same trace-id ratio: at equal rates the
-  server keeps exactly the traces the daemon kept.
+- **Joining the server's trace.** The run payload carries the dispatch trace
+  context into daemon startup. `daemon.run` continues that parent; outbound
+  `/v1/*` calls carry the current span's context back to the API. The run's
+  completion/outbox delivery retains the same bounded carrier. A polling or
+  unrelated daemon request can still have its own trace.
 - **Settings.** The server hands them over in the device registration
   response (`tracing`: endpoint, the public `phc_` project token, sample rate,
   environment); `daemonTraceSettings()` in `lib/tracing/config.ts` sends them
   only for the PostHog endpoint and only when server tracing is on. A daemon
   never gets a personal key.
-- **Sampling and turning it off.** The server's rate (default 10%).
-  `MIKKA_DAEMON_TRACE_SAMPLE_RATE` on the daemon can lower it, never raise it;
-  `0`, or `MIKKA_DAEMON_TRACING=0`, turns daemon tracing off.
+- **Sampling and turning it off.** The server's ordinary rate defaults to 10%.
+  The daemon continues an incoming retained run parent, so critical runs stay
+  complete. `MIKKA_DAEMON_TRACE_SAMPLE_RATE` can lower the ordinary rate;
+  `0`, or `MIKKA_DAEMON_TRACING=0`, remains a kill switch.
 - **Never blocks.** A batch processor exports every 10 s from a queue of 512
   (then drops). A failed or thrown export drops its spans and pauses exporting
   for a minute; shutdown waits at most 2 s. Nothing is registered globally,
@@ -136,10 +145,12 @@ why runs fail on users' computers.
 - **Privacy.** Only an allowlist of attributes leaves the computer; strings
   go through the same rules as the server (`@mikka/protocol/tracing`
   `scrubString`), and paths under a home directory become `[home]`. No
-  prompts, file content, paths, environment variables, tokens or emails; no
-  span events or status messages. Tested in `packages/daemon/src/tracing.test.ts`.
-  The daemon traces only its own work, never what the user's Claude Code or
-  Codex does, and passes no trace context to agent CLIs.
+  prompts, model output, tool arguments, file content, environment variables,
+  credentials or emails leave the process. Bounded opaque IDs, model labels,
+  token/cache counts, timing and provider cost receipts are allowed. Startup
+  phase spans from #1505/#1508 and prompt hash/version metadata from #1506/#1500
+  remain available. CLI activity text is never telemetry. Tests cover this in
+  `packages/daemon/src/tracing.test.ts` and the adapter metric tests.
 
 ## Background work
 
@@ -150,10 +161,10 @@ groups like a route.
 
 | Work | Label | Kind | Span |
 | --- | --- | --- | --- |
-| `after()` callbacks (coordinator wakes, live notifications, issue effects, webhook ingest, device wakes …) | `after:<job>` | `background` | New root span, linked to the request that scheduled it |
-| Fan-out a cron handler defers with `after()` | `cron:<name>/<part>` | `cron` | Same, root and linked |
+| `after()` callbacks (coordinator wakes, live notifications, issue effects, webhook ingest, device wakes …) | `after:<job>` | `background` | Child of the scheduling context, even after the response ends; a root only when no valid parent exists |
+| Fan-out a cron handler defers with `after()` | `cron:<name>/<part>` | `cron` | Continues the scheduling trace |
 | Cron handlers (`app/api/cron/*`: run recovery and lease sweeps, coordinator wake recovery, the ops/egress monitor …) | `cron:<name>` | `cron` | Child of the cron request's span |
-| Workflow steps (every `'use step'` body) | `workflow:<workflow>/<step>` | `workflow` | Inside the step delivery request, under the SDK's own `step.execute` spans |
+| Workflow steps (every `'use step'` body) | `workflow:<workflow>/<step>` | `workflow` | Continues the durable SDK trace carrier, including opaque Mikka correlation IDs |
 
 - Schedule deferred work with `afterJob('after:<job>', task)` from
   `lib/background.ts`, never the `next/server` compatibility adapter's `after`
@@ -170,12 +181,16 @@ groups like a route.
   `retainContext`, which binds outside the job. The only bare `after()` calls left hand over promises
   already running in their webhook (Slack, Telegram) or flush analytics.
 - Wrap a cron handler with `cronJob('<name>', handler)`.
-- Workflow steps need nothing: the label comes from the step context the
-  Workflow SDK runs every step body in (`getStepMetadata()`'s
-  AsyncLocalStorage).
+- Workflow step labels still come from `getStepMetadata()`. The registered
+  propagator also serializes the bounded Mikka carrier with the Workflow SDK's
+  durable `traceCarrier`, so later deliveries rejoin the originating trace.
+  SDK span names are normalized to `workflow.execute` and `step.execute`;
+  bounded workflow/step names remain in `mikka.workflow` and `mikka.step`.
+  The exporter normalizes these after the SDK has populated its attributes,
+  and the correlated Logs use the same names.
 - Job names are fixed strings, never ids or user data.
-- Root job spans are head sampled at `MIKKA_TRACE_SAMPLE_RATE` like a
-  request, independently of it; child job spans follow their request.
+- Coordinator, dispatch, run, Factory and computer jobs are critical paths.
+  Unrelated root jobs use the ordinary rate; child jobs retain their ancestry.
 
 `requireParentSpan` stays on, so a statement outside every span is still not
 traced. Turning it off would make each such statement its own single-span
@@ -200,8 +215,10 @@ get the database spans themselves rather than their traces:
 ```
 
 `apm-attributes-list` and `apm-attribute-values-list` list the attribute keys
-and values; `apm-trace-get` returns one trace's tree. Counts are sampled:
-multiply by `1 / MIKKA_TRACE_SAMPLE_RATE` for totals.
+and values; `apm-trace-get` returns one trace's tree. Counts now mix full
+retention and sampling. Estimate totals with each span's
+`1 / mikka.trace.sample_rate`, not a single global multiplier; historical
+records without that field use the previous 0.1 rate.
 
 ## Dashboard and alerts
 
@@ -212,9 +229,13 @@ collection health lives on the
 
 Read every number on it this way:
 
-- **Counts are sampled.** Traces are kept at 10% (`MIKKA_TRACE_SAMPLE_RATE`).
-  `sampled_*` columns are what arrived; `estimated_*_x10` multiply by 10 and
-  are what the charts draw. If the sample rate changes, the ×10 is wrong.
+- **Counts use per-span weights.** Critical spans and retained errors/slow
+  requests have rate 1; ordinary retained spans normally have rate 0.1.
+  `sampled_*` columns are what arrived; `estimated_*_weighted` sum
+  `1 / coalesce(toFloatOrNull(attributes['mikka.trace.sample_rate']), 0.1)`.
+  The 0.1 fallback preserves the historical convention, including old explicit
+  acceptance traffic whose original rate was not recorded. Missing telemetry
+  cannot be reconstructed by this estimator.
 - **Bytes are not Neon's bytes.** `mikka.db.response_bytes_approx` is the
   JSON size of the returned rows, estimated from the first 50 rows. It ranks
   routes and statements; it is not network transfer and not the bill. The
@@ -247,9 +268,9 @@ error code and its numbers.
 | --- | --- | --- |
 | Mikka transfer reaches 50% of 500 GB plan allowance | The billing period's Neon transfer reaches 50% of the Launch plan's 500 GB (`monthly-budget.sql`) | The threshold `upper: 0.5` in `ALERTS` |
 | Mikka monitoring collection failed or heartbeat absent | No healthy ops snapshot in the last hour (`heartbeat.sql`) | — |
-| [1324] Mikka 来源数据库小时异常 | One `mikka-web` route's sampled DB queries in the last full UTC hour exceed `max(3 × its 7-day hourly median, 200)` (≈2,000 real queries), or its sampled JSON bytes exceed `max(3 × median, 1 MB)` (≈10 MB). Needs 24 observed hours of history; bytes only when ≥95% of the hour's queries carry a size (`alert-source-anomaly.sql`) | `3 *` (the multiple) and the floors `200` / `1000000` in `metrics`; `covered_hours >= 24` for warm-up |
+| [1324] Mikka 来源数据库小时异常 | One `mikka-web` route's weighted DB queries in the last full UTC hour exceed `max(3 × its 7-day hourly median, 2000)`, or its weighted JSON bytes exceed `max(3 × median, 10 MB)`. Needs 24 observed hours; bytes require ≥95% weighted coverage (`alert-source-anomaly.sql`) | `3 *` and the floors `2000` / `10000000` in `metrics`; `covered_hours >= 24` for warm-up |
 | [1324] Mikka 日速率外推超过500GB月额度 | Today's Neon transfer so far, scaled to 24 h and to the month's days, exceeds 500 GB. Only from 03:00 UTC, with a snapshot ≤60 min and provider data ≤180 min old (`alert-daily-pace.sql`) | `500000000000` (the allowance) and `utc_hours >= 3` |
-| [1324] Mikka 错误码小时突增 | One service's error spans for one code in the last full UTC hour exceed `max(3 × its 7-day hourly median, 5)` (≈50 real spans), after 24 observed hours (`alert-error-spike.sql`) | `3 *` and the floor `5` in `metrics` |
+| [1324] Mikka 错误码小时突增 | One service's weighted error spans for one code in the last full UTC hour exceed `max(3 × its 7-day hourly median, 50)`, after 24 observed hours (`alert-error-spike.sql`) | `3 *` and the floor `50` in `metrics` |
 
 Every alert query returns exactly one row and the alert reads it
 (`first_row`). PostHog refuses an `any_row` alert whose query its `LIMIT`
@@ -279,10 +300,182 @@ Edit the definitions or SQL in a PR, then apply once it merges. A change made
 in the PostHog app shows as drift in the next `--check`; copy it back into the
 repository or it is overwritten on the next `--apply`.
 
+
+## One run, one trace (#1512)
+
+The W3C `traceparent` is the parent relationship. The separate bounded carrier
+in `@mikka/protocol/trace-context` adds the lookup keys below. It travels through
+the Workflow SDK's durable carrier, dispatch payload, E2B bootstrap/registration,
+daemon run and completion delivery. It contains no authorization material.
+Do not put IDs into span names: names describe fixed operations and the IDs
+belong in attributes.
+
+| Carrier field | Span/log attribute |
+| --- | --- |
+| `runId` | `mikka.run_id` |
+| `threadId` | `mikka.thread_id` |
+| `taskId` | `mikka.task_id` |
+| `taskNumber` | `mikka.task_number` |
+| `workflowRunId` | `mikka.workflow_run_id` |
+| `posthogDistinctId` | `posthogDistinctId` |
+| `sessionId` | `sessionId` |
+
+A selected run must show its API/Coordinator entry, Workflow turn and dispatch,
+`ensureThreadMachine`, E2B create/boot, daemon registration, repository/worktree
+preparation, adapter start, first generation, completion and delivery/Factory
+work in one parent tree. Existing startup phase spans remain nested beneath the
+run, rather than becoming isolated startup traces.
+
+### AI Observability
+
+`lib/tracing/ai.ts` observes each actual provider invocation, including stream
+completion/cancellation and retries, with a `mikka.ai.generation` span and one
+`$ai_generation` event. It reuses the application's trace provider and captures
+only numeric receipts and bounded metadata. Coordinator, bot, Decision,
+compaction, title/profile and daemon agent calls use the same convention.
+
+- `$ai_trace_id` equals the surrounding W3C trace ID (32 lowercase hex
+  characters); `$ai_span_id` and `$ai_parent_id` preserve span ancestry.
+- Latency and time to first token use seconds on PostHog's standard
+  `$ai_latency` / `$ai_time_to_first_token` properties. Mikka's
+  `mikka.ai.latency_ms` / `mikka.ai.ttft_ms` are milliseconds.
+- Input/output, cache-read and cache-write tokens use PostHog's standard
+  numeric fields. Missing provider usage stays absent, not a fabricated zero.
+  `$ai_cache_reporting_exclusive=false` records that input totals include
+  cached tokens.
+- Tier, effort, their score/confidence and the ZeroCat/Gateway/fallback route
+  are attributes. Prompt content, output content and tool arguments are never
+  included.
+- Real Gateway/ZeroCat/provider cost receipts set `$ai_total_cost_usd` and
+  `$ai_cost_passthrough=true`. A subscription without an actual per-call cost
+  omits that receipt. PostHog may display a model-catalog estimate from usage;
+  label that as an estimate, not the subscription bill or cash charged by a
+  provider. Unknown cost is not zero.
+
+See PostHog's [APM/AI linkage](https://posthog.com/docs/distributed-tracing/link-ai-observability)
+and [AI traces](https://posthog.com/docs/ai-observability/traces).
+
+### Structured Logs
+
+Web and daemon log exporters send OTLP/HTTP protobuf to
+`https://us.i.posthog.com/i/v1/logs`, using the existing project token in
+`Authorization: Bearer`. For a custom trace collector the logs endpoint is
+derived by replacing the final `/traces` with `/logs`. Never use a personal
+API key or a token in the endpoint URL.
+
+The log's native OTel `trace_id` and `span_id` come from the span context;
+copying them only into an arbitrary attribute would not establish the native
+APM link. `service.name` is a resource attribute. Stage records carry
+`mikka.stage`, `mikka.duration_ms`, the carrier IDs and allowlisted error
+type/code fields. Bodies are the fixed strings `mikka.stage.completed` or
+`mikka.stage.failed`; free-form messages and cause messages are excluded.
+Ordinary successful SQL spans are APM-only.
+
+Batching, bounded queues, exporter timeouts and an outage circuit breaker keep
+telemetry off the business response path. No log export adds a database query
+or an application polling loop. See the official [Node.js Logs guide](https://posthog.com/docs/logs/installation/nodejs).
+
+### Browser context and masked Replay
+
+`instrumentation-client.ts` restricts `tracing_headers` to Mikka's frontend/API
+hostnames. The SDK adds `X-POSTHOG-DISTINCT-ID` and `X-POSTHOG-SESSION-ID`;
+the API validates the opaque IDs and records `posthogDistinctId` / `sessionId`.
+These headers are attribution, not authentication. They must not be sent to
+arbitrary third-party hosts.
+
+Session Replay is enabled with all input/text/element attributes masked, media,
+canvas, iframes and editable elements blocked, console recording off, and network
+headers/bodies/performance capture off. The URL sanitizer removes query strings,
+fragments and identifier segments. Live-channel `status` / `message` handling
+records only event kind, allowed key names and receive/skip state, never payload
+content. See [Replay privacy](https://posthog.com/docs/session-replay/privacy).
+
+On 2026-11-06 the project received only these explicit settings changes:
+`session_recording_opt_in=true`, `capture_console_log_opt_in=false`,
+`capture_performance_opt_in=false`. The existing masking/network configuration
+objects and sampling/retention settings were preserved; the SDK supplies the
+stricter local policy before capture.
+
+## Saved runtime timeline and scouts
+
+Production is PostHog US project **670821 (Mikka)**, timezone **Asia/Shanghai**.
+Saved SQL tables label their times in **UTC**.
+
+| Entry | Purpose |
+| --- | --- |
+| [运行时间线](https://us.posthog.com/project/670821/notebooks/C9vQAc1L) | Recent traces, complete selected span timeline and correlated structured logs |
+| [数据库与错误 dashboard](https://us.posthog.com/project/670821/dashboard/2306506) | Weighted source/route/statement/error analysis |
+| [采集健康 dashboard](https://us.posthog.com/project/670821/dashboard/2297143) | Collection health and supplier transfer budgets |
+| [PostHog Inbox](https://us.posthog.com/project/670821/inbox) | Findings from automatic APM and AI scouts |
+
+In the notebook, fill at least one of `run_id`, `thread_id`, `task_id` or
+`trace_id` and run all SQL cells. Multiple nonempty IDs match with OR; all spans
+of each matched trace then appear, including ancestors that do not carry the
+particular ID. `lookback_hours` defaults to 24 and is bounded to 1–336 hours,
+matching the standard 14-day tracing retention. Clear all IDs to browse only
+the recent-trace entry list. Queries use bound variables and omit SQL bodies,
+model input/output and free-form log messages. A lookup is bounded to 100 matched
+traces, 2,000 spans and 1,000 logs; narrow the window or use one trace ID if a
+limit is reached, and inspect the full trace in APM. The notebook uses SQL only
+and does not provision a Python sandbox.
+
+The live HogQL tables are `posthog.trace_spans` and `logs`. Their native
+`trace_id` / `span_id` strings are base64; display hex with
+`lower(hex(base64Decode(trace_id)))`. Native APM tools accept hex trace IDs.
+The notebook converts the supplied hex back with `base64Encode(unhex(...))`;
+join the native trace columns directly, without decoding both join sides.
+
+| Scout | Configuration ID | Schedule / output |
+| --- | --- | --- |
+| APM regression | `01a1b247-0a2c-7611-9061-0f7e791cfd2e` | Enabled, every 1440 minutes, emit to Inbox |
+| AI observability | `01a1b247-09d7-7388-be42-a8d96310c44b` | Enabled, every 1440 minutes, emit to Inbox |
+
+Both use the canonical PostHog skills and their default activity prechecks:
+APM requires spans within 24 hours; AI requires AI events within 7 days.
+No-data skips are expected, not successful generation acceptance. Other
+canonical scouts remain paused. The APM precheck passed and the initial manual
+run completed without an error on 2026-11-06 (19:21:17–19:27:00 UTC), emitting no
+findings. AI had no events before the #1512 deployment.
+The configuration is permanent monitoring; no Slack/webhook destination or
+automatic repository write permission was added.
+
+### Acceptance evidence
+
+A pre-deployment baseline on 2026-11-06 found 77,527 web spans and 761 daemon
+spans in 24 hours; 759 daemon spans were roots. Logs service discovery was
+empty, AI event usage was zero, and Replay usage was zero. These are baseline
+observations, not proof that the new production path passed.
+
+After deployment, record the deployed commit and UTC window, one Coordinator
+trace and one real dispatch run with run/thread/task IDs. Verify all required
+stages, native log linkage, AI generations and masked Replay from those IDs.
+Record a controlled failure with retained rate 1, both scout configurations and
+the notebook result. Include actual PostHog URLs and screenshots/native exports
+in the PR. A client hash, a mocked collector or a successful notebook query alone
+does not close #1512.
+
+PostHog provides native PNG exports for saved insights/dashboards through
+`POST /api/projects/670821/exports/` and
+`GET /api/projects/670821/exports/:id/content/`, with `export:write/read`
+access. This does not establish support for exporting an arbitrary APM or
+Replay detail page; do not relabel a reconstructed chart as a UI screenshot.
+See the [exports API](https://posthog.com/docs/api/exports).
+
 ## Sampling and cost
 
-- Head sampling per trace, `MIKKA_TRACE_SAMPLE_RATE` (0–1), default `0.1`. A
-  caller's `traceparent` cannot force a trace to be kept.
+- Critical Coordinator/dispatch/run/Workflow paths are retained at 100%.
+  Ordinary traffic uses `MIKKA_TRACE_SAMPLE_RATE` (0–1), default `0.1`; an
+  arbitrary remote caller cannot force retention through the sampled flag.
+- Ordinary noncritical requests are recorded locally until their local tree
+  ends. Errors, HTTP failures and requests at least 1000 ms are promoted with
+  `mikka.trace.retention=error_or_slow` and `mikka.trace.sample_rate=1`.
+  This includes requests selected by the initial head sample, so all retained
+  failures use their effective rate of 1. A critical child also retains its
+  buffered ordinary parent tree with `mikka.trace.retention=critical_child`.
+  This local tail buffer is bounded to 256 concurrent traces and 512 spans per
+  trace. Critical traces bypass it. These limits bound memory but can truncate
+  ordinary traces under overload; the production acceptance must verify a
+  controlled failure and a critical run, not infer coverage from configuration.
 - `0` or a missing PostHog project token turns tracing off: no provider is
   registered. `NODE_ENV=test` and CI without `VERCEL` force the rate to 0;
   the historical `NEXT_PHASE=phase-production-build` guard does too. Nitro
@@ -296,6 +489,61 @@ repository or it is overwritten on the next `--apply`.
   exporter's own bounded 5 s attempt.
 - The tracer makes no database queries and does not change SQL (no
   sqlcommenter), so `pg_stat_statements` groups as before.
+
+### Cost baseline and bounds (2026-11-06)
+
+The billing API reported the free plan, **89 MB** of combined Logs/Tracing in the
+current billing period, and **73 MB** of traces on 2026-11-05. AI events and
+recordings were zero before the new instrumentation. Billing usage can lag
+ingestion; a single observed day is not a peak-capacity forecast.
+
+| Product | Current published allowance and first paid tier |
+| --- | --- |
+| Logs + Tracing, shared ingestion | 10 GB/month free; $0.25/GB from 10–300 GB, then $0.15/GB |
+| Retention | 14 days standard; custom retention $0.05/GB per month retained |
+| AI Observability | 100,000 events/month free; then starts at $0.000350/event, decreasing with volume |
+| Web Session Replay | 5,000 recordings/month free; then starts at $0.0050/recording |
+| Self-driving / Inbox | Outcome pricing: $15 per actionable PR; reports without a code-change PR are free. The account shows 4,500 free Inbox credits, equivalent to three PRs |
+
+Sources: [Logs/Tracing pricing](https://posthog.com/logs/pricing),
+[retention](https://posthog.com/docs/logs/pricing),
+[AI pricing](https://posthog.com/ai-observability/pricing),
+[Replay pricing](https://posthog.com/session-replay/pricing), and
+[Self-driving pricing](https://posthog.com/docs/self-driving/pricing).
+No paid plan or retention upgrade was made for #1512.
+
+For a 30-day planning example, 73 MB/day is **2.19 GB/month** at the former
+sampling mix. If a fraction `f` of that represented traffic changes from 10%
+to 100% retention, the existing-span estimate is
+`2.19 × (1 + 9f) GB/month`. This is a scenario calculation: it assumes the
+same traffic, bytes per span and prior 10% rate. It excludes new spans/logs and
+changes in workload or tail-retained error/slow traffic.
+
+- At an assumed `f=0.10`, the estimate is **4.16 GB/month**. An illustrative
+  100 runs/day with 25 additional spans + 10 stage logs per run at 1 KB each
+  adds **0.105 GB/month**, for **4.27 GB/month** combined.
+- A deliberately broad bound where all represented traffic becomes 100% is
+  **21.9 GB/month** before new telemetry: about **$2.98/month** ingestion on a
+  paid plan. This account remains on its 10 GB free cap, so that number is a
+  paid-plan equivalent, not authorization to increase spending or a forecast
+  of an automatic charge.
+- At 100 runs/day and five captured model calls per run, generation events
+  alone are **15,000/month**; additional `$ai_*` events also count. At 100
+  browser sessions/day, Replay is **3,000/month**. These planning volumes
+  remain below their respective allowances, but are not measured demand.
+
+Recheck the observed bytes, AI events and recordings after production acceptance
+with `billing-usage-get` and `billing-overview-get`. Do not apply the tracing
+multiplier to AI-event or Replay pricing.
+
+### Local overhead evidence
+
+The #1518 AI wrapper microbenchmark on Node 24.22.1, after warm-up over 3,000
+generations, measured mean **0.0359 ms**, p95 **0.0604 ms** and p99 **0.1571 ms**
+per generation. It included JSON capture and OTel batching, and excluded the
+network, database and actual model request. It does not measure full production
+request overhead or tail-buffer memory under sustained concurrency; production
+acceptance records those limits separately.
 
 ## Configuration
 
@@ -318,7 +566,12 @@ in `lib/tracing/tracing.test.ts` with the real `pg` driver and instrumentation.
 - Emails and IP addresses in any kept string become `[email]` / `[ip]`.
 - Exception messages, stack traces and status messages are dropped (database
   errors echo values); only the exception type is kept.
-- No person or session linking: spans carry no user id, email or token.
+- Correlation uses bounded opaque `mikka.run_id`, `mikka.thread_id`,
+  `mikka.task_id`, `mikka.task_number`, `mikka.workflow_run_id`,
+  `posthogDistinctId` and `sessionId`; they identify telemetry, never authorize
+  a request. Emails, IPs, credential-like values and free-form strings are
+  rejected. Session Replay masks all text, inputs and element attributes and
+  blocks media, canvas, iframes and editable content.
 
 Adding an attribute means adding its key to the allowlist in `sanitize.ts`
 and a case to the privacy test.

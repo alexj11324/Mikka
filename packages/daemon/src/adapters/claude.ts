@@ -20,6 +20,7 @@ import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { join } from "node:path"
 import { daemonTracer, runIdHash } from "../tracing"
+import { ClaudeGenerationMetrics } from './generation-metrics'
 import type { Readable, Writable } from "node:stream"
 
 import {
@@ -584,9 +585,12 @@ export class ClaudeAdapter implements AgentAdapter {
       child.once("exit", off)
       return child
     }
+    const traceContext = options.traceContext ?? daemonTracer.capture()
+    const generations = new ClaudeGenerationMetrics(metrics => daemonTracer.generation(metrics, traceContext))
     const session = query({
       prompt: prompts,
       options: {
+        includePartialMessages: daemonTracer.enabled,
         cwd: ctx.worktree,
         // Replaces the environment: the CLI sees the run's clean env only.
         env: {
@@ -695,6 +699,7 @@ export class ClaudeAdapter implements AgentAdapter {
     void (async () => {
       try {
         for await (const message of session) {
+          generations.observe(message)
           if (
             options.requireSessionResume &&
             "session_id" in message &&
@@ -752,6 +757,7 @@ export class ClaudeAdapter implements AgentAdapter {
         }
         if (!ending) diedEarly(stderrTail())
       } catch (error) {
+        generations.fail()
         if (!ending) diedEarly(errorMessage(error), claudeProviderException(error))
       } finally {
         clearTimeout(authTimer)

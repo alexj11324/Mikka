@@ -840,7 +840,6 @@ export class RunSupervisor {
     report: HandoffReport = baseReport(error),
   ) {
     this.active.get(runId)?.toolApproval?.revoke()
-    this.active.get(runId)?.span?.set("mikka.outcome", stopReason)
     // Report collection and capture uploads can await after the provider's
     // terminal event. A stop received in that interval still owns completion.
     const active = this.active.get(runId)
@@ -911,6 +910,10 @@ export class RunSupervisor {
         waitingQuestionId: report.question.questionId,
       })
     }
+    // A provider's terminal failure is an ordinary iterator result, not a
+    // throw. Mark its run span explicitly without passing private CLI text.
+    if (state === 'failed') active?.span?.fail({ name: 'RunFailure' }, stopReason)
+    else active?.span?.set('mikka.outcome', stopReason)
     this.setState(runId, state, {
       stopReason,
       ...(error ? { error } : {}),
@@ -1215,11 +1218,12 @@ export class RunSupervisor {
       abort: new AbortController(),
     }
     this.active.set(runId, run)
-    const harness = this.deps.journal.get(runId)?.assignment.harness
-    run.done = daemonTracer.span("daemon.run", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": harness }, span => {
+    const assignment = this.deps.journal.get(runId)?.assignment
+    const harness = assignment?.harness
+    run.done = daemonTracer.span("daemon.run", { "mikka.run_id": runId, "mikka.run.id_hash": runIdHash(runId), "mikka.harness": harness }, span => {
       run.span = span
       return this.drive(runId, repo, run)
-    }, { root: true })
+    }, { root: true, traceContext: assignment?.traceContext })
       .catch(async (error: unknown) => {
         const message = error instanceof Error ? error.message : String(error)
         this.deps.log.error({ run_id: runId, err: error }, "run failed")
@@ -1244,7 +1248,12 @@ export class RunSupervisor {
         run.toolApproval?.revoke()
         try { await this.closeMailbox(run) }
         catch { this.deps.log.warn('Run mailbox shutdown failed') }
-        finally { clearTimeout(run.cancelTimer); this.active.delete(runId) }
+        finally {
+          clearTimeout(run.cancelTimer); this.active.delete(runId)
+          // Start draining all three telemetry queues before an idle cloud VM
+          // can pause; the completed run never waits for the collector.
+          void daemonTracer.flush()
+        }
       })
   }
 
@@ -1407,6 +1416,7 @@ export class RunSupervisor {
       if (followUp) followUp = await materializeChatFiles(followUp, directory, download)
     }
     const options = {
+      traceContext: daemonTracer.capture(),
       // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
       github: assignment.github && assignment.mcp
         ? { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId } : undefined,

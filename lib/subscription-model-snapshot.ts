@@ -118,12 +118,13 @@ export async function resolveFrozenHostedModel(scope: HostedModelScope, runtime:
     defaultModel: () => { throw refuse() }, subscriptionService: () => service, workspace: dependencies.workspace,
   })
   await verify()
-  if (typeof model === 'string') throw refuse()
-  return new Proxy(model, { get(target, property) {
+  if (typeof model === 'string' || model.specificationVersion !== 'v4') throw refuse()
+  const { observedModel } = await import('./tracing/ai')
+  return observedModel(new Proxy(model, { get(target, property) {
     const member = Reflect.get(target, property, target)
     if ((property === 'doStream' || property === 'doGenerate') && typeof member === 'function') {
       return async (...args: unknown[]) => { await verify(); return Reflect.apply(member, target, args) }
     }
     return member
-  } })
+  } }), { modelId: frozen.modelId, userId: scope.ownerId, route: 'subscription', provider: frozen.route === 'claude_cpa' ? 'anthropic' : 'openai', operation: frozen.coordinator ? 'coordinator' : 'bot' })
 }

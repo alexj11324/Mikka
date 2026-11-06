@@ -10,6 +10,7 @@ import { codexQuotaSignal, mergeQuota, type CodexRateLimits, type QuotaSignal } 
 // `sessions` into its own before `thread/resume`.
 import { delimiter, dirname, isAbsolute, join, relative } from "node:path"
 import { daemonTracer, runIdHash } from "../tracing"
+import { CodexGenerationMetrics } from './generation-metrics'
 
 import type { MessageConnection } from "vscode-jsonrpc/node"
 
@@ -482,6 +483,8 @@ export class CodexAdapter implements AgentAdapter {
     let quota: QuotaSignal | undefined
     let rateLimits: CodexRateLimits | undefined
     let usage = { inputTokens: 0, outputTokens: 0 }
+    const traceContext = options.traceContext ?? daemonTracer.capture()
+    const generations = new CodexGenerationMetrics(metrics => daemonTracer.generation(metrics, traceContext))
     const pendingMcp = new Map<string,{turnId:string;server:string;tool:string;attempted:boolean}>()
     // Match the host-created MCP server's advertised capabilities. A fixed
     // check may inspect its artifact, but cannot select another repository.
@@ -596,6 +599,7 @@ export class CodexAdapter implements AgentAdapter {
           return
         }
         case "item/agentMessage/delta": {
+          generations.firstToken()
           const { itemId, delta } = params as DeltaNotification
           if (!streamed.has(itemId)) {
             streamed.add(itemId)
@@ -605,6 +609,7 @@ export class CodexAdapter implements AgentAdapter {
           return
         }
         case "item/reasoning/summaryTextDelta": {
+          generations.firstToken()
           const { itemId, delta } = params as DeltaNotification
           if (!streamed.has(itemId)) {
             streamed.add(itemId)
@@ -636,7 +641,10 @@ export class CodexAdapter implements AgentAdapter {
           if (!options.mailbox) activeTurn = (params as TurnNotification).turn.id
           return
         case "thread/tokenUsage/updated": {
-          const { total } = (params as TokenUsageNotification).tokenUsage
+          const notification = params as TokenUsageNotification
+          if (notification.threadId !== sessionId) return
+          const { total } = notification.tokenUsage
+          generations.observe(notification.tokenUsage, runtimeModel)
           usage = {
             inputTokens: total.inputTokens,
             outputTokens: total.outputTokens,
@@ -679,6 +687,7 @@ export class CodexAdapter implements AgentAdapter {
     rpc.listen()
 
     const turnCompleted = async (turn: TurnNotification["turn"]) => {
+      generations.endTurn()
       for (const [id,item] of pendingMcp) if (item.turnId === turn.id) pendingMcp.delete(id)
       queue.chunk({
         type: "data-usage",
@@ -747,6 +756,7 @@ export class CodexAdapter implements AgentAdapter {
       if (verify) {
         try { await daemonTracer.span("daemon.adapter.account_check", { "mikka.harness": "codex", "mikka.run.id_hash": runIdHash(options.runId) }, () => verify()) } catch (error) { throw new Error(SUBSCRIPTION_AUTH_ERROR, { cause: error }) }
       }
+      generations.startTurn()
       const result = rpc.sendRequest<{ turn: { id: string } }>("turn/start", {
         threadId: sessionId,
         input: text(message),

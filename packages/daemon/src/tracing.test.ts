@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest"
+import { InMemoryLogRecordExporter } from "@opentelemetry/sdk-logs"
 import { ExportResultCode } from "@opentelemetry/core"
 import { InMemorySpanExporter, type ReadableSpan, type SpanExporter } from "@opentelemetry/sdk-trace-base"
 import { CodedError } from "@mikka/protocol/coded-error"
 import { HttpServerLink } from "./server-link-http"
+import type { RunTraceContext } from '@mikka/protocol/trace-context'
+import type { generationEvent } from './tracing-ai'
 import { DaemonTracer, daemonSampleRate, daemonTracer, routeTemplate, runIdHash, SafeExporter, STARTUP_TIMING_PHASE_LIMIT, type DaemonStartupTiming, type TraceSettings } from "./tracing"
 
 const settings: TraceSettings = { endpoint: "https://us.i.posthog.com/i/v1/traces", projectToken: "phc_testtoken123", sampleRate: 1, environment: "dev" }
@@ -11,10 +14,72 @@ const deviceId = "6f1c1f1e-3a5b-4c8d-9e0f-1a2b3c4d5e6f"
 afterEach(async () => { await daemonTracer.shutdown() })
 
 describe("daemon tracing", () => {
+  it('retains complete critical runs without an incoming parent even at a tiny background rate', async () => {
+    const spans = new InMemorySpanExporter(), tracer = new DaemonTracer()
+    tracer.configure({ ...settings, sampleRate: Number.MIN_VALUE }, { exporter: spans, logExporter: new InMemoryLogRecordExporter(), aiSink: null, env: {} })
+    await tracer.span('daemon.registration', {}, async () => {})
+    await tracer.span('daemon.run', { 'mikka.run_id': 'legacy_run' }, () => tracer.span('POST /v1/runs/[id]/complete', {}, async () => {}), { root: true })
+    await tracer.flush()
+    expect(spans.getFinishedSpans().map(span => span.name).sort()).toEqual(['POST /v1/runs/[id]/complete', 'daemon.registration', 'daemon.run'])
+    await tracer.shutdown()
+  })
+
+  it('continues a dispatched run through HTTP, stage logs and numeric AI events', async () => {
+    const spans = new InMemorySpanExporter(), logs = new InMemoryLogRecordExporter()
+    const events: NonNullable<ReturnType<typeof generationEvent>>[] = []
+    const carrier: RunTraceContext = { traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01',
+      runId: 'e8c2ff88-b000-4000-8000-000000000001', threadId: 'e8c2ff88-b000-4000-8000-000000000002',
+      taskId: 'e8c2ff88-b000-4000-8000-000000000003', workflowRunId: 'wfr_run123', posthogDistinctId: 'user_123', sessionId: 'browser_session123' }
+    daemonTracer.configure(settings, { exporter: spans, logExporter: logs, env: {}, aiSink: {
+      capture: event => { events.push(event) }, flush: async () => {}, shutdown: async () => {},
+    } })
+    const seen: Headers[] = []
+    const link = new HttpServerLink('https://mikka.test', async (_input, init) => { seen.push(new Headers(init?.headers)); return Response.json({ repos: [] }) })
+    await daemonTracer.span('daemon.run', {}, async () => {
+      await daemonTracer.span('daemon.adapter.start', {}, async () => { await link.listRepos(deviceId) })
+      daemonTracer.generation({ harness: 'claude_code', provider: 'anthropic', model: 'claude-haiku-5-5', inputTokens: 120, outputTokens: 25, cacheReadTokens: 100, ttftMs: 150, latencyMs: 500 })
+    }, { root: true, traceContext: carrier })
+    await daemonTracer.flush()
+    const finished = spans.getFinishedSpans(), run = finished.find(span => span.name === 'daemon.run')!
+    const generation = finished.find(span => span.name === 'daemon.ai.generation')!
+    expect(run.parentSpanContext?.spanId).toBe('0123456789abcdef')
+    expect(finished.every(span => span.spanContext().traceId === carrier.traceparent.slice(3, 35))).toBe(true)
+    expect(finished.every(span => span.attributes['mikka.run_id'] === carrier.runId)).toBe(true)
+    expect(seen[0].get('x-mikka-trace-runid')).toBe(carrier.runId)
+    expect(seen[0].get('x-mikka-trace-sessionid')).toBe(carrier.sessionId)
+    const records = logs.getFinishedLogRecords()
+    expect(records.length).toBe(3)
+    expect(records.every(record => record.spanContext?.traceId === run.spanContext().traceId)).toBe(true)
+    expect(records.every(record => record.body === 'mikka.stage.completed')).toBe(true)
+    expect(events).toHaveLength(1)
+    expect(events[0].properties).toMatchObject({ '$ai_trace_id': run.spanContext().traceId, '$ai_span_id': generation.spanContext().spanId,
+      '$ai_parent_id': run.spanContext().spanId, '$ai_session_id': carrier.sessionId, '$ai_input_tokens': 120,
+      '$session_id': carrier.sessionId, '$ai_time_to_first_token': 0.15, '$ai_latency': 0.5, '$ai_cache_reporting_exclusive': false })
+    expect(events[0].properties).not.toHaveProperty('$ai_input')
+    expect(events[0].properties).not.toHaveProperty('$ai_output_choices')
+  })
+
+  it('drops unsafe carrier metadata and exports bounded error causes without messages', async () => {
+    const spans = new InMemorySpanExporter(), logs = new InMemoryLogRecordExporter(), tracer = new DaemonTracer()
+    tracer.configure(settings, { exporter: spans, logExporter: logs, aiSink: null, env: {} })
+    const carrier = { traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01', runId: 'run_safe',
+      sessionId: 'alice@example.com', posthogDistinctId: 'phx_private_key', prompt: 'private prompt' } as RunTraceContext
+    const error = new CodedError('subscription_local_runtime_unavailable', { detail: 'adapter_start_failed', cause: new Error('private prompt and sk-private') })
+    await expect(tracer.span('daemon.adapter.start', {}, async () => { throw error }, { traceContext: carrier })).rejects.toBe(error)
+    await tracer.flush()
+    const [record] = logs.getFinishedLogRecords()
+    expect(record.body).toBe('mikka.stage.failed')
+    expect(record.spanContext?.traceId).toBe(carrier.traceparent.slice(3, 35))
+    expect(record.attributes['mikka.error.causes']).toBeDefined()
+    const payload = JSON.stringify({ attributes: record.attributes, spans: spans.getFinishedSpans().map(span => span.attributes) })
+    for (const secret of ['alice', 'phx_', 'private prompt', 'sk-private']) expect(payload).not.toContain(secret)
+    await tracer.shutdown()
+  })
+
   it("exports only allowlisted, scrubbed attributes", async () => {
     const memory = new InMemorySpanExporter()
     const tracer = new DaemonTracer()
-    expect(tracer.configure(settings, { exporter: memory, env: {} })).toBe(true)
+    expect(tracer.configure(settings, { exporter: memory, logExporter: new InMemoryLogRecordExporter(), aiSink: null, env: {} })).toBe(true)
     await tracer.span("daemon.run /Users/alex/secret-project", {
       "mikka.run.id_hash": runIdHash("run_1"),
       "mikka.harness": "claude_code",
@@ -39,7 +104,7 @@ describe("daemon tracing", () => {
   it("records a failed operation by error code, never its message, and rethrows unchanged", async () => {
     const memory = new InMemorySpanExporter()
     const tracer = new DaemonTracer()
-    tracer.configure(settings, { exporter: memory, env: {} })
+    tracer.configure(settings, { exporter: memory, logExporter: new InMemoryLogRecordExporter(), aiSink: null, env: {} })
     const error = new CodedError("subscription_local_runtime_unavailable", { detail: "adapter_start_failed", cause: new Error("spawn /Users/alex/.local/bin/claude ENOENT") })
     await expect(tracer.span("daemon.adapter.start", { "mikka.harness": "claude_code" }, async () => { throw error })).rejects.toBe(error)
     await tracer.flush()
@@ -55,7 +120,7 @@ describe("daemon tracing", () => {
 
   it("joins /v1 calls to the active span with a traceparent the server continues", async () => {
     const memory = new InMemorySpanExporter()
-    daemonTracer.configure(settings, { exporter: memory, env: {} })
+    daemonTracer.configure(settings, { exporter: memory, logExporter: new InMemoryLogRecordExporter(), aiSink: null, env: {} })
     const seen: Headers[] = []
     const link = new HttpServerLink("https://mikka.test/mikka", async (_input, init) => {
       seen.push(new Headers(init?.headers))
@@ -83,7 +148,7 @@ describe("daemon tracing", () => {
     ]
     for (const exporter of exporters) {
       const tracer = new DaemonTracer()
-      tracer.configure(settings, { exporter, env: {} })
+      tracer.configure(settings, { exporter, logExporter: new InMemoryLogRecordExporter(), aiSink: null, env: {} })
       for (let i = 0; i < 5; i++) expect(await tracer.span("daemon.run", {}, async () => i)).toBe(i)
       await expect(tracer.span("daemon.run", {}, async () => { throw new TypeError("work failed") })).rejects.toThrow("work failed")
       const started = Date.now()

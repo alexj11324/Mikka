@@ -57,9 +57,10 @@ export class SafeExporter implements SpanExporter {
  * and the batch timer exports.
  */
 class FlushOnRootEnd implements SpanProcessor {
-  constructor(private readonly flush: () => Promise<void>) {}
+  constructor(private readonly flush: () => Promise<void>, private readonly serverless: boolean) {}
   onStart(): void {}
   onEnd(span: ReadableSpan): void {
+    if (!this.serverless) return
     // Deferred jobs can outlive an ended local request. Their flush is retained too.
     if (span.parentSpanContext && !span.parentSpanContext.isRemote && !String(span.attributes['mikka.route']).startsWith('after:')) return
     try { waitUntil(this.flush().catch(() => {})) } catch { /* not in a request */ }
@@ -68,9 +69,9 @@ class FlushOnRootEnd implements SpanProcessor {
   shutdown(): Promise<void> { return Promise.resolve() }
 }
 
-export type ProviderOptions = { exporter: SpanExporter; sampleRate: number; environment: TraceEnvironment; version?: string; logger?: Logger; batch?: { scheduledDelayMillis?: number } }
+export type ProviderOptions = { exporter: SpanExporter; sampleRate: number; environment: TraceEnvironment; version?: string; logger?: Logger; serverless?: boolean; batch?: { scheduledDelayMillis?: number } }
 
-export function createTracerProvider({ exporter, sampleRate, environment, version, logger, batch }: ProviderOptions): NodeTracerProvider {
+export function createTracerProvider({ exporter, sampleRate, environment, version, logger, serverless = process.env.VERCEL === '1', batch }: ProviderOptions): NodeTracerProvider {
   const batcher = new BatchSpanProcessor(exporter, { maxQueueSize: 2048, maxExportBatchSize: 512, scheduledDelayMillis: batch?.scheduledDelayMillis ?? 5_000, exportTimeoutMillis: 10_000 })
   return new NodeTracerProvider({
     resource: resourceFromAttributes({
@@ -80,7 +81,7 @@ export function createTracerProvider({ exporter, sampleRate, environment, versio
       'deployment.environment.name': environment,
     }),
     sampler: new RunSampler(sampleRate),
-    spanProcessors: [new RouteAttributesProcessor(), new RetainingSpanProcessor(batcher), ...(logger ? [new StageLogProcessor(logger)] : []), new FlushOnRootEnd(async () => { await Promise.allSettled([batcher.forceFlush(), flushTelemetry()]) })],
+    spanProcessors: [new RouteAttributesProcessor(), new RetainingSpanProcessor(batcher), ...(logger ? [new StageLogProcessor(logger)] : []), new FlushOnRootEnd(async () => { await Promise.allSettled([batcher.forceFlush(), flushTelemetry()]) }, serverless)],
   })
 }
 
@@ -112,7 +113,7 @@ export function startTracing(env: Record<string, string | undefined> = process.e
   const exporter = new SafeExporter(new OTLPTraceExporter({ url: settings.endpoint, headers: { Authorization: `Bearer ${settings.token}` }, timeoutMillis: 5_000 }))
   const logs = createLogProvider(settings)
   registerTelemetryFlush(() => logs.forceFlush({ timeoutMillis: 10_000 }))
-  const provider = createTracerProvider({ exporter, sampleRate: settings.sampleRate, environment: settings.environment, version: settings.version, logger: logs.getLogger('mikka.run') })
+  const provider = createTracerProvider({ exporter, sampleRate: settings.sampleRate, environment: settings.environment, version: settings.version, logger: logs.getLogger('mikka.run'), serverless: env.VERCEL === '1' })
   provider.register({ propagator: new CompositePropagator({ propagators: [new W3CTraceContextPropagator(), new RunContextPropagator()] }) })
   registerInstrumentations({ tracerProvider: provider, instrumentations: [createPgInstrumentation()] })
   return (global[started] = provider)
