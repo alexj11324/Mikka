@@ -80,7 +80,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
   }
   return <Auth registering={registering} addAccount={addAccount} next={returnPath}>
     <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={methods?.google ?? googleEnabled} githubEnabled={methods?.github ?? githubEnabled} emailEnabled={methods?.email ?? emailEnabled} showGoogleLinkHint={Boolean(error && (methods?.google ?? googleEnabled))} error={error} unverified={Boolean(error) && unverified} notice={notice} next={returnPath} onSubmit={submit} onGoogleSignIn={() => social('google')} onGitHubSignIn={() => social('github')} />
-    {target && <div className="flex max-w-[26rem] items-center gap-1 text-sm">
+    {target && <div data-desktop-only className="flex max-w-[26rem] items-center gap-1 text-sm">
       <ServerName server={target} />
       <Button type="button" variant="link" size="sm" disabled={pending} onClick={() => setChoosing(true)}>{serverT('change')}</Button>
     </div>}

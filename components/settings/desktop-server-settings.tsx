@@ -42,7 +42,7 @@ export function DesktopServerSettings() {
     finally { setPending(false) }
   }
 
-  return <>
+  return <div data-desktop-only className="contents">
     <SettingsSection id="desktop-server-heading" title={t('server')}>
       {rows.map(server => <SettingRow key={server.url} icon={<ServerIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />} title={label(server)} description={server.cloud ? undefined : new URL(server.url).host}>
         <div className="flex items-center gap-2">
@@ -66,5 +66,5 @@ export function DesktopServerSettings() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  </>
+  </div>
 }
