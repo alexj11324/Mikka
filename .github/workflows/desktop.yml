@@ -137,7 +137,7 @@ jobs:
   # Desktop release runs only on main; compile the Icon Composer bundle here so a
   # broken build/icon.icon or a runner without Xcode 26 fails on the pull request.
   icon:
-    runs-on: macos-15
+    runs-on: macos-26  # macos-15's Xcode 26.3 crashes compiling the glass layers of build/icon.icon
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
